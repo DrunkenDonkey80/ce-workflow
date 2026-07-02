@@ -1,0 +1,41 @@
+{
+  "name": "pi-work-orchestrator",
+  "version": "0.1.0",
+  "description": "Beads-backed Pi workflow package for staged software work orchestration.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "beads",
+    "subagents",
+    "workflow"
+  ],
+  "files": [
+    "agents/",
+    "prompts/",
+    "scripts/",
+    "skills/",
+    "README.md"
+  ],
+  "scripts": {
+    "verify": "node scripts/verify-package.mjs"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "subagents": {
+      "agents": [
+        "./agents"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "pi-subagents": "*"
+  }
+}
