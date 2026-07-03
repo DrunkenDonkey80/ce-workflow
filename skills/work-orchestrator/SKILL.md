@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents.
+Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents.
 
 ## Source of Truth
 
@@ -81,6 +81,31 @@ When the input points at a brainstorm or asks for a master plan, run `ce-plan` f
 
 Do not implement until the epic contains the master plan and durable executable Beads exist. Do not create duplicate task Beads for the same implementation unit.
 
+## Mode: migrate
+
+Use to import existing project state from CE brainstorms/plans, non-CE plans, TODOs, issue exports, docs, git history, and unfinished branches into Beads.
+
+Migration is read-only for source code and git history. Do not checkout, merge, rebase, delete branches, edit source files, stage, or commit. Run preflight, then inspect the requested artifacts and branch state:
+
+```bash
+git status --short --branch
+git branch --all --no-color --sort=-committerdate
+git log --all --decorate --date=short --pretty=format:'%h %ad %d %s' --max-count=80
+```
+
+1. Require the user to name the artifacts, branches, tracker export, or description to migrate. If scope is too vague, ask first.
+2. If the source is a clean CE brainstorm/plan with no partial implementation to reconcile, prefer `Mode: master` instead.
+3. Launch `bead-migrator` with the sources, current branch, suspected base branch, and instruction to mutate only Beads.
+4. `bead-migrator` creates or reuses exactly one epic unless the user asked for multiple epics.
+5. The epic notes must include provenance: artifacts read, branches inspected, current branch, base branch assumption, and migration date.
+6. Create closed child Beads only for completed units with strong evidence from artifacts plus code/commit/test evidence. Git log is evidence, not truth; never create one Bead per commit.
+7. Create open task/bug Beads for remaining work and decision Beads for ambiguity.
+8. For unmerged or stale branches, create review/integration Beads or decision Beads under the epic; never auto-merge or checkout branches during migration.
+9. If artifacts are messy but substantial, run `ce-plan` only to consolidate a reference plan, auto-accepting plan creation unless a real decision is needed, then store the resulting plan path in epic notes. Beads remains source of truth.
+10. After migration, show the created/reused epic ID and ask whether to start `Mode: resume` for that epic.
+
+Stop if completion evidence is weak but the user asked to mark work done, branch handling requires checkout/merge/rebase, artifact claims conflict with code, or dirty source changes make provenance unsafe.
+
 ## Mode: small
 
 Use for clear, low-risk changes in one or two files inside an existing epic.
@@ -141,9 +166,10 @@ Classify the task, then route:
 - med: bounded, some choices, fewer than about ten files;
 - debug: failing test, error, regression, stack trace, or broken behavior;
 - big: cross-cutting, high-risk, unclear, architecture/product decisions, or more than about ten files inside an existing epic;
-- master: new brainstorm, new product idea, or request to create a master plan/epic.
+- master: new brainstorm, new product idea, or request to create a master plan/epic;
+- migrate: existing partially completed project, legacy TODO/issue tracker, non-CE artifact set, or branch/history reconciliation.
 
-If classification is big, master, or ambiguous, ask before starting. Do not silently turn a vague request into an epic.
+If classification is big, master, migrate, or ambiguous, ask before starting. Do not silently turn a vague request into an epic.
 
 ## Mode: resume
 
@@ -153,7 +179,9 @@ When empty or `last`, resolve from Beads, not chat memory:
 
 1. in-progress epic in the current repo;
 2. latest not-completed epic with ready descendants;
-3. if ambiguous or no single latest epic can be found, list active not-completed epics and ask the user to pick one.
+3. if no single latest epic can be proven, list active not-completed epics and ask the user to pick one.
+
+Build the choice list with Beads commands such as `bd list --type=epic --status=open --json`, `bd list --type=epic --status=in_progress --json`, and `bd children <epic-id> --json` when available. The choice list must include, for each epic: Bead ID, created date, last worked date, status, ready/open/in-progress child counts when available, and a one-line description. Compute dates from Beads JSON fields such as `created_at`/`updated_at` when available; otherwise use child updates, notes, or `unknown`. Do not guess from chat memory.
 
 ## Mode: continue
 
@@ -196,7 +224,7 @@ Checkpoint and stop safely:
 
 Read-only report:
 
-- active epic or in-progress Beads;
+- active epic or in-progress Beads, with created date, last worked date, and one-line description;
 - ready Beads;
 - blocked Beads;
 - git status;
@@ -210,7 +238,7 @@ Use `pi-subagents` from the parent session. Children get concrete Bead IDs and m
 
 ## Cost and Model Policy
 
-Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Do not hard-code provider-specific models in this package.
+Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Do not hard-code provider-specific models in this package.
 
 ## Optional Intercom Coordination
 
@@ -220,6 +248,19 @@ Keep the parent/main orchestrator on the user's chosen model/effort. For role ag
 - `reason: "progress_update"` for short non-blocking updates when discovery changes the plan.
 
 The parent relays the question to the user when needed, records the answer in Bead notes, then resumes the role loop. If `contact_supervisor` is unavailable, times out, or delivery fails, the child must persist the blocker in Beads (decision Bead or notes) and stop safely. Do not require the user to install `pi-intercom`, do not ask the user directly from a child, and do not guess decisions just to keep the run moving.
+
+### bead-migrator
+
+Allowed to mutate Beads through `bd`. Must not edit source code or change git branches.
+
+Responsibilities:
+
+- read requested artifacts and git branch/history evidence;
+- create or reuse one migration epic with provenance notes;
+- create closed child Beads only for strongly evidenced completed units;
+- create open task/bug/decision Beads for remaining or ambiguous work;
+- represent unfinished branches as review/integration Beads or decision Beads, not automatic merges;
+- hand back the epic ID for `Mode: resume`.
 
 ### bead-planner
 

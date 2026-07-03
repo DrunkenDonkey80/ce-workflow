@@ -18,10 +18,10 @@ const RESET_ALL = "__reset_all__";
 const SLOTS = [
 	{
 		key: "plan",
-		label: "brainstorm/plan",
-		agents: ["bead-planner"],
+		label: "brainstorm/plan/migration",
+		agents: ["bead-planner", "bead-migrator"],
 		defaultThinking: "high",
-		description: "Slicing epics into executable Beads",
+		description: "Creating or importing epics and slicing executable Beads",
 	},
 	{
 		key: "work",
@@ -107,7 +107,8 @@ function slotSummary(slot, settings) {
 function itemMatchesFilter(item, filter) {
 	const terms = filter.toLowerCase().trim().split(/\s+/).filter(Boolean);
 	if (terms.length === 0) return true;
-	const haystack = `${item.label} ${item.value} ${item.description ?? ""}`.toLowerCase();
+	const haystack =
+		`${item.label} ${item.value} ${item.description ?? ""}`.toLowerCase();
 	return terms.every((term) => haystack.includes(term));
 }
 
@@ -135,9 +136,17 @@ async function pick(ctx, title, items, selectedValue) {
 		};
 
 		function rebuildList(preferredValue) {
-			const filteredItems = items.filter((item) => itemMatchesFilter(item, filter));
-			list = new SelectList(filteredItems, Math.min(filteredItems.length || 1, 12), listTheme);
-			const selectedIndex = filteredItems.findIndex((item) => item.value === preferredValue);
+			const filteredItems = items.filter((item) =>
+				itemMatchesFilter(item, filter),
+			);
+			list = new SelectList(
+				filteredItems,
+				Math.min(filteredItems.length || 1, 12),
+				listTheme,
+			);
+			const selectedIndex = filteredItems.findIndex(
+				(item) => item.value === preferredValue,
+			);
 			if (selectedIndex >= 0) list.setSelectedIndex(selectedIndex);
 			list.onSelect = (item) => done(item.value);
 			list.onCancel = () => done(null);
@@ -149,9 +158,16 @@ async function pick(ctx, title, items, selectedValue) {
 			render: (width) => [
 				...new DynamicBorder((text) => theme.fg("accent", text)).render(width),
 				...new Text(theme.fg("accent", theme.bold(title))).render(width),
-				...new Text(theme.fg("dim", `filter: ${filter || "(type to filter)"}`)).render(width),
+				...new Text(
+					theme.fg("dim", `filter: ${filter || "(type to filter)"}`),
+				).render(width),
 				...list.render(width),
-				...new Text(theme.fg("dim", "type to filter • backspace edit • ↑↓ navigate • enter select • esc cancel")).render(width),
+				...new Text(
+					theme.fg(
+						"dim",
+						"type to filter • backspace edit • ↑↓ navigate • enter select • esc cancel",
+					),
+				).render(width),
 				...new DynamicBorder((text) => theme.fg("accent", text)).render(width),
 			],
 			invalidate: () => list.invalidate(),

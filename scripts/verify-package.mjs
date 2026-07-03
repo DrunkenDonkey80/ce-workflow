@@ -104,6 +104,7 @@ check(
 );
 for (const mode of [
 	"master",
+	"migrate",
 	"small",
 	"med",
 	"big",
@@ -118,6 +119,7 @@ for (const mode of [
 	check(`skill defines mode: ${mode}`, skill.includes(`## Mode: ${mode}`));
 }
 for (const role of [
+	"bead-migrator",
 	"bead-planner",
 	"bead-worker",
 	"bead-reviewer",
@@ -151,6 +153,11 @@ for (const phrase of [
 	"brainstorm/plan",
 	"auto-accept plan creation",
 	"source brainstorm plus local plan path",
+	"git branch --all --no-color --sort=-committerdate",
+	"Git log is evidence, not truth",
+	"unmerged or stale branches",
+	"created date, last worked date",
+	"bd list --type=epic --status=open --json",
 	"active not-completed epics",
 	"clean-boundary gate",
 	"duplicate task Beads",
@@ -160,13 +167,14 @@ for (const phrase of [
 	check(`skill covers ${phrase}`, skill.includes(phrase));
 }
 check(
-	"work-auto asks before big, master, or ambiguous work",
+	"work-auto asks before big, master, migrate, or ambiguous work",
 	/ask before starting/i.test(skill) &&
-		/big, master, or ambiguous/i.test(skill),
+		/big, master, migrate, or ambiguous/i.test(skill),
 );
 
 const promptModes = {
 	"work-master.md": "master",
+	"work-migrate.md": "migrate",
 	"work-small.md": "small",
 	"work-med.md": "med",
 	"work-big.md": "big",
@@ -183,8 +191,8 @@ const promptFiles = readdirSync(path.join(root, "prompts")).filter((file) =>
 	file.endsWith(".md"),
 );
 check(
-	"exactly eleven prompt templates",
-	promptFiles.length === 11,
+	"exactly twelve prompt templates",
+	promptFiles.length === 12,
 	promptFiles.join(", "),
 );
 for (const [file, mode] of Object.entries(promptModes)) {
@@ -206,6 +214,20 @@ for (const [file, mode] of Object.entries(promptModes)) {
 }
 
 const agentRules = {
+	"bead-migrator.md": {
+		name: "bead-migrator",
+		forbidWrite: true,
+		thinking: "high",
+		must: [
+			"must not edit source code",
+			"must not edit source code, write files, stage files, commit, merge, rebase, checkout another branch, or delete branches",
+			"Git log is evidence, not truth",
+			"Create closed child Beads only when evidence is strong",
+			"unmerged or stale branches",
+			"--parent <epic-id>",
+			"contact_supervisor` is unavailable",
+		],
+	},
 	"bead-planner.md": {
 		name: "bead-planner",
 		forbidWrite: true,
@@ -332,6 +354,7 @@ for (const phrase of [
 	"ctx.modelRegistry.getAvailable",
 	"subagents",
 	"agentOverrides",
+	"bead-migrator",
 	"bead-planner",
 	"bead-worker",
 	"bead-debugger",
@@ -350,6 +373,7 @@ const readme = read("README.md");
 for (const phrase of [
 	"pi install",
 	"/work-master",
+	"/work-migrate",
 	"/work-small",
 	"/work-debug",
 	"/work-resume",
@@ -361,6 +385,10 @@ for (const phrase of [
 	"pi-intercom",
 	"bd init",
 	"Master plan epics",
+	"Migrating existing projects",
+	"created date, last worked date",
+	"Git log is evidence, not truth",
+	"unmerged/stale branches",
 	"ce-plan",
 	"ce-debug",
 	"ce-compound",
@@ -377,6 +405,7 @@ for (const phrase of [
 	"No custom dashboard",
 	"No push automation",
 	"No parallel writers",
+	"No automatic branch checkout",
 	"No mandatory `pi-intercom`",
 ]) {
 	check(`README mentions ${phrase}`, readme.includes(phrase));

@@ -2,7 +2,7 @@
 
 Beads-backed Pi workflow package for running software work through short `/work-*` commands.
 
-The package is intentionally boring: one skill, one tiny settings extension, eleven prompt templates, and six role subagents. Beads owns work state. Git owns code state. There is no package database.
+The package is intentionally boring: one skill, one tiny settings extension, twelve prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
 
 ## Install
 
@@ -40,12 +40,13 @@ bd prime
 | Command | Use when | What it does |
 | --- | --- | --- |
 | `/work-master <brainstorm-or-plan>` | New brainstorm, idea, or master plan | Runs `ce-plan` when needed, saves the master plan into an epic Bead, then creates planning/slice Beads |
+| `/work-migrate <sources>` | Existing plans, TODOs, tracker exports, partial implementations, or branches | Imports legacy state into one epic plus child Beads without editing code or changing branches |
 | `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Creates/claims a Bead, implements, verifies, lightly reviews, commits, closes |
 | `/work-med <task>` | Bounded work inside an epic with a few choices | Creates a parent Bead and one to three executable child Beads, then works ready slices |
 | `/work-big <task>` | Large, risky, or architectural slice inside an epic | Creates a planning Bead under the active epic, then slices it before implementation |
 | `/work-debug <bug>` | Failing test, error, regression, or broken behavior | Creates a bug Bead, runs `ce-debug` through `bead-debugger`, verifies, and compounds reusable lessons |
-| `/work-auto <task>` | You want the orchestrator to classify size | Routes to small, med, debug, big, or master; asks before big/master/ambiguous work |
-| `/work-resume [epic-id\|last]` | Resume latest master epic work | Resolves state from Beads; if unclear, lists active not-completed epics to pick from |
+| `/work-auto <task>` | You want the orchestrator to classify size | Routes to small, med, debug, big, master, or migrate; asks before big/master/migrate/ambiguous work |
+| `/work-resume [epic-id\|last]` | Resume epic work | Resolves state from Beads; if unclear, lists active not-completed epics to pick from |
 | `/work-continue [epic-id\|last]` | Legacy resume alias | Same as `/work-resume` |
 | `/work-add <task>` | Add urgent or discovered work mid-epic | Creates a Bead, adds dependency only if truly blocking, optionally runs it now |
 | `/work-pause [note]` | Stop safely | Updates Bead notes with git status, changed files, verification, and next step |
@@ -55,10 +56,11 @@ bd prime
 ## Mental model
 
 1. `/work-master` creates the durable epic/master plan.
-2. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
-3. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer.
-4. `/work-resume` rebuilds state from Beads and git, not chat history.
-5. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+2. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
+3. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
+4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer.
+5. `/work-resume` rebuilds state from Beads and git, not chat history.
+6. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 
@@ -120,6 +122,43 @@ Continue later, even in a fresh Pi session:
 
 ```text
 /work-resume last
+```
+
+When there is no obvious latest epic, `/work-resume` lists active epics with created date, last worked date, status, child counts, and one-line description so you can pick.
+
+## Migrating existing projects
+
+Use `/work-migrate` when a project already has plans, TODOs, old tracker exports, partial implementation, or unmerged branches from another workflow:
+
+```text
+/work-migrate Take docs/roadmap.md, TODO.md, and branches feature/importer and ui-redesign. Convert what is already done and what remains into one epic.
+```
+
+What migration does:
+
+1. Reads the named artifacts plus relevant README/docs.
+2. Inspects git read-only: current branch, all branches by recent activity, and recent decorated history.
+3. Creates or reuses one epic with provenance notes: artifacts read, branches inspected, current branch, base branch assumption, and migration date.
+4. Creates closed child Beads only when evidence is strong: artifact says done and code/commit/test evidence supports it.
+5. Creates open task/bug Beads for remaining work.
+6. Creates decision Beads for unclear ownership, product choices, or conflicting evidence.
+7. Represents unmerged/stale branches as review or integration Beads; it never checks out, merges, rebases, or deletes branches.
+8. Recommends `/work-resume <epic-id>` when migration is complete.
+
+Git log is evidence, not truth. The migrator does not create one Bead per commit.
+
+For a clean CE brainstorm or plan with no partial implementation to reconcile, skip migration and use:
+
+```text
+/work-master docs/brainstorms/my-feature.md
+# or
+/work-master docs/plans/my-feature-plan.md
+```
+
+Then continue:
+
+```text
+/work-resume <epic-id>
 ```
 
 ## Working inside an existing epic
@@ -222,6 +261,7 @@ The bug Bead goes through `bead-debugger`, which follows `ce-debug` discipline: 
 
 | Agent | Writes source? | Commits? | Job |
 | --- | --- | --- | --- |
+| `bead-migrator` | No | No | Imports legacy artifacts, completed work evidence, remaining tasks, and branch review needs into Beads |
 | `bead-planner` | No | No | Creates executable Beads and decision Beads |
 | `bead-worker` | Yes | No | Implements exactly one Bead and updates notes |
 | `bead-reviewer` | No | No | Reports `PASS` or `FAIL` from diff, acceptance, and verification |
@@ -241,9 +281,9 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 ## Model and effort tuning
 
-Use `/work-models` for the easy path: pick `brainstorm/plan`, `work`, `debug`, `review`, or `commit`, then choose a searchable available model list and effort. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
+Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose a searchable available model list and effort. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
 
-Role prompts set effort defaults: planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
+Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {
@@ -264,7 +304,7 @@ Use low/minimal effort for disposable smoke-test Pi instances. Keep your control
 npm run verify
 ```
 
-The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, CE integration hooks, optional `pi-intercom` policy, and MVP non-goals.
+The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, migration policy, CE integration hooks, optional `pi-intercom` policy, and MVP non-goals.
 
 ## Disposable repo smoke test
 
@@ -280,6 +320,7 @@ pi -e /absolute/path/to/pi-work-orchestrator
 Then try:
 
 ```text
+/work-migrate README.md and git history into one epic, marking only strongly evidenced completed work as closed
 /work-master Build a one-file notes CLI with add/list commands
 /work-status
 /work-add Add --version output
@@ -294,6 +335,7 @@ Then try:
 - No parallel writers in one checkout.
 - No package-owned task database.
 - No markdown TODO ledger as source of truth.
+- No automatic branch checkout, merge, rebase, or deletion during migration.
 - No mandatory `pi-intercom`; it is used when installed, with Beads as the fallback.
 - No `ce-compound` on routine small tasks; it runs only for big/master/debug work with reusable learning.
 - No provider-specific model IDs baked into the package; use `/work-models` or Pi settings overrides.
