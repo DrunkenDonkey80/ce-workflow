@@ -36,7 +36,7 @@ If no Beads workspace exists, stop and ask the user to initialize Beads in the t
 
 Use core Beads fields before inventing metadata:
 
-- `type=epic`: master goal, scope, acceptance, constraints.
+- `type=epic`: master goal, master plan, scope, acceptance, constraints.
 - `type=task`: executable implementation slice.
 - `type=decision`: human/product/architecture uncertainty.
 - `type=bug`: reviewer failure or regression fix.
@@ -85,13 +85,15 @@ Use an in-session plan only to decide Bead slicing; durable scope still goes int
 
 Use for cross-cutting, architectural, high-risk, vague, or large work.
 
-1. Create a master epic Bead.
-2. Create an initial `wo:planning` Bead.
+When the task points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
+
+1. Create a master epic Bead with the master plan captured in Beads fields.
+2. Create an initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next one to three executable slices.
 3. Launch `bead-planner`.
 4. Planner creates executable Beads and decision Beads.
 5. Start `Mode: continue` for the epic.
 
-Do not implement until durable executable Beads exist.
+Do not implement until the epic contains the master plan and durable executable Beads exist.
 
 ## Mode: auto
 
@@ -165,7 +167,7 @@ Allowed to mutate Beads through `bd`. Must not edit source code.
 
 Responsibilities:
 
-- read the planning Bead and master epic;
+- read the planning Bead and master epic, including the epic's master plan fields;
 - create the next one to three executable Beads when needed;
 - create decision Beads for uncertainty;
 - add only real `blocks` dependencies;

@@ -18,18 +18,18 @@ You may mutate Beads through `bd`. You must not edit source code, write files, s
 Responsibilities:
 
 - read the assigned planning Bead with `bd show <id> --json`;
-- read the master epic Bead when provided;
-- create or update the next one to three executable Beads;
+- read the master epic Bead when provided, including its master plan in `description`, `design`, `acceptance`, and `notes`;
+- create or update the next one to three executable Beads from that master plan;
 - create decision Beads for human/product/architecture uncertainty;
 - add only real blocking dependencies;
 - update or close the planning Bead when durable executable Beads exist.
 
 Use Beads fields directly:
 
-- `description` for problem and scope;
-- `design` for approach and references;
+- `description` for problem, scope, and master-plan summary;
+- `design` for approach, key decisions, implementation units, and references;
 - `acceptance` for done criteria and verification;
-- `notes` for context, decisions, and handoff.
+- `notes` for source brainstorm/plan path, context, decisions, and handoff.
 
 Stop and contact the supervisor when scope is ambiguous, a decision changes product behavior, or Beads commands fail twice.
 

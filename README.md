@@ -38,7 +38,7 @@ bd prime
 | --- | --- | --- |
 | `/work-small <task>` | Clear, low-risk work in one or two files | Creates/claims a Bead, implements, verifies, lightly reviews, commits, closes |
 | `/work-med <task>` | Bounded work with a few choices | Creates a parent Bead and one to three executable child Beads, then works ready slices |
-| `/work-big <task>` | Vague, cross-cutting, risky, or architectural work | Creates an epic and planning Bead, then runs planner before implementation |
+| `/work-big <task>` | Vague, cross-cutting, risky, architectural work, or a brainstorm that needs a master plan | Runs `ce-plan` when needed, saves the master plan into an epic Bead, then creates planning/slice Beads |
 | `/work-auto <task>` | You want the orchestrator to classify size | Routes to small, med, or big; asks before big or ambiguous work |
 | `/work-continue [epic-id\|last]` | Resume durable work | Resolves state from Beads and runs one ready Bead at a time |
 | `/work-add <task>` | Add urgent or discovered work mid-epic | Creates a Bead, adds dependency only if truly blocking, optionally runs it now |
@@ -47,11 +47,21 @@ bd prime
 
 ## Source-of-truth rules
 
-- Beads is the only durable work state: plans, acceptance, status, dependencies, discovered work, and resume notes.
+- Beads is the only durable work state: master plans, acceptance, status, dependencies, discovered work, and resume notes.
 - Git is the only code state: diffs, branches, commits, and changed files.
 - Chat memory is not source of truth.
 - Manual dirty changes are classified before writer agents run.
 - Work happens one ready Bead at a time unless isolated worktrees are explicitly used.
+
+## Master plan epics
+
+For brainstorm-driven work, use `/work-big` with the brainstorm path or request:
+
+```text
+/work-big plan docs/brainstorms/example.md into a detailed master plan for slicing later
+```
+
+The orchestrator runs `ce-plan` when a detailed master plan does not already exist, then creates an epic Bead with the plan summary/scope in `description`, key decisions and implementation units in `design`, acceptance and verification in `acceptance`, and source paths in `notes`. Later `bead-planner` slices that epic into one to three executable Beads at a time.
 
 ## Role agents
 

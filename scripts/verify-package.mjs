@@ -61,7 +61,7 @@ for (const mode of ['small', 'med', 'big', 'auto', 'continue', 'add', 'pause', '
 for (const role of ['bead-planner', 'bead-worker', 'bead-reviewer', 'bead-fixer', 'bead-committer']) {
   check(`skill references role: ${role}`, skill.includes(role));
 }
-for (const phrase of ['bd prime', 'bd ready --json', 'Stop Conditions', 'dirty', 'manual changes']) {
+for (const phrase of ['bd prime', 'bd ready --json', 'Stop Conditions', 'dirty', 'manual changes', 'master plan', 'ce-plan', 'source brainstorm plus local plan path']) {
   check(`skill covers ${phrase}`, skill.includes(phrase));
 }
 check('work-auto asks before big or ambiguous work', /ask before starting/i.test(skill) && /big or ambiguous/i.test(skill));
@@ -92,7 +92,7 @@ for (const [file, mode] of Object.entries(promptModes)) {
 }
 
 const agentRules = {
-  'bead-planner.md': { name: 'bead-planner', forbidWrite: true, must: ['must not edit source code', 'create decision Beads'] },
+  'bead-planner.md': { name: 'bead-planner', forbidWrite: true, must: ['must not edit source code', 'create decision Beads', 'master plan'] },
   'bead-worker.md': { name: 'bead-worker', requireWrite: true, must: ['Do not commit', 'claim the assigned Bead'] },
   'bead-reviewer.md': { name: 'bead-reviewer', forbidWrite: true, must: ['PASS', 'FAIL', 'read-only'] },
   'bead-fixer.md': { name: 'bead-fixer', requireWrite: true, must: ['Fix only reviewer-identified issues', 'Do not commit'] },
@@ -127,6 +127,8 @@ for (const phrase of [
   'pi-subagents',
   'pi-ask-user',
   'bd init',
+  'Master plan epics',
+  'ce-plan',
   'No TypeScript extension',
   'No custom dashboard',
   'No push automation',
