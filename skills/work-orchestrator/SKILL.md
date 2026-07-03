@@ -191,18 +191,19 @@ Legacy alias for `Mode: resume`. Follow the same resolution and loop.
 Loop:
 
 1. Run `bd ready --json`.
-2. Pick exactly one ready Bead belonging to or blocking the target epic.
-3. If no ready Bead belongs to the target epic, inspect `bd children <epic-id> --json` and the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; stop after the planner reports so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
-4. Run `bd show <id> --json`.
-5. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, then stop at the planning boundary.
-6. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, and relevant paths.
-7. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available.
-8. If review returns `FAIL`, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again.
-9. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate.
-10. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
-11. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
-12. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
-13. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and `Next: start a fresh Pi session and run /work-resume <epic-id>` unless a blocker or true epic completion exists.
+2. Inspect `bd children <epic-id> --json`. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
+3. Pick exactly one non-planning ready Bead belonging to or blocking the target epic.
+4. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
+5. Run `bd show <id> --json`.
+6. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, then stop at the planning boundary.
+7. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, and relevant paths.
+8. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available.
+9. If review returns `FAIL`, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again.
+10. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate.
+11. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
+12. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
+13. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
+14. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and `Next: start a fresh Pi session and run /work-resume <epic-id>` unless a blocker or true epic completion exists.
 
 ## Mode: add
 

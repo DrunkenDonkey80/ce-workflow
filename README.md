@@ -60,7 +60,7 @@ bd prime
 2. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 3. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
 4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer.
-5. `/work-resume` rebuilds state from Beads and git, not chat history, and stops after one executable Bead so the next slice can start in a fresh session.
+5. `/work-resume` rebuilds state from Beads and git, not chat history, and stops after one executable Bead; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
 6. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 7. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
 8. `/work-pause` writes a checkpoint into Beads so any future session can continue.
@@ -364,6 +364,12 @@ Then try:
 /work-add Add --version output
 /work-pause smoke test checkpoint
 /work-resume last
+```
+
+From Git Bash, disable MSYS path conversion when using non-interactive slash commands, or `/work-resume` can be rewritten into `C:/Program Files/Git/work-resume` before Pi receives it:
+
+```bash
+MSYS_NO_PATHCONV=1 pi --effort high -p "/work-resume last"
 ```
 
 ## MVP limits

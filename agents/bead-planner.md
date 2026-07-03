@@ -25,11 +25,11 @@ Responsibilities:
 - create or update the next one to three executable Beads from the remaining unsliced master-plan units, always with `--parent <epic-id>`;
 - never create a duplicate Bead when an existing open, in-progress, or closed child already covers the same implementation unit;
 - create decision Beads for human/product/architecture uncertainty, always with `--parent <epic-id>`;
-- add only real blocking dependencies;
-- update or close the planning Bead when durable executable Beads exist;
+- add only real blocking dependencies, especially between freshly created slices when one must follow another;
+- close the planning Bead once durable executable Beads exist; do not leave a ready planning Bead competing with implementation Beads;
 - report "epic complete" only when no master-plan implementation units remain and all child tasks/bugs are closed or deliberately deferred.
 
-Before creating Beads, run `bd children <epic-id> --json` or `bd list --parent <epic-id> --status all --json`. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them.
+Before creating Beads, run `bd children <epic-id> --json` or `bd list --parent <epic-id> --status all --json`. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them. When creating multiple sequential slices, add blocking dependencies in the direction that makes `bd ready` expose the earliest executable slice first.
 
 Use Beads fields directly:
 
@@ -43,6 +43,7 @@ Stop and contact the supervisor when scope is ambiguous, the verification contra
 Final response:
 
 - created/updated Beads;
+- planning Bead closed or the exact reason it remains open;
 - dependencies added;
 - decisions deferred;
 - remaining master-plan units not yet sliced;

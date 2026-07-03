@@ -204,7 +204,9 @@ function notifySummary(ctx, settings) {
 }
 
 function truncate(value, max = 800) {
-	const text = String(value ?? "").replace(/\s+/g, " ").trim();
+	const text = String(value ?? "")
+		.replace(/\s+/g, " ")
+		.trim();
 	return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
@@ -226,7 +228,8 @@ function messageRole(message) {
 }
 
 function toolNames(message) {
-	const calls = message?.toolCalls ?? message?.tool_calls ?? message?.calls ?? [];
+	const calls =
+		message?.toolCalls ?? message?.tool_calls ?? message?.calls ?? [];
 	if (!Array.isArray(calls)) return [];
 	return calls
 		.map((call) => call?.name ?? call?.function?.name ?? call?.toolName)
@@ -249,15 +252,20 @@ function messageLine(message) {
 
 function filesFromOps(fileOps) {
 	const read = fileOps?.readFiles ?? fileOps?.read ?? [];
-	const modified = fileOps?.modifiedFiles ?? fileOps?.modified ?? fileOps?.written ?? [];
+	const modified =
+		fileOps?.modifiedFiles ?? fileOps?.modified ?? fileOps?.written ?? [];
 	return {
 		read: Array.from(new Set(Array.isArray(read) ? read : [])).map(String),
-		modified: Array.from(new Set(Array.isArray(modified) ? modified : [])).map(String),
+		modified: Array.from(new Set(Array.isArray(modified) ? modified : [])).map(
+			String,
+		),
 	};
 }
 
 function instantSummary(preparation, customInstructions = "") {
-	const maxSummaryChars = Number.isFinite(Number(preparation.settings?.maxSummaryChars))
+	const maxSummaryChars = Number.isFinite(
+		Number(preparation.settings?.maxSummaryChars),
+	)
 		? Math.max(4_000, Number(preparation.settings.maxSummaryChars))
 		: DEFAULT_CONTEXT.maxSummaryChars;
 	const messages = [
@@ -272,12 +280,22 @@ function instantSummary(preparation, customInstructions = "") {
 	const summary = [
 		"## Work-orchestrator instant compaction",
 		"Assistant reasoning and full tool results were intentionally dropped; Beads, git, and files are the source of truth.",
-		customInstructions ? `\n## Instructions\n${truncate(customInstructions, 1_000)}` : "",
+		customInstructions
+			? `\n## Instructions\n${truncate(customInstructions, 1_000)}`
+			: "",
 		previous ? `\n## Previous summary\n${previous}` : "",
-		userLines.length ? `\n## Recent user goals\n${userLines.map((line) => `- ${line}`).join("\n")}` : "",
-		recentLines.length ? `\n## Recent visible conversation\n${recentLines.map((line) => `- ${line}`).join("\n")}` : "",
-		files.read.length ? `\n<read-files>\n${files.read.join("\n")}\n</read-files>` : "",
-		files.modified.length ? `\n<modified-files>\n${files.modified.join("\n")}\n</modified-files>` : "",
+		userLines.length
+			? `\n## Recent user goals\n${userLines.map((line) => `- ${line}`).join("\n")}`
+			: "",
+		recentLines.length
+			? `\n## Recent visible conversation\n${recentLines.map((line) => `- ${line}`).join("\n")}`
+			: "",
+		files.read.length
+			? `\n<read-files>\n${files.read.join("\n")}\n</read-files>`
+			: "",
+		files.modified.length
+			? `\n<modified-files>\n${files.modified.join("\n")}\n</modified-files>`
+			: "",
 		"\n## Next recovery step\nRun `/work-status` or `bd ready --json`, then continue with `/work-resume <epic-id>`.",
 	]
 		.filter(Boolean)
@@ -314,7 +332,10 @@ function maybeCompact(ctx, settings, reason) {
 		},
 		onError: (error) => {
 			contextCompactInFlight = false;
-			ctx.ui.notify(`Work context compaction failed: ${error.message}`, "warning");
+			ctx.ui.notify(
+				`Work context compaction failed: ${error.message}`,
+				"warning",
+			);
 		},
 	});
 	return true;
@@ -612,7 +633,10 @@ export default function workModelsExtension(pi) {
 						"manual work-context compact: preserve Beads/git state, files, blockers, and next command; omit reasoning and full tool logs.",
 					onComplete: () => ctx.ui.notify("Work context compacted", "info"),
 					onError: (error) =>
-						ctx.ui.notify(`Work context compaction failed: ${error.message}`, "warning"),
+						ctx.ui.notify(
+							`Work context compaction failed: ${error.message}`,
+							"warning",
+						),
 				});
 				return;
 			}
@@ -629,7 +653,9 @@ export default function workModelsExtension(pi) {
 				return;
 			}
 			if (command === "set") {
-				setContextSettings(settings, { compactAtTokens: clampCompactAt(value) });
+				setContextSettings(settings, {
+					compactAtTokens: clampCompactAt(value),
+				});
 				writeSettings(ctx.cwd, settings);
 				ctx.ui.notify(contextStatus(ctx, settings), "info");
 				return;
