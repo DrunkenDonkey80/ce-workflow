@@ -13,6 +13,7 @@ Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, 
 - Git is the only code state: changed files, diffs, commits, and branches live in git.
 - Chat memory is not source of truth. A fresh session must resume from `bd ready --json`, `bd list --status=in_progress --json`, and `git status`.
 - Work one ready Bead at a time unless isolated worktrees are explicitly used.
+- The parent orchestrator coordinates only; implementation, review, fixes, debugging, migration, and commit gates run through role agents. If `pi-subagents`/`subagent` is unavailable, stop with a setup blocker instead of doing the work in the parent chat.
 - One executable Bead is the default session boundary: after committing/closing it, stop with the next `/work-resume <epic-id>` command instead of dragging old context into the next slice.
 - Do not overwrite manual edits silently.
 
@@ -240,7 +241,7 @@ Do not mutate Beads or git in status mode.
 
 ## Role Loop
 
-Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Prefer file-only artifact output plus a short structured summary in the parent; do not paste long tool logs back into the control session.
+Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. The parent must not read broad source modules or implement source edits itself; if it cannot launch the required role agent, it stops with a setup blocker. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Prefer file-only artifact output plus a short structured summary in the parent; do not paste long tool logs, full `bd show` epic JSON, or whole master plans back into the control session.
 
 ## Context Budget Policy
 

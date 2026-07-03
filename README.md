@@ -59,7 +59,7 @@ bd prime
 1. `/work-master` creates the durable epic/master plan.
 2. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 3. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
-4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer.
+4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The parent orchestrator coordinates; it should not become the worker.
 5. `/work-resume` rebuilds state from Beads and git, not chat history, and stops after one executable Bead; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
 6. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 7. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
@@ -319,7 +319,7 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
 
-Role prompts use fresh child context by default and concise/file-artifact outputs so the parent session does not inherit every tool log. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
+Role prompts use fresh child context by default and concise/file-artifact outputs so the parent session does not inherit every tool log or full master plan. The parent should stop with a setup blocker if `pi-subagents` is unavailable instead of implementing in the control chat. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {
