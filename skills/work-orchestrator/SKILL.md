@@ -59,7 +59,7 @@ For discovered work, create a Bead and include `discovered-from:<current-bead-id
 
 Use to create a new master epic from a brainstorm, rough feature idea, or existing plan.
 
-When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
+When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Tell `ce-plan` to auto-accept plan creation and skip interactive confirmation unless it needs a real human decision. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
 
 1. Create a master epic Bead with the master plan captured in Beads fields.
 2. Create an initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next one to three executable slices.

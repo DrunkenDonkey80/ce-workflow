@@ -61,7 +61,7 @@ for (const mode of ['master', 'small', 'med', 'big', 'auto', 'resume', 'continue
 for (const role of ['bead-planner', 'bead-worker', 'bead-reviewer', 'bead-fixer', 'bead-committer']) {
   check(`skill references role: ${role}`, skill.includes(role));
 }
-for (const phrase of ['bd prime', 'bd ready --json', 'Stop Conditions', 'dirty', 'manual changes', 'master plan', 'ce-plan', 'source brainstorm plus local plan path', 'active not-completed epics']) {
+for (const phrase of ['bd prime', 'bd ready --json', 'Stop Conditions', 'dirty', 'manual changes', 'master plan', 'ce-plan', 'auto-accept plan creation', 'source brainstorm plus local plan path', 'active not-completed epics']) {
   check(`skill covers ${phrase}`, skill.includes(phrase));
 }
 check('work-auto asks before big, master, or ambiguous work', /ask before starting/i.test(skill) && /big, master, or ambiguous/i.test(skill));

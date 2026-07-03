@@ -63,7 +63,7 @@ For brainstorm-driven work, use `/work-master` with the brainstorm path or reque
 /work-master plan docs/brainstorms/example.md into a detailed master plan for slicing later
 ```
 
-The orchestrator runs `ce-plan` when a detailed master plan does not already exist, then creates an epic Bead with the plan summary/scope in `description`, key decisions and implementation units in `design`, acceptance and verification in `acceptance`, and source paths in `notes`. Later `bead-planner` slices that epic into one to three executable Beads at a time. The other `/work-*` commands add or execute work inside an existing epic.
+The orchestrator runs `ce-plan` when a detailed master plan does not already exist and tells it to auto-accept plan creation unless a real human decision is needed. It then creates an epic Bead with the plan summary/scope in `description`, key decisions and implementation units in `design`, acceptance and verification in `acceptance`, and source paths in `notes`. Later `bead-planner` slices that epic into one to three executable Beads at a time. The other `/work-*` commands add or execute work inside an existing epic.
 
 ## Role agents
 
