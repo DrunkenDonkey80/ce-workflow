@@ -49,6 +49,11 @@ check(
 );
 check("pi manifest exists", Boolean(pkg.pi));
 check(
+	"pi manifest exposes extensions",
+	Array.isArray(pkg.pi?.extensions) &&
+		pkg.pi.extensions.includes("./extensions"),
+);
+check(
 	"pi manifest exposes skills",
 	Array.isArray(pkg.pi?.skills) && pkg.pi.skills.includes("./skills"),
 );
@@ -62,8 +67,8 @@ check(
 		pkg.pi.subagents.agents.includes("./agents"),
 );
 check(
-	"MVP does not expose extensions",
-	!Object.hasOwn(pkg.pi ?? {}, "extensions"),
+	"@earendil-works/pi-tui listed as peer dependency",
+	Boolean(pkg.peerDependencies?.["@earendil-works/pi-tui"]),
 );
 check(
 	"pi-subagents listed as peer dependency",
@@ -74,7 +79,7 @@ check(
 	Boolean(pkg.peerDependencies?.["pi-compound-engineering"]),
 );
 
-for (const rel of ["skills", "prompts", "agents", "README.md"]) {
+for (const rel of ["extensions", "skills", "prompts", "agents", "README.md"]) {
 	check(`manifest path exists: ${rel}`, existsSync(path.join(root, rel)));
 }
 
@@ -133,6 +138,8 @@ for (const phrase of [
 	"real hardware",
 	"Cost and Model Policy",
 	"subagents.agentOverrides",
+	"/work-models",
+	"brainstorm/plan",
 	"auto-accept plan creation",
 	"source brainstorm plus local plan path",
 	"active not-completed epics",
@@ -269,7 +276,10 @@ for (const [file, rule] of Object.entries(agentRules)) {
 		fm.inheritProjectContext === "true",
 	);
 	if (rule.thinking) {
-		check(`agent ${file} thinking is ${rule.thinking}`, fm.thinking === rule.thinking);
+		check(
+			`agent ${file} thinking is ${rule.thinking}`,
+			fm.thinking === rule.thinking,
+		);
 	}
 	check(
 		`agent ${file} does not require unshipped skills`,
@@ -295,6 +305,23 @@ for (const [file, rule] of Object.entries(agentRules)) {
 	}
 }
 
+const extension = read("extensions/work-models.js");
+for (const phrase of [
+	"registerCommand(\"work-models\"",
+	"ctx.modelRegistry.getAvailable",
+	"subagents",
+	"agentOverrides",
+	"bead-planner",
+	"bead-worker",
+	"bead-debugger",
+	"bead-reviewer",
+	"bead-committer",
+	"CONFIG_DIR_NAME",
+	"SelectList",
+]) {
+	check(`extension covers ${phrase}`, extension.includes(phrase));
+}
+
 const readme = read("README.md");
 for (const phrase of [
 	"pi install",
@@ -303,6 +330,7 @@ for (const phrase of [
 	"/work-debug",
 	"/work-resume",
 	"/work-continue",
+	"/work-models",
 	"pi-subagents",
 	"pi-compound-engineering",
 	"pi-ask-user",
@@ -315,7 +343,7 @@ for (const phrase of [
 	"real hardware",
 	"Model and effort tuning",
 	"subagents.agentOverrides",
-	"No TypeScript extension",
+	"Blank model means",
 	"No custom dashboard",
 	"No push automation",
 	"No parallel writers",
@@ -326,7 +354,7 @@ for (const phrase of [
 const ignored = read(".gitignore");
 check(".gitignore excludes .pi-subagents", ignored.includes(".pi-subagents/"));
 
-for (const rel of ["agents", "prompts", "skills/work-orchestrator"]) {
+for (const rel of ["agents", "extensions", "prompts", "skills/work-orchestrator"]) {
 	check(`${rel} is a directory`, statSync(path.join(root, rel)).isDirectory());
 }
 

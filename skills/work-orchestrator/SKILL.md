@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`.
+Use this skill for `/work-master`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents.
 
 ## Source of Truth
 
@@ -210,7 +210,7 @@ Use `pi-subagents` from the parent session. Children get concrete Bead IDs and m
 
 ## Cost and Model Policy
 
-Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: planner high, debugger high, worker/fixer/reviewer medium, committer low. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Prefer project `subagents.agentOverrides` for concrete model IDs (for example frontier model for `bead-worker`, cheaper model for `bead-committer`) instead of hard-coding provider-specific models in this package.
+Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Do not hard-code provider-specific models in this package.
 
 All human questions from children must flow through the parent session. A child uses `contact_supervisor` with `reason: "need_decision"`; the parent relays the single concrete question to the user, records the answer in Beads notes, then resumes the role loop. Do not let a child block invisibly on user input.
 

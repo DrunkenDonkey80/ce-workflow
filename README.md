@@ -2,7 +2,7 @@
 
 Beads-backed Pi workflow package for running software work through short `/work-*` commands.
 
-The package is intentionally boring: one skill, eleven prompt templates, and six role subagents. Beads owns work state. Git owns code state. There is no package database.
+The package is intentionally boring: one skill, one tiny settings extension, eleven prompt templates, and six role subagents. Beads owns work state. Git owns code state. There is no package database.
 
 ## Install
 
@@ -48,6 +48,7 @@ bd prime
 | `/work-add <task>` | Add urgent or discovered work mid-epic | Creates a Bead, adds dependency only if truly blocking, optionally runs it now |
 | `/work-pause [note]` | Stop safely | Updates Bead notes with git status, changed files, verification, and next step |
 | `/work-status [epic-id\|last]` | Inspect state | Read-only Beads, git, and subagent status summary |
+| `/work-models [status\|reset]` | Pick role models/effort | Extension command with searchable model list; persists overrides to `.pi/settings.json` |
 
 ## Source-of-truth rules
 
@@ -91,7 +92,9 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 ## Model and effort tuning
 
-This package leaves concrete model IDs to Pi settings. Role prompts set effort defaults: planner/debugger high, worker/fixer/reviewer medium, committer low. Override per repo with `subagents.agentOverrides` in `.pi/settings.json` when you want frontier models for writers and cheaper models for gates:
+Use `/work-models` for the easy path: pick `brainstorm/plan`, `work`, `debug`, `review`, or `commit`, then choose a searchable available model list and effort. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
+
+Role prompts set effort defaults: planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {
@@ -104,7 +107,7 @@ This package leaves concrete model IDs to Pi settings. Role prompts set effort d
 }
 ```
 
-Use low/minimal effort for disposable smoke-test Pi instances.
+Use low/minimal effort for disposable smoke-test Pi instances. Keep your control session on a frontier model for `/work-master`/`ce-plan` if you want deep planning, then set `work` to a local model to save tokens.
 
 ## Verify this package
 
@@ -135,13 +138,10 @@ Then try:
 
 ## MVP limits
 
-- No TypeScript extension.
 - No custom dashboard.
 - No push automation by default.
 - No parallel writers in one checkout.
 - No package-owned task database.
 - No markdown TODO ledger as source of truth.
 - No `ce-compound` on routine small tasks; it runs only for big/master/debug work with reusable learning.
-- No provider-specific model IDs baked into the package; use Pi settings overrides.
-
-Add an extension later only if prompt templates plus the shared skill are not enough.
+- No provider-specific model IDs baked into the package; use `/work-models` or Pi settings overrides.
