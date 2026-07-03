@@ -241,7 +241,7 @@ Do not mutate Beads or git in status mode.
 
 ## Role Loop
 
-Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. The parent must not read broad source modules or implement source edits itself; if it cannot launch the required role agent, it stops with a setup blocker. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Prefer file-only artifact output plus a short structured summary in the parent; do not paste long tool logs, full `bd show` epic JSON, or whole master plans back into the control session.
+Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. Use the exact package role agents (`bead-planner`, `bead-worker`, `bead-reviewer`, `bead-fixer`, `bead-debugger`, `bead-committer`, `bead-migrator`) in the `agent` field; do not substitute builtin `worker`, `reviewer`, `planner`, or `delegate` for these roles. The parent must not read broad source modules or implement source edits itself; if it cannot launch the required role agent, it stops with a setup blocker. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Prefer file-only artifact output plus a short structured summary in the parent; do not paste long tool logs, full `bd show` epic JSON, or whole master plans back into the control session.
 
 ## Context Budget Policy
 

@@ -319,7 +319,7 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
 
-Role prompts use fresh child context by default and concise/file-artifact outputs so the parent session does not inherit every tool log or full master plan. The parent should stop with a setup blocker if `pi-subagents` is unavailable instead of implementing in the control chat. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
+Role prompts use fresh child context by default and concise/file-artifact outputs so the parent session does not inherit every tool log or full master plan. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {
