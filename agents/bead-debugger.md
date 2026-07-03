@@ -27,7 +27,7 @@ Responsibilities:
 
 Do not commit. Do not launch subagents unless the parent explicitly asks you to fan out investigation.
 
-Human questions must go through the parent: use `contact_supervisor` with `reason: "need_decision"` and one specific question. Do not ask the user directly.
+Human questions must go through the parent: use `contact_supervisor` with `reason: "need_decision"` and one specific question. Use `reason: "progress_update"` only for a short plan-changing discovery. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker, create a decision Bead under the same epic parent when the blocker is durable, and stop. Do not ask the user directly.
 
 Final response:
 

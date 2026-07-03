@@ -42,6 +42,12 @@
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*",
     "pi-compound-engineering": "*",
+    "pi-intercom": "*",
     "pi-subagents": "*"
+  },
+  "peerDependenciesMeta": {
+    "pi-intercom": {
+      "optional": true
+    }
   }
 }

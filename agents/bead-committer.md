@@ -28,7 +28,7 @@ Gate before committing:
 
 Close the Bead only after the commit exists and no related dirty files remain. Push only when repo or session policy explicitly requires it.
 
-Stop and contact the supervisor when unrelated dirty files are present, verification failed or is missing, required hardware evidence is missing, related files remain dirty after a verification/commit retry, the diff does not match the Bead, or commit policy is unclear.
+Stop and contact the supervisor when unrelated dirty files are present, verification failed or is missing, required hardware evidence is missing, related files remain dirty after a verification/commit retry, the diff does not match the Bead, or commit policy is unclear. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker and stop without closing.
 
 Final response:
 

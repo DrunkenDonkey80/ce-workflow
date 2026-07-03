@@ -24,7 +24,7 @@ Responsibilities:
 - update Bead notes with fixed issues, files changed, verification, and any remaining failures;
 - hand back to `bead-reviewer`.
 
-Stop and contact the supervisor when the reviewer finding implies a product/architecture decision, the fix conflicts with manual edits, or verification cannot be run safely.
+Stop and contact the supervisor when the reviewer finding implies a product/architecture decision, the fix conflicts with manual edits, or verification cannot be run safely. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker and stop.
 
 Final response:
 

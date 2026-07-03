@@ -32,7 +32,7 @@ Report exactly one outcome:
 
 For `FAIL`, give exact fix instructions and cite evidence. Create or update a fix Bead only when the fix should be durable outside the current handoff.
 
-Stop and contact the supervisor when the change cannot be judged from the Bead, diff, and verification evidence.
+Stop and contact the supervisor when the change cannot be judged from the Bead, diff, and verification evidence. If `contact_supervisor` is unavailable or times out, return `FAIL` with the blocker instead of guessing.
 
 Final response:
 

@@ -78,6 +78,11 @@ check(
 	"pi-compound-engineering listed as peer dependency",
 	Boolean(pkg.peerDependencies?.["pi-compound-engineering"]),
 );
+check(
+	"pi-intercom listed as optional peer dependency",
+	Boolean(pkg.peerDependencies?.["pi-intercom"]) &&
+		pkg.peerDependenciesMeta?.["pi-intercom"]?.optional === true,
+);
 
 for (const rel of ["extensions", "skills", "prompts", "agents", "README.md"]) {
 	check(`manifest path exists: ${rel}`, existsSync(path.join(root, rel)));
@@ -133,6 +138,10 @@ for (const phrase of [
 	"ce-debug",
 	"ce-compound mode:headless",
 	"contact_supervisor",
+	"Optional Intercom Coordination",
+	"pi-intercom",
+	"progress_update",
+	"contact_supervisor` is unavailable",
 	"Verification Contract",
 	"verification contract",
 	"real hardware",
@@ -208,6 +217,7 @@ const agentRules = {
 			"never create a duplicate Bead",
 			"--parent <epic-id>",
 			"verification contract",
+			"contact_supervisor` is unavailable",
 		],
 	},
 	"bead-worker.md": {
@@ -220,13 +230,20 @@ const agentRules = {
 			"same epic parent",
 			"verification contract",
 			"real hardware",
+			"contact_supervisor` is unavailable",
 		],
 	},
 	"bead-reviewer.md": {
 		name: "bead-reviewer",
 		forbidWrite: true,
 		thinking: "medium",
-		must: ["PASS", "FAIL", "read-only", "verification contract"],
+		must: [
+			"PASS",
+			"FAIL",
+			"read-only",
+			"verification contract",
+			"contact_supervisor` is unavailable",
+		],
 	},
 	"bead-debugger.md": {
 		name: "bead-debugger",
@@ -236,8 +253,10 @@ const agentRules = {
 			"ce-debug",
 			"ce-compound mode:headless",
 			"contact_supervisor",
+			"progress_update",
 			"same epic parent",
 			"verification contract",
+			"contact_supervisor` is unavailable",
 		],
 	},
 	"bead-fixer.md": {
@@ -248,6 +267,7 @@ const agentRules = {
 			"Fix only reviewer-identified issues",
 			"Do not commit",
 			"verification contract",
+			"contact_supervisor` is unavailable",
 		],
 	},
 	"bead-committer.md": {
@@ -260,6 +280,7 @@ const agentRules = {
 			"verification contract",
 			"hardware evidence",
 			"<bead-id>: <summary>",
+			"contact_supervisor` is unavailable",
 		],
 	},
 };
@@ -337,11 +358,17 @@ for (const phrase of [
 	"pi-subagents",
 	"pi-compound-engineering",
 	"pi-ask-user",
+	"pi-intercom",
 	"bd init",
 	"Master plan epics",
 	"ce-plan",
 	"ce-debug",
 	"ce-compound",
+	"Start-to-completion example",
+	"Insert work mid-flow",
+	"Pause, stop, and resume",
+	"Optional intercom coordination",
+	"contact_supervisor",
 	"Verification contracts",
 	"real hardware",
 	"Model and effort tuning",
@@ -350,6 +377,7 @@ for (const phrase of [
 	"No custom dashboard",
 	"No push automation",
 	"No parallel writers",
+	"No mandatory `pi-intercom`",
 ]) {
 	check(`README mentions ${phrase}`, readme.includes(phrase));
 }

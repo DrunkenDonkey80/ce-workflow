@@ -20,15 +20,17 @@ pi install npm:pi-compound-engineering
 bd --help
 ```
 
-Recommended for nicer confirmation prompts:
+Recommended, optional companions:
 
 ```bash
-pi install npm:pi-ask-user
+pi install npm:pi-ask-user    # nicer confirmation prompts
+pi install npm:pi-intercom    # child agents can ask the parent session for decisions
 ```
 
 Target repositories must have Beads initialized before the workflow can mutate work state:
 
 ```bash
+git init
 bd init
 bd prime
 ```
@@ -50,6 +52,14 @@ bd prime
 | `/work-status [epic-id\|last]` | Inspect state | Read-only Beads, git, and subagent status summary |
 | `/work-models [status\|reset]` | Pick role models/effort | Extension command with searchable model list; persists overrides to `.pi/settings.json` |
 
+## Mental model
+
+1. `/work-master` creates the durable epic/master plan.
+2. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
+3. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer.
+4. `/work-resume` rebuilds state from Beads and git, not chat history.
+5. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+
 ## Source-of-truth rules
 
 - Beads is the only durable work state: master plans, acceptance, status, dependencies, discovered work, and resume notes.
@@ -68,6 +78,145 @@ For brainstorm-driven work, use `/work-master` with the brainstorm path or reque
 ```
 
 The orchestrator runs `ce-plan` when a detailed master plan does not already exist and tells it to auto-accept plan creation unless a real human decision is needed. It then creates an epic Bead with the plan summary/scope in `description`, key decisions and implementation units in `design`, acceptance and verification in `acceptance`, and source paths in `notes`. Later `bead-planner` slices that epic into one to three executable Beads at a time. The other `/work-*` commands add or execute work inside an existing epic.
+
+## Start-to-completion example
+
+Fresh repo:
+
+```bash
+mkdir habit-app && cd habit-app
+git init
+bd init
+pi
+```
+
+In Pi:
+
+```text
+/work-master Build a tiny CLI habit tracker. It should add habits, list habits, mark done today, and show streaks. Keep storage local and simple.
+```
+
+What happens:
+
+1. `work-orchestrator` primes Beads and checks git.
+2. `ce-plan` turns the idea into a concrete master plan and auto-accepts plan creation unless a real decision is needed.
+3. An epic Bead is created with scope, design, acceptance, and verification.
+4. A planning Bead is created under the epic.
+5. `bead-planner` creates one to three child task Beads under the epic.
+6. `/work-resume` starts executing ready work.
+7. `bead-worker` implements one Bead.
+8. `bead-reviewer` checks diff, acceptance, and verification evidence.
+9. `bead-fixer` fixes reviewer failures when needed.
+10. `bead-committer` commits related files with `<bead-id>: <summary>` and closes the Bead.
+11. The loop repeats until no ready work remains or a stop condition needs the user.
+
+Check progress any time:
+
+```text
+/work-status
+```
+
+Continue later, even in a fresh Pi session:
+
+```text
+/work-resume last
+```
+
+## Working inside an existing epic
+
+Once an epic exists, add work at the right size:
+
+```text
+/work-small Add --help output for the CLI
+/work-med Add JSON export and import commands
+/work-big Add sync support, but first split it into safe slices
+/work-debug selfcheck fails when marking the same habit twice
+```
+
+`/work-big` does **not** create a new epic. It creates a planning Bead under the active epic and asks `bead-planner` to slice it.
+
+## Insert work mid-flow
+
+When a task appears while work is already underway:
+
+```text
+/work-add Add a migration note for the new habits.json format
+```
+
+The orchestrator creates a child Bead under the current epic with `discovered-from:<current-bead-id>` in notes. It only adds a dependency if the new work actually blocks current or future work.
+
+If it is urgent and should run now:
+
+```text
+/work-add Do the migration note now because the next task depends on it
+```
+
+After the inserted Bead closes, resume the original epic:
+
+```text
+/work-resume last
+```
+
+## Pause, stop, and resume
+
+Pause at a safe boundary:
+
+```text
+/work-pause leaving for now; next run should continue export tests
+```
+
+The pause records current Bead, git status, changed files, last verification, failures, and next step in Beads notes. It does not invent new work.
+
+Resume later:
+
+```text
+/work-resume
+```
+
+If there is exactly one active not-completed epic, it continues. If several epics are active, the orchestrator lists them and asks which to resume:
+
+```text
+/work-resume wo-abc123
+```
+
+`/work-continue` is kept as a legacy alias for `/work-resume`.
+
+## Optional intercom coordination
+
+`pi-intercom` is optional. Without it, the workflow still works: children persist blockers in Beads and stop safely.
+
+With `pi-intercom` installed, `pi-subagents` can give child agents a private `contact_supervisor` channel back to the parent Pi session. The child uses it only when it should not guess:
+
+- `reason: "need_decision"` — blocking product, architecture, scope, hardware, verification, or dirty-worktree decision.
+- `reason: "progress_update"` — short non-blocking update when discovery changes the plan.
+
+Example request:
+
+```text
+/work-resume last
+```
+
+If a worker discovers a product choice, the parent receives the question. Reply in the parent session:
+
+```text
+Use the simpler local-file format. Do not add sync yet.
+```
+
+The parent records the answer in Beads notes and resumes the role loop. If messages do not appear, run:
+
+```text
+/subagents-doctor
+```
+
+## Debugging flow
+
+Use `/work-debug` for failures, regressions, stack traces, or broken behavior:
+
+```text
+/work-debug npm run selfcheck fails after adding the export command
+```
+
+The bug Bead goes through `bead-debugger`, which follows `ce-debug` discipline: reproduce first, root-cause second, fix third, verify last. Non-trivial reusable debugging lessons trigger `ce-compound mode:headless` after the fix commit.
 
 ## Role agents
 
@@ -115,7 +264,7 @@ Use low/minimal effort for disposable smoke-test Pi instances. Keep your control
 npm run verify
 ```
 
-The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, CE integration hooks, and MVP non-goals.
+The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, CE integration hooks, optional `pi-intercom` policy, and MVP non-goals.
 
 ## Disposable repo smoke test
 
@@ -131,9 +280,11 @@ pi -e /absolute/path/to/pi-work-orchestrator
 Then try:
 
 ```text
-/work-small add a README with one sentence
+/work-master Build a one-file notes CLI with add/list commands
 /work-status
+/work-add Add --version output
 /work-pause smoke test checkpoint
+/work-resume last
 ```
 
 ## MVP limits
@@ -143,5 +294,6 @@ Then try:
 - No parallel writers in one checkout.
 - No package-owned task database.
 - No markdown TODO ledger as source of truth.
+- No mandatory `pi-intercom`; it is used when installed, with Beads as the fallback.
 - No `ce-compound` on routine small tasks; it runs only for big/master/debug work with reusable learning.
 - No provider-specific model IDs baked into the package; use `/work-models` or Pi settings overrides.

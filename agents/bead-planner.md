@@ -36,7 +36,7 @@ Use Beads fields directly:
 - `acceptance` for done criteria and the verification contract, including exact commands or required real-hardware checks;
 - `notes` for source brainstorm/plan path, context, decisions, and handoff.
 
-Stop and contact the supervisor when scope is ambiguous, the verification contract is unclear, required hardware/test equipment is unknown, a decision changes product behavior, or Beads commands fail twice.
+Stop and contact the supervisor when scope is ambiguous, the verification contract is unclear, required hardware/test equipment is unknown, a decision changes product behavior, or Beads commands fail twice. If `contact_supervisor` is unavailable or times out, create a decision Bead under the epic with the blocker and stop.
 
 Final response:
 
