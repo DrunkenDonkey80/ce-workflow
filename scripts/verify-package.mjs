@@ -307,7 +307,7 @@ for (const [file, rule] of Object.entries(agentRules)) {
 
 const extension = read("extensions/work-models.js");
 for (const phrase of [
-	"registerCommand(\"work-models\"",
+	'registerCommand("work-models"',
 	"ctx.modelRegistry.getAvailable",
 	"subagents",
 	"agentOverrides",
@@ -318,6 +318,9 @@ for (const phrase of [
 	"bead-committer",
 	"CONFIG_DIR_NAME",
 	"SelectList",
+	"decodeKittyPrintable",
+	"itemMatchesFilter",
+	"filter: ${filter",
 ]) {
 	check(`extension covers ${phrase}`, extension.includes(phrase));
 }
@@ -354,7 +357,12 @@ for (const phrase of [
 const ignored = read(".gitignore");
 check(".gitignore excludes .pi-subagents", ignored.includes(".pi-subagents/"));
 
-for (const rel of ["agents", "extensions", "prompts", "skills/work-orchestrator"]) {
+for (const rel of [
+	"agents",
+	"extensions",
+	"prompts",
+	"skills/work-orchestrator",
+]) {
 	check(`${rel} is a directory`, statSync(path.join(root, rel)).isDirectory());
 }
 
