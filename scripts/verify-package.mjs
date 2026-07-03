@@ -55,22 +55,24 @@ const skillFm = frontmatter(skill);
 check('skill frontmatter names work-orchestrator', skillFm.name === 'work-orchestrator');
 check('skill states Beads source of truth', /Beads is the only durable work state/.test(skill));
 check('skill states git source of truth', /Git is the only code state/.test(skill));
-for (const mode of ['small', 'med', 'big', 'auto', 'continue', 'add', 'pause', 'status']) {
+for (const mode of ['master', 'small', 'med', 'big', 'auto', 'resume', 'continue', 'add', 'pause', 'status']) {
   check(`skill defines mode: ${mode}`, skill.includes(`## Mode: ${mode}`));
 }
 for (const role of ['bead-planner', 'bead-worker', 'bead-reviewer', 'bead-fixer', 'bead-committer']) {
   check(`skill references role: ${role}`, skill.includes(role));
 }
-for (const phrase of ['bd prime', 'bd ready --json', 'Stop Conditions', 'dirty', 'manual changes', 'master plan', 'ce-plan', 'source brainstorm plus local plan path']) {
+for (const phrase of ['bd prime', 'bd ready --json', 'Stop Conditions', 'dirty', 'manual changes', 'master plan', 'ce-plan', 'source brainstorm plus local plan path', 'active not-completed epics']) {
   check(`skill covers ${phrase}`, skill.includes(phrase));
 }
-check('work-auto asks before big or ambiguous work', /ask before starting/i.test(skill) && /big or ambiguous/i.test(skill));
+check('work-auto asks before big, master, or ambiguous work', /ask before starting/i.test(skill) && /big, master, or ambiguous/i.test(skill));
 
 const promptModes = {
+  'work-master.md': 'master',
   'work-small.md': 'small',
   'work-med.md': 'med',
   'work-big.md': 'big',
   'work-auto.md': 'auto',
+  'work-resume.md': 'resume',
   'work-continue.md': 'continue',
   'work-add.md': 'add',
   'work-status.md': 'status',
@@ -78,7 +80,7 @@ const promptModes = {
 };
 
 const promptFiles = readdirSync(path.join(root, 'prompts')).filter(file => file.endsWith('.md'));
-check('exactly eight prompt templates', promptFiles.length === 8, promptFiles.join(', '));
+check('exactly ten prompt templates', promptFiles.length === 10, promptFiles.join(', '));
 for (const [file, mode] of Object.entries(promptModes)) {
   const rel = `prompts/${file}`;
   check(`prompt exists: ${file}`, existsSync(path.join(root, rel)));
@@ -122,7 +124,9 @@ for (const [file, rule] of Object.entries(agentRules)) {
 const readme = read('README.md');
 for (const phrase of [
   'pi install',
+  '/work-master',
   '/work-small',
+  '/work-resume',
   '/work-continue',
   'pi-subagents',
   'pi-ask-user',

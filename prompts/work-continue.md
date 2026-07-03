@@ -1,5 +1,5 @@
 ---
-description: Resume a Beads epic or active work loop
+description: Legacy alias for resuming a Beads epic or active work loop
 argument-hint: "[epic-id|last]"
 ---
 
@@ -7,4 +7,4 @@ Use the `work-orchestrator` skill in mode: `continue`.
 
 Target: $ARGUMENTS
 
-Resolve empty or `last` from Beads state, not chat memory.
+Follow `resume` behavior: resolve from Beads state, and ask the user to pick when no single active epic is obvious.

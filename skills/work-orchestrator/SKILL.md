@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-small`, `/work-med`, `/work-big`, `/work-auto`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`.
+Use this skill for `/work-master`, `/work-small`, `/work-med`, `/work-big`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`.
 
 ## Source of Truth
 
@@ -55,45 +55,58 @@ Use labels for workflow state:
 
 For discovered work, create a Bead and include `discovered-from:<current-bead-id>` in notes. Add a blocking dependency only when it truly blocks current or future work.
 
-## Mode: small
+## Mode: master
 
-Use for clear, low-risk changes in one or two files.
+Use to create a new master epic from a brainstorm, rough feature idea, or existing plan.
 
-1. Create a Bead for the task unless an existing Bead already matches it.
-2. Claim it.
-3. Implement directly or launch `bead-worker` for exactly that Bead.
-4. Run the smallest real verification.
-5. Do a light review against acceptance and diff.
-6. Commit related files with `<bead-id>: <summary>`.
-7. Close the Bead only after the commit exists.
-
-Stop if the task is not actually small, acceptance is unclear, or dirty files conflict.
-
-## Mode: med
-
-Use for bounded work with a few choices and fewer than about ten files.
-
-1. Create a parent Bead.
-2. Create one to three executable child Beads.
-3. Add dependencies only where real.
-4. Run the first ready child through the continue loop.
-5. Continue while ready work remains and no stop condition fires.
-
-Use an in-session plan only to decide Bead slicing; durable scope still goes into Beads.
-
-## Mode: big
-
-Use for cross-cutting, architectural, high-risk, vague, or large work.
-
-When the task points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
+When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
 
 1. Create a master epic Bead with the master plan captured in Beads fields.
 2. Create an initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next one to three executable slices.
 3. Launch `bead-planner`.
 4. Planner creates executable Beads and decision Beads.
-5. Start `Mode: continue` for the epic.
+5. Start `Mode: resume` for the epic.
 
 Do not implement until the epic contains the master plan and durable executable Beads exist.
+
+## Mode: small
+
+Use for clear, low-risk changes in one or two files inside an existing epic.
+
+1. Resolve the active epic first; if ambiguous, ask.
+2. Create a child or related Bead for the task unless an existing Bead already matches it.
+3. Claim it.
+4. Implement directly or launch `bead-worker` for exactly that Bead.
+5. Run the smallest real verification.
+6. Do a light review against acceptance and diff.
+7. Commit related files with `<bead-id>: <summary>`.
+8. Close the Bead only after the commit exists.
+
+Stop if the task is not actually small, acceptance is unclear, or dirty files conflict.
+
+## Mode: med
+
+Use for bounded work inside an existing epic with a few choices and fewer than about ten files.
+
+1. Resolve the active epic first; if ambiguous, ask.
+2. Create a parent Bead under that epic.
+3. Create one to three executable child Beads.
+4. Add dependencies only where real.
+5. Run the first ready child through the continue loop.
+6. Continue while ready work remains and no stop condition fires.
+
+Use an in-session plan only to decide Bead slicing; durable scope still goes into Beads.
+
+## Mode: big
+
+Use for large, risky, cross-cutting, or architectural work inside an existing epic.
+
+1. Resolve the active epic first; if ambiguous, ask.
+2. Create a `wo:planning` Bead under that epic describing the requested large slice.
+3. Launch `bead-planner` to split that slice into the next one to three executable Beads and any decision Beads.
+4. Start `Mode: resume` for the epic.
+
+Do not create a new master epic here; use `Mode: master` for that.
 
 ## Mode: auto
 
@@ -101,19 +114,24 @@ Classify the task, then route:
 
 - small: clear, low-risk, one or two files;
 - med: bounded, some choices, fewer than about ten files;
-- big: cross-cutting, high-risk, unclear, architecture/product decisions, or more than about ten files.
+- big: cross-cutting, high-risk, unclear, architecture/product decisions, or more than about ten files inside an existing epic;
+- master: new brainstorm, new product idea, or request to create a master plan/epic.
 
-If classification is big or ambiguous, ask before starting. Do not silently turn a vague request into an epic.
+If classification is big, master, or ambiguous, ask before starting. Do not silently turn a vague request into an epic.
 
-## Mode: continue
+## Mode: resume
 
 Argument may be an explicit epic Bead ID, `last`, or empty.
 
 When empty or `last`, resolve from Beads, not chat memory:
 
 1. in-progress epic in the current repo;
-2. latest epic with ready descendants;
-3. ask the user when ambiguous.
+2. latest not-completed epic with ready descendants;
+3. if ambiguous or no single latest epic can be found, list active not-completed epics and ask the user to pick one.
+
+## Mode: continue
+
+Legacy alias for `Mode: resume`. Follow the same resolution and loop.
 
 Loop:
 

@@ -1,6 +1,6 @@
 ---
-description: Create an epic, optionally master-plan a brainstorm, and start planned Beads-backed work
-argument-hint: "<task-or-brainstorm>"
+description: Add a large planned slice inside the active Beads epic
+argument-hint: "<task>"
 ---
 
 Use the `work-orchestrator` skill in mode: `big`.
