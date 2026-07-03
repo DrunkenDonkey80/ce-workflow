@@ -51,6 +51,8 @@ const children = [
 		issue_type: "decision",
 		status: "open",
 		title: "Choose host compiler",
+		notes:
+			"Failure artifact: CMake missing compiler\\nNext exact action: install compiler then rerun cmake",
 	},
 	{
 		id: "BUG-1",
@@ -197,6 +199,21 @@ try {
 	assert(
 		!bead.includes("E-1"),
 		"focused bead report ignores parent-child dependency",
+	);
+
+	assert(
+		bead.includes("Next: Next: install compiler and rerun"),
+		"focused bead report uses note next action",
+	);
+
+	const decision = buildWorkReport(process.cwd(), "D-1");
+	assert(
+		decision.includes("CMake missing compiler"),
+		"focused decision report normalizes escaped note newlines",
+	);
+	assert(
+		decision.includes("Next: Next exact action: install compiler"),
+		"focused decision report uses explicit next action instead of self-loop",
 	);
 
 	const rawFallback = buildWorkReport(process.cwd(), "BUG-1");

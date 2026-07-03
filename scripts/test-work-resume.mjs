@@ -311,8 +311,8 @@ try {
 		"blocked epic stops with report action",
 	);
 	assert(
-		state.suggestedCommands[0].startsWith("/work-debug"),
-		"blocked epic suggests debug/report command",
+		state.suggestedCommands[0] === "/work-report DEC-1",
+		"blocked epic points at the blocking decision, not downstream debug",
 	);
 
 	process.env.WORK_RESUME_SCENARIO = "plannerGap";
@@ -382,8 +382,8 @@ try {
 		"open decision without ready work reports blocked",
 	);
 	assert(
-		state.suggestedCommands[0] === "/work-report E-1",
-		"open decision suggests work-report",
+		state.suggestedCommands[0] === "/work-report DEC-ONLY",
+		"open decision suggests the decision report",
 	);
 	assert(!state.handoffPrompt, "open decision does not inject handoff");
 

@@ -666,7 +666,8 @@ function issueSummary(issue) {
 
 function noteDetails(issue) {
 	const raw = notesOf(issue);
-	const lines = raw
+	const normalized = raw.replaceAll("\\n", "\n");
+	const lines = normalized
 		.split(/\r?\n/)
 		.map((line) => line.trim())
 		.filter(Boolean);
@@ -680,14 +681,14 @@ function noteDetails(issue) {
 		.map((line) => truncate(line, 240));
 	const artifacts = Array.from(
 		new Set(
-			raw.match(
+			normalized.match(
 				/(?:[A-Za-z]:)?[\w./\\:-]+\.(?:jsonl?|log|txt|md|html|xml)\b/g,
 			) ?? [],
 		),
 	).slice(0, 10);
 	const runIds = Array.from(
 		new Set(
-			(raw.match(/\b(?:Run|run|run id)[:# ]+([A-Za-z0-9-]+)/g) ?? []).map(
+			(normalized.match(/\b(?:Run|run|run id)[:# ]+([A-Za-z0-9-]+)/g) ?? []).map(
 				(match) => match.replace(/^.*[:# ]+/, ""),
 			),
 		),
@@ -698,8 +699,14 @@ function noteDetails(issue) {
 		) ?? "",
 		240,
 	);
+	const nextLine =
+		lines.find((line) => /^(?:next\b|rerun\b|re-run\b|run .* again)/i.test(line)) ??
+		lines.find((line) => /\b(?:next\b|rerun\b|re-run\b|run .* again)/i.test(line));
+	const nextMatch = nextLine?.match(
+		/\b(?:next(?: exact action)?|rerun|re-run|run .* again)\b/i,
+	);
 	const nextAction = truncate(
-		lines.find((line) => /next|rerun|re-run|run .* again/i.test(line)) ?? "",
+		nextLine && nextMatch ? nextLine.slice(nextMatch.index) : "",
 		240,
 	);
 	return {
@@ -708,8 +715,8 @@ function noteDetails(issue) {
 		artifacts,
 		runIds,
 		nextAction,
-		rawExcerpt: truncate(raw, 900),
-		raw,
+		rawExcerpt: truncate(normalized, 900),
+		raw: normalized,
 	};
 }
 
@@ -1091,9 +1098,11 @@ function planResumeAction(state) {
 			action: "report-blocked",
 			message:
 				"No runnable Bead is ready; blockers or decisions need attention.",
-			suggestedCommands: state.blockerIssues.length
-				? suggestedCommands(state.epic.id, state.blockerIssues)
-				: [`/work-report ${state.epic.id}`],
+			suggestedCommands: suggestedCommands(
+				state.epic.id,
+				state.blockerIssues,
+				state.openDecisions,
+			),
 		};
 	return withHandoffPrompt({
 		...state,
@@ -1245,6 +1254,7 @@ function buildBeadReportState(cwd, bead) {
 		depsOf(issue).includes(idOf(bead)),
 	);
 	const git = gitReport(cwd);
+	const notes = noteDetails(bead);
 	return {
 		ok: true,
 		target: { requested: idOf(bead), kind: "bead" },
@@ -1255,7 +1265,7 @@ function buildBeadReportState(cwd, bead) {
 				issueSummary(byId.get(id) ?? { id }),
 			),
 			dependents: dependents.map(issueSummary),
-			notes: noteDetails(bead),
+			notes,
 		},
 		counts: {
 			dependencies: dependencyIds.length,
@@ -1269,19 +1279,26 @@ function buildBeadReportState(cwd, bead) {
 		openDecisions: [],
 		readyWork: [],
 		git,
-		suggestedCommands: suggestedCommands(parentId ?? idOf(bead), [bead]),
+		suggestedCommands: [
+			notes.nextAction ||
+				suggestedCommands(parentId ?? idOf(bead), [], [bead])[0],
+		].filter(Boolean),
 		rawNotes: notesOf(bead) ? [{ id: idOf(bead), text: notesOf(bead) }] : [],
 		warnings: git.warnings,
 	};
 }
 
-function suggestedCommands(epicId, blockers) {
-	const debugTarget =
-		blockers.find((issue) => ["bug", "debug"].includes(typeOf(issue))) ??
-		blockers[0];
+function suggestedCommands(epicId, blockers = [], decisions = []) {
+	const debugTarget = blockers.find(
+		(issue) => typeOf(issue) === "bug" || isDebugIssue(issue),
+	);
 	if (debugTarget)
 		return [`/work-debug ${idOf(debugTarget)}: investigate blocker`];
-	return epicId ? [`/work-resume ${epicId}`] : [];
+	const blockedDecision = decisions[0];
+	if (blockedDecision) return [`/work-report ${idOf(blockedDecision)}`];
+	const blockedWork = blockers[0];
+	if (blockedWork) return [`/work-report ${idOf(blockedWork)}`];
+	return epicId ? [`/work-report ${epicId}`] : [];
 }
 
 function isBeadId(value) {
