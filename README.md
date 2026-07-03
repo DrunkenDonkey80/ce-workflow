@@ -83,9 +83,10 @@ Whenever a disposable or real project run exposes workflow friction, feed it bac
 
 Recent examples this package now handles:
 
-- repeated dirty-file stop loops from whitespace-only `AGENTS.md` changes;
+- repeated dirty-file stop loops from whitespace-only `AGENTS.md` changes, including child-created instruction-file dirt after review/fix runs;
 - agents misreading `git diff --stat`/numstat lines as source content;
 - delayed/stale intercom asks after the Bead was already closed;
+- workers/fixers closing Beads before review and commit;
 - unnecessary committer-agent spawn when the parent can run the deterministic commit gate.
 
 ## Master plan epics

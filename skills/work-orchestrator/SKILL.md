@@ -203,14 +203,14 @@ Legacy alias for `Mode: resume`. Follow the same resolution and loop.
 Loop:
 
 1. Run `bd ready --json`.
-2. Run the worktree hygiene gate and resolve/record dirty files before spawning any child. Prefer one parent cleanup over repeated child stop/retry loops.
+2. Run the worktree hygiene gate and resolve/record dirty files before spawning any child. Prefer one parent cleanup over repeated child stop/retry loops. Repeat this gate after every child returns; restore whitespace-only tracked instruction-file changes such as `AGENTS.md` before interpreting review results or committing.
 3. Inspect `bd children <epic-id> --json`. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
 4. Pick exactly one non-planning ready Bead belonging to or blocking the target epic.
 5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
 6. Run `bd show <id> --json`.
 7. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, verify `bd ready --json` exposes the earliest executable slice and not the planning Bead or a later dependent slice, then stop at the planning boundary.
 8. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, relevant paths, related file allowlist, and known-unrelated dirty allowlist.
-9. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available.
+9. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available. Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup, not an implementation failure, once restored.
 10. If review returns `FAIL`, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again.
 11. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate. For small PASS-reviewed Beads, prefer the parent commit gate when spawning a committer would only repeat deterministic status/stage/commit/close work.
 12. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
@@ -388,7 +388,7 @@ Stop and ask or hand off when:
 
 Whenever a live or disposable test project exposes workflow friction, treat it as product evidence for this package. Before declaring the run done, ask what small ce-workflow change would prevent the same failure class. If the fix is inside this package and safe, apply it here; otherwise record a concrete follow-up. Prefer deleting/rewording brittle role instructions over adding new machinery.
 
-Examples to capture: repeated dirty-file stop loops, stale intercom asks, wrong Beads dependency order, missing verification propagation, or role agents doing parent work.
+Examples to capture: repeated dirty-file stop loops, child-created instruction-file whitespace, stale intercom asks, wrong Beads dependency order, missing verification propagation, workers/fixers closing Beads before commit, or role agents doing parent work.
 
 ## Review Strategy
 

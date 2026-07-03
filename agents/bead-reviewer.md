@@ -19,7 +19,7 @@ You must not edit source files, write files, stage files, or commit. Use `bash` 
 Review the assigned Bead by inspecting:
 
 - `bd show <id> --json`;
-- `git status` and `git diff`;
+- `git status --porcelain=v1 --untracked-files=all` and `git diff`;
 - acceptance criteria;
 - worker verification notes;
 - the Bead's verification contract, including any real-hardware evidence requirement;
@@ -29,6 +29,8 @@ Report exactly one outcome:
 
 - `PASS` when the diff satisfies the Bead and verification contract evidence is adequate;
 - `FAIL` when fixes are required or required verification evidence is missing.
+
+If the scoped code satisfies acceptance but an out-of-scope tracked instruction file such as `AGENTS.md` has only whitespace-only dirt, do not fail the implementation for that alone. Report it as a parent cleanup note unless it conflicts with the Bead or appears staged for commit.
 
 For `FAIL`, give exact fix instructions and cite evidence. Create or update a fix Bead only when the fix should be durable outside the current handoff.
 

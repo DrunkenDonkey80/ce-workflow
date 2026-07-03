@@ -184,6 +184,8 @@ for (const phrase of [
 	"Classify file names, not human diff/stat summaries",
 	"stale intercom",
 	"Live/Test Project Feedback Loop",
+	"Repeat this gate after every child returns",
+	"Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup",
 ]) {
 	check(`skill covers ${phrase}`, skill.includes(phrase));
 }
@@ -273,6 +275,7 @@ const agentRules = {
 		thinking: "medium",
 		must: [
 			"Do not commit",
+			"Do not close the Bead",
 			"claim the assigned Bead",
 			"same epic parent",
 			"verification contract",
@@ -291,6 +294,7 @@ const agentRules = {
 			"FAIL",
 			"read-only",
 			"verification contract",
+			"whitespace-only dirt",
 			"contact_supervisor` is unavailable",
 		],
 	},
@@ -315,6 +319,7 @@ const agentRules = {
 		must: [
 			"Fix only reviewer-identified issues",
 			"Do not commit",
+			"Do not close the Bead",
 			"verification contract",
 			"contact_supervisor` is unavailable",
 		],
