@@ -27,12 +27,23 @@ bd where
 git status --short --branch
 ```
 
-If no Beads workspace exists, stop and ask the user to initialize Beads in the target repo. Ignore Pi runtime artifacts such as `.pi-subagents/`; if they appear untracked, add them to `.gitignore` only when that is the smallest safe cleanup. If git is dirty, classify the files before launching a writer:
+If no Beads workspace exists, stop and ask the user to initialize Beads in the target repo. Ignore Pi runtime artifacts such as `.pi-subagents/`; if they appear untracked, add them to `.gitignore` only when that is the smallest safe cleanup. If git is dirty, run the worktree hygiene gate before launching a writer:
+
+```bash
+git status --porcelain=v1 --untracked-files=all
+git diff --name-only
+git diff --cached --name-only
+```
+
+Classify file names, not human diff/stat summaries such as `1 -0`:
 
 - belongs to the current Bead: include it and verify it;
-- unrelated but safe: leave it untouched;
+- unrelated but safe: leave it untouched and pass it to children as a known-unrelated dirty allowlist;
+- unrelated whitespace-only scratch in a tracked file, especially `AGENTS.md`/instructions touched by tooling: restore it before spawning children when it is clearly not user work;
 - conflicts with the current Bead: stop and ask;
 - completed work: create or update a Bead and commit that work first.
+
+Children should not rediscover already-classified dirt from chat memory. Include the exact related file list and known-unrelated dirty allowlist in every worker/reviewer/committer task.
 
 ## Verification Contract
 
@@ -192,19 +203,20 @@ Legacy alias for `Mode: resume`. Follow the same resolution and loop.
 Loop:
 
 1. Run `bd ready --json`.
-2. Inspect `bd children <epic-id> --json`. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
-3. Pick exactly one non-planning ready Bead belonging to or blocking the target epic.
-4. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
-5. Run `bd show <id> --json`.
-6. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, verify `bd ready --json` exposes the earliest executable slice and not the planning Bead or a later dependent slice, then stop at the planning boundary.
-7. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, and relevant paths.
-8. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available.
-9. If review returns `FAIL`, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again.
-10. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate.
-11. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
-12. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
-13. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
-14. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and `Next: start a fresh Pi session and run /work-resume <epic-id>` unless a blocker or true epic completion exists.
+2. Run the worktree hygiene gate and resolve/record dirty files before spawning any child. Prefer one parent cleanup over repeated child stop/retry loops.
+3. Inspect `bd children <epic-id> --json`. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
+4. Pick exactly one non-planning ready Bead belonging to or blocking the target epic.
+5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
+6. Run `bd show <id> --json`.
+7. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, verify `bd ready --json` exposes the earliest executable slice and not the planning Bead or a later dependent slice, then stop at the planning boundary.
+8. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, relevant paths, related file allowlist, and known-unrelated dirty allowlist.
+9. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available.
+10. If review returns `FAIL`, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again.
+11. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate. For small PASS-reviewed Beads, prefer the parent commit gate when spawning a committer would only repeat deterministic status/stage/commit/close work.
+12. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
+13. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
+14. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
+15. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and `Next: start a fresh Pi session and run /work-resume <epic-id>` unless a blocker or true epic completion exists.
 
 ## Mode: add
 
@@ -264,7 +276,7 @@ Keep the parent/main orchestrator on the user's chosen model/effort. For role ag
 - `reason: "need_decision"` for blocking product, architecture, scope, hardware, verification, or dirty-worktree decisions;
 - `reason: "progress_update"` for short non-blocking updates when discovery changes the plan.
 
-The parent relays the question to the user when needed, records the answer in Bead notes, then resumes the role loop. If `contact_supervisor` is unavailable, times out, or delivery fails, the child must persist the blocker in Beads (decision Bead or notes) and stop safely. Do not require the user to install `pi-intercom`, do not ask the user directly from a child, and do not guess decisions just to keep the run moving.
+The parent relays the question to the user when needed, records the answer in Bead notes, then resumes the role loop. Before answering a delayed intercom ask, run `intercom({ action: "pending" })` or equivalent; if the ask is no longer pending, the Bead is already closed, or the run has completed, treat it as stale intercom and do not restart work. If `contact_supervisor` is unavailable, times out, or delivery fails, the child must persist the blocker in Beads (decision Bead or notes) and stop safely. Do not require the user to install `pi-intercom`, do not ask the user directly from a child, and do not guess decisions just to keep the run moving.
 
 ### bead-migrator
 
@@ -302,7 +314,9 @@ Responsibilities:
 
 - claim the Bead;
 - read only relevant context;
+- inspect git with porcelain/name-only commands and do not parse diff/stat summaries as file content;
 - implement exactly that Bead;
+- ignore a parent-provided known-unrelated dirty allowlist unless those files conflict with the Bead;
 - run the Bead verification contract, including real hardware checks when required;
 - update notes with files changed, verification, and remaining work;
 - create discovered follow-up Beads when needed.
@@ -348,9 +362,10 @@ Commit and close gate. Must not edit source code.
 
 Responsibilities:
 
-- inspect `git status` and diff;
+- inspect `git status` and diff with porcelain/name-only commands;
 - confirm the verification contract passed;
 - commit only related files;
+- leave parent-declared known-unrelated dirty files unstaged and report them, stopping only if they conflict or are not on the allowlist;
 - use commit message `<bead-id>: <summary>`;
 - after commit, re-run `git status --short`; if related files changed due autoformat/test tooling, rerun verification and commit those changes before closing;
 - close the Bead only after the commit exists and no related dirty files remain;
@@ -368,6 +383,12 @@ Stop and ask or hand off when:
 - dirty/manual changes need classification;
 - acceptance criteria conflict with the implementation plan;
 - required verification cannot run and no safe substitute exists.
+
+## Live/Test Project Feedback Loop
+
+Whenever a live or disposable test project exposes workflow friction, treat it as product evidence for this package. Before declaring the run done, ask what small ce-workflow change would prevent the same failure class. If the fix is inside this package and safe, apply it here; otherwise record a concrete follow-up. Prefer deleting/rewording brittle role instructions over adding new machinery.
+
+Examples to capture: repeated dirty-file stop loops, stale intercom asks, wrong Beads dependency order, missing verification propagation, or role agents doing parent work.
 
 ## Review Strategy
 

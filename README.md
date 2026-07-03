@@ -72,8 +72,21 @@ bd prime
 - Chat memory is not source of truth.
 - One executable Bead is the default session boundary: close/commit/checkpoint it, then run `/work-resume <epic-id>` again from a fresh Pi session.
 - Manual dirty changes are classified before writer agents run.
+- Use `git status --porcelain=v1 --untracked-files=all` and `git diff --name-only`; do not treat human diff/stat summaries like `1 -0` as file content.
+- Known-unrelated dirty files are passed to children as an allowlist, and unrelated whitespace-only scratch in tracked instruction files is restored before spawning children when it is clearly not user work.
 - Project verification contracts from `AGENTS.md`/docs are copied into Bead acceptance and enforced before close.
 - Work happens one ready Bead at a time unless isolated worktrees are explicitly used.
+
+## Live/test feedback loop
+
+Whenever a disposable or real project run exposes workflow friction, feed it back into this package before calling the run done. Ask: what small `ce-workflow` change would prevent this class of failure next time? Apply the safe fix here, or record a concrete follow-up.
+
+Recent examples this package now handles:
+
+- repeated dirty-file stop loops from whitespace-only `AGENTS.md` changes;
+- agents misreading `git diff --stat`/numstat lines as source content;
+- delayed/stale intercom asks after the Bead was already closed;
+- unnecessary committer-agent spawn when the parent can run the deterministic commit gate.
 
 ## Master plan epics
 
@@ -279,7 +292,13 @@ If a worker discovers a product choice, the parent receives the question. Reply 
 Use the simpler local-file format. Do not add sync yet.
 ```
 
-The parent records the answer in Beads notes and resumes the role loop. If messages do not appear, run:
+The parent records the answer in Beads notes and resumes the role loop. If a delayed ask appears after a run already completed, first check pending state:
+
+```text
+intercom({ action: "pending" })
+```
+
+If there is no pending ask, the Bead is closed, or the child run already exited, treat it as stale intercom and do not restart work. If messages do not appear, run:
 
 ```text
 /subagents-doctor

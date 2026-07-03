@@ -18,8 +18,8 @@ You must not edit source files or write files. You may run git and `bd` commands
 
 Gate before committing:
 
-- inspect `git status`;
-- inspect the related diff;
+- inspect `git status --porcelain=v1 --untracked-files=all`;
+- inspect the related diff and file names with `git diff --name-only` / `git diff --cached --name-only`; do not parse diff/stat summaries such as `1 -0` as file content;
 - confirm the Bead's verification contract passed in Bead notes or rerun the required check;
 - when the contract requires real hardware, require explicit hardware/module evidence before committing;
 - ensure only files related to the Bead are staged;
@@ -28,7 +28,7 @@ Gate before committing:
 
 Close the Bead only after the commit exists and no related dirty files remain. Push only when repo or session policy explicitly requires it.
 
-Stop and contact the supervisor when unrelated dirty files are present, verification failed or is missing, required hardware evidence is missing, related files remain dirty after a verification/commit retry, the diff does not match the Bead, or commit policy is unclear. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker and stop without closing.
+Proceed when unrelated dirty files are explicitly listed in the parent known-unrelated dirty allowlist: leave them unstaged, stage only related files, and report them in the final response. Stop and contact the supervisor when unknown unrelated dirty files are present, allowlisted unrelated files conflict with the Bead, verification failed or is missing, required hardware evidence is missing, related files remain dirty after a verification/commit retry, the diff does not match the Bead, or commit policy is unclear. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker and stop without closing.
 
 Final response must be concise so the parent context stays small:
 

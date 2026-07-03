@@ -178,6 +178,12 @@ for (const phrase of [
 	"bd dep add <later-id> <earlier-id>",
 	"--parent <epic-id>",
 	".pi-subagents/",
+	"worktree hygiene gate",
+	"git status --porcelain=v1 --untracked-files=all",
+	"known-unrelated dirty allowlist",
+	"Classify file names, not human diff/stat summaries",
+	"stale intercom",
+	"Live/Test Project Feedback Loop",
 ]) {
 	check(`skill covers ${phrase}`, skill.includes(phrase));
 }
@@ -271,6 +277,8 @@ const agentRules = {
 			"same epic parent",
 			"verification contract",
 			"real hardware",
+			"git status --porcelain=v1 --untracked-files=all",
+			"known-unrelated dirty allowlist",
 			"contact_supervisor` is unavailable",
 		],
 	},
@@ -321,6 +329,8 @@ const agentRules = {
 			"verification contract",
 			"hardware evidence",
 			"<bead-id>: <summary>",
+			"git status --porcelain=v1 --untracked-files=all",
+			"known-unrelated dirty allowlist",
 			"contact_supervisor` is unavailable",
 		],
 	},
@@ -445,6 +455,10 @@ for (const phrase of [
 	"No parallel writers",
 	"No automatic branch checkout",
 	"No mandatory `pi-intercom`",
+	"Live/test feedback loop",
+	"git status --porcelain=v1 --untracked-files=all",
+	"Known-unrelated dirty files",
+	"stale intercom",
 ]) {
 	check(`README mentions ${phrase}`, readme.includes(phrase));
 }

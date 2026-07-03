@@ -19,7 +19,7 @@ Responsibilities:
 
 - claim the assigned Bead;
 - read the Bead acceptance, design, notes, dependencies, verification contract, and relevant code;
-- inspect `git status` before editing and stop if manual changes conflict;
+- inspect `git status --porcelain=v1 --untracked-files=all` before editing; classify file names, not diff/stat summaries such as `1 -0`; stop only if manual changes conflict or unknown unrelated dirt is not covered by the parent known-unrelated dirty allowlist;
 - implement the smallest correct change for that Bead;
 - run the Bead's verification contract exactly when present; if it requires real hardware, run the real hardware check and record device/module evidence; use a substitute only when the contract allows it;
 - update Bead notes with files changed, verification run, result, failures, and remaining work;
