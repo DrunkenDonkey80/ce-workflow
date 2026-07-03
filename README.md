@@ -135,14 +135,14 @@ When there is no obvious latest epic, `/work-resume` lists active epics with cre
 
 ## Context management
 
-The package installs a proactive compaction hook. At turn or prompt boundaries, when context reaches the lower of 100k tokens or 45% of the active model window, it calls Pi compaction before normal auto-compaction/overflow. The package supplies an instant local summary instead of asking another LLM: it preserves recent user-visible goals, previous summary, file lists, and next recovery command, while dropping assistant reasoning and full tool-result logs.
+The package installs `/work-context`, but it does not pre-prompt compact normal chats by default. Pi's native/ultracompact auto-compaction can keep running normally. If you explicitly enable the work guard, it checks at turn boundaries and compacts at 150k tokens (capped by the active model window). `/work-context compact` and opted-in work guard compactions use an instant local summary instead of another LLM call.
 
 Useful commands:
 
 ```text
 /work-context status
 /work-context compact
-/work-context set 80000
+/work-context set 150000
 /work-context off
 ```
 
@@ -153,14 +153,16 @@ Settings are optional and live in `.pi/settings.json`:
   "workOrchestrator": {
     "context": {
       "enabled": true,
-      "compactAtTokens": 100000,
+      "autoCompact": false,
+      "compactAtTokens": 150000,
+      "keepRecentTokens": 30000,
       "maxSummaryChars": 24000
     }
   }
 }
 ```
 
-Use fresh sessions between Beads anyway; compacting keeps long single-Bead debug/review loops from rotting, not a reason to run an entire epic in one chat.
+Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Use fresh sessions between Beads anyway; compacting keeps long single-Bead debug/review loops from rotting, not a reason to run an entire epic in one chat.
 
 ## Migrating existing projects
 

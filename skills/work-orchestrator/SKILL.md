@@ -245,10 +245,10 @@ Use `pi-subagents` from the parent session. Children get concrete Bead IDs and m
 
 ## Context Budget Policy
 
-Beads and git preserve the memory; Pi chat is disposable working context. The package extension registers `/work-context` and a proactive compaction hook: at prompt/turn boundaries it compacts before normal auto-compaction/overflow, using an instant local summary that drops assistant reasoning and full tool logs.
+Beads and git preserve the memory; Pi chat is disposable working context. The package extension registers `/work-context`; it does not force pre-prompt compaction in normal chats. Pi's native/ultracompact auto-compaction remains responsible unless the user explicitly enables the work guard.
 
 - before any compact/restart boundary, write the current decision, changed files, verification, blockers, and next command into Bead notes;
-- rely on `/work-context status` for current token/trigger state; default trigger is the lower of 100k tokens or 45% of model context;
+- rely on `/work-context status` for current token/trigger state; default opt-in trigger is 150k tokens, capped by model context, and keeps at least the latest 30k tokens via Pi compaction settings;
 - compact only inside a single Bead when context gets high or after a noisy debug/review phase;
 - after one executable Bead is committed and closed, stop instead of continuing to the next unrelated slice in the same session;
 - if the user explicitly requests continuous mode, run at most one more ready Bead after a compact/checkpoint boundary and stop when context budget is high.

@@ -48,11 +48,13 @@ const SLOTS = [
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 const DEFAULT_CONTEXT = {
 	enabled: true,
-	compactAtTokens: 100_000,
+	autoCompact: false,
+	compactAtTokens: 150_000,
+	keepRecentTokens: 30_000,
 	maxSummaryChars: 24_000,
 };
 const MIN_COMPACT_AT_TOKENS = 30_000;
-let contextCompactInFlight = false;
+const contextCompactState = { inFlight: false, requested: false };
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -83,6 +85,11 @@ function setContextSettings(settings, next) {
 		...contextSettings(settings),
 		...next,
 	};
+	settings.compaction ??= {};
+	settings.compaction.keepRecentTokens = Math.max(
+		DEFAULT_CONTEXT.keepRecentTokens,
+		Number(settings.compaction.keepRecentTokens) || 0,
+	);
 }
 
 function clampCompactAt(value) {
@@ -97,7 +104,7 @@ function compactTriggerTokens(ctx, settings) {
 	if (!contextWindow) return configured;
 	return Math.max(
 		MIN_COMPACT_AT_TOKENS,
-		Math.min(configured, Math.floor(contextWindow * 0.45)),
+		Math.min(configured, contextWindow - DEFAULT_CONTEXT.keepRecentTokens),
 	);
 }
 
@@ -309,29 +316,40 @@ function contextStatus(ctx, settings) {
 	const trigger = compactTriggerTokens(ctx, settings);
 	return [
 		`Work context guard: ${current.enabled === false ? "disabled" : "enabled"}`,
+		`Auto compact: ${current.autoCompact === true ? "enabled" : "disabled"}`,
 		`Usage: ${usage?.tokens ? `${usage.tokens.toLocaleString()} tokens` : "unknown"}`,
 		`Trigger: ${trigger.toLocaleString()} tokens`,
+		`Keep recent: ${Math.max(DEFAULT_CONTEXT.keepRecentTokens, Number(settings.compaction?.keepRecentTokens) || 0).toLocaleString()} tokens`,
 		`Summary budget: ${Number(current.maxSummaryChars ?? DEFAULT_CONTEXT.maxSummaryChars).toLocaleString()} chars`,
-		"Compaction style: instant, local, no LLM call; drops reasoning and full tool logs.",
+		"Compaction style: instant, local, no LLM call; only for /work-context or opted-in work auto-compaction.",
 	].join("\n");
 }
 
 function maybeCompact(ctx, settings, reason) {
 	const current = contextSettings(settings);
-	if (current.enabled === false || contextCompactInFlight) return false;
+	if (
+		current.enabled === false ||
+		current.autoCompact !== true ||
+		contextCompactState.inFlight
+	)
+		return false;
 	const usage = ctx.getContextUsage?.();
 	if (!usage?.tokens) return false;
 	const trigger = compactTriggerTokens(ctx, settings);
 	if (usage.tokens < trigger) return false;
-	contextCompactInFlight = true;
+	contextCompactState.inFlight = true;
+	contextCompactState.requested = true;
 	ctx.compact({
 		customInstructions: `work-orchestrator proactive ${reason}: preserve goals, Beads/git state, file changes, blockers, and next command; omit reasoning and full tool logs.`,
-		onComplete: () => {
-			contextCompactInFlight = false;
+			onComplete: () => {
+			contextCompactState.inFlight = false;
+			contextCompactState.requested = false;
 			ctx.ui.notify("Work context compacted before rot", "info");
 		},
+
 		onError: (error) => {
-			contextCompactInFlight = false;
+			contextCompactState.inFlight = false;
+			contextCompactState.requested = false;
 			ctx.ui.notify(
 				`Work context compaction failed: ${error.message}`,
 				"warning",
@@ -549,6 +567,8 @@ function buildWorkStatus(cwd, target) {
 
 export default function workModelsExtension(pi) {
 	pi.on("session_before_compact", async (event, ctx) => {
+		const instructions = event.customInstructions ?? "";
+		if (!contextCompactState.requested && !instructions.includes("work-context")) return;
 		let settings = {};
 		try {
 			settings = readSettings(ctx.cwd);
@@ -556,7 +576,7 @@ export default function workModelsExtension(pi) {
 			// Ignore unreadable project settings and keep compaction safe.
 		}
 		const current = contextSettings(settings);
-		if (current.enabled === false) return;
+		if (current.enabled === false && !contextCompactState.requested) return;
 		return {
 			compaction: {
 				summary: instantSummary(
@@ -575,7 +595,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_compact", async () => {
-		contextCompactInFlight = false;
+		contextCompactState.inFlight = false;
+		contextCompactState.requested = false;
 	});
 
 	pi.on("turn_end", async (_event, ctx) => {
@@ -583,14 +604,6 @@ export default function workModelsExtension(pi) {
 			maybeCompact(ctx, readSettings(ctx.cwd), "turn boundary");
 		} catch {
 			maybeCompact(ctx, {}, "turn boundary");
-		}
-	});
-
-	pi.on("before_agent_start", async (_event, ctx) => {
-		try {
-			maybeCompact(ctx, readSettings(ctx.cwd), "prompt boundary");
-		} catch {
-			maybeCompact(ctx, {}, "prompt boundary");
 		}
 	});
 
@@ -628,26 +641,32 @@ export default function workModelsExtension(pi) {
 				return;
 			}
 			if (command === "compact") {
+				contextCompactState.requested = true;
 				ctx.compact({
 					customInstructions:
 						"manual work-context compact: preserve Beads/git state, files, blockers, and next command; omit reasoning and full tool logs.",
-					onComplete: () => ctx.ui.notify("Work context compacted", "info"),
-					onError: (error) =>
+					onComplete: () => {
+						contextCompactState.requested = false;
+						ctx.ui.notify("Work context compacted", "info");
+					},
+					onError: (error) => {
+						contextCompactState.requested = false;
 						ctx.ui.notify(
 							`Work context compaction failed: ${error.message}`,
 							"warning",
-						),
+						);
+					},
 				});
 				return;
 			}
 			if (command === "off" || command === "disable") {
-				setContextSettings(settings, { enabled: false });
+				setContextSettings(settings, { enabled: false, autoCompact: false });
 				writeSettings(ctx.cwd, settings);
 				ctx.ui.notify("Disabled work context guard", "info");
 				return;
 			}
 			if (command === "on" || command === "enable") {
-				setContextSettings(settings, { enabled: true });
+				setContextSettings(settings, { enabled: true, autoCompact: true });
 				writeSettings(ctx.cwd, settings);
 				ctx.ui.notify("Enabled work context guard", "info");
 				return;
