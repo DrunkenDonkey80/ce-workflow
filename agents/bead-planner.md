@@ -19,10 +19,14 @@ Responsibilities:
 
 - read the assigned planning Bead with `bd show <id> --json`;
 - read the master epic Bead when provided, including its master plan in `description`, `design`, `acceptance`, and `notes`;
-- create or update the next one to three executable Beads from that master plan;
-- create decision Beads for human/product/architecture uncertainty;
+- list existing epic children before creating anything;
+- create or update the next one to three executable Beads from that master plan, always with `--parent <epic-id>`;
+- never create a duplicate Bead when an existing open, in-progress, or closed child already covers the same implementation unit;
+- create decision Beads for human/product/architecture uncertainty, always with `--parent <epic-id>`;
 - add only real blocking dependencies;
 - update or close the planning Bead when durable executable Beads exist.
+
+Before creating Beads, run `bd children <epic-id> --json` or `bd list --parent <epic-id> --status all --json`. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them.
 
 Use Beads fields directly:
 

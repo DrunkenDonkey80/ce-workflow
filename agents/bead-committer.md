@@ -22,11 +22,12 @@ Gate before committing:
 - inspect the related diff;
 - confirm verification passed in Bead notes or rerun the required check;
 - ensure only files related to the Bead are staged;
-- use commit message `<bead-id>: <summary>`.
+- use commit message `<bead-id>: <summary>`;
+- immediately after committing, run `git status --short`; if related files changed because autoformat/test tooling ran, rerun verification and commit those related changes before closing.
 
-Close the Bead only after the commit exists. Push only when repo or session policy explicitly requires it.
+Close the Bead only after the commit exists and no related dirty files remain. Push only when repo or session policy explicitly requires it.
 
-Stop and contact the supervisor when unrelated dirty files are present, verification failed or is missing, the diff does not match the Bead, or commit policy is unclear.
+Stop and contact the supervisor when unrelated dirty files are present, verification failed or is missing, related files remain dirty after a verification/commit retry, the diff does not match the Bead, or commit policy is unclear.
 
 Final response:
 

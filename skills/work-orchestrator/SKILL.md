@@ -25,7 +25,7 @@ bd where
 git status --short --branch
 ```
 
-If no Beads workspace exists, stop and ask the user to initialize Beads in the target repo. If git is dirty, classify the files before launching a writer:
+If no Beads workspace exists, stop and ask the user to initialize Beads in the target repo. Ignore Pi runtime artifacts such as `.pi-subagents/`; if they appear untracked, add them to `.gitignore` only when that is the smallest safe cleanup. If git is dirty, classify the files before launching a writer:
 
 - belongs to the current Bead: include it and verify it;
 - unrelated but safe: leave it untouched;
@@ -46,6 +46,8 @@ Use core Beads fields before inventing metadata:
 - `notes`: progress, files changed, verification result, handoff.
 - dependencies: only real blockers.
 
+Every non-epic Bead created inside an epic must use Beads hierarchy (`bd create --parent <epic-id>` or the equivalent). Do not create top-level task/decision Beads for epic work.
+
 Use labels for workflow state:
 
 - `wo:planning`
@@ -61,20 +63,21 @@ Use to create a new master epic from a brainstorm, rough feature idea, or existi
 
 When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Tell `ce-plan` to auto-accept plan creation and skip interactive confirmation unless it needs a real human decision. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
 
-1. Create a master epic Bead with the master plan captured in Beads fields.
-2. Create an initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next one to three executable slices.
-3. Launch `bead-planner`.
-4. Planner creates executable Beads and decision Beads.
-5. Start `Mode: resume` for the epic.
+1. Create only the master epic Bead with the master plan captured in Beads fields.
+2. Create only one initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next one to three executable slices.
+3. Do not create executable task Beads in the parent; that is only `bead-planner`'s job.
+4. Launch `bead-planner`.
+5. Planner creates or reuses executable Beads and decision Beads.
+6. Start `Mode: resume` for the epic.
 
-Do not implement until the epic contains the master plan and durable executable Beads exist.
+Do not implement until the epic contains the master plan and durable executable Beads exist. Do not create duplicate task Beads for the same implementation unit.
 
 ## Mode: small
 
 Use for clear, low-risk changes in one or two files inside an existing epic.
 
 1. Resolve the active epic first; if ambiguous, ask.
-2. Create a child or related Bead for the task unless an existing Bead already matches it.
+2. Create a child Bead under that epic (`--parent <epic-id>`) unless an existing Bead already matches it.
 3. Claim it.
 4. Implement directly or launch `bead-worker` for exactly that Bead.
 5. Run the smallest real verification.
@@ -143,13 +146,15 @@ Loop:
 6. Launch `bead-reviewer` against the diff, Bead acceptance, and verification notes.
 7. If review returns `FAIL`, launch `bead-fixer`, then review again.
 8. After `PASS`, launch `bead-committer` or commit in the parent with the same gate.
-9. Repeat until a stop condition fires.
+9. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, and `bd list --status=open --json` plus `bd list --status=in_progress --json` for the target epic.
+10. If autoformat/test tooling changed related files after commit, verify and commit those related changes before moving on; do not report completion with dirty related files.
+11. Repeat until a stop condition fires.
 
 ## Mode: add
 
 Use when new work appears during an active epic.
 
-1. Create a new Bead with current context and `discovered-from:<current-bead-id>` in notes.
+1. Create a new Bead under the active epic (`--parent <epic-id>`) with current context and `discovered-from:<current-bead-id>` in notes.
 2. If it blocks current work, add a real dependency.
 3. If optional or future, do not block the active Bead.
 4. If the user says to do it now, run it as small or med work, then return to the previous epic.
@@ -186,8 +191,9 @@ Allowed to mutate Beads through `bd`. Must not edit source code.
 Responsibilities:
 
 - read the planning Bead and master epic, including the epic's master plan fields;
-- create the next one to three executable Beads when needed;
-- create decision Beads for uncertainty;
+- list existing children of the epic before creating anything;
+- create the next one to three executable Beads under the epic (`--parent <epic-id>`) only when no existing open/in-progress/closed child already covers that implementation unit;
+- create decision Beads for uncertainty under the epic (`--parent <epic-id>`);
 - add only real `blocks` dependencies;
 - close or update the planning Bead when durable Beads exist.
 
@@ -237,7 +243,8 @@ Responsibilities:
 - confirm verification passed;
 - commit only related files;
 - use commit message `<bead-id>: <summary>`;
-- close the Bead only after the commit exists;
+- after commit, re-run `git status --short`; if related files changed due autoformat/test tooling, rerun verification and commit those changes before closing;
+- close the Bead only after the commit exists and no related dirty files remain;
 - push only when repo/session policy requires it.
 
 ## Stop Conditions

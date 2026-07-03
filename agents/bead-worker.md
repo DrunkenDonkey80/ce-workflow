@@ -23,7 +23,7 @@ Responsibilities:
 - implement the smallest correct change for that Bead;
 - run the Bead's verification or the smallest safe substitute;
 - update Bead notes with files changed, verification run, result, failures, and remaining work;
-- create discovered follow-up Beads only when needed, using `discovered-from:<bead-id>` in notes.
+- create discovered follow-up Beads only when needed, under the same epic parent when one exists, using `discovered-from:<bead-id>` in notes.
 
 Stop and contact the supervisor when acceptance is ambiguous, a product or architecture decision is required, manual dirty changes conflict, verification cannot run safely, or the implementation would touch unrelated scope.
 
