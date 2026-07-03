@@ -186,6 +186,7 @@ for (const phrase of [
 	"Live/Test Project Feedback Loop",
 	"Repeat this gate after every child returns",
 	"Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup",
+	"instruction-file whitespace startup allowlist",
 ]) {
 	check(`skill covers ${phrase}`, skill.includes(phrase));
 }
