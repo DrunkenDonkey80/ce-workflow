@@ -39,11 +39,11 @@ bd prime
 
 | Command | Use when | What it does |
 | --- | --- | --- |
-| `/work-master <brainstorm-or-plan>` | New brainstorm, idea, or master plan | Runs `ce-plan` when needed, saves the master plan into an epic Bead, then creates planning/slice Beads |
-| `/work-migrate <sources>` | Existing plans, TODOs, tracker exports, partial implementations, or branches | Imports legacy state into one epic plus child Beads without editing code or changing branches |
-| `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Creates/claims a Bead, implements, verifies, lightly reviews, commits, closes |
-| `/work-med <task>` | Bounded work inside an epic with a few choices | Creates a parent Bead and one to three executable child Beads, then works ready slices |
-| `/work-big <task>` | Large, risky, or architectural slice inside an epic | Creates a planning Bead under the active epic, then slices it before implementation |
+| `/work-master <brainstorm-or-plan>` | New brainstorm, idea, or master plan | Extension command: creates an epic from an existing master plan, or hands raw/source input to `ce-plan` before Beads mutation |
+| `/work-migrate <sources>` | Existing plans, TODOs, tracker exports, partial implementations, or branches | Extension command: normalizes migration sources and hands them to `bead-migrator` without editing code or changing branches |
+| `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Extension command: creates one child Bead, then hands it to the implementation role loop |
+| `/work-med <task>` | Bounded work inside an epic with a few choices | Extension command: creates one planning Bead for one to three executable children, then hands it to `bead-planner` |
+| `/work-big <task>` | Large, risky, or architectural slice inside an epic | Extension command: creates one planning Bead for deeper slicing, then hands it to `bead-planner` |
 | `/work-debug <bug-or-bead-id\|symptom[: guidance]>` | Failing test, blocked/debug-needed Bead, regression, or broken behavior | Extension command: resolves/reuses or creates a debug Bead, then hands that compact state to the existing debug role loop |
 | `/work-auto <task>` | You want the orchestrator to classify size | Extension command: rejects empty input, routes explicit blocked/debug-needed Beads to debug, otherwise hands unchanged text to the auto skill path |
 | `/work-resume [epic-id\|last]` | Resume epic work | Extension command: deterministically resolves Beads/git state, selects one safe next action, then hands that compact state to the existing role loop |
@@ -51,6 +51,7 @@ bd prime
 | `/work-add [--epic <id>] [--blocked-by <bead-id>] <task>` | Add urgent or discovered work mid-epic | Extension command: creates one child Bead under an unambiguous epic and adds only explicit `--blocked-by` dependencies |
 | `/work-pause [note]` | Stop safely | Extension command: appends a deterministic checkpoint with git files, verification, failures, remaining work, and next step |
 | `/work-report [epic-id\|last\|bead-id] [--json]` | Human handoff for blockers | Extension command: deterministic blocked/debug-needed Bead report, failure artifacts, dependencies, suggested debug commands, and optional JSON |
+| `/work-finish <bead-id\|epic-id>` | Classify commit/close readiness | Extension command: checks PASS review, verification evidence, related dirty files, and emits a deterministic commit-ready or stop state |
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
 | `/work-models [status\|reset]` | Pick role models/effort | Extension command with model/effort picker; persists overrides to `.pi/settings.json` |
@@ -62,11 +63,13 @@ bd prime
 3. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
 4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
 5. `/work-resume` rebuilds state from Beads and git in extension code, picks one safe action, and hands a compact prompt to role agents; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
-6. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
-7. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
-8. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
-9. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
-10. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+6. `/work-small`, `/work-med`, `/work-big`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
+7. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
+8. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
+9. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
+10. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
+11. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
+12. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 

@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. The extension commands `/work-status` and `/work-report` provide cheap deterministic status and blocker handoff views when loaded.
+Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-finish`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. Extension commands provide cheap deterministic status, report, resume, start-gate, pause/debug/add/auto intake, and finish-gate state when loaded.
 
 ## Source of Truth
 
@@ -216,7 +216,7 @@ Legacy alias for `Mode: resume`. Follow the same resolution and loop.
 
 If the prompt starts with "Use the work-orchestrator skill in mode: resume with this precomputed extension state", trust that extension-resolved epic/action/selected Bead as the starting point. Verify Beads/git freshness, then continue at the matching loop step below instead of repeating target selection or ready-work discovery.
 
-If the prompt starts with a precomputed extension state for `debug`, `add`, `pause`, or `auto`, trust its resolved target/action as intake state, verify Beads/git freshness, then continue at that mode's role-loop boundary instead of rediscovering the target.
+If the prompt starts with a precomputed extension state for `small`, `med`, `big`, `master`, `migrate`, or `finish` (or for `debug`, `add`, `pause`, or `auto`), trust its resolved target/action as intake state, verify Beads/git freshness, then continue at that mode's role-loop or stop boundary instead of rediscovering the target.
 
 Loop:
 

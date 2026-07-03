@@ -84,6 +84,38 @@ const scenarioChildren = {
 			labels: ["wo:blocked"],
 		},
 	],
+	finishReady: [
+		{
+			id: "FIN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Finishable slice",
+			notes:
+				"Review: PASS\nVerification: npm run verify passed\nFiles: extensions/work-models.js",
+		},
+	],
+	finishMissingReview: [
+		{
+			id: "FIN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Unreviewed slice",
+			notes:
+				"Verification: npm run verify passed\nFiles: extensions/work-models.js",
+		},
+	],
+	finishMissingVerification: [
+		{
+			id: "FIN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Unverified slice",
+			notes: "Review: PASS\nFiles: extensions/work-models.js",
+		},
+	],
 };
 
 export function assert(ok, message) {
@@ -136,7 +168,8 @@ else if (args[0] === "show") {
   const type = fieldAfter("--type") || "task";
   const parent = fieldAfter("--parent");
   const notes = fieldAfter("--append-notes");
-  const id = (type === "bug" ? "BUG-NEW-" : "TASK-NEW-") + state.next++;
+  const prefix = type === "bug" ? "BUG-NEW-" : type === "epic" ? "E-NEW-" : "TASK-NEW-";
+  const id = prefix + state.next++;
   const issue = { id, parent_id: parent, issue_type: type, status: "open", title: args[1], notes };
   state.children.push(issue);
   save(); log({ op: "create", issue }); out(issue);
