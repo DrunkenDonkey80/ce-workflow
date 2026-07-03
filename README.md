@@ -2,7 +2,7 @@
 
 Beads-backed Pi workflow package for running software work through short `/work-*` commands.
 
-The package is intentionally boring: one skill, one tiny settings extension, twelve prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
+The package is intentionally boring: one skill, one tiny settings/status extension, eleven prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
 
 ## Install
 
@@ -46,12 +46,12 @@ bd prime
 | `/work-big <task>` | Large, risky, or architectural slice inside an epic | Creates a planning Bead under the active epic, then slices it before implementation |
 | `/work-debug <bug>` | Failing test, error, regression, or broken behavior | Creates a bug Bead, runs `ce-debug` through `bead-debugger`, verifies, and compounds reusable lessons |
 | `/work-auto <task>` | You want the orchestrator to classify size | Routes to small, med, debug, big, master, or migrate; asks before big/master/migrate/ambiguous work |
-| `/work-resume [epic-id\|last]` | Resume epic work | Resolves state from Beads; if unclear, lists active not-completed epics to pick from |
+| `/work-resume [epic-id\|last]` | Resume epic work | Resolves state from Beads, handles one executable Bead, then stops with status and the next resume command |
 | `/work-continue [epic-id\|last]` | Legacy resume alias | Same as `/work-resume` |
 | `/work-add <task>` | Add urgent or discovered work mid-epic | Creates a Bead, adds dependency only if truly blocking, optionally runs it now |
 | `/work-pause [note]` | Stop safely | Updates Bead notes with git status, changed files, verification, and next step |
-| `/work-status [epic-id\|last]` | Inspect state | Read-only Beads, git, and subagent status summary |
-| `/work-models [status\|reset]` | Pick role models/effort | Extension command with searchable model list; persists overrides to `.pi/settings.json` |
+| `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
+| `/work-models [status\|reset]` | Pick role models/effort | Extension command with model/effort picker; persists overrides to `.pi/settings.json` |
 
 ## Mental model
 
@@ -59,14 +59,16 @@ bd prime
 2. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 3. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
 4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer.
-5. `/work-resume` rebuilds state from Beads and git, not chat history.
-6. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+5. `/work-resume` rebuilds state from Beads and git, not chat history, and stops after one executable Bead so the next slice can start in a fresh session.
+6. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
+7. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 
 - Beads is the only durable work state: master plans, acceptance, status, dependencies, discovered work, and resume notes.
 - Git is the only code state: diffs, branches, commits, and changed files.
 - Chat memory is not source of truth.
+- One executable Bead is the default session boundary: close/commit/checkpoint it, then run `/work-resume <epic-id>` again from a fresh Pi session.
 - Manual dirty changes are classified before writer agents run.
 - Project verification contracts from `AGENTS.md`/docs are copied into Bead acceptance and enforced before close.
 - Work happens one ready Bead at a time unless isolated worktrees are explicitly used.
@@ -105,12 +107,13 @@ What happens:
 3. An epic Bead is created with scope, design, acceptance, and verification.
 4. A planning Bead is created under the epic.
 5. `bead-planner` creates one to three child task Beads under the epic.
-6. `/work-resume` starts executing ready work.
-7. `bead-worker` implements one Bead.
+6. `/work-resume` starts executing one ready Bead.
+7. `bead-worker` implements that Bead.
 8. `bead-reviewer` checks diff, acceptance, and verification evidence.
 9. `bead-fixer` fixes reviewer failures when needed.
 10. `bead-committer` commits related files with `<bead-id>: <summary>` and closes the Bead.
-11. The loop repeats until no ready work remains or a stop condition needs the user.
+11. The run prints status and the next `/work-resume <epic-id>` command. Start a fresh Pi session for the next slice.
+12. If no ready Bead exists but the epic is not complete, `/work-resume` asks `bead-planner` to compare the epic plan against existing children and create the next one to three slices instead of declaring done.
 
 Check progress any time:
 
@@ -125,6 +128,8 @@ Continue later, even in a fresh Pi session:
 ```
 
 When there is no obvious latest epic, `/work-resume` lists active epics with created date, last worked date, status, child counts, and one-line description so you can pick.
+
+`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command.
 
 ## Migrating existing projects
 
@@ -281,9 +286,9 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 ## Model and effort tuning
 
-Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose a searchable available model list and effort. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
+Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
 
-Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
+Role prompts use fresh child context by default and concise/file-artifact outputs so the parent session does not inherit every tool log. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {

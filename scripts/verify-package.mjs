@@ -49,9 +49,9 @@ check(
 );
 check("pi manifest exists", Boolean(pkg.pi));
 check(
-	"pi manifest exposes extensions",
+	"pi manifest exposes work-models extension file",
 	Array.isArray(pkg.pi?.extensions) &&
-		pkg.pi.extensions.includes("./extensions"),
+		pkg.pi.extensions.includes("extensions/work-models.js"),
 );
 check(
 	"pi manifest exposes skills",
@@ -67,8 +67,8 @@ check(
 		pkg.pi.subagents.agents.includes("./agents"),
 );
 check(
-	"@earendil-works/pi-tui listed as peer dependency",
-	Boolean(pkg.peerDependencies?.["@earendil-works/pi-tui"]),
+	"@earendil-works/pi-tui is not required",
+	!pkg.peerDependencies?.["@earendil-works/pi-tui"],
 );
 check(
 	"pi-subagents listed as peer dependency",
@@ -161,6 +161,11 @@ for (const phrase of [
 	"active not-completed epics",
 	"clean-boundary gate",
 	"duplicate task Beads",
+	"one executable Bead",
+	"context:fresh",
+	"bd children <epic-id> --json",
+	"percent complete",
+	"bead-planner` to compare the master plan",
 	"--parent <epic-id>",
 	".pi-subagents/",
 ]) {
@@ -183,7 +188,6 @@ const promptModes = {
 	"work-resume.md": "resume",
 	"work-continue.md": "continue",
 	"work-add.md": "add",
-	"work-status.md": "status",
 	"work-pause.md": "pause",
 };
 
@@ -191,8 +195,8 @@ const promptFiles = readdirSync(path.join(root, "prompts")).filter((file) =>
 	file.endsWith(".md"),
 );
 check(
-	"exactly twelve prompt templates",
-	promptFiles.length === 12,
+	"exactly eleven prompt templates",
+	promptFiles.length === 11,
 	promptFiles.join(", "),
 );
 for (const [file, mode] of Object.entries(promptModes)) {
@@ -360,11 +364,13 @@ for (const phrase of [
 	"bead-debugger",
 	"bead-reviewer",
 	"bead-committer",
+	'registerCommand("work-status"',
+	"buildWorkStatus",
+	"planned ahead",
+	"Progress: ${done.length}/${slices.length}",
 	"CONFIG_DIR_NAME",
-	"SelectList",
-	"decodeKittyPrintable",
-	"itemMatchesFilter",
-	"filter: ${filter",
+	"ctx.ui.select",
+	"choose(ctx",
 ]) {
 	check(`extension covers ${phrase}`, extension.includes(phrase));
 }
@@ -402,6 +408,8 @@ for (const phrase of [
 	"Model and effort tuning",
 	"subagents.agentOverrides",
 	"Blank model means",
+	"fresh Pi session",
+	"percent complete",
 	"No custom dashboard",
 	"No push automation",
 	"No parallel writers",

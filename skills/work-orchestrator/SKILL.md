@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents.
+Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. The extension command `/work-status` provides the cheap deterministic status view when loaded.
 
 ## Source of Truth
 
@@ -13,6 +13,7 @@ Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, 
 - Git is the only code state: changed files, diffs, commits, and branches live in git.
 - Chat memory is not source of truth. A fresh session must resume from `bd ready --json`, `bd list --status=in_progress --json`, and `git status`.
 - Work one ready Bead at a time unless isolated worktrees are explicitly used.
+- One executable Bead is the default session boundary: after committing/closing it, stop with the next `/work-resume <epic-id>` command instead of dragging old context into the next slice.
 - Do not overwrite manual edits silently.
 
 ## Preflight
@@ -173,7 +174,7 @@ If classification is big, master, migrate, or ambiguous, ask before starting. Do
 
 ## Mode: resume
 
-Argument may be an explicit epic Bead ID, `last`, or empty.
+Argument may be an explicit epic Bead ID, `last`, or empty. Default behavior is one executable Bead per invocation; the user can run `/work-resume <epic-id>` again from a fresh Pi session for the next slice.
 
 When empty or `last`, resolve from Beads, not chat memory:
 
@@ -191,16 +192,17 @@ Loop:
 
 1. Run `bd ready --json`.
 2. Pick exactly one ready Bead belonging to or blocking the target epic.
-3. Run `bd show <id> --json`.
-4. If it is a planning Bead, launch `bead-planner`.
-5. If it is an implementation Bead, launch `bead-worker`.
-6. Launch `bead-reviewer` against the diff, Bead acceptance, and verification notes.
-7. If review returns `FAIL`, launch `bead-fixer`, then review again.
-8. After `PASS`, launch `bead-committer` or commit in the parent with the same gate.
-9. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
-10. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, and `bd list --status=open --json` plus `bd list --status=in_progress --json` for the target epic.
-11. If autoformat/test tooling changed related files after commit, verify and commit those related changes before moving on; do not report completion with dirty related files.
-12. Repeat until a stop condition fires.
+3. If no ready Bead belongs to the target epic, inspect `bd children <epic-id> --json` and the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; stop after the planner reports so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
+4. Run `bd show <id> --json`.
+5. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, then stop at the planning boundary.
+6. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, and relevant paths.
+7. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available.
+8. If review returns `FAIL`, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again.
+9. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate.
+10. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
+11. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
+12. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
+13. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and `Next: start a fresh Pi session and run /work-resume <epic-id>` unless a blocker or true epic completion exists.
 
 ## Mode: add
 
@@ -222,19 +224,31 @@ Checkpoint and stop safely:
 
 ## Mode: status
 
-Read-only report:
+Read-only report. Prefer the extension command `/work-status` when available because it does not spend LLM context. If using the skill path, compute the same fields without mutating Beads or git:
 
-- active epic or in-progress Beads, with created date, last worked date, and one-line description;
-- ready Beads;
-- blocked Beads;
+- current epic ID, title, status, created date, last worked date, and one-line description;
+- slice progress: closed executable slices / total executable slices and percent complete;
+- ready slices, in-progress slices, planned-ahead/open slices that are not ready, open decisions, and planning Beads;
+- tasks completed and remaining by Beads status;
+- whether `bd ready` is empty because the epic is complete, blocked, or needs another `bead-planner` slicing pass;
 - git status;
-- active subagent runs when visible.
+- active subagent runs when visible;
+- next command, usually `/work-resume <epic-id>`.
 
 Do not mutate Beads or git in status mode.
 
 ## Role Loop
 
-Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role.
+Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Prefer file-only artifact output plus a short structured summary in the parent; do not paste long tool logs back into the control session.
+
+## Context Budget Policy
+
+Beads and git preserve the memory; Pi chat is disposable working context.
+
+- before any compact/restart boundary, write the current decision, changed files, verification, blockers, and next command into Bead notes;
+- compact only inside a single Bead when context gets high or after a noisy debug/review phase;
+- after one executable Bead is committed and closed, stop instead of continuing to the next unrelated slice in the same session;
+- if the user explicitly requests continuous mode, run at most one more ready Bead after a compact/checkpoint boundary and stop when context budget is high.
 
 ## Cost and Model Policy
 

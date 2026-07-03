@@ -21,11 +21,13 @@ Responsibilities:
 - read the master epic Bead when provided, including its master plan in `description`, `design`, `acceptance`, and `notes`;
 - read the repo verification contract from project instructions and the epic acceptance before creating children;
 - list existing epic children before creating anything;
-- create or update the next one to three executable Beads from that master plan, always with `--parent <epic-id>`;
+- compare the master plan against existing open, in-progress, and closed children every time, especially when `bd ready` is empty;
+- create or update the next one to three executable Beads from the remaining unsliced master-plan units, always with `--parent <epic-id>`;
 - never create a duplicate Bead when an existing open, in-progress, or closed child already covers the same implementation unit;
 - create decision Beads for human/product/architecture uncertainty, always with `--parent <epic-id>`;
 - add only real blocking dependencies;
-- update or close the planning Bead when durable executable Beads exist.
+- update or close the planning Bead when durable executable Beads exist;
+- report "epic complete" only when no master-plan implementation units remain and all child tasks/bugs are closed or deliberately deferred.
 
 Before creating Beads, run `bd children <epic-id> --json` or `bd list --parent <epic-id> --status all --json`. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them.
 
@@ -43,5 +45,7 @@ Final response:
 - created/updated Beads;
 - dependencies added;
 - decisions deferred;
+- remaining master-plan units not yet sliced;
+- whether the epic appears complete;
 - why the plan is now executable;
 - blockers, if any.

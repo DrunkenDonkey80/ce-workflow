@@ -1,16 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-	CONFIG_DIR_NAME,
-	DynamicBorder,
-} from "@earendil-works/pi-coding-agent";
-import {
-	decodeKittyPrintable,
-	getKeybindings,
-	SelectList,
-	Text,
-} from "@earendil-works/pi-tui";
 
+const CONFIG_DIR_NAME = ".pi";
 const INHERIT_MODEL = "__inherit_model__";
 const DEFAULT_THINKING = "__default_thinking__";
 const RESET_ALL = "__reset_all__";
@@ -104,102 +96,16 @@ function slotSummary(slot, settings) {
 	return `model:${model ?? "inherit current"} • effort:${thinking ?? `default ${slot.defaultThinking}`}`;
 }
 
-function itemMatchesFilter(item, filter) {
-	const terms = filter.toLowerCase().trim().split(/\s+/).filter(Boolean);
-	if (terms.length === 0) return true;
-	const haystack =
-		`${item.label} ${item.value} ${item.description ?? ""}`.toLowerCase();
-	return terms.every((term) => haystack.includes(term));
+function labelFor(item) {
+	return item.description
+		? `${item.label} — ${item.description}`
+		: item.label;
 }
 
-function printableInput(data) {
-	const kittyPrintable = decodeKittyPrintable(data);
-	if (kittyPrintable !== undefined) return kittyPrintable;
-	const hasControlChars = [...data].some((char) => {
-		const code = char.charCodeAt(0);
-		return code < 32 || code === 0x7f || (code >= 0x80 && code <= 0x9f);
-	});
-	return hasControlChars ? undefined : data;
-}
-
-async function pick(ctx, title, items, selectedValue) {
-	const result = await ctx.ui.custom((tui, theme, _kb, done) => {
-		let filter = "";
-		let list;
-
-		const listTheme = {
-			selectedPrefix: (text) => theme.fg("accent", text),
-			selectedText: (text) => theme.fg("accent", text),
-			description: (text) => theme.fg("muted", text),
-			scrollInfo: (text) => theme.fg("dim", text),
-			noMatch: (text) => theme.fg("warning", text),
-		};
-
-		function rebuildList(preferredValue) {
-			const filteredItems = items.filter((item) =>
-				itemMatchesFilter(item, filter),
-			);
-			list = new SelectList(
-				filteredItems,
-				Math.min(filteredItems.length || 1, 12),
-				listTheme,
-			);
-			const selectedIndex = filteredItems.findIndex(
-				(item) => item.value === preferredValue,
-			);
-			if (selectedIndex >= 0) list.setSelectedIndex(selectedIndex);
-			list.onSelect = (item) => done(item.value);
-			list.onCancel = () => done(null);
-		}
-
-		rebuildList(selectedValue);
-
-		return {
-			render: (width) => [
-				...new DynamicBorder((text) => theme.fg("accent", text)).render(width),
-				...new Text(theme.fg("accent", theme.bold(title))).render(width),
-				...new Text(
-					theme.fg("dim", `filter: ${filter || "(type to filter)"}`),
-				).render(width),
-				...list.render(width),
-				...new Text(
-					theme.fg(
-						"dim",
-						"type to filter • backspace edit • ↑↓ navigate • enter select • esc cancel",
-					),
-				).render(width),
-				...new DynamicBorder((text) => theme.fg("accent", text)).render(width),
-			],
-			invalidate: () => list.invalidate(),
-			handleInput: (data) => {
-				const kb = getKeybindings();
-				if (kb.matches(data, "tui.editor.deleteCharBackward") && filter) {
-					filter = filter.slice(0, -1);
-					rebuildList();
-					tui.requestRender();
-					return;
-				}
-				if (kb.matches(data, "tui.editor.deleteToLineStart") && filter) {
-					filter = "";
-					rebuildList(selectedValue);
-					tui.requestRender();
-					return;
-				}
-
-				const typed = printableInput(data);
-				if (typed) {
-					filter += typed;
-					rebuildList();
-					tui.requestRender();
-					return;
-				}
-
-				list.handleInput(data);
-				tui.requestRender();
-			},
-		};
-	});
-	return result;
+async function choose(ctx, title, items) {
+	const labels = items.map(labelFor);
+	const selected = await ctx.ui.select(title, labels);
+	return items[labels.indexOf(selected)]?.value;
 }
 
 async function modelItems(ctx) {
@@ -261,7 +167,214 @@ function notifySummary(ctx, settings) {
 	);
 }
 
+function run(cwd, command, args) {
+	return execFileSync(command, args, {
+		cwd,
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+	}).trim();
+}
+
+function bdJson(cwd, args) {
+	const raw = run(cwd, "bd", [...args, "--json"]);
+	return raw ? JSON.parse(raw) : [];
+}
+
+function one(value) {
+	return Array.isArray(value) ? value[0] : value;
+}
+
+function field(issue, ...names) {
+	for (const name of names) if (issue?.[name] !== undefined) return issue[name];
+	return undefined;
+}
+
+function idOf(issue) {
+	return field(issue, "id", "ID") ?? "unknown";
+}
+
+function typeOf(issue) {
+	return field(issue, "issue_type", "type") ?? "task";
+}
+
+function statusOf(issue) {
+	return field(issue, "status", "state") ?? "unknown";
+}
+
+function parentOf(issue) {
+	return field(issue, "parent_id", "parent", "parentId");
+}
+
+function titleOf(issue) {
+	return field(issue, "title", "summary") ?? idOf(issue);
+}
+
+function updatedAt(issue) {
+	return field(issue, "updated_at", "updated", "modified_at") ?? "";
+}
+
+function createdAt(issue) {
+	return field(issue, "created_at", "created") ?? "";
+}
+
+function shortDate(value) {
+	return value ? String(value).slice(0, 10) : "unknown";
+}
+
+function byUpdatedDesc(a, b) {
+	return String(updatedAt(b) || createdAt(b)).localeCompare(
+		String(updatedAt(a) || createdAt(a)),
+	);
+}
+
+function listEpics(cwd, status) {
+	try {
+		const items = bdJson(cwd, ["list", "--type=epic", `--status=${status}`]);
+		return Array.isArray(items) ? items : [];
+	} catch {
+		return [];
+	}
+}
+
+function resolveEpic(cwd, target) {
+	const wanted = target.trim();
+	if (wanted && wanted !== "last") return { epic: one(bdJson(cwd, ["show", wanted])) };
+
+	const candidates = [
+		...listEpics(cwd, "in_progress"),
+		...listEpics(cwd, "open"),
+	].sort(byUpdatedDesc);
+	if (candidates.length === 1) return { epic: candidates[0] };
+	if (candidates.length > 1) return { choices: candidates };
+	return { choices: [] };
+}
+
+function childrenOf(cwd, epicId) {
+	try {
+		const children = bdJson(cwd, ["children", epicId]);
+		if (Array.isArray(children)) return children;
+	} catch {
+		// Older bd versions may not have `children`.
+	}
+	try {
+		const children = bdJson(cwd, ["list", `--parent=${epicId}`]);
+		return Array.isArray(children) ? children : [];
+	} catch {
+		return [];
+	}
+}
+
+function readyIds(cwd, epicId) {
+	try {
+		return new Set(
+			bdJson(cwd, ["ready"])
+				.filter((issue) => parentOf(issue) === epicId)
+				.map(idOf),
+		);
+	} catch {
+		return new Set();
+	}
+}
+
+function isWorkSlice(issue) {
+	return !["epic", "decision"].includes(typeOf(issue));
+}
+
+function lineFor(issue) {
+	return `${idOf(issue)} ${statusOf(issue)} ${typeOf(issue)} — ${titleOf(issue)}`;
+}
+
+function buildWorkStatus(cwd, target) {
+	const resolved = resolveEpic(cwd, target);
+	if (resolved.choices) {
+		if (resolved.choices.length === 0)
+			return "No open or in-progress epic found. Use /work-master or /work-migrate first.";
+		return [
+			"Multiple active epics. Run /work-status <epic-id> or /work-resume <epic-id>.",
+			...resolved.choices.map(
+				(epic) =>
+					`- ${idOf(epic)} ${statusOf(epic)} — ${titleOf(epic)} (updated ${shortDate(updatedAt(epic))})`,
+			),
+		].join("\n");
+	}
+
+	const epic = resolved.epic;
+	const epicId = idOf(epic);
+	const children = childrenOf(cwd, epicId);
+	const ready = readyIds(cwd, epicId);
+	const slices = children.filter(isWorkSlice);
+	const done = slices.filter((issue) => statusOf(issue) === "closed");
+	const active = slices.filter((issue) => statusOf(issue) === "in_progress");
+	const readySlices = slices.filter((issue) => ready.has(idOf(issue)));
+	const planned = slices.filter(
+		(issue) => statusOf(issue) === "open" && !ready.has(idOf(issue)),
+	);
+	const decisions = children.filter(
+		(issue) => typeOf(issue) === "decision" && statusOf(issue) !== "closed",
+	);
+	const planning = children.filter(
+		(issue) => /wo:planning/.test(JSON.stringify(issue)) && statusOf(issue) !== "closed",
+	);
+	const percent = slices.length
+		? Math.round((done.length / slices.length) * 100)
+		: 0;
+	const gitStatus = (() => {
+		try {
+			return run(cwd, "git", ["status", "--short", "--branch"]);
+		} catch {
+			return "git status unavailable";
+		}
+	})();
+
+	const next = (() => {
+		if (decisions.length) return "Resolve decision Beads first.";
+		if (readySlices.length) return `Run /work-resume ${epicId} to handle ${idOf(readySlices[0])}.`;
+		if (active.length) return `Continue or pause active slice ${idOf(active[0])}.`;
+		if (planning.length) return `Run /work-resume ${epicId}; planner should create the next slices.`;
+		if (statusOf(epic) === "closed") return "Epic is closed.";
+		return "No ready slices. /work-resume should ask bead-planner to compare the epic plan against closed children and create the next slice, or close the epic if done.";
+	})();
+
+	return [
+		`Epic: ${titleOf(epic)} (${epicId})`,
+		`Status: ${statusOf(epic)} • created ${shortDate(createdAt(epic))} • updated ${shortDate(updatedAt(epic))}`,
+		`Progress: ${done.length}/${slices.length} slices closed (${percent}%)`,
+		`Ready: ${readySlices.length} • in progress: ${active.length} • planned ahead: ${planned.length} • decisions: ${decisions.length}`,
+		"",
+		"Ready slices:",
+		...(readySlices.length ? readySlices.map((issue) => `- ${lineFor(issue)}`) : ["- none"]),
+		"",
+		"In progress:",
+		...(active.length ? active.map((issue) => `- ${lineFor(issue)}`) : ["- none"]),
+		"",
+		"Planned ahead / blocked:",
+		...(planned.length ? planned.map((issue) => `- ${lineFor(issue)}`) : ["- none"]),
+		"",
+		"Open decisions:",
+		...(decisions.length ? decisions.map((issue) => `- ${lineFor(issue)}`) : ["- none"]),
+		"",
+		"Git:",
+		gitStatus || "clean",
+		"",
+		`Next: ${next}`,
+	].join("\n");
+}
+
 export default function workModelsExtension(pi) {
+	pi.registerCommand("work-status", {
+		description: "Show deterministic Beads/git work-orchestrator status",
+		handler: async (args, ctx) => {
+			try {
+				ctx.ui.notify(buildWorkStatus(ctx.cwd, args), "info");
+			} catch (error) {
+				ctx.ui.notify(
+					`Could not build work status: ${error instanceof Error ? error.message : String(error)}`,
+					"error",
+				);
+			}
+		},
+	});
+
 	pi.registerCommand("work-models", {
 		description:
 			"Configure persisted model/effort overrides for work-orchestrator role agents",
@@ -300,7 +413,7 @@ export default function workModelsExtension(pi) {
 				description: "Remove model/effort overrides for these work roles",
 			});
 
-			const slotKey = await pick(ctx, "Work models: choose task", slotItems);
+			const slotKey = await choose(ctx, "Work models: choose task", slotItems);
 			if (!slotKey) return;
 
 			if (slotKey === RESET_ALL) {
@@ -314,19 +427,7 @@ export default function workModelsExtension(pi) {
 			if (!slot) return;
 
 			const current = settings.subagents?.agentOverrides ?? {};
-			const selectedModel = commonValue(
-				slot.agents.map((agent) => current[agent]?.model),
-			);
-			const selectedThinking = commonValue(
-				slot.agents.map((agent) => current[agent]?.thinking),
-			);
-
-			const model = await pick(
-				ctx,
-				`${slot.label}: choose model`,
-				await modelItems(ctx),
-				typeof selectedModel === "string" ? selectedModel : INHERIT_MODEL,
-			);
+			const model = await choose(ctx, `${slot.label}: choose model`, await modelItems(ctx));
 			if (!model) return;
 
 			const thinkingItems = [
@@ -341,13 +442,13 @@ export default function workModelsExtension(pi) {
 					description: "persisted subagent thinking level",
 				})),
 			];
-			const thinking = await pick(
+			const selectedThinking = commonValue(
+				slot.agents.map((agent) => current[agent]?.thinking),
+			);
+			const thinking = await choose(
 				ctx,
-				`${slot.label}: choose effort`,
+				`${slot.label}: choose effort${selectedThinking ? ` (current ${selectedThinking})` : ""}`,
 				thinkingItems,
-				typeof selectedThinking === "string"
-					? selectedThinking
-					: DEFAULT_THINKING,
 			);
 			if (!thinking) return;
 

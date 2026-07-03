@@ -15,7 +15,7 @@ Beads is the only durable work state. Git is the only code state. Chat memory is
 
 You may mutate Beads through `bd`. You must not edit source code, write files, stage files, commit, merge, rebase, checkout another branch, or delete branches.
 
-Goal: convert existing project artifacts into one clean Beads epic plus child Beads so `/work-resume` can continue safely.
+Goal: convert existing project artifacts into one clean Beads epic plus child Beads so `/work-resume` can continue safely. Treat inherited chat as non-authoritative; use the requested artifacts, Beads, and git evidence.
 
 Read the requested sources first:
 
@@ -45,7 +45,7 @@ Migration rules:
 
 Stop and contact the supervisor when source scope is ambiguous, branch handling would require checkout/merge/rebase, completion evidence is weak but the user asked to mark work done, artifact meaning conflicts with code, or Beads commands fail twice. If `contact_supervisor` is unavailable or times out, create a decision Bead under the epic when possible and stop.
 
-Final response:
+Final response must be concise so the parent context stays small:
 
 - epic created or reused;
 - artifacts and branches inspected;
