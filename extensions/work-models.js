@@ -46,6 +46,13 @@ const SLOTS = [
 ];
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const DEFAULT_CONTEXT = {
+	enabled: true,
+	compactAtTokens: 100_000,
+	maxSummaryChars: 24_000,
+};
+const MIN_COMPACT_AT_TOKENS = 30_000;
+let contextCompactInFlight = false;
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -61,6 +68,37 @@ function writeSettings(cwd, settings) {
 	const dir = join(cwd, CONFIG_DIR_NAME);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(settingsPath(cwd), `${JSON.stringify(settings, null, "\t")}\n`);
+}
+
+function contextSettings(settings) {
+	return {
+		...DEFAULT_CONTEXT,
+		...(settings.workOrchestrator?.context ?? {}),
+	};
+}
+
+function setContextSettings(settings, next) {
+	settings.workOrchestrator ??= {};
+	settings.workOrchestrator.context = {
+		...contextSettings(settings),
+		...next,
+	};
+}
+
+function clampCompactAt(value) {
+	const number = Number(value);
+	if (!Number.isFinite(number)) return DEFAULT_CONTEXT.compactAtTokens;
+	return Math.max(MIN_COMPACT_AT_TOKENS, Math.round(number));
+}
+
+function compactTriggerTokens(ctx, settings) {
+	const configured = clampCompactAt(contextSettings(settings).compactAtTokens);
+	const contextWindow = ctx.model?.contextWindow ?? ctx.model?.context_window;
+	if (!contextWindow) return configured;
+	return Math.max(
+		MIN_COMPACT_AT_TOKENS,
+		Math.min(configured, Math.floor(contextWindow * 0.45)),
+	);
 }
 
 function overrides(settings) {
@@ -97,9 +135,7 @@ function slotSummary(slot, settings) {
 }
 
 function labelFor(item) {
-	return item.description
-		? `${item.label} — ${item.description}`
-		: item.label;
+	return item.description ? `${item.label} — ${item.description}` : item.label;
 }
 
 async function choose(ctx, title, items) {
@@ -165,6 +201,123 @@ function notifySummary(ctx, settings) {
 		),
 		"info",
 	);
+}
+
+function truncate(value, max = 800) {
+	const text = String(value ?? "").replace(/\s+/g, " ").trim();
+	return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function contentText(content) {
+	if (!content) return "";
+	if (typeof content === "string") return content;
+	if (Array.isArray(content))
+		return content
+			.map((item) => contentText(item))
+			.filter(Boolean)
+			.join("\n");
+	if (typeof content === "object")
+		return contentText(content.text ?? content.content ?? content.message);
+	return "";
+}
+
+function messageRole(message) {
+	return String(message?.role ?? message?.type ?? "message");
+}
+
+function toolNames(message) {
+	const calls = message?.toolCalls ?? message?.tool_calls ?? message?.calls ?? [];
+	if (!Array.isArray(calls)) return [];
+	return calls
+		.map((call) => call?.name ?? call?.function?.name ?? call?.toolName)
+		.filter(Boolean)
+		.map(String);
+}
+
+function messageLine(message) {
+	const role = messageRole(message);
+	if (/thinking|reasoning/i.test(role)) return "";
+	if (/tool/i.test(role)) {
+		const name = message?.toolName ?? message?.name ?? "tool";
+		return `[tool:${name}] result omitted`;
+	}
+	const tools = toolNames(message);
+	const text = truncate(contentText(message?.content ?? message?.message), 900);
+	const suffix = tools.length ? ` tools:${tools.join(",")}` : "";
+	return text || suffix ? `[${role}] ${text}${suffix}` : "";
+}
+
+function filesFromOps(fileOps) {
+	const read = fileOps?.readFiles ?? fileOps?.read ?? [];
+	const modified = fileOps?.modifiedFiles ?? fileOps?.modified ?? fileOps?.written ?? [];
+	return {
+		read: Array.from(new Set(Array.isArray(read) ? read : [])).map(String),
+		modified: Array.from(new Set(Array.isArray(modified) ? modified : [])).map(String),
+	};
+}
+
+function instantSummary(preparation, customInstructions = "") {
+	const maxSummaryChars = Number.isFinite(Number(preparation.settings?.maxSummaryChars))
+		? Math.max(4_000, Number(preparation.settings.maxSummaryChars))
+		: DEFAULT_CONTEXT.maxSummaryChars;
+	const messages = [
+		...(preparation.messagesToSummarize ?? []),
+		...(preparation.turnPrefixMessages ?? []),
+	];
+	const lines = messages.map(messageLine).filter(Boolean);
+	const userLines = lines.filter((line) => /^\[user\]/i.test(line)).slice(-8);
+	const recentLines = lines.slice(-24);
+	const files = filesFromOps(preparation.fileOps);
+	const previous = truncate(preparation.previousSummary ?? "", 4_000);
+	const summary = [
+		"## Work-orchestrator instant compaction",
+		"Assistant reasoning and full tool results were intentionally dropped; Beads, git, and files are the source of truth.",
+		customInstructions ? `\n## Instructions\n${truncate(customInstructions, 1_000)}` : "",
+		previous ? `\n## Previous summary\n${previous}` : "",
+		userLines.length ? `\n## Recent user goals\n${userLines.map((line) => `- ${line}`).join("\n")}` : "",
+		recentLines.length ? `\n## Recent visible conversation\n${recentLines.map((line) => `- ${line}`).join("\n")}` : "",
+		files.read.length ? `\n<read-files>\n${files.read.join("\n")}\n</read-files>` : "",
+		files.modified.length ? `\n<modified-files>\n${files.modified.join("\n")}\n</modified-files>` : "",
+		"\n## Next recovery step\nRun `/work-status` or `bd ready --json`, then continue with `/work-resume <epic-id>`.",
+	]
+		.filter(Boolean)
+		.join("\n");
+	return summary.slice(0, maxSummaryChars);
+}
+
+function contextStatus(ctx, settings) {
+	const current = contextSettings(settings);
+	const usage = ctx.getContextUsage?.();
+	const trigger = compactTriggerTokens(ctx, settings);
+	return [
+		`Work context guard: ${current.enabled === false ? "disabled" : "enabled"}`,
+		`Usage: ${usage?.tokens ? `${usage.tokens.toLocaleString()} tokens` : "unknown"}`,
+		`Trigger: ${trigger.toLocaleString()} tokens`,
+		`Summary budget: ${Number(current.maxSummaryChars ?? DEFAULT_CONTEXT.maxSummaryChars).toLocaleString()} chars`,
+		"Compaction style: instant, local, no LLM call; drops reasoning and full tool logs.",
+	].join("\n");
+}
+
+function maybeCompact(ctx, settings, reason) {
+	const current = contextSettings(settings);
+	if (current.enabled === false || contextCompactInFlight) return false;
+	const usage = ctx.getContextUsage?.();
+	if (!usage?.tokens) return false;
+	const trigger = compactTriggerTokens(ctx, settings);
+	if (usage.tokens < trigger) return false;
+	contextCompactInFlight = true;
+	ctx.compact({
+		customInstructions: `work-orchestrator proactive ${reason}: preserve goals, Beads/git state, file changes, blockers, and next command; omit reasoning and full tool logs.`,
+		onComplete: () => {
+			contextCompactInFlight = false;
+			ctx.ui.notify("Work context compacted before rot", "info");
+		},
+		onError: (error) => {
+			contextCompactInFlight = false;
+			ctx.ui.notify(`Work context compaction failed: ${error.message}`, "warning");
+		},
+	});
+	return true;
 }
 
 function run(cwd, command, args) {
@@ -238,7 +391,8 @@ function listEpics(cwd, status) {
 
 function resolveEpic(cwd, target) {
 	const wanted = target.trim();
-	if (wanted && wanted !== "last") return { epic: one(bdJson(cwd, ["show", wanted])) };
+	if (wanted && wanted !== "last")
+		return { epic: one(bdJson(cwd, ["show", wanted])) };
 
 	const candidates = [
 		...listEpics(cwd, "in_progress"),
@@ -313,7 +467,8 @@ function buildWorkStatus(cwd, target) {
 		(issue) => typeOf(issue) === "decision" && statusOf(issue) !== "closed",
 	);
 	const planning = children.filter(
-		(issue) => /wo:planning/.test(JSON.stringify(issue)) && statusOf(issue) !== "closed",
+		(issue) =>
+			/wo:planning/.test(JSON.stringify(issue)) && statusOf(issue) !== "closed",
 	);
 	const percent = slices.length
 		? Math.round((done.length / slices.length) * 100)
@@ -328,9 +483,12 @@ function buildWorkStatus(cwd, target) {
 
 	const next = (() => {
 		if (decisions.length) return "Resolve decision Beads first.";
-		if (readySlices.length) return `Run /work-resume ${epicId} to handle ${idOf(readySlices[0])}.`;
-		if (active.length) return `Continue or pause active slice ${idOf(active[0])}.`;
-		if (planning.length) return `Run /work-resume ${epicId}; planner should create the next slices.`;
+		if (readySlices.length)
+			return `Run /work-resume ${epicId} to handle ${idOf(readySlices[0])}.`;
+		if (active.length)
+			return `Continue or pause active slice ${idOf(active[0])}.`;
+		if (planning.length)
+			return `Run /work-resume ${epicId}; planner should create the next slices.`;
 		if (statusOf(epic) === "closed") return "Epic is closed.";
 		return "No ready slices. /work-resume should ask bead-planner to compare the epic plan against closed children and create the next slice, or close the epic if done.";
 	})();
@@ -342,16 +500,24 @@ function buildWorkStatus(cwd, target) {
 		`Ready: ${readySlices.length} • in progress: ${active.length} • planned ahead: ${planned.length} • decisions: ${decisions.length}`,
 		"",
 		"Ready slices:",
-		...(readySlices.length ? readySlices.map((issue) => `- ${lineFor(issue)}`) : ["- none"]),
+		...(readySlices.length
+			? readySlices.map((issue) => `- ${lineFor(issue)}`)
+			: ["- none"]),
 		"",
 		"In progress:",
-		...(active.length ? active.map((issue) => `- ${lineFor(issue)}`) : ["- none"]),
+		...(active.length
+			? active.map((issue) => `- ${lineFor(issue)}`)
+			: ["- none"]),
 		"",
 		"Planned ahead / blocked:",
-		...(planned.length ? planned.map((issue) => `- ${lineFor(issue)}`) : ["- none"]),
+		...(planned.length
+			? planned.map((issue) => `- ${lineFor(issue)}`)
+			: ["- none"]),
 		"",
 		"Open decisions:",
-		...(decisions.length ? decisions.map((issue) => `- ${lineFor(issue)}`) : ["- none"]),
+		...(decisions.length
+			? decisions.map((issue) => `- ${lineFor(issue)}`)
+			: ["- none"]),
 		"",
 		"Git:",
 		gitStatus || "clean",
@@ -361,6 +527,52 @@ function buildWorkStatus(cwd, target) {
 }
 
 export default function workModelsExtension(pi) {
+	pi.on("session_before_compact", async (event, ctx) => {
+		let settings = {};
+		try {
+			settings = readSettings(ctx.cwd);
+		} catch {
+			// Ignore unreadable project settings and keep compaction safe.
+		}
+		const current = contextSettings(settings);
+		if (current.enabled === false) return;
+		return {
+			compaction: {
+				summary: instantSummary(
+					{ ...event.preparation, settings: current },
+					event.customInstructions,
+				),
+				firstKeptEntryId: event.preparation.firstKeptEntryId,
+				tokensBefore: event.preparation.tokensBefore,
+				details: {
+					kind: "work-orchestrator-instant",
+					reason: event.reason,
+					files: filesFromOps(event.preparation.fileOps),
+				},
+			},
+		};
+	});
+
+	pi.on("session_compact", async () => {
+		contextCompactInFlight = false;
+	});
+
+	pi.on("turn_end", async (_event, ctx) => {
+		try {
+			maybeCompact(ctx, readSettings(ctx.cwd), "turn boundary");
+		} catch {
+			maybeCompact(ctx, {}, "turn boundary");
+		}
+	});
+
+	pi.on("before_agent_start", async (_event, ctx) => {
+		try {
+			maybeCompact(ctx, readSettings(ctx.cwd), "prompt boundary");
+		} catch {
+			maybeCompact(ctx, {}, "prompt boundary");
+		}
+	});
+
 	pi.registerCommand("work-status", {
 		description: "Show deterministic Beads/git work-orchestrator status",
 		handler: async (args, ctx) => {
@@ -372,6 +584,61 @@ export default function workModelsExtension(pi) {
 					"error",
 				);
 			}
+		},
+	});
+
+	pi.registerCommand("work-context", {
+		description: "Inspect or tune proactive instant context compaction",
+		handler: async (args, ctx) => {
+			let settings;
+			try {
+				settings = readSettings(ctx.cwd);
+			} catch (error) {
+				ctx.ui.notify(
+					`Could not read ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
+					"error",
+				);
+				return;
+			}
+
+			const [command, value] = args.trim().split(/\s+/, 2);
+			if (!command || command === "status") {
+				ctx.ui.notify(contextStatus(ctx, settings), "info");
+				return;
+			}
+			if (command === "compact") {
+				ctx.compact({
+					customInstructions:
+						"manual work-context compact: preserve Beads/git state, files, blockers, and next command; omit reasoning and full tool logs.",
+					onComplete: () => ctx.ui.notify("Work context compacted", "info"),
+					onError: (error) =>
+						ctx.ui.notify(`Work context compaction failed: ${error.message}`, "warning"),
+				});
+				return;
+			}
+			if (command === "off" || command === "disable") {
+				setContextSettings(settings, { enabled: false });
+				writeSettings(ctx.cwd, settings);
+				ctx.ui.notify("Disabled work context guard", "info");
+				return;
+			}
+			if (command === "on" || command === "enable") {
+				setContextSettings(settings, { enabled: true });
+				writeSettings(ctx.cwd, settings);
+				ctx.ui.notify("Enabled work context guard", "info");
+				return;
+			}
+			if (command === "set") {
+				setContextSettings(settings, { compactAtTokens: clampCompactAt(value) });
+				writeSettings(ctx.cwd, settings);
+				ctx.ui.notify(contextStatus(ctx, settings), "info");
+				return;
+			}
+
+			ctx.ui.notify(
+				"Usage: /work-context [status|compact|on|off|set <tokens>]",
+				"warning",
+			);
 		},
 	});
 
@@ -427,7 +694,11 @@ export default function workModelsExtension(pi) {
 			if (!slot) return;
 
 			const current = settings.subagents?.agentOverrides ?? {};
-			const model = await choose(ctx, `${slot.label}: choose model`, await modelItems(ctx));
+			const model = await choose(
+				ctx,
+				`${slot.label}: choose model`,
+				await modelItems(ctx),
+			);
 			if (!model) return;
 
 			const thinkingItems = [

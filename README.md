@@ -51,6 +51,7 @@ bd prime
 | `/work-add <task>` | Add urgent or discovered work mid-epic | Creates a Bead, adds dependency only if truly blocking, optionally runs it now |
 | `/work-pause [note]` | Stop safely | Updates Bead notes with git status, changed files, verification, and next step |
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
+| `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
 | `/work-models [status\|reset]` | Pick role models/effort | Extension command with model/effort picker; persists overrides to `.pi/settings.json` |
 
 ## Mental model
@@ -61,7 +62,8 @@ bd prime
 4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer.
 5. `/work-resume` rebuilds state from Beads and git, not chat history, and stops after one executable Bead so the next slice can start in a fresh session.
 6. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
-7. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+7. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
+8. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 
@@ -130,6 +132,35 @@ Continue later, even in a fresh Pi session:
 When there is no obvious latest epic, `/work-resume` lists active epics with created date, last worked date, status, child counts, and one-line description so you can pick.
 
 `/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command.
+
+## Context management
+
+The package installs a proactive compaction hook. At turn or prompt boundaries, when context reaches the lower of 100k tokens or 45% of the active model window, it calls Pi compaction before normal auto-compaction/overflow. The package supplies an instant local summary instead of asking another LLM: it preserves recent user-visible goals, previous summary, file lists, and next recovery command, while dropping assistant reasoning and full tool-result logs.
+
+Useful commands:
+
+```text
+/work-context status
+/work-context compact
+/work-context set 80000
+/work-context off
+```
+
+Settings are optional and live in `.pi/settings.json`:
+
+```json
+{
+  "workOrchestrator": {
+    "context": {
+      "enabled": true,
+      "compactAtTokens": 100000,
+      "maxSummaryChars": 24000
+    }
+  }
+}
+```
+
+Use fresh sessions between Beads anyway; compacting keeps long single-Bead debug/review loops from rotting, not a reason to run an entire epic in one chat.
 
 ## Migrating existing projects
 
@@ -303,6 +334,8 @@ Role prompts use fresh child context by default and concise/file-artifact output
 
 Use low/minimal effort for disposable smoke-test Pi instances. Keep your control session on a frontier model for `/work-master`/`ce-plan` if you want deep planning, then set `work` to a local model to save tokens.
 
+`/work-context` is separate from model choice. It is on by default and uses no model call for its compact summary.
+
 ## Verify this package
 
 ```bash
@@ -344,3 +377,4 @@ Then try:
 - No mandatory `pi-intercom`; it is used when installed, with Beads as the fallback.
 - No `ce-compound` on routine small tasks; it runs only for big/master/debug work with reusable learning.
 - No provider-specific model IDs baked into the package; use `/work-models` or Pi settings overrides.
+- No external ultracompact dependency; the built-in `/work-context` guard is intentionally smaller.

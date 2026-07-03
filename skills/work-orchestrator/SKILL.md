@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. The extension command `/work-status` provides the cheap deterministic status view when loaded.
+Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. The extension command `/work-status` provides the cheap deterministic status view when loaded.
 
 ## Source of Truth
 
@@ -243,9 +243,10 @@ Use `pi-subagents` from the parent session. Children get concrete Bead IDs and m
 
 ## Context Budget Policy
 
-Beads and git preserve the memory; Pi chat is disposable working context.
+Beads and git preserve the memory; Pi chat is disposable working context. The package extension registers `/work-context` and a proactive compaction hook: at prompt/turn boundaries it compacts before normal auto-compaction/overflow, using an instant local summary that drops assistant reasoning and full tool logs.
 
 - before any compact/restart boundary, write the current decision, changed files, verification, blockers, and next command into Bead notes;
+- rely on `/work-context status` for current token/trigger state; default trigger is the lower of 100k tokens or 45% of model context;
 - compact only inside a single Bead when context gets high or after a noisy debug/review phase;
 - after one executable Bead is committed and closed, stop instead of continuing to the next unrelated slice in the same session;
 - if the user explicitly requests continuous mode, run at most one more ready Bead after a compact/checkpoint boundary and stop when context budget is high.
