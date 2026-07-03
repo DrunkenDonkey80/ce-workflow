@@ -187,6 +187,11 @@ for (const phrase of [
 	"Repeat this gate after every child returns",
 	"Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup",
 	"instruction-file whitespace startup allowlist",
+	"Failure and Blocker Lifecycle",
+	"Mode: report",
+	"failure artifact",
+	"wo:debug-needed",
+	"wo:blocked",
 ]) {
 	check(`skill covers ${phrase}`, skill.includes(phrase));
 }
@@ -204,6 +209,7 @@ const promptModes = {
 	"work-big.md": "big",
 	"work-debug.md": "debug",
 	"work-auto.md": "auto",
+	"work-report.md": "report",
 	"work-resume.md": "resume",
 	"work-continue.md": "continue",
 	"work-add.md": "add",
@@ -214,8 +220,8 @@ const promptFiles = readdirSync(path.join(root, "prompts")).filter((file) =>
 	file.endsWith(".md"),
 );
 check(
-	"exactly eleven prompt templates",
-	promptFiles.length === 11,
+	"exactly twelve prompt templates",
+	promptFiles.length === 12,
 	promptFiles.join(", "),
 );
 for (const [file, mode] of Object.entries(promptModes)) {
@@ -418,6 +424,7 @@ for (const phrase of [
 	"/work-migrate",
 	"/work-small",
 	"/work-debug",
+	"/work-report",
 	"/work-resume",
 	"/work-continue",
 	"/work-models",
@@ -462,6 +469,8 @@ for (const phrase of [
 	"No automatic branch checkout",
 	"No mandatory `pi-intercom`",
 	"Live/test feedback loop",
+	"failure artifact",
+	"blocked/debug-needed",
 	"git status --porcelain=v1 --untracked-files=all",
 	"Known-unrelated dirty files",
 	"stale intercom",

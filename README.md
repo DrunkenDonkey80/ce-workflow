@@ -2,7 +2,7 @@
 
 Beads-backed Pi workflow package for running software work through short `/work-*` commands.
 
-The package is intentionally boring: one skill, one tiny settings/status extension, eleven prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
+The package is intentionally boring: one skill, one tiny settings/status extension, twelve prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
 
 ## Install
 
@@ -44,12 +44,13 @@ bd prime
 | `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Creates/claims a Bead, implements, verifies, lightly reviews, commits, closes |
 | `/work-med <task>` | Bounded work inside an epic with a few choices | Creates a parent Bead and one to three executable child Beads, then works ready slices |
 | `/work-big <task>` | Large, risky, or architectural slice inside an epic | Creates a planning Bead under the active epic, then slices it before implementation |
-| `/work-debug <bug>` | Failing test, error, regression, or broken behavior | Creates a bug Bead, runs `ce-debug` through `bead-debugger`, verifies, and compounds reusable lessons |
+| `/work-debug <bug-or-bead-id[: guidance]>` | Failing test, blocked/debug-needed Bead, regression, or broken behavior | Creates/reuses a bug Bead, runs `ce-debug` (agent or interactive console when explicitly requested), verifies, and compounds reusable lessons |
 | `/work-auto <task>` | You want the orchestrator to classify size | Routes to small, med, debug, big, master, or migrate; asks before big/master/migrate/ambiguous work |
 | `/work-resume [epic-id\|last]` | Resume epic work | Resolves state from Beads, handles one executable Bead, then stops with status and the next resume command |
 | `/work-continue [epic-id\|last]` | Legacy resume alias | Same as `/work-resume` |
 | `/work-add <task>` | Add urgent or discovered work mid-epic | Creates a Bead, adds dependency only if truly blocking, optionally runs it now |
 | `/work-pause [note]` | Stop safely | Updates Bead notes with git status, changed files, verification, and next step |
+| `/work-report [epic-id\|last\|bead-id]` | Human handoff for blockers | Read-only detailed report of blocked/debug-needed Beads, failure artifacts, dependencies, and suggested debug commands |
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
 | `/work-models [status\|reset]` | Pick role models/effort | Extension command with model/effort picker; persists overrides to `.pi/settings.json` |
@@ -62,8 +63,9 @@ bd prime
 4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
 5. `/work-resume` rebuilds state from Beads and git, not chat history, and stops after one executable Bead; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
 6. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
-7. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
-8. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+7. `/work-report` is the human handoff view for blocked/debug-needed work and failure artifacts.
+8. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
+9. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 
@@ -75,6 +77,7 @@ bd prime
 - Use `git status --porcelain=v1 --untracked-files=all` and `git diff --name-only`; do not treat human diff/stat summaries like `1 -0` as file content.
 - Known-unrelated dirty files are passed to children as an allowlist, and unrelated whitespace-only scratch in tracked instruction files is restored before spawning children when it is clearly not user work.
 - Project verification contracts from `AGENTS.md`/docs are copied into Bead acceptance and enforced before close.
+- Failed verification or failed live/product evidence is recorded as a failure artifact in Bead notes, then linked to a `wo:debug` bug or `wo:blocked` decision path instead of being left in chat.
 - Work happens one ready Bead at a time unless isolated worktrees are explicitly used.
 
 ## Live/test feedback loop
@@ -83,6 +86,7 @@ Whenever a disposable or real project run exposes workflow friction, feed it bac
 
 Recent examples this package now handles:
 
+- hardware smoke where the harness passes but product evidence is `terminal-failed`/`hardware-blocked`, requiring a follow-up debug Bead before dependent work proceeds;
 - repeated dirty-file stop loops from whitespace-only `AGENTS.md` changes, including child-created instruction-file dirt at startup or after review/fix runs;
 - agents misreading `git diff --stat`/numstat lines as source content;
 - delayed/stale intercom asks after the Bead was already closed;
@@ -145,7 +149,7 @@ Continue later, even in a fresh Pi session:
 
 When there is no obvious latest epic, `/work-resume` lists active epics with created date, last worked date, status, child counts, and one-line description so you can pick.
 
-`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command.
+`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command. Use `/work-report <epic-id>` when a human needs the full blocker ledger: blocked/debug-needed Beads, failure artifacts, artifact paths, dependencies, and suggested `/work-debug <bead-id>: <guidance>` commands.
 
 ## Context management
 
@@ -313,7 +317,15 @@ Use `/work-debug` for failures, regressions, stack traces, or broken behavior:
 /work-debug npm run selfcheck fails after adding the export command
 ```
 
-The bug Bead goes through `bead-debugger`, which follows `ce-debug` discipline: reproduce first, root-cause second, fix third, verify last. Non-trivial reusable debugging lessons trigger `ce-compound mode:headless` after the fix commit.
+If a Bead already has a failure artifact or `debug-needed:<bug-id>`, target it directly:
+
+```text
+/work-debug RFLib-9g6.12: try lowering the RF retry timeout and re-run the COM7/COM8 smoke
+```
+
+The default path sends the bug Bead through `bead-debugger`, which follows `ce-debug` discipline: reproduce first, root-cause second, fix third, verify last. When you explicitly target a blocked Bead with guidance and want to watch the console, the parent may run an interactive debug loop directly, then use the same review/commit/close gates. If debugging cannot safely fix or verify, the bug is left blocked with a failure artifact and any human decision Bead needed; `/work-resume` then picks the next unrelated ready Bead.
+
+Non-trivial reusable debugging lessons trigger `ce-compound mode:headless` after the fix commit.
 
 ## Role agents
 

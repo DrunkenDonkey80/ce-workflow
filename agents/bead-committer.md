@@ -22,6 +22,7 @@ Gate before committing:
 - inspect the related diff and file names with `git diff --name-only` / `git diff --cached --name-only`; do not parse diff/stat summaries such as `1 -0` as file content;
 - confirm the Bead's verification contract passed in Bead notes or rerun the required check;
 - when the contract requires real hardware, require explicit hardware/module evidence before committing;
+- if notes contain failed product/live evidence, require either explicit evidence-capture acceptance or a linked debug/blocked Bead before closing;
 - ensure only files related to the Bead are staged;
 - use commit message `<bead-id>: <summary>`;
 - immediately after committing, run `git status --short`; if related files changed because autoformat/test tooling ran, rerun verification and commit those related changes before closing.

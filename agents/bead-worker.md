@@ -23,6 +23,8 @@ Responsibilities:
 - implement the smallest correct change for that Bead;
 - run the Bead's verification contract exactly when present; if it requires real hardware, run the real hardware check and record device/module evidence; use a substitute only when the contract allows it;
 - update Bead notes with files changed, verification run, result, failures, and remaining work, leaving the Bead open/in-progress for review and commit;
+- when verification fails after a real attempt, attach a compact failure artifact in notes: command, exit/status, artifact paths, failing phase, observed vs expected, touched files, suspected owner, and next debug command;
+- create or request a `type=bug` / `wo:debug` Bead under the same epic when root-cause debugging is needed, with `discovered-from:<bead-id>` and blocker dependencies for the failed work;
 - create discovered follow-up Beads only when needed, under the same epic parent when one exists, using `discovered-from:<bead-id>` in notes.
 
 Stop and contact the supervisor when acceptance is ambiguous, a product or architecture decision is required, manual dirty changes conflict, required hardware or test equipment is unavailable, verification cannot run safely, or the implementation would touch unrelated scope. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker, create a decision Bead under the same epic parent when the blocker is durable, and stop.

@@ -22,6 +22,8 @@ Responsibilities:
 - use `ce-debug` discipline: reproduce, trace, root-cause, fix, verify;
 - obey the Bead's verification contract; when it requires real hardware, reproduce and verify on the affected hardware/module or stop for the parent;
 - update Bead notes with symptoms, root cause, files changed, verification, hardware evidence when applicable, and result;
+- when reproduction, fix, or verification cannot proceed after a real attempt, attach a failure artifact with attempted commands, logs/artifact paths, current hypothesis, blocker reason, and the exact human decision needed;
+- mark/ask the parent to mark the bug as blocked (`wo:blocked` label or project equivalent) and create a decision Bead when a human/product/hardware choice is required;
 - create follow-up Beads under the same epic parent when debugging exposes separate work;
 - after a non-trivial root-cause fix, ask the parent to run `ce-compound mode:headless` with a short context summary.
 

@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. The extension command `/work-status` provides the cheap deterministic status view when loaded.
+Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. The extension command `/work-status` provides the cheap deterministic status view when loaded.
 
 ## Source of Truth
 
@@ -74,10 +74,20 @@ Use labels for workflow state:
 - `wo:planning`
 - `wo:implementation`
 - `wo:debug`
+- `wo:debug-needed`
+- `wo:blocked`
 - `wo:fix`
 - `wo:decision`
 
 For discovered work, create a Bead and include `discovered-from:<current-bead-id>` in notes. Add a blocking dependency only when it truly blocks current or future work.
+
+## Failure and Blocker Lifecycle
+
+A failed verification or live evidence result is durable work state, not chat trivia. Record a compact failure artifact in the Bead notes with: command/run ID, artifact paths, failing phase, exit code/status, observed vs expected result, touched files, suspected owner, and exact next debug command. If the harness passes but product evidence says `failed`, `hardware-blocked`, `terminal-failed`, or similar, treat those as separate fields: the harness task may close only when its acceptance was evidence capture, but a follow-up debug Bead must exist for the product failure before downstream dependent work proceeds.
+
+When an implementation Bead fails its own acceptance or verification, do not close it. Create or reuse a `type=bug` child Bead under the same epic, label it `wo:debug`, include `discovered-from:<failed-bead-id>` and the failure artifact, then add a dependency so the failed Bead and any downstream slices wait for the bug. Mark the failed Bead notes with `debug-needed:<bug-id>` and `wo:debug-needed` when labels are available. If Beads supports a blocked status in the project, use it; otherwise keep the blocker represented by dependencies and labels.
+
+When `ce-debug` cannot safely fix or verify, record the debugger's failure artifact in the bug Bead, create a `type=decision` Bead for the human question when needed, label the bug `wo:blocked`, and add a dependency from the bug to that decision. `/work-resume` should then continue with the next unrelated ready Bead from `bd ready --json`; it must not spin on blocked work. `/work-report` is the human handoff surface for blocked/debug-needed Beads.
 
 ## Mode: master
 
@@ -160,16 +170,18 @@ Do not create a new master epic here; use `Mode: master` for that.
 
 ## Mode: debug
 
-Use for failing tests, errors, regressions, or broken behavior inside an existing epic.
+Use for failing tests, errors, regressions, blocked/debug-needed Beads, or broken behavior inside an existing epic.
 
 1. Resolve the active epic first; if ambiguous, ask.
-2. Create a `type=bug` child Bead under that epic (`--parent <epic-id>`) with the reported symptom, reproduction command, and expected behavior.
-3. Launch `bead-debugger` with that bug Bead and require the `ce-debug` workflow: reproduce, root-cause, fix, verify.
-4. Review the debug diff with `bead-reviewer`; if it fails, return to `bead-debugger` or `bead-fixer` with exact findings.
-5. Commit through `bead-committer`, then close the bug Bead only after verification passes and no related dirty files remain.
-6. If debugging produced a reusable root-cause lesson, run `ce-compound mode:headless <short context>` after the fix commit and commit any generated learning docs before closing the epic.
+2. If the argument starts with an existing Bead ID, inspect that Bead instead of creating a duplicate. Treat text after `:` as human guidance and append it to the debug Bead notes before debugging. If the target is an implementation Bead with `debug-needed:<bug-id>`, debug the bug Bead.
+3. Otherwise create a `type=bug` child Bead under that epic (`--parent <epic-id>`) with the reported symptom, reproduction command, expected behavior, and failure artifact when supplied.
+4. Default path: launch `bead-debugger` with that bug Bead and require the `ce-debug` workflow: reproduce, root-cause, fix, verify.
+5. Interactive path: when the user explicitly asks to debug a blocked Bead in the console or gives direct guidance (`/work-debug <bead-id>: ...`), the parent may run the debug loop directly for observability. Keep Beads/git as source of truth, avoid unrelated edits, and then run the same review/commit/close gates as the agent path.
+6. If `ce-debug` fixes and verifies the issue, review the debug diff with `bead-reviewer`; if it fails, return to `bead-debugger` or `bead-fixer` with exact findings.
+7. Commit through `bead-committer` or the parent commit gate, then close the bug Bead only after verification passes and no related dirty files remain. Remove or satisfy blocking dependencies so `/work-resume` can continue downstream work.
+8. If debugging produced a reusable root-cause lesson, run `ce-compound mode:headless <short context>` after the fix commit and commit any generated learning docs before closing the epic.
 
-Stop when reproduction needs unavailable external state, the root cause requires a product/architecture decision, or `ce-debug` cannot verify safely.
+Stop and mark blocked when reproduction needs unavailable external state, the root cause requires a product/architecture decision, or `ce-debug` cannot verify safely. The blocked bug Bead must contain the failure artifact, current hypothesis, attempted commands, and exact human decision needed.
 
 ## Mode: auto
 
@@ -205,14 +217,14 @@ Loop:
 1. Run `bd ready --json`.
 2. Run the worktree hygiene gate and resolve/record dirty files before spawning any child. Prefer one parent cleanup over repeated child stop/retry loops. Repeat this gate after every child returns; restore whitespace-only tracked instruction-file changes such as `AGENTS.md` before interpreting review results or committing. Because some child starts can recreate this whitespace dirt after the parent gate, include a startup allowlist telling children to continue when the only dirty file is whitespace-only `AGENTS.md`/instruction-file EOF dirt, and to leave it for parent cleanup.
 3. Inspect `bd children <epic-id> --json`. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
-4. Pick exactly one non-planning ready Bead belonging to or blocking the target epic.
-5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
+4. Pick exactly one non-planning ready Bead belonging to or blocking the target epic. Prefer `wo:debug` bug Beads when they unblock in-progress/debug-needed work; otherwise pick the earliest unblocked implementation slice. Skip `wo:blocked` Beads unless the user explicitly chose them with `/work-debug`.
+5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions, blocked/debug-needed children, or failed evidence exist, report them with `/work-report <epic-id>` style details and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
 6. Run `bd show <id> --json`.
 7. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, verify `bd ready --json` exposes the earliest executable slice and not the planning Bead or a later dependent slice, then stop at the planning boundary.
 8. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, relevant paths, related file allowlist, and known-unrelated dirty allowlist. Always include the instruction-file whitespace startup allowlist from step 2 so workers do not contact the supervisor for harmless EOF-only `AGENTS.md` dirt.
 9. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available. Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup, not an implementation failure, once restored.
-10. If review returns `FAIL`, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again.
-11. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate. For small PASS-reviewed Beads, prefer the parent commit gate when spawning a committer would only repeat deterministic status/stage/commit/close work.
+10. If review returns `FAIL` for fixable code, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again. If review or verification shows the Bead cannot meet acceptance without root-cause debugging, apply the Failure and Blocker Lifecycle: create/reuse a `wo:debug` bug Bead, attach the failure artifact, add blocker dependencies, and stop so the next `/work-resume` can pick the debug Bead or unrelated ready work.
+11. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate. For small PASS-reviewed Beads, prefer the parent commit gate when spawning a committer would only repeat deterministic status/stage/commit/close work. Before close, confirm any product evidence failure was either accepted as evidence-only scope or has a linked debug Bead.
 12. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
 13. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
 14. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
@@ -238,7 +250,7 @@ Checkpoint and stop safely:
 
 ## Mode: status
 
-Read-only report. Prefer the extension command `/work-status` when available because it does not spend LLM context. If using the skill path, compute the same fields without mutating Beads or git:
+Read-only summary. Prefer the extension command `/work-status` when available because it does not spend LLM context. If using the skill path, compute the same fields without mutating Beads or git:
 
 - current epic ID, title, status, created date, last worked date, and one-line description;
 - slice progress: closed executable slices / total executable slices and percent complete;
@@ -250,6 +262,21 @@ Read-only report. Prefer the extension command `/work-status` when available bec
 - next command, usually `/work-resume <epic-id>`.
 
 Do not mutate Beads or git in status mode.
+
+## Mode: report
+
+Read-only detailed handoff for a whole epic or one blocked/debug-needed Bead. Use when the user wants to know what is blocked, why, what failed, and what command/guidance to give next. Do not mutate Beads or git.
+
+For an epic target, report:
+
+- epic ID, title, status, progress percent, and next ready Bead from `bd ready --json`;
+- ready unblocked work that `/work-resume` can continue;
+- blocked/debug-needed Beads, grouped by `wo:blocked`, `wo:debug-needed`, open decisions, and unmet dependencies;
+- for each blocked item: blocker Bead/dependency, latest failure artifact summary, artifact paths, last verification command/result, owner/phase, and exact suggested command such as `/work-debug <bug-id>: <human guidance>`;
+- downstream Beads waiting on each blocker;
+- git status and any active/stale subagent coordination.
+
+For a Bead target, show the detailed failure artifact from notes: command, exit/status, logs/artifact paths, observed vs expected, attempted fixes, current hypothesis, human decision needed, dependencies, and what `/work-debug <bead-id>: ...` would do. If the Bead is not blocked, say so and point back to `/work-resume <epic-id>`.
 
 ## Role Loop
 
@@ -318,7 +345,8 @@ Responsibilities:
 - implement exactly that Bead;
 - ignore a parent-provided known-unrelated dirty allowlist unless those files conflict with the Bead;
 - run the Bead verification contract, including real hardware checks when required;
-- update notes with files changed, verification, and remaining work;
+- update notes with files changed, verification, hardware evidence when applicable, and remaining work;
+- when verification fails after a real attempt, attach a failure artifact and ask the parent to create/reuse a `wo:debug` bug Bead with blocker dependencies;
 - create discovered follow-up Beads when needed.
 
 ### bead-reviewer
@@ -330,8 +358,9 @@ Responsibilities:
 - inspect git diff;
 - inspect Bead acceptance criteria;
 - inspect verification contract evidence in notes;
+- require a linked debug Bead when product evidence failed but harness/evidence-capture scope passed;
 - report `PASS` or `FAIL` with evidence;
-- when failing, provide exact fix instructions or a fix Bead.
+- when failing, provide exact fix instructions, a required debug Bead, or a fix Bead.
 
 ### bead-debugger
 
@@ -341,7 +370,8 @@ Responsibilities:
 
 - read the bug Bead and current git state;
 - use `ce-debug` discipline to reproduce, trace, root-cause, fix, and verify;
-- update Bead notes with symptoms, causal chain, files changed, verification contract evidence, and result;
+- update Bead notes with symptoms, causal chain, files changed, verification contract evidence, hardware evidence when applicable, and result;
+- when reproduction or verification fails after a real attempt, attach a failure artifact, label the bug `wo:blocked` when available, create a decision Bead for any human question, and leave dependencies so `/work-resume` can move to unrelated ready work;
 - create follow-up Beads under the same epic only for separate work;
 - request `ce-compound mode:headless` when a non-trivial reusable lesson was learned.
 
@@ -353,6 +383,7 @@ Responsibilities:
 
 - fix only reviewer findings;
 - rerun the verification contract;
+- if the finding becomes a root-cause/debug problem instead of a local fix, attach a failure artifact and ask the parent to create/reuse a `wo:debug` bug Bead;
 - update Bead notes;
 - hand back to reviewer.
 
@@ -364,6 +395,7 @@ Responsibilities:
 
 - inspect `git status` and diff with porcelain/name-only commands;
 - confirm the verification contract passed;
+- refuse close when the Bead contains unresolved failed product evidence without a linked debug/blocked Bead, unless acceptance explicitly says the Bead only captures evidence;
 - commit only related files;
 - leave parent-declared known-unrelated dirty files unstaged and report them, stopping only if they conflict or are not on the allowlist;
 - use commit message `<bead-id>: <summary>`;
