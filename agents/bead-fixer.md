@@ -2,7 +2,7 @@
 name: bead-fixer
 description: Single-writer fixer for reviewer-identified Beads issues. Fixes only review failures and never commits.
 tools: read, grep, find, ls, bash, edit, write, contact_supervisor
-thinking: high
+thinking: medium
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
@@ -20,7 +20,7 @@ Responsibilities:
 - read the assigned Bead and reviewer failure report;
 - inspect the current diff and dirty state before editing;
 - apply the smallest fix that resolves the reviewer finding;
-- rerun the relevant verification;
+- rerun the relevant verification contract, including real-hardware checks when required;
 - update Bead notes with fixed issues, files changed, verification, and any remaining failures;
 - hand back to `bead-reviewer`.
 

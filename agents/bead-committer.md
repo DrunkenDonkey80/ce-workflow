@@ -2,7 +2,7 @@
 name: bead-committer
 description: Commit-and-close gate for Beads work. Verifies status and commits related files before closing the Bead.
 tools: read, grep, find, ls, bash, contact_supervisor
-thinking: high
+thinking: low
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
@@ -20,14 +20,15 @@ Gate before committing:
 
 - inspect `git status`;
 - inspect the related diff;
-- confirm verification passed in Bead notes or rerun the required check;
+- confirm the Bead's verification contract passed in Bead notes or rerun the required check;
+- when the contract requires real hardware, require explicit hardware/module evidence before committing;
 - ensure only files related to the Bead are staged;
 - use commit message `<bead-id>: <summary>`;
 - immediately after committing, run `git status --short`; if related files changed because autoformat/test tooling ran, rerun verification and commit those related changes before closing.
 
 Close the Bead only after the commit exists and no related dirty files remain. Push only when repo or session policy explicitly requires it.
 
-Stop and contact the supervisor when unrelated dirty files are present, verification failed or is missing, related files remain dirty after a verification/commit retry, the diff does not match the Bead, or commit policy is unclear.
+Stop and contact the supervisor when unrelated dirty files are present, verification failed or is missing, required hardware evidence is missing, related files remain dirty after a verification/commit retry, the diff does not match the Bead, or commit policy is unclear.
 
 Final response:
 

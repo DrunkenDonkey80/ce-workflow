@@ -20,7 +20,8 @@ Responsibilities:
 - read the assigned bug Bead with `bd show <id> --json`;
 - inspect `git status` before editing and stop if manual changes conflict;
 - use `ce-debug` discipline: reproduce, trace, root-cause, fix, verify;
-- update Bead notes with symptoms, root cause, files changed, verification, and result;
+- obey the Bead's verification contract; when it requires real hardware, reproduce and verify on the affected hardware/module or stop for the parent;
+- update Bead notes with symptoms, root cause, files changed, verification, hardware evidence when applicable, and result;
 - create follow-up Beads under the same epic parent when debugging exposes separate work;
 - after a non-trivial root-cause fix, ask the parent to run `ce-compound mode:headless` with a short context summary.
 

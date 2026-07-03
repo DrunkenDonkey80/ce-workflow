@@ -32,6 +32,14 @@ If no Beads workspace exists, stop and ask the user to initialize Beads in the t
 - conflicts with the current Bead: stop and ask;
 - completed work: create or update a Bead and commit that work first.
 
+## Verification Contract
+
+Project instructions can define mandatory verification such as TDD, hardware-in-the-loop checks, fixture runs, safety tests, or exact commands. Treat those as a verification contract, not advice.
+
+During preflight, read the relevant project instructions (`AGENTS.md`, `CLAUDE.md`, `.pi/`, README/test docs when referenced) and extract only concrete verification rules that apply to the requested work. Propagate them into the epic and every child Bead's `acceptance`/`notes` before implementation. If the contract says real hardware testing is required for affected modules, each affected Bead must name the module/device check and require real hardware evidence.
+
+Workers must run the contract or stop. Reviewers and committers must fail/hold the Bead when contract evidence is missing. Do not replace required hardware verification with mocks, simulation, or static checks unless the contract or user explicitly allows that substitute.
+
 ## Beads Conventions
 
 Use core Beads fields before inventing metadata:
@@ -42,7 +50,7 @@ Use core Beads fields before inventing metadata:
 - `type=bug`: reviewer failure or regression fix.
 - `description`: problem, scope, why this exists.
 - `design`: approach, decisions, relevant plan references.
-- `acceptance`: concrete done criteria and verification.
+- `acceptance`: concrete done criteria and verification contract.
 - `notes`: progress, files changed, verification result, handoff.
 - dependencies: only real blockers.
 
@@ -62,7 +70,7 @@ For discovered work, create a Bead and include `discovered-from:<current-bead-id
 
 Use to create a new master epic from a brainstorm, rough feature idea, or existing plan.
 
-When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Tell `ce-plan` to auto-accept plan creation and skip interactive confirmation unless it needs a real human decision. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
+When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Tell `ce-plan` to auto-accept plan creation and skip interactive confirmation unless it needs a real human decision. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification contract in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
 
 1. Create only the master epic Bead with the master plan captured in Beads fields.
 2. Create only one initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next one to three executable slices.
@@ -81,7 +89,7 @@ Use for clear, low-risk changes in one or two files inside an existing epic.
 2. Create a child Bead under that epic (`--parent <epic-id>`) unless an existing Bead already matches it.
 3. Claim it.
 4. Implement directly or launch `bead-worker` for exactly that Bead.
-5. Run the smallest real verification.
+5. Run the smallest real verification that satisfies the Bead's verification contract.
 6. Do a light review against acceptance and diff.
 7. Commit related files with `<bead-id>: <summary>`.
 8. Close the Bead only after the commit exists.
@@ -200,6 +208,10 @@ Do not mutate Beads or git in status mode.
 
 Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role.
 
+## Cost and Model Policy
+
+Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: planner high, debugger high, worker/fixer/reviewer medium, committer low. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Prefer project `subagents.agentOverrides` for concrete model IDs (for example frontier model for `bead-worker`, cheaper model for `bead-committer`) instead of hard-coding provider-specific models in this package.
+
 All human questions from children must flow through the parent session. A child uses `contact_supervisor` with `reason: "need_decision"`; the parent relays the single concrete question to the user, records the answer in Beads notes, then resumes the role loop. Do not let a child block invisibly on user input.
 
 ### bead-planner
@@ -209,6 +221,7 @@ Allowed to mutate Beads through `bd`. Must not edit source code.
 Responsibilities:
 
 - read the planning Bead and master epic, including the epic's master plan fields;
+- propagate the project verification contract into child Bead acceptance;
 - list existing children of the epic before creating anything;
 - create the next one to three executable Beads under the epic (`--parent <epic-id>`) only when no existing open/in-progress/closed child already covers that implementation unit;
 - create decision Beads for uncertainty under the epic (`--parent <epic-id>`);
@@ -224,7 +237,7 @@ Responsibilities:
 - claim the Bead;
 - read only relevant context;
 - implement exactly that Bead;
-- run the Bead verification;
+- run the Bead verification contract, including real hardware checks when required;
 - update notes with files changed, verification, and remaining work;
 - create discovered follow-up Beads when needed.
 
@@ -236,7 +249,7 @@ Responsibilities:
 
 - inspect git diff;
 - inspect Bead acceptance criteria;
-- inspect verification notes;
+- inspect verification contract evidence in notes;
 - report `PASS` or `FAIL` with evidence;
 - when failing, provide exact fix instructions or a fix Bead.
 
@@ -248,7 +261,7 @@ Responsibilities:
 
 - read the bug Bead and current git state;
 - use `ce-debug` discipline to reproduce, trace, root-cause, fix, and verify;
-- update Bead notes with symptoms, causal chain, files changed, verification, and result;
+- update Bead notes with symptoms, causal chain, files changed, verification contract evidence, and result;
 - create follow-up Beads under the same epic only for separate work;
 - request `ce-compound mode:headless` when a non-trivial reusable lesson was learned.
 
@@ -259,7 +272,7 @@ Single writer for reviewer-identified issues only. Must not commit.
 Responsibilities:
 
 - fix only reviewer findings;
-- rerun verification;
+- rerun the verification contract;
 - update Bead notes;
 - hand back to reviewer.
 
@@ -270,7 +283,7 @@ Commit and close gate. Must not edit source code.
 Responsibilities:
 
 - inspect `git status` and diff;
-- confirm verification passed;
+- confirm the verification contract passed;
 - commit only related files;
 - use commit message `<bead-id>: <summary>`;
 - after commit, re-run `git status --short`; if related files changed due autoformat/test tooling, rerun verification and commit those changes before closing;

@@ -19,6 +19,7 @@ Responsibilities:
 
 - read the assigned planning Bead with `bd show <id> --json`;
 - read the master epic Bead when provided, including its master plan in `description`, `design`, `acceptance`, and `notes`;
+- read the repo verification contract from project instructions and the epic acceptance before creating children;
 - list existing epic children before creating anything;
 - create or update the next one to three executable Beads from that master plan, always with `--parent <epic-id>`;
 - never create a duplicate Bead when an existing open, in-progress, or closed child already covers the same implementation unit;
@@ -32,10 +33,10 @@ Use Beads fields directly:
 
 - `description` for problem, scope, and master-plan summary;
 - `design` for approach, key decisions, implementation units, and references;
-- `acceptance` for done criteria and verification;
+- `acceptance` for done criteria and the verification contract, including exact commands or required real-hardware checks;
 - `notes` for source brainstorm/plan path, context, decisions, and handoff.
 
-Stop and contact the supervisor when scope is ambiguous, a decision changes product behavior, or Beads commands fail twice.
+Stop and contact the supervisor when scope is ambiguous, the verification contract is unclear, required hardware/test equipment is unknown, a decision changes product behavior, or Beads commands fail twice.
 
 Final response:
 

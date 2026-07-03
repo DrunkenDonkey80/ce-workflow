@@ -55,6 +55,7 @@ bd prime
 - Git is the only code state: diffs, branches, commits, and changed files.
 - Chat memory is not source of truth.
 - Manual dirty changes are classified before writer agents run.
+- Project verification contracts from `AGENTS.md`/docs are copied into Bead acceptance and enforced before close.
 - Work happens one ready Bead at a time unless isolated worktrees are explicitly used.
 
 ## Master plan epics
@@ -77,6 +78,33 @@ The orchestrator runs `ce-plan` when a detailed master plan does not already exi
 | `bead-debugger` | Yes | No | Uses `ce-debug` to reproduce, root-cause, fix, verify, and request learning capture |
 | `bead-fixer` | Yes | No | Fixes reviewer-identified issues only |
 | `bead-committer` | No | Yes | Verifies, commits related files, then closes the Bead |
+
+## Verification contracts
+
+Put project-specific must-run checks in `AGENTS.md` or referenced test docs. The orchestrator treats concrete rules as a contract and copies them into epic/child Bead acceptance. Example:
+
+```markdown
+For affected hardware modules, run the real hardware smoke test on the module before closing work. Record the module ID, command, and observed result in Bead notes. Do not substitute mocks unless the user approves.
+```
+
+Workers run that contract, reviewers check evidence, and committers refuse to close when evidence is missing.
+
+## Model and effort tuning
+
+This package leaves concrete model IDs to Pi settings. Role prompts set effort defaults: planner/debugger high, worker/fixer/reviewer medium, committer low. Override per repo with `subagents.agentOverrides` in `.pi/settings.json` when you want frontier models for writers and cheaper models for gates:
+
+```json
+{
+  "subagents": {
+    "agentOverrides": {
+      "bead-worker": { "model": "anthropic/claude-sonnet-4", "thinking": "medium" },
+      "bead-committer": { "thinking": "low" }
+    }
+  }
+}
+```
+
+Use low/minimal effort for disposable smoke-test Pi instances.
 
 ## Verify this package
 
@@ -114,5 +142,6 @@ Then try:
 - No package-owned task database.
 - No markdown TODO ledger as source of truth.
 - No `ce-compound` on routine small tasks; it runs only for big/master/debug work with reusable learning.
+- No provider-specific model IDs baked into the package; use Pi settings overrides.
 
 Add an extension later only if prompt templates plus the shared skill are not enough.

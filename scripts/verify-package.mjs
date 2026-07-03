@@ -128,6 +128,11 @@ for (const phrase of [
 	"ce-debug",
 	"ce-compound mode:headless",
 	"contact_supervisor",
+	"Verification Contract",
+	"verification contract",
+	"real hardware",
+	"Cost and Model Policy",
+	"subagents.agentOverrides",
 	"auto-accept plan creation",
 	"source brainstorm plus local plan path",
 	"active not-completed epics",
@@ -188,45 +193,65 @@ const agentRules = {
 	"bead-planner.md": {
 		name: "bead-planner",
 		forbidWrite: true,
+		thinking: "high",
 		must: [
 			"must not edit source code",
 			"create decision Beads",
 			"master plan",
 			"never create a duplicate Bead",
 			"--parent <epic-id>",
+			"verification contract",
 		],
 	},
 	"bead-worker.md": {
 		name: "bead-worker",
 		requireWrite: true,
-		must: ["Do not commit", "claim the assigned Bead", "same epic parent"],
+		thinking: "medium",
+		must: [
+			"Do not commit",
+			"claim the assigned Bead",
+			"same epic parent",
+			"verification contract",
+			"real hardware",
+		],
 	},
 	"bead-reviewer.md": {
 		name: "bead-reviewer",
 		forbidWrite: true,
-		must: ["PASS", "FAIL", "read-only"],
+		thinking: "medium",
+		must: ["PASS", "FAIL", "read-only", "verification contract"],
 	},
 	"bead-debugger.md": {
 		name: "bead-debugger",
 		requireWrite: true,
+		thinking: "high",
 		must: [
 			"ce-debug",
 			"ce-compound mode:headless",
 			"contact_supervisor",
 			"same epic parent",
+			"verification contract",
 		],
 	},
 	"bead-fixer.md": {
 		name: "bead-fixer",
 		requireWrite: true,
-		must: ["Fix only reviewer-identified issues", "Do not commit"],
+		thinking: "medium",
+		must: [
+			"Fix only reviewer-identified issues",
+			"Do not commit",
+			"verification contract",
+		],
 	},
 	"bead-committer.md": {
 		name: "bead-committer",
 		forbidWrite: true,
+		thinking: "low",
 		must: [
 			"Close the Bead only after the commit exists",
 			"no related dirty files remain",
+			"verification contract",
+			"hardware evidence",
 			"<bead-id>: <summary>",
 		],
 	},
@@ -243,6 +268,9 @@ for (const [file, rule] of Object.entries(agentRules)) {
 		`agent ${file} inherits project context`,
 		fm.inheritProjectContext === "true",
 	);
+	if (rule.thinking) {
+		check(`agent ${file} thinking is ${rule.thinking}`, fm.thinking === rule.thinking);
+	}
 	check(
 		`agent ${file} does not require unshipped skills`,
 		!fm.skills,
@@ -283,6 +311,10 @@ for (const phrase of [
 	"ce-plan",
 	"ce-debug",
 	"ce-compound",
+	"Verification contracts",
+	"real hardware",
+	"Model and effort tuning",
+	"subagents.agentOverrides",
 	"No TypeScript extension",
 	"No custom dashboard",
 	"No push automation",
