@@ -290,6 +290,8 @@ For a Bead target, show the detailed failure artifact from notes: command, exit/
 
 Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. Use the exact package role agents (`bead-planner`, `bead-worker`, `bead-reviewer`, `bead-fixer`, `bead-debugger`, `bead-committer`, `bead-migrator`) in the `agent` field; do not substitute builtin `worker`, `reviewer`, `planner`, or `delegate` for these roles. The parent must not read broad source modules or implement source edits itself; if it cannot launch the required role agent, it stops with a setup blocker. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Prefer file-only artifact output plus a short structured summary in the parent; do not paste long tool logs, full `bd show` epic JSON, or whole master plans back into the control session.
 
+Do not put tiny wall-clock limits on real role agents. Prefer no explicit timeout; if the runtime requires one, use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Use async/background for broad reviews, hardware work, or repo-scale investigation. A child timeout is an infrastructure failure artifact, not a review `FAIL` or implementation result.
+
 ## Context Budget Policy
 
 Beads and git preserve the memory; Pi chat is disposable working context. The package extension registers `/work-context`; it does not force pre-prompt compaction in normal chats. Pi's native/ultracompact auto-compaction remains responsible unless the user explicitly enables the work guard.

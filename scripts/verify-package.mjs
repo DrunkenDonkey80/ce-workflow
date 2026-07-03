@@ -190,6 +190,8 @@ for (const phrase of [
 	"instruction-file whitespace startup allowlist",
 	"Failure and Blocker Lifecycle",
 	"Mode: report",
+	"tiny wall-clock limits",
+	"at least 10 minutes",
 	"failure artifact",
 	"wo:debug-needed",
 	"wo:blocked",
