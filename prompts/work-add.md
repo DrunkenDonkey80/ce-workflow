@@ -1,9 +1,9 @@
 ---
 description: Add urgent or discovered work to the current Beads flow
-argument-hint: "<task>"
+argument-hint: "[--epic <id>] [--blocked-by <bead-id>] <task>"
 ---
 
-Use the `work-orchestrator` skill in mode: `add`.
+Fallback when the extension command is unavailable: use the `work-orchestrator` skill in mode: `add`.
 
 Task: $ARGUMENTS
 

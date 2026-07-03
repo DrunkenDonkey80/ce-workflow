@@ -3,7 +3,7 @@ description: Classify work size and route to the right work-orchestrator mode
 argument-hint: "<task>"
 ---
 
-Use the `work-orchestrator` skill in mode: `auto`.
+Fallback when the extension command is unavailable: use the `work-orchestrator` skill in mode: `auto`.
 
 Task: $ARGUMENTS
 

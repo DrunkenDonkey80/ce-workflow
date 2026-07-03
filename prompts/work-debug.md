@@ -1,9 +1,9 @@
 ---
 description: Debug a failing test, error, or broken behavior inside the active epic
-argument-hint: "<bug-or-test-failure>"
+argument-hint: "<bug-or-bead-id|symptom[: guidance]>"
 ---
 
-Use the `work-orchestrator` skill in mode: `debug`.
+Fallback when the extension command is unavailable: use the `work-orchestrator` skill in mode: `debug`.
 
 Bug: $ARGUMENTS
 

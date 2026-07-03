@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -402,7 +403,24 @@ for (const phrase of [
 	"bead-reviewer",
 	"bead-committer",
 	'registerCommand("work-status"',
+	'registerCommand("work-report"',
+	'registerCommand("work-resume"',
+	'registerCommand("work-continue"',
+	'registerCommand("work-pause"',
+	'registerCommand("work-debug"',
+	'registerCommand("work-add"',
+	'registerCommand("work-auto"',
 	'registerCommand("work-context"',
+	"buildWorkReport",
+	"buildWorkResumeState",
+	"buildWorkflowIntakeState",
+	"buildWorkPauseState",
+	"buildWorkDebugState",
+	"buildWorkAddState",
+	"buildWorkAutoState",
+	"handleWorkResumeCommand",
+	"renderWorkReportJson",
+	"rawNotes",
 	"session_before_compact",
 	"instantSummary",
 	"ctx.getContextUsage",
@@ -424,6 +442,13 @@ for (const phrase of [
 	"/work-migrate",
 	"/work-small",
 	"/work-debug",
+	"/work-add",
+	"/work-pause",
+	"/work-auto",
+	"Extension command: resolves/reuses or creates a debug Bead",
+	"Extension command: creates one child Bead",
+	"Extension command: appends a deterministic checkpoint",
+	"Extension command: rejects empty input",
 	"/work-report",
 	"/work-resume",
 	"/work-continue",
@@ -480,6 +505,30 @@ for (const phrase of [
 
 const ignored = read(".gitignore");
 check(".gitignore excludes .pi-subagents", ignored.includes(".pi-subagents/"));
+
+for (const script of [
+	"test-work-report.mjs",
+	"test-work-resume.mjs",
+	"test-work-intake.mjs",
+	"test-work-pause.mjs",
+	"test-work-debug.mjs",
+	"test-work-add.mjs",
+	"test-work-auto.mjs",
+]) {
+	try {
+		execFileSync(process.execPath, [`scripts/${script}`], {
+			cwd: root,
+			stdio: "inherit",
+		});
+		check(`${script} fixture behavior passes`, true);
+	} catch (error) {
+		check(
+			`${script} fixture behavior passes`,
+			false,
+			error instanceof Error ? error.message : String(error),
+		);
+	}
+}
 
 for (const rel of [
 	"agents",

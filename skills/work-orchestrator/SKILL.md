@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. The extension command `/work-status` provides the cheap deterministic status view when loaded.
+Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. The extension commands `/work-status` and `/work-report` provide cheap deterministic status and blocker handoff views when loaded.
 
 ## Source of Truth
 
@@ -214,11 +214,15 @@ Build the choice list with Beads commands such as `bd list --type=epic --status=
 
 Legacy alias for `Mode: resume`. Follow the same resolution and loop.
 
+If the prompt starts with "Use the work-orchestrator skill in mode: resume with this precomputed extension state", trust that extension-resolved epic/action/selected Bead as the starting point. Verify Beads/git freshness, then continue at the matching loop step below instead of repeating target selection or ready-work discovery.
+
+If the prompt starts with a precomputed extension state for `debug`, `add`, `pause`, or `auto`, trust its resolved target/action as intake state, verify Beads/git freshness, then continue at that mode's role-loop boundary instead of rediscovering the target.
+
 Loop:
 
-1. Run `bd ready --json`.
+1. Run `bd ready --json` unless precomputed extension state already names the selected action and Bead for this invocation.
 2. Run the worktree hygiene gate and resolve/record dirty files before spawning any child. Prefer one parent cleanup over repeated child stop/retry loops. Repeat this gate after every child returns; restore whitespace-only tracked instruction-file changes such as `AGENTS.md` before interpreting review results or committing. Because some child starts can recreate this whitespace dirt after the parent gate, include a startup allowlist telling children to continue when the only dirty file is whitespace-only `AGENTS.md`/instruction-file EOF dirt, and to leave it for parent cleanup.
-3. Inspect `bd children <epic-id> --json`. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
+3. Inspect `bd children <epic-id> --json` unless precomputed extension state already handled stale planning for this invocation. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
 4. Pick exactly one non-planning ready Bead belonging to or blocking the target epic. Prefer `wo:debug` bug Beads when they unblock in-progress/debug-needed work; otherwise pick the earliest unblocked implementation slice. Skip `wo:blocked` Beads unless the user explicitly chose them with `/work-debug`.
 5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions, blocked/debug-needed children, or failed evidence exist, report them with `/work-report <epic-id>` style details and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
 6. Run `bd show <id> --json`.
@@ -266,6 +270,8 @@ Read-only summary. Prefer the extension command `/work-status` when available be
 Do not mutate Beads or git in status mode.
 
 ## Mode: report
+
+Prefer the extension command `/work-report` when available because it does not spend LLM context and can emit `--json`. The skill path is the fallback for environments where the extension command is not loaded.
 
 Read-only detailed handoff for a whole epic or one blocked/debug-needed Bead. Use when the user wants to know what is blocked, why, what failed, and what command/guidance to give next. Do not mutate Beads or git.
 

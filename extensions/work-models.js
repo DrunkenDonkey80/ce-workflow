@@ -341,7 +341,7 @@ function maybeCompact(ctx, settings, reason) {
 	contextCompactState.requested = true;
 	ctx.compact({
 		customInstructions: `work-orchestrator proactive ${reason}: preserve goals, Beads/git state, file changes, blockers, and next command; omit reasoning and full tool logs.`,
-			onComplete: () => {
+		onComplete: () => {
 			contextCompactState.inFlight = false;
 			contextCompactState.requested = false;
 			ctx.ui.notify("Work context compacted before rot", "info");
@@ -360,11 +360,21 @@ function maybeCompact(ctx, settings, reason) {
 }
 
 function run(cwd, command, args) {
-	return execFileSync(command, args, {
+	const override =
+		command === "bd"
+			? process.env.WORK_ORCH_BD_BIN
+			: command === "git"
+				? process.env.WORK_ORCH_GIT_BIN
+				: undefined;
+	const actualCommand = override?.endsWith(".mjs")
+		? process.execPath
+		: (override ?? command);
+	const actualArgs = override?.endsWith(".mjs") ? [override, ...args] : args;
+	return execFileSync(actualCommand, actualArgs, {
 		cwd,
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
-	}).trim();
+	}).trimEnd();
 }
 
 function bdJson(cwd, args) {
@@ -565,10 +575,1343 @@ function buildWorkStatus(cwd, target) {
 	].join("\n");
 }
 
+function commandErrorText(error) {
+	return [error?.stderr, error?.stdout, error?.message]
+		.filter(Boolean)
+		.map(String)
+		.join("\n")
+		.trim();
+}
+
+function classifyBdError(error, args = []) {
+	const text = commandErrorText(error);
+	if (
+		args[0] === "show" &&
+		/not found|no such|unknown|does not exist/i.test(text)
+	)
+		return "unknown-target";
+	if (/no beads database|bd init|ENOENT|not recognized/i.test(text))
+		return "beads-unavailable";
+	return "beads-error";
+}
+
+function bdJsonRequired(cwd, args) {
+	try {
+		const raw = run(cwd, "bd", [...args, "--json"]);
+		return raw ? JSON.parse(raw) : [];
+	} catch (error) {
+		const err = new Error(commandErrorText(error) || "bd command failed");
+		err.reason = classifyBdError(error, args);
+		throw err;
+	}
+}
+
+function asArray(value) {
+	if (value === undefined || value === null || value === "") return [];
+	return Array.isArray(value) ? value : [value];
+}
+
+function labelsOf(issue) {
+	return asArray(field(issue, "labels", "tags"))
+		.flatMap((label) =>
+			typeof label === "string"
+				? label.split(/[\s,]+/)
+				: [field(label, "name", "label")],
+		)
+		.filter(Boolean)
+		.map(String);
+}
+
+function notesOf(issue) {
+	return asArray(field(issue, "notes", "comments", "comment"))
+		.map((note) =>
+			String(
+				typeof note === "object"
+					? field(note, "text", "body", "content", "note")
+					: note,
+			),
+		)
+		.filter(Boolean)
+		.join("\n");
+}
+
+function depsOf(issue) {
+	return asArray(
+		field(issue, "depends_on", "dependencies", "blocked_by", "deps"),
+	)
+		.filter((dep) => {
+			if (typeof dep !== "object") return true;
+			const type = String(field(dep, "type", "dependency_type") ?? "blocks");
+			return !/parent[-_]child/i.test(type);
+		})
+		.map((dep) =>
+			typeof dep === "object"
+				? field(dep, "depends_on_id", "dependsOnId", "dependency_id", "id")
+				: dep,
+		)
+		.filter(Boolean)
+		.map(String);
+}
+
+function issueSummary(issue) {
+	return {
+		id: idOf(issue),
+		title: titleOf(issue),
+		type: typeOf(issue),
+		status: statusOf(issue),
+		labels: labelsOf(issue),
+		updated: updatedAt(issue),
+	};
+}
+
+function noteDetails(issue) {
+	const raw = notesOf(issue);
+	const lines = raw
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean);
+	const commands = lines
+		.filter((line) =>
+			/(^|\s)(bd|git|node|npm|npx|rtk|uv|pytest|cmake|ctest|ninja|\/work-)\b/i.test(
+				line,
+			),
+		)
+		.slice(0, 5)
+		.map((line) => truncate(line, 240));
+	const artifacts = Array.from(
+		new Set(
+			raw.match(
+				/(?:[A-Za-z]:)?[\w./\\:-]+\.(?:jsonl?|log|txt|md|html|xml)\b/g,
+			) ?? [],
+		),
+	).slice(0, 10);
+	const runIds = Array.from(
+		new Set(
+			(raw.match(/\b(?:Run|run|run id)[:# ]+([A-Za-z0-9-]+)/g) ?? []).map(
+				(match) => match.replace(/^.*[:# ]+/, ""),
+			),
+		),
+	).slice(0, 5);
+	const reason = truncate(
+		lines.find((line) =>
+			/blocked|failed|failure|error|missing|cannot|unable/i.test(line),
+		) ?? "",
+		240,
+	);
+	const nextAction = truncate(
+		lines.find((line) => /next|rerun|re-run|run .* again/i.test(line)) ?? "",
+		240,
+	);
+	return {
+		reason,
+		commands,
+		artifacts,
+		runIds,
+		nextAction,
+		rawExcerpt: truncate(raw, 900),
+		raw,
+	};
+}
+
+function parseWorkReportArgs(args = "") {
+	const tokens = String(args).trim().split(/\s+/).filter(Boolean);
+	let json = false;
+	const target = [];
+	for (const token of tokens) {
+		if (token === "--json") json = true;
+		else target.push(token);
+	}
+	return { json, target: target.join(" ") };
+}
+
+function epicsByStatus(cwd, status) {
+	const items = bdJsonRequired(cwd, [
+		"list",
+		"--type=epic",
+		`--status=${status}`,
+	]);
+	return Array.isArray(items) ? items : [];
+}
+
+function childrenOfRequired(cwd, epicId) {
+	try {
+		const children = bdJsonRequired(cwd, ["children", epicId]);
+		if (Array.isArray(children)) return children;
+	} catch (error) {
+		try {
+			const children = bdJsonRequired(cwd, ["list", `--parent=${epicId}`]);
+			return Array.isArray(children) ? children : [];
+		} catch {
+			throw error;
+		}
+	}
+	return [];
+}
+
+function resolveReportTarget(cwd, target) {
+	const wanted = target.trim();
+	if (wanted && wanted !== "last") {
+		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
+		if (!issue)
+			return {
+				error: "unknown-target",
+				message: `No Bead found for ${wanted}`,
+			};
+		return typeOf(issue) === "epic"
+			? { kind: "epic", epic: issue }
+			: { kind: "bead", bead: issue };
+	}
+
+	let candidates = [
+		...epicsByStatus(cwd, "in_progress"),
+		...epicsByStatus(cwd, "open"),
+	].sort(byUpdatedDesc);
+	if (candidates.length === 0) {
+		try {
+			candidates = bdJsonRequired(cwd, ["list", "--type=epic"])
+				.filter((epic) => statusOf(epic) !== "closed")
+				.sort(byUpdatedDesc);
+		} catch {
+			candidates = [];
+		}
+	}
+	if (candidates.length === 1) return { kind: "epic", epic: candidates[0] };
+	if (candidates.length > 1) return { error: "ambiguous-target", candidates };
+	return {
+		error: "no-default-target",
+		message: "No open or in-progress epic found.",
+	};
+}
+
+function gitReport(cwd) {
+	try {
+		return {
+			ok: true,
+			status: run(cwd, "git", ["status", "--short", "--branch"]) || "clean",
+			warnings: [],
+		};
+	} catch {
+		return {
+			ok: false,
+			status: "git status unavailable",
+			warnings: ["git status unavailable"],
+		};
+	}
+}
+
+function parsePorcelainStatus(text) {
+	return String(text ?? "")
+		.split(/\r?\n/)
+		.map((line) => line.trimEnd())
+		.filter(Boolean)
+		.map((line) => {
+			const raw = line.slice(0, 2).padEnd(2, " ");
+			return {
+				status: raw.trim(),
+				x: raw[0],
+				y: raw[1],
+				path: line.slice(3).replace(/^"|"$/g, ""),
+			};
+		});
+}
+
+function isInstructionFile(file) {
+	return /(^|[/\\])(AGENTS|CLAUDE)\.md$/i.test(file);
+}
+
+function isBenignInstructionDirt(cwd, item) {
+	if (!isInstructionFile(item.path)) return false;
+	if (item.x !== " " || item.y !== "M") return false;
+	try {
+		run(cwd, "git", ["diff", "--quiet", "--ignore-all-space", "--", item.path]);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function resumeGitReport(cwd) {
+	try {
+		const status =
+			run(cwd, "git", ["status", "--short", "--branch"]) || "clean";
+		const dirtyFiles = parsePorcelainStatus(
+			run(cwd, "git", ["status", "--porcelain=v1", "--untracked-files=all"]),
+		);
+		const dirtyPaths = dirtyFiles.map((item) => item.path);
+		const benignDirty =
+			dirtyFiles.length > 0 &&
+			dirtyFiles.every((item) => isBenignInstructionDirt(cwd, item));
+		return {
+			ok: true,
+			status,
+			dirtyFiles,
+			dirtyPaths,
+			safeForHandoff: dirtyFiles.length === 0 || benignDirty,
+			benignDirty,
+			warnings: benignDirty
+				? [
+						"Only whitespace instruction-file dirt detected; do not stage it automatically.",
+					]
+				: [],
+		};
+	} catch {
+		return {
+			ok: false,
+			status: "git status unavailable",
+			dirtyFiles: [],
+			dirtyPaths: [],
+			safeForHandoff: false,
+			benignDirty: false,
+			warnings: ["git status unavailable"],
+		};
+	}
+}
+
+function isPlanningIssue(issue) {
+	return (
+		labelsOf(issue).includes("wo:planning") ||
+		/wo:planning/.test(notesOf(issue))
+	);
+}
+
+function isBlockedIssue(issue) {
+	const labels = labelsOf(issue);
+	return labels.includes("wo:blocked") || labels.includes("wo:debug-needed");
+}
+
+function isDebugIssue(issue) {
+	return typeOf(issue) === "bug" || labelsOf(issue).includes("wo:debug");
+}
+
+function byCreatedAsc(a, b) {
+	return String(createdAt(a) ?? "").localeCompare(String(createdAt(b) ?? ""));
+}
+
+function buildEpicChildState(cwd, epic) {
+	const epicId = idOf(epic);
+	const children = childrenOfRequired(cwd, epicId);
+	const byId = new Map(children.map((issue) => [idOf(issue), issue]));
+	const slices = children.filter(isWorkSlice);
+	const closed = slices.filter((issue) => statusOf(issue) === "closed");
+	const inProgress = slices.filter(
+		(issue) => statusOf(issue) === "in_progress",
+	);
+	const openDecisions = children.filter(
+		(issue) => typeOf(issue) === "decision" && statusOf(issue) !== "closed",
+	);
+	const planning = slices.filter(
+		(issue) => isPlanningIssue(issue) && statusOf(issue) !== "closed",
+	);
+	const readyWork = slices
+		.filter(
+			(issue) =>
+				statusOf(issue) === "open" &&
+				!isBlockedIssue(issue) &&
+				depsOf(issue).every((id) => statusOf(byId.get(id)) === "closed"),
+		)
+		.sort(byCreatedAsc);
+	const downstreamBlocked = slices
+		.filter((issue) => statusOf(issue) !== "closed")
+		.flatMap((issue) =>
+			depsOf(issue)
+				.filter((dependencyId) => statusOf(byId.get(dependencyId)) !== "closed")
+				.map((dependencyId) => ({
+					bead: issueSummary(issue),
+					blockedBy: issueSummary(
+						byId.get(dependencyId) ?? { id: dependencyId },
+					),
+				})),
+		);
+	const blockers = slices.filter((issue) => {
+		if (statusOf(issue) === "closed") return false;
+		return (
+			isBlockedIssue(issue) ||
+			typeOf(issue) === "bug" ||
+			depsOf(issue).some((id) => statusOf(byId.get(id)) !== "closed")
+		);
+	});
+	return {
+		epicId,
+		children,
+		slices,
+		closed,
+		inProgress,
+		openDecisions,
+		planning,
+		readyWork,
+		downstreamBlocked,
+		blockers,
+	};
+}
+
+function candidateSummary(cwd, epic) {
+	let counts = { children: 0, slices: 0, ready: 0, closed: 0 };
+	try {
+		const childState = buildEpicChildState(cwd, epic);
+		counts = {
+			children: childState.children.length,
+			slices: childState.slices.length,
+			ready: childState.readyWork.length,
+			closed: childState.closed.length,
+		};
+	} catch {
+		// Candidate lists should survive a broken child lookup.
+	}
+	return {
+		...issueSummary(epic),
+		created: createdAt(epic),
+		counts,
+	};
+}
+
+function resolveResumeTarget(cwd, target) {
+	const wanted = target.trim();
+	if (wanted && wanted !== "last") {
+		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
+		if (!issue)
+			return {
+				error: "unknown-target",
+				message: `No Bead found for ${wanted}`,
+			};
+		if (typeOf(issue) === "epic") return { kind: "epic", epic: issue };
+		return {
+			error: "unsupported-target",
+			message: `${wanted} is a child Bead; run /work-resume ${parentOf(issue) ?? "<epic-id>"} or /work-debug ${wanted}`,
+		};
+	}
+
+	const inProgress = epicsByStatus(cwd, "in_progress").sort(byUpdatedDesc);
+	if (inProgress.length === 1) return { kind: "epic", epic: inProgress[0] };
+	if (inProgress.length > 1)
+		return {
+			error: "ambiguous-target",
+			candidates: inProgress.map((epic) => candidateSummary(cwd, epic)),
+		};
+
+	let candidates = epicsByStatus(cwd, "open").sort(byUpdatedDesc);
+	if (candidates.length === 0) {
+		try {
+			candidates = bdJsonRequired(cwd, ["list", "--type=epic"])
+				.filter((epic) => statusOf(epic) !== "closed")
+				.sort(byUpdatedDesc);
+		} catch {
+			candidates = [];
+		}
+	}
+	if (candidates.length === 1) return { kind: "epic", epic: candidates[0] };
+	const withReady = candidates.filter((epic) => {
+		try {
+			return buildEpicChildState(cwd, epic).readyWork.length > 0;
+		} catch {
+			return false;
+		}
+	});
+	if (withReady.length > 0)
+		return { kind: "epic", epic: withReady.sort(byUpdatedDesc)[0] };
+	if (candidates.length > 1)
+		return {
+			error: "ambiguous-target",
+			candidates: candidates.map((epic) => candidateSummary(cwd, epic)),
+		};
+	return {
+		error: "no-default-target",
+		message: "No open or in-progress epic found.",
+	};
+}
+
+function resumeBlockers(childState) {
+	return childState.blockers.map((issue) => ({
+		...issueSummary(issue),
+		dependencies: depsOf(issue),
+		notes: noteDetails(issue),
+	}));
+}
+
+function planResumeAction(state) {
+	if (!state.ok) return state;
+	if (state.git && !state.git.safeForHandoff)
+		return {
+			...state,
+			action: "dirty-stop",
+			message:
+				"Dirty files must be resolved before /work-resume can launch writers.",
+			suggestedCommands: [
+				"git status --short",
+				`/work-report ${state.epic.id}`,
+			],
+		};
+	if (state.epic.status === "closed")
+		return {
+			...state,
+			action: "done-candidate",
+			message: "Epic is closed.",
+			suggestedCommands: [`/work-report ${state.epic.id}`],
+		};
+	if (state.readyPlanning.length && state.executableSlices.length)
+		return {
+			...state,
+			action: "close-stale-planning",
+			selectedBead: state.readyPlanning[0],
+			message:
+				"A ready planning Bead exists after executable children were created; close or update it before resuming.",
+			suggestedCommands: [
+				`bd close ${state.readyPlanning[0].id}`,
+				`/work-resume ${state.epic.id}`,
+			],
+		};
+	const debug = state.readyExecutable.find(isDebugIssue);
+	if (debug)
+		return withHandoffPrompt({
+			...state,
+			action: "run-debug",
+			selectedBead: debug,
+		});
+	const implementation = state.readyExecutable.find(
+		(issue) => !isPlanningIssue(issue),
+	);
+	if (implementation)
+		return withHandoffPrompt({
+			...state,
+			action: "run-implementation",
+			selectedBead: implementation,
+		});
+	if (state.readyPlanning.length)
+		return withHandoffPrompt({
+			...state,
+			action: "run-planner",
+			selectedBead: state.readyPlanning[0],
+		});
+	if (
+		state.blockers.length ||
+		state.openDecisions.length ||
+		state.downstreamBlocked.length
+	)
+		return {
+			...state,
+			action: "report-blocked",
+			message:
+				"No runnable Bead is ready; blockers or decisions need attention.",
+			suggestedCommands: state.blockerIssues.length
+				? suggestedCommands(state.epic.id, state.blockerIssues)
+				: [`/work-report ${state.epic.id}`],
+		};
+	return withHandoffPrompt({
+		...state,
+		action: "run-planner",
+		message:
+			"No ready work or blockers; ask the planner to create the next slices or confirm done.",
+	});
+}
+
+function withHandoffPrompt(state) {
+	const selected = state.selectedBead;
+	const selectedLine = selected
+		? `${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
+		: "none; create/reuse a wo:planning Bead if needed";
+	return {
+		...state,
+		handoffPrompt: [
+			"Use the work-orchestrator skill in mode: resume with this precomputed extension state.",
+			`Epic: ${state.epic.id} — ${state.epic.title}`,
+			`Action: ${state.action}`,
+			`Selected Bead: ${selectedLine}`,
+			`Git dirty classification: ${state.git.benignDirty ? "instruction-file allowlist" : "clean"}`,
+			"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
+			selected?.id ? `Target Bead ID: ${selected.id}` : "Target Bead ID: none",
+		].join("\n"),
+	};
+}
+
+function parseWorkResumeArgs(args = "") {
+	return parseWorkReportArgs(args);
+}
+
+function buildWorkResumeState(cwd, args = "") {
+	const { target } = parseWorkResumeArgs(args);
+	try {
+		const resolved = resolveResumeTarget(cwd, target);
+		if (resolved.error)
+			return errorState(resolved.error, resolved.message ?? resolved.error, {
+				action: "ask-target",
+				candidates: resolved.candidates ?? [],
+				suggestedCommands: [],
+			});
+		const childState = buildEpicChildState(cwd, resolved.epic);
+		const git = resumeGitReport(cwd);
+		const readyPlanning = childState.readyWork
+			.filter(isPlanningIssue)
+			.map(issueSummary);
+		const readyExecutable = childState.readyWork
+			.filter((issue) => !isPlanningIssue(issue))
+			.map(issueSummary);
+		const executableSlices = childState.slices
+			.filter(
+				(issue) => !isPlanningIssue(issue) && typeOf(issue) !== "decision",
+			)
+			.map(issueSummary);
+		const base = {
+			ok: true,
+			target: { requested: target || "last", kind: "epic" },
+			epic: issueSummary(resolved.epic),
+			counts: {
+				children: childState.children.length,
+				slices: childState.slices.length,
+				closed: childState.closed.length,
+				inProgress: childState.inProgress.length,
+				ready: childState.readyWork.length,
+				readyExecutable: readyExecutable.length,
+				planning: childState.planning.length,
+				blockers: childState.blockers.length,
+				decisions: childState.openDecisions.length,
+			},
+			readyWork: childState.readyWork.map(issueSummary),
+			readyExecutable,
+			readyPlanning,
+			executableSlices,
+			blockerIssues: childState.blockers,
+			blockers: resumeBlockers(childState),
+			downstreamBlocked: childState.downstreamBlocked,
+			openDecisions: childState.openDecisions.map(issueSummary),
+			git,
+			suggestedCommands: [`/work-resume ${childState.epicId}`],
+			warnings: git.warnings,
+		};
+		return planResumeAction(base);
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: "beads-error",
+			suggestedCommands: [],
+		});
+	}
+}
+
+function buildEpicReportState(cwd, epic) {
+	const childState = buildEpicChildState(cwd, epic);
+	const git = gitReport(cwd);
+	return {
+		ok: true,
+		target: { requested: childState.epicId, kind: "epic" },
+		epic: issueSummary(epic),
+		counts: {
+			children: childState.children.length,
+			slices: childState.slices.length,
+			closed: childState.closed.length,
+			inProgress: childState.inProgress.length,
+			ready: childState.readyWork.length,
+			blockers: childState.blockers.length,
+			decisions: childState.openDecisions.length,
+		},
+		blockers: resumeBlockers(childState),
+		downstreamBlocked: childState.downstreamBlocked,
+		openDecisions: childState.openDecisions.map(issueSummary),
+		readyWork: childState.readyWork.map(issueSummary),
+		git,
+		suggestedCommands: suggestedCommands(
+			childState.epicId,
+			childState.blockers,
+		),
+		rawNotes: childState.blockers
+			.map((issue) => ({ id: idOf(issue), text: notesOf(issue) }))
+			.filter((item) => item.text),
+		warnings: git.warnings,
+	};
+}
+
+function buildBeadReportState(cwd, bead) {
+	const parentId = parentOf(bead);
+	const siblings = parentId ? childrenOfRequired(cwd, parentId) : [];
+	const byId = new Map(siblings.map((issue) => [idOf(issue), issue]));
+	const dependencyIds = depsOf(bead);
+	const dependents = siblings.filter((issue) =>
+		depsOf(issue).includes(idOf(bead)),
+	);
+	const git = gitReport(cwd);
+	return {
+		ok: true,
+		target: { requested: idOf(bead), kind: "bead" },
+		epic: parentId ? { id: parentId } : undefined,
+		bead: {
+			...issueSummary(bead),
+			dependencies: dependencyIds.map((id) =>
+				issueSummary(byId.get(id) ?? { id }),
+			),
+			dependents: dependents.map(issueSummary),
+			notes: noteDetails(bead),
+		},
+		counts: {
+			dependencies: dependencyIds.length,
+			dependents: dependents.length,
+		},
+		blockers: dependencyIds.map((id) => issueSummary(byId.get(id) ?? { id })),
+		downstreamBlocked: dependents.map((issue) => ({
+			bead: issueSummary(issue),
+			blockedBy: issueSummary(bead),
+		})),
+		openDecisions: [],
+		readyWork: [],
+		git,
+		suggestedCommands: suggestedCommands(parentId ?? idOf(bead), [bead]),
+		rawNotes: notesOf(bead) ? [{ id: idOf(bead), text: notesOf(bead) }] : [],
+		warnings: git.warnings,
+	};
+}
+
+function suggestedCommands(epicId, blockers) {
+	const debugTarget =
+		blockers.find((issue) => ["bug", "debug"].includes(typeOf(issue))) ??
+		blockers[0];
+	if (debugTarget)
+		return [`/work-debug ${idOf(debugTarget)}: investigate blocker`];
+	return epicId ? [`/work-resume ${epicId}`] : [];
+}
+
+function isBeadId(value) {
+	return /^[A-Za-z][A-Za-z0-9_-]*-[A-Za-z0-9_.-]+$/.test(value ?? "");
+}
+
+function createBead(cwd, { title, type = "task", parent, notes }) {
+	const args = ["create", title, "--type", type];
+	if (parent) args.push("--parent", parent);
+	if (notes) args.push("--append-notes", notes);
+	return one(bdJsonRequired(cwd, args));
+}
+
+function appendBeadNote(cwd, id, note) {
+	return one(bdJsonRequired(cwd, ["update", id, "--append-notes", note]));
+}
+
+function debugNeededId(issue) {
+	const text = [...labelsOf(issue), notesOf(issue)].join("\n");
+	return text.match(/debug-needed:([^\s,;]+)/)?.[1] ?? "";
+}
+
+function resolveWorkflowEpic(cwd, target = "") {
+	const wanted = target.trim();
+	if (wanted && wanted !== "last") {
+		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
+		if (!issue)
+			return {
+				error: "unknown-target",
+				message: `No Bead found for ${wanted}`,
+			};
+		return typeOf(issue) === "epic"
+			? { kind: "epic", epic: issue }
+			: { error: "unsupported-target", message: `${wanted} is not an epic.` };
+	}
+	const active = epicsByStatus(cwd, "in_progress").sort(byUpdatedDesc);
+	if (active.length === 1) return { kind: "epic", epic: active[0] };
+	if (active.length > 1)
+		return {
+			error: "ambiguous-target",
+			message:
+				"Multiple active epics found; pass --epic <id> or target a Bead.",
+			candidates: active.map((epic) => candidateSummary(cwd, epic)),
+		};
+	return {
+		error: "no-active-epic",
+		message: "No active epic found; pass --epic <id>.",
+		candidates: epicsByStatus(cwd, "open").map((epic) =>
+			candidateSummary(cwd, epic),
+		),
+	};
+}
+
+function buildWorkflowIntakeState(cwd, args = "") {
+	const { target } = parseWorkReportArgs(args);
+	try {
+		const resolved = resolveWorkflowEpic(cwd, target);
+		if (resolved.error)
+			return errorState(resolved.error, resolved.message ?? resolved.error, {
+				candidates: resolved.candidates ?? [],
+			});
+		const childState = buildEpicChildState(cwd, resolved.epic);
+		const git = resumeGitReport(cwd);
+		return {
+			ok: true,
+			epic: issueSummary(resolved.epic),
+			counts: {
+				children: childState.children.length,
+				slices: childState.slices.length,
+				inProgress: childState.inProgress.length,
+				ready: childState.readyWork.length,
+				blockers: childState.blockers.length,
+			},
+			inProgress: childState.inProgress.map(issueSummary),
+			readyWork: childState.readyWork.map(issueSummary),
+			git,
+			warnings: git.warnings,
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message);
+	}
+}
+
+function checkpointNote({ epic, bead, git, userNote }) {
+	const details = bead ? noteDetails(bead) : {};
+	const dirty = git.dirtyPaths?.length ? git.dirtyPaths.join(", ") : "clean";
+	return [
+		"work-pause checkpoint",
+		`epic: ${idOf(epic)} — ${titleOf(epic)}`,
+		bead ? `bead: ${idOf(bead)} — ${titleOf(bead)}` : "bead: none",
+		`git: ${dirty}`,
+		`last verification: ${details.commands?.at(-1) ?? "unknown"}`,
+		`failures: ${details.reason || "none recorded"}`,
+		`remaining work: ${details.nextAction || `resume /work-resume ${idOf(epic)}`}`,
+		userNote ? `note: ${userNote}` : "note: none",
+		`next: /work-resume ${idOf(epic)}`,
+	].join("\n");
+}
+
+function buildWorkPauseState(cwd, args = "") {
+	const { target: note, json } = parseWorkReportArgs(args);
+	try {
+		const intake = buildWorkflowIntakeState(cwd, "");
+		if (!intake.ok) return { ...intake, action: "stop", json };
+		const resolved = resolveWorkflowEpic(cwd, "");
+		if (resolved.error)
+			return errorState(resolved.error, resolved.message ?? resolved.error, {
+				action: "stop",
+				candidates: resolved.candidates ?? [],
+			});
+		const childState = buildEpicChildState(cwd, resolved.epic);
+		const git = resumeGitReport(cwd);
+		const bead =
+			childState.inProgress.length === 1 ? childState.inProgress[0] : undefined;
+		const noteText = checkpointNote({
+			epic: resolved.epic,
+			bead,
+			git,
+			userNote: note,
+		});
+		if (!bead)
+			return {
+				ok: true,
+				action: "draft-checkpoint",
+				epic: issueSummary(resolved.epic),
+				git,
+				note: noteText,
+				message:
+					"No single in-progress Bead found; checkpoint draft was not appended.",
+				warnings: git.warnings,
+				json,
+			};
+		appendBeadNote(cwd, idOf(bead), noteText);
+		return {
+			ok: true,
+			action: "checkpoint-appended",
+			epic: issueSummary(resolved.epic),
+			selectedBead: issueSummary(bead),
+			git,
+			note: noteText,
+			message: `Checkpoint appended to ${idOf(bead)}.`,
+			warnings: git.warnings,
+			json,
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: "beads-error",
+		});
+	}
+}
+
+function splitTargetGuidance(args = "") {
+	const text = String(args).trim();
+	const colon = text.indexOf(":");
+	if (colon === -1) return { target: text, guidance: "" };
+	return {
+		target: text.slice(0, colon).trim(),
+		guidance: text.slice(colon + 1).trim(),
+	};
+}
+
+function findExistingDebugBug(cwd, target) {
+	const parentId = parentOf(target);
+	if (!parentId) return undefined;
+	const children = childrenOfRequired(cwd, parentId);
+	const deps = depsOf(target);
+	return children.find(
+		(issue) =>
+			statusOf(issue) !== "closed" &&
+			isDebugIssue(issue) &&
+			(deps.includes(idOf(issue)) || notesOf(issue).includes(idOf(target))),
+	);
+}
+
+function debugHandoff(state, guidance = "") {
+	return {
+		...state,
+		handoffPrompt: [
+			"Use the work-orchestrator skill in mode: debug with this precomputed extension state.",
+			`Epic: ${state.epic.id} — ${state.epic.title}`,
+			`Debug Bead: ${state.selectedBead.id} — ${state.selectedBead.title}`,
+			guidance ? `Guidance: ${guidance}` : "Guidance: none",
+			"Do not rediscover the debug target. Verify Beads/git freshness, then run the debug loop for this Bead.",
+		].join("\n"),
+	};
+}
+
+function dirtyStopState(git, message) {
+	return errorState("dirty-stop", message, {
+		action: "dirty-stop",
+		git,
+		suggestedCommands: ["git status --short"],
+	});
+}
+
+function buildWorkDebugState(cwd, args = "") {
+	const { target, guidance } = splitTargetGuidance(args);
+	if (!target)
+		return errorState("usage", "Usage: /work-debug <bug-or-bead-id|symptom>", {
+			action: "usage",
+		});
+	try {
+		const git = resumeGitReport(cwd);
+		if (!git.safeForHandoff)
+			return dirtyStopState(
+				git,
+				"Dirty files must be resolved before /work-debug can launch writers.",
+			);
+		let source;
+		let bug;
+		let epic;
+		if (isBeadId(target)) {
+			source = one(bdJsonRequired(cwd, ["show", target]));
+			if (!source)
+				return errorState("unknown-target", `No Bead found for ${target}`);
+			const linked = debugNeededId(source);
+			if (linked) bug = one(bdJsonRequired(cwd, ["show", linked]));
+			if (!bug && isDebugIssue(source)) bug = source;
+			if (!bug) bug = findExistingDebugBug(cwd, source);
+			const parentId =
+				typeOf(source) === "epic" ? idOf(source) : parentOf(source);
+			if (!parentId)
+				return errorState("unknown-parent", "Debug target has no parent epic.");
+			epic =
+				typeOf(source) === "epic"
+					? source
+					: one(bdJsonRequired(cwd, ["show", parentId]));
+			if (!bug) {
+				bug = createBead(cwd, {
+					title: `Debug ${titleOf(source)}`,
+					type: "bug",
+					parent: parentId,
+					notes: `debug target: ${idOf(source)}`,
+				});
+				if (typeOf(source) !== "epic")
+					run(cwd, "bd", ["dep", "add", idOf(source), idOf(bug)]);
+			}
+		} else {
+			const resolved = resolveWorkflowEpic(cwd, "");
+			if (resolved.error)
+				return errorState(resolved.error, resolved.message ?? resolved.error, {
+					action: "ask-target",
+					candidates: resolved.candidates ?? [],
+				});
+			epic = resolved.epic;
+			bug = createBead(cwd, {
+				title: target,
+				type: "bug",
+				parent: idOf(epic),
+				notes: guidance ? `guidance: ${guidance}` : "created by /work-debug",
+			});
+		}
+		if (guidance && bug && !(source === undefined && !isBeadId(target)))
+			appendBeadNote(cwd, idOf(bug), `guidance: ${guidance}`);
+		return debugHandoff(
+			{
+				ok: true,
+				action:
+					source && idOf(source) !== idOf(bug)
+						? "debug-resolved"
+						: "debug-ready",
+				epic: issueSummary(epic ?? { id: parentOf(bug) }),
+				selectedBead: issueSummary(bug),
+				sourceBead: source ? issueSummary(source) : undefined,
+				git,
+				message: `Debug target ready: ${idOf(bug)}.`,
+				warnings: git.warnings,
+			},
+			guidance,
+		);
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: error.reason ?? "beads-error",
+		});
+	}
+}
+
+function parseWorkAddArgs(args = "") {
+	const tokens = String(args).trim().split(/\s+/).filter(Boolean);
+	const task = [];
+	let epic = "";
+	let blockedBy = "";
+	for (let index = 0; index < tokens.length; index += 1) {
+		const token = tokens[index];
+		if (token === "--epic") epic = tokens[++index] ?? "";
+		else if (token === "--blocked-by") blockedBy = tokens[++index] ?? "";
+		else task.push(token);
+	}
+	return { epic, blockedBy, task: task.join(" ") };
+}
+
+function buildWorkAddState(cwd, args = "") {
+	const parsed = parseWorkAddArgs(args);
+	if (!parsed.task)
+		return errorState(
+			"usage",
+			"Usage: /work-add [--epic <id>] [--blocked-by <bead-id>] <task>",
+			{
+				action: "usage",
+			},
+		);
+	try {
+		const intake = parsed.epic ? undefined : buildWorkflowIntakeState(cwd, "");
+		if (intake && !intake.ok) return { ...intake, action: "ask-target" };
+		const git = resumeGitReport(cwd);
+		if (!git.safeForHandoff)
+			return dirtyStopState(
+				git,
+				"Dirty files must be resolved before /work-add can mutate Beads.",
+			);
+		let resolved;
+		if (parsed.epic) {
+			const epic = one(bdJsonRequired(cwd, ["show", parsed.epic]));
+			resolved =
+				typeOf(epic) === "epic"
+					? { kind: "epic", epic }
+					: {
+							error: "unsupported-target",
+							message: `${parsed.epic} is not an epic.`,
+						};
+		} else {
+			resolved = resolveWorkflowEpic(cwd, "");
+		}
+		if (resolved.error)
+			return errorState(resolved.error, resolved.message ?? resolved.error, {
+				action: "ask-target",
+				candidates: resolved.candidates ?? [],
+			});
+		let blocker;
+		if (parsed.blockedBy)
+			blocker = one(bdJsonRequired(cwd, ["show", parsed.blockedBy]));
+		const bead = createBead(cwd, {
+			title: parsed.task,
+			type: "task",
+			parent: idOf(resolved.epic),
+			notes: "created by /work-add",
+		});
+		if (blocker) run(cwd, "bd", ["dep", "add", idOf(bead), idOf(blocker)]);
+		return {
+			ok: true,
+			action: "work-added",
+			epic: issueSummary(resolved.epic),
+			selectedBead: issueSummary(bead),
+			blockedBy: blocker ? issueSummary(blocker) : undefined,
+			git,
+			message: `Created ${idOf(bead)} under ${idOf(resolved.epic)}.`,
+			warnings: git.warnings,
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: error.reason ?? "beads-error",
+		});
+	}
+}
+
+function explicitBeadIn(text) {
+	return (
+		String(text).match(/\b[A-Za-z][A-Za-z0-9_-]*-[A-Za-z0-9_.-]+\b/)?.[0] ?? ""
+	);
+}
+
+function buildWorkAutoState(cwd, args = "") {
+	const task = String(args).trim();
+	if (!task)
+		return errorState("usage", "Usage: /work-auto <task>", { action: "usage" });
+	try {
+		const git = resumeGitReport(cwd);
+		if (!git.safeForHandoff)
+			return dirtyStopState(
+				git,
+				"Dirty files must be resolved before /work-auto can launch writers.",
+			);
+		const beadId = explicitBeadIn(task);
+		if (beadId) {
+			const issue = one(bdJsonRequired(cwd, ["show", beadId]));
+			if (issue && (isBlockedIssue(issue) || debugNeededId(issue)))
+				return buildWorkDebugState(cwd, beadId);
+		}
+		return {
+			ok: true,
+			action: "handoff-auto",
+			git,
+			handoffPrompt: [
+				"Use the work-orchestrator skill in mode: auto.",
+				`Task: ${task}`,
+				"Classify semantically in the skill path; the extension only checked empty input, explicit Bead routing, and git safety.",
+			].join("\n"),
+			message: "Auto handoff queued.",
+			warnings: git.warnings,
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: error.reason ?? "beads-error",
+		});
+	}
+}
+
+function errorState(reason, message, extra = {}) {
+	return {
+		ok: false,
+		reason,
+		message,
+		warnings: [],
+		...extra,
+	};
+}
+
+function buildWorkReportState(cwd, args = "") {
+	const { target } = parseWorkReportArgs(args);
+	try {
+		const resolved = resolveReportTarget(cwd, target);
+		if (resolved.error) {
+			return errorState(resolved.error, resolved.message ?? resolved.error, {
+				candidates: resolved.candidates?.map(issueSummary) ?? [],
+			});
+		}
+		return resolved.kind === "bead"
+			? buildBeadReportState(cwd, resolved.bead)
+			: buildEpicReportState(cwd, resolved.epic);
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message);
+	}
+}
+
+function renderNoteLines(notes) {
+	const lines = [];
+	if (notes.reason) lines.push(`reason: ${notes.reason}`);
+	for (const command of notes.commands ?? []) lines.push(`command: ${command}`);
+	for (const artifact of notes.artifacts ?? [])
+		lines.push(`artifact: ${artifact}`);
+	for (const runId of notes.runIds ?? []) lines.push(`run: ${runId}`);
+	if (notes.nextAction) lines.push(`next: ${notes.nextAction}`);
+	if (lines.length === 0 && notes.rawExcerpt) lines.push(notes.rawExcerpt);
+	return lines;
+}
+
+function renderIssueList(items, fallback = "- none") {
+	return items?.length
+		? items.map(
+				(issue) =>
+					`- ${issue.id} ${issue.status} ${issue.type} — ${issue.title}`,
+			)
+		: [fallback];
+}
+
+function renderWorkReportText(state) {
+	if (!state.ok) {
+		const candidates = state.candidates?.length
+			? ["Candidates:", ...renderIssueList(state.candidates)]
+			: [];
+		return [`Work report unavailable: ${state.message}`, ...candidates].join(
+			"\n",
+		);
+	}
+	if (state.bead) {
+		return [
+			`Bead: ${state.bead.title} (${state.bead.id})`,
+			`Status: ${state.bead.status} • type: ${state.bead.type}`,
+			"",
+			"Dependencies / blockers:",
+			...renderIssueList(state.bead.dependencies),
+			"",
+			"Downstream blocked:",
+			...(state.downstreamBlocked.length
+				? state.downstreamBlocked.map(
+						(item) =>
+							`- ${item.bead.id} blocked by ${item.blockedBy.id} — ${item.bead.title}`,
+					)
+				: ["- none"]),
+			"",
+			"Failure artifact / notes:",
+			state.bead.notes.reason || state.bead.notes.rawExcerpt || "- none",
+			"",
+			"Git:",
+			state.git.status,
+			"",
+			`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
+		].join("\n");
+	}
+	return [
+		`Epic: ${state.epic.title} (${state.epic.id})`,
+		`Status: ${state.epic.status} • Progress: ${state.counts.closed}/${state.counts.slices} slices closed`,
+		`Ready: ${state.counts.ready} • in progress: ${state.counts.inProgress} • blockers: ${state.counts.blockers} • decisions: ${state.counts.decisions}`,
+		"",
+		"Current blockers:",
+		...(state.blockers.length
+			? state.blockers.flatMap((issue) => {
+					const details = renderNoteLines(issue.notes).map(
+						(line) => `  - ${line}`,
+					);
+					return [
+						`- ${issue.id} ${issue.status} ${issue.type} — ${issue.title}`,
+						...details,
+					];
+				})
+			: ["- none"]),
+		"",
+		"Downstream blocked:",
+		...(state.downstreamBlocked.length
+			? state.downstreamBlocked.map(
+					(item) =>
+						`- ${item.bead.id} blocked by ${item.blockedBy.id} — ${item.bead.title}`,
+				)
+			: ["- none"]),
+		"",
+		"Open decisions:",
+		...renderIssueList(state.openDecisions),
+		"",
+		"Ready work:",
+		...renderIssueList(state.readyWork),
+		"",
+		"Git:",
+		state.git.status,
+		"",
+		`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
+	].join("\n");
+}
+
+function renderWorkReportJson(state) {
+	return JSON.stringify(state, null, "\t");
+}
+
+function buildWorkReport(cwd, args = "") {
+	const parsed = parseWorkReportArgs(args);
+	const state = buildWorkReportState(cwd, args);
+	return parsed.json
+		? renderWorkReportJson(state)
+		: renderWorkReportText(state);
+}
+
+function renderWorkResumeText(state) {
+	if (!state.ok) {
+		const candidates = state.candidates?.length
+			? [
+					"Candidates:",
+					...state.candidates.map(
+						(epic) =>
+							`- ${epic.id} ${epic.status} — ${epic.title} (updated ${shortDate(epic.updated)}, children ${epic.counts?.children ?? "?"}, ready ${epic.counts?.ready ?? "?"})`,
+					),
+				]
+			: [];
+		return [`Work resume unavailable: ${state.message}`, ...candidates].join(
+			"\n",
+		);
+	}
+	return [
+		`Epic: ${state.epic.title} (${state.epic.id})`,
+		`Action: ${state.action}`,
+		`Ready: ${state.counts.ready} • executable: ${state.counts.readyExecutable} • planning: ${state.counts.planning} • blockers: ${state.counts.blockers} • decisions: ${state.counts.decisions}`,
+		state.selectedBead
+			? `Selected: ${state.selectedBead.id} ${state.selectedBead.type} — ${state.selectedBead.title}`
+			: "Selected: none",
+		state.message ? `Reason: ${state.message}` : "",
+		"",
+		"Git:",
+		state.git.status,
+		"",
+		`Next: ${state.handoffPrompt ? "handoff queued to work-orchestrator" : (state.suggestedCommands?.[0] ?? "No action suggested.")}`,
+	]
+		.filter((line) => line !== "")
+		.join("\n");
+}
+
+function renderWorkResumeJson(state) {
+	return JSON.stringify(state, null, "\t");
+}
+
+function buildWorkResume(cwd, args = "") {
+	const parsed = parseWorkResumeArgs(args);
+	const state = buildWorkResumeState(cwd, args);
+	return parsed.json
+		? renderWorkResumeJson(state)
+		: renderWorkResumeText(state);
+}
+
+async function handleWorkResumeCommand(args, ctx) {
+	const state = buildWorkResumeState(ctx.cwd, args);
+	ctx.ui.notify(renderWorkResumeText(state), state.ok ? "info" : "warning");
+	if (state.handoffPrompt) {
+		await ctx.sendUserMessage(state.handoffPrompt, { deliverAs: "followUp" });
+	}
+	return state;
+}
+
+function renderWorkflowActionText(state) {
+	if (!state.ok) {
+		const candidates = state.candidates?.length
+			? ["Candidates:", ...renderIssueList(state.candidates)]
+			: [];
+		const suggested = state.suggestedCommands?.length
+			? [
+					"Suggested:",
+					...state.suggestedCommands.map((command) => `- ${command}`),
+				]
+			: [];
+		return [
+			`Work command unavailable: ${state.message}`,
+			...candidates,
+			...suggested,
+		].join("\n");
+	}
+	return [
+		`Action: ${state.action}`,
+		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "",
+		state.selectedBead
+			? `Bead: ${state.selectedBead.id} — ${state.selectedBead.title}`
+			: "",
+		state.message ? `Result: ${state.message}` : "",
+		state.git ? `Git: ${state.git.status}` : "",
+		state.note ? `\n${state.note}` : "",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+async function handleWorkflowAction(builder, args, ctx) {
+	const state = builder(ctx.cwd, args);
+	ctx.ui.notify(renderWorkflowActionText(state), state.ok ? "info" : "warning");
+	if (state.handoffPrompt)
+		await ctx.sendUserMessage(state.handoffPrompt, { deliverAs: "followUp" });
+	return state;
+}
+
+export {
+	buildWorkAddState,
+	buildWorkAutoState,
+	buildWorkDebugState,
+	buildWorkflowIntakeState,
+	buildWorkPauseState,
+	buildWorkReport,
+	buildWorkReportState,
+	buildWorkResume,
+	buildWorkResumeState,
+	handleWorkResumeCommand,
+	planResumeAction,
+	renderWorkReportJson,
+	renderWorkReportText,
+	renderWorkResumeJson,
+	renderWorkResumeText,
+};
+
 export default function workModelsExtension(pi) {
 	pi.on("session_before_compact", async (event, ctx) => {
 		const instructions = event.customInstructions ?? "";
-		if (!contextCompactState.requested && !instructions.includes("work-context")) return;
+		if (
+			!contextCompactState.requested &&
+			!instructions.includes("work-context")
+		)
+			return;
 		let settings = {};
 		try {
 			settings = readSettings(ctx.cwd);
@@ -618,6 +1961,56 @@ export default function workModelsExtension(pi) {
 					"error",
 				);
 			}
+		},
+	});
+
+	pi.registerCommand("work-report", {
+		description: "Show deterministic Beads/git blocker handoff report",
+		handler: async (args, ctx) => {
+			ctx.ui.notify(buildWorkReport(ctx.cwd, args), "info");
+		},
+	});
+
+	pi.registerCommand("work-resume", {
+		description:
+			"Resolve the next Beads-backed work action and hand off safely",
+		handler: async (args, ctx) => {
+			await handleWorkResumeCommand(args, ctx);
+		},
+	});
+
+	pi.registerCommand("work-continue", {
+		description: "Alias for deterministic /work-resume preflight",
+		handler: async (args, ctx) => {
+			await handleWorkResumeCommand(args, ctx);
+		},
+	});
+
+	pi.registerCommand("work-pause", {
+		description: "Checkpoint current Beads-backed work and stop",
+		handler: async (args, ctx) => {
+			await handleWorkflowAction(buildWorkPauseState, args, ctx);
+		},
+	});
+
+	pi.registerCommand("work-debug", {
+		description: "Resolve or create a debug Bead and hand off safely",
+		handler: async (args, ctx) => {
+			await handleWorkflowAction(buildWorkDebugState, args, ctx);
+		},
+	});
+
+	pi.registerCommand("work-add", {
+		description: "Create explicit work under the active Beads epic",
+		handler: async (args, ctx) => {
+			await handleWorkflowAction(buildWorkAddState, args, ctx);
+		},
+	});
+
+	pi.registerCommand("work-auto", {
+		description: "Run deterministic /work-auto guards and hand off",
+		handler: async (args, ctx) => {
+			await handleWorkflowAction(buildWorkAutoState, args, ctx);
 		},
 	});
 
