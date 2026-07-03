@@ -194,9 +194,9 @@ Loop:
 1. Run `bd ready --json`.
 2. Inspect `bd children <epic-id> --json`. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
 3. Pick exactly one non-planning ready Bead belonging to or blocking the target epic.
-4. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
+4. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions or blocked/in-progress children exist, report them and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
 5. Run `bd show <id> --json`.
-6. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, then stop at the planning boundary.
+6. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, verify `bd ready --json` exposes the earliest executable slice and not the planning Bead or a later dependent slice, then stop at the planning boundary.
 7. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, and relevant paths.
 8. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, and verification evidence. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available.
 9. If review returns `FAIL`, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again.
@@ -290,7 +290,8 @@ Responsibilities:
 - list existing children of the epic before creating anything;
 - create the next one to three executable Beads under the epic (`--parent <epic-id>`) only when no existing open/in-progress/closed child already covers that implementation unit;
 - create decision Beads for uncertainty under the epic (`--parent <epic-id>`);
-- add only real `blocks` dependencies;
+- add only real `blocks` dependencies, using `bd dep add <later-id> <earlier-id>` when later slices must wait for earlier slices;
+- run `bd ready --json` after dependency changes and repair the order if the earliest executable slice is not ready first;
 - close or update the planning Bead when durable Beads exist.
 
 ### bead-worker

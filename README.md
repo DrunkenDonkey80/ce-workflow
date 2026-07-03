@@ -59,7 +59,7 @@ bd prime
 1. `/work-master` creates the durable epic/master plan.
 2. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 3. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
-4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The parent orchestrator coordinates; it should not become the worker.
+4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
 5. `/work-resume` rebuilds state from Beads and git, not chat history, and stops after one executable Bead; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
 6. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 7. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.

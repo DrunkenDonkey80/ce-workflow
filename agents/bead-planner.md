@@ -26,10 +26,12 @@ Responsibilities:
 - never create a duplicate Bead when an existing open, in-progress, or closed child already covers the same implementation unit;
 - create decision Beads for human/product/architecture uncertainty, always with `--parent <epic-id>`;
 - add only real blocking dependencies, especially between freshly created slices when one must follow another;
+- use Beads dependency direction explicitly: if slice B must wait for slice A, run `bd dep add B A` (B depends on A; A blocks B), so `bd ready` shows A first;
+- after creating or updating dependencies, run `bd ready --json`; if the wrong slice is ready, repair dependencies before closing the planning Bead;
 - close the planning Bead once durable executable Beads exist; do not leave a ready planning Bead competing with implementation Beads;
 - report "epic complete" only when no master-plan implementation units remain and all child tasks/bugs are closed or deliberately deferred.
 
-Before creating Beads, run `bd children <epic-id> --json` or `bd list --parent <epic-id> --status all --json`. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them. When creating multiple sequential slices, add blocking dependencies in the direction that makes `bd ready` expose the earliest executable slice first.
+Before creating Beads, run `bd children <epic-id> --json` or `bd list --parent <epic-id> --status all --json`. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them. When creating multiple sequential slices, add dependencies from later to earlier (`bd dep add <later-id> <earlier-id>`) and verify `bd ready --json` exposes the earliest executable slice first before closing the planning Bead.
 
 Use Beads fields directly:
 
