@@ -69,6 +69,10 @@ check(
 	"pi-subagents listed as peer dependency",
 	Boolean(pkg.peerDependencies?.["pi-subagents"]),
 );
+check(
+	"pi-compound-engineering listed as peer dependency",
+	Boolean(pkg.peerDependencies?.["pi-compound-engineering"]),
+);
 
 for (const rel of ["skills", "prompts", "agents", "README.md"]) {
 	check(`manifest path exists: ${rel}`, existsSync(path.join(root, rel)));
@@ -93,6 +97,7 @@ for (const mode of [
 	"small",
 	"med",
 	"big",
+	"debug",
 	"auto",
 	"resume",
 	"continue",
@@ -106,6 +111,7 @@ for (const role of [
 	"bead-planner",
 	"bead-worker",
 	"bead-reviewer",
+	"bead-debugger",
 	"bead-fixer",
 	"bead-committer",
 ]) {
@@ -119,6 +125,9 @@ for (const phrase of [
 	"manual changes",
 	"master plan",
 	"ce-plan",
+	"ce-debug",
+	"ce-compound mode:headless",
+	"contact_supervisor",
 	"auto-accept plan creation",
 	"source brainstorm plus local plan path",
 	"active not-completed epics",
@@ -140,6 +149,7 @@ const promptModes = {
 	"work-small.md": "small",
 	"work-med.md": "med",
 	"work-big.md": "big",
+	"work-debug.md": "debug",
 	"work-auto.md": "auto",
 	"work-resume.md": "resume",
 	"work-continue.md": "continue",
@@ -152,8 +162,8 @@ const promptFiles = readdirSync(path.join(root, "prompts")).filter((file) =>
 	file.endsWith(".md"),
 );
 check(
-	"exactly ten prompt templates",
-	promptFiles.length === 10,
+	"exactly eleven prompt templates",
+	promptFiles.length === 11,
 	promptFiles.join(", "),
 );
 for (const [file, mode] of Object.entries(promptModes)) {
@@ -195,6 +205,16 @@ const agentRules = {
 		name: "bead-reviewer",
 		forbidWrite: true,
 		must: ["PASS", "FAIL", "read-only"],
+	},
+	"bead-debugger.md": {
+		name: "bead-debugger",
+		requireWrite: true,
+		must: [
+			"ce-debug",
+			"ce-compound mode:headless",
+			"contact_supervisor",
+			"same epic parent",
+		],
 	},
 	"bead-fixer.md": {
 		name: "bead-fixer",
@@ -252,13 +272,17 @@ for (const phrase of [
 	"pi install",
 	"/work-master",
 	"/work-small",
+	"/work-debug",
 	"/work-resume",
 	"/work-continue",
 	"pi-subagents",
+	"pi-compound-engineering",
 	"pi-ask-user",
 	"bd init",
 	"Master plan epics",
 	"ce-plan",
+	"ce-debug",
+	"ce-compound",
 	"No TypeScript extension",
 	"No custom dashboard",
 	"No push automation",

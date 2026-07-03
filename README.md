@@ -2,7 +2,7 @@
 
 Beads-backed Pi workflow package for running software work through short `/work-*` commands.
 
-The package is intentionally boring: one skill, ten prompt templates, and five role subagents. Beads owns work state. Git owns code state. There is no package database.
+The package is intentionally boring: one skill, eleven prompt templates, and six role subagents. Beads owns work state. Git owns code state. There is no package database.
 
 ## Install
 
@@ -12,10 +12,11 @@ From this repository:
 pi install /absolute/path/to/pi-work-orchestrator
 ```
 
-Required companion package and CLI:
+Required companion packages and CLI:
 
 ```bash
 pi install npm:pi-subagents
+pi install npm:pi-compound-engineering
 bd --help
 ```
 
@@ -40,7 +41,8 @@ bd prime
 | `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Creates/claims a Bead, implements, verifies, lightly reviews, commits, closes |
 | `/work-med <task>` | Bounded work inside an epic with a few choices | Creates a parent Bead and one to three executable child Beads, then works ready slices |
 | `/work-big <task>` | Large, risky, or architectural slice inside an epic | Creates a planning Bead under the active epic, then slices it before implementation |
-| `/work-auto <task>` | You want the orchestrator to classify size | Routes to small, med, big, or master; asks before big/master/ambiguous work |
+| `/work-debug <bug>` | Failing test, error, regression, or broken behavior | Creates a bug Bead, runs `ce-debug` through `bead-debugger`, verifies, and compounds reusable lessons |
+| `/work-auto <task>` | You want the orchestrator to classify size | Routes to small, med, debug, big, or master; asks before big/master/ambiguous work |
 | `/work-resume [epic-id\|last]` | Resume latest master epic work | Resolves state from Beads; if unclear, lists active not-completed epics to pick from |
 | `/work-continue [epic-id\|last]` | Legacy resume alias | Same as `/work-resume` |
 | `/work-add <task>` | Add urgent or discovered work mid-epic | Creates a Bead, adds dependency only if truly blocking, optionally runs it now |
@@ -72,6 +74,7 @@ The orchestrator runs `ce-plan` when a detailed master plan does not already exi
 | `bead-planner` | No | No | Creates executable Beads and decision Beads |
 | `bead-worker` | Yes | No | Implements exactly one Bead and updates notes |
 | `bead-reviewer` | No | No | Reports `PASS` or `FAIL` from diff, acceptance, and verification |
+| `bead-debugger` | Yes | No | Uses `ce-debug` to reproduce, root-cause, fix, verify, and request learning capture |
 | `bead-fixer` | Yes | No | Fixes reviewer-identified issues only |
 | `bead-committer` | No | Yes | Verifies, commits related files, then closes the Bead |
 
@@ -81,7 +84,7 @@ The orchestrator runs `ce-plan` when a detailed master plan does not already exi
 npm run verify
 ```
 
-The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, and MVP non-goals.
+The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, CE integration hooks, and MVP non-goals.
 
 ## Disposable repo smoke test
 
@@ -110,5 +113,6 @@ Then try:
 - No parallel writers in one checkout.
 - No package-owned task database.
 - No markdown TODO ledger as source of truth.
+- No `ce-compound` on routine small tasks; it runs only for big/master/debug work with reusable learning.
 
 Add an extension later only if prompt templates plus the shared skill are not enough.

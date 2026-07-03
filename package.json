@@ -36,6 +36,7 @@
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
+    "pi-compound-engineering": "*",
     "pi-subagents": "*"
   }
 }

@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-small`, `/work-med`, `/work-big`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`.
+Use this skill for `/work-master`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-status`, and `/work-pause`.
 
 ## Source of Truth
 
@@ -52,6 +52,7 @@ Use labels for workflow state:
 
 - `wo:planning`
 - `wo:implementation`
+- `wo:debug`
 - `wo:fix`
 - `wo:decision`
 
@@ -111,12 +112,26 @@ Use for large, risky, cross-cutting, or architectural work inside an existing ep
 
 Do not create a new master epic here; use `Mode: master` for that.
 
+## Mode: debug
+
+Use for failing tests, errors, regressions, or broken behavior inside an existing epic.
+
+1. Resolve the active epic first; if ambiguous, ask.
+2. Create a `type=bug` child Bead under that epic (`--parent <epic-id>`) with the reported symptom, reproduction command, and expected behavior.
+3. Launch `bead-debugger` with that bug Bead and require the `ce-debug` workflow: reproduce, root-cause, fix, verify.
+4. Review the debug diff with `bead-reviewer`; if it fails, return to `bead-debugger` or `bead-fixer` with exact findings.
+5. Commit through `bead-committer`, then close the bug Bead only after verification passes and no related dirty files remain.
+6. If debugging produced a reusable root-cause lesson, run `ce-compound mode:headless <short context>` after the fix commit and commit any generated learning docs before closing the epic.
+
+Stop when reproduction needs unavailable external state, the root cause requires a product/architecture decision, or `ce-debug` cannot verify safely.
+
 ## Mode: auto
 
 Classify the task, then route:
 
 - small: clear, low-risk, one or two files;
 - med: bounded, some choices, fewer than about ten files;
+- debug: failing test, error, regression, stack trace, or broken behavior;
 - big: cross-cutting, high-risk, unclear, architecture/product decisions, or more than about ten files inside an existing epic;
 - master: new brainstorm, new product idea, or request to create a master plan/epic.
 
@@ -146,9 +161,10 @@ Loop:
 6. Launch `bead-reviewer` against the diff, Bead acceptance, and verification notes.
 7. If review returns `FAIL`, launch `bead-fixer`, then review again.
 8. After `PASS`, launch `bead-committer` or commit in the parent with the same gate.
-9. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, and `bd list --status=open --json` plus `bd list --status=in_progress --json` for the target epic.
-10. If autoformat/test tooling changed related files after commit, verify and commit those related changes before moving on; do not report completion with dirty related files.
-11. Repeat until a stop condition fires.
+9. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
+10. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, and `bd list --status=open --json` plus `bd list --status=in_progress --json` for the target epic.
+11. If autoformat/test tooling changed related files after commit, verify and commit those related changes before moving on; do not report completion with dirty related files.
+12. Repeat until a stop condition fires.
 
 ## Mode: add
 
@@ -183,6 +199,8 @@ Do not mutate Beads or git in status mode.
 ## Role Loop
 
 Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role.
+
+All human questions from children must flow through the parent session. A child uses `contact_supervisor` with `reason: "need_decision"`; the parent relays the single concrete question to the user, records the answer in Beads notes, then resumes the role loop. Do not let a child block invisibly on user input.
 
 ### bead-planner
 
@@ -222,6 +240,18 @@ Responsibilities:
 - report `PASS` or `FAIL` with evidence;
 - when failing, provide exact fix instructions or a fix Bead.
 
+### bead-debugger
+
+Single writer for root-cause debugging. Must not commit.
+
+Responsibilities:
+
+- read the bug Bead and current git state;
+- use `ce-debug` discipline to reproduce, trace, root-cause, fix, and verify;
+- update Bead notes with symptoms, causal chain, files changed, verification, and result;
+- create follow-up Beads under the same epic only for separate work;
+- request `ce-compound mode:headless` when a non-trivial reusable lesson was learned.
+
 ### bead-fixer
 
 Single writer for reviewer-identified issues only. Must not commit.
@@ -252,7 +282,7 @@ Responsibilities:
 Stop and ask or hand off when:
 
 - no ready Beads remain;
-- human product or architecture decision is needed;
+- human product, architecture, or debugging-environment decision is needed;
 - verification failure invalidates the plan;
 - the same subagent fails twice;
 - context budget is high;
