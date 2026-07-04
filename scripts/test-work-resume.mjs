@@ -435,6 +435,10 @@ try {
 	delete process.env.WORK_RESUME_GIT_DIRTY;
 	state = buildWorkResumeState(process.cwd(), "E-C");
 	assert(state.action === "done-candidate", "closed epic does not launch work");
+	assert(
+		state.suggestedCommands.length === 0,
+		"closed epic has no self-loop next command",
+	);
 
 	const sent = [];
 	const notices = [];

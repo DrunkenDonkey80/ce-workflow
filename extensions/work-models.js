@@ -1063,7 +1063,7 @@ function planResumeAction(state) {
 			...state,
 			action: "done-candidate",
 			message: "Epic is closed.",
-			suggestedCommands: [`/work-report ${state.epic.id}`],
+			suggestedCommands: [],
 		};
 	if (state.readyPlanning.length && state.executableSlices.length)
 		return {
