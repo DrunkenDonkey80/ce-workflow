@@ -1149,6 +1149,7 @@ function roleHandoffPrompt(state, mode, extraLines = []) {
 			: "Known dirty paths: none",
 		ROLE_TIMEOUT_GUIDANCE,
 		"Subagent output guidance: set outputMode:file-only with an artifact path unless the full result is under 20 lines; paste only a short PASS/FAIL or changed-files summary into the parent session.",
+		"Closure rule: worker/reviewer/fixer/debugger roles must leave Beads open for parent/committer close after review, verification, and commit.",
 		...extraLines.filter(Boolean),
 		"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
 		selected?.id ? `Target Bead ID: ${selected.id}` : "Target Bead ID: none",
