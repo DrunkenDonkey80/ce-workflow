@@ -357,7 +357,7 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
 
-Role prompts use fresh child context by default and concise/file-artifact outputs so the parent session does not inherit every tool log or full master plan. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
+Role prompts use fresh child context by default and file-only artifacts so the parent session does not inherit every tool log or full master plan. Subagent launches should set `outputMode: "file-only"` with a saved artifact path unless the entire result is a short PASS/FAIL summary. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {
@@ -372,15 +372,16 @@ Role prompts use fresh child context by default and concise/file-artifact output
 
 Use low/minimal effort for disposable smoke-test Pi instances. Keep your control session on a frontier model for `/work-master`/`ce-plan` if you want deep planning, then set `work` to a local model to save tokens.
 
-`/work-context` is separate from model choice. It is on by default and uses no model call for its compact summary.
+`/work-context` is separate from model choice. It is on by default and uses no model call for its compact summary. For normal control-session inspection, use `/work-report` and `/work-resume`; avoid raw `bd show --json` for epics because it can dump full plans into chat.
 
 ## Verify this package
 
 ```bash
 npm run verify
+npm run verify:quiet
 ```
 
-The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, migration policy, CE integration hooks, optional `pi-intercom` policy, and MVP non-goals.
+Use `verify:quiet` in agent chats and `verify` when you want the full local log. The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, migration policy, CE integration hooks, optional `pi-intercom` policy, and MVP non-goals.
 
 ## Disposable repo smoke test
 

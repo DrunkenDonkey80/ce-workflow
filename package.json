@@ -20,7 +20,8 @@
     "README.md"
   ],
   "scripts": {
-    "verify": "node scripts/verify-package.mjs"
+    "verify": "node scripts/verify-package.mjs",
+    "verify:quiet": "node scripts/verify-package.mjs --quiet"
   },
   "pi": {
     "extensions": [

@@ -5,11 +5,14 @@ import path from "node:path";
 import process from "node:process";
 
 const root = process.cwd();
+const quiet =
+	process.argv.includes("--quiet") ||
+	process.env.WORK_ORCH_VERIFY_QUIET === "1";
 const failures = [];
 
 function check(label, ok, detail = "") {
 	if (ok) {
-		console.log(`ok - ${label}`);
+		if (!quiet) console.log(`ok - ${label}`);
 		return;
 	}
 	failures.push(`${label}${detail ? `: ${detail}` : ""}`);
@@ -46,7 +49,8 @@ check(
 check("package is ESM", pkg.type === "module");
 check(
 	"verify script exists",
-	pkg.scripts?.verify === "node scripts/verify-package.mjs",
+	pkg.scripts?.verify === "node scripts/verify-package.mjs" &&
+		pkg.scripts?.["verify:quiet"] === "node scripts/verify-package.mjs --quiet",
 );
 check("pi manifest exists", Boolean(pkg.pi));
 check(
@@ -168,6 +172,7 @@ for (const phrase of [
 	"one executable Bead",
 	"setup blocker instead of doing the work in the parent chat",
 	"do not substitute builtin `worker`, `reviewer`, `planner`, or `delegate`",
+	"outputMode: \"file-only\"",
 	"full `bd show` epic JSON",
 	"context:fresh",
 	"bd children <epic-id> --json",
@@ -436,7 +441,7 @@ for (const phrase of [
 	"ROLE_TIMEOUT_GUIDANCE",
 	"handleWorkResumeCommand",
 	"renderWorkReportJson",
-	"rawNotes",
+	"noteExcerpts",
 	"session_before_compact",
 	"instantSummary",
 	"ctx.getContextUsage",
@@ -519,6 +524,8 @@ for (const phrase of [
 	"git status --porcelain=v1 --untracked-files=all",
 	"Known-unrelated dirty files",
 	"stale intercom",
+	"npm run verify:quiet",
+	"avoid raw `bd show --json` for epics",
 ]) {
 	check(`README mentions ${phrase}`, readme.includes(phrase));
 }
@@ -539,7 +546,7 @@ for (const script of [
 	try {
 		execFileSync(process.execPath, [`scripts/${script}`], {
 			cwd: root,
-			stdio: "inherit",
+			stdio: quiet ? "pipe" : "inherit",
 		});
 		check(`${script} fixture behavior passes`, true);
 	} catch (error) {
@@ -566,4 +573,6 @@ if (failures.length) {
 	process.exit(1);
 }
 
-console.log("\nAll package checks passed.");
+console.log(
+	quiet ? "ok - package checks passed" : "\nAll package checks passed.",
+);

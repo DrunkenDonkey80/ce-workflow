@@ -51,7 +51,7 @@ const DEFAULT_CONTEXT = {
 	autoCompact: false,
 	compactAtTokens: 150_000,
 	keepRecentTokens: 30_000,
-	maxSummaryChars: 24_000,
+	maxSummaryChars: 12_000,
 };
 const MIN_COMPACT_AT_TOKENS = 30_000;
 const contextCompactState = { inFlight: false, requested: false };
@@ -280,10 +280,10 @@ function instantSummary(preparation, customInstructions = "") {
 		...(preparation.turnPrefixMessages ?? []),
 	];
 	const lines = messages.map(messageLine).filter(Boolean);
-	const userLines = lines.filter((line) => /^\[user\]/i.test(line)).slice(-8);
-	const recentLines = lines.slice(-24);
+	const userLines = lines.filter((line) => /^\[user\]/i.test(line)).slice(-6);
+	const recentLines = lines.slice(-12);
 	const files = filesFromOps(preparation.fileOps);
-	const previous = truncate(preparation.previousSummary ?? "", 4_000);
+	const previous = truncate(preparation.previousSummary ?? "", 1_500);
 	const summary = [
 		"## Work-orchestrator instant compaction",
 		"Assistant reasoning and full tool results were intentionally dropped; Beads, git, and files are the source of truth.",
@@ -664,6 +664,14 @@ function issueSummary(issue) {
 	};
 }
 
+function issueRef(issue) {
+	return issueSummary(issue ?? {});
+}
+
+function noteExcerpt(issue, max = 300) {
+	return truncate(notesOf(issue), max);
+}
+
 function noteDetails(issue) {
 	const raw = notesOf(issue);
 	const normalized = raw.replaceAll("\\n", "\n");
@@ -688,9 +696,9 @@ function noteDetails(issue) {
 	).slice(0, 10);
 	const runIds = Array.from(
 		new Set(
-			(normalized.match(/\b(?:Run|run|run id)[:# ]+([A-Za-z0-9-]+)/g) ?? []).map(
-				(match) => match.replace(/^.*[:# ]+/, ""),
-			),
+			(
+				normalized.match(/\b(?:Run|run|run id)[:# ]+([A-Za-z0-9-]+)/g) ?? []
+			).map((match) => match.replace(/^.*[:# ]+/, "")),
 		),
 	).slice(0, 5);
 	const reason = truncate(
@@ -700,8 +708,12 @@ function noteDetails(issue) {
 		240,
 	);
 	const nextLine =
-		lines.find((line) => /^(?:next\b|rerun\b|re-run\b|run .* again)/i.test(line)) ??
-		lines.find((line) => /\b(?:next\b|rerun\b|re-run\b|run .* again)/i.test(line));
+		lines.find((line) =>
+			/^(?:next\b|rerun\b|re-run\b|run .* again)/i.test(line),
+		) ??
+		lines.find((line) =>
+			/\b(?:next\b|rerun\b|re-run\b|run .* again)/i.test(line),
+		);
 	const nextMatch = nextLine?.match(
 		/\b(?:next(?: exact action)?|rerun|re-run|run .* again)\b/i,
 	);
@@ -716,7 +728,6 @@ function noteDetails(issue) {
 		runIds,
 		nextAction,
 		rawExcerpt: truncate(normalized, 900),
-		raw: normalized,
 	};
 }
 
@@ -1100,7 +1111,7 @@ function planResumeAction(state) {
 				"No runnable Bead is ready; blockers or decisions need attention.",
 			suggestedCommands: suggestedCommands(
 				state.epic.id,
-				state.blockerIssues,
+				state.blockers,
 				state.openDecisions,
 			),
 		};
@@ -1137,6 +1148,7 @@ function roleHandoffPrompt(state, mode, extraLines = []) {
 			? `Known dirty paths: ${state.git.dirtyPaths.join(", ")}`
 			: "Known dirty paths: none",
 		ROLE_TIMEOUT_GUIDANCE,
+		"Subagent output guidance: set outputMode:file-only with an artifact path unless the full result is under 20 lines; paste only a short PASS/FAIL or changed-files summary into the parent session.",
 		...extraLines.filter(Boolean),
 		"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
 		selected?.id ? `Target Bead ID: ${selected.id}` : "Target Bead ID: none",
@@ -1196,7 +1208,6 @@ function buildWorkResumeState(cwd, args = "") {
 			readyExecutable,
 			readyPlanning,
 			executableSlices,
-			blockerIssues: childState.blockers,
 			blockers: resumeBlockers(childState),
 			downstreamBlocked: childState.downstreamBlocked,
 			openDecisions: childState.openDecisions.map(issueSummary),
@@ -1238,8 +1249,8 @@ function buildEpicReportState(cwd, epic) {
 			childState.epicId,
 			childState.blockers,
 		),
-		rawNotes: childState.blockers
-			.map((issue) => ({ id: idOf(issue), text: notesOf(issue) }))
+		noteExcerpts: childState.blockers
+			.map((issue) => ({ id: idOf(issue), text: noteExcerpt(issue) }))
 			.filter((item) => item.text),
 		warnings: git.warnings,
 	};
@@ -1261,9 +1272,7 @@ function buildBeadReportState(cwd, bead) {
 		epic: parentId ? { id: parentId } : undefined,
 		bead: {
 			...issueSummary(bead),
-			dependencies: dependencyIds.map((id) =>
-				issueSummary(byId.get(id) ?? { id }),
-			),
+			dependencies: dependencyIds.map((id) => issueRef(byId.get(id) ?? { id })),
 			dependents: dependents.map(issueSummary),
 			notes,
 		},
@@ -1271,7 +1280,7 @@ function buildBeadReportState(cwd, bead) {
 			dependencies: dependencyIds.length,
 			dependents: dependents.length,
 		},
-		blockers: dependencyIds.map((id) => issueSummary(byId.get(id) ?? { id })),
+		blockers: dependencyIds.map((id) => issueRef(byId.get(id) ?? { id })),
 		downstreamBlocked: dependents.map((issue) => ({
 			bead: issueSummary(issue),
 			blockedBy: issueSummary(bead),
@@ -1283,7 +1292,9 @@ function buildBeadReportState(cwd, bead) {
 			notes.nextAction ||
 				suggestedCommands(parentId ?? idOf(bead), [], [bead])[0],
 		].filter(Boolean),
-		rawNotes: notesOf(bead) ? [{ id: idOf(bead), text: notesOf(bead) }] : [],
+		noteExcerpts: notesOf(bead)
+			? [{ id: idOf(bead), text: noteExcerpt(bead, 800) }]
+			: [],
 		warnings: git.warnings,
 	};
 }

@@ -5,11 +5,17 @@ import path from "node:path";
 import process from "node:process";
 import { buildWorkReport } from "../extensions/work-models.js";
 
+const hugeText = "FULL_PLAN_SHOULD_NOT_LEAK ".repeat(200);
+
 const epic = {
 	id: "E-1",
 	issue_type: "epic",
 	status: "in_progress",
 	title: "Add coded work report",
+	description: hugeText,
+	design: hugeText,
+	acceptance_criteria: hugeText,
+	notes: hugeText,
 	updated_at: "2026-07-03T10:00:00Z",
 };
 const children = [
@@ -26,6 +32,8 @@ const children = [
 		issue_type: "task",
 		status: "open",
 		title: "Blocked C compiler verification",
+		description: hugeText,
+		design: hugeText,
 		labels: ["wo:blocked"],
 		depends_on: [
 			{ issue_id: "B-1", depends_on_id: "D-1", type: "blocks" },
@@ -171,8 +179,12 @@ try {
 		"json ignores parent-child dependency id",
 	);
 	assert(
-		json.rawNotes.some((item) => item.text.includes("CMAKE_C_COMPILER")),
-		"json preserves raw notes",
+		json.noteExcerpts.some((item) => item.text.includes("CMAKE_C_COMPILER")),
+		"json preserves compact note excerpts",
+	);
+	assert(
+		!JSON.stringify(json).includes("FULL_PLAN_SHOULD_NOT_LEAK"),
+		"json omits full Beads description/design/acceptance/notes",
 	);
 	assert(
 		json.downstreamBlocked.some(

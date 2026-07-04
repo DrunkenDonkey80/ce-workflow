@@ -282,6 +282,10 @@ try {
 		!state.handoffPrompt.includes("Large unrelated notes"),
 		"handoff omits unrelated note blob",
 	);
+	assert(
+		!JSON.stringify(state).includes("Large unrelated notes"),
+		"resume state omits full Beads notes",
+	);
 
 	process.env.WORK_RESUME_SCENARIO = "implementation";
 	state = buildWorkResumeState(process.cwd(), "E-1");
