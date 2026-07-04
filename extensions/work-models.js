@@ -1228,6 +1228,14 @@ function buildWorkResumeState(cwd, args = "") {
 function buildEpicReportState(cwd, epic) {
 	const childState = buildEpicChildState(cwd, epic);
 	const git = gitReport(cwd);
+	const complete =
+		statusOf(epic) === "closed" ||
+		(childState.slices.length > 0 &&
+			childState.closed.length === childState.slices.length &&
+			childState.inProgress.length === 0 &&
+			childState.readyWork.length === 0 &&
+			childState.blockers.length === 0 &&
+			childState.openDecisions.length === 0);
 	return {
 		ok: true,
 		target: { requested: childState.epicId, kind: "epic" },
@@ -1246,10 +1254,13 @@ function buildEpicReportState(cwd, epic) {
 		openDecisions: childState.openDecisions.map(issueSummary),
 		readyWork: childState.readyWork.map(issueSummary),
 		git,
-		suggestedCommands: suggestedCommands(
-			childState.epicId,
-			childState.blockers,
-		),
+		suggestedCommands: complete
+			? []
+			: suggestedCommands(
+					childState.epicId,
+					childState.blockers,
+					childState.openDecisions,
+				),
 		noteExcerpts: childState.blockers
 			.map((issue) => ({ id: idOf(issue), text: noteExcerpt(issue) }))
 			.filter((item) => item.text),

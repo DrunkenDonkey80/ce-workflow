@@ -1,9 +1,23 @@
 #!/usr/bin/env node
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import process from "node:process";
-import { buildWorkReport } from "../extensions/work-models.js";
+
+const { buildWorkReport } = await import(
+	pathToFileURL(
+		realpathSync(
+			path.join(import.meta.dirname, "../extensions/work-models.js"),
+		),
+	).href
+);
 
 const hugeText = "FULL_PLAN_SHOULD_NOT_LEAK ".repeat(200);
 
@@ -88,20 +102,22 @@ const epic = ${JSON.stringify(epic)};
 const children = ${JSON.stringify(children)};
 const scenario = process.env.WORK_REPORT_SCENARIO || "default";
 const args = process.argv.slice(2).filter((arg) => arg !== "--json");
+const activeEpic = scenario === "closed" ? {...epic, status: "closed"} : epic;
+const activeChildren = scenario === "closed" ? children.map((issue) => ({...issue, status: "closed", labels: [], depends_on: []})) : children;
 function out(value) { console.log(JSON.stringify(value)); }
 if (scenario === "no-beads") { console.error("Error: no beads database found"); process.exit(1); }
 if (scenario === "invalid-json") { process.stdout.write("{"); process.exit(0); }
 if (args[0] === "list" && args.includes("--type=epic")) {
   if (scenario === "ambiguous" && args.some((arg) => arg === "--status=in_progress")) out([{...epic, id:"E-1"}, {...epic, id:"E-2", title:"Second epic"}]);
-  else if (args.some((arg) => arg === "--status=in_progress")) out([epic]);
+  else if (args.some((arg) => arg === "--status=in_progress")) out(scenario === "closed" ? [] : [activeEpic]);
   else out([]);
 } else if (args[0] === "show") {
   const id = args[1];
-  if (id === "E-1") out(epic);
-  else if (children.find((issue) => issue.id === id)) out(children.find((issue) => issue.id === id));
+  if (id === "E-1") out(activeEpic);
+  else if (activeChildren.find((issue) => issue.id === id)) out(activeChildren.find((issue) => issue.id === id));
   else { console.error("not found"); process.exit(2); }
-} else if (args[0] === "children") out(children);
-else if (args[0] === "ready") out(children.filter((issue) => issue.id === "BUG-1"));
+} else if (args[0] === "children") out(activeChildren);
+else if (args[0] === "ready") out(activeChildren.filter((issue) => scenario !== "closed" && issue.id === "BUG-1"));
 else out([]);
 `,
 	);
@@ -249,6 +265,19 @@ try {
 	assert(
 		ambiguous.candidates.length === 2,
 		"ambiguous target includes candidates",
+	);
+
+	process.env.WORK_REPORT_SCENARIO = "closed";
+	const closed = buildWorkReport(process.cwd(), "E-1");
+	assert(
+		closed.includes("Status: closed") &&
+			closed.includes("Next: No action suggested."),
+		"closed completed epic has no self-loop next command",
+	);
+	const closedJson = JSON.parse(buildWorkReport(process.cwd(), "E-1 --json"));
+	assert(
+		closedJson.suggestedCommands.length === 0,
+		"closed completed epic JSON has no suggested command",
 	);
 
 	process.env.WORK_REPORT_SCENARIO = "no-beads";
