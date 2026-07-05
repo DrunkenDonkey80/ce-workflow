@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-finish`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. Extension commands provide cheap deterministic status, report, resume, start-gate, pause/debug/add/auto intake, and finish-gate state when loaded.
+Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-telemetry`, `/work-finish`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. Extension commands provide cheap deterministic status, report, telemetry, resume, start-gate, pause/debug/add/auto intake, and finish-gate state when loaded.
 
 ## Source of Truth
 
@@ -304,7 +304,7 @@ Beads and git preserve the memory; Pi chat is disposable working context. The pa
 
 ## Cost and Model Policy
 
-Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Do not hard-code provider-specific models in this package.
+Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Use `/work-telemetry today` or `/work-telemetry epic <id>` before changing role/model policy; it shows command time, agent time, token usage, tool/subagent durations, and context growth. Do not hard-code provider-specific models in this package.
 
 ## Optional Intercom Coordination
 

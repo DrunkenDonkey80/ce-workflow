@@ -1,8 +1,16 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	appendFileSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 
 const CONFIG_DIR_NAME = ".pi";
+const TELEMETRY_DIR_NAME = "work-runs";
 const INHERIT_MODEL = "__inherit_model__";
 const DEFAULT_THINKING = "__default_thinking__";
 const RESET_ALL = "__reset_all__";
@@ -55,6 +63,8 @@ const DEFAULT_CONTEXT = {
 };
 const MIN_COMPACT_AT_TOKENS = 30_000;
 const contextCompactState = { inFlight: false, requested: false };
+let pendingWorkPrompt = null;
+let activeWorkAgent = null;
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -70,6 +80,324 @@ function writeSettings(cwd, settings) {
 	const dir = join(cwd, CONFIG_DIR_NAME);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(settingsPath(cwd), `${JSON.stringify(settings, null, "\t")}\n`);
+}
+
+function telemetryDir(cwd) {
+	return join(cwd, CONFIG_DIR_NAME, TELEMETRY_DIR_NAME);
+}
+
+function telemetryDay(timestamp = Date.now()) {
+	return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function telemetryPath(cwd, day = telemetryDay()) {
+	return join(telemetryDir(cwd), `${day}.jsonl`);
+}
+
+function telemetryId(prefix = "wr") {
+	return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function usageSnapshot(ctx) {
+	const usage = ctx?.getContextUsage?.();
+	if (!usage) return undefined;
+	const out = {};
+	for (const key of [
+		"tokens",
+		"maxTokens",
+		"remainingTokens",
+		"percent",
+		"contextWindow",
+	]) {
+		if (usage[key] !== undefined) out[key] = usage[key];
+	}
+	return Object.keys(out).length ? out : undefined;
+}
+
+function textChars(value) {
+	if (value === undefined || value === null) return 0;
+	if (typeof value === "string") return value.length;
+	if (Array.isArray(value)) return value.reduce((sum, item) => sum + textChars(item), 0);
+	if (typeof value === "object") {
+		if (typeof value.text === "string") return value.text.length;
+		if (value.content) return textChars(value.content);
+	}
+	return String(value).length;
+}
+
+function stateTelemetry(state) {
+	return {
+		ok: state?.ok !== false,
+		action: state?.action,
+		reason: state?.reason,
+		epicId: state?.epic?.id,
+		beadId: state?.selectedBead?.id ?? state?.bead?.id,
+		beadType: state?.selectedBead?.type ?? state?.bead?.type,
+		outputChars: state?.outputChars,
+		counts: state?.counts,
+	};
+}
+
+function recordWorkTelemetry(cwd, event) {
+	if (!cwd || process.env.WORK_ORCH_TELEMETRY_OFF === "1") return "";
+	const timestamp = event.timestamp ?? Date.now();
+	const record = {
+		version: 1,
+		...event,
+		id: event.id ?? telemetryId(),
+		timestamp: new Date(timestamp).toISOString(),
+	};
+	const file = telemetryPath(cwd, telemetryDay(timestamp));
+	mkdirSync(telemetryDir(cwd), { recursive: true });
+	appendFileSync(file, `${JSON.stringify(record)}\n`);
+	return file;
+}
+
+function appendTelemetryNote(cwd, beadId, event, file) {
+	if (!beadId || process.env.WORK_ORCH_TELEMETRY_NOTES === "0") return;
+	const parts = [
+		`telemetry: run=${event.id} type=${event.type} phase=${event.phase ?? event.command ?? event.mode ?? "work"} duration=${formatDuration(event.durationMs ?? 0)}`,
+	];
+	if (event.usage?.totalTokens) parts.push(`tokens=${event.usage.totalTokens}`);
+	if (event.context?.after?.tokens) parts.push(`context_after=${event.context.after.tokens}`);
+	if (file) parts.push(`artifact=${file}`);
+	try {
+		appendBeadNote(cwd, beadId, parts.join(" "));
+	} catch {
+		// Telemetry must never block work execution.
+	}
+}
+
+function parseWorkPromptMeta(prompt) {
+	const text = String(prompt ?? "");
+	if (!text.includes("work-orchestrator")) return undefined;
+	const lines = text.split(/\r?\n/);
+	const line = (label) =>
+		lines
+			.find((item) => item.startsWith(`${label}:`))
+			?.slice(label.length + 1)
+			.trim();
+	const epic = line("Epic") ?? "";
+	const selected = line("Selected Bead") ?? "";
+	const target = line("Target Bead ID") ?? "";
+	const epicId = epic.match(/^([^\s]+)/)?.[1];
+	const selectedId = selected.match(/^([^\s]+)/)?.[1];
+	return {
+		mode: text.match(/mode:\s*([^\s]+)/)?.[1],
+		action: line("Action"),
+		epicId: epicId === "none" ? undefined : epicId,
+		beadId:
+			target && target !== "none"
+				? target
+				: selectedId && !selectedId.startsWith("none")
+					? selectedId
+					: undefined,
+	};
+}
+
+function messageUsage(messages = []) {
+	const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 };
+	for (const message of messages) {
+		if (message?.role !== "assistant" || !message.usage) continue;
+		usage.input += Number(message.usage.input ?? 0);
+		usage.output += Number(message.usage.output ?? 0);
+		usage.cacheRead += Number(message.usage.cacheRead ?? 0);
+		usage.cacheWrite += Number(message.usage.cacheWrite ?? 0);
+		usage.totalTokens += Number(message.usage.totalTokens ?? 0);
+		usage.cost += Number(message.usage.cost?.total ?? 0);
+	}
+	return usage;
+}
+
+function summarizeMessages(messages = []) {
+	return {
+		count: messages.length,
+		assistant: messages.filter((message) => message.role === "assistant").length,
+		tools: messages.filter((message) => message.role === "toolResult").length,
+		chars: messages.reduce((sum, message) => sum + textChars(message.content), 0),
+	};
+}
+
+function summarizeToolResult(event, started) {
+	const text = typeof event.result === "string" ? event.result : JSON.stringify(event.result ?? "");
+	return {
+		id: event.toolCallId,
+		name: event.toolName,
+		durationMs: Math.max(0, Date.now() - (started?.startedAt ?? Date.now())),
+		isError: Boolean(event.isError),
+		inputChars: textChars(started?.args),
+		outputChars: text.length,
+		runId: text.match(/Run:\s*([A-Za-z0-9_-]+)/)?.[1] ?? text.match(/Async:\s*[^[]*\[([^\]]+)\]/)?.[1],
+		artifact: text.match(/Artifacts?:\s*\n?-\s*[^:]+:\s*([^\s]+)/)?.[1],
+	};
+}
+
+async function withCommandTelemetry(command, args, ctx, fn, note = false) {
+	const startedAt = Date.now();
+	const contextBefore = usageSnapshot(ctx);
+	let state;
+	let errorMessage = "";
+	try {
+		state = await fn();
+		return state;
+	} catch (error) {
+		errorMessage = error instanceof Error ? error.message : String(error);
+		throw error;
+	} finally {
+		const summary = stateTelemetry(state);
+		const event = {
+			id: telemetryId("cmd"),
+			type: "command",
+			command,
+			args: truncate(args, 300),
+			durationMs: Math.max(0, Date.now() - startedAt),
+			ok: !errorMessage && summary.ok,
+			error: errorMessage || undefined,
+			...summary,
+			context: { before: contextBefore, after: usageSnapshot(ctx) },
+		};
+		const file = recordWorkTelemetry(ctx.cwd, event);
+		if (note && state?.handoffPrompt) appendTelemetryNote(ctx.cwd, summary.beadId, event, file);
+	}
+}
+
+function readTelemetryEvents(cwd) {
+	const dir = telemetryDir(cwd);
+	if (!existsSync(dir)) return [];
+	return readdirSync(dir)
+		.filter((file) => file.endsWith(".jsonl"))
+		.flatMap((file) =>
+			readFileSync(join(dir, file), "utf8")
+				.split(/\r?\n/)
+				.filter(Boolean)
+				.map((line) => {
+					try {
+						return { ...JSON.parse(line), file: join(dir, file) };
+					} catch {
+						return undefined;
+					}
+				})
+				.filter(Boolean),
+		);
+}
+
+function parseTelemetryArgs(args = "") {
+	const tokens = String(args).trim().split(/\s+/).filter(Boolean);
+	const json = tokens.includes("--json");
+	const filtered = tokens.filter((token) => token !== "--json");
+	const scope = filtered[0] ?? "today";
+	const value = filtered[1] ?? "";
+	return { json, scope, value };
+}
+
+function matchesTelemetryScope(event, { scope, value }) {
+	const today = telemetryDay();
+	if (!scope || scope === "today") return event.timestamp?.slice(0, 10) === today;
+	if (scope === "all") return true;
+	if (scope === "epic") return event.epicId === value || event.meta?.epicId === value;
+	if (scope === "bead" || scope === "task") return event.beadId === value || event.meta?.beadId === value;
+	if (scope.includes("-")) return event.epicId === scope || event.beadId === scope || event.meta?.epicId === scope || event.meta?.beadId === scope;
+	return event.timestamp?.slice(0, 10) === scope;
+}
+
+function addMetric(map, key, event) {
+	const item = map.get(key) ?? { key, count: 0, durationMs: 0, tokens: 0 };
+	item.count += 1;
+	item.durationMs += Number(event.durationMs ?? 0);
+	item.tokens += Number(event.usage?.totalTokens ?? 0);
+	map.set(key, item);
+}
+
+function buildWorkTelemetryState(cwd, args = "") {
+	const filter = parseTelemetryArgs(args);
+	const events = readTelemetryEvents(cwd).filter((event) => matchesTelemetryScope(event, filter));
+	const byPhase = new Map();
+	const byBead = new Map();
+	const totals = {
+		durationMs: 0,
+		tokens: 0,
+		input: 0,
+		output: 0,
+		cost: 0,
+		messageChars: 0,
+		toolOutputChars: 0,
+		toolCalls: 0,
+		subagentRuns: 0,
+	};
+	let maxContextTokens = 0;
+	for (const event of events) {
+		totals.durationMs += Number(event.durationMs ?? 0);
+		totals.tokens += Number(event.usage?.totalTokens ?? 0);
+		totals.input += Number(event.usage?.input ?? 0);
+		totals.output += Number(event.usage?.output ?? 0);
+		totals.cost += Number(event.usage?.cost ?? 0);
+		totals.messageChars += Number(event.messages?.chars ?? event.outputChars ?? 0);
+		totals.toolOutputChars += (event.tools ?? []).reduce(
+			(sum, tool) => sum + Number(tool.outputChars ?? 0),
+			0,
+		);
+		totals.toolCalls += (event.tools ?? []).length;
+		totals.subagentRuns += (event.tools ?? []).filter(
+			(tool) => tool.name === "subagent",
+		).length;
+		maxContextTokens = Math.max(maxContextTokens, Number(event.context?.after?.tokens ?? event.context?.before?.tokens ?? 0));
+		addMetric(byPhase, [event.type, event.command ?? event.mode, event.action].filter(Boolean).join("/"), event);
+		const bead = event.beadId ?? event.meta?.beadId;
+		if (bead) addMetric(byBead, bead, event);
+	}
+	return {
+		ok: true,
+		dir: telemetryDir(cwd),
+		filter,
+		files: [...new Set(events.map((event) => event.file).filter(Boolean))],
+		events: events.length,
+		totals,
+		maxContextTokens,
+		byPhase: [...byPhase.values()].sort((a, b) => b.durationMs - a.durationMs),
+		byBead: [...byBead.values()].sort((a, b) => b.durationMs - a.durationMs),
+		slowest: [...events].sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0)).slice(0, 5),
+	};
+}
+
+function formatDuration(ms) {
+	const total = Math.round(Number(ms ?? 0));
+	if (total < 1000) return `${total}ms`;
+	const seconds = total / 1000;
+	if (seconds < 60) return `${seconds.toFixed(1)}s`;
+	return `${Math.floor(seconds / 60)}m${Math.round(seconds % 60).toString().padStart(2, "0")}s`;
+}
+
+function renderMetricRows(rows) {
+	return rows.length
+		? rows.slice(0, 8).map((row) => `- ${row.key}: ${row.count} events, ${formatDuration(row.durationMs)}, ${row.tokens} tokens`)
+		: ["- none"];
+}
+
+function renderWorkTelemetryText(state) {
+	return [
+		`Work telemetry: ${state.filter.scope}${state.filter.value ? ` ${state.filter.value}` : ""}`,
+		`Events: ${state.events} • observed time: ${formatDuration(state.totals.durationMs)} • tokens: ${state.totals.tokens} in:${state.totals.input} out:${state.totals.output} • cost: ${state.totals.cost.toFixed(4)}`,
+		`Tools: ${state.totals.toolCalls} calls, ${state.totals.subagentRuns} subagent runs, ${state.totals.toolOutputChars} tool-output chars • messages: ${state.totals.messageChars} chars`,
+		`Max recorded context: ${state.maxContextTokens || "unknown"} tokens`,
+		"",
+		"By phase:",
+		...renderMetricRows(state.byPhase),
+		"",
+		"By Bead:",
+		...renderMetricRows(state.byBead),
+		"",
+		"Slowest:",
+		...(state.slowest.length
+			? state.slowest.map((event) => `- ${event.id} ${event.type}/${event.command ?? event.mode ?? "agent"}/${event.action ?? ""}: ${formatDuration(event.durationMs)} ${event.beadId ?? event.meta?.beadId ?? ""}`.trim())
+			: ["- none"]),
+		"",
+		`Files: ${state.files.length ? state.files.join(", ") : state.dir}`,
+	].join("\n");
+}
+
+function buildWorkTelemetry(cwd, args = "") {
+	const state = buildWorkTelemetryState(cwd, args);
+	return state.filter.json ? JSON.stringify(state, null, "\t") : renderWorkTelemetryText(state);
 }
 
 function contextSettings(settings) {
@@ -2352,6 +2680,9 @@ export {
 	buildWorkResume,
 	buildWorkResumeState,
 	buildWorkSmallState,
+	buildWorkTelemetry,
+	buildWorkTelemetryState,
+	recordWorkTelemetry,
 	handleWorkResumeCommand,
 	planResumeAction,
 	renderWorkReportJson,
@@ -2361,6 +2692,68 @@ export {
 };
 
 export default function workModelsExtension(pi) {
+	pi.on("before_agent_start", async (event, ctx) => {
+		const meta = parseWorkPromptMeta(event.prompt);
+		pendingWorkPrompt = meta
+			? {
+					id: telemetryId("agent"),
+					cwd: ctx.cwd,
+					promptChars: String(event.prompt ?? "").length,
+					meta,
+					contextBefore: usageSnapshot(ctx),
+				}
+			: null;
+	});
+
+	pi.on("agent_start", async () => {
+		if (!pendingWorkPrompt) return;
+		activeWorkAgent = {
+			...pendingWorkPrompt,
+			startedAt: Date.now(),
+			tools: [],
+			toolStarts: new Map(),
+		};
+		pendingWorkPrompt = null;
+	});
+
+	pi.on("tool_execution_start", async (event) => {
+		if (!activeWorkAgent) return;
+		activeWorkAgent.toolStarts.set(event.toolCallId, {
+			startedAt: Date.now(),
+			args: event.args,
+		});
+	});
+
+	pi.on("tool_execution_end", async (event) => {
+		if (!activeWorkAgent) return;
+		const started = activeWorkAgent.toolStarts.get(event.toolCallId);
+		activeWorkAgent.tools.push(summarizeToolResult(event, started));
+		activeWorkAgent.toolStarts.delete(event.toolCallId);
+	});
+
+	pi.on("agent_end", async (event, ctx) => {
+		if (!activeWorkAgent) return;
+		const run = activeWorkAgent;
+		activeWorkAgent = null;
+		const usage = messageUsage(event.messages);
+		const telemetry = {
+			id: run.id,
+			type: "agent",
+			mode: run.meta.mode,
+			action: run.meta.action,
+			epicId: run.meta.epicId,
+			beadId: run.meta.beadId,
+			durationMs: Math.max(0, Date.now() - run.startedAt),
+			promptChars: run.promptChars,
+			messages: summarizeMessages(event.messages),
+			tools: run.tools,
+			usage,
+			context: { before: run.contextBefore, after: usageSnapshot(ctx) },
+		};
+		const file = recordWorkTelemetry(run.cwd, telemetry);
+		appendTelemetryNote(run.cwd, run.meta.beadId, telemetry, file);
+	});
+
 	pi.on("session_before_compact", async (event, ctx) => {
 		const instructions = event.customInstructions ?? "";
 		if (
@@ -2409,21 +2802,38 @@ export default function workModelsExtension(pi) {
 	pi.registerCommand("work-status", {
 		description: "Show deterministic Beads/git work-orchestrator status",
 		handler: async (args, ctx) => {
-			try {
-				ctx.ui.notify(buildWorkStatus(ctx.cwd, args), "info");
-			} catch (error) {
-				ctx.ui.notify(
-					`Could not build work status: ${error instanceof Error ? error.message : String(error)}`,
-					"error",
-				);
-			}
+			await withCommandTelemetry("work-status", args, ctx, async () => {
+				try {
+					const output = buildWorkStatus(ctx.cwd, args);
+					ctx.ui.notify(output, "info");
+					return { ok: true, outputChars: output.length };
+				} catch (error) {
+					ctx.ui.notify(
+						`Could not build work status: ${error instanceof Error ? error.message : String(error)}`,
+						"error",
+					);
+					return { ok: false, reason: "status-error" };
+				}
+			});
 		},
 	});
 
 	pi.registerCommand("work-report", {
 		description: "Show deterministic Beads/git blocker handoff report",
 		handler: async (args, ctx) => {
-			ctx.ui.notify(buildWorkReport(ctx.cwd, args), "info");
+			await withCommandTelemetry("work-report", args, ctx, async () => {
+				const output = buildWorkReport(ctx.cwd, args);
+				ctx.ui.notify(output, "info");
+				return { ok: true, outputChars: output.length };
+			});
+		},
+	});
+
+	pi.registerCommand("work-telemetry", {
+		description: "Summarize work-orchestrator timing, token, and context telemetry",
+		handler: async (args, ctx) => {
+			const output = buildWorkTelemetry(ctx.cwd, args);
+			ctx.ui.notify(output, "info");
 		},
 	});
 
@@ -2431,84 +2841,140 @@ export default function workModelsExtension(pi) {
 		description:
 			"Resolve the next Beads-backed work action and hand off safely",
 		handler: async (args, ctx) => {
-			await handleWorkResumeCommand(args, ctx);
+			await withCommandTelemetry(
+				"work-resume",
+				args,
+				ctx,
+				() => handleWorkResumeCommand(args, ctx),
+				true,
+			);
 		},
 	});
 
 	pi.registerCommand("work-continue", {
 		description: "Alias for deterministic /work-resume preflight",
 		handler: async (args, ctx) => {
-			await handleWorkResumeCommand(args, ctx);
+			await withCommandTelemetry(
+				"work-continue",
+				args,
+				ctx,
+				() => handleWorkResumeCommand(args, ctx),
+				true,
+			);
 		},
 	});
 
 	pi.registerCommand("work-pause", {
 		description: "Checkpoint current Beads-backed work and stop",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkPauseState, args, ctx);
+			await withCommandTelemetry("work-pause", args, ctx, () =>
+				handleWorkflowAction(buildWorkPauseState, args, ctx),
+			);
 		},
 	});
 
 	pi.registerCommand("work-small", {
 		description: "Create one implementation Bead and hand off safely",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkSmallState, args, ctx);
+			await withCommandTelemetry(
+				"work-small",
+				args,
+				ctx,
+				() => handleWorkflowAction(buildWorkSmallState, args, ctx),
+				true,
+			);
 		},
 	});
 
 	pi.registerCommand("work-med", {
 		description: "Create one medium planning Bead and hand off safely",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkMedState, args, ctx);
+			await withCommandTelemetry(
+				"work-med",
+				args,
+				ctx,
+				() => handleWorkflowAction(buildWorkMedState, args, ctx),
+				true,
+			);
 		},
 	});
 
 	pi.registerCommand("work-big", {
 		description: "Create one large-slice planning Bead and hand off safely",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkBigState, args, ctx);
+			await withCommandTelemetry(
+				"work-big",
+				args,
+				ctx,
+				() => handleWorkflowAction(buildWorkBigState, args, ctx),
+				true,
+			);
 		},
 	});
 
 	pi.registerCommand("work-master", {
 		description: "Bootstrap a master epic or plan handoff",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkMasterState, args, ctx);
+			await withCommandTelemetry(
+				"work-master",
+				args,
+				ctx,
+				() => handleWorkflowAction(buildWorkMasterState, args, ctx),
+				true,
+			);
 		},
 	});
 
 	pi.registerCommand("work-migrate", {
 		description: "Normalize migration sources and hand off safely",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkMigrateState, args, ctx);
+			await withCommandTelemetry(
+				"work-migrate",
+				args,
+				ctx,
+				() => handleWorkflowAction(buildWorkMigrateState, args, ctx),
+				true,
+			);
 		},
 	});
 
 	pi.registerCommand("work-finish", {
 		description: "Classify commit/close readiness for reviewed work",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkFinishState, args, ctx);
+			await withCommandTelemetry("work-finish", args, ctx, () =>
+				handleWorkflowAction(buildWorkFinishState, args, ctx),
+			);
 		},
 	});
 
 	pi.registerCommand("work-debug", {
 		description: "Resolve or create a debug Bead and hand off safely",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkDebugState, args, ctx);
+			await withCommandTelemetry(
+				"work-debug",
+				args,
+				ctx,
+				() => handleWorkflowAction(buildWorkDebugState, args, ctx),
+				true,
+			);
 		},
 	});
 
 	pi.registerCommand("work-add", {
 		description: "Create explicit work under the active Beads epic",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkAddState, args, ctx);
+			await withCommandTelemetry("work-add", args, ctx, () =>
+				handleWorkflowAction(buildWorkAddState, args, ctx),
+			);
 		},
 	});
 
 	pi.registerCommand("work-auto", {
 		description: "Run deterministic /work-auto guards and hand off",
 		handler: async (args, ctx) => {
-			await handleWorkflowAction(buildWorkAutoState, args, ctx);
+			await withCommandTelemetry("work-auto", args, ctx, () =>
+				handleWorkflowAction(buildWorkAutoState, args, ctx),
+			);
 		},
 	});
 

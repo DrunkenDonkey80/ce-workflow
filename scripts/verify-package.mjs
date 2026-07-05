@@ -412,6 +412,7 @@ for (const phrase of [
 	"bead-committer",
 	'registerCommand("work-status"',
 	'registerCommand("work-report"',
+	'registerCommand("work-telemetry"',
 	'registerCommand("work-resume"',
 	'registerCommand("work-continue"',
 	'registerCommand("work-pause"',
@@ -426,6 +427,9 @@ for (const phrase of [
 	'registerCommand("work-auto"',
 	'registerCommand("work-context"',
 	"buildWorkReport",
+	"buildWorkTelemetry",
+	"buildWorkTelemetryState",
+	"recordWorkTelemetry",
 	"buildWorkResumeState",
 	"buildWorkflowIntakeState",
 	"buildWorkPauseState",
@@ -446,6 +450,8 @@ for (const phrase of [
 	"session_before_compact",
 	"instantSummary",
 	"ctx.getContextUsage",
+	"tool_execution_start",
+	"agent_end",
 	"ctx.compact",
 	"buildWorkStatus",
 	"planned ahead",
@@ -476,6 +482,7 @@ for (const phrase of [
 	"Extension command: appends a deterministic checkpoint",
 	"Extension command: rejects empty input",
 	"/work-report",
+	"/work-telemetry",
 	"/work-resume",
 	"/work-continue",
 	"/work-models",
@@ -527,6 +534,7 @@ for (const phrase of [
 	"stale intercom",
 	"npm run verify:quiet",
 	"avoid raw `bd show --json` for epics",
+	".pi/work-runs/*.jsonl",
 ]) {
 	check(`README mentions ${phrase}`, readme.includes(phrase));
 }
@@ -543,6 +551,7 @@ for (const script of [
 	"test-work-add.mjs",
 	"test-work-auto.mjs",
 	"test-work-start-finish.mjs",
+	"test-work-telemetry.mjs",
 ]) {
 	try {
 		execFileSync(process.execPath, [`scripts/${script}`], {

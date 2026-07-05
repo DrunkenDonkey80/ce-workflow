@@ -51,6 +51,7 @@ bd prime
 | `/work-add [--epic <id>] [--blocked-by <bead-id>] <task>` | Add urgent or discovered work mid-epic | Extension command: creates one child Bead under an unambiguous epic and adds only explicit `--blocked-by` dependencies |
 | `/work-pause [note]` | Stop safely | Extension command: appends a deterministic checkpoint with git files, verification, failures, remaining work, and next step |
 | `/work-report [epic-id\|last\|bead-id] [--json]` | Human handoff for blockers | Extension command: deterministic blocked/debug-needed Bead report, failure artifacts, dependencies, suggested debug commands, and optional JSON |
+| `/work-telemetry [today\|all\|epic <id>\|bead <id>] [--json]` | See timing/token/context cost | Extension command: summarizes `.pi/work-runs/*.jsonl` without an LLM |
 | `/work-finish <bead-id\|epic-id>` | Classify commit/close readiness | Extension command: checks PASS review, verification evidence, related dirty files, and emits a deterministic commit-ready or stop state |
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
@@ -68,8 +69,9 @@ bd prime
 8. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
 9. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 10. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
-11. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
-12. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+11. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`; handoff commands and role-agent runs also append a one-line telemetry pointer to the selected Bead.
+12. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
+13. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 
@@ -153,7 +155,7 @@ Continue later, even in a fresh Pi session:
 
 When there is no obvious latest epic, `/work-resume` lists active epics with created date, last worked date, status, child counts, and one-line description so you can pick.
 
-`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command. Use `/work-report <epic-id>` when a human needs the full blocker ledger without spending agent context: blocked/debug-needed Beads, failure artifacts, artifact paths, dependencies, and suggested `/work-debug <bead-id>: <guidance>` commands. Add `--json` for the machine-readable state that future resume automation can reuse.
+`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command. Use `/work-report <epic-id>` when a human needs the full blocker ledger without spending agent context: blocked/debug-needed Beads, failure artifacts, artifact paths, dependencies, and suggested `/work-debug <bead-id>: <guidance>` commands. Add `--json` for the machine-readable state that future resume automation can reuse. Use `/work-telemetry today` or `/work-telemetry epic <id>` to see which commands, role agents, subagent/tool calls, token usage, and context jumps are expensive enough to optimize.
 
 ## Context management
 
