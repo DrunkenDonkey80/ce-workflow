@@ -11,7 +11,9 @@ const {
 	recordWorkTelemetry,
 } = await import(
 	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+		realpathSync(
+			path.join(import.meta.dirname, "../extensions/work-models.js"),
+		),
 	).href
 );
 const { installWorkflowFixture } = await import(
@@ -152,7 +154,8 @@ try {
 		await commands["work-small"].handler("Add tiny thing", {
 			cwd,
 			getContextUsage: () => ({ tokens: 2222 }),
-			sendUserMessage: async (message, options) => sent.push({ message, options }),
+			sendUserMessage: async (message, options) =>
+				sent.push({ message, options }),
 			ui: { notify: () => {} },
 		});
 		const commandSummary = buildWorkTelemetryState(cwd, "bead TASK-NEW-1");
@@ -163,7 +166,12 @@ try {
 		);
 		assert(sent.length === 1, "instrumented command still queues handoff");
 		assert(
-			fixture.logs().some((entry) => entry.op === "update" && entry.notes.includes("telemetry:")),
+			fixture
+				.logs()
+				.some(
+					(entry) =>
+						entry.op === "update" && entry.notes.includes("telemetry:"),
+				),
 			"instrumented command appends compact telemetry note to Bead",
 		);
 	} finally {

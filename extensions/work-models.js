@@ -117,7 +117,8 @@ function usageSnapshot(ctx) {
 function textChars(value) {
 	if (value === undefined || value === null) return 0;
 	if (typeof value === "string") return value.length;
-	if (Array.isArray(value)) return value.reduce((sum, item) => sum + textChars(item), 0);
+	if (Array.isArray(value))
+		return value.reduce((sum, item) => sum + textChars(item), 0);
 	if (typeof value === "object") {
 		if (typeof value.text === "string") return value.text.length;
 		if (value.content) return textChars(value.content);
@@ -159,7 +160,8 @@ function appendTelemetryNote(cwd, beadId, event, file) {
 		`telemetry: run=${event.id} type=${event.type} phase=${event.phase ?? event.command ?? event.mode ?? "work"} duration=${formatDuration(event.durationMs ?? 0)}`,
 	];
 	if (event.usage?.totalTokens) parts.push(`tokens=${event.usage.totalTokens}`);
-	if (event.context?.after?.tokens) parts.push(`context_after=${event.context.after.tokens}`);
+	if (event.context?.after?.tokens)
+		parts.push(`context_after=${event.context.after.tokens}`);
 	if (file) parts.push(`artifact=${file}`);
 	try {
 		appendBeadNote(cwd, beadId, parts.join(" "));
@@ -196,7 +198,14 @@ function parseWorkPromptMeta(prompt) {
 }
 
 function messageUsage(messages = []) {
-	const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 };
+	const usage = {
+		input: 0,
+		output: 0,
+		cacheRead: 0,
+		cacheWrite: 0,
+		totalTokens: 0,
+		cost: 0,
+	};
 	for (const message of messages) {
 		if (message?.role !== "assistant" || !message.usage) continue;
 		usage.input += Number(message.usage.input ?? 0);
@@ -212,14 +221,21 @@ function messageUsage(messages = []) {
 function summarizeMessages(messages = []) {
 	return {
 		count: messages.length,
-		assistant: messages.filter((message) => message.role === "assistant").length,
+		assistant: messages.filter((message) => message.role === "assistant")
+			.length,
 		tools: messages.filter((message) => message.role === "toolResult").length,
-		chars: messages.reduce((sum, message) => sum + textChars(message.content), 0),
+		chars: messages.reduce(
+			(sum, message) => sum + textChars(message.content),
+			0,
+		),
 	};
 }
 
 function summarizeToolResult(event, started) {
-	const text = typeof event.result === "string" ? event.result : JSON.stringify(event.result ?? "");
+	const text =
+		typeof event.result === "string"
+			? event.result
+			: JSON.stringify(event.result ?? "");
 	return {
 		id: event.toolCallId,
 		name: event.toolName,
@@ -227,7 +243,9 @@ function summarizeToolResult(event, started) {
 		isError: Boolean(event.isError),
 		inputChars: textChars(started?.args),
 		outputChars: text.length,
-		runId: text.match(/Run:\s*([A-Za-z0-9_-]+)/)?.[1] ?? text.match(/Async:\s*[^[]*\[([^\]]+)\]/)?.[1],
+		runId:
+			text.match(/Run:\s*([A-Za-z0-9_-]+)/)?.[1] ??
+			text.match(/Async:\s*[^[]*\[([^\]]+)\]/)?.[1],
 		artifact: text.match(/Artifacts?:\s*\n?-\s*[^:]+:\s*([^\s]+)/)?.[1],
 	};
 }
@@ -257,7 +275,8 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 			context: { before: contextBefore, after: usageSnapshot(ctx) },
 		};
 		const file = recordWorkTelemetry(ctx.cwd, event);
-		if (note && state?.handoffPrompt) appendTelemetryNote(ctx.cwd, summary.beadId, event, file);
+		if (note && state?.handoffPrompt)
+			appendTelemetryNote(ctx.cwd, summary.beadId, event, file);
 	}
 }
 
@@ -292,11 +311,20 @@ function parseTelemetryArgs(args = "") {
 
 function matchesTelemetryScope(event, { scope, value }) {
 	const today = telemetryDay();
-	if (!scope || scope === "today") return event.timestamp?.slice(0, 10) === today;
+	if (!scope || scope === "today")
+		return event.timestamp?.slice(0, 10) === today;
 	if (scope === "all") return true;
-	if (scope === "epic") return event.epicId === value || event.meta?.epicId === value;
-	if (scope === "bead" || scope === "task") return event.beadId === value || event.meta?.beadId === value;
-	if (scope.includes("-")) return event.epicId === scope || event.beadId === scope || event.meta?.epicId === scope || event.meta?.beadId === scope;
+	if (scope === "epic")
+		return event.epicId === value || event.meta?.epicId === value;
+	if (scope === "bead" || scope === "task")
+		return event.beadId === value || event.meta?.beadId === value;
+	if (scope.includes("-"))
+		return (
+			event.epicId === scope ||
+			event.beadId === scope ||
+			event.meta?.epicId === scope ||
+			event.meta?.beadId === scope
+		);
 	return event.timestamp?.slice(0, 10) === scope;
 }
 
@@ -310,7 +338,9 @@ function addMetric(map, key, event) {
 
 function buildWorkTelemetryState(cwd, args = "") {
 	const filter = parseTelemetryArgs(args);
-	const events = readTelemetryEvents(cwd).filter((event) => matchesTelemetryScope(event, filter));
+	const events = readTelemetryEvents(cwd).filter((event) =>
+		matchesTelemetryScope(event, filter),
+	);
 	const byPhase = new Map();
 	const byBead = new Map();
 	const totals = {
@@ -331,7 +361,9 @@ function buildWorkTelemetryState(cwd, args = "") {
 		totals.input += Number(event.usage?.input ?? 0);
 		totals.output += Number(event.usage?.output ?? 0);
 		totals.cost += Number(event.usage?.cost ?? 0);
-		totals.messageChars += Number(event.messages?.chars ?? event.outputChars ?? 0);
+		totals.messageChars += Number(
+			event.messages?.chars ?? event.outputChars ?? 0,
+		);
 		totals.toolOutputChars += (event.tools ?? []).reduce(
 			(sum, tool) => sum + Number(tool.outputChars ?? 0),
 			0,
@@ -340,8 +372,19 @@ function buildWorkTelemetryState(cwd, args = "") {
 		totals.subagentRuns += (event.tools ?? []).filter(
 			(tool) => tool.name === "subagent",
 		).length;
-		maxContextTokens = Math.max(maxContextTokens, Number(event.context?.after?.tokens ?? event.context?.before?.tokens ?? 0));
-		addMetric(byPhase, [event.type, event.command ?? event.mode, event.action].filter(Boolean).join("/"), event);
+		maxContextTokens = Math.max(
+			maxContextTokens,
+			Number(
+				event.context?.after?.tokens ?? event.context?.before?.tokens ?? 0,
+			),
+		);
+		addMetric(
+			byPhase,
+			[event.type, event.command ?? event.mode, event.action]
+				.filter(Boolean)
+				.join("/"),
+			event,
+		);
 		const bead = event.beadId ?? event.meta?.beadId;
 		if (bead) addMetric(byBead, bead, event);
 	}
@@ -355,7 +398,9 @@ function buildWorkTelemetryState(cwd, args = "") {
 		maxContextTokens,
 		byPhase: [...byPhase.values()].sort((a, b) => b.durationMs - a.durationMs),
 		byBead: [...byBead.values()].sort((a, b) => b.durationMs - a.durationMs),
-		slowest: [...events].sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0)).slice(0, 5),
+		slowest: [...events]
+			.sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0))
+			.slice(0, 5),
 	};
 }
 
@@ -364,12 +409,19 @@ function formatDuration(ms) {
 	if (total < 1000) return `${total}ms`;
 	const seconds = total / 1000;
 	if (seconds < 60) return `${seconds.toFixed(1)}s`;
-	return `${Math.floor(seconds / 60)}m${Math.round(seconds % 60).toString().padStart(2, "0")}s`;
+	return `${Math.floor(seconds / 60)}m${Math.round(seconds % 60)
+		.toString()
+		.padStart(2, "0")}s`;
 }
 
 function renderMetricRows(rows) {
 	return rows.length
-		? rows.slice(0, 8).map((row) => `- ${row.key}: ${row.count} events, ${formatDuration(row.durationMs)}, ${row.tokens} tokens`)
+		? rows
+				.slice(0, 8)
+				.map(
+					(row) =>
+						`- ${row.key}: ${row.count} events, ${formatDuration(row.durationMs)}, ${row.tokens} tokens`,
+				)
 		: ["- none"];
 }
 
@@ -388,7 +440,9 @@ function renderWorkTelemetryText(state) {
 		"",
 		"Slowest:",
 		...(state.slowest.length
-			? state.slowest.map((event) => `- ${event.id} ${event.type}/${event.command ?? event.mode ?? "agent"}/${event.action ?? ""}: ${formatDuration(event.durationMs)} ${event.beadId ?? event.meta?.beadId ?? ""}`.trim())
+			? state.slowest.map((event) =>
+					`- ${event.id} ${event.type}/${event.command ?? event.mode ?? "agent"}/${event.action ?? ""}: ${formatDuration(event.durationMs)} ${event.beadId ?? event.meta?.beadId ?? ""}`.trim(),
+				)
 			: ["- none"]),
 		"",
 		`Files: ${state.files.length ? state.files.join(", ") : state.dir}`,
@@ -397,7 +451,9 @@ function renderWorkTelemetryText(state) {
 
 function buildWorkTelemetry(cwd, args = "") {
 	const state = buildWorkTelemetryState(cwd, args);
-	return state.filter.json ? JSON.stringify(state, null, "\t") : renderWorkTelemetryText(state);
+	return state.filter.json
+		? JSON.stringify(state, null, "\t")
+		: renderWorkTelemetryText(state);
 }
 
 function contextSettings(settings) {
@@ -2830,7 +2886,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-telemetry", {
-		description: "Summarize work-orchestrator timing, token, and context telemetry",
+		description:
+			"Summarize work-orchestrator timing, token, and context telemetry",
 		handler: async (args, ctx) => {
 			const output = buildWorkTelemetry(ctx.cwd, args);
 			ctx.ui.notify(output, "info");

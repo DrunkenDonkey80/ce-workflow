@@ -16,3 +16,7 @@ Install with:
 ## Workflow Feedback Rule
 
 When a live or disposable test project exposes a ce-workflow issue, do not only work around it. Before calling the run done, improve this project so the same failure class is less likely next time, or record a concrete follow-up if the fix is not safe to apply immediately.
+
+## Code-First Workflow Rule
+
+If project workflow behavior can be handled in code without losing functionality, prefer coded automation over prompt-only or manual process guidance.
