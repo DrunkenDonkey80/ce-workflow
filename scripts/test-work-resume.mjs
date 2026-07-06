@@ -153,6 +153,7 @@ const childrenByScenario = {
 			status: "blocked",
 			title: "Repair COM7 device",
 			labels: ["wo:blocked"],
+			notes: "Next command after repair: reconnect COM7 and run pytest -m hardware",
 		},
 		{
 			id: "BUG-2",
@@ -555,6 +556,19 @@ try {
 		notices.at(-1)?.message.includes("DEC-1") &&
 			notices.at(-1)?.message.includes("Blocked:"),
 		"blocked resume output includes the compact blocker ledger",
+	);
+
+	process.env.WORK_RESUME_SCENARIO = "externalBlocked";
+	await handleWorkResumeCommand("E-1", {
+		cwd: process.cwd(),
+		ui: { notify: (message, level) => notices.push({ message, level }) },
+		sendUserMessage: async (message, options) =>
+			sent.push({ message, options }),
+	});
+	assert(
+		notices.at(-1)?.message.includes("Required action:") &&
+			notices.at(-1)?.message.includes("reconnect COM7"),
+		"blocked resume output includes blocker next action",
 	);
 } finally {
 	if (oldEnv.bd === undefined) delete process.env.WORK_ORCH_BD_BIN;
