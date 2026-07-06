@@ -1834,13 +1834,20 @@ function buildBeadReportState(cwd, bead) {
 }
 
 function suggestedCommands(epicId, blockers = [], decisions = []) {
-	const debugTarget = blockers.find(
-		(issue) => typeOf(issue) === "bug" || isDebugIssue(issue),
+	const runnableDebug = blockers.find(
+		(issue) =>
+			statusOf(issue) !== "blocked" &&
+			(typeOf(issue) === "bug" || isDebugIssue(issue)),
 	);
-	if (debugTarget)
-		return [`/work-debug ${idOf(debugTarget)}: investigate blocker`];
+	if (runnableDebug)
+		return [`/work-debug ${idOf(runnableDebug)}: investigate blocker`];
 	const blockedDecision = decisions[0];
 	if (blockedDecision) return [`/work-report ${idOf(blockedDecision)}`];
+	const externalBlocker = blockers.find(
+		(issue) =>
+			statusOf(issue) === "blocked" || labelsOf(issue).includes("wo:blocked"),
+	);
+	if (externalBlocker) return [`/work-report ${idOf(externalBlocker)}`];
 	const blockedWork = blockers[0];
 	if (blockedWork) return [`/work-report ${idOf(blockedWork)}`];
 	return epicId ? [`/work-report ${epicId}`] : [];

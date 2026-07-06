@@ -145,6 +145,25 @@ const childrenByScenario = {
 			title: "Provide C compiler",
 		},
 	],
+	externalBlocked: [
+		{
+			id: "HW-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "blocked",
+			title: "Repair COM7 device",
+			labels: ["wo:blocked"],
+		},
+		{
+			id: "BUG-2",
+			parent_id: "E-1",
+			issue_type: "bug",
+			status: "blocked",
+			title: "Finish live gate",
+			labels: ["wo:debug"],
+			depends_on: [{ depends_on_id: "HW-1", type: "blocks" }],
+		},
+	],
 	plannerGap: [],
 	openReady: [
 		{
@@ -333,6 +352,13 @@ try {
 	assert(
 		state.suggestedCommands[0] === "/work-report DEC-1",
 		"blocked epic points at the blocking decision, not downstream debug",
+	);
+
+	process.env.WORK_RESUME_SCENARIO = "externalBlocked";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.suggestedCommands[0] === "/work-report HW-1",
+		"blocked epic points at external hardware blocker before downstream debug",
 	);
 
 	process.env.WORK_RESUME_SCENARIO = "plannerGap";
