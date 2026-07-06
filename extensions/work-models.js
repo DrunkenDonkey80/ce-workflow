@@ -252,6 +252,11 @@ function summarizeToolResult(event, started) {
 	};
 }
 
+function notify(ctx, message, level = "info") {
+	ctx.ui.notify(message, level);
+	if (ctx.mode === "print" || ctx.hasUI === false) console.log(message);
+}
+
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 	const startedAt = Date.now();
 	const contextBefore = usageSnapshot(ctx);
@@ -2985,7 +2990,7 @@ async function sendFollowUp(ctx, message, pi) {
 
 async function handleWorkResumeCommand(args, ctx, pi) {
 	const state = buildWorkResumeState(ctx.cwd, args);
-	ctx.ui.notify(renderWorkResumeText(state), state.ok ? "info" : "warning");
+	notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning");
 	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
 	return state;
 }
@@ -3027,7 +3032,7 @@ function renderWorkflowActionText(state) {
 
 async function handleWorkflowAction(builder, args, ctx, pi) {
 	const state = builder(ctx.cwd, args);
-	ctx.ui.notify(renderWorkflowActionText(state), state.ok ? "info" : "warning");
+	notify(ctx, renderWorkflowActionText(state), state.ok ? "info" : "warning");
 	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
 	return state;
 }
@@ -3184,10 +3189,11 @@ export default function workModelsExtension(pi) {
 			await withCommandTelemetry("work-status", args, ctx, async () => {
 				try {
 					const output = buildWorkStatus(ctx.cwd, args);
-					ctx.ui.notify(output, "info");
+					notify(ctx, output, "info");
 					return { ok: true, outputChars: output.length };
 				} catch (error) {
-					ctx.ui.notify(
+					notify(
+						ctx,
 						`Could not build work status: ${error instanceof Error ? error.message : String(error)}`,
 						"error",
 					);
@@ -3202,7 +3208,7 @@ export default function workModelsExtension(pi) {
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-report", args, ctx, async () => {
 				const output = buildWorkReport(ctx.cwd, args);
-				ctx.ui.notify(output, "info");
+				notify(ctx, output, "info");
 				return { ok: true, outputChars: output.length };
 			});
 		},
@@ -3213,7 +3219,7 @@ export default function workModelsExtension(pi) {
 			"Summarize work-orchestrator timing, token, and context telemetry",
 		handler: async (args, ctx) => {
 			const output = buildWorkTelemetry(ctx.cwd, args);
-			ctx.ui.notify(output, "info");
+			notify(ctx, output, "info");
 		},
 	});
 
