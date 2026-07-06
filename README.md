@@ -73,7 +73,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 8. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
 9. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 10. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
-11. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
+11. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Immediate duplicate `/work-resume` blocked reports are deduped to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
 12. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
 13. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 

@@ -141,6 +141,40 @@ try {
 	assert(bead.byBead[0].key === "TASK-1", "bead JSON groups by selected bead");
 	assert(bead.files.length === 1, "json reports backing telemetry file");
 
+	const blockedCwd = mkdtempSync(path.join(tmpdir(), "work-blocked-telemetry-"));
+	try {
+		const blockedEvent = {
+			timestamp: now,
+			type: "command",
+			command: "work-resume",
+			action: "report-blocked",
+			epicId: "E-BLOCKED",
+			beadId: "BLOCKER-1",
+			reason: "No runnable Bead is ready; blockers or decisions need attention.",
+		};
+		recordWorkTelemetry(blockedCwd, { ...blockedEvent, id: "blocked-1" });
+		recordWorkTelemetry(blockedCwd, {
+			...blockedEvent,
+			id: "blocked-duplicate",
+			timestamp: now + 1,
+		});
+		assert(
+			buildWorkTelemetryState(blockedCwd, "epic E-BLOCKED").events === 1,
+			"duplicate report-blocked telemetry is suppressed",
+		);
+		recordWorkTelemetry(blockedCwd, {
+			...blockedEvent,
+			id: "blocked-later",
+			timestamp: now + 5 * 60 * 1000,
+		});
+		assert(
+			buildWorkTelemetryState(blockedCwd, "epic E-BLOCKED").events === 2,
+			"blocked telemetry records again after the dedupe window",
+		);
+	} finally {
+		rmSync(blockedCwd, { recursive: true, force: true });
+	}
+
 	const fixture = installWorkflowFixture();
 	try {
 		const commands = {};

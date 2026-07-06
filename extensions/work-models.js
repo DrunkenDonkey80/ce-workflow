@@ -143,6 +143,52 @@ function stateTelemetry(state) {
 	};
 }
 
+function telemetryFingerprint(event) {
+	if (
+		process.env.WORK_ORCH_TELEMETRY_DEDUPE_OFF === "1" ||
+		event.type !== "command" ||
+		event.command !== "work-resume" ||
+		event.action !== "report-blocked"
+	)
+		return "";
+	return [
+		event.type,
+		event.command,
+		event.action,
+		event.epicId ?? event.meta?.epicId ?? "",
+		event.beadId ?? event.meta?.beadId ?? "",
+		event.reason ?? "",
+	].join("\u001f");
+}
+
+function lastTelemetryRecord(file) {
+	if (!existsSync(file)) return undefined;
+	const lines = readFileSync(file, "utf8").trim().split(/\r?\n/);
+	const line = lines.at(-1);
+	if (!line) return undefined;
+	try {
+		return JSON.parse(line);
+	} catch {
+		return undefined;
+	}
+}
+
+function isDuplicateTelemetry(file, record) {
+	const fingerprint = telemetryFingerprint(record);
+	if (!fingerprint) return false;
+	const previous = lastTelemetryRecord(file);
+	if (!previous || telemetryFingerprint(previous) !== fingerprint) return false;
+	const previousAt = Date.parse(previous.timestamp ?? "");
+	const recordAt = Date.parse(record.timestamp ?? "");
+	const ageMs = recordAt - previousAt;
+	return (
+		Number.isFinite(previousAt) &&
+		Number.isFinite(recordAt) &&
+		ageMs >= 0 &&
+		ageMs < 5 * 60 * 1000
+	);
+}
+
 function recordWorkTelemetry(cwd, event) {
 	if (!cwd || process.env.WORK_ORCH_TELEMETRY_OFF === "1") return "";
 	const timestamp = event.timestamp ?? Date.now();
@@ -154,6 +200,7 @@ function recordWorkTelemetry(cwd, event) {
 	};
 	const file = telemetryPath(cwd, telemetryDay(timestamp));
 	mkdirSync(telemetryDir(cwd), { recursive: true });
+	if (isDuplicateTelemetry(file, record)) return file;
 	appendFileSync(file, `${JSON.stringify(record)}\n`);
 	return file;
 }
