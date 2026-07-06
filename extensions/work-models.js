@@ -2983,9 +2983,7 @@ function renderResumeBlockedLines(state) {
 	if (state.openDecisions?.length) {
 		lines.push("Open decisions:");
 		for (const decision of state.openDecisions.slice(0, 3))
-			lines.push(
-				`- ${decision.id} ${decision.status} — ${decision.title}`,
-			);
+			lines.push(`- ${decision.id} ${decision.status} — ${decision.title}`);
 		if (state.openDecisions.length > 3)
 			lines.push(`- … ${state.openDecisions.length - 3} more decision(s)`);
 	}
