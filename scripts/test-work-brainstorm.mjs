@@ -45,8 +45,54 @@ try {
 		"# Raw idea with animation\n",
 	);
 
-	fixture.reset("ideas");
+	fixture.reset("no-beads-empty");
 	let state = buildWorkBrainstormState(
+		cwd,
+		"Explore a standalone reporting dashboard with filters and CSV export",
+	);
+	assert(
+		state.ok && state.action === "brainstorm-epic-created",
+		"standalone brainstorm initializes Beads and creates an epic",
+	);
+	assert(
+		state.epic.id.startsWith("E-NEW-") && state.idea.id.startsWith("TASK-NEW-"),
+		"standalone brainstorm creates an epic and idea Bead",
+	);
+	assert(
+		fixture.logs().some((entry) => entry.op === "init"),
+		"standalone brainstorm initializes missing Beads workspace",
+	);
+	assert(
+		fixture
+			.logs()
+			.some(
+				(entry) =>
+					entry.op === "create" && entry.issue.notes.includes("wo:brainstorm"),
+			),
+		"standalone brainstorm epic is marked as brainstorm-created",
+	);
+
+	fixture.reset("ideas");
+	const longPrompt = `Modernize the LPGSlim Android interface to match the Linea Pro demo look and feel with smooth transitions, graphics, animations, connected-device startup states, and updated screens while preserving the full detailed request for brainstorming. ${"Use the attached Pixel device and inspect the installed demo UI source before proposing screen-by-screen changes. ".repeat(8)}`;
+	state = buildWorkBrainstormState(cwd, longPrompt);
+	const longPromptIdea = fixture.logs().at(-1).issue;
+	assert(
+		state.ok && longPromptIdea.title.length <= 180,
+		"freeform brainstorm stores a compact Beads title",
+	);
+	assert(
+		longPromptIdea.title !== longPrompt &&
+			longPromptIdea.description.includes(state.topic),
+		"freeform brainstorm keeps the full request outside the title",
+	);
+
+	state = buildWorkBrainstormState(cwd, longPrompt);
+	assert(
+		state.ok && state.action === "brainstorm-reused",
+		"repeating a long brainstorm reuses the compact title match",
+	);
+
+	state = buildWorkBrainstormState(
 		cwd,
 		"idea IDEA-2 docs/brainstorms/accepted.md",
 	);

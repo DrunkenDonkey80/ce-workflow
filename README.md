@@ -17,8 +17,13 @@ Required companion packages and CLI:
 ```bash
 pi install npm:pi-subagents
 pi install npm:pi-compound-engineering
+npm install -g @beads/bd
 bd --help
 ```
+
+On Windows, the extension resolves the npm `bd.cmd` shim to the underlying
+`@beads/bd` Node entrypoint so `/work-init` works from Pi without a shell
+wrapper.
 
 Recommended, optional companions:
 
@@ -44,7 +49,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-init` | Repo has no Beads workspace yet | Extension command: runs `bd init --non-interactive --skip-agents` only when needed |
 | `/work-plan <idea-or-plan-file>` | New idea, brainstorm, roadmap, or master plan | Extension command: initializes Beads if needed, sends raw input to `ce-plan`, then creates an epic from the produced master roadmap plan |
 | `/work-ideate [target action\|topic]` | Capture, list, inspect, accept, reject, discuss, or import ideas | Extension command: shows Beads-backed ideas, guards numeric indexes, and mutates only the resolved idea |
-| `/work-brainstorm [idea <target>\|topic] [path]` | Brainstorm an idea or topic without losing lineage | Extension command: links brainstorm artifacts to exact idea records and reports near-duplicates instead of fuzzy merging |
+| `/work-brainstorm [idea <target>\|topic] [path]` | Brainstorm an idea or topic without losing lineage | Extension command: initializes Beads when needed, creates a standalone brainstorm epic if no active epic exists, links artifacts to exact idea records, and reports near-duplicates instead of fuzzy merging |
 | `/work-master <brainstorm-or-plan>` | Legacy alias | Same as `/work-plan` |
 | `/work-migrate <sources>` | Existing plans, TODOs, tracker exports, partial implementations, or branches | Extension command: normalizes migration sources and hands them to `bead-migrator` without editing code or changing branches |
 | `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Extension command: creates one child Bead, then hands it to the implementation role loop |
@@ -68,7 +73,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 
 1. `/work-plan` initializes the workflow when needed, wraps `ce-plan`, and creates the durable epic/master plan. `/work-master` is a legacy alias.
 2. `/work-ideate` keeps idea records in Beads so accepted, contender, rejected, discussed, brainstormed, and planned ideas stay visible without becoming executable work.
-3. `/work-brainstorm` links brainstorm artifacts and later plans back to idea records instead of relying on chat history.
+3. `/work-brainstorm` links brainstorm artifacts and later plans back to idea records instead of relying on chat history. In a fresh repo or unrelated context with no active epic, it creates a standalone brainstorm epic first.
 4. `/work-usage` turns existing telemetry into a local HTML report without creating another source of truth; pass `--jsonl` for agent-readable rows or `--open` only when you want a browser.
 5. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 6. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.

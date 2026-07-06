@@ -7,7 +7,15 @@ import {
 	readFileSync,
 	writeFileSync,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+	delimiter,
+	dirname,
+	isAbsolute,
+	join,
+	relative,
+	resolve,
+} from "node:path";
 
 const CONFIG_DIR_NAME = ".pi";
 const TELEMETRY_DIR_NAME = "work-runs";
@@ -17,6 +25,36 @@ const DEFAULT_THINKING = "__default_thinking__";
 const RESET_ALL = "__reset_all__";
 const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
+const BRAINSTORM_TITLE_MAX = 180;
+const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
+const WORK_ORCH_AGENT_DIR = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	"..",
+	"agents",
+);
+
+function exposeBundledSubagentAgents() {
+	if (!existsSync(WORK_ORCH_AGENT_DIR)) return;
+	const current = process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] ?? "";
+	const entries = current.split(delimiter).filter(Boolean);
+	const normalized =
+		process.platform === "win32"
+			? WORK_ORCH_AGENT_DIR.toLowerCase()
+			: WORK_ORCH_AGENT_DIR;
+	if (
+		entries.some(
+			(entry) =>
+				(process.platform === "win32"
+					? resolve(entry).toLowerCase()
+					: resolve(entry)) === normalized,
+		)
+	)
+		return;
+	process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] = [
+		...entries,
+		WORK_ORCH_AGENT_DIR,
+	].join(delimiter);
+}
 
 const SLOTS = [
 	{
@@ -1394,14 +1432,33 @@ function maybeCompact(ctx, settings, reason) {
 	return true;
 }
 
+function nodeScript(value) {
+	return /\.[cm]?js$/i.test(value ?? "");
+}
+
+function pathEntries() {
+	return (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+}
+
+function windowsBeadsBinScript(command, override) {
+	if (process.platform !== "win32" || command !== "bd") return undefined;
+	const dirs = override ? [dirname(resolve(override))] : pathEntries();
+	for (const dir of dirs) {
+		const script = join(dir, "node_modules", "@beads", "bd", "bin", "bd.js");
+		if (existsSync(script)) return script;
+	}
+	return undefined;
+}
+
 function run(cwd, command, args) {
 	let override;
 	if (command === "bd") override = process.env.WORK_ORCH_BD_BIN;
 	else if (command === "git") override = process.env.WORK_ORCH_GIT_BIN;
-	const actualCommand = override?.endsWith(".mjs")
-		? process.execPath
-		: (override ?? command);
-	const actualArgs = override?.endsWith(".mjs") ? [override, ...args] : args;
+	const script = nodeScript(override)
+		? override
+		: windowsBeadsBinScript(command, override);
+	const actualCommand = script ? process.execPath : (override ?? command);
+	const actualArgs = script ? [script, ...args] : args;
 	try {
 		return execFileSync(actualCommand, actualArgs, {
 			cwd,
@@ -1649,8 +1706,8 @@ function classifyBdError(error, args = []) {
 		/not found|no such|unknown|does not exist/i.test(text)
 	)
 		return "unknown-target";
-	if (/no beads database|bd init|ENOENT|not recognized/i.test(text))
-		return "beads-unavailable";
+	if (/ENOENT|not recognized/i.test(text)) return "bd-missing";
+	if (/no beads database|bd init/i.test(text)) return "beads-unavailable";
 	return "beads-error";
 }
 
@@ -2070,6 +2127,38 @@ function isInstructionFile(file) {
 	return /(^|[/\\])(AGENTS|CLAUDE)\.md$/i.test(file);
 }
 
+function normalizeInstructionDiffLine(line) {
+	return String(line ?? "")
+		.trim()
+		.replace(/<((?:https?|file):\/\/[^>\s]+)>/gi, "$1");
+}
+
+function instructionDiffSide(diff, marker) {
+	return String(diff ?? "")
+		.split(/\r?\n/)
+		.filter(
+			(line) =>
+				line.startsWith(marker) &&
+				!line.startsWith(`${marker}${marker}${marker}`),
+		)
+		.map((line) => normalizeInstructionDiffLine(line.slice(1)))
+		.filter(Boolean);
+}
+
+function isFormatterOnlyInstructionDirt(cwd, item) {
+	try {
+		const diff = run(cwd, "git", ["diff", "--", item.path]);
+		const removed = instructionDiffSide(diff, "-");
+		const added = instructionDiffSide(diff, "+");
+		return (
+			removed.length === added.length &&
+			removed.every((line, index) => line === added[index])
+		);
+	} catch {
+		return false;
+	}
+}
+
 function isBenignInstructionDirt(cwd, item) {
 	if (!isInstructionFile(item.path)) return false;
 	if (item.x !== " " || item.y !== "M") return false;
@@ -2084,7 +2173,7 @@ function isBenignInstructionDirt(cwd, item) {
 		]);
 		return true;
 	} catch {
-		return false;
+		return isFormatterOnlyInstructionDirt(cwd, item);
 	}
 }
 
@@ -2203,7 +2292,7 @@ function resumeGitReport(cwd, planPaths = []) {
 		let warnings = [];
 		if (benignDirty) {
 			warnings = [
-				"Only whitespace instruction-file dirt detected; do not stage it automatically.",
+				"Only whitespace/formatter instruction-file dirt detected; do not stage it automatically.",
 			];
 		} else if (workflowDirty) {
 			warnings = [
@@ -2438,7 +2527,11 @@ function planResumeAction(state) {
 			suggestedCommands: [],
 			nextAction: `Next: epic ${state.epic.id} "${state.epic.title}" is complete.`,
 		};
-	if (state.readyPlanning.length && state.executableSlices.length)
+	if (
+		state.readyPlanning.length &&
+		state.executableSlices.length &&
+		!state.readyExecutable.length
+	)
 		return {
 			...state,
 			action: "close-stale-planning",
@@ -2805,7 +2898,12 @@ function ensureBeadsInitialized(cwd) {
 			message: "Beads workspace already initialized.",
 		};
 	} catch (error) {
-		if (classifyBdError(error, ["where"]) !== "beads-unavailable") throw error;
+		const reason = classifyBdError(error, ["where"]);
+		if (reason !== "beads-unavailable") {
+			const err = new Error(commandErrorText(error) || "bd command failed");
+			err.reason = reason;
+			throw err;
+		}
 	}
 	try {
 		run(cwd, "bd", ["init", "--non-interactive", "--skip-agents"]);
@@ -3875,6 +3973,34 @@ function parseWorkBrainstormArgs(args = "") {
 	return { kind: "topic", action, topic: parts.join(" "), artifact };
 }
 
+function compactBrainstormTitle(topic, max = BRAINSTORM_TITLE_MAX) {
+	const text = String(topic ?? "")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (!text) return "Brainstorm idea";
+	if (text.length <= max) return text;
+	const suffix = `… [${textHash(text)}]`;
+	return `${text.slice(0, max - suffix.length).trimEnd()}${suffix}`;
+}
+
+function brainstormEpicTitle(topic) {
+	return `Brainstorm: ${compactBrainstormTitle(topic, 80)}`;
+}
+
+function createBrainstormEpic(cwd, topic) {
+	const epic = createBead(cwd, {
+		title: brainstormEpicTitle(topic),
+		type: "epic",
+		description: `Brainstorm workspace created by /work-brainstorm for: ${topic}`,
+		notes: workflowBeadNotes("/work-brainstorm", topic, [
+			"wo:brainstorm",
+			"auto-created for standalone brainstorm",
+		]),
+	});
+	rememberWorkflowEpic(cwd, epic);
+	return epic;
+}
+
 function ideaBrainstormNote(artifact = "", action = "brainstorm") {
 	return [
 		"wo:idea",
@@ -3898,12 +4024,17 @@ function possibleDuplicateIdeas(ideas, title) {
 	});
 }
 
-function createBrainstormIdea(cwd, epic, title, artifact = "") {
+function createBrainstormIdea(cwd, epic, topic, artifact = "") {
 	return createBead(cwd, {
-		title,
+		title: compactBrainstormTitle(topic),
 		type: "task",
 		parent: idOf(epic),
-		description: `Idea created by /work-brainstorm${artifact ? ` from ${artifact}` : ""}.`,
+		description: [
+			`Idea created by /work-brainstorm${artifact ? ` from ${artifact}` : ""}.`,
+			"",
+			"Full brainstorm request:",
+			topic,
+		].join("\n"),
 		notes: [
 			"wo:idea",
 			`schema=${IDEA_SCHEMA_VERSION}`,
@@ -3918,9 +4049,11 @@ function createBrainstormIdea(cwd, epic, title, artifact = "") {
 function resolveFreeformIdea(cwd, epic, topic) {
 	const ideas = ideaSummaries(cwd, idOf(epic));
 	const normalized = normalizedIdeaTitle(topic);
-	const exact = ideas.filter(
-		(idea) => normalizedIdeaTitle(idea.title) === normalized,
-	);
+	const compact = normalizedIdeaTitle(compactBrainstormTitle(topic));
+	const exact = ideas.filter((idea) => {
+		const candidate = normalizedIdeaTitle(idea.title);
+		return candidate === normalized || candidate === compact;
+	});
 	if (exact.length === 1)
 		return { idea: exact[0], reused: true, possibleDuplicates: [] };
 	if (exact.length > 1)
@@ -3945,13 +4078,19 @@ function buildWorkBrainstormState(cwd, args = "") {
 			{ action: "usage" },
 		);
 	try {
+		const init = ensureBeadsInitialized(cwd);
 		const resolved = resolveWorkflowEpic(cwd, "");
-		if (resolved.error)
-			return errorState(resolved.error, resolved.message ?? resolved.error, {
-				action: "ask-target",
-				candidates: resolved.candidates ?? [],
-			});
-		const epic = resolved.epic;
+		let createdEpic = false;
+		let epic = resolved.epic;
+		if (resolved.error) {
+			if (resolved.error !== "no-active-epic" || parsed.kind !== "topic")
+				return errorState(resolved.error, resolved.message ?? resolved.error, {
+					action: "ask-target",
+					candidates: resolved.candidates ?? [],
+				});
+			epic = createBrainstormEpic(cwd, parsed.topic);
+			createdEpic = true;
+		}
 		const artifact = parsed.artifact
 			? repoRelativePath(cwd, parsed.artifact)
 			: "";
@@ -3979,6 +4118,7 @@ function buildWorkBrainstormState(cwd, args = "") {
 				epic: issueSummary(epic),
 				idea: issueSummary(bead),
 				artifact,
+				topic: parsed.topic,
 				message: `Linked brainstorm${artifact ? ` ${artifact}` : ""} to ${resolvedIdea.idea.id}.`,
 				suggestedCommands: artifact
 					? [`/work-plan ${artifact}`]
@@ -4000,12 +4140,23 @@ function buildWorkBrainstormState(cwd, args = "") {
 			: createBrainstormIdea(cwd, epic, parsed.topic, artifact);
 		return {
 			ok: true,
-			action: match.reused ? "brainstorm-reused" : "brainstorm-created",
+			action: createdEpic
+				? "brainstorm-epic-created"
+				: match.reused
+					? "brainstorm-reused"
+					: "brainstorm-created",
 			epic: issueSummary(epic),
 			idea: issueSummary(bead),
 			artifact,
+			topic: parsed.topic,
 			possibleDuplicates: match.possibleDuplicates,
-			message: `${match.reused ? "Updated" : "Created"} idea ${idOf(bead)} for brainstorm ${parsed.topic}.`,
+			message: [
+				init.initialized ? init.message : "",
+				createdEpic ? `Created epic ${idOf(epic)}.` : "",
+				`${match.reused ? "Updated" : "Created"} idea ${idOf(bead)} for brainstorm ${parsed.topic}.`,
+			]
+				.filter(Boolean)
+				.join(" "),
 			suggestedCommands: artifact
 				? [`/work-plan ${artifact}`]
 				: [`/work-brainstorm idea ${idOf(bead)} <brainstorm-path>`],
@@ -4022,9 +4173,10 @@ function brainstormHandoffPrompt(state) {
 		"Use the work-orchestrator skill in mode: brainstorm with this precomputed extension state.",
 		`Epic: ${state.epic.id} — ${state.epic.title}`,
 		`Idea: ${state.idea.id} — ${state.idea.title}`,
+		state.topic ? `Full brainstorm request:\n${state.topic}` : "",
 		state.artifact
 			? `Brainstorm artifact: ${state.artifact}`
-			: "Write the brainstorm artifact, then rerun /work-brainstorm idea <id> <path>.",
+			: `Write the brainstorm artifact, then rerun /work-brainstorm idea ${state.idea.id} <path>.`,
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
 		ROLE_TIMEOUT_GUIDANCE,
 	].join("\n");
@@ -4205,9 +4357,13 @@ function buildWorkInitState(cwd, _args = "") {
 			nextAction: "Next: /work-plan <idea-or-plan-file>",
 		};
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
-			suggestedCommands: ["bd --help"],
+		const reason = error.reason ?? "beads-error";
+		return errorState(reason, error.message, {
+			action: reason,
+			suggestedCommands:
+				reason === "bd-missing"
+					? ["npm install -g @beads/bd", "bd --help"]
+					: ["bd --help"],
 		});
 	}
 }
@@ -4773,6 +4929,8 @@ export {
 };
 
 export default function workModelsExtension(pi) {
+	exposeBundledSubagentAgents();
+
 	pi.on("before_agent_start", async (event, ctx) => {
 		const meta = parseWorkPromptMeta(event.prompt);
 		pendingWorkPrompt = meta
@@ -4834,6 +4992,7 @@ export default function workModelsExtension(pi) {
 		};
 		const file = recordWorkTelemetry(run.cwd, telemetry);
 		appendTelemetryNote(run.cwd, run.meta.beadId, telemetry, file);
+		cleanupBenignInstructionDirt(run.cwd);
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
@@ -4879,6 +5038,7 @@ export default function workModelsExtension(pi) {
 		} catch {
 			maybeCompact(ctx, {}, "turn boundary");
 		}
+		cleanupBenignInstructionDirt(ctx.cwd);
 	});
 
 	pi.registerCommand("work-init", {

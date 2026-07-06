@@ -193,6 +193,24 @@ const childrenByScenario = {
 			title: "Created executable child",
 		},
 	],
+	stalePlanningReady: [
+		{
+			id: "PLAN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Old planning bead",
+			labels: ["wo:planning"],
+			created_at: "2026-07-03T01:00:00Z",
+		},
+		{
+			id: "IMP-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Created executable child",
+		},
+	],
 	blocked: [
 		{
 			id: "BLOCK-1",
@@ -319,12 +337,23 @@ const dirty = process.env.WORK_RESUME_GIT_DIRTY || "clean";
 if (process.env.WORK_RESUME_GIT_FAIL === "1") process.exit(1);
 if (args[0] === "diff") {
   if (dirty === "instruction-substantive") process.exit(1);
+  if (dirty === "instruction-formatter" && !args.includes("--ignore-blank-lines")) {
+    console.log([
+      "diff --git a/AGENTS.md b/AGENTS.md",
+      "--- a/AGENTS.md",
+      "+++ b/AGENTS.md",
+      "@@ -1 +1 @@",
+      "-See https://example.com/docs for details.",
+      "+See <https://example.com/docs> for details."
+    ].join("\\n"));
+    process.exit(0);
+  }
   if (dirty === "benign" && !args.includes("--ignore-blank-lines")) process.exit(1);
   process.exit(0);
 }
 function printDirty() {
   if (dirty === "unknown") console.log(" M extensions/work-models.js");
-  if (dirty === "benign" || dirty === "instruction-substantive" || dirty === "workflow") console.log(" M AGENTS.md");
+  if (dirty === "benign" || dirty === "instruction-substantive" || dirty === "instruction-formatter" || dirty === "workflow") console.log(" M AGENTS.md");
   if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
   if (dirty === "workflow") {
     console.log("M  .beads/issues.jsonl");
@@ -421,7 +450,7 @@ try {
 	state = buildWorkResumeState(process.cwd(), "E-1");
 	assert(
 		state.action === "close-stale-planning",
-		"stale planning stops for cleanup",
+		"stale planning stops for cleanup when no executable work is ready",
 	);
 	assert(
 		state.counts.slices === 1,
@@ -432,6 +461,14 @@ try {
 		"closed executable slice count excludes planning beads",
 	);
 	assert(!state.handoffPrompt, "cleanup stop does not inject handoff");
+
+	process.env.WORK_RESUME_SCENARIO = "stalePlanningReady";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-implementation",
+		"ready executable work proceeds despite stale planning cleanup",
+	);
+	assert(state.selectedBead.id === "IMP-1", "ready implementation wins");
 
 	process.env.WORK_RESUME_SCENARIO = "blocked";
 	state = buildWorkResumeState(process.cwd(), "E-1");
@@ -579,6 +616,14 @@ try {
 		`benign instruction-file dirt allows handoff, got ${state.action}: ${state.message ?? ""}`,
 	);
 	assert(state.git.benignDirty, "benign dirt is represented in state");
+
+	process.env.WORK_RESUME_GIT_DIRTY = "instruction-formatter";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-debug",
+		"formatter-only instruction-file dirt allows handoff",
+	);
+	assert(state.git.benignDirty, "formatter-only dirt is represented as benign");
 
 	process.env.WORK_RESUME_GIT_DIRTY = "instruction-substantive";
 	state = buildWorkResumeState(process.cwd(), "E-1");

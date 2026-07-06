@@ -49,6 +49,8 @@ const scenarioChildren = {
 		},
 	],
 	noIdeas: [],
+	empty: [],
+	"no-beads-empty": [],
 	createFailAfterOne: [],
 	ideas: [
 		{
@@ -198,9 +200,15 @@ export function installWorkflowFixture() {
 		const children = JSON.parse(
 			JSON.stringify(scenarioChildren[scenario] ?? scenarioChildren.active),
 		);
+		const scenarioEpics =
+			scenario === "empty" || scenario === "no-beads-empty" ? [] : epics;
 		writeFileSync(
 			statePath,
-			JSON.stringify({ scenario, epics, children, next: 1 }, null, "\t"),
+			JSON.stringify(
+				{ scenario, epics: scenarioEpics, children, next: 1 },
+				null,
+				"\t",
+			),
 		);
 		writeFileSync(logPath, "");
 		process.env.WORK_FLOW_SCENARIO = scenario;
@@ -220,13 +228,13 @@ function save() { writeFileSync(statePath, JSON.stringify(state, null, "\t")); }
 function log(value) { appendFileSync(logPath, JSON.stringify({ args, ...value }) + "\\n"); }
 function fieldAfter(name) { const i = args.indexOf(name); return i === -1 ? "" : args[i + 1] || ""; }
 function all() { return [...epics, ...state.children]; }
-if (state.scenario === "no-beads" && args[0] === "init") {
-  state.scenario = "active"; save(); log({ op: "init" }); out({ initialized: true });
-} else if (state.scenario === "no-beads") { console.error("Error: no beads database found; run bd init"); process.exit(1); }
+if (state.scenario.startsWith("no-beads") && args[0] === "init") {
+  state.scenario = state.scenario === "no-beads-empty" ? "empty" : "active"; save(); log({ op: "init" }); out({ initialized: true });
+} else if (state.scenario.startsWith("no-beads")) { console.error("Error: no beads database found; run bd init"); process.exit(1); }
 else if (args[0] === "where") out({ path: ".beads" });
 else if (args[0] === "list" && args.includes("--type=epic")) {
-  if (args.includes("--status=in_progress")) out(["openReadyAmbiguous", "oneOpen"].includes(state.scenario) ? [] : state.scenario === "ambiguous" ? epics : [epics[0]]);
-  else if (args.includes("--status=open")) out(state.scenario === "openReadyAmbiguous" ? epics : state.scenario === "oneOpen" ? [epics[0]] : []);
+  if (args.includes("--status=in_progress")) out(["empty", "openReadyAmbiguous", "oneOpen"].includes(state.scenario) ? [] : state.scenario === "ambiguous" ? epics : [epics[0]].filter(Boolean));
+  else if (args.includes("--status=open")) out(state.scenario === "openReadyAmbiguous" ? epics : state.scenario === "oneOpen" ? [epics[0]] : epics.filter((epic) => epic.status === "open"));
   else out(epics);
 } else if (args[0] === "children") out(state.children.filter((issue) => issue.parent_id === args[1]));
 else if (args[0] === "show") {
@@ -244,7 +252,7 @@ else if (args[0] === "show") {
   const prefix = type === "bug" ? "BUG-NEW-" : type === "epic" ? "E-NEW-" : "TASK-NEW-";
   const id = prefix + state.next++;
   const issue = { id, parent_id: parent, issue_type: type, status: "open", title: args[1], notes, description, design, acceptance };
-  state.children.push(issue);
+  if (type === "epic") state.epics.push(issue); else state.children.push(issue);
   save(); log({ op: "create", issue }); out(issue);
 } else if (args[0] === "update") {
   const issue = all().find((item) => item.id === args[1]);

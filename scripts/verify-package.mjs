@@ -196,7 +196,7 @@ for (const phrase of [
 	"stale intercom",
 	"Live/Test Project Feedback Loop",
 	"Repeat this gate after every child returns",
-	"Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup",
+	"Treat out-of-scope whitespace/formatter-only instruction-file dirt as parent cleanup",
 	"instruction-file whitespace startup allowlist",
 	"Failure and Blocker Lifecycle",
 	"Mode: report",
@@ -412,7 +412,13 @@ for (const [file, rule] of Object.entries(agentRules)) {
 	}
 }
 
-const extension = read("extensions/work-models.js");
+const extensionSource = read("extensions/work-models.js");
+check(
+	"extension exposes bundled role agents to pi-subagents",
+	extensionSource.includes("PI_SUBAGENT_EXTRA_AGENT_DIRS") &&
+		extensionSource.includes("exposeBundledSubagentAgents") &&
+		extensionSource.includes('"..",\n\t"agents"'),
+);
 for (const phrase of [
 	'registerCommand("work-models"',
 	"ctx.modelRegistry.getAvailable",
@@ -490,7 +496,7 @@ for (const phrase of [
 	"ctx.ui.select",
 	"choose(ctx",
 ]) {
-	check(`extension covers ${phrase}`, extension.includes(phrase));
+	check(`extension covers ${phrase}`, extensionSource.includes(phrase));
 }
 
 const readme = read("README.md");
@@ -593,6 +599,7 @@ for (const script of [
 	"test-work-auto.mjs",
 	"test-work-start-finish.mjs",
 	"test-work-telemetry.mjs",
+	"test-windows-bd-shim.mjs",
 ]) {
 	try {
 		execFileSync(process.execPath, [`scripts/${script}`], {
