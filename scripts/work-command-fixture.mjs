@@ -146,9 +146,8 @@ const scenarioChildren = {
 			id: "BLOCK-1",
 			parent_id: "E-1",
 			issue_type: "task",
-			status: "open",
+			status: "blocked",
 			title: "Blocked slice",
-			labels: ["wo:blocked"],
 		},
 	],
 	finishReady: [
@@ -215,7 +214,7 @@ const statePath = ${JSON.stringify(statePath)};
 const logPath = ${JSON.stringify(logPath)};
 const args = process.argv.slice(2).filter((arg) => arg !== "--json");
 const state = JSON.parse(readFileSync(statePath, "utf8"));
-const epics = state.scenario === "openReadyAmbiguous" ? state.epics.map((epic) => ({ ...epic, status: "open" })) : state.epics;
+const epics = ["openReadyAmbiguous", "oneOpen"].includes(state.scenario) ? state.epics.map((epic) => ({ ...epic, status: "open" })) : state.epics;
 function out(value) { console.log(JSON.stringify(value)); }
 function save() { writeFileSync(statePath, JSON.stringify(state, null, "\t")); }
 function log(value) { appendFileSync(logPath, JSON.stringify({ args, ...value }) + "\\n"); }
@@ -226,8 +225,8 @@ if (state.scenario === "no-beads" && args[0] === "init") {
 } else if (state.scenario === "no-beads") { console.error("Error: no beads database found; run bd init"); process.exit(1); }
 else if (args[0] === "where") out({ path: ".beads" });
 else if (args[0] === "list" && args.includes("--type=epic")) {
-  if (args.includes("--status=in_progress")) out(state.scenario === "openReadyAmbiguous" ? [] : state.scenario === "ambiguous" ? epics : [epics[0]]);
-  else if (args.includes("--status=open")) out(state.scenario === "openReadyAmbiguous" ? epics : []);
+  if (args.includes("--status=in_progress")) out(["openReadyAmbiguous", "oneOpen"].includes(state.scenario) ? [] : state.scenario === "ambiguous" ? epics : [epics[0]]);
+  else if (args.includes("--status=open")) out(state.scenario === "openReadyAmbiguous" ? epics : state.scenario === "oneOpen" ? [epics[0]] : []);
   else out(epics);
 } else if (args[0] === "children") out(state.children.filter((issue) => issue.parent_id === args[1]));
 else if (args[0] === "show") {

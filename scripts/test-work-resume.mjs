@@ -74,6 +74,10 @@ const childrenByScenario = {
 			title: "Fix failing verification",
 			labels: ["wo:debug"],
 			created_at: "2026-07-03T01:00:00Z",
+			dependencies: [
+				{ id: "E-1", title: "Active epic" },
+				{ depends_on_id: "IMP-OLD", type: "discovered-from" },
+			],
 			notes: "Run: abc123\nNext: inspect fixture",
 		},
 		{
@@ -365,7 +369,10 @@ try {
 	delete process.env.WORK_RESUME_SCENARIO;
 	delete process.env.WORK_RESUME_GIT_DIRTY;
 	let state = buildWorkResumeState(process.cwd(), "E-1");
-	assert(state.ok && state.action === "run-debug", "ready debug bug wins");
+	assert(
+		state.ok && state.action === "run-debug",
+		"ready debug bug wins even when Beads echoes non-blocking dependencies",
+	);
 	assert(state.selectedBead.id === "BUG-1", "debug bug selected");
 	assert(
 		state.handoffPrompt.includes("Target Bead ID: BUG-1"),

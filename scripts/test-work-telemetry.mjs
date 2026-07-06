@@ -140,6 +140,10 @@ try {
 	assert(bead.events === 5, "bead filter isolates one task");
 	assert(bead.byBead[0].key === "TASK-1", "bead JSON groups by selected bead");
 	assert(bead.files.length === 1, "json reports backing telemetry file");
+	assert(
+		!Array.isArray(bead.slowest[0].tools) && bead.slowest[0].tools.count >= 0,
+		"json reports compact tool summaries instead of full tool arrays",
+	);
 
 	const blockedCwd = mkdtempSync(
 		path.join(tmpdir(), "work-blocked-telemetry-"),
@@ -222,6 +226,21 @@ try {
 			sent[0].message.includes("Review scope default: current Bead TASK-NEW-1"),
 			"review handoff scope names selected bead instead of whole repo",
 		);
+
+		fixture.reset("blocked");
+		const statusNotices = [];
+		await commands["work-status"].handler("E-1", {
+			cwd,
+			getContextUsage: () => ({ tokens: 2222 }),
+			ui: { notify: (message) => statusNotices.push(message) },
+		});
+		assert(
+			statusNotices[0]?.includes("blockers: 1") &&
+				statusNotices[0].includes("Next: Run /work-report BLOCK-1"),
+			"work-status reports blocked Beads instead of only active/ready state",
+		);
+		fixture.reset("active");
+
 		await hooks.before_agent_start(
 			{ prompt: sent[0].message },
 			{

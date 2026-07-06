@@ -32,6 +32,24 @@ try {
 		"debug-needed marker is followed",
 	);
 
+	fixture.reset("blocked");
+	state = buildWorkDebugState(process.cwd(), "BLOCK-1: device is available");
+	assert(
+		state.ok && state.selectedBead.id === "BLOCK-1",
+		"explicit blocked target is debugged directly",
+	);
+	assert(
+		state.handoffPrompt.includes("Guidance: device is available"),
+		"blocked target guidance is preserved",
+	);
+
+	fixture.reset("blocked");
+	state = buildWorkDebugState(process.cwd(), "1: device is available");
+	assert(
+		state.ok && state.selectedBead.id === "BLOCK-1",
+		"numeric shorthand resolves to active epic child bead",
+	);
+
 	fixture.reset("debug");
 	state = buildWorkDebugState(process.cwd(), "IMP-1: rerun: npm test");
 	assert(

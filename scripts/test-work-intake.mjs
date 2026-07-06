@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { realpathSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
@@ -13,12 +14,29 @@ const { buildWorkflowIntakeState } = await import(
 );
 
 const fixture = installWorkflowFixture();
+const oldStateDir = process.env.WORK_ORCH_STATE_DIR;
+const stateDir = mkdtempSync(path.join(tmpdir(), "work-intake-state-"));
+process.env.WORK_ORCH_STATE_DIR = stateDir;
 try {
 	let state = buildWorkflowIntakeState(process.cwd(), "E-1");
 	assert(state.ok, "clean explicit epic returns intake state");
 	assert(state.epic.id === "E-1", "intake includes epic");
 	assert(state.git.safeForHandoff, "clean git is safe");
 
+	fixture.reset("oneOpen");
+	state = buildWorkflowIntakeState(process.cwd(), "");
+	assert(
+		state.ok && state.epic.id === "E-1",
+		"single open epic resolves default when no epic is active",
+	);
+	fixture.reset("openReadyAmbiguous");
+	state = buildWorkflowIntakeState(process.cwd(), "last");
+	assert(
+		state.ok && state.epic.id === "E-1",
+		"remembered epic resolves explicit last among open epics",
+	);
+
+	rmSync(stateDir, { recursive: true, force: true });
 	fixture.reset("no-beads");
 	state = buildWorkflowIntakeState(process.cwd(), "last");
 	assert(
@@ -62,6 +80,9 @@ try {
 	assert(!state.git.safeForHandoff, "untracked instruction dirt is unsafe");
 } finally {
 	fixture.cleanup();
+	rmSync(stateDir, { recursive: true, force: true });
+	if (oldStateDir === undefined) delete process.env.WORK_ORCH_STATE_DIR;
+	else process.env.WORK_ORCH_STATE_DIR = oldStateDir;
 }
 
 console.log("ok - coded work-intake behavior");

@@ -127,7 +127,7 @@ Fallback behavior: run CE brainstorming for the selected idea or topic, save the
 
 ## Mode: usage
 
-Prefer the extension command `/work-usage` when available. It reads existing `.pi/work-runs` telemetry, defaults to the one active epic only when unambiguous, writes an escaped local HTML report under `.pi/work-runs/usage/`, and never creates or mutates Beads.
+Prefer the extension command `/work-usage` when available. It reads existing `.pi/work-runs` telemetry, defaults to the one active epic only when unambiguous, writes an escaped local HTML report under `.pi/work-runs/usage/`, prints machine-readable rows with `--jsonl`, opens a browser only with `--open`, and never creates or mutates Beads.
 
 Fallback behavior: summarize existing telemetry only. If multiple epics could match, ask for `epic <id>` instead of blending them.
 
@@ -329,7 +329,7 @@ Beads and git preserve the memory; Pi chat is disposable working context. The pa
 
 ## Cost and Model Policy
 
-Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Use `/work-telemetry today`, `/work-telemetry epic <id>`, or `/work-usage epic <id>` before changing role/model policy; they show command time, agent time, token usage, tool/subagent durations, context growth, and review payoff when telemetry recorded it. Do not hard-code provider-specific models in this package.
+Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Use `/work-telemetry today`, `/work-telemetry epic <id>`, or `/work-usage epic <id> --jsonl` before changing role/model policy; they show command time, agent time, token usage, tool/subagent durations, context growth, and review payoff when telemetry recorded it. Do not add `--open` in spawned/agent runs. Do not hard-code provider-specific models in this package.
 
 ## Optional Intercom Coordination
 

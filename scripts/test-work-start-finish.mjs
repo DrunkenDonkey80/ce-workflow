@@ -222,6 +222,13 @@ try {
 		"finish produces deterministic commit seed",
 	);
 
+	fixture.reset("finishReady", "unknown");
+	state = buildWorkFinishState(process.cwd(), "1");
+	assert(
+		state.ok && state.selectedBead.id === "FIN-1",
+		"finish accepts numeric shorthand for active epic child bead",
+	);
+
 	fixture.reset("finishMissingReview", "unknown");
 	state = buildWorkFinishState(process.cwd(), "FIN-1");
 	assert(

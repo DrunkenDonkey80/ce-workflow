@@ -11,6 +11,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 
 const CONFIG_DIR_NAME = ".pi";
 const TELEMETRY_DIR_NAME = "work-runs";
+const WORK_STATE_FILE = "work-orchestrator-state.json";
 const INHERIT_MODEL = "__inherit_model__";
 const DEFAULT_THINKING = "__default_thinking__";
 const RESET_ALL = "__reset_all__";
@@ -90,6 +91,54 @@ function writeSettings(cwd, settings) {
 
 function telemetryDir(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, TELEMETRY_DIR_NAME);
+}
+
+function workStateDir(cwd) {
+	return process.env.WORK_ORCH_STATE_DIR || join(cwd, CONFIG_DIR_NAME);
+}
+
+function workStatePath(cwd) {
+	return join(workStateDir(cwd), WORK_STATE_FILE);
+}
+
+function readWorkState(cwd) {
+	const file = workStatePath(cwd);
+	if (!existsSync(file)) return {};
+	try {
+		return JSON.parse(readFileSync(file, "utf8"));
+	} catch {
+		return {};
+	}
+}
+
+function writeWorkState(cwd, state) {
+	mkdirSync(workStateDir(cwd), { recursive: true });
+	writeFileSync(workStatePath(cwd), `${JSON.stringify(state, null, "\t")}\n`);
+}
+
+function rememberWorkflowEpic(cwd, epic) {
+	if (!epic || typeOf(epic) !== "epic") return;
+	const state = readWorkState(cwd);
+	writeWorkState(cwd, {
+		...state,
+		lastEpicId: idOf(epic),
+		lastEpicTitle: titleOf(epic),
+		lastEpicStatus: statusOf(epic),
+		updatedAt: new Date().toISOString(),
+	});
+}
+
+function rememberedWorkflowEpic(cwd) {
+	const id = readWorkState(cwd).lastEpicId;
+	if (!id) return undefined;
+	try {
+		const epic = one(bdJsonRequired(cwd, ["show", id]));
+		if (epic && typeOf(epic) === "epic" && statusOf(epic) !== "closed")
+			return epic;
+	} catch {
+		return undefined;
+	}
+	return undefined;
 }
 
 function telemetryDay(timestamp = Date.now()) {
@@ -285,11 +334,97 @@ function summarizeMessages(messages = []) {
 	};
 }
 
+function parseToolArgs(args) {
+	if (typeof args !== "string") return args ?? {};
+	try {
+		return JSON.parse(args);
+	} catch {
+		return {};
+	}
+}
+
+function subagentNamesFromArgs(args) {
+	const names = [];
+	const visit = (value) => {
+		if (!value || typeof value !== "object") return;
+		if (typeof value.agent === "string") names.push(value.agent);
+		if (Array.isArray(value.tasks)) {
+			for (const task of value.tasks) {
+				const count = Math.max(1, Number(task?.count ?? 1));
+				for (let i = 0; i < count; i++) visit(task);
+			}
+		}
+		if (Array.isArray(value.chain)) value.chain.forEach(visit);
+		if (Array.isArray(value.parallel)) value.parallel.forEach(visit);
+		else visit(value.parallel);
+	};
+	visit(parseToolArgs(args));
+	return names;
+}
+
+function subagentUsageTotal(usage) {
+	const total =
+		usage?.total ??
+		usage?.totalTokens ??
+		Number(usage?.input ?? 0) + Number(usage?.output ?? 0);
+	return total || undefined;
+}
+
+function subagentStatus(result) {
+	if (result.status) return result.status;
+	if (result.exitCode === 0) return "completed";
+	if (result.exitCode === undefined) return "unknown";
+	return "failed";
+}
+
+function summarizeSubagentResult(result) {
+	return {
+		agent: result.agent ?? "unknown",
+		status: subagentStatus(result),
+		durationMs: result.durationMs ?? result.progressSummary?.durationMs,
+		toolCount: result.toolCount ?? result.progressSummary?.toolCount,
+		model: result.model,
+		tokens: subagentUsageTotal(result.usage ?? result.tokens),
+		input: result.usage?.input ?? result.tokens?.input,
+		output: result.usage?.output ?? result.tokens?.output,
+		cacheRead: result.usage?.cacheRead,
+		cost: result.usage?.cost ?? result.totalCost?.costUsd,
+		turns: result.usage?.turns ?? result.turnCount,
+		sessionFile: result.sessionFile,
+		artifact: result.artifactPaths?.outputPath ?? result.artifact,
+		error: result.error,
+	};
+}
+
+function statusSubagentResults(dir) {
+	const file = dir ? join(dir, "status.json") : "";
+	if (!file || !existsSync(file)) return [];
+	try {
+		const status = JSON.parse(readFileSync(file, "utf8"));
+		return (status.steps ?? []).map(summarizeSubagentResult);
+	} catch {
+		return [];
+	}
+}
+
+function subagentDetailsFromResult(result) {
+	const details =
+		result && typeof result === "object" ? result.details : undefined;
+	return [
+		...(details?.results ?? []).map(summarizeSubagentResult),
+		...statusSubagentResults(details?.asyncDir),
+	];
+}
+
 function summarizeToolResult(event, started) {
 	const text =
 		typeof event.result === "string"
 			? event.result
 			: JSON.stringify(event.result ?? "");
+	const subagentDetails =
+		event.toolName === "subagent"
+			? subagentDetailsFromResult(event.result)
+			: [];
 	return {
 		id: event.toolCallId,
 		name: event.toolName,
@@ -297,6 +432,11 @@ function summarizeToolResult(event, started) {
 		isError: Boolean(event.isError),
 		inputChars: textChars(started?.args),
 		outputChars: text.length,
+		subagents:
+			subagentDetails.length > 0
+				? subagentDetails.map((item) => item.agent)
+				: subagentNamesFromArgs(started?.args),
+		subagentDetails,
 		runId:
 			text.match(/Run:\s*([A-Za-z0-9_-]+)/)?.[1] ??
 			text.match(/Async:\s*[^[]*\[([^\]]+)\]/)?.[1],
@@ -396,6 +536,52 @@ function addMetric(map, key, event) {
 	map.set(key, item);
 }
 
+function summarizeTelemetryTools(tools = []) {
+	const rows = [...tools]
+		.sort(
+			(a, b) =>
+				Number(b.outputChars ?? 0) - Number(a.outputChars ?? 0) ||
+				Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0),
+		)
+		.slice(0, 5)
+		.map((tool) => ({
+			name: tool.name,
+			durationMs: tool.durationMs,
+			isError: Boolean(tool.isError),
+			outputChars: tool.outputChars,
+			runId: tool.runId,
+		}));
+	return {
+		count: tools.length,
+		outputChars: tools.reduce(
+			(sum, tool) => sum + Number(tool.outputChars ?? 0),
+			0,
+		),
+		subagentRuns: tools.filter((tool) => tool.name === "subagent").length,
+		top: rows,
+	};
+}
+
+function summarizeTelemetryEvent(event) {
+	return {
+		id: event.id,
+		type: event.type,
+		command: event.command,
+		mode: event.mode,
+		action: event.action,
+		epicId: event.epicId,
+		beadId: event.beadId ?? event.meta?.beadId,
+		durationMs: event.durationMs,
+		usage: event.usage,
+		messages: event.messages,
+		context: event.context,
+		review: event.review,
+		reason: event.reason,
+		file: event.file,
+		tools: summarizeTelemetryTools(event.tools ?? []),
+	};
+}
+
 function buildWorkTelemetryState(cwd, args = "") {
 	const filter = parseTelemetryArgs(args);
 	const events = readTelemetryEvents(cwd).filter((event) =>
@@ -460,18 +646,19 @@ function buildWorkTelemetryState(cwd, args = "") {
 		byBead: [...byBead.values()].sort((a, b) => b.durationMs - a.durationMs),
 		slowest: [...events]
 			.sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0))
-			.slice(0, 5),
+			.slice(0, 5)
+			.map(summarizeTelemetryEvent),
 	};
 }
 
 function formatDuration(ms) {
-	const total = Math.round(Number(ms ?? 0));
-	if (total < 1000) return `${total}ms`;
-	const seconds = total / 1000;
-	if (seconds < 60) return `${seconds.toFixed(1)}s`;
-	return `${Math.floor(seconds / 60)}m${Math.round(seconds % 60)
-		.toString()
-		.padStart(2, "0")}s`;
+	const totalSeconds = Math.round(Number(ms ?? 0) / 1000);
+	if (totalSeconds < 60) return `${totalSeconds}s`;
+	const minutes = Math.floor(totalSeconds / 60);
+	const seconds = totalSeconds % 60;
+	if (minutes < 60) return `${minutes}m ${seconds}s`;
+	const hours = Math.floor(minutes / 60);
+	return `${hours}h ${minutes % 60}m ${seconds}s`;
 }
 
 function renderMetricRows(rows) {
@@ -535,9 +722,29 @@ function unknown(value, suffix = "") {
 		: `${value}${suffix}`;
 }
 
+function parseWorkUsageArgs(args = "") {
+	const tokens = String(args).trim().split(/\s+/).filter(Boolean);
+	const open = tokens.includes("--open");
+	const jsonl = tokens.includes("--jsonl");
+	return {
+		open: open && !jsonl,
+		format: jsonl ? "jsonl" : "html",
+		telemetryArgs: tokens
+			.filter((token) => token !== "--open" && token !== "--jsonl")
+			.join(" "),
+	};
+}
+
 function usageScope(cwd, args = "") {
-	const parsed = parseTelemetryArgs(args);
-	if (String(args).trim()) return { filter: parsed, explicit: true };
+	const parsedArgs = parseWorkUsageArgs(args);
+	const parsed = parseTelemetryArgs(parsedArgs.telemetryArgs);
+	if (parsedArgs.telemetryArgs)
+		return {
+			filter: parsed,
+			explicit: true,
+			open: parsedArgs.open,
+			format: parsedArgs.format,
+		};
 	const resolved = resolveWorkflowEpic(cwd, "");
 	if (resolved.error)
 		return {
@@ -548,6 +755,8 @@ function usageScope(cwd, args = "") {
 	return {
 		filter: { json: false, scope: "epic", value: idOf(resolved.epic) },
 		explicit: false,
+		open: parsedArgs.open,
+		format: parsedArgs.format,
 		epic: issueSummary(resolved.epic),
 	};
 }
@@ -584,31 +793,125 @@ function reviewPayoff(review) {
 		.join(" / ");
 }
 
+function countNames(names = []) {
+	const counts = new Map();
+	for (const name of names.filter(Boolean))
+		counts.set(name, (counts.get(name) ?? 0) + 1);
+	return [...counts.entries()]
+		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+		.map(([name, count]) => ({ name, count }));
+}
+
+function formatCounts(counts) {
+	return counts.length
+		? counts.map((item) => `${item.name}(${item.count})`).join(", ")
+		: "unknown";
+}
+
+function toolCounts(tools = []) {
+	return countNames(tools.map((tool) => tool.name));
+}
+
+function subagentNames(tool) {
+	if (Array.isArray(tool.subagents) && tool.subagents.length)
+		return tool.subagents;
+	return tool.name === "subagent" ? ["unknown"] : [];
+}
+
+function subagentCounts(tools = []) {
+	return countNames(tools.flatMap(subagentNames));
+}
+
+function operationKind(event) {
+	const label = event.type === "agent" ? event.mode : event.command;
+	if (event.type === "agent") return "agent";
+	if (String(label).includes("debug")) return "debug";
+	if (String(label).includes("review")) return "review";
+	if (String(label).includes("telemetry") || String(label).includes("usage"))
+		return "report";
+	return "work";
+}
+
+function hasUsageSignal(event) {
+	return Boolean(
+		event.usage?.totalTokens !== undefined ||
+			event.context?.after?.tokens !== undefined ||
+			event.context?.before?.tokens !== undefined ||
+			(event.tools ?? []).length ||
+			event.messages?.count,
+	);
+}
+
 function usageEventRows(events) {
 	return events
-		.filter((event) => event.command !== "work-usage")
+		.filter((event) => event.command !== "work-usage" && hasUsageSignal(event))
 		.sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0))
-		.map((event) => ({
-			id: event.id ?? "unknown",
-			timestamp: event.timestamp ?? "unknown",
-			task: event.beadId ?? event.meta?.beadId ?? "unknown",
-			agent:
-				event.type === "agent"
-					? (event.mode ?? "agent")
-					: (event.command ?? event.type ?? "unknown"),
-			phase: event.action ?? event.phase ?? "unknown",
-			duration: event.durationMs,
-			tokens: event.usage?.totalTokens,
-			context: event.context?.after?.tokens ?? event.context?.before?.tokens,
-			tools: (event.tools ?? [])
-				.map((tool) => tool.name)
-				.filter(Boolean)
-				.join(", "),
-			review: event.review,
-		}));
+		.map((event) => {
+			const tools = event.tools ?? [];
+			return {
+				id: event.id ?? "unknown",
+				timestamp: event.timestamp ?? "unknown",
+				task: event.beadId ?? event.meta?.beadId ?? "unknown",
+				agent:
+					event.type === "agent"
+						? (event.mode ?? "agent")
+						: (event.command ?? event.type ?? "unknown"),
+				eventType: event.type ?? "unknown",
+				kind: operationKind(event),
+				phase: event.action ?? event.phase ?? "unknown",
+				duration: event.durationMs,
+				tokens: event.usage?.totalTokens,
+				context: event.context?.after?.tokens ?? event.context?.before?.tokens,
+				contextBefore: event.context?.before?.tokens,
+				contextAfter: event.context?.after?.tokens,
+				tools: formatCounts(toolCounts(tools)),
+				subagents: formatCounts(subagentCounts(tools)),
+				toolDetails: tools.map((tool) => ({
+					name: tool.name ?? "unknown",
+					durationMs: tool.durationMs,
+					inputChars: tool.inputChars,
+					outputChars: tool.outputChars,
+					isError: Boolean(tool.isError),
+					subagents: Array.isArray(tool.subagents) ? tool.subagents : [],
+					subagentDetails: Array.isArray(tool.subagentDetails)
+						? tool.subagentDetails
+						: [],
+					runId: tool.runId,
+					artifact: tool.artifact,
+				})),
+				messages: event.messages,
+				usage: event.usage,
+				review: event.review,
+				error: event.error,
+				ok: event.ok,
+			};
+		});
+}
+
+function subagentUsageSummary(tools = []) {
+	const totals = new Map();
+	for (const item of tools.flatMap((tool) => tool.subagentDetails ?? [])) {
+		const key = item.agent ?? "unknown";
+		const row = totals.get(key) ?? {
+			agent: key,
+			count: 0,
+			durationMs: 0,
+			tokens: 0,
+			cost: 0,
+		};
+		row.count += 1;
+		row.durationMs += Number(item.durationMs ?? 0);
+		row.tokens += Number(item.tokens ?? 0);
+		row.cost += Number(item.cost ?? 0);
+		totals.set(key, row);
+	}
+	return [...totals.values()].sort(
+		(a, b) => b.tokens - a.tokens || b.durationMs - a.durationMs,
+	);
 }
 
 function usageSummary(events, rows) {
+	const tools = events.flatMap((event) => event.tools ?? []);
 	return {
 		events: rows.length,
 		durationMs: rows.reduce((sum, row) => sum + Number(row.duration ?? 0), 0),
@@ -616,33 +919,102 @@ function usageSummary(events, rows) {
 		unknownTokens: rows.filter((row) => row.tokens === undefined).length,
 		unknownContext: rows.filter((row) => row.context === undefined).length,
 		toolEvents: events.filter((event) => (event.tools ?? []).length).length,
+		tools: toolCounts(tools),
+		subagents: subagentCounts(tools),
+		subagentUsage: subagentUsageSummary(tools),
 	};
 }
 
-function usageHtml(state) {
-	const rowHtml = state.rows
+function usageSubagentSummaryHtml(summary) {
+	if (!summary.subagentUsage.length) return "";
+	return `<h2>Subagent usage</h2><table class="summary-table"><thead><tr><th>Agent</th><th>Runs</th><th>Time</th><th>Tokens</th><th>Cost</th></tr></thead><tbody>${summary.subagentUsage
 		.map(
 			(row) =>
-				`<tr><td>${escapeHtml(row.task)}</td><td>${escapeHtml(row.agent)}</td><td>${escapeHtml(row.phase)}</td><td data-sort="${Number(row.duration ?? -1)}">${escapeHtml(unknown(row.duration, "ms"))}</td><td data-sort="${Number(row.tokens ?? -1)}">${escapeHtml(unknown(row.tokens))}</td><td>${escapeHtml(unknown(row.context))}</td><td>${escapeHtml(row.tools || "unknown")}</td><td>${escapeHtml(row.review?.scope ?? "unknown")}</td><td>${escapeHtml(reviewPayoff(row.review))}</td><td>${escapeHtml(row.timestamp)}</td></tr>`,
+				`<tr><td>${escapeHtml(row.agent)}</td><td class="num">${row.count}</td><td class="num">${escapeHtml(formatDuration(row.durationMs))}</td><td class="num">${escapeHtml(row.tokens || "unknown")}</td><td class="num">${escapeHtml(row.cost || "unknown")}</td></tr>`,
+		)
+		.join("")}</tbody></table>`;
+}
+
+function usageTier(value, warn, danger) {
+	const number = Number(value ?? -1);
+	if (number < 0) return "";
+	if (number >= danger) return " hot";
+	if (number >= warn) return " warm";
+	return " cool";
+}
+
+function usageToolDetailHtml(row) {
+	if (!row.toolDetails.length)
+		return '<p class="muted">No tool calls recorded.</p>';
+	return `<h3>Tool calls</h3><table class="detail-table"><thead><tr><th>Tool</th><th>Time</th><th>Input chars</th><th>Output chars</th><th>Status</th><th>Subagents</th><th>Run/artifact</th></tr></thead><tbody>${row.toolDetails
+		.map(
+			(tool) =>
+				`<tr><td>${escapeHtml(tool.name)}</td><td class="num" data-sort="${Number(tool.durationMs ?? -1)}">${escapeHtml(tool.durationMs === undefined ? "unknown" : formatDuration(tool.durationMs))}</td><td class="num">${escapeHtml(unknown(tool.inputChars))}</td><td class="num">${escapeHtml(unknown(tool.outputChars))}</td><td>${tool.isError ? "error" : "ok"}</td><td>${escapeHtml(tool.subagents.length ? tool.subagents.join(", ") : "unknown")}</td><td>${escapeHtml([tool.runId, tool.artifact].filter(Boolean).join(" / ") || "unknown")}</td></tr>`,
+		)
+		.join("")}</tbody></table>`;
+}
+
+function usageSubagentDetailHtml(row) {
+	const subagents = row.toolDetails.flatMap(
+		(tool) => tool.subagentDetails ?? [],
+	);
+	if (!subagents.length)
+		return '<p class="muted">No per-subagent token records captured for this event.</p>';
+	return `<h3>Subagent runs</h3><table class="detail-table"><thead><tr><th>Agent</th><th>Status</th><th>Time</th><th>Tokens</th><th>In</th><th>Out</th><th>Cost</th><th>Tools</th><th>Turns</th><th>Model</th></tr></thead><tbody>${subagents
+		.map(
+			(item) =>
+				`<tr><td>${escapeHtml(item.agent)}</td><td>${escapeHtml(item.status)}</td><td class="num" data-sort="${Number(item.durationMs ?? -1)}">${escapeHtml(item.durationMs === undefined ? "unknown" : formatDuration(item.durationMs))}</td><td class="num">${escapeHtml(unknown(item.tokens))}</td><td class="num">${escapeHtml(unknown(item.input))}</td><td class="num">${escapeHtml(unknown(item.output))}</td><td class="num">${escapeHtml(unknown(item.cost))}</td><td class="num">${escapeHtml(unknown(item.toolCount))}</td><td class="num">${escapeHtml(unknown(item.turns))}</td><td>${escapeHtml(item.model ?? "unknown")}</td></tr>`,
+		)
+		.join("")}</tbody></table>`;
+}
+
+function usageDetailHtml(row) {
+	return `<div class="detail-box"><div class="detail-grid"><div><b>Event</b><br>${escapeHtml(row.id)} · ${escapeHtml(row.eventType)} · ${escapeHtml(row.kind)} · ${escapeHtml(row.ok === false ? "failed" : "ok/unknown")}</div><div><b>Usage</b><br>tokens ${escapeHtml(unknown(row.tokens))}; in ${escapeHtml(unknown(row.usage?.input))}; out ${escapeHtml(unknown(row.usage?.output))}; cost ${escapeHtml(unknown(row.usage?.cost))}</div><div><b>Context</b><br>before ${escapeHtml(unknown(row.contextBefore))}; after ${escapeHtml(unknown(row.contextAfter))}</div><div><b>Messages</b><br>${escapeHtml(row.messages ? `${row.messages.count} total, ${row.messages.assistant} assistant, ${row.messages.tools} tool results` : "unknown")}</div></div>${row.error ? `<p class="error">${escapeHtml(row.error)}</p>` : ""}<p class="muted">Rows are event totals. Tool calls record wall time and I/O chars. New subagent runs also record child tokens/cost/model when pi-subagents returns them.</p>${usageSubagentDetailHtml(row)}${usageToolDetailHtml(row)}</div>`;
+}
+
+function usageHtml(state) {
+	const detailHtml = state.rows
+		.map(
+			(row, index) =>
+				`<div id="detail-${index}" class="detail-source" hidden>${usageDetailHtml(row)}</div>`,
+		)
+		.join("\n");
+	const rowHtml = state.rows
+		.map(
+			(row, index) =>
+				`<tr class="event-row kind-${escapeHtml(row.kind)}" data-detail="detail-${index}" title="Click for details"><td>${escapeHtml(row.task)}</td><td>${escapeHtml(row.agent)}</td><td>${escapeHtml(row.phase)}</td><td class="num${usageTier(row.duration, 60_000, 300_000)}" data-sort="${Number(row.duration ?? -1)}">${escapeHtml(row.duration === undefined ? "unknown" : formatDuration(row.duration))}</td><td class="num${usageTier(row.tokens, 8_000, 32_000)}" data-sort="${Number(row.tokens ?? -1)}">${escapeHtml(unknown(row.tokens))}</td><td class="num${usageTier(row.context, 80_000, 160_000)}" data-sort="${Number(row.context ?? -1)}">${escapeHtml(unknown(row.context))}</td><td>${escapeHtml(row.tools)}</td><td>${escapeHtml(row.subagents)}</td><td>${escapeHtml(row.review?.scope ?? "unknown")}</td><td>${escapeHtml(reviewPayoff(row.review))}</td><td>${escapeHtml(row.timestamp)}</td></tr>`,
 		)
 		.join("\n");
 	return `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
 <title>Work usage</title>
-<style>body{font-family:system-ui,sans-serif;margin:2rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:.4rem;text-align:left}th{cursor:pointer;background:#f6f6f6}.muted{color:#666}</style>
+<style>
+:root{color-scheme:light dark;--b:#d8dee9;--muted:#667085;--head:#f8fafc;--agent:#eff6ff;--debug:#fff7ed;--review:#f5f3ff;--work:#f8fafc;--report:#ecfdf5;--cool:#ecfdf3;--warm:#fffbeb;--hot:#fef2f2}
+body{font-family:ui-sans-serif,system-ui,sans-serif;margin:2rem;color:#111827;background:#fff}h1{margin:.2rem 0 1rem}.cards{display:flex;gap:.75rem;flex-wrap:wrap;margin:1rem 0}.card{border:1px solid var(--b);border-radius:.75rem;padding:.75rem 1rem;background:#fff;box-shadow:0 1px 2px #0001}.card b{display:block;font-size:1.2rem}.muted{color:var(--muted)}.error{color:#b91c1c}input{width:100%;max-width:36rem;padding:.55rem .7rem;border:1px solid var(--b);border-radius:.6rem;margin:.75rem 0}table{border-collapse:separate;border-spacing:0;width:100%;font-size:.92rem}th,td{border-bottom:1px solid var(--b);padding:.5rem .55rem;text-align:left;vertical-align:top}th{cursor:pointer;background:var(--head);position:sticky;top:0;user-select:none}th::after{content:' ↕';color:#98a2b3;font-size:.8em}.num{text-align:right;font-variant-numeric:tabular-nums}.cool{background:var(--cool)}.warm{background:var(--warm)}.hot{background:var(--hot)}.kind-agent{background:var(--agent)}.kind-debug{background:var(--debug)}.kind-review{background:var(--review)}.kind-work{background:var(--work)}.kind-report{background:var(--report)}.event-row{cursor:pointer}.event-row:hover{outline:2px solid #93c5fd55}.modal{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:2rem;z-index:10}.modal[hidden]{display:none}.modal-card{background:#fff;color:#111827;border-radius:1rem;width:min(78rem,96vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px #0006}.modal-head{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.8rem 1rem;border-bottom:1px solid var(--b);background:inherit}.modal-body{padding:1rem}.close{font-size:1.2rem;border:1px solid var(--b);border-radius:.5rem;background:transparent;cursor:pointer}.detail-box{border:1px solid var(--b);border-radius:.75rem;padding:1rem;background:#fff;box-shadow:inset 0 1px 2px #00000008}.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.75rem;margin-bottom:.75rem}.detail-table th{position:static}.detail-table,.summary-table{font-size:.86rem;margin:.5rem 0 1rem}.summary-table th{position:static}h2{font-size:1.05rem;margin:1rem 0 .4rem}h3{margin:1rem 0 .4rem}@media (prefers-color-scheme:dark){body{background:#111827;color:#f9fafb}.card,th,.detail-box,.modal-card{background:#1f2937;color:#f9fafb}:root{--b:#374151;--muted:#9ca3af;--agent:#172554;--debug:#431407;--review:#2e1065;--work:#1f2937;--report:#052e16;--cool:#052e16;--warm:#422006;--hot:#450a0a}}
+</style>
 <h1>Work usage</h1>
-<p>Scope: <strong>${escapeHtml(state.filter.scope)} ${escapeHtml(state.filter.value)}</strong></p>
-<p>Events: ${state.summary.events} · Time: ${escapeHtml(formatDuration(state.summary.durationMs))} · Tokens: ${escapeHtml(state.summary.tokens || "unknown")}</p>
+<p class="muted">Scope: <strong>${escapeHtml(state.filter.scope)} ${escapeHtml(state.filter.value)}</strong></p>
+<div class="cards"><div class="card"><b>${state.summary.events}</b><span>events</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.durationMs))}</b><span>time</span></div><div class="card"><b>${escapeHtml(state.summary.tokens || "unknown")}</b><span>tokens</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.subagents))}</b><span>subagents</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.tools))}</b><span>tools</span></div></div>
 <p class="muted">Missing data: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}. Generated from ${state.files.length ? state.files.map(escapeHtml).join(", ") : escapeHtml(state.dir)}.</p>
+${usageSubagentSummaryHtml(state.summary)}
 <input id="filter" placeholder="filter rows" aria-label="filter rows">
-<table id="usage"><thead><tr><th>Task</th><th>Agent</th><th>Phase</th><th>Duration</th><th>Tokens</th><th>Context</th><th>Tools</th><th>Review scope</th><th>Review payoff</th><th>Time</th></tr></thead><tbody>
-${rowHtml || '<tr><td colspan="10">No usage events for this scope.</td></tr>'}
+<table id="usage"><thead><tr><th>Task</th><th>Agent</th><th>Phase</th><th>Duration</th><th>Tokens</th><th>Context</th><th>Tools</th><th>Subagents</th><th>Review scope</th><th>Review payoff</th><th>Time</th></tr></thead><tbody>
+${rowHtml || '<tr><td colspan="11">No usage events for this scope.</td></tr>'}
 </tbody></table>
+${detailHtml}
+<div id="modal" class="modal" hidden><div class="modal-card"><div class="modal-head"><strong>Usage detail</strong><button id="close" class="close" aria-label="close">×</button></div><div id="modal-body" class="modal-body"></div></div></div>
 <script>
-const rows=[...document.querySelectorAll('tbody tr')];
-document.querySelector('#filter').addEventListener('input',e=>{const q=e.target.value.toLowerCase();for(const r of rows)r.hidden=!r.textContent.toLowerCase().includes(q)});
-for(const th of document.querySelectorAll('th'))th.addEventListener('click',()=>{const i=[...th.parentNode.children].indexOf(th);rows.sort((a,b)=>(a.children[i].dataset.sort??a.children[i].textContent).localeCompare(b.children[i].dataset.sort??b.children[i].textContent,undefined,{numeric:true}));for(const r of rows)r.parentNode.appendChild(r)});
+const rows=[...document.querySelectorAll('tr.event-row')];
+const modal=document.querySelector('#modal');
+const modalBody=document.querySelector('#modal-body');
+const close=()=>{modal.hidden=true;modalBody.innerHTML=''};
+document.querySelector('#close').addEventListener('click',close);
+modal.addEventListener('click',e=>{if(e.target===modal)close()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+for(const r of rows)r.addEventListener('click',()=>{const source=document.querySelector('#'+CSS.escape(r.dataset.detail));if(!source)return;modalBody.innerHTML=source.innerHTML;modal.hidden=false});
+document.querySelector('#filter').addEventListener('input',e=>{const q=e.target.value.toLowerCase();for(const r of rows){const source=document.querySelector('#'+CSS.escape(r.dataset.detail));const show=r.textContent.toLowerCase().includes(q)||(source?.textContent.toLowerCase().includes(q));r.hidden=!show}});
+for(const th of document.querySelectorAll('thead th'))th.addEventListener('click',()=>{const i=[...th.parentNode.children].indexOf(th);const dir=th.dataset.dir==='asc'?'desc':'asc';for(const h of document.querySelectorAll('thead th'))delete h.dataset.dir;th.dataset.dir=dir;rows.sort((a,b)=>(a.children[i].dataset.sort??a.children[i].textContent).localeCompare(b.children[i].dataset.sort??b.children[i].textContent,undefined,{numeric:true}));if(dir==='desc')rows.reverse();const body=document.querySelector('tbody');for(const r of rows)body.appendChild(r)});
 </script>
 </html>`;
 }
@@ -674,9 +1046,25 @@ function buildWorkUsageState(cwd, args = "") {
 		files: [...new Set(events.map((event) => event.file).filter(Boolean))],
 		rows,
 		summary: usageSummary(events, rows),
+		open: scoped.open,
+		format: scoped.format ?? "html",
 	};
-	state.path = writeUsageReport(cwd, state);
+	if (state.format === "html") state.path = writeUsageReport(cwd, state);
 	return state;
+}
+
+function renderWorkUsageJsonl(state) {
+	return [
+		{
+			type: "summary",
+			filter: state.filter,
+			summary: state.summary,
+			files: state.files,
+		},
+		...state.rows.map((row) => ({ type: "row", ...row })),
+	]
+		.map((row) => JSON.stringify(row))
+		.join("\n");
 }
 
 function renderWorkUsageText(state) {
@@ -687,8 +1075,12 @@ function renderWorkUsageText(state) {
 				(item) => `- ${item.id} ${item.status} — ${item.title}`,
 			),
 		].join("\n");
+	if (state.format === "jsonl") return renderWorkUsageJsonl(state);
 	return [
 		`Work usage report: ${state.path}`,
+		state.open
+			? "Browser open requested."
+			: "Browser not opened; pass --open to launch it.",
 		`Scope: ${state.filter.scope}${state.filter.value ? ` ${state.filter.value}` : ""} · events: ${state.summary.events} · time: ${formatDuration(state.summary.durationMs)} · tokens: ${state.summary.tokens || "unknown"}`,
 		state.summary.unknownTokens || state.summary.unknownContext
 			? `Missing data shown as unknown: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}`
@@ -1151,8 +1543,10 @@ function buildWorkStatus(cwd, target) {
 	}
 
 	const epic = resolved.epic;
+	rememberWorkflowEpic(cwd, epic);
 	const epicId = idOf(epic);
 	const children = childrenOf(cwd, epicId);
+	const byId = new Map(children.map((issue) => [idOf(issue), issue]));
 	const ready = readyIds(cwd, epicId);
 	const workItems = children.filter(isWorkSlice);
 	const planning = workItems.filter(
@@ -1164,6 +1558,13 @@ function buildWorkStatus(cwd, target) {
 	const readySlices = slices.filter((issue) => ready.has(idOf(issue)));
 	const planned = slices.filter(
 		(issue) => statusOf(issue) === "open" && !ready.has(idOf(issue)),
+	);
+	const blockers = slices.filter(
+		(issue) =>
+			statusOf(issue) !== "closed" &&
+			(isBlockedIssue(issue) ||
+				typeOf(issue) === "bug" ||
+				depsOf(issue).some((id) => statusOf(byId.get(id)) !== "closed")),
 	);
 	const decisions = children.filter(
 		(issue) => typeOf(issue) === "decision" && statusOf(issue) !== "closed",
@@ -1183,6 +1584,10 @@ function buildWorkStatus(cwd, target) {
 		if (decisions.length) return "Resolve decision Beads first.";
 		if (readySlices.length)
 			return `Run /work-resume ${epicId} to handle ${idOf(readySlices[0])}.`;
+		if (blockers.length) {
+			const blocker = blockers.find(isBlockedIssue) ?? blockers[0];
+			return `Run /work-report ${idOf(blocker)}`;
+		}
 		if (active.length)
 			return `Continue or pause active slice ${idOf(active[0])}.`;
 		if (planning.length)
@@ -1195,7 +1600,7 @@ function buildWorkStatus(cwd, target) {
 		`Epic: ${titleOf(epic)} (${epicId})`,
 		`Status: ${statusOf(epic)} • created ${shortDate(createdAt(epic))} • updated ${shortDate(updatedAt(epic))}`,
 		`Progress: ${done.length}/${slices.length} slices closed (${percent}%)`,
-		`Ready: ${readySlices.length} • in progress: ${active.length} • planned ahead: ${planned.length} • decisions: ${decisions.length}`,
+		`Ready: ${readySlices.length} • in progress: ${active.length} • planned ahead: ${planned.length} • blockers: ${blockers.length} • decisions: ${decisions.length}`,
 		"",
 		"Ready slices:",
 		...(readySlices.length
@@ -1207,9 +1612,14 @@ function buildWorkStatus(cwd, target) {
 			? active.map((issue) => `- ${lineFor(issue)}`)
 			: ["- none"]),
 		"",
-		"Planned ahead / blocked:",
+		"Planned ahead:",
 		...(planned.length
 			? planned.map((issue) => `- ${lineFor(issue)}`)
+			: ["- none"]),
+		"",
+		"Blockers:",
+		...(blockers.length
+			? blockers.map((issue) => `- ${lineFor(issue)}`)
 			: ["- none"]),
 		"",
 		"Open decisions:",
@@ -1435,13 +1845,14 @@ function deriveIdeaStatus(issue) {
 }
 
 function depsOf(issue) {
+	const parent = parentOf(issue);
 	return asArray(
 		field(issue, "depends_on", "dependencies", "blocked_by", "deps"),
 	)
 		.filter((dep) => {
 			if (typeof dep !== "object") return true;
 			const type = String(field(dep, "type", "dependency_type") ?? "blocks");
-			return !/parent[-_]child/i.test(type);
+			return /^blocks?$/i.test(type);
 		})
 		.map((dep) =>
 			typeof dep === "object"
@@ -1449,7 +1860,8 @@ function depsOf(issue) {
 				: dep,
 		)
 		.filter(Boolean)
-		.map(String);
+		.map(String)
+		.filter((id) => id !== parent);
 }
 
 function issueSummary(issue) {
@@ -1502,17 +1914,18 @@ function noteDetails(issue) {
 			).map((match) => match.replace(/^.*[:# ]+/, "")),
 		),
 	).slice(0, 5);
+	const recentLines = lines.toReversed();
 	const reason = truncate(
-		lines.find((line) =>
+		recentLines.find((line) =>
 			/blocked|failed|failure|error|missing|cannot|unable/i.test(line),
 		) ?? "",
 		240,
 	);
 	const nextLine =
-		lines.find((line) =>
+		recentLines.find((line) =>
 			/^(?:next\b|rerun\b|re-run\b|run .* again)/i.test(line),
 		) ??
-		lines.find((line) =>
+		recentLines.find((line) =>
 			/\b(?:next\b|rerun\b|re-run\b|run .* again)/i.test(line),
 		);
 	const nextMatch = nextLine?.match(
@@ -1528,8 +1941,17 @@ function noteDetails(issue) {
 		artifacts,
 		runIds,
 		nextAction,
-		rawExcerpt: truncate(normalized, 900),
+		rawExcerpt: truncate(normalized.slice(-900), 900),
 	};
+}
+
+function normalizeCommandTarget(target) {
+	const text = String(target ?? "").trim();
+	const cleaned = text.replace(/[.,;:)\]]+$/, "");
+	return cleaned !== text &&
+		(isBeadId(cleaned) || isNumericBeadShorthand(cleaned))
+		? cleaned
+		: text;
 }
 
 function parseWorkReportArgs(args = "") {
@@ -1540,7 +1962,7 @@ function parseWorkReportArgs(args = "") {
 		if (token === "--json") json = true;
 		else target.push(token);
 	}
-	return { json, target: target.join(" ") };
+	return { json, target: normalizeCommandTarget(target.join(" ")) };
 }
 
 function epicsByStatus(cwd, status) {
@@ -1568,8 +1990,11 @@ function childrenOfRequired(cwd, epicId) {
 }
 
 function resolveReportTarget(cwd, target) {
-	const wanted = target.trim();
+	let wanted = target.trim();
 	if (wanted && wanted !== "last") {
+		const expanded = expandNumericBeadShorthand(cwd, wanted);
+		if (expanded.error) return expanded;
+		wanted = expanded.target;
 		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
 		if (!issue)
 			return {
@@ -1821,7 +2246,11 @@ function isPlanningIssue(issue) {
 
 function isBlockedIssue(issue) {
 	const labels = labelsOf(issue);
-	return labels.includes("wo:blocked") || labels.includes("wo:debug-needed");
+	return (
+		statusOf(issue) === "blocked" ||
+		labels.includes("wo:blocked") ||
+		labels.includes("wo:debug-needed")
+	);
 }
 
 function isDebugIssue(issue) {
@@ -1911,8 +2340,11 @@ function candidateSummary(cwd, epic) {
 }
 
 function resolveResumeTarget(cwd, target) {
-	const wanted = normalizePathToken(target.trim());
+	let wanted = normalizePathToken(target.trim());
 	if (wanted && wanted !== "last") {
+		const expanded = expandNumericBeadShorthand(cwd, wanted);
+		if (expanded.error) return expanded;
+		wanted = expanded.target;
 		if (looksLikePath(wanted))
 			return {
 				error: "plan-path-target",
@@ -2131,6 +2563,7 @@ function buildWorkResumeState(cwd, args = "") {
 				candidates: resolved.candidates ?? [],
 				suggestedCommands: resolved.suggestedCommands ?? [],
 			});
+		rememberWorkflowEpic(cwd, resolved.epic);
 		const childState = buildEpicChildState(cwd, resolved.epic);
 		const git = resumeGitReport(cwd, planRefsFromIssue(resolved.epic));
 		const readyPlanning = childState.readyWork
@@ -2180,6 +2613,7 @@ function buildWorkResumeState(cwd, args = "") {
 }
 
 function buildEpicReportState(cwd, epic) {
+	rememberWorkflowEpic(cwd, epic);
 	const childState = buildEpicChildState(cwd, epic);
 	const git = gitReport(cwd);
 	const complete =
@@ -2231,6 +2665,13 @@ function buildEpicReportState(cwd, epic) {
 
 function buildBeadReportState(cwd, bead) {
 	const parentId = parentOf(bead);
+	if (parentId) {
+		try {
+			rememberWorkflowEpic(cwd, one(bdJsonRequired(cwd, ["show", parentId])));
+		} catch {
+			// Best-effort memory only; report should not fail on parent lookup.
+		}
+	}
 	const siblings = parentId ? childrenOfRequired(cwd, parentId) : [];
 	const byId = new Map(siblings.map((issue) => [idOf(issue), issue]));
 	const dependencyIds = depsOf(bead);
@@ -2296,6 +2737,66 @@ function isBeadId(value) {
 	return /^[A-Za-z][A-Za-z0-9_-]*-[A-Za-z0-9_.-]+$/.test(value ?? "");
 }
 
+function isNumericBeadShorthand(value) {
+	return /^\d+$/.test(String(value ?? "").trim());
+}
+
+function idHasNumericSuffix(id, suffix) {
+	return new RegExp(`[._-]${suffix}$`).test(String(id ?? ""));
+}
+
+function activeEpicCandidates(cwd) {
+	let candidates = [
+		...epicsByStatus(cwd, "in_progress"),
+		...epicsByStatus(cwd, "open"),
+	].sort(byUpdatedDesc);
+	if (candidates.length) return candidates;
+	try {
+		candidates = bdJsonRequired(cwd, ["list", "--type=epic"])
+			.filter((epic) => statusOf(epic) !== "closed")
+			.sort(byUpdatedDesc);
+	} catch {
+		candidates = [];
+	}
+	return candidates;
+}
+
+function expandNumericBeadShorthand(cwd, target, kind = "any") {
+	const text = String(target ?? "").trim();
+	if (!isNumericBeadShorthand(text)) return { target: text };
+	const epics = activeEpicCandidates(cwd);
+	const children = [];
+	if (kind !== "epic") {
+		for (const epic of epics) {
+			children.push(
+				...childrenOfRequired(cwd, idOf(epic)).filter((issue) =>
+					idHasNumericSuffix(idOf(issue), text),
+				),
+			);
+		}
+	}
+	const epicsMatching =
+		kind === "bead"
+			? []
+			: epics.filter((epic) => idHasNumericSuffix(idOf(epic), text));
+	// Prefer child Beads for the common `/work-debug 19:` case when the epic is E-1.
+	const matches = children.length ? children : epicsMatching;
+	const unique = [
+		...new Map(matches.map((issue) => [idOf(issue), issue])).values(),
+	];
+	if (unique.length === 1) return { target: idOf(unique[0]), issue: unique[0] };
+	if (unique.length > 1)
+		return {
+			error: "ambiguous-target",
+			message: `Numeric Bead shorthand ${text} matches multiple Beads; use the full ID.`,
+			candidates: unique.map(issueSummary),
+		};
+	return {
+		error: "unknown-target",
+		message: `No active Bead matches numeric shorthand ${text}; use the full ID.`,
+	};
+}
+
 function ensureBeadsInitialized(cwd) {
 	try {
 		run(cwd, "bd", ["where", "--json"]);
@@ -2352,20 +2853,35 @@ function debugNeededId(issue) {
 }
 
 function resolveWorkflowEpic(cwd, target = "") {
-	const wanted = target.trim();
+	let wanted = normalizeCommandTarget(target);
 	if (wanted && wanted !== "last") {
+		const expanded = expandNumericBeadShorthand(cwd, wanted, "epic");
+		if (expanded.error) return expanded;
+		wanted = expanded.target;
 		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
 		if (!issue)
 			return {
 				error: "unknown-target",
 				message: `No Bead found for ${wanted}`,
 			};
-		return typeOf(issue) === "epic"
-			? { kind: "epic", epic: issue }
-			: { error: "unsupported-target", message: `${wanted} is not an epic.` };
+		if (typeOf(issue) !== "epic")
+			return {
+				error: "unsupported-target",
+				message: `${wanted} is not an epic.`,
+			};
+		rememberWorkflowEpic(cwd, issue);
+		return { kind: "epic", epic: issue };
 	}
+
+	const remembered = rememberedWorkflowEpic(cwd);
+	if (wanted === "last" && remembered)
+		return { kind: "epic", epic: remembered };
+
 	const active = epicsByStatus(cwd, "in_progress").sort(byUpdatedDesc);
-	if (active.length === 1) return { kind: "epic", epic: active[0] };
+	if (active.length === 1) {
+		rememberWorkflowEpic(cwd, active[0]);
+		return { kind: "epic", epic: active[0] };
+	}
 	if (active.length > 1)
 		return {
 			error: "ambiguous-target",
@@ -2373,12 +2889,16 @@ function resolveWorkflowEpic(cwd, target = "") {
 				"Multiple active epics found; pass --epic <id> or target a Bead.",
 			candidates: active.map((epic) => candidateSummary(cwd, epic)),
 		};
+
+	const open = epicsByStatus(cwd, "open").sort(byUpdatedDesc);
+	if (open.length === 1) {
+		rememberWorkflowEpic(cwd, open[0]);
+		return { kind: "epic", epic: open[0] };
+	}
 	return {
 		error: "no-active-epic",
 		message: "No active epic found; pass --epic <id>.",
-		candidates: epicsByStatus(cwd, "open").map((epic) =>
-			candidateSummary(cwd, epic),
-		),
+		candidates: open.map((epic) => candidateSummary(cwd, epic)),
 	};
 }
 
@@ -2515,12 +3035,16 @@ function debugHandoff(state, guidance = "") {
 }
 
 function buildWorkDebugState(cwd, args = "") {
-	const { target, guidance } = splitTargetGuidance(args);
+	let { target, guidance } = splitTargetGuidance(args);
 	if (!target)
 		return errorState("usage", "Usage: /work-debug <bug-or-bead-id|symptom>", {
 			action: "usage",
 		});
 	try {
+		const expanded = expandNumericBeadShorthand(cwd, target);
+		if (expanded.error)
+			return errorState(expanded.error, expanded.message, expanded);
+		target = expanded.target;
 		const git = resumeGitReport(cwd);
 		if (!git.safeForHandoff)
 			return dirtyStopState(
@@ -2536,7 +3060,8 @@ function buildWorkDebugState(cwd, args = "") {
 				return errorState("unknown-target", `No Bead found for ${target}`);
 			const linked = debugNeededId(source);
 			if (linked) bug = one(bdJsonRequired(cwd, ["show", linked]));
-			if (!bug && isDebugIssue(source)) bug = source;
+			if (!bug && (isDebugIssue(source) || isBlockedIssue(source)))
+				bug = source;
 			if (!bug) bug = findExistingDebugBug(cwd, source);
 			const parentId =
 				typeOf(source) === "epic" ? idOf(source) : parentOf(source);
@@ -2629,27 +3154,23 @@ function buildWorkAddState(cwd, args = "") {
 				git,
 				"Dirty files must be resolved before /work-add can mutate Beads.",
 			);
-		let resolved;
-		if (parsed.epic) {
-			const epic = one(bdJsonRequired(cwd, ["show", parsed.epic]));
-			resolved =
-				typeOf(epic) === "epic"
-					? { kind: "epic", epic }
-					: {
-							error: "unsupported-target",
-							message: `${parsed.epic} is not an epic.`,
-						};
-		} else {
-			resolved = resolveWorkflowEpic(cwd, "");
-		}
+		const resolved = resolveParsedEpic(cwd, parsed);
 		if (resolved.error)
 			return errorState(resolved.error, resolved.message ?? resolved.error, {
 				action: "ask-target",
 				candidates: resolved.candidates ?? [],
 			});
 		let blocker;
-		if (parsed.blockedBy)
-			blocker = one(bdJsonRequired(cwd, ["show", parsed.blockedBy]));
+		if (parsed.blockedBy) {
+			const expanded = expandNumericBeadShorthand(
+				cwd,
+				parsed.blockedBy,
+				"bead",
+			);
+			if (expanded.error)
+				return errorState(expanded.error, expanded.message, expanded);
+			blocker = one(bdJsonRequired(cwd, ["show", expanded.target]));
+		}
 		const bead = createBead(cwd, {
 			title: parsed.task,
 			type: "task",
@@ -2729,7 +3250,9 @@ function workflowBeadNotes(command, task, extra = []) {
 
 function resolveParsedEpic(cwd, parsed) {
 	if (!parsed.epic) return resolveWorkflowEpic(cwd, "");
-	const epic = one(bdJsonRequired(cwd, ["show", parsed.epic]));
+	const expanded = expandNumericBeadShorthand(cwd, parsed.epic, "epic");
+	if (expanded.error) return expanded;
+	const epic = one(bdJsonRequired(cwd, ["show", expanded.target]));
 	return typeOf(epic) === "epic"
 		? { kind: "epic", epic }
 		: {
@@ -2754,10 +3277,21 @@ function buildWorkSmallState(cwd, args = "") {
 				"Dirty files must be resolved before /work-small can launch writers.",
 			);
 		const [first, ...rest] = raw.split(/\s+/);
-		if (isBeadId(first) && first !== "--epic") {
-			const issue = one(bdJsonRequired(cwd, ["show", first]));
+		const expandedFirst =
+			first === "--epic"
+				? { target: first }
+				: expandNumericBeadShorthand(cwd, first);
+		if (expandedFirst.error)
+			return errorState(
+				expandedFirst.error,
+				expandedFirst.message,
+				expandedFirst,
+			);
+		const firstTarget = expandedFirst.target;
+		if (isBeadId(firstTarget) && firstTarget !== "--epic") {
+			const issue = one(bdJsonRequired(cwd, ["show", firstTarget]));
 			if (!issue)
-				return errorState("unknown-target", `No Bead found for ${first}`);
+				return errorState("unknown-target", `No Bead found for ${firstTarget}`);
 			if (typeOf(issue) !== "epic") {
 				const epic = one(bdJsonRequired(cwd, ["show", parentOf(issue)]));
 				return withHandoffPrompt({
@@ -3838,12 +4372,16 @@ function hasVerificationEvidence(issue) {
 }
 
 function buildWorkFinishState(cwd, args = "") {
-	const target = String(args).trim();
+	let target = String(args).trim();
 	if (!target)
 		return errorState("usage", "Usage: /work-finish <bead-id|epic-id>", {
 			action: "usage",
 		});
 	try {
+		const expanded = expandNumericBeadShorthand(cwd, target);
+		if (expanded.error)
+			return errorState(expanded.error, expanded.message, expanded);
+		target = expanded.target;
 		const issue = one(bdJsonRequired(cwd, ["show", target]));
 		if (!issue)
 			return errorState("unknown-target", `No Bead found for ${target}`);
@@ -4401,8 +4939,9 @@ export default function workModelsExtension(pi) {
 			await withCommandTelemetry("work-usage", args, ctx, async () => {
 				cleanupBenignInstructionDirt(ctx.cwd);
 				const state = buildWorkUsageState(ctx.cwd, args);
+				if (state.ok && state.open)
+					state.browserOpened = openUsageReport(state.path);
 				notify(ctx, renderWorkUsageText(state), state.ok ? "info" : "warning");
-				if (state.ok) state.browserOpened = openUsageReport(state.path);
 				return stateTelemetry(state);
 			});
 		},

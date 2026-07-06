@@ -54,7 +54,7 @@ const children = [
 			{ issue_id: "B-1", depends_on_id: "E-1", type: "parent-child" },
 		],
 		notes:
-			"Command: rtk cmake -S rf-lib -B rf-lib/build\nNo CMAKE_C_COMPILER could be found\nNext: install compiler and rerun\nArtifact: logs/build.json",
+			"Command: rtk cmake -S rf-lib -B rf-lib/build\nNo CMAKE_C_COMPILER could be found\nNext: install compiler and rerun\nArtifact: logs/build.json\nLater debug failed: compiler installed but linker missing\nNext: install linker and rerun",
 	},
 	{
 		id: "B-2",
@@ -215,23 +215,38 @@ try {
 		"json excludes downstream work whose dependency is closed",
 	);
 
+	const shorthand = buildWorkReport(process.cwd(), "2");
+	assert(
+		shorthand.includes("Bead: Downstream JSON renderer"),
+		"numeric shorthand resolves focused bead report",
+	);
+	const punctuatedShorthand = buildWorkReport(process.cwd(), "2.");
+	assert(
+		punctuatedShorthand.includes("Bead: Downstream JSON renderer"),
+		"numeric shorthand tolerates copied sentence punctuation",
+	);
+
 	const bead = buildWorkReport(process.cwd(), "B-1");
 	assert(
 		bead.includes("Bead: Blocked C compiler verification"),
 		"focused bead report renders bead",
+	);
+	const punctuatedBead = buildWorkReport(process.cwd(), "B-1.");
+	assert(
+		punctuatedBead.includes("Bead: Blocked C compiler verification"),
+		"focused bead report tolerates copied sentence punctuation",
 	);
 	assert(
 		bead.includes("D-1"),
 		"focused bead report includes direct dependency",
 	);
 	assert(
+		bead.includes("Next: Next: install linker and rerun"),
+		"focused bead report uses latest next action",
+	);
+	assert(
 		!bead.includes("E-1"),
 		"focused bead report ignores parent-child dependency",
-	);
-
-	assert(
-		bead.includes("Next: Next: install compiler and rerun"),
-		"focused bead report uses note next action",
 	);
 
 	const decision = buildWorkReport(process.cwd(), "D-1");

@@ -58,7 +58,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-pause [note]` | Stop safely | Extension command: appends a deterministic checkpoint with git files, verification, failures, remaining work, and next step |
 | `/work-report [epic-id\|last\|bead-id] [--json]` | Human handoff for blockers | Extension command: deterministic blocked/debug-needed Bead report, failure artifacts, dependencies, suggested debug commands, and optional JSON |
 | `/work-telemetry [today\|all\|epic <id>\|bead <id>] [--json]` | See timing/token/context cost | Extension command: summarizes `.pi/work-runs/*.jsonl` without an LLM |
-| `/work-usage [today\|all\|epic <id>\|bead <id>]` | Open a local HTML usage table | Extension command: writes escaped sortable/filterable HTML under `.pi/work-runs/usage/` and prints the path |
+| `/work-usage [today\|all\|epic <id>\|bead <id>] [--open\|--jsonl]` | Write a usage report | Extension command: writes escaped sortable/filterable HTML under `.pi/work-runs/usage/` and prints the path; `--open` launches it; `--jsonl` prints machine-readable rows without HTML |
 | `/work-finish <bead-id\|epic-id>` | Classify commit/close readiness | Extension command: checks PASS review, verification evidence, related dirty files, and emits a deterministic commit-ready or stop state |
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
@@ -69,7 +69,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 1. `/work-plan` initializes the workflow when needed, wraps `ce-plan`, and creates the durable epic/master plan. `/work-master` is a legacy alias.
 2. `/work-ideate` keeps idea records in Beads so accepted, contender, rejected, discussed, brainstormed, and planned ideas stay visible without becoming executable work.
 3. `/work-brainstorm` links brainstorm artifacts and later plans back to idea records instead of relying on chat history.
-4. `/work-usage` turns existing telemetry into a local HTML report without creating another source of truth.
+4. `/work-usage` turns existing telemetry into a local HTML report without creating another source of truth; pass `--jsonl` for agent-readable rows or `--open` only when you want a browser.
 5. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 6. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
 7. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
@@ -80,7 +80,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 12. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 13. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
 14. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
-15. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git.
+15. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git and only open in a browser with `--open`. Use `--jsonl` for agent/subagent consumption.
 16. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
 17. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
@@ -166,7 +166,7 @@ Continue later, even in a fresh Pi session:
 
 When there is no obvious latest epic, `/work-resume` lists active epics with created date, last worked date, status, child counts, and one-line description so you can pick.
 
-`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command. Use `/work-report <epic-id>` when a human needs the full blocker ledger without spending agent context: blocked/debug-needed Beads, failure artifacts, artifact paths, dependencies, and suggested `/work-debug <bead-id>: <guidance>` commands. Add `--json` for the machine-readable state that future resume automation can reuse. Use `/work-telemetry today` or `/work-telemetry epic <id>` to see which commands, role agents, subagent/tool calls, token usage, and context jumps are expensive enough to optimize. Use `/work-usage` for the local sortable/filterable HTML version, including review scope/payoff when the telemetry recorded it.
+`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command. Use `/work-report <epic-id>` when a human needs the full blocker ledger without spending agent context: blocked/debug-needed Beads, failure artifacts, artifact paths, dependencies, and suggested `/work-debug <bead-id>: <guidance>` commands. Add `--json` for the machine-readable state that future resume automation can reuse. Use `/work-telemetry today` or `/work-telemetry epic <id>` to see which commands, role agents, subagent/tool calls, token usage, and context jumps are expensive enough to optimize. Use `/work-usage` for the local sortable/filterable HTML version, including review scope/payoff when the telemetry recorded it; use `/work-usage --jsonl` for agents and add `--open` only when you want a browser.
 
 ## Context management
 
