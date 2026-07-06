@@ -1194,19 +1194,26 @@ function resolveReportTarget(cwd, target) {
 }
 
 function gitReport(cwd) {
-	try {
-		return {
-			ok: true,
-			status: run(cwd, "git", ["status", "--short", "--branch"]) || "clean",
-			warnings: [],
-		};
-	} catch {
+	const report = resumeGitReport(cwd);
+	if (!report.ok)
 		return {
 			ok: false,
 			status: "git status unavailable",
 			warnings: ["git status unavailable"],
 		};
+	if (report.dirtyPaths.length && !report.blockedPaths.length) {
+		const branch = report.status.split(/\r?\n/)[0] || "git status";
+		return {
+			ok: true,
+			status: `${branch}\n(no blocking dirty files; ignored workflow/runtime dirt: ${report.dirtyPaths.join(", ")})`,
+			warnings: report.warnings,
+		};
 	}
+	return {
+		ok: true,
+		status: report.status || "clean",
+		warnings: report.warnings,
+	};
 }
 
 function parsePorcelainStatus(text) {
