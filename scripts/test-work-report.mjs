@@ -271,8 +271,8 @@ try {
 	const closed = buildWorkReport(process.cwd(), "E-1");
 	assert(
 		closed.includes("Status: closed") &&
-			closed.includes("Next: No action suggested."),
-		"closed completed epic has no self-loop next command",
+			closed.includes('Next: epic E-1 "Add coded work report" is complete.'),
+		"closed completed epic reports completion next action",
 	);
 	const closedJson = JSON.parse(buildWorkReport(process.cwd(), "E-1 --json"));
 	assert(

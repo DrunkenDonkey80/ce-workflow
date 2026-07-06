@@ -35,4 +35,5 @@ Final response must be concise so the parent context stays small:
 - files changed;
 - verification run and result;
 - Beads updated or created;
-- blockers or decisions needed.
+- blockers or decisions needed;
+- final line: `Next: reviewer for <bead-id>` or the exact blocker command.

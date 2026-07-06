@@ -39,4 +39,5 @@ Final response must be concise so the parent context stays small:
 - fix applied or diagnosis-only result;
 - verification run and result;
 - Beads updated;
-- whether `ce-compound mode:headless` is warranted.
+- whether `ce-compound mode:headless` is warranted;
+- final line: `Next: /work-resume <epic-id>` or the exact blocker command.

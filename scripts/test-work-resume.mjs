@@ -25,6 +25,8 @@ const epics = [
 		issue_type: "epic",
 		status: "in_progress",
 		title: "Active epic",
+		design:
+			"Master plan reference: file:docs/plans/2026-07-05-001-feat-rflib-card-emulation-plan.md",
 		created_at: "2026-07-01T00:00:00Z",
 		updated_at: "2026-07-03T10:00:00Z",
 	},
@@ -101,8 +103,7 @@ const childrenByScenario = {
 			parent_id: "E-1",
 			issue_type: "task",
 			status: "open",
-			title: "Slice the next units",
-			labels: ["wo:planning"],
+			title: "Plan next slice for Active epic",
 			created_at: "2026-07-03T01:00:00Z",
 		},
 	],
@@ -229,17 +230,24 @@ const dirty = process.env.WORK_RESUME_GIT_DIRTY || "clean";
 if (process.env.WORK_RESUME_GIT_FAIL === "1") process.exit(1);
 if (args[0] === "diff") {
   if (dirty === "instruction-substantive") process.exit(1);
+  if (dirty === "benign" && !args.includes("--ignore-blank-lines")) process.exit(1);
   process.exit(0);
 }
-if (args.includes("--porcelain=v1")) {
+function printDirty() {
   if (dirty === "unknown") console.log(" M extensions/work-models.js");
-  if (dirty === "benign" || dirty === "instruction-substantive") console.log(" M AGENTS.md");
+  if (dirty === "benign" || dirty === "instruction-substantive" || dirty === "workflow") console.log(" M AGENTS.md");
   if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
-} else {
+  if (dirty === "workflow") {
+    console.log("M  .beads/issues.jsonl");
+    console.log("?? docs/plans/2026-07-05-001-feat-rflib-card-emulation-plan.md");
+    console.log("?? pi-session-2026-07-05T17-02-37-680Z_abc.html");
+    console.log("?? .pi-subagents/artifacts/run-output.md");
+  }
+}
+if (args.includes("--porcelain=v1")) printDirty();
+else {
   console.log("## feat/coded-work-resume");
-  if (dirty === "unknown") console.log(" M extensions/work-models.js");
-  if (dirty === "benign" || dirty === "instruction-substantive") console.log(" M AGENTS.md");
-  if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
+  printDirty();
 }
 `,
 	);
@@ -306,6 +314,14 @@ try {
 		state.action === "close-stale-planning",
 		"stale planning stops for cleanup",
 	);
+	assert(
+		state.counts.slices === 1,
+		"planning beads are not counted as executable slices",
+	);
+	assert(
+		state.counts.closed === 1,
+		"closed executable slice count excludes planning beads",
+	);
 	assert(!state.handoffPrompt, "cleanup stop does not inject handoff");
 
 	process.env.WORK_RESUME_SCENARIO = "blocked";
@@ -366,6 +382,20 @@ try {
 		"explicit child target is rejected instead of silently replanned",
 	);
 
+	state = buildWorkResumeState(
+		process.cwd(),
+		"@docs/plans/2026-07-05-001-feat-rflib-card-emulation-plan.md",
+	);
+	assert(
+		!state.ok && state.reason === "plan-path-target",
+		"plan path resume target suggests work-plan instead of bd show",
+	);
+	assert(
+		state.suggestedCommands[0] ===
+			"/work-plan docs/plans/2026-07-05-001-feat-rflib-card-emulation-plan.md",
+		"plan path target strips autocomplete @ marker",
+	);
+
 	state = buildWorkResumeState(process.cwd(), "NOPE");
 	assert(
 		!state.ok && state.reason === "unknown-target",
@@ -408,7 +438,23 @@ try {
 		state.action === "dirty-stop",
 		"unknown dirty file stops writer handoff",
 	);
+	assert(
+		state.message.includes("extensions/work-models.js"),
+		"dirty stop names true blocking files",
+	);
 	assert(!state.handoffPrompt, "dirty stop does not inject handoff");
+
+	process.env.WORK_RESUME_GIT_DIRTY = "workflow";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-debug",
+		`workflow-owned dirt allows handoff, got ${state.action}: ${state.message ?? ""}`,
+	);
+	assert(state.git.workflowDirty, "workflow dirt is represented in state");
+	assert(
+		state.handoffPrompt.includes("workflow-owned allowlist"),
+		"handoff tells child about workflow-owned dirty allowlist",
+	);
 
 	process.env.WORK_RESUME_GIT_DIRTY = "benign";
 	state = buildWorkResumeState(process.cwd(), "E-1");
@@ -452,6 +498,22 @@ try {
 	assert(
 		sent[0].options.deliverAs === "followUp",
 		"handler uses followUp delivery",
+	);
+
+	const piSent = [];
+	await handleWorkResumeCommand(
+		"E-1",
+		{
+			cwd: process.cwd(),
+			ui: { notify: (message, level) => notices.push({ message, level }) },
+		},
+		{
+			sendUserMessage: (message, options) => piSent.push({ message, options }),
+		},
+	);
+	assert(
+		piSent.length === 1 && piSent[0].options.deliverAs === "followUp",
+		"handler falls back to pi.sendUserMessage when ctx helper is absent",
 	);
 
 	process.env.WORK_RESUME_SCENARIO = "blocked";

@@ -45,7 +45,7 @@ Loop:
    The planner must:
    - read the Bead
    - read the master epic
-   - create the next 1–3 executable Beads if needed
+   - create the next executable Bead by default, or up to three only when obvious and low-risk
    - add real `blocks` dependencies only
    - create decision Beads for uncertainty
    - not edit source code

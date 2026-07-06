@@ -52,4 +52,4 @@ Final response must be concise so the parent context stays small:
 - closed Beads created with evidence;
 - open task/bug/decision Beads created;
 - branches needing review;
-- recommended next command, usually `/work-resume <epic-id>`.
+- final line: `Next: /work-resume <epic-id>`.

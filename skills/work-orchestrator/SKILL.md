@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-telemetry`, `/work-finish`, `/work-status`, and `/work-pause`. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. Extension commands provide cheap deterministic status, report, telemetry, resume, start-gate, pause/debug/add/auto intake, and finish-gate state when loaded.
+Use this skill for `/work-plan`, `/work-init`, `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-telemetry`, `/work-finish`, `/work-status`, and `/work-pause`. Use `/work-plan` as the human-facing bootstrap command; `/work-master` is a legacy alias. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. Extension commands provide cheap deterministic init, status, report, telemetry, resume, start-gate, pause/debug/add/auto intake, and finish-gate state when loaded.
 
 ## Source of Truth
 
@@ -22,12 +22,11 @@ Use this skill for `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, 
 Run these before mutating work:
 
 ```bash
-bd prime
 bd where
 git status --short --branch
 ```
 
-If no Beads workspace exists, stop and ask the user to initialize Beads in the target repo. Ignore Pi runtime artifacts such as `.pi-subagents/`; if they appear untracked, add them to `.gitignore` only when that is the smallest safe cleanup. If git is dirty, run the worktree hygiene gate before launching a writer:
+If no Beads workspace exists, use `/work-init` or `/work-plan <idea-or-plan-file>`; they run `bd init --non-interactive --skip-agents` so Beads does not add generic AGENTS.md instructions. Ignore Pi runtime artifacts such as `.pi-subagents/`; if they appear untracked, add them to `.gitignore` only when that is the smallest safe cleanup. If git is dirty, run the worktree hygiene gate before launching a writer:
 
 ```bash
 git status --porcelain=v1 --untracked-files=all
@@ -91,14 +90,22 @@ If mandatory verification cannot run because the environment is missing a toolch
 
 When `ce-debug` cannot safely fix or verify, record the debugger's failure artifact in the bug Bead, create a `type=decision` Bead for the human question when needed, label the bug `wo:blocked`, and add a dependency from the bug to that decision. `/work-resume` should then continue with the next unrelated ready Bead from `bd ready --json`; it must not spin on blocked work. `/work-report` is the human handoff surface for blocked/debug-needed Beads.
 
+## Mode: init
+
+Use to initialize the current repository for this workflow.
+
+Run `bd init --non-interactive --skip-agents` only when `bd where` shows no workspace. Do not install generic Beads instructions into AGENTS.md; this workflow owns Beads mutation through `/work-*` commands and role agents.
+
+Final output: `Next: /work-plan <idea-or-plan-file>`.
+
 ## Mode: master
 
-Use to create a new master epic from a brainstorm, rough feature idea, or existing plan.
+Use to create a new master epic from a brainstorm, rough feature idea, or existing plan. Prefer the user-facing command name `/work-plan`; `/work-master` remains an alias.
 
 When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Tell `ce-plan` to auto-accept plan creation and skip interactive confirmation unless it needs a real human decision. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification contract in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
 
 1. Create only the master epic Bead with the master plan captured in Beads fields.
-2. Create only one initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next one to three executable slices.
+2. Create only one initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next executable slice, or at most three obvious low-risk slices.
 3. Do not create executable task Beads in the parent; that is only `bead-planner`'s job.
 4. Launch `bead-planner`.
 5. Planner creates or reuses executable Beads and decision Beads.
@@ -152,7 +159,7 @@ Use for bounded work inside an existing epic with a few choices and fewer than a
 
 1. Resolve the active epic first; if ambiguous, ask.
 2. Create a parent Bead under that epic.
-3. Create one to three executable child Beads.
+3. Create one executable child Bead by default; create up to three only for obvious low-risk sequential work.
 4. Add dependencies only where real.
 5. Run the first ready child through the continue loop.
 6. Continue while ready work remains and no stop condition fires.
@@ -165,7 +172,7 @@ Use for large, risky, cross-cutting, or architectural work inside an existing ep
 
 1. Resolve the active epic first; if ambiguous, ask.
 2. Create a `wo:planning` Bead under that epic describing the requested large slice.
-3. Launch `bead-planner` to split that slice into the next one to three executable Beads and any decision Beads.
+3. Launch `bead-planner` to split that slice into the next executable Bead by default, plus any decision Beads; create up to three executable Beads only for obvious low-risk sequential work.
 4. Start `Mode: resume` for the epic.
 
 Do not create a new master epic here; use `Mode: master` for that.
@@ -224,8 +231,8 @@ Loop:
 2. Run the worktree hygiene gate and resolve/record dirty files before spawning any child. Prefer one parent cleanup over repeated child stop/retry loops. Repeat this gate after every child returns; restore whitespace-only tracked instruction-file changes such as `AGENTS.md` before interpreting review results or committing. Because some child starts can recreate this whitespace dirt after the parent gate, include a startup allowlist telling children to continue when the only dirty file is whitespace-only `AGENTS.md`/instruction-file EOF dirt, and to leave it for parent cleanup.
 3. Inspect `bd children <epic-id> --json` unless precomputed extension state already handled stale planning for this invocation. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
 4. Pick exactly one non-planning ready Bead belonging to or blocking the target epic. Prefer `wo:debug` bug Beads when they unblock in-progress/debug-needed work; otherwise pick the earliest unblocked implementation slice. Skip `wo:blocked` Beads unless the user explicitly chose them with `/work-debug`.
-5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan. If open decisions, blocked/debug-needed children, or failed evidence exist, report them with `/work-report <epic-id>` style details and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next one to three slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
-6. Do not dump raw `bd show <id> --json` into the parent chat. Use the precomputed extension state or `/work-report <id> --json`. Only child role agents read full Bead JSON inside their fresh context.
+5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan through compact fields or the referenced plan file section, not raw epic JSON. If open decisions, blocked/debug-needed children, or failed evidence exist, report them with `/work-report <epic-id>` style details and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next executable slice by default, or up to three obvious low-risk slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred.
+6. Do not dump raw `bd show <id> --json` into the parent chat. Use the precomputed extension state, `/work-report <id> --json`, or small `bd show ... | python/node` projections. Child role agents may read full child Beads, but planner must not read full epic/master-plan JSON when a plan path or expected unit is available.
 7. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, verify `bd ready --json` exposes the earliest executable slice and not the planning Bead or a later dependent slice, then stop at the planning boundary.
 8. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, relevant paths, related file allowlist, and known-unrelated dirty allowlist. Always include the instruction-file whitespace startup allowlist from step 2 so workers do not contact the supervisor for harmless EOF-only `AGENTS.md` dirt.
 9. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, verification evidence, known-unrelated dirty allowlist, and the same instruction-file whitespace startup allowlist from step 2. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available. Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup, not an implementation failure, once restored.
@@ -234,7 +241,7 @@ Loop:
 12. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
 13. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
 14. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
-15. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and `Next: start a fresh Pi session and run /work-resume <epic-id>` unless a blocker or true epic completion exists.
+15. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and a final one-line next action: `Next: /work-resume <epic-id>` when work remains, the exact blocker/debug command when blocked, or `Next: epic <epic-id> "<title>" is complete.` when truly complete.
 
 ## Mode: add
 
@@ -288,7 +295,7 @@ For a Bead target, show the detailed failure artifact from notes: command, exit/
 
 ## Role Loop
 
-Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. Use the exact package role agents (`bead-planner`, `bead-worker`, `bead-reviewer`, `bead-fixer`, `bead-debugger`, `bead-committer`, `bead-migrator`) in the `agent` field; do not substitute builtin `worker`, `reviewer`, `planner`, or `delegate` for these roles. The parent must not read broad source modules or implement source edits itself; if it cannot launch the required role agent, it stops with a setup blocker. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Use `outputMode: "file-only"` with an artifact path for review/research/work outputs unless the complete result is under about 20 lines. Keep only a short structured summary in the parent; do not paste long tool logs, full `bd show` epic JSON, or whole master plans back into the control session.
+Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. Use the exact package role agents (`bead-planner`, `bead-worker`, `bead-reviewer`, `bead-fixer`, `bead-debugger`, `bead-committer`, `bead-migrator`) in the `agent` field; do not substitute builtin `worker`, `reviewer`, `planner`, or `delegate` for these roles. The parent must not read broad source modules or implement source edits itself; if it cannot launch the required role agent, it stops with a setup blocker. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Use `outputMode: "file-only"` with a short relative output filename for review/research/work outputs unless the complete result is under about 20 lines; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. Keep only a short structured summary in the parent; do not paste long tool logs, full `bd show` epic JSON, raw `bd ready --json`, raw `bd children --json`, or whole master plans back into the control session. Pipe Beads JSON through python/node projections when only IDs/status/titles are needed.
 
 Do not put tiny wall-clock limits on real role agents. Prefer no explicit timeout; if the runtime requires one, use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Use async/background for broad reviews, hardware work, or repo-scale investigation. A child timeout is an infrastructure failure artifact, not a review `FAIL` or implementation result.
 
@@ -334,10 +341,11 @@ Allowed to mutate Beads through `bd`. Must not edit source code.
 
 Responsibilities:
 
-- read the planning Bead and master epic, including the epic's master plan fields;
+- read the planning Bead and master epic through compact field extractors; do not dump raw epic JSON or full master plans into the transcript;
+- prefer the referenced plan file and read only the expected next implementation-unit section plus the verification/hardware contract;
 - propagate the project verification contract into child Bead acceptance;
-- list existing children of the epic before creating anything;
-- create the next one to three executable Beads under the epic (`--parent <epic-id>`) only when no existing open/in-progress/closed child already covers that implementation unit;
+- list existing children of the epic before creating anything, summarized to ids/titles/status;
+- create the next executable Bead under the epic (`--parent <epic-id>`) by default, only when no existing open/in-progress/closed child already covers that implementation unit; create up to three executable Beads only when the next units are obvious, low-risk, and sequential;
 - create decision Beads for uncertainty under the epic (`--parent <epic-id>`);
 - add only real `blocks` dependencies, using `bd dep add <later-id> <earlier-id>` when later slices must wait for earlier slices;
 - run `bd ready --json` after dependency changes and repair the order if the earliest executable slice is not ready first;

@@ -66,7 +66,7 @@ flowchart TB
 **Command surface**
 
 - R5. `/work-small <task>` must create, claim, implement, verify, lightly review, commit, and close one obvious low-risk Bead.
-- R6. `/work-med <task>` must create a bounded parent Bead, split it into one to three executable child Beads, and start the first safe slice.
+- R6. `/work-med <task>` must create a bounded parent Bead, split it into one executable child Bead by default, with up to three only for obvious low-risk sequences, and start the first safe slice.
 - R7. `/work-big <task>` must create a master epic Bead, create an initial planning Bead, run planning, and hand off to the continue loop.
 - R8. `/work-auto <task>` must classify work as small, medium, or big and ask before launching big or ambiguous work.
 - R9. `/work-continue [epic-id|last]` must resolve the target epic from Beads, choose exactly one ready related Bead, run the role loop, and repeat until a stop condition fires.
@@ -109,7 +109,7 @@ flowchart TB
 - F2. Medium work
   - **Trigger:** A1 invokes `/work-med <task>`.
   - **Actors:** A1, A2, A3, A4, A5
-  - **Steps:** A2 creates a parent Bead, creates one to three executable child Beads, links only real dependencies, runs the first ready child through worker, reviewer, fixer when needed, and committer.
+  - **Steps:** A2 creates a parent Bead, creates one executable child Bead by default, with up to three only for obvious low-risk sequences, links only real dependencies, runs the first ready child through worker, reviewer, fixer when needed, and committer.
   - **Covered by:** R6, R13, R14, R15, R16, R17
 
 - F3. Big work

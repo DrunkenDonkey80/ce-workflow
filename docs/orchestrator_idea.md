@@ -125,7 +125,7 @@ For bounded work that needs a short plan.
 Flow:
 
 1. Create a parent Bead.
-2. Create 1-3 executable child Beads.
+2. Create one executable child Bead by default; create up to three only for obvious low-risk sequences.
 3. Add dependencies only where real.
 4. Work first ready child through worker/reviewer/fixer/committer.
 5. Continue if safe.
@@ -235,7 +235,7 @@ Responsibilities:
 
 - read the current planning Bead;
 - read the master epic;
-- create next 1-3 executable Beads;
+- create the next executable Bead by default, or up to three only for obvious low-risk sequences;
 - create decision Beads for uncertainty;
 - add real dependencies only;
 - close/update the planning Bead when durable Beads exist.

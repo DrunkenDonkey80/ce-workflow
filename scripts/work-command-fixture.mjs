@@ -154,8 +154,11 @@ function save() { writeFileSync(statePath, JSON.stringify(state, null, "\t")); }
 function log(value) { appendFileSync(logPath, JSON.stringify({ args, ...value }) + "\\n"); }
 function fieldAfter(name) { const i = args.indexOf(name); return i === -1 ? "" : args[i + 1] || ""; }
 function all() { return [...epics, ...state.children]; }
-if (state.scenario === "no-beads") { console.error("Error: no beads database found"); process.exit(1); }
-if (args[0] === "list" && args.includes("--type=epic")) {
+if (state.scenario === "no-beads" && args[0] === "init") {
+  state.scenario = "active"; save(); log({ op: "init" }); out({ initialized: true });
+} else if (state.scenario === "no-beads") { console.error("Error: no beads database found; run bd init"); process.exit(1); }
+else if (args[0] === "where") out({ path: ".beads" });
+else if (args[0] === "list" && args.includes("--type=epic")) {
   if (args.includes("--status=in_progress")) out(state.scenario === "openReadyAmbiguous" ? [] : state.scenario === "ambiguous" ? epics : [epics[0]]);
   else if (args.includes("--status=open")) out(state.scenario === "openReadyAmbiguous" ? epics : []);
   else out(epics);
@@ -167,10 +170,14 @@ else if (args[0] === "show") {
   if (state.scenario === "create-fail") { console.error("create failed"); process.exit(3); }
   const type = fieldAfter("--type") || "task";
   const parent = fieldAfter("--parent");
-  const notes = fieldAfter("--append-notes");
+  const notes = fieldAfter("--notes") || fieldAfter("--append-notes");
+  const description = fieldAfter("--description");
+  const designFile = fieldAfter("--design-file");
+  const design = fieldAfter("--design") || (designFile ? "file:" + designFile : "");
+  const acceptance = fieldAfter("--acceptance");
   const prefix = type === "bug" ? "BUG-NEW-" : type === "epic" ? "E-NEW-" : "TASK-NEW-";
   const id = prefix + state.next++;
-  const issue = { id, parent_id: parent, issue_type: type, status: "open", title: args[1], notes };
+  const issue = { id, parent_id: parent, issue_type: type, status: "open", title: args[1], notes, description, design, acceptance };
   state.children.push(issue);
   save(); log({ op: "create", issue }); out(issue);
 } else if (args[0] === "update") {
@@ -197,12 +204,14 @@ if (args.includes("--porcelain=v1")) {
   if (dirty === "benign" || dirty === "instruction-substantive") console.log(" M AGENTS.md");
   if (dirty === "staged-instruction") console.log("M  AGENTS.md");
   if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
+  if (dirty === "pi-session") console.log("?? pi-session-2026-07-05T17-02-37-680Z_abc.html");
 } else {
   console.log("## feat/workflow-intake");
   if (dirty === "unknown") console.log(" M extensions/work-models.js");
   if (dirty === "benign" || dirty === "instruction-substantive") console.log(" M AGENTS.md");
   if (dirty === "staged-instruction") console.log("M  AGENTS.md");
   if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
+  if (dirty === "pi-session") console.log("?? pi-session-2026-07-05T17-02-37-680Z_abc.html");
 }
 `,
 	);

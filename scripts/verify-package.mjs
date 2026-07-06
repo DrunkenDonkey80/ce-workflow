@@ -108,6 +108,7 @@ check(
 	/Git is the only code state/.test(skill),
 );
 for (const mode of [
+	"init",
 	"master",
 	"migrate",
 	"small",
@@ -135,7 +136,8 @@ for (const role of [
 	check(`skill references role: ${role}`, skill.includes(role));
 }
 for (const phrase of [
-	"bd prime",
+	"bd where",
+	"bd init --non-interactive --skip-agents",
 	"bd ready --json",
 	"Stop Conditions",
 	"dirty",
@@ -211,6 +213,8 @@ check(
 );
 
 const promptModes = {
+	"work-init.md": "init",
+	"work-plan.md": "master",
 	"work-master.md": "master",
 	"work-migrate.md": "migrate",
 	"work-small.md": "small",
@@ -229,8 +233,8 @@ const promptFiles = readdirSync(path.join(root, "prompts")).filter((file) =>
 	file.endsWith(".md"),
 );
 check(
-	"exactly twelve prompt templates",
-	promptFiles.length === 12,
+	"exactly fourteen prompt templates",
+	promptFiles.length === 14,
 	promptFiles.join(", "),
 );
 for (const [file, mode] of Object.entries(promptModes)) {
@@ -410,6 +414,8 @@ for (const phrase of [
 	"bead-debugger",
 	"bead-reviewer",
 	"bead-committer",
+	'registerCommand("work-init"',
+	'registerCommand("work-plan"',
 	'registerCommand("work-status"',
 	'registerCommand("work-report"',
 	'registerCommand("work-telemetry"',
@@ -439,6 +445,8 @@ for (const phrase of [
 	"buildWorkSmallState",
 	"buildWorkMedState",
 	"buildWorkBigState",
+	"buildWorkInitState",
+	"buildWorkPlanState",
 	"buildWorkMasterState",
 	"buildWorkMigrateState",
 	"buildWorkFinishState",
@@ -466,6 +474,8 @@ for (const phrase of [
 const readme = read("README.md");
 for (const phrase of [
 	"pi install",
+	"/work-init",
+	"/work-plan",
 	"/work-master",
 	"/work-migrate",
 	"/work-small",

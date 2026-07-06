@@ -166,13 +166,13 @@ try {
 		);
 		assert(sent.length === 1, "instrumented command still queues handoff");
 		assert(
-			fixture
+			!fixture
 				.logs()
 				.some(
 					(entry) =>
 						entry.op === "update" && entry.notes.includes("telemetry:"),
 				),
-			"instrumented command appends compact telemetry note to Bead",
+			"instrumented command keeps telemetry in .pi/work-runs by default",
 		);
 	} finally {
 		fixture.cleanup();

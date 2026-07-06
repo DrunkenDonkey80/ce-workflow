@@ -1,12 +1,12 @@
 ---
-description: Create a master epic from a brainstorm, idea, or plan
-argument-hint: "<brainstorm-or-master-plan-request>"
+description: Alias for /work-plan; create a master epic from an idea or plan
+argument-hint: "<idea-or-plan-file>"
 ---
 
-Use the `work-orchestrator` skill in mode: `master`.
+Prefer `/work-plan` for new users. This legacy alias uses the `work-orchestrator` skill in mode: `master`.
 
-When this runs `ce-plan`, tell it to auto-accept plan creation and avoid interactive confirmation unless a real decision is needed.
+When this runs `ce-plan`, auto-accept plan creation unless a real human decision is needed, then return to `/work-plan <created-plan-path>`.
 
 Task: $ARGUMENTS
 
-Preserve the task text verbatim. If no task is provided, ask for the brainstorm, idea, or plan source before doing anything.
+Final line must name the next command: `/work-plan <created-plan-path>` or `/work-resume <epic-id>`.

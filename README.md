@@ -2,7 +2,7 @@
 
 Beads-backed Pi workflow package for running software work through short `/work-*` commands.
 
-The package is intentionally boring: one skill, one tiny settings/status extension, twelve prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
+The package is intentionally boring: one skill, one tiny workflow extension, fourteen prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
 
 ## Install
 
@@ -27,22 +27,26 @@ pi install npm:pi-ask-user    # nicer confirmation prompts
 pi install npm:pi-intercom    # child agents can ask the parent session for decisions
 ```
 
-Target repositories must have Beads initialized before the workflow can mutate work state:
+Target repositories can be bootstrapped from Pi:
 
-```bash
-git init
-bd init
-bd prime
+```text
+/work-init
+# or just
+/work-plan <idea-or-plan-file>
 ```
+
+The workflow initializes Beads with `bd init --non-interactive --skip-agents` so target projects do not get generic Beads AGENTS.md noise.
 
 ## Commands
 
 | Command | Use when | What it does |
 | --- | --- | --- |
-| `/work-master <brainstorm-or-plan>` | New brainstorm, idea, or master plan | Extension command: creates an epic from an existing master plan, or hands raw/source input to `ce-plan` before Beads mutation |
+| `/work-init` | Repo has no Beads workspace yet | Extension command: runs `bd init --non-interactive --skip-agents` only when needed |
+| `/work-plan <idea-or-plan-file>` | New idea, brainstorm, roadmap, or master plan | Extension command: initializes Beads if needed, sends raw input to `ce-plan`, then creates an epic from the produced master roadmap plan |
+| `/work-master <brainstorm-or-plan>` | Legacy alias | Same as `/work-plan` |
 | `/work-migrate <sources>` | Existing plans, TODOs, tracker exports, partial implementations, or branches | Extension command: normalizes migration sources and hands them to `bead-migrator` without editing code or changing branches |
 | `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Extension command: creates one child Bead, then hands it to the implementation role loop |
-| `/work-med <task>` | Bounded work inside an epic with a few choices | Extension command: creates one planning Bead for one to three executable children, then hands it to `bead-planner` |
+| `/work-med <task>` | Bounded work inside an epic with a few choices | Extension command: creates one planning Bead for one executable child by default, then hands it to `bead-planner` |
 | `/work-big <task>` | Large, risky, or architectural slice inside an epic | Extension command: creates one planning Bead for deeper slicing, then hands it to `bead-planner` |
 | `/work-debug <bug-or-bead-id\|symptom[: guidance]>` | Failing test, blocked/debug-needed Bead, regression, or broken behavior | Extension command: resolves/reuses or creates a debug Bead, then hands that compact state to the existing debug role loop |
 | `/work-auto <task>` | You want the orchestrator to classify size | Extension command: rejects empty input, routes explicit blocked/debug-needed Beads to debug, otherwise hands unchanged text to the auto skill path |
@@ -59,17 +63,17 @@ bd prime
 
 ## Mental model
 
-1. `/work-master` creates the durable epic/master plan.
+1. `/work-plan` initializes the workflow when needed, wraps `ce-plan`, and creates the durable epic/master plan. `/work-master` is a legacy alias.
 2. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 3. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
 4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
 5. `/work-resume` rebuilds state from Beads and git in extension code, picks one safe action, and hands a compact prompt to role agents; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
-6. `/work-small`, `/work-med`, `/work-big`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
+6. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
 7. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
 8. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
 9. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 10. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
-11. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`; handoff commands and role-agent runs also append a one-line telemetry pointer to the selected Bead.
+11. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
 12. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
 13. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
@@ -82,7 +86,8 @@ bd prime
 - Manual dirty changes are classified before writer agents run.
 - Use `git status --porcelain=v1 --untracked-files=all` and `git diff --name-only`; do not treat human diff/stat summaries like `1 -0` as file content.
 - Known-unrelated dirty files are passed to children as an allowlist, and unrelated whitespace-only scratch in tracked instruction files is restored before spawning children when it is clearly not user work.
-- Project verification contracts from `AGENTS.md`/docs are copied into Bead acceptance and enforced before close.
+- Project verification contracts from project instructions/docs are copied into Bead acceptance and enforced before close.
+- Do not mutate workflow Beads directly in normal use; use `/work-*` commands or the dedicated role agents.
 - Failed verification or failed live/product evidence is recorded as a failure artifact in Bead notes, then linked to a `wo:debug` bug or `wo:blocked` decision path instead of being left in chat.
 - Work happens one ready Bead at a time unless isolated worktrees are explicitly used.
 
@@ -101,13 +106,13 @@ Recent examples this package now handles:
 
 ## Master plan epics
 
-For brainstorm-driven work, use `/work-master` with the brainstorm path or request:
+For brainstorm-driven work, use `/work-plan` with the brainstorm path or request:
 
 ```text
-/work-master plan docs/brainstorms/example.md into a detailed master plan for slicing later
+/work-plan plan docs/brainstorms/example.md into a detailed master roadmap for slicing later
 ```
 
-The orchestrator runs `ce-plan` when a detailed master plan does not already exist and tells it to auto-accept plan creation unless a real human decision is needed. It then creates an epic Bead with the plan summary/scope in `description`, key decisions and implementation units in `design`, acceptance and verification in `acceptance`, and source paths in `notes`. Later `bead-planner` slices that epic into one to three executable Beads at a time. The other `/work-*` commands add or execute work inside an existing epic.
+The orchestrator runs `ce-plan` when a detailed master plan does not already exist and tells it to auto-accept plan creation unless a real human decision is needed. It then creates an epic Bead with the plan summary/scope in `description`, the full plan stored via `design`, acceptance and verification in `acceptance`, and source paths in `notes`. Later `bead-planner` usually slices that epic into one executable Bead at a time, creating up to three only when the next steps are obvious and low-risk. The other `/work-*` commands add or execute work inside an existing epic.
 
 ## Start-to-completion example
 
@@ -116,30 +121,29 @@ Fresh repo:
 ```bash
 mkdir habit-app && cd habit-app
 git init
-bd init
 pi
 ```
 
 In Pi:
 
 ```text
-/work-master Build a tiny CLI habit tracker. It should add habits, list habits, mark done today, and show streaks. Keep storage local and simple.
+/work-plan Build a tiny CLI habit tracker. It should add habits, list habits, mark done today, and show streaks. Keep storage local and simple.
 ```
 
 What happens:
 
-1. `work-orchestrator` primes Beads and checks git.
+1. `work-orchestrator` initializes Beads if needed and checks git.
 2. `ce-plan` turns the idea into a concrete master plan and auto-accepts plan creation unless a real decision is needed.
-3. An epic Bead is created with scope, design, acceptance, and verification.
+3. An epic Bead is created with scope, full plan design, acceptance, and verification.
 4. A planning Bead is created under the epic.
-5. `bead-planner` creates one to three child task Beads under the epic.
+5. `bead-planner` creates the next child task Bead under the epic, or up to three only for obvious low-risk sequences.
 6. `/work-resume` starts executing one ready Bead.
 7. `bead-worker` implements that Bead.
 8. `bead-reviewer` checks diff, acceptance, and verification evidence.
 9. `bead-fixer` fixes reviewer failures when needed.
 10. `bead-committer` commits related files with `<bead-id>: <summary>` and closes the Bead.
 11. The run prints status and the next `/work-resume <epic-id>` command. Start a fresh Pi session for the next slice.
-12. If no ready Bead exists but the epic is not complete, `/work-resume` asks `bead-planner` to compare the epic plan against existing children and create the next one to three slices instead of declaring done.
+12. If no ready Bead exists but the epic is not complete, `/work-resume` asks `bead-planner` to compare the epic plan against existing children and create the next executable slice instead of declaring done.
 
 Check progress any time:
 
@@ -212,9 +216,9 @@ Git log is evidence, not truth. The migrator does not create one Bead per commit
 For a clean CE brainstorm or plan with no partial implementation to reconcile, skip migration and use:
 
 ```text
-/work-master docs/brainstorms/my-feature.md
+/work-plan docs/brainstorms/my-feature.md
 # or
-/work-master docs/plans/my-feature-plan.md
+/work-plan docs/plans/my-feature-plan.md
 ```
 
 Then continue:
@@ -359,7 +363,7 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
 
-Role prompts use fresh child context by default and file-only artifacts so the parent session does not inherit every tool log or full master plan. Subagent launches should set `outputMode: "file-only"` with a saved artifact path unless the entire result is a short PASS/FAIL summary. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
+Role prompts use fresh child context by default and file-only artifacts so the parent session does not inherit every tool log or full master plan. Subagent launches should set `outputMode: "file-only"` with a short relative output filename unless the entire result is a short PASS/FAIL summary; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {
@@ -372,7 +376,7 @@ Role prompts use fresh child context by default and file-only artifacts so the p
 }
 ```
 
-Use low/minimal effort for disposable smoke-test Pi instances. Keep your control session on a frontier model for `/work-master`/`ce-plan` if you want deep planning, then set `work` to a local model to save tokens.
+Use low/minimal effort for disposable smoke-test Pi instances. Keep your control session on a frontier model for `/work-plan`/`ce-plan` if you want deep planning, then set `work` to a local model to save tokens.
 
 `/work-context` is separate from model choice. It is on by default and uses no model call for its compact summary. For normal control-session inspection, use `/work-report` and `/work-resume`; avoid raw `bd show --json` for epics because it can dump full plans into chat.
 
@@ -392,15 +396,14 @@ After static verification passes, test behavior in a throwaway repo:
 ```bash
 mkdir /tmp/wo-smoke && cd /tmp/wo-smoke
 git init
-bd init
 pi -e /absolute/path/to/pi-work-orchestrator
 ```
 
 Then try:
 
 ```text
-/work-migrate README.md and git history into one epic, marking only strongly evidenced completed work as closed
-/work-master Build a one-file notes CLI with add/list commands
+/work-init
+/work-plan Build a one-file notes CLI with add/list commands
 /work-status
 /work-add Add --version output
 /work-pause smoke test checkpoint

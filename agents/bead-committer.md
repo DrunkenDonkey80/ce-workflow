@@ -37,4 +37,4 @@ Final response must be concise so the parent context stays small:
 - Bead closed or updated;
 - verification evidence;
 - uncommitted unrelated files, if any;
-- next command: `/work-resume <epic-id>` when more epic work remains.
+- final line: `Next: /work-resume <epic-id>` when more epic work remains, or `Next: epic <epic-id> "<title>" is complete.` when closing the final slice.

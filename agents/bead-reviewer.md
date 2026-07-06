@@ -47,6 +47,7 @@ Required fixes:
 - ...
 Optional notes:
 - ...
+Next: fixer for <bead-id>|committer for <bead-id>|exact blocker command
 ```
 
-Put only blockers, key evidence, and residual risk in the parent response; long detail belongs in the artifact/session log.
+Put only blockers, key evidence, residual risk, and the one-line next action in the parent response; long detail belongs in the artifact/session log.

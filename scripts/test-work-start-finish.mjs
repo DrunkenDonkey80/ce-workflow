@@ -11,8 +11,10 @@ const { assert, installWorkflowFixture } = await import(
 const {
 	buildWorkBigState,
 	buildWorkFinishState,
+	buildWorkInitState,
 	buildWorkMasterState,
 	buildWorkMedState,
+	buildWorkPlanState,
 	buildWorkMigrateState,
 	buildWorkSmallState,
 } = await import(
@@ -81,6 +83,10 @@ try {
 		"med Bead is planning-marked",
 	);
 	assert(
+		fixture.logs()[0].args.includes("--notes"),
+		"new Beads use create --notes so planning markers persist",
+	);
+	assert(
 		state.handoffPrompt.includes("bd ready --json"),
 		"med handoff names dependency-direction check",
 	);
@@ -94,6 +100,29 @@ try {
 	assert(
 		state.handoffPrompt.includes("big slice"),
 		"big handoff carries big posture",
+	);
+
+	fixture.reset("no-beads");
+	state = buildWorkInitState(process.cwd());
+	assert(
+		state.ok && state.action === "initialized",
+		"work-init initializes Beads",
+	);
+	assert(fixture.logs()[0].op === "init", "work-init runs bd init");
+
+	fixture.reset("no-beads");
+	state = buildWorkPlanState(process.cwd(), "raw product idea");
+	assert(
+		state.ok && state.action === "handoff-plan",
+		"raw work-plan input routes to ce-plan",
+	);
+	assert(
+		fixture.logs().some((entry) => entry.op === "init"),
+		"work-plan initializes before ce-plan handoff",
+	);
+	assert(
+		state.nextAction.includes("/work-plan <plan-path>"),
+		"raw work-plan reports next command",
 	);
 
 	fixture.reset("active");
@@ -113,15 +142,33 @@ try {
 	fixture.reset("active");
 	state = buildWorkMasterState(
 		process.cwd(),
-		"docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md",
+		"@docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md",
 	);
 	assert(
 		state.ok && state.epic.id.startsWith("E-NEW-"),
-		"plan path creates epic",
+		"@ plan path creates epic",
 	);
 	assert(
 		state.selectedBead.id.startsWith("TASK-NEW-"),
-		"plan path creates one planning Bead",
+		"@ plan path creates one planning Bead",
+	);
+	assert(
+		fixture.logs()[0].issue.design.includes("file:docs/plans/"),
+		"@ plan path stores master plan in epic design",
+	);
+	assert(
+		state.nextAction.includes(`/work-resume ${state.epic.id}`),
+		"@ plan path reports resume command",
+	);
+
+	fixture.reset("active", "pi-session");
+	state = buildWorkMasterState(
+		process.cwd(),
+		"docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md",
+	);
+	assert(
+		state.ok && state.action === "run-planner",
+		"plan bootstrap ignores pi-session HTML artifacts",
 	);
 
 	fixture.reset("active", "unknown");
@@ -132,6 +179,10 @@ try {
 	assert(
 		!state.ok && state.reason === "dirty-stop",
 		"master dirty state stops before Beads mutation",
+	);
+	assert(
+		state.message.includes("extensions/work-models.js"),
+		"master dirty stop names blocking files",
 	);
 
 	fixture.reset("active");

@@ -73,7 +73,11 @@ function settingsPath(cwd) {
 function readSettings(cwd) {
 	const file = settingsPath(cwd);
 	if (!existsSync(file)) return {};
-	return JSON.parse(readFileSync(file, "utf8"));
+	try {
+		return JSON.parse(readFileSync(file, "utf8"));
+	} catch {
+		return {};
+	}
 }
 
 function writeSettings(cwd, settings) {
@@ -155,7 +159,7 @@ function recordWorkTelemetry(cwd, event) {
 }
 
 function appendTelemetryNote(cwd, beadId, event, file) {
-	if (!beadId || process.env.WORK_ORCH_TELEMETRY_NOTES === "0") return;
+	if (!beadId || process.env.WORK_ORCH_TELEMETRY_NOTES !== "1") return;
 	const parts = [
 		`telemetry: run=${event.id} type=${event.type} phase=${event.phase ?? event.command ?? event.mode ?? "work"} duration=${formatDuration(event.durationMs ?? 0)}`,
 	];
@@ -184,16 +188,14 @@ function parseWorkPromptMeta(prompt) {
 	const target = line("Target Bead ID") ?? "";
 	const epicId = epic.match(/^([^\s]+)/)?.[1];
 	const selectedId = selected.match(/^([^\s]+)/)?.[1];
+	let beadId;
+	if (target && target !== "none") beadId = target;
+	else if (selectedId && !selectedId.startsWith("none")) beadId = selectedId;
 	return {
 		mode: text.match(/mode:\s*([^\s]+)/)?.[1],
 		action: line("Action"),
 		epicId: epicId === "none" ? undefined : epicId,
-		beadId:
-			target && target !== "none"
-				? target
-				: selectedId && !selectedId.startsWith("none")
-					? selectedId
-					: undefined,
+		beadId,
 	};
 }
 
@@ -744,26 +746,32 @@ function maybeCompact(ctx, settings, reason) {
 }
 
 function run(cwd, command, args) {
-	const override =
-		command === "bd"
-			? process.env.WORK_ORCH_BD_BIN
-			: command === "git"
-				? process.env.WORK_ORCH_GIT_BIN
-				: undefined;
+	let override;
+	if (command === "bd") override = process.env.WORK_ORCH_BD_BIN;
+	else if (command === "git") override = process.env.WORK_ORCH_GIT_BIN;
 	const actualCommand = override?.endsWith(".mjs")
 		? process.execPath
 		: (override ?? command);
 	const actualArgs = override?.endsWith(".mjs") ? [override, ...args] : args;
-	return execFileSync(actualCommand, actualArgs, {
-		cwd,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
-	}).trimEnd();
+	try {
+		return execFileSync(actualCommand, actualArgs, {
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		}).trimEnd();
+	} catch (error) {
+		throw error;
+	}
 }
 
 function bdJson(cwd, args) {
 	const raw = run(cwd, "bd", [...args, "--json"]);
-	return raw ? JSON.parse(raw) : [];
+	if (!raw) return [];
+	try {
+		return JSON.parse(raw);
+	} catch {
+		return [];
+	}
 }
 
 function one(value) {
@@ -875,7 +883,7 @@ function buildWorkStatus(cwd, target) {
 	const resolved = resolveEpic(cwd, target);
 	if (resolved.choices) {
 		if (resolved.choices.length === 0)
-			return "No open or in-progress epic found. Use /work-master or /work-migrate first.";
+			return "No open or in-progress epic found. Use /work-plan or /work-migrate first.";
 		return [
 			"Multiple active epics. Run /work-status <epic-id> or /work-resume <epic-id>.",
 			...resolved.choices.map(
@@ -889,7 +897,11 @@ function buildWorkStatus(cwd, target) {
 	const epicId = idOf(epic);
 	const children = childrenOf(cwd, epicId);
 	const ready = readyIds(cwd, epicId);
-	const slices = children.filter(isWorkSlice);
+	const workItems = children.filter(isWorkSlice);
+	const planning = workItems.filter(
+		(issue) => isPlanningIssue(issue) && statusOf(issue) !== "closed",
+	);
+	const slices = workItems.filter((issue) => !isPlanningIssue(issue));
 	const done = slices.filter((issue) => statusOf(issue) === "closed");
 	const active = slices.filter((issue) => statusOf(issue) === "in_progress");
 	const readySlices = slices.filter((issue) => ready.has(idOf(issue)));
@@ -898,10 +910,6 @@ function buildWorkStatus(cwd, target) {
 	);
 	const decisions = children.filter(
 		(issue) => typeOf(issue) === "decision" && statusOf(issue) !== "closed",
-	);
-	const planning = children.filter(
-		(issue) =>
-			/wo:planning/.test(JSON.stringify(issue)) && statusOf(issue) !== "closed",
 	);
 	const percent = slices.length
 		? Math.round((done.length / slices.length) * 100)
@@ -921,7 +929,7 @@ function buildWorkStatus(cwd, target) {
 		if (active.length)
 			return `Continue or pause active slice ${idOf(active[0])}.`;
 		if (planning.length)
-			return `Run /work-resume ${epicId}; planner should create the next slices.`;
+			return `Run /work-resume ${epicId}; planner should create the next slice.`;
 		if (statusOf(epic) === "closed") return "Epic is closed.";
 		return "No ready slices. /work-resume should ask bead-planner to compare the epic plan against closed children and create the next slice, or close the epic if done.";
 	})();
@@ -1225,14 +1233,98 @@ function isBenignInstructionDirt(cwd, item) {
 	if (!isInstructionFile(item.path)) return false;
 	if (item.x !== " " || item.y !== "M") return false;
 	try {
-		run(cwd, "git", ["diff", "--quiet", "--ignore-all-space", "--", item.path]);
+		run(cwd, "git", [
+			"diff",
+			"--quiet",
+			"--ignore-all-space",
+			"--ignore-blank-lines",
+			"--",
+			item.path,
+		]);
 		return true;
 	} catch {
 		return false;
 	}
 }
 
-function resumeGitReport(cwd) {
+function normalizedRepoPath(value) {
+	return String(value ?? "").replace(/\\/g, "/");
+}
+
+function isPiRuntimeArtifact(path) {
+	const file = normalizedRepoPath(path);
+	return (
+		/^pi-session-.+\.html$/i.test(file) ||
+		file.startsWith(".pi-subagents/") ||
+		file.startsWith(".pi/work-runs/") ||
+		file.startsWith(".work-orchestrator/")
+	);
+}
+
+function isBeadsDirt(path) {
+	const file = normalizedRepoPath(path);
+	return file === ".beads" || file.startsWith(".beads/");
+}
+
+function isAllowedPlanDirt(path, planPaths = []) {
+	const file = normalizedRepoPath(path);
+	return planPaths.map(normalizedRepoPath).includes(file);
+}
+
+function isWorkflowDirt(cwd, item, planPaths = []) {
+	const file = normalizedRepoPath(item.path);
+	return (
+		isBeadsDirt(file) ||
+		isPiRuntimeArtifact(file) ||
+		isAllowedPlanDirt(file, planPaths) ||
+		isBenignInstructionDirt(cwd, item)
+	);
+}
+
+function dirtyBlockers(cwd, dirtyFiles, planPaths = []) {
+	return dirtyFiles.filter((item) => !isWorkflowDirt(cwd, item, planPaths));
+}
+
+function planRefsFromIssue(issue) {
+	const text = JSON.stringify(issue ?? {});
+	return [
+		...text.matchAll(/(?:^|[\s"'(:])(@?docs[\\/]plans[\\/][^\s"'),]+\.md)/gi),
+	].map((match) => normalizePathToken(normalizedRepoPath(match[1])));
+}
+
+function planBootstrapBlockers(cwd, git, planPath) {
+	return dirtyBlockers(cwd, git.dirtyFiles, [planPath]);
+}
+
+function safeForPlanBootstrap(cwd, git, planPath) {
+	return planBootstrapBlockers(cwd, git, planPath).length === 0;
+}
+
+function dirtyStopState(git, message) {
+	const blockers = git.blockedPaths?.length ? git.blockedPaths : git.dirtyPaths;
+	return errorState("dirty-stop", message, {
+		action: "dirty-stop",
+		git,
+		suggestedCommands: [
+			"git status --short",
+			...blockers
+				.filter((file) => normalizedRepoPath(file) === "AGENTS.md")
+				.map((file) => `git diff -- ${file}`),
+		],
+	});
+}
+
+function planBootstrapDirtyStop(cwd, git, planPath, command) {
+	const blockers = planBootstrapBlockers(cwd, git, planPath).map(
+		(item) => item.path,
+	);
+	return dirtyStopState(
+		{ ...git, blockedPaths: blockers },
+		`Dirty files must be resolved before ${command} can mutate Beads. Blocking files: ${blockers.join(", ") || "unknown"}.`,
+	);
+}
+
+function resumeGitReport(cwd, planPaths = []) {
 	try {
 		const status =
 			run(cwd, "git", ["status", "--short", "--branch"]) || "clean";
@@ -1240,21 +1332,33 @@ function resumeGitReport(cwd) {
 			run(cwd, "git", ["status", "--porcelain=v1", "--untracked-files=all"]),
 		);
 		const dirtyPaths = dirtyFiles.map((item) => item.path);
+		const blockers = dirtyBlockers(cwd, dirtyFiles, planPaths);
+		const blockedPaths = blockers.map((item) => item.path);
 		const benignDirty =
 			dirtyFiles.length > 0 &&
 			dirtyFiles.every((item) => isBenignInstructionDirt(cwd, item));
+		const workflowDirty =
+			dirtyFiles.length > 0 && blockers.length === 0 && !benignDirty;
+		let warnings = [];
+		if (benignDirty) {
+			warnings = [
+				"Only whitespace instruction-file dirt detected; do not stage it automatically.",
+			];
+		} else if (workflowDirty) {
+			warnings = [
+				`Only workflow-owned dirt detected: ${dirtyPaths.join(", ")}.`,
+			];
+		}
 		return {
 			ok: true,
 			status,
 			dirtyFiles,
 			dirtyPaths,
-			safeForHandoff: dirtyFiles.length === 0 || benignDirty,
+			blockedPaths,
+			safeForHandoff: blockers.length === 0,
 			benignDirty,
-			warnings: benignDirty
-				? [
-						"Only whitespace instruction-file dirt detected; do not stage it automatically.",
-					]
-				: [],
+			workflowDirty,
+			warnings,
 		};
 	} catch {
 		return {
@@ -1262,8 +1366,10 @@ function resumeGitReport(cwd) {
 			status: "git status unavailable",
 			dirtyFiles: [],
 			dirtyPaths: [],
+			blockedPaths: [],
 			safeForHandoff: false,
 			benignDirty: false,
+			workflowDirty: false,
 			warnings: ["git status unavailable"],
 		};
 	}
@@ -1272,7 +1378,8 @@ function resumeGitReport(cwd) {
 function isPlanningIssue(issue) {
 	return (
 		labelsOf(issue).includes("wo:planning") ||
-		/wo:planning/.test(notesOf(issue))
+		/wo:planning/.test(notesOf(issue)) ||
+		/^plan next slice\b/i.test(titleOf(issue))
 	);
 }
 
@@ -1293,7 +1400,11 @@ function buildEpicChildState(cwd, epic) {
 	const epicId = idOf(epic);
 	const children = childrenOfRequired(cwd, epicId);
 	const byId = new Map(children.map((issue) => [idOf(issue), issue]));
-	const slices = children.filter(isWorkSlice);
+	const workItems = children.filter(isWorkSlice);
+	const planning = workItems.filter(
+		(issue) => isPlanningIssue(issue) && statusOf(issue) !== "closed",
+	);
+	const slices = workItems.filter((issue) => !isPlanningIssue(issue));
 	const closed = slices.filter((issue) => statusOf(issue) === "closed");
 	const inProgress = slices.filter(
 		(issue) => statusOf(issue) === "in_progress",
@@ -1301,10 +1412,7 @@ function buildEpicChildState(cwd, epic) {
 	const openDecisions = children.filter(
 		(issue) => typeOf(issue) === "decision" && statusOf(issue) !== "closed",
 	);
-	const planning = slices.filter(
-		(issue) => isPlanningIssue(issue) && statusOf(issue) !== "closed",
-	);
-	const readyWork = slices
+	const readyWork = workItems
 		.filter(
 			(issue) =>
 				statusOf(issue) === "open" &&
@@ -1312,7 +1420,7 @@ function buildEpicChildState(cwd, epic) {
 				depsOf(issue).every((id) => statusOf(byId.get(id)) === "closed"),
 		)
 		.sort(byCreatedAsc);
-	const downstreamBlocked = slices
+	const downstreamBlocked = workItems
 		.filter((issue) => statusOf(issue) !== "closed")
 		.flatMap((issue) =>
 			depsOf(issue)
@@ -1324,7 +1432,7 @@ function buildEpicChildState(cwd, epic) {
 					),
 				})),
 		);
-	const blockers = slices.filter((issue) => {
+	const blockers = workItems.filter((issue) => {
 		if (statusOf(issue) === "closed") return false;
 		return (
 			isBlockedIssue(issue) ||
@@ -1367,8 +1475,14 @@ function candidateSummary(cwd, epic) {
 }
 
 function resolveResumeTarget(cwd, target) {
-	const wanted = target.trim();
+	const wanted = normalizePathToken(target.trim());
 	if (wanted && wanted !== "last") {
+		if (looksLikePath(wanted))
+			return {
+				error: "plan-path-target",
+				message: `${wanted} looks like a plan path, not an epic ID. Use /work-plan ${wanted}.`,
+				suggestedCommands: [`/work-plan ${wanted}`],
+			};
 		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
 		if (!issue)
 			return {
@@ -1431,23 +1545,30 @@ function resumeBlockers(childState) {
 
 function planResumeAction(state) {
 	if (!state.ok) return state;
-	if (state.git && !state.git.safeForHandoff)
+	if (state.git && !state.git.safeForHandoff) {
+		const blockers = state.git.blockedPaths?.length
+			? state.git.blockedPaths
+			: state.git.dirtyPaths;
 		return {
 			...state,
 			action: "dirty-stop",
-			message:
-				"Dirty files must be resolved before /work-resume can launch writers.",
+			message: `Dirty files must be resolved before /work-resume can launch writers. Blocking files: ${blockers.join(", ") || "unknown"}.`,
 			suggestedCommands: [
 				"git status --short",
+				...blockers
+					.filter((file) => normalizedRepoPath(file) === "AGENTS.md")
+					.map((file) => `git diff -- ${file}`),
 				`/work-report ${state.epic.id}`,
 			],
 		};
+	}
 	if (state.epic.status === "closed")
 		return {
 			...state,
 			action: "done-candidate",
 			message: "Epic is closed.",
 			suggestedCommands: [],
+			nextAction: `Next: epic ${state.epic.id} "${state.epic.title}" is complete.`,
 		};
 	if (state.readyPlanning.length && state.executableSlices.length)
 		return {
@@ -1503,7 +1624,7 @@ function planResumeAction(state) {
 		...state,
 		action: "run-planner",
 		message:
-			"No ready work or blockers; ask the planner to create the next slices or confirm done.",
+			"No ready work or blockers; ask the planner to create the next slice or confirm done.",
 	});
 }
 
@@ -1512,8 +1633,10 @@ const ROLE_TIMEOUT_GUIDANCE =
 
 function gitDirtyClassification(git) {
 	if (!git) return "unknown";
+	if (git.blockedPaths?.length) return "dirty-stop/unsafe";
+	if (git.workflowDirty) return "workflow-owned allowlist";
 	if (git.benignDirty) return "instruction-file allowlist";
-	if (git.dirtyPaths?.length) return "dirty-stop/unsafe";
+	if (git.dirtyPaths?.length) return "workflow-owned allowlist";
 	return "clean";
 }
 
@@ -1522,6 +1645,12 @@ function roleHandoffPrompt(state, mode, extraLines = []) {
 	const selectedLine = selected
 		? `${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
 		: "none; create/reuse a wo:planning Bead if needed";
+	const plannerLines =
+		state.action === "run-planner"
+			? [
+					"Planner efficiency: do not run raw `bd show <epic-id> --json`; project epics can contain full roadmap plans. Use compact bd show projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
+				]
+			: [];
 	return [
 		`Use the work-orchestrator skill in mode: ${mode} with this precomputed extension state.`,
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
@@ -1532,8 +1661,10 @@ function roleHandoffPrompt(state, mode, extraLines = []) {
 			? `Known dirty paths: ${state.git.dirtyPaths.join(", ")}`
 			: "Known dirty paths: none",
 		ROLE_TIMEOUT_GUIDANCE,
-		"Subagent output guidance: set outputMode:file-only with an artifact path unless the full result is under 20 lines; paste only a short PASS/FAIL or changed-files summary into the parent session.",
+		"Subagent output guidance: set outputMode:file-only with a short relative output filename unless the full result is under 20 lines; do not pass .pi-subagents/ paths because the subagent tool owns the artifact directory.",
+		"Beads output hygiene: raw `bd ready --json`, `bd children --json`, or epic `bd show --json` can dump full roadmap plans; pipe them through python/node projections that print only ids, status, titles, and needed fields.",
 		"Closure rule: worker/reviewer/fixer/debugger roles must leave Beads open for parent/committer close after review, verification, and commit.",
+		...plannerLines,
 		...extraLines.filter(Boolean),
 		"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
 		selected?.id ? `Target Bead ID: ${selected.id}` : "Target Bead ID: none",
@@ -1559,10 +1690,10 @@ function buildWorkResumeState(cwd, args = "") {
 			return errorState(resolved.error, resolved.message ?? resolved.error, {
 				action: "ask-target",
 				candidates: resolved.candidates ?? [],
-				suggestedCommands: [],
+				suggestedCommands: resolved.suggestedCommands ?? [],
 			});
 		const childState = buildEpicChildState(cwd, resolved.epic);
-		const git = resumeGitReport(cwd);
+		const git = resumeGitReport(cwd, planRefsFromIssue(resolved.epic));
 		const readyPlanning = childState.readyWork
 			.filter(isPlanningIssue)
 			.map(issueSummary);
@@ -1620,6 +1751,16 @@ function buildEpicReportState(cwd, epic) {
 			childState.readyWork.length === 0 &&
 			childState.blockers.length === 0 &&
 			childState.openDecisions.length === 0);
+	let suggested = [];
+	if (!complete) {
+		if (childState.blockers.length || childState.openDecisions.length)
+			suggested = suggestedCommands(
+				childState.epicId,
+				childState.blockers,
+				childState.openDecisions,
+			);
+		else suggested = [`/work-resume ${childState.epicId}`];
+	}
 	return {
 		ok: true,
 		target: { requested: childState.epicId, kind: "epic" },
@@ -1638,13 +1779,10 @@ function buildEpicReportState(cwd, epic) {
 		openDecisions: childState.openDecisions.map(issueSummary),
 		readyWork: childState.readyWork.map(issueSummary),
 		git,
-		suggestedCommands: complete
-			? []
-			: suggestedCommands(
-					childState.epicId,
-					childState.blockers,
-					childState.openDecisions,
-				),
+		nextAction: complete
+			? `Next: epic ${childState.epicId} "${titleOf(epic)}" is complete.`
+			: undefined,
+		suggestedCommands: suggested,
 		noteExcerpts: childState.blockers
 			.map((issue) => ({ id: idOf(issue), text: noteExcerpt(issue) }))
 			.filter((item) => item.text),
@@ -1712,10 +1850,49 @@ function isBeadId(value) {
 	return /^[A-Za-z][A-Za-z0-9_-]*-[A-Za-z0-9_.-]+$/.test(value ?? "");
 }
 
-function createBead(cwd, { title, type = "task", parent, notes }) {
+function ensureBeadsInitialized(cwd) {
+	try {
+		run(cwd, "bd", ["where", "--json"]);
+		return {
+			initialized: false,
+			message: "Beads workspace already initialized.",
+		};
+	} catch (error) {
+		if (classifyBdError(error, ["where"]) !== "beads-unavailable") throw error;
+	}
+	try {
+		run(cwd, "bd", ["init", "--non-interactive", "--skip-agents"]);
+		return {
+			initialized: true,
+			message: "Initialized Beads with bd init --skip-agents.",
+		};
+	} catch (error) {
+		const err = new Error(commandErrorText(error) || "bd init failed");
+		err.reason = classifyBdError(error, ["init"]);
+		throw err;
+	}
+}
+
+function createBead(
+	cwd,
+	{
+		title,
+		type = "task",
+		parent,
+		notes,
+		description,
+		design,
+		designFile,
+		acceptance,
+	},
+) {
 	const args = ["create", title, "--type", type];
 	if (parent) args.push("--parent", parent);
-	if (notes) args.push("--append-notes", notes);
+	if (description) args.push("--description", description);
+	if (designFile) args.push("--design-file", designFile);
+	else if (design) args.push("--design", design);
+	if (acceptance) args.push("--acceptance", acceptance);
+	if (notes) args.push("--notes", notes);
 	return one(bdJsonRequired(cwd, args));
 }
 
@@ -1889,14 +2066,6 @@ function debugHandoff(state, guidance = "") {
 			"Do not rediscover the debug target. Verify Beads/git freshness, then run the debug loop for this Bead.",
 		]),
 	};
-}
-
-function dirtyStopState(git, message) {
-	return errorState("dirty-stop", message, {
-		action: "dirty-stop",
-		git,
-		suggestedCommands: ["git status --short"],
-	});
 }
 
 function buildWorkDebugState(cwd, args = "") {
@@ -2230,7 +2399,7 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 		const posture =
 			size === "big"
 				? "big slice: split into executable Beads and decision Beads before implementation"
-				: "medium slice: create one to three executable child Beads before implementation";
+				: "medium slice: create one executable child Bead by default before implementation; create up to three only for obvious low-risk sequences";
 		const bead = createBead(cwd, {
 			title: parsed.task,
 			type: "task",
@@ -2268,8 +2437,12 @@ function buildWorkBigState(cwd, args = "") {
 	return buildPlanningStartState(cwd, args, "big");
 }
 
+function normalizePathToken(value) {
+	return String(value ?? "").replace(/^@(?=[^\s@]*[\\/.])/, "");
+}
+
 function looksLikePath(value) {
-	return /[\\/]|\.(?:md|html|txt|json|csv)$/i.test(value);
+	return /[\\/]|\.(?:md|html|txt|json|csv)$/i.test(normalizePathToken(value));
 }
 
 function artifactTitle(cwd, rel) {
@@ -2281,20 +2454,89 @@ function artifactTitle(cwd, rel) {
 	).trim();
 }
 
-function buildWorkMasterState(cwd, args = "") {
+function stripFrontmatter(text) {
+	return text.replace(/^---[\s\S]*?---\s*/, "").trim();
+}
+
+function markdownSection(text, pattern) {
+	const lines = text.split(/\r?\n/);
+	const start = lines.findIndex(
+		(line) => /^#{1,4}\s+/.test(line) && pattern.test(line),
+	);
+	if (start === -1) return "";
+	const level = lines[start].match(/^(#+)/)?.[1].length ?? 1;
+	const end = lines.findIndex(
+		(line, index) =>
+			index > start &&
+			/^#{1,4}\s+/.test(line) &&
+			(line.match(/^(#+)/)?.[1].length ?? 9) <= level,
+	);
+	return lines
+		.slice(start, end === -1 ? undefined : end)
+		.join("\n")
+		.trim();
+}
+
+function planEpicFields(cwd, rel) {
+	const text = readFileSync(join(cwd, rel), "utf8");
+	const body = stripFrontmatter(text);
+	const summary =
+		markdownSection(body, /summary|overview|context|goal|requirements/i) ||
+		body;
+	const acceptance = markdownSection(
+		body,
+		/acceptance|verification|done criteria|test plan/i,
+	);
+	return {
+		title: artifactTitle(cwd, rel),
+		description: `Master roadmap plan from ${rel}.\n\n${summary.slice(0, 6000)}`,
+		designFile: rel,
+		acceptance:
+			acceptance.slice(0, 6000) ||
+			"Follow the master roadmap plan plus project verification instructions.",
+		notes: `created by /work-plan\nsource plan: ${rel}`,
+	};
+}
+
+function buildWorkInitState(cwd, _args = "") {
+	try {
+		const init = ensureBeadsInitialized(cwd);
+		return {
+			ok: true,
+			action: init.initialized ? "initialized" : "already-initialized",
+			message: init.message,
+			suggestedCommands: ["/work-plan <idea-or-plan-file>"],
+			nextAction: "Next: /work-plan <idea-or-plan-file>",
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: error.reason ?? "beads-error",
+			suggestedCommands: ["bd --help"],
+		});
+	}
+}
+
+function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 	const input = String(args).trim();
 	if (!input)
-		return errorState("usage", "Usage: /work-master <brainstorm-or-plan>", {
+		return errorState("usage", `Usage: ${command} <idea-or-plan-file>`, {
 			action: "usage",
 		});
 	try {
+		const first = normalizePathToken(input.split(/\s+/)[0]);
+		const pathExists = existsSync(join(cwd, first));
+		if (!pathExists && looksLikePath(first))
+			return errorState("missing-source", `Source path not found: ${first}`, {
+				action: "missing-source",
+			});
+		const init = ensureBeadsInitialized(cwd);
 		const masterGit = resumeGitReport(cwd);
 		const handoffPlan = (message, detail) => ({
 			ok: true,
 			action: "handoff-plan",
-			message,
+			message: `${init.initialized ? `${init.message} ` : ""}${message}`,
 			handoffPrompt: [
-				"Use ce-plan to convert this input into a detailed master plan, then return to /work-master with the plan path.",
+				"Use ce-plan to convert this input into a detailed master roadmap plan, then run /work-plan with the produced plan path.",
 				"Auto-accept plan creation unless a real human decision is needed.",
 				detail,
 				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
@@ -2302,16 +2544,13 @@ function buildWorkMasterState(cwd, args = "") {
 			].join("\n"),
 			git: masterGit,
 			warnings: masterGit.warnings,
+			suggestedCommands: ["/work-plan <path-to-created-plan>"],
+			nextAction:
+				"Next: after ce-plan writes the roadmap, run /work-plan <plan-path>.",
 		});
-		const first = input.split(/\s+/)[0];
-		const pathExists = existsSync(join(cwd, first));
-		if (!pathExists && looksLikePath(first))
-			return errorState("missing-source", `Source path not found: ${first}`, {
-				action: "missing-source",
-			});
 		if (!pathExists)
 			return handoffPlan(
-				"Raw idea handed to ce-plan before Beads mutation.",
+				"Raw idea handed to ce-plan before epic creation.",
 				`Task: ${input}`,
 			);
 		if (!/docs[\\/]plans[\\/].+\.(?:md|html)$/i.test(first))
@@ -2319,24 +2558,25 @@ function buildWorkMasterState(cwd, args = "") {
 				"Source artifact needs ce-plan before epic creation.",
 				`Source: ${first}`,
 			);
-		if (!masterGit.safeForHandoff)
-			return dirtyStopState(
-				masterGit,
-				"Dirty files must be resolved before /work-master can mutate Beads.",
-			);
-		const title = artifactTitle(cwd, first);
+		if (!safeForPlanBootstrap(cwd, masterGit, first))
+			return planBootstrapDirtyStop(cwd, masterGit, first, command);
+		const fields = planEpicFields(cwd, first);
 		const epic = createBead(cwd, {
-			title,
+			title: fields.title,
 			type: "epic",
-			notes: `created by /work-master\nsource: ${first}`,
+			description: fields.description,
+			designFile: fields.designFile,
+			acceptance: fields.acceptance,
+			notes: fields.notes,
 		});
 		const planning = createBead(cwd, {
-			title: `Plan next slices for ${title}`,
+			title: `Plan next slice for ${fields.title}`,
 			type: "task",
 			parent: idOf(epic),
-			notes: workflowBeadNotes("/work-master", title, [
+			notes: workflowBeadNotes(command, fields.title, [
 				"wo:planning",
 				`source plan: ${first}`,
+				"create one executable slice by default",
 			]),
 		});
 		return withHandoffPrompt({
@@ -2345,8 +2585,10 @@ function buildWorkMasterState(cwd, args = "") {
 			epic: issueSummary(epic),
 			selectedBead: issueSummary(planning),
 			git: masterGit,
-			message: `Created epic ${idOf(epic)} and planning Bead ${idOf(planning)}.`,
+			message: `${init.initialized ? `${init.message} ` : ""}Created epic ${idOf(epic)} and planning Bead ${idOf(planning)}.`,
 			warnings: masterGit.warnings,
+			suggestedCommands: [`/work-resume ${idOf(epic)}`],
+			nextAction: `Next: planner will create the first slice; then run /work-resume ${idOf(epic)}.`,
 		});
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
@@ -2355,16 +2597,25 @@ function buildWorkMasterState(cwd, args = "") {
 	}
 }
 
+function buildWorkPlanState(cwd, args = "") {
+	return buildWorkPlanLikeState(cwd, args, "/work-plan");
+}
+
+function buildWorkMasterState(cwd, args = "") {
+	return buildWorkPlanLikeState(cwd, args, "/work-master");
+}
+
 function parseMigrateSources(cwd, input) {
 	const files = [];
 	const branches = [];
 	const text = [];
 	const missing = [];
-	for (const token of input.split(/\s+/).filter(Boolean)) {
+	for (const raw of input.split(/\s+/).filter(Boolean)) {
+		const token = normalizePathToken(raw);
 		if (existsSync(join(cwd, token))) files.push(token);
 		else if (/\.(?:md|html|txt|json|csv)$/i.test(token)) missing.push(token);
 		else if (/^[\w.-]+\/[\w./-]+$/.test(token)) branches.push(token);
-		else text.push(token);
+		else text.push(raw);
 	}
 	return { files, branches, text: text.join(" "), missing };
 }
@@ -2611,7 +2862,8 @@ function renderWorkReportText(state) {
 		"Git:",
 		state.git.status,
 		"",
-		`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
+		state.nextAction ??
+			`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
 	].join("\n");
 }
 
@@ -2638,9 +2890,17 @@ function renderWorkResumeText(state) {
 					),
 				]
 			: [];
-		return [`Work resume unavailable: ${state.message}`, ...candidates].join(
-			"\n",
-		);
+		const suggested = state.suggestedCommands?.length
+			? [
+					"Suggested:",
+					...state.suggestedCommands.map((command) => `- ${command}`),
+				]
+			: [];
+		return [
+			`Work resume unavailable: ${state.message}`,
+			...candidates,
+			...suggested,
+		].join("\n");
 	}
 	return [
 		`Epic: ${state.epic.title} (${state.epic.id})`,
@@ -2654,7 +2914,8 @@ function renderWorkResumeText(state) {
 		"Git:",
 		state.git.status,
 		"",
-		`Next: ${state.handoffPrompt ? "handoff queued to work-orchestrator" : (state.suggestedCommands?.[0] ?? "No action suggested.")}`,
+		state.nextAction ??
+			`Next: ${state.handoffPrompt ? "handoff queued to work-orchestrator" : (state.suggestedCommands?.[0] ?? `epic ${state.epic.id} "${state.epic.title}" is complete.`)}`,
 	]
 		.filter((line) => line !== "")
 		.join("\n");
@@ -2672,12 +2933,26 @@ function buildWorkResume(cwd, args = "") {
 		: renderWorkResumeText(state);
 }
 
-async function handleWorkResumeCommand(args, ctx) {
+async function sendFollowUp(ctx, message, pi) {
+	if (!message) return;
+	if (typeof ctx.sendUserMessage === "function") {
+		await ctx.sendUserMessage(message, { deliverAs: "followUp" });
+		return;
+	}
+	if (typeof pi?.sendUserMessage === "function") {
+		pi.sendUserMessage(message, { deliverAs: "followUp" });
+		return;
+	}
+	ctx.ui.notify(
+		`Could not queue role handoff automatically. Run this next:\n\n${message}`,
+		"warning",
+	);
+}
+
+async function handleWorkResumeCommand(args, ctx, pi) {
 	const state = buildWorkResumeState(ctx.cwd, args);
 	ctx.ui.notify(renderWorkResumeText(state), state.ok ? "info" : "warning");
-	if (state.handoffPrompt) {
-		await ctx.sendUserMessage(state.handoffPrompt, { deliverAs: "followUp" });
-	}
+	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
 	return state;
 }
 
@@ -2707,16 +2982,19 @@ function renderWorkflowActionText(state) {
 		state.message ? `Result: ${state.message}` : "",
 		state.git ? `Git: ${state.git.status}` : "",
 		state.note ? `\n${state.note}` : "",
+		state.nextAction ??
+			(state.suggestedCommands?.length
+				? `Next: ${state.suggestedCommands[0]}`
+				: ""),
 	]
 		.filter(Boolean)
 		.join("\n");
 }
 
-async function handleWorkflowAction(builder, args, ctx) {
+async function handleWorkflowAction(builder, args, ctx, pi) {
 	const state = builder(ctx.cwd, args);
 	ctx.ui.notify(renderWorkflowActionText(state), state.ok ? "info" : "warning");
-	if (state.handoffPrompt)
-		await ctx.sendUserMessage(state.handoffPrompt, { deliverAs: "followUp" });
+	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
 	return state;
 }
 
@@ -2727,8 +3005,10 @@ export {
 	buildWorkDebugState,
 	buildWorkFinishState,
 	buildWorkflowIntakeState,
+	buildWorkInitState,
 	buildWorkMasterState,
 	buildWorkMedState,
+	buildWorkPlanState,
 	buildWorkMigrateState,
 	buildWorkPauseState,
 	buildWorkReport,
@@ -2855,6 +3135,15 @@ export default function workModelsExtension(pi) {
 		}
 	});
 
+	pi.registerCommand("work-init", {
+		description: "Initialize Beads for work-orchestrator without AGENTS noise",
+		handler: async (args, ctx) => {
+			await withCommandTelemetry("work-init", args, ctx, () =>
+				handleWorkflowAction(buildWorkInitState, args, ctx, pi),
+			);
+		},
+	});
+
 	pi.registerCommand("work-status", {
 		description: "Show deterministic Beads/git work-orchestrator status",
 		handler: async (args, ctx) => {
@@ -2902,7 +3191,7 @@ export default function workModelsExtension(pi) {
 				"work-resume",
 				args,
 				ctx,
-				() => handleWorkResumeCommand(args, ctx),
+				() => handleWorkResumeCommand(args, ctx, pi),
 				true,
 			);
 		},
@@ -2915,7 +3204,7 @@ export default function workModelsExtension(pi) {
 				"work-continue",
 				args,
 				ctx,
-				() => handleWorkResumeCommand(args, ctx),
+				() => handleWorkResumeCommand(args, ctx, pi),
 				true,
 			);
 		},
@@ -2925,7 +3214,7 @@ export default function workModelsExtension(pi) {
 		description: "Checkpoint current Beads-backed work and stop",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-pause", args, ctx, () =>
-				handleWorkflowAction(buildWorkPauseState, args, ctx),
+				handleWorkflowAction(buildWorkPauseState, args, ctx, pi),
 			);
 		},
 	});
@@ -2937,7 +3226,7 @@ export default function workModelsExtension(pi) {
 				"work-small",
 				args,
 				ctx,
-				() => handleWorkflowAction(buildWorkSmallState, args, ctx),
+				() => handleWorkflowAction(buildWorkSmallState, args, ctx, pi),
 				true,
 			);
 		},
@@ -2950,7 +3239,7 @@ export default function workModelsExtension(pi) {
 				"work-med",
 				args,
 				ctx,
-				() => handleWorkflowAction(buildWorkMedState, args, ctx),
+				() => handleWorkflowAction(buildWorkMedState, args, ctx, pi),
 				true,
 			);
 		},
@@ -2963,20 +3252,33 @@ export default function workModelsExtension(pi) {
 				"work-big",
 				args,
 				ctx,
-				() => handleWorkflowAction(buildWorkBigState, args, ctx),
+				() => handleWorkflowAction(buildWorkBigState, args, ctx, pi),
+				true,
+			);
+		},
+	});
+
+	pi.registerCommand("work-plan", {
+		description: "Plan an idea and bootstrap the Beads epic",
+		handler: async (args, ctx) => {
+			await withCommandTelemetry(
+				"work-plan",
+				args,
+				ctx,
+				() => handleWorkflowAction(buildWorkPlanState, args, ctx, pi),
 				true,
 			);
 		},
 	});
 
 	pi.registerCommand("work-master", {
-		description: "Bootstrap a master epic or plan handoff",
+		description: "Alias for /work-plan master epic bootstrap",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-master",
 				args,
 				ctx,
-				() => handleWorkflowAction(buildWorkMasterState, args, ctx),
+				() => handleWorkflowAction(buildWorkMasterState, args, ctx, pi),
 				true,
 			);
 		},
@@ -2989,7 +3291,7 @@ export default function workModelsExtension(pi) {
 				"work-migrate",
 				args,
 				ctx,
-				() => handleWorkflowAction(buildWorkMigrateState, args, ctx),
+				() => handleWorkflowAction(buildWorkMigrateState, args, ctx, pi),
 				true,
 			);
 		},
@@ -2999,7 +3301,7 @@ export default function workModelsExtension(pi) {
 		description: "Classify commit/close readiness for reviewed work",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-finish", args, ctx, () =>
-				handleWorkflowAction(buildWorkFinishState, args, ctx),
+				handleWorkflowAction(buildWorkFinishState, args, ctx, pi),
 			);
 		},
 	});
@@ -3011,7 +3313,7 @@ export default function workModelsExtension(pi) {
 				"work-debug",
 				args,
 				ctx,
-				() => handleWorkflowAction(buildWorkDebugState, args, ctx),
+				() => handleWorkflowAction(buildWorkDebugState, args, ctx, pi),
 				true,
 			);
 		},
@@ -3021,7 +3323,7 @@ export default function workModelsExtension(pi) {
 		description: "Create explicit work under the active Beads epic",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-add", args, ctx, () =>
-				handleWorkflowAction(buildWorkAddState, args, ctx),
+				handleWorkflowAction(buildWorkAddState, args, ctx, pi),
 			);
 		},
 	});
@@ -3030,7 +3332,7 @@ export default function workModelsExtension(pi) {
 		description: "Run deterministic /work-auto guards and hand off",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-auto", args, ctx, () =>
-				handleWorkflowAction(buildWorkAutoState, args, ctx),
+				handleWorkflowAction(buildWorkAutoState, args, ctx, pi),
 			);
 		},
 	});

@@ -139,7 +139,7 @@ The extension computes mechanical state. The existing skill remains the executor
   - `README.md`
   - `skills/work-orchestrator/SKILL.md`
   - `scripts/verify-package.mjs`
-- **Approach:** Resolve the active epic, stop on unsafe dirt, create one planning Bead under that epic with the user's task text, and hand off to `bead-planner`. Medium and big differ only in the requested slicing posture: medium asks for one to three executable children; big asks for a deeper slice plan inside the existing epic.
+- **Approach:** Resolve the active epic, stop on unsafe dirt, create one planning Bead under that epic with the user's task text, and hand off to `bead-planner`. Medium and big differ only in the requested slicing posture: medium asks for one executable child by default, with up to three only for obvious low-risk sequences; big asks for a deeper slice plan inside the existing epic.
 - **Patterns to follow:** Current resume behavior for planning Beads and stale-planning closure rules.
 - **Test scenarios:**
   - Empty task returns usage guidance.
