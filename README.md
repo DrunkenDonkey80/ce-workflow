@@ -2,7 +2,7 @@
 
 Beads-backed Pi workflow package for running software work through short `/work-*` commands.
 
-The package is intentionally boring: one skill, one tiny workflow extension, fourteen prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
+The package is intentionally boring: one skill, one tiny workflow extension, seventeen prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
 
 ## Install
 
@@ -43,6 +43,8 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | --- | --- | --- |
 | `/work-init` | Repo has no Beads workspace yet | Extension command: runs `bd init --non-interactive --skip-agents` only when needed |
 | `/work-plan <idea-or-plan-file>` | New idea, brainstorm, roadmap, or master plan | Extension command: initializes Beads if needed, sends raw input to `ce-plan`, then creates an epic from the produced master roadmap plan |
+| `/work-ideate [target action\|topic]` | Capture, list, inspect, accept, reject, discuss, or import ideas | Extension command: shows Beads-backed ideas, guards numeric indexes, and mutates only the resolved idea |
+| `/work-brainstorm [idea <target>\|topic] [path]` | Brainstorm an idea or topic without losing lineage | Extension command: links brainstorm artifacts to exact idea records and reports near-duplicates instead of fuzzy merging |
 | `/work-master <brainstorm-or-plan>` | Legacy alias | Same as `/work-plan` |
 | `/work-migrate <sources>` | Existing plans, TODOs, tracker exports, partial implementations, or branches | Extension command: normalizes migration sources and hands them to `bead-migrator` without editing code or changing branches |
 | `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Extension command: creates one child Bead, then hands it to the implementation role loop |
@@ -56,6 +58,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-pause [note]` | Stop safely | Extension command: appends a deterministic checkpoint with git files, verification, failures, remaining work, and next step |
 | `/work-report [epic-id\|last\|bead-id] [--json]` | Human handoff for blockers | Extension command: deterministic blocked/debug-needed Bead report, failure artifacts, dependencies, suggested debug commands, and optional JSON |
 | `/work-telemetry [today\|all\|epic <id>\|bead <id>] [--json]` | See timing/token/context cost | Extension command: summarizes `.pi/work-runs/*.jsonl` without an LLM |
+| `/work-usage [today\|all\|epic <id>\|bead <id>]` | Open a local HTML usage table | Extension command: writes escaped sortable/filterable HTML under `.pi/work-runs/usage/` and prints the path |
 | `/work-finish <bead-id\|epic-id>` | Classify commit/close readiness | Extension command: checks PASS review, verification evidence, related dirty files, and emits a deterministic commit-ready or stop state |
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
@@ -64,18 +67,22 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 ## Mental model
 
 1. `/work-plan` initializes the workflow when needed, wraps `ce-plan`, and creates the durable epic/master plan. `/work-master` is a legacy alias.
-2. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
-3. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
-4. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
-5. `/work-resume` rebuilds state from Beads and git in extension code, picks one safe action, and hands a compact prompt to role agents; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
-6. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
-7. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
-8. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
-9. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
-10. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
-11. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
-12. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
-13. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+2. `/work-ideate` keeps idea records in Beads so accepted, contender, rejected, discussed, brainstormed, and planned ideas stay visible without becoming executable work.
+3. `/work-brainstorm` links brainstorm artifacts and later plans back to idea records instead of relying on chat history.
+4. `/work-usage` turns existing telemetry into a local HTML report without creating another source of truth.
+5. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
+6. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
+7. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
+8. `/work-resume` rebuilds state from Beads and git in extension code, picks one safe action, and hands a compact prompt to role agents; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
+9. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
+10. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
+11. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
+12. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
+13. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
+14. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
+15. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git.
+16. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
+17. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 
@@ -159,7 +166,7 @@ Continue later, even in a fresh Pi session:
 
 When there is no obvious latest epic, `/work-resume` lists active epics with created date, last worked date, status, child counts, and one-line description so you can pick.
 
-`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command. Use `/work-report <epic-id>` when a human needs the full blocker ledger without spending agent context: blocked/debug-needed Beads, failure artifacts, artifact paths, dependencies, and suggested `/work-debug <bead-id>: <guidance>` commands. Add `--json` for the machine-readable state that future resume automation can reuse. Use `/work-telemetry today` or `/work-telemetry epic <id>` to see which commands, role agents, subagent/tool calls, token usage, and context jumps are expensive enough to optimize.
+`/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command. Use `/work-report <epic-id>` when a human needs the full blocker ledger without spending agent context: blocked/debug-needed Beads, failure artifacts, artifact paths, dependencies, and suggested `/work-debug <bead-id>: <guidance>` commands. Add `--json` for the machine-readable state that future resume automation can reuse. Use `/work-telemetry today` or `/work-telemetry epic <id>` to see which commands, role agents, subagent/tool calls, token usage, and context jumps are expensive enough to optimize. Use `/work-usage` for the local sortable/filterable HTML version, including review scope/payoff when the telemetry recorded it.
 
 ## Context management
 
@@ -361,7 +368,7 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 ## Model and effort tuning
 
-Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`.
+Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-models status` makes review tuning settings visible and `/work-models reset` clears them.
 
 Role prompts use fresh child context by default and file-only artifacts so the parent session does not inherit every tool log or full master plan. Subagent launches should set `outputMode: "file-only"` with a short relative output filename unless the entire result is a short PASS/FAIL summary; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 

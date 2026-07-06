@@ -194,8 +194,11 @@ try {
 	const fixture = installWorkflowFixture();
 	try {
 		const commands = {};
+		const hooks = {};
 		workModelsExtension({
-			on: () => {},
+			on: (name, handler) => {
+				hooks[name] = handler;
+			},
 			registerCommand: (name, config) => {
 				commands[name] = config;
 			},
@@ -215,6 +218,38 @@ try {
 			"extension command records command/action phase",
 		);
 		assert(sent.length === 1, "instrumented command still queues handoff");
+		assert(
+			sent[0].message.includes("Review scope default: current Bead TASK-NEW-1"),
+			"review handoff scope names selected bead instead of whole repo",
+		);
+		await hooks.before_agent_start(
+			{ prompt: sent[0].message },
+			{
+				cwd,
+				getContextUsage: () => ({ tokens: 3000 }),
+			},
+		);
+		await hooks.agent_start();
+		await hooks.agent_end(
+			{
+				messages: [],
+				review: {
+					outcome: "PASS",
+					findings: 0,
+					fixer: false,
+				},
+			},
+			{ cwd, getContextUsage: () => ({ tokens: 3100 }) },
+		);
+		const reviewSummary = buildWorkTelemetryState(cwd, "bead TASK-NEW-1");
+		assert(
+			reviewSummary.slowest.some(
+				(event) =>
+					event.review?.scope === "bead TASK-NEW-1" &&
+					event.review.outcome === "PASS",
+			),
+			"review telemetry records scoped outcome fields",
+		);
 		assert(
 			!fixture
 				.logs()

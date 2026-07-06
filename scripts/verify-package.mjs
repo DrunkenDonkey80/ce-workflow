@@ -110,6 +110,9 @@ check(
 for (const mode of [
 	"init",
 	"master",
+	"ideate",
+	"brainstorm",
+	"usage",
 	"migrate",
 	"small",
 	"med",
@@ -203,6 +206,8 @@ for (const phrase of [
 	"failure artifact",
 	"wo:debug-needed",
 	"wo:blocked",
+	"default review scope is the current Bead slice",
+	"review payoff when telemetry recorded it",
 ]) {
 	check(`skill covers ${phrase}`, skill.includes(phrase));
 }
@@ -215,6 +220,9 @@ check(
 const promptModes = {
 	"work-init.md": "init",
 	"work-plan.md": "master",
+	"work-ideate.md": "ideate",
+	"work-brainstorm.md": "brainstorm",
+	"work-usage.md": "usage",
 	"work-master.md": "master",
 	"work-migrate.md": "migrate",
 	"work-small.md": "small",
@@ -233,8 +241,8 @@ const promptFiles = readdirSync(path.join(root, "prompts")).filter((file) =>
 	file.endsWith(".md"),
 );
 check(
-	"exactly fourteen prompt templates",
-	promptFiles.length === 14,
+	"exactly seventeen prompt templates",
+	promptFiles.length === 17,
 	promptFiles.join(", "),
 );
 for (const [file, mode] of Object.entries(promptModes)) {
@@ -314,6 +322,8 @@ const agentRules = {
 			"FAIL",
 			"read-only",
 			"verification contract",
+			"current scoped files/diff",
+			"broad whole-repo review",
 			"whitespace-only dirt",
 			"contact_supervisor` is unavailable",
 		],
@@ -419,6 +429,9 @@ for (const phrase of [
 	'registerCommand("work-status"',
 	'registerCommand("work-report"',
 	'registerCommand("work-telemetry"',
+	'registerCommand("work-ideate"',
+	'registerCommand("work-brainstorm"',
+	'registerCommand("work-usage"',
 	'registerCommand("work-resume"',
 	'registerCommand("work-continue"',
 	'registerCommand("work-pause"',
@@ -437,6 +450,15 @@ for (const phrase of [
 	"buildWorkTelemetryState",
 	"recordWorkTelemetry",
 	"buildWorkResumeState",
+	"buildWorkIdeateState",
+	"buildWorkBrainstormState",
+	"buildWorkUsageState",
+	"renderWorkIdeateText",
+	"renderWorkBrainstormText",
+	"renderWorkUsageText",
+	"reviewTelemetry",
+	"reviewPayoff",
+	"Review scope default",
 	"buildWorkflowIntakeState",
 	"buildWorkPauseState",
 	"buildWorkDebugState",
@@ -476,6 +498,9 @@ for (const phrase of [
 	"pi install",
 	"/work-init",
 	"/work-plan",
+	"/work-ideate",
+	"/work-brainstorm",
+	"/work-usage",
 	"/work-master",
 	"/work-migrate",
 	"/work-small",
@@ -545,6 +570,8 @@ for (const phrase of [
 	"npm run verify:quiet",
 	"avoid raw `bd show --json` for epics",
 	".pi/work-runs/*.jsonl",
+	"review scope/payoff",
+	"review tuning settings",
 ]) {
 	check(`README mentions ${phrase}`, readme.includes(phrase));
 }
@@ -555,6 +582,10 @@ check(".gitignore excludes .pi-subagents", ignored.includes(".pi-subagents/"));
 for (const script of [
 	"test-work-report.mjs",
 	"test-work-resume.mjs",
+	"test-work-ideate.mjs",
+	"test-work-brainstorm.mjs",
+	"test-work-usage.mjs",
+	"test-work-models.mjs",
 	"test-work-intake.mjs",
 	"test-work-pause.mjs",
 	"test-work-debug.mjs",

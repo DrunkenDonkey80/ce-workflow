@@ -97,6 +97,70 @@ const childrenByScenario = {
 			created_at: "2026-07-03T02:00:00Z",
 		},
 	],
+	ideasOnly: [
+		{
+			id: "IDEA-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Accepted idea only",
+			labels: ["wo:idea"],
+			metadata: {
+				kind: "idea",
+				ideaSchemaVersion: 1,
+				manualStatus: "accepted",
+			},
+			created_at: "2026-07-03T01:00:00Z",
+		},
+		{
+			id: "IDEA-2",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Brainstormed idea only",
+			notes: "wo:idea status=accepted brainstorm-id=docs/brainstorms/idea.md",
+			created_at: "2026-07-03T02:00:00Z",
+		},
+		{
+			id: "IDEA-3",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Rejected idea only",
+			labels: ["wo:idea"],
+			metadata: {
+				kind: "idea",
+				ideaSchemaVersion: 1,
+				manualStatus: "rejected",
+			},
+			created_at: "2026-07-03T03:00:00Z",
+		},
+	],
+	plannedIdea: [
+		{
+			id: "IDEA-PLANNED",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Planned idea marker",
+			labels: ["wo:idea"],
+			metadata: {
+				kind: "idea",
+				ideaSchemaVersion: 1,
+				manualStatus: "accepted",
+				taskId: "IMP-1",
+			},
+			created_at: "2026-07-03T01:00:00Z",
+		},
+		{
+			id: "IMP-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Executable idea child",
+			created_at: "2026-07-03T02:00:00Z",
+		},
+	],
 	planning: [
 		{
 			id: "PLAN-1",
@@ -323,6 +387,23 @@ try {
 		"implementation selected before planning",
 	);
 	assert(state.selectedBead.id === "IMP-1", "implementation bead selected");
+
+	process.env.WORK_RESUME_SCENARIO = "ideasOnly";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-planner",
+		"idea records alone launch planning rather than implementation",
+	);
+	assert(state.counts.readyExecutable === 0, "idea records are not executable");
+	assert(!state.selectedBead, "idea record is never selected as a bead");
+
+	process.env.WORK_RESUME_SCENARIO = "plannedIdea";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-implementation",
+		"planned idea selects linked executable child",
+	);
+	assert(state.selectedBead.id === "IMP-1", "linked task selected over idea");
 
 	process.env.WORK_RESUME_SCENARIO = "planning";
 	state = buildWorkResumeState(process.cwd(), "E-1");

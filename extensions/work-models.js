@@ -7,13 +7,15 @@ import {
 	readFileSync,
 	writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 const CONFIG_DIR_NAME = ".pi";
 const TELEMETRY_DIR_NAME = "work-runs";
 const INHERIT_MODEL = "__inherit_model__";
 const DEFAULT_THINKING = "__default_thinking__";
 const RESET_ALL = "__reset_all__";
+const IDEA_LABEL = "wo:idea";
+const IDEA_SCHEMA_VERSION = 1;
 
 const SLOTS = [
 	{
@@ -514,6 +516,205 @@ function buildWorkTelemetry(cwd, args = "") {
 		: renderWorkTelemetryText(state);
 }
 
+function usageDir(cwd) {
+	return join(telemetryDir(cwd), "usage");
+}
+
+function escapeHtml(value) {
+	return String(value ?? "")
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;")
+		.replaceAll("'", "&#39;");
+}
+
+function unknown(value, suffix = "") {
+	return value === undefined || value === null || value === ""
+		? "unknown"
+		: `${value}${suffix}`;
+}
+
+function usageScope(cwd, args = "") {
+	const parsed = parseTelemetryArgs(args);
+	if (String(args).trim()) return { filter: parsed, explicit: true };
+	const resolved = resolveWorkflowEpic(cwd, "");
+	if (resolved.error)
+		return {
+			error: resolved.error,
+			message: resolved.message,
+			candidates: resolved.candidates ?? [],
+		};
+	return {
+		filter: { json: false, scope: "epic", value: idOf(resolved.epic) },
+		explicit: false,
+		epic: issueSummary(resolved.epic),
+	};
+}
+
+function reviewTelemetry(meta = {}, event = {}) {
+	const review = event.review ?? event.reviewOutcome;
+	const scope = meta.beadId
+		? `bead ${meta.beadId}`
+		: meta.epicId
+			? `diff for epic ${meta.epicId}`
+			: "current diff";
+	if (!review) return { scope, outcome: "unknown" };
+	return {
+		scope: review.scope ?? scope,
+		outcome: review.outcome ?? "unknown",
+		findings: review.findings ?? review.findingCount,
+		fixer: review.fixer ?? review.fixerTriggered,
+		rerunOf: review.rerunOf,
+	};
+}
+
+function reviewPayoff(review) {
+	if (!review || review.outcome === "unknown") return "unknown";
+	return [
+		review.outcome,
+		review.findings === undefined
+			? "findings unknown"
+			: `${review.findings} findings`,
+		review.fixer === undefined
+			? "fixer unknown"
+			: `fixer ${review.fixer ? "yes" : "no"}`,
+	]
+		.filter(Boolean)
+		.join(" / ");
+}
+
+function usageEventRows(events) {
+	return events
+		.filter((event) => event.command !== "work-usage")
+		.sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0))
+		.map((event) => ({
+			id: event.id ?? "unknown",
+			timestamp: event.timestamp ?? "unknown",
+			task: event.beadId ?? event.meta?.beadId ?? "unknown",
+			agent:
+				event.type === "agent"
+					? (event.mode ?? "agent")
+					: (event.command ?? event.type ?? "unknown"),
+			phase: event.action ?? event.phase ?? "unknown",
+			duration: event.durationMs,
+			tokens: event.usage?.totalTokens,
+			context: event.context?.after?.tokens ?? event.context?.before?.tokens,
+			tools: (event.tools ?? [])
+				.map((tool) => tool.name)
+				.filter(Boolean)
+				.join(", "),
+			review: event.review,
+		}));
+}
+
+function usageSummary(events, rows) {
+	return {
+		events: rows.length,
+		durationMs: rows.reduce((sum, row) => sum + Number(row.duration ?? 0), 0),
+		tokens: rows.reduce((sum, row) => sum + Number(row.tokens ?? 0), 0),
+		unknownTokens: rows.filter((row) => row.tokens === undefined).length,
+		unknownContext: rows.filter((row) => row.context === undefined).length,
+		toolEvents: events.filter((event) => (event.tools ?? []).length).length,
+	};
+}
+
+function usageHtml(state) {
+	const rowHtml = state.rows
+		.map(
+			(row) =>
+				`<tr><td>${escapeHtml(row.task)}</td><td>${escapeHtml(row.agent)}</td><td>${escapeHtml(row.phase)}</td><td data-sort="${Number(row.duration ?? -1)}">${escapeHtml(unknown(row.duration, "ms"))}</td><td data-sort="${Number(row.tokens ?? -1)}">${escapeHtml(unknown(row.tokens))}</td><td>${escapeHtml(unknown(row.context))}</td><td>${escapeHtml(row.tools || "unknown")}</td><td>${escapeHtml(row.review?.scope ?? "unknown")}</td><td>${escapeHtml(reviewPayoff(row.review))}</td><td>${escapeHtml(row.timestamp)}</td></tr>`,
+		)
+		.join("\n");
+	return `<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Work usage</title>
+<style>body{font-family:system-ui,sans-serif;margin:2rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:.4rem;text-align:left}th{cursor:pointer;background:#f6f6f6}.muted{color:#666}</style>
+<h1>Work usage</h1>
+<p>Scope: <strong>${escapeHtml(state.filter.scope)} ${escapeHtml(state.filter.value)}</strong></p>
+<p>Events: ${state.summary.events} · Time: ${escapeHtml(formatDuration(state.summary.durationMs))} · Tokens: ${escapeHtml(state.summary.tokens || "unknown")}</p>
+<p class="muted">Missing data: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}. Generated from ${state.files.length ? state.files.map(escapeHtml).join(", ") : escapeHtml(state.dir)}.</p>
+<input id="filter" placeholder="filter rows" aria-label="filter rows">
+<table id="usage"><thead><tr><th>Task</th><th>Agent</th><th>Phase</th><th>Duration</th><th>Tokens</th><th>Context</th><th>Tools</th><th>Review scope</th><th>Review payoff</th><th>Time</th></tr></thead><tbody>
+${rowHtml || '<tr><td colspan="10">No usage events for this scope.</td></tr>'}
+</tbody></table>
+<script>
+const rows=[...document.querySelectorAll('tbody tr')];
+document.querySelector('#filter').addEventListener('input',e=>{const q=e.target.value.toLowerCase();for(const r of rows)r.hidden=!r.textContent.toLowerCase().includes(q)});
+for(const th of document.querySelectorAll('th'))th.addEventListener('click',()=>{const i=[...th.parentNode.children].indexOf(th);rows.sort((a,b)=>(a.children[i].dataset.sort??a.children[i].textContent).localeCompare(b.children[i].dataset.sort??b.children[i].textContent,undefined,{numeric:true}));for(const r of rows)r.parentNode.appendChild(r)});
+</script>
+</html>`;
+}
+
+function writeUsageReport(cwd, state) {
+	mkdirSync(usageDir(cwd), { recursive: true });
+	const file = join(usageDir(cwd), `usage-${Date.now().toString(36)}.html`);
+	writeFileSync(file, usageHtml(state));
+	return file;
+}
+
+function buildWorkUsageState(cwd, args = "") {
+	const scoped = usageScope(cwd, args);
+	if (scoped.error)
+		return errorState(scoped.error, scoped.message, {
+			action: "choose-scope",
+			candidates: scoped.candidates,
+		});
+	const events = readTelemetryEvents(cwd).filter((event) =>
+		matchesTelemetryScope(event, scoped.filter),
+	);
+	const rows = usageEventRows(events);
+	const state = {
+		ok: true,
+		action: "usage-report",
+		filter: scoped.filter,
+		epic: scoped.epic,
+		dir: telemetryDir(cwd),
+		files: [...new Set(events.map((event) => event.file).filter(Boolean))],
+		rows,
+		summary: usageSummary(events, rows),
+	};
+	state.path = writeUsageReport(cwd, state);
+	return state;
+}
+
+function renderWorkUsageText(state) {
+	if (!state.ok)
+		return [
+			state.message ?? "Could not build work usage report.",
+			...(state.candidates ?? []).map(
+				(item) => `- ${item.id} ${item.status} — ${item.title}`,
+			),
+		].join("\n");
+	return [
+		`Work usage report: ${state.path}`,
+		`Scope: ${state.filter.scope}${state.filter.value ? ` ${state.filter.value}` : ""} · events: ${state.summary.events} · time: ${formatDuration(state.summary.durationMs)} · tokens: ${state.summary.tokens || "unknown"}`,
+		state.summary.unknownTokens || state.summary.unknownContext
+			? `Missing data shown as unknown: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}`
+			: "",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function openUsageReport(file) {
+	try {
+		const command =
+			process.platform === "win32"
+				? "cmd"
+				: process.platform === "darwin"
+					? "open"
+					: "xdg-open";
+		const args =
+			process.platform === "win32" ? ["/c", "start", "", file] : [file];
+		execFileSync(command, args, { stdio: "ignore", timeout: 1000 });
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 function contextSettings(settings) {
 	return {
 		...DEFAULT_CONTEXT,
@@ -928,7 +1129,7 @@ function readyIds(cwd, epicId) {
 }
 
 function isWorkSlice(issue) {
-	return !["epic", "decision"].includes(typeOf(issue));
+	return !isIdeaIssue(issue) && !["epic", "decision"].includes(typeOf(issue));
 }
 
 function lineFor(issue) {
@@ -1083,6 +1284,156 @@ function notesOf(issue) {
 		.join("\n");
 }
 
+function objectMetadata(value) {
+	if (!value) return {};
+	if (typeof value === "string") {
+		try {
+			const parsed = JSON.parse(value);
+			return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+				? parsed
+				: {};
+		} catch {
+			return {};
+		}
+	}
+	return typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function normalizeMetadataKey(key) {
+	return String(key).replace(/[-_](\w)/g, (_match, letter) =>
+		letter.toUpperCase(),
+	);
+}
+
+function noteMetadata(issue) {
+	const metadata = {};
+	for (const line of notesOf(issue).split(/\r?\n/)) {
+		const match = line.trim().match(/^wo:idea(?:\s+|:)(.*)$/i);
+		if (!match) continue;
+		for (const part of match[1].split(/\s+/)) {
+			const [key, ...rest] = part.split("=");
+			if (!key || rest.length === 0) continue;
+			metadata[normalizeMetadataKey(key)] = rest
+				.join("=")
+				.replace(/^['"]|['"]$/g, "");
+		}
+	}
+	return metadata;
+}
+
+function ideaMetadata(issue) {
+	const direct = objectMetadata(
+		field(
+			issue,
+			"metadata",
+			"meta",
+			"properties",
+			"custom_fields",
+			"customFields",
+		),
+	);
+	return {
+		...direct,
+		...objectMetadata(direct.workOrchestrator),
+		...objectMetadata(direct.work_orchestrator),
+		...objectMetadata(direct.wo),
+		...noteMetadata(issue),
+	};
+}
+
+function isIdeaIssue(issue) {
+	const labels = labelsOf(issue);
+	const metadata = ideaMetadata(issue);
+	return (
+		labels.includes(IDEA_LABEL) ||
+		labels.some((label) => /^wo:idea[:/-]/.test(label)) ||
+		metadata.kind === "idea" ||
+		metadata.type === "idea" ||
+		metadata.idea === true ||
+		Number(metadata.ideaSchemaVersion) === IDEA_SCHEMA_VERSION ||
+		/(^|\s)wo:idea(\s|:|$)/i.test(notesOf(issue))
+	);
+}
+
+function normalizeIdeaStatus(value) {
+	const status = String(value ?? "")
+		.trim()
+		.toLowerCase()
+		.replace(/[-\s]+/g, "_");
+	if (status === "completed") return "complete";
+	return [
+		"raw",
+		"accepted",
+		"contender",
+		"discussed",
+		"brainstormed",
+		"planned",
+		"complete",
+		"in_progress",
+		"reopened",
+		"rejected",
+		"conflicted",
+	].includes(status)
+		? status
+		: "";
+}
+
+function metadataValue(metadata, ...keys) {
+	for (const key of keys) {
+		const value = metadata[key];
+		if (asArray(value).some((item) => item !== undefined && item !== ""))
+			return value;
+	}
+	return undefined;
+}
+
+function hasMetadataValue(metadata, ...keys) {
+	return metadataValue(metadata, ...keys) !== undefined;
+}
+
+function deriveIdeaStatus(issue) {
+	const metadata = ideaMetadata(issue);
+	const manual = normalizeIdeaStatus(
+		metadataValue(metadata, "manualStatus", "ideaStatus", "status"),
+	);
+	const hasDownstream = hasMetadataValue(
+		metadata,
+		"brainstormId",
+		"brainstormPath",
+		"planId",
+		"planPath",
+		"epicId",
+		"taskId",
+		"taskIds",
+		"childChangeId",
+	);
+	if (manual === "rejected" && hasDownstream) return "conflicted";
+	if (manual === "rejected") return "rejected";
+	if (manual === "reopened" || hasMetadataValue(metadata, "childChangeId"))
+		return "reopened";
+	if (manual === "in_progress" || hasMetadataValue(metadata, "inProgressId"))
+		return "in_progress";
+	if (
+		manual === "complete" ||
+		hasMetadataValue(metadata, "completedAt", "completionEvidence")
+	)
+		return "complete";
+	if (
+		hasMetadataValue(
+			metadata,
+			"planId",
+			"planPath",
+			"epicId",
+			"taskId",
+			"taskIds",
+		)
+	)
+		return "planned";
+	if (hasMetadataValue(metadata, "brainstormId", "brainstormPath"))
+		return "brainstormed";
+	return manual || "raw";
+}
+
 function depsOf(issue) {
 	return asArray(
 		field(issue, "depends_on", "dependencies", "blocked_by", "deps"),
@@ -1102,7 +1453,7 @@ function depsOf(issue) {
 }
 
 function issueSummary(issue) {
-	return {
+	const summary = {
 		id: idOf(issue),
 		title: titleOf(issue),
 		type: typeOf(issue),
@@ -1110,6 +1461,8 @@ function issueSummary(issue) {
 		labels: labelsOf(issue),
 		updated: updatedAt(issue),
 	};
+	if (isIdeaIssue(issue)) summary.ideaStatus = deriveIdeaStatus(issue);
+	return summary;
 }
 
 function issueRef(issue) {
@@ -1339,6 +1692,7 @@ function isPiRuntimeArtifact(path) {
 		/^pi-session-.+\.html$/i.test(file) ||
 		file.startsWith(".pi-subagents/") ||
 		file.startsWith(".pi/work-runs/") ||
+		file.startsWith(".pi/work-ideate/") ||
 		file.startsWith(".work-orchestrator/")
 	);
 }
@@ -1746,6 +2100,9 @@ function roleHandoffPrompt(state, mode, extraLines = []) {
 		"Subagent output guidance: set outputMode:file-only with a short relative output filename unless the full result is under 20 lines; do not pass .pi-subagents/ paths because the subagent tool owns the artifact directory.",
 		"Beads output hygiene: raw `bd ready --json`, `bd children --json`, or epic `bd show --json` can dump full roadmap plans; pipe them through python/node projections that print only ids, status, titles, and needed fields.",
 		"Closure rule: worker/reviewer/fixer/debugger roles must leave Beads open for parent/committer close after review, verification, and commit.",
+		selected?.id
+			? `Review scope default: current Bead ${selected.id} and its diff/verification evidence; do not run broad whole-repo review unless this Bead explicitly requires it.`
+			: "Review scope default: current diff for this epic; do not run broad whole-repo review unless the action explicitly requires it.",
 		...plannerLines,
 		...extraLines.filter(Boolean),
 		"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
@@ -2566,6 +2923,12 @@ function markdownSection(text, pattern) {
 		.trim();
 }
 
+function artifactIdeaId(text) {
+	return String(text ?? "").match(
+		/\bidea[-_ ]?id\s*[:=]\s*([A-Za-z0-9._-]+)/i,
+	)?.[1];
+}
+
 function planEpicFields(cwd, rel) {
 	const text = readFileSync(join(cwd, rel), "utf8");
 	const body = stripFrontmatter(text);
@@ -2576,6 +2939,7 @@ function planEpicFields(cwd, rel) {
 		body,
 		/acceptance|verification|done criteria|test plan/i,
 	);
+	const ideaId = artifactIdeaId(text);
 	return {
 		title: artifactTitle(cwd, rel),
 		description: `Master roadmap plan from ${rel}.\n\n${summary.slice(0, 6000)}`,
@@ -2583,8 +2947,717 @@ function planEpicFields(cwd, rel) {
 		acceptance:
 			acceptance.slice(0, 6000) ||
 			"Follow the master roadmap plan plus project verification instructions.",
-		notes: `created by /work-plan\nsource plan: ${rel}`,
+		notes: [
+			"created by /work-plan",
+			`source plan: ${rel}`,
+			ideaId ? `idea-id=${ideaId}` : "",
+		]
+			.filter(Boolean)
+			.join("\n"),
+		ideaId,
 	};
+}
+
+const IDEA_ACTIONS = new Set([
+	"accept",
+	"reject",
+	"discuss",
+	"inspect",
+	"import",
+]);
+const BRAINSTORM_ACTIONS = new Set(["link", "inspect"]);
+const IDEA_STATUS_ORDER = [
+	"conflicted",
+	"reopened",
+	"in_progress",
+	"complete",
+	"planned",
+	"brainstormed",
+	"discussed",
+	"accepted",
+	"contender",
+	"raw",
+	"rejected",
+];
+
+function workIdeateDir(cwd) {
+	return join(cwd, CONFIG_DIR_NAME, "work-ideate");
+}
+
+function workIdeateSnapshotPath(cwd) {
+	return join(workIdeateDir(cwd), "dashboard.json");
+}
+
+function titleFingerprint(issue) {
+	return titleOf(issue).trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizedIdeaTitle(value) {
+	return String(value ?? "")
+		.trim()
+		.toLowerCase()
+		.replace(/\s+/g, " ");
+}
+
+function repoRelativePath(cwd, value) {
+	const absolute = resolve(cwd, normalizePathToken(value));
+	const rel = relative(cwd, absolute);
+	if (!rel || rel.startsWith("..") || isAbsolute(rel)) return "";
+	return normalizedRepoPath(rel);
+}
+
+function ideaActionHint(status) {
+	return (
+		{
+			raw: "accept, discuss, reject, inspect",
+			accepted: "discuss, reject, inspect",
+			contender: "accept, discuss, reject, inspect",
+			discussed: "brainstorm, reject, inspect",
+			brainstormed: "plan or inspect; reject is blocked",
+			planned: "resume linked work or inspect",
+			in_progress: "resume linked work or inspect",
+			complete: "inspect; reopen via child change",
+			reopened: "resume linked work or inspect",
+			rejected: "accept or inspect",
+			conflicted: "resolve downstream work before rejecting",
+		}[status] ?? "inspect"
+	);
+}
+
+function ideaSourcePath(issue) {
+	return metadataValue(
+		ideaMetadata(issue),
+		"sourcePath",
+		"sourceArtifact",
+		"source",
+	);
+}
+
+function ideaRecords(cwd, epicId) {
+	return childrenOfRequired(cwd, epicId).filter(isIdeaIssue);
+}
+
+function ideaSummaries(cwd, epicId) {
+	return ideaRecords(cwd, epicId)
+		.map((issue) => ({
+			...issueSummary(issue),
+			fingerprint: titleFingerprint(issue),
+			sourcePath: ideaSourcePath(issue),
+			actionHint: ideaActionHint(deriveIdeaStatus(issue)),
+		}))
+		.sort(
+			(a, b) =>
+				IDEA_STATUS_ORDER.indexOf(a.ideaStatus) -
+					IDEA_STATUS_ORDER.indexOf(b.ideaStatus) ||
+				String(a.updated).localeCompare(String(b.updated)) ||
+				String(a.id).localeCompare(String(b.id)),
+		);
+}
+
+function writeIdeaSnapshot(cwd, state) {
+	mkdirSync(workIdeateDir(cwd), { recursive: true });
+	writeFileSync(
+		workIdeateSnapshotPath(cwd),
+		`${JSON.stringify(
+			{
+				viewId: state.viewId,
+				generatedAt: new Date().toISOString(),
+				epicId: state.epic.id,
+				filter: state.filter,
+				items: state.ideas.map((idea, index) => ({
+					index: index + 1,
+					id: idea.id,
+					fingerprint: idea.fingerprint,
+					status: idea.ideaStatus,
+					updated: idea.updated,
+				})),
+			},
+			null,
+			"\t",
+		)}\n`,
+	);
+}
+
+function readIdeaSnapshot(cwd) {
+	try {
+		return JSON.parse(readFileSync(workIdeateSnapshotPath(cwd), "utf8"));
+	} catch {
+		return undefined;
+	}
+}
+
+function parseWorkIdeateArgs(args = "") {
+	const input = String(args).trim();
+	if (!input) return { kind: "dashboard" };
+	const parts = input.split(/\s+/);
+	const action = parts.at(-1);
+	if (IDEA_ACTIONS.has(action))
+		return { kind: "action", action, target: parts.slice(0, -1).join(" ") };
+	return { kind: "topic", topic: input };
+}
+
+function resolveIdeaTarget(cwd, epicId, target) {
+	const ideas = ideaSummaries(cwd, epicId);
+	const text = String(target ?? "").trim();
+	if (!text)
+		return { error: "missing-target", message: "Missing idea target." };
+	if (/^\d+$/.test(text)) {
+		const snapshot = readIdeaSnapshot(cwd);
+		const entry = snapshot?.items?.[Number(text) - 1];
+		if (!entry)
+			return {
+				error: "stale-index",
+				message:
+					"Numeric idea index is missing or stale; run /work-ideate again.",
+			};
+		const idea = ideas.find((item) => item.id === entry.id);
+		if (
+			!idea ||
+			idea.fingerprint !== entry.fingerprint ||
+			idea.ideaStatus !== entry.status ||
+			idea.updated !== entry.updated
+		)
+			return {
+				error: "stale-index",
+				message:
+					"Numeric idea index no longer matches the dashboard; run /work-ideate again.",
+			};
+		return { idea };
+	}
+	const byId = ideas.find((item) => item.id === text);
+	if (byId) return { idea: byId };
+	const title = normalizedIdeaTitle(text);
+	const matches = ideas.filter(
+		(item) => normalizedIdeaTitle(item.title) === title,
+	);
+	if (matches.length === 1) return { idea: matches[0] };
+	if (matches.length > 1)
+		return {
+			error: "ambiguous-target",
+			message: `Multiple ideas match ${text}; use a Bead ID.`,
+			candidates: matches,
+		};
+	return { error: "unknown-target", message: `No idea found for ${text}.` };
+}
+
+function appendIdeaStatus(cwd, id, status, action) {
+	return appendBeadNote(
+		cwd,
+		id,
+		`wo:idea status=${status} action=${action} updated-at=${new Date().toISOString()}`,
+	);
+}
+
+function importIdea(cwd, epic, target) {
+	const rel = repoRelativePath(cwd, target);
+	if (!rel || !looksLikePath(rel) || !existsSync(join(cwd, rel)))
+		return errorState(
+			"missing-source",
+			`Import source not found in repo: ${target}`,
+			{
+				action: "missing-source",
+			},
+		);
+	const ideas = ideaRecords(cwd, idOf(epic));
+	const existing = ideas.find((idea) => ideaSourcePath(idea) === rel);
+	const title = artifactTitle(cwd, rel);
+	const note = `wo:idea status=accepted source-path=${rel} imported-at=${new Date().toISOString()}`;
+	const bead = existing
+		? appendBeadNote(cwd, idOf(existing), note)
+		: createBead(cwd, {
+				title,
+				type: "task",
+				parent: idOf(epic),
+				description: `Idea imported from ${rel}.`,
+				notes: `wo:idea schema=${IDEA_SCHEMA_VERSION} status=accepted source-path=${rel}`,
+			});
+	return {
+		ok: true,
+		action: existing ? "import-updated" : "import-created",
+		epic: issueSummary(epic),
+		idea: issueSummary(bead),
+		message: `${existing ? "Updated" : "Created"} idea ${idOf(bead)} from ${rel}.`,
+		suggestedCommands: [`/work-ideate ${idOf(bead)} inspect`],
+	};
+}
+
+function textHash(value) {
+	let hash = 0;
+	for (const char of String(value)) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+	return Math.abs(hash).toString(36);
+}
+
+function jsonPayload(text) {
+	const input = String(text ?? "").trim();
+	const fenced = input.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
+	for (const candidate of [fenced, input].filter(Boolean)) {
+		try {
+			return JSON.parse(candidate);
+		} catch {
+			const start = candidate.search(/[[{]/);
+			const end = Math.max(
+				candidate.lastIndexOf("}"),
+				candidate.lastIndexOf("]"),
+			);
+			if (start !== -1 && end > start) {
+				try {
+					return JSON.parse(candidate.slice(start, end + 1));
+				} catch {
+					// Try the next candidate.
+				}
+			}
+		}
+	}
+	return undefined;
+}
+
+function parseIdeationIdeas(output) {
+	// ponytail: JSON-only capture; add markdown parsing only if CE output drifts.
+	const payload = jsonPayload(output);
+	const ideas = Array.isArray(payload) ? payload : asArray(payload?.ideas);
+	const topPicks = new Set(asArray(payload?.topPicks ?? payload?.top_picks));
+	return ideas
+		.map((item, index) => {
+			const title = String(
+				typeof item === "string" ? item : field(item, "title", "name", "idea"),
+			).trim();
+			if (!title) return undefined;
+			const rank = Number(field(item, "rank", "index") ?? index + 1);
+			const status = normalizeIdeaStatus(field(item, "status", "state"));
+			const accepted =
+				status === "accepted" ||
+				field(item, "topPick", "top_pick", "accepted") === true ||
+				topPicks.has(rank) ||
+				topPicks.has(index + 1) ||
+				topPicks.has(title);
+			return {
+				index: index + 1,
+				title,
+				summary: String(field(item, "summary", "description", "why") ?? ""),
+				status: accepted ? "accepted" : "contender",
+				hash: textHash(title),
+			};
+		})
+		.filter(Boolean);
+}
+
+function existingIdeaByRun(ideas, runId, idea) {
+	return ideas.find((item) => {
+		const metadata = ideaMetadata(item);
+		return (
+			metadata.sourceRunId === runId &&
+			String(metadata.sourceIndex) === String(idea.index) &&
+			metadata.titleHash === idea.hash
+		);
+	});
+}
+
+function captureIdeationIdeas(
+	cwd,
+	epic,
+	{ topic, output, runId = telemetryId("ideate") },
+) {
+	const parsed = parseIdeationIdeas(output);
+	if (!parsed.length) {
+		const recovery = createBead(cwd, {
+			title: `Recover ideation output: ${String(topic ?? "ideas").slice(0, 80)}`,
+			type: "decision",
+			parent: idOf(epic),
+			description: `Raw ideation output could not be parsed.\n\n${String(output ?? "").slice(0, 6000)}`,
+			notes: `wo:idea-recovery run-id=${runId}`,
+		});
+		return {
+			ok: false,
+			action: "capture-recovery",
+			epic: issueSummary(epic),
+			recovery: issueSummary(recovery),
+			saved: [],
+			unsaved: [],
+			message: `Could not parse ideation output; created recovery Bead ${idOf(recovery)}.`,
+		};
+	}
+	const saved = [];
+	const unsaved = [];
+	for (const idea of parsed) {
+		try {
+			const existing = existingIdeaByRun(
+				ideaRecords(cwd, idOf(epic)),
+				runId,
+				idea,
+			);
+			const note = `wo:idea schema=${IDEA_SCHEMA_VERSION} status=${idea.status} source-run-id=${runId} source-index=${idea.index} title-hash=${idea.hash}`;
+			const bead = existing
+				? appendBeadNote(cwd, idOf(existing), note)
+				: createBead(cwd, {
+						title: idea.title,
+						type: "task",
+						parent: idOf(epic),
+						description: idea.summary || `Idea from /work-ideate ${topic}.`,
+						notes: note,
+					});
+			saved.push(issueSummary(bead));
+		} catch (error) {
+			unsaved.push({ title: idea.title, error: commandErrorText(error) });
+		}
+	}
+	return {
+		ok: unsaved.length === 0,
+		action: unsaved.length ? "capture-partial" : "capture-complete",
+		epic: issueSummary(epic),
+		runId,
+		saved,
+		unsaved,
+		message: unsaved.length
+			? `Saved ${saved.length}/${parsed.length} ideas; rerun with run ${runId} to recover the rest.`
+			: `Saved ${saved.length} ideas from /work-ideate.`,
+	};
+}
+
+function ideationHandoffPrompt(epic, topic, runId) {
+	return [
+		"Use the work-orchestrator skill in mode: ideate with this precomputed extension state.",
+		`Epic: ${idOf(epic)} — ${titleOf(epic)}`,
+		`Topic: ${topic}`,
+		`Run ID: ${runId}`,
+		`Structured capture contract: ${captureIdeationIdeas.name} expects JSON ideas[] plus optional topPicks.`,
+		"Generate roughly 20 ideas, mark about 7 top picks as accepted, the rest as contenders, then create Beads under the epic with wo:idea notes and source-run/source-index metadata.",
+		"If structured capture fails, preserve the raw output in a recovery decision Bead and report saved vs unsaved ideas.",
+		ROLE_TIMEOUT_GUIDANCE,
+	].join("\n");
+}
+
+function parseWorkBrainstormArgs(args = "") {
+	const input = String(args).trim();
+	if (!input) return { kind: "usage" };
+	const parts = input.split(/\s+/);
+	const action = BRAINSTORM_ACTIONS.has(parts.at(-1)) ? parts.pop() : "link";
+	if (parts[0] === "idea") {
+		const artifact =
+			parts.length > 2 && looksLikePath(parts.at(-1)) ? parts.pop() : "";
+		return { kind: "idea", action, target: parts.slice(1).join(" "), artifact };
+	}
+	const artifact =
+		parts.length > 1 && looksLikePath(parts.at(-1)) ? parts.pop() : "";
+	return { kind: "topic", action, topic: parts.join(" "), artifact };
+}
+
+function ideaBrainstormNote(artifact = "", action = "brainstorm") {
+	return [
+		"wo:idea",
+		"status=discussed",
+		`action=${action}`,
+		artifact ? `brainstorm-path=${artifact}` : "",
+		`brainstormed-at=${new Date().toISOString()}`,
+	]
+		.filter(Boolean)
+		.join(" ");
+}
+
+function possibleDuplicateIdeas(ideas, title) {
+	const normalized = normalizedIdeaTitle(title);
+	return ideas.filter((idea) => {
+		const candidate = normalizedIdeaTitle(idea.title);
+		return (
+			candidate !== normalized &&
+			(candidate.includes(normalized) || normalized.includes(candidate))
+		);
+	});
+}
+
+function createBrainstormIdea(cwd, epic, title, artifact = "") {
+	return createBead(cwd, {
+		title,
+		type: "task",
+		parent: idOf(epic),
+		description: `Idea created by /work-brainstorm${artifact ? ` from ${artifact}` : ""}.`,
+		notes: [
+			"wo:idea",
+			`schema=${IDEA_SCHEMA_VERSION}`,
+			"status=discussed",
+			artifact ? `brainstorm-path=${artifact}` : "",
+		]
+			.filter(Boolean)
+			.join(" "),
+	});
+}
+
+function resolveFreeformIdea(cwd, epic, topic) {
+	const ideas = ideaSummaries(cwd, idOf(epic));
+	const normalized = normalizedIdeaTitle(topic);
+	const exact = ideas.filter(
+		(idea) => normalizedIdeaTitle(idea.title) === normalized,
+	);
+	if (exact.length === 1)
+		return { idea: exact[0], reused: true, possibleDuplicates: [] };
+	if (exact.length > 1)
+		return {
+			error: "ambiguous-target",
+			message: `Multiple ideas match ${topic}; use /work-brainstorm idea <id>.`,
+			candidates: exact,
+		};
+	return {
+		idea: undefined,
+		reused: false,
+		possibleDuplicates: possibleDuplicateIdeas(ideas, topic),
+	};
+}
+
+function buildWorkBrainstormState(cwd, args = "") {
+	const parsed = parseWorkBrainstormArgs(args);
+	if (parsed.kind === "usage")
+		return errorState(
+			"usage",
+			"Usage: /work-brainstorm [idea <target>|<topic>] [brainstorm-path]",
+			{ action: "usage" },
+		);
+	try {
+		const resolved = resolveWorkflowEpic(cwd, "");
+		if (resolved.error)
+			return errorState(resolved.error, resolved.message ?? resolved.error, {
+				action: "ask-target",
+				candidates: resolved.candidates ?? [],
+			});
+		const epic = resolved.epic;
+		const artifact = parsed.artifact
+			? repoRelativePath(cwd, parsed.artifact)
+			: "";
+		if (parsed.artifact && (!artifact || !existsSync(join(cwd, artifact))))
+			return errorState(
+				"missing-source",
+				`Brainstorm artifact not found in repo: ${parsed.artifact}`,
+				{ action: "missing-source" },
+			);
+		if (parsed.kind === "idea") {
+			const resolvedIdea = resolveIdeaTarget(cwd, idOf(epic), parsed.target);
+			if (resolvedIdea.error)
+				return errorState(resolvedIdea.error, resolvedIdea.message, {
+					action: resolvedIdea.error,
+					candidates: resolvedIdea.candidates ?? [],
+				});
+			const bead = appendBeadNote(
+				cwd,
+				resolvedIdea.idea.id,
+				ideaBrainstormNote(artifact, "selected-brainstorm"),
+			);
+			return {
+				ok: true,
+				action: "brainstorm-linked",
+				epic: issueSummary(epic),
+				idea: issueSummary(bead),
+				artifact,
+				message: `Linked brainstorm${artifact ? ` ${artifact}` : ""} to ${resolvedIdea.idea.id}.`,
+				suggestedCommands: artifact
+					? [`/work-plan ${artifact}`]
+					: [`/work-brainstorm idea ${resolvedIdea.idea.id} <brainstorm-path>`],
+			};
+		}
+		const match = resolveFreeformIdea(cwd, epic, parsed.topic);
+		if (match.error)
+			return errorState(match.error, match.message, {
+				action: match.error,
+				candidates: match.candidates ?? [],
+			});
+		const bead = match.idea
+			? appendBeadNote(
+					cwd,
+					match.idea.id,
+					ideaBrainstormNote(artifact, "freeform-brainstorm"),
+				)
+			: createBrainstormIdea(cwd, epic, parsed.topic, artifact);
+		return {
+			ok: true,
+			action: match.reused ? "brainstorm-reused" : "brainstorm-created",
+			epic: issueSummary(epic),
+			idea: issueSummary(bead),
+			artifact,
+			possibleDuplicates: match.possibleDuplicates,
+			message: `${match.reused ? "Updated" : "Created"} idea ${idOf(bead)} for brainstorm ${parsed.topic}.`,
+			suggestedCommands: artifact
+				? [`/work-plan ${artifact}`]
+				: [`/work-brainstorm idea ${idOf(bead)} <brainstorm-path>`],
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: error.reason ?? "beads-error",
+		});
+	}
+}
+
+function brainstormHandoffPrompt(state) {
+	return [
+		"Use the work-orchestrator skill in mode: brainstorm with this precomputed extension state.",
+		`Epic: ${state.epic.id} — ${state.epic.title}`,
+		`Idea: ${state.idea.id} — ${state.idea.title}`,
+		state.artifact
+			? `Brainstorm artifact: ${state.artifact}`
+			: "Write the brainstorm artifact, then rerun /work-brainstorm idea <id> <path>.",
+		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
+		ROLE_TIMEOUT_GUIDANCE,
+	].join("\n");
+}
+
+function renderWorkBrainstormText(state) {
+	if (!state.ok)
+		return [
+			state.message ?? "Could not prepare brainstorm.",
+			...(state.candidates ?? []).map(
+				(item) =>
+					`- ${item.id} ${item.ideaStatus ?? item.status} — ${item.title}`,
+			),
+		].join("\n");
+	return [
+		state.message,
+		...(state.possibleDuplicates?.length
+			? [
+					"Possible duplicates:",
+					...state.possibleDuplicates.map(
+						(item) => `- ${item.id} — ${item.title}`,
+					),
+				]
+			: []),
+		state.suggestedCommands?.[0] ? `Next: ${state.suggestedCommands[0]}` : "",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function buildWorkIdeateState(cwd, args = "") {
+	const parsed = parseWorkIdeateArgs(args);
+	try {
+		const resolved = resolveWorkflowEpic(cwd, "");
+		if (resolved.error)
+			return errorState(resolved.error, resolved.message ?? resolved.error, {
+				action: "ask-target",
+				candidates: resolved.candidates ?? [],
+			});
+		const epic = resolved.epic;
+		if (parsed.kind === "topic") {
+			const runId = telemetryId("ideate");
+			return {
+				ok: true,
+				action: "handoff-ideate",
+				epic: issueSummary(epic),
+				topic: parsed.topic,
+				runId,
+				message: `Starting ideation capture for ${parsed.topic}.`,
+				handoffPrompt: ideationHandoffPrompt(epic, parsed.topic, runId),
+				suggestedCommands: [`/work-ideate ${runId}`],
+			};
+		}
+		if (parsed.kind === "dashboard") {
+			const state = {
+				ok: true,
+				action: "dashboard",
+				epic: issueSummary(epic),
+				filter: "all",
+				viewId: telemetryId("ideas"),
+				ideas: ideaSummaries(cwd, idOf(epic)),
+			};
+			writeIdeaSnapshot(cwd, state);
+			return state;
+		}
+		if (parsed.action === "import") return importIdea(cwd, epic, parsed.target);
+		const resolvedIdea = resolveIdeaTarget(cwd, idOf(epic), parsed.target);
+		if (resolvedIdea.error)
+			return errorState(resolvedIdea.error, resolvedIdea.message, {
+				action: resolvedIdea.error,
+				candidates: resolvedIdea.candidates ?? [],
+			});
+		const idea = resolvedIdea.idea;
+		const status = idea.ideaStatus;
+		if (parsed.action === "inspect")
+			return {
+				ok: true,
+				action: "inspect",
+				epic: issueSummary(epic),
+				idea,
+				message: `${idea.id} ${status} — ${idea.title}`,
+				suggestedCommands: [`/work-ideate ${idea.id} discuss`],
+			};
+		if (parsed.action === "reject") {
+			if (!["raw", "accepted", "contender", "discussed"].includes(status))
+				return errorState(
+					"reject-refused",
+					`${idea.id} is ${status}; use abandon/defer/conflict resolution instead of direct reject.`,
+					{ action: "reject-refused", idea },
+				);
+			const bead = appendIdeaStatus(cwd, idea.id, "rejected", "reject");
+			return {
+				ok: true,
+				action: "rejected",
+				epic: issueSummary(epic),
+				idea: issueSummary(bead),
+				message: `Rejected ${idea.id}; it remains inspectable and resume-ineligible.`,
+				suggestedCommands: [`/work-ideate ${idea.id} inspect`],
+			};
+		}
+		if (parsed.action === "accept") {
+			const bead = appendIdeaStatus(cwd, idea.id, "accepted", "accept");
+			return {
+				ok: true,
+				action: "accepted",
+				epic: issueSummary(epic),
+				idea: issueSummary(bead),
+				message: `Accepted ${idea.id}.`,
+				suggestedCommands: [`/work-ideate ${idea.id} discuss`],
+			};
+		}
+		if (parsed.action === "discuss") {
+			const bead = appendIdeaStatus(cwd, idea.id, "discussed", "discuss");
+			return {
+				ok: true,
+				action: "discussed",
+				epic: issueSummary(epic),
+				idea: issueSummary(bead),
+				message: `Marked ${idea.id} as discussed; next use /work-brainstorm idea ${idea.id}.`,
+				suggestedCommands: [`/work-brainstorm idea ${idea.id}`],
+			};
+		}
+		return errorState(
+			"unsupported-action",
+			`Unsupported action: ${parsed.action}`,
+			{
+				action: "unsupported-action",
+			},
+		);
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: error.reason ?? "beads-error",
+		});
+	}
+}
+
+function renderWorkIdeateText(state) {
+	if (!state.ok) {
+		return [
+			state.message ?? "Could not build idea dashboard.",
+			...(state.candidates ?? []).map(
+				(item) =>
+					`- ${item.id} ${item.status ?? item.ideaStatus} — ${item.title}`,
+			),
+		].join("\n");
+	}
+	if (state.action !== "dashboard") {
+		return [
+			state.message,
+			state.suggestedCommands?.[0] ? `Next: ${state.suggestedCommands[0]}` : "",
+		]
+			.filter(Boolean)
+			.join("\n");
+	}
+	const lines = [`Ideas for ${state.epic.title} (${state.epic.id})`];
+	if (state.ideas.length === 0)
+		return [...lines, "No ideas yet.", "Next: /work-ideate <topic>"].join("\n");
+	for (const status of IDEA_STATUS_ORDER) {
+		const group = state.ideas.filter((idea) => idea.ideaStatus === status);
+		if (!group.length) continue;
+		lines.push("", `${status}:`);
+		for (const idea of group) {
+			const index = state.ideas.indexOf(idea) + 1;
+			lines.push(`${index}. ${idea.id} — ${idea.title} (${idea.actionHint})`);
+		}
+	}
+	return lines.join("\n");
 }
 
 function buildWorkInitState(cwd, _args = "") {
@@ -2665,9 +3738,16 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			notes: workflowBeadNotes(command, fields.title, [
 				"wo:planning",
 				`source plan: ${first}`,
+				fields.ideaId ? `idea-id=${fields.ideaId}` : "",
 				"create one executable slice by default",
 			]),
 		});
+		if (fields.ideaId)
+			appendBeadNote(
+				cwd,
+				fields.ideaId,
+				`wo:idea status=discussed plan-path=${first} epic-id=${idOf(epic)} task-id=${idOf(planning)}`,
+			);
 		return withHandoffPrompt({
 			ok: true,
 			action: "run-planner",
@@ -3121,6 +4201,9 @@ export {
 	buildWorkBigState,
 	buildWorkDebugState,
 	buildWorkFinishState,
+	buildWorkIdeateState,
+	buildWorkBrainstormState,
+	captureIdeationIdeas,
 	buildWorkflowIntakeState,
 	buildWorkInitState,
 	buildWorkMasterState,
@@ -3135,9 +4218,16 @@ export {
 	buildWorkSmallState,
 	buildWorkTelemetry,
 	buildWorkTelemetryState,
+	buildWorkUsageState,
+	deriveIdeaStatus,
+	isIdeaIssue,
+	parseIdeationIdeas,
 	recordWorkTelemetry,
 	handleWorkResumeCommand,
 	planResumeAction,
+	renderWorkIdeateText,
+	renderWorkBrainstormText,
+	renderWorkUsageText,
 	renderWorkReportJson,
 	renderWorkReportText,
 	renderWorkResumeJson,
@@ -3201,6 +4291,7 @@ export default function workModelsExtension(pi) {
 			messages: summarizeMessages(event.messages),
 			tools: run.tools,
 			usage,
+			review: reviewTelemetry(run.meta, event),
 			context: { before: run.contextBefore, after: usageSnapshot(ctx) },
 		};
 		const file = recordWorkTelemetry(run.cwd, telemetry);
@@ -3301,6 +4392,51 @@ export default function workModelsExtension(pi) {
 			cleanupBenignInstructionDirt(ctx.cwd);
 			const output = buildWorkTelemetry(ctx.cwd, args);
 			notify(ctx, output, "info");
+		},
+	});
+
+	pi.registerCommand("work-usage", {
+		description: "Write a local HTML work usage report from telemetry",
+		handler: async (args, ctx) => {
+			await withCommandTelemetry("work-usage", args, ctx, async () => {
+				cleanupBenignInstructionDirt(ctx.cwd);
+				const state = buildWorkUsageState(ctx.cwd, args);
+				notify(ctx, renderWorkUsageText(state), state.ok ? "info" : "warning");
+				if (state.ok) state.browserOpened = openUsageReport(state.path);
+				return stateTelemetry(state);
+			});
+		},
+	});
+
+	pi.registerCommand("work-ideate", {
+		description: "Show and mutate Beads-backed idea state",
+		handler: async (args, ctx) => {
+			await withCommandTelemetry("work-ideate", args, ctx, async () => {
+				cleanupBenignInstructionDirt(ctx.cwd);
+				const state = buildWorkIdeateState(ctx.cwd, args);
+				notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
+				if (state.handoffPrompt)
+					await sendFollowUp(ctx, state.handoffPrompt, pi);
+				return stateTelemetry(state);
+			});
+		},
+	});
+
+	pi.registerCommand("work-brainstorm", {
+		description: "Link brainstorms back to Beads-backed ideas",
+		handler: async (args, ctx) => {
+			await withCommandTelemetry("work-brainstorm", args, ctx, async () => {
+				cleanupBenignInstructionDirt(ctx.cwd);
+				const state = buildWorkBrainstormState(ctx.cwd, args);
+				notify(
+					ctx,
+					renderWorkBrainstormText(state),
+					state.ok ? "info" : "warning",
+				);
+				if (state.ok)
+					await sendFollowUp(ctx, brainstormHandoffPrompt(state), pi);
+				return stateTelemetry(state);
+			});
 		},
 	});
 

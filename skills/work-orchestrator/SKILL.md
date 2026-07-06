@@ -113,6 +113,24 @@ When the input points at a brainstorm or asks for a master plan, run `ce-plan` f
 
 Do not implement until the epic contains the master plan and durable executable Beads exist. Do not create duplicate task Beads for the same implementation unit.
 
+## Mode: ideate
+
+Prefer the extension command `/work-ideate` when available. It lists `wo:idea` Beads, guards numeric dashboard indexes with a disposable snapshot, and mutates only the resolved idea for `accept`, `reject`, `discuss`, `inspect`, and `import`.
+
+Fallback behavior: read the active epic's child Beads, filter idea records marked with `wo:idea`, and show their derived status. For a topic handoff, run CE ideation, ask for structured JSON with `ideas[]` and optional `topPicks`, save every parsed idea under the epic with `source-run-id` and `source-index` notes, and create a recovery decision Bead if parsing or saving fails. Never treat an idea record as executable work; only linked planning/task descendants can be resumed.
+
+## Mode: brainstorm
+
+Prefer the extension command `/work-brainstorm` when available. It resolves `idea <target>` before freeform topics, reuses exact normalized title matches, refuses fuzzy auto-merge by reporting possible duplicates, and appends brainstorm/plan backlinks to `wo:idea` Beads.
+
+Fallback behavior: run CE brainstorming for the selected idea or topic, save the artifact, then link the artifact path back with `/work-brainstorm idea <id> <path>`.
+
+## Mode: usage
+
+Prefer the extension command `/work-usage` when available. It reads existing `.pi/work-runs` telemetry, defaults to the one active epic only when unambiguous, writes an escaped local HTML report under `.pi/work-runs/usage/`, and never creates or mutates Beads.
+
+Fallback behavior: summarize existing telemetry only. If multiple epics could match, ask for `epic <id>` instead of blending them.
+
 ## Mode: migrate
 
 Use to import existing project state from CE brainstorms/plans, non-CE plans, TODOs, issue exports, docs, git history, and unfinished branches into Beads.
@@ -235,7 +253,7 @@ Loop:
 6. Do not dump raw `bd show <id> --json` into the parent chat. Use the precomputed extension state, `/work-report <id> --json`, or small `bd show ... | python/node` projections. Child role agents may read full child Beads, but planner must not read full epic/master-plan JSON when a plan path or expected unit is available.
 7. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, verify `bd ready --json` exposes the earliest executable slice and not the planning Bead or a later dependent slice, then stop at the planning boundary.
 8. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, relevant paths, related file allowlist, and known-unrelated dirty allowlist. Always include the instruction-file whitespace startup allowlist from step 2 so workers do not contact the supervisor for harmless EOF-only `AGENTS.md` dirt.
-9. Launch `bead-reviewer` with `context:fresh`, scoped files, acceptance, verification evidence, known-unrelated dirty allowlist, and the same instruction-file whitespace startup allowlist from step 2. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available. Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup, not an implementation failure, once restored.
+9. Launch `bead-reviewer` with `context:fresh`, the assigned Bead ID, current diff or scoped file list, acceptance, verification evidence, known-unrelated dirty allowlist, and the same instruction-file whitespace startup allowlist from step 2. The default review scope is the current Bead slice and its diff, not broad whole-repo review. Request a short PASS/FAIL summary and keep full output in `.pi-subagents/artifacts/` when available. Treat out-of-scope whitespace-only instruction-file dirt as parent cleanup, not an implementation failure, once restored.
 10. If review returns `FAIL` for fixable code, launch `bead-fixer` with `context:fresh`, exact findings, and the assigned Bead, then review again. If review or verification shows the Bead cannot meet acceptance without root-cause debugging, apply the Failure and Blocker Lifecycle: create/reuse a `wo:debug` bug Bead, attach the failure artifact, add blocker dependencies, and stop so the next `/work-resume` can pick the debug Bead or unrelated ready work.
 11. After `PASS`, launch `bead-committer` with `context:fresh` or commit in the parent with the same gate. For small PASS-reviewed Beads, prefer the parent commit gate when spawning a committer would only repeat deterministic status/stage/commit/close work. Before close, confirm any product evidence failure was either accepted as evidence-only scope or has a linked debug Bead.
 12. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
@@ -311,7 +329,7 @@ Beads and git preserve the memory; Pi chat is disposable working context. The pa
 
 ## Cost and Model Policy
 
-Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Use `/work-telemetry today` or `/work-telemetry epic <id>` before changing role/model policy; it shows command time, agent time, token usage, tool/subagent durations, and context growth. Do not hard-code provider-specific models in this package.
+Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Use `/work-telemetry today`, `/work-telemetry epic <id>`, or `/work-usage epic <id>` before changing role/model policy; they show command time, agent time, token usage, tool/subagent durations, context growth, and review payoff when telemetry recorded it. Do not hard-code provider-specific models in this package.
 
 ## Optional Intercom Coordination
 

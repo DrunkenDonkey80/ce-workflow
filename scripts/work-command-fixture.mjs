@@ -48,6 +48,73 @@ const scenarioChildren = {
 			title: "Ready slice",
 		},
 	],
+	noIdeas: [],
+	createFailAfterOne: [],
+	ideas: [
+		{
+			id: "IDEA-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Raw idea",
+			notes: "wo:idea status=raw",
+			updated_at: "2026-07-03T01:00:00Z",
+		},
+		{
+			id: "IDEA-2",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Accepted idea",
+			notes: "wo:idea status=accepted",
+			updated_at: "2026-07-03T02:00:00Z",
+		},
+		{
+			id: "IDEA-3",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Contender idea",
+			notes: "wo:idea status=contender",
+			updated_at: "2026-07-03T03:00:00Z",
+		},
+		{
+			id: "IDEA-4",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Brainstormed idea",
+			notes: "wo:idea status=accepted brainstorm-id=B-1",
+			updated_at: "2026-07-03T04:00:00Z",
+		},
+		{
+			id: "IDEA-5",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Planned idea",
+			notes: "wo:idea status=accepted plan-id=P-1",
+			updated_at: "2026-07-03T05:00:00Z",
+		},
+		{
+			id: "IDEA-6",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Completed idea",
+			notes: "wo:idea status=complete",
+			updated_at: "2026-07-03T06:00:00Z",
+		},
+		{
+			id: "IDEA-7",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Rejected idea",
+			notes: "wo:idea status=rejected",
+			updated_at: "2026-07-03T07:00:00Z",
+		},
+	],
 	debug: [
 		{
 			id: "BUG-1",
@@ -167,7 +234,7 @@ else if (args[0] === "show") {
   const issue = all().find((item) => item.id === args[1]);
   if (issue) out(issue); else { console.error("not found"); process.exit(2); }
 } else if (args[0] === "create") {
-  if (state.scenario === "create-fail") { console.error("create failed"); process.exit(3); }
+  if (state.scenario === "create-fail" || (state.scenario === "createFailAfterOne" && state.next > 1)) { console.error("create failed"); process.exit(3); }
   const type = fieldAfter("--type") || "task";
   const parent = fieldAfter("--parent");
   const notes = fieldAfter("--notes") || fieldAfter("--append-notes");
