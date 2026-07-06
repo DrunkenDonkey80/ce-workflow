@@ -102,7 +102,7 @@ Final output: `Next: /work-plan <idea-or-plan-file>`.
 
 Use to create a new master epic from a brainstorm, rough feature idea, or existing plan. Prefer the user-facing command name `/work-plan`; `/work-master` remains an alias.
 
-When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Tell `ce-plan` to auto-accept plan creation and skip interactive confirmation unless it needs a real human decision. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification contract in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
+When the input points at a brainstorm or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. Tell `ce-plan` to ask clarification questions one at a time when the source is broad, important, or underspecified; auto-accept only skips final write-confirmation after discovery is clear, not planning questions. Then create the epic Bead from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification contract in `acceptance`, and the source brainstorm plus local plan path in `notes`. Beads remains source of truth; the plan file is a reference.
 
 1. Create only the master epic Bead with the master plan captured in Beads fields.
 2. Create only one initial `wo:planning` Bead that tells `bead-planner` to split the epic into the next executable slice, or at most three obvious low-risk slices.
@@ -123,7 +123,7 @@ Fallback behavior: read the active epic's child Beads, filter idea records marke
 
 Prefer the extension command `/work-brainstorm` when available. It resolves `idea <target>` before freeform topics, reuses exact normalized title matches, refuses fuzzy auto-merge by reporting possible duplicates, and appends brainstorm/plan backlinks to `wo:idea` Beads.
 
-Fallback behavior: if no active epic exists and the target is a freeform topic, initialize Beads if needed and create one standalone brainstorm epic before saving ideas under it. Run CE brainstorming for the selected idea or topic, save the artifact, then link the artifact path back with `/work-brainstorm idea <id> <path>`.
+Fallback behavior: if no active epic exists and the target is a freeform topic, initialize Beads if needed and create one standalone brainstorm epic before saving ideas under it. When no artifact path is supplied, run `ce-brainstorm` interactively for the selected idea or topic, asking one question at a time until requirements are clear; do not silently synthesize broad, important, or underspecified brainstorms. Save the artifact, then link the artifact path back with `/work-brainstorm idea <id> <path>`.
 
 ## Mode: usage
 

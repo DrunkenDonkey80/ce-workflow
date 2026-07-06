@@ -4176,7 +4176,8 @@ function brainstormHandoffPrompt(state) {
 		state.topic ? `Full brainstorm request:\n${state.topic}` : "",
 		state.artifact
 			? `Brainstorm artifact: ${state.artifact}`
-			: `Write the brainstorm artifact, then rerun /work-brainstorm idea ${state.idea.id} <path>.`,
+			: `Run ce-brainstorm interactively, ask one question at a time until the requirements are clear, write the brainstorm artifact, then rerun /work-brainstorm idea ${state.idea.id} <path>.`,
+		"Never silently skip ce-brainstorm questions for broad, important, or underspecified work.",
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
 		ROLE_TIMEOUT_GUIDANCE,
 	].join("\n");
@@ -4389,7 +4390,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			message: `${init.initialized ? `${init.message} ` : ""}${message}`,
 			handoffPrompt: [
 				"Use ce-plan to convert this input into a detailed master roadmap plan, then run /work-plan with the produced plan path.",
-				"Auto-accept plan creation unless a real human decision is needed.",
+				"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
 				detail,
 				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
 				ROLE_TIMEOUT_GUIDANCE,
