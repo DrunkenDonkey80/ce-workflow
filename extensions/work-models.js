@@ -2989,6 +2989,7 @@ async function sendFollowUp(ctx, message, pi) {
 }
 
 async function handleWorkResumeCommand(args, ctx, pi) {
+	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = buildWorkResumeState(ctx.cwd, args);
 	notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning");
 	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
@@ -3031,6 +3032,7 @@ function renderWorkflowActionText(state) {
 }
 
 async function handleWorkflowAction(builder, args, ctx, pi) {
+	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = builder(ctx.cwd, args);
 	notify(ctx, renderWorkflowActionText(state), state.ok ? "info" : "warning");
 	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
