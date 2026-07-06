@@ -3189,6 +3189,7 @@ export default function workModelsExtension(pi) {
 		description: "Show deterministic Beads/git work-orchestrator status",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-status", args, ctx, async () => {
+				cleanupBenignInstructionDirt(ctx.cwd);
 				try {
 					const output = buildWorkStatus(ctx.cwd, args);
 					notify(ctx, output, "info");
@@ -3209,6 +3210,7 @@ export default function workModelsExtension(pi) {
 		description: "Show deterministic Beads/git blocker handoff report",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-report", args, ctx, async () => {
+				cleanupBenignInstructionDirt(ctx.cwd);
 				const output = buildWorkReport(ctx.cwd, args);
 				notify(ctx, output, "info");
 				return { ok: true, outputChars: output.length };
@@ -3220,6 +3222,7 @@ export default function workModelsExtension(pi) {
 		description:
 			"Summarize work-orchestrator timing, token, and context telemetry",
 		handler: async (args, ctx) => {
+			cleanupBenignInstructionDirt(ctx.cwd);
 			const output = buildWorkTelemetry(ctx.cwd, args);
 			notify(ctx, output, "info");
 		},
