@@ -161,32 +161,34 @@ function telemetryFingerprint(event) {
 	].join("\u001f");
 }
 
-function lastTelemetryRecord(file) {
-	if (!existsSync(file)) return undefined;
-	const lines = readFileSync(file, "utf8").trim().split(/\r?\n/);
-	const line = lines.at(-1);
-	if (!line) return undefined;
-	try {
-		return JSON.parse(line);
-	} catch {
-		return undefined;
-	}
+function duplicateTelemetryWindowMs() {
+	const configured = Number(
+		process.env.WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES,
+	);
+	const minutes = Number.isFinite(configured) && configured >= 0 ? configured : 60;
+	return minutes * 60 * 1000;
 }
 
 function isDuplicateTelemetry(file, record) {
 	const fingerprint = telemetryFingerprint(record);
-	if (!fingerprint) return false;
-	const previous = lastTelemetryRecord(file);
-	if (!previous || telemetryFingerprint(previous) !== fingerprint) return false;
-	const previousAt = Date.parse(previous.timestamp ?? "");
+	if (!fingerprint || !existsSync(file)) return false;
 	const recordAt = Date.parse(record.timestamp ?? "");
-	const ageMs = recordAt - previousAt;
-	return (
-		Number.isFinite(previousAt) &&
-		Number.isFinite(recordAt) &&
-		ageMs >= 0 &&
-		ageMs < 5 * 60 * 1000
-	);
+	if (!Number.isFinite(recordAt)) return false;
+	const windowMs = duplicateTelemetryWindowMs();
+	const lines = readFileSync(file, "utf8").trim().split(/\r?\n/);
+	for (let index = lines.length - 1; index >= 0; index -= 1) {
+		let previous;
+		try {
+			previous = JSON.parse(lines[index]);
+		} catch {
+			continue;
+		}
+		if (telemetryFingerprint(previous) !== fingerprint) continue;
+		const previousAt = Date.parse(previous.timestamp ?? "");
+		const ageMs = recordAt - previousAt;
+		return Number.isFinite(previousAt) && ageMs >= 0 && ageMs < windowMs;
+	}
+	return false;
 }
 
 function recordWorkTelemetry(cwd, event) {
