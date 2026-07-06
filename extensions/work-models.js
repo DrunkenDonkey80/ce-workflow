@@ -165,7 +165,8 @@ function duplicateTelemetryWindowMs() {
 	const configured = Number(
 		process.env.WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES,
 	);
-	const minutes = Number.isFinite(configured) && configured >= 0 ? configured : 60;
+	const minutes =
+		Number.isFinite(configured) && configured >= 0 ? configured : 60;
 	return minutes * 60 * 1000;
 }
 
