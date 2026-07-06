@@ -279,6 +279,7 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 		const file = recordWorkTelemetry(ctx.cwd, event);
 		if (note && state?.handoffPrompt)
 			appendTelemetryNote(ctx.cwd, summary.beadId, event, file);
+		cleanupBenignInstructionDirt(ctx.cwd);
 	}
 }
 
@@ -1251,6 +1252,25 @@ function isBenignInstructionDirt(cwd, item) {
 		return true;
 	} catch {
 		return false;
+	}
+}
+
+function cleanupBenignInstructionDirt(cwd) {
+	let dirtyFiles;
+	try {
+		dirtyFiles = parsePorcelainStatus(
+			run(cwd, "git", ["status", "--porcelain=v1", "--untracked-files=all"]),
+		);
+	} catch {
+		return;
+	}
+	for (const item of dirtyFiles) {
+		if (!isBenignInstructionDirt(cwd, item)) continue;
+		try {
+			run(cwd, "git", ["checkout", "--", item.path]);
+		} catch {
+			// Best-effort cleanup only; never fail the workflow command for this.
+		}
 	}
 }
 
