@@ -2968,6 +2968,30 @@ function buildWorkReport(cwd, args = "") {
 		: renderWorkReportText(state);
 }
 
+function renderResumeBlockedLines(state) {
+	if (state.action !== "report-blocked") return [];
+	const lines = [];
+	if (state.blockers?.length) {
+		lines.push("Blocked:");
+		for (const blocker of state.blockers.slice(0, 3))
+			lines.push(
+				`- ${blocker.id} ${blocker.status} ${blocker.type} — ${blocker.title}`,
+			);
+		if (state.blockers.length > 3)
+			lines.push(`- … ${state.blockers.length - 3} more blocker(s)`);
+	}
+	if (state.openDecisions?.length) {
+		lines.push("Open decisions:");
+		for (const decision of state.openDecisions.slice(0, 3))
+			lines.push(
+				`- ${decision.id} ${decision.status} — ${decision.title}`,
+			);
+		if (state.openDecisions.length > 3)
+			lines.push(`- … ${state.openDecisions.length - 3} more decision(s)`);
+	}
+	return lines.length ? ["", ...lines] : [];
+}
+
 function renderWorkResumeText(state) {
 	if (!state.ok) {
 		const candidates = state.candidates?.length
@@ -2999,6 +3023,7 @@ function renderWorkResumeText(state) {
 			? `Selected: ${state.selectedBead.id} ${state.selectedBead.type} — ${state.selectedBead.title}`
 			: "Selected: none",
 		state.message ? `Reason: ${state.message}` : "",
+		...renderResumeBlockedLines(state),
 		"",
 		"Git:",
 		state.git.status,

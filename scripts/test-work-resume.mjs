@@ -551,6 +551,11 @@ try {
 			sent.push({ message, options }),
 	});
 	assert(sent.length === 0, "blocked handler does not inject follow-up");
+	assert(
+		notices.at(-1)?.message.includes("DEC-1") &&
+			notices.at(-1)?.message.includes("Blocked:"),
+		"blocked resume output includes the compact blocker ledger",
+	);
 } finally {
 	if (oldEnv.bd === undefined) delete process.env.WORK_ORCH_BD_BIN;
 	else process.env.WORK_ORCH_BD_BIN = oldEnv.bd;
