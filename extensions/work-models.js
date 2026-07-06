@@ -2973,11 +2973,11 @@ function renderResumeBlockedLines(state) {
 	const lines = [];
 	if (state.blockers?.length) {
 		lines.push("Blocked:");
-		for (const blocker of state.blockers.slice(0, 3)) {
+		for (const [index, blocker] of state.blockers.slice(0, 3).entries()) {
 			lines.push(
 				`- ${blocker.id} ${blocker.status} ${blocker.type} — ${blocker.title}`,
 			);
-			if (blocker.notes?.nextAction)
+			if (index === 0 && blocker.notes?.nextAction)
 				lines.push(`  Required action: ${blocker.notes.nextAction}`);
 		}
 		if (state.blockers.length > 3)
