@@ -416,6 +416,8 @@ From Git Bash, disable MSYS path conversion when using non-interactive slash com
 MSYS_NO_PATHCONV=1 pi --effort high -p "/work-resume last"
 ```
 
+Known runtime follow-up: current Pi on this Windows bench prints `The system cannot find the path specified.` before any `pi -e ...` extension session, even for an empty extension. The work commands now print deterministic results and keep git clean despite that upstream/runtime noise; investigate Pi extension startup separately if the message becomes actionable.
+
 ## MVP limits
 
 - No custom dashboard.
