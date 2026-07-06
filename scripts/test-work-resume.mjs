@@ -153,7 +153,8 @@ const childrenByScenario = {
 			status: "blocked",
 			title: "Repair COM7 device",
 			labels: ["wo:blocked"],
-			notes: "Next command after repair: reconnect COM7 and run pytest -m hardware",
+			notes:
+				"Next command after repair: reconnect COM7 and run pytest -m hardware",
 		},
 		{
 			id: "BUG-2",
