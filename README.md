@@ -40,12 +40,6 @@ Target repositories can be bootstrapped from Pi:
 /work-plan <idea-or-plan-file>
 ```
 
-For an autonomous epic loop from another working directory, use:
-
-```text
-/skill:work-epic-autopilot <product-dir> --workflow <workflow-package-dir>
-```
-
 The workflow initializes Beads with `bd init --non-interactive --skip-agents` so target projects do not get generic Beads AGENTS.md noise.
 
 ## Commands
