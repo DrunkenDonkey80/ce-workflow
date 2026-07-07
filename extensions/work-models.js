@@ -5053,6 +5053,16 @@ function workGoalSelfImprovingAppendix() {
 - Finish only after target-project progress and ce-workflow improvements are verified.`;
 }
 
+function workProjectAutopilotAppendix() {
+	return `Project autopilot policy:
+- Treat the target directory as the source of truth: verify git and Beads state there before mutating anything.
+- Use the work-orchestrator resume/debug/status/report loop, with all product commands and role-agent cwd values pointed at the target project.
+- Keep the parent session as coordinator only; use fresh-context Beads role agents for implementation, review, fixing, debugging, and committing.
+- Obey the user instruction literally; if it says one task only, stop after one executable Bead closes. If it says N tasks, stop after N executable Beads close.
+- At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo before continuing.
+- Stop only when the requested scope is done, the epic is complete, or a real product/credential/hardware/destructive/verification decision is required.`;
+}
+
 function parseWorkProjectGoalInput(input = "") {
 	const prompt = String(input ?? "").trim();
 	const explicit = /\s+--\s+/.exec(prompt);
@@ -5088,8 +5098,9 @@ function buildWorkSelfImprovingObjective(input = "", options = {}) {
 		return [
 			project ? `Target project: ${project}` : "",
 			task
-				? `Run only this task in the target project: ${task}`
+				? `User instruction for the target project: ${task}`
 				: "Run the autonomous project work loop for the target project until the active work is complete or a real human decision is required.",
+			workProjectAutopilotAppendix(),
 			workGoalSelfImprovingAppendix(),
 		]
 			.filter(Boolean)

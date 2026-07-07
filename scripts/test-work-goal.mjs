@@ -38,8 +38,10 @@ const oneTaskObjective = mod.buildWorkSelfImprovingObjective(
 assert.match(oneTaskObjective, /Target project: C:\/soft\/git\/AI-Wedge/);
 assert.match(
 	oneTaskObjective,
-	/Run only this task in the target project: one task only: fix login/,
+	/User instruction for the target project: one task only: fix login/,
 );
+assert.match(oneTaskObjective, /Project autopilot policy/);
+assert.match(oneTaskObjective, /if it says one task only, stop after one executable Bead closes/);
 assert.deepEqual(
 	mod.parseWorkProjectGoalInput("C:/soft/git/AI-Wedge task 19"),
 	{
