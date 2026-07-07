@@ -23,7 +23,7 @@ Review the assigned Bead by inspecting:
 - acceptance criteria;
 - worker verification notes;
 - any failure artifact in Bead notes, including live/product evidence failures distinct from harness pass/fail;
-- the Bead's verification contract, including any real-hardware evidence requirement;
+- the Bead's verification contract, including any real-hardware evidence requirement and package/activity identity when multiple installed apps could match the proof;
 - relevant tests or static checks.
 
 Report exactly one outcome:
