@@ -22,7 +22,7 @@ Responsibilities:
 - inspect `git status --porcelain=v1 --untracked-files=all` before editing; classify file names, not diff/stat summaries such as `1 -0`; stop only if manual changes conflict or unknown unrelated dirt is not covered by the parent known-unrelated dirty allowlist;
 - implement the smallest correct change for that Bead;
 - run the Bead's verification contract exactly when present; if it requires real hardware, run the real hardware check and record device/module evidence; use a substitute only when the contract allows it;
-- update Bead notes with files changed, verification run, result, failures, and remaining work, leaving the Bead open/in-progress for review and commit;
+- update Bead notes with files changed, verification run, result, failures, and remaining work, leaving the Bead open/in-progress for review and commit; for multi-line notes, pass real newlines via a temp file/heredoc or `$'...'`, never literal `\\n` text;
 - when verification fails after a real attempt, attach a compact failure artifact in notes: command, exit/status, artifact paths, failing phase, observed vs expected, touched files, suspected owner, and next debug command;
 - create or request a `type=bug` / `wo:debug` Bead under the same epic when root-cause debugging is needed, with `discovered-from:<bead-id>` and blocker dependencies for the failed work;
 - create discovered follow-up Beads only when needed, under the same epic parent when one exists, using `discovered-from:<bead-id>` in notes.
