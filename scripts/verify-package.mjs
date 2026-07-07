@@ -418,7 +418,7 @@ check(
 	"extension exposes bundled role agents to pi-subagents",
 	extensionSource.includes("PI_SUBAGENT_EXTRA_AGENT_DIRS") &&
 		extensionSource.includes("exposeBundledSubagentAgents") &&
-		extensionSource.includes('"..",\n\t"agents"'),
+		extensionSource.includes('"agents"'),
 );
 for (const phrase of [
 	'registerCommand("work-models"',

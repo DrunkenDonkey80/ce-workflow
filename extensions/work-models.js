@@ -27,11 +27,7 @@ const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
-const WORK_ORCH_AGENT_DIR = resolve(
-	dirname(fileURLToPath(import.meta.url)),
-	"..",
-	"agents",
-);
+const WORK_ORCH_AGENT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "agents");
 
 function exposeBundledSubagentAgents() {
 	if (!existsSync(WORK_ORCH_AGENT_DIR)) return;
