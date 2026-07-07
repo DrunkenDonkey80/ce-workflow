@@ -20,3 +20,7 @@ When a live or disposable test project exposes a ce-workflow issue, do not only 
 ## Code-First Workflow Rule
 
 If project workflow behavior can be handled in code without losing functionality, prefer coded automation over prompt-only or manual process guidance.
+
+## Continuous Workflow Optimization Rule
+
+Always look for ways to make ce-workflow faster, quieter, more autonomous, and cheaper in tokens/context. Use existing telemetry to spot waste in command flow, role selection, subagent handoffs, retries, output volume, and verification gates. If better telemetry would make the next improvement obvious, add the smallest structured signal needed. When you see a safe improvement to extension behavior, implement and verify it before moving on.

@@ -215,16 +215,52 @@ function textChars(value) {
 	return String(value).length;
 }
 
+function handoffRole(action) {
+	const text = String(action ?? "");
+	if (text.includes("debug")) return "debugger";
+	if (text.includes("review")) return "reviewer";
+	if (text.includes("commit") || text.includes("finish")) return "committer";
+	if (text.includes("planner") || text.includes("plan")) return "planner";
+	if (text.includes("migrate")) return "migrator";
+	if (text.includes("fix")) return "fixer";
+	if (text.includes("implementation") || text.includes("work")) return "worker";
+	return undefined;
+}
+
+function stopReason(state) {
+	if (!state) return "unknown";
+	if (state.ok === false) return state.action ?? state.reason ?? "command-error";
+	if (state.git && state.git.safeForHandoff === false) return "dirty-worktree";
+	if (state.action === "report-blocked") return "blocked";
+	if (state.action === "done-candidate") return "completed-slice";
+	if (state.action === "close-stale-planning") return "planning-boundary";
+	if (state.handoffPrompt) return "handoff-queued";
+	if (state.suggestedCommands?.length) return "manual-next-step";
+	return "completed-command";
+}
+
 function stateTelemetry(state) {
+	const handoffQueued = Boolean(state?.handoffPrompt);
+	const role = handoffRole(state?.action);
 	return {
 		ok: state?.ok !== false,
 		action: state?.action,
 		reason: state?.reason,
+		stopReason: stopReason(state),
 		epicId: state?.epic?.id,
 		beadId: state?.selectedBead?.id ?? state?.bead?.id,
 		beadType: state?.selectedBead?.type ?? state?.bead?.type,
+		handoff: {
+			queued: handoffQueued,
+			started: false,
+			role,
+			reason: handoffQueued ? undefined : stopReason(state),
+		},
 		outputChars: state?.outputChars,
 		counts: state?.counts,
+		warnings: state?.warnings?.length
+			? { count: state.warnings.length }
+			: undefined,
 	};
 }
 
@@ -414,6 +450,7 @@ function subagentStatus(result) {
 function summarizeSubagentResult(result) {
 	return {
 		agent: result.agent ?? "unknown",
+		role: handoffRole(result.agent),
 		status: subagentStatus(result),
 		durationMs: result.durationMs ?? result.progressSummary?.durationMs,
 		toolCount: result.toolCount ?? result.progressSummary?.toolCount,
@@ -450,6 +487,17 @@ function subagentDetailsFromResult(result) {
 	];
 }
 
+function toolKind(name, args) {
+	if (name !== "bash") return name;
+	const command = String(parseToolArgs(args).command ?? "").toLowerCase();
+	if (/\b(pytest|unittest|npm\s+(run\s+)?test|gradle\s+test)\b/.test(command))
+		return "test";
+	if (/\b(smoke_|smoke-|adb|emulator|powershell|pwsh)\b/.test(command))
+		return "live-smoke";
+	if (/\b(git|bd)\b/.test(command)) return "state";
+	return "shell";
+}
+
 function summarizeToolResult(event, started) {
 	const text =
 		typeof event.result === "string"
@@ -462,6 +510,7 @@ function summarizeToolResult(event, started) {
 	return {
 		id: event.toolCallId,
 		name: event.toolName,
+		kind: toolKind(event.toolName, started?.args),
 		durationMs: Math.max(0, Date.now() - (started?.startedAt ?? Date.now())),
 		isError: Boolean(event.isError),
 		inputChars: textChars(started?.args),
@@ -603,6 +652,9 @@ function summarizeTelemetryEvent(event) {
 		command: event.command,
 		mode: event.mode,
 		action: event.action,
+		role: event.role,
+		stopReason: event.stopReason,
+		handoff: event.handoff,
 		epicId: event.epicId,
 		beadId: event.beadId ?? event.meta?.beadId,
 		durationMs: event.durationMs,
@@ -610,6 +662,7 @@ function summarizeTelemetryEvent(event) {
 		messages: event.messages,
 		context: event.context,
 		review: event.review,
+		payoff: event.payoff,
 		reason: event.reason,
 		file: event.file,
 		tools: summarizeTelemetryTools(event.tools ?? []),
@@ -633,7 +686,12 @@ function buildWorkTelemetryState(cwd, args = "") {
 		toolOutputChars: 0,
 		toolCalls: 0,
 		subagentRuns: 0,
+		testRuns: 0,
+		handoffsQueued: 0,
+		handoffsStarted: 0,
 	};
+	const stopReasons = new Map();
+	const rolePayoff = new Map();
 	let maxContextTokens = 0;
 	for (const event of events) {
 		totals.durationMs += Number(event.durationMs ?? 0);
@@ -652,6 +710,31 @@ function buildWorkTelemetryState(cwd, args = "") {
 		totals.subagentRuns += (event.tools ?? []).filter(
 			(tool) => tool.name === "subagent",
 		).length;
+		totals.testRuns += (event.tools ?? []).filter(
+			(tool) => tool.kind === "test",
+		).length;
+		if (event.handoff?.queued) totals.handoffsQueued += 1;
+		if (event.handoff?.started) totals.handoffsStarted += 1;
+		const reason = event.stopReason;
+		if (reason) stopReasons.set(reason, (stopReasons.get(reason) ?? 0) + 1);
+		if (event.payoff?.role) {
+			const payoff = rolePayoff.get(event.payoff.role) ?? {
+				role: event.payoff.role,
+				count: 0,
+				durationMs: 0,
+				tokens: 0,
+				filesChanged: 0,
+				testsRun: 0,
+				commits: 0,
+			};
+			payoff.count += 1;
+			payoff.durationMs += Number(event.payoff.durationMs ?? event.durationMs ?? 0);
+			payoff.tokens += Number(event.payoff.tokens ?? event.usage?.totalTokens ?? 0);
+			payoff.filesChanged += Number(event.payoff.filesChanged ?? 0);
+			payoff.testsRun += Number(event.payoff.testsRun ?? 0);
+			if (event.payoff.commitCreated) payoff.commits += 1;
+			rolePayoff.set(event.payoff.role, payoff);
+		}
 		maxContextTokens = Math.max(
 			maxContextTokens,
 			Number(
@@ -676,6 +759,13 @@ function buildWorkTelemetryState(cwd, args = "") {
 		events: events.length,
 		totals,
 		maxContextTokens,
+		stopReasons: [...stopReasons.entries()].map(([reason, count]) => ({
+			reason,
+			count,
+		})),
+		rolePayoff: [...rolePayoff.values()].sort(
+			(a, b) => b.durationMs - a.durationMs,
+		),
 		byPhase: [...byPhase.values()].sort((a, b) => b.durationMs - a.durationMs),
 		byBead: [...byBead.values()].sort((a, b) => b.durationMs - a.durationMs),
 		slowest: [...events]
@@ -710,8 +800,22 @@ function renderWorkTelemetryText(state) {
 	return [
 		`Work telemetry: ${state.filter.scope}${state.filter.value ? ` ${state.filter.value}` : ""}`,
 		`Events: ${state.events} • observed time: ${formatDuration(state.totals.durationMs)} • tokens: ${state.totals.tokens} in:${state.totals.input} out:${state.totals.output} • cost: ${state.totals.cost.toFixed(4)}`,
-		`Tools: ${state.totals.toolCalls} calls, ${state.totals.subagentRuns} subagent runs, ${state.totals.toolOutputChars} tool-output chars • messages: ${state.totals.messageChars} chars`,
+		`Tools: ${state.totals.toolCalls} calls, ${state.totals.subagentRuns} subagent runs, ${state.totals.testRuns} test runs, ${state.totals.toolOutputChars} tool-output chars • messages: ${state.totals.messageChars} chars`,
+		`Handoffs: ${state.totals.handoffsQueued} queued, ${state.totals.handoffsStarted} started`,
 		`Max recorded context: ${state.maxContextTokens || "unknown"} tokens`,
+		"",
+		"Stop reasons:",
+		...(state.stopReasons.length
+			? state.stopReasons.map((row) => `- ${row.reason}: ${row.count}`)
+			: ["- none"]),
+		"",
+		"Role payoff:",
+		...(state.rolePayoff.length
+			? state.rolePayoff.map(
+					(row) =>
+						`- ${row.role}: ${row.count} runs, ${formatDuration(row.durationMs)}, ${row.tokens} tokens, ${row.filesChanged} dirty-file observations, ${row.testsRun} tests, ${row.commits} commits`,
+				)
+			: ["- none"]),
 		"",
 		"By phase:",
 		...renderMetricRows(state.byPhase),
@@ -1464,6 +1568,22 @@ function run(cwd, command, args) {
 	} catch (error) {
 		throw error;
 	}
+}
+
+function safeRun(cwd, command, args) {
+	try {
+		return run(cwd, command, args);
+	} catch {
+		return "";
+	}
+}
+
+function gitSnapshot(cwd) {
+	const status = safeRun(cwd, "git", ["status", "--porcelain=v1"]);
+	return {
+		head: safeRun(cwd, "git", ["rev-parse", "--verify", "HEAD"]),
+		dirtyFiles: status ? status.split(/\r?\n/).filter(Boolean).length : 0,
+	};
 }
 
 function bdJson(cwd, args) {
@@ -4948,6 +5068,7 @@ export default function workModelsExtension(pi) {
 		activeWorkAgent = {
 			...pendingWorkPrompt,
 			startedAt: Date.now(),
+			gitBefore: gitSnapshot(pendingWorkPrompt.cwd),
 			tools: [],
 			toolStarts: new Map(),
 		};
@@ -4974,19 +5095,35 @@ export default function workModelsExtension(pi) {
 		const run = activeWorkAgent;
 		activeWorkAgent = null;
 		const usage = messageUsage(event.messages);
+		const durationMs = Math.max(0, Date.now() - run.startedAt);
+		const review = reviewTelemetry(run.meta, event);
+		const gitAfter = gitSnapshot(run.cwd);
+		const testsRun = run.tools.filter((tool) => tool.kind === "test").length;
+		const role = handoffRole(run.meta.action) ?? handoffRole(run.meta.mode);
 		const telemetry = {
 			id: run.id,
 			type: "agent",
 			mode: run.meta.mode,
 			action: run.meta.action,
+			role,
+			handoff: { queued: false, started: true, role },
 			epicId: run.meta.epicId,
 			beadId: run.meta.beadId,
-			durationMs: Math.max(0, Date.now() - run.startedAt),
+			durationMs,
 			promptChars: run.promptChars,
 			messages: summarizeMessages(event.messages),
 			tools: run.tools,
 			usage,
-			review: reviewTelemetry(run.meta, event),
+			review,
+			payoff: {
+				role,
+				durationMs,
+				tokens: usage.totalTokens || undefined,
+				filesChanged: gitAfter.dirtyFiles,
+				commitCreated: Boolean(run.gitBefore?.head && gitAfter.head && run.gitBefore.head !== gitAfter.head),
+				testsRun,
+				reviewOutcome: review?.outcome,
+			},
 			context: { before: run.contextBefore, after: usageSnapshot(ctx) },
 		};
 		const file = recordWorkTelemetry(run.cwd, telemetry);

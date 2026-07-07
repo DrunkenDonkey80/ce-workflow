@@ -35,6 +35,8 @@ try {
 		type: "command",
 		command: "work-small",
 		action: "run-implementation",
+		stopReason: "handoff-queued",
+		handoff: { queued: true, started: false, role: "worker" },
 		epicId: "E-1",
 		beadId: "TASK-1",
 		durationMs: 120,
@@ -46,12 +48,24 @@ try {
 		type: "agent",
 		mode: "resume",
 		action: "run-implementation",
+		role: "worker",
 		epicId: "E-1",
 		beadId: "TASK-1",
 		durationMs: 420_000,
 		usage: { input: 9000, output: 2000, totalTokens: 11_000, cost: 0.15 },
+		payoff: {
+			role: "worker",
+			durationMs: 420_000,
+			tokens: 11_000,
+			filesChanged: 3,
+			testsRun: 1,
+			commitCreated: false,
+		},
 		context: { before: { tokens: 1200 }, after: { tokens: 18_000 } },
-		tools: [{ name: "subagent", runId: "worker-1", durationMs: 390_000 }],
+		tools: [
+			{ name: "subagent", runId: "worker-1", durationMs: 390_000 },
+			{ name: "bash", kind: "test", durationMs: 20_000 },
+		],
 	});
 	recordWorkTelemetry(cwd, {
 		id: "agent-review",
@@ -119,10 +133,21 @@ try {
 	assert(text.includes("work-big"), "text includes work-big command phase");
 	assert(text.includes("TASK-1"), "text groups by task bead");
 	assert(text.includes("24000"), "text reports max context tokens");
+	assert(text.includes("Handoffs: 1 queued"), "text reports handoff outcomes");
+	assert(text.includes("handoff-queued"), "text reports stop reasons");
+	assert(text.includes("worker: 1 runs"), "text reports role payoff");
 
 	const epic = buildWorkTelemetryState(cwd, "epic E-1");
 	assert(epic.events === 7, "epic filter includes all synthetic events");
 	assert(epic.totals.tokens === 31_600, "epic totals agent token usage");
+	assert(epic.totals.testRuns === 1, "epic totals classified test tools");
+	assert(epic.totals.handoffsQueued === 1, "epic totals queued handoffs");
+	assert(
+		epic.rolePayoff.some(
+			(row) => row.role === "worker" && row.filesChanged === 3,
+		),
+		"epic reports structured role payoff",
+	);
 	assert(
 		epic.byPhase.some((row) => row.key === "agent/resume/review"),
 		"phase summary includes review agent",
@@ -221,6 +246,11 @@ try {
 			commandSummary.byPhase[0].key === "command/work-small/run-implementation",
 			"extension command records command/action phase",
 		);
+		assert(
+			commandSummary.slowest[0].handoff?.queued &&
+				commandSummary.slowest[0].handoff.role === "worker",
+			"extension command records handoff outcome and role",
+		);
 		assert(sent.length === 1, "instrumented command still queues handoff");
 		assert(
 			sent[0].message.includes("Review scope default: current Bead TASK-NEW-1"),
@@ -268,6 +298,10 @@ try {
 					event.review.outcome === "PASS",
 			),
 			"review telemetry records scoped outcome fields",
+		);
+		assert(
+			reviewSummary.totals.handoffsStarted === 1,
+			"agent telemetry records handoff start outcome",
 		);
 		assert(
 			!fixture
