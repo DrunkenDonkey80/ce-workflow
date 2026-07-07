@@ -436,7 +436,8 @@ Responsibilities:
 - leave parent-declared known-unrelated dirty files unstaged and report them, stopping only if they conflict or are not on the allowlist;
 - use commit message `<bead-id>: <summary>`;
 - after commit, re-run `git status --short`; if related files changed due autoformat/test tooling, rerun verification and commit those changes before closing;
-- close the Bead only after the commit exists and no related dirty files remain;
+- close the Bead only after the work commit exists and no related dirty files remain;
+- after close, re-run `git status --short`; if `bd close` changed tracked Beads files such as `.beads/interactions.jsonl`, stage only those close-record files and amend or create a same-Bead follow-up commit before finalizing;
 - push only when repo/session policy requires it.
 
 ## Stop Conditions

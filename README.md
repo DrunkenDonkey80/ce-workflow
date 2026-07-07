@@ -2,7 +2,7 @@
 
 Beads-backed Pi workflow package for running software work through short `/work-*` commands.
 
-The package is intentionally boring: one skill, one tiny workflow extension, seventeen prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
+The package is intentionally boring: one core workflow skill, one autopilot wrapper skill, one tiny workflow extension, seventeen prompt templates, and seven role subagents. Beads owns work state. Git owns code state. There is no package database.
 
 ## Install
 
@@ -40,6 +40,12 @@ Target repositories can be bootstrapped from Pi:
 /work-plan <idea-or-plan-file>
 ```
 
+For an autonomous epic loop from another working directory, use:
+
+```text
+/skill:work-epic-autopilot <product-dir> --workflow <workflow-package-dir>
+```
+
 The workflow initializes Beads with `bd init --non-interactive --skip-agents` so target projects do not get generic Beads AGENTS.md noise.
 
 ## Commands
@@ -66,6 +72,9 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-usage [today\|all\|epic <id>\|bead <id>] [--open\|--jsonl]` | Write a usage report | Extension command: writes escaped sortable/filterable HTML under `.pi/work-runs/usage/` and prints the path; `--open` launches it; `--jsonl` prints machine-readable rows without HTML |
 | `/work-finish <bead-id\|epic-id>` | Classify commit/close readiness | Extension command: checks PASS review, verification evidence, related dirty files, and emits a deterministic commit-ready or stop state |
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
+| `/work-goal <objective>` | Run autonomous loops but stop for real human decisions | Extension command: appends goal-management rules, microcompacts before continuations, auto-consumes clear-winner questions, and pauses on human-decision blockers |
+| `/work-self-improving-goal <objective>` | Run `/work-goal` with ce-workflow improvement pressure | Same as `/work-goal`, plus a temporary self-improvement overlay for fixing workflow friction in this package |
+| `/work-project-goal <repo-path> [instruction]` / `/work-project <repo-path> [instruction]` | Self-improving autonomous loop for another repository | Plain language after the path becomes the constraint, e.g. `/work-project C:\soft\git\AI-Wedge do three tasks and stop` |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
 | `/work-models [status\|reset]` | Pick role models/effort | Extension command with model/effort picker; persists overrides to `.pi/settings.json` |
 
@@ -86,8 +95,9 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 13. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
 14. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
 15. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git and only open in a browser with `--open`. Use `--jsonl` for agent/subagent consumption.
-16. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
-17. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+16. `/work-goal` runs a session-scoped autonomous loop with a scoped human-decision stop and `/work-context` microcompaction before continuations; `/work-self-improving-goal` and `/work-project-goal` add temporary ce-workflow self-improvement pressure.
+17. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
+18. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 

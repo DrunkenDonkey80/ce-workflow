@@ -519,7 +519,10 @@ try {
 
 	process.env.WORK_RESUME_SCENARIO = "open-two-ready";
 	state = buildWorkResumeState(process.cwd(), "O-1");
-	assert(state.ok && state.epic.id === "O-1", "explicit open target refreshes remembered epic");
+	assert(
+		state.ok && state.epic.id === "O-1",
+		"explicit open target refreshes remembered epic",
+	);
 	state = buildWorkResumeState(process.cwd(), "last");
 	assert(
 		state.ok && state.epic.id === "O-1",

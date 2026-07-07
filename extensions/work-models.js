@@ -27,7 +27,11 @@ const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
-const WORK_ORCH_AGENT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "agents");
+const WORK_ORCH_AGENT_DIR = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	"..",
+	"agents",
+);
 
 function exposeBundledSubagentAgents() {
 	if (!existsSync(WORK_ORCH_AGENT_DIR)) return;
@@ -102,6 +106,31 @@ const MIN_COMPACT_AT_TOKENS = 30_000;
 const contextCompactState = { inFlight: false, requested: false };
 let pendingWorkPrompt = null;
 let activeWorkAgent = null;
+let activeWorkGoal = null;
+let workGoalContinuationPending = null;
+
+const WORK_GOAL_STATE_ENTRY_TYPE = "work-goal-state";
+const WORK_GOAL_STATUS_KEY = "work-goal";
+const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
+const WORK_GOAL_DECISION_MARKER = "WORK_GOAL_NEEDS_HUMAN_DECISION";
+const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
+const WORK_GOAL_TOOL_SCHEMA = {
+	type: "object",
+	properties: {
+		summary: { type: "string", description: "Completion or decision summary" },
+		question: { type: "string", description: "Human decision question" },
+		whyUserNeeded: {
+			type: "string",
+			description: "Why the agent cannot decide safely",
+		},
+		options: { type: "string", description: "Known options, if any" },
+		recommendation: {
+			type: "string",
+			description: "Recommended option, if one exists",
+		},
+	},
+	additionalProperties: false,
+};
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -2338,9 +2367,14 @@ function compactList(items = [], limit = 8) {
 }
 
 function compactMultiline(value, limit = 20) {
-	const lines = String(value ?? "").split(/\r?\n/).filter(Boolean);
+	const lines = String(value ?? "")
+		.split(/\r?\n/)
+		.filter(Boolean);
 	if (lines.length <= limit) return String(value ?? "");
-	return [...lines.slice(0, limit), `… +${lines.length - limit} more lines`].join("\n");
+	return [
+		...lines.slice(0, limit),
+		`… +${lines.length - limit} more lines`,
+	].join("\n");
 }
 
 function isPiRuntimeArtifact(path) {
@@ -4991,6 +5025,543 @@ function buildWorkResume(cwd, args = "") {
 		: renderWorkResumeText(state);
 }
 
+function splitFirstWord(value) {
+	const trimmed = String(value ?? "").trim();
+	if (!trimmed) return ["", ""];
+	const match = /^(\S+)(?:\s+([\s\S]*))?$/.exec(trimmed);
+	return [match?.[1] ?? "", match?.[2] ?? ""];
+}
+
+function parseWorkGoalCommand(args = "") {
+	const trimmed = String(args ?? "").trim();
+	if (!trimmed) return { kind: "status" };
+	const [command, rest] = splitFirstWord(trimmed);
+	if (["status", "show", "help"].includes(command)) return { kind: "status" };
+	if (command === "pause") return { kind: "pause" };
+	if (command === "resume") return { kind: "resume" };
+	if (command === "clear" || command === "stop") return { kind: "clear" };
+	if (command === "edit") return { kind: "edit", objective: rest.trim() };
+	return { kind: "start", objective: trimmed };
+}
+
+function workGoalSelfImprovingAppendix() {
+	return `Self-improving overlay:
+- Use the ce-workflow/work-orchestrator process where it applies; prefer /work-init, /work-plan, /work-resume, /work-status, /work-report, and Beads-backed state over chat-only tracking.
+- If a live or disposable target project exposes ce-workflow friction, fix this ce-workflow package in code before declaring done, or record one concrete follow-up when a safe fix is not possible now.
+- Prefer coded automation over prompt-only guidance when workflow behavior can be handled in this extension.
+- Use work telemetry and /work-context microcompaction to keep loops cheap, quiet, and resumable.
+- Finish only after target-project progress and ce-workflow improvements are verified.`;
+}
+
+function parseWorkProjectGoalInput(input = "") {
+	const prompt = String(input ?? "").trim();
+	const explicit = /\s+--\s+/.exec(prompt);
+	if (explicit) {
+		return {
+			project: prompt.slice(0, explicit.index).trim(),
+			task: prompt.slice(explicit.index + explicit[0].length).trim(),
+		};
+	}
+	const quoted =
+		/^(?<quote>["'])(?<project>.+?)\k<quote>\s*(?<task>[\s\S]*)$/.exec(prompt);
+	if (quoted?.groups)
+		return {
+			project: quoted.groups.project.trim(),
+			task: quoted.groups.task.trim(),
+		};
+	for (let index = prompt.length - 1; index > 0; index -= 1) {
+		if (!/\s/.test(prompt[index])) continue;
+		const project = prompt.slice(0, index).trim();
+		const path = isAbsolute(project)
+			? project
+			: resolve(process.cwd(), project);
+		if (existsSync(path)) return { project, task: prompt.slice(index).trim() };
+	}
+	const [project, task] = splitFirstWord(prompt);
+	return { project, task: task.trim() };
+}
+
+function buildWorkSelfImprovingObjective(input = "", options = {}) {
+	const prompt = String(input ?? "").trim();
+	if (options.project) {
+		const { project, task } = parseWorkProjectGoalInput(prompt);
+		return [
+			project ? `Target project: ${project}` : "",
+			task
+				? `Run only this task in the target project: ${task}`
+				: "Run the autonomous project work loop for the target project until the active work is complete or a real human decision is required.",
+			workGoalSelfImprovingAppendix(),
+		]
+			.filter(Boolean)
+			.join("\n\n");
+	}
+	return [prompt, workGoalSelfImprovingAppendix()].filter(Boolean).join("\n\n");
+}
+
+function isWorkGoal(value) {
+	return (
+		value &&
+		typeof value === "object" &&
+		typeof value.id === "string" &&
+		typeof value.objective === "string" &&
+		["active", "paused", "needs_human", "complete"].includes(value.status)
+	);
+}
+
+function loadWorkGoalFromSession(ctx) {
+	const entries =
+		ctx.sessionManager?.getBranch?.() ??
+		ctx.sessionManager?.getEntries?.() ??
+		[];
+	const entry = entries
+		.filter(
+			(item) =>
+				item.type === "custom" &&
+				item.customType === WORK_GOAL_STATE_ENTRY_TYPE,
+		)
+		.pop();
+	const goal = entry?.data?.goal;
+	return isWorkGoal(goal) && goal.status !== "complete" ? goal : null;
+}
+
+function persistWorkGoal(pi, goal = activeWorkGoal) {
+	pi?.appendEntry?.(WORK_GOAL_STATE_ENTRY_TYPE, { goal: goal ?? null });
+}
+
+function formatWorkGoalStatus(goal = activeWorkGoal) {
+	if (!goal) return undefined;
+	if (goal.status === "needs_human") return "needs human";
+	if (goal.status === "active") return `active #${goal.iteration ?? 0}`;
+	return goal.status;
+}
+
+function updateWorkGoalStatus(ctx, goal = activeWorkGoal) {
+	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, formatWorkGoalStatus(goal));
+}
+
+function workGoalSummary(goal = activeWorkGoal) {
+	if (!goal) return "No active /work-goal.";
+	return [
+		`Work goal: ${goal.objective}`,
+		`Mode: ${goal.mode}`,
+		`Status: ${goal.status}`,
+		`Iteration: ${goal.iteration ?? 0}`,
+		goal.decision
+			? `Human decision: ${formatWorkGoalDecision(goal.decision)}`
+			: "",
+		"Commands: /work-goal pause|resume|clear|status|edit <objective>",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function createWorkGoal(mode, objective) {
+	const now = Date.now();
+	return {
+		id: telemetryId("wg"),
+		mode,
+		objective,
+		status: "active",
+		iteration: 0,
+		startedAt: now,
+		updatedAt: now,
+	};
+}
+
+function escapeXmlText(value) {
+	return String(value ?? "")
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
+function buildWorkGoalSystemPrompt(goal) {
+	return `Active /work-goal:
+<work_goal_objective>
+${escapeXmlText(goal.objective)}
+</work_goal_objective>
+
+/work-goal management rules:
+- The user's objective above is the work prompt; these rules only manage looping, compaction, and human-decision stops.
+- Keep working autonomously until the objective is complete and verified.
+- Before each continuation, /work-goal will microcompact old reasoning and tool noise; treat Beads, git, files, tests, and command output as source of truth.
+- Do not stop for plan approval, permission to continue, or obvious implementation choices. Pick the clear winner and continue.
+- Use work_goal_human_decision only when progress truly depends on user-only information: product intent, credentials/accounts, destructive or risky action, production/billing/legal impact, ambiguous priority/scope with no clear winner, hardware/environment access, or a target path/project choice you cannot infer.
+- If tools are unavailable, end with ${WORK_GOAL_DECISION_MARKER}: and the question instead of asking a plain-text question.
+- When complete, call work_goal_complete with verification evidence. If the tool is unavailable, end with ${WORK_GOAL_COMPLETE_MARKER}: and the evidence.
+- Do not call completion for partial progress, blockers, failing tests, or unverified work.`;
+}
+
+function buildWorkGoalKickoffPrompt(goal) {
+	return `Work-goal mode is active. Complete this objective fully:\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>`;
+}
+
+function workGoalContinuationMarker(goal) {
+	return `${goal.id}:${goal.iteration}:${Date.now().toString(36)}`;
+}
+
+function workGoalMarkerComment(marker) {
+	return `<!-- ${WORK_GOAL_CONTINUATION_PREFIX}${marker} -->`;
+}
+
+function extractWorkGoalContinuationMarker(prompt) {
+	const pattern = new RegExp(
+		`<!--\\s*${WORK_GOAL_CONTINUATION_PREFIX.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}([^\\s>]+)\\s*-->`,
+	);
+	return pattern.exec(String(prompt ?? ""))?.[1];
+}
+
+function markWorkGoalContinuationDelivered(prompt) {
+	const marker = extractWorkGoalContinuationMarker(prompt);
+	if (marker && workGoalContinuationPending?.marker === marker)
+		workGoalContinuationPending = null;
+}
+
+function buildWorkGoalContinuePrompt(goal, marker, note = "") {
+	return `Continue the active /work-goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. Use work_goal_human_decision only for real human-decision blockers; otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
+}
+
+function buildWorkGoalCompactInstructions(goal) {
+	return `work-context work-goal microcompact: preserve the active /work-goal objective, human decisions, Beads/git state, files changed/read, blockers, verification evidence, and next step. Omit old reasoning and full tool logs. Objective: ${truncate(goal.objective, 1_200)}`;
+}
+
+function workGoalHasPendingMessages(ctx) {
+	return ctx.hasPendingMessages?.() ?? false;
+}
+
+async function sendWorkGoalPrompt(pi, ctx, prompt) {
+	try {
+		const send =
+			typeof ctx.sendUserMessage === "function"
+				? ctx.sendUserMessage.bind(ctx)
+				: pi?.sendUserMessage?.bind(pi);
+		if (!send) return false;
+		if (ctx.isIdle?.()) await send(prompt);
+		else await send(prompt, { deliverAs: "followUp" });
+		return true;
+	} catch (error) {
+		ctx.ui.notify(
+			`Could not queue /work-goal prompt: ${formatError(error)}`,
+			"error",
+		);
+		return false;
+	}
+}
+
+async function microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt) {
+	if (typeof ctx.compact !== "function")
+		return sendWorkGoalPrompt(pi, ctx, prompt);
+	contextCompactState.inFlight = true;
+	contextCompactState.requested = true;
+	return new Promise((resolvePromise) => {
+		let settled = false;
+		const finish = async (warning) => {
+			if (settled) return;
+			settled = true;
+			contextCompactState.inFlight = false;
+			contextCompactState.requested = false;
+			if (warning) ctx.ui.notify(warning, "warning");
+			if (
+				!activeWorkGoal ||
+				activeWorkGoal.id !== goal.id ||
+				activeWorkGoal.status !== "active"
+			) {
+				resolvePromise(false);
+				return;
+			}
+			resolvePromise(await sendWorkGoalPrompt(pi, ctx, prompt));
+		};
+		try {
+			ctx.compact({
+				customInstructions: buildWorkGoalCompactInstructions(goal),
+				onComplete: () => finish(),
+				onError: (error) =>
+					finish(
+						`Work-goal microcompact failed; continuing anyway: ${error.message}`,
+					),
+			});
+		} catch (error) {
+			finish(
+				`Work-goal microcompact failed; continuing anyway: ${formatError(error)}`,
+			);
+		}
+	});
+}
+
+async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
+	if (workGoalContinuationPending?.goalId === goal.id) return false;
+	if (workGoalHasPendingMessages(ctx)) return false;
+	const marker = workGoalContinuationMarker(goal);
+	const prompt = buildWorkGoalContinuePrompt(goal, marker, note);
+	workGoalContinuationPending = {
+		goalId: goal.id,
+		marker,
+		iteration: goal.iteration,
+	};
+	const sent = await microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt);
+	if (!sent && workGoalContinuationPending?.marker === marker)
+		workGoalContinuationPending = null;
+	return sent;
+}
+
+function finalAssistantMessage(messages = []) {
+	for (let index = messages.length - 1; index >= 0; index -= 1) {
+		const message = messages[index];
+		if (message?.role === "assistant") return message;
+	}
+	return undefined;
+}
+
+function assistantVisibleText(message) {
+	return contentText(message?.content ?? message?.message);
+}
+
+function parseWorkGoalCompletion(text) {
+	const match = new RegExp(
+		`(?:^|\\n)${WORK_GOAL_COMPLETE_MARKER}:?\\s*([\\s\\S]*)`,
+		"i",
+	).exec(String(text ?? ""));
+	return match ? truncate(match[1] || "completed", 1_500) : "";
+}
+
+function parseWorkGoalDecision(text) {
+	const match = new RegExp(
+		`(?:^|\\n)${WORK_GOAL_DECISION_MARKER}:?\\s*([\\s\\S]*)`,
+		"i",
+	).exec(String(text ?? ""));
+	return match
+		? { question: truncate(match[1], 2_000), source: "marker" }
+		: null;
+}
+
+function likelyHumanDecisionQuestion(text) {
+	const compact = String(text ?? "").trim();
+	if (!/\?\s*$/.test(compact)) return false;
+	return /\b(product|requirement|priority|scope|credential|secret|password|api key|account|billing|legal|production|deploy|delete|destructive|risk|hardware|device|port|path|repository|repo|choose|which option)\b/i.test(
+		compact,
+	);
+}
+
+function formatWorkGoalDecision(decision = {}) {
+	return [
+		decision.question ? `Question: ${decision.question}` : "",
+		decision.whyUserNeeded ? `Why user needed: ${decision.whyUserNeeded}` : "",
+		decision.options ? `Options: ${decision.options}` : "",
+		decision.recommendation ? `Recommendation: ${decision.recommendation}` : "",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function pauseWorkGoalForDecision(decision, ctx, pi) {
+	if (!activeWorkGoal) return;
+	workGoalContinuationPending = null;
+	activeWorkGoal = {
+		...activeWorkGoal,
+		status: "needs_human",
+		decision,
+		updatedAt: Date.now(),
+	};
+	persistWorkGoal(pi);
+	updateWorkGoalStatus(ctx);
+	ctx.ui.notify(
+		`/work-goal needs human decision:\n${formatWorkGoalDecision(decision)}`,
+		"warning",
+	);
+}
+
+function completeActiveWorkGoal(summary, ctx, pi) {
+	const goal = activeWorkGoal;
+	if (!goal) {
+		return {
+			content: [{ type: "text", text: "No active /work-goal." }],
+			details: {},
+		};
+	}
+	activeWorkGoal = { ...goal, status: "complete", updatedAt: Date.now() };
+	persistWorkGoal(pi, activeWorkGoal);
+	activeWorkGoal = null;
+	workGoalContinuationPending = null;
+	persistWorkGoal(pi, null);
+	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+	ctx.ui.notify(`/work-goal complete: ${truncate(summary, 240)}`, "info");
+	return {
+		content: [{ type: "text", text: `/work-goal complete: ${summary}` }],
+		details: { goal: goal.objective, summary },
+		terminate: true,
+	};
+}
+
+async function startWorkGoal(mode, objective, pi, ctx) {
+	const text = String(objective ?? "").trim();
+	if (!text) {
+		ctx.ui.notify("Usage: /work-goal <objective>", "warning");
+		return;
+	}
+	if (activeWorkGoal && activeWorkGoal.status !== "complete") {
+		const replace = await ctx.ui.confirm(
+			"Replace /work-goal?",
+			`Current: ${activeWorkGoal.objective}\n\nNew: ${text}`,
+		);
+		if (!replace) return;
+	}
+	workGoalContinuationPending = null;
+	activeWorkGoal = createWorkGoal(mode, text);
+	persistWorkGoal(pi);
+	updateWorkGoalStatus(ctx);
+	ctx.ui.notify(`/work-goal started: ${truncate(text, 240)}`, "info");
+	await sendWorkGoalPrompt(pi, ctx, buildWorkGoalKickoffPrompt(activeWorkGoal));
+}
+
+async function handleWorkGoalCommand(args, mode, pi, ctx) {
+	const command = parseWorkGoalCommand(args);
+	if (command.kind === "status") {
+		ctx.ui.notify(workGoalSummary(), "info");
+		updateWorkGoalStatus(ctx);
+		return;
+	}
+	if (command.kind === "clear") {
+		const previous = activeWorkGoal?.objective;
+		activeWorkGoal = null;
+		workGoalContinuationPending = null;
+		persistWorkGoal(pi, null);
+		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+		ctx.ui.notify(
+			previous
+				? `/work-goal cleared: ${truncate(previous, 240)}`
+				: "No active /work-goal.",
+			"info",
+		);
+		return;
+	}
+	if (!activeWorkGoal && command.kind !== "start") {
+		ctx.ui.notify("No active /work-goal.", "warning");
+		return;
+	}
+	if (command.kind === "pause") {
+		activeWorkGoal = {
+			...activeWorkGoal,
+			status: "paused",
+			updatedAt: Date.now(),
+		};
+		workGoalContinuationPending = null;
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		ctx.ui.notify("/work-goal paused.", "info");
+		return;
+	}
+	if (command.kind === "resume") {
+		activeWorkGoal = {
+			...activeWorkGoal,
+			status: "active",
+			updatedAt: Date.now(),
+		};
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		await sendWorkGoalPrompt(
+			pi,
+			ctx,
+			buildWorkGoalContinuePrompt(
+				activeWorkGoal,
+				workGoalContinuationMarker(activeWorkGoal),
+				"User resumed the goal.",
+			),
+		);
+		return;
+	}
+	if (command.kind === "edit") {
+		if (!command.objective) {
+			ctx.ui.notify("Usage: /work-goal edit <objective>", "warning");
+			return;
+		}
+		activeWorkGoal = {
+			...activeWorkGoal,
+			objective: command.objective,
+			status: "active",
+			updatedAt: Date.now(),
+		};
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		await sendWorkGoalPrompt(
+			pi,
+			ctx,
+			buildWorkGoalKickoffPrompt(activeWorkGoal),
+		);
+		return;
+	}
+	await startWorkGoal(mode, command.objective, pi, ctx);
+}
+
+async function handleSelfImprovingWorkGoalCommand(args, pi, ctx, options = {}) {
+	const command = parseWorkGoalCommand(args);
+	if (command.kind !== "start" && command.kind !== "edit")
+		return handleWorkGoalCommand(args, "self-improving", pi, ctx);
+	const objective = buildWorkSelfImprovingObjective(command.objective, options);
+	return command.kind === "edit"
+		? handleWorkGoalCommand(`edit ${objective}`, "self-improving", pi, ctx)
+		: startWorkGoal("self-improving", objective, pi, ctx);
+}
+
+function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
+	if (event.source === "extension") return;
+	if (!activeWorkGoal || activeWorkGoal.status !== "needs_human") return;
+	activeWorkGoal = {
+		...activeWorkGoal,
+		status: "active",
+		decision: undefined,
+		updatedAt: Date.now(),
+	};
+	persistWorkGoal(pi);
+	updateWorkGoalStatus(ctx);
+}
+
+async function handleWorkGoalAgentEnd(event, ctx, pi) {
+	if (!activeWorkGoal || activeWorkGoal.status !== "active") return;
+	const goal = activeWorkGoal;
+	const assistant = finalAssistantMessage(event.messages);
+	const text = assistantVisibleText(assistant);
+	const completion = parseWorkGoalCompletion(text);
+	if (completion) {
+		completeActiveWorkGoal(completion, ctx, pi);
+		return;
+	}
+	const decision = parseWorkGoalDecision(text);
+	if (decision || likelyHumanDecisionQuestion(text)) {
+		pauseWorkGoalForDecision(
+			decision ?? { question: truncate(text, 2_000), source: "question" },
+			ctx,
+			pi,
+		);
+		return;
+	}
+	if (["aborted", "error"].includes(String(assistant?.stopReason ?? ""))) {
+		activeWorkGoal = { ...goal, status: "paused", updatedAt: Date.now() };
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		ctx.ui.notify(
+			"/work-goal paused after interruption. Run /work-goal resume to continue.",
+			"warning",
+		);
+		return;
+	}
+	activeWorkGoal = {
+		...goal,
+		iteration: (goal.iteration ?? 0) + 1,
+		updatedAt: Date.now(),
+	};
+	persistWorkGoal(pi);
+	updateWorkGoalStatus(ctx);
+	if (workGoalHasPendingMessages(ctx)) return;
+	const note = /\?\s*$/.test(String(text).trim())
+		? "Your last response ended with a non-blocking question; answer it yourself by choosing the clear winner."
+		: "";
+	await sendWorkGoalContinuation(pi, ctx, activeWorkGoal, note);
+}
+
+function formatError(error) {
+	return error instanceof Error ? error.message : String(error);
+}
+
 async function sendFollowUp(ctx, message, pi) {
 	if (!message) return;
 	if (typeof ctx.sendUserMessage === "function") {
@@ -5063,6 +5634,8 @@ async function handleWorkflowAction(builder, args, ctx, pi) {
 export {
 	buildWorkAddState,
 	buildWorkAutoState,
+	buildWorkGoalSystemPrompt,
+	buildWorkSelfImprovingObjective,
 	buildWorkBigState,
 	buildWorkDebugState,
 	buildWorkFinishState,
@@ -5089,6 +5662,8 @@ export {
 	parseIdeationIdeas,
 	recordWorkTelemetry,
 	handleWorkResumeCommand,
+	parseWorkGoalCommand,
+	parseWorkProjectGoalInput,
 	planResumeAction,
 	renderWorkIdeateText,
 	renderWorkBrainstormText,
@@ -5102,7 +5677,80 @@ export {
 export default function workModelsExtension(pi) {
 	exposeBundledSubagentAgents();
 
+	if (typeof pi.registerTool === "function") {
+		pi.registerTool({
+			name: "work_goal_complete",
+			label: "Work Goal Complete",
+			description:
+				"Mark the active /work-goal complete after the objective is fully done and verified.",
+			promptSnippet:
+				"Mark the active /work-goal complete after verified completion",
+			promptGuidelines: [
+				"Use work_goal_complete only when the active /work-goal is fully complete and verified.",
+			],
+			parameters: { ...WORK_GOAL_TOOL_SCHEMA, required: ["summary"] },
+			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+				return completeActiveWorkGoal(
+					String(params.summary ?? "completed"),
+					ctx,
+					pi,
+				);
+			},
+		});
+
+		pi.registerTool({
+			name: "work_goal_human_decision",
+			label: "Work Goal Human Decision",
+			description:
+				"Pause the active /work-goal only for real user-only decisions; do not use for plan approval, permission to continue, or clear-winner choices.",
+			promptSnippet: "Pause /work-goal for a real human decision factor",
+			promptGuidelines: [
+				"Use work_goal_human_decision only for user-only product, credential, destructive/risky, priority/scope, environment, or no-clear-winner decisions.",
+			],
+			parameters: {
+				...WORK_GOAL_TOOL_SCHEMA,
+				required: ["question", "whyUserNeeded"],
+			},
+			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+				const decision = {
+					question: String(params.question ?? "").trim(),
+					whyUserNeeded: String(params.whyUserNeeded ?? "").trim(),
+					options: String(params.options ?? "").trim(),
+					recommendation: String(params.recommendation ?? "").trim(),
+					source: "tool",
+				};
+				pauseWorkGoalForDecision(decision, ctx, pi);
+				return {
+					content: [
+						{
+							type: "text",
+							text: `/work-goal paused for human decision.\n${formatWorkGoalDecision(decision)}`,
+						},
+					],
+					details: decision,
+					terminate: true,
+				};
+			},
+		});
+	}
+
+	pi.on("session_start", (_event, ctx) => {
+		activeWorkGoal = loadWorkGoalFromSession(ctx);
+		workGoalContinuationPending = null;
+		updateWorkGoalStatus(ctx);
+	});
+
+	pi.on("session_shutdown", (_event, ctx) => {
+		persistWorkGoal(pi);
+		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+	});
+
+	pi.on("input", (event, ctx) => {
+		maybeResumeWorkGoalFromUserInput(event, ctx, pi);
+	});
+
 	pi.on("before_agent_start", async (event, ctx) => {
+		markWorkGoalContinuationDelivered(event.prompt);
 		const meta = parseWorkPromptMeta(event.prompt);
 		pendingWorkPrompt = meta
 			? {
@@ -5113,6 +5761,10 @@ export default function workModelsExtension(pi) {
 					contextBefore: usageSnapshot(ctx),
 				}
 			: null;
+		if (!activeWorkGoal || activeWorkGoal.status !== "active") return;
+		return {
+			systemPrompt: `${event.systemPrompt}\n\n${buildWorkGoalSystemPrompt(activeWorkGoal)}`,
+		};
 	});
 
 	pi.on("agent_start", async () => {
@@ -5143,7 +5795,10 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("agent_end", async (event, ctx) => {
-		if (!activeWorkAgent) return;
+		if (!activeWorkAgent) {
+			await handleWorkGoalAgentEnd(event, ctx, pi);
+			return;
+		}
 		const run = activeWorkAgent;
 		activeWorkAgent = null;
 		const usage = messageUsage(event.messages);
@@ -5185,6 +5840,7 @@ export default function workModelsExtension(pi) {
 		const file = recordWorkTelemetry(run.cwd, telemetry);
 		appendTelemetryNote(run.cwd, run.meta.beadId, telemetry, file);
 		cleanupBenignInstructionDirt(run.cwd);
+		await handleWorkGoalAgentEnd(event, ctx, pi);
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
@@ -5232,6 +5888,33 @@ export default function workModelsExtension(pi) {
 		}
 		cleanupBenignInstructionDirt(ctx.cwd);
 	});
+
+	pi.registerCommand("work-goal", {
+		description:
+			"Run an autonomous goal with microcompact loops and human-decision stops",
+		handler: async (args, ctx) => {
+			await handleWorkGoalCommand(args, "generic", pi, ctx);
+		},
+	});
+
+	pi.registerCommand("work-self-improving-goal", {
+		description: "Run /work-goal with the ce-workflow self-improvement overlay",
+		handler: async (args, ctx) => {
+			await handleSelfImprovingWorkGoalCommand(args, pi, ctx);
+		},
+	});
+
+	const workProjectGoalCommand = {
+		description:
+			"Run the self-improving project goal for a target repository path",
+		handler: async (args, ctx) => {
+			await handleSelfImprovingWorkGoalCommand(args, pi, ctx, {
+				project: true,
+			});
+		},
+	};
+	pi.registerCommand("work-project-goal", workProjectGoalCommand);
+	pi.registerCommand("work-project", workProjectGoalCommand);
 
 	pi.registerCommand("work-init", {
 		description: "Initialize Beads for work-orchestrator without AGENTS noise",
