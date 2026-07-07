@@ -4870,9 +4870,11 @@ function renderWorkflowActionText(state) {
 		state.git ? `Git: ${state.git.status}` : "",
 		state.note ? `\n${state.note}` : "",
 		state.nextAction ??
-			(state.suggestedCommands?.length
-				? `Next: ${state.suggestedCommands[0]}`
-				: ""),
+			(state.handoffPrompt
+				? "Next: handoff queued to work-orchestrator"
+				: state.suggestedCommands?.length
+					? `Next: ${state.suggestedCommands[0]}`
+					: ""),
 	]
 		.filter(Boolean)
 		.join("\n");
