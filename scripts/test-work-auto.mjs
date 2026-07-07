@@ -24,12 +24,12 @@ try {
 	fixture.reset("blocked");
 	state = buildWorkAutoState(process.cwd(), "BLOCK-1");
 	assert(
-		state.ok && state.action.startsWith("debug"),
-		"blocked Bead routes through debug intake",
+		state.ok && state.action === "debug-blocked",
+		"blocked Bead routes through debug intake without retrying blindly",
 	);
 	assert(
-		state.handoffPrompt.includes("mode: debug"),
-		"blocked Bead gets debug handoff",
+		state.suggestedCommands[0] === "/work-report BLOCK-1",
+		"blocked Bead points to report handoff",
 	);
 
 	fixture.reset("debug");

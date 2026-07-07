@@ -33,10 +33,21 @@ try {
 	);
 
 	fixture.reset("blocked");
+	state = buildWorkDebugState(process.cwd(), "BLOCK-1");
+	assert(
+		state.ok && state.action === "debug-blocked" && !state.handoffPrompt,
+		"blocked debug target stops without explicit retry guidance",
+	);
+	assert(
+		state.suggestedCommands[0] === "/work-report BLOCK-1",
+		"blocked debug target points to report handoff",
+	);
+
+	fixture.reset("blocked");
 	state = buildWorkDebugState(process.cwd(), "BLOCK-1: device is available");
 	assert(
 		state.ok && state.selectedBead.id === "BLOCK-1",
-		"explicit blocked target is debugged directly",
+		"explicit blocked target with guidance is debugged directly",
 	);
 	assert(
 		state.handoffPrompt.includes("Guidance: device is available"),

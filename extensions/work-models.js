@@ -229,9 +229,11 @@ function handoffRole(action) {
 
 function stopReason(state) {
 	if (!state) return "unknown";
-	if (state.ok === false) return state.action ?? state.reason ?? "command-error";
+	if (state.ok === false)
+		return state.action ?? state.reason ?? "command-error";
 	if (state.git && state.git.safeForHandoff === false) return "dirty-worktree";
-	if (state.action === "report-blocked") return "blocked";
+	if (state.action === "report-blocked" || state.action === "debug-blocked")
+		return "blocked";
 	if (state.action === "done-candidate") return "completed-slice";
 	if (state.action === "close-stale-planning") return "planning-boundary";
 	if (state.handoffPrompt) return "handoff-queued";
@@ -535,6 +537,15 @@ function notify(ctx, message, level = "info") {
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 	const startedAt = Date.now();
 	const contextBefore = usageSnapshot(ctx);
+	recordWorkTelemetry(ctx.cwd, {
+		id: telemetryId("cmd-start"),
+		type: "command-start",
+		command,
+		args: truncate(args, 300),
+		ok: true,
+		stopReason: "started",
+		context: { before: contextBefore },
+	});
 	let state;
 	let errorMessage = "";
 	try {
@@ -728,8 +739,12 @@ function buildWorkTelemetryState(cwd, args = "") {
 				commits: 0,
 			};
 			payoff.count += 1;
-			payoff.durationMs += Number(event.payoff.durationMs ?? event.durationMs ?? 0);
-			payoff.tokens += Number(event.payoff.tokens ?? event.usage?.totalTokens ?? 0);
+			payoff.durationMs += Number(
+				event.payoff.durationMs ?? event.durationMs ?? 0,
+			);
+			payoff.tokens += Number(
+				event.payoff.tokens ?? event.usage?.totalTokens ?? 0,
+			);
 			payoff.filesChanged += Number(event.payoff.filesChanged ?? 0);
 			payoff.testsRun += Number(event.payoff.testsRun ?? 0);
 			if (event.payoff.commitCreated) payoff.commits += 1;
@@ -3312,6 +3327,21 @@ function buildWorkDebugState(cwd, args = "") {
 		}
 		if (guidance && bug && !(source === undefined && !isBeadId(target)))
 			appendBeadNote(cwd, idOf(bug), `guidance: ${guidance}`);
+		if (bug && isBlockedIssue(bug) && !guidance)
+			return {
+				ok: true,
+				action: "debug-blocked",
+				epic: issueSummary(epic ?? { id: parentOf(bug) }),
+				selectedBead: issueSummary(bug),
+				sourceBead: source ? issueSummary(source) : undefined,
+				git,
+				message: `Debug Bead ${idOf(bug)} is already blocked. Add guidance after ':' to retry, otherwise use /work-report ${idOf(bug)}.`,
+				suggestedCommands: [
+					`/work-report ${idOf(bug)}`,
+					`/work-debug ${idOf(bug)}: <what changed / what to retry>`,
+				],
+				warnings: git.warnings,
+			};
 		return debugHandoff(
 			{
 				ok: true,
@@ -5120,7 +5150,11 @@ export default function workModelsExtension(pi) {
 				durationMs,
 				tokens: usage.totalTokens || undefined,
 				filesChanged: gitAfter.dirtyFiles,
-				commitCreated: Boolean(run.gitBefore?.head && gitAfter.head && run.gitBefore.head !== gitAfter.head),
+				commitCreated: Boolean(
+					run.gitBefore?.head &&
+						gitAfter.head &&
+						run.gitBefore.head !== gitAfter.head,
+				),
 				testsRun,
 				reviewOutcome: review?.outcome,
 			},
