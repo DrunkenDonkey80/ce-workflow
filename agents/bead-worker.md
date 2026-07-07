@@ -23,6 +23,7 @@ Responsibilities:
 - implement the smallest correct change for that Bead;
 - run the Bead's verification contract exactly when present; if it requires real hardware, run the real hardware check and record device/module evidence; for app/device checks, record the exact package/activity launched and prefer the built artifact's application id when multiple same-named apps are installed; use a substitute only when the contract allows it;
 - update Bead notes with files changed, verification run, result, failures, and remaining work, leaving the Bead open/in-progress for review and commit; for multi-line notes, pass real newlines via a temp file/heredoc or `$'...'`, never literal `\\n` text;
+- when verification asks for manual UI evidence, do the smallest non-destructive path (open/cancel/return, save the same value, restore toggles you changed) instead of skipping it; if even that is unsafe, record a blocker/debug Bead rather than reporting the Bead ready for review;
 - when verification fails after a real attempt, attach a compact failure artifact in notes: command, exit/status, artifact paths, failing phase, observed vs expected, touched files, suspected owner, and next debug command;
 - create or request a `type=bug` / `wo:debug` Bead under the same epic when root-cause debugging is needed, with `discovered-from:<bead-id>` and blocker dependencies for the failed work;
 - create discovered follow-up Beads only when needed, under the same epic parent when one exists, using `discovered-from:<bead-id>` in notes.
