@@ -1893,8 +1893,8 @@ function buildWorkStatus(cwd, target) {
 	const blockers = slices.filter(
 		(issue) =>
 			statusOf(issue) !== "closed" &&
+			!ready.has(idOf(issue)) &&
 			(isBlockedIssue(issue) ||
-				typeOf(issue) === "bug" ||
 				depsOf(issue).some((id) => statusOf(byId.get(id)) !== "closed")),
 	);
 	const decisions = children.filter(
@@ -3402,11 +3402,15 @@ function buildWorkPauseState(cwd, args = "") {
 function splitTargetGuidance(args = "") {
 	const text = String(args).trim();
 	const colon = text.indexOf(":");
-	if (colon === -1) return { target: text, guidance: "" };
-	return {
-		target: text.slice(0, colon).trim(),
-		guidance: text.slice(colon + 1).trim(),
-	};
+	if (colon !== -1)
+		return {
+			target: text.slice(0, colon).trim(),
+			guidance: text.slice(colon + 1).trim(),
+		};
+	const [first, rest] = splitFirstWord(text);
+	if (rest && (isBeadId(first) || isNumericBeadShorthand(first)))
+		return { target: first, guidance: rest.trim() };
+	return { target: text, guidance: "" };
 }
 
 function findExistingDebugBug(cwd, target) {
@@ -3495,8 +3499,20 @@ function buildWorkDebugState(cwd, args = "") {
 				notes: guidance ? `guidance: ${guidance}` : "created by /work-debug",
 			});
 		}
-		if (guidance && bug && !(source === undefined && !isBeadId(target)))
-			appendBeadNote(cwd, idOf(bug), `guidance: ${guidance}`);
+		if (guidance && bug && !(source === undefined && !isBeadId(target))) {
+			if (isBlockedIssue(bug))
+				bug = one(
+					bdJsonRequired(cwd, [
+						"update",
+						idOf(bug),
+						"--status",
+						"open",
+						"--append-notes",
+						`retry-guidance: ${guidance}`,
+					]),
+				);
+			else appendBeadNote(cwd, idOf(bug), `guidance: ${guidance}`);
+		}
 		if (bug && isBlockedIssue(bug) && !guidance)
 			return {
 				ok: true,

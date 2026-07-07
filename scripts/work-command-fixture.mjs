@@ -257,8 +257,10 @@ else if (args[0] === "show") {
 } else if (args[0] === "update") {
   const issue = all().find((item) => item.id === args[1]);
   if (!issue) { console.error("not found"); process.exit(2); }
+  const status = fieldAfter("--status");
+  if (status) issue.status = status;
   issue.notes = [issue.notes, fieldAfter("--append-notes")].filter(Boolean).join("\\n");
-  save(); log({ op: "update", id: issue.id, notes: fieldAfter("--append-notes") }); out(issue);
+  save(); log({ op: "update", id: issue.id, status, notes: fieldAfter("--append-notes") }); out(issue);
 } else if (args[0] === "dep" && args[1] === "add") {
   const issue = state.children.find((item) => item.id === args[2]);
   if (!issue) { console.error("not found"); process.exit(2); }

@@ -53,12 +53,32 @@ try {
 		state.handoffPrompt.includes("Guidance: device is available"),
 		"blocked target guidance is preserved",
 	);
+	assert(
+		fixture.logs().some(
+			(entry) =>
+				entry.op === "update" &&
+				entry.id === "BLOCK-1" &&
+				entry.status === "open",
+		),
+		"blocked target with retry guidance is reopened before handoff",
+	);
 
 	fixture.reset("blocked");
 	state = buildWorkDebugState(process.cwd(), "1: device is available");
 	assert(
 		state.ok && state.selectedBead.id === "BLOCK-1",
 		"numeric shorthand resolves to active epic child bead",
+	);
+
+	fixture.reset("blocked");
+	state = buildWorkDebugState(process.cwd(), "1 device is available");
+	assert(
+		state.ok && state.selectedBead.id === "BLOCK-1",
+		"numeric shorthand plus prose is treated as retry guidance, not a new bug",
+	);
+	assert(
+		state.handoffPrompt.includes("Guidance: device is available"),
+		"space-separated shorthand guidance is preserved",
 	);
 
 	fixture.reset("debug");

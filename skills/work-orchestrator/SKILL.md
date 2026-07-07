@@ -200,7 +200,7 @@ Do not create a new master epic here; use `Mode: master` for that.
 Use for failing tests, errors, regressions, blocked/debug-needed Beads, or broken behavior inside an existing epic.
 
 1. Resolve the active epic first; if ambiguous, ask.
-2. If the argument starts with an existing Bead ID, inspect that Bead instead of creating a duplicate. Treat text after `:` as human guidance and append it to the debug Bead notes before debugging. If the target is an implementation Bead with `debug-needed:<bug-id>`, debug the bug Bead.
+2. If the argument starts with an existing Bead ID or numeric shorthand, inspect that Bead instead of creating a duplicate. Treat text after `:` or after the first target token as human retry guidance, append it to the debug Bead notes, and reopen a blocked target before debugging. If the target is an implementation Bead with `debug-needed:<bug-id>`, debug the bug Bead.
 3. Otherwise create a `type=bug` child Bead under that epic (`--parent <epic-id>`) with the reported symptom, reproduction command, expected behavior, and failure artifact when supplied.
 4. Default path: launch `bead-debugger` with that bug Bead and require the `ce-debug` workflow: reproduce, root-cause, fix, verify.
 5. Interactive path: when the user explicitly asks to debug a blocked Bead in the console or gives direct guidance (`/work-debug <bead-id>: ...`), the parent may run the debug loop directly for observability. Keep Beads/git as source of truth, avoid unrelated edits, and then run the same review/commit/close gates as the agent path.
