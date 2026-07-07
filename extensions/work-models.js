@@ -108,6 +108,7 @@ let pendingWorkPrompt = null;
 let activeWorkAgent = null;
 let activeWorkGoal = null;
 let workGoalContinuationPending = null;
+let workGoalContinuationRetry = null;
 
 const WORK_GOAL_STATE_ENTRY_TYPE = "work-goal-state";
 const WORK_GOAL_STATUS_KEY = "work-goal";
@@ -5522,8 +5523,26 @@ function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 		decision: undefined,
 		updatedAt: Date.now(),
 	};
+	workGoalContinuationRetry = {
+		goalId: activeWorkGoal.id,
+		note: "The human answered the pending decision; resume the objective using that answer.",
+	};
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
+}
+
+async function flushWorkGoalContinuationRetry(ctx, pi) {
+	if (!activeWorkGoal || activeWorkGoal.status !== "active") return;
+	if (workGoalContinuationRetry?.goalId !== activeWorkGoal.id) return;
+	if (workGoalHasPendingMessages(ctx)) return;
+	const retry = workGoalContinuationRetry;
+	const sent = await sendWorkGoalContinuation(
+		pi,
+		ctx,
+		activeWorkGoal,
+		retry.note,
+	);
+	if (sent) workGoalContinuationRetry = null;
 }
 
 async function handleWorkGoalAgentEnd(event, ctx, pi) {
@@ -5562,10 +5581,13 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	};
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
-	if (workGoalHasPendingMessages(ctx)) return;
 	const note = /\?\s*$/.test(String(text).trim())
 		? "Your last response ended with a non-blocking question; answer it yourself by choosing the clear winner."
 		: "";
+	if (workGoalHasPendingMessages(ctx)) {
+		workGoalContinuationRetry = { goalId: activeWorkGoal.id, note };
+		return;
+	}
 	await sendWorkGoalContinuation(pi, ctx, activeWorkGoal, note);
 }
 
@@ -5898,6 +5920,7 @@ export default function workModelsExtension(pi) {
 			maybeCompact(ctx, {}, "turn boundary");
 		}
 		cleanupBenignInstructionDirt(ctx.cwd);
+		await flushWorkGoalContinuationRetry(ctx, pi);
 	});
 
 	pi.registerCommand("work-goal", {

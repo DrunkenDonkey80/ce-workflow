@@ -161,6 +161,10 @@ try {
 	assert.match(sent[1].message, /Automatic continuation #1/);
 	assert.equal(statuses["work-goal"], "active #1");
 
+	await tempHooks.before_agent_start(
+		{ prompt: sent[1].message, systemPrompt: "base" },
+		ctx,
+	);
 	await tempHooks.agent_end(
 		{
 			messages: [
@@ -185,6 +189,16 @@ try {
 	);
 	assert.equal(sent.length, 2);
 
+	tempHooks.input?.({ source: "user" }, ctx);
+	await tempHooks.turn_end?.({}, ctx);
+	assert.equal(statuses["work-goal"], "active #1");
+	assert.equal(sent.length, 3);
+	assert.match(sent[2].message, /human answered the pending decision/);
+
+	await tempHooks.before_agent_start(
+		{ prompt: sent[2].message, systemPrompt: "base" },
+		ctx,
+	);
 	await tempTools.work_goal_complete.execute(
 		"t1",
 		{ summary: "verified in temp harness" },
