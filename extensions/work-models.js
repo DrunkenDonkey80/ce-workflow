@@ -2331,6 +2331,18 @@ function normalizedRepoPath(value) {
 	return String(value ?? "").replace(/\\/g, "/");
 }
 
+function compactList(items = [], limit = 8) {
+	const values = items.filter(Boolean);
+	if (values.length <= limit) return values.join(", ");
+	return `${values.slice(0, limit).join(", ")} … +${values.length - limit} more`;
+}
+
+function compactMultiline(value, limit = 20) {
+	const lines = String(value ?? "").split(/\r?\n/).filter(Boolean);
+	if (lines.length <= limit) return String(value ?? "");
+	return [...lines.slice(0, limit), `… +${lines.length - limit} more lines`].join("\n");
+}
+
 function isPiRuntimeArtifact(path) {
 	const file = normalizedRepoPath(path);
 	return (
@@ -2401,7 +2413,7 @@ function planBootstrapDirtyStop(cwd, git, planPath, command) {
 	);
 	return dirtyStopState(
 		{ ...git, blockedPaths: blockers },
-		`Dirty files must be resolved before ${command} can mutate Beads. Blocking files: ${blockers.join(", ") || "unknown"}.`,
+		`Dirty files must be resolved before ${command} can mutate Beads. Blocking files: ${compactList(blockers) || "unknown"}.`,
 	);
 }
 
@@ -2427,7 +2439,7 @@ function resumeGitReport(cwd, planPaths = []) {
 			];
 		} else if (workflowDirty) {
 			warnings = [
-				`Only workflow-owned dirt detected: ${dirtyPaths.join(", ")}.`,
+				`Only workflow-owned dirt detected: ${compactList(dirtyPaths)}.`,
 			];
 		}
 		return {
@@ -2592,6 +2604,16 @@ function resolveResumeTarget(cwd, target) {
 			candidates: inProgress.map((epic) => candidateSummary(cwd, epic)),
 		};
 
+	const remembered = rememberedWorkflowEpic(cwd);
+	if (remembered) {
+		try {
+			if (buildEpicChildState(cwd, remembered).children.length > 0)
+				return { kind: "epic", epic: remembered };
+		} catch {
+			// Ignore stale remembered state and fall back to Beads discovery.
+		}
+	}
+
 	let candidates = epicsByStatus(cwd, "open").sort(byUpdatedDesc);
 	if (candidates.length === 0) {
 		try {
@@ -2640,7 +2662,7 @@ function planResumeAction(state) {
 		return {
 			...state,
 			action: "dirty-stop",
-			message: `Dirty files must be resolved before /work-resume can launch writers. Blocking files: ${blockers.join(", ") || "unknown"}.`,
+			message: `Dirty files must be resolved before /work-resume can launch writers. Blocking files: ${compactList(blockers) || "unknown"}.`,
 			suggestedCommands: [
 				"git status --short",
 				...blockers
@@ -4832,7 +4854,7 @@ function renderWorkReportText(state) {
 			state.bead.notes.reason || state.bead.notes.rawExcerpt || "- none",
 			"",
 			"Git:",
-			state.git.status,
+			compactMultiline(state.git.status),
 			"",
 			`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
 		].join("\n");
@@ -4870,7 +4892,7 @@ function renderWorkReportText(state) {
 		...renderIssueList(state.readyWork),
 		"",
 		"Git:",
-		state.git.status,
+		compactMultiline(state.git.status),
 		"",
 		state.nextAction ??
 			`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
@@ -4948,7 +4970,7 @@ function renderWorkResumeText(state) {
 		...renderResumeBlockedLines(state),
 		"",
 		"Git:",
-		state.git.status,
+		compactMultiline(state.git.status),
 		"",
 		state.nextAction ??
 			`Next: ${state.handoffPrompt ? "handoff queued to work-orchestrator" : (state.suggestedCommands?.[0] ?? `epic ${state.epic.id} "${state.epic.title}" is complete.`)}`,

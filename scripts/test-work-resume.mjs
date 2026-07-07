@@ -309,15 +309,16 @@ const scenario = process.env.WORK_RESUME_SCENARIO || "default";
 const args = process.argv.slice(2).filter((arg) => arg !== "--json");
 function out(value) { console.log(JSON.stringify(value)); }
 function childrenFor(id) {
-  if (scenario === "open-ready") return id === "O-1" ? childrenByScenario.openReady : childrenByScenario.openBlocked;
-  if (scenario === "open-two-ready") return id === "O-1" ? childrenByScenario.openReady : [{...childrenByScenario.openReady[0], id:"OPEN-READY-2", parent_id:"O-2"}];
+  if (scenario === "open-ready") return id === "O-1" ? childrenByScenario.openReady : (id === "O-2" ? childrenByScenario.openBlocked : []);
+  if (scenario === "open-two-ready") return id === "O-1" ? childrenByScenario.openReady : (id === "O-2" ? [{...childrenByScenario.openReady[0], id:"OPEN-READY-2", parent_id:"O-2"}] : []);
+  if (scenario === "remembered-blocked") return id === "E-1" ? childrenByScenario.blocked : (id === "O-1" ? childrenByScenario.openReady : (id === "O-2" ? childrenByScenario.openBlocked : []));
   const rows = childrenByScenario[scenario] || childrenByScenario.default;
   return rows.filter((issue) => issue.parent_id === id);
 }
 if (scenario === "no-beads") { console.error("Error: no beads database found"); process.exit(1); }
 if (args[0] === "list" && args.includes("--type=epic")) {
-  if (args.some((arg) => arg === "--status=in_progress")) out(scenario === "ambiguous" ? epics.slice(0, 2) : ["open-ready", "open-two-ready"].includes(scenario) ? [] : [epics[0]]);
-  else if (args.some((arg) => arg === "--status=open")) out(["open-ready", "open-two-ready"].includes(scenario) ? [epics[2], epics[3]] : []);
+  if (args.some((arg) => arg === "--status=in_progress")) out(scenario === "ambiguous" ? epics.slice(0, 2) : ["open-ready", "open-two-ready", "remembered-blocked"].includes(scenario) ? [] : [epics[0]]);
+  else if (args.some((arg) => arg === "--status=open")) out(["open-ready", "open-two-ready", "remembered-blocked"].includes(scenario) ? [epics[2], epics[3]] : []);
   else out(epics.filter((epic) => epic.status !== "closed"));
 } else if (args[0] === "show") {
   const id = args[1];
@@ -507,7 +508,18 @@ try {
 	);
 	assert(state.candidates === undefined, "ready open epic is not ambiguous");
 
+	process.env.WORK_RESUME_SCENARIO = "remembered-blocked";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(state.ok && state.epic.id === "E-1", "explicit target is remembered");
+	state = buildWorkResumeState(process.cwd(), "last");
+	assert(
+		state.ok && state.epic.id === "E-1" && state.action === "report-blocked",
+		"remembered blocked epic wins over unrelated ready open epics",
+	);
+
 	process.env.WORK_RESUME_SCENARIO = "open-two-ready";
+	state = buildWorkResumeState(process.cwd(), "O-1");
+	assert(state.ok && state.epic.id === "O-1", "explicit open target refreshes remembered epic");
 	state = buildWorkResumeState(process.cwd(), "last");
 	assert(
 		state.ok && state.epic.id === "O-1",
