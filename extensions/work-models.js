@@ -436,6 +436,62 @@ function summarizeMessages(messages = []) {
 	};
 }
 
+function latestMessageExcerpts(messages = [], limit = 4) {
+	return messages
+		.slice()
+		.reverse()
+		.filter((message) => ["assistant", "toolResult", "user"].includes(message.role))
+		.slice(0, limit)
+		.reverse()
+		.map((message) => `${message.role}: ${truncate(contentText(message.content ?? message.message), 260)}`)
+		.filter((line) => !line.endsWith(": "));
+}
+
+function failedSubagents(tools = []) {
+	return tools
+		.flatMap((tool) => tool.subagentDetails ?? [])
+		.filter((item) => !["completed", "success", "ok", "passed"].includes(String(item.status ?? "").toLowerCase()));
+}
+
+function hasWorkAgentFailure(event, telemetry) {
+	const assistant = finalAssistantMessage(event.messages);
+	const text = assistantVisibleText(assistant);
+	return Boolean(
+		["aborted", "error"].includes(String(assistant?.stopReason ?? "")) ||
+			telemetry.review?.outcome === "fail" ||
+			telemetry.tools?.some((tool) => tool.isError) ||
+			failedSubagents(telemetry.tools).length ||
+			(/\b(fail(?:ed|ure)?|blocked|cannot|unable|timed? out|timeout|error)\b/i.test(text) &&
+				!/\bPASS\b/i.test(text.slice(0, 500))),
+	);
+}
+
+function failureStatusNote(run, event, telemetry, file) {
+	const assistant = finalAssistantMessage(event.messages);
+	const finalText = truncate(assistantVisibleText(assistant), 900);
+	const erroredTools = telemetry.tools?.filter((tool) => tool.isError) ?? [];
+	const subagents = failedSubagents(telemetry.tools);
+	const lines = [
+		`wo:failure-summary run=${telemetry.id} role=${telemetry.role ?? "work"} action=${run.meta.action ?? run.meta.mode ?? "work"} duration=${formatDuration(telemetry.durationMs)}`,
+		`reason: ${truncate(finalText || telemetry.review?.outcome || "work agent stopped without a passing result", 500)}`,
+		file ? `artifact: ${file}` : "",
+		...erroredTools.slice(0, 3).map((tool) => `tool-error: ${tool.name} ${tool.runId ? `run=${tool.runId} ` : ""}${tool.outputChars ?? 0} chars`),
+		...subagents.slice(0, 3).map((item) => `subagent: ${item.agent} status=${item.status}${item.artifact ? ` artifact=${item.artifact}` : ""}`),
+		...latestMessageExcerpts(event.messages).map((line) => `latest: ${line}`),
+		run.meta.beadId ? `next: /work-report ${run.meta.beadId}` : "",
+	];
+	return lines.filter(Boolean).join("\n");
+}
+
+function appendFailureStatusNote(cwd, beadId, run, event, telemetry, file) {
+	if (!beadId || !hasWorkAgentFailure(event, telemetry)) return;
+	try {
+		appendBeadNote(cwd, beadId, failureStatusNote(run, event, telemetry, file));
+	} catch {
+		// Failure-status capture must never mask the original task result.
+	}
+}
+
 function parseToolArgs(args) {
 	if (typeof args !== "string") return args ?? {};
 	try {
@@ -1433,6 +1489,63 @@ function truncate(value, max = 800) {
 		.replace(/\s+/g, " ")
 		.trim();
 	return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function extractWorkAction(text) {
+	const line = String(text ?? "").trim();
+	const match = line.match(/(\/work-[\w-]+)(?:\s+([^\s.;,]+))?(?::\s*(.*))?/);
+	if (!match) return "";
+	return `${match[1]}${match[2] ? ` ${match[2]}` : ""}${match[3] ? `: ${match[3]}` : ""}`;
+}
+
+function uniqueActions(actions = []) {
+	return [
+		...new Set(
+			actions.map(extractWorkAction).filter((action) => action.startsWith("/work-")),
+		),
+	];
+}
+
+function recommendedActions(state) {
+	return uniqueActions([
+		...(state?.suggestedCommands ?? []),
+		state?.nextAction,
+		state?.message,
+	]);
+}
+
+function recommendedActionsFromText(text) {
+	return uniqueActions(String(text ?? "").split(/\r?\n/));
+}
+
+function renderRecommendedActions(actions) {
+	if (!actions.length) return [];
+	return [
+		"Recommended actions:",
+		...actions.map((action, index) => `${index + 1}. ${action}`),
+		"Type a number to run one.",
+	];
+}
+
+function withRecommendedActionsText(text) {
+	const actions = recommendedActionsFromText(text);
+	if (!actions.length) return text;
+	return [text, "", ...renderRecommendedActions(actions)].join("\n");
+}
+
+function rememberRecommendedActions(cwd, actions, source = "work") {
+	if (!cwd) return;
+	const state = readWorkState(cwd);
+	if (actions.length) {
+		state.lastActions = {
+			source,
+			updatedAt: new Date().toISOString(),
+			actions,
+		};
+	} else {
+		delete state.lastActions;
+	}
+	writeWorkState(cwd, state);
 }
 
 function contentText(content) {
@@ -4865,9 +4978,11 @@ function renderWorkReportText(state) {
 		const candidates = state.candidates?.length
 			? ["Candidates:", ...renderIssueList(state.candidates)]
 			: [];
-		return [`Work report unavailable: ${state.message}`, ...candidates].join(
-			"\n",
-		);
+		return [
+			`Work report unavailable: ${state.message}`,
+			...candidates,
+			...renderRecommendedActions(recommendedActions(state)),
+		].join("\n");
 	}
 	if (state.bead) {
 		return [
@@ -4891,6 +5006,7 @@ function renderWorkReportText(state) {
 			"Git:",
 			compactMultiline(state.git.status),
 			"",
+			...renderRecommendedActions(recommendedActions(state)),
 			`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
 		].join("\n");
 	}
@@ -4929,6 +5045,7 @@ function renderWorkReportText(state) {
 		"Git:",
 		compactMultiline(state.git.status),
 		"",
+		...renderRecommendedActions(recommendedActions(state)),
 		state.nextAction ??
 			`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
 	].join("\n");
@@ -4982,16 +5099,10 @@ function renderWorkResumeText(state) {
 					),
 				]
 			: [];
-		const suggested = state.suggestedCommands?.length
-			? [
-					"Suggested:",
-					...state.suggestedCommands.map((command) => `- ${command}`),
-				]
-			: [];
 		return [
 			`Work resume unavailable: ${state.message}`,
 			...candidates,
-			...suggested,
+			...renderRecommendedActions(recommendedActions(state)),
 		].join("\n");
 	}
 	return [
@@ -5003,6 +5114,7 @@ function renderWorkResumeText(state) {
 			: "Selected: none",
 		state.message ? `Reason: ${state.message}` : "",
 		...renderResumeBlockedLines(state),
+		...renderRecommendedActions(recommendedActions(state)),
 		"",
 		"Git:",
 		compactMultiline(state.git.status),
@@ -5614,6 +5726,7 @@ async function sendFollowUp(ctx, message, pi) {
 async function handleWorkResumeCommand(args, ctx, pi) {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = buildWorkResumeState(ctx.cwd, args);
+	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-resume");
 	notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning");
 	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
 	return state;
@@ -5645,6 +5758,7 @@ function renderWorkflowActionText(state) {
 		state.message ? `Result: ${state.message}` : "",
 		state.git ? `Git: ${state.git.status}` : "",
 		state.note ? `\n${state.note}` : "",
+		...renderRecommendedActions(recommendedActions(state)),
 		state.nextAction ??
 			(state.handoffPrompt
 				? "Next: handoff queued to work-orchestrator"
@@ -5659,9 +5773,82 @@ function renderWorkflowActionText(state) {
 async function handleWorkflowAction(builder, args, ctx, pi) {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = builder(ctx.cwd, args);
+	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-action");
 	notify(ctx, renderWorkflowActionText(state), state.ok ? "info" : "warning");
 	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
 	return state;
+}
+
+async function handleWorkStatusCommand(args, ctx) {
+	cleanupBenignInstructionDirt(ctx.cwd);
+	try {
+		const output = withRecommendedActionsText(buildWorkStatus(ctx.cwd, args));
+		rememberRecommendedActions(
+			ctx.cwd,
+			recommendedActionsFromText(output),
+			"work-status",
+		);
+		notify(ctx, output, "info");
+		return { ok: true, outputChars: output.length };
+	} catch (error) {
+		notify(ctx, `Could not build work status: ${formatError(error)}`, "error");
+		return { ok: false, reason: "status-error" };
+	}
+}
+
+async function handleWorkReportCommand(args, ctx) {
+	cleanupBenignInstructionDirt(ctx.cwd);
+	const parsed = parseWorkReportArgs(args);
+	const state = buildWorkReportState(ctx.cwd, args);
+	const output = parsed.json ? renderWorkReportJson(state) : renderWorkReportText(state);
+	if (!parsed.json) rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-report");
+	notify(ctx, output, "info");
+	return { ok: true, outputChars: output.length };
+}
+
+async function executeNumberedWorkAction(action, ctx, pi) {
+	const match = String(action ?? "").match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
+	if (!match) return false;
+	const [, command, args = ""] = match;
+	const builders = {
+		"work-init": buildWorkInitState,
+		"work-pause": buildWorkPauseState,
+		"work-small": buildWorkSmallState,
+		"work-med": buildWorkMedState,
+		"work-big": buildWorkBigState,
+		"work-plan": buildWorkPlanState,
+		"work-master": buildWorkMasterState,
+		"work-migrate": buildWorkMigrateState,
+		"work-finish": buildWorkFinishState,
+		"work-debug": buildWorkDebugState,
+		"work-add": buildWorkAddState,
+		"work-auto": buildWorkAutoState,
+	};
+	if (command === "work-status")
+		await withCommandTelemetry(command, args, ctx, () => handleWorkStatusCommand(args, ctx));
+	else if (command === "work-report")
+		await withCommandTelemetry(command, args, ctx, () => handleWorkReportCommand(args, ctx));
+	else if (command === "work-resume" || command === "work-continue")
+		await withCommandTelemetry(command, args, ctx, () => handleWorkResumeCommand(args, ctx, pi), true);
+	else if (builders[command])
+		await withCommandTelemetry(command, args, ctx, () => handleWorkflowAction(builders[command], args, ctx, pi), true);
+	else return false;
+	return true;
+}
+
+async function maybeRunNumberedWorkAction(event, ctx, pi) {
+	if (event.source === "extension") return false;
+	if (activeWorkGoal?.status === "needs_human") return false;
+	const match = String(event.text ?? "").trim().match(/^(\d+)$/);
+	if (!match) return false;
+	const last = readWorkState(ctx.cwd).lastActions;
+	const ageMs = Date.now() - Date.parse(last?.updatedAt ?? "");
+	if (!last?.actions?.length || !Number.isFinite(ageMs) || ageMs > 60 * 60 * 1000)
+		return false;
+	const action = last.actions[Number(match[1]) - 1];
+	if (!action) return false;
+	notify(ctx, `Running ${match[1]}. ${action}`, "info");
+	return executeNumberedWorkAction(action, ctx, pi);
 }
 
 export {
@@ -5779,6 +5966,12 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", (event, ctx) => {
+		if (/^\d+$/.test(String(event.text ?? "").trim()))
+			return (async () => {
+				if (await maybeRunNumberedWorkAction(event, ctx, pi))
+					return { action: "handled" };
+				maybeResumeWorkGoalFromUserInput(event, ctx, pi);
+			})();
 		maybeResumeWorkGoalFromUserInput(event, ctx, pi);
 	});
 
@@ -5872,6 +6065,7 @@ export default function workModelsExtension(pi) {
 		};
 		const file = recordWorkTelemetry(run.cwd, telemetry);
 		appendTelemetryNote(run.cwd, run.meta.beadId, telemetry, file);
+		appendFailureStatusNote(run.cwd, run.meta.beadId, run, event, telemetry, file);
 		cleanupBenignInstructionDirt(run.cwd);
 		await handleWorkGoalAgentEnd(event, ctx, pi);
 	});
@@ -5962,33 +6156,18 @@ export default function workModelsExtension(pi) {
 	pi.registerCommand("work-status", {
 		description: "Show deterministic Beads/git work-orchestrator status",
 		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-status", args, ctx, async () => {
-				cleanupBenignInstructionDirt(ctx.cwd);
-				try {
-					const output = buildWorkStatus(ctx.cwd, args);
-					notify(ctx, output, "info");
-					return { ok: true, outputChars: output.length };
-				} catch (error) {
-					notify(
-						ctx,
-						`Could not build work status: ${error instanceof Error ? error.message : String(error)}`,
-						"error",
-					);
-					return { ok: false, reason: "status-error" };
-				}
-			});
+			await withCommandTelemetry("work-status", args, ctx, () =>
+				handleWorkStatusCommand(args, ctx),
+			);
 		},
 	});
 
 	pi.registerCommand("work-report", {
 		description: "Show deterministic Beads/git blocker handoff report",
 		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-report", args, ctx, async () => {
-				cleanupBenignInstructionDirt(ctx.cwd);
-				const output = buildWorkReport(ctx.cwd, args);
-				notify(ctx, output, "info");
-				return { ok: true, outputChars: output.length };
-			});
+			await withCommandTelemetry("work-report", args, ctx, () =>
+				handleWorkReportCommand(args, ctx),
+			);
 		},
 	});
 
