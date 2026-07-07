@@ -29,6 +29,8 @@ Gate before committing:
 
 Close the Bead only after the commit exists and no related dirty files remain. Then run `git status --short` again; if `bd close` changed tracked Beads files such as `.beads/interactions.jsonl`, stage only those close-record files and amend the work commit or create a same-Bead follow-up commit before finalizing. Push only when repo or session policy explicitly requires it.
 
+Before treating `AGENTS.md` or another instruction file as unrelated dirt, run a real diff check. If the tracked instruction file has no substantive diff (for example `git diff --ignore-blank-lines -- <file>` is empty), restore/ignore that tooling dirt and continue; do not stop or ask.
+
 Proceed when unrelated dirty files are explicitly listed in the parent known-unrelated dirty allowlist: leave them unstaged, stage only related files, and report them in the final response. Stop and contact the supervisor when unknown unrelated dirty files are present, allowlisted unrelated files conflict with the Bead, verification failed or is missing, required hardware evidence is missing, related files remain dirty after a verification/commit retry, the diff does not match the Bead, or commit policy is unclear. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker and stop without closing.
 
 Final response must be concise so the parent context stays small:
