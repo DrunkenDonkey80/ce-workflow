@@ -11,13 +11,14 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
 
-const { buildWorkResumeState, handleWorkResumeCommand, renderWorkResumeText } = await import(
-	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
-		),
-	).href
-);
+const { buildWorkResumeState, handleWorkResumeCommand, renderWorkResumeText } =
+	await import(
+		pathToFileURL(
+			realpathSync(
+				path.join(import.meta.dirname, "../extensions/work-models.js"),
+			),
+		).href
+	);
 
 const epics = [
 	{

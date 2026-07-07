@@ -54,12 +54,14 @@ try {
 		"blocked target guidance is preserved",
 	);
 	assert(
-		fixture.logs().some(
-			(entry) =>
-				entry.op === "update" &&
-				entry.id === "BLOCK-1" &&
-				entry.status === "open",
-		),
+		fixture
+			.logs()
+			.some(
+				(entry) =>
+					entry.op === "update" &&
+					entry.id === "BLOCK-1" &&
+					entry.status === "open",
+			),
 		"blocked target with retry guidance is reopened before handoff",
 	);
 

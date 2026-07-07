@@ -440,17 +440,27 @@ function latestMessageExcerpts(messages = [], limit = 4) {
 	return messages
 		.slice()
 		.reverse()
-		.filter((message) => ["assistant", "toolResult", "user"].includes(message.role))
+		.filter((message) =>
+			["assistant", "toolResult", "user"].includes(message.role),
+		)
 		.slice(0, limit)
 		.reverse()
-		.map((message) => `${message.role}: ${truncate(contentText(message.content ?? message.message), 260)}`)
+		.map(
+			(message) =>
+				`${message.role}: ${truncate(contentText(message.content ?? message.message), 260)}`,
+		)
 		.filter((line) => !line.endsWith(": "));
 }
 
 function failedSubagents(tools = []) {
 	return tools
 		.flatMap((tool) => tool.subagentDetails ?? [])
-		.filter((item) => !["completed", "success", "ok", "passed"].includes(String(item.status ?? "").toLowerCase()));
+		.filter(
+			(item) =>
+				!["completed", "success", "ok", "passed"].includes(
+					String(item.status ?? "").toLowerCase(),
+				),
+		);
 }
 
 function hasWorkAgentFailure(event, telemetry) {
@@ -461,7 +471,9 @@ function hasWorkAgentFailure(event, telemetry) {
 			telemetry.review?.outcome === "fail" ||
 			telemetry.tools?.some((tool) => tool.isError) ||
 			failedSubagents(telemetry.tools).length ||
-			(/\b(fail(?:ed|ure)?|blocked|cannot|unable|timed? out|timeout|error)\b/i.test(text) &&
+			(/\b(fail(?:ed|ure)?|blocked|cannot|unable|timed? out|timeout|error)\b/i.test(
+				text,
+			) &&
 				!/\bPASS\b/i.test(text.slice(0, 500))),
 	);
 }
@@ -475,8 +487,18 @@ function failureStatusNote(run, event, telemetry, file) {
 		`wo:failure-summary run=${telemetry.id} role=${telemetry.role ?? "work"} action=${run.meta.action ?? run.meta.mode ?? "work"} duration=${formatDuration(telemetry.durationMs)}`,
 		`reason: ${truncate(finalText || telemetry.review?.outcome || "work agent stopped without a passing result", 500)}`,
 		file ? `artifact: ${file}` : "",
-		...erroredTools.slice(0, 3).map((tool) => `tool-error: ${tool.name} ${tool.runId ? `run=${tool.runId} ` : ""}${tool.outputChars ?? 0} chars`),
-		...subagents.slice(0, 3).map((item) => `subagent: ${item.agent} status=${item.status}${item.artifact ? ` artifact=${item.artifact}` : ""}`),
+		...erroredTools
+			.slice(0, 3)
+			.map(
+				(tool) =>
+					`tool-error: ${tool.name} ${tool.runId ? `run=${tool.runId} ` : ""}${tool.outputChars ?? 0} chars`,
+			),
+		...subagents
+			.slice(0, 3)
+			.map(
+				(item) =>
+					`subagent: ${item.agent} status=${item.status}${item.artifact ? ` artifact=${item.artifact}` : ""}`,
+			),
 		...latestMessageExcerpts(event.messages).map((line) => `latest: ${line}`),
 		run.meta.beadId ? `next: /work-report ${run.meta.beadId}` : "",
 	];
@@ -1501,7 +1523,9 @@ function extractWorkAction(text) {
 function uniqueActions(actions = []) {
 	return [
 		...new Set(
-			actions.map(extractWorkAction).filter((action) => action.startsWith("/work-")),
+			actions
+				.map(extractWorkAction)
+				.filter((action) => action.startsWith("/work-")),
 		),
 	];
 }
@@ -5816,8 +5840,15 @@ async function handleWorkReportCommand(args, ctx) {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const parsed = parseWorkReportArgs(args);
 	const state = buildWorkReportState(ctx.cwd, args);
-	const output = parsed.json ? renderWorkReportJson(state) : renderWorkReportText(state);
-	if (!parsed.json) rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-report");
+	const output = parsed.json
+		? renderWorkReportJson(state)
+		: renderWorkReportText(state);
+	if (!parsed.json)
+		rememberRecommendedActions(
+			ctx.cwd,
+			recommendedActions(state),
+			"work-report",
+		);
 	notify(ctx, output, "info");
 	return { ok: true, outputChars: output.length };
 }
@@ -5841,13 +5872,29 @@ async function executeNumberedWorkAction(action, ctx, pi) {
 		"work-auto": buildWorkAutoState,
 	};
 	if (command === "work-status")
-		await withCommandTelemetry(command, args, ctx, () => handleWorkStatusCommand(args, ctx));
+		await withCommandTelemetry(command, args, ctx, () =>
+			handleWorkStatusCommand(args, ctx),
+		);
 	else if (command === "work-report")
-		await withCommandTelemetry(command, args, ctx, () => handleWorkReportCommand(args, ctx));
+		await withCommandTelemetry(command, args, ctx, () =>
+			handleWorkReportCommand(args, ctx),
+		);
 	else if (command === "work-resume" || command === "work-continue")
-		await withCommandTelemetry(command, args, ctx, () => handleWorkResumeCommand(args, ctx, pi), true);
+		await withCommandTelemetry(
+			command,
+			args,
+			ctx,
+			() => handleWorkResumeCommand(args, ctx, pi),
+			true,
+		);
 	else if (builders[command])
-		await withCommandTelemetry(command, args, ctx, () => handleWorkflowAction(builders[command], args, ctx, pi), true);
+		await withCommandTelemetry(
+			command,
+			args,
+			ctx,
+			() => handleWorkflowAction(builders[command], args, ctx, pi),
+			true,
+		);
 	else return false;
 	return true;
 }
@@ -5855,11 +5902,17 @@ async function executeNumberedWorkAction(action, ctx, pi) {
 async function maybeRunNumberedWorkAction(event, ctx, pi) {
 	if (event.source === "extension") return false;
 	if (activeWorkGoal?.status === "needs_human") return false;
-	const match = String(event.text ?? "").trim().match(/^(\d+)$/);
+	const match = String(event.text ?? "")
+		.trim()
+		.match(/^(\d+)$/);
 	if (!match) return false;
 	const last = readWorkState(ctx.cwd).lastActions;
 	const ageMs = Date.now() - Date.parse(last?.updatedAt ?? "");
-	if (!last?.actions?.length || !Number.isFinite(ageMs) || ageMs > 60 * 60 * 1000)
+	if (
+		!last?.actions?.length ||
+		!Number.isFinite(ageMs) ||
+		ageMs > 60 * 60 * 1000
+	)
 		return false;
 	const action = last.actions[Number(match[1]) - 1];
 	if (!action) return false;
@@ -6081,7 +6134,14 @@ export default function workModelsExtension(pi) {
 		};
 		const file = recordWorkTelemetry(run.cwd, telemetry);
 		appendTelemetryNote(run.cwd, run.meta.beadId, telemetry, file);
-		appendFailureStatusNote(run.cwd, run.meta.beadId, run, event, telemetry, file);
+		appendFailureStatusNote(
+			run.cwd,
+			run.meta.beadId,
+			run,
+			event,
+			telemetry,
+			file,
+		);
 		cleanupBenignInstructionDirt(run.cwd);
 		await handleWorkGoalAgentEnd(event, ctx, pi);
 	});
