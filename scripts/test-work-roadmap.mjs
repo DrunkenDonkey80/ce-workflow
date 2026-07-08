@@ -71,9 +71,34 @@ if (args[0] === 'list' && args.includes('--type=epic')) {
 );
 chmodSync(bd, 0o755);
 mkdirSync(path.join(root, "docs", "plans"), { recursive: true });
+mkdirSync(path.join(root, "docs", "brainstorms"), { recursive: true });
+writeFileSync(
+	path.join(root, "docs", "brainstorms", "requirements.md"),
+	[
+		"# Requirements",
+		"- Must keep home visual parity before shared primitives.",
+		"- No white cards or generic Material buttons.",
+		"- Side-by-side Pixel screenshot required for approval.",
+	].join("\n"),
+);
+writeFileSync(
+	path.join(root, "docs", "brainstorms", "sketch.html"),
+	"<main>home reference sketch</main>",
+);
 writeFileSync(
 	path.join(root, "docs", "plans", "overhaul.md"),
-	"# Overhaul\n\nSource: docs/brainstorms/requirements.md and docs/brainstorms/sketch.html\n",
+	[
+		"# Overhaul",
+		"Source: docs/brainstorms/requirements.md and docs/brainstorms/sketch.html",
+		"## Source Trace",
+		"- Home visual parity before shared primitives.",
+		"- No white cards or generic Material buttons.",
+		"- Side-by-side Pixel screenshot required for approval.",
+	].join("\n"),
+);
+writeFileSync(
+	path.join(root, "docs", "plans", "weak.md"),
+	"# Weak\n\nSource: docs/brainstorms/requirements.md\n\nBuild shared primitives first.\n",
 );
 writeFileSync(
 	path.join(root, ".pi", "work-orchestrator-state.json"),
@@ -165,6 +190,11 @@ try {
 		cwd: root,
 		stdio: "ignore",
 	});
+	const weakPlan = buildWorkPlanState(root, "docs/plans/weak.md");
+	console.assert(
+		!weakPlan.ok && weakPlan.reason === "source-alignment-stop",
+		"weak plans with linked brainstorms stop before epic creation",
+	);
 	const planCreated = buildWorkPlanState(root, "docs/plans/overhaul.md");
 	if (
 		!planCreated.ok ||

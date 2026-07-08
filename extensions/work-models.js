@@ -3923,8 +3923,71 @@ function extractRepoArtifactRefs(text) {
 			/docs[\\/](?:brainstorms|plans)[\\/][^\s)'"<>]+/gi,
 		),
 	]
-		.map((match) => normalizedRepoPath(match[0].replace(/[.,;:]+$/, "")))
+		.map((match) => normalizedRepoPath(match[0].replace(/[.,;:`\]]+$/, "")))
 		.filter((item, index, items) => items.indexOf(item) === index);
+}
+
+const SOURCE_ALIGNMENT_STOPWORDS = new Set(
+	"about after again against all also and any are because been before being between both but can cannot could did does done each either every for from has have into its itself just more must not now only other our out over plan project should than that the their them then there these they this through until use using was were when where which while with without would".split(
+		/\s+/,
+	),
+);
+
+function sourceSignalLines(text) {
+	return String(text)
+		.split(/\r?\n/)
+		.map((line) => line.replace(/^\s*(?:[-*+]|\d+\.)\s*/, "").trim())
+		.filter(
+			(line) =>
+				line.length >= 12 &&
+				/(must|must not|should|do not|don't|never|require|required|acceptance|constraint|non-goal|reference|example|match|approval|proof|screenshot|parity|gate|block|no\s+\w+)/i.test(
+					line,
+				),
+		)
+		.slice(0, 40);
+}
+
+function sourceLineTokens(line) {
+	return (
+		String(line)
+			.toLowerCase()
+			.match(/[a-z0-9][a-z0-9_-]{2,}/g)
+			?.filter((token) => !SOURCE_ALIGNMENT_STOPWORDS.has(token))
+			.slice(0, 8) ?? []
+	);
+}
+
+function planSourceAlignmentReport(cwd, rel) {
+	const planText = readFileSync(join(cwd, rel), "utf8");
+	const planLower = planText.toLowerCase();
+	const sources = extractRepoArtifactRefs(planText).filter((path) =>
+		/docs[\\/]brainstorms[\\/]/i.test(path),
+	);
+	const missingSources = sources.filter((source) => !existsSync(join(cwd, source)));
+	const missingSignals = [];
+	let signalCount = 0;
+	for (const source of sources.filter(
+		(item) => !missingSources.includes(item),
+	)) {
+		for (const line of sourceSignalLines(readFileSync(join(cwd, source), "utf8"))) {
+			const tokens = sourceLineTokens(line);
+			if (tokens.length === 0) continue;
+			signalCount += 1;
+			const hits = tokens.filter((token) => planLower.includes(token)).length;
+			if (hits < Math.min(2, tokens.length))
+				missingSignals.push({ source, line });
+		}
+	}
+	// ponytail: heuristic gate; replace with semantic trace scoring if false positives matter.
+	return {
+		sources,
+		missingSources,
+		signalCount,
+		missingSignals: missingSignals.slice(0, 8),
+		ok:
+			missingSources.length === 0 &&
+			(signalCount === 0 || missingSignals.length / signalCount <= 0.4),
+	};
 }
 
 function planEpicFields(cwd, rel) {
@@ -4931,6 +4994,17 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			);
 		if (!safeForPlanBootstrap(cwd, masterGit, first))
 			return planBootstrapDirtyStop(cwd, masterGit, first, command);
+		const alignment = planSourceAlignmentReport(cwd, first);
+		if (!alignment.ok)
+			return errorState(
+				"source-alignment-stop",
+				`Plan does not sufficiently trace linked brainstorm source artifacts: ${alignment.missingSources.length} missing source file(s), ${alignment.missingSignals.length}/${alignment.signalCount} source signal(s) not found in the plan.`,
+				{
+					action: "source-alignment-stop",
+					alignment,
+					suggestedCommands: [`${command} ${first}`],
+				},
+			);
 		const fields = planEpicFields(cwd, first);
 		const epic = createBead(cwd, {
 			title: fields.title,
@@ -6162,8 +6236,19 @@ function renderWorkflowActionText(state) {
 					...state.suggestedCommands.map((command) => `- ${command}`),
 				]
 			: [];
+		const alignment = state.alignment
+			? [
+					...state.alignment.missingSources.map(
+						(source) => `Missing source: ${source}`,
+					),
+					...state.alignment.missingSignals
+						.slice(0, 5)
+						.map((item) => `Untraced source signal: ${item.source} — ${item.line}`),
+				]
+			: [];
 		return [
 			`Work command unavailable: ${state.message}`,
+			...alignment,
 			...candidates,
 			...suggested,
 		].join("\n");
