@@ -259,6 +259,11 @@ function setWarpTitle(ctx, title) {
 	writeTerminal(`\x1b]0;${title}\x07`);
 }
 
+function resetWarpTitle(ctx) {
+	const cwd = ctx?.cwd ?? process.cwd();
+	setWarpTitle(ctx, `π - ${basename(cwd)}`);
+}
+
 function startWarpWork(ctx, mode, query = "") {
 	const cwd = ctx?.cwd ?? process.cwd();
 	emitWarp(ctx, "session_start");
@@ -272,7 +277,7 @@ function finishWarpWork(ctx, mode, response = "") {
 		query: `/work-${mode}`,
 		response: truncate(response, 200),
 	});
-	setWarpTitle(ctx, `π - ${basename(cwd)}`);
+	resetWarpTitle(ctx);
 }
 
 function pauseWarpForDecision(ctx, decision) {
@@ -6905,12 +6910,15 @@ export default function workModelsExtension(pi) {
 
 	pi.on("agent_start", async (_event, ctx) => {
 		if (!pendingWorkPrompt) {
-			if (activeWorkGoal?.status === "active")
+			if (activeWorkGoal?.status === "active") {
 				startWarpWork(
 					ctx,
 					workWarpMode(activeWorkGoal.mode, activeWorkGoal),
 					activeWorkGoal.objective,
 				);
+			} else {
+				setWarpTitle(ctx, workWarpTitle("work", ctx?.cwd ?? process.cwd()));
+			}
 			return;
 		}
 		activeWorkAgent = {
@@ -6946,7 +6954,9 @@ export default function workModelsExtension(pi) {
 
 	pi.on("agent_end", async (event, ctx) => {
 		if (!activeWorkAgent) {
+			const hadWorkGoal = Boolean(activeWorkGoal);
 			await handleWorkGoalAgentEnd(event, ctx, pi);
+			if (!hadWorkGoal) resetWarpTitle(ctx);
 			return;
 		}
 		const run = activeWorkAgent;
