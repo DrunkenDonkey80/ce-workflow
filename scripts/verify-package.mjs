@@ -121,7 +121,6 @@ for (const mode of [
 	"debug",
 	"auto",
 	"resume",
-	"continue",
 	"add",
 	"pause",
 	"status",
@@ -233,8 +232,6 @@ const promptModes = {
 	"work-debug.md": "debug",
 	"work-auto.md": "auto",
 	"work-report.md": "report",
-	"work-resume.md": "resume",
-	"work-continue.md": "continue",
 	"work-add.md": "add",
 	"work-pause.md": "pause",
 };
@@ -243,8 +240,8 @@ const promptFiles = readdirSync(path.join(root, "prompts")).filter((file) =>
 	file.endsWith(".md"),
 );
 check(
-	"exactly seventeen prompt templates",
-	promptFiles.length === 17,
+	"exactly fifteen prompt templates",
+	promptFiles.length === 15,
 	promptFiles.join(", "),
 );
 for (const [file, mode] of Object.entries(promptModes)) {
@@ -442,7 +439,9 @@ for (const phrase of [
 	'registerCommand("work-brainstorm"',
 	'registerCommand("work-usage"',
 	'registerCommand("work-resume"',
-	'registerCommand("work-continue"',
+	'registerCommand("work-menu"',
+	'pi.registerShortcut?.("f7"',
+	'pi.registerShortcut?.("f8"',
 	'registerCommand("work-pause"',
 	'registerCommand("work-small"',
 	'registerCommand("work-med"',
@@ -531,7 +530,6 @@ for (const phrase of [
 	"/work-roadmap",
 	"/work-telemetry",
 	"/work-resume",
-	"/work-continue",
 	"/work-models",
 	"/work-context",
 	"Context management",
@@ -544,7 +542,6 @@ for (const phrase of [
 	"bd init",
 	"Master plan epics",
 	"Migrating existing projects",
-	"created date, last worked date",
 	"Git log is evidence, not truth",
 	"unmerged/stale branches",
 	"ce-plan",
@@ -565,7 +562,6 @@ for (const phrase of [
 	"not builtin stand-ins like `worker`",
 	"parent orchestrator coordinates",
 	"pi-subagents` is unavailable",
-	"planning is the one task",
 	"MSYS_NO_PATHCONV=1",
 	"percent complete",
 	"No custom dashboard",

@@ -9,4 +9,4 @@ When this runs `ce-plan`, auto-accept plan creation unless a real human decision
 
 Task: $ARGUMENTS
 
-Final line must name the next command: `/work-plan <created-plan-path>` or `/work-resume <epic-id>`.
+Final line must name the next command: `/work-plan <created-plan-path>` or `/work-resume`.

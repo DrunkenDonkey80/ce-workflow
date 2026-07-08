@@ -159,7 +159,10 @@ try {
 		text.includes("Current blockers:"),
 		"text report includes blockers section",
 	);
-	assert(text.includes("B-1 open task"), "text report includes blocked bead");
+	assert(
+		text.includes("B-1 🟢 open task"),
+		"text report includes blocked bead",
+	);
 	assert(
 		text.includes("command: Command: rtk cmake"),
 		"text report includes failure command",
@@ -285,7 +288,7 @@ try {
 	process.env.WORK_REPORT_SCENARIO = "closed";
 	const closed = buildWorkReport(process.cwd(), "E-1");
 	assert(
-		closed.includes("Status: closed") &&
+		closed.includes("Status: ✅ closed") &&
 			closed.includes('Next: epic E-1 "Add coded work report" is complete.'),
 		"closed completed epic reports completion next action",
 	);

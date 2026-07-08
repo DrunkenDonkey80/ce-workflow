@@ -159,7 +159,8 @@ try {
 			ui: {
 				select: async (title, labels) => {
 					if (title.includes("BUG-1")) opLabels.push(...labels);
-					return labels.find((label) => picks.shift().test(label));
+					const pick = picks.shift();
+					return pick ? labels.find((label) => pick.test(label)) : undefined;
 				},
 				notify: (message) => notices.push(message),
 			},

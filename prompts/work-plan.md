@@ -12,4 +12,4 @@ Task: $ARGUMENTS
 Final line must be one of:
 
 - `Next: /work-plan <created-plan-path>` after ce-plan writes a plan.
-- `Next: /work-resume <epic-id>` after the epic and first planning Bead exists.
+- `Next: /work-resume` after the epic and first planning Bead exists.

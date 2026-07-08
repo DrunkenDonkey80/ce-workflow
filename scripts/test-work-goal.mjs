@@ -80,7 +80,7 @@ assert.equal(
 		blocked: 2,
 		elapsedMs: 123_000,
 	}),
-	"Epic ██████░░░░░░ Comp: 3 / Total: 6 (Failed: 1, Blocked: 2) Time: 2m 3s",
+	"Epic ✅ 3/6 🔴 failed 1 🟠 blocked 2 ⏱️ 2m 3s · F7 roadmaps · F8 menu",
 );
 assert.deepEqual(
 	mod.warpPayload(
@@ -105,12 +105,14 @@ const prompt = mod.buildWorkGoalSystemPrompt({
 });
 assert.match(prompt, /Do not stop for plan approval/);
 assert.match(prompt, /work_goal_human_decision only when/);
+assert.match(prompt, /ask the user to make that state available/);
 assert.match(prompt, /WORK_GOAL_NEEDS_HUMAN_DECISION/);
 assert.match(prompt, /work_goal_complete/);
 
 const commands = {};
 const tools = {};
 const hooks = {};
+const shortcuts = {};
 mod.default({
 	on: (name, handler) => {
 		hooks[name] = handler;
@@ -121,11 +123,20 @@ mod.default({
 	registerTool: (tool) => {
 		tools[tool.name] = tool;
 	},
+	registerShortcut: (key, config) => {
+		shortcuts[key] = config;
+	},
 });
 assert.ok(commands["work-goal"]);
-assert.ok(commands["work-self-improving-goal"]);
-assert.ok(commands["work-project-goal"]);
-assert.ok(commands["work-project"]);
+assert.ok(commands["work-resume"]);
+assert.ok(commands["work-resume-stop"]);
+assert.ok(commands["work-menu"]);
+assert.ok(commands["work-goal-reset-continue"]);
+assert.ok(shortcuts.f7);
+assert.ok(shortcuts.f8);
+assert.ok(!commands["work-self-improving-goal"]);
+assert.ok(!commands["work-project-goal"]);
+assert.ok(!commands["work-project"]);
 assert.ok(tools.work_goal_complete);
 assert.ok(tools.work_goal_human_decision);
 assert.equal(tools.work_goal_human_decision.parameters.required[0], "question");
@@ -152,6 +163,7 @@ try {
 		registerTool: (tool) => {
 			tempTools[tool.name] = tool;
 		},
+		registerShortcut: () => {},
 		appendEntry: (customType, data) => {
 			entries.push({ type: "custom", customType, data });
 		},
@@ -176,10 +188,17 @@ try {
 
 	mod.default(pi);
 	tempHooks.session_start?.({}, ctx);
+	assert.ok(
+		notices.some((notice) =>
+			String(notice.message).includes(
+				"work-orchestrator loaded · F7 roadmaps · F8 menu",
+			),
+		),
+	);
 	await tempCommands["work-goal"].handler("write temp proof file", ctx);
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
-	assert.equal(statuses["work-goal"], "active #0");
+	assert.equal(statuses["work-goal"], "▶️ active #0");
 
 	const before = await tempHooks.before_agent_start(
 		{ prompt: sent[0].message, systemPrompt: "base" },
@@ -201,7 +220,7 @@ try {
 	);
 	assert.equal(sent.length, 2);
 	assert.match(sent[1].message, /Automatic continuation #1/);
-	assert.equal(statuses["work-goal"], "active #1");
+	assert.equal(statuses["work-goal"], "▶️ active #1");
 
 	await tempHooks.before_agent_start(
 		{ prompt: sent[1].message, systemPrompt: "base" },
@@ -223,7 +242,7 @@ try {
 		},
 		ctx,
 	);
-	assert.equal(statuses["work-goal"], "needs human");
+	assert.equal(statuses["work-goal"], "🟣❓ needs human");
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes("needs human decision"),
@@ -236,7 +255,7 @@ try {
 		ctx,
 	);
 	assert.equal(clarifyResult, undefined);
-	assert.equal(statuses["work-goal"], "needs human");
+	assert.equal(statuses["work-goal"], "🟣❓ needs human");
 	const pausedBefore = await tempHooks.before_agent_start(
 		{ prompt: "clarify: what screenshot is missing?", systemPrompt: "base" },
 		ctx,
@@ -255,9 +274,10 @@ try {
 		ctx,
 	);
 	assert.deepEqual(inputResult, { action: "handled" });
-	assert.equal(statuses["work-goal"], "active #1");
+	assert.equal(statuses["work-goal"], "▶️ active #1");
 	assert.equal(sent.length, 3);
-	assert.match(sent[2].message, /human answered the pending decision/);
+	assert.match(sent[2].message, /Act on this answer immediately/);
+	assert.match(sent[2].message, /perform an action, do that action first/);
 	assert.match(sent[2].message, /add a connect button/);
 
 	await tempHooks.before_agent_start(
@@ -272,6 +292,39 @@ try {
 		ctx,
 	);
 	assert.equal(statuses["work-goal"], undefined);
+
+	await tempCommands["work-resume"].handler("one task only", ctx);
+	assert.match(sent.at(-1).message, /Project autopilot policy/);
+	tempHooks.agent_start?.({}, ctx);
+	assert.equal(statuses["work-goal"], "🔵 working #0");
+	await tempCommands["work-resume-stop"].handler("after this phase", ctx);
+	assert.equal(statuses["work-goal"], "🛑 stopping… #0");
+	assert.match(sent.at(-1).message, /Clean stop requested/);
+	const afterStopSent = sent.length;
+	await tempCommands["work-resume"].handler("", ctx);
+	assert.equal(statuses["work-goal"], "🔵 working #0");
+	assert.equal(sent.length, afterStopSent);
+	await tempCommands["work-resume-stop"].handler("after this phase", ctx);
+	assert.equal(statuses["work-goal"], "🛑 stopping… #0");
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Closed one project Bead." }],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(statuses["work-goal"], "⏹️ stopped #0");
+	assert.doesNotMatch(sent.at(-1).message, /^\/work-goal-reset-continue /);
+	await tempCommands["work-resume"].handler("", ctx);
+	assert.match(
+		sent.at(-1).message,
+		/Started in a fresh session|User resumed the goal/,
+	);
+	await tempCommands["work-goal"].handler("clear", ctx);
 
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(

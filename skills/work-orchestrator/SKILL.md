@@ -5,7 +5,7 @@ description: Drive Beads-backed software work from /work-* prompts. Use when cre
 
 # Work Orchestrator
 
-Use this skill for `/work-plan`, `/work-init`, `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-continue`, `/work-add`, `/work-report`, `/work-telemetry`, `/work-finish`, `/work-status`, and `/work-pause`. Use `/work-plan` as the human-facing bootstrap command; `/work-master` is a legacy alias. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. Extension commands provide cheap deterministic init, status, report, telemetry, resume, start-gate, pause/debug/add/auto intake, and finish-gate state when loaded.
+Use this skill for `/work-plan`, `/work-init`, `/work-master`, `/work-migrate`, `/work-small`, `/work-med`, `/work-big`, `/work-debug`, `/work-auto`, `/work-resume`, `/work-add`, `/work-report`, `/work-telemetry`, `/work-finish`, `/work-status`, and `/work-pause`. Use `/work-plan` as the human-facing bootstrap command; `/work-master` is a legacy alias. Use `/work-resume` as the autonomous project-loop entrypoint. Use the extension command `/work-models` to persist model/effort overrides for the role agents. Use `/work-context` to inspect or tune the built-in proactive instant compaction guard. Extension commands provide cheap deterministic init, status, report, telemetry, start-gate, pause/debug/add/auto intake, and finish-gate state when loaded.
 
 ## Source of Truth
 
@@ -14,7 +14,7 @@ Use this skill for `/work-plan`, `/work-init`, `/work-master`, `/work-migrate`, 
 - Chat memory is not source of truth. A fresh session must resume from `bd ready --json`, `bd list --status=in_progress --json`, and `git status`.
 - Work one ready Bead at a time unless isolated worktrees are explicitly used.
 - The parent orchestrator coordinates only; implementation, review, fixes, debugging, migration, and commit gates run through role agents. If `pi-subagents`/`subagent` is unavailable, stop with a setup blocker instead of doing the work in the parent chat.
-- One executable Bead is the default session boundary: after committing/closing it, stop with the next `/work-resume <epic-id>` command instead of dragging old context into the next slice.
+- One executable Bead is the default session boundary: after committing/closing it, stop with the next `/work-resume` command instead of dragging old context into the next slice.
 - Do not overwrite manual edits silently.
 
 ## Preflight
@@ -225,7 +225,7 @@ If classification is big, master, migrate, or ambiguous, ask before starting. Do
 
 ## Mode: resume
 
-Argument may be an explicit epic Bead ID, `last`, or empty. Default behavior is one executable Bead per invocation; the user can run `/work-resume <epic-id>` again from a fresh Pi session for the next slice.
+Argument may be an explicit epic Bead ID, `last`, empty, or project-loop guidance from `/work-resume`. Default behavior is one executable Bead per invocation; the user can run `/work-resume` again from a fresh Pi session for the next slice.
 
 When empty or `last`, resolve from Beads, not chat memory:
 
@@ -234,10 +234,6 @@ When empty or `last`, resolve from Beads, not chat memory:
 3. if no single latest epic can be proven, list active not-completed epics and ask the user to pick one.
 
 Build the choice list with Beads commands such as `bd list --type=epic --status=open --json`, `bd list --type=epic --status=in_progress --json`, and `bd children <epic-id> --json` when available. The choice list must include, for each epic: Bead ID, created date, last worked date, status, ready/open/in-progress child counts when available, and a one-line description. Compute dates from Beads JSON fields such as `created_at`/`updated_at` when available; otherwise use child updates, notes, or `unknown`. Do not guess from chat memory.
-
-## Mode: continue
-
-Legacy alias for `Mode: resume`. Follow the same resolution and loop.
 
 If the prompt starts with "Use the work-orchestrator skill in mode: resume with this precomputed extension state", trust that extension-resolved epic/action/selected Bead as the starting point. Verify Beads/git freshness, then continue at the matching loop step below instead of repeating target selection or ready-work discovery.
 
@@ -249,7 +245,7 @@ Loop:
 2. Run the worktree hygiene gate and resolve/record dirty files before spawning any child. Prefer one parent cleanup over repeated child stop/retry loops. Repeat this gate after every child returns; restore whitespace-only tracked instruction-file changes such as `AGENTS.md` before interpreting review results or committing. Because some child starts can recreate this instruction-file dirt after the parent gate, include a startup allowlist telling children to continue when the only dirty file is whitespace/formatter-only `AGENTS.md`/instruction-file dirt, and to leave it for parent cleanup.
 3. Inspect `bd children <epic-id> --json` unless precomputed extension state already handled stale planning for this invocation. If ready contains `wo:planning` Beads and executable child Beads already exist, close the satisfied planning Bead with a note naming the created children; do not run it as implementation work.
 4. Pick exactly one non-planning ready Bead belonging to or blocking the target epic. Prefer `wo:debug` bug Beads when they unblock in-progress/debug-needed work; otherwise pick the earliest unblocked implementation slice. Skip `wo:blocked` Beads unless the user explicitly chose them with `/work-debug`.
-5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan through compact fields or the referenced plan file section, not raw epic JSON. If open decisions, blocked/debug-needed children, or failed evidence exist, report them with `/work-report <epic-id>` style details and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next executable slice by default, or up to three obvious low-risk slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume <epic-id>` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred; never close the epic automatically.
+5. If no non-planning ready Bead belongs to the target epic, inspect the epic master plan through compact fields or the referenced plan file section, not raw epic JSON. If open decisions, blocked/debug-needed children, or failed evidence exist, report them with `/work-report <epic-id>` style details and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` Bead under the epic and launch `bead-planner` to compare the master plan against closed/open children and create the next executable slice by default, or up to three obvious low-risk slices; require the planner to close the planning Bead once executable children exist, verify `bd ready --json` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child Beads are closed or deliberately deferred; never close the epic automatically.
 6. Do not dump raw `bd show <id> --json` into the parent chat. Use the precomputed extension state, `/work-report <id> --json`, or small `bd show ... | python/node` projections. Child role agents may read full child Beads, but planner must not read full epic/master-plan JSON when a plan path or expected unit is available.
 7. If it is a planning Bead, launch `bead-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning Bead, verify `bd ready --json` exposes the earliest executable slice and not the planning Bead or a later dependent slice, then stop at the planning boundary.
 8. If it is an implementation Bead, launch `bead-worker` with `context:fresh` and a concrete task containing only the epic ID, Bead ID, acceptance, verification contract, relevant paths, related file allowlist, and known-unrelated dirty allowlist. Always include the instruction-file whitespace startup allowlist from step 2 so workers do not contact the supervisor for harmless EOF-only `AGENTS.md` dirt. When intercom is unavailable or not needed, explicitly tell the worker not to use `contact_supervisor`; it should persist a Beads blocker instead of detaching for coordination.
@@ -259,7 +255,7 @@ Loop:
 12. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
 13. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
 14. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
-15. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and numbered recommended actions when there is a next command (`1. /work-resume <epic-id>`, `2. ...`) so the user can type the number; also include the final one-line next action: `Next: /work-resume <epic-id>` when work remains, the exact blocker/debug command when blocked, or `Next: epic <epic-id> "<title>" is complete; close it explicitly with /work-roadmap close <epic-id>.` when truly complete.
+15. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and numbered recommended actions when there is a next command (`1. /work-resume`, `2. ...`) so the user can type the number; also include the final one-line next action: `Next: /work-resume` when work remains, the exact blocker/debug command when blocked, or `Next: epic <epic-id> "<title>" is complete; close it explicitly with /work-roadmap close <epic-id>.` when truly complete.
 
 ## Mode: roadmap
 
@@ -294,7 +290,7 @@ Read-only summary. Prefer the extension command `/work-status` when available be
 - whether `bd ready` is empty because the epic is complete, blocked, or needs another `bead-planner` slicing pass;
 - git status;
 - active subagent runs when visible;
-- next command, usually `/work-resume <epic-id>`.
+- next command, usually `/work-resume`.
 
 Do not mutate Beads or git in status mode.
 
@@ -313,7 +309,7 @@ For an epic target, report:
 - downstream Beads waiting on each blocker;
 - git status and any active/stale subagent coordination.
 
-For a Bead target, show the detailed failure artifact from notes: command, exit/status, logs/artifact paths, observed vs expected, attempted fixes, current hypothesis, human decision needed, dependencies, and what `/work-debug <bead-id>: ...` would do. If the Bead is not blocked, say so and point back to `/work-resume <epic-id>`.
+For a Bead target, show the detailed failure artifact from notes: command, exit/status, logs/artifact paths, observed vs expected, attempted fixes, current hypothesis, human decision needed, dependencies, and what `/work-debug <bead-id>: ...` would do. If the Bead is not blocked, say so and point back to `/work-resume`.
 
 ## Role Loop
 
@@ -328,8 +324,9 @@ Beads and git preserve the memory; Pi chat is disposable working context. The pa
 - before any compact/restart boundary, write the current decision, changed files, verification, blockers, and next command into Bead notes;
 - rely on `/work-context status` for current token/trigger state; default opt-in trigger is 150k tokens, capped by model context, and keeps at least the latest 30k tokens via Pi compaction settings;
 - compact only inside a single Bead when context gets high or after a noisy debug/review phase;
-- after one executable Bead is committed and closed, stop instead of continuing to the next unrelated slice in the same session;
-- if the user explicitly requests continuous mode, run at most one more ready Bead after a compact/checkpoint boundary and stop when context budget is high.
+- `/work-resume` automatic project-goal continuations start in a fresh session by default; opt out only with `workResume.newSessionBetweenIterations: false`;
+- `/work-resume-stop` requests a clean stop: checkpoint Beads/git, finish the current safe phase, and do not start another Bead;
+- after one executable Bead is committed and closed, stop unless the active `/work-resume` project-goal continuation is doing the fresh-session handoff.
 
 ## Cost and Model Policy
 

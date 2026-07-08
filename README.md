@@ -57,8 +57,9 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-big <task>` | Large, risky, or architectural slice inside an epic | Extension command: creates one planning Bead for deeper slicing, then hands it to `bead-planner` |
 | `/work-debug <bug-or-bead-id\|symptom[: guidance]>` | Failing test, blocked/debug-needed Bead, regression, or broken behavior | Extension command: resolves/reuses or creates a debug Bead, then hands that compact state to the existing debug role loop |
 | `/work-auto <task>` | You want the orchestrator to classify size | Extension command: rejects empty input, routes explicit blocked/debug-needed Beads to debug, otherwise hands unchanged text to the auto skill path |
-| `/work-resume [epic-id\|last]` | Resume epic work | Extension command: deterministically resolves Beads/git state, selects one safe next action, then hands that compact state to the existing role loop |
-| `/work-continue [epic-id\|last]` | Legacy resume alias | Same deterministic preflight and role-loop handoff as `/work-resume` |
+| `/work-resume [repo-path\|instruction]` | Resume autonomous project work | Extension command: starts/resumes a `/work-goal` project loop from Beads/git state. With no path it uses the current repo; plain text becomes the constraint. Self-improving workflow fixes default on via `.pi/settings.json` `workResume.selfImproving` |
+| `/work-resume-stop [reason]` | Stop overnight/autonomous work cleanly | Marks the active `/work-resume` loop as stopping, asks the agent to checkpoint and stop at the next safe phase boundary, then leaves it resumable with `/work-resume` |
+| `/work-menu` | Open the small work menu | Extension command/shortcut target for resume, stop, roadmap, status, and report |
 | `/work-add [--epic <id>] [--blocked-by <bead-id>] <task>` | Add urgent or discovered work mid-epic | Extension command: creates one child Bead under an unambiguous epic and adds only explicit `--blocked-by` dependencies |
 | `/work-pause [note]` | Stop safely | Extension command: appends a deterministic checkpoint with git files, verification, failures, remaining work, and next step |
 | `/work-report [epic-id\|last\|bead-id] [--json]` | Human handoff for blockers | Extension command: deterministic blocked/debug-needed Bead report, failure artifacts, dependencies, suggested debug commands, and optional JSON |
@@ -67,9 +68,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-usage [today\|all\|epic <id>\|bead <id>] [--open\|--jsonl]` | Write a usage report | Extension command: writes escaped sortable/filterable HTML under `.pi/work-runs/usage/` and prints the path; `--open` launches it; `--jsonl` prints machine-readable rows without HTML |
 | `/work-finish <bead-id\|epic-id>` | Classify commit/close readiness | Extension command: checks PASS review, verification evidence, related dirty files, and emits a deterministic commit-ready or stop state |
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
-| `/work-goal <objective>` | Run autonomous loops but stop for real human decisions | Extension command: appends goal-management rules, microcompacts before continuations, auto-consumes clear-winner questions, and pauses on human-decision blockers |
-| `/work-self-improving-goal <objective>` | Run `/work-goal` with ce-workflow improvement pressure | Same as `/work-goal`, plus a temporary self-improvement overlay for fixing workflow friction in this package |
-| `/work-project-goal <repo-path> [instruction]` / `/work-project <repo-path> [instruction]` | Self-improving autonomous loop for another repository | Plain language after the path becomes the constraint, e.g. `/work-project C:\soft\git\AI-Wedge do three tasks and stop` |
+| `/work-goal <objective>` | Run a raw autonomous goal | Extension command: appends goal-management rules, microcompacts before continuations, auto-consumes clear-winner questions, and pauses on human-decision blockers |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
 | `/work-models [status\|reset]` | Pick role models/effort | Extension command with model/effort picker; persists overrides to `.pi/settings.json` |
 
@@ -83,7 +82,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 6. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
 7. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
 8. Roadmap epics are not auto-closed. When a roadmap looks complete, use `/work-roadmap close <epic-id>`; unresolved child Beads require confirmation or `--force`.
-9. `/work-resume` rebuilds state from Beads and git in extension code, picks one safe action, and hands a compact prompt to role agents; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
+9. `/work-resume` is the project autopilot entrypoint. It targets the current repo by default, or a path when the first argument is an existing path, then continues from Beads/git state until done or a real human decision is needed.
 10. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
 11. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
 12. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
@@ -91,7 +90,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 14. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
 15. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
 16. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git and only open in a browser with `--open`. Use `--jsonl` for agent/subagent consumption.
-17. `/work-goal` runs a session-scoped autonomous loop with a scoped human-decision stop and `/work-context` microcompaction before continuations; `/work-self-improving-goal` and `/work-project-goal` add temporary ce-workflow self-improvement pressure.
+17. `/work-goal` runs a session-scoped autonomous loop with a scoped human-decision stop and `/work-context` microcompaction before continuations; `/work-resume` wraps it with project-autopilot rules and optional self-improvement pressure.
 18. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
 19. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
@@ -100,7 +99,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 - Beads is the only durable work state: master plans, acceptance, status, dependencies, discovered work, and resume notes.
 - Git is the only code state: diffs, branches, commits, and changed files.
 - Chat memory is not source of truth.
-- One executable Bead is the default session boundary: close/commit/checkpoint it, then run `/work-resume <epic-id>` again from a fresh Pi session.
+- One executable Bead is the default session boundary: close/commit/checkpoint it, then run `/work-resume` again from a fresh Pi session.
 - Manual dirty changes are classified before writer agents run.
 - Use `git status --porcelain=v1 --untracked-files=all` and `git diff --name-only`; do not treat human diff/stat summaries like `1 -0` as file content.
 - Known-unrelated dirty files are passed to children as an allowlist, and unrelated whitespace-only scratch in tracked instruction files is restored before spawning children when it is clearly not user work.
@@ -162,7 +161,7 @@ What happens:
 8. `bead-reviewer` checks diff, acceptance, and verification evidence.
 9. `bead-fixer` fixes reviewer failures when needed.
 10. `bead-committer` commits related files with `<bead-id>: <summary>` and closes the Bead.
-11. The run prints status and the next `/work-resume <epic-id>` command. Start a fresh Pi session for the next slice.
+11. The run prints status and the next `/work-resume` command. Start a fresh Pi session for the next slice.
 12. If no ready Bead exists but the epic is not complete, `/work-resume` asks `bead-planner` to compare the epic plan against existing children and create the next executable slice instead of declaring done.
 
 Check progress any time:
@@ -174,10 +173,10 @@ Check progress any time:
 Continue later, even in a fresh Pi session:
 
 ```text
-/work-resume last
+/work-resume
 ```
 
-When there is no obvious latest epic, `/work-resume` lists active epics with created date, last worked date, status, child counts, and one-line description so you can pick.
+When you need to constrain the next run, add plain text after the command, for example `/work-resume finish U3 only`.
 
 `/work-status` reports the same state without spending agent context: current epic title/status, closed slices over total slices, percent complete, ready/in-progress/planned-ahead/open-decision counts, git state, and the next command. Use `/work-report <epic-id>` when a human needs the full blocker ledger without spending agent context: blocked/debug-needed Beads, failure artifacts, artifact paths, dependencies, and suggested `/work-debug <bead-id>: <guidance>` commands. Add `--json` for the machine-readable state that future resume automation can reuse. Use `/work-telemetry today` or `/work-telemetry epic <id>` to see which commands, role agents, subagent/tool calls, token usage, and context jumps are expensive enough to optimize. Use `/work-usage` for the local sortable/filterable HTML version, including review scope/payoff when the telemetry recorded it; use `/work-usage --jsonl` for agents and add `--open` only when you want a browser.
 
@@ -199,6 +198,10 @@ Settings are optional and live in `.pi/settings.json`:
 ```json
 {
   "warp": { "enabled": true },
+  "workResume": {
+    "selfImproving": true,
+    "newSessionBetweenIterations": true
+  },
   "workOrchestrator": {
     "context": {
       "enabled": true,
@@ -211,7 +214,7 @@ Settings are optional and live in `.pi/settings.json`:
 }
 ```
 
-Warp notifications auto-enable when Warp's env vars are present; set `"warp": { "enabled": true }` to force them or `false` to disable. Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Use fresh sessions between Beads anyway; compacting keeps long single-Bead debug/review loops from rotting, not a reason to run an entire epic in one chat.
+Warp notifications auto-enable when Warp's env vars are present; set `"warp": { "enabled": true }` to force them or `false` to disable. `/work-resume` self-improvement is on by default; set `"workResume": { "selfImproving": false }` to run target-project autopilot without fixing ce-workflow friction. `/work-resume` also starts each automatic continuation in a fresh session by default; set `"workResume": { "newSessionBetweenIterations": false }` only if you want one growing chat. Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Compacting is still useful inside a noisy single agent turn, but overnight project loops should rely on Beads/git plus fresh-session continuations.
 
 ## Migrating existing projects
 
@@ -230,7 +233,7 @@ What migration does:
 5. Creates open task/bug Beads for remaining work.
 6. Creates decision Beads for unclear ownership, product choices, or conflicting evidence.
 7. Represents unmerged/stale branches as review or integration Beads; it never checks out, merges, rebases, or deletes branches.
-8. Recommends `/work-resume <epic-id>` when migration is complete.
+8. Recommends `/work-resume` when migration is complete.
 
 Git log is evidence, not truth. The migrator does not create one Bead per commit.
 
@@ -245,7 +248,7 @@ For a clean CE brainstorm or plan with no partial implementation to reconcile, s
 Then continue:
 
 ```text
-/work-resume <epic-id>
+/work-resume
 ```
 
 ## Working inside an existing epic
@@ -280,7 +283,7 @@ If it is urgent and should run now:
 After the inserted Bead closes, resume the original epic:
 
 ```text
-/work-resume last
+/work-resume
 ```
 
 ## Pause, stop, and resume
@@ -299,13 +302,17 @@ Resume later:
 /work-resume
 ```
 
-If there is exactly one active not-completed epic, it continues. If several epics are active, the orchestrator lists them and asks which to resume:
+With no arguments it resumes the current repo. To steer it, pass plain text:
 
 ```text
-/work-resume wo-abc123
+/work-resume finish U3 and stop after one Bead closes
 ```
 
-`/work-continue` is kept as a legacy alias for `/work-resume`.
+To target another repo, make the first argument an existing path:
+
+```text
+/work-resume C:\soft\git\AI-Wedge finish U3
+```
 
 ## Optional intercom coordination
 
@@ -319,7 +326,7 @@ With `pi-intercom` installed, `pi-subagents` can give child agents a private `co
 Example request:
 
 ```text
-/work-resume last
+/work-resume
 ```
 
 If a worker discovers a product choice, the parent receives the question. Reply in the parent session:
@@ -399,7 +406,9 @@ Role prompts use fresh child context by default and file-only artifacts so the p
 
 Use low/minimal effort for disposable smoke-test Pi instances. Keep your control session on a frontier model for `/work-plan`/`ce-plan` if you want deep planning, then set `work` to a local model to save tokens.
 
-`/work-context` is separate from model choice. It is on by default and uses no model call for its compact summary. For normal control-session inspection, use `/work-report` and `/work-resume`; avoid raw `bd show --json` for epics because it can dump full plans into chat.
+`/work-context` is separate from model choice. It is on by default and uses no model call for its compact summary. `/work-resume` starts automatic continuations in fresh sessions by default (`workResume.newSessionBetweenIterations !== false`) so overnight loops do not inherit every prior tool log. Use `/work-resume-stop` to request a clean stop; running `/work-resume` while it says 🛑 stopping cancels that stop. The status line shows ▶️ active, 🔵 working, 🛑 stopping, ⏹️ stopped, or 🟣❓ needs human. For normal control-session inspection, use `/work-report` and `/work-resume`; avoid raw `bd show --json` for epics because it can dump full plans into chat.
+
+Status line hints the working hotkeys: `F7 roadmaps · F8 menu`. Run `/reload` after installing or editing the package.
 
 ## Verify this package
 
@@ -428,13 +437,13 @@ Then try:
 /work-status
 /work-add Add --version output
 /work-pause smoke test checkpoint
-/work-resume last
+/work-resume
 ```
 
 From Git Bash, disable MSYS path conversion when using non-interactive slash commands, or `/work-resume` can be rewritten into `C:/Program Files/Git/work-resume` before Pi receives it:
 
 ```bash
-MSYS_NO_PATHCONV=1 pi --effort high -p "/work-resume last"
+MSYS_NO_PATHCONV=1 pi --effort high -p "/work-resume"
 ```
 
 Known runtime follow-up: current Pi on this Windows bench prints `The system cannot find the path specified.` before any `pi -e ...` extension session, even for an empty extension. The work commands now print deterministic results and keep git clean despite that upstream/runtime noise; investigate Pi extension startup separately if the message becomes actionable.

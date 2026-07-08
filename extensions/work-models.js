@@ -24,6 +24,7 @@ import {
 const CONFIG_DIR_NAME = ".pi";
 const TELEMETRY_DIR_NAME = "work-runs";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
+const WORK_SHORTCUT_STATUS = "F7 roadmaps · F8 menu";
 const INHERIT_MODEL = "__inherit_model__";
 const DEFAULT_THINKING = "__default_thinking__";
 const RESET_ALL = "__reset_all__";
@@ -112,11 +113,13 @@ let pendingWorkPrompt = null;
 let activeWorkAgent = null;
 let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
+let activeWorkGoalRunning = false;
 let workGoalContinuationPending = null;
 let workGoalContinuationRetry = null;
 let workGoalProgressTimer = null;
 
 const WORK_GOAL_STATE_ENTRY_TYPE = "work-goal-state";
+const WORK_GOAL_RESET_COMMAND = "work-goal-reset-continue";
 const WORK_GOAL_STATUS_KEY = "work-goal";
 const WORK_GOAL_PROGRESS_WIDGET_KEY = "work-goal-progress";
 const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
@@ -1795,7 +1798,7 @@ function instantSummary(preparation, customInstructions = "") {
 		files.modified.length
 			? `\n<modified-files>\n${files.modified.join("\n")}\n</modified-files>`
 			: "",
-		"\n## Next recovery step\nRun `/work-status` or `bd ready --json`, then continue with `/work-resume <epic-id>`.",
+		"\n## Next recovery step\nRun `/work-status` or `bd ready --json`, then continue with `/work-resume`.",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -1936,6 +1939,39 @@ function statusOf(issue) {
 	return field(issue, "status", "state") ?? "unknown";
 }
 
+function statusIcon(status) {
+	const key = String(status ?? "")
+		.toLowerCase()
+		.replace(/[\s-]+/g, "_");
+	return (
+		{
+			open: "🟢",
+			in_progress: "🔵",
+			working: "🔵",
+			active: "🔵",
+			closed: "✅",
+			done: "✅",
+			complete: "✅",
+			blocked: "🟠",
+			needs_human: "🟣❓",
+			paused: "⏸️",
+			stopping: "🛑",
+			stopped: "⏹️",
+			failed: "🔴",
+			error: "🔴",
+			unknown: "⚪",
+		}[key] ?? "⚪"
+	);
+}
+
+function statusLabel(status) {
+	return `${statusIcon(status)} ${status ?? "unknown"}`;
+}
+
+function issueLine(issue) {
+	return `${idOf(issue)} ${statusLabel(statusOf(issue))} ${typeOf(issue)} — ${titleOf(issue)}`;
+}
+
 function parentOf(issue) {
 	return field(issue, "parent_id", "parent", "parentId");
 }
@@ -2017,7 +2053,7 @@ function isWorkSlice(issue) {
 }
 
 function lineFor(issue) {
-	return `${idOf(issue)} ${statusOf(issue)} ${typeOf(issue)} — ${titleOf(issue)}`;
+	return issueLine(issue);
 }
 
 function buildWorkStatus(cwd, target) {
@@ -2026,10 +2062,10 @@ function buildWorkStatus(cwd, target) {
 		if (resolved.choices.length === 0)
 			return "No open or in-progress epic found. Use /work-plan or /work-migrate first.";
 		return [
-			"Multiple active epics. Run /work-status <epic-id> or /work-resume <epic-id>.",
+			"Multiple active epics. Run /work-status <epic-id> or /work-resume with the epic id as guidance.",
 			...resolved.choices.map(
 				(epic) =>
-					`- ${idOf(epic)} ${statusOf(epic)} — ${titleOf(epic)} (updated ${shortDate(updatedAt(epic))})`,
+					`- ${idOf(epic)} ${statusLabel(statusOf(epic))} — ${titleOf(epic)} (updated ${shortDate(updatedAt(epic))})`,
 			),
 		].join("\n");
 	}
@@ -2090,9 +2126,9 @@ function buildWorkStatus(cwd, target) {
 
 	return [
 		`Epic: ${titleOf(epic)} (${epicId})`,
-		`Status: ${statusOf(epic)} • created ${shortDate(createdAt(epic))} • updated ${shortDate(updatedAt(epic))}`,
+		`Status: ${statusLabel(statusOf(epic))} • created ${shortDate(createdAt(epic))} • updated ${shortDate(updatedAt(epic))}`,
 		`Progress: ${done.length}/${slices.length} slices closed (${percent}%)`,
-		`Ready: ${readySlices.length} • in progress: ${active.length} • planned ahead: ${planned.length} • blockers: ${blockers.length} • decisions: ${decisions.length}`,
+		`Ready: ${readySlices.length} • 🔵 in progress: ${active.length} • planned ahead: ${planned.length} • 🟠 blockers: ${blockers.length} • 🟣❓ decisions: ${decisions.length}`,
 		"",
 		"Ready slices:",
 		...(readySlices.length
@@ -5559,10 +5595,7 @@ function renderNoteLines(notes) {
 
 function renderIssueList(items, fallback = "- none") {
 	return items?.length
-		? items.map(
-				(issue) =>
-					`- ${issue.id} ${issue.status} ${issue.type} — ${issue.title}`,
-			)
+		? items.map((issue) => `- ${issueLine(issue)}`)
 		: [fallback];
 }
 
@@ -5580,7 +5613,7 @@ function renderWorkReportText(state) {
 	if (state.bead) {
 		return [
 			`Bead: ${state.bead.title} (${state.bead.id})`,
-			`Status: ${state.bead.status} • type: ${state.bead.type}`,
+			`Status: ${statusLabel(state.bead.status)} • type: ${state.bead.type}`,
 			"",
 			"Dependencies / blockers:",
 			...renderIssueList(state.bead.dependencies),
@@ -5605,8 +5638,8 @@ function renderWorkReportText(state) {
 	}
 	return [
 		`Epic: ${state.epic.title} (${state.epic.id})`,
-		`Status: ${state.epic.status} • Progress: ${state.counts.closed}/${state.counts.slices} slices closed`,
-		`Ready: ${state.counts.ready} • in progress: ${state.counts.inProgress} • blockers: ${state.counts.blockers} • decisions: ${state.counts.decisions}`,
+		`Status: ${statusLabel(state.epic.status)} • Progress: ${state.counts.closed}/${state.counts.slices} slices closed`,
+		`Ready: ${state.counts.ready} • 🔵 in progress: ${state.counts.inProgress} • 🟠 blockers: ${state.counts.blockers} • 🟣❓ decisions: ${state.counts.decisions}`,
 		"",
 		"Current blockers:",
 		...(state.blockers.length
@@ -5614,10 +5647,7 @@ function renderWorkReportText(state) {
 					const details = renderNoteLines(issue.notes).map(
 						(line) => `  - ${line}`,
 					);
-					return [
-						`- ${issue.id} ${issue.status} ${issue.type} — ${issue.title}`,
-						...details,
-					];
+					return [`- ${issueLine(issue)}`, ...details];
 				})
 			: ["- none"]),
 		"",
@@ -5652,7 +5682,9 @@ function renderTaskGroup(title, items) {
 	if (!items?.length) return [];
 	return [
 		title,
-		...items.map((item) => `- ${item.id} [${item.status}] ${item.title}`),
+		...items.map(
+			(item) => `- ${item.id} [${statusLabel(item.status)}] ${item.title}`,
+		),
 	];
 }
 
@@ -5661,23 +5693,23 @@ function renderWorkRoadmapText(state) {
 	if (state.action === "roadmap-list") {
 		const rows = state.roadmaps.map(
 			(epic) =>
-				`- ${epic.current ? "*" : " "} ${epic.id} [${epic.status}] ${epic.title}`,
+				`- ${epic.current ? "*" : " "} ${epic.id} [${statusLabel(epic.status)}] ${epic.title}`,
 		);
-		return ["Roadmaps:", ...(rows.length ? rows : ["- none"])].join("\n");
+		return ["🗺️ Roadmaps:", ...(rows.length ? rows : ["- none"])].join("\n");
 	}
 	if (state.action === "roadmap-tasks")
 		return [
 			`Roadmap: ${state.epic.id} — ${state.epic.title}`,
-			...renderTaskGroup("Blockers:", state.tasks.blockers),
-			...renderTaskGroup("Open:", state.tasks.open),
-			...renderTaskGroup("Closed:", state.tasks.closed),
+			...renderTaskGroup("🟠 Blockers:", state.tasks.blockers),
+			...renderTaskGroup("🟢 Open:", state.tasks.open),
+			...renderTaskGroup("✅ Closed:", state.tasks.closed),
 		].join("\n");
 	if (state.action === "roadmap-close-needs-confirmation")
 		return [
 			`Roadmap: ${state.epic.id} — ${state.epic.title}`,
 			state.message,
-			...renderTaskGroup("Unresolved:", state.unresolved),
-			"Suggested:",
+			...renderTaskGroup("🟠 Unresolved:", state.unresolved),
+			"💡 Suggested:",
 			...state.suggestedCommands.map((command) => `- ${command}`),
 		].join("\n");
 	return [
@@ -5703,9 +5735,7 @@ function renderResumeBlockedLines(state) {
 	if (state.blockers?.length) {
 		lines.push("Blocked:");
 		for (const [index, blocker] of state.blockers.slice(0, 3).entries()) {
-			lines.push(
-				`- ${blocker.id} ${blocker.status} ${blocker.type} — ${blocker.title}`,
-			);
+			lines.push(`- ${issueLine(blocker)}`);
 			if (index === 0 && blocker.notes?.nextAction)
 				lines.push(`  Required action: ${blocker.notes.nextAction}`);
 		}
@@ -5715,7 +5745,9 @@ function renderResumeBlockedLines(state) {
 	if (state.openDecisions?.length) {
 		lines.push("Open decisions:");
 		for (const decision of state.openDecisions.slice(0, 3))
-			lines.push(`- ${decision.id} ${decision.status} — ${decision.title}`);
+			lines.push(
+				`- ${decision.id} ${statusLabel(decision.status)} — ${decision.title}`,
+			);
 		if (state.openDecisions.length > 3)
 			lines.push(`- … ${state.openDecisions.length - 3} more decision(s)`);
 	}
@@ -5729,7 +5761,7 @@ function renderWorkResumeText(state) {
 					"Candidates:",
 					...state.candidates.map(
 						(epic) =>
-							`- ${epic.id} ${epic.status} — ${epic.title} (updated ${shortDate(epic.updated)}, children ${epic.counts?.children ?? "?"}, ready ${epic.counts?.ready ?? "?"})`,
+							`- ${epic.id} ${statusLabel(epic.status)} — ${epic.title} (updated ${shortDate(epic.updated)}, children ${epic.counts?.children ?? "?"}, ready ${epic.counts?.ready ?? "?"})`,
 					),
 				]
 			: [];
@@ -5742,9 +5774,9 @@ function renderWorkResumeText(state) {
 	return [
 		`Epic: ${state.epic.title} (${state.epic.id})`,
 		`Action: ${state.action}`,
-		`Ready: ${state.counts.ready} • executable: ${state.counts.readyExecutable} • planning: ${state.counts.planning} • blockers: ${state.counts.blockers} • decisions: ${state.counts.decisions}`,
+		`Ready: ${state.counts.ready} • executable: ${state.counts.readyExecutable} • planning: ${state.counts.planning} • 🟠 blockers: ${state.counts.blockers} • 🟣❓ decisions: ${state.counts.decisions}`,
 		state.selectedBead
-			? `Selected: ${state.selectedBead.id} ${state.selectedBead.type} — ${state.selectedBead.title}`
+			? `Selected: ${state.selectedBead.id} ${statusLabel(state.selectedBead.status)} ${state.selectedBead.type} — ${state.selectedBead.title}`
 			: "Selected: none",
 		state.message ? `Reason: ${state.message}` : "",
 		...renderResumeBlockedLines(state),
@@ -5800,10 +5832,22 @@ function workGoalSelfImprovingAppendix() {
 - Finish only after target-project progress and ce-workflow improvements are verified.`;
 }
 
+function workResumeSettings(cwd) {
+	const value = readSettings(cwd).workResume;
+	return typeof value === "object" && value !== null
+		? {
+				selfImproving: value.selfImproving !== false,
+				newSessionBetweenIterations:
+					value.newSessionBetweenIterations !== false,
+			}
+		: { selfImproving: true, newSessionBetweenIterations: true };
+}
+
 function workProjectAutopilotAppendix() {
 	return `Project autopilot policy:
 - Treat the target directory as the source of truth: verify git and Beads state there before mutating anything.
 - Use the work-orchestrator resume/debug/status/report loop, with all product commands and role-agent cwd values pointed at the target project.
+- Use cached role-agent names directly; do not call subagent list unless a direct launch says an agent is unknown: bead-planner, bead-worker, bead-reviewer, bead-fixer, bead-debugger, bead-committer, bead-migrator.
 - Keep the parent session as coordinator only; use fresh-context Beads role agents for implementation, review, fixing, debugging, and committing.
 - Obey the user instruction literally; if it says one task only, stop after one executable Bead closes. If it says N tasks, stop after N executable Beads close.
 - At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
@@ -5848,12 +5892,36 @@ function buildWorkSelfImprovingObjective(input = "", options = {}) {
 				? `User instruction for the target project: ${task}`
 				: "Run the autonomous project work loop for the target project until the active work is complete or a real human decision is required.",
 			workProjectAutopilotAppendix(),
-			workGoalSelfImprovingAppendix(),
+			options.selfImproving === false ? "" : workGoalSelfImprovingAppendix(),
 		]
 			.filter(Boolean)
 			.join("\n\n");
 	}
 	return [prompt, workGoalSelfImprovingAppendix()].filter(Boolean).join("\n\n");
+}
+
+function buildWorkResumeGoalObjective(cwd, args = "") {
+	const raw = String(args ?? "").trim();
+	if (!raw)
+		return buildWorkSelfImprovingObjective(cwd, {
+			project: true,
+			...workResumeSettings(cwd),
+		});
+	const explicit = parseWorkProjectGoalInput(raw);
+	const candidate = explicit.project
+		? isAbsolute(explicit.project)
+			? explicit.project
+			: resolve(cwd, explicit.project)
+		: "";
+	if (explicit.project && existsSync(candidate))
+		return buildWorkSelfImprovingObjective(raw, {
+			project: true,
+			...workResumeSettings(candidate),
+		});
+	return buildWorkSelfImprovingObjective(`${cwd} -- ${raw}`, {
+		project: true,
+		...workResumeSettings(cwd),
+	});
 }
 
 function isWorkGoal(value) {
@@ -5862,7 +5930,14 @@ function isWorkGoal(value) {
 		typeof value === "object" &&
 		typeof value.id === "string" &&
 		typeof value.objective === "string" &&
-		["active", "paused", "needs_human", "complete"].includes(value.status)
+		[
+			"active",
+			"paused",
+			"needs_human",
+			"stopping",
+			"stopped",
+			"complete",
+		].includes(value.status)
 	);
 }
 
@@ -5893,19 +5968,21 @@ function persistWorkGoal(pi, goal = activeWorkGoal, cwd = activeWorkGoalCwd) {
 
 function formatWorkGoalStatus(goal = activeWorkGoal) {
 	if (!goal) return undefined;
-	if (goal.status === "needs_human") return "needs human";
-	if (goal.status === "active") return `active #${goal.iteration ?? 0}`;
-	return goal.status;
+	if (goal.status === "needs_human")
+		return `${statusIcon("needs_human")} needs human`;
+	if (goal.status === "stopping")
+		return `${statusIcon("stopping")} stopping… #${goal.iteration ?? 0}`;
+	if (goal.status === "stopped")
+		return `${statusIcon("stopped")} stopped #${goal.iteration ?? 0}`;
+	if (goal.status === "active")
+		return activeWorkGoalRunning || activeWorkAgent
+			? `${statusIcon("active")} working #${goal.iteration ?? 0}`
+			: `▶️ active #${goal.iteration ?? 0}`;
+	return statusLabel(goal.status);
 }
 
 function updateWorkGoalStatus(ctx, goal = activeWorkGoal) {
-	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, formatWorkGoalStatus(goal));
-}
-
-function progressBar(done, total, width = 12) {
-	if (!total) return "░".repeat(width);
-	const filled = Math.min(width, Math.round((done / total) * width));
-	return `${"█".repeat(filled)}${"░".repeat(width - filled)}`;
+	ctx?.ui?.setStatus?.(WORK_GOAL_STATUS_KEY, formatWorkGoalStatus(goal));
 }
 
 function isFailedIssue(issue) {
@@ -5937,7 +6014,7 @@ function projectGoalProgressState(cwd, goal = activeWorkGoal) {
 }
 
 function renderProjectGoalProgress(state) {
-	return `${state.title} ${progressBar(state.complete, state.total)} Comp: ${state.complete} / Total: ${state.total} (Failed: ${state.failed}, Blocked: ${state.blocked}) Time: ${formatDuration(state.elapsedMs)}`;
+	return `${state.title} ✅ ${state.complete}/${state.total} 🔴 failed ${state.failed} 🟠 blocked ${state.blocked} ⏱️ ${formatDuration(state.elapsedMs)} · ${WORK_SHORTCUT_STATUS}`;
 }
 
 function updateWorkGoalProgress(ctx) {
@@ -5979,7 +6056,7 @@ function workGoalSummary(goal = activeWorkGoal) {
 		goal.decision
 			? `Human decision: ${formatWorkGoalDecision(goal.decision)}`
 			: "",
-		"Commands: /work-goal pause|resume|clear|status|edit <objective>",
+		"Commands: /work-goal pause|resume|clear|status|edit <objective>; /work-resume-stop for clean project-loop stop",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -6017,6 +6094,7 @@ ${escapeXmlText(goal.objective)}
 - Before each continuation, /work-goal will microcompact old reasoning and tool noise; treat Beads, git, files, tests, and command output as source of truth.
 - Do not stop for plan approval, permission to continue, or obvious implementation choices. Pick the clear winner and continue.
 - Use work_goal_human_decision only when progress truly depends on user-only information: product intent, credentials/accounts, destructive or risky action, production/billing/legal impact, ambiguous priority/scope with no clear winner, hardware/environment access, or a target path/project choice you cannot infer.
+- If evidence depends on external hardware/account/environment state, ask the user to make that state available. Once they answer that it is available or tell you to proceed, capture/inspect the artifact yourself immediately instead of asking again.
 - If tools are unavailable, end with ${WORK_GOAL_DECISION_MARKER}: and the question instead of asking a plain-text question.
 - When complete, call work_goal_complete with verification evidence. If the tool is unavailable, end with ${WORK_GOAL_COMPLETE_MARKER}: and the evidence.
 - Do not call completion for partial progress, blockers, failing tests, or unverified work.`;
@@ -6048,7 +6126,7 @@ function markWorkGoalContinuationDelivered(prompt) {
 }
 
 function buildWorkGoalContinuePrompt(goal, marker, note = "") {
-	return `Continue the active /work-goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. Use work_goal_human_decision only for real human-decision blockers; otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
+	return `Continue the active /work-goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. If the human answer asked you to perform an action, do that action first before unrelated work. Do not ask the same question again unless the answer is impossible to act on. Use work_goal_human_decision only for real human-decision blockers; otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
 }
 
 function buildWorkGoalCompactInstructions(goal) {
@@ -6128,6 +6206,19 @@ async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
 		marker,
 		iteration: goal.iteration,
 	};
+	if (
+		goal.mode === "project" &&
+		workResumeSettings(activeWorkGoalCwd ?? ctx.cwd).newSessionBetweenIterations
+	) {
+		const queued = await sendWorkGoalPrompt(
+			pi,
+			ctx,
+			`/${WORK_GOAL_RESET_COMMAND} ${goal.id} ${marker}`,
+		);
+		if (!queued && workGoalContinuationPending?.marker === marker)
+			workGoalContinuationPending = null;
+		return queued;
+	}
 	const sent = await microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt);
 	if (!sent && workGoalContinuationPending?.marker === marker)
 		workGoalContinuationPending = null;
@@ -6197,10 +6288,10 @@ function formatDecisionBlock(label, value, splitNumbered = false) {
 
 function formatWorkGoalDecision(decision = {}) {
 	return [
-		formatDecisionBlock("Question", decision.question),
-		formatDecisionBlock("Why user needed", decision.whyUserNeeded),
-		formatDecisionBlock("Options", decision.options, true),
-		formatDecisionBlock("Recommendation", decision.recommendation),
+		formatDecisionBlock("❓ Question", decision.question),
+		formatDecisionBlock("🧭 Why user needed", decision.whyUserNeeded),
+		formatDecisionBlock("🔢 Options", decision.options, true),
+		formatDecisionBlock("💡 Recommendation", decision.recommendation),
 	]
 		.filter(Boolean)
 		.join("\n\n");
@@ -6235,6 +6326,7 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	activeWorkGoal = { ...goal, status: "complete", updatedAt: Date.now() };
 	persistWorkGoal(pi, activeWorkGoal);
 	activeWorkGoal = null;
+	activeWorkGoalRunning = false;
 	workGoalContinuationPending = null;
 	persistWorkGoal(pi, null);
 	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
@@ -6350,23 +6442,142 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 	await startWorkGoal(mode, command.objective, pi, ctx);
 }
 
-async function handleSelfImprovingWorkGoalCommand(args, pi, ctx, options = {}) {
+async function handleWorkResumeGoalCommand(args, pi, ctx) {
 	const raw = String(args ?? "").trim();
-	if (options.project && !raw) {
-		return startWorkGoal(
-			"self-improving",
-			buildWorkSelfImprovingObjective(ctx.cwd, options),
-			pi,
-			ctx,
-		);
+	if (!raw && activeWorkGoal?.mode === "project") {
+		if (activeWorkGoal.status === "stopping") {
+			activeWorkGoal = {
+				...activeWorkGoal,
+				status: "active",
+				stopReason: undefined,
+				updatedAt: Date.now(),
+			};
+			persistWorkGoal(pi);
+			updateWorkGoalStatus(ctx);
+			ctx.ui.notify("/work-resume stop canceled.", "info");
+			return;
+		}
+		if (["paused", "stopped"].includes(activeWorkGoal.status))
+			return handleWorkGoalCommand("resume", "project", pi, ctx);
+		return handleWorkGoalCommand("status", "project", pi, ctx);
 	}
-	const command = parseWorkGoalCommand(args);
+	const command = raw
+		? parseWorkGoalCommand(raw)
+		: { kind: "start", objective: "" };
 	if (command.kind !== "start" && command.kind !== "edit")
-		return handleWorkGoalCommand(args, "self-improving", pi, ctx);
-	const objective = buildWorkSelfImprovingObjective(command.objective, options);
+		return handleWorkGoalCommand(raw, "project", pi, ctx);
+	const objective = buildWorkResumeGoalObjective(ctx.cwd, command.objective);
 	return command.kind === "edit"
-		? handleWorkGoalCommand(`edit ${objective}`, "self-improving", pi, ctx)
-		: startWorkGoal("self-improving", objective, pi, ctx);
+		? handleWorkGoalCommand(`edit ${objective}`, "project", pi, ctx)
+		: startWorkGoal("project", objective, pi, ctx);
+}
+
+async function handleWorkResumeStopCommand(args, pi, ctx) {
+	if (!activeWorkGoal || activeWorkGoal.mode !== "project") {
+		ctx.ui.notify("No active /work-resume project loop.", "warning");
+		return;
+	}
+	const working = activeWorkAgent || !ctx.isIdle?.();
+	activeWorkGoal = {
+		...activeWorkGoal,
+		status: working ? "stopping" : "stopped",
+		stopReason: String(args ?? "").trim() || "user requested stop",
+		updatedAt: Date.now(),
+	};
+	workGoalContinuationPending = null;
+	persistWorkGoal(pi);
+	updateWorkGoalStatus(ctx);
+	ctx.ui.notify(
+		working
+			? "/work-resume stopping after the current clean phase."
+			: "/work-resume stopped. Run /work-resume to resume.",
+		"info",
+	);
+	if (working) {
+		try {
+			const send =
+				typeof ctx.sendUserMessage === "function"
+					? ctx.sendUserMessage.bind(ctx)
+					: pi?.sendUserMessage?.bind(pi);
+			const prompt =
+				"Clean stop requested. Checkpoint current Beads/git state, stop at the next safe phase boundary, and do not start another Bead.";
+			if (send) {
+				if (ctx.isIdle?.()) await send(prompt);
+				else await send(prompt, { deliverAs: "steer" });
+			}
+		} catch {
+			// Stop flag is persisted; the current turn may still finish normally.
+		}
+	}
+}
+
+async function handleWorkMenuCommand(ctx, pi) {
+	const action = await choose(ctx, "Work menu", [
+		{
+			value: "resume",
+			label: "resume / cancel stop",
+			description: "Run /work-resume",
+		},
+		{
+			value: "stop",
+			label: "stop after current phase",
+			description: "Run /work-resume-stop",
+		},
+		{
+			value: "roadmap",
+			label: "roadmaps",
+			description: "Open /work-roadmap",
+		},
+		{
+			value: "status",
+			label: "status",
+			description: "Show /work-status",
+		},
+		{
+			value: "report",
+			label: "blocker report",
+			description: "Show /work-report",
+		},
+	]);
+	if (action === "resume") return handleWorkResumeGoalCommand("", pi, ctx);
+	if (action === "stop") return handleWorkResumeStopCommand("", pi, ctx);
+	if (action === "roadmap") return handleWorkRoadmapCommand("", ctx, pi);
+	if (action === "status") return handleWorkStatusCommand("", ctx);
+	if (action === "report") return handleWorkReportCommand("", ctx);
+}
+
+async function handleWorkGoalResetCommand(args, ctx) {
+	const [goalId, marker] = String(args ?? "")
+		.trim()
+		.split(/\s+/, 2);
+	const goal = activeWorkGoal;
+	if (!goal || goal.status !== "active" || goal.id !== goalId) return;
+	if (typeof ctx.newSession !== "function") {
+		await ctx.sendUserMessage(
+			buildWorkGoalContinuePrompt(
+				goal,
+				marker,
+				"Session reset unavailable; continuing in-place.",
+			),
+		);
+		return;
+	}
+	const prompt = buildWorkGoalContinuePrompt(
+		goal,
+		marker || workGoalContinuationMarker(goal),
+		"Started in a fresh session; resume from Beads/git and avoid relying on prior chat.",
+	);
+	const parentSession = ctx.sessionManager?.getSessionFile?.();
+	const result = await ctx.newSession({
+		parentSession,
+		withSession: async (nextCtx) => {
+			await nextCtx.sendUserMessage(prompt);
+		},
+	});
+	if (result?.cancelled) {
+		workGoalContinuationPending = null;
+		ctx.ui.notify("Work-goal session reset cancelled", "warning");
+	}
 }
 
 function workGoalHumanInputKind(text) {
@@ -6402,7 +6613,7 @@ async function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 		decision: undefined,
 		updatedAt: Date.now(),
 	};
-	const note = `The human answered the pending decision; resume the objective using this answer:\n\n${truncate(answer, 2_000)}`;
+	const note = `The human answered the pending decision. Act on this answer immediately, then resume the objective:\n\n${truncate(answer, 2_000)}`;
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
 	startWarpWork(
@@ -6430,7 +6641,11 @@ async function flushWorkGoalContinuationRetry(ctx, pi) {
 }
 
 async function handleWorkGoalAgentEnd(event, ctx, pi) {
-	if (!activeWorkGoal || activeWorkGoal.status !== "active") return;
+	if (
+		!activeWorkGoal ||
+		!["active", "stopping"].includes(activeWorkGoal.status)
+	)
+		return;
 	const goal = activeWorkGoal;
 	const assistant = finalAssistantMessage(event.messages);
 	const text = assistantVisibleText(assistant);
@@ -6456,6 +6671,14 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 			"/work-goal paused after interruption. Run /work-goal resume to continue.",
 			"warning",
 		);
+		return;
+	}
+	if (goal.status === "stopping") {
+		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		ctx.ui.notify("/work-resume stopped. Run /work-resume to resume.", "info");
+		finishWarpWork(ctx, workWarpMode(goal.mode, goal), "stopped");
 		return;
 	}
 	activeWorkGoal = {
@@ -6632,7 +6855,7 @@ async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 	}
 	const items = roadmapTaskItems(state.tasks).map(({ group, label, item }) => ({
 		value: `${group}:${item.id}`,
-		label: `${label}: ${item.id} [${item.status}] ${item.title}`,
+		label: `${label}: ${item.id} [${statusLabel(item.status)}] ${item.title}`,
 		description: item.type,
 	}));
 	if (!items.length) {
@@ -6677,36 +6900,40 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 	}
 	const selected = await choose(
 		ctx,
-		"Work roadmaps",
+		"🗺️ Work roadmaps",
 		list.roadmaps.map((epic) => ({
 			value: epic.id,
-			label: `${epic.current ? "* " : ""}${epic.id} [${epic.status}] ${epic.title}`,
+			label: `${epic.current ? "* " : ""}${epic.id} [${statusLabel(epic.status)}] ${epic.title}`,
 		})),
 	);
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
 	const op = await choose(ctx, `${selected}: operation`, [
 		{
+			value: "resume",
+			label: "▶️ work-resume",
+			description: "autonomous project loop for this roadmap",
+		},
+		{
 			value: "tasks",
-			label: "list tasks",
+			label: "📋 list tasks",
 			description: "blockers, open, closed",
 		},
 		{
 			value: "plan",
-			label: "plan / strengthen",
+			label: "🧭 plan / strengthen",
 			description: "use linked brainstorm/plan",
 		},
-		{ value: "set-current", label: "set current" },
+		{ value: "set-current", label: "⭐ set current" },
 		{
 			value: "close",
-			label: "close",
+			label: "✅ close",
 			description: "asks before unresolved tasks",
 		},
-		{ value: "reopen", label: "reopen" },
-		{ value: "resume", label: "resume work" },
-		{ value: "report", label: "full report" },
+		{ value: "reopen", label: "♻️ reopen" },
+		{ value: "report", label: "📄 full report" },
 	]);
 	if (!op) return { ok: true, action: "roadmap-cancel" };
-	if (op === "resume") return handleWorkResumeCommand(selected, ctx, pi);
+	if (op === "resume") return handleWorkResumeGoalCommand(selected, pi, ctx);
 	if (op === "report") return handleWorkReportCommand(selected, ctx);
 	if (op === "tasks") return handleRoadmapTasksMenu(selected, ctx, pi);
 	if (op === "plan")
@@ -6780,13 +7007,11 @@ async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
 		await withCommandTelemetry(command, args, ctx, () =>
 			handleWorkReportCommand(args, ctx),
 		);
-	else if (command === "work-resume" || command === "work-continue")
-		await withCommandTelemetry(
-			command,
-			args,
+	else if (command === "work-resume")
+		await handleWorkResumeGoalCommand(
+			withSelectionNote(args, selectionNote),
+			pi,
 			ctx,
-			() => handleWorkResumeCommand(args, ctx, pi, selectionNote),
-			true,
 		);
 	else if (builders[command])
 		await withCommandTelemetry(
@@ -6893,10 +7118,11 @@ export default function workModelsExtension(pi) {
 			name: "work_goal_human_decision",
 			label: "Work Goal Human Decision",
 			description:
-				"Pause the active /work-goal only for real user-only decisions; do not use for plan approval, permission to continue, or clear-winner choices.",
+				"Pause the active /work-goal only for real user-only decisions; do not use for plan approval, permission to continue, clear-winner choices, or artifacts that are already available to capture.",
 			promptSnippet: "Pause /work-goal for a real human decision factor",
 			promptGuidelines: [
 				"Use work_goal_human_decision only for user-only product, credential, destructive/risky, priority/scope, environment, or no-clear-winner decisions.",
+				"For screenshots/logs/browser state tied to external hardware or accounts, ask only to make the state available; after the user says proceed, capture it yourself immediately.",
 			],
 			parameters: {
 				...WORK_GOAL_TOOL_SCHEMA,
@@ -6928,9 +7154,11 @@ export default function workModelsExtension(pi) {
 	pi.on("session_start", (_event, ctx) => {
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
+		activeWorkGoalRunning = false;
 		workGoalContinuationPending = null;
 		updateWorkGoalStatus(ctx);
 		updateWorkGoalProgress(ctx);
+		ctx.ui.notify("work-orchestrator loaded · F7 roadmaps · F8 menu", "info");
 		resetWarpTitle(ctx);
 		startWorkGoalProgressTimer(ctx);
 	});
@@ -6977,12 +7205,14 @@ export default function workModelsExtension(pi) {
 
 	pi.on("agent_start", async (_event, ctx) => {
 		if (!pendingWorkPrompt) {
-			if (activeWorkGoal?.status === "active") {
+			if (["active", "stopping"].includes(activeWorkGoal?.status)) {
+				activeWorkGoalRunning = true;
 				startWarpWork(
 					ctx,
 					workWarpMode(activeWorkGoal.mode, activeWorkGoal),
 					activeWorkGoal.objective,
 				);
+				updateWorkGoalStatus(ctx);
 			} else {
 				setWarpTitle(ctx, workWarpTitle("work", ctx?.cwd ?? process.cwd()));
 			}
@@ -7000,6 +7230,7 @@ export default function workModelsExtension(pi) {
 			workWarpMode(activeWorkAgent.meta.mode),
 			`/work-${activeWorkAgent.meta.mode ?? "work"}`,
 		);
+		updateWorkGoalStatus(ctx);
 		pendingWorkPrompt = null;
 	});
 
@@ -7021,6 +7252,7 @@ export default function workModelsExtension(pi) {
 
 	pi.on("agent_end", async (event, ctx) => {
 		if (!activeWorkAgent) {
+			activeWorkGoalRunning = false;
 			const hadWorkGoal = Boolean(activeWorkGoal);
 			await handleWorkGoalAgentEnd(event, ctx, pi);
 			if (!hadWorkGoal) resetWarpTitle(ctx);
@@ -7028,6 +7260,7 @@ export default function workModelsExtension(pi) {
 		}
 		const run = activeWorkAgent;
 		activeWorkAgent = null;
+		activeWorkGoalRunning = false;
 		const usage = messageUsage(event.messages);
 		const durationMs = Math.max(0, Date.now() - run.startedAt);
 		const review = reviewTelemetry(run.meta, event);
@@ -7138,24 +7371,46 @@ export default function workModelsExtension(pi) {
 		},
 	});
 
-	pi.registerCommand("work-self-improving-goal", {
-		description: "Run /work-goal with the ce-workflow self-improvement overlay",
+	pi.registerCommand("work-resume", {
+		description: "Resume autonomous project work from Beads/git state",
 		handler: async (args, ctx) => {
-			await handleSelfImprovingWorkGoalCommand(args, pi, ctx);
+			await handleWorkResumeGoalCommand(args, pi, ctx);
 		},
 	});
 
-	const workProjectGoalCommand = {
-		description:
-			"Run the self-improving project goal for a target repository path",
+	pi.registerCommand("work-resume-stop", {
+		description: "Cleanly stop /work-resume at the next safe boundary",
 		handler: async (args, ctx) => {
-			await handleSelfImprovingWorkGoalCommand(args, pi, ctx, {
-				project: true,
-			});
+			await handleWorkResumeStopCommand(args, pi, ctx);
 		},
-	};
-	pi.registerCommand("work-project-goal", workProjectGoalCommand);
-	pi.registerCommand("work-project", workProjectGoalCommand);
+	});
+
+	pi.registerCommand("work-menu", {
+		description: "Open a small work-orchestrator menu",
+		handler: async (_args, ctx) => {
+			await handleWorkMenuCommand(ctx, pi);
+		},
+	});
+
+	pi.registerCommand(WORK_GOAL_RESET_COMMAND, {
+		description: "Internal: continue a work goal in a fresh session",
+		handler: async (args, ctx) => {
+			await handleWorkGoalResetCommand(args, ctx);
+		},
+	});
+
+	pi.registerShortcut?.("f7", {
+		description: "Open work roadmaps",
+		handler: async (ctx) => {
+			await handleWorkRoadmapCommand("", ctx, pi);
+		},
+	});
+	pi.registerShortcut?.("f8", {
+		description: "Open work menu",
+		handler: async (ctx) => {
+			await handleWorkMenuCommand(ctx, pi);
+		},
+	});
 
 	pi.registerCommand("work-init", {
 		description: "Initialize Beads for work-orchestrator without AGENTS noise",
@@ -7246,33 +7501,6 @@ export default function workModelsExtension(pi) {
 					await sendFollowUp(ctx, brainstormHandoffPrompt(state), pi);
 				return stateTelemetry(state);
 			});
-		},
-	});
-
-	pi.registerCommand("work-resume", {
-		description:
-			"Resolve the next Beads-backed work action and hand off safely",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-resume",
-				args,
-				ctx,
-				() => handleWorkResumeCommand(args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-continue", {
-		description: "Alias for deterministic /work-resume preflight",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-continue",
-				args,
-				ctx,
-				() => handleWorkResumeCommand(args, ctx, pi),
-				true,
-			);
 		},
 	});
 
