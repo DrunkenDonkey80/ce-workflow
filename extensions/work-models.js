@@ -3963,13 +3963,17 @@ function planSourceAlignmentReport(cwd, rel) {
 	const sources = extractRepoArtifactRefs(planText).filter((path) =>
 		/docs[\\/]brainstorms[\\/]/i.test(path),
 	);
-	const missingSources = sources.filter((source) => !existsSync(join(cwd, source)));
+	const missingSources = sources.filter(
+		(source) => !existsSync(join(cwd, source)),
+	);
 	const missingSignals = [];
 	let signalCount = 0;
 	for (const source of sources.filter(
 		(item) => !missingSources.includes(item),
 	)) {
-		for (const line of sourceSignalLines(readFileSync(join(cwd, source), "utf8"))) {
+		for (const line of sourceSignalLines(
+			readFileSync(join(cwd, source), "utf8"),
+		)) {
 			const tokens = sourceLineTokens(line);
 			if (tokens.length === 0) continue;
 			signalCount += 1;
@@ -6243,7 +6247,9 @@ function renderWorkflowActionText(state) {
 					),
 					...state.alignment.missingSignals
 						.slice(0, 5)
-						.map((item) => `Untraced source signal: ${item.source} — ${item.line}`),
+						.map(
+							(item) => `Untraced source signal: ${item.source} — ${item.line}`,
+						),
 				]
 			: [];
 		return [
