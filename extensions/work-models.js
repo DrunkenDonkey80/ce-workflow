@@ -31,11 +31,8 @@ const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
-const WORK_ORCH_AGENT_DIR = resolve(
-	dirname(fileURLToPath(import.meta.url)),
-	"..",
-	"agents",
-);
+const WORKFLOW_REPO_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const WORK_ORCH_AGENT_DIR = resolve(WORKFLOW_REPO_DIR, "agents");
 
 function exposeBundledSubagentAgents() {
 	if (!existsSync(WORK_ORCH_AGENT_DIR)) return;
@@ -5804,7 +5801,7 @@ function workProjectAutopilotAppendix() {
 - Use the work-orchestrator resume/debug/status/report loop, with all product commands and role-agent cwd values pointed at the target project.
 - Keep the parent session as coordinator only; use fresh-context Beads role agents for implementation, review, fixing, debugging, and committing.
 - Obey the user instruction literally; if it says one task only, stop after one executable Bead closes. If it says N tasks, stop after N executable Beads close.
-- At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo before continuing.
+- At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
 - Stop only when the requested scope is done, the epic is complete, or a real product/credential/hardware/destructive/verification decision is required.`;
 }
 
