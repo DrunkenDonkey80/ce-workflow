@@ -16,6 +16,7 @@ const { assert, installWorkflowFixture } = await import(
 	).href
 );
 const {
+	brainstormHandoffPrompt,
 	buildWorkBrainstormState,
 	buildWorkPlanState,
 	deriveIdeaStatus,
@@ -110,6 +111,21 @@ try {
 			.at(-1)
 			.notes.includes("brainstorm-path=docs/brainstorms/accepted.md"),
 		"selected idea note includes brainstorm path",
+	);
+	assert(
+		brainstormHandoffPrompt(state).includes("Run /work-plan E-1 now") &&
+			brainstormHandoffPrompt(state).includes(
+				"do not use ce-brainstorm's post-doc planning menu",
+			),
+		"linked brainstorm handoff routes planning through work-plan",
+	);
+	const planFromEpic = buildWorkPlanState(cwd, "E-1 fork");
+	assert(
+		planFromEpic.ok &&
+			planFromEpic.handoffPrompt.includes(
+				"Source brainstorm: docs/brainstorms/accepted.md",
+			),
+		"work-plan can create a new roadmap from an epic-linked brainstorm",
 	);
 
 	state = buildWorkBrainstormState(

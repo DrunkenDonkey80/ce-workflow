@@ -20,17 +20,17 @@ Responsibilities:
 - read the assigned planning Bead with `bd show <id> --json`;
 - do not dump raw epic JSON into the transcript; for the master epic, use a small `bd show <epic-id> --json | python -c ...`/`node -e ...` extractor for id/title/status, acceptance, plan refs, and the one implementation-unit section you need;
 - prefer the plan file referenced by the epic/planning Bead and read only the expected next unit section (for example U4) plus the hardware/verification contract, not the whole roadmap;
-- read the repo verification contract from project instructions and the epic acceptance before creating children;
+- read the repo verification contract, epic acceptance, and any Acceptance Contract from the plan before creating children;
 - list existing epic children before creating anything, summarized to ids/titles/status rather than full notes/design blobs;
 - compare the master plan against existing open, in-progress, and closed children every time, especially when `bd ready` is empty;
 - create or update the next executable Bead from the remaining unsliced master-plan units by default, always with `--parent <epic-id>`; create up to three only when the next units are obvious, low-risk, and sequential;
 - never create a duplicate Bead when an existing open, in-progress, or closed child already covers the same implementation unit;
-- create decision Beads for human/product/architecture uncertainty, always with `--parent <epic-id>`;
+- create decision Beads for human/product/architecture uncertainty, and blocker Beads for unresolved Acceptance Contract proof gaps, always with `--parent <epic-id>`;
 - add only real blocking dependencies, especially between freshly created slices when one must follow another;
 - use Beads dependency direction explicitly: if slice B must wait for slice A, run `bd dep add B A` (B depends on A; A blocks B), so `bd ready` shows A first;
 - after creating or updating dependencies, run `bd ready --json` through a python/node projection that prints only ready ids/status/titles; if the wrong slice is ready, repair dependencies before closing the planning Bead;
 - close the planning Bead once durable executable Beads exist; do not leave a ready planning Bead competing with implementation Beads;
-- report "epic complete" only when no master-plan implementation units remain and all child tasks/bugs are closed or deliberately deferred.
+- report "epic complete" only when no master-plan implementation units remain and all child tasks/bugs are closed or deliberately deferred; never close the epic itself.
 
 Before creating Beads, inspect existing children with `bd children <epic-id> --json` or `bd list --parent <epic-id> --status all --json` piped through python/node to print only ids/status/types/titles unless you need one specific child body. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them. When exceptionally creating multiple sequential slices, add dependencies from later to earlier (`bd dep add <later-id> <earlier-id>`) and verify a compact `bd ready --json` projection exposes the earliest executable slice first before closing the planning Bead.
 
@@ -53,4 +53,4 @@ Final response:
 - whether the epic appears complete;
 - why the plan is now executable;
 - blockers, if any;
-- final line: `Next: /work-resume <epic-id>` when executable work exists, or `Next: epic <epic-id> "<title>" is complete.` when no work remains.
+- final line: `Next: /work-resume <epic-id>` when executable work exists, or `Next: epic <epic-id> "<title>" is complete; close it explicitly with /work-roadmap close <epic-id>.` when no work remains.

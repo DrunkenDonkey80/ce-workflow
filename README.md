@@ -47,7 +47,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | Command | Use when | What it does |
 | --- | --- | --- |
 | `/work-init` | Repo has no Beads workspace yet | Extension command: runs `bd init --non-interactive --skip-agents` only when needed |
-| `/work-plan <idea-or-plan-file>` | New idea, brainstorm, roadmap, or master plan | Extension command: initializes Beads if needed, sends raw input to `ce-plan`, then creates an epic from the produced master roadmap plan |
+| `/work-plan [epic-id\|idea-or-plan-file]` | New idea, brainstorm, roadmap, or master plan | Extension command: initializes Beads if needed, plans from raw input or an epic-linked brainstorm, then creates an epic from the produced master roadmap plan |
 | `/work-ideate [target action\|topic]` | Capture, list, inspect, accept, reject, discuss, or import ideas | Extension command: shows Beads-backed ideas, guards numeric indexes, and mutates only the resolved idea |
 | `/work-brainstorm [idea <target>\|topic] [path]` | Brainstorm an idea or topic without losing lineage | Extension command: initializes Beads when needed, creates a standalone brainstorm epic if no active epic exists, links artifacts to exact idea records, and reports near-duplicates instead of fuzzy merging |
 | `/work-master <brainstorm-or-plan>` | Legacy alias | Same as `/work-plan` |
@@ -62,6 +62,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-add [--epic <id>] [--blocked-by <bead-id>] <task>` | Add urgent or discovered work mid-epic | Extension command: creates one child Bead under an unambiguous epic and adds only explicit `--blocked-by` dependencies |
 | `/work-pause [note]` | Stop safely | Extension command: appends a deterministic checkpoint with git files, verification, failures, remaining work, and next step |
 | `/work-report [epic-id\|last\|bead-id] [--json]` | Human handoff for blockers | Extension command: deterministic blocked/debug-needed Bead report, failure artifacts, dependencies, suggested debug commands, and optional JSON |
+| `/work-roadmap [list\|tasks\|plan\|set-current\|close\|reopen]` | Manage roadmap epics | Extension command: fast epic picker, task submenu with summaries, linked brainstorm/plan handoff, blocker debug handoff, and explicit-only close/reopen |
 | `/work-telemetry [today\|all\|epic <id>\|bead <id>] [--json]` | See timing/token/context cost | Extension command: summarizes `.pi/work-runs/*.jsonl` without an LLM |
 | `/work-usage [today\|all\|epic <id>\|bead <id>] [--open\|--jsonl]` | Write a usage report | Extension command: writes escaped sortable/filterable HTML under `.pi/work-runs/usage/` and prints the path; `--open` launches it; `--jsonl` prints machine-readable rows without HTML |
 | `/work-finish <bead-id\|epic-id>` | Classify commit/close readiness | Extension command: checks PASS review, verification evidence, related dirty files, and emits a deterministic commit-ready or stop state |
@@ -81,17 +82,18 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 5. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 6. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
 7. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
-8. `/work-resume` rebuilds state from Beads and git in extension code, picks one safe action, and hands a compact prompt to role agents; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
-9. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
-10. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
-11. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
-12. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
-13. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
-14. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
-15. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git and only open in a browser with `--open`. Use `--jsonl` for agent/subagent consumption.
-16. `/work-goal` runs a session-scoped autonomous loop with a scoped human-decision stop and `/work-context` microcompaction before continuations; `/work-self-improving-goal` and `/work-project-goal` add temporary ce-workflow self-improvement pressure.
-17. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
-18. `/work-pause` writes a checkpoint into Beads so any future session can continue.
+8. Roadmap epics are not auto-closed. When a roadmap looks complete, use `/work-roadmap close <epic-id>`; unresolved child Beads require confirmation or `--force`.
+9. `/work-resume` rebuilds state from Beads and git in extension code, picks one safe action, and hands a compact prompt to role agents; if it only had to create new slices, planning is the one task and implementation starts on the next resume.
+10. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
+11. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
+12. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
+13. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
+14. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
+15. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
+16. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git and only open in a browser with `--open`. Use `--jsonl` for agent/subagent consumption.
+17. `/work-goal` runs a session-scoped autonomous loop with a scoped human-decision stop and `/work-context` microcompaction before continuations; `/work-self-improving-goal` and `/work-project-goal` add temporary ce-workflow self-improvement pressure.
+18. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
+19. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
 ## Source-of-truth rules
 
@@ -122,13 +124,15 @@ Recent examples this package now handles:
 
 ## Master plan epics
 
-For brainstorm-driven work, use `/work-plan` with the brainstorm path or request:
+For brainstorm-driven work, use `/work-plan` with the brainstorm epic, brainstorm path, or request:
 
 ```text
-/work-plan plan docs/brainstorms/example.md into a detailed master roadmap for slicing later
+/work-plan E-123 fork
+/work-plan docs/brainstorms/example.md
+/work-plan Build a small CLI from this description...
 ```
 
-The orchestrator runs `ce-plan` when a detailed master plan does not already exist and tells it to auto-accept plan creation unless a real human decision is needed. It then creates an epic Bead with the plan summary/scope in `description`, the full plan stored via `design`, acceptance and verification in `acceptance`, and source paths in `notes`. Later `bead-planner` usually slices that epic into one executable Bead at a time, creating up to three only when the next steps are obvious and low-risk. The other `/work-*` commands add or execute work inside an existing epic.
+The orchestrator runs `ce-plan` when a detailed master plan does not already exist and tells it to write a new plan for non-plan sources instead of reusing an older weaker plan. It preserves every source decision instead of compressing the brainstorm into a vague summary. Any authoritative reference or target behavior becomes a generic Acceptance Contract: source, must-match invariants, must-not regressions, proof artifacts/checks, and approval path. Plan self-audit findings must become plan fixes, blocking questions, decision/blocker Bead instructions, or explicit waivers — not passive risk prose; `/work-plan` repeats that hardening loop until no blocking uncertainty remains. It then creates an epic Bead with the plan summary/scope in `description`, the full plan stored via `design`, acceptance and verification in `acceptance`, and source paths in `notes`. Later `bead-planner` usually slices that epic into one executable Bead at a time, creating up to three only when the next steps are obvious and low-risk. The other `/work-*` commands add or execute work inside an existing epic.
 
 ## Start-to-completion example
 

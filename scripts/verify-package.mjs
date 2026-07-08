@@ -113,6 +113,7 @@ for (const mode of [
 	"ideate",
 	"brainstorm",
 	"usage",
+	"roadmap",
 	"migrate",
 	"small",
 	"med",
@@ -435,6 +436,7 @@ for (const phrase of [
 	'registerCommand("work-plan"',
 	'registerCommand("work-status"',
 	'registerCommand("work-report"',
+	'registerCommand("work-roadmap"',
 	'registerCommand("work-telemetry"',
 	'registerCommand("work-ideate"',
 	'registerCommand("work-brainstorm"',
@@ -453,6 +455,8 @@ for (const phrase of [
 	'registerCommand("work-auto"',
 	'registerCommand("work-context"',
 	"buildWorkReport",
+	"buildWorkRoadmapState",
+	"renderWorkRoadmapText",
 	"buildWorkTelemetry",
 	"buildWorkTelemetryState",
 	"recordWorkTelemetry",
@@ -524,6 +528,7 @@ for (const phrase of [
 	"Extension command: appends a deterministic checkpoint",
 	"Extension command: rejects empty input",
 	"/work-report",
+	"/work-roadmap",
 	"/work-telemetry",
 	"/work-resume",
 	"/work-continue",
@@ -579,6 +584,7 @@ for (const phrase of [
 	".pi/work-runs/*.jsonl",
 	"review scope/payoff",
 	"review tuning settings",
+	"Roadmap epics are not auto-closed",
 ]) {
 	check(`README mentions ${phrase}`, readme.includes(phrase));
 }
@@ -592,6 +598,7 @@ for (const script of [
 	"test-work-ideate.mjs",
 	"test-work-brainstorm.mjs",
 	"test-work-usage.mjs",
+	"test-work-roadmap.mjs",
 	"test-work-models.mjs",
 	"test-work-intake.mjs",
 	"test-work-pause.mjs",

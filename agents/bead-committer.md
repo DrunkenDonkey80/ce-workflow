@@ -20,7 +20,7 @@ Gate before committing:
 
 - inspect `git status --porcelain=v1 --untracked-files=all`;
 - inspect the related diff and file names with `git diff --name-only` / `git diff --cached --name-only`; do not parse diff/stat summaries such as `1 -0` as file content;
-- confirm the Bead's verification contract passed in Bead notes or rerun the required check;
+- confirm the Bead's verification contract and any Acceptance Contract proof passed in Bead notes or rerun the required check;
 - when the contract requires real hardware, require explicit hardware/module evidence before committing;
 - if notes contain failed product/live evidence, require either explicit evidence-capture acceptance or a linked debug/blocked Bead before closing;
 - ensure only files related to the Bead are staged;
@@ -39,4 +39,4 @@ Final response must be concise so the parent context stays small:
 - Bead closed or updated;
 - verification evidence;
 - uncommitted unrelated files, if any;
-- final line: `Next: /work-resume <epic-id>` when more epic work remains, or `Next: epic <epic-id> "<title>" is complete.` when closing the final slice.
+- final line: `Next: /work-resume <epic-id>` when more epic work remains, or `Next: epic <epic-id> "<title>" is complete; close it explicitly with /work-roadmap close <epic-id>.` when closing the final slice.

@@ -1948,7 +1948,7 @@ function buildWorkStatus(cwd, target) {
 		if (planning.length)
 			return `Run /work-resume ${epicId}; planner should create the next slice.`;
 		if (statusOf(epic) === "closed") return "Epic is closed.";
-		return "No ready slices. /work-resume should ask bead-planner to compare the epic plan against closed children and create the next slice, or close the epic if done.";
+		return "No ready slices. /work-resume should ask bead-planner to compare the epic plan against closed children and create the next slice, or report done. Close the roadmap only with /work-roadmap close.";
 	})();
 
 	return [
@@ -3917,6 +3917,16 @@ function artifactIdeaId(text) {
 	)?.[1];
 }
 
+function extractRepoArtifactRefs(text) {
+	return [
+		...String(text).matchAll(
+			/docs[\\/](?:brainstorms|plans)[\\/][^\s)'"<>]+/gi,
+		),
+	]
+		.map((match) => normalizedRepoPath(match[0].replace(/[.,;:]+$/, "")))
+		.filter((item, index, items) => items.indexOf(item) === index);
+}
+
 function planEpicFields(cwd, rel) {
 	const text = readFileSync(join(cwd, rel), "utf8");
 	const body = stripFrontmatter(text);
@@ -3928,6 +3938,9 @@ function planEpicFields(cwd, rel) {
 		/acceptance|verification|done criteria|test plan/i,
 	);
 	const ideaId = artifactIdeaId(text);
+	const sourceArtifacts = extractRepoArtifactRefs(text).filter(
+		(path) => path !== rel,
+	);
 	return {
 		title: artifactTitle(cwd, rel),
 		description: `Master roadmap plan from ${rel}.\n\n${summary.slice(0, 6000)}`,
@@ -3938,6 +3951,10 @@ function planEpicFields(cwd, rel) {
 		notes: [
 			"created by /work-plan",
 			`source plan: ${rel}`,
+			...sourceArtifacts.map((path) => `source artifact: ${path}`),
+			...sourceArtifacts
+				.filter((path) => /docs[\\/]brainstorms[\\/]/i.test(path))
+				.map((path) => `source brainstorm: ${path}`),
 			ideaId ? `idea-id=${ideaId}` : "",
 		]
 			.filter(Boolean)
@@ -4525,14 +4542,16 @@ function buildWorkBrainstormState(cwd, args = "") {
 }
 
 function brainstormHandoffPrompt(state) {
+	const artifact = state.artifact;
 	return [
-		"Use the work-orchestrator skill in mode: brainstorm with this precomputed extension state.",
+		`Use the work-orchestrator skill in mode: ${artifact ? "master" : "brainstorm"} with this precomputed extension state.`,
 		`Epic: ${state.epic.id} — ${state.epic.title}`,
 		`Idea: ${state.idea.id} — ${state.idea.title}`,
 		state.topic ? `Full brainstorm request:\n${state.topic}` : "",
-		state.artifact
-			? `Brainstorm artifact: ${state.artifact}`
-			: `Run ce-brainstorm interactively, ask one question at a time until the requirements are clear, write the brainstorm artifact, then rerun /work-brainstorm idea ${state.idea.id} <path>.`,
+		artifact
+			? `Brainstorm artifact: ${artifact}\nRun /work-plan ${state.epic.id} now; do not use ce-brainstorm's post-doc planning menu.`
+			: `Run ce-brainstorm interactively, ask one question at a time until the requirements are clear, write only the brainstorm artifact, skip ce-brainstorm's post-doc planning menu, then rerun /work-brainstorm idea ${state.idea.id} <path>.`,
+		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can call ce-plan with the preservation and self-audit contract.",
 		"Never silently skip ce-brainstorm questions for broad, important, or underspecified work.",
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
 		ROLE_TIMEOUT_GUIDANCE,
@@ -4725,6 +4744,59 @@ function buildWorkInitState(cwd, _args = "") {
 	}
 }
 
+function notePaths(issue, names) {
+	const text = notesOf(issue);
+	return names.flatMap((name) => {
+		const pattern = new RegExp(`${name}[:=]\\s*([^\\s]+)`, "gi");
+		return [...text.matchAll(pattern)].map((match) => match[1]);
+	});
+}
+
+function issueArtifactPaths(cwd, issue, kind) {
+	const direct = asArray(
+		field(issue, "design_file", "designFile", "source", "sourcePath"),
+	);
+	const noted =
+		kind === "plan"
+			? notePaths(issue, ["source plan", "plan-path", "plan"])
+			: notePaths(issue, [
+					"brainstorm-path",
+					"source brainstorm",
+					"brainstorm",
+				]);
+	return [...direct, ...noted]
+		.map((item) => repoRelativePath(cwd, item))
+		.filter((item) =>
+			kind === "plan"
+				? /docs[\\/]plans[\\/].+\.(?:md|html)$/i.test(item)
+				: /docs[\\/]brainstorms[\\/].+\.(?:md|html)$/i.test(item),
+		)
+		.filter((item, index, items) => items.indexOf(item) === index);
+}
+
+function epicArtifacts(cwd, epic) {
+	let children = [];
+	try {
+		children = childrenOfRequired(cwd, idOf(epic));
+	} catch {
+		children = [];
+	}
+	return {
+		plans: [epic, ...children].flatMap((issue) =>
+			issueArtifactPaths(cwd, issue, "plan"),
+		),
+		brainstorms: [epic, ...children].flatMap((issue) =>
+			issueArtifactPaths(cwd, issue, "brainstorm"),
+		),
+	};
+}
+
+function splitPlanTarget(input) {
+	const [target, rest] = splitFirstWord(input);
+	const [mode, tail] = splitFirstWord(rest);
+	return { target, mode, tail };
+}
+
 function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 	const input = String(args).trim();
 	if (!input)
@@ -4740,12 +4812,23 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			});
 		const init = ensureBeadsInitialized(cwd);
 		const masterGit = resumeGitReport(cwd);
-		const handoffPlan = (message, detail) => ({
+		const sourceArtifacts = extractRepoArtifactRefs(input);
+		const handoffPlan = (message, detail, extra = {}) => ({
 			ok: true,
 			action: "handoff-plan",
 			message: `${init.initialized ? `${init.message} ` : ""}${message}`,
+			...extra,
 			handoffPrompt: [
 				"Use ce-plan to convert this input into a detailed master roadmap plan, then run /work-plan with the produced plan path.",
+				sourceArtifacts.length
+					? `Source artifacts to read and cite verbatim in the final plan: ${sourceArtifacts.join(", ")}`
+					: "",
+				"When the source is not already a plan file, write a new plan artifact; do not reuse or lightly update an older weaker plan unless the user explicitly asks.",
+				"Preserve every decided requirement, constraint, non-goal, reference, acceptance example, and open question from the source; the implementor must not need to guess.",
+				"Trace each source decision into exactly one place: plan requirement, implementation unit, verification/acceptance proof, explicit open question, or intentionally dropped-with-rationale note.",
+				"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
+				"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker Bead instruction, or an explicit user waiver; never leave it as passive risk prose.",
+				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Only then return the plan path and run /work-plan <plan-path>.",
 				"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
 				detail,
 				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
@@ -4757,6 +4840,85 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			nextAction:
 				"Next: after ce-plan writes the roadmap, run /work-plan <plan-path>.",
 		});
+		const planTarget = splitPlanTarget(input);
+		const targetLooksEpic =
+			["current", "last"].includes(planTarget.target) ||
+			isBeadId(planTarget.target) ||
+			isNumericBeadShorthand(planTarget.target);
+		if (targetLooksEpic) {
+			const resolved = resolveWorkflowEpic(cwd, planTarget.target);
+			if (resolved.error)
+				return errorState(resolved.error, resolved.message ?? resolved.error, {
+					action: resolved.error,
+					candidates: resolved.candidates ?? [],
+				});
+			const artifacts = epicArtifacts(cwd, resolved.epic);
+			const brainstorm = artifacts.brainstorms[0];
+			const plan = artifacts.plans[0];
+			const mode = planTarget.mode || (plan ? "" : "new");
+			if (plan && !mode)
+				return {
+					ok: true,
+					action: "plan-epic-has-plan",
+					epic: issueSummary(resolved.epic),
+					message: `Epic already has plan ${plan}. Choose how to use it.`,
+					suggestedCommands: [
+						`${command} ${idOf(resolved.epic)} strengthen`,
+						brainstorm ? `${command} ${idOf(resolved.epic)} fork` : "",
+						`${command} ${plan}`,
+					].filter(Boolean),
+					nextAction: `Next: ${command} ${idOf(resolved.epic)} fork to create a new roadmap from the brainstorm, or ${command} ${idOf(resolved.epic)} strengthen to harden the existing plan.`,
+				};
+			if (["fork", "new", "replace"].includes(mode)) {
+				if (!brainstorm)
+					return errorState(
+						"missing-source",
+						`Epic ${idOf(resolved.epic)} has no linked brainstorm artifact.`,
+						{ action: "missing-source", epic: issueSummary(resolved.epic) },
+					);
+				return handoffPlan(
+					`Brainstorm from epic ${idOf(resolved.epic)} handed to ce-plan.`,
+					[
+						`Source epic: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
+						`Source brainstorm: ${brainstorm}`,
+						plan && mode === "replace"
+							? `Ignore weaker existing plan: ${plan}`
+							: "",
+						"Create a new hardened plan artifact from the brainstorm, then run /work-plan <plan-path> to create a new active roadmap epic.",
+					]
+						.filter(Boolean)
+						.join("\n"),
+					{ epic: issueSummary(resolved.epic) },
+				);
+			}
+			if (mode === "strengthen") {
+				if (!plan)
+					return errorState(
+						"missing-source",
+						`Epic ${idOf(resolved.epic)} has no linked plan artifact to strengthen.`,
+						{ action: "missing-source", epic: issueSummary(resolved.epic) },
+					);
+				return handoffPlan(
+					`Existing plan from epic ${idOf(resolved.epic)} handed to ce-plan for hardening.`,
+					[
+						`Source epic: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
+						brainstorm
+							? `Source brainstorm: ${brainstorm}`
+							: "Source brainstorm: none linked",
+						`Existing plan: ${plan}`,
+						"Strengthen the existing plan in place using the brainstorm when available; if the user asks for a new roadmap instead, switch to fork mode.",
+					]
+						.filter(Boolean)
+						.join("\n"),
+					{ epic: issueSummary(resolved.epic) },
+				);
+			}
+			return errorState(
+				"usage",
+				`Usage: ${command} ${idOf(resolved.epic)} [strengthen|fork|replace]`,
+				{ action: "usage", epic: issueSummary(resolved.epic) },
+			);
+		}
 		if (!pathExists)
 			return handoffPlan(
 				"Raw idea handed to ce-plan before epic creation.",
@@ -4778,6 +4940,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			acceptance: fields.acceptance,
 			notes: fields.notes,
 		});
+		rememberWorkflowEpic(cwd, epic);
 		const planning = createBead(cwd, {
 			title: `Plan next slice for ${fields.title}`,
 			type: "task",
@@ -4965,6 +5128,181 @@ function buildWorkFinishState(cwd, args = "") {
 	}
 }
 
+function allRoadmaps(cwd) {
+	try {
+		return bdJsonRequired(cwd, ["list", "--type=epic"])
+			.filter((epic) => typeOf(epic) === "epic")
+			.sort(byUpdatedDesc);
+	} catch {
+		const byId = new Map();
+		for (const status of ["in_progress", "open", "closed"]) {
+			for (const epic of epicsByStatus(cwd, status)) byId.set(idOf(epic), epic);
+		}
+		return [...byId.values()].sort(byUpdatedDesc);
+	}
+}
+
+function currentRoadmap(cwd) {
+	const id = readWorkState(cwd).lastEpicId;
+	if (id) {
+		const epic = one(bdJsonRequired(cwd, ["show", id]));
+		if (epic && typeOf(epic) === "epic") return epic;
+	}
+	const active = activeEpicCandidates(cwd);
+	return active.length === 1 ? active[0] : undefined;
+}
+
+function resolveRoadmapTarget(cwd, target = "") {
+	const text = String(target ?? "").trim();
+	if (!text || text === "current" || text === "last") {
+		const epic = currentRoadmap(cwd);
+		return epic
+			? { epic }
+			: {
+					error: "no-current-roadmap",
+					message: "No current roadmap is selected.",
+				};
+	}
+	const expanded = expandNumericBeadShorthand(cwd, text, "epic");
+	if (expanded.error) return expanded;
+	const epic = one(bdJsonRequired(cwd, ["show", expanded.target]));
+	if (!epic)
+		return { error: "unknown-target", message: `No Bead found for ${text}` };
+	if (typeOf(epic) !== "epic")
+		return {
+			error: "not-roadmap",
+			message: `${idOf(epic)} is not a roadmap/epic.`,
+		};
+	return { epic };
+}
+
+function roadmapSummary(_cwd, epic, currentId) {
+	return { ...issueSummary(epic), current: idOf(epic) === currentId };
+}
+
+function splitRoadmapArgs(args = "") {
+	const parts = String(args).trim().split(/\s+/).filter(Boolean);
+	const command = parts[0] ?? "list";
+	const target = parts[1]?.startsWith("--") ? "" : (parts[1] ?? "");
+	const flags = parts.slice(target ? 2 : 1);
+	return { command, target, flags };
+}
+
+function groupedRoadmapTasks(cwd, epic) {
+	const state = buildEpicChildState(cwd, epic);
+	const blocked = new Set(state.blockers.map(idOf));
+	const open = state.children.filter(
+		(issue) => statusOf(issue) !== "closed" && !blocked.has(idOf(issue)),
+	);
+	const closed = state.children.filter((issue) => statusOf(issue) === "closed");
+	return {
+		blockers: state.blockers.map(issueSummary),
+		open: open.map(issueSummary),
+		closed: closed.map(issueSummary),
+	};
+}
+
+function buildWorkRoadmapState(cwd, args = "") {
+	try {
+		const { command, target, flags } = splitRoadmapArgs(args);
+		const current = (() => {
+			try {
+				return currentRoadmap(cwd);
+			} catch {
+				return undefined;
+			}
+		})();
+		const currentId = current ? idOf(current) : readWorkState(cwd).lastEpicId;
+		if (command === "list") {
+			const roadmaps = allRoadmaps(cwd).map((epic) =>
+				roadmapSummary(cwd, epic, currentId),
+			);
+			return { ok: true, action: "roadmap-list", currentId, roadmaps };
+		}
+		if (command === "tasks") {
+			const resolved = resolveRoadmapTarget(cwd, target);
+			if (resolved.error)
+				return errorState(resolved.error, resolved.message, resolved);
+			return {
+				ok: true,
+				action: "roadmap-tasks",
+				epic: issueSummary(resolved.epic),
+				tasks: groupedRoadmapTasks(cwd, resolved.epic),
+			};
+		}
+		if (command === "plan") {
+			const state = buildWorkPlanState(
+				cwd,
+				[target, ...flags].filter(Boolean).join(" "),
+			);
+			return { ...state, action: `roadmap-${state.action}` };
+		}
+		if (command === "set-current") {
+			const resolved = resolveRoadmapTarget(cwd, target);
+			if (resolved.error)
+				return errorState(resolved.error, resolved.message, resolved);
+			rememberWorkflowEpic(cwd, resolved.epic);
+			return {
+				ok: true,
+				action: "roadmap-set-current",
+				epic: issueSummary(resolved.epic),
+				message: "Current roadmap updated.",
+			};
+		}
+		if (command === "close") {
+			const force = flags.includes("--force");
+			const resolved = resolveRoadmapTarget(cwd, target);
+			if (resolved.error)
+				return errorState(resolved.error, resolved.message, resolved);
+			const unresolved = childrenOfRequired(cwd, idOf(resolved.epic)).filter(
+				(issue) => statusOf(issue) !== "closed",
+			);
+			if (unresolved.length && !force)
+				return {
+					ok: true,
+					action: "roadmap-close-needs-confirmation",
+					epic: issueSummary(resolved.epic),
+					unresolved: unresolved.map(issueSummary),
+					message: `${unresolved.length} unresolved child Bead(s). Close anyway?`,
+					suggestedCommands: [
+						`/work-roadmap tasks ${idOf(resolved.epic)}`,
+						`/work-roadmap close ${idOf(resolved.epic)} --force`,
+					],
+				};
+			run(cwd, "bd", ["close", idOf(resolved.epic)]);
+			rememberWorkflowEpic(cwd, { ...resolved.epic, status: "closed" });
+			return {
+				ok: true,
+				action: "roadmap-closed",
+				epic: issueSummary({ ...resolved.epic, status: "closed" }),
+				message: "Roadmap closed by request.",
+			};
+		}
+		if (command === "reopen") {
+			const resolved = resolveRoadmapTarget(cwd, target);
+			if (resolved.error)
+				return errorState(resolved.error, resolved.message, resolved);
+			run(cwd, "bd", ["reopen", idOf(resolved.epic)]);
+			rememberWorkflowEpic(cwd, { ...resolved.epic, status: "open" });
+			return {
+				ok: true,
+				action: "roadmap-reopened",
+				epic: issueSummary({ ...resolved.epic, status: "open" }),
+				message: "Roadmap reopened.",
+			};
+		}
+		return errorState(
+			"usage",
+			"Usage: /work-roadmap [list|tasks|plan|set-current|close|reopen] [epic-id|current] [--force]",
+			{ action: "usage" },
+		);
+	} catch (error) {
+		return errorState(error.reason ?? "beads-error", error.message, {
+			action: error.reason ?? "beads-error",
+		});
+	}
+}
+
 function errorState(reason, message, extra = {}) {
 	return {
 		ok: false,
@@ -5093,6 +5431,47 @@ function renderWorkReportText(state) {
 
 function renderWorkReportJson(state) {
 	return JSON.stringify(state, null, "\t");
+}
+
+function renderTaskGroup(title, items) {
+	if (!items?.length) return [];
+	return [
+		title,
+		...items.map((item) => `- ${item.id} [${item.status}] ${item.title}`),
+	];
+}
+
+function renderWorkRoadmapText(state) {
+	if (!state.ok) return `Work roadmap unavailable: ${state.message}`;
+	if (state.action === "roadmap-list") {
+		const rows = state.roadmaps.map(
+			(epic) =>
+				`- ${epic.current ? "*" : " "} ${epic.id} [${epic.status}] ${epic.title}`,
+		);
+		return ["Roadmaps:", ...(rows.length ? rows : ["- none"])].join("\n");
+	}
+	if (state.action === "roadmap-tasks")
+		return [
+			`Roadmap: ${state.epic.id} — ${state.epic.title}`,
+			...renderTaskGroup("Blockers:", state.tasks.blockers),
+			...renderTaskGroup("Open:", state.tasks.open),
+			...renderTaskGroup("Closed:", state.tasks.closed),
+		].join("\n");
+	if (state.action === "roadmap-close-needs-confirmation")
+		return [
+			`Roadmap: ${state.epic.id} — ${state.epic.title}`,
+			state.message,
+			...renderTaskGroup("Unresolved:", state.unresolved),
+			"Suggested:",
+			...state.suggestedCommands.map((command) => `- ${command}`),
+		].join("\n");
+	return [
+		`Action: ${state.action}`,
+		state.epic ? `Roadmap: ${state.epic.id} — ${state.epic.title}` : "",
+		state.message ?? "",
+	]
+		.filter(Boolean)
+		.join("\n");
 }
 
 function buildWorkReport(cwd, args = "") {
@@ -5853,6 +6232,116 @@ async function handleWorkReportCommand(args, ctx) {
 	return { ok: true, outputChars: output.length };
 }
 
+function roadmapTaskItems(tasks = {}) {
+	return [
+		["blocker", "Blocker", tasks.blockers],
+		["open", "Open", tasks.open],
+		["closed", "Closed", tasks.closed],
+	].flatMap(([group, label, items = []]) =>
+		items.map((item) => ({ group, label, item })),
+	);
+}
+
+async function handleRoadmapTasksMenu(epicId, ctx, pi) {
+	const state = buildWorkRoadmapState(ctx.cwd, `tasks ${epicId}`);
+	if (!state.ok) {
+		notify(ctx, renderWorkRoadmapText(state), "warning");
+		return stateTelemetry(state);
+	}
+	const items = roadmapTaskItems(state.tasks).map(({ group, label, item }) => ({
+		value: `${group}:${item.id}`,
+		label: `${label}: ${item.id} [${item.status}] ${item.title}`,
+		description: item.type,
+	}));
+	if (!items.length) {
+		notify(ctx, renderWorkRoadmapText(state), "info");
+		return stateTelemetry(state);
+	}
+	const task = await choose(ctx, `${state.epic.id}: tasks`, items);
+	if (!task) {
+		notify(ctx, renderWorkRoadmapText(state), "info");
+		return stateTelemetry(state);
+	}
+	const [group, beadId] = task.split(":", 2);
+	const ops = [{ value: "summary", label: "summary" }];
+	if (group === "blocker")
+		ops.push({ value: "debug", label: "debug / full info" });
+	const op = await choose(ctx, `${beadId}: operation`, ops);
+	if (op === "debug")
+		return handleWorkflowAction(buildWorkDebugState, beadId, ctx, pi);
+	return handleWorkReportCommand(beadId, ctx);
+}
+
+async function handleWorkRoadmapCommand(args, ctx, pi) {
+	cleanupBenignInstructionDirt(ctx.cwd);
+	const text = String(args ?? "").trim();
+	if (text) {
+		const parsed = splitRoadmapArgs(text);
+		if (parsed.command === "plan")
+			return handleWorkflowAction(
+				buildWorkPlanState,
+				[parsed.target, ...parsed.flags].filter(Boolean).join(" "),
+				ctx,
+				pi,
+			);
+		const state = buildWorkRoadmapState(ctx.cwd, text);
+		notify(ctx, renderWorkRoadmapText(state), state.ok ? "info" : "warning");
+		return stateTelemetry(state);
+	}
+	const list = buildWorkRoadmapState(ctx.cwd, "list");
+	if (!list.ok) {
+		notify(ctx, renderWorkRoadmapText(list), "warning");
+		return stateTelemetry(list);
+	}
+	const selected = await choose(
+		ctx,
+		"Work roadmaps",
+		list.roadmaps.map((epic) => ({
+			value: epic.id,
+			label: `${epic.current ? "* " : ""}${epic.id} [${epic.status}] ${epic.title}`,
+		})),
+	);
+	if (!selected) return { ok: true, action: "roadmap-cancel" };
+	const op = await choose(ctx, `${selected}: operation`, [
+		{
+			value: "tasks",
+			label: "list tasks",
+			description: "blockers, open, closed",
+		},
+		{
+			value: "plan",
+			label: "plan / strengthen",
+			description: "use linked brainstorm/plan",
+		},
+		{ value: "set-current", label: "set current" },
+		{
+			value: "close",
+			label: "close",
+			description: "asks before unresolved tasks",
+		},
+		{ value: "reopen", label: "reopen" },
+		{ value: "resume", label: "resume work" },
+		{ value: "report", label: "full report" },
+	]);
+	if (!op) return { ok: true, action: "roadmap-cancel" };
+	if (op === "resume") return handleWorkResumeCommand(selected, ctx, pi);
+	if (op === "report") return handleWorkReportCommand(selected, ctx);
+	if (op === "tasks") return handleRoadmapTasksMenu(selected, ctx, pi);
+	if (op === "plan")
+		return handleWorkflowAction(buildWorkPlanState, selected, ctx, pi);
+	let state = buildWorkRoadmapState(ctx.cwd, `${op} ${selected}`);
+	if (state.action === "roadmap-close-needs-confirmation") {
+		const confirm = await choose(ctx, state.message, [
+			{ value: "cancel", label: "cancel" },
+			{ value: "force", label: "close anyway" },
+		]);
+		if (confirm === "force")
+			state = buildWorkRoadmapState(ctx.cwd, `close ${selected} --force`);
+	}
+	notify(ctx, renderWorkRoadmapText(state), state.ok ? "info" : "warning");
+	return stateTelemetry(state);
+}
+
 async function executeNumberedWorkAction(action, ctx, pi) {
 	const match = String(action ?? "").match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
 	if (!match) return false;
@@ -5870,6 +6359,7 @@ async function executeNumberedWorkAction(action, ctx, pi) {
 		"work-debug": buildWorkDebugState,
 		"work-add": buildWorkAddState,
 		"work-auto": buildWorkAutoState,
+		"work-roadmap": buildWorkRoadmapState,
 	};
 	if (command === "work-status")
 		await withCommandTelemetry(command, args, ctx, () =>
@@ -5931,6 +6421,7 @@ export {
 	buildWorkIdeateState,
 	buildWorkBrainstormState,
 	captureIdeationIdeas,
+	brainstormHandoffPrompt,
 	buildWorkflowIntakeState,
 	buildWorkInitState,
 	buildWorkMasterState,
@@ -5940,6 +6431,7 @@ export {
 	buildWorkPauseState,
 	buildWorkReport,
 	buildWorkReportState,
+	buildWorkRoadmapState,
 	buildWorkResume,
 	buildWorkResumeState,
 	buildWorkSmallState,
@@ -5951,6 +6443,7 @@ export {
 	parseIdeationIdeas,
 	recordWorkTelemetry,
 	handleWorkResumeCommand,
+	handleWorkRoadmapCommand,
 	parseWorkGoalCommand,
 	parseWorkProjectGoalInput,
 	planResumeAction,
@@ -5959,6 +6452,7 @@ export {
 	renderWorkUsageText,
 	renderWorkReportJson,
 	renderWorkReportText,
+	renderWorkRoadmapText,
 	renderWorkResumeJson,
 	renderWorkResumeText,
 };
@@ -6243,6 +6737,15 @@ export default function workModelsExtension(pi) {
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-report", args, ctx, () =>
 				handleWorkReportCommand(args, ctx),
+			);
+		},
+	});
+
+	pi.registerCommand("work-roadmap", {
+		description: "List, select, close, reopen, and inspect Beads epics",
+		handler: async (args, ctx) => {
+			await withCommandTelemetry("work-roadmap", args, ctx, () =>
+				handleWorkRoadmapCommand(args, ctx, pi),
 			);
 		},
 	});

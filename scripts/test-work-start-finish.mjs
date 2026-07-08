@@ -124,6 +124,13 @@ try {
 		state.nextAction.includes("/work-plan <plan-path>"),
 		"raw work-plan reports next command",
 	);
+	assert(
+		state.handoffPrompt.includes("Preserve every decided requirement") &&
+			state.handoffPrompt.includes("Acceptance Contract") &&
+			state.handoffPrompt.includes("hardening loop") &&
+			state.handoffPrompt.includes("blocking question"),
+		"work-plan handoff asks ce-plan to preserve source decisions and audit uncertainties",
+	);
 
 	fixture.reset("active");
 	state = buildWorkMasterState(process.cwd(), "raw product idea");
