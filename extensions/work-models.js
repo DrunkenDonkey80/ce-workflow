@@ -262,7 +262,7 @@ function setWarpTitle(ctx, title) {
 
 function resetWarpTitle(ctx) {
 	const cwd = ctx?.cwd ?? process.cwd();
-	setWarpTitle(ctx, `π - ${basename(cwd)}`);
+	setWarpTitle(ctx, basename(cwd));
 }
 
 function startWarpWork(ctx, mode, query = "") {
@@ -6873,6 +6873,7 @@ export default function workModelsExtension(pi) {
 		workGoalContinuationPending = null;
 		updateWorkGoalStatus(ctx);
 		updateWorkGoalProgress(ctx);
+		resetWarpTitle(ctx);
 		startWorkGoalProgressTimer(ctx);
 	});
 
