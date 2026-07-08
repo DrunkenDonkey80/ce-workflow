@@ -3,12 +3,16 @@ import {
 	appendFileSync,
 	existsSync,
 	mkdirSync,
+	closeSync,
+	openSync,
 	readdirSync,
 	readFileSync,
 	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
+	basename,
 	delimiter,
 	dirname,
 	isAbsolute,
@@ -151,6 +155,130 @@ function writeSettings(cwd, settings) {
 	const dir = join(cwd, CONFIG_DIR_NAME);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(settingsPath(cwd), `${JSON.stringify(settings, null, "\t")}\n`);
+}
+
+const WARP_TITLE = "warp://cli-agent";
+const WORK_WARP_ICONS = {
+	goal: "◎",
+	project: "▣",
+	plan: "◇",
+	brainstorm: "✦",
+	ideate: "✦",
+	debug: "⚑",
+	work: "●",
+};
+
+function warpSettings(cwd) {
+	const value = readSettings(cwd).warp;
+	return typeof value === "object" && value !== null
+		? value
+		: { enabled: value };
+}
+
+function warpNotificationEnabled(ctx) {
+	if (!ctx?.cwd) return false;
+	const setting = warpSettings(ctx.cwd).enabled;
+	if (setting === false) return false;
+	if (setting === true || setting === "force") return true;
+	return (
+		process.env.TERM_PROGRAM === "WarpTerminal" &&
+		Boolean(process.env.WARP_CLI_AGENT_PROTOCOL_VERSION)
+	);
+}
+
+function writeTerminal(bytes) {
+	if (process.platform === "win32") {
+		if (process.stdout.isTTY) process.stdout.write(bytes);
+		return;
+	}
+	let fd;
+	try {
+		fd = openSync("/dev/tty", "w");
+		writeSync(fd, bytes);
+	} catch {
+		// no controlling terminal; stay quiet
+	} finally {
+		if (fd !== undefined) {
+			try {
+				closeSync(fd);
+			} catch {
+				// already closed
+			}
+		}
+	}
+}
+
+function warpPayload(event, ctx, extra = {}) {
+	const cwd = ctx?.cwd ?? process.cwd();
+	const rawVersion = Number.parseInt(
+		process.env.WARP_CLI_AGENT_PROTOCOL_VERSION ?? "1",
+		10,
+	);
+	return {
+		v: Number.isFinite(rawVersion) ? Math.min(rawVersion, 1) : 1,
+		agent: "pi",
+		event,
+		session_id: ctx?.sessionManager?.getSessionId?.() ?? "work-orchestrator",
+		cwd,
+		project: basename(cwd),
+		...extra,
+	};
+}
+
+function emitWarp(ctx, event, extra = {}) {
+	if (!warpNotificationEnabled(ctx)) return;
+	writeTerminal(
+		`\x1b]777;notify;${WARP_TITLE};${JSON.stringify(warpPayload(event, ctx, extra))}\x07`,
+	);
+}
+
+function workWarpMode(mode, goal) {
+	if (
+		mode === "self-improving" &&
+		/Project autopilot policy/.test(goal?.objective ?? "")
+	)
+		return "project";
+	if (["generic", "self-improving"].includes(mode)) return "goal";
+	if (
+		["goal", "project", "plan", "brainstorm", "ideate", "debug"].includes(mode)
+	)
+		return mode;
+	if (["big", "med", "master", "migrate", "small"].includes(mode))
+		return "plan";
+	return "work";
+}
+
+function workWarpTitle(mode, cwd) {
+	return `${WORK_WARP_ICONS[workWarpMode(mode)] ?? WORK_WARP_ICONS.work} - ${basename(cwd)}`;
+}
+
+function setWarpTitle(ctx, title) {
+	if (!warpNotificationEnabled(ctx)) return;
+	writeTerminal(`\x1b]0;${title}\x07`);
+}
+
+function startWarpWork(ctx, mode, query = "") {
+	const cwd = ctx?.cwd ?? process.cwd();
+	emitWarp(ctx, "session_start");
+	emitWarp(ctx, "prompt_submit", { query: query || `/work-${mode}` });
+	setWarpTitle(ctx, workWarpTitle(mode, cwd));
+}
+
+function finishWarpWork(ctx, mode, response = "") {
+	const cwd = ctx?.cwd ?? process.cwd();
+	emitWarp(ctx, "stop", {
+		query: `/work-${mode}`,
+		response: truncate(response, 200),
+	});
+	setWarpTitle(ctx, `π - ${basename(cwd)}`);
+}
+
+function pauseWarpForDecision(ctx, decision) {
+	const cwd = ctx?.cwd ?? process.cwd();
+	emitWarp(ctx, "question_asked", {
+		query: decision?.question ?? "Human decision needed",
+	});
+	setWarpTitle(ctx, `? - ${basename(cwd)}`);
 }
 
 function telemetryDir(cwd) {
@@ -5963,15 +6091,23 @@ function likelyHumanDecisionQuestion(text) {
 	);
 }
 
+function formatDecisionBlock(label, value, splitNumbered = false) {
+	let text = String(value ?? "").trim();
+	if (!text) return "";
+	if (splitNumbered) text = text.replace(/\s+(?=\d+\.\s)/g, "\n");
+	const lines = text.split(/\r?\n/).map((line) => `  ${line.trim()}`);
+	return `${label}:\n${lines.join("\n")}`;
+}
+
 function formatWorkGoalDecision(decision = {}) {
 	return [
-		decision.question ? `Question: ${decision.question}` : "",
-		decision.whyUserNeeded ? `Why user needed: ${decision.whyUserNeeded}` : "",
-		decision.options ? `Options: ${decision.options}` : "",
-		decision.recommendation ? `Recommendation: ${decision.recommendation}` : "",
+		formatDecisionBlock("Question", decision.question),
+		formatDecisionBlock("Why user needed", decision.whyUserNeeded),
+		formatDecisionBlock("Options", decision.options, true),
+		formatDecisionBlock("Recommendation", decision.recommendation),
 	]
 		.filter(Boolean)
-		.join("\n");
+		.join("\n\n");
 }
 
 function pauseWorkGoalForDecision(decision, ctx, pi) {
@@ -5989,6 +6125,7 @@ function pauseWorkGoalForDecision(decision, ctx, pi) {
 		`/work-goal needs human decision:\n${formatWorkGoalDecision(decision)}`,
 		"warning",
 	);
+	pauseWarpForDecision(ctx, decision);
 }
 
 function completeActiveWorkGoal(summary, ctx, pi) {
@@ -6006,6 +6143,7 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	persistWorkGoal(pi, null);
 	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 	ctx.ui.notify(`/work-goal complete: ${truncate(summary, 240)}`, "info");
+	finishWarpWork(ctx, workWarpMode(goal.mode, goal), summary);
 	return {
 		content: [{ type: "text", text: `/work-goal complete: ${summary}` }],
 		details: { goal: goal.objective, summary },
@@ -6138,6 +6276,11 @@ function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 	};
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
+	startWarpWork(
+		ctx,
+		workWarpMode(activeWorkGoal.mode, activeWorkGoal),
+		"human answered",
+	);
 }
 
 async function flushWorkGoalContinuationRetry(ctx, pi) {
@@ -6546,6 +6689,10 @@ export {
 	renderWorkRoadmapText,
 	renderWorkResumeJson,
 	renderWorkResumeText,
+	warpNotificationEnabled,
+	warpPayload,
+	workWarpMode,
+	workWarpTitle,
 };
 
 export default function workModelsExtension(pi) {
@@ -6647,8 +6794,16 @@ export default function workModelsExtension(pi) {
 		};
 	});
 
-	pi.on("agent_start", async () => {
-		if (!pendingWorkPrompt) return;
+	pi.on("agent_start", async (_event, ctx) => {
+		if (!pendingWorkPrompt) {
+			if (activeWorkGoal?.status === "active")
+				startWarpWork(
+					ctx,
+					workWarpMode(activeWorkGoal.mode, activeWorkGoal),
+					activeWorkGoal.objective,
+				);
+			return;
+		}
 		activeWorkAgent = {
 			...pendingWorkPrompt,
 			startedAt: Date.now(),
@@ -6656,6 +6811,11 @@ export default function workModelsExtension(pi) {
 			tools: [],
 			toolStarts: new Map(),
 		};
+		startWarpWork(
+			ctx ?? { cwd: activeWorkAgent.cwd },
+			workWarpMode(activeWorkAgent.meta.mode),
+			`/work-${activeWorkAgent.meta.mode ?? "work"}`,
+		);
 		pendingWorkPrompt = null;
 	});
 
@@ -6728,6 +6888,11 @@ export default function workModelsExtension(pi) {
 			file,
 		);
 		cleanupBenignInstructionDirt(run.cwd);
+		finishWarpWork(
+			ctx,
+			workWarpMode(run.meta.mode),
+			assistantVisibleText(finalAssistantMessage(event.messages)),
+		);
 		await handleWorkGoalAgentEnd(event, ctx, pi);
 	});
 

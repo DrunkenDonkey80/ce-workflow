@@ -198,6 +198,7 @@ Settings are optional and live in `.pi/settings.json`:
 
 ```json
 {
+  "warp": { "enabled": true },
   "workOrchestrator": {
     "context": {
       "enabled": true,
@@ -210,7 +211,7 @@ Settings are optional and live in `.pi/settings.json`:
 }
 ```
 
-Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Use fresh sessions between Beads anyway; compacting keeps long single-Bead debug/review loops from rotting, not a reason to run an entire epic in one chat.
+Warp notifications auto-enable when Warp's env vars are present; set `"warp": { "enabled": true }` to force them or `false` to disable. Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Use fresh sessions between Beads anyway; compacting keeps long single-Bead debug/review loops from rotting, not a reason to run an entire epic in one chat.
 
 ## Migrating existing projects
 

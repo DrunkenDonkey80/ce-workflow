@@ -56,6 +56,28 @@ assert.deepEqual(
 	mod.parseWorkProjectGoalInput('"C:/soft/git/path with spaces" first blocker'),
 	{ project: "C:/soft/git/path with spaces", task: "first blocker" },
 );
+assert.equal(mod.workWarpMode("generic"), "goal");
+assert.equal(
+	mod.workWarpMode("self-improving", { objective: "Project autopilot policy" }),
+	"project",
+);
+assert.equal(mod.workWarpTitle("brainstorm", "C:/soft/git/demo"), "✦ - demo");
+assert.deepEqual(
+	mod.warpPayload(
+		"prompt_submit",
+		{ cwd: "C:/soft/git/demo", sessionManager: { getSessionId: () => "s1" } },
+		{ query: "/work-plan" },
+	),
+	{
+		v: 1,
+		agent: "pi",
+		event: "prompt_submit",
+		session_id: "s1",
+		cwd: "C:/soft/git/demo",
+		project: "demo",
+		query: "/work-plan",
+	},
+);
 
 const prompt = mod.buildWorkGoalSystemPrompt({
 	objective: "Do the thing",
@@ -207,6 +229,26 @@ try {
 		ctx,
 	);
 	assert.equal(statuses["work-goal"], undefined);
+
+	await tempCommands["work-goal"].handler("format decision notice", ctx);
+	await tempTools.work_goal_human_decision.execute(
+		"t2",
+		{
+			question: "Pick one?",
+			whyUserNeeded: "Only the user can choose.",
+			options: "1. Approve. 2. Request changes.",
+			recommendation: "Pick 1.",
+		},
+		null,
+		null,
+		ctx,
+	);
+	const decisionNotice = String(notices[notices.length - 1].message);
+	assert.match(decisionNotice, /Question:\n {2}Pick one\?/);
+	assert.match(
+		decisionNotice,
+		/Options:\n {2}1\. Approve\.\n {2}2\. Request changes\./,
+	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });
 }
