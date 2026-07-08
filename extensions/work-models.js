@@ -5902,7 +5902,8 @@ function isFailedIssue(issue) {
 }
 
 function projectGoalProgressState(cwd, goal = activeWorkGoal) {
-	if (!goal || !["active", "needs_human"].includes(goal.status)) return undefined;
+	if (!goal || !["active", "needs_human"].includes(goal.status))
+		return undefined;
 	if (workWarpMode(goal.mode, goal) !== "project") return undefined;
 	const epic = currentRoadmap(cwd);
 	if (!epic) return undefined;
@@ -5943,7 +5944,10 @@ function updateWorkGoalProgress(ctx) {
 
 function startWorkGoalProgressTimer(ctx) {
 	if (workGoalProgressTimer) return;
-	workGoalProgressTimer = setInterval(() => updateWorkGoalProgress(ctx), 15_000);
+	workGoalProgressTimer = setInterval(
+		() => updateWorkGoalProgress(ctx),
+		15_000,
+	);
 	workGoalProgressTimer.unref?.();
 }
 
