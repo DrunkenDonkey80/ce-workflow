@@ -6474,12 +6474,17 @@ async function sendFollowUp(ctx, message, pi) {
 	);
 }
 
-async function handleWorkResumeCommand(args, ctx, pi) {
+async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = buildWorkResumeState(ctx.cwd, args);
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-resume");
 	notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning");
-	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
+	if (state.handoffPrompt)
+		await sendFollowUp(
+			ctx,
+			withSelectionNote(state.handoffPrompt, selectionNote),
+			pi,
+		);
 	return state;
 }
 
@@ -6534,12 +6539,23 @@ function renderWorkflowActionText(state) {
 		.join("\n");
 }
 
-async function handleWorkflowAction(builder, args, ctx, pi) {
+async function handleWorkflowAction(
+	builder,
+	args,
+	ctx,
+	pi,
+	selectionNote = "",
+) {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = builder(ctx.cwd, args);
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-action");
 	notify(ctx, renderWorkflowActionText(state), state.ok ? "info" : "warning");
-	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
+	if (state.handoffPrompt)
+		await sendFollowUp(
+			ctx,
+			withSelectionNote(state.handoffPrompt, selectionNote),
+			pi,
+		);
 	return state;
 }
 
@@ -6687,7 +6703,24 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 	return stateTelemetry(state);
 }
 
-async function executeNumberedWorkAction(action, ctx, pi) {
+function parseNumberedWorkActionInput(text) {
+	const value = String(text ?? "").trim();
+	let match = value.match(/^(\d+)$/);
+	if (match) return { number: Number(match[1]), note: "" };
+	match =
+		value.match(/^(\d+)\s*[).,:-]\s*(.*)$/) ?? value.match(/^(\d+)\s+(.+)$/);
+	if (!match) return null;
+	return { number: Number(match[1]), note: String(match[2] ?? "").trim() };
+}
+
+function withSelectionNote(prompt, note) {
+	const text = String(note ?? "").trim();
+	return text
+		? `${prompt}\n\nHuman note from numbered selection:\n${truncate(text, 2_000)}`
+		: prompt;
+}
+
+async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
 	const match = String(action ?? "").match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
 	if (!match) return false;
 	const [, command, args = ""] = match;
@@ -6719,7 +6752,7 @@ async function executeNumberedWorkAction(action, ctx, pi) {
 			command,
 			args,
 			ctx,
-			() => handleWorkResumeCommand(args, ctx, pi),
+			() => handleWorkResumeCommand(args, ctx, pi, selectionNote),
 			true,
 		);
 	else if (builders[command])
@@ -6727,7 +6760,8 @@ async function executeNumberedWorkAction(action, ctx, pi) {
 			command,
 			args,
 			ctx,
-			() => handleWorkflowAction(builders[command], args, ctx, pi),
+			() =>
+				handleWorkflowAction(builders[command], args, ctx, pi, selectionNote),
 			true,
 		);
 	else return false;
@@ -6737,10 +6771,8 @@ async function executeNumberedWorkAction(action, ctx, pi) {
 async function maybeRunNumberedWorkAction(event, ctx, pi) {
 	if (event.source === "extension") return false;
 	if (activeWorkGoal?.status === "needs_human") return false;
-	const match = String(event.text ?? "")
-		.trim()
-		.match(/^(\d+)$/);
-	if (!match) return false;
+	const parsed = parseNumberedWorkActionInput(event.text);
+	if (!parsed) return false;
 	const last = readWorkState(ctx.cwd).lastActions;
 	const ageMs = Date.now() - Date.parse(last?.updatedAt ?? "");
 	if (
@@ -6749,10 +6781,10 @@ async function maybeRunNumberedWorkAction(event, ctx, pi) {
 		ageMs > 60 * 60 * 1000
 	)
 		return false;
-	const action = last.actions[Number(match[1]) - 1];
+	const action = last.actions[parsed.number - 1];
 	if (!action) return false;
-	notify(ctx, `Running ${match[1]}. ${action}`, "info");
-	return executeNumberedWorkAction(action, ctx, pi);
+	notify(ctx, `Running ${parsed.number}. ${action}`, "info");
+	return executeNumberedWorkAction(action, ctx, pi, parsed.note);
 }
 
 export {
@@ -6884,7 +6916,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", (event, ctx) => {
-		if (/^\d+$/.test(String(event.text ?? "").trim()))
+		if (parseNumberedWorkActionInput(event.text))
 			return (async () => {
 				if (await maybeRunNumberedWorkAction(event, ctx, pi))
 					return { action: "handled" };

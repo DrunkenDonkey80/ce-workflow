@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -268,6 +274,32 @@ try {
 	);
 	assert.equal(statuses["work-goal"], undefined);
 
+	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(cwd, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({
+			lastActions: {
+				source: "test",
+				updatedAt: new Date().toISOString(),
+				actions: ["/work-status"],
+			},
+		}),
+	);
+	const noticeCount = notices.length;
+	const numberedResult = await tempHooks.input?.(
+		{ source: "user", text: "1, but show current status" },
+		ctx,
+	);
+	assert.deepEqual(numberedResult, { action: "handled" });
+	assert.ok(
+		notices
+			.slice(noticeCount)
+			.some((notice) =>
+				String(notice.message).includes("Running 1. /work-status"),
+			),
+		"numbered choice with trailing text runs the selected action",
+	);
+
 	await tempCommands["work-goal"].handler("format decision notice", ctx);
 	await tempTools.work_goal_human_decision.execute(
 		"t2",
@@ -288,7 +320,18 @@ try {
 		/Options:\n {2}1\. Approve\.\n {2}2\. Request changes\./,
 	);
 } finally {
-	rmSync(cwd, { recursive: true, force: true });
+	rmSync(path.join(cwd, ".git"), { recursive: true, force: true });
+	rmSync(path.join(cwd, ".pi"), { recursive: true, force: true });
+	try {
+		rmSync(cwd, {
+			recursive: true,
+			force: true,
+			maxRetries: 3,
+			retryDelay: 100,
+		});
+	} catch {
+		// Windows can hold the just-created temp repo directory briefly.
+	}
 }
 
 console.log("ok - work-goal helpers");
