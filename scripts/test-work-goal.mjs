@@ -247,7 +247,7 @@ try {
 		/Answer the user's clarification only/,
 	);
 
-	const inputResult = await tempHooks.input?.(
+	const inputResult = tempHooks.input?.(
 		{
 			source: "user",
 			text: "2, but use the AI-Wedge connected proof and add a connect button.",

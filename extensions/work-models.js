@@ -6916,15 +6916,13 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", (event, ctx) => {
+		if (maybeResumeWorkGoalFromUserInput(event, ctx, pi))
+			return { action: "handled" };
 		if (parseNumberedWorkActionInput(event.text))
 			return (async () => {
 				if (await maybeRunNumberedWorkAction(event, ctx, pi))
 					return { action: "handled" };
-				if (maybeResumeWorkGoalFromUserInput(event, ctx, pi))
-					return { action: "handled" };
 			})();
-		if (maybeResumeWorkGoalFromUserInput(event, ctx, pi))
-			return { action: "handled" };
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
