@@ -211,11 +211,16 @@ try {
 	);
 	assert.equal(sent.length, 2);
 
-	tempHooks.input?.({ source: "user" }, ctx);
+	const inputResult = await tempHooks.input?.(
+		{ source: "user", text: "Use the AI-Wedge connected proof and add a connect button." },
+		ctx,
+	);
+	assert.deepEqual(inputResult, { action: "handled" });
 	await tempHooks.turn_end?.({}, ctx);
 	assert.equal(statuses["work-goal"], "active #1");
 	assert.equal(sent.length, 3);
 	assert.match(sent[2].message, /human answered the pending decision/);
+	assert.match(sent[2].message, /add a connect button/);
 
 	await tempHooks.before_agent_start(
 		{ prompt: sent[2].message, systemPrompt: "base" },

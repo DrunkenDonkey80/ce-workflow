@@ -6262,8 +6262,9 @@ async function handleSelfImprovingWorkGoalCommand(args, pi, ctx, options = {}) {
 }
 
 function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
-	if (event.source === "extension") return;
-	if (!activeWorkGoal || activeWorkGoal.status !== "needs_human") return;
+	if (event.source === "extension") return false;
+	if (!activeWorkGoal || activeWorkGoal.status !== "needs_human") return false;
+	const answer = String(event.text ?? "").trim();
 	activeWorkGoal = {
 		...activeWorkGoal,
 		status: "active",
@@ -6272,7 +6273,7 @@ function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 	};
 	workGoalContinuationRetry = {
 		goalId: activeWorkGoal.id,
-		note: "The human answered the pending decision; resume the objective using that answer.",
+		note: `The human answered the pending decision; resume the objective using this answer:\n\n${truncate(answer, 2_000)}`,
 	};
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
@@ -6281,6 +6282,7 @@ function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 		workWarpMode(activeWorkGoal.mode, activeWorkGoal),
 		"human answered",
 	);
+	return true;
 }
 
 async function flushWorkGoalContinuationRetry(ctx, pi) {
@@ -6771,9 +6773,11 @@ export default function workModelsExtension(pi) {
 			return (async () => {
 				if (await maybeRunNumberedWorkAction(event, ctx, pi))
 					return { action: "handled" };
-				maybeResumeWorkGoalFromUserInput(event, ctx, pi);
+				if (maybeResumeWorkGoalFromUserInput(event, ctx, pi))
+					return { action: "handled" };
 			})();
-		maybeResumeWorkGoalFromUserInput(event, ctx, pi);
+		if (maybeResumeWorkGoalFromUserInput(event, ctx, pi))
+			return { action: "handled" };
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
