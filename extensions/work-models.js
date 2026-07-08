@@ -31,7 +31,10 @@ const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
-const WORKFLOW_REPO_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const WORKFLOW_REPO_DIR = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	"..",
+);
 const WORK_ORCH_AGENT_DIR = resolve(WORKFLOW_REPO_DIR, "agents");
 
 function exposeBundledSubagentAgents() {
@@ -6325,6 +6328,15 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 }
 
 async function handleSelfImprovingWorkGoalCommand(args, pi, ctx, options = {}) {
+	const raw = String(args ?? "").trim();
+	if (options.project && !raw) {
+		return startWorkGoal(
+			"self-improving",
+			buildWorkSelfImprovingObjective(ctx.cwd, options),
+			pi,
+			ctx,
+		);
+	}
 	const command = parseWorkGoalCommand(args);
 	if (command.kind !== "start" && command.kind !== "edit")
 		return handleWorkGoalCommand(args, "self-improving", pi, ctx);
