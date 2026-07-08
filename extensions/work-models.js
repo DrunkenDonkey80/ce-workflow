@@ -6261,10 +6261,33 @@ async function handleSelfImprovingWorkGoalCommand(args, pi, ctx, options = {}) {
 		: startWorkGoal("self-improving", objective, pi, ctx);
 }
 
+function workGoalHumanInputKind(text) {
+	const value = String(text ?? "").trim();
+	if (!value) return "clarify";
+	if (/^(answer|decide|decision)\s*:/i.test(value)) return "answer";
+	if (/^\d+\s*[).,:-]?/.test(value)) return "answer";
+	if (/^(ask|clarify|question|q)\s*:/i.test(value)) return "clarify";
+	if (/\?\s*$/.test(value)) return "clarify";
+	return "answer";
+}
+
+function buildWorkGoalPausedPrompt(goal) {
+	return `Paused /work-goal waiting for a human decision:
+<work_goal_objective>
+${escapeXmlText(goal.objective)}
+</work_goal_objective>
+
+Pending decision:
+${formatWorkGoalDecision(goal.decision)}
+
+Answer the user's clarification only. Do not continue the work-goal until the user gives a decision/answer.`;
+}
+
 function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 	if (event.source === "extension") return false;
 	if (!activeWorkGoal || activeWorkGoal.status !== "needs_human") return false;
 	const answer = String(event.text ?? "").trim();
+	if (workGoalHumanInputKind(answer) === "clarify") return false;
 	activeWorkGoal = {
 		...activeWorkGoal,
 		status: "active",
@@ -6693,6 +6716,7 @@ export {
 	renderWorkResumeText,
 	warpNotificationEnabled,
 	warpPayload,
+	workGoalHumanInputKind,
 	workWarpMode,
 	workWarpTitle,
 };
@@ -6792,7 +6816,13 @@ export default function workModelsExtension(pi) {
 					contextBefore: usageSnapshot(ctx),
 				}
 			: null;
-		if (!activeWorkGoal || activeWorkGoal.status !== "active") return;
+		if (!activeWorkGoal) return;
+		if (activeWorkGoal.status === "needs_human") {
+			return {
+				systemPrompt: `${event.systemPrompt}\n\n${buildWorkGoalPausedPrompt(activeWorkGoal)}`,
+			};
+		}
+		if (activeWorkGoal.status !== "active") return;
 		return {
 			systemPrompt: `${event.systemPrompt}\n\n${buildWorkGoalSystemPrompt(activeWorkGoal)}`,
 		};

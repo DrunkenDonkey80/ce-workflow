@@ -57,6 +57,9 @@ assert.deepEqual(
 	{ project: "C:/soft/git/path with spaces", task: "first blocker" },
 );
 assert.equal(mod.workWarpMode("generic"), "goal");
+assert.equal(mod.workGoalHumanInputKind("2, but add this"), "answer");
+assert.equal(mod.workGoalHumanInputKind("clarify: what changed?"), "clarify");
+assert.equal(mod.workGoalHumanInputKind("What changed?"), "clarify");
 assert.equal(
 	mod.workWarpMode("self-improving", { objective: "Project autopilot policy" }),
 	"project",
@@ -211,8 +214,24 @@ try {
 	);
 	assert.equal(sent.length, 2);
 
+	const clarifyResult = await tempHooks.input?.(
+		{ source: "user", text: "clarify: what screenshot is missing?" },
+		ctx,
+	);
+	assert.equal(clarifyResult, undefined);
+	assert.equal(statuses["work-goal"], "needs human");
+	const pausedBefore = await tempHooks.before_agent_start(
+		{ prompt: "clarify: what screenshot is missing?", systemPrompt: "base" },
+		ctx,
+	);
+	assert.match(pausedBefore.systemPrompt, /Paused \/work-goal/);
+	assert.match(pausedBefore.systemPrompt, /Answer the user's clarification only/);
+
 	const inputResult = await tempHooks.input?.(
-		{ source: "user", text: "Use the AI-Wedge connected proof and add a connect button." },
+		{
+			source: "user",
+			text: "2, but use the AI-Wedge connected proof and add a connect button.",
+		},
 		ctx,
 	);
 	assert.deepEqual(inputResult, { action: "handled" });
