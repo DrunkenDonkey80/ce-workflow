@@ -6134,6 +6134,21 @@ async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
 	return sent;
 }
 
+async function sendWorkGoalAnswerContinuation(pi, ctx, goal, note = "") {
+	if (workGoalContinuationPending?.goalId === goal.id) return false;
+	const marker = workGoalContinuationMarker(goal);
+	const prompt = buildWorkGoalContinuePrompt(goal, marker, note);
+	workGoalContinuationPending = {
+		goalId: goal.id,
+		marker,
+		iteration: goal.iteration,
+	};
+	const sent = await sendWorkGoalPrompt(pi, ctx, prompt);
+	if (!sent && workGoalContinuationPending?.marker === marker)
+		workGoalContinuationPending = null;
+	return sent;
+}
+
 function finalAssistantMessage(messages = []) {
 	for (let index = messages.length - 1; index >= 0; index -= 1) {
 		const message = messages[index];
@@ -6376,7 +6391,7 @@ ${formatWorkGoalDecision(goal.decision)}
 Answer the user's clarification only. Do not continue the work-goal until the user gives a decision/answer.`;
 }
 
-function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
+async function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 	if (event.source === "extension") return false;
 	if (!activeWorkGoal || activeWorkGoal.status !== "needs_human") return false;
 	const answer = String(event.text ?? "").trim();
@@ -6387,10 +6402,7 @@ function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 		decision: undefined,
 		updatedAt: Date.now(),
 	};
-	workGoalContinuationRetry = {
-		goalId: activeWorkGoal.id,
-		note: `The human answered the pending decision; resume the objective using this answer:\n\n${truncate(answer, 2_000)}`,
-	};
+	const note = `The human answered the pending decision; resume the objective using this answer:\n\n${truncate(answer, 2_000)}`;
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
 	startWarpWork(
@@ -6398,6 +6410,8 @@ function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
 		workWarpMode(activeWorkGoal.mode, activeWorkGoal),
 		"human answered",
 	);
+	if (!(await sendWorkGoalAnswerContinuation(pi, ctx, activeWorkGoal, note)))
+		workGoalContinuationRetry = { goalId: activeWorkGoal.id, note };
 	return true;
 }
 
@@ -6927,15 +6941,14 @@ export default function workModelsExtension(pi) {
 		stopWorkGoalProgressTimer(ctx);
 	});
 
-	pi.on("input", (event, ctx) => {
-		if (maybeResumeWorkGoalFromUserInput(event, ctx, pi))
+	pi.on("input", async (event, ctx) => {
+		if (await maybeResumeWorkGoalFromUserInput(event, ctx, pi))
 			return { action: "handled" };
 		const parsed = parseNumberedWorkActionInput(event.text);
-		if (parsed && recentNumberedWorkAction(ctx.cwd, parsed.number))
-			return (async () => {
-				if (await maybeRunNumberedWorkAction(event, ctx, pi))
-					return { action: "handled" };
-			})();
+		if (parsed && recentNumberedWorkAction(ctx.cwd, parsed.number)) {
+			if (await maybeRunNumberedWorkAction(event, ctx, pi))
+				return { action: "handled" };
+		}
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {

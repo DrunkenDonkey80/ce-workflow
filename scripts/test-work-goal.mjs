@@ -247,7 +247,7 @@ try {
 		/Answer the user's clarification only/,
 	);
 
-	const inputResult = tempHooks.input?.(
+	const inputResult = await tempHooks.input?.(
 		{
 			source: "user",
 			text: "2, but use the AI-Wedge connected proof and add a connect button.",
@@ -255,7 +255,6 @@ try {
 		ctx,
 	);
 	assert.deepEqual(inputResult, { action: "handled" });
-	await tempHooks.turn_end?.({}, ctx);
 	assert.equal(statuses["work-goal"], "active #1");
 	assert.equal(sent.length, 3);
 	assert.match(sent[2].message, /human answered the pending decision/);
@@ -289,12 +288,11 @@ try {
 		}),
 	);
 	tempHooks.session_start?.({}, ctx);
-	const restartedInput = tempHooks.input?.(
+	const restartedInput = await tempHooks.input?.(
 		{ source: "user", text: "4, waive only disconnection screenshot" },
 		ctx,
 	);
 	assert.deepEqual(restartedInput, { action: "handled" });
-	await tempHooks.turn_end?.({}, ctx);
 	assert.match(sent.at(-1).message, /waive only disconnection screenshot/);
 
 	writeFileSync(
