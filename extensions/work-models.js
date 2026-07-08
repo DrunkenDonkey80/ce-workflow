@@ -111,6 +111,7 @@ const contextCompactState = { inFlight: false, requested: false };
 let pendingWorkPrompt = null;
 let activeWorkAgent = null;
 let activeWorkGoal = null;
+let activeWorkGoalCwd = null;
 let workGoalContinuationPending = null;
 let workGoalContinuationRetry = null;
 let workGoalProgressTimer = null;
@@ -5877,12 +5878,17 @@ function loadWorkGoalFromSession(ctx) {
 				item.customType === WORK_GOAL_STATE_ENTRY_TYPE,
 		)
 		.pop();
-	const goal = entry?.data?.goal;
+	const goal = entry?.data?.goal ?? readWorkState(ctx?.cwd).workGoal;
 	return isWorkGoal(goal) && goal.status !== "complete" ? goal : null;
 }
 
-function persistWorkGoal(pi, goal = activeWorkGoal) {
+function persistWorkGoal(pi, goal = activeWorkGoal, cwd = activeWorkGoalCwd) {
 	pi?.appendEntry?.(WORK_GOAL_STATE_ENTRY_TYPE, { goal: goal ?? null });
+	if (!cwd) return;
+	const state = readWorkState(cwd);
+	if (goal) state.workGoal = goal;
+	else delete state.workGoal;
+	writeWorkState(cwd, state);
 }
 
 function formatWorkGoalStatus(goal = activeWorkGoal) {
@@ -6242,6 +6248,7 @@ async function startWorkGoal(mode, objective, pi, ctx) {
 	}
 	workGoalContinuationPending = null;
 	activeWorkGoal = createWorkGoal(mode, text);
+	activeWorkGoalCwd = ctx.cwd;
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
 	ctx.ui.notify(`/work-goal started: ${truncate(text, 240)}`, "info");
@@ -6720,6 +6727,18 @@ function withSelectionNote(prompt, note) {
 		: prompt;
 }
 
+function recentNumberedWorkAction(cwd, number) {
+	const last = readWorkState(cwd).lastActions;
+	const ageMs = Date.now() - Date.parse(last?.updatedAt ?? "");
+	if (
+		!last?.actions?.length ||
+		!Number.isFinite(ageMs) ||
+		ageMs > 60 * 60 * 1000
+	)
+		return null;
+	return last.actions[number - 1] ?? null;
+}
+
 async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
 	const match = String(action ?? "").match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
 	if (!match) return false;
@@ -6773,15 +6792,7 @@ async function maybeRunNumberedWorkAction(event, ctx, pi) {
 	if (activeWorkGoal?.status === "needs_human") return false;
 	const parsed = parseNumberedWorkActionInput(event.text);
 	if (!parsed) return false;
-	const last = readWorkState(ctx.cwd).lastActions;
-	const ageMs = Date.now() - Date.parse(last?.updatedAt ?? "");
-	if (
-		!last?.actions?.length ||
-		!Number.isFinite(ageMs) ||
-		ageMs > 60 * 60 * 1000
-	)
-		return false;
-	const action = last.actions[parsed.number - 1];
+	const action = recentNumberedWorkAction(ctx.cwd, parsed.number);
 	if (!action) return false;
 	notify(ctx, `Running ${parsed.number}. ${action}`, "info");
 	return executeNumberedWorkAction(action, ctx, pi, parsed.note);
@@ -6901,6 +6912,7 @@ export default function workModelsExtension(pi) {
 	}
 
 	pi.on("session_start", (_event, ctx) => {
+		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
 		workGoalContinuationPending = null;
 		updateWorkGoalStatus(ctx);
@@ -6918,7 +6930,8 @@ export default function workModelsExtension(pi) {
 	pi.on("input", (event, ctx) => {
 		if (maybeResumeWorkGoalFromUserInput(event, ctx, pi))
 			return { action: "handled" };
-		if (parseNumberedWorkActionInput(event.text))
+		const parsed = parseNumberedWorkActionInput(event.text);
+		if (parsed && recentNumberedWorkAction(ctx.cwd, parsed.number))
 			return (async () => {
 				if (await maybeRunNumberedWorkAction(event, ctx, pi))
 					return { action: "handled" };

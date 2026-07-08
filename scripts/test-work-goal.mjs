@@ -278,6 +278,28 @@ try {
 	writeFileSync(
 		path.join(cwd, ".pi", "work-orchestrator-state.json"),
 		JSON.stringify({
+			workGoal: {
+				id: "wg-restart",
+				mode: "self-improving",
+				objective: "resume after restart",
+				status: "needs_human",
+				iteration: 1,
+				decision: { question: "Pick one?" },
+			},
+		}),
+	);
+	tempHooks.session_start?.({}, ctx);
+	const restartedInput = tempHooks.input?.(
+		{ source: "user", text: "4, waive only disconnection screenshot" },
+		ctx,
+	);
+	assert.deepEqual(restartedInput, { action: "handled" });
+	await tempHooks.turn_end?.({}, ctx);
+	assert.match(sent.at(-1).message, /waive only disconnection screenshot/);
+
+	writeFileSync(
+		path.join(cwd, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({
 			lastActions: {
 				source: "test",
 				updatedAt: new Date().toISOString(),
