@@ -256,6 +256,7 @@ function workWarpTitle(mode, cwd) {
 
 function setWarpTitle(ctx, title) {
 	if (!warpNotificationEnabled(ctx)) return;
+	ctx?.ui?.setTitle?.(title);
 	writeTerminal(`\x1b]0;${title}\x07`);
 }
 
