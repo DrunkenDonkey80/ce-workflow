@@ -113,9 +113,11 @@ let activeWorkAgent = null;
 let activeWorkGoal = null;
 let workGoalContinuationPending = null;
 let workGoalContinuationRetry = null;
+let workGoalProgressTimer = null;
 
 const WORK_GOAL_STATE_ENTRY_TYPE = "work-goal-state";
 const WORK_GOAL_STATUS_KEY = "work-goal";
+const WORK_GOAL_PROGRESS_WIDGET_KEY = "work-goal-progress";
 const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
 const WORK_GOAL_DECISION_MARKER = "WORK_GOAL_NEEDS_HUMAN_DECISION";
 const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
@@ -5888,6 +5890,69 @@ function updateWorkGoalStatus(ctx, goal = activeWorkGoal) {
 	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, formatWorkGoalStatus(goal));
 }
 
+function progressBar(done, total, width = 12) {
+	if (!total) return "░".repeat(width);
+	const filled = Math.min(width, Math.round((done / total) * width));
+	return `${"█".repeat(filled)}${"░".repeat(width - filled)}`;
+}
+
+function isFailedIssue(issue) {
+	const labels = labelsOf(issue);
+	return statusOf(issue) === "failed" || labels.includes("wo:failed");
+}
+
+function projectGoalProgressState(cwd, goal = activeWorkGoal) {
+	if (!goal || !["active", "needs_human"].includes(goal.status)) return undefined;
+	if (workWarpMode(goal.mode, goal) !== "project") return undefined;
+	const epic = currentRoadmap(cwd);
+	if (!epic) return undefined;
+	const childState = buildEpicChildState(cwd, epic);
+	const total = childState.slices.length;
+	const complete = childState.closed.length;
+	const failed = childState.slices.filter(isFailedIssue).length;
+	const blocked = childState.slices.filter(
+		(issue) => statusOf(issue) !== "closed" && isBlockedIssue(issue),
+	).length;
+	return {
+		title: titleOf(epic),
+		complete,
+		total,
+		failed,
+		blocked,
+		elapsedMs: Date.now() - (goal.startedAt ?? Date.now()),
+	};
+}
+
+function renderProjectGoalProgress(state) {
+	return `${state.title} ${progressBar(state.complete, state.total)} Comp: ${state.complete} / Total: ${state.total} (Failed: ${state.failed}, Blocked: ${state.blocked}) Time: ${formatDuration(state.elapsedMs)}`;
+}
+
+function updateWorkGoalProgress(ctx) {
+	if (!ctx?.cwd || !ctx.ui?.setWidget) return;
+	try {
+		const state = projectGoalProgressState(ctx.cwd);
+		ctx.ui.setWidget(
+			WORK_GOAL_PROGRESS_WIDGET_KEY,
+			state ? [renderProjectGoalProgress(state)] : undefined,
+			{ placement: "belowEditor" },
+		);
+	} catch {
+		ctx.ui.setWidget(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
+	}
+}
+
+function startWorkGoalProgressTimer(ctx) {
+	if (workGoalProgressTimer) return;
+	workGoalProgressTimer = setInterval(() => updateWorkGoalProgress(ctx), 15_000);
+	workGoalProgressTimer.unref?.();
+}
+
+function stopWorkGoalProgressTimer(ctx) {
+	if (workGoalProgressTimer) clearInterval(workGoalProgressTimer);
+	workGoalProgressTimer = null;
+	ctx?.ui?.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
+}
+
 function workGoalSummary(goal = activeWorkGoal) {
 	if (!goal) return "No active /work-goal.";
 	return [
@@ -6142,6 +6207,7 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	workGoalContinuationPending = null;
 	persistWorkGoal(pi, null);
 	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+	ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
 	ctx.ui.notify(`/work-goal complete: ${truncate(summary, 240)}`, "info");
 	finishWarpWork(ctx, workWarpMode(goal.mode, goal), summary);
 	return {
@@ -6185,6 +6251,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		workGoalContinuationPending = null;
 		persistWorkGoal(pi, null);
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+		ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
 		ctx.ui.notify(
 			previous
 				? `/work-goal cleared: ${truncate(previous, 240)}`
@@ -6712,6 +6779,7 @@ export {
 	renderWorkReportJson,
 	renderWorkReportText,
 	renderWorkRoadmapText,
+	renderProjectGoalProgress,
 	renderWorkResumeJson,
 	renderWorkResumeText,
 	warpNotificationEnabled,
@@ -6785,11 +6853,14 @@ export default function workModelsExtension(pi) {
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
 		workGoalContinuationPending = null;
 		updateWorkGoalStatus(ctx);
+		updateWorkGoalProgress(ctx);
+		startWorkGoalProgressTimer(ctx);
 	});
 
 	pi.on("session_shutdown", (_event, ctx) => {
 		persistWorkGoal(pi);
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+		stopWorkGoalProgressTimer(ctx);
 	});
 
 	pi.on("input", (event, ctx) => {
@@ -6861,7 +6932,8 @@ export default function workModelsExtension(pi) {
 		});
 	});
 
-	pi.on("tool_execution_end", async (event) => {
+	pi.on("tool_execution_end", async (event, ctx) => {
+		updateWorkGoalProgress(ctx);
 		if (!activeWorkAgent) return;
 		const started = activeWorkAgent.toolStarts.get(event.toolCallId);
 		activeWorkAgent.tools.push(summarizeToolResult(event, started));

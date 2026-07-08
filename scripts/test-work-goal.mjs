@@ -65,6 +65,17 @@ assert.equal(
 	"project",
 );
 assert.equal(mod.workWarpTitle("brainstorm", "C:/soft/git/demo"), "✦ - demo");
+assert.equal(
+	mod.renderProjectGoalProgress({
+		title: "Epic",
+		complete: 3,
+		total: 6,
+		failed: 1,
+		blocked: 2,
+		elapsedMs: 123_000,
+	}),
+	"Epic ██████░░░░░░ Comp: 3 / Total: 6 (Failed: 1, Blocked: 2) Time: 2m 3s",
+);
 assert.deepEqual(
 	mod.warpPayload(
 		"prompt_submit",
@@ -225,7 +236,10 @@ try {
 		ctx,
 	);
 	assert.match(pausedBefore.systemPrompt, /Paused \/work-goal/);
-	assert.match(pausedBefore.systemPrompt, /Answer the user's clarification only/);
+	assert.match(
+		pausedBefore.systemPrompt,
+		/Answer the user's clarification only/,
+	);
 
 	const inputResult = await tempHooks.input?.(
 		{
