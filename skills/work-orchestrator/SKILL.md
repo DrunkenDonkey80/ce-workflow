@@ -384,7 +384,7 @@ Responsibilities:
 - inspect git with porcelain/name-only commands and do not parse diff/stat summaries as file content;
 - implement exactly that Bead;
 - ignore a parent-provided known-unrelated dirty allowlist unless those files conflict with the Bead;
-- run the Bead verification contract, including real hardware checks when required;
+- run the Bead verification contract, including real hardware checks when required; before declaring hardware unavailable, run the smallest non-destructive availability probe for the platform (for Android, `adb devices -l`);
 - update notes with files changed, verification, hardware evidence when applicable, and remaining work, using real newlines for multi-line notes rather than literal `\\n` text;
 - when verification fails after a real attempt, attach a failure artifact and ask the parent to create/reuse a `wo:debug` bug Bead with blocker dependencies;
 - create discovered follow-up Beads when needed.
