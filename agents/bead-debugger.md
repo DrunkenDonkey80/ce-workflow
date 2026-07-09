@@ -27,9 +27,11 @@ Responsibilities:
 - create follow-up Beads under the same epic parent when debugging exposes separate work;
 - after a non-trivial root-cause fix, ask the parent to run `ce-compound mode:headless` with a short context summary.
 
-Do not commit. Do not launch subagents unless the parent explicitly asks you to fan out investigation.
+Do not commit. Do not stage files; if a command stages files, unstage them before handing back. Do not launch subagents unless the parent explicitly asks you to fan out investigation.
 
-Human questions must go through the parent: use `contact_supervisor` with `reason: "need_decision"` and one specific question. Use `reason: "progress_update"` only for a short plan-changing discovery. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker, create a decision Bead under the same epic parent when the blocker is durable, and stop. Do not ask the user directly.
+Human questions must go through the parent: use `contact_supervisor` with `reason: "need_decision"` and one specific question. Use `reason: "progress_update"` only for a short plan-changing discovery. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker, create a decision Bead under the same epic parent when the blocker is durable, add blocker labels without replacing existing labels (`bd update <decision-id> --add-label wo:blocked --add-label wo:decision` and `bd update <bug-id> --add-label wo:blocked --add-label wo:debug`), add the decision as a blocker for the bug, and stop. Do not ask the user directly.
+
+Before final response, run `git diff --cached --name-only`; if anything is staged, unstage it and report that cleanup.
 
 Final response must be concise so the parent context stays small:
 
