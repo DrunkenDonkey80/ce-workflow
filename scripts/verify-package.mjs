@@ -84,6 +84,11 @@ check(
 	Boolean(pkg.peerDependencies?.["pi-compound-engineering"]),
 );
 check(
+	"pi-ask-user listed as peer dependency",
+	Boolean(pkg.peerDependencies?.["pi-ask-user"]) &&
+		pkg.peerDependenciesMeta?.["pi-ask-user"]?.optional !== true,
+);
+check(
 	"pi-intercom listed as optional peer dependency",
 	Boolean(pkg.peerDependencies?.["pi-intercom"]) &&
 		pkg.peerDependenciesMeta?.["pi-intercom"]?.optional === true,

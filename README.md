@@ -17,6 +17,7 @@ Required companion packages and CLI:
 ```bash
 pi install npm:pi-subagents
 pi install npm:pi-compound-engineering
+pi install npm:pi-ask-user
 npm install -g @beads/bd
 bd --help
 ```
@@ -28,7 +29,6 @@ wrapper.
 Recommended, optional companions:
 
 ```bash
-pi install npm:pi-ask-user    # nicer confirmation prompts
 pi install npm:pi-intercom    # child agents can ask the parent session for decisions
 ```
 
