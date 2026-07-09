@@ -5990,23 +5990,129 @@ function isFailedIssue(issue) {
 	return statusOf(issue) === "failed" || labels.includes("wo:failed");
 }
 
+function progressBar(complete, total, width = 12) {
+	const safeTotal = Math.max(0, Number(total) || 0);
+	const safeComplete = Math.max(0, Math.min(safeTotal, Number(complete) || 0));
+	const filled = safeTotal
+		? Math.round((safeComplete / safeTotal) * width)
+		: 0;
+	return `[${"█".repeat(filled)}${"░".repeat(width - filled)}]`;
+}
+
+function issueProgressText(issue) {
+	return [
+		titleOf(issue),
+		field(issue, "description", "body"),
+		field(issue, "design"),
+		field(issue, "acceptance"),
+		notesOf(issue),
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function normalizeProgressText(value) {
+	return String(value ?? "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, " ")
+		.trim()
+		.replace(/\s+/g, " ");
+}
+
+function extractImplementationUnits(markdown) {
+	const text = String(markdown ?? "");
+	const start = text.search(/^##\s+Implementation Units\b/im);
+	let section = text;
+	if (start >= 0) {
+		const rest = text.slice(start);
+		const next = rest.slice(1).search(/^##\s+/im);
+		section = next >= 0 ? rest.slice(0, next + 1) : rest;
+	}
+	return [...section.matchAll(/^###\s+((?:U|Unit\s*)\d+[\w.-]*)[).:\s-]*(.+)$/gim)].map(
+		(match) => ({
+			key: match[1].replace(/\s+/g, "").replace(/[).:-]+$/, ""),
+			title: match[2].trim(),
+		}),
+	);
+}
+
+function planPathForEpic(cwd, epic) {
+	const text = issueProgressText(epic);
+	const matches = [...text.matchAll(/(?:file:|plan-path=)?((?:[A-Za-z]:)?[^\s`'"<>]+\.md)\b/g)];
+	const candidates = matches
+		.map((match) => match[1].replace(/^@/, ""))
+		.filter((path) => /(?:^|[\\/])(?:docs[\\/])?plans[\\/]/i.test(path));
+	for (const candidate of candidates) {
+		const file = isAbsolute(candidate) ? candidate : resolve(cwd, candidate);
+		if (existsSync(file)) return file;
+	}
+	return undefined;
+}
+
+function unitMatchesIssue(unit, issue) {
+	const text = normalizeProgressText(issueProgressText(issue));
+	const key = normalizeProgressText(unit.key);
+	if (key && new RegExp(`\\b${key}\\b`, "i").test(text)) return true;
+	const title = normalizeProgressText(unit.title);
+	if (title.length >= 10 && text.includes(title)) return true;
+	const words = title.split(" ").filter((word) => word.length > 3);
+	if (words.length < 3) return false;
+	const hits = words.filter((word) => text.includes(word)).length;
+	return hits >= Math.min(words.length, 4);
+}
+
+function planProgressForEpic(cwd, epic, childState) {
+	const planPath = planPathForEpic(cwd, epic);
+	if (!planPath) return undefined;
+	const units = extractImplementationUnits(readFileSync(planPath, "utf8"));
+	if (!units.length) return undefined;
+	const matched = new Set();
+	const closed = new Set();
+	for (const slice of childState.slices) {
+		for (const [index, unit] of units.entries()) {
+			if (!unitMatchesIssue(unit, slice)) continue;
+			matched.add(index);
+			if (statusOf(slice) === "closed") closed.add(index);
+		}
+	}
+	if (childState.slices.length && matched.size === 0) return undefined;
+	return {
+		source: "plan",
+		total: units.length,
+		complete: closed.size,
+		created: matched.size,
+		unsliced: units.length - matched.size,
+		path: relative(cwd, planPath),
+	};
+}
+
 function projectGoalProgressState(cwd, goal = activeWorkGoal) {
 	if (!goal || !["active", "needs_human"].includes(goal.status))
 		return undefined;
 	if (workWarpMode(goal.mode, goal) !== "project") return undefined;
-	const epic = currentRoadmap(cwd);
+	let epic = currentRoadmap(cwd);
 	if (!epic) return undefined;
+	try {
+		epic = one(bdJsonRequired(cwd, ["show", idOf(epic)])) ?? epic;
+	} catch {
+		// list output is enough for the slice fallback.
+	}
 	const childState = buildEpicChildState(cwd, epic);
-	const total = childState.slices.length;
-	const complete = childState.closed.length;
+	const fallback = {
+		source: "slices",
+		total: childState.slices.length,
+		complete: childState.closed.length,
+		created: childState.slices.length,
+		unsliced: 0,
+	};
+	const progress = planProgressForEpic(cwd, epic, childState) ?? fallback;
 	const failed = childState.slices.filter(isFailedIssue).length;
 	const blocked = childState.slices.filter(
 		(issue) => statusOf(issue) !== "closed" && isBlockedIssue(issue),
 	).length;
 	return {
 		title: titleOf(epic),
-		complete,
-		total,
+		...progress,
 		failed,
 		blocked,
 		elapsedMs: Date.now() - (goal.startedAt ?? Date.now()),
@@ -6014,7 +6120,12 @@ function projectGoalProgressState(cwd, goal = activeWorkGoal) {
 }
 
 function renderProjectGoalProgress(state) {
-	return `${state.title} ✅ ${state.complete}/${state.total} 🔴 failed ${state.failed} 🟠 blocked ${state.blocked} ⏱️ ${formatDuration(state.elapsedMs)} · ${WORK_SHORTCUT_STATUS}`;
+	const total = Number(state.total) || 0;
+	const complete = Number(state.complete) || 0;
+	const left = Math.max(0, total - complete);
+	const noun = state.source === "plan" ? "units" : "slices";
+	const unsliced = state.unsliced ? ` · ${state.unsliced} unsliced` : "";
+	return `${state.title} ${progressBar(complete, total)} ✅ ${complete}/${total} ${noun} (${left} left${unsliced}) 🔴 ${state.failed} 🟠 ${state.blocked} ⏱️ ${formatDuration(state.elapsedMs)} · ${WORK_SHORTCUT_STATUS}`;
 }
 
 function updateWorkGoalProgress(ctx) {
@@ -7071,9 +7182,11 @@ export {
 	recordWorkTelemetry,
 	handleWorkResumeCommand,
 	handleWorkRoadmapCommand,
+	extractImplementationUnits,
 	parseWorkGoalCommand,
 	parseWorkProjectGoalInput,
 	planResumeAction,
+	progressBar,
 	renderWorkIdeateText,
 	renderWorkBrainstormText,
 	renderWorkUsageText,

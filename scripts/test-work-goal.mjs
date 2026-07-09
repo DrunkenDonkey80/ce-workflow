@@ -71,16 +71,26 @@ assert.equal(
 	"project",
 );
 assert.equal(mod.workWarpTitle("brainstorm", "C:/soft/git/demo"), "✦ - demo");
+assert.equal(mod.progressBar(3, 6), "[██████░░░░░░]");
+assert.deepEqual(
+	mod.extractImplementationUnits(`## Implementation Units\n\n### U1. First slice\n\n### U2. Second slice\n\n## Done`),
+	[
+		{ key: "U1", title: "First slice" },
+		{ key: "U2", title: "Second slice" },
+	],
+);
 assert.equal(
 	mod.renderProjectGoalProgress({
 		title: "Epic",
+		source: "plan",
 		complete: 3,
 		total: 6,
+		unsliced: 2,
 		failed: 1,
 		blocked: 2,
 		elapsedMs: 123_000,
 	}),
-	"Epic ✅ 3/6 🔴 failed 1 🟠 blocked 2 ⏱️ 2m 3s · F7 roadmaps · F8 menu",
+	"Epic [██████░░░░░░] ✅ 3/6 units (3 left · 2 unsliced) 🔴 1 🟠 2 ⏱️ 2m 3s · F7 roadmaps · F8 menu",
 );
 assert.deepEqual(
 	mod.warpPayload(
