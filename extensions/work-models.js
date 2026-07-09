@@ -673,14 +673,32 @@ function failedSubagents(tools = []) {
 		);
 }
 
+function finalTextIndicatesRecoveredWork(text) {
+	return /\b(Outcome:\s*PASS|Review:\s*PASS|Planning boundary complete|Done and pushed|Committed and pushed|Closed (?:Bead|planning Bead)|Created next ready Bead)\b/i.test(
+		text,
+	);
+}
+
 function hasWorkAgentFailure(event, telemetry) {
 	const assistant = finalAssistantMessage(event.messages);
 	const text = assistantVisibleText(assistant);
+	const stopFailed = ["aborted", "error"].includes(
+		String(assistant?.stopReason ?? ""),
+	);
+	const reviewFailed = telemetry.review?.outcome === "fail";
+	const toolFailed = telemetry.tools?.some((tool) => tool.isError);
+	const subagentFailed = failedSubagents(telemetry.tools).length > 0;
+	const recoveredSubagentFailure =
+		subagentFailed &&
+		!stopFailed &&
+		!reviewFailed &&
+		!toolFailed &&
+		finalTextIndicatesRecoveredWork(text);
 	return Boolean(
-		["aborted", "error"].includes(String(assistant?.stopReason ?? "")) ||
-			telemetry.review?.outcome === "fail" ||
-			telemetry.tools?.some((tool) => tool.isError) ||
-			failedSubagents(telemetry.tools).length ||
+		stopFailed ||
+			reviewFailed ||
+			toolFailed ||
+			(subagentFailed && !recoveredSubagentFailure) ||
 			(/\b(fail(?:ed|ure)?|blocked|cannot|unable|timed? out|timeout|error)\b/i.test(
 				text,
 			) &&

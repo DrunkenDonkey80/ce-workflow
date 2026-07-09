@@ -279,9 +279,35 @@ try {
 			},
 		);
 		await hooks.agent_start();
+		await hooks.tool_execution_start({
+			toolCallId: "subagent-retry",
+			args: JSON.stringify({ agent: "bead-planner" }),
+		});
+		await hooks.tool_execution_end(
+			{
+				toolCallId: "subagent-retry",
+				toolName: "subagent",
+				isError: false,
+				result: {
+					details: {
+						results: [
+							{ agent: "bead-planner", status: "failed" },
+							{ agent: "bead-planner", status: "completed" },
+						],
+					},
+				},
+			},
+			{ cwd, getContextUsage: () => ({ tokens: 3050 }) },
+		);
 		await hooks.agent_end(
 			{
-				messages: [],
+				messages: [
+					{
+						role: "assistant",
+						content:
+							"Planning boundary complete and pushed. Created next ready Bead TASK-NEW-2.",
+					},
+				],
 				review: {
 					outcome: "PASS",
 					findings: 0,
@@ -311,6 +337,16 @@ try {
 						entry.op === "update" && entry.notes.includes("telemetry:"),
 				),
 			"instrumented command keeps telemetry in .pi/work-runs by default",
+		);
+		assert(
+			!fixture
+				.logs()
+				.some(
+					(entry) =>
+						entry.op === "update" &&
+						entry.notes.includes("wo:failure-summary"),
+				),
+			"recovered subagent retries do not append failure summaries",
 		);
 	} finally {
 		fixture.cleanup();
