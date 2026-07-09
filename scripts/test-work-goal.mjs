@@ -30,6 +30,44 @@ assert.deepEqual(mod.parseWorkGoalCommand("ship it"), {
 	kind: "start",
 	objective: "ship it",
 });
+assert.deepEqual(mod.parseWorkGoalCommand("--tokens 100k ship it"), {
+	kind: "start",
+	objective: "ship it",
+	tokenBudget: 100000,
+});
+assert.deepEqual(mod.parseWorkGoalCommand("edit --tokens 1.5m ship it"), {
+	kind: "edit",
+	objective: "ship it",
+	tokenBudget: 1500000,
+});
+assert.match(
+	mod.parseWorkGoalCommand("edit --tokens nope ship it").error,
+	/Invalid token budget/,
+);
+assert.equal(mod.parseTokenBudget("42"), 42);
+assert.equal(mod.formatTokenCount(1500), "1.5k");
+assert.equal(
+	mod.isRetryableWorkGoalInterruption({
+		stopReason: "error",
+		errorMessage: "context length exceeded",
+	}),
+	true,
+);
+assert.equal(
+	mod.isWorkGoalContextOverflow({ errorMessage: "input exceeds the context window" }),
+	true,
+);
+assert.equal(
+	mod.isRetryableWorkGoalInterruption({
+		stopReason: "error",
+		errorMessage: "invalid api key",
+	}),
+	false,
+);
+assert.equal(
+	mod.isContradictoryWorkGoalCompletion("tests still fail"),
+	true,
+);
 
 const objective = mod.buildWorkSelfImprovingObjective("C:/soft/git/AI-Wedge", {
 	project: true,

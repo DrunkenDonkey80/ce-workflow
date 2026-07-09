@@ -202,7 +202,14 @@ let activeWorkGoalCwd = null;
 let activeWorkGoalRunning = false;
 let workGoalContinuationPending = null;
 let workGoalContinuationRetry = null;
+let workGoalRecovery = null;
+let workGoalCompactionResume = null;
 let workGoalProgressTimer = null;
+
+function clearWorkGoalRecovery() {
+	workGoalRecovery = null;
+	workGoalCompactionResume = null;
+}
 
 const WORK_GOAL_STATE_ENTRY_TYPE = "work-goal-state";
 const WORK_GOAL_RESET_COMMAND = "work-goal-reset-continue";
@@ -211,6 +218,15 @@ const WORK_GOAL_PROGRESS_WIDGET_KEY = "work-goal-progress";
 const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
 const WORK_GOAL_DECISION_MARKER = "WORK_GOAL_NEEDS_HUMAN_DECISION";
 const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
+const WORK_GOAL_MAX_RETRIES = 4;
+const WORK_GOAL_NON_RETRYABLE_RE =
+	/usage[_\s-]*limit|chatgpt usage limit|multi-auth rotation failed|credentials tried|unauthori[sz]ed|invalid api key/i;
+const WORK_GOAL_RETRYABLE_RE =
+	/websocket closed|sse response headers timed out|headers timed out|context[_\s-]*length[_\s-]*exceeded|input exceeds the context window|context window|provider returned error|overloaded|529|503|connection reset|fetch failed|etimedout|socket hang up/i;
+const WORK_GOAL_CONTEXT_OVERFLOW_RE =
+	/context[_\s-]*length|context window|input exceeds|prompt is too long|maximum context length/i;
+const WORK_GOAL_CONTRADICTORY_COMPLETION_RE =
+	/(?<!could\s)\bnot\s+(?:yet\s+)?(?:complete|completed|done|finished)\b|\bstill\s+(?:incomplete|failing|failing\s+tests?|fails?)\b|\btests?\s+(?:still\s+)?fail(?:ing)?\b|\bblocked\b|\bnot\s+verified\b/i;
 const WORK_GOAL_TOOL_SCHEMA = {
 	type: "object",
 	properties: {
@@ -3351,8 +3367,7 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 				]
 			: [];
 	const settings = cwd ? workOrchSettings(cwd) : null;
-	const advisorLines =
-		settings?.advisorVerifyTask ? [advisorVerifyStep()] : [];
+	const advisorLines = settings?.advisorVerifyTask ? [advisorVerifyStep()] : [];
 	const simplifyLines = settings?.simplifyBeforeReview
 		? [simplifyBeforeReviewStep()]
 		: [];
@@ -6118,15 +6133,50 @@ function splitFirstWord(value) {
 }
 
 function parseWorkGoalCommand(args = "") {
-	const trimmed = String(args ?? "").trim();
+	let trimmed = String(args ?? "").trim();
 	if (!trimmed) return { kind: "status" };
+	let tokenBudget;
+	if (trimmed.startsWith("--tokens ")) {
+		const [, rawBudget, ...rest] = trimmed.split(/\s+/);
+		tokenBudget = parseTokenBudget(rawBudget);
+		if (tokenBudget === undefined)
+			return { kind: "status", error: `Invalid token budget: ${rawBudget}` };
+		trimmed = rest.join(" ").trim();
+		if (!trimmed)
+			return {
+				kind: "status",
+				error: "Usage: /work-goal --tokens 100k <objective>",
+			};
+	}
 	const [command, rest] = splitFirstWord(trimmed);
-	if (["status", "show", "help"].includes(command)) return { kind: "status" };
+	const attach = (result) =>
+		tokenBudget !== undefined ? { ...result, tokenBudget } : result;
+	if (command === "edit") {
+		let editObjective = rest.trim();
+		let editBudget = tokenBudget;
+		if (editObjective.startsWith("--tokens ")) {
+			const [, rawBudget, ...editRest] = editObjective.split(/\s+/);
+			editBudget = parseTokenBudget(rawBudget);
+			if (editBudget === undefined)
+				return { kind: "status", error: `Invalid token budget: ${rawBudget}` };
+			editObjective = editRest.join(" ").trim();
+		}
+		if (editBudget === undefined && tokenBudget === undefined)
+			return { kind: "edit", objective: editObjective };
+		return {
+			kind: "edit",
+			objective: editObjective,
+			tokenBudget: editBudget ?? tokenBudget,
+		};
+	}
+	if (["status", "show", "help"].includes(command))
+		return tokenBudget !== undefined
+			? { kind: "status", error: "--tokens only applies to start/edit" }
+			: { kind: "status" };
 	if (command === "pause") return { kind: "pause" };
 	if (command === "resume") return { kind: "resume" };
 	if (command === "clear" || command === "stop") return { kind: "clear" };
-	if (command === "edit") return { kind: "edit", objective: rest.trim() };
-	return { kind: "start", objective: trimmed };
+	return attach({ kind: "start", objective: trimmed });
 }
 
 function workGoalSelfImprovingAppendix() {
@@ -6243,6 +6293,7 @@ function isWorkGoal(value) {
 			"stopping",
 			"stopped",
 			"complete",
+			"budget_limited",
 		].includes(value.status)
 	);
 }
@@ -6274,16 +6325,17 @@ function persistWorkGoal(pi, goal = activeWorkGoal, cwd = activeWorkGoalCwd) {
 
 function formatWorkGoalStatus(goal = activeWorkGoal) {
 	if (!goal) return undefined;
+	const budget = formatWorkGoalBudget(goal);
 	if (goal.status === "needs_human")
 		return `${statusIcon("needs_human")} needs human`;
 	if (goal.status === "stopping")
-		return `${statusIcon("stopping")} stopping… #${goal.iteration ?? 0}`;
+		return `${statusIcon("stopping")} stopping… #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
 	if (goal.status === "stopped")
-		return `${statusIcon("stopped")} stopped #${goal.iteration ?? 0}`;
+		return `${statusIcon("stopped")} stopped #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
+	if (goal.status === "budget_limited")
+		return `${statusIcon("paused")} budget ${budget ?? "reached"} #${goal.iteration ?? 0}`;
 	if (goal.status === "active")
-		return activeWorkGoalRunning || activeWorkAgent
-			? `${statusIcon("active")} working #${goal.iteration ?? 0}`
-			: `▶️ active #${goal.iteration ?? 0}`;
+		return `${activeWorkGoalRunning || activeWorkAgent ? `${statusIcon("active")} working` : "▶️ active"} #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
 	return statusLabel(goal.status);
 }
 
@@ -6465,21 +6517,23 @@ function stopWorkGoalProgressTimer(ctx) {
 
 function workGoalSummary(goal = activeWorkGoal) {
 	if (!goal) return "No active /work-goal.";
+	const budget = formatWorkGoalBudget(goal);
 	return [
 		`Work goal: ${goal.objective}`,
 		`Mode: ${goal.mode}`,
 		`Status: ${goal.status}`,
-		`Iteration: ${goal.iteration ?? 0}`,
+		`Iteration: ${goal.iteration ?? 0}${goal.retries ? ` (retries ${goal.retries}/${WORK_GOAL_MAX_RETRIES})` : ""}`,
+		budget ? `Tokens: ${budget}${goal.tokenBudget ? " used" : ""}` : "",
 		goal.decision
 			? `Human decision: ${formatWorkGoalDecision(goal.decision)}`
 			: "",
-		"Commands: /work-goal pause|resume|clear|status|edit <objective>; /work-resume-stop for clean project-loop stop",
+		"Commands: /work-goal pause|resume|clear|status|edit <objective>; /work-goal --tokens 100k <objective>; /work-resume-stop for clean project-loop stop",
 	]
 		.filter(Boolean)
 		.join("\n");
 }
 
-function createWorkGoal(mode, objective) {
+function createWorkGoal(mode, objective, tokenBudget, baselineTokens = 0) {
 	const now = Date.now();
 	return {
 		id: telemetryId("wg"),
@@ -6489,7 +6543,83 @@ function createWorkGoal(mode, objective) {
 		iteration: 0,
 		startedAt: now,
 		updatedAt: now,
+		tokenBudget,
+		tokensUsed: 0,
+		baselineTokens,
+		retries: 0,
 	};
+}
+
+function parseTokenBudget(value) {
+	const match = /^(\d+(?:\.\d+)?)([km])?$/iu.exec(String(value ?? "").trim());
+	if (!match) return undefined;
+	const amount = Number(match[1]);
+	if (!Number.isFinite(amount) || amount <= 0) return undefined;
+	const multiplier =
+		match[2]?.toLowerCase() === "m"
+			? 1_000_000
+			: match[2]?.toLowerCase() === "k"
+				? 1_000
+				: 1;
+	return Math.floor(amount * multiplier);
+}
+
+function formatTokenCount(value) {
+	const n = Number(value ?? 0);
+	if (n < 1_000) return `${n}`;
+	if (n < 1_000_000)
+		return `${Number.isInteger(n / 1_000) ? n / 1_000 : (n / 1_000).toFixed(1)}k`;
+	return `${Number.isInteger(n / 1_000_000) ? n / 1_000_000 : (n / 1_000_000).toFixed(1)}m`;
+}
+
+function formatWorkGoalBudget(goal = activeWorkGoal) {
+	if (!goal?.tokenBudget) return undefined;
+	return `${formatTokenCount(goal.tokensUsed ?? 0)}/${formatTokenCount(goal.tokenBudget)}`;
+}
+
+function workGoalTokenTotal(ctx) {
+	const branch =
+		ctx?.sessionManager?.getBranch?.() ??
+		ctx?.sessionManager?.getEntries?.() ??
+		[];
+	let total = 0;
+	for (const entry of branch) {
+		if (entry?.type !== "message" || entry?.message?.role !== "assistant")
+			continue;
+		const usage = entry.message.usage;
+		total += Number(usage?.input ?? 0) + Number(usage?.output ?? 0);
+	}
+	return total;
+}
+
+function updateWorkGoalUsage(goal, ctx) {
+	if (!goal) return goal;
+	const baseline = goal.baselineTokens ?? 0;
+	goal.tokensUsed = Math.max(0, workGoalTokenTotal(ctx) - baseline);
+	goal.timeUsedSeconds = Math.max(
+		0,
+		Math.floor((Date.now() - (goal.startedAt ?? Date.now())) / 1000),
+	);
+	return goal;
+}
+
+function isWorkGoalContextOverflow(assistant) {
+	const message = String(assistant?.errorMessage ?? "");
+	return WORK_GOAL_CONTEXT_OVERFLOW_RE.test(message);
+}
+
+function isRetryableWorkGoalInterruption(assistant) {
+	if (assistant?.stopReason !== "error") return false;
+	const message = String(assistant?.errorMessage ?? "");
+	if (!message) return false;
+	if (WORK_GOAL_NON_RETRYABLE_RE.test(message)) return false;
+	return (
+		isWorkGoalContextOverflow(assistant) || WORK_GOAL_RETRYABLE_RE.test(message)
+	);
+}
+
+function isContradictoryWorkGoalCompletion(summary) {
+	return WORK_GOAL_CONTRADICTORY_COMPLETION_RE.test(String(summary ?? ""));
 }
 
 function escapeXmlText(value) {
@@ -6500,6 +6630,9 @@ function escapeXmlText(value) {
 }
 
 function buildWorkGoalSystemPrompt(goal) {
+	const budgetLine = goal.tokenBudget
+		? `\n- Respect the /work-goal token budget (${formatWorkGoalBudget(goal)} used); the loop pauses at the limit.`
+		: "";
 	return `Active /work-goal:
 <work_goal_objective>
 ${escapeXmlText(goal.objective)}
@@ -6514,7 +6647,7 @@ ${escapeXmlText(goal.objective)}
 - If evidence depends on external hardware/account/environment state, ask the user to make that state available. Once they answer that it is available or tell you to proceed, capture/inspect the artifact yourself immediately instead of asking again.
 - If tools are unavailable, end with ${WORK_GOAL_DECISION_MARKER}: and the question instead of asking a plain-text question.
 - When complete, call work_goal_complete with verification evidence. If the tool is unavailable, end with ${WORK_GOAL_COMPLETE_MARKER}: and the evidence.
-- Do not call completion for partial progress, blockers, failing tests, or unverified work.`;
+- Do not call completion for partial progress, blockers, failing tests, or unverified work. Summaries that say the work is incomplete or tests still fail are rejected.${budgetLine}`;
 }
 
 function buildWorkGoalKickoffPrompt(goal) {
@@ -6738,6 +6871,29 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 		return {
 			content: [{ type: "text", text: "No active /work-goal." }],
 			details: {},
+			completed: false,
+		};
+	}
+	const trimmed = String(summary ?? "").trim();
+	const rejection = !trimmed
+		? "summary is empty"
+		: isContradictoryWorkGoalCompletion(trimmed)
+			? "summary says the goal is not complete"
+			: undefined;
+	if (rejection) {
+		updateWorkGoalUsage(goal, ctx);
+		persistWorkGoal(pi);
+		ctx.ui.notify(`/work-goal completion rejected: ${rejection}.`, "warning");
+		return {
+			content: [
+				{
+					type: "text",
+					text: `Goal completion rejected: ${rejection}. The goal is NOT complete; keep working and only call work_goal_complete once it is fully done and verified.`,
+				},
+			],
+			details: { goal: goal.objective, summary: trimmed },
+			terminate: false,
+			completed: false,
 		};
 	}
 	activeWorkGoal = { ...goal, status: "complete", updatedAt: Date.now() };
@@ -6745,19 +6901,21 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	activeWorkGoal = null;
 	activeWorkGoalRunning = false;
 	workGoalContinuationPending = null;
+	clearWorkGoalRecovery();
 	persistWorkGoal(pi, null);
 	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 	ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
-	ctx.ui.notify(`/work-goal complete: ${truncate(summary, 240)}`, "info");
-	finishWarpWork(ctx, workWarpMode(goal.mode, goal), summary);
+	ctx.ui.notify(`/work-goal complete: ${truncate(trimmed, 240)}`, "info");
+	finishWarpWork(ctx, workWarpMode(goal.mode, goal), trimmed);
 	return {
-		content: [{ type: "text", text: `/work-goal complete: ${summary}` }],
-		details: { goal: goal.objective, summary },
+		content: [{ type: "text", text: `/work-goal complete: ${trimmed}` }],
+		details: { goal: goal.objective, summary: trimmed },
 		terminate: true,
+		completed: true,
 	};
 }
 
-async function startWorkGoal(mode, objective, pi, ctx) {
+async function startWorkGoal(mode, objective, pi, ctx, tokenBudget) {
 	const text = String(objective ?? "").trim();
 	if (!text) {
 		ctx.ui.notify("Usage: /work-goal <objective>", "warning");
@@ -6771,16 +6929,29 @@ async function startWorkGoal(mode, objective, pi, ctx) {
 		if (!replace) return;
 	}
 	workGoalContinuationPending = null;
-	activeWorkGoal = createWorkGoal(mode, text);
+	clearWorkGoalRecovery();
+	activeWorkGoal = createWorkGoal(
+		mode,
+		text,
+		tokenBudget,
+		workGoalTokenTotal(ctx),
+	);
 	activeWorkGoalCwd = ctx.cwd;
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
-	ctx.ui.notify(`/work-goal started: ${truncate(text, 240)}`, "info");
+	ctx.ui.notify(
+		`/work-goal started: ${truncate(text, 240)}${tokenBudget ? ` (budget ${formatTokenCount(tokenBudget)})` : ""}`,
+		"info",
+	);
 	await sendWorkGoalPrompt(pi, ctx, buildWorkGoalKickoffPrompt(activeWorkGoal));
 }
 
 async function handleWorkGoalCommand(args, mode, pi, ctx) {
 	const command = parseWorkGoalCommand(args);
+	if (command.error) {
+		ctx.ui.notify(command.error, "warning");
+		return;
+	}
 	if (command.kind === "status") {
 		ctx.ui.notify(workGoalSummary(), "info");
 		updateWorkGoalStatus(ctx);
@@ -6790,6 +6961,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		const previous = activeWorkGoal?.objective;
 		activeWorkGoal = null;
 		workGoalContinuationPending = null;
+		clearWorkGoalRecovery();
 		persistWorkGoal(pi, null);
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 		ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
@@ -6812,15 +6984,27 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 			updatedAt: Date.now(),
 		};
 		workGoalContinuationPending = null;
+		clearWorkGoalRecovery();
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
 		ctx.ui.notify("/work-goal paused.", "info");
 		return;
 	}
 	if (command.kind === "resume") {
+		if (
+			!activeWorkGoal ||
+			!["paused", "budget_limited", "needs_human", "stopped"].includes(
+				activeWorkGoal.status,
+			)
+		) {
+			ctx.ui.notify("No paused /work-goal to resume.", "warning");
+			return;
+		}
+		clearWorkGoalRecovery();
 		activeWorkGoal = {
 			...activeWorkGoal,
 			status: "active",
+			decision: undefined,
 			updatedAt: Date.now(),
 		};
 		persistWorkGoal(pi);
@@ -6844,9 +7028,12 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		activeWorkGoal = {
 			...activeWorkGoal,
 			objective: command.objective,
+			tokenBudget: command.tokenBudget ?? activeWorkGoal.tokenBudget,
 			status: "active",
+			decision: undefined,
 			updatedAt: Date.now(),
 		};
+		clearWorkGoalRecovery();
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
 		await sendWorkGoalPrompt(
@@ -6856,7 +7043,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		);
 		return;
 	}
-	await startWorkGoal(mode, command.objective, pi, ctx);
+	await startWorkGoal(mode, command.objective, pi, ctx, command.tokenBudget);
 }
 
 async function handleWorkResumeGoalCommand(args, pi, ctx) {
@@ -7068,8 +7255,9 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	const text = assistantVisibleText(assistant);
 	const completion = parseWorkGoalCompletion(text);
 	if (completion) {
-		completeActiveWorkGoal(completion, ctx, pi);
-		return;
+		const result = completeActiveWorkGoal(completion, ctx, pi);
+		if (result?.completed) return;
+		// Rejected completion (empty/contradictory): keep working.
 	}
 	const decision = parseWorkGoalDecision(text);
 	if (decision || likelyHumanDecisionQuestion(text)) {
@@ -7080,15 +7268,50 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		);
 		return;
 	}
+	let retrying = false;
 	if (["aborted", "error"].includes(String(assistant?.stopReason ?? ""))) {
-		activeWorkGoal = { ...goal, status: "paused", updatedAt: Date.now() };
-		persistWorkGoal(pi);
-		updateWorkGoalStatus(ctx);
-		ctx.ui.notify(
-			"/work-goal paused after interruption. Run /work-goal resume to continue.",
-			"warning",
-		);
-		return;
+		if (isRetryableWorkGoalInterruption(assistant)) {
+			const nextRetries = (goal.retries ?? 0) + 1;
+			if (nextRetries > WORK_GOAL_MAX_RETRIES) {
+				activeWorkGoal = {
+					...goal,
+					status: "paused",
+					retries: 0,
+					updatedAt: Date.now(),
+				};
+				clearWorkGoalRecovery();
+				persistWorkGoal(pi);
+				updateWorkGoalStatus(ctx);
+				ctx.ui.notify(
+					"/work-goal paused after repeated transient errors. Run /work-goal resume to retry.",
+					"warning",
+				);
+				return;
+			}
+			retrying = true;
+			workGoalRecovery = {
+				goalId: goal.id,
+				kind: isWorkGoalContextOverflow(assistant)
+					? "compaction_retry"
+					: "provider_retry",
+			};
+			ctx.ui.notify(
+				`/work-goal hit a transient error (retry ${nextRetries}/${WORK_GOAL_MAX_RETRIES}); continuing.`,
+				"info",
+			);
+		} else {
+			activeWorkGoal = { ...goal, status: "paused", updatedAt: Date.now() };
+			clearWorkGoalRecovery();
+			persistWorkGoal(pi);
+			updateWorkGoalStatus(ctx);
+			ctx.ui.notify(
+				"/work-goal paused after interruption. Run /work-goal resume to continue.",
+				"warning",
+			);
+			return;
+		}
+	} else {
+		clearWorkGoalRecovery();
 	}
 	if (goal.status === "stopping") {
 		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
@@ -7101,18 +7324,42 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	activeWorkGoal = {
 		...goal,
 		iteration: (goal.iteration ?? 0) + 1,
+		retries: retrying ? (goal.retries ?? 0) + 1 : 0,
 		updatedAt: Date.now(),
 	};
+	updateWorkGoalUsage(activeWorkGoal, ctx);
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
-	const note = /\?\s*$/.test(String(text).trim())
-		? "Your last response ended with a non-blocking question; answer it yourself by choosing the clear winner."
-		: "";
+	if (
+		activeWorkGoal.tokenBudget !== undefined &&
+		activeWorkGoal.tokensUsed >= activeWorkGoal.tokenBudget
+	) {
+		workGoalContinuationPending = null;
+		activeWorkGoal = {
+			...activeWorkGoal,
+			status: "budget_limited",
+			updatedAt: Date.now(),
+		};
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		ctx.ui.notify(
+			`/work-goal token budget reached: ${formatWorkGoalBudget(activeWorkGoal)}. Run /work-goal resume to continue over budget or /work-goal edit --tokens <N> <objective> to raise it.`,
+			"warning",
+		);
+		return;
+	}
+	const note = retrying
+		? "The previous turn ended with a transient error. Resume from where you left off; re-check files, tests, and command output."
+		: /\?\s*$/.test(String(text).trim())
+			? "Your last response ended with a non-blocking question; answer it yourself by choosing the clear winner."
+			: "";
 	if (workGoalHasPendingMessages(ctx)) {
 		workGoalContinuationRetry = { goalId: activeWorkGoal.id, note };
 		return;
 	}
-	await sendWorkGoalContinuation(pi, ctx, activeWorkGoal, note);
+	if (retrying)
+		await sendWorkGoalAnswerContinuation(pi, ctx, activeWorkGoal, note);
+	else await sendWorkGoalContinuation(pi, ctx, activeWorkGoal, note);
 }
 
 function formatError(error) {
@@ -7490,6 +7737,11 @@ export {
 	handleWorkRoadmapCommand,
 	extractImplementationUnits,
 	parseWorkGoalCommand,
+	parseTokenBudget,
+	formatTokenCount,
+	isContradictoryWorkGoalCompletion,
+	isRetryableWorkGoalInterruption,
+	isWorkGoalContextOverflow,
 	parseWorkProjectGoalInput,
 	planResumeAction,
 	progressBar,
@@ -7579,6 +7831,7 @@ export default function workModelsExtension(pi) {
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
 		activeWorkGoalRunning = false;
 		workGoalContinuationPending = null;
+		clearWorkGoalRecovery();
 		updateWorkGoalStatus(ctx);
 		updateWorkGoalProgress(ctx);
 		ctx.ui.notify("work-orchestrator loaded · F7 roadmaps · F8 menu", "info");
@@ -7593,6 +7846,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", async (event, ctx) => {
+		if (!extractWorkGoalContinuationMarker(event.text)) clearWorkGoalRecovery();
 		if (await maybeResumeWorkGoalFromUserInput(event, ctx, pi))
 			return { action: "handled" };
 		const parsed = parseNumberedWorkActionInput(event.text);
@@ -7740,6 +7994,14 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
+		if (activeWorkGoal?.status === "active") {
+			updateWorkGoalUsage(activeWorkGoal, ctx);
+			if (workGoalContinuationPending?.goalId === activeWorkGoal.id) {
+				workGoalCompactionResume = { goalId: activeWorkGoal.id };
+				workGoalContinuationPending = null;
+			}
+			persistWorkGoal(pi);
+		}
 		const instructions = event.customInstructions ?? "";
 		if (
 			!contextCompactState.requested &&
@@ -7771,9 +8033,25 @@ export default function workModelsExtension(pi) {
 		};
 	});
 
-	pi.on("session_compact", async () => {
+	pi.on("session_compact", async (_event, ctx) => {
+		const wasOurs = contextCompactState.inFlight;
 		contextCompactState.inFlight = false;
 		contextCompactState.requested = false;
+		if (
+			!wasOurs &&
+			activeWorkGoal?.status === "active" &&
+			workGoalCompactionResume?.goalId === activeWorkGoal.id &&
+			!workGoalHasPendingMessages(ctx) &&
+			ctx?.sessionManager
+		) {
+			workGoalCompactionResume = null;
+			if (workGoalRecovery?.goalId === activeWorkGoal.id)
+				workGoalRecovery = null;
+			updateWorkGoalUsage(activeWorkGoal, ctx);
+			persistWorkGoal(pi);
+			updateWorkGoalStatus(ctx);
+			await sendWorkGoalContinuation(pi, ctx, activeWorkGoal);
+		}
 	});
 
 	pi.on("turn_end", async (_event, ctx) => {
@@ -8199,9 +8477,7 @@ function workSettingsStatus(ctx) {
 		...SLOTS.map((slot) => `${slot.label}: ${slotSummary(slot, settings)}`),
 		`Critic on brainstorm: ${resolved.critic.brainstorm}`,
 		`Critic on plan: ${resolved.critic.plan}`,
-		...WORK_ORCH_BOOLEANS.map(
-			(flag) => `${flag.label}: ${resolved[flag.key]}`,
-		),
+		...WORK_ORCH_BOOLEANS.map((flag) => `${flag.label}: ${resolved[flag.key]}`),
 	];
 	notify(ctx, lines.join("\n"), "info");
 }
@@ -8288,13 +8564,15 @@ async function workSettingsLoop(ctx) {
 					label: key,
 					description: `${SLOTS.map(
 						(slot) => `${slot.key}=${EFFORT_PROFILES[key][slot.key]}`,
-					).join(" ")} · gates:${[
-						EFFORT_PROFILES[key].simplifyBeforeReview && "simplify",
-						EFFORT_PROFILES[key].browserTestsOnUiDiff && "browser",
-						EFFORT_PROFILES[key].codeReviewBeforeCommit && "review",
-					]
-						.filter(Boolean)
-						.join("/") || "none"}`,
+					).join(" ")} · gates:${
+						[
+							EFFORT_PROFILES[key].simplifyBeforeReview && "simplify",
+							EFFORT_PROFILES[key].browserTestsOnUiDiff && "browser",
+							EFFORT_PROFILES[key].codeReviewBeforeCommit && "review",
+						]
+							.filter(Boolean)
+							.join("/") || "none"
+					}`,
 				})),
 			]);
 			if (!profileKey) continue;
