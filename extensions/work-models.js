@@ -121,6 +121,8 @@ const EFFORT_PROFILES = {
 		advisor: "medium",
 		critic: { brainstorm: false, plan: false },
 		advisorVerifyTask: false,
+		simplifyBeforeReview: false,
+		browserTestsOnUiDiff: false,
 		codeReviewBeforeCommit: false,
 	},
 	medium: {
@@ -132,6 +134,8 @@ const EFFORT_PROFILES = {
 		advisor: "high",
 		critic: { brainstorm: true, plan: true },
 		advisorVerifyTask: true,
+		simplifyBeforeReview: false,
+		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: false,
 	},
 	high: {
@@ -143,6 +147,8 @@ const EFFORT_PROFILES = {
 		advisor: "xhigh",
 		critic: { brainstorm: true, plan: true },
 		advisorVerifyTask: true,
+		simplifyBeforeReview: true,
+		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: false,
 	},
 	max: {
@@ -154,12 +160,22 @@ const EFFORT_PROFILES = {
 		advisor: "xhigh",
 		critic: { brainstorm: true, plan: true },
 		advisorVerifyTask: true,
+		simplifyBeforeReview: true,
+		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: true,
 	},
 };
 const DEFAULT_PROFILE = "medium";
 const WORK_ORCH_BOOLEANS = [
 	{ key: "advisorVerifyTask", label: "advisor verifies task vs plan" },
+	{
+		key: "simplifyBeforeReview",
+		label: "ce-simplify-code before review",
+	},
+	{
+		key: "browserTestsOnUiDiff",
+		label: "ce-test-browser when diff touches UI",
+	},
 	{
 		key: "codeReviewBeforeCommit",
 		label: "full ce-code-review before commit",
@@ -1670,8 +1686,7 @@ function workOrchSettings(cwd) {
 		plan: raw.critic?.plan ?? base.critic.plan,
 	};
 	const flags = {};
-	for (const { key } of WORK_ORCH_BOOLEANS)
-		flags[key] = raw[key] ?? base[key];
+	for (const { key } of WORK_ORCH_BOOLEANS) flags[key] = raw[key] ?? base[key];
 	return { profile, critic, ...flags };
 }
 
@@ -1724,6 +1739,18 @@ function advisorVerifyStep() {
 function codeReviewBeforeCommitStep() {
 	return [
 		`Pre-commit code-review gate: before committing, run the full ce-code-review skill on the current diff for this slice. Resolve any blocking findings (or record an explicit user waiver) before the committer commits and closes the Bead.`,
+	].join("\n");
+}
+
+function simplifyBeforeReviewStep() {
+	return [
+		`Simplify-before-review gate: after this slice is implemented and self-verified but before you signal done-for-review, run the ce-simplify-code skill on the current diff for this slice to tighten clarity and remove over-engineering, dead flexibility, and duplicated helpers that already exist in the repo. Keep behavior; do not refactor beyond the slice. Apply only when a real implementation diff was produced this handoff; otherwise no-op.`,
+	].join("\n");
+}
+
+function browserTestsOnUiDiffStep() {
+	return [
+		`UI-diff browser-test gate: before committing, if the related dirty files touch a runnable web frontend surface (routes/pages/components/styles — e.g. *.tsx, *.jsx, *.vue, *.svelte, *.html, *.css, *.scss under app/, src/app/, pages/, routes/, components/, views/), run the ce-test-browser skill on the affected pages and resolve blocking failures (or record an evidence-only user waiver) before commit. Skip when the diff is backend/CLI/docs-only or the project has no runnable web frontend.`,
 	].join("\n");
 }
 
@@ -3323,10 +3350,12 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 					"Planner efficiency: do not run raw `bd show <epic-id> --json`; project epics can contain full roadmap plans. Use compact bd show projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
 				]
 			: [];
+	const settings = cwd ? workOrchSettings(cwd) : null;
 	const advisorLines =
-		cwd && workOrchSettings(cwd).advisorVerifyTask
-			? [advisorVerifyStep()]
-			: [];
+		settings?.advisorVerifyTask ? [advisorVerifyStep()] : [];
+	const simplifyLines = settings?.simplifyBeforeReview
+		? [simplifyBeforeReviewStep()]
+		: [];
 	return [
 		`Use the work-orchestrator skill in mode: ${mode} with this precomputed extension state.`,
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
@@ -3344,6 +3373,7 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 			? `Review scope default: current Bead ${selected.id} and its diff/verification evidence; do not run broad whole-repo review unless this Bead explicitly requires it.`
 			: "Review scope default: current diff for this epic; do not run broad whole-repo review unless the action explicitly requires it.",
 		...plannerLines,
+		...simplifyLines,
 		...advisorLines,
 		...extraLines.filter(Boolean),
 		"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
@@ -4150,18 +4180,21 @@ function buildWorkSmallState(cwd, args = "") {
 				return errorState("unknown-target", `No Bead found for ${firstTarget}`);
 			if (typeOf(issue) !== "epic") {
 				const epic = one(bdJsonRequired(cwd, ["show", parentOf(issue)]));
-				return withHandoffPrompt({
-					ok: true,
-					action: "run-implementation",
-					epic: issueSummary(epic),
-					selectedBead: issueSummary(issue),
-					git,
-				message: `Using existing ${idOf(issue)}.`,
-				warnings: git.warnings,
-				handoffExtra: rest.length ? [`Task guidance: ${rest.join(" ")}`] : [],
-			},
-			cwd,
-		);
+				return withHandoffPrompt(
+					{
+						ok: true,
+						action: "run-implementation",
+						epic: issueSummary(epic),
+						selectedBead: issueSummary(issue),
+						git,
+						message: `Using existing ${idOf(issue)}.`,
+						warnings: git.warnings,
+						handoffExtra: rest.length
+							? [`Task guidance: ${rest.join(" ")}`]
+							: [],
+					},
+					cwd,
+				);
 			}
 			const task = rest.join(" ").trim();
 			if (!task)
@@ -4174,17 +4207,18 @@ function buildWorkSmallState(cwd, args = "") {
 				parent: idOf(issue),
 				notes: workflowBeadNotes("/work-small", task, ["wo:implementation"]),
 			});
-			return withHandoffPrompt({
-				ok: true,
-				action: "run-implementation",
-				epic: issueSummary(issue),
-				selectedBead: issueSummary(bead),
-				git,
-			message: `Created ${idOf(bead)} under ${idOf(issue)}.`,
-			warnings: git.warnings,
-		},
-		cwd,
-	);
+			return withHandoffPrompt(
+				{
+					ok: true,
+					action: "run-implementation",
+					epic: issueSummary(issue),
+					selectedBead: issueSummary(bead),
+					git,
+					message: `Created ${idOf(bead)} under ${idOf(issue)}.`,
+					warnings: git.warnings,
+				},
+				cwd,
+			);
 		}
 		const parsed = parseWorkAddArgs(raw);
 		const resolved = resolveParsedEpic(cwd, parsed);
@@ -4201,17 +4235,18 @@ function buildWorkSmallState(cwd, args = "") {
 				"wo:implementation",
 			]),
 		});
-		return withHandoffPrompt({
-			ok: true,
-			action: "run-implementation",
-			epic: issueSummary(resolved.epic),
-			selectedBead: issueSummary(bead),
-			git,
-			message: `Created ${idOf(bead)} under ${idOf(resolved.epic)}.`,
-			warnings: git.warnings,
-		},
-		cwd,
-	);
+		return withHandoffPrompt(
+			{
+				ok: true,
+				action: "run-implementation",
+				epic: issueSummary(resolved.epic),
+				selectedBead: issueSummary(bead),
+				git,
+				message: `Created ${idOf(bead)} under ${idOf(resolved.epic)}.`,
+				warnings: git.warnings,
+			},
+			cwd,
+		);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
 			action: error.reason ?? "beads-error",
@@ -4251,21 +4286,22 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 				posture,
 			]),
 		});
-		return withHandoffPrompt({
-			ok: true,
-			action: "run-planner",
-			epic: issueSummary(resolved.epic),
-			selectedBead: issueSummary(bead),
-			git,
-			message: `Created planning Bead ${idOf(bead)} under ${idOf(resolved.epic)}.`,
-			warnings: git.warnings,
-			handoffExtra: [
-				posture,
-				"Planner must verify dependency direction with bd ready --json.",
-			],
-		},
-		cwd,
-	);
+		return withHandoffPrompt(
+			{
+				ok: true,
+				action: "run-planner",
+				epic: issueSummary(resolved.epic),
+				selectedBead: issueSummary(bead),
+				git,
+				message: `Created planning Bead ${idOf(bead)} under ${idOf(resolved.epic)}.`,
+				warnings: git.warnings,
+				handoffExtra: [
+					posture,
+					"Planner must verify dependency direction with bd ready --json.",
+				],
+			},
+			cwd,
+		);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
 			action: error.reason ?? "beads-error",
@@ -5311,13 +5347,13 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
 				"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker Bead instruction, or an explicit user waiver; never leave it as passive risk prose.",
 				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Only then return the plan path and run /work-plan <plan-path>.",
-					"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
-					detail,
-					`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
-					ROLE_TIMEOUT_GUIDANCE,
-					workOrchSettings(cwd).critic.plan
-						? advisorCriticStep("produced plan")
-						: "",
+				"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
+				detail,
+				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
+				ROLE_TIMEOUT_GUIDANCE,
+				workOrchSettings(cwd).critic.plan
+					? advisorCriticStep("produced plan")
+					: "",
 			].join("\n"),
 			git: masterGit,
 			warnings: masterGit.warnings,
@@ -5454,19 +5490,20 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				fields.ideaId,
 				`wo:idea status=discussed plan-path=${first} epic-id=${idOf(epic)} task-id=${idOf(planning)}`,
 			);
-		return withHandoffPrompt({
-			ok: true,
-			action: "run-planner",
-			epic: issueSummary(epic),
-			selectedBead: issueSummary(planning),
-			git: masterGit,
-			message: `${init.initialized ? `${init.message} ` : ""}Created epic ${idOf(epic)} and planning Bead ${idOf(planning)}.`,
-			warnings: masterGit.warnings,
-			suggestedCommands: [`/work-resume ${idOf(epic)}`],
-			nextAction: `Next: planner will create the first slice; then run /work-resume ${idOf(epic)}.`,
-		},
-		cwd,
-	);
+		return withHandoffPrompt(
+			{
+				ok: true,
+				action: "run-planner",
+				epic: issueSummary(epic),
+				selectedBead: issueSummary(planning),
+				git: masterGit,
+				message: `${init.initialized ? `${init.message} ` : ""}Created epic ${idOf(epic)} and planning Bead ${idOf(planning)}.`,
+				warnings: masterGit.warnings,
+				suggestedCommands: [`/work-resume ${idOf(epic)}`],
+				nextAction: `Next: planner will create the first slice; then run /work-resume ${idOf(epic)}.`,
+			},
+			cwd,
+		);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
 			action: error.reason ?? "beads-error",
@@ -5607,7 +5644,13 @@ function buildWorkFinishState(cwd, args = "") {
 				"Dirty files are not all tied to the selected Bead notes.",
 				{ relatedFiles: related },
 			);
-		const reviewBeforeCommit = workOrchSettings(cwd).codeReviewBeforeCommit;
+		const gates = workOrchSettings(cwd);
+		const reviewBeforeCommit = gates.codeReviewBeforeCommit;
+		const preCommitSteps = [
+			reviewBeforeCommit ? codeReviewBeforeCommitStep() : "",
+			gates.browserTestsOnUiDiff ? browserTestsOnUiDiffStep() : "",
+		].filter(Boolean);
+		const gated = preCommitSteps.length > 0;
 		return {
 			ok: true,
 			action: "commit-ready",
@@ -5616,19 +5659,21 @@ function buildWorkFinishState(cwd, args = "") {
 			git,
 			relatedFiles: related,
 			commitMessage: `${idOf(bead)}: ${titleOf(bead)}`,
-			message: reviewBeforeCommit
-				? "Finish gate passed; full ce-code-review required before commit."
+			message: gated
+				? "Finish gate passed; pre-commit gates required before commit."
 				: "Finish gate has review, verification, and related dirty files.",
-			note: `Commit seed: ${idOf(bead)}: ${titleOf(bead)}\nFiles: ${related.join(", ")}${reviewBeforeCommit ? "\nGate: run full ce-code-review on this diff before committing." : ""}`,
-			handoffPrompt: reviewBeforeCommit
+			note: `Commit seed: ${idOf(bead)}: ${titleOf(bead)}\nFiles: ${related.join(
+				", ",
+			)}${gated ? `\nGates: ${preCommitSteps.length}` : ""}`,
+			handoffPrompt: gated
 				? [
 						"Use the work-orchestrator skill in mode: finish with this precomputed extension state.",
 						`Epic: ${idOf(epic)} — ${titleOf(epic)}`,
 						`Bead: ${idOf(bead)} — ${titleOf(bead)}`,
 						`Commit message: ${idOf(bead)}: ${titleOf(bead)}`,
 						`Files: ${related.join(", ")}`,
-						codeReviewBeforeCommitStep(),
-						"After the review gate passes (or an explicit user waiver), commit with the seed message and close the Bead; do not rediscover the target.",
+						...preCommitSteps,
+						"After the gates pass (or explicit user waivers), commit with the seed message and close the Bead; do not rediscover the target.",
 					].join("\n")
 				: undefined,
 			warnings: git.warnings,
@@ -8140,8 +8185,7 @@ export default function workModelsExtension(pi) {
 		description:
 			"Work-orchestrator settings submenu: effort profiles, role/advisor model+effort, and advisor/critic gates",
 		handler: async (args, ctx) => {
-			if (String(args).trim() === "status")
-				return workSettingsStatus(ctx);
+			if (String(args).trim() === "status") return workSettingsStatus(ctx);
 			await workSettingsLoop(ctx);
 		},
 	});
@@ -8155,8 +8199,9 @@ function workSettingsStatus(ctx) {
 		...SLOTS.map((slot) => `${slot.label}: ${slotSummary(slot, settings)}`),
 		`Critic on brainstorm: ${resolved.critic.brainstorm}`,
 		`Critic on plan: ${resolved.critic.plan}`,
-		`Advisor verifies task vs plan: ${resolved.advisorVerifyTask}`,
-		`Full ce-code-review before commit: ${resolved.codeReviewBeforeCommit}`,
+		...WORK_ORCH_BOOLEANS.map(
+			(flag) => `${flag.label}: ${resolved[flag.key]}`,
+		),
 	];
 	notify(ctx, lines.join("\n"), "info");
 }
@@ -8166,7 +8211,10 @@ const SETTINGS_PROFILE = "__profile__";
 const SETTINGS_RESET = "__reset__";
 
 function boolLabel(label, value) {
-	return { label: `${label}: ${value ? "on" : "off"}`, description: "enter to flip" };
+	return {
+		label: `${label}: ${value ? "on" : "off"}`,
+		description: "enter to flip",
+	};
 }
 
 async function workSettingsLoop(ctx) {
@@ -8238,9 +8286,15 @@ async function workSettingsLoop(ctx) {
 				...Object.keys(EFFORT_PROFILES).map((key) => ({
 					value: key,
 					label: key,
-					description: `${SLOTS.map((slot) => `${slot.key}=${EFFORT_PROFILES[key][slot.key]}`).join(
-						" ",
-					)} · gates:${EFFORT_PROFILES[key].codeReviewBeforeCommit ? " review" : ""}`,
+					description: `${SLOTS.map(
+						(slot) => `${slot.key}=${EFFORT_PROFILES[key][slot.key]}`,
+					).join(" ")} · gates:${[
+						EFFORT_PROFILES[key].simplifyBeforeReview && "simplify",
+						EFFORT_PROFILES[key].browserTestsOnUiDiff && "browser",
+						EFFORT_PROFILES[key].codeReviewBeforeCommit && "review",
+					]
+						.filter(Boolean)
+						.join("/") || "none"}`,
 				})),
 			]);
 			if (!profileKey) continue;
@@ -8267,11 +8321,16 @@ async function workSettingsLoop(ctx) {
 		settings = readSettings(ctx.cwd);
 		const criticKey = pick.value.split(".")[1];
 		const current =
-			pick.kind === "critic" ? resolved.critic[criticKey] : resolved[pick.value];
+			pick.kind === "critic"
+				? resolved.critic[criticKey]
+				: resolved[pick.value];
 		const next = !current;
 		if (pick.kind === "critic") setWorkOrchCritic(settings, criticKey, next);
 		else setWorkOrchBoolean(settings, pick.value, next);
 		writeSettings(ctx.cwd, settings);
-		ctx.ui.notify(`${pick.label.split(":")[0]}: ${next ? "on" : "off"}`, "info");
+		ctx.ui.notify(
+			`${pick.label.split(":")[0]}: ${next ? "on" : "off"}`,
+			"info",
+		);
 	}
 }

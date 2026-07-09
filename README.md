@@ -396,12 +396,12 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 Profiles set effort per role plus the advisor, and the advisory gates. Applying one overwrites effort and gates, not models:
 
-| profile | plan | work | debug | review | commit | advisor | critic (brainstorm/plan) | advisor verifies task | ce-code-review before commit |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| low | low | low | medium | low | low | medium | off / off | off | off |
-| medium | medium | medium | high | medium | low | high | on / on | on | off |
-| high | high | high | high | high | low | xhigh | on / on | on | off |
-| max | xhigh | xhigh | xhigh | high | medium | xhigh | on / on | on | on |
+| profile | plan | work | debug | review | commit | advisor | critic (brainstorm/plan) | advisor verifies task | simplify before review | browser tests on UI diff | ce-code-review before commit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| low | low | low | medium | low | low | medium | off / off | off | off | off | off |
+| medium | medium | medium | high | medium | low | high | on / on | on | off | on | off |
+| high | high | high | high | high | low | xhigh | on / on | on | on | on | off |
+| max | xhigh | xhigh | xhigh | high | medium | xhigh | on / on | on | on | on | on |
 
 ### Advisor and gates (prompt-live)
 
@@ -409,6 +409,8 @@ The advisor (`bead-advisor`, read-only, xhigh by default, inherits the control m
 
 - **critic on brainstorm / plan** — after `ce-brainstorm`/`ce-plan` produces the artifact, run `bead-advisor` to find weak requirements, unverified acceptance, incomplete decisions, and untested assumptions. On for medium/high/max, off for low.
 - **advisor verifies task vs plan** — once a slice is implemented and self-verified (before review/finish), run `bead-advisor` to compare the change against the plan's acceptance and flag drift or missing evidence. On for medium/high/max.
+- **simplify before review** — after a slice is implemented and self-verified but before it signals done-for-review, run `ce-simplify-code` on the diff to tighten clarity and drop over-engineering/dead flexibility. Closes the core-loop simplify step that otherwise only ran on review FAIL. On for high/max.
+- **browser tests on UI diff** — at the `/work-finish` commit-ready gate, if the related files touch a runnable web frontend (routes/pages/components/styles), run `ce-test-browser` on the affected pages; skipped automatically for backend/CLI/docs-only diffs or projects with no web frontend. Trigger-based, not effort-bound: on for medium/high/max.
 - **full ce-code-review before commit** — at the `/work-finish` commit-ready gate, run the full `ce-code-review` skill on the diff before the committer commits. On for max only.
 
 Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `commit`, or `advisor`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-settings status` (and `/work-models status`) make the tuning visible and `/work-settings` lets you flip gates live.
@@ -428,6 +430,8 @@ Role prompts use fresh child context by default and file-only artifacts so the p
     "profile": "max",
     "critic": { "brainstorm": true, "plan": true },
     "advisorVerifyTask": true,
+    "simplifyBeforeReview": true,
+    "browserTestsOnUiDiff": true,
     "codeReviewBeforeCommit": true
   }
 }

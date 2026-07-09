@@ -452,6 +452,18 @@ Responsibilities:
 - return exactly one verdict: `CLEAN` or `CONCERNS`, each finding tagged blocking or note with the smallest fix;
 - record-worthy findings go back to the parent/role that launched it; the advisor does not write Beads itself.
 
+## Quality gates (prompt-live)
+
+`/work-settings` toggles these on or off; when on, the extension appends the gate step to the matching handoff prompt, so the receiving role actually runs it. Defaults come from the effort profile:
+
+- **critic on brainstorm/plan** — `bead-advisor` on the artifact after `ce-brainstorm`/`ce-plan` (medium/high/max).
+- **advisor verifies task vs plan** — `bead-advisor` compares the implemented slice to the plan before review (medium/high/max).
+- **simplify before review** — `ce-simplify-code` on the slice diff after self-verify, before done-for-review (high/max). Closes the core-loop simplify step that otherwise only ran on review FAIL.
+- **browser tests on UI diff** — at `/work-finish`, `ce-test-browser` on affected pages when the related files touch a runnable web frontend; auto-skipped for backend/CLI/docs-only diffs (medium/high/max).
+- **ce-code-review before commit** — full `ce-code-review` on the diff at the commit-ready gate (max).
+
+Gates are orthogonal to role effort. Flip any of them live without changing models.
+
 ## Stop Conditions
 
 Stop and ask or hand off when:

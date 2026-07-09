@@ -1,13 +1,19 @@
 #!/usr/bin/env node
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+	mkdirSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const mod = await import(
-	pathToFileURL(
-		path.join(import.meta.dirname, "../extensions/work-models.js"),
-	).href
+	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
+		.href
 );
 
 function assert(ok, message) {
@@ -20,14 +26,33 @@ try {
 	const settingsFile = () => path.join(cwd, ".pi", "settings.json");
 	const writeSettings = (settings) =>
 		writeFileSync(settingsFile(), `${JSON.stringify(settings, null, "\t")}\n`);
-	const readSettings = () =>
-		JSON.parse(readFileSync(settingsFile(), "utf8"));
+	const readSettings = () => JSON.parse(readFileSync(settingsFile(), "utf8"));
 
 	// Default (no settings) resolves to medium profile.
-	assert(mod.workOrchSettings(cwd).profile === "medium", "default profile medium");
-	assert(mod.workOrchSettings(cwd).critic.brainstorm === true, "medium critic brainstorm");
-	assert(mod.workOrchSettings(cwd).advisorVerifyTask === true, "medium advisor verify");
-	assert(mod.workOrchSettings(cwd).codeReviewBeforeCommit === false, "medium no code review");
+	assert(
+		mod.workOrchSettings(cwd).profile === "medium",
+		"default profile medium",
+	);
+	assert(
+		mod.workOrchSettings(cwd).critic.brainstorm === true,
+		"medium critic brainstorm",
+	);
+	assert(
+		mod.workOrchSettings(cwd).advisorVerifyTask === true,
+		"medium advisor verify",
+	);
+	assert(
+		mod.workOrchSettings(cwd).codeReviewBeforeCommit === false,
+		"medium no code review",
+	);
+	assert(
+		mod.workOrchSettings(cwd).simplifyBeforeReview === false,
+		"medium no simplify",
+	);
+	assert(
+		mod.workOrchSettings(cwd).browserTestsOnUiDiff === true,
+		"medium browser tests on ui diff",
+	);
 
 	// Apply max profile: effort + gates copied onto current, models preserved.
 	let settings = {};
@@ -38,8 +63,11 @@ try {
 	assert(max.critic.plan === true, "max critic plan");
 	assert(max.advisorVerifyTask === true, "max advisor verify");
 	assert(max.codeReviewBeforeCommit === true, "max code review");
+	assert(max.simplifyBeforeReview === true, "max simplify");
+	assert(max.browserTestsOnUiDiff === true, "max browser tests");
 	assert(
-		readSettings().subagents.agentOverrides["bead-advisor"].thinking === "xhigh",
+		readSettings().subagents.agentOverrides["bead-advisor"].thinking ===
+			"xhigh",
 		"advisor effort xhigh",
 	);
 	assert(
@@ -52,10 +80,22 @@ try {
 	mod.setWorkOrchBoolean(settings, "advisorVerifyTask", false);
 	mod.setWorkOrchBoolean(settings, "codeReviewBeforeCommit", false);
 	writeSettings(settings);
-	assert(mod.workOrchSettings(cwd).advisorVerifyTask === false, "flipped verify off");
-	assert(mod.workOrchSettings(cwd).codeReviewBeforeCommit === false, "flipped review off");
-	assert(mod.workOrchSettings(cwd).profile === "max", "profile retained after flip");
-	assert(readSettings().workOrchestrator.profile === "max", "explicit profile stored");
+	assert(
+		mod.workOrchSettings(cwd).advisorVerifyTask === false,
+		"flipped verify off",
+	);
+	assert(
+		mod.workOrchSettings(cwd).codeReviewBeforeCommit === false,
+		"flipped review off",
+	);
+	assert(
+		mod.workOrchSettings(cwd).profile === "max",
+		"profile retained after flip",
+	);
+	assert(
+		readSettings().workOrchestrator.profile === "max",
+		"explicit profile stored",
+	);
 
 	// Apply low profile: critic and verify off.
 	mod.applyProfile((settings = readSettings()), "low");
@@ -64,12 +104,20 @@ try {
 	assert(low.critic.brainstorm === false, "low no critic brainstorm");
 	assert(low.advisorVerifyTask === false, "low no advisor verify");
 	assert(low.codeReviewBeforeCommit === false, "low no code review");
+	assert(low.simplifyBeforeReview === false, "low no simplify");
+	assert(low.browserTestsOnUiDiff === false, "low no browser tests");
 
 	// Toggle a critic gate explicitly.
 	mod.setWorkOrchCritic((settings = readSettings()), "plan", true);
 	writeSettings(settings);
-	assert(mod.workOrchSettings(cwd).critic.plan === true, "explicit critic plan on");
-	assert(mod.workOrchSettings(cwd).critic.brainstorm === false, "brainstorm stays low default");
+	assert(
+		mod.workOrchSettings(cwd).critic.plan === true,
+		"explicit critic plan on",
+	);
+	assert(
+		mod.workOrchSettings(cwd).critic.brainstorm === false,
+		"brainstorm stays low default",
+	);
 
 	// Submenu loop: opening then choosing "done" exits cleanly.
 	const commands = {};
@@ -99,16 +147,27 @@ try {
 		"status lists advisor slot",
 	);
 	assert(
-		notices.at(-1).message.includes("Full ce-code-review before commit"),
+		notices.at(-1).message.includes("full ce-code-review before commit"),
 		"status lists code-review gate",
+	);
+	assert(
+		notices.at(-1).message.includes("ce-simplify-code before review"),
+		"status lists simplify gate",
+	);
+	assert(
+		notices.at(-1).message.includes("ce-test-browser when diff touches UI"),
+		"status lists browser-test gate",
 	);
 	assert(existsSync(settingsFile()), "settings file exists");
 
 	// Live submenu: flip a critic gate off through the UI loop.
 	mod.applyProfile((settings = readSettings()), "medium");
 	writeSettings(settings);
-	assert(mod.workOrchSettings(cwd).critic.brainstorm === true, "medium critic brainstorm on");
-		let flipped = false;
+	assert(
+		mod.workOrchSettings(cwd).critic.brainstorm === true,
+		"medium critic brainstorm on",
+	);
+	let flipped = false;
 	const flipCtx = {
 		cwd,
 		model: { provider: "p", id: "m" },
