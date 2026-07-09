@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -38,6 +39,8 @@ const WORKFLOW_REPO_DIR = resolve(
 	"..",
 );
 const WORK_ORCH_AGENT_DIR = resolve(WORKFLOW_REPO_DIR, "agents");
+const SUBAGENT_RPC_REQUEST_EVENT = "subagents:rpc:v1:request";
+const SUBAGENT_RPC_REPLY_EVENT_PREFIX = "subagents:rpc:v1:reply:";
 
 function exposeBundledSubagentAgents() {
 	if (!existsSync(WORK_ORCH_AGENT_DIR)) return;
@@ -206,6 +209,13 @@ let workGoalContinuationRetry = null;
 let workGoalRecovery = null;
 let workGoalCompactionResume = null;
 let workGoalProgressTimer = null;
+let workGoalUsageLimitTimer = null;
+
+function clearWorkGoalUsageLimitTimer() {
+	if (!workGoalUsageLimitTimer) return;
+	clearTimeout(workGoalUsageLimitTimer);
+	workGoalUsageLimitTimer = null;
+}
 
 function clearWorkGoalRecovery() {
 	workGoalRecovery = null;
@@ -220,8 +230,11 @@ const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
 const WORK_GOAL_DECISION_MARKER = "WORK_GOAL_NEEDS_HUMAN_DECISION";
 const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
 const WORK_GOAL_MAX_RETRIES = 4;
+const WORK_GOAL_USAGE_LIMIT_RETRY_MS = 10 * 60 * 1000;
+const WORK_GOAL_USAGE_LIMIT_RE =
+	/usage[_\s-]*(?:limit|reached)|\b429\b|too many requests|rate limit|访问量过大|使用上限|限额将在/i;
 const WORK_GOAL_NON_RETRYABLE_RE =
-	/usage[_\s-]*limit|chatgpt usage limit|multi-auth rotation failed|credentials tried|unauthori[sz]ed|invalid api key/i;
+	/multi-auth rotation failed|credentials tried|unauthori[sz]ed|invalid api key/i;
 const WORK_GOAL_RETRYABLE_RE =
 	/websocket closed|sse response headers timed out|headers timed out|context[_\s-]*length[_\s-]*exceeded|input exceeds the context window|context window|provider returned error|overloaded|529|503|connection reset|fetch failed|etimedout|socket hang up/i;
 const WORK_GOAL_CONTEXT_OVERFLOW_RE =
@@ -380,7 +393,6 @@ function startWarpWork(ctx, mode, query = "") {
 }
 
 function finishWarpWork(ctx, mode, response = "") {
-	const cwd = ctx?.cwd ?? process.cwd();
 	emitWarp(ctx, "stop", {
 		query: `/work-${mode}`,
 		response: truncate(response, 200),
@@ -3367,6 +3379,105 @@ function gitDirtyClassification(git) {
 	return "clean";
 }
 
+function subagentRpcReplyEvent(requestId) {
+	return `${SUBAGENT_RPC_REPLY_EVENT_PREFIX}${requestId}`;
+}
+
+function safeArtifactPart(value) {
+	return (
+		String(value ?? "work")
+			.replace(/[^a-z0-9_.-]+/gi, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 80) || "work"
+	);
+}
+
+function directRoleAgent(state) {
+	if (
+		!["run-implementation", "run-planner", "run-debug"].includes(state?.action)
+	)
+		return undefined;
+	const role = handoffRole(state.action);
+	return role ? `bead-${role}` : undefined;
+}
+
+function directRoleTask(state) {
+	return [
+		"Direct work-orchestrator role launch. You are already the selected role agent; do not call subagent, subagent list, or delegate further.",
+		"If parent coordination is unavailable, persist blockers or decisions in Beads instead of contacting a supervisor.",
+		state.handoffPrompt,
+	]
+		.filter(Boolean)
+		.join("\n\n");
+}
+
+function directRoleHandoffParams(state, cwd) {
+	const agent = directRoleAgent(state);
+	if (!agent || !state?.handoffPrompt || !state?.selectedBead?.id) return null;
+	const target = safeArtifactPart(state.selectedBead.id);
+	return {
+		agent,
+		params: {
+			agent,
+			task: directRoleTask(state),
+			context: "fresh",
+			cwd,
+			async: true,
+			clarify: false,
+			output: `work-${target}-${agent}.md`,
+			outputMode: "file-only",
+		},
+	};
+}
+
+async function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
+	if (!pi?.events?.on || !pi?.events?.emit) {
+		return { ok: false, message: "pi-subagents RPC is unavailable" };
+	}
+	const requestId = randomUUID();
+	return await new Promise((resolve) => {
+		let settled = false;
+		let unsubscribe;
+		const finish = (result) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			try {
+				unsubscribe?.();
+			} catch {
+				// Best effort; stale listeners should not break command fallback.
+			}
+			resolve(result);
+		};
+		const timer = setTimeout(
+			() => finish({ ok: false, message: "pi-subagents RPC timed out" }),
+			timeoutMs,
+		);
+		try {
+			unsubscribe = pi.events.on(subagentRpcReplyEvent(requestId), (reply) => {
+				if (reply?.success) finish({ ok: true, reply });
+				else
+					finish({
+						ok: false,
+						message: reply?.error?.message ?? "pi-subagents RPC failed",
+						reply,
+					});
+			});
+			pi.events.emit(SUBAGENT_RPC_REQUEST_EVENT, {
+				version: 1,
+				requestId,
+				method: "spawn",
+				params,
+			});
+		} catch (error) {
+			finish({
+				ok: false,
+				message: error instanceof Error ? error.message : String(error),
+			});
+		}
+	});
+}
+
 function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 	const selected = state.selectedBead;
 	const selectedLine = selected
@@ -6308,6 +6419,7 @@ function isWorkGoal(value) {
 			"stopped",
 			"complete",
 			"budget_limited",
+			"waiting_usage_limit",
 		].includes(value.status)
 	);
 }
@@ -6348,6 +6460,8 @@ function formatWorkGoalStatus(goal = activeWorkGoal) {
 		return `${statusIcon("stopped")} stopped #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
 	if (goal.status === "budget_limited")
 		return `${statusIcon("paused")} budget ${budget ?? "reached"} #${goal.iteration ?? 0}`;
+	if (goal.status === "waiting_usage_limit")
+		return `${statusIcon("paused")} usage wait #${goal.iteration ?? 0}`;
 	if (goal.status === "active")
 		return `${activeWorkGoalRunning || activeWorkAgent ? `${statusIcon("active")} working` : "▶️ active"} #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
 	return statusLabel(goal.status);
@@ -6537,6 +6651,9 @@ function workGoalSummary(goal = activeWorkGoal) {
 		`Mode: ${goal.mode}`,
 		`Status: ${goal.status}`,
 		`Iteration: ${goal.iteration ?? 0}${goal.retries ? ` (retries ${goal.retries}/${WORK_GOAL_MAX_RETRIES})` : ""}`,
+		goal.status === "waiting_usage_limit" && goal.nextRetryAt
+			? `Next usage-limit retry: ${new Date(goal.nextRetryAt).toISOString()}`
+			: "",
 		budget ? `Tokens: ${budget}${goal.tokenBudget ? " used" : ""}` : "",
 		goal.decision
 			? `Human decision: ${formatWorkGoalDecision(goal.decision)}`
@@ -6622,10 +6739,23 @@ function isWorkGoalContextOverflow(assistant) {
 	return WORK_GOAL_CONTEXT_OVERFLOW_RE.test(message);
 }
 
+function isWorkGoalUsageLimit(assistant) {
+	const message = String(assistant?.errorMessage ?? "");
+	return WORK_GOAL_USAGE_LIMIT_RE.test(message);
+}
+
+function workGoalUsageLimitRetryDelayMs() {
+	const override = Number(process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS);
+	return Number.isFinite(override) && override >= 0
+		? override
+		: WORK_GOAL_USAGE_LIMIT_RETRY_MS;
+}
+
 function isRetryableWorkGoalInterruption(assistant) {
 	if (assistant?.stopReason !== "error") return false;
 	const message = String(assistant?.errorMessage ?? "");
 	if (!message) return false;
+	if (isWorkGoalUsageLimit(assistant)) return true;
 	if (WORK_GOAL_NON_RETRYABLE_RE.test(message)) return false;
 	return (
 		isWorkGoalContextOverflow(assistant) || WORK_GOAL_RETRYABLE_RE.test(message)
@@ -6804,6 +6934,51 @@ async function sendWorkGoalAnswerContinuation(pi, ctx, goal, note = "") {
 	return sent;
 }
 
+function scheduleWorkGoalUsageLimitRetry(pi, ctx, goal = activeWorkGoal) {
+	clearWorkGoalUsageLimitTimer();
+	if (!goal || goal.status !== "waiting_usage_limit") return;
+	const delayMs = Math.max(
+		0,
+		Number(goal.nextRetryAt ?? Date.now()) - Date.now(),
+	);
+	workGoalUsageLimitTimer = setTimeout(async () => {
+		workGoalUsageLimitTimer = null;
+		if (
+			!activeWorkGoal ||
+			activeWorkGoal.id !== goal.id ||
+			activeWorkGoal.status !== "waiting_usage_limit"
+		)
+			return;
+		activeWorkGoal = {
+			...activeWorkGoal,
+			status: "active",
+			nextRetryAt: undefined,
+			updatedAt: Date.now(),
+		};
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		ctx.ui.notify("/work-goal usage limit wait elapsed; retrying.", "info");
+		const sent = await sendWorkGoalAnswerContinuation(
+			pi,
+			ctx,
+			activeWorkGoal,
+			"The previous turn hit a usage/rate limit. Resume exactly where you left off; re-check Beads/git and continue.",
+		);
+		if (!sent && activeWorkGoal?.id === goal.id) {
+			activeWorkGoal = {
+				...activeWorkGoal,
+				status: "waiting_usage_limit",
+				nextRetryAt: Date.now() + workGoalUsageLimitRetryDelayMs(),
+				updatedAt: Date.now(),
+			};
+			persistWorkGoal(pi);
+			updateWorkGoalStatus(ctx);
+			scheduleWorkGoalUsageLimitRetry(pi, ctx, activeWorkGoal);
+		}
+	}, delayMs);
+	workGoalUsageLimitTimer.unref?.();
+}
+
 function finalAssistantMessage(messages = []) {
 	for (let index = messages.length - 1; index >= 0; index -= 1) {
 		const message = messages[index];
@@ -6916,6 +7091,7 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	activeWorkGoalRunning = false;
 	workGoalContinuationPending = null;
 	clearWorkGoalRecovery();
+	clearWorkGoalUsageLimitTimer();
 	persistWorkGoal(pi, null);
 	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 	ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
@@ -6944,6 +7120,7 @@ async function startWorkGoal(mode, objective, pi, ctx, tokenBudget) {
 	}
 	workGoalContinuationPending = null;
 	clearWorkGoalRecovery();
+	clearWorkGoalUsageLimitTimer();
 	activeWorkGoal = createWorkGoal(
 		mode,
 		text,
@@ -6976,6 +7153,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		activeWorkGoal = null;
 		workGoalContinuationPending = null;
 		clearWorkGoalRecovery();
+		clearWorkGoalUsageLimitTimer();
 		persistWorkGoal(pi, null);
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 		ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
@@ -6999,6 +7177,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		};
 		workGoalContinuationPending = null;
 		clearWorkGoalRecovery();
+		clearWorkGoalUsageLimitTimer();
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
 		ctx.ui.notify("/work-goal paused.", "info");
@@ -7007,14 +7186,19 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 	if (command.kind === "resume") {
 		if (
 			!activeWorkGoal ||
-			!["paused", "budget_limited", "needs_human", "stopped"].includes(
-				activeWorkGoal.status,
-			)
+			![
+				"paused",
+				"budget_limited",
+				"needs_human",
+				"stopped",
+				"waiting_usage_limit",
+			].includes(activeWorkGoal.status)
 		) {
 			ctx.ui.notify("No paused /work-goal to resume.", "warning");
 			return;
 		}
 		clearWorkGoalRecovery();
+		clearWorkGoalUsageLimitTimer();
 		activeWorkGoal = {
 			...activeWorkGoal,
 			status: "active",
@@ -7048,6 +7232,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 			updatedAt: Date.now(),
 		};
 		clearWorkGoalRecovery();
+		clearWorkGoalUsageLimitTimer();
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
 		await sendWorkGoalPrompt(
@@ -7075,7 +7260,11 @@ async function handleWorkResumeGoalCommand(args, pi, ctx) {
 			ctx.ui.notify("/work-resume stop canceled.", "info");
 			return;
 		}
-		if (["paused", "stopped"].includes(activeWorkGoal.status))
+		if (
+			["paused", "stopped", "waiting_usage_limit"].includes(
+				activeWorkGoal.status,
+			)
+		)
 			return handleWorkGoalCommand("resume", "project", pi, ctx);
 		return handleWorkGoalCommand("status", "project", pi, ctx);
 	}
@@ -7284,6 +7473,26 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	}
 	let retrying = false;
 	if (["aborted", "error"].includes(String(assistant?.stopReason ?? ""))) {
+		if (isWorkGoalUsageLimit(assistant)) {
+			const nextRetryAt = Date.now() + workGoalUsageLimitRetryDelayMs();
+			activeWorkGoal = {
+				...goal,
+				status: "waiting_usage_limit",
+				usageLimitRetries: (goal.usageLimitRetries ?? 0) + 1,
+				nextRetryAt,
+				updatedAt: Date.now(),
+			};
+			workGoalContinuationPending = null;
+			clearWorkGoalRecovery();
+			persistWorkGoal(pi);
+			updateWorkGoalStatus(ctx);
+			scheduleWorkGoalUsageLimitRetry(pi, ctx, activeWorkGoal);
+			ctx.ui.notify(
+				`/work-goal hit a usage/rate limit; retrying in ${formatDuration(nextRetryAt - Date.now())}.`,
+				"warning",
+			);
+			return;
+		}
 		if (isRetryableWorkGoalInterruption(assistant)) {
 			const nextRetries = (goal.retries ?? 0) + 1;
 			if (nextRetries > WORK_GOAL_MAX_RETRIES) {
@@ -7471,7 +7680,25 @@ async function handleWorkflowAction(
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = builder(ctx.cwd, args);
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-action");
-	notify(ctx, renderWorkflowActionText(state), state.ok ? "info" : "warning");
+	const direct = state.ok ? directRoleHandoffParams(state, ctx.cwd) : null;
+	notify(
+		ctx,
+		renderWorkflowActionText(
+			direct
+				? { ...state, nextAction: `Next: ${direct.agent} queued directly` }
+				: state,
+		),
+		state.ok ? "info" : "warning",
+	);
+	if (direct) {
+		const spawned = await spawnSubagentRpc(pi, direct.params);
+		if (spawned.ok) return { ...state, directHandoff: direct };
+		notify(
+			ctx,
+			`Direct ${direct.agent} handoff failed (${spawned.message}); falling back to LLM handoff.`,
+			"warning",
+		);
+	}
 	if (state.handoffPrompt)
 		await sendFollowUp(
 			ctx,
@@ -7743,6 +7970,7 @@ export {
 	buildWorkTelemetry,
 	buildWorkTelemetryState,
 	buildWorkUsageState,
+	directRoleHandoffParams,
 	deriveIdeaStatus,
 	isIdeaIssue,
 	parseIdeationIdeas,
@@ -7756,6 +7984,7 @@ export {
 	isContradictoryWorkGoalCompletion,
 	isRetryableWorkGoalInterruption,
 	isWorkGoalContextOverflow,
+	isWorkGoalUsageLimit,
 	parseWorkProjectGoalInput,
 	planResumeAction,
 	progressBar,
@@ -7846,6 +8075,8 @@ export default function workModelsExtension(pi) {
 		activeWorkGoalRunning = false;
 		workGoalContinuationPending = null;
 		clearWorkGoalRecovery();
+		if (activeWorkGoal?.status === "waiting_usage_limit")
+			scheduleWorkGoalUsageLimitRetry(pi, ctx, activeWorkGoal);
 		updateWorkGoalStatus(ctx);
 		updateWorkGoalProgress(ctx);
 		ctx.ui.notify("work-orchestrator loaded · F7 roadmaps · F8 menu", "info");
@@ -7855,6 +8086,7 @@ export default function workModelsExtension(pi) {
 
 	pi.on("session_shutdown", (_event, ctx) => {
 		persistWorkGoal(pi);
+		clearWorkGoalUsageLimitTimer();
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 		stopWorkGoalProgressTimer(ctx);
 	});

@@ -54,7 +54,9 @@ assert.equal(
 	true,
 );
 assert.equal(
-	mod.isWorkGoalContextOverflow({ errorMessage: "input exceeds the context window" }),
+	mod.isWorkGoalContextOverflow({
+		errorMessage: "input exceeds the context window",
+	}),
 	true,
 );
 assert.equal(
@@ -65,9 +67,14 @@ assert.equal(
 	false,
 );
 assert.equal(
-	mod.isContradictoryWorkGoalCompletion("tests still fail"),
+	mod.isWorkGoalUsageLimit({
+		errorMessage:
+			'429: {"code":"1308","message":"已达到 5 小时的使用上限。您的限额将在 2026-07-10 03:31:19 重置。"}',
+	}),
 	true,
 );
+assert.equal(mod.isWorkGoalUsageLimit({ errorMessage: "usage reached" }), true);
+assert.equal(mod.isContradictoryWorkGoalCompletion("tests still fail"), true);
 
 const objective = mod.buildWorkSelfImprovingObjective("C:/soft/git/AI-Wedge", {
 	project: true,
@@ -232,6 +239,7 @@ try {
 			setStatus: (key, value) => {
 				statuses[key] = value;
 			},
+			setWidget: () => {},
 			confirm: async () => true,
 		},
 	};
@@ -442,6 +450,32 @@ try {
 		decisionNotice,
 		/Options:\n {2}1\. Approve\.\n {2}2\. Request changes\./,
 	);
+
+	const oldUsageDelay = process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS;
+	process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = "1";
+	await tempCommands["work-goal"].handler("survive usage windows", ctx);
+	const beforeUsageRetry = sent.length;
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					stopReason: "error",
+					errorMessage:
+						'429: {"code":"1308","message":"已达到 5 小时的使用上限。"}',
+					content: [{ type: "text", text: "" }],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(statuses["work-goal"], "⏸️ usage wait #0");
+	await new Promise((resolve) => setTimeout(resolve, 20));
+	assert.equal(sent.length, beforeUsageRetry + 1);
+	assert.match(sent.at(-1).message, /usage\/rate limit/);
+	if (oldUsageDelay === undefined)
+		delete process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS;
+	else process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = oldUsageDelay;
 } finally {
 	rmSync(path.join(cwd, ".git"), { recursive: true, force: true });
 	rmSync(path.join(cwd, ".pi"), { recursive: true, force: true });

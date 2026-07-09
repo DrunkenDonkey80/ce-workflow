@@ -17,6 +17,7 @@ const {
 	buildWorkPlanState,
 	buildWorkMigrateState,
 	buildWorkSmallState,
+	directRoleHandoffParams,
 } = await import(
 	pathToFileURL(
 		realpathSync(
@@ -39,6 +40,15 @@ try {
 	assert(
 		state.handoffPrompt.includes("at least 10 minutes"),
 		"small handoff carries timeout guidance",
+	);
+	const direct = directRoleHandoffParams(state, process.cwd());
+	assert(
+		direct?.agent === "bead-worker" && direct.params.async === true,
+		"small handoff can launch bead-worker directly",
+	);
+	assert(
+		direct.params.task.includes("do not call subagent"),
+		"direct handoff bypasses parent subagent tool chatter",
 	);
 	assert(
 		fixture.logs().filter((entry) => entry.op === "create").length === 1,
