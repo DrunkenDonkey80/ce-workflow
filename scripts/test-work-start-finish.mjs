@@ -46,6 +46,16 @@ try {
 	);
 
 	fixture.reset("active");
+	const longTask = `Implement the wedge workflow ${"with careful acceptance details ".repeat(20)}`;
+	state = buildWorkSmallState(process.cwd(), longTask);
+	const longCreate = fixture.logs().find((entry) => entry.op === "create");
+	assert(longCreate.issue.title.length <= 181, "small clamps long Bead title");
+	assert(
+		longCreate.args.join(" ").includes(longTask.trim()),
+		"small keeps full request in Bead notes",
+	);
+
+	fixture.reset("active");
 	state = buildWorkSmallState(process.cwd(), "IMP-1 extra guidance");
 	assert(
 		state.ok && state.selectedBead.id === "IMP-1",

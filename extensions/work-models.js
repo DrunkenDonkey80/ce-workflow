@@ -31,6 +31,7 @@ const RESET_ALL = "__reset_all__";
 const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
+const BEAD_TITLE_MAX = 180;
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
 const WORKFLOW_REPO_DIR = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -1897,6 +1898,17 @@ function truncate(value, max = 800) {
 	return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+function compactBeadTitle(value) {
+	return truncate(value, BEAD_TITLE_MAX);
+}
+
+function appendOriginalBeadTitle(notes, originalTitle) {
+	const title = String(originalTitle ?? "").trim();
+	if (title.length <= BEAD_TITLE_MAX || String(notes ?? "").includes(title))
+		return notes;
+	return [notes, `Full title/request:\n${title}`].filter(Boolean).join("\n\n");
+}
+
 function extractWorkAction(text) {
 	const line = String(text ?? "").trim();
 	const match = line.match(/(\/work-[\w-]+)(?:\s+([^\s.;,]+))?(?::\s*(.*))?/);
@@ -3697,13 +3709,15 @@ function createBead(
 		acceptance,
 	},
 ) {
-	const args = ["create", title, "--type", type];
+	const beadTitle = compactBeadTitle(title);
+	const beadNotes = appendOriginalBeadTitle(notes, title);
+	const args = ["create", beadTitle, "--type", type];
 	if (parent) args.push("--parent", parent);
 	if (description) args.push("--description", description);
 	if (designFile) args.push("--design-file", designFile);
 	else if (design) args.push("--design", design);
 	if (acceptance) args.push("--acceptance", acceptance);
-	if (notes) args.push("--notes", notes);
+	if (beadNotes) args.push("--notes", beadNotes);
 	return one(bdJsonRequired(cwd, args));
 }
 

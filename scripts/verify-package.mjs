@@ -523,6 +523,8 @@ for (const phrase of [
 	"WORK_GOAL_RETRYABLE_RE",
 	"WORK_GOAL_NON_RETRYABLE_RE",
 	"parseTokenBudget",
+	"BEAD_TITLE_MAX",
+	"appendOriginalBeadTitle",
 	"budget_limited",
 	"isContradictoryWorkGoalCompletion",
 	"workGoalRecovery",
