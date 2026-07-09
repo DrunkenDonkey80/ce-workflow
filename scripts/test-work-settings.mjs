@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+const mod = await import(
+	pathToFileURL(
+		path.join(import.meta.dirname, "../extensions/work-models.js"),
+	).href
+);
+
+function assert(ok, message) {
+	if (!ok) throw new Error(message);
+}
+
+const cwd = mkdtempSync(path.join(tmpdir(), "work-settings-"));
+try {
+	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+	const settingsFile = () => path.join(cwd, ".pi", "settings.json");
+	const writeSettings = (settings) =>
+		writeFileSync(settingsFile(), `${JSON.stringify(settings, null, "\t")}\n`);
+	const readSettings = () =>
+		JSON.parse(readFileSync(settingsFile(), "utf8"));
+
+	// Default (no settings) resolves to medium profile.
+	assert(mod.workOrchSettings(cwd).profile === "medium", "default profile medium");
+	assert(mod.workOrchSettings(cwd).critic.brainstorm === true, "medium critic brainstorm");
+	assert(mod.workOrchSettings(cwd).advisorVerifyTask === true, "medium advisor verify");
+	assert(mod.workOrchSettings(cwd).codeReviewBeforeCommit === false, "medium no code review");
+
+	// Apply max profile: effort + gates copied onto current, models preserved.
+	let settings = {};
+	mod.applyProfile(settings, "max");
+	writeSettings(settings);
+	const max = mod.workOrchSettings(cwd);
+	assert(max.profile === "max", "profile max");
+	assert(max.critic.plan === true, "max critic plan");
+	assert(max.advisorVerifyTask === true, "max advisor verify");
+	assert(max.codeReviewBeforeCommit === true, "max code review");
+	assert(
+		readSettings().subagents.agentOverrides["bead-advisor"].thinking === "xhigh",
+		"advisor effort xhigh",
+	);
+	assert(
+		readSettings().subagents.agentOverrides["bead-worker"].thinking === "xhigh",
+		"worker effort xhigh",
+	);
+
+	// Flip a boolean live; profile label is preserved.
+	settings = readSettings();
+	mod.setWorkOrchBoolean(settings, "advisorVerifyTask", false);
+	mod.setWorkOrchBoolean(settings, "codeReviewBeforeCommit", false);
+	writeSettings(settings);
+	assert(mod.workOrchSettings(cwd).advisorVerifyTask === false, "flipped verify off");
+	assert(mod.workOrchSettings(cwd).codeReviewBeforeCommit === false, "flipped review off");
+	assert(mod.workOrchSettings(cwd).profile === "max", "profile retained after flip");
+	assert(readSettings().workOrchestrator.profile === "max", "explicit profile stored");
+
+	// Apply low profile: critic and verify off.
+	mod.applyProfile((settings = readSettings()), "low");
+	writeSettings(settings);
+	const low = mod.workOrchSettings(cwd);
+	assert(low.critic.brainstorm === false, "low no critic brainstorm");
+	assert(low.advisorVerifyTask === false, "low no advisor verify");
+	assert(low.codeReviewBeforeCommit === false, "low no code review");
+
+	// Toggle a critic gate explicitly.
+	mod.setWorkOrchCritic((settings = readSettings()), "plan", true);
+	writeSettings(settings);
+	assert(mod.workOrchSettings(cwd).critic.plan === true, "explicit critic plan on");
+	assert(mod.workOrchSettings(cwd).critic.brainstorm === false, "brainstorm stays low default");
+
+	// Submenu loop: opening then choosing "done" exits cleanly.
+	const commands = {};
+	mod.default({
+		on: () => {},
+		registerCommand: (name, config) => {
+			commands[name] = config;
+		},
+	});
+	const notices = [];
+	const ctx = {
+		cwd,
+		model: { provider: "p", id: "m" },
+		modelRegistry: { getAvailable: async () => [] },
+		ui: {
+			notify: (message, level) => notices.push({ message, level }),
+			select: async () => "done — Exit settings",
+		},
+	};
+	await commands["work-settings"].handler("", ctx);
+	assert(notices.length === 0, "done exits without notify");
+
+	// status reports the advisor slot and gates.
+	await commands["work-settings"].handler("status", ctx);
+	assert(
+		notices.at(-1).message.includes("advisor (critic)"),
+		"status lists advisor slot",
+	);
+	assert(
+		notices.at(-1).message.includes("Full ce-code-review before commit"),
+		"status lists code-review gate",
+	);
+	assert(existsSync(settingsFile()), "settings file exists");
+
+	// Live submenu: flip a critic gate off through the UI loop.
+	mod.applyProfile((settings = readSettings()), "medium");
+	writeSettings(settings);
+	assert(mod.workOrchSettings(cwd).critic.brainstorm === true, "medium critic brainstorm on");
+		let flipped = false;
+	const flipCtx = {
+		cwd,
+		model: { provider: "p", id: "m" },
+		modelRegistry: { getAvailable: async () => [] },
+		ui: {
+			notify: () => {},
+			select: async (_title, labels) => {
+				if (!flipped) {
+					flipped = true;
+					return labels.find((label) =>
+						label.startsWith("critic on brainstorm:"),
+					);
+				}
+				return labels.find((label) => label.startsWith("done"));
+			},
+		},
+	};
+	await commands["work-settings"].handler("", flipCtx);
+	assert(
+		mod.workOrchSettings(cwd).critic.brainstorm === false,
+		"UI loop flipped critic brainstorm off",
+	);
+} finally {
+	rmSync(cwd, { recursive: true, force: true });
+}
+
+console.log("ok - work-settings behavior");

@@ -71,6 +71,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-goal <objective>` | Run a raw autonomous goal | Extension command: appends goal-management rules, microcompacts before continuations, auto-consumes clear-winner questions, and pauses on human-decision blockers |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
 | `/work-models [status\|reset]` | Pick role models/effort | Extension command with model/effort picker; persists overrides to `.pi/settings.json` |
+| `/work-settings [status]` | Settings submenu | Extension command: effort profiles (low/medium/high/max), role + advisor model/effort, and advisor/critic gates; enter flips booleans live |
 
 ## Mental model
 
@@ -389,7 +390,28 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 ## Model and effort tuning
 
-Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, or `commit`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-models status` makes review tuning settings visible and `/work-models reset` clears them.
+`/work-settings` is the umbrella submenu: effort profiles, per-role (and advisor) model + effort, and the advisor/critic gates. Enter on a boolean flips it immediately and writes `.pi/settings.json`; selecting a profile copies its effort levels and gates onto your current settings (your chosen models are kept). `/work-models` remains as a focused role model/effort picker that writes the same settings.
+
+### Effort profiles
+
+Profiles set effort per role plus the advisor, and the advisory gates. Applying one overwrites effort and gates, not models:
+
+| profile | plan | work | debug | review | commit | advisor | critic (brainstorm/plan) | advisor verifies task | ce-code-review before commit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| low | low | low | medium | low | low | medium | off / off | off | off |
+| medium | medium | medium | high | medium | low | high | on / on | on | off |
+| high | high | high | high | high | low | xhigh | on / on | on | off |
+| max | xhigh | xhigh | xhigh | high | medium | xhigh | on / on | on | on |
+
+### Advisor and gates (prompt-live)
+
+The advisor (`bead-advisor`, read-only, xhigh by default, inherits the control model) is a critic that the orchestrator actually launches from the handoff prompts when the matching gate is on:
+
+- **critic on brainstorm / plan** — after `ce-brainstorm`/`ce-plan` produces the artifact, run `bead-advisor` to find weak requirements, unverified acceptance, incomplete decisions, and untested assumptions. On for medium/high/max, off for low.
+- **advisor verifies task vs plan** — once a slice is implemented and self-verified (before review/finish), run `bead-advisor` to compare the change against the plan's acceptance and flag drift or missing evidence. On for medium/high/max.
+- **full ce-code-review before commit** — at the `/work-finish` commit-ready gate, run the full `ce-code-review` skill on the diff before the committer commits. On for max only.
+
+Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `commit`, or `advisor`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-settings status` (and `/work-models status`) make the tuning visible and `/work-settings` lets you flip gates live.
 
 Role prompts use fresh child context by default and file-only artifacts so the parent session does not inherit every tool log or full master plan. Subagent launches should set `outputMode: "file-only"` with a short relative output filename unless the entire result is a short PASS/FAIL summary; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
@@ -398,8 +420,15 @@ Role prompts use fresh child context by default and file-only artifacts so the p
   "subagents": {
     "agentOverrides": {
       "bead-worker": { "model": "anthropic/claude-sonnet-4", "thinking": "medium" },
-      "bead-committer": { "thinking": "low" }
+      "bead-committer": { "thinking": "low" },
+      "bead-advisor": { "thinking": "xhigh" }
     }
+  },
+  "workOrchestrator": {
+    "profile": "max",
+    "critic": { "brainstorm": true, "plan": true },
+    "advisorVerifyTask": true,
+    "codeReviewBeforeCommit": true
   }
 }
 ```

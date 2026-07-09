@@ -97,9 +97,79 @@ const SLOTS = [
 		defaultThinking: "low",
 		description: "Verification gate, commit, and Bead close",
 	},
+	{
+		key: "advisor",
+		label: "advisor (critic)",
+		agents: ["bead-advisor"],
+		defaultThinking: "xhigh",
+		description:
+			"Optional critic for plans/brainstorms and task-vs-plan verification; defaults to inherit model with xhigh effort",
+	},
 ];
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
+
+// Effort profiles: thinking per slot + advisor, plus the advisory gates.
+// Applying a profile overwrites effort and gates but keeps chosen models.
+const EFFORT_PROFILES = {
+	low: {
+		plan: "low",
+		work: "low",
+		debug: "medium",
+		review: "low",
+		commit: "low",
+		advisor: "medium",
+		critic: { brainstorm: false, plan: false },
+		advisorVerifyTask: false,
+		codeReviewBeforeCommit: false,
+	},
+	medium: {
+		plan: "medium",
+		work: "medium",
+		debug: "high",
+		review: "medium",
+		commit: "low",
+		advisor: "high",
+		critic: { brainstorm: true, plan: true },
+		advisorVerifyTask: true,
+		codeReviewBeforeCommit: false,
+	},
+	high: {
+		plan: "high",
+		work: "high",
+		debug: "high",
+		review: "high",
+		commit: "low",
+		advisor: "xhigh",
+		critic: { brainstorm: true, plan: true },
+		advisorVerifyTask: true,
+		codeReviewBeforeCommit: false,
+	},
+	max: {
+		plan: "xhigh",
+		work: "xhigh",
+		debug: "xhigh",
+		review: "high",
+		commit: "medium",
+		advisor: "xhigh",
+		critic: { brainstorm: true, plan: true },
+		advisorVerifyTask: true,
+		codeReviewBeforeCommit: true,
+	},
+};
+const DEFAULT_PROFILE = "medium";
+const WORK_ORCH_BOOLEANS = [
+	{ key: "advisorVerifyTask", label: "advisor verifies task vs plan" },
+	{
+		key: "codeReviewBeforeCommit",
+		label: "full ce-code-review before commit",
+	},
+];
+const WORK_ORCH_CRITIC_KEYS = ["brainstorm", "plan"];
+
+function slotByKey(key) {
+	return SLOTS.find((slot) => slot.key === key);
+}
 const DEFAULT_CONTEXT = {
 	enabled: true,
 	autoCompact: false,
@@ -1568,6 +1638,77 @@ function commonValue(values) {
 	return present.every((value) => value === present[0]) ? present[0] : "mixed";
 }
 
+function workOrchBlock(settings) {
+	settings.workOrchestrator ??= {};
+	return settings.workOrchestrator;
+}
+
+function workOrchSettings(cwd) {
+	const raw = readSettings(cwd).workOrchestrator ?? {};
+	const profile = EFFORT_PROFILES[raw.profile] ? raw.profile : DEFAULT_PROFILE;
+	const base = EFFORT_PROFILES[profile];
+	const critic = {
+		brainstorm: raw.critic?.brainstorm ?? base.critic.brainstorm,
+		plan: raw.critic?.plan ?? base.critic.plan,
+	};
+	const flags = {};
+	for (const { key } of WORK_ORCH_BOOLEANS)
+		flags[key] = raw[key] ?? base[key];
+	return { profile, critic, ...flags };
+}
+
+function applyProfile(settings, profileKey) {
+	const profile = EFFORT_PROFILES[profileKey];
+	if (!profile) return false;
+	for (const slot of SLOTS) {
+		const thinking = profile[slot.key];
+		if (!thinking) continue;
+		const current = overrides(settings);
+		for (const agent of slot.agents) {
+			const next = { ...(current[agent] ?? {}) };
+			next.thinking = thinking;
+			current[agent] = next;
+		}
+	}
+	compactOverrides(settings);
+	const block = workOrchBlock(settings);
+	block.profile = profileKey;
+	block.critic = { ...profile.critic };
+	for (const { key } of WORK_ORCH_BOOLEANS) block[key] = profile[key];
+	return true;
+}
+
+function setWorkOrchBoolean(settings, key, value) {
+	const block = workOrchBlock(settings);
+	block[key] = Boolean(value);
+}
+
+function setWorkOrchCritic(settings, key, value) {
+	const block = workOrchBlock(settings);
+	block.critic ??= {};
+	block.critic[key] = Boolean(value);
+}
+
+// ponytail: settings are prompt-live; the steps below are appended to the
+// role/plan/brainstorm/finish handoff prompts so the advisor actually runs.
+function advisorCriticStep(target) {
+	return [
+		`Advisor critic gate (read-only): launch the bead-advisor subagent (agent: "bead-advisor", context: fresh) on the ${target} to hunt weak or missing requirements, unverified acceptance, incomplete decisions, ambiguous scope, and untested assumptions. Record concrete findings as notes on the relevant Bead; convert any blocking gap into a decision/blocker Bead under the epic before proceeding. Skip if the ${target} is trivial and obviously complete.`,
+	].join("\n");
+}
+
+function advisorVerifyStep() {
+	return [
+		`Advisor task-verification gate (read-only): once a slice is implemented and self-verified but before review/finish, launch the bead-advisor subagent (agent: "bead-advisor", context: fresh) to compare the change against the epic plan's acceptance and implementation unit, and to flag inconsistencies, drift from the plan, or missing verification evidence. Record findings as notes on the slice Bead. Apply only when a real implementation slice was produced this handoff; otherwise no-op.`,
+	].join("\n");
+}
+
+function codeReviewBeforeCommitStep() {
+	return [
+		`Pre-commit code-review gate: before committing, run the full ce-code-review skill on the current diff for this slice. Resolve any blocking findings (or record an explicit user waiver) before the committer commits and closes the Bead.`,
+	].join("\n");
+}
+
 function slotSummary(slot, settings) {
 	const current = settings.subagents?.agentOverrides ?? {};
 	const model = commonValue(slot.agents.map((agent) => current[agent]?.model));
@@ -1635,6 +1776,48 @@ function resetAll(settings) {
 			delete settings.subagents?.agentOverrides?.[agent];
 	}
 	compactOverrides(settings);
+}
+
+function thinkingItemsFor(slot, settings) {
+	const current = settings.subagents?.agentOverrides ?? {};
+	const selectedThinking = commonValue(
+		slot.agents.map((agent) => current[agent]?.thinking),
+	);
+	return {
+		selectedThinking,
+		items: [
+			{
+				value: DEFAULT_THINKING,
+				label: `(blank) use role default (${slot.defaultThinking})`,
+				description: "stored as no override",
+			},
+			...THINKING_LEVELS.map((level) => ({
+				value: level,
+				label: level,
+				description: "persisted subagent thinking level",
+			})),
+		],
+	};
+}
+
+async function editSlotModel(ctx, settings, slot) {
+	const model = await choose(
+		ctx,
+		`${slot.label}: choose model`,
+		await modelItems(ctx),
+	);
+	if (model === undefined) return false;
+	const { selectedThinking, items } = thinkingItemsFor(slot, settings);
+	const thinking = await choose(
+		ctx,
+		`${slot.label}: choose effort${selectedThinking ? ` (current ${selectedThinking})` : ""}`,
+		items,
+	);
+	if (thinking === undefined) return false;
+	setSlot(settings, slot, model, thinking);
+	writeSettings(ctx.cwd, settings);
+	ctx.ui.notify(`Saved ${slot.label}: ${slotSummary(slot, settings)}`, "info");
+	return true;
 }
 
 function notifySummary(ctx, settings) {
@@ -2998,7 +3181,7 @@ function resumeBlockers(childState) {
 	}));
 }
 
-function planResumeAction(state) {
+function planResumeAction(state, cwd) {
 	if (!state.ok) return state;
 	if (state.git && !state.git.safeForHandoff) {
 		const blockers = state.git.blockedPaths?.length
@@ -3043,26 +3226,35 @@ function planResumeAction(state) {
 		};
 	const debug = state.readyExecutable.find(isDebugIssue);
 	if (debug)
-		return withHandoffPrompt({
-			...state,
-			action: "run-debug",
-			selectedBead: debug,
-		});
+		return withHandoffPrompt(
+			{
+				...state,
+				action: "run-debug",
+				selectedBead: debug,
+			},
+			cwd,
+		);
 	const implementation = state.readyExecutable.find(
 		(issue) => !isPlanningIssue(issue),
 	);
 	if (implementation)
-		return withHandoffPrompt({
-			...state,
-			action: "run-implementation",
-			selectedBead: implementation,
-		});
+		return withHandoffPrompt(
+			{
+				...state,
+				action: "run-implementation",
+				selectedBead: implementation,
+			},
+			cwd,
+		);
 	if (state.readyPlanning.length)
-		return withHandoffPrompt({
-			...state,
-			action: "run-planner",
-			selectedBead: state.readyPlanning[0],
-		});
+		return withHandoffPrompt(
+			{
+				...state,
+				action: "run-planner",
+				selectedBead: state.readyPlanning[0],
+			},
+			cwd,
+		);
 	if (
 		state.blockers.length ||
 		state.openDecisions.length ||
@@ -3079,12 +3271,15 @@ function planResumeAction(state) {
 				state.openDecisions,
 			),
 		};
-	return withHandoffPrompt({
-		...state,
-		action: "run-planner",
-		message:
-			"No ready work or blockers; ask the planner to create the next slice or confirm done.",
-	});
+	return withHandoffPrompt(
+		{
+			...state,
+			action: "run-planner",
+			message:
+				"No ready work or blockers; ask the planner to create the next slice or confirm done.",
+		},
+		cwd,
+	);
 }
 
 const ROLE_TIMEOUT_GUIDANCE =
@@ -3099,7 +3294,7 @@ function gitDirtyClassification(git) {
 	return "clean";
 }
 
-function roleHandoffPrompt(state, mode, extraLines = []) {
+function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 	const selected = state.selectedBead;
 	const selectedLine = selected
 		? `${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
@@ -3109,6 +3304,10 @@ function roleHandoffPrompt(state, mode, extraLines = []) {
 			? [
 					"Planner efficiency: do not run raw `bd show <epic-id> --json`; project epics can contain full roadmap plans. Use compact bd show projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
 				]
+			: [];
+	const advisorLines =
+		cwd && workOrchSettings(cwd).advisorVerifyTask
+			? [advisorVerifyStep()]
 			: [];
 	return [
 		`Use the work-orchestrator skill in mode: ${mode} with this precomputed extension state.`,
@@ -3127,16 +3326,22 @@ function roleHandoffPrompt(state, mode, extraLines = []) {
 			? `Review scope default: current Bead ${selected.id} and its diff/verification evidence; do not run broad whole-repo review unless this Bead explicitly requires it.`
 			: "Review scope default: current diff for this epic; do not run broad whole-repo review unless the action explicitly requires it.",
 		...plannerLines,
+		...advisorLines,
 		...extraLines.filter(Boolean),
 		"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
 		selected?.id ? `Target Bead ID: ${selected.id}` : "Target Bead ID: none",
 	].join("\n");
 }
 
-function withHandoffPrompt(state) {
+function withHandoffPrompt(state, cwd) {
 	return {
 		...state,
-		handoffPrompt: roleHandoffPrompt(state, "resume", state.handoffExtra ?? []),
+		handoffPrompt: roleHandoffPrompt(
+			state,
+			"resume",
+			state.handoffExtra ?? [],
+			cwd,
+		),
 	};
 }
 
@@ -3194,7 +3399,7 @@ function buildWorkResumeState(cwd, args = "") {
 			suggestedCommands: [`/work-resume ${childState.epicId}`],
 			warnings: git.warnings,
 		};
-		return planResumeAction(base);
+		return planResumeAction(base, cwd);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
 			action: "beads-error",
@@ -3623,14 +3828,19 @@ function findExistingDebugBug(cwd, target) {
 	);
 }
 
-function debugHandoff(state, guidance = "") {
+function debugHandoff(state, guidance = "", cwd) {
 	return {
 		...state,
-		handoffPrompt: roleHandoffPrompt(state, "debug", [
-			`Debug Bead: ${state.selectedBead.id} — ${state.selectedBead.title}`,
-			guidance ? `Guidance: ${guidance}` : "Guidance: none",
-			"Do not rediscover the debug target. Verify Beads/git freshness, then run the debug loop for this Bead.",
-		]),
+		handoffPrompt: roleHandoffPrompt(
+			state,
+			"debug",
+			[
+				`Debug Bead: ${state.selectedBead.id} — ${state.selectedBead.title}`,
+				guidance ? `Guidance: ${guidance}` : "Guidance: none",
+				"Do not rediscover the debug target. Verify Beads/git freshness, then run the debug loop for this Bead.",
+			],
+			cwd,
+		),
 	};
 }
 
@@ -3740,6 +3950,7 @@ function buildWorkDebugState(cwd, args = "") {
 				warnings: git.warnings,
 			},
 			guidance,
+			cwd,
 		);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
@@ -3927,10 +4138,12 @@ function buildWorkSmallState(cwd, args = "") {
 					epic: issueSummary(epic),
 					selectedBead: issueSummary(issue),
 					git,
-					message: `Using existing ${idOf(issue)}.`,
-					warnings: git.warnings,
-					handoffExtra: rest.length ? [`Task guidance: ${rest.join(" ")}`] : [],
-				});
+				message: `Using existing ${idOf(issue)}.`,
+				warnings: git.warnings,
+				handoffExtra: rest.length ? [`Task guidance: ${rest.join(" ")}`] : [],
+			},
+			cwd,
+		);
 			}
 			const task = rest.join(" ").trim();
 			if (!task)
@@ -3949,9 +4162,11 @@ function buildWorkSmallState(cwd, args = "") {
 				epic: issueSummary(issue),
 				selectedBead: issueSummary(bead),
 				git,
-				message: `Created ${idOf(bead)} under ${idOf(issue)}.`,
-				warnings: git.warnings,
-			});
+			message: `Created ${idOf(bead)} under ${idOf(issue)}.`,
+			warnings: git.warnings,
+		},
+		cwd,
+	);
 		}
 		const parsed = parseWorkAddArgs(raw);
 		const resolved = resolveParsedEpic(cwd, parsed);
@@ -3976,7 +4191,9 @@ function buildWorkSmallState(cwd, args = "") {
 			git,
 			message: `Created ${idOf(bead)} under ${idOf(resolved.epic)}.`,
 			warnings: git.warnings,
-		});
+		},
+		cwd,
+	);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
 			action: error.reason ?? "beads-error",
@@ -4028,7 +4245,9 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 				posture,
 				"Planner must verify dependency direction with bd ready --json.",
 			],
-		});
+		},
+		cwd,
+	);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
 			action: error.reason ?? "beads-error",
@@ -4781,8 +5000,12 @@ function buildWorkBrainstormState(cwd, args = "") {
 	}
 }
 
-function brainstormHandoffPrompt(state) {
+function brainstormHandoffPrompt(state, cwd) {
 	const artifact = state.artifact;
+	const criticLines =
+		cwd && workOrchSettings(cwd).critic.brainstorm
+			? [advisorCriticStep("brainstorm artifact")]
+			: [];
 	return [
 		`Use the work-orchestrator skill in mode: ${artifact ? "master" : "brainstorm"} with this precomputed extension state.`,
 		`Epic: ${state.epic.id} — ${state.epic.title}`,
@@ -4795,6 +5018,7 @@ function brainstormHandoffPrompt(state) {
 		"Never silently skip ce-brainstorm questions for broad, important, or underspecified work.",
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
 		ROLE_TIMEOUT_GUIDANCE,
+		...criticLines,
 	].join("\n");
 }
 
@@ -5069,10 +5293,13 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
 				"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker Bead instruction, or an explicit user waiver; never leave it as passive risk prose.",
 				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Only then return the plan path and run /work-plan <plan-path>.",
-				"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
-				detail,
-				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
-				ROLE_TIMEOUT_GUIDANCE,
+					"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
+					detail,
+					`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
+					ROLE_TIMEOUT_GUIDANCE,
+					workOrchSettings(cwd).critic.plan
+						? advisorCriticStep("produced plan")
+						: "",
 			].join("\n"),
 			git: masterGit,
 			warnings: masterGit.warnings,
@@ -5219,7 +5446,9 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			warnings: masterGit.warnings,
 			suggestedCommands: [`/work-resume ${idOf(epic)}`],
 			nextAction: `Next: planner will create the first slice; then run /work-resume ${idOf(epic)}.`,
-		});
+		},
+		cwd,
+	);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
 			action: error.reason ?? "beads-error",
@@ -5360,6 +5589,7 @@ function buildWorkFinishState(cwd, args = "") {
 				"Dirty files are not all tied to the selected Bead notes.",
 				{ relatedFiles: related },
 			);
+		const reviewBeforeCommit = workOrchSettings(cwd).codeReviewBeforeCommit;
 		return {
 			ok: true,
 			action: "commit-ready",
@@ -5368,8 +5598,21 @@ function buildWorkFinishState(cwd, args = "") {
 			git,
 			relatedFiles: related,
 			commitMessage: `${idOf(bead)}: ${titleOf(bead)}`,
-			message: "Finish gate has review, verification, and related dirty files.",
-			note: `Commit seed: ${idOf(bead)}: ${titleOf(bead)}\nFiles: ${related.join(", ")}`,
+			message: reviewBeforeCommit
+				? "Finish gate passed; full ce-code-review required before commit."
+				: "Finish gate has review, verification, and related dirty files.",
+			note: `Commit seed: ${idOf(bead)}: ${titleOf(bead)}\nFiles: ${related.join(", ")}${reviewBeforeCommit ? "\nGate: run full ce-code-review on this diff before committing." : ""}`,
+			handoffPrompt: reviewBeforeCommit
+				? [
+						"Use the work-orchestrator skill in mode: finish with this precomputed extension state.",
+						`Epic: ${idOf(epic)} — ${titleOf(epic)}`,
+						`Bead: ${idOf(bead)} — ${titleOf(bead)}`,
+						`Commit message: ${idOf(bead)}: ${titleOf(bead)}`,
+						`Files: ${related.join(", ")}`,
+						codeReviewBeforeCommitStep(),
+						"After the review gate passes (or an explicit user waiver), commit with the seed message and close the Bead; do not rediscover the target.",
+					].join("\n")
+				: undefined,
 			warnings: git.warnings,
 		};
 	} catch (error) {
@@ -5847,7 +6090,7 @@ function workProjectAutopilotAppendix() {
 	return `Project autopilot policy:
 - Treat the target directory as the source of truth: verify git and Beads state there before mutating anything.
 - Use the work-orchestrator resume/debug/status/report loop, with all product commands and role-agent cwd values pointed at the target project.
-- Use cached role-agent names directly; do not call subagent list unless a direct launch says an agent is unknown: bead-planner, bead-worker, bead-reviewer, bead-fixer, bead-debugger, bead-committer, bead-migrator.
+- Use cached role-agent names directly; do not call subagent list unless a direct launch says an agent is unknown: bead-planner, bead-worker, bead-reviewer, bead-fixer, bead-debugger, bead-committer, bead-migrator, bead-advisor.
 - Keep the parent session as coordinator only; use fresh-context Beads role agents for implementation, review, fixing, debugging, and committing.
 - Obey the user instruction literally; if it says one task only, stop after one executable Bead closes. If it says N tasks, stop after N executable Beads close.
 - At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
@@ -5993,9 +6236,7 @@ function isFailedIssue(issue) {
 function progressBar(complete, total, width = 12) {
 	const safeTotal = Math.max(0, Number(total) || 0);
 	const safeComplete = Math.max(0, Math.min(safeTotal, Number(complete) || 0));
-	const filled = safeTotal
-		? Math.round((safeComplete / safeTotal) * width)
-		: 0;
+	const filled = safeTotal ? Math.round((safeComplete / safeTotal) * width) : 0;
 	return `[${"█".repeat(filled)}${"░".repeat(width - filled)}]`;
 }
 
@@ -6028,17 +6269,19 @@ function extractImplementationUnits(markdown) {
 		const next = rest.slice(1).search(/^##\s+/im);
 		section = next >= 0 ? rest.slice(0, next + 1) : rest;
 	}
-	return [...section.matchAll(/^###\s+((?:U|Unit\s*)\d+[\w.-]*)[).:\s-]*(.+)$/gim)].map(
-		(match) => ({
-			key: match[1].replace(/\s+/g, "").replace(/[).:-]+$/, ""),
-			title: match[2].trim(),
-		}),
-	);
+	return [
+		...section.matchAll(/^###\s+((?:U|Unit\s*)\d+[\w.-]*)[).:\s-]*(.+)$/gim),
+	].map((match) => ({
+		key: match[1].replace(/\s+/g, "").replace(/[).:-]+$/, ""),
+		title: match[2].trim(),
+	}));
 }
 
 function planPathForEpic(cwd, epic) {
 	const text = issueProgressText(epic);
-	const matches = [...text.matchAll(/(?:file:|plan-path=)?((?:[A-Za-z]:)?[^\s`'"<>]+\.md)\b/g)];
+	const matches = [
+		...text.matchAll(/(?:file:|plan-path=)?((?:[A-Za-z]:)?[^\s`'"<>]+\.md)\b/g),
+	];
 	const candidates = matches
 		.map((match) => match[1].replace(/^@/, ""))
 		.filter((path) => /(?:^|[\\/])(?:docs[\\/])?plans[\\/]/i.test(path));
@@ -7187,6 +7430,10 @@ export {
 	parseWorkProjectGoalInput,
 	planResumeAction,
 	progressBar,
+	applyProfile,
+	setWorkOrchBoolean,
+	setWorkOrchCritic,
+	workOrchSettings,
 	renderWorkIdeateText,
 	renderWorkBrainstormText,
 	renderWorkUsageText,
@@ -7611,7 +7858,7 @@ export default function workModelsExtension(pi) {
 					state.ok ? "info" : "warning",
 				);
 				if (state.ok)
-					await sendFollowUp(ctx, brainstormHandoffPrompt(state), pi);
+					await sendFollowUp(ctx, brainstormHandoffPrompt(state, ctx.cwd), pi);
 				return stateTelemetry(state);
 			});
 		},
@@ -7860,52 +8107,153 @@ export default function workModelsExtension(pi) {
 
 			const slot = SLOTS.find((item) => item.key === slotKey);
 			if (!slot) return;
-
-			const current = settings.subagents?.agentOverrides ?? {};
-			const model = await choose(
-				ctx,
-				`${slot.label}: choose model`,
-				await modelItems(ctx),
-			);
-			if (!model) return;
-
-			const thinkingItems = [
-				{
-					value: DEFAULT_THINKING,
-					label: `(blank) use role default (${slot.defaultThinking})`,
-					description: "stored as no override",
-				},
-				...THINKING_LEVELS.map((level) => ({
-					value: level,
-					label: level,
-					description: "persisted subagent thinking level",
-				})),
-			];
-			const selectedThinking = commonValue(
-				slot.agents.map((agent) => current[agent]?.thinking),
-			);
-			const thinking = await choose(
-				ctx,
-				`${slot.label}: choose effort${selectedThinking ? ` (current ${selectedThinking})` : ""}`,
-				thinkingItems,
-			);
-			if (!thinking) return;
-
 			try {
-				setSlot(settings, slot, model, thinking);
-				writeSettings(ctx.cwd, settings);
+				await editSlotModel(ctx, readSettings(ctx.cwd), slot);
 			} catch (error) {
 				ctx.ui.notify(
 					`Could not write ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
 					"error",
 				);
-				return;
 			}
-
-			ctx.ui.notify(
-				`Saved ${slot.label}: ${slotSummary(slot, settings)}`,
-				"info",
-			);
 		},
 	});
+
+	pi.registerCommand("work-settings", {
+		description:
+			"Work-orchestrator settings submenu: effort profiles, role/advisor model+effort, and advisor/critic gates",
+		handler: async (args, ctx) => {
+			if (String(args).trim() === "status")
+				return workSettingsStatus(ctx);
+			await workSettingsLoop(ctx);
+		},
+	});
+}
+
+function workSettingsStatus(ctx) {
+	const settings = readSettings(ctx.cwd);
+	const resolved = workOrchSettings(ctx.cwd);
+	const lines = [
+		`Profile: ${resolved.profile}`,
+		...SLOTS.map((slot) => `${slot.label}: ${slotSummary(slot, settings)}`),
+		`Critic on brainstorm: ${resolved.critic.brainstorm}`,
+		`Critic on plan: ${resolved.critic.plan}`,
+		`Advisor verifies task vs plan: ${resolved.advisorVerifyTask}`,
+		`Full ce-code-review before commit: ${resolved.codeReviewBeforeCommit}`,
+	];
+	notify(ctx, lines.join("\n"), "info");
+}
+
+const SETTINGS_DONE = "__done__";
+const SETTINGS_PROFILE = "__profile__";
+const SETTINGS_RESET = "__reset__";
+
+function boolLabel(label, value) {
+	return { label: `${label}: ${value ? "on" : "off"}`, description: "enter to flip" };
+}
+
+async function workSettingsLoop(ctx) {
+	for (;;) {
+		let settings;
+		try {
+			settings = readSettings(ctx.cwd);
+		} catch (error) {
+			ctx.ui.notify(
+				`Could not read ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
+				"error",
+			);
+			return;
+		}
+		const resolved = workOrchSettings(ctx.cwd);
+		const items = [
+			{
+				kind: "profile",
+				value: SETTINGS_PROFILE,
+				label: `profile: ${resolved.profile}`,
+				description:
+					"low / medium / high / max — copy effort + gates onto current",
+			},
+			...SLOTS.map((slot) => ({
+				kind: "slot",
+				value: slot.key,
+				label: slot.label,
+				description: slotSummary(slot, settings),
+			})),
+			...WORK_ORCH_CRITIC_KEYS.map((key) => ({
+				kind: "critic",
+				value: `critic.${key}`,
+				...boolLabel(`critic on ${key}`, resolved.critic[key]),
+			})),
+			...WORK_ORCH_BOOLEANS.map((flag) => ({
+				kind: "bool",
+				value: flag.key,
+				...boolLabel(flag.label, resolved[flag.key]),
+			})),
+			{
+				kind: "reset",
+				value: SETTINGS_RESET,
+				label: "reset all",
+				description: "Clear all work-orchestrator model/gate overrides",
+			},
+			{
+				kind: "done",
+				value: SETTINGS_DONE,
+				label: "done",
+				description: "Exit settings",
+			},
+		];
+		const labels = items.map(labelFor);
+		const selected = await ctx.ui.select(
+			"Work settings (enter flips booleans)",
+			labels,
+		);
+		const pick = items[labels.indexOf(selected)];
+		if (!pick || pick.kind === "done") return;
+		if (pick.kind === "reset") {
+			resetAll(settings);
+			delete settings.workOrchestrator;
+			writeSettings(ctx.cwd, settings);
+			ctx.ui.notify("Cleared all work-orchestrator settings", "info");
+			continue;
+		}
+		if (pick.kind === "profile") {
+			const profileKey = await choose(ctx, "Choose effort profile", [
+				...Object.keys(EFFORT_PROFILES).map((key) => ({
+					value: key,
+					label: key,
+					description: `${SLOTS.map((slot) => `${slot.key}=${EFFORT_PROFILES[key][slot.key]}`).join(
+						" ",
+					)} · gates:${EFFORT_PROFILES[key].codeReviewBeforeCommit ? " review" : ""}`,
+				})),
+			]);
+			if (!profileKey) continue;
+			settings = readSettings(ctx.cwd);
+			applyProfile(settings, profileKey);
+			writeSettings(ctx.cwd, settings);
+			ctx.ui.notify(`Applied ${profileKey} profile`, "info");
+			continue;
+		}
+		if (pick.kind === "slot") {
+			const slot = slotByKey(pick.value);
+			if (slot)
+				try {
+					await editSlotModel(ctx, readSettings(ctx.cwd), slot);
+				} catch (error) {
+					ctx.ui.notify(
+						`Could not write ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
+						"error",
+					);
+				}
+			continue;
+		}
+		// Boolean flip (live): write immediately.
+		settings = readSettings(ctx.cwd);
+		const criticKey = pick.value.split(".")[1];
+		const current =
+			pick.kind === "critic" ? resolved.critic[criticKey] : resolved[pick.value];
+		const next = !current;
+		if (pick.kind === "critic") setWorkOrchCritic(settings, criticKey, next);
+		else setWorkOrchBoolean(settings, pick.value, next);
+		writeSettings(ctx.cwd, settings);
+		ctx.ui.notify(`${pick.label.split(":")[0]}: ${next ? "on" : "off"}`, "info");
+	}
 }

@@ -313,7 +313,7 @@ For a Bead target, show the detailed failure artifact from notes: command, exit/
 
 ## Role Loop
 
-Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. Use the exact package role agents (`bead-planner`, `bead-worker`, `bead-reviewer`, `bead-fixer`, `bead-debugger`, `bead-committer`, `bead-migrator`) in the `agent` field; do not substitute builtin `worker`, `reviewer`, `planner`, or `delegate` for these roles. The parent must not read broad source modules or implement source edits itself; if it cannot launch the required role agent, it stops with a setup blocker. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Use `outputMode: "file-only"` with a short relative output filename for review/research/work outputs unless the complete result is under about 20 lines; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. Keep only a short structured summary in the parent; do not paste long tool logs, full `bd show` epic JSON, raw `bd ready --json`, raw `bd children --json`, or whole master plans back into the control session. Pipe Beads JSON through python/node projections when only IDs/status/titles are needed.
+Use `pi-subagents` from the parent session. Children get concrete Bead IDs and must not launch their own subagent workflows unless explicitly assigned a fanout role. Use the exact package role agents (`bead-planner`, `bead-worker`, `bead-reviewer`, `bead-fixer`, `bead-debugger`, `bead-committer`, `bead-migrator`, `bead-advisor`) in the `agent` field; do not substitute builtin `worker`, `reviewer`, `planner`, or `delegate` for these roles. The parent must not read broad source modules or implement source edits itself; if it cannot launch the required role agent, it stops with a setup blocker. Always launch role agents with fresh context (`context:fresh`) unless the user explicitly asks to review the parent conversation. Use `outputMode: "file-only"` with a short relative output filename for review/research/work outputs unless the complete result is under about 20 lines; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. Keep only a short structured summary in the parent; do not paste long tool logs, full `bd show` epic JSON, raw `bd ready --json`, raw `bd children --json`, or whole master plans back into the control session. Pipe Beads JSON through python/node projections when only IDs/status/titles are needed.
 
 Do not put tiny wall-clock limits on real role agents. Prefer no explicit timeout; if the runtime requires one, use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Use async/background for broad reviews, hardware work, or repo-scale investigation. A child timeout is an infrastructure failure artifact, not a review `FAIL` or implementation result.
 
@@ -440,6 +440,17 @@ Responsibilities:
 - close the Bead only after the work commit exists and no related dirty files remain;
 - after close, re-run `git status --short`; if `bd close` changed tracked Beads files such as `.beads/interactions.jsonl`, stage only those close-record files and amend or create a same-Bead follow-up commit before finalizing;
 - push only when repo/session policy requires it.
+
+### bead-advisor
+
+Read-only critic launched by the orchestrator from the work-settings gates (not a primary implementation role). Must not edit source code or mutate Beads.
+
+Responsibilities:
+
+- critic gate (brainstorm/plan): hunt weak or missing requirements, unverified or subjective acceptance, incomplete decisions, ambiguous scope, untested assumptions, and Acceptance Contracts lacking proof/approval;
+- task-verification gate: compare the change/diff and worker verification notes against the plan's acceptance and the implementation unit; flag drift, inconsistencies, and missing verification evidence;
+- return exactly one verdict: `CLEAN` or `CONCERNS`, each finding tagged blocking or note with the smallest fix;
+- record-worthy findings go back to the parent/role that launched it; the advisor does not write Beads itself.
 
 ## Stop Conditions
 

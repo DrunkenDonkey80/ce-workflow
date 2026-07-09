@@ -73,7 +73,9 @@ assert.equal(
 assert.equal(mod.workWarpTitle("brainstorm", "C:/soft/git/demo"), "✦ - demo");
 assert.equal(mod.progressBar(3, 6), "[██████░░░░░░]");
 assert.deepEqual(
-	mod.extractImplementationUnits(`## Implementation Units\n\n### U1. First slice\n\n### U2. Second slice\n\n## Done`),
+	mod.extractImplementationUnits(
+		`## Implementation Units\n\n### U1. First slice\n\n### U2. Second slice\n\n## Done`,
+	),
 	[
 		{ key: "U1", title: "First slice" },
 		{ key: "U2", title: "Second slice" },
