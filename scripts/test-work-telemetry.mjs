@@ -1,5 +1,13 @@
 #!/usr/bin/env node
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -330,6 +338,71 @@ try {
 			"agent telemetry records handoff start outcome",
 		);
 		assert(
+			!existsSync(path.join(cwd, ".pi", "work-runs", "history")),
+			"self-improving history stays off unless enabled",
+		);
+
+		mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+		writeFileSync(
+			path.join(cwd, ".pi", "settings.json"),
+			`${JSON.stringify({ workResume: { selfImproving: true } })}\n`,
+		);
+		const historyCtx = {
+			cwd,
+			getContextUsage: () => ({ tokens: 3200 }),
+			sessionManager: {
+				getSessionId: () => "sess-history",
+				getSessionFile: () => path.join(cwd, "session.jsonl"),
+			},
+		};
+		await hooks.before_agent_start(
+			{ prompt: sent[0].message, systemPrompt: "system" },
+			historyCtx,
+		);
+		await hooks.agent_start({}, historyCtx);
+		await hooks.message_end(
+			{
+				message: { role: "assistant", content: [{ type: "text", text: "ok" }] },
+			},
+			historyCtx,
+		);
+		await hooks.tool_execution_start(
+			{ toolCallId: "read-1", toolName: "read", args: { path: "README.md" } },
+			historyCtx,
+		);
+		await hooks.tool_execution_end(
+			{
+				toolCallId: "read-1",
+				toolName: "read",
+				isError: false,
+				result: { content: [{ type: "text", text: "full local output" }] },
+			},
+			historyCtx,
+		);
+		await hooks.agent_end({ messages: [] }, historyCtx);
+		const historyFile = path.join(
+			cwd,
+			".pi",
+			"work-runs",
+			"history",
+			"TASK-NEW-1",
+			"sess-history.jsonl",
+		);
+		assert(existsSync(historyFile), "self-improving history writes per task");
+		const historyLines = readFileSync(historyFile, "utf8")
+			.trim()
+			.split(/\r?\n/)
+			.map((line) => JSON.parse(line));
+		assert(
+			historyLines.some((line) => line.type === "message_end") &&
+				historyLines.some((line) => line.type === "tool_execution_end"),
+			"self-improving history records messages and tool results",
+		);
+		assert(
+			historyLines.every((line) => line.task.beadId === "TASK-NEW-1"),
+			"self-improving history is grouped by Bead task",
+		);
+		assert(
 			!fixture
 				.logs()
 				.some(
@@ -343,8 +416,7 @@ try {
 				.logs()
 				.some(
 					(entry) =>
-						entry.op === "update" &&
-						entry.notes.includes("wo:failure-summary"),
+						entry.op === "update" && entry.notes.includes("wo:failure-summary"),
 				),
 			"recovered subagent retries do not append failure summaries",
 		);

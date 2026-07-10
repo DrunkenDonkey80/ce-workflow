@@ -24,6 +24,7 @@ import {
 
 const CONFIG_DIR_NAME = ".pi";
 const TELEMETRY_DIR_NAME = "work-runs";
+const HISTORY_DIR_NAME = "history";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
 const WORK_SHORTCUT_STATUS = "F7 roadmaps · F8 menu";
 const INHERIT_MODEL = "__inherit_model__";
@@ -237,6 +238,7 @@ const DEFAULT_CONTEXT = {
 const MIN_COMPACT_AT_TOKENS = 30_000;
 const contextCompactState = { inFlight: false, requested: false };
 let pendingWorkPrompt = null;
+let activeHistoryTask = null;
 let activeWorkAgent = null;
 let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
@@ -651,6 +653,114 @@ function recordWorkTelemetry(cwd, event) {
 	if (isDuplicateTelemetry(file, record)) return file;
 	appendFileSync(file, `${JSON.stringify(record)}\n`);
 	return file;
+}
+
+function safeHistoryPathPart(value) {
+	return (
+		String(value ?? "session")
+			.replace(/[^A-Za-z0-9._-]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 100) || "session"
+	);
+}
+
+function jsonSafe(value) {
+	const seen = new WeakSet();
+	return JSON.parse(
+		JSON.stringify(value, (_key, item) => {
+			if (typeof item === "bigint") return item.toString();
+			if (typeof item === "function" || typeof item === "symbol")
+				return undefined;
+			if (item instanceof Error)
+				return { name: item.name, message: item.message, stack: item.stack };
+			if (item && typeof item === "object") {
+				if (seen.has(item)) return "[Circular]";
+				seen.add(item);
+			}
+			return item;
+		}),
+	);
+}
+
+function selfImprovementHistoryEnabled(ctx) {
+	if (process.env.WORK_ORCH_HISTORY_OFF === "1") return false;
+	if (activeWorkGoal?.mode === "self-improving") return true;
+	try {
+		return workResumeSettings(
+			ctx?.cwd ?? activeWorkAgent?.cwd ?? activeWorkGoalCwd,
+		).selfImproving;
+	} catch {
+		return false;
+	}
+}
+
+function historyTaskFromText(value) {
+	const text = String(value ?? "");
+	const labeled = text.match(
+		/(?:Target Bead ID|Selected Bead|Bead ID|bead)\s*:\s*([^\s]+)/i,
+	)?.[1];
+	const beadId = labeled && labeled !== "none" ? labeled : undefined;
+	return {
+		key:
+			beadId ?? text.match(/\b[A-Za-z][A-Za-z0-9_.-]*-\d+\b/)?.[0] ?? "session",
+		beadId,
+	};
+}
+
+function selfImprovementHistoryTask(event) {
+	const meta = activeWorkAgent?.meta ?? pendingWorkPrompt?.meta ?? {};
+	const fallback = activeHistoryTask ?? historyTaskFromText(event?.prompt);
+	const goal = activeWorkGoal;
+	const key =
+		meta.beadId ??
+		meta.epicId ??
+		fallback.key ??
+		(goal ? `${goal.mode}-${goal.id}` : "session");
+	return {
+		key,
+		mode: meta.mode ?? goal?.mode,
+		action: meta.action,
+		epicId: meta.epicId,
+		beadId: meta.beadId ?? fallback.beadId,
+		goalId: goal?.id,
+		objective: goal?.objective,
+	};
+}
+
+function recordSelfImprovementHistory(ctx, type, event = {}) {
+	if (!selfImprovementHistoryEnabled(ctx)) return "";
+	const cwd = ctx?.cwd ?? activeWorkAgent?.cwd ?? activeWorkGoalCwd;
+	if (!cwd) return "";
+	try {
+		if (type === "before_agent_start")
+			activeHistoryTask = historyTaskFromText(event.prompt);
+		const task = selfImprovementHistoryTask(event);
+		const sessionId = ctx?.sessionManager?.getSessionId?.() ?? "no-session";
+		const file = join(
+			telemetryDir(cwd),
+			HISTORY_DIR_NAME,
+			safeHistoryPathPart(task.key),
+			`${safeHistoryPathPart(sessionId)}.jsonl`,
+		);
+		mkdirSync(dirname(file), { recursive: true });
+		appendFileSync(
+			file,
+			`${JSON.stringify({
+				version: 1,
+				id: telemetryId("hist"),
+				timestamp: new Date().toISOString(),
+				type,
+				cwd,
+				sessionId,
+				sessionFile: ctx?.sessionManager?.getSessionFile?.(),
+				task,
+				event: jsonSafe(event),
+			})}\n`,
+		);
+		return file;
+	} catch {
+		return "";
+	}
 }
 
 function appendTelemetryNote(cwd, beadId, event, file) {
@@ -8424,6 +8534,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "input", event);
 		if (!extractWorkGoalContinuationMarker(event.text)) clearWorkGoalRecovery();
 		if (await maybeResumeWorkGoalFromUserInput(event, ctx, pi))
 			return { action: "handled" };
@@ -8446,6 +8557,7 @@ export default function workModelsExtension(pi) {
 					contextBefore: usageSnapshot(ctx),
 				}
 			: null;
+		recordSelfImprovementHistory(ctx, "before_agent_start", event);
 		if (!activeWorkGoal) return;
 		if (activeWorkGoal.status === "needs_human") {
 			return {
@@ -8458,7 +8570,8 @@ export default function workModelsExtension(pi) {
 		};
 	});
 
-	pi.on("agent_start", async (_event, ctx) => {
+	pi.on("agent_start", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "agent_start", event);
 		if (!pendingWorkPrompt) {
 			if (["active", "stopping"].includes(activeWorkGoal?.status)) {
 				activeWorkGoalRunning = true;
@@ -8489,7 +8602,8 @@ export default function workModelsExtension(pi) {
 		pendingWorkPrompt = null;
 	});
 
-	pi.on("tool_execution_start", async (event) => {
+	pi.on("tool_execution_start", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "tool_execution_start", event);
 		if (!activeWorkAgent) return;
 		activeWorkAgent.toolStarts.set(event.toolCallId, {
 			startedAt: Date.now(),
@@ -8498,6 +8612,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("tool_execution_end", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "tool_execution_end", event);
 		updateWorkGoalProgress(ctx);
 		if (!activeWorkAgent) return;
 		const started = activeWorkAgent.toolStarts.get(event.toolCallId);
@@ -8506,10 +8621,12 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("agent_end", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "agent_end", event);
 		if (!activeWorkAgent) {
 			activeWorkGoalRunning = false;
 			const hadWorkGoal = Boolean(activeWorkGoal);
 			await handleWorkGoalAgentEnd(event, ctx, pi);
+			activeHistoryTask = null;
 			if (!hadWorkGoal) resetWarpTitle(ctx);
 			return;
 		}
@@ -8569,6 +8686,7 @@ export default function workModelsExtension(pi) {
 			assistantVisibleText(finalAssistantMessage(event.messages)),
 		);
 		await handleWorkGoalAgentEnd(event, ctx, pi);
+		activeHistoryTask = null;
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
@@ -8611,7 +8729,8 @@ export default function workModelsExtension(pi) {
 		};
 	});
 
-	pi.on("session_compact", async (_event, ctx) => {
+	pi.on("session_compact", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "session_compact", event);
 		const wasOurs = contextCompactState.inFlight;
 		contextCompactState.inFlight = false;
 		contextCompactState.requested = false;
@@ -8632,7 +8751,8 @@ export default function workModelsExtension(pi) {
 		}
 	});
 
-	pi.on("turn_end", async (_event, ctx) => {
+	pi.on("turn_end", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "turn_end", event);
 		try {
 			maybeCompact(ctx, readSettings(ctx.cwd), "turn boundary");
 		} catch {
@@ -8640,6 +8760,14 @@ export default function workModelsExtension(pi) {
 		}
 		cleanupBenignInstructionDirt(ctx.cwd);
 		await flushWorkGoalContinuationRetry(ctx, pi);
+	});
+
+	pi.on("message_end", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "message_end", event);
+	});
+
+	pi.on("turn_start", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "turn_start", event);
 	});
 
 	pi.registerCommand("work-goal", {
