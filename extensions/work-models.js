@@ -224,6 +224,7 @@ const WORK_ORCH_BOOLEANS = [
 	},
 ];
 const WORK_ORCH_CRITIC_KEYS = ["brainstorm", "plan"];
+const SUBMENU_ARROW = "›";
 
 function slotByKey(key) {
 	return SLOTS.find((slot) => slot.key === key);
@@ -666,20 +667,24 @@ function safeHistoryPathPart(value) {
 
 function jsonSafe(value) {
 	const seen = new WeakSet();
-	return JSON.parse(
-		JSON.stringify(value, (_key, item) => {
-			if (typeof item === "bigint") return item.toString();
-			if (typeof item === "function" || typeof item === "symbol")
-				return undefined;
-			if (item instanceof Error)
-				return { name: item.name, message: item.message, stack: item.stack };
-			if (item && typeof item === "object") {
-				if (seen.has(item)) return "[Circular]";
-				seen.add(item);
-			}
-			return item;
-		}),
-	);
+	try {
+		return JSON.parse(
+			JSON.stringify(value, (_key, item) => {
+				if (typeof item === "bigint") return item.toString();
+				if (typeof item === "function" || typeof item === "symbol")
+					return undefined;
+				if (item instanceof Error)
+					return { name: item.name, message: item.message, stack: item.stack };
+				if (item && typeof item === "object") {
+					if (seen.has(item)) return "[Circular]";
+					seen.add(item);
+				}
+				return item;
+			}),
+		);
+	} catch {
+		return String(value);
+	}
 }
 
 function selfImprovementHistoryEnabled(ctx) {
@@ -1898,6 +1903,11 @@ function setWorkOrchCritic(settings, key, value) {
 	const block = workOrchBlock(settings);
 	block.critic ??= {};
 	block.critic[key] = Boolean(value);
+}
+
+function setWorkResumeBoolean(settings, key, value) {
+	settings.workResume ??= {};
+	settings.workResume[key] = Boolean(value);
 }
 
 // ponytail: settings are prompt-live; the steps below are appended to the
@@ -3609,6 +3619,7 @@ function directRoleTask(state) {
 	return [
 		"Direct work-orchestrator role launch. You are already the selected role agent; do not call subagent, subagent list, or delegate further.",
 		"If parent coordination is unavailable, persist blockers or decisions in Beads instead of contacting a supervisor.",
+		"Do not read raw Pi/subagent session files from ~/.pi/agent/sessions; they are optional diagnostics and may be missing. Use Beads, git, named artifacts, and .pi/work-runs/history instead.",
 		state.handoffPrompt,
 	]
 		.filter(Boolean)
@@ -9175,16 +9186,37 @@ export default function workModelsExtension(pi) {
 	});
 }
 
+function onOff(value) {
+	return value ? "✓ on" : "○ off";
+}
+
 function workSettingsStatus(ctx) {
 	const settings = readSettings(ctx.cwd);
 	const resolved = workOrchSettings(ctx.cwd);
+	const resume = workResumeSettings(ctx.cwd);
 	const lines = [
-		`Profile: ${resolved.profile}`,
-		...SLOTS.map((slot) => `${slot.label}: ${slotSummary(slot, settings)}`),
-		`Critic on brainstorm: ${resolved.critic.brainstorm}`,
-		`Critic on plan: ${resolved.critic.plan}`,
-		...WORK_ORCH_BOOLEANS.map((flag) => `${flag.label}: ${resolved[flag.key]}`),
-		`ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
+		"Work settings",
+		"",
+		"Profile",
+		`  ${SUBMENU_ARROW} profile: ${resolved.profile}`,
+		"",
+		"Role models / effort",
+		...SLOTS.map(
+			(slot) =>
+				`  ${SUBMENU_ARROW} ${slot.label}: ${slotSummary(slot, settings)}`,
+		),
+		"",
+		"Gates",
+		`  ${onOff(resolved.critic.brainstorm)} critic on brainstorm`,
+		`  ${onOff(resolved.critic.plan)} critic on plan`,
+		...WORK_ORCH_BOOLEANS.map(
+			(flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`,
+		),
+		`  ${SUBMENU_ARROW} ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
+		"",
+		"Resume automation",
+		`  ${onOff(resume.selfImproving)} self-improving workflow fixes`,
+		`  ${onOff(resume.newSessionBetweenIterations)} new session between iterations`,
 	];
 	notify(ctx, lines.join("\n"), "info");
 }
@@ -9195,8 +9227,9 @@ const SETTINGS_RESET = "__reset__";
 
 function boolLabel(label, value) {
 	return {
-		label: `${label}: ${value ? "on" : "off"}`,
+		label: `${onOff(value)} ${label}`,
 		description: "enter to flip",
+		settingLabel: label,
 	};
 }
 
@@ -9213,18 +9246,19 @@ async function workSettingsLoop(ctx) {
 			return;
 		}
 		const resolved = workOrchSettings(ctx.cwd);
+		const resume = workResumeSettings(ctx.cwd);
 		const items = [
 			{
 				kind: "profile",
 				value: SETTINGS_PROFILE,
-				label: `profile: ${resolved.profile}`,
+				label: `profile ${SUBMENU_ARROW} ${resolved.profile}`,
 				description:
 					"low / medium / high / max — copy effort + gates onto current",
 			},
 			...SLOTS.map((slot) => ({
 				kind: "slot",
 				value: slot.key,
-				label: slot.label,
+				label: `${slot.label} ${SUBMENU_ARROW}`,
 				description: slotSummary(slot, settings),
 			})),
 			...WORK_ORCH_CRITIC_KEYS.map((key) => ({
@@ -9238,10 +9272,23 @@ async function workSettingsLoop(ctx) {
 				...boolLabel(flag.label, resolved[flag.key]),
 			})),
 			{
+				kind: "resumeBool",
+				value: "selfImproving",
+				...boolLabel("self-improving workflow fixes", resume.selfImproving),
+			},
+			{
+				kind: "resumeBool",
+				value: "newSessionBetweenIterations",
+				...boolLabel(
+					"new session between iterations",
+					resume.newSessionBetweenIterations,
+				),
+			},
+			{
 				kind: "reset",
 				value: SETTINGS_RESET,
-				label: "reset all",
-				description: "Clear all work-orchestrator model/gate overrides",
+				label: "reset role/gate overrides",
+				description: "Clear work-orchestrator model/gate overrides",
 			},
 			{
 				kind: "done",
@@ -9261,7 +9308,7 @@ async function workSettingsLoop(ctx) {
 			resetAll(settings);
 			delete settings.workOrchestrator;
 			writeSettings(ctx.cwd, settings);
-			ctx.ui.notify("Cleared all work-orchestrator settings", "info");
+			ctx.ui.notify("Cleared work-orchestrator role/gate overrides", "info");
 			continue;
 		}
 		if (pick.kind === "profile") {
@@ -9308,13 +9355,17 @@ async function workSettingsLoop(ctx) {
 		const current =
 			pick.kind === "critic"
 				? resolved.critic[criticKey]
-				: resolved[pick.value];
+				: pick.kind === "resumeBool"
+					? resume[pick.value]
+					: resolved[pick.value];
 		const next = !current;
 		if (pick.kind === "critic") setWorkOrchCritic(settings, criticKey, next);
+		else if (pick.kind === "resumeBool")
+			setWorkResumeBoolean(settings, pick.value, next);
 		else setWorkOrchBoolean(settings, pick.value, next);
 		writeSettings(ctx.cwd, settings);
 		ctx.ui.notify(
-			`${pick.label.split(":")[0]}: ${next ? "on" : "off"}`,
+			`${pick.settingLabel ?? pick.label}: ${next ? "on" : "off"}`,
 			"info",
 		);
 	}

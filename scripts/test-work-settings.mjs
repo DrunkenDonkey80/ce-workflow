@@ -182,12 +182,16 @@ try {
 	// status reports the advisor slot and gates.
 	await commands["work-settings"].handler("status", ctx);
 	assert(
-		notices.at(-1).message.includes("advisor (critic)"),
-		"status lists advisor slot",
+		notices.at(-1).message.includes("Work settings\n\nProfile"),
+		"status is grouped and readable",
 	);
 	assert(
-		notices.at(-1).message.includes("advisor backup"),
-		"status lists backup advisor slot",
+		notices.at(-1).message.includes("› advisor (critic)"),
+		"status lists advisor slot as submenu",
+	);
+	assert(
+		notices.at(-1).message.includes("› advisor backup"),
+		"status lists backup advisor slot as submenu",
 	);
 	assert(
 		notices.at(-1).message.includes("planner writes slice plan before work"),
@@ -213,6 +217,14 @@ try {
 		notices.at(-1).message.includes("ce-test-browser when diff touches UI"),
 		"status lists browser-test gate",
 	);
+	assert(
+		notices.at(-1).message.includes("self-improving workflow fixes"),
+		"status lists self-improving toggle",
+	);
+	assert(
+		notices.at(-1).message.includes("new session between iterations"),
+		"status lists fresh-session toggle",
+	);
 	assert(existsSync(settingsFile()), "settings file exists");
 
 	// Live submenu: flip a critic gate off through the UI loop.
@@ -232,9 +244,7 @@ try {
 			select: async (_title, labels) => {
 				if (!flipped) {
 					flipped = true;
-					return labels.find((label) =>
-						label.startsWith("critic on brainstorm:"),
-					);
+					return labels.find((label) => label.includes("critic on brainstorm"));
 				}
 				return labels.find((label) => label.startsWith("done"));
 			},
@@ -244,6 +254,30 @@ try {
 	assert(
 		mod.workOrchSettings(cwd).critic.brainstorm === false,
 		"UI loop flipped critic brainstorm off",
+	);
+
+	let flippedResume = false;
+	const resumeCtx = {
+		cwd,
+		model: { provider: "p", id: "m" },
+		modelRegistry: { getAvailable: async () => [] },
+		ui: {
+			notify: () => {},
+			select: async (_title, labels) => {
+				if (!flippedResume) {
+					flippedResume = true;
+					return labels.find((label) =>
+						label.includes("self-improving workflow fixes"),
+					);
+				}
+				return labels.find((label) => label.startsWith("done"));
+			},
+		},
+	};
+	await commands["work-settings"].handler("", resumeCtx);
+	assert(
+		readSettings().workResume.selfImproving === true,
+		"UI loop flipped self-improving on",
 	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

@@ -51,6 +51,10 @@ try {
 		"direct handoff bypasses parent subagent tool chatter",
 	);
 	assert(
+		direct.params.task.includes("Do not read raw Pi/subagent session files"),
+		"direct handoff treats missing session files as optional diagnostics",
+	);
+	assert(
 		fixture.logs().filter((entry) => entry.op === "create").length === 1,
 		"small creates exactly one Bead",
 	);
