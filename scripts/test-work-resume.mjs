@@ -425,14 +425,11 @@ try {
 	process.env.WORK_RESUME_SCENARIO = "implementation";
 	state = buildWorkResumeState(process.cwd(), "E-1");
 	assert(
-		state.action === "run-planner",
-		"unplanned implementation selected for slice planning",
+		state.action === "slice-planned-inline",
+		"unplanned implementation gets coded slice plan without planner agent",
 	);
 	assert(state.selectedBead.id === "IMP-1", "implementation bead selected");
-	assert(
-		state.handoffPrompt.includes("wo:slice-plan"),
-		"slice-planning handoff asks for durable plan note",
-	);
+	assert(!state.handoffPrompt, "inline slice planning skips agent handoff");
 
 	process.env.WORK_RESUME_SCENARIO = "ideasOnly";
 	state = buildWorkResumeState(process.cwd(), "E-1");
@@ -739,50 +736,36 @@ try {
 		"blocked resume output includes blocker next action",
 	);
 
-	// low keeps the cheap bead-planner note; medium/high/max use ce-plan depth.
+	// normal profiles add the slice-plan note inline; max can still launch a planner for messy/large slices.
 	process.env.WORK_RESUME_SCENARIO = "implementation";
-	const lowCwd = mkdtempSync(path.join(tmpdir(), "work-resume-low-"));
-	mkdirSync(path.join(lowCwd, ".pi"), { recursive: true });
-	writeFileSync(
-		path.join(lowCwd, ".pi", "settings.json"),
-		JSON.stringify({ workOrchestrator: { profile: "low" } }),
-	);
-	const lowState = buildWorkResumeState(lowCwd, "E-1");
-	assert(
-		lowState.handoffPrompt.includes("append one compact Bead note headed") &&
-			!lowState.handoffPrompt.includes("Invoke the ce-plan skill"),
-		"low slice handoff uses bead-planner note, not ce-plan",
-	);
-	rmSync(lowCwd, { recursive: true, force: true });
-
-	for (const [profile, depthText] of [
-		["medium", "Lightweight depth"],
-		["high", "Standard depth"],
-		["max", "Deep depth"],
-	]) {
-		const ceCwd = mkdtempSync(path.join(tmpdir(), "work-resume-ce-"));
-		mkdirSync(path.join(ceCwd, ".pi"), { recursive: true });
+	for (const profile of ["low", "medium", "high"]) {
+		const inlineCwd = mkdtempSync(path.join(tmpdir(), "work-resume-inline-"));
+		mkdirSync(path.join(inlineCwd, ".pi"), { recursive: true });
 		writeFileSync(
-			path.join(ceCwd, ".pi", "settings.json"),
+			path.join(inlineCwd, ".pi", "settings.json"),
 			JSON.stringify({ workOrchestrator: { profile } }),
 		);
-		const ceState = buildWorkResumeState(ceCwd, "E-1");
+		const inlineState = buildWorkResumeState(inlineCwd, "E-1");
 		assert(
-			ceState.action === "run-planner",
-			`${profile} unplanned slice still routes to planner`,
+			inlineState.action === "slice-planned-inline" &&
+				!inlineState.handoffPrompt,
+			`${profile} slice planning is inline`,
 		);
-		assert(
-			ceState.handoffPrompt.includes("ce-plan") &&
-				ceState.handoffPrompt.includes("plan-path:") &&
-				ceState.handoffPrompt.includes(depthText),
-			`${profile} slice handoff invokes ce-plan ${depthText}`,
-		);
-		assert(
-			!ceState.handoffPrompt.includes("append one compact Bead note headed"),
-			`${profile} slice handoff does not use the lightweight note step`,
-		);
-		rmSync(ceCwd, { recursive: true, force: true });
+		rmSync(inlineCwd, { recursive: true, force: true });
 	}
+
+	const maxCwd = mkdtempSync(path.join(tmpdir(), "work-resume-ce-"));
+	mkdirSync(path.join(maxCwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(maxCwd, ".pi", "settings.json"),
+		JSON.stringify({ workOrchestrator: { profile: "max" } }),
+	);
+	const maxState = buildWorkResumeState(maxCwd, "E-1");
+	assert(
+		maxState.action === "slice-planned-inline",
+		"max still skips planner for simple slices",
+	);
+	rmSync(maxCwd, { recursive: true, force: true });
 } finally {
 	if (oldEnv.bd === undefined) delete process.env.WORK_ORCH_BD_BIN;
 	else process.env.WORK_ORCH_BD_BIN = oldEnv.bd;

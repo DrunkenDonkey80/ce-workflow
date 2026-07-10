@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { realpathSync } from "node:fs";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 const { assert, installWorkflowFixture } = await import(
@@ -11,6 +11,7 @@ const { assert, installWorkflowFixture } = await import(
 const {
 	buildWorkBigState,
 	buildWorkFinishState,
+	executeWorkFinishState,
 	buildWorkInitState,
 	buildWorkMasterState,
 	buildWorkMedState,
@@ -242,8 +243,20 @@ try {
 		"migrate missing path stops",
 	);
 
+	const finishCwd = fixture.dir;
+	mkdirSync(path.join(finishCwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(finishCwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workOrchestrator: {
+				browserTestsOnUiDiff: false,
+				codeReviewBeforeCommit: false,
+			},
+		}),
+	);
+
 	fixture.reset("finishReady", "unknown");
-	state = buildWorkFinishState(process.cwd(), "FIN-1");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
 		state.ok && state.action === "commit-ready",
 		"finish accepts reviewed verified related dirty work",
@@ -252,37 +265,59 @@ try {
 		state.commitMessage === "FIN-1: Finishable slice",
 		"finish produces deterministic commit seed",
 	);
+	state = executeWorkFinishState(finishCwd, state);
+	assert(
+		state.ok && state.action === "finish-committed",
+		"finish commits and closes without a committer agent",
+	);
+	assert(
+		fixture
+			.logs()
+			.some((entry) => entry.tool === "git" && entry.op === "commit") &&
+			fixture.logs().some((entry) => entry.op === "close") &&
+			fixture
+				.logs()
+				.some((entry) => entry.tool === "git" && entry.op === "amend"),
+		"finish stages work, closes Bead, and amends Beads metadata",
+	);
 
 	fixture.reset("finishReady", "unknown");
-	state = buildWorkFinishState(process.cwd(), "1");
+	state = buildWorkFinishState(finishCwd, "1");
 	assert(
 		state.ok && state.selectedBead.id === "FIN-1",
 		"finish accepts numeric shorthand for active epic child bead",
 	);
 
 	fixture.reset("finishMissingReview", "unknown");
-	state = buildWorkFinishState(process.cwd(), "FIN-1");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		state.ok && state.note.includes("coded small-diff check"),
+		"finish skips reviewer for small verified diffs",
+	);
+
+	fixture.reset("finishMissingReview", "large");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
 		!state.ok && state.reason === "missing-review",
-		"finish requires PASS review",
+		"finish requires PASS review for large diffs",
 	);
 
 	fixture.reset("finishMissingVerification", "unknown");
-	state = buildWorkFinishState(process.cwd(), "FIN-1");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
 		!state.ok && state.reason === "missing-verification",
 		"finish requires verification evidence",
 	);
 
 	fixture.reset("finishReady", "staged-instruction");
-	state = buildWorkFinishState(process.cwd(), "FIN-1");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
 		!state.ok && state.reason === "unrelated-dirty-files",
 		"finish rejects unrelated dirty files",
 	);
 
 	fixture.reset("finishReady", "clean");
-	state = buildWorkFinishState(process.cwd(), "FIN-1");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
 		!state.ok && state.reason === "no-related-dirty-files",
 		"finish requires related dirty files",

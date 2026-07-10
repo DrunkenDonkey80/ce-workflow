@@ -46,12 +46,12 @@ try {
 		"medium slice planning",
 	);
 	assert(
-		mod.workOrchSettings(cwd).slicePlanWithCePlan === true,
-		"medium ce-plan per slice",
+		mod.workOrchSettings(cwd).slicePlanWithCePlan === false,
+		"medium inline slice planning",
 	);
 	assert(
 		mod.workOrchSettings(cwd).slicePlanCeDepth === "Lightweight",
-		"medium ce-plan lightweight",
+		"medium lightweight slice depth",
 	);
 	assert(
 		mod.workOrchSettings(cwd).codeReviewBeforeCommit === false,
@@ -75,7 +75,7 @@ try {
 	assert(max.critic.plan === true, "max critic plan");
 	assert(max.advisorVerifyTask === true, "max advisor verify");
 	assert(max.codeReviewBeforeCommit === true, "max code review");
-	assert(max.slicePlanWithCePlan === true, "max ce-plan per slice");
+	assert(max.slicePlanWithCePlan === true, "max agent slice planner available");
 	assert(max.slicePlanCeDepth === "Deep", "max ce-plan deep");
 	assert(max.simplifyBeforeReview === true, "max simplify");
 	assert(max.browserTestsOnUiDiff === true, "max browser tests");
@@ -130,7 +130,7 @@ try {
 	writeSettings(settings);
 	assert(
 		mod.workOrchSettings(cwd).slicePlanCeDepth === "Standard",
-		"high ce-plan standard",
+		"high slice-plan standard when agent planner is enabled",
 	);
 
 	// Apply low profile: critic and verify off.
@@ -198,15 +198,19 @@ try {
 		"status lists slice planning gate",
 	);
 	assert(
-		notices.at(-1).message.includes("ce-plan per slice (medium/high/max)"),
-		"status lists ce-plan slice gate",
+		notices
+			.at(-1)
+			.message.includes("agent slice planner for messy/large slices"),
+		"status lists agent slice-planner gate",
 	);
 	assert(
 		notices.at(-1).message.includes("ce-plan slice depth: Lightweight"),
 		"status lists ce-plan slice depth",
 	);
 	assert(
-		notices.at(-1).message.includes("full ce-code-review before commit"),
+		notices
+			.at(-1)
+			.message.includes("full ce-code-review for risky/large commits"),
 		"status lists code-review gate",
 	);
 	assert(

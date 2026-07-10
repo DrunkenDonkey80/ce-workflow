@@ -101,13 +101,6 @@ const SLOTS = [
 		description: "Read-only diff/acceptance/verification review",
 	},
 	{
-		key: "commit",
-		label: "commit",
-		agents: ["bead-committer"],
-		defaultThinking: "low",
-		description: "Verification gate, commit, and Bead close",
-	},
-	{
 		key: "advisor",
 		label: "advisor (critic)",
 		agents: ["bead-advisor"],
@@ -135,7 +128,6 @@ const EFFORT_PROFILES = {
 		work: "low",
 		debug: "medium",
 		review: "low",
-		commit: "low",
 		advisor: "medium",
 		advisorBackup: "low",
 		critic: { brainstorm: false, plan: false },
@@ -152,13 +144,12 @@ const EFFORT_PROFILES = {
 		work: "medium",
 		debug: "high",
 		review: "medium",
-		commit: "low",
 		advisor: "high",
 		advisorBackup: "medium",
 		critic: { brainstorm: true, plan: true },
 		advisorVerifyTask: true,
 		slicePlanBeforeWork: true,
-		slicePlanWithCePlan: true,
+		slicePlanWithCePlan: false,
 		slicePlanCeDepth: "Lightweight",
 		simplifyBeforeReview: false,
 		browserTestsOnUiDiff: true,
@@ -169,13 +160,12 @@ const EFFORT_PROFILES = {
 		work: "high",
 		debug: "high",
 		review: "high",
-		commit: "low",
 		advisor: "xhigh",
 		advisorBackup: "medium",
 		critic: { brainstorm: true, plan: true },
 		advisorVerifyTask: true,
 		slicePlanBeforeWork: true,
-		slicePlanWithCePlan: true,
+		slicePlanWithCePlan: false,
 		slicePlanCeDepth: "Standard",
 		simplifyBeforeReview: true,
 		browserTestsOnUiDiff: true,
@@ -186,7 +176,6 @@ const EFFORT_PROFILES = {
 		work: "xhigh",
 		debug: "xhigh",
 		review: "high",
-		commit: "medium",
 		advisor: "xhigh",
 		advisorBackup: "high",
 		critic: { brainstorm: true, plan: true },
@@ -201,14 +190,14 @@ const EFFORT_PROFILES = {
 };
 const DEFAULT_PROFILE = "medium";
 const WORK_ORCH_BOOLEANS = [
-	{ key: "advisorVerifyTask", label: "advisor verifies task vs plan" },
+	{ key: "advisorVerifyTask", label: "coded task-vs-plan checklist" },
 	{
 		key: "slicePlanBeforeWork",
 		label: "planner writes slice plan before work",
 	},
 	{
 		key: "slicePlanWithCePlan",
-		label: "ce-plan per slice (medium/high/max)",
+		label: "agent slice planner for messy/large slices",
 	},
 	{
 		key: "simplifyBeforeReview",
@@ -220,7 +209,7 @@ const WORK_ORCH_BOOLEANS = [
 	},
 	{
 		key: "codeReviewBeforeCommit",
-		label: "full ce-code-review before commit",
+		label: "full ce-code-review for risky/large commits",
 	},
 ];
 const WORK_ORCH_CRITIC_KEYS = ["brainstorm", "plan"];
@@ -581,7 +570,9 @@ function stateTelemetry(state) {
 			queued: handoffQueued,
 			started: false,
 			role,
-			reason: handoffQueued ? undefined : stopReason(state),
+			reason: handoffQueued
+				? (state?.handoffReason ?? state?.action)
+				: stopReason(state),
 		},
 		outputChars: state?.outputChars,
 		counts: state?.counts,
@@ -642,11 +633,12 @@ function isDuplicateTelemetry(file, record) {
 
 function recordWorkTelemetry(cwd, event) {
 	if (!cwd || process.env.WORK_ORCH_TELEMETRY_OFF === "1") return "";
-	const timestamp = event.timestamp ?? Date.now();
+	const enriched = telemetryWithTranscript(event);
+	const timestamp = enriched.timestamp ?? Date.now();
 	const record = {
 		version: 1,
-		...event,
-		id: event.id ?? telemetryId(),
+		...enriched,
+		id: enriched.id ?? telemetryId(),
 		timestamp: new Date(timestamp).toISOString(),
 	};
 	const file = telemetryPath(cwd, telemetryDay(timestamp));
@@ -1239,18 +1231,28 @@ function buildWorkTelemetryState(cwd, args = "") {
 	let maxContextTokens = 0;
 	for (const event of events) {
 		totals.durationMs += Number(event.durationMs ?? 0);
-		totals.tokens += Number(event.usage?.totalTokens ?? 0);
-		totals.input += Number(event.usage?.input ?? 0);
-		totals.output += Number(event.usage?.output ?? 0);
-		totals.cost += Number(event.usage?.cost ?? 0);
+		const reconciledUsage = event.telemetry?.reconciled?.usage;
+		totals.tokens += Number(
+			reconciledUsage?.totalTokens ?? event.usage?.totalTokens ?? 0,
+		);
+		totals.input += Number(reconciledUsage?.input ?? event.usage?.input ?? 0);
+		totals.output += Number(
+			reconciledUsage?.output ?? event.usage?.output ?? 0,
+		);
+		totals.cost += Number(reconciledUsage?.cost ?? event.usage?.cost ?? 0);
 		totals.messageChars += Number(
 			event.messages?.chars ?? event.outputChars ?? 0,
 		);
-		totals.toolOutputChars += (event.tools ?? []).reduce(
-			(sum, tool) => sum + Number(tool.outputChars ?? 0),
-			0,
+		totals.toolOutputChars += Number(
+			event.telemetry?.reconciled?.toolOutputChars ??
+				(event.tools ?? []).reduce(
+					(sum, tool) => sum + Number(tool.outputChars ?? 0),
+					0,
+				),
 		);
-		totals.toolCalls += (event.tools ?? []).length;
+		totals.toolCalls += Number(
+			event.telemetry?.reconciled?.toolCalls ?? (event.tools ?? []).length,
+		);
 		totals.subagentRuns += (event.tools ?? []).filter(
 			(tool) => tool.name === "subagent",
 		).length;
@@ -1316,6 +1318,7 @@ function buildWorkTelemetryState(cwd, args = "") {
 		),
 		byPhase: [...byPhase.values()].sort((a, b) => b.durationMs - a.durationMs),
 		byBead: [...byBead.values()].sort((a, b) => b.durationMs - a.durationMs),
+		outputWaste: optimizationTelemetry(events),
 		slowest: [...events]
 			.sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0))
 			.slice(0, 5)
@@ -1370,6 +1373,16 @@ function renderWorkTelemetryText(state) {
 		"",
 		"By Bead:",
 		...renderMetricRows(state.byBead),
+		"",
+		"Output waste:",
+		...(state.outputWaste?.largeOutputs?.length
+			? state.outputWaste.largeOutputs.map(
+					(row) => `- ${row.commandSignature}: ${row.outputChars} chars`,
+				)
+			: ["- none"]),
+		...(state.outputWaste?.recommendations?.length
+			? state.outputWaste.recommendations.map((item) => `  next: ${item}`)
+			: []),
 		"",
 		"Slowest:",
 		...(state.slowest.length
@@ -1924,7 +1937,7 @@ function advisorCriticStep(target) {
 
 function advisorVerifyStep() {
 	return [
-		`Advisor task-verification gate (read-only): once a slice is implemented and self-verified but before review/finish, launch the bead-advisor subagent (agent: "bead-advisor", context: fresh) to compare the change against the epic plan's acceptance and implementation unit, and to flag inconsistencies, drift from the plan, or missing verification evidence. ${advisorFallbackText()} Record findings as notes on the slice Bead. Apply only when a real implementation slice was produced this handoff; otherwise no-op.`,
+		"Coded task-verification checklist: once a slice is implemented and self-verified but before finish, compare the Bead notes/diff against the epic plan's acceptance and implementation unit yourself. Append a compact Bead note headed `wo:verify-check` with: plan match, acceptance covered, verification command/proof, known gaps/waivers. Do not launch bead-advisor unless the plan or evidence is ambiguous after this checklist.",
 	].join("\n");
 }
 
@@ -1937,6 +1950,54 @@ function hasSlicePlan(issue) {
 
 function slicePlanStep(issue) {
 	return `Slice-planning pass before implementation: target ${issueRef(issue)} already exists as executable work. Do not create child Beads. Read the epic's referenced plan/acceptance plus this Bead, then append one compact Bead note headed \`wo:slice-plan\` with: intended approach, files likely touched, acceptance/verification commands or hardware proof, risks/unknowns, and explicit out-of-scope. Add label \`wo:slice-planned\` to the Bead. Stop after that planning note; implementation happens on the next /work-resume.`;
+}
+
+function needsPlannerAgent(issue, state) {
+	const text = [notesOf(issue), issue?.description, issue?.acceptance].join(
+		"\n",
+	);
+	return text.length > 4_000 || (state?.executableSlices?.length ?? 0) > 12;
+}
+
+function inlineSlicePlanNote(issue, state, cwd) {
+	const plan = state.planPath ? relative(cwd, state.planPath) : "none linked";
+	return [
+		"wo:slice-plan",
+		`plan-path: ${plan}`,
+		`target: ${issueRef(issue)}`,
+		"approach: implement the Bead's acceptance with the smallest localized diff; reuse existing helpers before adding code.",
+		"likely files: derive from the Bead notes/design before editing; do not broaden scope.",
+		"verification: run the Bead's named check, or the smallest focused command that proves the acceptance.",
+		"risks/out-of-scope: create a blocker Bead instead of guessing when acceptance, hardware/live proof, or ownership is unclear.",
+	].join("\n");
+}
+
+function applyInlineSlicePlan(cwd, state, issue) {
+	try {
+		run(cwd, "bd", [
+			"update",
+			idOf(issue),
+			"--append-notes",
+			inlineSlicePlanNote(issue, state, cwd),
+		]);
+		return {
+			...state,
+			action: "slice-planned-inline",
+			selectedBead: issueSummary(issue),
+			message: "Added coded slice-plan note; no planner agent launched.",
+			nextAction: `Next: /work-resume ${state.epic.id}`,
+		};
+	} catch (error) {
+		return errorState(
+			"slice-plan-failed",
+			commandErrorText(error) || error.message,
+			{
+				...state,
+				action: "slice-plan-stop",
+				selectedBead: issueSummary(issue),
+			},
+		);
+	}
 }
 
 function cePlanSliceStep(issue, cwd, masterPlanPath, depth = "Lightweight") {
@@ -2352,6 +2413,552 @@ function run(cwd, command, args) {
 	}
 }
 
+const LARGE_OUTPUT_THRESHOLD = 10_000;
+const BOUNDED_OUTPUT_CAP = 10_000;
+const TASK_RAW_THRESHOLD = 10_000;
+
+function artifactPath(cwd, group, prefix, ext = "txt") {
+	const dir = join(telemetryDir(cwd), group);
+	mkdirSync(dir, { recursive: true });
+	return join(
+		dir,
+		`${safeHistoryPathPart(prefix)}-${telemetryId("art")}.${ext}`,
+	);
+}
+
+function writeArtifact(cwd, group, prefix, ext, content) {
+	const file = artifactPath(cwd, group, prefix, ext);
+	writeFileSync(file, String(content ?? ""));
+	return file;
+}
+
+function textHeadTail(value, cap = BOUNDED_OUTPUT_CAP) {
+	const text = String(value ?? "");
+	if (text.length <= cap) return text;
+	const half = Math.max(500, Math.floor((cap - 80) / 2));
+	return `${text.slice(0, half)}\n… truncated ${text.length - half * 2} chars …\n${text.slice(-half)}`;
+}
+
+function commandSignature(command, args = []) {
+	const parts = [command, ...args].map((part) =>
+		String(part ?? "")
+			.replace(/\b[A-Z]{2,}-\d+\b/g, "<task>")
+			.replace(/[a-f0-9]{7,40}/gi, "<hash>")
+			.replace(/(['"]).{80,}\1/g, "<long-string>")
+			.replace(/\s+/g, " ")
+			.trim(),
+	);
+	return parts.filter(Boolean).join(" ");
+}
+
+function runBounded(cwd, command, args = [], options = {}) {
+	let override;
+	if (command === "bd") override = process.env.WORK_ORCH_BD_BIN;
+	else if (command === "git") override = process.env.WORK_ORCH_GIT_BIN;
+	const script = nodeScript(override)
+		? override
+		: windowsBeadsBinScript(command, override);
+	const actualCommand = script ? process.execPath : (override ?? command);
+	const actualArgs = script ? [script, ...args] : args;
+	let stdout = "";
+	let stderr = "";
+	let exitCode = 0;
+	const started = Date.now();
+	try {
+		stdout = execFileSync(actualCommand, actualArgs, {
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+	} catch (error) {
+		exitCode = Number(error.status ?? 1);
+		stdout = String(error.stdout ?? "");
+		stderr = String(error.stderr ?? error.message ?? "");
+	}
+	const prefix = options.name ?? commandSignature(command, args).slice(0, 80);
+	const fullStdoutPath = writeArtifact(
+		cwd,
+		"logs",
+		`${prefix}-stdout`,
+		"txt",
+		stdout,
+	);
+	const fullStderrPath = writeArtifact(
+		cwd,
+		"logs",
+		`${prefix}-stderr`,
+		"txt",
+		stderr,
+	);
+	const cap = Number(options.cap ?? BOUNDED_OUTPUT_CAP);
+	const result = {
+		command: commandSignature(command, args),
+		exit_code: exitCode,
+		duration_ms: Math.max(0, Date.now() - started),
+		stdout_chars: stdout.length,
+		stderr_chars: stderr.length,
+		stdout_summary: textHeadTail(stdout, cap),
+		stderr_summary: textHeadTail(stderr, cap),
+		truncated: stdout.length > cap || stderr.length > cap,
+		full_stdout_path: fullStdoutPath,
+		full_stderr_path: fullStderrPath,
+	};
+	if (result.truncated)
+		recordWorkTelemetry(cwd, {
+			type: "large-output",
+			command: result.command,
+			ok: exitCode === 0,
+			outputChars: stdout.length + stderr.length,
+			threshold: cap,
+			artifacts: [fullStdoutPath, fullStderrPath],
+		});
+	return result;
+}
+
+function compactTaskSummary(issue, options = {}) {
+	const notes = notesOf(issue);
+	const acceptance = String(
+		issue?.acceptance ?? issue?.acceptance_criteria ?? issue?.criteria ?? "",
+	);
+	const notesCap = Number(options.notesTail ?? 2_000);
+	const acceptanceCap = Number(options.acceptanceTail ?? 1_500);
+	return {
+		id: idOf(issue),
+		title: titleOf(issue),
+		status: statusOf(issue),
+		issue_type: typeOf(issue),
+		priority: issue?.priority,
+		assignee: issue?.assignee,
+		labels: labelsOf(issue),
+		parent: parentOf(issue),
+		dependencies: depsOf(issue).map((id) => ({ id, blocking: true })),
+		dependents: asArray(issue?.dependents).map((item) => ({
+			id: idOf(item) || item?.id,
+			status: statusOf(item),
+			type: item?.type,
+		})),
+		created_at: createdAt(issue),
+		updated_at: updatedAt(issue),
+		closed_at: issue?.closed_at ?? issue?.closedAt,
+		close_reason: issue?.close_reason ?? issue?.closeReason,
+		notes_tail: notes.slice(-notesCap),
+		acceptance_criteria_tail: acceptance.slice(-acceptanceCap),
+	};
+}
+
+function workflowTaskSummary(cwd, taskId, options = {}) {
+	const issue = one(bdJsonRequired(cwd, ["show", taskId]));
+	const raw = JSON.stringify(issue, null, "\t");
+	const summary = compactTaskSummary(issue, options);
+	if (options.full || raw.length > TASK_RAW_THRESHOLD) {
+		summary.raw_artifact_path = writeArtifact(
+			cwd,
+			"tasks",
+			taskId,
+			"json",
+			raw,
+		);
+		if (raw.length > TASK_RAW_THRESHOLD)
+			recordWorkTelemetry(cwd, {
+				type: "large-task-read",
+				beadId: taskId,
+				ok: true,
+				outputChars: raw.length,
+				threshold: TASK_RAW_THRESHOLD,
+				artifact: summary.raw_artifact_path,
+			});
+	}
+	return summary;
+}
+
+function changedFilesSummary(cwd) {
+	const rows = parsePorcelainStatus(
+		run(cwd, "git", ["status", "--porcelain=v1", "--untracked-files=all"]),
+	);
+	const changedFiles = rows.map((item) => item.path);
+	const fullDiffPath = writeArtifact(
+		cwd,
+		"logs",
+		"git-diff",
+		"patch",
+		safeRun(cwd, "git", ["diff", "--", ...changedFiles]) || "",
+	);
+	return {
+		status: "PASS",
+		changed_files: changedFiles,
+		full_diff_path: fullDiffPath,
+	};
+}
+
+function stagedFilesSummary(cwd) {
+	const staged = run(cwd, "git", ["diff", "--cached", "--name-only"])
+		.split(/\r?\n/)
+		.filter(Boolean);
+	return { status: "PASS", staged_files: staged };
+}
+
+function patternToRegex(pattern) {
+	const escaped = String(pattern)
+		.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+		.replace(/\*/g, ".*");
+	return new RegExp(`^${escaped}$`);
+}
+
+function onlyAllowedFilesChanged(cwd, allowPatterns = []) {
+	const changed = changedFilesSummary(cwd);
+	const tests = allowPatterns.map(patternToRegex);
+	const unexpected = changed.changed_files.filter(
+		(file) => !tests.some((test) => test.test(normalizedRepoPath(file))),
+	);
+	return {
+		...changed,
+		status: unexpected.length ? "FAIL" : "PASS",
+		unexpected_files: unexpected,
+	};
+}
+
+function jsonlRecords(path, ids = []) {
+	const wanted = new Set(ids.map(String));
+	return readFileSync(path, "utf8")
+		.split(/\r?\n/)
+		.filter(Boolean)
+		.flatMap((line) => {
+			try {
+				return [JSON.parse(line)];
+			} catch {
+				return [];
+			}
+		})
+		.filter((record) => !wanted.size || wanted.has(String(record.id)));
+}
+
+function jsonlRecordSummary(path, ids = []) {
+	const records = Object.fromEntries(
+		jsonlRecords(path, ids).map((record) => [
+			record.id,
+			{
+				status: record.status,
+				labels: record.labels ?? [],
+				dependency_ids: depsOf(record),
+				updated_at: record.updated_at,
+			},
+		]),
+	);
+	return { status: "PASS", path, records };
+}
+
+function jsonlRecordDiff(path, ids = [], baselinePath) {
+	const current = jsonlRecordSummary(path, ids).records;
+	const baseline =
+		baselinePath && existsSync(baselinePath)
+			? jsonlRecordSummary(baselinePath, ids).records
+			: {};
+	const records = {};
+	for (const [id, record] of Object.entries(current)) {
+		const before = baseline[id] ?? {};
+		records[id] = {
+			...record,
+			changed_fields: Object.keys(record).filter(
+				(key) => JSON.stringify(record[key]) !== JSON.stringify(before[key]),
+			),
+		};
+	}
+	return { status: "PASS", path, records };
+}
+
+function forbiddenPatternCheck(paths, patterns) {
+	const regexes = patterns.map((pattern) => new RegExp(pattern));
+	const failures = [];
+	for (const file of paths) {
+		const text = readFileSync(file, "utf8");
+		for (const regex of regexes)
+			if (regex.test(text))
+				failures.push({ path: file, pattern: String(regex) });
+	}
+	return { status: failures.length ? "FAIL" : "PASS", failures };
+}
+
+function runTempCheck(cwd, name, script, inputs = {}, options = {}) {
+	const dir = join(telemetryDir(cwd), "checks");
+	mkdirSync(dir, { recursive: true });
+	const prefix = safeHistoryPathPart(name);
+	const scriptPath = join(dir, `${prefix}-${telemetryId("check")}.mjs`);
+	const inputPath = join(dir, `${prefix}-inputs.json`);
+	writeFileSync(scriptPath, script);
+	writeFileSync(inputPath, JSON.stringify(inputs, null, "\t"));
+	const result = runBounded(cwd, process.execPath, [scriptPath, inputPath], {
+		name: `${prefix}-check`,
+		cap: options.cap ?? 4_000,
+	});
+	let parsed;
+	try {
+		parsed = JSON.parse(result.stdout_summary);
+	} catch {
+		parsed = { summary: result.stdout_summary };
+	}
+	return {
+		name,
+		status: result.exit_code === 0 ? (parsed.status ?? "PASS") : "FAIL",
+		exit_code: result.exit_code,
+		duration_ms: result.duration_ms,
+		summary: parsed.summary ?? result.stderr_summary,
+		key_values: parsed.key_values ?? {},
+		failed_assertions: parsed.failed_assertions ?? [],
+		full_log_path: result.full_stdout_path,
+		script_path: scriptPath,
+	};
+}
+
+function searchSummary(cwd, query, paths = ["."], options = {}) {
+	const max = String(options.max ?? 20);
+	const result = runBounded(cwd, "rg", ["-n", "-m", max, query, ...paths], {
+		name: `search-${query}`,
+		cap: options.cap ?? 4_000,
+	});
+	const matches = result.stdout_summary.split(/\r?\n/).filter(Boolean);
+	const files = [...new Set(matches.map((line) => line.split(":")[0]))];
+	return {
+		query,
+		searched_paths: paths,
+		matching_file_count: files.length,
+		match_count: matches.length,
+		top_matches: matches.slice(0, Number(max)),
+		suggested_next_files: files.slice(0, 10),
+		full_raw_search_log_path: result.full_stdout_path,
+	};
+}
+
+function prepareTaskExportForGate(cwd, taskIds = []) {
+	const exportedPath = join(cwd, ".beads", "issues.jsonl");
+	const changed = changedFilesSummary(cwd);
+	const staged = stagedFilesSummary(cwd);
+	if (!existsSync(exportedPath))
+		return {
+			status: "SKIP",
+			exported_path: exportedPath,
+			changed_files: changed.changed_files,
+			staged_files: staged.staged_files,
+			summary: "No .beads/issues.jsonl export found.",
+		};
+	const consistency = jsonlRecordSummary(exportedPath, taskIds);
+	const missing = taskIds.filter((id) => !consistency.records[id]);
+	return {
+		status: missing.length ? "FAIL" : "PASS",
+		exported_path: exportedPath,
+		consistency_status: missing.length ? "FAIL" : "PASS",
+		missing_ids: missing,
+		changed_files: changed.changed_files,
+		staged_files: staged.staged_files,
+		summary: missing.length
+			? `Missing exported tasks: ${missing.join(", ")}`
+			: `Export covers ${taskIds.length} task(s).`,
+	};
+}
+
+function evidenceSummaryPath(cwd, runId) {
+	return join(
+		telemetryDir(cwd),
+		"evidence",
+		`${safeHistoryPathPart(runId)}-summary.json`,
+	);
+}
+
+function writeEvidenceSummary(cwd, summary) {
+	const runId = summary.run_id ?? telemetryId("run");
+	const file = evidenceSummaryPath(cwd, runId);
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(
+		file,
+		JSON.stringify({ ...summary, run_id: runId }, null, "\t"),
+	);
+	return file;
+}
+
+function readEvidenceSummary(cwd, runId) {
+	const file = evidenceSummaryPath(cwd, runId);
+	if (!existsSync(file)) return undefined;
+	try {
+		return JSON.parse(readFileSync(file, "utf8"));
+	} catch {
+		return undefined;
+	}
+}
+
+function transcriptText(value) {
+	if (typeof value === "string") return value;
+	return JSON.stringify(value ?? "");
+}
+
+function reconcileTranscriptTelemetry(path) {
+	const out = {
+		assistantTurns: 0,
+		userTurns: 0,
+		toolCalls: 0,
+		toolResults: 0,
+		toolErrors: 0,
+		perToolCounts: {},
+		toolOutputChars: 0,
+		maxToolOutputChars: 0,
+		repeatedCommandSignatures: [],
+		usage: { totalTokens: 0, input: 0, output: 0, cost: 0 },
+		firstTimestamp: undefined,
+		lastTimestamp: undefined,
+	};
+	const repeats = new Map();
+	for (const line of readFileSync(path, "utf8")
+		.split(/\r?\n/)
+		.filter(Boolean)) {
+		let row;
+		try {
+			row = JSON.parse(line);
+		} catch {
+			continue;
+		}
+		const role = row.role ?? row.message?.role ?? row.type;
+		if (role === "assistant") out.assistantTurns += 1;
+		if (role === "user") out.userTurns += 1;
+		const calls =
+			row.toolCalls ??
+			row.tool_calls ??
+			row.message?.toolCalls ??
+			row.message?.tool_calls ??
+			[];
+		if (Array.isArray(calls)) {
+			out.toolCalls += calls.length;
+			for (const call of calls) {
+				const name = call.name ?? call.function?.name ?? "tool";
+				out.perToolCounts[name] = (out.perToolCounts[name] ?? 0) + 1;
+				const sig = commandSignature(name, [call.args ?? call.arguments ?? ""]);
+				repeats.set(sig, (repeats.get(sig) ?? 0) + 1);
+			}
+		}
+		if (
+			/tool.*result|result.*tool/.test(String(row.type ?? "")) ||
+			row.toolResult
+		) {
+			out.toolResults += 1;
+			const chars = transcriptText(
+				row.result ?? row.toolResult ?? row.content,
+			).length;
+			out.toolOutputChars += chars;
+			out.maxToolOutputChars = Math.max(out.maxToolOutputChars, chars);
+			if (row.isError || row.error) out.toolErrors += 1;
+		}
+		const usage = row.usage ?? row.message?.usage;
+		if (usage) {
+			out.usage.totalTokens += Number(
+				usage.totalTokens ?? usage.total_tokens ?? 0,
+			);
+			out.usage.input += Number(usage.input ?? usage.input_tokens ?? 0);
+			out.usage.output += Number(usage.output ?? usage.output_tokens ?? 0);
+			out.usage.cost += Number(usage.cost ?? 0);
+		}
+		const timestamp = row.timestamp ?? row.time;
+		if (timestamp) {
+			out.firstTimestamp ??= timestamp;
+			out.lastTimestamp = timestamp;
+		}
+	}
+	out.repeatedCommandSignatures = [...repeats.entries()]
+		.filter(([, count]) => count > 1)
+		.map(([signature, count]) => ({ signature, count }));
+	return out;
+}
+
+function telemetryWithTranscript(event) {
+	if (!event.transcriptPath || !existsSync(event.transcriptPath)) return event;
+	try {
+		const reconciled = reconcileTranscriptTelemetry(event.transcriptPath);
+		const live = {
+			toolCount: (event.tools ?? []).length,
+			assistantTurns:
+				event.messages?.assistantTurns ?? event.messages?.assistant ?? 0,
+		};
+		const mismatchFields = [];
+		if (live.toolCount !== reconciled.toolCalls)
+			mismatchFields.push("toolCount");
+		if (live.assistantTurns !== reconciled.assistantTurns)
+			mismatchFields.push("assistantTurns");
+		return {
+			...event,
+			usage: reconciled.usage.totalTokens ? reconciled.usage : event.usage,
+			telemetry: {
+				live,
+				reconciled,
+				used: "reconciled",
+				mismatch: mismatchFields.length > 0,
+				mismatch_fields: mismatchFields,
+			},
+		};
+	} catch {
+		return event;
+	}
+}
+
+function optimizationTelemetry(events) {
+	const largeOutputs = [];
+	const repeated = new Map();
+	let totalToolOutputChars = 0;
+	let fullTaskReadCount = 0;
+	for (const event of events) {
+		if (event.type === "large-task-read") fullTaskReadCount += 1;
+		for (const tool of event.tools ?? []) {
+			const outputChars = Number(tool.outputChars ?? 0);
+			totalToolOutputChars += outputChars;
+			const signature = commandSignature(tool.name ?? "tool", [
+				tool.kind ?? "",
+			]);
+			const item = repeated.get(signature) ?? {
+				signature,
+				count: 0,
+				totalOutputChars: 0,
+			};
+			item.count += 1;
+			item.totalOutputChars += outputChars;
+			repeated.set(signature, item);
+			if (outputChars > LARGE_OUTPUT_THRESHOLD)
+				largeOutputs.push({
+					tool: tool.name,
+					commandSignature: signature,
+					outputChars,
+					threshold: LARGE_OUTPUT_THRESHOLD,
+				});
+		}
+		if (event.outputChars > LARGE_OUTPUT_THRESHOLD)
+			largeOutputs.push({
+				tool: event.command ?? event.type,
+				commandSignature: event.command ?? event.type,
+				outputChars: event.outputChars,
+				threshold: LARGE_OUTPUT_THRESHOLD,
+			});
+	}
+	const repeatedCommandSignatures = [...repeated.values()].filter(
+		(item) => item.count > 1,
+	);
+	return {
+		totalToolOutputChars,
+		largeOutputs: largeOutputs
+			.sort((a, b) => b.outputChars - a.outputChars)
+			.slice(0, 10),
+		topOutputCommands: [...largeOutputs]
+			.sort((a, b) => b.outputChars - a.outputChars)
+			.slice(0, 5)
+			.map((item) => item.commandSignature),
+		repeatedCommandSignatures: repeatedCommandSignatures
+			.sort((a, b) => b.totalOutputChars - a.totalOutputChars)
+			.slice(0, 10),
+		fullTaskReadCount,
+		recommendations: [
+			fullTaskReadCount &&
+				"Use compact task summary instead of full task JSON.",
+			largeOutputs.length &&
+				"Use bounded output; large command output was artifacted.",
+			repeatedCommandSignatures.length &&
+				"Repeated command signatures found; prefer evidence summaries.",
+		].filter(Boolean),
+	};
+}
+
 function safeRun(cwd, command, args) {
 	try {
 		return run(cwd, command, args);
@@ -2645,6 +3252,24 @@ function classifyBdError(error, args = []) {
 function bdJsonRequired(cwd, args) {
 	try {
 		const raw = run(cwd, "bd", [...args, "--json"]);
+		if (raw.length > TASK_RAW_THRESHOLD) {
+			const artifact = writeArtifact(
+				cwd,
+				"tasks",
+				`bd-${args[0] ?? "json"}`,
+				"json",
+				raw,
+			);
+			recordWorkTelemetry(cwd, {
+				type: "large-task-read",
+				command: `bd ${args.join(" ")} --json`,
+				beadId: args[1],
+				ok: true,
+				outputChars: raw.length,
+				threshold: TASK_RAW_THRESHOLD,
+				artifact,
+			});
+		}
 		return raw ? JSON.parse(raw) : [];
 	} catch (error) {
 		const err = new Error(commandErrorText(error) || "bd command failed");
@@ -3517,24 +4142,27 @@ function planResumeAction(state, cwd) {
 	if (implementation) {
 		const settings = workOrchSettings(cwd);
 		if (settings.slicePlanBeforeWork && !hasSlicePlan(implementation)) {
-			return withHandoffPrompt(
-				{
-					...state,
-					action: "run-planner",
-					selectedBead: implementation,
-					handoffExtra: [
-						settings.slicePlanWithCePlan
-							? cePlanSliceStep(
-									implementation,
-									cwd,
-									state.planPath,
-									settings.slicePlanCeDepth,
-								)
-							: slicePlanStep(implementation),
-					],
-				},
-				cwd,
-			);
+			if (
+				settings.slicePlanWithCePlan &&
+				needsPlannerAgent(implementation, state)
+			)
+				return withHandoffPrompt(
+					{
+						...state,
+						action: "run-planner",
+						selectedBead: implementation,
+						handoffExtra: [
+							cePlanSliceStep(
+								implementation,
+								cwd,
+								state.planPath,
+								settings.slicePlanCeDepth,
+							),
+						],
+					},
+					cwd,
+				);
+			return applyInlineSlicePlan(cwd, state, implementation);
 		}
 		return withHandoffPrompt(
 			{
@@ -3737,9 +4365,21 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 	].join("\n");
 }
 
+function agentLaunchReason(state) {
+	if (state?.handoffReason) return state.handoffReason;
+	if (state?.action === "run-debug")
+		return "debug Bead requires root-cause agent";
+	if (state?.action === "run-planner")
+		return "planning/ambiguous scope needs planner agent";
+	if (state?.action === "run-implementation")
+		return "implementation writer for selected Bead";
+	return state?.action;
+}
+
 function withHandoffPrompt(state, cwd) {
 	return {
 		...state,
+		handoffReason: agentLaunchReason(state),
 		handoffPrompt: roleHandoffPrompt(
 			state,
 			"resume",
@@ -5962,6 +6602,110 @@ function hasVerificationEvidence(issue) {
 	);
 }
 
+function gitDiffChangeCount(cwd, files) {
+	if (!files.length) return Number.POSITIVE_INFINITY;
+	const output = run(cwd, "git", ["diff", "--numstat", "--", ...files]);
+	return output
+		.split(/\r?\n/)
+		.filter(Boolean)
+		.reduce((total, line) => {
+			const [added, deleted] = line.split(/\s+/);
+			if (added === "-" || deleted === "-") return total + 10_000;
+			return total + Number(added || 0) + Number(deleted || 0);
+		}, 0);
+}
+
+function isSmallDiff(cwd, files) {
+	return (
+		files.length > 0 &&
+		files.length <= 5 &&
+		gitDiffChangeCount(cwd, files) <= 80
+	);
+}
+
+function isUiPath(file) {
+	return /(?:^|\/)(?:app|src\/app|pages|routes|components|views)\/|\.(?:tsx|jsx|vue|svelte|html|css|scss)$/i.test(
+		normalizedRepoPath(file),
+	);
+}
+
+function gitDirty(cwd) {
+	return parsePorcelainStatus(
+		run(cwd, "git", ["status", "--porcelain=v1", "--untracked-files=all"]),
+	);
+}
+
+function normalizedPathSet(paths = []) {
+	return new Set(paths.map(normalizedRepoPath));
+}
+
+function samePathSet(left = [], right = []) {
+	const a = normalizedPathSet(left);
+	const b = normalizedPathSet(right);
+	return a.size === b.size && [...a].every((item) => b.has(item));
+}
+
+function isBeadsPath(file) {
+	return normalizedRepoPath(file).startsWith(".beads/");
+}
+
+function ensureOnlyStaged(cwd, files) {
+	const staged = run(cwd, "git", ["diff", "--cached", "--name-only"])
+		.split(/\r?\n/)
+		.filter(Boolean);
+	if (!samePathSet(staged, files))
+		throw new Error(`Unexpected staged files: ${staged.join(", ") || "none"}`);
+}
+
+function amendIfOnly(cwd, dirty, files, message) {
+	if (!dirty.length) return;
+	const paths = dirty.map((item) => item.path);
+	if (!samePathSet(paths, files))
+		throw new Error(`${message}: ${paths.join(", ") || "none"}`);
+	run(cwd, "git", ["add", "--", ...files]);
+	run(cwd, "git", ["commit", "--amend", "--no-edit"]);
+}
+
+function executeWorkFinishState(cwd, state) {
+	if (!state?.ok || state.action !== "commit-ready") return state;
+	if (state.handoffPrompt)
+		return errorState(
+			"finish-gates-required",
+			"Pre-commit gates are still required before coded commit/close.",
+			state,
+		);
+	try {
+		const files = state.relatedFiles ?? [];
+		run(cwd, "git", ["add", "--", ...files]);
+		ensureOnlyStaged(cwd, files);
+		run(cwd, "git", ["commit", "-m", state.commitMessage]);
+		amendIfOnly(cwd, gitDirty(cwd), files, "Post-commit dirty files");
+		run(cwd, "bd", ["close", state.selectedBead.id]);
+		const closeDirty = gitDirty(cwd);
+		amendIfOnly(
+			cwd,
+			closeDirty,
+			closeDirty.map((item) => item.path).filter(isBeadsPath),
+			"Bead close changed non-Beads files",
+		);
+		const commitHash = run(cwd, "git", ["rev-parse", "--short", "HEAD"]);
+		return {
+			...state,
+			action: "finish-committed",
+			commitHash,
+			message: "Committed related files and closed the Bead.",
+			note: `Commit: ${commitHash} ${state.commitMessage}`,
+			nextAction: `Next: /work-resume ${state.epic.id}`,
+		};
+	} catch (error) {
+		return errorState(
+			"finish-execute-failed",
+			commandErrorText(error) || error.message,
+			{ ...state, action: "finish-stop" },
+		);
+	}
+}
+
 function buildWorkFinishState(cwd, args = "") {
 	let target = String(args).trim();
 	if (!target)
@@ -6007,11 +6751,14 @@ function buildWorkFinishState(cwd, args = "") {
 		const related = dirty.filter(
 			(file) => raw.includes(file) || raw.includes(file.split(/[\\/]/).pop()),
 		);
+		const verified = hasVerificationEvidence(bead);
+		const codedReview =
+			!hasReviewPass(bead) && verified && isSmallDiff(cwd, related);
 		if (isBlockedIssue(bead) || debugNeededId(bead))
 			return stop("blocked", "Selected Bead is blocked/debug-needed.");
-		if (!hasReviewPass(bead))
+		if (!hasReviewPass(bead) && !codedReview)
 			return stop("missing-review", "PASS review evidence is missing.");
-		if (!hasVerificationEvidence(bead))
+		if (!verified)
 			return stop("missing-verification", "Verification evidence is missing.");
 		if (!dirty.length)
 			return stop(
@@ -6025,10 +6772,13 @@ function buildWorkFinishState(cwd, args = "") {
 				{ relatedFiles: related },
 			);
 		const gates = workOrchSettings(cwd);
-		const reviewBeforeCommit = gates.codeReviewBeforeCommit;
+		const reviewBeforeCommit =
+			gates.codeReviewBeforeCommit && !isSmallDiff(cwd, related);
 		const preCommitSteps = [
 			reviewBeforeCommit ? codeReviewBeforeCommitStep() : "",
-			gates.browserTestsOnUiDiff ? browserTestsOnUiDiffStep() : "",
+			gates.browserTestsOnUiDiff && related.some(isUiPath)
+				? browserTestsOnUiDiffStep()
+				: "",
 		].filter(Boolean);
 		const gated = preCommitSteps.length > 0;
 		return {
@@ -6044,7 +6794,7 @@ function buildWorkFinishState(cwd, args = "") {
 				: "Finish gate has review, verification, and related dirty files.",
 			note: `Commit seed: ${idOf(bead)}: ${titleOf(bead)}\nFiles: ${related.join(
 				", ",
-			)}${gated ? `\nGates: ${preCommitSteps.length}` : ""}`,
+			)}${codedReview ? "\nReview: coded small-diff check" : ""}${gated ? `\nGates: ${preCommitSteps.length}` : ""}`,
 			handoffPrompt: gated
 				? [
 						"Use the work-orchestrator skill in mode: finish with this precomputed extension state.",
@@ -8400,6 +9150,7 @@ export {
 	buildWorkBigState,
 	buildWorkDebugState,
 	buildWorkFinishState,
+	executeWorkFinishState,
 	buildWorkIdeateState,
 	buildWorkBrainstormState,
 	buildWorkCatchUpState,
@@ -8422,6 +9173,23 @@ export {
 	buildWorkTelemetry,
 	buildWorkTelemetryState,
 	buildWorkUsageState,
+	changedFilesSummary,
+	compactTaskSummary,
+	evidenceSummaryPath,
+	forbiddenPatternCheck,
+	jsonlRecordDiff,
+	jsonlRecordSummary,
+	onlyAllowedFilesChanged,
+	optimizationTelemetry,
+	prepareTaskExportForGate,
+	reconcileTranscriptTelemetry,
+	readEvidenceSummary,
+	runBounded,
+	runTempCheck,
+	searchSummary,
+	stagedFilesSummary,
+	workflowTaskSummary,
+	writeEvidenceSummary,
 	directRoleHandoffParams,
 	deriveIdeaStatus,
 	isIdeaIssue,
@@ -9010,11 +9778,28 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-finish", {
-		description: "Classify commit/close readiness for reviewed work",
+		description:
+			"Commit reviewed work and close the Bead when deterministic gates pass",
 		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-finish", args, ctx, () =>
-				handleWorkflowAction(buildWorkFinishState, args, ctx, pi),
-			);
+			await withCommandTelemetry("work-finish", args, ctx, async () => {
+				cleanupBenignInstructionDirt(ctx.cwd);
+				let state = buildWorkFinishState(ctx.cwd, args);
+				if (state.ok && !state.handoffPrompt)
+					state = executeWorkFinishState(ctx.cwd, state);
+				rememberRecommendedActions(
+					ctx.cwd,
+					recommendedActions(state),
+					"work-finish",
+				);
+				notify(
+					ctx,
+					renderWorkflowActionText(state),
+					state.ok ? "info" : "warning",
+				);
+				if (state.handoffPrompt)
+					await sendFollowUp(ctx, state.handoffPrompt, pi);
+				return stateTelemetry(state);
+			});
 		},
 	});
 

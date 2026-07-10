@@ -85,12 +85,12 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 7. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
 8. Roadmap epics are not auto-closed. When a roadmap looks complete, use `/work-roadmap close <epic-id>`; unresolved child Beads require confirmation or `--force`.
 9. `/work-resume` is the project autopilot entrypoint. It targets the current repo by default, or a path when the first argument is an existing path, then continues from Beads/git state until done or a real human decision is needed.
-10. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, review, and commits.
-11. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging, implementation, review, and commits.
-12. `/work-finish` classifies whether reviewed work is commit-ready; it does not auto-commit.
+10. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, and risky review.
+11. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging and implementation.
+12. `/work-finish` does deterministic gate checks and commits/closes directly when safe; large/risky changes still route to review first.
 13. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 14. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
-15. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
+15. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, output-waste/repeated-command summaries, transcript-reconciled counters when a transcript path is available, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
 16. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git and only open in a browser with `--open`. Use `--jsonl` for agent/subagent consumption.
 17. `/work-goal` runs a session-scoped autonomous loop with scoped human-decision stops, `/work-context` microcompaction before continuations, retryable provider/context-error recovery, optional `--tokens` budgets, and contradictory-completion rejection; `/work-resume` wraps it with project-autopilot rules and optional self-improvement pressure.
 18. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
@@ -109,6 +109,9 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 - Do not mutate workflow Beads directly in normal use; use `/work-*` commands or the dedicated role agents.
 - Failed verification or failed live/product evidence is recorded as a failure artifact in Bead notes, then linked to a `wo:debug` bug or `wo:blocked` decision path instead of being left in chat.
 - Work happens one ready Bead at a time unless isolated worktrees are explicitly used.
+- Use code for deterministic questions: required JSON fields, counts/statuses, stale exports, changed-file allowlists, forbidden strings, dependency emptiness, and known success markers. Use LLM review for judgment: semantic fit, maintainability, requirement interpretation, architecture, and residual risk.
+- Workflow-owned shell/search/diff/task reads should return compact summaries and artifact paths by default; raw blobs belong in `.pi/work-runs/`, not LLM context.
+- Before blocking on missing formal support, check for a safe repo-owned lower-level path with source-confirmed constants/parameters; record whether evidence came from the formal path or direct path.
 
 ## Live/test feedback loop
 

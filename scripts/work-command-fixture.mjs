@@ -205,7 +205,15 @@ export function installWorkflowFixture() {
 		writeFileSync(
 			statePath,
 			JSON.stringify(
-				{ scenario, epics: scenarioEpics, children, next: 1 },
+				{
+					scenario,
+					epics: scenarioEpics,
+					children,
+					next: 1,
+					gitCommitted: false,
+					bdClosed: false,
+					closeCommitted: false,
+				},
 				null,
 				"\t",
 			),
@@ -266,28 +274,54 @@ else if (args[0] === "show") {
   if (!issue) { console.error("not found"); process.exit(2); }
   issue.depends_on = [...(issue.depends_on || []), { depends_on_id: args[3], type: "blocks" }];
   save(); log({ op: "dep-add", later: args[2], earlier: args[3] }); out(issue);
+} else if (args[0] === "close") {
+  const issue = all().find((item) => item.id === args[1]);
+  if (!issue) { console.error("not found"); process.exit(2); }
+  issue.status = "closed";
+  state.bdClosed = true;
+  save(); log({ op: "close", id: issue.id }); out(issue);
 } else out([]);
 `,
 	);
 	writeFileSync(
 		git,
 		`#!/usr/bin/env node
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+const statePath = ${JSON.stringify(statePath)};
+const logPath = ${JSON.stringify(logPath)};
 const args = process.argv.slice(2);
 const dirty = process.env.WORK_FLOW_GIT_DIRTY || "clean";
-if (args[0] === "diff") process.exit(dirty === "benign" ? 0 : 1);
-if (args.includes("--porcelain=v1")) {
-  if (dirty === "unknown") console.log(" M extensions/work-models.js");
-  if (dirty === "benign" || dirty === "instruction-substantive") console.log(" M AGENTS.md");
-  if (dirty === "staged-instruction") console.log("M  AGENTS.md");
-  if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
-  if (dirty === "pi-session") console.log("?? pi-session-2026-07-05T17-02-37-680Z_abc.html");
-} else {
+const state = JSON.parse(readFileSync(statePath, "utf8"));
+function save() { writeFileSync(statePath, JSON.stringify(state, null, "\t")); }
+function log(value) { appendFileSync(logPath, JSON.stringify({ tool: "git", args, ...value }) + "\\n"); }
+function dirtyLines() {
+  if (state.bdClosed && !state.closeCommitted) return [" M .beads/interactions.jsonl"];
+  if (state.gitCommitted) return [];
+  if (dirty === "unknown" || dirty === "large") return [" M extensions/work-models.js"];
+  if (dirty === "benign" || dirty === "instruction-substantive") return [" M AGENTS.md"];
+  if (dirty === "staged-instruction") return ["M  AGENTS.md"];
+  if (dirty === "untracked-instruction") return ["?? AGENTS.md"];
+  if (dirty === "pi-session") return ["?? pi-session-2026-07-05T17-02-37-680Z_abc.html"];
+  return [];
+}
+if (args[0] === "diff" && args.includes("--numstat")) {
+  if (dirty === "unknown") console.log("12\t3\textensions/work-models.js");
+  if (dirty === "large") console.log("90\t40\textensions/work-models.js");
+} else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-only")) {
+  if (state.gitStaged) console.log("extensions/work-models.js");
+} else if (args[0] === "diff") process.exit(dirty === "benign" ? 0 : 1);
+else if (args[0] === "add") { state.gitStaged = true; save(); log({ op: "add" }); }
+else if (args[0] === "commit") {
+  if (args.includes("--amend")) state.closeCommitted = true;
+  else state.gitCommitted = true;
+  state.gitStaged = false;
+  save(); log({ op: args.includes("--amend") ? "amend" : "commit" });
+}
+else if (args[0] === "rev-parse") console.log(state.closeCommitted ? "feed123" : "c0ffee1");
+else if (args.includes("--porcelain=v1")) console.log(dirtyLines().join("\\n"));
+else {
   console.log("## feat/workflow-intake");
-  if (dirty === "unknown") console.log(" M extensions/work-models.js");
-  if (dirty === "benign" || dirty === "instruction-substantive") console.log(" M AGENTS.md");
-  if (dirty === "staged-instruction") console.log("M  AGENTS.md");
-  if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
-  if (dirty === "pi-session") console.log("?? pi-session-2026-07-05T17-02-37-680Z_abc.html");
+  for (const line of dirtyLines()) console.log(line);
 }
 `,
 	);
