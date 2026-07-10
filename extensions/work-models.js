@@ -109,6 +109,14 @@ const SLOTS = [
 		description:
 			"Optional critic for plans/brainstorms and task-vs-plan verification; defaults to inherit model with xhigh effort",
 	},
+	{
+		key: "advisorBackup",
+		label: "advisor backup",
+		agents: ["bead-advisor-backup"],
+		defaultThinking: "medium",
+		description:
+			"Lower-cost fallback critic when the primary advisor model is unavailable",
+	},
 ];
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
@@ -123,8 +131,12 @@ const EFFORT_PROFILES = {
 		review: "low",
 		commit: "low",
 		advisor: "medium",
+		advisorBackup: "low",
 		critic: { brainstorm: false, plan: false },
 		advisorVerifyTask: false,
+		slicePlanBeforeWork: true,
+		slicePlanWithCePlan: false,
+		slicePlanCeDepth: "Lightweight",
 		simplifyBeforeReview: false,
 		browserTestsOnUiDiff: false,
 		codeReviewBeforeCommit: false,
@@ -136,8 +148,12 @@ const EFFORT_PROFILES = {
 		review: "medium",
 		commit: "low",
 		advisor: "high",
+		advisorBackup: "medium",
 		critic: { brainstorm: true, plan: true },
 		advisorVerifyTask: true,
+		slicePlanBeforeWork: true,
+		slicePlanWithCePlan: true,
+		slicePlanCeDepth: "Lightweight",
 		simplifyBeforeReview: false,
 		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: false,
@@ -149,8 +165,12 @@ const EFFORT_PROFILES = {
 		review: "high",
 		commit: "low",
 		advisor: "xhigh",
+		advisorBackup: "medium",
 		critic: { brainstorm: true, plan: true },
 		advisorVerifyTask: true,
+		slicePlanBeforeWork: true,
+		slicePlanWithCePlan: true,
+		slicePlanCeDepth: "Standard",
 		simplifyBeforeReview: true,
 		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: false,
@@ -162,8 +182,12 @@ const EFFORT_PROFILES = {
 		review: "high",
 		commit: "medium",
 		advisor: "xhigh",
+		advisorBackup: "high",
 		critic: { brainstorm: true, plan: true },
 		advisorVerifyTask: true,
+		slicePlanBeforeWork: true,
+		slicePlanWithCePlan: true,
+		slicePlanCeDepth: "Deep",
 		simplifyBeforeReview: true,
 		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: true,
@@ -172,6 +196,14 @@ const EFFORT_PROFILES = {
 const DEFAULT_PROFILE = "medium";
 const WORK_ORCH_BOOLEANS = [
 	{ key: "advisorVerifyTask", label: "advisor verifies task vs plan" },
+	{
+		key: "slicePlanBeforeWork",
+		label: "planner writes slice plan before work",
+	},
+	{
+		key: "slicePlanWithCePlan",
+		label: "ce-plan per slice (medium/high/max)",
+	},
 	{
 		key: "simplifyBeforeReview",
 		label: "ce-simplify-code before review",
@@ -1716,7 +1748,8 @@ function workOrchSettings(cwd) {
 	};
 	const flags = {};
 	for (const { key } of WORK_ORCH_BOOLEANS) flags[key] = raw[key] ?? base[key];
-	return { profile, critic, ...flags };
+	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
+	return { profile, critic, slicePlanCeDepth, ...flags };
 }
 
 function applyProfile(settings, profileKey) {
@@ -1737,6 +1770,7 @@ function applyProfile(settings, profileKey) {
 	block.profile = profileKey;
 	block.critic = { ...profile.critic };
 	for (const { key } of WORK_ORCH_BOOLEANS) block[key] = profile[key];
+	block.slicePlanCeDepth = profile.slicePlanCeDepth;
 	return true;
 }
 
@@ -1753,15 +1787,48 @@ function setWorkOrchCritic(settings, key, value) {
 
 // ponytail: settings are prompt-live; the steps below are appended to the
 // role/plan/brainstorm/finish handoff prompts so the advisor actually runs.
+function advisorFallbackText() {
+	return "If bead-advisor is unavailable, usage-limited, or fails to start, run bead-advisor-backup once instead; do not wait or retry the primary.";
+}
+
 function advisorCriticStep(target) {
 	return [
-		`Advisor critic gate (read-only): launch the bead-advisor subagent (agent: "bead-advisor", context: fresh) on the ${target} to hunt weak or missing requirements, unverified acceptance, incomplete decisions, ambiguous scope, and untested assumptions. Record concrete findings as notes on the relevant Bead; convert any blocking gap into a decision/blocker Bead under the epic before proceeding. Skip if the ${target} is trivial and obviously complete.`,
+		`Advisor critic gate (read-only): launch the bead-advisor subagent (agent: "bead-advisor", context: fresh) on the ${target} to hunt weak or missing requirements, unverified acceptance, incomplete decisions, ambiguous scope, and untested assumptions. ${advisorFallbackText()} Record concrete findings as notes on the relevant Bead; convert any blocking gap into a decision/blocker Bead under the epic before proceeding. Skip if the ${target} is trivial and obviously complete.`,
 	].join("\n");
 }
 
 function advisorVerifyStep() {
 	return [
-		`Advisor task-verification gate (read-only): once a slice is implemented and self-verified but before review/finish, launch the bead-advisor subagent (agent: "bead-advisor", context: fresh) to compare the change against the epic plan's acceptance and implementation unit, and to flag inconsistencies, drift from the plan, or missing verification evidence. Record findings as notes on the slice Bead. Apply only when a real implementation slice was produced this handoff; otherwise no-op.`,
+		`Advisor task-verification gate (read-only): once a slice is implemented and self-verified but before review/finish, launch the bead-advisor subagent (agent: "bead-advisor", context: fresh) to compare the change against the epic plan's acceptance and implementation unit, and to flag inconsistencies, drift from the plan, or missing verification evidence. ${advisorFallbackText()} Record findings as notes on the slice Bead. Apply only when a real implementation slice was produced this handoff; otherwise no-op.`,
+	].join("\n");
+}
+
+function hasSlicePlan(issue) {
+	return (
+		labelsOf(issue).includes("wo:slice-planned") ||
+		/wo:slice-plan|slice plan/i.test(notesOf(issue))
+	);
+}
+
+function slicePlanStep(issue) {
+	return `Slice-planning pass before implementation: target ${issueRef(issue)} already exists as executable work. Do not create child Beads. Read the epic's referenced plan/acceptance plus this Bead, then append one compact Bead note headed \`wo:slice-plan\` with: intended approach, files likely touched, acceptance/verification commands or hardware proof, risks/unknowns, and explicit out-of-scope. Add label \`wo:slice-planned\` to the Bead. Stop after that planning note; implementation happens on the next /work-resume.`;
+}
+
+function cePlanSliceStep(issue, cwd, masterPlanPath, depth = "Lightweight") {
+	const scopeLine = masterPlanPath
+		? `Scope: this Bead's acceptance/design plus the matching Implementation Unit from ${relative(cwd, masterPlanPath)}.`
+		: `Scope: this Bead's acceptance/design and notes.`;
+	const depthLine =
+		depth === "Deep"
+			? "Use Deep depth for the full ce-plan research/deepening pass."
+			: depth === "Standard"
+				? "Use Standard depth (ce-plan's normal tier) so flow analysis runs without Deep extensions."
+				: "Use Lightweight depth so ce-plan skips flow analysis and external research when local patterns are strong.";
+	return [
+		`Slice-planning pass (ce-plan) before implementation: target ${issueRef(issue)} already exists as executable work. Do not create child Beads and do not dispatch bead-planner.`,
+		scopeLine,
+		`Invoke the ce-plan skill in the control session on this slice to produce a compact plan doc at docs/plans/YYYY-MM-DD-NNN-slice-${safeArtifactPart(idOf(issue))}-plan.md with a single Implementation Unit (Goal, Files, Approach, Test scenarios, Verification). ${depthLine}`,
+		`Then append a Bead note headed \`wo:slice-plan\` containing \`plan-path: <repo-relative plan doc path>\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the Bead title.`,
 	].join("\n");
 }
 
@@ -3322,7 +3389,28 @@ function planResumeAction(state, cwd) {
 	const implementation = state.readyExecutable.find(
 		(issue) => !isPlanningIssue(issue),
 	);
-	if (implementation)
+	if (implementation) {
+		const settings = workOrchSettings(cwd);
+		if (settings.slicePlanBeforeWork && !hasSlicePlan(implementation)) {
+			return withHandoffPrompt(
+				{
+					...state,
+					action: "run-planner",
+					selectedBead: implementation,
+					handoffExtra: [
+						settings.slicePlanWithCePlan
+							? cePlanSliceStep(
+									implementation,
+									cwd,
+									state.planPath,
+									settings.slicePlanCeDepth,
+								)
+							: slicePlanStep(implementation),
+					],
+				},
+				cwd,
+			);
+		}
 		return withHandoffPrompt(
 			{
 				...state,
@@ -3331,6 +3419,7 @@ function planResumeAction(state, cwd) {
 			},
 			cwd,
 		);
+	}
 	if (state.readyPlanning.length)
 		return withHandoffPrompt(
 			{
@@ -3513,6 +3602,9 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 		...plannerLines,
 		...simplifyLines,
 		...advisorLines,
+		state.action === "run-implementation" || state.action === "run-debug"
+			? planReference(state, cwd)
+			: "",
 		...extraLines.filter(Boolean),
 		"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
 		selected?.id ? `Target Bead ID: ${selected.id}` : "Target Bead ID: none",
@@ -3529,6 +3621,26 @@ function withHandoffPrompt(state, cwd) {
 			cwd,
 		),
 	};
+}
+
+function planReference(state, cwd) {
+	const bead = state.selectedBead;
+	if (!bead) return "";
+	const slicePlanned = bead.labels?.includes("wo:slice-planned");
+	const planPath = state.planPath
+		? isAbsolute(state.planPath)
+			? relative(cwd, state.planPath)
+			: state.planPath
+		: undefined;
+	if (slicePlanned) {
+		const line = `Plan: execute the wo:slice-plan note on Bead ${bead.id} as your spec; if the note references a plan-path doc, that doc is your spec. The Bead is the tracking item, not the spec — do not invent scope beyond it.`;
+		return planPath
+			? `${line} Epic master plan for context: ${planPath}.`
+			: line;
+	}
+	if (planPath)
+		return `Plan: execute the matching Implementation Unit from ${planPath} for Bead ${bead.id}; the Bead is the tracking item, the plan is your spec.`;
+	return "";
 }
 
 function parseWorkResumeArgs(args = "") {
@@ -3548,6 +3660,7 @@ function buildWorkResumeState(cwd, args = "") {
 		rememberWorkflowEpic(cwd, resolved.epic);
 		const childState = buildEpicChildState(cwd, resolved.epic);
 		const git = resumeGitReport(cwd, planRefsFromIssue(resolved.epic));
+		const planPath = planPathForEpic(cwd, resolved.epic);
 		const readyPlanning = childState.readyWork
 			.filter(isPlanningIssue)
 			.map(issueSummary);
@@ -3582,6 +3695,7 @@ function buildWorkResumeState(cwd, args = "") {
 			downstreamBlocked: childState.downstreamBlocked,
 			openDecisions: childState.openDecisions.map(issueSummary),
 			git,
+			planPath,
 			suggestedCommands: [`/work-resume ${childState.epicId}`],
 			warnings: git.warnings,
 		};
@@ -6317,11 +6431,11 @@ function workResumeSettings(cwd) {
 	const value = readSettings(cwd).workResume;
 	return typeof value === "object" && value !== null
 		? {
-				selfImproving: value.selfImproving !== false,
+				selfImproving: value.selfImproving === true,
 				newSessionBetweenIterations:
 					value.newSessionBetweenIterations !== false,
 			}
-		: { selfImproving: true, newSessionBetweenIterations: true };
+		: { selfImproving: false, newSessionBetweenIterations: true };
 }
 
 function workProjectAutopilotAppendix() {
@@ -6373,12 +6487,17 @@ function buildWorkSelfImprovingObjective(input = "", options = {}) {
 				? `User instruction for the target project: ${task}`
 				: "Run the autonomous project work loop for the target project until the active work is complete or a real human decision is required.",
 			workProjectAutopilotAppendix(),
-			options.selfImproving === false ? "" : workGoalSelfImprovingAppendix(),
+			options.selfImproving === true ? workGoalSelfImprovingAppendix() : "",
 		]
 			.filter(Boolean)
 			.join("\n\n");
 	}
-	return [prompt, workGoalSelfImprovingAppendix()].filter(Boolean).join("\n\n");
+	return [
+		prompt,
+		options.selfImproving === true ? workGoalSelfImprovingAppendix() : "",
+	]
+		.filter(Boolean)
+		.join("\n\n");
 }
 
 function buildWorkResumeGoalObjective(cwd, args = "") {
@@ -8724,6 +8843,7 @@ function workSettingsStatus(ctx) {
 		`Critic on brainstorm: ${resolved.critic.brainstorm}`,
 		`Critic on plan: ${resolved.critic.plan}`,
 		...WORK_ORCH_BOOLEANS.map((flag) => `${flag.label}: ${resolved[flag.key]}`),
+		`ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
 	];
 	notify(ctx, lines.join("\n"), "info");
 }

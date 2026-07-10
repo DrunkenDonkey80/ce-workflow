@@ -80,8 +80,13 @@ const objective = mod.buildWorkSelfImprovingObjective("C:/soft/git/AI-Wedge", {
 	project: true,
 });
 assert.match(objective, /Target project: C:\/soft\/git\/AI-Wedge/);
-assert.match(objective, /Self-improving overlay/);
-assert.match(objective, /fix this ce-workflow package in code/);
+assert.doesNotMatch(objective, /Self-improving overlay/);
+const selfImprovingObjective = mod.buildWorkSelfImprovingObjective(
+	"C:/soft/git/AI-Wedge",
+	{ project: true, selfImproving: true },
+);
+assert.match(selfImprovingObjective, /Self-improving overlay/);
+assert.match(selfImprovingObjective, /fix this ce-workflow package in code/);
 const oneTaskObjective = mod.buildWorkSelfImprovingObjective(
 	"C:/soft/git/AI-Wedge one task only: fix login",
 	{ project: true },

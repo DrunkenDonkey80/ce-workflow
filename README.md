@@ -57,7 +57,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-big <task>` | Large, risky, or architectural slice inside an epic | Extension command: creates one planning Bead for deeper slicing, then hands it to `bead-planner` |
 | `/work-debug <bug-or-bead-id\|symptom[: guidance]>` | Failing test, blocked/debug-needed Bead, regression, or broken behavior | Extension command: resolves/reuses or creates a debug Bead, then hands that compact state to the existing debug role loop |
 | `/work-auto <task>` | You want the orchestrator to classify size | Extension command: rejects empty input, routes explicit blocked/debug-needed Beads to debug, otherwise hands unchanged text to the auto skill path |
-| `/work-resume [repo-path\|instruction]` | Resume autonomous project work | Extension command: starts/resumes a `/work-goal` project loop from Beads/git state. With no path it uses the current repo; plain text becomes the constraint. Self-improving workflow fixes default on via `.pi/settings.json` `workResume.selfImproving` |
+| `/work-resume [repo-path\|instruction]` | Resume autonomous project work | Extension command: starts/resumes a `/work-goal` project loop from Beads/git state. With no path it uses the current repo; plain text becomes the constraint. Self-improving ce-workflow fixes are opt-in via `.pi/settings.json` `workResume.selfImproving` |
 | `/work-resume-stop [reason]` | Stop overnight/autonomous work cleanly | Marks the active `/work-resume` loop as stopping, asks the agent to checkpoint and stop at the next safe phase boundary, then leaves it resumable with `/work-resume` |
 | `/work-menu` | Open the small work menu | Extension command/shortcut target for resume, stop, roadmap, status, and report |
 | `/work-add [--epic <id>] [--blocked-by <bead-id>] <task>` | Add urgent or discovered work mid-epic | Extension command: creates one child Bead under an unambiguous epic and adds only explicit `--blocked-by` dependencies |
@@ -215,7 +215,7 @@ Settings are optional and live in `.pi/settings.json`:
 }
 ```
 
-Warp notifications auto-enable when Warp's env vars are present; set `"warp": { "enabled": true }` to force them or `false` to disable. `/work-resume` self-improvement is on by default; set `"workResume": { "selfImproving": false }` to run target-project autopilot without fixing ce-workflow friction. `/work-resume` also starts each automatic continuation in a fresh session by default; set `"workResume": { "newSessionBetweenIterations": false }` only if you want one growing chat. Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Compacting is still useful inside a noisy single agent turn, but overnight project loops should rely on Beads/git plus fresh-session continuations.
+Warp notifications auto-enable when Warp's env vars are present; set `"warp": { "enabled": true }` to force them or `false` to disable. `/work-resume` self-improvement is off by default for external projects; set `"workResume": { "selfImproving": true }` only when the agent should fix ce-workflow friction it observes while running target-project goals. `/work-resume` also starts each automatic continuation in a fresh session by default; set `"workResume": { "newSessionBetweenIterations": false }` only if you want one growing chat. Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Compacting is still useful inside a noisy single agent turn, but overnight project loops should rely on Beads/git plus fresh-session continuations.
 
 ## Migrating existing projects
 
@@ -396,24 +396,25 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 Profiles set effort per role plus the advisor, and the advisory gates. Applying one overwrites effort and gates, not models:
 
-| profile | plan | work | debug | review | commit | advisor | critic (brainstorm/plan) | advisor verifies task | simplify before review | browser tests on UI diff | ce-code-review before commit |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| low | low | low | medium | low | low | medium | off / off | off | off | off | off |
-| medium | medium | medium | high | medium | low | high | on / on | on | off | on | off |
-| high | high | high | high | high | low | xhigh | on / on | on | on | on | off |
-| max | xhigh | xhigh | xhigh | high | medium | xhigh | on / on | on | on | on | on |
+| profile | plan | work | debug | review | commit | advisor | backup advisor | critic (brainstorm/plan) | slice plan before work | slice plan mode | advisor verifies task | simplify before review | browser tests on UI diff | ce-code-review before commit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| low | low | low | medium | low | low | medium | low | off / off | on | bead-planner note | off | off | off | off |
+| medium | medium | medium | high | medium | low | high | medium | on / on | on | ce-plan Lightweight | on | off | on | off |
+| high | high | high | high | high | low | xhigh | medium | on / on | on | ce-plan Standard | on | on | on | off |
+| max | xhigh | xhigh | xhigh | high | medium | xhigh | high | on / on | on | ce-plan Deep | on | on | on | on |
 
 ### Advisor and gates (prompt-live)
 
-The advisor (`bead-advisor`, read-only, xhigh by default, inherits the control model) is a critic that the orchestrator actually launches from the handoff prompts when the matching gate is on:
+The advisor (`bead-advisor`, read-only, xhigh by default, inherits the control model) is a critic that the orchestrator actually launches from the handoff prompts when the matching gate is on. If it is unavailable, usage-limited, or fails to start, the prompt falls back once to `bead-advisor-backup`, which you can pin to a smaller model in `/work-settings`.
 
 - **critic on brainstorm / plan** — after `ce-brainstorm`/`ce-plan` produces the artifact, run `bead-advisor` to find weak requirements, unverified acceptance, incomplete decisions, and untested assumptions. On for medium/high/max, off for low.
+- **slice plan before work** — before an executable Bead runs for the first time, a planning pass writes a compact `wo:slice-plan` note and `wo:slice-planned` label. The worker executes that plan as the spec (the Bead is the tracking item, not the spec). Always on by profile: low uses one cheap `bead-planner` note; medium uses ce-plan Lightweight; high uses ce-plan Standard (normal); max uses ce-plan Deep. ce-plan **cannot disable individual research agents** (it dispatches `ce-repo-research-analyst` + `ce-learnings-researcher` in parallel by default; flow analysis is depth-gated, external research is skip-when-local-patterns-strong), so the real cost lever is this depth ladder.
 - **advisor verifies task vs plan** — once a slice is implemented and self-verified (before review/finish), run `bead-advisor` to compare the change against the plan's acceptance and flag drift or missing evidence. On for medium/high/max.
 - **simplify before review** — after a slice is implemented and self-verified but before it signals done-for-review, run `ce-simplify-code` on the diff to tighten clarity and drop over-engineering/dead flexibility. Closes the core-loop simplify step that otherwise only ran on review FAIL. On for high/max.
 - **browser tests on UI diff** — at the `/work-finish` commit-ready gate, if the related files touch a runnable web frontend (routes/pages/components/styles), run `ce-test-browser` on the affected pages; skipped automatically for backend/CLI/docs-only diffs or projects with no web frontend. Trigger-based, not effort-bound: on for medium/high/max.
 - **full ce-code-review before commit** — at the `/work-finish` commit-ready gate, run the full `ce-code-review` skill on the diff before the committer commits. On for max only.
 
-Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `commit`, or `advisor`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-settings status` (and `/work-models status`) make the tuning visible and `/work-settings` lets you flip gates live.
+Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `commit`, `advisor`, or `advisor backup`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-settings status` (and `/work-models status`) make the tuning visible and `/work-settings` lets you flip gates live.
 
 Role prompts use fresh child context by default and file-only artifacts so the parent session does not inherit every tool log or full master plan. Subagent launches should set `outputMode: "file-only"` with a short relative output filename unless the entire result is a short PASS/FAIL summary; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
@@ -423,13 +424,17 @@ Role prompts use fresh child context by default and file-only artifacts so the p
     "agentOverrides": {
       "bead-worker": { "model": "anthropic/claude-sonnet-4", "thinking": "medium" },
       "bead-committer": { "thinking": "low" },
-      "bead-advisor": { "thinking": "xhigh" }
+      "bead-advisor": { "thinking": "xhigh" },
+      "bead-advisor-backup": { "model": "openai/gpt-5-mini", "thinking": "medium" }
     }
   },
   "workOrchestrator": {
     "profile": "max",
     "critic": { "brainstorm": true, "plan": true },
     "advisorVerifyTask": true,
+    "slicePlanBeforeWork": true,
+    "slicePlanWithCePlan": true,
+    "slicePlanCeDepth": "Deep",
     "simplifyBeforeReview": true,
     "browserTestsOnUiDiff": true,
     "codeReviewBeforeCommit": true

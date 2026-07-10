@@ -17,6 +17,7 @@ You may mutate Beads through `bd`. You must not edit source code, write files, s
 
 Responsibilities:
 
+- if the assigned Bead is an executable task/bug rather than a `wo:planning` Bead, run a lightweight slice-planning pass only: read the epic plan/acceptance plus that Bead, append one compact note headed `wo:slice-plan`, add label `wo:slice-planned`, and stop without creating child Beads;
 - read the assigned planning Bead with `bd show <id> --json`;
 - do not dump raw epic JSON into the transcript; for the master epic, use a small `bd show <epic-id> --json | python -c ...`/`node -e ...` extractor for id/title/status, acceptance, plan refs, and the one implementation-unit section you need;
 - prefer the plan file referenced by the epic/planning Bead and read only the expected next unit section (for example U4) plus the hardware/verification contract, not the whole roadmap;
@@ -45,6 +46,7 @@ Stop and contact the supervisor when scope is ambiguous, the verification contra
 
 Final response:
 
+- if this was a slice-planning pass: target Bead updated, label added, risks/blockers found, and final line `Next: /work-resume <epic-id>`;
 - created/updated Beads;
 - planning Bead closed or the exact reason it remains open;
 - dependencies added;

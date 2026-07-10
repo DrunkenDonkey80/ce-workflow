@@ -386,6 +386,19 @@ const agentRules = {
 			"contact_supervisor` is unavailable",
 		],
 	},
+	"bead-advisor-backup.md": {
+		name: "bead-advisor-backup",
+		forbidWrite: true,
+		thinking: "medium",
+		must: [
+			"CLEAN",
+			"CONCERNS",
+			"read-only",
+			"task-verification gate",
+			"drift from the plan",
+			"contact_supervisor` is unavailable",
+		],
+	},
 };
 
 for (const [file, rule] of Object.entries(agentRules)) {
@@ -448,6 +461,7 @@ for (const phrase of [
 	"bead-reviewer",
 	"bead-committer",
 	"bead-advisor",
+	"bead-advisor-backup",
 	'registerCommand("work-init"',
 	'registerCommand("work-plan"',
 	'registerCommand("work-status"',
@@ -505,6 +519,12 @@ for (const phrase of [
 	"applyProfile",
 	"advisorCriticStep",
 	"advisorVerifyStep",
+	"advisor backup",
+	"slicePlanBeforeWork",
+	"slicePlanWithCePlan",
+	"slicePlanCeDepth",
+	"cePlanSliceStep",
+	"planReference",
 	"codeReviewBeforeCommitStep",
 	"simplifyBeforeReviewStep",
 	"browserTestsOnUiDiffStep",
@@ -621,6 +641,10 @@ for (const phrase of [
 	".pi/work-runs/*.jsonl",
 	"review scope/payoff",
 	"make the tuning visible",
+	"advisor backup",
+	"slice plan before work",
+	"ce-plan Lightweight",
+	"self-improvement is off by default",
 	"Roadmap epics are not auto-closed",
 ]) {
 	check(`README mentions ${phrase}`, readme.includes(phrase));

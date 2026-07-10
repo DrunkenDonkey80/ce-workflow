@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {
 	chmodSync,
+	mkdirSync,
 	mkdtempSync,
 	realpathSync,
 	rmSync,
@@ -163,6 +164,7 @@ const childrenByScenario = {
 			issue_type: "task",
 			status: "open",
 			title: "Executable idea child",
+			labels: ["wo:slice-planned"],
 			created_at: "2026-07-03T02:00:00Z",
 		},
 	],
@@ -210,6 +212,7 @@ const childrenByScenario = {
 			issue_type: "task",
 			status: "open",
 			title: "Created executable child",
+			labels: ["wo:slice-planned"],
 		},
 	],
 	blocked: [
@@ -261,6 +264,7 @@ const childrenByScenario = {
 			issue_type: "task",
 			status: "open",
 			title: "Ready open epic work",
+			labels: ["wo:slice-planned"],
 		},
 	],
 	openBlocked: [
@@ -421,10 +425,14 @@ try {
 	process.env.WORK_RESUME_SCENARIO = "implementation";
 	state = buildWorkResumeState(process.cwd(), "E-1");
 	assert(
-		state.action === "run-implementation",
-		"implementation selected before planning",
+		state.action === "run-planner",
+		"unplanned implementation selected for slice planning",
 	);
 	assert(state.selectedBead.id === "IMP-1", "implementation bead selected");
+	assert(
+		state.handoffPrompt.includes("wo:slice-plan"),
+		"slice-planning handoff asks for durable plan note",
+	);
 
 	process.env.WORK_RESUME_SCENARIO = "ideasOnly";
 	state = buildWorkResumeState(process.cwd(), "E-1");
@@ -442,6 +450,12 @@ try {
 		"planned idea selects linked executable child",
 	);
 	assert(state.selectedBead.id === "IMP-1", "linked task selected over idea");
+	assert(
+		state.handoffPrompt.includes(
+			"Plan: execute the wo:slice-plan note on Bead IMP-1 as your spec",
+		),
+		"implementation handoff points to the slice plan, not the bead alone",
+	);
 
 	process.env.WORK_RESUME_SCENARIO = "planning";
 	state = buildWorkResumeState(process.cwd(), "E-1");
@@ -724,6 +738,51 @@ try {
 			notices.at(-1)?.message.includes("reconnect COM7"),
 		"blocked resume output includes blocker next action",
 	);
+
+	// low keeps the cheap bead-planner note; medium/high/max use ce-plan depth.
+	process.env.WORK_RESUME_SCENARIO = "implementation";
+	const lowCwd = mkdtempSync(path.join(tmpdir(), "work-resume-low-"));
+	mkdirSync(path.join(lowCwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(lowCwd, ".pi", "settings.json"),
+		JSON.stringify({ workOrchestrator: { profile: "low" } }),
+	);
+	const lowState = buildWorkResumeState(lowCwd, "E-1");
+	assert(
+		lowState.handoffPrompt.includes("append one compact Bead note headed") &&
+			!lowState.handoffPrompt.includes("Invoke the ce-plan skill"),
+		"low slice handoff uses bead-planner note, not ce-plan",
+	);
+	rmSync(lowCwd, { recursive: true, force: true });
+
+	for (const [profile, depthText] of [
+		["medium", "Lightweight depth"],
+		["high", "Standard depth"],
+		["max", "Deep depth"],
+	]) {
+		const ceCwd = mkdtempSync(path.join(tmpdir(), "work-resume-ce-"));
+		mkdirSync(path.join(ceCwd, ".pi"), { recursive: true });
+		writeFileSync(
+			path.join(ceCwd, ".pi", "settings.json"),
+			JSON.stringify({ workOrchestrator: { profile } }),
+		);
+		const ceState = buildWorkResumeState(ceCwd, "E-1");
+		assert(
+			ceState.action === "run-planner",
+			`${profile} unplanned slice still routes to planner`,
+		);
+		assert(
+			ceState.handoffPrompt.includes("ce-plan") &&
+				ceState.handoffPrompt.includes("plan-path:") &&
+				ceState.handoffPrompt.includes(depthText),
+			`${profile} slice handoff invokes ce-plan ${depthText}`,
+		);
+		assert(
+			!ceState.handoffPrompt.includes("append one compact Bead note headed"),
+			`${profile} slice handoff does not use the lightweight note step`,
+		);
+		rmSync(ceCwd, { recursive: true, force: true });
+	}
 } finally {
 	if (oldEnv.bd === undefined) delete process.env.WORK_ORCH_BD_BIN;
 	else process.env.WORK_ORCH_BD_BIN = oldEnv.bd;

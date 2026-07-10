@@ -325,6 +325,7 @@ Beads and git preserve the memory; Pi chat is disposable working context. The pa
 - rely on `/work-context status` for current token/trigger state; default opt-in trigger is 150k tokens, capped by model context, and keeps at least the latest 30k tokens via Pi compaction settings;
 - compact only inside a single Bead when context gets high or after a noisy debug/review phase;
 - `/work-resume` automatic project-goal continuations start in a fresh session by default; opt out only with `workResume.newSessionBetweenIterations: false`;
+- self-improving ce-workflow fixes during target-project goals are off by default; opt in only with `workResume.selfImproving: true`;
 - `/work-resume-stop` requests a clean stop: checkpoint Beads/git, finish the current safe phase, and do not start another Bead;
 - after one executable Bead is committed and closed, stop unless the active `/work-resume` project-goal continuation is doing the fresh-session handoff.
 
@@ -441,9 +442,9 @@ Responsibilities:
 - after close, re-run `git status --short`; if `bd close` changed tracked Beads files such as `.beads/interactions.jsonl`, stage only those close-record files and amend or create a same-Bead follow-up commit before finalizing;
 - push only when repo/session policy requires it.
 
-### bead-advisor
+### bead-advisor / bead-advisor-backup
 
-Read-only critic launched by the orchestrator from the work-settings gates (not a primary implementation role). Must not edit source code or mutate Beads.
+Read-only critic launched by the orchestrator from the work-settings gates (not a primary implementation role). Must not edit source code or mutate Beads. If `bead-advisor` is unavailable, usage-limited, or fails to start, run `bead-advisor-backup` once instead; do not wait or retry the primary.
 
 Responsibilities:
 
@@ -456,8 +457,9 @@ Responsibilities:
 
 `/work-settings` toggles these on or off; when on, the extension appends the gate step to the matching handoff prompt, so the receiving role actually runs it. Defaults come from the effort profile:
 
-- **critic on brainstorm/plan** — `bead-advisor` on the artifact after `ce-brainstorm`/`ce-plan` (medium/high/max).
-- **advisor verifies task vs plan** — `bead-advisor` compares the implemented slice to the plan before review (medium/high/max).
+- **critic on brainstorm/plan** — `bead-advisor` on the artifact after `ce-brainstorm`/`ce-plan` (medium/high/max), falling back once to `bead-advisor-backup`.
+- **slice plan before work** — before an executable Bead runs for the first time, a planning pass writes a compact `wo:slice-plan` note and `wo:slice-planned` label; the worker then executes that plan as its spec (the Bead is the tracking item, not the spec). Always on by profile: low uses one cheap `bead-planner` note; medium uses ce-plan Lightweight; high uses ce-plan Standard (normal); max uses ce-plan Deep. ce-plan can't disable individual research agents, so depth is the cost/quality lever.
+- **advisor verifies task vs plan** — `bead-advisor` compares the implemented slice to the plan before review (medium/high/max), falling back once to `bead-advisor-backup`.
 - **simplify before review** — `ce-simplify-code` on the slice diff after self-verify, before done-for-review (high/max). Closes the core-loop simplify step that otherwise only ran on review FAIL.
 - **browser tests on UI diff** — at `/work-finish`, `ce-test-browser` on affected pages when the related files touch a runnable web frontend; auto-skipped for backend/CLI/docs-only diffs (medium/high/max).
 - **ce-code-review before commit** — full `ce-code-review` on the diff at the commit-ready gate (max).

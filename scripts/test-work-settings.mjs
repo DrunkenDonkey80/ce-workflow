@@ -42,6 +42,18 @@ try {
 		"medium advisor verify",
 	);
 	assert(
+		mod.workOrchSettings(cwd).slicePlanBeforeWork === true,
+		"medium slice planning",
+	);
+	assert(
+		mod.workOrchSettings(cwd).slicePlanWithCePlan === true,
+		"medium ce-plan per slice",
+	);
+	assert(
+		mod.workOrchSettings(cwd).slicePlanCeDepth === "Lightweight",
+		"medium ce-plan lightweight",
+	);
+	assert(
 		mod.workOrchSettings(cwd).codeReviewBeforeCommit === false,
 		"medium no code review",
 	);
@@ -63,12 +75,19 @@ try {
 	assert(max.critic.plan === true, "max critic plan");
 	assert(max.advisorVerifyTask === true, "max advisor verify");
 	assert(max.codeReviewBeforeCommit === true, "max code review");
+	assert(max.slicePlanWithCePlan === true, "max ce-plan per slice");
+	assert(max.slicePlanCeDepth === "Deep", "max ce-plan deep");
 	assert(max.simplifyBeforeReview === true, "max simplify");
 	assert(max.browserTestsOnUiDiff === true, "max browser tests");
 	assert(
 		readSettings().subagents.agentOverrides["bead-advisor"].thinking ===
 			"xhigh",
 		"advisor effort xhigh",
+	);
+	assert(
+		readSettings().subagents.agentOverrides["bead-advisor-backup"].thinking ===
+			"high",
+		"backup advisor effort high",
 	);
 	assert(
 		readSettings().subagents.agentOverrides["bead-worker"].thinking === "xhigh",
@@ -78,11 +97,21 @@ try {
 	// Flip a boolean live; profile label is preserved.
 	settings = readSettings();
 	mod.setWorkOrchBoolean(settings, "advisorVerifyTask", false);
+	mod.setWorkOrchBoolean(settings, "slicePlanBeforeWork", false);
+	mod.setWorkOrchBoolean(settings, "slicePlanWithCePlan", false);
 	mod.setWorkOrchBoolean(settings, "codeReviewBeforeCommit", false);
 	writeSettings(settings);
 	assert(
 		mod.workOrchSettings(cwd).advisorVerifyTask === false,
 		"flipped verify off",
+	);
+	assert(
+		mod.workOrchSettings(cwd).slicePlanBeforeWork === false,
+		"flipped slice planning off",
+	);
+	assert(
+		mod.workOrchSettings(cwd).slicePlanWithCePlan === false,
+		"flipped ce-plan per slice off",
 	);
 	assert(
 		mod.workOrchSettings(cwd).codeReviewBeforeCommit === false,
@@ -97,12 +126,22 @@ try {
 		"explicit profile stored",
 	);
 
+	mod.applyProfile((settings = readSettings()), "high");
+	writeSettings(settings);
+	assert(
+		mod.workOrchSettings(cwd).slicePlanCeDepth === "Standard",
+		"high ce-plan standard",
+	);
+
 	// Apply low profile: critic and verify off.
 	mod.applyProfile((settings = readSettings()), "low");
 	writeSettings(settings);
 	const low = mod.workOrchSettings(cwd);
 	assert(low.critic.brainstorm === false, "low no critic brainstorm");
 	assert(low.advisorVerifyTask === false, "low no advisor verify");
+	assert(low.slicePlanBeforeWork === true, "low lightweight slice planning");
+	assert(low.slicePlanWithCePlan === false, "low no ce-plan per slice");
+	assert(low.slicePlanCeDepth === "Lightweight", "low ce-plan depth unused");
 	assert(low.codeReviewBeforeCommit === false, "low no code review");
 	assert(low.simplifyBeforeReview === false, "low no simplify");
 	assert(low.browserTestsOnUiDiff === false, "low no browser tests");
@@ -145,6 +184,22 @@ try {
 	assert(
 		notices.at(-1).message.includes("advisor (critic)"),
 		"status lists advisor slot",
+	);
+	assert(
+		notices.at(-1).message.includes("advisor backup"),
+		"status lists backup advisor slot",
+	);
+	assert(
+		notices.at(-1).message.includes("planner writes slice plan before work"),
+		"status lists slice planning gate",
+	);
+	assert(
+		notices.at(-1).message.includes("ce-plan per slice (medium/high/max)"),
+		"status lists ce-plan slice gate",
+	);
+	assert(
+		notices.at(-1).message.includes("ce-plan slice depth: Lightweight"),
+		"status lists ce-plan slice depth",
 	);
 	assert(
 		notices.at(-1).message.includes("full ce-code-review before commit"),

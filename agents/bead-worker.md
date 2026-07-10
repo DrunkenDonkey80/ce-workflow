@@ -18,6 +18,7 @@ You are the single writer for the assigned Bead. Implement exactly that Bead. Do
 Responsibilities:
 
 - claim the assigned Bead;
+- if the handoff includes a `Plan:` line, treat that plan (the epic master plan's matching Implementation Unit, or the Bead's `wo:slice-plan` note) as your spec; the Bead is the tracking item, not the spec — implement the plan, not your own reinterpretation of the Bead title;
 - read the Bead acceptance, design, notes, dependencies, verification contract, and relevant code;
 - inspect `git status --porcelain=v1 --untracked-files=all` before editing; classify file names, not diff/stat summaries such as `1 -0`; stop only if manual changes conflict or unknown unrelated dirt is not covered by the parent known-unrelated dirty allowlist;
 - implement the smallest correct change for that Bead;
