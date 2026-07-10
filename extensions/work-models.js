@@ -38,6 +38,11 @@ const WORKFLOW_REPO_DIR = resolve(
 	dirname(fileURLToPath(import.meta.url)),
 	"..",
 );
+const WORK_CATCH_UP_BASELINE_PATH = resolve(
+	WORKFLOW_REPO_DIR,
+	"extensions",
+	"work-catch-up-baseline.json",
+);
 const WORK_ORCH_AGENT_DIR = resolve(WORKFLOW_REPO_DIR, "agents");
 const SUBAGENT_RPC_REQUEST_EVENT = "subagents:rpc:v1:request";
 const SUBAGENT_RPC_REPLY_EVENT_PREFIX = "subagents:rpc:v1:reply:";
@@ -6438,6 +6443,198 @@ function workResumeSettings(cwd) {
 		: { selfImproving: false, newSessionBetweenIterations: true };
 }
 
+function readWorkCatchUpBaseline() {
+	try {
+		const parsed = JSON.parse(
+			readFileSync(WORK_CATCH_UP_BASELINE_PATH, "utf8"),
+		);
+		return {
+			...parsed,
+			packages: Array.isArray(parsed.packages) ? parsed.packages : [],
+		};
+	} catch {
+		return { schemaVersion: 1, packages: [] };
+	}
+}
+
+function npmBin() {
+	return process.platform === "win32" ? "npm.cmd" : "npm";
+}
+
+function npmLatestVersion(name) {
+	if (process.env.WORK_CATCH_UP_OFFLINE === "1") return "";
+	try {
+		return execFileSync(npmBin(), ["view", name, "version"], {
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+			timeout: 15_000,
+		})
+			.trim()
+			.replace(/^"|"$/g, "");
+	} catch {
+		return "";
+	}
+}
+
+function installedPackageVersion(name) {
+	const roots = [
+		join(WORKFLOW_REPO_DIR, "node_modules"),
+		process.env.APPDATA ? join(process.env.APPDATA, "npm", "node_modules") : "",
+		process.env.HOME
+			? join(process.env.HOME, ".pi", "agent", "npm", "node_modules")
+			: "",
+	].filter(Boolean);
+	for (const root of roots) {
+		try {
+			return JSON.parse(readFileSync(join(root, name, "package.json"), "utf8"))
+				.version;
+		} catch {
+			// keep looking
+		}
+	}
+	return "";
+}
+
+function writeWorkCatchUpDiff(cwd, dir, name, from, to) {
+	if (!from || !to || from === to) return undefined;
+	const file = join(dir, `${safeArtifactPart(name)}-${from}-to-${to}.diff`);
+	try {
+		const output = execFileSync(
+			npmBin(),
+			["diff", `--diff=${name}@${from}`, `--diff=${name}@${to}`],
+			{
+				cwd,
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "pipe"],
+				maxBuffer: 2_000_000,
+				timeout: 30_000,
+			},
+		);
+		writeFileSync(file, output || "(no diff output)\n");
+		return file;
+	} catch (error) {
+		const output = [error?.stdout, error?.stderr]
+			.filter(Boolean)
+			.map(String)
+			.join("\n")
+			.trim();
+		writeFileSync(file, `${output || String(error)}\n`);
+		return file;
+	}
+}
+
+function buildWorkCatchUpState(cwd) {
+	if (!workResumeSettings(cwd).selfImproving) {
+		return {
+			ok: false,
+			reason: "self-improving-off",
+			message:
+				"/work-catch-up is available only when .pi/settings.json has workResume.selfImproving: true.",
+		};
+	}
+	const baseline = readWorkCatchUpBaseline();
+	const dir = join(
+		cwd,
+		CONFIG_DIR_NAME,
+		"work-catch-up",
+		new Date().toISOString().replace(/[:.]/g, "-"),
+	);
+	mkdirSync(dir, { recursive: true });
+	const packages = baseline.packages.map((item) => {
+		const name = String(item.name ?? "").trim();
+		const baselineVersion = String(item.version ?? "").trim();
+		const latestVersion = npmLatestVersion(name);
+		const installedVersion = installedPackageVersion(name);
+		const targetVersion = latestVersion || installedVersion || baselineVersion;
+		const diffPath = writeWorkCatchUpDiff(
+			cwd,
+			dir,
+			name,
+			baselineVersion,
+			targetVersion,
+		);
+		return {
+			name,
+			baselineVersion,
+			installedVersion,
+			latestVersion,
+			targetVersion,
+			changed: Boolean(baselineVersion && targetVersion !== baselineVersion),
+			diffPath,
+		};
+	});
+	const summaryPath = join(dir, "summary.json");
+	const state = {
+		ok: true,
+		baselinePath: WORK_CATCH_UP_BASELINE_PATH,
+		artifactDir: dir,
+		summaryPath,
+		capturedAt: baseline.capturedAt,
+		packages,
+	};
+	writeFileSync(summaryPath, JSON.stringify(state, null, 2));
+	return state;
+}
+
+function renderWorkCatchUpText(state) {
+	if (!state.ok) return state.message;
+	const changed = state.packages.filter((pkg) => pkg.changed);
+	return [
+		`Work catch-up: ${changed.length}/${state.packages.length} package(s) changed since baseline`,
+		`baseline: ${state.baselinePath}`,
+		`artifacts: ${state.artifactDir}`,
+		...state.packages.map(
+			(pkg) =>
+				`- ${pkg.name}: ${pkg.baselineVersion} → ${pkg.targetVersion}${pkg.diffPath ? ` (${relative(state.artifactDir, pkg.diffPath)})` : ""}`,
+		),
+	].join("\n");
+}
+
+function buildWorkCatchUpObjective(state, args = "") {
+	const userFocus = String(args ?? "").trim();
+	return [
+		"Catch ce-workflow up with upstream Pi/Compound/subagent package changes.",
+		userFocus ? `User focus: ${userFocus}` : "",
+		`Read the catch-up summary first: ${state.summaryPath}`,
+		`Diff artifacts live in: ${state.artifactDir}`,
+		`Baseline file to update after verified wins: ${state.baselinePath}`,
+		"Process:",
+		"1. Inspect only changed packages and their diff artifacts.",
+		"2. Decide whether each upstream change affects this package or enables a simpler implementation.",
+		"3. Implement clear compatibility fixes or obvious new-API wins directly; do not build a generic dependency intelligence system.",
+		"4. Ask the user only for no-clear-winner decisions.",
+		"5. Run npm run verify:quiet.",
+		"6. If verified, update the baseline versions for packages you actually handled.",
+		workGoalSelfImprovingAppendix(),
+	]
+		.filter(Boolean)
+		.join("\n\n");
+}
+
+async function handleWorkCatchUpCommand(args, pi, ctx) {
+	const state = buildWorkCatchUpState(ctx.cwd);
+	notify(ctx, renderWorkCatchUpText(state), state.ok ? "info" : "warning");
+	if (!state.ok) return;
+	if (!state.packages.some((pkg) => pkg.changed)) return;
+	await handleWorkGoalCommand(
+		buildWorkCatchUpObjective(state, args),
+		"self-improving",
+		pi,
+		ctx,
+	);
+}
+
+function registerWorkCatchUpCommand(pi, ctx) {
+	if (!workResumeSettings(ctx.cwd).selfImproving) return;
+	pi.registerCommand("work-catch-up", {
+		description:
+			"Self-improving upstream dependency catch-up from the recorded release baseline",
+		handler: async (args, ctx) => {
+			await handleWorkCatchUpCommand(args, pi, ctx);
+		},
+	});
+}
+
 function workProjectAutopilotAppendix() {
 	return `Project autopilot policy:
 - Treat the target directory as the source of truth: verify git and Beads state there before mutating anything.
@@ -6858,9 +7055,19 @@ function isWorkGoalContextOverflow(assistant) {
 	return WORK_GOAL_CONTEXT_OVERFLOW_RE.test(message);
 }
 
+function workGoalAssistantErrorText(assistant) {
+	return [
+		assistant?.errorMessage,
+		assistant?.message,
+		assistantVisibleText(assistant),
+	]
+		.filter(Boolean)
+		.map(String)
+		.join("\n");
+}
+
 function isWorkGoalUsageLimit(assistant) {
-	const message = String(assistant?.errorMessage ?? "");
-	return WORK_GOAL_USAGE_LIMIT_RE.test(message);
+	return WORK_GOAL_USAGE_LIMIT_RE.test(workGoalAssistantErrorText(assistant));
 }
 
 function workGoalUsageLimitRetryDelayMs() {
@@ -6872,7 +7079,7 @@ function workGoalUsageLimitRetryDelayMs() {
 
 function isRetryableWorkGoalInterruption(assistant) {
 	if (assistant?.stopReason !== "error") return false;
-	const message = String(assistant?.errorMessage ?? "");
+	const message = workGoalAssistantErrorText(assistant);
 	if (!message) return false;
 	if (isWorkGoalUsageLimit(assistant)) return true;
 	if (WORK_GOAL_NON_RETRYABLE_RE.test(message)) return false;
@@ -7591,7 +7798,10 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		return;
 	}
 	let retrying = false;
-	if (["aborted", "error"].includes(String(assistant?.stopReason ?? ""))) {
+	if (
+		["aborted", "error"].includes(String(assistant?.stopReason ?? "")) ||
+		isWorkGoalUsageLimit(assistant)
+	) {
 		if (isWorkGoalUsageLimit(assistant)) {
 			const nextRetryAt = Date.now() + workGoalUsageLimitRetryDelayMs();
 			activeWorkGoal = {
@@ -8071,6 +8281,8 @@ export {
 	buildWorkFinishState,
 	buildWorkIdeateState,
 	buildWorkBrainstormState,
+	buildWorkCatchUpState,
+	buildWorkCatchUpObjective,
 	captureIdeationIdeas,
 	brainstormHandoffPrompt,
 	buildWorkflowIntakeState,
@@ -8189,6 +8401,7 @@ export default function workModelsExtension(pi) {
 	}
 
 	pi.on("session_start", (_event, ctx) => {
+		registerWorkCatchUpCommand(pi, ctx);
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
 		activeWorkGoalRunning = false;

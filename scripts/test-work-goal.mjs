@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import {
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -74,6 +75,17 @@ assert.equal(
 	true,
 );
 assert.equal(mod.isWorkGoalUsageLimit({ errorMessage: "usage reached" }), true);
+assert.equal(
+	mod.isWorkGoalUsageLimit({
+		content: [
+			{
+				type: "text",
+				text: "Error: Codex error: The usage limit has been reached",
+			},
+		],
+	}),
+	true,
+);
 assert.equal(mod.isContradictoryWorkGoalCompletion("tests still fail"), true);
 
 const objective = mod.buildWorkSelfImprovingObjective("C:/soft/git/AI-Wedge", {
@@ -199,6 +211,7 @@ assert.ok(shortcuts.f8);
 assert.ok(!commands["work-self-improving-goal"]);
 assert.ok(!commands["work-project-goal"]);
 assert.ok(!commands["work-project"]);
+assert.ok(!commands["work-catch-up"]);
 assert.ok(tools.work_goal_complete);
 assert.ok(tools.work_goal_human_decision);
 assert.equal(tools.work_goal_human_decision.parameters.required[0], "question");
@@ -249,8 +262,35 @@ try {
 		},
 	};
 
+	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({ workResume: { selfImproving: true } }),
+	);
+	const oldCatchUpOffline = process.env.WORK_CATCH_UP_OFFLINE;
+	process.env.WORK_CATCH_UP_OFFLINE = "1";
+	const catchUpState = mod.buildWorkCatchUpState(cwd);
+	const baseline = JSON.parse(
+		readFileSync(
+			path.join(
+				import.meta.dirname,
+				"../extensions/work-catch-up-baseline.json",
+			),
+			"utf8",
+		),
+	);
+	assert.equal(catchUpState.ok, true);
+	assert.equal(catchUpState.packages.length, baseline.packages.length);
+	assert.match(
+		mod.buildWorkCatchUpObjective(catchUpState),
+		/npm run verify:quiet/,
+	);
+	if (oldCatchUpOffline === undefined) delete process.env.WORK_CATCH_UP_OFFLINE;
+	else process.env.WORK_CATCH_UP_OFFLINE = oldCatchUpOffline;
+
 	mod.default(pi);
 	tempHooks.session_start?.({}, ctx);
+	assert.ok(tempCommands["work-catch-up"]);
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes(
@@ -465,10 +505,12 @@ try {
 			messages: [
 				{
 					role: "assistant",
-					stopReason: "error",
-					errorMessage:
-						'429: {"code":"1308","message":"已达到 5 小时的使用上限。"}',
-					content: [{ type: "text", text: "" }],
+					content: [
+						{
+							type: "text",
+							text: "Error: Codex error: The usage limit has been reached",
+						},
+					],
 				},
 			],
 		},
