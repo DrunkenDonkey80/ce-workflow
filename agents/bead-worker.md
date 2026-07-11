@@ -21,9 +21,10 @@ Responsibilities:
 
 - claim the assigned Bead;
 - if the handoff includes a `Plan:` line, treat that plan (the epic master plan's matching Implementation Unit, or the Bead's `wo:slice-plan` note) as your spec; the Bead is the tracking item, not the spec — implement the plan, not your own reinterpretation of the Bead title;
-- read the Bead acceptance, design, notes, dependencies, verification contract, and relevant code;
-- inspect `git status --porcelain=v1 --untracked-files=all` before editing; classify file names, not diff/stat summaries such as `1 -0`; stop only if manual changes conflict or unknown unrelated dirt is not covered by the parent known-unrelated dirty allowlist;
+- read the Bead acceptance, design, notes, dependencies, verification contract, and relevant code; prefer the handoff-provided `work-helper.mjs bd-summary` / `bd-children-summary` / `blocker-search` before raw `bd show --json` or broad source search;
+- inspect `git status --porcelain=v1 --untracked-files=all` before editing; classify file names, not diff/stat summaries such as `1 -0`; stop only if manual changes conflict with files you will write or unknown unrelated dirt is not covered by the parent known-unrelated dirty allowlist. Unrelated dirty files are parent context: record them, avoid touching them, and continue;
 - implement the smallest correct change for that Bead;
+- after search narrows the area, read the smallest useful symbol/range instead of whole large files; broad searches should use helper byte caps;
 - run the Bead's verification contract exactly when present; if it requires real hardware, run the real hardware check and record device/module evidence; for app/device checks, record the exact package/activity launched and prefer the built artifact's application id when multiple same-named apps are installed; use a substitute only when the contract allows it;
 - update Bead notes with files changed, verification run, result, failures, and remaining work, leaving the Bead open/in-progress for review and commit; for multi-line notes, pass real newlines via a temp file/heredoc or `$'...'`, never literal `\\n` text;
 - when verification asks for manual UI evidence, do the smallest non-destructive path (open/cancel/return, save the same value, restore toggles you changed) instead of skipping it; before declaring device/hardware evidence unavailable, run the smallest non-destructive availability probe for that platform (for Android, `adb devices -l`); if evidence is still unsafe or unavailable, record a blocker/debug Bead rather than reporting the Bead ready for review;
@@ -33,7 +34,7 @@ Responsibilities:
 
 Stop and contact the supervisor when acceptance is ambiguous, a product or architecture decision is required, manual dirty changes conflict, required hardware or test equipment is unavailable, verification cannot run safely, or the implementation would touch unrelated scope. If the parent task says intercom/contact_supervisor is unavailable, disabled, or not to use it, skip contact and immediately use the Beads fallback. If `contact_supervisor` is unavailable or times out, do not retry, wait, or detach for coordination: update Bead notes with the blocker, create a `type=decision` Bead under the same epic parent when the blocker is durable, add blocker labels without replacing existing labels (`bd update <id> --add-label wo:blocked --add-label wo:decision`), add it as a blocker for the assigned Bead, and stop.
 
-Before final response, run `git diff --cached --name-only`; if anything is staged, unstage it and report that cleanup.
+Before final response, run `git diff --cached --name-only` or the handoff-provided `work-helper.mjs ensure-no-staged --allow-beads`; if anything is staged, unstage it and report that cleanup.
 
 Final response must be concise so the parent context stays small:
 

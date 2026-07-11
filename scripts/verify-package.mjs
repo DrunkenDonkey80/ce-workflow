@@ -98,15 +98,21 @@ for (const rel of ["extensions", "skills", "prompts", "agents", "README.md"]) {
 	check(`manifest path exists: ${rel}`, existsSync(path.join(root, rel)));
 }
 
-const skill = read("skills/work-orchestrator/SKILL.md");
-const skillFm = frontmatter(skill);
+const skillEntry = read("skills/work-orchestrator/SKILL.md");
+const skill = `${skillEntry}\n${read("skills/work-orchestrator/references/full-policy.md")}`;
+const skillFm = frontmatter(skillEntry);
 check(
 	"skill frontmatter names work-orchestrator",
 	skillFm.name === "work-orchestrator",
 );
 check(
+	"compact skill stays below 8 KB",
+	Buffer.byteLength(skillEntry) < 8000,
+	`${Buffer.byteLength(skillEntry)} bytes`,
+);
+check(
 	"skill states Beads source of truth",
-	/Beads is the only durable work state/.test(skill),
+	/Beads is (?:the )?(?:only )?durable work state/.test(skill),
 );
 check(
 	"skill states git source of truth",
@@ -181,8 +187,9 @@ for (const phrase of [
 	"clean-boundary gate",
 	"duplicate task Beads",
 	"one executable Bead",
-	"setup blocker instead of doing the work in the parent chat",
-	"do not substitute builtin `worker`, `reviewer`, `planner`, or `delegate`",
+	"Work directly in the current session by default",
+	"Do not call `subagent list` during a workflow",
+	"do not substitute builtin roles",
 	'outputMode: "file-only"',
 	"full `bd show` epic JSON",
 	"context:fresh",
@@ -202,8 +209,8 @@ for (const phrase of [
 	"stale intercom",
 	"Live/Test Project Feedback Loop",
 	"Repeat this gate after every child returns",
-	"Treat out-of-scope whitespace/formatter-only instruction-file dirt as parent cleanup",
-	"instruction-file whitespace startup allowlist",
+	"Skip an independent reviewer when acceptance is explicit",
+	"coded execution policy",
 	"Failure and Blocker Lifecycle",
 	"Mode: report",
 	"precomputed extension state for `small`, `med`, `big`, `master`, `migrate`, or `finish`",
@@ -212,7 +219,7 @@ for (const phrase of [
 	"failure artifact",
 	"wo:debug-needed",
 	"wo:blocked",
-	"default review scope is the current Bead slice",
+	"Launch exactly one `bead-reviewer` for high-risk",
 	"review payoff when telemetry recorded it",
 ]) {
 	check(`skill covers ${phrase}`, skill.includes(phrase));
@@ -533,7 +540,7 @@ for (const phrase of [
 	"advisor (critic)",
 	'registerCommand("work-settings"',
 	"ROLE_TIMEOUT_GUIDANCE",
-	"Closure rule: worker/reviewer/fixer/debugger roles must leave Beads open",
+	"Closure rule: worker/reviewer/fixer/debugger roles leave Beads open",
 	"handleWorkResumeCommand",
 	"renderWorkReportJson",
 	"noteExcerpts",
@@ -583,7 +590,7 @@ for (const phrase of [
 	"Extension command: normalizes migration sources",
 	"Extension command: checks PASS review",
 	"Extension command: appends a deterministic checkpoint",
-	"Extension command: rejects empty input",
+	"deterministically classifies obvious debug/master/big/small work",
 	"/work-report",
 	"/work-roadmap",
 	"/work-telemetry",
@@ -592,7 +599,7 @@ for (const phrase of [
 	"work-catch-up-baseline.json",
 	"--tokens 100k",
 	"retryable provider/context-error recovery",
-	"contradictory-completion rejection",
+	"contradictory completion summaries",
 	"/work-models",
 	"/work-settings",
 	"/work-context",
@@ -623,10 +630,10 @@ for (const phrase of [
 	"subagents.agentOverrides",
 	"Blank model means",
 	"fresh Pi session",
-	"planner verifies dependency direction with `bd ready --json`",
-	"not builtin stand-ins like `worker`",
-	"parent orchestrator coordinates",
-	"pi-subagents` is unavailable",
+	"wo:execution-agent",
+	"exact package roles",
+	"Routine work stays in the current session",
+	"required specialist cannot start",
 	"MSYS_NO_PATHCONV=1",
 	"percent complete",
 	"No custom dashboard",
@@ -641,13 +648,13 @@ for (const phrase of [
 	"Known-unrelated dirty files",
 	"stale intercom",
 	"npm run verify:quiet",
-	"avoid raw `bd show --json` for epics",
+	"avoid raw epic JSON",
 	".pi/work-runs/*.jsonl",
 	"review scope/payoff",
 	"make the tuning visible",
 	"advisor backup",
 	"slice plan before work",
-	"ce-plan Lightweight",
+	"coded; planner only when messy",
 	"self-improvement is off by default",
 	"Roadmap epics are not auto-closed",
 ]) {
@@ -674,6 +681,7 @@ for (const script of [
 	"test-work-goal.mjs",
 	"test-work-start-finish.mjs",
 	"test-work-telemetry.mjs",
+	"test-work-optimization-helpers.mjs",
 	"test-windows-bd-shim.mjs",
 ]) {
 	try {

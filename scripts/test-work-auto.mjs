@@ -45,24 +45,27 @@ try {
 		"test failure: expected 200 got 500",
 	);
 	assert(
-		state.ok && state.action === "handoff-auto",
-		"failing-test prose stays in auto skill path",
-	);
-	assert(
-		state.handoffPrompt.includes("Task: test failure: expected 200 got 500"),
-		"failure prose is preserved unchanged",
+		state.ok &&
+			state.action === "debug-ready" &&
+			state.autoClassification === "debug",
+		"failing-test prose routes directly to the debugger policy",
 	);
 
 	state = buildWorkAutoState(process.cwd(), "migrate old TODO list");
 	assert(
-		state.ok && state.action === "handoff-auto",
-		"migration-like prose stays in auto skill path",
+		state.ok &&
+			state.action === "handoff-migrate" &&
+			state.autoClassification === "migrate",
+		"migration-like prose routes directly to migration",
 	);
 
 	state = buildWorkAutoState(process.cwd(), "add a tiny status helper");
 	assert(
-		state.ok && state.action === "handoff-auto",
-		"ordinary feature text hands off to auto",
+		state.ok &&
+			state.action === "run-implementation" &&
+			state.autoClassification === "small" &&
+			state.inlineWork,
+		"ordinary tiny feature routes directly to inline small work",
 	);
 
 	fixture.reset("active", "unknown");

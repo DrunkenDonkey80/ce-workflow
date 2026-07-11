@@ -52,12 +52,12 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-brainstorm [idea <target>\|topic] [path]` | Brainstorm an idea or topic without losing lineage | Extension command: initializes Beads when needed, creates a standalone brainstorm epic if no active epic exists, links artifacts to exact idea records, and reports near-duplicates instead of fuzzy merging |
 | `/work-master <brainstorm-or-plan>` | Legacy alias | Same as `/work-plan` |
 | `/work-migrate <sources>` | Existing plans, TODOs, tracker exports, partial implementations, or branches | Extension command: normalizes migration sources and hands them to `bead-migrator` without editing code or changing branches |
-| `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Extension command: creates one child Bead, then hands it to the implementation role loop |
-| `/work-med <task>` | Bounded work inside an epic with a few choices | Extension command: creates one planning Bead for one executable child by default, then hands it to `bead-planner` |
-| `/work-big <task>` | Large, risky, or architectural slice inside an epic | Extension command: creates one planning Bead for deeper slicing, then hands it to `bead-planner` |
+| `/work-small <task>` | Clear, low-risk work in one or two files inside an epic | Extension command: creates and claims one child Bead, then queues a compact inline implementation/finalization prompt in the current session |
+| `/work-med <task>` | Bounded work inside an epic with a few choices | Extension command: creates and claims one executable Bead for inline work; sensitive or unexpectedly large diffs escalate to one reviewer |
+| `/work-big <task>` | Large, risky, or architectural slice inside an epic | Extension command: creates one planning Bead for deeper slicing, directly launches `bead-planner`, and propagates `wo:execution-agent` to risky executable children |
 | `/work-debug <bug-or-bead-id\|symptom[: guidance]>` | Failing test, blocked/debug-needed Bead, regression, or broken behavior | Extension command: resolves/reuses or creates a debug Bead, then hands that compact state to the existing debug role loop |
-| `/work-auto <task>` | You want the orchestrator to classify size | Extension command: rejects empty input, routes explicit blocked/debug-needed Beads to debug, otherwise hands unchanged text to the auto skill path |
-| `/work-resume [repo-path\|instruction]` | Resume autonomous project work | Extension command: starts/resumes a `/work-goal` project loop from Beads/git state. With no path it uses the current repo; plain text becomes the constraint. Self-improving ce-workflow fixes are opt-in via `.pi/settings.json` `workResume.selfImproving` |
+| `/work-auto <task>` | You want the orchestrator to classify size | Extension command: deterministically classifies obvious debug/master/big/small work and defaults the rest to med; it then calls the matching coded builder without an LLM routing turn |
+| `/work-resume [epic-id\|last]` | Run the next Bead boundary | Extension command: resolves Beads/git state in code, then queues inline work or directly launches the exact planner/debugger/high-risk worker role; one executable Bead per invocation |
 | `/work-catch-up [focus]` | Self-improving mode is on and this package should catch up to upstream Pi/CE/subagent changes | Extension command: compares the recorded release baseline in `extensions/work-catch-up-baseline.json` with current package versions, writes diff artifacts, then starts a self-improving `/work-goal` only when something changed |
 | `/work-resume-stop [reason]` | Stop overnight/autonomous work cleanly | Marks the active `/work-resume` loop as stopping, asks the agent to checkpoint and stop at the next safe phase boundary, then leaves it resumable with `/work-resume` |
 | `/work-menu` | Open the small work menu | Extension command/shortcut target for resume, stop, roadmap, status, and report |
@@ -82,17 +82,17 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 4. `/work-usage` turns existing telemetry into a local HTML report without creating another source of truth; pass `--jsonl` for agent-readable rows or `--open` only when you want a browser.
 5. `/work-migrate` converts existing partial project state into an epic when work did not start in this system.
 6. `/work-big`, `/work-med`, `/work-small`, `/work-debug`, and `/work-add` operate inside that epic.
-7. Ready Beads move through role agents: planner → worker/debugger → reviewer → fixer if needed → committer. The planner verifies dependency direction with `bd ready --json`; the parent orchestrator coordinates and should not become the worker.
+7. Clear bounded Beads run directly in the current session and finish through coded verification/commit/close. Planner, debugger, high-risk worker, reviewer, and fixer agents launch only when deterministic mode/risk gates require their distinct judgment.
 8. Roadmap epics are not auto-closed. When a roadmap looks complete, use `/work-roadmap close <epic-id>`; unresolved child Beads require confirmation or `--force`.
-9. `/work-resume` is the project autopilot entrypoint. It targets the current repo by default, or a path when the first argument is an existing path, then continues from Beads/git state until done or a real human decision is needed.
-10. `/work-small`, `/work-med`, `/work-big`, `/work-plan`, `/work-master`, and `/work-migrate` now do deterministic start-gate intake in extension code; role agents still execute planning, migration, implementation, and risky review.
+9. `/work-resume` is a coded one-Bead boundary: it resolves the next action without a generic goal/agent-discovery turn. Use `/work-goal` explicitly for autonomous multi-step objectives.
+10. `/work-small` and routine `/work-med` use compact inline handoffs plus the coded `finish-task` transaction; deterministic evidence and non-sensitive bounded diffs skip separate reviewer and committer agents.
 11. `/work-debug`, `/work-add`, and `/work-pause` now do deterministic Beads/git intake in extension code; role agents still execute debugging and implementation.
 12. `/work-finish` does deterministic gate checks and commits/closes directly when safe; large/risky changes still route to review first.
 13. `/work-status` is the cheap dashboard; it does not ask the LLM when the extension command is loaded.
 14. `/work-report` is the deterministic human handoff view for blocked/debug-needed work and failure artifacts; `--json` emits the same computed state for automation.
 15. `/work-telemetry` records command/agent wall time, assistant token usage when exposed by Pi, context token snapshots, tool/subagent durations, output-waste/repeated-command summaries, transcript-reconciled counters when a transcript path is available, and backing artifact files in `.pi/work-runs/*.jsonl`. Repeated `/work-resume` blocked reports for the same blocker are deduped for one hour to keep continuation loops from bloating telemetry; set `WORK_ORCH_TELEMETRY_BLOCKED_DEDUPE_MINUTES=0` or `WORK_ORCH_TELEMETRY_DEDUPE_OFF=1` to capture every blocked poll. Set `WORK_ORCH_TELEMETRY_NOTES=1` only if you also want one-line Bead note pointers.
 16. `/work-usage` reads those same files and writes local HTML under `.pi/work-runs/usage/`; generated reports stay ignored by git and only open in a browser with `--open`. Use `--jsonl` for agent/subagent consumption.
-17. `/work-goal` runs a session-scoped autonomous loop with scoped human-decision stops, `/work-context` microcompaction before continuations, retryable provider/context-error recovery, optional `--tokens` budgets, and contradictory-completion rejection; `/work-resume` wraps it with project-autopilot rules and optional self-improvement pressure.
+17. `/work-goal` runs a session-scoped autonomous loop with scoped human-decision stops, microcompaction, retryable provider/context-error recovery, optional budgets, and an inline-first/no-agent-list system policy.
 18. `/work-context` proactively compacts before context rot; Beads/git keep durable state, compacted chat keeps only visible goals/state.
 19. `/work-pause` writes a checkpoint into Beads so any future session can continue.
 
@@ -161,13 +161,11 @@ What happens:
 3. An epic Bead is created with scope, full plan design, acceptance, and verification.
 4. A planning Bead is created under the epic.
 5. `bead-planner` creates the next child task Bead under the epic, or up to three only for obvious low-risk sequences.
-6. `/work-resume` starts executing one ready Bead.
-7. `bead-worker` implements that Bead.
-8. `bead-reviewer` checks diff, acceptance, and verification evidence.
-9. `bead-fixer` fixes reviewer failures when needed.
-10. `bead-committer` commits related files with `<bead-id>: <summary>` and closes the Bead.
-11. The run prints status and the next `/work-resume` command. Start a fresh Pi session for the next slice.
-12. If no ready Bead exists but the epic is not complete, `/work-resume` asks `bead-planner` to compare the epic plan against existing children and create the next executable slice instead of declaring done.
+6. `/work-resume` deterministically selects one ready Bead.
+7. Routine work is implemented in the current session and finalized by `finish-task`.
+8. High-risk work directly launches `bead-worker`; one scoped `bead-reviewer` runs only when risk or evidence requires it, and `bead-fixer` only on concrete FAIL findings.
+9. Commit and close are coded; no committer agent is needed for routine policy.
+10. The run prints status and the next `/work-resume` command. If no ready Bead exists but the epic is incomplete, only then does `/work-resume` launch `bead-planner`.
 
 Check progress any time:
 
@@ -380,7 +378,7 @@ Non-trivial reusable debugging lessons trigger `ce-compound mode:headless` after
 | `bead-reviewer` | No | No | Reports `PASS` or `FAIL` from diff, acceptance, and verification |
 | `bead-debugger` | Yes | No | Uses `ce-debug` to reproduce, root-cause, fix, verify, and request learning capture |
 | `bead-fixer` | Yes | No | Fixes reviewer-identified issues only |
-| `bead-committer` | No | Yes | Verifies, commits related files, then closes the Bead |
+| `bead-committer` | No | Yes | Exceptional commit-policy fallback; routine commit/close uses coded `finish-task` |
 
 ## Verification contracts
 
@@ -390,7 +388,7 @@ Put project-specific must-run checks in `AGENTS.md` or referenced test docs. The
 For affected hardware modules, run the real hardware smoke test on the module before closing work. Record the module ID, command, and observed result in Bead notes. Do not substitute mocks unless the user approves.
 ```
 
-Workers run that contract, reviewers check evidence, and committers refuse to close when evidence is missing.
+Inline work or workers run that contract; coded gates and risk-triggered reviewers refuse close when evidence is missing.
 
 ## Model and effort tuning
 
@@ -400,34 +398,33 @@ Workers run that contract, reviewers check evidence, and committers refuse to cl
 
 Profiles set effort per role plus the advisor, and the advisory gates. Applying one overwrites effort and gates, not models:
 
-| profile | plan | work | debug | review | commit | advisor | backup advisor | critic (brainstorm/plan) | slice plan before work | slice plan mode | advisor verifies task | simplify before review | browser tests on UI diff | ce-code-review before commit |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| low | low | low | medium | low | low | medium | low | off / off | on | bead-planner note | off | off | off | off |
-| medium | medium | medium | high | medium | low | high | medium | on / on | on | ce-plan Lightweight | on | off | on | off |
-| high | high | high | high | high | low | xhigh | medium | on / on | on | ce-plan Standard | on | on | on | off |
-| max | xhigh | xhigh | xhigh | high | medium | xhigh | high | on / on | on | ce-plan Deep | on | on | on | on |
+| profile | plan | work | debug | review | advisor | backup advisor | critic (brainstorm/plan) | routine slice plan | task-vs-plan check | simplify gate | browser gate | full code review |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| low | low | low | medium | low | medium | low | off / off | coded | off | off | off | off |
+| medium | medium | medium | high | medium | high | medium | on / on | coded | coded, advisor on ambiguity | off | trigger-only | off |
+| high | high | high | high | high | xhigh | medium | on / on | coded; planner only when messy | coded, advisor on ambiguity | direct, skill only if non-trivial | trigger-only | off |
+| max | xhigh | xhigh | xhigh | high | xhigh | high | on / on | coded; deep planner only when messy | coded, advisor on ambiguity | direct, skill only if non-trivial | trigger-only | high-risk only |
 
 ### Advisor and gates (prompt-live)
 
-The advisor (`bead-advisor`, read-only, xhigh by default, inherits the control model) is a critic that the orchestrator actually launches from the handoff prompts when the matching gate is on. If it is unavailable, usage-limited, or fails to start, the prompt falls back once to `bead-advisor-backup`, which you can pin to a smaller model in `/work-settings`.
+The advisor (`bead-advisor`, read-only, xhigh by default) is reserved for semantic ambiguity. If it is unavailable, usage-limited, or fails to start, the prompt can fall back once to `bead-advisor-backup`.
 
-- **critic on brainstorm / plan** — after `ce-brainstorm`/`ce-plan` produces the artifact, run `bead-advisor` to find weak requirements, unverified acceptance, incomplete decisions, and untested assumptions. On for medium/high/max, off for low.
-- **slice plan before work** — before an executable Bead runs for the first time, a planning pass writes a compact `wo:slice-plan` note and `wo:slice-planned` label. The worker executes that plan as the spec (the Bead is the tracking item, not the spec). Always on by profile: low uses one cheap `bead-planner` note; medium uses ce-plan Lightweight; high uses ce-plan Standard (normal); max uses ce-plan Deep. ce-plan **cannot disable individual research agents** (it dispatches `ce-repo-research-analyst` + `ce-learnings-researcher` in parallel by default; flow analysis is depth-gated, external research is skip-when-local-patterns-strong), so the real cost lever is this depth ladder.
-- **advisor verifies task vs plan** — once a slice is implemented and self-verified (before review/finish), run `bead-advisor` to compare the change against the plan's acceptance and flag drift or missing evidence. On for medium/high/max.
-- **simplify before review** — after a slice is implemented and self-verified but before it signals done-for-review, run `ce-simplify-code` on the diff to tighten clarity and drop over-engineering/dead flexibility. Closes the core-loop simplify step that otherwise only ran on review FAIL. On for high/max.
-- **browser tests on UI diff** — at the `/work-finish` commit-ready gate, if the related files touch a runnable web frontend (routes/pages/components/styles), run `ce-test-browser` on the affected pages; skipped automatically for backend/CLI/docs-only diffs or projects with no web frontend. Trigger-based, not effort-bound: on for medium/high/max.
-- **full ce-code-review before commit** — at the `/work-finish` commit-ready gate, run the full `ce-code-review` skill on the diff before the committer commits. On for max only.
+- **critic on brainstorm / plan** — use `bead-advisor` for non-trivial requirements or plans; skip obvious complete artifacts.
+- **slice plan before work** — code writes a compact `wo:slice-plan` note and continues for routine slices. Only genuinely messy or large slices launch planner/ce-plan.
+- **task-vs-plan verification** — code first compares Bead acceptance, plan unit, diff, and verification evidence; launch an advisor only when ambiguity remains.
+- **simplify before review** — inspect the scoped diff directly first; invoke `ce-simplify-code` only for a non-trivial cleanup.
+- **browser tests on UI diff** — run browser verification only when affected UI acceptance requires it.
+- **full code review before commit** — reserved for max-profile/high-risk diffs; deterministic bounded work uses the coded finalizer.
 
-Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `commit`, `advisor`, or `advisor backup`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-settings status` (and `/work-models status`) make the tuning visible and `/work-settings` lets you flip gates live.
+Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `advisor`, or `advisor backup`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-settings status` (and `/work-models status`) make the tuning visible and `/work-settings` lets you flip gates live.
 
-Role prompts use fresh child context by default and file-only artifacts so the parent session does not inherit every tool log or full master plan. Subagent launches should set `outputMode: "file-only"` with a short relative output filename unless the entire result is a short PASS/FAIL summary; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. The orchestrator must launch the exact package agents (`bead-worker`, `bead-reviewer`, etc.), not builtin stand-ins like `worker`; if `pi-subagents` is unavailable it stops with a setup blocker instead of implementing in the control chat. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
+Routine work stays in the current session. Specialist role prompts use fresh child context and file-only artifacts so tool logs and master plans do not spill back. The extension directly launches exact package roles without an agent-list/LLM-selection turn; if a required specialist cannot start, it stops rather than duplicating work. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {
   "subagents": {
     "agentOverrides": {
       "bead-worker": { "model": "anthropic/claude-sonnet-4", "thinking": "medium" },
-      "bead-committer": { "thinking": "low" },
       "bead-advisor": { "thinking": "xhigh" },
       "bead-advisor-backup": { "model": "openai/gpt-5-mini", "thinking": "medium" }
     }
@@ -448,7 +445,9 @@ Role prompts use fresh child context by default and file-only artifacts so the p
 
 Use low/minimal effort for disposable smoke-test Pi instances. Keep your control session on a frontier model for `/work-plan`/`ce-plan` if you want deep planning, then set `work` to a local model to save tokens.
 
-`/work-context` is separate from model choice. It is on by default and uses no model call for its compact summary. `/work-resume` starts automatic continuations in fresh sessions by default (`workResume.newSessionBetweenIterations !== false`) so overnight loops do not inherit every prior tool log. Use `/work-resume-stop` to request a clean stop; running `/work-resume` while it says 🛑 stopping cancels that stop. The status line shows ▶️ active, 🔵 working, 🛑 stopping, ⏹️ stopped, or 🟣❓ needs human. For normal control-session inspection, use `/work-report` and `/work-resume`; avoid raw `bd show --json` for epics because it can dump full plans into chat.
+`/work-context` is separate from model choice and uses no model call for its compact summary. `/work-resume` now runs one coded Bead boundary and does not create a growing automatic project-goal chat. Use `/work-goal` explicitly for autonomous multi-step loops; those loops microcompact before continuations and can be stopped with `/work-resume-stop` when running in project mode. For normal inspection, use `/work-report` and `/work-resume`; avoid raw epic JSON.
+
+Role and inline handoffs include `scripts/work-helper.mjs`, a deterministic helper for compact Beads summaries, blocker search, bounded `rg`, JSON assertions, Beads updates, staged-file cleanup, and the atomic `finish-task` verify/commit/close/push gate. Prefer that helper before spending an LLM turn on CLI help, raw epic JSON, broad grep output, or simple artifact validation.
 
 Status line hints the working hotkeys: `F7 roadmaps · F8 menu`. Run `/reload` after installing or editing the package.
 

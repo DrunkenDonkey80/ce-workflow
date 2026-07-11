@@ -256,13 +256,14 @@ try {
 		);
 		assert(
 			commandSummary.slowest[0].handoff?.queued &&
-				commandSummary.slowest[0].handoff.role === "worker",
-			"extension command records handoff outcome and role",
+				commandSummary.slowest[0].handoff.role === "inline-small",
+			"extension command records inline-small handoff role",
 		);
 		assert(sent.length === 1, "instrumented command still queues handoff");
 		assert(
-			sent[0].message.includes("Review scope default: current Bead TASK-NEW-1"),
-			"review handoff scope names selected bead instead of whole repo",
+			sent[0].message.includes("WO_INLINE_V1") &&
+				sent[0].message.includes("Do not call subagent list"),
+			"small handoff stays inline and discovery-free",
 		);
 
 		fixture.reset("blocked");

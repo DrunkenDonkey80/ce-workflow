@@ -9,6 +9,7 @@ const { assert, installWorkflowFixture } = await import(
 );
 
 const {
+	buildWorkAutoState,
 	buildWorkBigState,
 	buildWorkFinishState,
 	executeWorkFinishState,
@@ -35,25 +36,23 @@ try {
 		"small creates implementation handoff",
 	);
 	assert(
-		state.selectedBead.id.startsWith("TASK-NEW-"),
-		"small creates one task Bead",
+		state.selectedBead.id.startsWith("TASK-NEW-") &&
+			state.selectedBead.status === "in_progress",
+		"small creates and claims one task Bead in coded intake",
 	);
 	assert(
-		state.handoffPrompt.includes("at least 10 minutes"),
-		"small handoff carries timeout guidance",
-	);
-	const direct = directRoleHandoffParams(state, process.cwd());
-	assert(
-		direct?.agent === "bead-worker" && direct.params.async === true,
-		"small handoff can launch bead-worker directly",
+		state.inlineWork && state.handoffPrompt.includes("WO_INLINE_V1"),
+		"small uses concise inline fast path",
 	);
 	assert(
-		direct.params.task.includes("do not call subagent"),
-		"direct handoff bypasses parent subagent tool chatter",
+		directRoleHandoffParams(state, process.cwd()) === null,
+		"small does not launch a subagent",
 	);
 	assert(
-		direct.params.task.includes("Do not read raw Pi/subagent session files"),
-		"direct handoff treats missing session files as optional diagnostics",
+		state.handoffPrompt.includes("Do not call subagent list") &&
+			state.handoffPrompt.includes("finish-task") &&
+			state.handoffPrompt.length < 3000,
+		"small handoff is compact, coded, and discovery-free",
 	);
 	assert(
 		fixture.logs().filter((entry) => entry.op === "create").length === 1,
@@ -100,20 +99,36 @@ try {
 	fixture.reset("active");
 	state = buildWorkMedState(process.cwd(), "Split a bounded feature");
 	assert(
-		state.ok && state.action === "run-planner",
-		"med creates planner handoff",
+		state.ok && state.action === "run-implementation" && state.inlineWork,
+		"med creates one inline executable handoff",
 	);
 	assert(
-		fixture.logs()[0].issue.notes.includes("wo:planning"),
-		"med Bead is planning-marked",
+		state.selectedBead.status === "in_progress" &&
+			fixture.logs()[0].issue.notes.includes("wo:execution-inline"),
+		"med creates and claims an inline-marked Bead",
 	);
 	assert(
-		fixture.logs()[0].args.includes("--notes"),
-		"new Beads use create --notes so planning markers persist",
+		directRoleHandoffParams(state, process.cwd()) === null &&
+			state.handoffPrompt.includes("--max-files 8"),
+		"med skips planner/worker agents and uses bounded coded finalization",
 	);
+
+	fixture.reset("active");
+	state = buildWorkSmallState(
+		process.cwd(),
+		"Update authentication permission checks",
+	);
+	const riskyDirect = directRoleHandoffParams(state, process.cwd());
 	assert(
-		state.handoffPrompt.includes("bd ready --json"),
-		"med handoff names dependency-direction check",
+		!state.inlineWork && riskyDirect?.agent === "bead-worker",
+		"sensitive small requests escalate to the exact isolated writer",
+	);
+
+	fixture.reset("active");
+	state = buildWorkAutoState(process.cwd(), "Add docs note");
+	assert(
+		state.autoClassification === "small" && state.inlineWork,
+		"auto classifies obvious small work in code",
 	);
 
 	fixture.reset("active");
@@ -123,8 +138,9 @@ try {
 		"big creates planner handoff",
 	);
 	assert(
-		state.handoffPrompt.includes("big slice"),
-		"big handoff carries big posture",
+		state.handoffPrompt.includes("big slice") &&
+			directRoleHandoffParams(state, process.cwd())?.agent === "bead-planner",
+		"big handoff carries big posture and directly selects the planner",
 	);
 
 	fixture.reset("no-beads");
@@ -236,6 +252,10 @@ try {
 		"migrate handoff forbids branch mutation",
 	);
 	assert(fixture.logs().length === 0, "migrate does not mutate Beads");
+	assert(
+		directRoleHandoffParams(state, process.cwd())?.agent === "bead-migrator",
+		"migrate directly selects the exact specialist without agent discovery",
+	);
 
 	state = buildWorkMigrateState(process.cwd(), "missing-source.md");
 	assert(

@@ -19,8 +19,8 @@ Use the `ce-debug` workflow for the assigned bug Bead: reproduce first, identify
 
 Responsibilities:
 
-- read the assigned bug Bead with `bd show <id> --json`;
-- inspect `git status` before editing and stop if manual changes conflict;
+- read the assigned bug Bead with the handoff-provided `work-helper.mjs bd-summary <id>` first; use raw `bd show <id> --json` only when the compact summary lacks a required field;
+- inspect `git status` before editing and stop only if manual changes conflict with files you will write; unrelated dirty files should be recorded and avoided;
 - use `ce-debug` discipline: reproduce, trace, root-cause, fix, verify;
 - obey the Bead's verification contract; when it requires real hardware, reproduce and verify on the affected hardware/module or stop for the parent;
 - update Bead notes with symptoms, root cause, files changed, verification, hardware evidence when applicable, and result;
@@ -34,7 +34,7 @@ Do not commit. Do not stage files; if a command stages files, unstage them befor
 
 Human questions must go through the parent: use `contact_supervisor` with `reason: "need_decision"` and one specific question. Use `reason: "progress_update"` only for a short plan-changing discovery. If `contact_supervisor` is unavailable or times out, update Bead notes with the blocker, create a decision Bead under the same epic parent when the blocker is durable, add blocker labels without replacing existing labels (`bd update <decision-id> --add-label wo:blocked --add-label wo:decision` and `bd update <bug-id> --add-label wo:blocked --add-label wo:debug`), add the decision as a blocker for the bug, and stop. Do not ask the user directly.
 
-Before final response, run `git diff --cached --name-only`; if anything is staged, unstage it and report that cleanup.
+Before final response, run `git diff --cached --name-only` or the handoff-provided `work-helper.mjs ensure-no-staged --allow-beads`; if anything is staged, unstage it and report that cleanup.
 
 Final response must be concise so the parent context stays small:
 

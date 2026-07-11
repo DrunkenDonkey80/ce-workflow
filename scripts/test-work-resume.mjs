@@ -12,14 +12,18 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
 
-const { buildWorkResumeState, handleWorkResumeCommand, renderWorkResumeText } =
-	await import(
-		pathToFileURL(
-			realpathSync(
-				path.join(import.meta.dirname, "../extensions/work-models.js"),
-			),
-		).href
-	);
+const {
+	buildWorkResumeState,
+	directRoleHandoffParams,
+	handleWorkResumeCommand,
+	renderWorkResumeText,
+} = await import(
+	pathToFileURL(
+		realpathSync(
+			path.join(import.meta.dirname, "../extensions/work-models.js"),
+		),
+	).href
+);
 
 const epics = [
 	{
@@ -215,6 +219,62 @@ const childrenByScenario = {
 			labels: ["wo:slice-planned"],
 		},
 	],
+	inProgressSensitiveContract: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			acceptance: "Verification contract: run npm run verify before review",
+			notes:
+				"wo:execution-agent\nVerification command required: npm run verify",
+		},
+	],
+	inProgressReviewFail: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains",
+		},
+	],
+	inProgressFixReady: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed and tests passed",
+		},
+	],
+	inProgressReviewPass: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				"wo:execution-agent\nwo:verify-check PASS\nwo:review PASS - no blockers",
+		},
+	],
+	inProgressReviewCap: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL - two\nwo:fix PASS\nwo:review FAIL - three",
+		},
+	],
 	blocked: [
 		{
 			id: "BLOCK-1",
@@ -332,6 +392,10 @@ if (args[0] === "list" && args.includes("--type=epic")) {
   else { console.error("not found"); process.exit(2); }
 } else if (args[0] === "children") out(childrenFor(args[1]));
 else if (args[0] === "ready") out(childrenFor(args[1]).filter((issue) => issue.status === "open"));
+else if (args[0] === "update") {
+  const issue = Object.values(childrenByScenario).flat().find((item) => item.id === args[1]);
+  out(issue ? { ...issue, status: args[args.indexOf("--status") + 1] || issue.status } : []);
+}
 else out([]);
 `,
 	);
@@ -425,11 +489,19 @@ try {
 	process.env.WORK_RESUME_SCENARIO = "implementation";
 	state = buildWorkResumeState(process.cwd(), "E-1");
 	assert(
-		state.action === "slice-planned-inline",
-		"unplanned implementation gets coded slice plan without planner agent",
+		state.action === "run-implementation" && state.inlineWork,
+		"unplanned implementation gets a coded slice plan and continues inline",
 	);
 	assert(state.selectedBead.id === "IMP-1", "implementation bead selected");
-	assert(!state.handoffPrompt, "inline slice planning skips agent handoff");
+	assert(
+		state.handoffPrompt?.includes("WO_INLINE_V1"),
+		"inline slice planning avoids a separate planner boundary",
+	);
+	assert(
+		state.handoffPrompt.includes("target: IMP-1 — Implement feature slice") &&
+			!state.handoffPrompt.includes("[object Object]"),
+		"coded slice-plan target stays compact and readable",
+	);
 
 	process.env.WORK_RESUME_SCENARIO = "ideasOnly";
 	state = buildWorkResumeState(process.cwd(), "E-1");
@@ -443,8 +515,8 @@ try {
 	process.env.WORK_RESUME_SCENARIO = "plannedIdea";
 	state = buildWorkResumeState(process.cwd(), "E-1");
 	assert(
-		state.action === "run-implementation",
-		"planned idea selects linked executable child",
+		state.action === "run-implementation" && state.inlineWork,
+		"planned idea selects linked executable child inline",
 	);
 	assert(state.selectedBead.id === "IMP-1", "linked task selected over idea");
 	assert(
@@ -478,10 +550,48 @@ try {
 	process.env.WORK_RESUME_SCENARIO = "stalePlanningReady";
 	state = buildWorkResumeState(process.cwd(), "E-1");
 	assert(
-		state.action === "run-implementation",
-		"ready executable work proceeds despite stale planning cleanup",
+		state.action === "run-implementation" && state.inlineWork,
+		"ready executable work proceeds inline despite stale planning cleanup",
 	);
 	assert(state.selectedBead.id === "IMP-1", "ready implementation wins");
+
+	process.env.WORK_RESUME_SCENARIO = "inProgressSensitiveContract";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "in-progress-agent" &&
+			!state.selectedBead.verificationReady,
+		"verification requirements do not masquerade as passing evidence or launch review early",
+	);
+
+	process.env.WORK_RESUME_SCENARIO = "inProgressReviewFail";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-fix" &&
+			directRoleHandoffParams(state, process.cwd())?.agent === "bead-fixer",
+		"concrete review FAIL routes directly to exactly one fixer",
+	);
+
+	process.env.WORK_RESUME_SCENARIO = "inProgressFixReady";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-review" &&
+			directRoleHandoffParams(state, process.cwd())?.agent === "bead-reviewer",
+		"verified fixer result routes directly to one scoped re-review",
+	);
+
+	process.env.WORK_RESUME_SCENARIO = "inProgressReviewPass";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "finish-ready" && !state.handoffPrompt,
+		"durable review PASS skips duplicate reviewer and writer agents",
+	);
+
+	process.env.WORK_RESUME_SCENARIO = "inProgressReviewCap";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "review-blocked" && !state.handoffPrompt,
+		"three review failures stop the coded loop instead of spawning forever",
+	);
 
 	process.env.WORK_RESUME_SCENARIO = "blocked";
 	state = buildWorkResumeState(process.cwd(), "E-1");
@@ -680,6 +790,7 @@ try {
 
 	const sent = [];
 	const notices = [];
+	process.env.WORK_RESUME_SCENARIO = "plannedIdea";
 	await handleWorkResumeCommand("E-1", {
 		cwd: process.cwd(),
 		ui: { notify: (message, level) => notices.push({ message, level }) },
@@ -705,7 +816,34 @@ try {
 	);
 	assert(
 		piSent.length === 1 && piSent[0].options.deliverAs === "followUp",
-		"handler falls back to pi.sendUserMessage when ctx helper is absent",
+		"inline handler falls back to pi.sendUserMessage when ctx helper is absent",
+	);
+
+	delete process.env.WORK_RESUME_SCENARIO;
+	let rpcReply;
+	const rpcPi = {
+		events: {
+			on: (_name, reply) => {
+				rpcReply = reply;
+				return () => {};
+			},
+			emit: () => queueMicrotask(() => rpcReply({ success: true, data: {} })),
+		},
+	};
+	const directResult = await handleWorkResumeCommand(
+		"E-1",
+		{
+			cwd: process.cwd(),
+			ui: { notify: (message, level) => notices.push({ message, level }) },
+			sendUserMessage: async (message, options) =>
+				sent.push({ message, options }),
+		},
+		rpcPi,
+	);
+	assert(
+		directResult.directHandoff?.agent === "bead-debugger" &&
+			directResult.handoffClaimed,
+		"live resume directly launches and claims the exact specialist without a duplicate-writer window",
 	);
 
 	process.env.WORK_RESUME_SCENARIO = "blocked";
@@ -747,9 +885,10 @@ try {
 		);
 		const inlineState = buildWorkResumeState(inlineCwd, "E-1");
 		assert(
-			inlineState.action === "slice-planned-inline" &&
-				!inlineState.handoffPrompt,
-			`${profile} slice planning is inline`,
+			inlineState.action === "run-implementation" &&
+				inlineState.inlineWork &&
+				inlineState.handoffPrompt,
+			`${profile} slice planning continues inline`,
 		);
 		rmSync(inlineCwd, { recursive: true, force: true });
 	}
@@ -762,8 +901,8 @@ try {
 	);
 	const maxState = buildWorkResumeState(maxCwd, "E-1");
 	assert(
-		maxState.action === "slice-planned-inline",
-		"max still skips planner for simple slices",
+		maxState.action === "run-implementation" && maxState.inlineWork,
+		"max still skips a planner boundary for simple slices",
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
 } finally {

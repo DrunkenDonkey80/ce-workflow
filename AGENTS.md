@@ -6,7 +6,7 @@ This block is added by the pi-compound-engineering package.
 Pi extensions used by skills shipped by this package:
 
 - Required for full functionality: `pi-subagents` (by nicobailon) provides the `subagent` tool used by ce-compound, ce-code-review, ce-plan, ce-compound-refresh, and other parallel-agent skills.
-- Required for workflow prompts: `pi-ask-user` (by edlsh) provides the `ask_user` tool so blocking user decisions use the interactive prompt path.
+- Recommended: `pi-ask-user` (by edlsh) provides the `ask_user` tool; skills fall back to numbered options in chat when it is missing.
 
 Install with:
   pi install npm:pi-subagents

@@ -396,38 +396,18 @@ try {
 	);
 	assert.equal(statuses["work-goal"], undefined);
 
+	const beforeResumeSent = sent.length;
+	const beforeResumeNotices = notices.length;
 	await tempCommands["work-resume"].handler("one task only", ctx);
-	assert.match(sent.at(-1).message, /Project autopilot policy/);
-	tempHooks.agent_start?.({}, ctx);
-	assert.equal(statuses["work-goal"], "🔵 working #0");
-	await tempCommands["work-resume-stop"].handler("after this phase", ctx);
-	assert.equal(statuses["work-goal"], "🛑 stopping… #0");
-	assert.match(sent.at(-1).message, /Clean stop requested/);
-	const afterStopSent = sent.length;
-	await tempCommands["work-resume"].handler("", ctx);
-	assert.equal(statuses["work-goal"], "🔵 working #0");
-	assert.equal(sent.length, afterStopSent);
-	await tempCommands["work-resume-stop"].handler("after this phase", ctx);
-	assert.equal(statuses["work-goal"], "🛑 stopping… #0");
-	await tempHooks.agent_end(
-		{
-			messages: [
-				{
-					role: "assistant",
-					content: [{ type: "text", text: "Closed one project Bead." }],
-				},
-			],
-		},
-		ctx,
+	assert.equal(
+		sent.length,
+		beforeResumeSent,
+		"work-resume does not start a generic project-goal LLM turn",
 	);
-	assert.equal(statuses["work-goal"], "⏹️ stopped #0");
-	assert.doesNotMatch(sent.at(-1).message, /^\/work-goal-reset-continue /);
-	await tempCommands["work-resume"].handler("", ctx);
-	assert.match(
-		sent.at(-1).message,
-		/Started in a fresh session|User resumed the goal/,
+	assert.ok(
+		notices.length > beforeResumeNotices,
+		"work-resume reports coded Beads target resolution without a goal kickoff",
 	);
-	await tempCommands["work-goal"].handler("clear", ctx);
 
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
