@@ -165,7 +165,7 @@ function finishTask() {
 	const task = one(bd(["show", id]));
 	const taskText = `${titleOf(task)}\n${notesOf(task)}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
 	const evidenceOnly =
-		/evidence[- ](?:only|capture)|\b(?:record|capture|probe)\b/i.test(taskText);
+		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(taskText);
 	const reviewReasons = [];
 	const sensitivePaths = implementationFiles.filter((file) =>
 		/(?:^|\/)(?:migrations?|schema|auth|security|permissions?|payments?|billing|secrets?|deploy|infra)(?:\/|\.|$)|\.github\/workflows\//i.test(
