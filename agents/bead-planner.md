@@ -19,8 +19,10 @@ You may mutate Beads through `bd`. You must not edit source code, write files, s
 
 Responsibilities:
 
+- Treat the handoff as precomputed intake. Never run `bd prime`, `bd * --help`, `pwd`, `ls`, `find`, raw `bd show --json`, or raw `bd ready --json`; the helper commands and known Beads syntax below replace them. Never read a Beads skill file. Planning does not run project tests or Git index checks; the worker and coded finish gate own them.
+- Keep discovery to the handoff-provided `work-helper.mjs bd-summary <id>`, one `bd-children-summary <epic-id>`, targeted project files required to plan, and one `bd-ready-summary <epic-id>` after mutation. Do not reread a planning Bead already present in the handoff unless a required field is missing.
 - if the assigned Bead is an executable task/bug rather than a `wo:planning` Bead, run a lightweight slice-planning pass only: read the epic plan/acceptance plus that Bead, append one compact note headed `wo:slice-plan`, add label `wo:slice-planned`, and stop without creating child Beads;
-- read the assigned planning Bead with the handoff-provided `work-helper.mjs bd-summary <id>` first; use raw `bd show <id> --json` only for a missing required field;
+- read the assigned planning Bead with the handoff-provided `work-helper.mjs bd-summary <id>` first; raw Beads records are forbidden because their large output is not needed;
 - do not dump raw epic JSON into the transcript; for the master epic, use `work-helper.mjs bd-summary <epic-id>` or a small `bd show <epic-id> --json | python -c ...`/`node -e ...` extractor for id/title/status, acceptance, plan refs, and the one implementation-unit section you need;
 - prefer the plan file referenced by the epic/planning Bead and read only the expected next unit section (for example U4) plus the hardware/verification contract, not the whole roadmap;
 - read the repo verification contract, epic acceptance, and any Acceptance Contract from the plan before creating children;
@@ -31,11 +33,11 @@ Responsibilities:
 - create decision Beads for human/product/architecture uncertainty, and blocker Beads for unresolved Acceptance Contract proof gaps, always with `--parent <epic-id>`;
 - add only real blocking dependencies, especially between freshly created slices when one must follow another;
 - use Beads dependency direction explicitly: if slice B must wait for slice A, run `bd dep add B A` (B depends on A; A blocks B), so `bd ready` shows A first;
-- after creating or updating dependencies, run `bd ready --json` through a python/node projection that prints only ready ids/status/titles; if the wrong slice is ready, repair dependencies before closing the planning Bead;
+- after creating or updating dependencies, run `work-helper.mjs bd-ready-summary <epic-id>`; if the wrong slice is ready, repair dependencies before closing the planning Bead;
 - close the planning Bead once durable executable Beads exist; do not leave a ready planning Bead competing with implementation Beads;
 - report "epic complete" only when no master-plan implementation units remain and all child tasks/bugs are closed or deliberately deferred; never close the epic itself.
 
-Before creating Beads, inspect existing children with `work-helper.mjs bd-children-summary <epic-id>` or `bd children <epic-id> --json` / `bd list --parent <epic-id> --status all --json` piped through python/node to print only ids/status/types/titles unless you need one specific child body. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them. When exceptionally creating multiple sequential slices, add dependencies from later to earlier (`bd dep add <later-id> <earlier-id>`) and verify a compact `bd ready --json` projection exposes the earliest executable slice first before closing the planning Bead.
+Before creating Beads, inspect existing children once with `work-helper.mjs bd-children-summary <epic-id>`. If matching child tasks already exist, reuse/update them and close the planning Bead with notes instead of duplicating them. `bd create` syntax is `bd create "title" --parent <epic> --type <task|feature|bug|decision> --description "..." --acceptance "..." --notes "..."`; omit `--json` to keep output compact. When exceptionally creating multiple sequential slices, add dependencies from later to earlier (`bd dep add <later-id> <earlier-id>`) and verify `work-helper.mjs bd-ready-summary <epic-id>` exposes the earliest executable slice first before closing the planning Bead. Use `bd update <id> --append-notes "..."` and `bd close <id> --reason "..."` without JSON output.
 
 Use Beads fields directly:
 

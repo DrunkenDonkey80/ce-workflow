@@ -302,6 +302,7 @@ function dirtyLines() {
   if (dirty === "staged-instruction") return ["M  AGENTS.md"];
   if (dirty === "untracked-instruction") return ["?? AGENTS.md"];
   if (dirty === "pi-session") return ["?? pi-session-2026-07-05T17-02-37-680Z_abc.html"];
+  if (dirty === "work-state") return ["?? .pi/work-orchestrator-state.json"];
   return [];
 }
 if (args[0] === "diff" && args.includes("--numstat")) {

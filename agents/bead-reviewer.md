@@ -20,8 +20,9 @@ You must not edit source files, write project files, stage files, or commit. You
 
 Review the assigned Bead by inspecting:
 
-- handoff-provided `work-helper.mjs bd-summary <id>` first; raw `bd show <id> --json` only when the compact summary lacks a required field;
-- `git status --porcelain=v1 --untracked-files=all` and the current scoped `git diff`; ignore unrelated dirty files unless they overlap the reviewed Bead or are staged;
+- Treat the handoff as precomputed intake. Never read a Beads skill file, run `bd prime`/help, or use `pwd`/`ls`/`find`. Do not inspect Pi/subagent artifacts or rediscover scope.
+- handoff-provided `work-helper.mjs bd-summary <id>` first; raw Beads records are forbidden because the compact summary carries the review contract;
+- the diff only for the handoff's `Review only:` files; do not run broad status or whole-repo diff. The parent already proved those are the verified worker paths and classified all other dirt. For untracked review files, a direct read is authoritative: do not run `git ls-files`, `git show`, or shell redirection to `NUL`/`/dev/null`;
 - acceptance criteria;
 - worker verification notes;
 - any failure artifact in Bead notes, including live/product evidence failures distinct from harness pass/fail;

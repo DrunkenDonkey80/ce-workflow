@@ -439,6 +439,20 @@ try {
 				notes_tail: undefined,
 			})),
 		);
+	} else if (command === "bd-ready-summary") {
+		const epic = args[0];
+		print(
+			bd(["ready"])
+				.filter((issue) => !epic || parentOf(issue) === epic)
+				.map((issue) => ({
+					id: idOf(issue),
+					title: titleOf(issue),
+					status: statusOf(issue),
+					issue_type: typeOf(issue),
+					parent: parentOf(issue),
+					dependencies: depsOf(issue),
+				})),
+		);
 	} else if (command === "blocker-search") {
 		const [epic, ...queryParts] = args;
 		const terms = queryParts
@@ -562,7 +576,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <bd-summary|bd-children-summary|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|bd-claim|bd-note|bd-block|bd-label|json-assert> ...",
+			"usage: work-helper <bd-summary|bd-children-summary|bd-ready-summary|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|bd-claim|bd-note|bd-block|bd-label|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}

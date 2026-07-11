@@ -55,7 +55,7 @@ try {
 	const countFile = path.join(cwd, "bd-count.txt");
 	writeFileSync(
 		fakeBd,
-		`#!/usr/bin/env node\nimport { readFileSync, writeFileSync, existsSync } from "node:fs";\nconst countFile = ${JSON.stringify(countFile)};\nconst count = existsSync(countFile) ? Number(readFileSync(countFile, "utf8")) : 0;\nwriteFileSync(countFile, String(count + 1));\nconsole.log(JSON.stringify([{ id: "TASK-123", title: "Cached", status: "open", issue_type: "task" }]));\n`,
+		`#!/usr/bin/env node\nimport { readFileSync, writeFileSync, existsSync } from "node:fs";\nconst countFile = ${JSON.stringify(countFile)};\nconst count = existsSync(countFile) ? Number(readFileSync(countFile, "utf8")) : 0;\nwriteFileSync(countFile, String(count + 1));\nconsole.log(JSON.stringify([{ id: "TASK-123", title: "Cached", status: "open", issue_type: "task", parent_id: "E-1" }]));\n`,
 	);
 	process.env.WORK_ORCH_BD_BIN = fakeBd;
 	mod.workflowTaskSummary(cwd, "TASK-123");
@@ -63,6 +63,25 @@ try {
 	assert(
 		readFileSync(countFile, "utf8") === "1",
 		"bd JSON reads are cached for unchanged Beads DB",
+	);
+	const ready = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"bd-ready-summary",
+				"E-1",
+			],
+			{
+				cwd,
+				encoding: "utf8",
+				env: { ...process.env, WORK_ORCH_BD_BIN: fakeBd },
+			},
+		),
+	);
+	assert(
+		ready.length === 1 && ready[0].id === "TASK-123" && !ready[0].notes_tail,
+		"ready helper returns only compact execution fields",
 	);
 	if (oldBd === undefined) delete process.env.WORK_ORCH_BD_BIN;
 	else process.env.WORK_ORCH_BD_BIN = oldBd;

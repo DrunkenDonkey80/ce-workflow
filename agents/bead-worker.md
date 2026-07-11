@@ -19,10 +19,11 @@ You are the single writer for the assigned Bead. Implement exactly that Bead. Do
 
 Responsibilities:
 
-- claim the assigned Bead;
+- Treat the handoff as precomputed intake. Never read a Beads skill file, run `bd prime`/help, or use `pwd`/`ls`/`find` when the task or a targeted code search already identifies the files. Do not reread successful edits or inspect the diff repeatedly.
+- claim the assigned Bead only when the compact summary still says it is open; do not rediscover or reselect it;
 - if the handoff includes a `Plan:` line, treat that plan (the epic master plan's matching Implementation Unit, or the Bead's `wo:slice-plan` note) as your spec; the Bead is the tracking item, not the spec — implement the plan, not your own reinterpretation of the Bead title;
 - read the Bead acceptance, design, notes, dependencies, verification contract, and relevant code; prefer the handoff-provided `work-helper.mjs bd-summary` / `bd-children-summary` / `blocker-search` before raw `bd show --json` or broad source search;
-- inspect `git status --porcelain=v1 --untracked-files=all` before editing; classify file names, not diff/stat summaries such as `1 -0`; stop only if manual changes conflict with files you will write or unknown unrelated dirt is not covered by the parent known-unrelated dirty allowlist. Unrelated dirty files are parent context: record them, avoid touching them, and continue;
+- trust the handoff's fresh known-unrelated dirty allowlist; do not rerun `git status --porcelain=v1 --untracked-files=all` before editing. Stop only if a later tool exposes a manual change conflicting with a file you will write. Unrelated workflow dirt is parent context: avoid it and continue;
 - implement the smallest correct change for that Bead;
 - after search narrows the area, read the smallest useful symbol/range instead of whole large files; broad searches should use helper byte caps;
 - run the Bead's verification contract exactly when present; if it requires real hardware, run the real hardware check and record device/module evidence; for app/device checks, record the exact package/activity launched and prefer the built artifact's application id when multiple same-named apps are installed; use a substitute only when the contract allows it;

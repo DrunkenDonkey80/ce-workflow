@@ -704,7 +704,7 @@ function selfImprovementHistoryEnabled(ctx) {
 function historyTaskFromText(value) {
 	const text = String(value ?? "");
 	const labeled = text.match(
-		/(?:Target Bead ID|Selected Bead|Bead ID|bead)\s*:\s*([^\s]+)/i,
+		/(?:Target Bead ID|Selected Bead|Target|Bead ID|bead)\s*:\s*([^\s]+)/i,
 	)?.[1];
 	const beadId = labeled && labeled !== "none" ? labeled : undefined;
 	return {
@@ -797,7 +797,7 @@ function parseWorkPromptMeta(prompt) {
 			.trim();
 	const epic = line("Epic") ?? "";
 	const selected = line("Selected Bead") ?? "";
-	const target = line("Target Bead ID") ?? "";
+	const target = line("Target Bead ID") ?? line("Target") ?? "";
 	const epicId = epic.match(/^([^\s]+)/)?.[1];
 	const selectedId = selected.match(/^([^\s]+)/)?.[1];
 	let beadId;
@@ -3583,6 +3583,9 @@ function depsOf(issue) {
 }
 
 function workflowExecutionMode(issue) {
+	const explicit = field(issue, "executionMode", "execution_mode");
+	if (["agent", "inline-medium", "inline-small"].includes(explicit))
+		return explicit;
 	const text = `${labelsOf(issue).join(" ")}\n${notesOf(issue)}`;
 	if (/wo:execution-agent|created by \/work-big|big slice/i.test(text))
 		return "agent";
@@ -3590,6 +3593,17 @@ function workflowExecutionMode(issue) {
 		return "inline-medium";
 	if (/created by \/work-small/i.test(text)) return "inline-small";
 	return "auto";
+}
+
+function implementationPathsFromNotes(issue) {
+	return [
+		...notesOf(issue).matchAll(/(?:files changed|touched files):\s*([^\n]+)/gi),
+	]
+		.flatMap((match) => match[1].split(","))
+		.map((file) => file.trim().replace(/^`|[.`]$/g, ""))
+		.filter((file) => file && !/\s/.test(file))
+		.map(normalizedRepoPath)
+		.filter(Boolean);
 }
 
 function issueSummary(issue) {
@@ -3611,6 +3625,8 @@ function issueSummary(issue) {
 			"acceptanceCriteria",
 		);
 		if (acceptance) summary.acceptance = truncate(acceptance, 1600);
+		const changedPaths = implementationPathsFromNotes(issue);
+		if (changedPaths.length) summary.changedPaths = [...new Set(changedPaths)];
 		const notes = notesOf(issue);
 		const slicePlanAt = notes.lastIndexOf("wo:slice-plan");
 		if (slicePlanAt >= 0)
@@ -3802,7 +3818,7 @@ function parsePorcelainStatus(text) {
 	return String(text ?? "")
 		.split(/\r?\n/)
 		.map((line) => line.trimEnd())
-		.filter(Boolean)
+		.filter((line) => line && !line.startsWith("## "))
 		.map((line) => {
 			const raw = line.slice(0, 2).padEnd(2, " ");
 			return {
@@ -3913,6 +3929,7 @@ function isPiRuntimeArtifact(path) {
 	return (
 		/^pi-session-.+\.html$/i.test(file) ||
 		file.startsWith(".pi-subagents/") ||
+		file === ".pi/work-orchestrator-state.json" ||
 		file.startsWith(".pi/work-runs/") ||
 		file.startsWith(".pi/work-ideate/") ||
 		file.startsWith(".work-orchestrator/")
@@ -3984,11 +4001,14 @@ function planBootstrapDirtyStop(cwd, git, planPath, command) {
 
 function resumeGitReport(cwd, planPaths = []) {
 	try {
-		const status =
-			run(cwd, "git", ["status", "--short", "--branch"]) || "clean";
-		const dirtyFiles = parsePorcelainStatus(
-			run(cwd, "git", ["status", "--porcelain=v1", "--untracked-files=all"]),
-		);
+		const rawStatus = run(cwd, "git", [
+			"status",
+			"--porcelain=v1",
+			"--branch",
+			"--untracked-files=all",
+		]);
+		const status = rawStatus || "clean";
+		const dirtyFiles = parsePorcelainStatus(rawStatus);
 		const dirtyPaths = dirtyFiles.map((item) => item.path);
 		const blockers = dirtyBlockers(cwd, dirtyFiles, planPaths);
 		const blockedPaths = blockers.map((item) => item.path);
@@ -4258,11 +4278,20 @@ function resumeBlockers(childState) {
 
 function planResumeAction(state, cwd) {
 	if (!state.ok) return state;
+	const activeImplementation = state.inProgressExecutable?.[0];
 	if (state.git && !state.git.safeForHandoff) {
 		const blockers = state.git.blockedPaths?.length
 			? state.git.blockedPaths
 			: state.git.dirtyPaths;
-		return {
+		const expectedAgentDiff =
+			activeImplementation?.executionMode === "agent" &&
+			activeImplementation.verificationReady &&
+			blockers.length > 0 &&
+			blockers.every((file) =>
+				activeImplementation.changedPaths?.includes(normalizedRepoPath(file)),
+			);
+		if (!expectedAgentDiff)
+			return {
 			...state,
 			action: "dirty-stop",
 			message: `Dirty files must be resolved before /work-resume can launch writers. Blocking files: ${compactList(blockers) || "unknown"}.`,
@@ -4273,7 +4302,7 @@ function planResumeAction(state, cwd) {
 					.map((file) => `git diff -- ${file}`),
 				`/work-report ${state.epic.id}`,
 			],
-		};
+			};
 	}
 	if (state.epic.status === "closed")
 		return {
@@ -4299,7 +4328,6 @@ function planResumeAction(state, cwd) {
 				`/work-resume ${state.epic.id}`,
 			],
 		};
-	const activeImplementation = state.inProgressExecutable?.[0];
 	if (activeImplementation) {
 		const routed = withImplementationPolicy({
 			...state,
@@ -4482,15 +4510,47 @@ function directRoleAgent(state) {
 	return undefined;
 }
 
-function directRoleTask(state) {
+function directRoleTask(state, cwd) {
+	const selected = state.selectedBead;
+	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
+	const expectedImplementationDiff =
+		["run-review", "run-fix"].includes(state.action) &&
+		selected?.changedPaths?.length;
 	return [
-		"Direct work-orchestrator role launch. You are already the selected role agent; do not call subagent, subagent list, or delegate further.",
-		"If parent coordination is unavailable, persist blockers or decisions in Beads instead of contacting a supervisor.",
-		"Do not read raw Pi/subagent session files from ~/.pi/agent/sessions; they are optional diagnostics and may be missing. Use Beads, git, named artifacts, and .pi/work-runs/history instead.",
-		state.handoffPrompt,
+		"Precomputed work-orchestrator handoff. Run this role directly; do not delegate or rediscover target selection.",
+		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
+		`Action: ${state.action}`,
+		selected
+			? `Target: ${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
+			: "Target: no selected Bead; create/reuse the next planning Bead only if required.",
+		`Git: ${expectedImplementationDiff ? `expected implementation diff (${selected.changedPaths.length} files)` : gitDirtyClassification(state.git)}`,
+		state.git?.dirtyPaths?.length
+			? expectedImplementationDiff
+				? "Known dirt is the scoped implementation diff plus workflow artifacts; avoid unrelated paths and do not enumerate them again."
+				: `Known workflow-owned dirt: ${state.git.dirtyPaths.length} paths; avoid it and do not enumerate it again.`
+			: "Known dirt: none",
+		selected?.id && existsSync(WORK_HELPER_SCRIPT)
+			? `Read the compact task first: node ${helper} bd-summary ${selected.id}`
+			: "Read only the compact fields needed for this action.",
+		state.action === "run-review" && selected?.changedPaths?.length
+			? `Review only: ${selected.changedPaths.join(", ")}`
+			: "",
+		state.epic?.id &&
+			["run-planner", "run-debug"].includes(state.action) &&
+			existsSync(WORK_HELPER_SCRIPT)
+			? `For child state use: node ${helper} bd-children-summary ${state.epic.id}`
+			: "",
+		state.action === "run-planner"
+			? `Use only the helper summaries plus targeted project files; never run bd prime/help, pwd/list/find, raw bd show, or raw bd ready. Create the minimum executable Beads required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} bd-ready-summary ${state.epic?.id ?? "<epic>"}, close the planning Bead, then stop.`
+			: "",
+		state.action === "run-implementation" || state.action === "run-debug"
+			? planReference(state, cwd)
+			: "",
+		...(state.handoffExtra ?? []).filter(Boolean),
+		"Persist concise evidence/blockers in Beads. Do not read Pi session transcripts. Run exactly this action and stop at one Bead or planning boundary.",
 	]
 		.filter(Boolean)
-		.join("\n\n");
+		.join("\n");
 }
 
 function directRoleHandoffParams(state, cwd) {
@@ -4503,13 +4563,14 @@ function directRoleHandoffParams(state, cwd) {
 		agent,
 		params: {
 			agent,
-			task: directRoleTask(state),
+			task: directRoleTask(state, cwd),
 			context: "fresh",
 			cwd,
 			async: true,
 			clarify: false,
 			output: `work-${target}-${agent}.md`,
 			outputMode: "file-only",
+			acceptance: false,
 		},
 	};
 }
@@ -4656,23 +4717,37 @@ function inlineWorkHandoffPrompt(state, extraLines = [], cwd) {
 	const level = state.inlineLevel ?? state.executionPolicy?.level ?? "medium";
 	const maxFiles =
 		state.executionPolicy?.maxFiles ?? (level === "small" ? 2 : 8);
+	const task = state.smallTask ?? selected ?? {};
+	const contract = {
+		id: task.id,
+		title: task.title,
+		notes: task.notes_tail,
+		acceptance: task.acceptance_criteria_tail ?? task.acceptance,
+	};
+	const taskText = Object.values(contract).filter(Boolean).join("\n");
+	const evidenceOnly =
+		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
+			taskText,
+		);
 	return [
 		`work-orchestrator WO_INLINE_V1: complete this ${level} task directly in the current session. Do not call subagent list and do not launch a worker, planner, or committer.`,
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
-		"Action: run-implementation",
-		`Selected Bead: ${selected?.id ?? "none"}`,
-		`Target Bead ID: ${selected?.id ?? "none"}`,
-		`Task contract: ${JSON.stringify(state.smallTask ?? selected)}`,
-		`Git intake: ${state.git?.status ?? "unknown"}; runtime/Beads dirt created after intake is expected.`,
-		`Workflow helper: node ${helper}`,
-		`The extension already selected and claimed the Bead. Implement now with targeted reads only; do not rerun target discovery, claim, broad status, pwd, or directory listing. If this is a greenfield task naming its output files, create them immediately. Keep the change within ${maxFiles} implementation files.`,
-		`Finish in one coded transaction: finish-task <id> --max-files ${maxFiles} --message "<summary>" --verify "<smallest real check>" [--expect "<exact stdout>"] --push. Pass the real check directly to finish-task; do not run it separately first unless diagnosing a failure. For JSON use --json <file> --equals <path=value>. The helper verifies, records evidence, enforces scope/risk, commits, closes, amends Beads state, and checks cleanliness.`,
-		"For a fully specified deterministic text/JSON transformation, prefer one stdlib script chained to finish-task over separate read/edit rounds. Do not run raw bd show/children/ready, broad scans, CLI help, repeated status/diff, or a separate review for a safe bounded diff.",
-		"If finish-task reports independent review required, launch exactly bead-reviewer once (never list agents), persist its PASS note, then rerun finish-task with --reviewed. If scope conflicts, verification fails, or a real decision is needed, persist the blocker and stop open/uncommitted.",
+		`Target: ${selected?.id ?? "none"}`,
+		`Task: ${JSON.stringify(contract)}`,
+		`Git intake: ${state.git?.status ?? "unknown"}; later runtime/Beads dirt is expected.`,
+		`Helper: node ${helper}`,
+		evidenceOnly
+			? "Evidence-only task: prove the exact requested condition; do not substitute a broader suite or edit product/workflow source. Read project instructions, search once for the narrowest existing probe, then run it. Evidence plus Beads changes may be the only commit."
+			: `Implement with targeted reads only and keep the change within ${maxFiles} implementation files. Greenfield tasks naming output files should create them immediately.`,
+		`Finish once: finish-task ${selected?.id ?? "<id>"} --max-files ${maxFiles} --message "<summary>" --verify "<smallest real check>" [--expect "<exact stdout>"] --push. Pass the check directly; use --json <file> --equals <path=value> for JSON. For a multiline check, write one runtime script under .pi first instead of retrying shell quoting. If edits are awaiting deferred autoformat, run the project's existing formatter once before finish-task so the final commit stays clean.`,
+		"When the task names files, read those files directly: no pwd/list/find. Do not reread successful edits, run verification separately, or inspect diff/status; finish-task performs those checks. Do not rediscover/claim, dump raw Beads JSON, run broad scans/help, or modify the work-orchestrator package/helper as a workaround. Use one stdlib transform for deterministic text/JSON work.",
+		"If finish-task requires independent review, launch exactly bead-reviewer once, persist PASS, then rerun with --reviewed. On scope conflict, failed verification, or a real decision, persist the blocker and stop open/uncommitted.",
 		planReference(state, cwd),
 		...extraLines.filter(Boolean),
-		"After finish-task succeeds, return its compact result and stop; do not inspect it again.",
-	].join("\n");
+		"After finish-task succeeds, return its compact result and stop.",
+	]
+		.filter(Boolean)
+		.join("\n");
 }
 
 function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
@@ -5765,7 +5840,7 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 				warnings: git.warnings,
 				handoffExtra: [
 					posture,
-					"Planner must verify dependency direction with bd ready --json.",
+					`Planner must verify dependency direction once with node ${JSON.stringify(WORK_HELPER_SCRIPT)} bd-ready-summary ${idOf(resolved.epic)}.`,
 				],
 			},
 			cwd,
@@ -10297,7 +10372,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-med", {
-		description: "Create one medium planning Bead and hand off safely",
+		description: "Create one bounded medium Bead and execute it inline",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-med",

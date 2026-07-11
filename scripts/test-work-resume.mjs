@@ -105,6 +105,18 @@ const childrenByScenario = {
 			status: "open",
 			title: "Implement feature slice",
 			created_at: "2026-07-03T02:00:00Z",
+			acceptance: "npm run verify passes",
+		},
+	],
+	implementationAgent: [
+		{
+			id: "IMP-BIG",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Implement agent-bound slice",
+			created_at: "2026-07-03T02:00:00Z",
+			notes: "wo:execution-agent",
 		},
 	],
 	ideasOnly: [
@@ -217,6 +229,17 @@ const childrenByScenario = {
 			status: "open",
 			title: "Created executable child",
 			labels: ["wo:slice-planned"],
+		},
+	],
+	inProgressVerifiedAgent: [
+		{
+			id: "IMP-BIG",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Verified isolated implementation",
+			notes:
+				"wo:execution-agent\nFiles changed: extensions/work-models.js.\nVerification: npm run verify — passed.",
 		},
 	],
 	inProgressSensitiveContract: [
@@ -498,9 +521,20 @@ try {
 		"inline slice planning avoids a separate planner boundary",
 	);
 	assert(
-		state.handoffPrompt.includes("target: IMP-1 — Implement feature slice") &&
+		state.handoffPrompt.includes("Target: IMP-1") &&
+			state.handoffPrompt.includes('"title":"Implement feature slice"') &&
+			state.handoffPrompt.includes('"acceptance":"npm run verify passes"') &&
 			!state.handoffPrompt.includes("[object Object]"),
 		"coded slice-plan target stays compact and readable",
+	);
+
+	process.env.WORK_RESUME_SCENARIO = "implementationAgent";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-implementation" &&
+			!state.inlineWork &&
+			state.selectedBead.executionMode === "agent",
+		"coded slice planning preserves the big/high-risk isolated-writer boundary",
 	);
 
 	process.env.WORK_RESUME_SCENARIO = "ideasOnly";
@@ -737,6 +771,15 @@ try {
 		"dirty stop names true blocking files",
 	);
 	assert(!state.handoffPrompt, "dirty stop does not inject handoff");
+
+	process.env.WORK_RESUME_SCENARIO = "inProgressVerifiedAgent";
+	state = buildWorkResumeState(process.cwd(), "E-1");
+	assert(
+		state.action === "run-review" &&
+			state.selectedBead.changedPaths.includes("extensions/work-models.js"),
+		"verified detached-writer files may cross the dirty gate into scoped review",
+	);
+	process.env.WORK_RESUME_SCENARIO = "debug";
 
 	process.env.WORK_RESUME_GIT_DIRTY = "workflow";
 	state = buildWorkResumeState(process.cwd(), "E-1");

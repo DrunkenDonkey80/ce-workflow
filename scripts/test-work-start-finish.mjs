@@ -51,12 +51,28 @@ try {
 	assert(
 		state.handoffPrompt.includes("Do not call subagent list") &&
 			state.handoffPrompt.includes("finish-task") &&
-			state.handoffPrompt.length < 3000,
+			state.handoffPrompt.length < 2400,
 		"small handoff is compact, coded, and discovery-free",
 	);
 	assert(
 		fixture.logs().filter((entry) => entry.op === "create").length === 1,
 		"small creates exactly one Bead",
+	);
+
+	fixture.reset("active");
+	state = buildWorkSmallState(
+		process.cwd(),
+		"try the hardware probe to verify the device without changing source",
+	);
+	assert(
+		state.handoffPrompt.includes("Evidence-only task:") &&
+			state.handoffPrompt.includes("search once") &&
+			state.handoffPrompt.includes("runtime script under .pi") &&
+			/modify the work-orchestrator package\/helper as a workaround/i.test(
+				state.handoffPrompt,
+			) &&
+			state.handoffPrompt.length < 2400,
+		"evidence-only small work gets a bounded probe path without workflow self-modification",
 	);
 
 	fixture.reset("active");
@@ -95,6 +111,13 @@ try {
 		"small dirty state stops before mutation",
 	);
 	assert(fixture.logs().length === 0, "small dirty stop creates nothing");
+
+	fixture.reset("active", "work-state");
+	state = buildWorkSmallState(process.cwd(), "Continue after coded intake");
+	assert(
+		state.ok && state.git.workflowDirty && state.git.blockedPaths.length === 0,
+		"workflow state written by the extension never blocks the next action",
+	);
 
 	fixture.reset("active");
 	state = buildWorkMedState(process.cwd(), "Split a bounded feature");
@@ -137,10 +160,20 @@ try {
 		state.ok && state.action === "run-planner",
 		"big creates planner handoff",
 	);
+	const bigDirect = directRoleHandoffParams(state, process.cwd());
 	assert(
 		state.handoffPrompt.includes("big slice") &&
-			directRoleHandoffParams(state, process.cwd())?.agent === "bead-planner",
+			bigDirect?.agent === "bead-planner",
 		"big handoff carries big posture and directly selects the planner",
+	);
+	assert(
+		bigDirect.params.task.length < 1800 &&
+			bigDirect.params.task.includes(`Target: ${state.selectedBead.id}`) &&
+			bigDirect.params.task.includes("bd-ready-summary") &&
+			!bigDirect.params.task.includes("bd ready --json") &&
+			!bigDirect.params.task.includes("Subagent output guidance") &&
+			bigDirect.params.acceptance === false,
+		"big sends the planner a compact direct contract without generic acceptance boilerplate",
 	);
 
 	fixture.reset("no-beads");
