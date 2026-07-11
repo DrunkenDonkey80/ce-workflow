@@ -244,6 +244,7 @@ try {
 		await commands["work-small"].handler("Add tiny thing", {
 			cwd,
 			getContextUsage: () => ({ tokens: 2222 }),
+			isIdle: () => true,
 			sendUserMessage: async (message, options) =>
 				sent.push({ message, options }),
 			ui: { notify: () => {} },
@@ -259,7 +260,10 @@ try {
 				commandSummary.slowest[0].handoff.role === "inline-small",
 			"extension command records inline-small handoff role",
 		);
-		assert(sent.length === 1, "instrumented command still queues handoff");
+		assert(
+			sent.length === 1 && sent[0].options === undefined,
+			"idle commands trigger the handoff immediately instead of leaving print mode queued",
+		);
 		assert(
 			sent[0].message.includes("WO_INLINE_V1") &&
 				sent[0].message.includes("Do not call subagent list"),

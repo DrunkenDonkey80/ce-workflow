@@ -4292,16 +4292,16 @@ function planResumeAction(state, cwd) {
 			);
 		if (!expectedAgentDiff)
 			return {
-			...state,
-			action: "dirty-stop",
-			message: `Dirty files must be resolved before /work-resume can launch writers. Blocking files: ${compactList(blockers) || "unknown"}.`,
-			suggestedCommands: [
-				"git status --short",
-				...blockers
-					.filter((file) => normalizedRepoPath(file) === "AGENTS.md")
-					.map((file) => `git diff -- ${file}`),
-				`/work-report ${state.epic.id}`,
-			],
+				...state,
+				action: "dirty-stop",
+				message: `Dirty files must be resolved before /work-resume can launch writers. Blocking files: ${compactList(blockers) || "unknown"}.`,
+				suggestedCommands: [
+					"git status --short",
+					...blockers
+						.filter((file) => normalizedRepoPath(file) === "AGENTS.md")
+						.map((file) => `git diff -- ${file}`),
+					`/work-report ${state.epic.id}`,
+				],
 			};
 	}
 	if (state.epic.status === "closed")
@@ -4536,8 +4536,8 @@ function directRoleTask(state, cwd) {
 			? `Review only: ${selected.changedPaths.join(", ")}`
 			: "",
 		state.epic?.id &&
-			["run-planner", "run-debug"].includes(state.action) &&
-			existsSync(WORK_HELPER_SCRIPT)
+		["run-planner", "run-debug"].includes(state.action) &&
+		existsSync(WORK_HELPER_SCRIPT)
 			? `For child state use: node ${helper} bd-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
@@ -4739,7 +4739,7 @@ function inlineWorkHandoffPrompt(state, extraLines = [], cwd) {
 		evidenceOnly
 			? "Evidence-only task: prove the exact requested condition; do not substitute a broader suite or edit product/workflow source. Read project instructions, search once for the narrowest existing probe, then run it. Evidence plus Beads changes may be the only commit."
 			: `Implement with targeted reads only and keep the change within ${maxFiles} implementation files. Greenfield tasks naming output files should create them immediately.`,
-		`Finish once: finish-task ${selected?.id ?? "<id>"} --max-files ${maxFiles} --message "<summary>" --verify "<smallest real check>" [--expect "<exact stdout>"] --push. Pass the check directly; use --json <file> --equals <path=value> for JSON. For a multiline check, write one runtime script under .pi first instead of retrying shell quoting. If edits are awaiting deferred autoformat, run the project's existing formatter once before finish-task so the final commit stays clean.`,
+		`Finish once: finish-task ${selected?.id ?? "<id>"} --max-files ${maxFiles} --message "<summary>" --verify "<smallest real check>" [--expect "<exact stdout>"] --immediate-format --push. Pass the check directly; use --json <file> --equals <path=value> for JSON. For a multiline check, write one runtime script under .pi first instead of retrying shell quoting. The helper settles Pi's managed formatter before verification and commit.`,
 		"When the task names files, read those files directly: no pwd/list/find. Do not reread successful edits, run verification separately, or inspect diff/status; finish-task performs those checks. Do not rediscover/claim, dump raw Beads JSON, run broad scans/help, or modify the work-orchestrator package/helper as a workaround. Use one stdlib transform for deterministic text/JSON work.",
 		"If finish-task requires independent review, launch exactly bead-reviewer once, persist PASS, then rerun with --reviewed. On scope conflict, failed verification, or a real decision, persist the blocker and stop open/uncommitted.",
 		planReference(state, cwd),
@@ -9399,7 +9399,8 @@ function formatError(error) {
 async function sendFollowUp(ctx, message, pi) {
 	if (!message) return;
 	if (typeof ctx.sendUserMessage === "function") {
-		await ctx.sendUserMessage(message, { deliverAs: "followUp" });
+		if (ctx.isIdle?.()) await ctx.sendUserMessage(message);
+		else await ctx.sendUserMessage(message, { deliverAs: "followUp" });
 		return;
 	}
 	if (typeof pi?.sendUserMessage === "function") {

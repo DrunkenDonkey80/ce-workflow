@@ -238,13 +238,21 @@ try {
 		path.join(finishCwd, ".beads", "issues.jsonl"),
 		'{"id":"TASK-1","status":"open"}\n',
 	);
-	writeFileSync(path.join(finishCwd, "result.txt"), "before\n");
+	writeFileSync(
+		path.join(finishCwd, "result.js"),
+		"const result = 'before';\n",
+	);
 	execFileSync("git", ["add", "-A"], { cwd: finishCwd });
 	execFileSync("git", ["commit", "-m", "initial"], {
 		cwd: finishCwd,
 		stdio: "ignore",
 	});
-	writeFileSync(path.join(finishCwd, "result.txt"), "after\n");
+	writeFileSync(path.join(finishCwd, "result.js"), "const result='after'\n");
+	const fakeFormatter = path.join(cwd, "fake-biome.mjs");
+	writeFileSync(
+		fakeFormatter,
+		'#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nfor (const file of process.argv.slice(2)) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
+	);
 	writeFileSync(
 		path.join(finishCwd, "AGENTS.md"),
 		"<!-- BEGIN COMPOUND PI TOOL MAP -->\ngenerated\n<!-- END COMPOUND PI TOOL MAP -->\n",
@@ -269,17 +277,26 @@ try {
 				`"${process.execPath}" -e "process.stdout.write('checked')"`,
 				"--expect",
 				"checked",
+				"--immediate-format",
 			],
 			{
 				cwd: finishCwd,
 				encoding: "utf8",
-				env: { ...process.env, WORK_ORCH_BD_BIN: fakeBdScript },
+				env: {
+					...process.env,
+					WORK_ORCH_BD_BIN: fakeBdScript,
+					WORK_ORCH_FORMATTER_BIN: fakeFormatter,
+				},
 			},
 		),
 	);
 	assert(
 		finished.status === "PASS" &&
 			finished.verification?.output === "checked" &&
+			finished.formatted?.includes("result.js") &&
+			readFileSync(path.join(finishCwd, "result.js"), "utf8").includes(
+				'"after"',
+			) &&
 			finished.clean &&
 			!existsSync(path.join(finishCwd, "AGENTS.md")),
 		"finish-task closes, removes generated instruction dirt, and leaves git clean",

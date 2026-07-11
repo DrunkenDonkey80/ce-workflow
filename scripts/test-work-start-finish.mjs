@@ -51,6 +51,7 @@ try {
 	assert(
 		state.handoffPrompt.includes("Do not call subagent list") &&
 			state.handoffPrompt.includes("finish-task") &&
+			state.handoffPrompt.includes("--immediate-format") &&
 			state.handoffPrompt.length < 2400,
 		"small handoff is compact, coded, and discovery-free",
 	);

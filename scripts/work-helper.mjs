@@ -7,6 +7,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const cwd = process.cwd();
@@ -82,6 +83,34 @@ function cleanupGeneratedInstructions() {
 	}
 }
 
+function formatPendingFiles() {
+	if (!args.includes("--immediate-format")) return [];
+	const files = gitStatusPaths().filter(
+		(file) =>
+			!isRuntimePath(file) &&
+			/\.(?:[cm]?[jt]sx?|jsonc?|css|scss|sass|vue|svelte|html?)$/i.test(file) &&
+			existsSync(file),
+	);
+	if (!files.length) return [];
+	const suffix = process.platform === "win32" ? ".cmd" : "";
+	const candidates = [
+		process.env.WORK_ORCH_FORMATTER_BIN,
+		path.join(cwd, "node_modules", ".bin", `biome${suffix}`),
+		path.join(
+			os.homedir(),
+			".pi-lens",
+			"tools",
+			"node_modules",
+			".bin",
+			`biome${suffix}`,
+		),
+	].filter(Boolean);
+	const formatter = candidates.find(existsSync);
+	if (!formatter) return [];
+	run(formatter, ["format", "--write", ...files]);
+	return files;
+}
+
 function finishTask() {
 	const id = args[0];
 	const message = option("--message");
@@ -90,9 +119,10 @@ function finishTask() {
 	);
 	if (!id || !message || !Number.isInteger(maxFiles) || maxFiles < 1)
 		throw new Error(
-			"usage: finish-task <bead-id> --max-files <n> --message <summary> [--verify <command> --expect <stdout> | --json <file> --equals <path=value>] [--reviewed] [--push]",
+			"usage: finish-task <bead-id> --max-files <n> --message <summary> [--verify <command> --expect <stdout> | --json <file> --equals <path=value>] [--immediate-format] [--reviewed] [--push]",
 		);
 	cleanupGeneratedInstructions();
+	const formatted = formatPendingFiles();
 	const stagedBefore = git(["diff", "--cached", "--name-only"])
 		.split(/\r?\n/)
 		.filter(Boolean);
@@ -165,7 +195,9 @@ function finishTask() {
 	const task = one(bd(["show", id]));
 	const taskText = `${titleOf(task)}\n${notesOf(task)}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
 	const evidenceOnly =
-		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(taskText);
+		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
+			taskText,
+		);
 	const reviewReasons = [];
 	const sensitivePaths = implementationFiles.filter((file) =>
 		/(?:^|\/)(?:migrations?|schema|auth|security|permissions?|payments?|billing|secrets?|deploy|infra)(?:\/|\.|$)|\.github\/workflows\//i.test(
@@ -287,6 +319,7 @@ function finishTask() {
 		commit: git(["rev-parse", "--short", "HEAD"]).trim(),
 		files: staged,
 		verification: verificationResult,
+		formatted,
 		push,
 		clean: true,
 	};
