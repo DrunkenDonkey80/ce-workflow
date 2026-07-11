@@ -276,6 +276,21 @@ try {
 			"small handoff stays inline and discovery-free",
 		);
 
+		fixture.reset("active");
+		await commands["work-med"].handler("Do not queue", {
+			cwd,
+			mode: "print",
+			getContextUsage: () => ({ tokens: 0 }),
+			sendUserMessage: async (message, options) =>
+				sent.push({ message, options }),
+			ui: { notify: () => {} },
+		});
+		assert(
+			fixture.logs().every((entry) => entry.op !== "create") &&
+				sent.length === 1,
+			"print mode fails safely before creating a queued or duplicate Bead",
+		);
+
 		fixture.reset("blocked");
 		const statusNotices = [];
 		await commands["work-status"].handler("E-1", {

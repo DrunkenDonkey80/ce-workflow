@@ -9412,6 +9412,18 @@ async function sendFollowUp(ctx, message, pi) {
 	);
 }
 
+function unsupportedPrintWorkflow(ctx) {
+	if (!["print", "json"].includes(ctx.mode)) return undefined;
+	const state = {
+		ok: false,
+		action: "unsupported-mode",
+		message:
+			"Work commands that launch implementation turns require TUI or RPC mode. Print/JSON mode stopped before creating or claiming a Bead.",
+	};
+	notify(ctx, state.message, "warning");
+	return state;
+}
+
 async function sendWorkflowFollowUp(ctx, message, pi, state) {
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
 	let compactEnabled = true;
@@ -9453,6 +9465,8 @@ async function sendWorkflowFollowUp(ctx, message, pi, state) {
 }
 
 async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
+	const unsupported = unsupportedPrintWorkflow(ctx);
+	if (unsupported) return unsupported;
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = buildWorkResumeState(ctx.cwd, args);
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-resume");
@@ -9554,6 +9568,8 @@ async function handleWorkflowAction(
 	pi,
 	selectionNote = "",
 ) {
+	const unsupported = unsupportedPrintWorkflow(ctx);
+	if (unsupported) return unsupported;
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = builder(ctx.cwd, args);
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-action");
