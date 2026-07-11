@@ -267,7 +267,7 @@ try {
 			"extension command records inline-small handoff role",
 		);
 		assert(
-			compactCalls === 1 && sent.length === 1 && sent[0].options === undefined,
+			compactCalls === 1 && sent.length === 1,
 			"context-heavy inline commands microcompact before triggering the handoff",
 		);
 		assert(

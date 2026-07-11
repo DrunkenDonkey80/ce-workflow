@@ -9399,8 +9399,7 @@ function formatError(error) {
 async function sendFollowUp(ctx, message, pi) {
 	if (!message) return;
 	if (typeof ctx.sendUserMessage === "function") {
-		if (ctx.isIdle?.()) await ctx.sendUserMessage(message);
-		else await ctx.sendUserMessage(message, { deliverAs: "followUp" });
+		await ctx.sendUserMessage(message, { deliverAs: "followUp" });
 		return;
 	}
 	if (typeof pi?.sendUserMessage === "function") {
