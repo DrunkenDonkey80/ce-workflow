@@ -9413,6 +9413,46 @@ async function sendFollowUp(ctx, message, pi) {
 	);
 }
 
+async function sendWorkflowFollowUp(ctx, message, pi, state) {
+	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
+	let compactEnabled = true;
+	try {
+		compactEnabled = contextSettings(readSettings(ctx.cwd)).enabled !== false;
+	} catch {
+		// Keep the safe default when project settings are unreadable.
+	}
+	if (
+		!compactEnabled ||
+		!state.inlineWork ||
+		tokens < 32_000 ||
+		typeof ctx.compact !== "function" ||
+		["print", "json"].includes(ctx.mode)
+	)
+		return sendFollowUp(ctx, message, pi);
+	contextCompactState.inFlight = true;
+	contextCompactState.requested = true;
+	return new Promise((resolvePromise) => {
+		let settled = false;
+		const finish = async () => {
+			if (settled) return;
+			settled = true;
+			contextCompactState.inFlight = false;
+			contextCompactState.requested = false;
+			resolvePromise(await sendFollowUp(ctx, message, pi));
+		};
+		try {
+			ctx.compact({
+				customInstructions:
+					"work-context: keep current repo state, decisions, modified files, verification, and Bead IDs; the queued handoff is self-contained.",
+				onComplete: finish,
+				onError: finish,
+			});
+		} catch {
+			finish();
+		}
+	});
+}
+
 async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = buildWorkResumeState(ctx.cwd, args);
@@ -9448,10 +9488,11 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		};
 	}
 	if (state.handoffPrompt)
-		await sendFollowUp(
+		await sendWorkflowFollowUp(
 			ctx,
 			withSelectionNote(state.handoffPrompt, selectionNote),
 			pi,
+			state,
 		);
 	return state;
 }
@@ -9550,10 +9591,11 @@ async function handleWorkflowAction(
 		return { ...state, handoffFailed: true };
 	}
 	if (state.handoffPrompt)
-		await sendFollowUp(
+		await sendWorkflowFollowUp(
 			ctx,
 			withSelectionNote(state.handoffPrompt, selectionNote),
 			pi,
+			state,
 		);
 	return state;
 }

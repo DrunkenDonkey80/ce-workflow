@@ -241,9 +241,15 @@ try {
 			},
 		});
 		const sent = [];
+		let compactCalls = 0;
 		await commands["work-small"].handler("Add tiny thing", {
 			cwd,
-			getContextUsage: () => ({ tokens: 2222 }),
+			mode: "tui",
+			getContextUsage: () => ({ tokens: 40_000 }),
+			compact: ({ onComplete }) => {
+				compactCalls += 1;
+				onComplete();
+			},
 			isIdle: () => true,
 			sendUserMessage: async (message, options) =>
 				sent.push({ message, options }),
@@ -261,8 +267,8 @@ try {
 			"extension command records inline-small handoff role",
 		);
 		assert(
-			sent.length === 1 && sent[0].options === undefined,
-			"idle commands trigger the handoff immediately instead of leaving print mode queued",
+			compactCalls === 1 && sent.length === 1 && sent[0].options === undefined,
+			"context-heavy inline commands microcompact before triggering the handoff",
 		);
 		assert(
 			sent[0].message.includes("WO_INLINE_V1") &&
