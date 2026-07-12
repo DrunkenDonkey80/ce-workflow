@@ -17,7 +17,10 @@ import {
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { appendCandidateTransition } from "../extensions/work-improvement.js";
+import {
+	appendCandidateTransition,
+	readCandidateState,
+} from "../extensions/work-improvement.js";
 import { hostname } from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -424,6 +427,7 @@ export function revalidateMutationBoundary(expected, options = {}) {
 }
 
 const PATCH_EVIDENCE_BYTES = 64 * 1024;
+const ACTIVE_VALIDATION_WORKTREES = new Set();
 const PROTECTED_ATTEMPT_PATHS = [
 	".git",
 	".pi/",
@@ -704,6 +708,61 @@ function removeAttemptWorktree(sourceCwd, worktreeCwd, runGit) {
 	}
 }
 
+function registeredWorktrees(sourceCwd, runGit) {
+	const listed = git(runGit, sourceCwd, ["worktree", "list", "--porcelain", "-z"]);
+	if (!listed.ok)
+		return result("stale-worktree-registration-scan-failed", {
+			detail: bounded(listed.output),
+		});
+	return {
+		ok: true,
+		paths: listed.output
+			.split("\0")
+			.filter((field) => field.startsWith("worktree "))
+			.map((field) => path.resolve(field.slice("worktree ".length))),
+	};
+}
+
+function recoverDeliveryValidationWorktrees(sourceCwd, attemptId, runGit) {
+	const root = path.resolve(sourceCwd, ".pi", "work-improvement", "worktrees");
+	const prefix = `validation-${safePart(attemptId)}-`;
+	const listed = registeredWorktrees(sourceCwd, runGit);
+	if (!listed.ok) return listed;
+	const recovered = [];
+	for (const worktree of listed.paths) {
+		if (
+			path.dirname(worktree) !== root ||
+			!path.basename(worktree).startsWith(prefix) ||
+			ACTIVE_VALIDATION_WORKTREES.has(worktree)
+		)
+			continue;
+		const status = git(runGit, worktree, [
+			"status",
+			"--porcelain=v1",
+			"--untracked-files=all",
+		]);
+		if (!status.ok)
+			return result("stale-validation-worktree-status-failed", { worktree });
+		const patchArtifact = status.output
+			? preservePatchEvidence(
+					sourceCwd,
+					`recovered-${path.basename(worktree)}`,
+					worktree,
+					runGit,
+				)
+			: "";
+		const cleanup = removeAttemptWorktree(sourceCwd, worktree, runGit);
+		if (!cleanup.ok)
+			return result("stale-validation-worktree-cleanup-failed", {
+				worktree,
+				patchArtifact,
+				cleanup,
+			});
+		recovered.push({ worktree, patchArtifact });
+	}
+	return { ok: true, recovered };
+}
+
 function recoverAttemptWorktrees(sourceCwd, currentAttemptId, runGit) {
 	const root = path.join(sourceCwd, ".pi", "work-improvement", "worktrees");
 	if (!existsSync(root)) return { ok: true, recovered: [] };
@@ -715,17 +774,9 @@ function recoverAttemptWorktrees(sourceCwd, currentAttemptId, runGit) {
 			detail: bounded(error?.message ?? error),
 		});
 	}
-	const listed = git(runGit, sourceCwd, ["worktree", "list", "--porcelain", "-z"]);
-	if (!listed.ok)
-		return result("stale-worktree-registration-scan-failed", {
-			detail: bounded(listed.output),
-		});
-	const registeredWorktrees = new Set(
-		listed.output
-			.split("\0")
-			.filter((field) => field.startsWith("worktree "))
-			.map((field) => path.resolve(field.slice("worktree ".length))),
-	);
+	const listed = registeredWorktrees(sourceCwd, runGit);
+	if (!listed.ok) return listed;
+	const registeredWorktreePaths = new Set(listed.paths);
 	const recovered = [];
 	for (const entry of entries) {
 		if (
@@ -735,7 +786,7 @@ function recoverAttemptWorktrees(sourceCwd, currentAttemptId, runGit) {
 		)
 			continue;
 		const worktree = path.resolve(root, entry.name);
-		if (!registeredWorktrees.has(worktree)) continue;
+		if (!registeredWorktreePaths.has(worktree)) continue;
 		const patchArtifact = preservePatchEvidence(
 			sourceCwd,
 			`recovered-${entry.name}`,
@@ -1188,4 +1239,650 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 	} finally {
 		clearInterval(heartbeatTimer);
 	}
+}
+
+function deliveryTransition(sourceCwd, candidateId, attemptId, state, details = {}) {
+	try {
+		appendCandidateTransition(sourceCwd, candidateId, state, {
+			attemptId,
+			activity: details.activity ?? "improvement",
+			...details,
+		});
+		return { ok: true };
+	} catch (error) {
+		return result("transition-write-failed", {
+			detail: bounded(error?.message ?? error),
+		});
+	}
+}
+
+function deliveryState(options) {
+	const persisted = readCandidateState(options.sourceCwd).candidates.get(
+		options.candidateId,
+	);
+	return {
+		...persisted,
+		...options,
+		candidateRef: options.candidateRef ?? persisted?.candidateRef,
+		commitSha: options.commitSha ?? persisted?.commitSha,
+		integrationSha: options.integrationSha ?? persisted?.integrationSha,
+		revertSha: options.revertSha ?? persisted?.revertSha,
+	};
+}
+
+function operationInProgress(sourceCwd, runGit) {
+	return [
+		"MERGE_HEAD",
+		"CHERRY_PICK_HEAD",
+		"REBASE_HEAD",
+		"REVERT_HEAD",
+		"rebase-merge",
+		"rebase-apply",
+	].find((marker) => gitPathExists(sourceCwd, runGit, marker));
+}
+
+/** Revalidate all authoritative checkout invariants for a delivery boundary. */
+function deliveryBoundary(expected, localSha, remoteSha, options = {}) {
+	const runGit = options.runGit ?? defaultRunGit;
+	const resolved = resolveSourceCheckout({
+		explicitSource: expected.sourceCwd,
+		runGit,
+		env: {},
+	});
+	if (!resolved.ok || resolved.sourceCwd !== expected.sourceCwd)
+		return result("source-identity-changed");
+	const lease = readLease(leasePaths(expected.sourceCwd).metadata);
+	if (!lease || lease.owner !== expected.lease?.owner)
+		return result("lease-ownership-lost");
+	if (Date.parse(lease.expiry ?? "") <= (options.now?.() ?? Date.now()))
+		return result("lease-expired");
+	const branch = git(runGit, expected.sourceCwd, [
+		"symbolic-ref",
+		"--quiet",
+		"--short",
+		"HEAD",
+	]);
+	if (!branch.ok || branch.output !== expected.branch)
+		return result("branch-changed");
+	const head = git(runGit, expected.sourceCwd, ["rev-parse", "HEAD"]);
+	if (!head.ok || head.output !== localSha) return result("head-changed");
+	const operation = operationInProgress(expected.sourceCwd, runGit);
+	if (operation) return result("git-operation-in-progress", { operation });
+	const status = git(runGit, expected.sourceCwd, [
+		"status",
+		"--porcelain=v1",
+		"--untracked-files=all",
+	]);
+	if (!status.ok || status.output) return result("dirty-worktree");
+	const upstream = git(runGit, expected.sourceCwd, [
+		"rev-parse",
+		"--abbrev-ref",
+		"--symbolic-full-name",
+		"@{upstream}",
+	]);
+	if (!upstream.ok || upstream.output !== expected.upstream)
+		return result("upstream-changed");
+	const fetched = git(runGit, expected.sourceCwd, ["fetch", "--quiet"]);
+	if (!fetched.ok) return result("fetch-failed");
+	const remote = git(runGit, expected.sourceCwd, ["rev-parse", "@{upstream}"]);
+	if (!remote.ok) return result("upstream-unavailable");
+	if (remote.output !== remoteSha)
+		return result("upstream-diverged", {
+			expectedRemoteSha: remoteSha,
+			remoteSha: remote.output,
+		});
+	return { ok: true, head: head.output, remoteSha: remote.output, lease };
+}
+
+function candidateIntegration(sourceCwd, baseSha, candidateSha, runGit) {
+	const head = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
+	if (!head.ok) return result("head-unavailable");
+	if (head.output === candidateSha)
+		return { ok: true, integrationSha: head.output, recovered: true };
+	if (head.output !== baseSha) {
+		const count = git(runGit, sourceCwd, [
+			"rev-list",
+			"--count",
+			`${baseSha}..HEAD`,
+		]);
+		const equivalent = git(runGit, sourceCwd, ["cherry", "HEAD", candidateSha]);
+		if (count.ok && count.output === "1" && equivalent.ok && equivalent.output.startsWith("-"))
+			return { ok: true, integrationSha: head.output, recovered: true };
+		return result("integration-diverged");
+	}
+	const ancestor = git(runGit, sourceCwd, [
+		"merge-base",
+		"--is-ancestor",
+		baseSha,
+		candidateSha,
+	]);
+	const integrated = ancestor.ok
+		? git(runGit, sourceCwd, ["merge", "--ff-only", candidateSha])
+		: git(runGit, sourceCwd, ["cherry-pick", candidateSha]);
+	if (!integrated.ok) return result("integration-failed", { detail: bounded(integrated.output) });
+	const integratedHead = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
+	return integratedHead.ok
+		? { ok: true, integrationSha: integratedHead.output }
+		: result("integration-sha-unavailable");
+}
+
+function reconcileRemote(sourceCwd, expectedRemoteSha, targetSha, runGit) {
+	const fetched = git(runGit, sourceCwd, ["fetch", "--quiet"]);
+	if (!fetched.ok) return result("fetch-failed");
+	const local = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
+	const remote = git(runGit, sourceCwd, ["rev-parse", "@{upstream}"]);
+	if (!local.ok || !remote.ok) return result("push-reconciliation-failed");
+	if (local.output !== targetSha)
+		return result("local-diverged", { localSha: local.output, targetSha });
+	if (remote.output === targetSha)
+		return { ok: true, classification: "present", remoteSha: remote.output };
+	if (remote.output === expectedRemoteSha)
+		return {
+			ok: true,
+			classification: "proven-absent",
+			remoteSha: remote.output,
+		};
+	return result("remote-diverged", { remoteSha: remote.output, targetSha });
+}
+
+function recordedPushTarget(expected, runGit) {
+	const suffix = `/${expected.branch}`;
+	if (
+		typeof expected.upstream !== "string" ||
+		!expected.upstream.endsWith(suffix) ||
+		expected.upstream.length === suffix.length
+	)
+		return result("upstream-invalid");
+	const remote = expected.upstream.slice(0, -suffix.length);
+	const branchRef = `refs/heads/${expected.branch}`;
+	const validBranch = git(runGit, expected.sourceCwd, [
+		"check-ref-format",
+		branchRef,
+	]);
+	const remotes = git(runGit, expected.sourceCwd, ["remote"]);
+	if (
+		!validBranch.ok ||
+		!remotes.ok ||
+		!remotes.output.split(/\r?\n/).includes(remote)
+	)
+		return result("upstream-invalid");
+	return { ok: true, remote, branchRef };
+}
+
+function normalPush(
+	sourceCwd,
+	expectedRemoteSha,
+	targetSha,
+	pushTarget,
+	runGit,
+	beforePush,
+) {
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		const intent = beforePush(attempt);
+		if (!intent.ok) return intent;
+		git(runGit, sourceCwd, [
+			"push",
+			pushTarget.remote,
+			`${targetSha}:${pushTarget.branchRef}`,
+		]);
+		const reconciled = reconcileRemote(
+			sourceCwd,
+			expectedRemoteSha,
+			targetSha,
+			runGit,
+		);
+		if (!reconciled.ok) return reconciled;
+		if (reconciled.classification === "present") return reconciled;
+	}
+	return result("push-proven-absent", { retrySafe: true });
+}
+
+async function cancellableValidation(
+	run,
+	args,
+	timeoutMs,
+	graceMs,
+	label,
+	onEventuallySettled,
+) {
+	const controller = new AbortController();
+	const settled = Promise.resolve()
+		.then(() => run({ ...args, signal: controller.signal }))
+		.then(
+			(value) => ({ settled: true, value }),
+			(error) => ({
+				settled: true,
+				value: { passed: false, output: bounded(error?.message ?? error) },
+			}),
+		);
+	let timer;
+	const first = await Promise.race([
+		settled,
+		new Promise((resolve) => {
+			timer = setTimeout(() => resolve({ settled: false }), timeoutMs);
+		}),
+	]);
+	clearTimeout(timer);
+	if (first.settled) return first;
+	controller.abort(new Error(`${label} timed out`));
+	let graceTimer;
+	const cancelled = await Promise.race([
+		settled,
+		new Promise((resolve) => {
+			graceTimer = setTimeout(() => resolve({ settled: false }), graceMs);
+		}),
+	]);
+	clearTimeout(graceTimer);
+	if (!cancelled.settled) {
+		settled.finally(onEventuallySettled);
+		return result("validation-unknown", { validationCancellable: false });
+	}
+	return {
+		...cancelled,
+		value: {
+			passed: false,
+			output: `${label} timed out`,
+			cancelled: true,
+		},
+	};
+}
+
+async function validateRemoteRevision(options, seams, remoteSha, transition) {
+	const runGit = seams.runGit ?? defaultRunGit;
+	const intent = transition("validating", { remoteSha, activity: "validation" });
+	if (!intent.ok) return intent;
+	const boundary = deliveryBoundary(options.expected, remoteSha, remoteSha, {
+		runGit,
+		now: seams.now,
+	});
+	if (!boundary.ok) return boundary;
+	const validationCwd = path.join(
+		options.sourceCwd,
+		".pi",
+		"work-improvement",
+		"worktrees",
+		`validation-${safePart(options.attemptId)}-${randomUUID()}`,
+	);
+	mkdirSync(path.dirname(validationCwd), { recursive: true });
+	const added = git(runGit, options.sourceCwd, [
+		"worktree",
+		"add",
+		"--detach",
+		validationCwd,
+		remoteSha,
+	]);
+	if (!added.ok) return result("validation-worktree-create-failed");
+	const resolvedValidationCwd = path.resolve(validationCwd);
+	ACTIVE_VALIDATION_WORKTREES.add(resolvedValidationCwd);
+	let heartbeatFailure;
+	const heartbeatTimer = setInterval(() => {
+		const beat = heartbeatLease(options.sourceCwd, options.expected.lease, {
+			now: seams.now,
+			durationMs: seams.leaseDurationMs,
+		});
+		if (!beat.ok) heartbeatFailure = beat;
+	}, seams.heartbeatIntervalMs ?? Math.max(1_000, LEASE_DURATION_MS / 3));
+	heartbeatTimer.unref?.();
+	let validation;
+	try {
+		const clean = git(runGit, validationCwd, [
+			"status",
+			"--porcelain=v1",
+			"--untracked-files=all",
+		]);
+		if (!clean.ok || clean.output) validation = result("validation-worktree-dirty");
+		else {
+			if (typeof seams.runPackageVerify !== "function")
+				throw new TypeError("runPackageVerify is required");
+			if (typeof seams.runBenchmarkGate !== "function")
+				throw new TypeError("runBenchmarkGate is required");
+			const packageRun = await cancellableValidation(
+				seams.runPackageVerify,
+				{ cwd: validationCwd, remoteSha },
+				seams.validationTimeoutMs ?? 2 * 60 * 1000,
+				seams.validationCancelGraceMs ?? 1_000,
+				"post-push package verification",
+				() => ACTIVE_VALIDATION_WORKTREES.delete(resolvedValidationCwd),
+			);
+			if (!packageRun.ok && packageRun.reason === "validation-unknown")
+				validation = { ...packageRun, validationCwd };
+			else {
+				const packageVerification = packageRun.value;
+				let benchmark = { passed: false, skipped: true };
+				if (packageVerification?.passed === true) {
+					const benchmarkRun = await cancellableValidation(
+						seams.runBenchmarkGate,
+						{
+							cwd: validationCwd,
+							remoteSha,
+							changedPaths: options.changedPaths ?? [],
+							activity: "validation",
+						},
+						seams.validationTimeoutMs ?? 30 * 60 * 1000,
+						seams.validationCancelGraceMs ?? 1_000,
+						"post-push benchmark",
+						() => ACTIVE_VALIDATION_WORKTREES.delete(resolvedValidationCwd),
+					);
+					if (!benchmarkRun.ok && benchmarkRun.reason === "validation-unknown")
+						validation = {
+							...benchmarkRun,
+							packageVerification,
+							validationCwd,
+						};
+					else benchmark = benchmarkRun.value;
+				}
+				validation ??= {
+					ok:
+						!heartbeatFailure &&
+						packageVerification?.passed === true &&
+						benchmark?.passed === true,
+					packageVerification,
+					benchmark,
+					...(heartbeatFailure ? { heartbeatFailure } : {}),
+				};
+			}
+		}
+	} finally {
+		clearInterval(heartbeatTimer);
+	}
+	if (validation.reason === "validation-unknown") return validation;
+	ACTIVE_VALIDATION_WORKTREES.delete(resolvedValidationCwd);
+	const cleanup = removeAttemptWorktree(options.sourceCwd, validationCwd, runGit);
+	return cleanup.ok
+		? validation
+		: result("validation-worktree-cleanup-failed", { cleanup, validation });
+}
+
+/** Deliver a U5 candidate ref to the unchanged current branch, validate the remote revision, and normally revert failures. */
+export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
+	const options = deliveryState(rawOptions);
+	const runGit = seams.runGit ?? defaultRunGit;
+	const { sourceCwd, candidateId, attemptId, candidateRef, commitSha } = options;
+	const expected = { ...rawOptions.expected, sourceCwd };
+	options.expected = expected;
+	if (!sourceCwd || !candidateId || !attemptId || !candidateRef || !commitSha)
+		throw new TypeError("sourceCwd, candidateId, attemptId, candidateRef, and commitSha are required");
+	if (!expected.head || !expected.branch || !expected.upstream || !expected.lease)
+		throw new TypeError("expected source preflight and lease are required");
+	const transition = (state, details = {}) =>
+		deliveryTransition(sourceCwd, candidateId, attemptId, state, details);
+	const stop = (state, reason, details = {}) => {
+		const recorded = transition(state, { blockerSignature: reason, ...details });
+		return {
+			ok: false,
+			state,
+			reason: recorded.ok ? reason : recorded.reason,
+			...details,
+		};
+	};
+	const pushTarget = recordedPushTarget(expected, runGit);
+	if (!pushTarget.ok) return stop("manual-recovery", pushTarget.reason);
+	const staleValidation = recoverDeliveryValidationWorktrees(
+		sourceCwd,
+		attemptId,
+		runGit,
+	);
+	if (!staleValidation.ok)
+		return stop("manual-recovery", staleValidation.reason, {
+			cleanup: staleValidation,
+		});
+	const candidateRefValue = () =>
+		git(runGit, sourceCwd, [
+			"for-each-ref",
+			"--format=%(objectname)",
+			candidateRef,
+		]);
+	const terminal = (state, details = {}, recordIntent = true) => {
+		if (recordIntent) {
+			const intent = transition("cleanup-pending", {
+				...details,
+				cleanupState: state,
+			});
+			if (!intent.ok) return { ...intent, state: "manual-recovery" };
+		}
+		const cleanup = recoverDeliveryValidationWorktrees(
+			sourceCwd,
+			attemptId,
+			runGit,
+		);
+		if (!cleanup.ok)
+			return {
+				ok: false,
+				state: "manual-recovery",
+				reason: cleanup.reason,
+				cleanup,
+				...details,
+			};
+		const beforeDelete = candidateRefValue();
+		if (!beforeDelete.ok || (beforeDelete.output && beforeDelete.output !== commitSha))
+			return stop("manual-recovery", "candidate-ref-mismatch", details);
+		if (beforeDelete.output) {
+			const removed = git(runGit, sourceCwd, [
+				"update-ref",
+				"-d",
+				candidateRef,
+				commitSha,
+			]);
+			if (!removed.ok)
+				return {
+					ok: false,
+					state: "manual-recovery",
+					reason: "candidate-ref-delete-failed",
+					...details,
+				};
+		}
+		const afterDelete = candidateRefValue();
+		if (!afterDelete.ok || afterDelete.output)
+			return {
+				ok: false,
+				state: "manual-recovery",
+				reason: "candidate-ref-delete-validation-failed",
+				...details,
+			};
+		if (!recordIntent) return { ok: true, state, ...details };
+		const recorded = transition(state, details);
+		return recorded.ok
+			? { ok: true, state, ...details }
+			: { ...recorded, state: "manual-recovery" };
+	};
+	if (["accepted", "reverted"].includes(options.state))
+		return terminal(options.state, {
+			commitSha,
+			integrationSha: options.integrationSha,
+			revertSha: options.revertSha,
+			remoteSha: options.remoteSha,
+		}, false);
+	if (options.state === "cleanup-pending") {
+		if (!["accepted", "reverted"].includes(options.cleanupState))
+			return stop("manual-recovery", "cleanup-state-invalid");
+		return terminal(options.cleanupState, {
+			commitSha,
+			integrationSha: options.integrationSha,
+			revertSha: options.revertSha,
+			remoteSha: options.remoteSha,
+		});
+	}
+	if (options.state === "manual-recovery")
+		return { ok: false, state: options.state, reason: "manual-recovery-persisted" };
+	const verifiedRef = candidateRefValue();
+	if (!verifiedRef.ok || verifiedRef.output !== commitSha)
+		return stop("manual-recovery", "candidate-ref-mismatch");
+
+	let integrationSha = options.integrationSha;
+	if (!integrationSha) {
+		const intent = transition("integration-pending", { candidateRef, commitSha });
+		if (!intent.ok) return stop("deferred", intent.reason);
+		const currentHead = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
+		if (!currentHead.ok) return stop("deferred", "head-unavailable");
+		if (currentHead.output === expected.head) {
+			const boundary = deliveryBoundary(expected, expected.head, expected.head, { runGit, now: seams.now });
+			if (!boundary.ok) return stop("deferred", boundary.reason);
+		}
+		const integrated = candidateIntegration(sourceCwd, expected.head, commitSha, runGit);
+		if (!integrated.ok) return stop("manual-recovery", integrated.reason);
+		integrationSha = integrated.integrationSha;
+		const recorded = transition("push-pending", { candidateRef, commitSha, integrationSha });
+		if (!recorded.ok) return stop("manual-recovery", recorded.reason);
+	}
+
+	let revertSha = options.revertSha;
+	if (!revertSha) {
+		const local = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
+		const parent = local.ok
+			? git(runGit, sourceCwd, ["rev-parse", `${local.output}^`])
+			: result("head-unavailable");
+		const restoresBase = local.ok
+			? git(runGit, sourceCwd, ["diff", "--quiet", expected.head, local.output])
+			: result("head-unavailable");
+		if (local.ok && local.output !== integrationSha && parent.ok &&
+			parent.output === integrationSha && restoresBase.ok) {
+			revertSha = local.output;
+			const recovered = transition("revert-pending", {
+				commitSha, integrationSha, revertSha, activity: "revert",
+			});
+			if (!recovered.ok) return stop("manual-recovery", recovered.reason);
+		}
+	}
+	if (revertSha) {
+		let revertRemote = reconcileRemote(sourceCwd, integrationSha, revertSha, runGit);
+		if (revertRemote.ok && revertRemote.classification === "proven-absent")
+			revertRemote = normalPush(sourceCwd, integrationSha, revertSha, pushTarget, runGit,
+				(attempt) => {
+					const intent = transition(attempt ? "revert-push-unknown" : "revert-pending", {
+						commitSha, integrationSha, revertSha, activity: "revert",
+					});
+					return intent.ok
+						? deliveryBoundary(expected, revertSha, integrationSha, { runGit, now: seams.now })
+						: intent;
+				});
+		if (!revertRemote.ok)
+			return stop(
+				["fetch-failed", "push-reconciliation-failed"].includes(revertRemote.reason)
+					? "revert-push-unknown"
+					: "manual-recovery",
+				revertRemote.reason,
+				{ integrationSha, revertSha },
+			);
+		return terminal("reverted", {
+			commitSha, integrationSha, revertSha, remoteSha: revertSha, activity: "revert",
+		});
+	}
+
+	let reconciliation = reconcileRemote(sourceCwd, expected.head, integrationSha, runGit);
+	if (!reconciliation.ok)
+		return stop(
+			["fetch-failed", "push-reconciliation-failed"].includes(reconciliation.reason)
+				? "push-unknown"
+				: "manual-recovery",
+			reconciliation.reason,
+			{ integrationSha },
+		);
+	if (reconciliation.classification === "proven-absent") {
+		const boundary = deliveryBoundary(expected, integrationSha, expected.head, { runGit, now: seams.now });
+		if (!boundary.ok)
+			return stop(boundary.reason === "upstream-diverged" ? "manual-recovery" : "deferred", boundary.reason, { integrationSha });
+		reconciliation = normalPush(sourceCwd, expected.head, integrationSha, pushTarget, runGit,
+			(attempt) => {
+				const intent = transition(attempt ? "push-unknown" : "push-pending", {
+					candidateRef, commitSha, integrationSha,
+				});
+				return intent.ok
+					? deliveryBoundary(expected, integrationSha, expected.head, { runGit, now: seams.now })
+					: intent;
+			});
+		if (!reconciliation.ok)
+			return stop(
+				["fetch-failed", "push-reconciliation-failed"].includes(reconciliation.reason)
+					? "push-unknown"
+					: reconciliation.reason === "remote-diverged"
+						? "manual-recovery"
+						: "deferred",
+				reconciliation.reason,
+				{ integrationSha },
+			);
+	}
+	const pushed = transition("pushed", { candidateRef, commitSha, integrationSha, remoteSha: integrationSha });
+	if (!pushed.ok) return stop("manual-recovery", pushed.reason);
+	const validation = await validateRemoteRevision(
+		{ ...options, expected, integrationSha }, seams, integrationSha, transition);
+	const validationEvidence = {
+		validationPassed: validation.ok,
+		packagePassed: validation.packageVerification?.passed === true,
+		benchmarkPassed: validation.benchmark?.passed === true,
+	};
+	if (
+		["validation-unknown", "validation-worktree-cleanup-failed"].includes(
+			validation.reason,
+		)
+	)
+		return stop("manual-recovery", validation.reason, {
+			integrationSha,
+			validation,
+			...validationEvidence,
+		});
+	if (validation.ok) {
+		const afterValidation = deliveryBoundary(
+			expected,
+			integrationSha,
+			integrationSha,
+			{ runGit, now: seams.now },
+		);
+		if (!afterValidation.ok)
+			return stop("manual-recovery", afterValidation.reason, {
+				integrationSha,
+				validation,
+				...validationEvidence,
+			});
+		return terminal("accepted", {
+			commitSha,
+			integrationSha,
+			remoteSha: integrationSha,
+			validation,
+			...validationEvidence,
+		});
+	}
+
+	const revertIntent = transition("revert-pending", {
+		commitSha,
+		integrationSha,
+		remoteSha: integrationSha,
+		activity: "revert",
+		...validationEvidence,
+	});
+	if (!revertIntent.ok) return stop("manual-recovery", revertIntent.reason);
+	const beforeRevert = deliveryBoundary(expected, integrationSha, integrationSha, { runGit, now: seams.now });
+	if (!beforeRevert.ok)
+		return stop("manual-recovery", beforeRevert.reason, { integrationSha, validation });
+	const reverted = git(runGit, sourceCwd, ["revert", "--no-edit", integrationSha]);
+	if (!reverted.ok)
+		return stop("manual-recovery", "revert-failed", { integrationSha, validation });
+	const revertHead = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
+	if (!revertHead.ok) return stop("manual-recovery", "revert-sha-unavailable", { integrationSha });
+	revertSha = revertHead.output;
+	const revertPush = normalPush(sourceCwd, integrationSha, revertSha, pushTarget, runGit,
+		(attempt) => {
+			const intent = transition(attempt ? "revert-push-unknown" : "revert-pending", {
+				commitSha, integrationSha, revertSha, activity: "revert",
+			});
+			return intent.ok
+				? deliveryBoundary(expected, revertSha, integrationSha, { runGit, now: seams.now })
+				: intent;
+		});
+	if (!revertPush.ok)
+		return stop(
+			["fetch-failed", "push-reconciliation-failed"].includes(revertPush.reason)
+				? "revert-push-unknown"
+				: "manual-recovery",
+			revertPush.reason,
+			{ integrationSha, revertSha, validation },
+		);
+	return terminal("reverted", {
+		commitSha,
+		integrationSha,
+		revertSha,
+		remoteSha: revertSha,
+		validation,
+		activity: "revert",
+		...validationEvidence,
+	});
 }

@@ -701,6 +701,7 @@ for (const script of [
 	"test-work-improvement-git.mjs",
 	"test-work-improvement-benchmark.mjs",
 	"test-work-improvement-lifecycle.mjs",
+	"test-work-improvement-delivery.mjs",
 	"test-work-optimization-helpers.mjs",
 	"test-windows-bd-shim.mjs",
 ]) {

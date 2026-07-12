@@ -558,6 +558,18 @@ export function readCandidateState(sourceCwd, policy = {}) {
 		} else if (event.transition !== "observed") {
 			candidate.state = event.transition;
 			candidate.updatedAt = event.timestamp;
+			for (const key of [
+				"candidateRef",
+				"commitSha",
+				"integrationSha",
+				"remoteSha",
+				"revertSha",
+				"validationPassed",
+				"packagePassed",
+				"benchmarkPassed",
+				"cleanupState",
+			])
+				if (event[key] !== undefined) candidate[key] = event[key];
 			if (event.transition === "claimed") {
 				candidate.attempts += 1;
 				candidate.lastAttemptAt = event.timestamp;
@@ -594,6 +606,20 @@ export function appendCandidateTransition(
 		blockerSignature: text(details.blockerSignature, 200) || undefined,
 		activity: text(details.activity, 40) || undefined,
 	};
+	for (const key of [
+		"candidateRef",
+		"commitSha",
+		"integrationSha",
+		"remoteSha",
+		"revertSha",
+	]) {
+		const value = text(details[key], 240);
+		if (value) event[key] = value;
+	}
+	for (const key of ["validationPassed", "packagePassed", "benchmarkPassed"])
+		if (typeof details[key] === "boolean") event[key] = details[key];
+	const cleanupState = text(details.cleanupState, 40);
+	if (cleanupState) event.cleanupState = cleanupState;
 	appendEvent(sourceCwd, event);
 	return event;
 }
