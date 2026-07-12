@@ -683,6 +683,7 @@ for (const script of [
 	"test-work-telemetry.mjs",
 	"test-work-improvement-analyzer.mjs",
 	"test-work-improvement-git.mjs",
+	"test-work-improvement-benchmark.mjs",
 	"test-work-optimization-helpers.mjs",
 	"test-windows-bd-shim.mjs",
 ]) {

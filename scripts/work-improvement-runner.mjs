@@ -21,6 +21,37 @@ export const SOURCE_ENV = "CE_WORKFLOW_SOURCE_DIR";
 export const LEASE_DURATION_MS = 5 * 60 * 1000;
 const EXPECTED_PACKAGE = "pi-work-orchestrator";
 
+/** Execute a benchmark plan through injected gates. Agent dispatch is deliberately a seam owned by later lifecycle wiring. */
+export async function runBenchmarkGatePlan(plan, seams = {}) {
+	if (typeof seams.runPackageVerify !== "function")
+		throw new TypeError("runPackageVerify is required");
+	if (typeof seams.runDeterministicFixture !== "function")
+		throw new TypeError("runDeterministicFixture is required");
+	if (
+		(plan.agentScenarioIds?.length ?? 0) > 0 &&
+		typeof seams.runAgentScenario !== "function"
+	)
+		throw new TypeError("runAgentScenario is required");
+	const packageVerification = await seams.runPackageVerify();
+	if (packageVerification?.passed !== true)
+		return { packageVerification, deterministic: [], agentBacked: [] };
+	const deterministic = [];
+	for (const fixtureId of plan.deterministicFixtureIds ?? []) {
+		deterministic.push({
+			fixtureId,
+			samples: [await seams.runDeterministicFixture(fixtureId)],
+		});
+	}
+	const agentBacked = [];
+	for (const fixtureId of plan.agentScenarioIds ?? []) {
+		const samples = [];
+		for (let sample = 0; sample < 3; sample += 1)
+			samples.push(await seams.runAgentScenario(fixtureId));
+		agentBacked.push({ fixtureId, samples });
+	}
+	return { packageVerification, deterministic, agentBacked };
+}
+
 function result(reason, details = {}) {
 	return { ok: false, reason, ...details };
 }
