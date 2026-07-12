@@ -29,7 +29,6 @@ import {
 	resolve,
 } from "node:path";
 import {
-	ANALYZER_VERSION,
 	analyzeWorkflow,
 	readCandidateState,
 	selectCandidate,

@@ -14,4 +14,5 @@ Rules:
 - Do not inspect unrelated files or rediscover project context.
 - Run the exact bounded command once.
 - Return the command outcome and measured values supplied by the harness.
-- If the command or required measurement is unavailable, report failure; never invent metrics.
+- If the command or required measurement is unavailable, report failure; never
+  invent metrics.
