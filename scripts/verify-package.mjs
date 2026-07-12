@@ -681,6 +681,7 @@ for (const script of [
 	"test-work-goal.mjs",
 	"test-work-start-finish.mjs",
 	"test-work-telemetry.mjs",
+	"test-work-improvement-analyzer.mjs",
 	"test-work-optimization-helpers.mjs",
 	"test-windows-bd-shim.mjs",
 ]) {
