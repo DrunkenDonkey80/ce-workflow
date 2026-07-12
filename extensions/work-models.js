@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { execFileSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -26,6 +27,7 @@ import {
 const CONFIG_DIR_NAME = ".pi";
 const TELEMETRY_DIR_NAME = "work-runs";
 const HISTORY_DIR_NAME = "history";
+const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
 const WORK_SHORTCUT_STATUS = "F7 roadmaps · F8 menu";
 const INHERIT_MODEL = "__inherit_model__";
@@ -234,6 +236,7 @@ const DEFAULT_CONTEXT = {
 const MIN_COMPACT_AT_TOKENS = 30_000;
 const contextCompactState = { inFlight: false, requested: false };
 let pendingWorkPrompt = null;
+const commandWorkflowStorage = new AsyncLocalStorage();
 let activeHistoryTask = null;
 let activeWorkAgent = null;
 let activeWorkGoal = null;
@@ -620,10 +623,9 @@ function duplicateTelemetryWindowMs() {
 }
 
 function isDuplicateTelemetry(file, record) {
+	if (!existsSync(file)) return false;
 	const fingerprint = telemetryFingerprint(record);
-	if (!fingerprint || !existsSync(file)) return false;
 	const recordAt = Date.parse(record.timestamp ?? "");
-	if (!Number.isFinite(recordAt)) return false;
 	const windowMs = duplicateTelemetryWindowMs();
 	const lines = readFileSync(file, "utf8").trim().split(/\r?\n/);
 	for (let index = lines.length - 1; index >= 0; index -= 1) {
@@ -633,6 +635,8 @@ function isDuplicateTelemetry(file, record) {
 		} catch {
 			continue;
 		}
+		if (record.id && previous?.id === record.id) return true;
+		if (!fingerprint || !Number.isFinite(recordAt)) continue;
 		if (telemetryFingerprint(previous) !== fingerprint) continue;
 		const previousAt = Date.parse(previous.timestamp ?? "");
 		const ageMs = recordAt - previousAt;
@@ -656,6 +660,210 @@ function recordWorkTelemetry(cwd, event) {
 	if (isDuplicateTelemetry(file, record)) return file;
 	appendFileSync(file, `${JSON.stringify(record)}\n`);
 	return file;
+}
+
+function currentCommandWorkflow() {
+	return commandWorkflowStorage.getStore();
+}
+
+function workflowActivityMarker() {
+	return (
+		currentCommandWorkflow()?.activity ??
+		process.env.WORK_ORCH_ACTIVITY_MARKER ??
+		process.env.WORK_ORCH_ACTIVITY ??
+		undefined
+	);
+}
+
+function workflowPromptMetadata() {
+	const workflow = currentCommandWorkflow();
+	if (!workflow?.workflowRunId) return [];
+	return [
+		`Workflow Run ID: ${workflow.workflowRunId}`,
+		workflow.activity ? `Activity: ${workflow.activity}` : "",
+	].filter(Boolean);
+}
+
+function workflowClaimPath(cwd, workflowRunId) {
+	const key = createHash("sha256").update(String(workflowRunId)).digest("hex");
+	return join(telemetryDir(cwd), "claims", `${key}.complete`);
+}
+
+function completeWorkflowOnce(cwd, completion) {
+	if (!cwd || !completion?.workflowRunId) return "";
+	const claim = workflowClaimPath(cwd, completion.workflowRunId);
+	mkdirSync(dirname(claim), { recursive: true });
+	let descriptor;
+	try {
+		descriptor = openSync(claim, "wx");
+		writeSync(
+			descriptor,
+			`${JSON.stringify({
+				version: 1,
+				id: telemetryId("workflow-complete"),
+				timestamp: new Date().toISOString(),
+				type: "workflow-complete",
+				...completion,
+				terminal: true,
+			})}\n`,
+		);
+	} catch (error) {
+		if (error?.code === "EEXIST") return "";
+		throw error;
+	} finally {
+		if (descriptor !== undefined) closeSync(descriptor);
+	}
+	return claim;
+}
+
+function pendingDirectPath(cwd) {
+	return join(telemetryDir(cwd), "direct", PENDING_DIRECT_FILE);
+}
+
+function readPendingDirectEvents(cwd) {
+	try {
+		const file = pendingDirectPath(cwd);
+		if (!existsSync(file)) return [];
+		return readFileSync(file, "utf8")
+			.split(/\r?\n/)
+			.filter(Boolean)
+			.map((line) => {
+				try {
+					const event = JSON.parse(line);
+					return event && typeof event === "object" ? event : undefined;
+				} catch {
+					return undefined;
+				}
+			})
+			.filter(Boolean);
+	} catch {
+		return [];
+	}
+}
+
+function recordPendingDirectRun(cwd, run) {
+	if (
+		!cwd ||
+		!run?.workflowRunId ||
+		(!run?.runId && !run?.asyncDir)
+	)
+		return "";
+	const file = pendingDirectPath(cwd);
+	mkdirSync(dirname(file), { recursive: true });
+	appendFileSync(
+		file,
+		`${JSON.stringify({ version: 1, type: "pending", timestamp: new Date().toISOString(), ...run })}\n`,
+	);
+	return file;
+}
+
+const DIRECT_SUCCESS_STATES = new Set([
+	"complete",
+	"completed",
+	"success",
+	"ok",
+	"passed",
+]);
+const DIRECT_TERMINAL_STATES = new Set([
+	...DIRECT_SUCCESS_STATES,
+	"failed",
+	"error",
+	"cancelled",
+	"canceled",
+	"timed_out",
+	"timeout",
+]);
+
+function directStatusState(status) {
+	return String(status?.state ?? status?.status ?? "").toLowerCase();
+}
+
+function directStatusComplete(status) {
+	if (!status || typeof status !== "object") return false;
+	if (DIRECT_TERMINAL_STATES.has(directStatusState(status))) return true;
+	return (
+		Array.isArray(status.steps) &&
+		status.steps.length > 0 &&
+		status.steps.every((step) =>
+			DIRECT_TERMINAL_STATES.has(String(step?.status ?? "").toLowerCase()),
+		)
+	);
+}
+
+function reconcilePendingDirectRuns(cwd) {
+	try {
+		const events = readPendingDirectEvents(cwd);
+		const completed = new Set(
+			events
+				.filter((event) => event.type === "completed")
+				.map((event) => event.workflowRunId),
+		);
+		const pending = new Map();
+		for (const event of events) {
+			if (event.type === "pending" && event.workflowRunId)
+				pending.set(event.workflowRunId, event);
+		}
+		const reconciled = [];
+		for (const run of pending.values()) {
+			try {
+				if (completed.has(run.workflowRunId)) continue;
+				const statusFile =
+					typeof run.asyncDir === "string"
+						? join(run.asyncDir, "status.json")
+						: "";
+				if (!statusFile || !existsSync(statusFile)) continue;
+				let status;
+				try {
+					status = JSON.parse(readFileSync(statusFile, "utf8"));
+				} catch {
+					continue;
+				}
+				if (!directStatusComplete(status)) continue;
+				const details = Array.isArray(status.steps)
+					? status.steps.map(summarizeSubagentResult)
+					: [];
+				const state = directStatusState(status);
+				const ok = state
+					? DIRECT_SUCCESS_STATES.has(state)
+					: details.every((item) =>
+							DIRECT_SUCCESS_STATES.has(String(item.status).toLowerCase()),
+						);
+				recordWorkTelemetry(cwd, {
+					id: `direct-agent-${run.workflowRunId}`,
+					type: "agent",
+					workflowRunId: run.workflowRunId,
+					activity: run.activity,
+					action: run.action,
+					role: handoffRole(run.agent ?? run.action),
+					epicId: run.epicId,
+					beadId: run.beadId,
+					ok,
+					handoff: { queued: false, started: true, role: run.agent },
+					tools: [
+						{ name: "subagent", runId: run.runId, subagentDetails: details },
+					],
+				});
+				completeWorkflowOnce(cwd, {
+					workflowRunId: run.workflowRunId,
+					activity: run.activity,
+					outcome: ok ? "completed" : "failed",
+					action: run.action,
+					epicId: run.epicId,
+					beadId: run.beadId,
+				});
+				appendFileSync(
+					pendingDirectPath(cwd),
+					`${JSON.stringify({ version: 1, type: "completed", timestamp: new Date().toISOString(), workflowRunId: run.workflowRunId })}\n`,
+				);
+				reconciled.push(run.workflowRunId);
+			} catch {
+				// Malformed or concurrently removed runtime artifacts are retried later.
+			}
+		}
+		return reconciled;
+	} catch {
+		return [];
+	}
 }
 
 function safeHistoryPathPart(value) {
@@ -761,6 +969,14 @@ function recordSelfImprovementHistory(ctx, type, event = {}) {
 				sessionId,
 				sessionFile: ctx?.sessionManager?.getSessionFile?.(),
 				task,
+				workflowRunId:
+					activeWorkAgent?.meta?.workflowRunId ??
+					pendingWorkPrompt?.meta?.workflowRunId ??
+					currentCommandWorkflow()?.workflowRunId,
+				activity:
+					activeWorkAgent?.meta?.activity ??
+					pendingWorkPrompt?.meta?.activity ??
+					workflowActivityMarker(),
 				event: jsonSafe(event),
 			})}\n`,
 		);
@@ -808,6 +1024,8 @@ function parseWorkPromptMeta(prompt) {
 	)?.[1];
 	return {
 		mode: text.match(/mode:\s*([^\s]+)/)?.[1],
+		workflowRunId: line("Workflow Run ID"),
+		activity: line("Activity"),
 		action: line("Action"),
 		epicId: epicId === "none" ? undefined : epicId,
 		beadId,
@@ -1099,63 +1317,101 @@ function notify(ctx, message, level = "info") {
 }
 
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
-	const startedAt = Date.now();
-	const contextBefore = usageSnapshot(ctx);
-	recordWorkTelemetry(ctx.cwd, {
-		id: telemetryId("cmd-start"),
-		type: "command-start",
-		command,
-		args: truncate(args, 300),
-		ok: true,
-		stopReason: "started",
-		context: { before: contextBefore },
-	});
-	let state;
-	let errorMessage = "";
-	try {
-		state = await fn();
-		return state;
-	} catch (error) {
-		errorMessage = error instanceof Error ? error.message : String(error);
-		throw error;
-	} finally {
-		const summary = stateTelemetry(state);
-		const event = {
-			id: telemetryId("cmd"),
-			type: "command",
+	const workflow = {
+		workflowRunId: telemetryId("workflow"),
+		activity:
+			process.env.WORK_ORCH_ACTIVITY_MARKER ??
+			process.env.WORK_ORCH_ACTIVITY ??
+			undefined,
+	};
+	return commandWorkflowStorage.run(workflow, async () => {
+		const startedAt = Date.now();
+		const contextBefore = usageSnapshot(ctx);
+		reconcilePendingDirectRuns(ctx.cwd);
+		recordWorkTelemetry(ctx.cwd, {
+			id: telemetryId("cmd-start"),
+			type: "command-start",
+			workflowRunId: workflow.workflowRunId,
+			activity: workflow.activity,
 			command,
 			args: truncate(args, 300),
-			durationMs: Math.max(0, Date.now() - startedAt),
-			ok: !errorMessage && summary.ok,
-			error: errorMessage || undefined,
-			...summary,
-			context: { before: contextBefore, after: usageSnapshot(ctx) },
-		};
-		const file = recordWorkTelemetry(ctx.cwd, event);
-		if (note && state?.handoffPrompt)
-			appendTelemetryNote(ctx.cwd, summary.beadId, event, file);
-		cleanupBenignInstructionDirt(ctx.cwd);
-	}
+			ok: true,
+			stopReason: "started",
+			context: { before: contextBefore },
+		});
+		let state;
+		let errorMessage = "";
+		try {
+			state = await fn();
+			return state;
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : String(error);
+			throw error;
+		} finally {
+			const summary = stateTelemetry(state);
+			const event = {
+				id: telemetryId("cmd"),
+				type: "command",
+				workflowRunId: workflow.workflowRunId,
+				activity: workflow.activity,
+				command,
+				args: truncate(args, 300),
+				durationMs: Math.max(0, Date.now() - startedAt),
+				ok: !errorMessage && summary.ok,
+				error: errorMessage || undefined,
+				...summary,
+				context: { before: contextBefore, after: usageSnapshot(ctx) },
+			};
+			const file = recordWorkTelemetry(ctx.cwd, event);
+			if (note && state?.handoffPrompt)
+				appendTelemetryNote(ctx.cwd, summary.beadId, event, file);
+			const awaitingAgent =
+				Boolean(state?.handoffPrompt) &&
+				!state?.handoffFailed &&
+				(Boolean(state?.inlineWork) ||
+					Boolean(state?.directHandoff) ||
+					Boolean(state?.handoffPending) ||
+					(!state?.directHandoff && !state?.handoffFailed));
+			if (!awaitingAgent)
+				completeWorkflowOnce(ctx.cwd, {
+					workflowRunId: workflow.workflowRunId,
+					activity: workflow.activity,
+					outcome: event.ok ? "completed" : "failed",
+					action: summary.action,
+					epicId: summary.epicId,
+					beadId: summary.beadId,
+				});
+			cleanupBenignInstructionDirt(ctx.cwd);
+		}
+	});
 }
 
 function readTelemetryEvents(cwd) {
 	const dir = telemetryDir(cwd);
 	if (!existsSync(dir)) return [];
-	return readdirSync(dir)
+	const files = readdirSync(dir)
 		.filter((file) => file.endsWith(".jsonl"))
-		.flatMap((file) =>
-			readFileSync(join(dir, file), "utf8")
-				.split(/\r?\n/)
-				.filter(Boolean)
-				.map((line) => {
-					try {
-						return { ...JSON.parse(line), file: join(dir, file) };
-					} catch {
-						return undefined;
-					}
-				})
-				.filter(Boolean),
+		.map((file) => join(dir, file));
+	const claims = join(dir, "claims");
+	if (existsSync(claims))
+		files.push(
+			...readdirSync(claims)
+				.filter((file) => file.endsWith(".complete"))
+				.map((file) => join(claims, file)),
 		);
+	return files.flatMap((file) =>
+		readFileSync(file, "utf8")
+			.split(/\r?\n/)
+			.filter(Boolean)
+			.map((line) => {
+				try {
+					return { ...JSON.parse(line), file };
+				} catch {
+					return undefined;
+				}
+			})
+			.filter(Boolean),
+	);
 }
 
 function parseTelemetryArgs(args = "") {
@@ -1224,6 +1480,10 @@ function summarizeTelemetryEvent(event) {
 	return {
 		id: event.id,
 		type: event.type,
+		workflowRunId: event.workflowRunId,
+		activity: event.activity,
+		terminal: event.terminal,
+		outcome: event.outcome,
 		command: event.command,
 		mode: event.mode,
 		action: event.action,
@@ -4518,6 +4778,7 @@ function directRoleTask(state, cwd) {
 		selected?.changedPaths?.length;
 	return [
 		"Precomputed work-orchestrator handoff. Run this role directly; do not delegate or rediscover target selection.",
+		...workflowPromptMetadata(),
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
 		`Action: ${state.action}`,
 		selected
@@ -4564,6 +4825,8 @@ function directRoleHandoffParams(state, cwd) {
 		params: {
 			agent,
 			task: directRoleTask(state, cwd),
+			workflowRunId: currentCommandWorkflow()?.workflowRunId,
+			activity: workflowActivityMarker(),
 			context: "fresh",
 			cwd,
 			async: true,
@@ -4573,6 +4836,39 @@ function directRoleHandoffParams(state, cwd) {
 			acceptance: false,
 		},
 	};
+}
+
+function directRunIdentity(direct, spawned) {
+	const data = spawned?.reply?.data ?? spawned?.data ?? {};
+	const result = data.result ?? {};
+	const details = data.details ?? result.details ?? {};
+	return {
+		runId:
+			data.runId ??
+			data.id ??
+			result.runId ??
+			result.id ??
+			details.runId ??
+			direct?.params?.runId,
+		asyncDir:
+			data.asyncDir ??
+			result.asyncDir ??
+			details.asyncDir ??
+			direct?.params?.asyncDir,
+	};
+}
+
+function recordSpawnedDirectRun(cwd, state, direct, spawned) {
+	const identity = directRunIdentity(direct, spawned);
+	return recordPendingDirectRun(cwd, {
+		workflowRunId: currentCommandWorkflow()?.workflowRunId,
+		activity: workflowActivityMarker(),
+		action: state.action,
+		agent: direct.agent,
+		epicId: state.epic?.id,
+		beadId: state.selectedBead?.id,
+		...identity,
+	});
 }
 
 function markDirectHandoffStarted(cwd, state) {
@@ -4731,6 +5027,7 @@ function inlineWorkHandoffPrompt(state, extraLines = [], cwd) {
 		);
 	return [
 		`work-orchestrator WO_INLINE_V1: complete this ${level} task directly in the current session. Do not call subagent list and do not launch a worker, planner, or committer.`,
+		...workflowPromptMetadata(),
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
 		`Target: ${selected?.id ?? "none"}`,
 		`Task: ${JSON.stringify(contract)}`,
@@ -4769,6 +5066,7 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 		: [];
 	return [
 		`Use the work-orchestrator skill in mode: ${mode} with this precomputed extension state.`,
+		...workflowPromptMetadata(),
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
 		`Action: ${state.action}`,
 		`Selected Bead: ${selectedLine}`,
@@ -9425,6 +9723,9 @@ function unsupportedPrintWorkflow(ctx) {
 }
 
 async function sendWorkflowFollowUp(ctx, message, pi, state) {
+	const metadata = workflowPromptMetadata();
+	if (metadata.length && !String(message).includes("Workflow Run ID:"))
+		message = `${message}\n${metadata.join("\n")}`;
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
 	let compactEnabled = true;
 	try {
@@ -9482,11 +9783,15 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 	);
 	if (direct) {
 		const spawned = await spawnSubagentRpc(pi, direct.params);
-		if (spawned.ok)
+		if (spawned.ok) {
+			recordSpawnedDirectRun(ctx.cwd, state, direct, spawned);
 			return {
 				...markDirectHandoffStarted(ctx.cwd, state),
 				directHandoff: direct,
 			};
+		}
+		if (spawned.ambiguous)
+			recordSpawnedDirectRun(ctx.cwd, state, direct, spawned);
 		notify(
 			ctx,
 			spawned.ambiguous
@@ -9585,12 +9890,15 @@ async function handleWorkflowAction(
 	);
 	if (direct) {
 		const spawned = await spawnSubagentRpc(pi, direct.params);
-		if (spawned.ok)
+		if (spawned.ok) {
+			recordSpawnedDirectRun(ctx.cwd, state, direct, spawned);
 			return {
 				...markDirectHandoffStarted(ctx.cwd, state),
 				directHandoff: direct,
 			};
+		}
 		if (spawned.ambiguous) {
+			recordSpawnedDirectRun(ctx.cwd, state, direct, spawned);
 			notify(
 				ctx,
 				`Direct ${direct.agent} handoff acknowledgement timed out. Not launching a fallback because the role may already be running; retry /work-resume only after checking the active-run widget.`,
@@ -9900,6 +10208,12 @@ export {
 	workflowTaskSummary,
 	writeEvidenceSummary,
 	directRoleHandoffParams,
+	completeWorkflowOnce,
+	withCommandTelemetry,
+	parseWorkPromptMeta,
+	reconcilePendingDirectRuns,
+	recordPendingDirectRun,
+	recordSpawnedDirectRun,
 	deriveIdeaStatus,
 	isIdeaIssue,
 	parseIdeationIdeas,
@@ -9999,6 +10313,7 @@ export default function workModelsExtension(pi) {
 	}
 
 	pi.on("session_start", (_event, ctx) => {
+		reconcilePendingDirectRuns(ctx.cwd);
 		registerWorkCatchUpCommand(pi, ctx);
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
@@ -10022,6 +10337,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", async (event, ctx) => {
+		reconcilePendingDirectRuns(ctx.cwd);
 		recordSelfImprovementHistory(ctx, "input", event);
 		if (!extractWorkGoalContinuationMarker(event.text)) clearWorkGoalRecovery();
 		if (await maybeResumeWorkGoalFromUserInput(event, ctx, pi))
@@ -10132,6 +10448,8 @@ export default function workModelsExtension(pi) {
 		const telemetry = {
 			id: run.id,
 			type: "agent",
+			workflowRunId: run.meta.workflowRunId,
+			activity: run.meta.activity,
 			mode: run.meta.mode,
 			action: run.meta.action,
 			role,
@@ -10160,6 +10478,14 @@ export default function workModelsExtension(pi) {
 			context: { before: run.contextBefore, after: usageSnapshot(ctx) },
 		};
 		const file = recordWorkTelemetry(run.cwd, telemetry);
+		completeWorkflowOnce(run.cwd, {
+			workflowRunId: run.meta.workflowRunId,
+			activity: run.meta.activity,
+			outcome: hasWorkAgentFailure(event, telemetry) ? "failed" : "completed",
+			action: run.meta.action,
+			epicId: run.meta.epicId,
+			beadId: run.meta.beadId,
+		});
 		appendTelemetryNote(run.cwd, run.meta.beadId, telemetry, file);
 		appendFailureStatusNote(
 			run.cwd,

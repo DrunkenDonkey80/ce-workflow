@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import {
+	appendFileSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
@@ -15,8 +17,15 @@ import { pathToFileURL } from "node:url";
 const {
 	buildWorkTelemetry,
 	buildWorkTelemetryState,
+	completeWorkflowOnce,
 	default: workModelsExtension,
+	directRoleHandoffParams,
+	parseWorkPromptMeta,
+	reconcilePendingDirectRuns,
+	recordPendingDirectRun,
+	recordSpawnedDirectRun,
 	recordWorkTelemetry,
+	withCommandTelemetry,
 } = await import(
 	pathToFileURL(
 		realpathSync(
@@ -34,9 +43,155 @@ function assert(ok, message) {
 	if (!ok) throw new Error(message);
 }
 
+function telemetryEvents(cwd) {
+	const dir = path.join(cwd, ".pi", "work-runs");
+	return readdirSync(dir)
+		.filter((file) => file.endsWith(".jsonl"))
+		.flatMap((file) =>
+			readFileSync(path.join(dir, file), "utf8")
+				.split(/\r?\n/)
+				.filter(Boolean)
+				.map((line) => JSON.parse(line)),
+		);
+}
+
 const cwd = mkdtempSync(path.join(tmpdir(), "work-telemetry-"));
 const now = Date.now();
 try {
+	const parsedMarker = parseWorkPromptMeta(
+		"work-orchestrator mode: resume\nWorkflow Run ID: wf-marker\nActivity: validation",
+	);
+	assert(
+		parsedMarker.workflowRunId === "wf-marker" &&
+			parsedMarker.activity === "validation",
+		"workflow identity and activity marker survive prompt parsing",
+	);
+	completeWorkflowOnce(cwd, {
+		workflowRunId: "wf-once",
+		activity: "improvement",
+		outcome: "completed",
+	});
+	completeWorkflowOnce(cwd, {
+		workflowRunId: "wf-once",
+		activity: "improvement",
+		outcome: "completed",
+	});
+	assert(
+		buildWorkTelemetryState(cwd, "today").slowest.filter(
+			(event) =>
+				event.type === "workflow-complete" &&
+				event.workflowRunId === "wf-once",
+		).length === 1,
+		"terminal workflow records are exactly once",
+	);
+
+	const directDir = path.join(cwd, ".pi-subagents", "direct-1");
+	mkdirSync(directDir, { recursive: true });
+	recordPendingDirectRun(cwd, {
+		workflowRunId: "wf-direct",
+		activity: "benchmark",
+		action: "run-review",
+		agent: "bead-reviewer",
+		asyncDir: directDir,
+	});
+	writeFileSync(
+		path.join(directDir, "status.json"),
+		JSON.stringify({
+			state: "complete",
+			steps: [{ agent: "bead-reviewer", status: "complete" }],
+		}),
+	);
+	assert(
+		reconcilePendingDirectRuns(cwd).length === 1 &&
+			reconcilePendingDirectRuns(cwd).length === 0,
+		"real pi-subagents complete schema reconciles exactly once",
+	);
+	let directEvents = buildWorkTelemetryState(cwd, "today").slowest.filter(
+		(event) => event.workflowRunId === "wf-direct",
+	);
+	assert(
+		directEvents.some(
+			(event) => event.type === "agent" && event.activity === "benchmark",
+		) &&
+			directEvents.filter((event) => event.type === "workflow-complete")
+				.length === 1,
+		"direct-role reconciliation emits correlated agent and terminal records with activity",
+	);
+
+	const pendingFile = path.join(
+		cwd,
+		".pi",
+		"work-runs",
+		"direct",
+		"pending-direct.jsonl",
+	);
+	writeFileSync(
+		pendingFile,
+		readFileSync(pendingFile, "utf8")
+			.split(/\r?\n/)
+			.filter((line) => !line.includes('"type":"completed"'))
+			.filter(Boolean)
+			.join("\n") + "\n",
+	);
+	assert(
+		reconcilePendingDirectRuns(cwd).length === 1,
+		"reconciliation can retry after a crash before its completed marker",
+	);
+	directEvents = buildWorkTelemetryState(cwd, "today").slowest.filter(
+		(event) => event.workflowRunId === "wf-direct" && event.type === "agent",
+	);
+	assert(
+		directEvents.length === 1,
+		"retried reconciliation emits idempotent agent telemetry",
+	);
+
+	const failedDir = path.join(cwd, ".pi-subagents", "direct-failed");
+	mkdirSync(failedDir, { recursive: true });
+	recordPendingDirectRun(cwd, {
+		workflowRunId: "wf-direct-failed",
+		action: "run-review",
+		agent: "bead-reviewer",
+		asyncDir: failedDir,
+	});
+	writeFileSync(
+		path.join(failedDir, "status.json"),
+		JSON.stringify({ state: "failed" }),
+	);
+	assert(
+		reconcilePendingDirectRuns(cwd).includes("wf-direct-failed") &&
+			buildWorkTelemetryState(cwd, "today").slowest.some(
+				(event) =>
+					event.workflowRunId === "wf-direct-failed" &&
+					event.type === "workflow-complete" &&
+					event.outcome === "failed",
+			),
+		"top-level failed status without steps emits a failed outcome",
+	);
+
+	assert(
+		recordPendingDirectRun(cwd, { workflowRunId: "wf-untrackable" }) === "" &&
+		Boolean(
+			recordPendingDirectRun(cwd, {
+				workflowRunId: "wf-ambiguous-trackable",
+				runId: "run-known-after-timeout",
+			}),
+		),
+		"ambiguous launches persist real identifiers without fabricating trackability",
+	);
+	appendFileSync(pendingFile, "not-json\nnull\n{}\n");
+	recordPendingDirectRun(cwd, {
+		workflowRunId: "wf-malformed-status",
+		asyncDir: path.join(cwd, ".pi-subagents", "malformed"),
+	});
+	mkdirSync(path.join(cwd, ".pi-subagents", "malformed"), { recursive: true });
+	writeFileSync(
+		path.join(cwd, ".pi-subagents", "malformed", "status.json"),
+		"{bad",
+	);
+	assert(
+		Array.isArray(reconcilePendingDirectRuns(cwd)),
+		"malformed pending and status records do not throw",
+	);
 	recordWorkTelemetry(cwd, {
 		id: "cmd-small",
 		timestamp: now,
@@ -228,6 +383,97 @@ try {
 		rmSync(blockedCwd, { recursive: true, force: true });
 	}
 
+	const commandCtx = {
+		cwd,
+		getContextUsage: () => ({ tokens: 0 }),
+	};
+	const trackedAmbiguousDir = path.join(
+		cwd,
+		".pi-subagents",
+		"tracked-ambiguous",
+	);
+	await withCommandTelemetry("ambiguous-tracking", "", commandCtx, async () => {
+		const state = { action: "run-review", handoffPrompt: "review" };
+		const direct = directRoleHandoffParams(state, cwd);
+		assert(
+			Boolean(
+				recordSpawnedDirectRun(cwd, state, direct, {
+					ambiguous: true,
+					data: { asyncDir: trackedAmbiguousDir },
+				}),
+			),
+			"ambiguous acknowledgement persists launcher-provided identity",
+		);
+		return { ok: true, handoffPrompt: "review", handoffPending: true };
+	});
+	assert(
+		readFileSync(pendingFile, "utf8").includes(
+			trackedAmbiguousDir.replaceAll("\\", "\\\\"),
+		),
+		"ambiguous launch identity is durable in pending telemetry",
+	);
+	let outerAfterNested;
+	await withCommandTelemetry("outer-context", "", commandCtx, async () => {
+		try {
+			await withCommandTelemetry("nested-error", "", commandCtx, async () => {
+				throw new Error("expected nested failure");
+			});
+		} catch {}
+		outerAfterNested = parseWorkPromptMeta(
+			directRoleHandoffParams(
+				{ action: "run-review", handoffPrompt: "review" },
+				cwd,
+			).params.task,
+		);
+		return { ok: true };
+	});
+	const outerEvent = telemetryEvents(cwd).find(
+		(event) => event.type === "command" && event.command === "outer-context",
+	);
+	assert(
+		outerAfterNested.workflowRunId === outerEvent.workflowRunId,
+		"nested command errors restore the outer workflow context",
+	);
+
+	let releaseFirst;
+	const firstGate = new Promise((resolve) => {
+		releaseFirst = resolve;
+	});
+	const firstCommand = withCommandTelemetry(
+		"concurrent-first",
+		"",
+		commandCtx,
+		async () => {
+			await firstGate;
+			return { ok: true };
+		},
+	);
+	let secondMeta;
+	const secondCommand = withCommandTelemetry(
+		"concurrent-second",
+		"",
+		commandCtx,
+		async () => {
+			await firstCommand;
+			secondMeta = parseWorkPromptMeta(
+				directRoleHandoffParams(
+					{ action: "run-review", handoffPrompt: "review" },
+					cwd,
+				).params.task,
+			);
+			return { ok: true };
+		},
+	);
+	releaseFirst();
+	await secondCommand;
+	const secondEvent = telemetryEvents(cwd).find(
+		(event) => event.type === "command" && event.command === "concurrent-second",
+	);
+	assert(
+		secondMeta.workflowRunId === secondEvent.workflowRunId,
+		"overlapping commands retain independent workflow identities",
+	);
+
 	const fixture = installWorkflowFixture();
 	try {
 		const commands = {};
@@ -242,6 +488,21 @@ try {
 		});
 		const sent = [];
 		let compactCalls = 0;
+		const hookCtx = {
+			cwd,
+			getContextUsage: () => ({ tokens: 0 }),
+			sessionManager: { getEntries: () => [] },
+			ui: {
+				notify: () => {},
+				setStatus: () => {},
+				setTitle: () => {},
+			},
+		};
+		await hooks.session_start({}, hookCtx);
+		await hooks.input({ text: "ordinary input", source: "user" }, hookCtx);
+		await hooks.session_shutdown({}, hookCtx);
+		assert(true, "session and input hooks tolerate malformed reconciliation data");
+		process.env.WORK_ORCH_ACTIVITY_MARKER = "validation";
 		await commands["work-small"].handler("Add tiny thing", {
 			cwd,
 			mode: "tui",
@@ -255,8 +516,9 @@ try {
 				sent.push({ message, options }),
 			ui: { notify: () => {} },
 		});
+		delete process.env.WORK_ORCH_ACTIVITY_MARKER;
 		const commandSummary = buildWorkTelemetryState(cwd, "bead TASK-NEW-1");
-		assert(commandSummary.events === 1, "extension command writes telemetry");
+		assert(commandSummary.events === 1, "extension command writes telemetry before inline completion");
 		assert(
 			commandSummary.byPhase[0].key === "command/work-small/run-implementation",
 			"extension command records command/action phase",
@@ -274,6 +536,11 @@ try {
 			sent[0].message.includes("WO_INLINE_V1") &&
 				sent[0].message.includes("Do not call subagent list"),
 			"small handoff stays inline and discovery-free",
+		);
+		const inlineMeta = parseWorkPromptMeta(sent[0].message);
+		assert(
+			inlineMeta.workflowRunId && inlineMeta.activity === "validation",
+			"inline handoff carries command workflow identity and activity",
 		);
 
 		fixture.reset("active");
@@ -351,6 +618,17 @@ try {
 			{ cwd, getContextUsage: () => ({ tokens: 3100 }) },
 		);
 		const reviewSummary = buildWorkTelemetryState(cwd, "bead TASK-NEW-1");
+		const correlated = reviewSummary.slowest.filter(
+			(event) => event.workflowRunId === inlineMeta.workflowRunId,
+		);
+		assert(
+			correlated.some((event) => event.type === "command") &&
+				correlated.some((event) => event.type === "agent") &&
+				correlated.filter((event) => event.type === "workflow-complete")
+					.length === 1 &&
+				correlated.every((event) => event.activity === "validation"),
+			"inline command and agent share one workflow identity, marker, and terminal event",
+		);
 		assert(
 			reviewSummary.slowest.some(
 				(event) =>
