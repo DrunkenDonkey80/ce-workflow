@@ -3,12 +3,17 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { execFileSync } from "node:child_process";
 import {
 	appendFileSync,
-	existsSync,
-	mkdirSync,
 	closeSync,
+	constants as fsConstants,
+	existsSync,
+	fstatSync,
+	mkdirSync,
 	openSync,
 	readdirSync,
 	readFileSync,
+	readSync,
+	realpathSync,
+	lstatSync,
 	statSync,
 	writeFileSync,
 	writeSync,
@@ -742,12 +747,7 @@ function readPendingDirectEvents(cwd) {
 }
 
 function recordPendingDirectRun(cwd, run) {
-	if (
-		!cwd ||
-		!run?.workflowRunId ||
-		(!run?.runId && !run?.asyncDir)
-	)
-		return "";
+	if (!cwd || !run?.workflowRunId || (!run?.runId && !run?.asyncDir)) return "";
 	const file = pendingDirectPath(cwd);
 	mkdirSync(dirname(file), { recursive: true });
 	appendFileSync(
@@ -4939,6 +4939,133 @@ async function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
 			});
 		}
 	});
+}
+
+const WORKFLOW_AGENT_OUTPUT_BYTES = 64 * 1024;
+const WORKFLOW_AGENT_STATUS_BYTES = 64 * 1024;
+const WORKFLOW_AGENT_POLL_MS = 100;
+
+function readContainedFile(file, directory, maxBytes) {
+	let descriptor;
+	try {
+		const requestedRoot = resolve(directory);
+		const rel = relative(requestedRoot, resolve(file));
+		if (!rel || dirname(rel) !== "." || isAbsolute(rel)) return null;
+		const target = join(realpathSync(directory), rel);
+		const pathInfo = lstatSync(target);
+		if (!pathInfo.isFile() || pathInfo.isSymbolicLink() || pathInfo.size > maxBytes)
+			return null;
+		descriptor = openSync(
+			target,
+			fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
+		);
+		const info = fstatSync(descriptor);
+		if (
+			!info.isFile() ||
+			info.size > maxBytes ||
+			info.dev !== pathInfo.dev ||
+			info.ino !== pathInfo.ino
+		)
+			return null;
+		const buffer = Buffer.alloc(info.size);
+		let offset = 0;
+		while (offset < buffer.length) {
+			const count = readSync(descriptor, buffer, offset, buffer.length - offset, null);
+			if (count === 0) break;
+			offset += count;
+		}
+		return { path: target, text: buffer.subarray(0, offset).toString("utf8") };
+	} catch {
+		return null;
+	} finally {
+		if (descriptor !== undefined) closeSync(descriptor);
+	}
+}
+
+function asyncRunIdentity(response) {
+	const data = response.reply?.data ?? {};
+	const result = data.result ?? data;
+	const details = result.details ?? {};
+	return {
+		runId: data.runId ?? result.runId ?? result.id ?? details.runId,
+		asyncDir: data.asyncDir ?? result.asyncDir ?? details.asyncDir,
+		artifact:
+			result.artifactPaths?.outputPath ??
+			result.artifact ??
+			result.outputPath ??
+			data.outputPath,
+	};
+}
+
+/** Spawn a real asynchronous pi-subagents run, wait for terminal status, then read its bounded artifact. */
+export async function dispatchWorkflowImprovementAgent(
+	pi,
+	params,
+	timeoutMs = 30 * 60 * 1000,
+) {
+	if (!isAbsolute(params.artifactDir ?? ""))
+		return { ok: false, message: "absolute artifactDir is required" };
+	mkdirSync(params.artifactDir, { recursive: true });
+	const artifactPath = resolve(
+		params.artifactDir,
+		`workflow-${safeArtifactPart(params.candidateId)}-${safeArtifactPart(params.attemptId)}-${safeArtifactPart(params.agent)}.md`,
+	);
+	const started = Date.now();
+	const response = await spawnSubagentRpc(
+		pi,
+		{
+			...params,
+			artifactDir: undefined,
+			context: "fresh",
+			async: true,
+			clarify: false,
+			acceptance: false,
+			output: artifactPath,
+			outputMode: "file-only",
+		},
+		Math.min(timeoutMs, 30_000),
+	);
+	if (!response.ok)
+		return { ...response, timedOut: Boolean(response.ambiguous) };
+	const identity = asyncRunIdentity(response);
+	if (!identity.runId || !isAbsolute(identity.asyncDir ?? ""))
+		return { ok: false, message: "pi-subagents returned no async run identity", ...identity };
+	for (;;) {
+		if (Date.now() - started >= timeoutMs)
+			return { ok: false, timedOut: true, message: "agent run timed out", ...identity };
+		const statusPath = join(identity.asyncDir, "status.json");
+		let status;
+		try {
+			const statusFile = readContainedFile(
+				statusPath,
+				identity.asyncDir,
+				WORKFLOW_AGENT_STATUS_BYTES,
+			);
+			if (statusFile) status = JSON.parse(statusFile.text);
+		} catch {}
+		const state = String(status?.state ?? status?.status ?? "").toLowerCase();
+		if (state === "failed")
+			return { ok: false, message: "agent run failed", status, ...identity };
+		if (state === "complete" || state === "completed") {
+			const reported = identity.artifact ?? artifactPath;
+			const safeArtifact = readContainedFile(
+				reported,
+				params.artifactDir,
+				WORKFLOW_AGENT_OUTPUT_BYTES,
+			);
+			if (!safeArtifact)
+				return { ok: false, message: "unsafe or missing agent artifact", status, ...identity };
+			return {
+				ok: true,
+				response,
+				status,
+				...identity,
+				artifact: safeArtifact.path,
+				output: safeArtifact.text,
+			};
+		}
+		await new Promise((resolvePoll) => setTimeout(resolvePoll, WORKFLOW_AGENT_POLL_MS));
+	}
 }
 
 function workflowHelperGuidance(cwd, state) {

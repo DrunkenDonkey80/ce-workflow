@@ -406,6 +406,22 @@ const agentRules = {
 			"contact_supervisor` is unavailable",
 		],
 	},
+	"workflow-improver.md": {
+		name: "workflow-improver",
+		requireWrite: true,
+		thinking: "high",
+		must: [
+			"exactly that candidate",
+			"Do not stage files, commit, push",
+			"coded coordinator",
+		],
+	},
+	"workflow-improvement-reviewer.md": {
+		name: "workflow-improvement-reviewer",
+		forbidWrite: true,
+		thinking: "high",
+		must: ["Outcome: PASS", "Outcome: FAIL", "read-only", "benchmark evidence"],
+	},
 };
 
 for (const [file, rule] of Object.entries(agentRules)) {
@@ -684,6 +700,7 @@ for (const script of [
 	"test-work-improvement-analyzer.mjs",
 	"test-work-improvement-git.mjs",
 	"test-work-improvement-benchmark.mjs",
+	"test-work-improvement-lifecycle.mjs",
 	"test-work-optimization-helpers.mjs",
 	"test-windows-bd-shim.mjs",
 ]) {
