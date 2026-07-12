@@ -28,6 +28,13 @@ try {
 		writeFileSync(settingsFile(), `${JSON.stringify(settings, null, "\t")}\n`);
 	const readSettings = () => JSON.parse(readFileSync(settingsFile(), "utf8"));
 
+	// Autonomous improvement remains opt-in and has no implicit source setting.
+	assert(
+		mod.workResumeSettingsForTest?.(cwd)?.selfImproving !== true,
+		"self improvement defaults off",
+	);
+	assert(!existsSync(settingsFile()), "no default source mutation");
+
 	// Default (no settings) resolves to medium profile.
 	assert(
 		mod.workOrchSettings(cwd).profile === "medium",

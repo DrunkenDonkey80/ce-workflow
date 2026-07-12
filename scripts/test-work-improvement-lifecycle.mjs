@@ -21,7 +21,10 @@ const {
 	acquireLease,
 	gitPreflight,
 	releaseLease,
+	reconcileAutonomousImprovement,
 	reviewerPassed,
+	runAutonomousImprovement,
+	runAutonomousImprovementBenchmark,
 	runImprovementLifecycle,
 } = await import(
 		pathToFileURL(
@@ -31,9 +34,20 @@ const {
 		).href
 	);
 
-const { dispatchWorkflowImprovementAgent } = await import(
+const {
+	completeWorkflowOnce,
+	dispatchWorkflowImprovementAgent,
+	processTerminalWorkflow,
+	recoverTerminalWorkflowClaims,
+} = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+	).href
+);
+
+const { appendCandidateTransition, readCandidateState } = await import(
+	pathToFileURL(
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-improvement.js")),
 	).href
 );
 
@@ -607,6 +621,290 @@ try {
 	);
 	assert.equal(unsafeDispatch.ok, false);
 	assert.match(unsafeDispatch.message, /unsafe or missing agent artifact/);
+
+	// U7 paired source + consumer lifecycle wiring.
+	const paired = fixture("paired");
+	const consumer = path.join(path.dirname(paired.source), "consumer");
+	mkdirSync(consumer);
+	git(consumer, "init");
+	git(consumer, "config", "user.email", "fixture@example.test");
+	git(consumer, "config", "user.name", "Fixture");
+	writeFileSync(path.join(consumer, "consumer.txt"), "unchanged\n");
+	git(consumer, "add", ".");
+	git(consumer, "commit", "-m", "consumer fixture");
+	const consumerHead = git(consumer, "rev-parse", "HEAD");
+	mkdirSync(path.join(consumer, ".pi"), { recursive: true });
+	const settingsFile = path.join(consumer, ".pi", "settings.json");
+	writeFileSync(
+		settingsFile,
+		JSON.stringify({
+			workResume: { selfImproving: false },
+			workImprovement: { sourceCheckout: paired.source },
+		}),
+	);
+	assert.equal(
+		(await processTerminalWorkflow(consumer, {
+			workflowRunId: "flag-off",
+			outcome: "failed",
+		})).status,
+		"disabled",
+	);
+	assert.equal(readCandidateState(paired.source).analyses.size, 0);
+
+	writeFileSync(
+		settingsFile,
+		JSON.stringify({
+			workResume: { selfImproving: true },
+			workImprovement: { sourceCheckout: paired.source },
+		}),
+	);
+	const invalidSources = [];
+	const arbitrary = path.join(path.dirname(paired.source), "arbitrary-source");
+	mkdirSync(arbitrary);
+	writeFileSync(path.join(arbitrary, "marker.txt"), "unchanged\n");
+	invalidSources.push([arbitrary, "not-git-worktree"]);
+	const wrongPackage = path.join(path.dirname(paired.source), "wrong-package");
+	mkdirSync(wrongPackage);
+	git(wrongPackage, "init");
+	writeFileSync(path.join(wrongPackage, "package.json"), JSON.stringify({ name: "not-this-package" }));
+	writeFileSync(path.join(wrongPackage, "marker.txt"), "unchanged\n");
+	git(wrongPackage, "add", ".");
+	git(wrongPackage, "-c", "user.email=x@example.test", "-c", "user.name=X", "commit", "-m", "wrong");
+	invalidSources.push([wrongPackage, "wrong-package-identity"]);
+	invalidSources.push([path.join(path.dirname(paired.source), "missing-untrusted"), "source-unavailable"]);
+	for (const [invalidSource, reason] of invalidSources) {
+		writeFileSync(settingsFile, JSON.stringify({ workResume: { selfImproving: true }, workImprovement: { sourceCheckout: invalidSource } }));
+		const before = existsSync(invalidSource) ? readFileSync(path.join(invalidSource, "marker.txt"), "utf8") : null;
+		const invalid = await processTerminalWorkflow(consumer, { workflowRunId: `invalid-${reason}`, outcome: "failed" });
+		assert.equal(invalid.reason, reason);
+		assert.equal(existsSync(path.join(invalidSource, ".pi")), false, "untrusted source must not receive candidate state");
+		if (before !== null) assert.equal(readFileSync(path.join(invalidSource, "marker.txt"), "utf8"), before);
+	}
+	writeFileSync(settingsFile, JSON.stringify({ workResume: { selfImproving: true }, workImprovement: { sourceCheckout: path.relative(consumer, paired.source) } }));
+	const telemetryDir = path.join(consumer, ".pi", "work-runs");
+	mkdirSync(telemetryDir, { recursive: true });
+	const telemetryFile = path.join(telemetryDir, "fixture.jsonl");
+	const writeSignal = (workflowRunId) =>
+		writeFileSync(
+			telemetryFile,
+			`${JSON.stringify({ type: "command", workflowRunId, outputChars: 20_000 })}\n`,
+			{ flag: "a" },
+		);
+	writeSignal("ordinary-1");
+	const accumulating = await processTerminalWorkflow(
+		consumer,
+		{ workflowRunId: "ordinary-1", outcome: "completed" },
+		{ allowLaunch: false },
+	);
+	assert.equal(accumulating.status, "analyzed");
+	assert.equal(
+		[...readCandidateState(paired.source).candidates.values()].some(
+			(candidate) => candidate.state === "accumulating",
+		),
+		true,
+	);
+	assert.equal(
+		(await processTerminalWorkflow(
+			consumer,
+			{ workflowRunId: "ordinary-1", outcome: "completed" },
+			{ allowLaunch: false },
+		)).status,
+		"already-analyzed",
+		"terminal analysis is exactly once",
+	);
+	writeSignal("ordinary-2");
+	await processTerminalWorkflow(
+		consumer,
+		{ workflowRunId: "ordinary-2", outcome: "completed" },
+		{ allowLaunch: false },
+	);
+	assert.equal(
+		[...readCandidateState(paired.source).candidates.values()].some(
+			(candidate) => candidate.state === "actionable",
+		),
+		true,
+	);
+	const candidateLog = path.join(paired.source, ".pi", "work-improvement", "candidate-events.jsonl");
+	const beforePrint = readFileSync(candidateLog, "utf8");
+	const hardPrint = await processTerminalWorkflow(
+		consumer,
+		{ workflowRunId: "hard-print", outcome: "failed", reason: "gate failed" },
+		{ mode: "print" },
+	);
+	assert.equal(hardPrint.status, "suppressed", "print mode stops before source resolution");
+	assert.equal(readFileSync(candidateLog, "utf8"), beforePrint, "print mode must not mutate source or candidates");
+	const hardJson = await processTerminalWorkflow(
+		consumer,
+		{ workflowRunId: "hard-json", outcome: "failed" },
+		{ json: true },
+	);
+	assert.equal(hardJson.status, "suppressed");
+	assert.equal(readFileSync(candidateLog, "utf8"), beforePrint, "JSON mode must not mutate source or candidates");
+	const recursive = await processTerminalWorkflow(
+		consumer,
+		{ workflowRunId: "recursive", outcome: "failed", activity: "validation" },
+		{ improvementSeams: { dispatchAgent: () => assert.fail("nested dispatch") } },
+	);
+	assert.equal(recursive.status, "excluded");
+
+	const autonomous = async (name, validationPass) => {
+		const repo = fixture(`autonomous-${name}`);
+		let benchmarkRuns = 0;
+		const result = await runAutonomousImprovement(
+			{
+				consumerCwd: consumer,
+				candidate: {
+					candidateId: `candidate-autonomous-${name}`,
+					phase: "fixture",
+					signature: "paired lifecycle",
+					evidence: [{ workflowRunId: `workflow-${name}` }],
+					scopePaths: ["lib.txt"],
+				},
+				settings: { workImprovement: { sourceCheckout: repo.source } },
+				packageRoot: repo.source,
+			},
+			{
+				dispatchAgent: async (payload) => {
+					if (payload.agent === "workflow-improver") {
+						writeFileSync(path.join(payload.cwd, "lib.txt"), `after-${name}\n`);
+						return { ok: true, output: "one scoped change" };
+					}
+					return { ok: true, output: "Outcome: PASS" };
+				},
+				runPackageVerify: async () => ({ passed: true }),
+				runBenchmarkGate: async () => ({
+					passed: ++benchmarkRuns === 1 || validationPass,
+				}),
+			},
+		);
+		assert.equal(git(consumer, "rev-parse", "HEAD"), consumerHead);
+		assert.equal(
+			git(consumer, "status", "--porcelain=v1", "--untracked-files=no"),
+			"",
+			"consumer tracked files remain unchanged",
+		);
+		return { repo, result };
+	};
+	assert.equal((await autonomous("accepted", true)).result.state, "accepted");
+	assert.equal((await autonomous("reverted", false)).result.state, "reverted");
+
+	const benchmarkRepo = fixture("production-benchmark");
+	mkdirSync(path.join(benchmarkRepo.source, "scripts"));
+	mkdirSync(path.join(benchmarkRepo.source, "agents"));
+	for (const script of ["test-work-models.mjs", "test-work-settings.mjs"])
+		writeFileSync(path.join(benchmarkRepo.source, "scripts", script), "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 150); process.stdout.write('ok')\n");
+	writeFileSync(path.join(benchmarkRepo.source, "agents", "workflow-benchmark.md"), "# Workflow benchmark\nRun read-only and return the requested JSON metrics.\n");
+	git(benchmarkRepo.source, "add", ".");
+	git(benchmarkRepo.source, "commit", "-m", "benchmark fixtures");
+	git(benchmarkRepo.source, "push");
+	const benchmarkCandidate = path.join(path.dirname(benchmarkRepo.source), "benchmark-candidate");
+	mkdirSync(path.join(benchmarkCandidate, "scripts"), { recursive: true });
+	for (const script of ["test-work-models.mjs", "test-work-settings.mjs"])
+		writeFileSync(path.join(benchmarkCandidate, "scripts", script), "process.stdout.write('ok')\n");
+	let agentBenchmarkCalls = 0;
+	const productionBenchmark = await runAutonomousImprovementBenchmark(
+		benchmarkRepo.source,
+		{ cwd: benchmarkCandidate, changedPaths: ["agents/workflow-benchmark.md"], candidateId: "benchmark-candidate", attemptId: "benchmark-attempt" },
+		async (payload) => {
+			agentBenchmarkCalls += 1;
+			assert.equal(payload.agent, "workflow-benchmark");
+			assert.equal(payload.readOnly, true);
+			const baseline = payload.cwd === benchmarkRepo.source;
+			const output = JSON.stringify({
+				hard: { outcomes: { completed: true, goal: true }, gates: { verification: true, review: true, commit: true, close: true, push: true }, telemetry: true, errors: 0 },
+				cost: { tokens: baseline ? 200 : 50, retries: 0 },
+			}) + (baseline ? " ".repeat(1_000) : "");
+			return { ok: true, output, status: { state: "complete", usage: { totalTokens: baseline ? 200 : 50 }, steps: [{ status: "complete" }] } };
+		},
+	);
+	assert.equal(agentBenchmarkCalls, 36, "six scenarios run three baseline and candidate samples");
+	assert.equal(productionBenchmark.passed, true, JSON.stringify(productionBenchmark));
+
+	const retryRepo = fixture("deferred-retry");
+	const retryConsumer = path.join(path.dirname(retryRepo.source), "retry-consumer");
+	mkdirSync(path.join(retryConsumer, ".pi"), { recursive: true });
+	writeFileSync(path.join(retryConsumer, ".pi", "settings.json"), JSON.stringify({ workResume: { selfImproving: true }, workImprovement: { sourceCheckout: retryRepo.source } }));
+	await processTerminalWorkflow(retryConsumer, { workflowRunId: "retry-seed", outcome: "failed", reason: "seed failure" }, { allowLaunch: false });
+	const retryCandidate = [...readCandidateState(retryRepo.source).candidates.values()][0];
+	const old = Date.now() - 60 * 60 * 1000;
+	appendCandidateTransition(retryRepo.source, retryCandidate.candidateId, "claimed", { attemptId: "old-attempt", now: old, branch: retryRepo.branch, baseHead: git(retryRepo.source, "rev-parse", "HEAD"), upstream: `origin/${retryRepo.branch}` });
+	appendCandidateTransition(retryRepo.source, retryCandidate.candidateId, "deferred", { attemptId: "old-attempt", now: old, blockerSignature: "dirty-worktree" });
+	writeFileSync(path.join(retryRepo.source, "lib.txt"), "still blocked\n");
+	const unchangedRetry = await processTerminalWorkflow(retryConsumer, { workflowRunId: "retry-unchanged", outcome: "completed" }, { improvementSeams: { dispatchAgent: () => assert.fail("unchanged blocker retried") } });
+	assert.equal(unchangedRetry.queued, undefined, "unchanged blockers are not endlessly retried");
+	git(retryRepo.source, "checkout", "--", "lib.txt");
+	const changedRetry = await processTerminalWorkflow(retryConsumer, { workflowRunId: "retry-cleared", outcome: "completed" }, {
+		improvementSeams: {
+			dispatchAgent: async (payload) => {
+				if (payload.agent === "workflow-improver") {
+					writeFileSync(path.join(payload.cwd, "extensions", "work-models.js"), "export default 'improved';\n");
+					return { ok: true, output: "changed" };
+				}
+				return { ok: true, output: "Outcome: PASS" };
+			},
+			runPackageVerify: async () => ({ passed: true }),
+			runBenchmarkGate: async () => ({ passed: true }),
+		},
+	});
+	assert.equal(changedRetry.queued, true, "a cleared blocker re-enters wired autonomy after cooldown");
+	for (let wait = 0; wait < 200 && !["accepted", "reverted", "rejected", "manual-recovery"].includes(readCandidateState(retryRepo.source).candidates.get(retryCandidate.candidateId)?.state); wait += 1)
+		await new Promise((resolveWait) => setTimeout(resolveWait, 10));
+	assert.equal(readCandidateState(retryRepo.source).candidates.get(retryCandidate.candidateId).attempts, 2, "runtime performs exactly one new attempt");
+
+	const claimRepo = fixture("terminal-claim-recovery");
+	const claimConsumer = path.join(path.dirname(claimRepo.source), "claim-consumer");
+	mkdirSync(path.join(claimConsumer, ".pi"), { recursive: true });
+	writeFileSync(path.join(claimConsumer, ".pi", "settings.json"), JSON.stringify({ workResume: { selfImproving: true }, workImprovement: { sourceCheckout: claimRepo.source } }));
+	completeWorkflowOnce(claimConsumer, { workflowRunId: "crashed-terminal", outcome: "failed" }, { mode: "print" });
+	assert.equal(readCandidateState(claimRepo.source).analyses.size, 0, "output-only completion leaves no source analysis");
+	await recoverTerminalWorkflowClaims(claimConsumer, { allowLaunch: false });
+	assert.equal(readCandidateState(claimRepo.source).analyses.size, 1, "startup scans durable terminal claims");
+	completeWorkflowOnce(claimConsumer, { workflowRunId: "crashed-terminal", outcome: "failed" }, { allowLaunch: false });
+	await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+	assert.equal(readCandidateState(claimRepo.source).analyses.size, 1, "EEXIST safely reruns idempotent analysis exactly once");
+
+	const missingSource = path.join(path.dirname(paired.source), "missing-source");
+	const missing = await runAutonomousImprovement({
+		consumerCwd: consumer,
+		candidate: { candidateId: "candidate-missing" },
+		settings: { workImprovement: { sourceCheckout: missingSource } },
+		packageRoot: paired.source,
+	});
+	assert.equal(missing.state, "deferred");
+	assert.equal(missing.reason, "source-unavailable");
+	assert.equal(existsSync(missingSource), false, "missing source is not created");
+	assert.equal(git(consumer, "rev-parse", "HEAD"), consumerHead);
+
+	const dirty = fixture("autonomous-dirty");
+	writeFileSync(path.join(dirty.source, "lib.txt"), "human dirt\n");
+	const deferred = await runAutonomousImprovement({
+		consumerCwd: consumer,
+		candidate: { candidateId: "candidate-dirty" },
+		settings: { workImprovement: { sourceCheckout: dirty.source } },
+		packageRoot: dirty.source,
+	});
+	assert.equal(deferred.state, "deferred");
+	assert.equal(deferred.reason, "dirty-worktree");
+	assert.equal(git(consumer, "rev-parse", "HEAD"), consumerHead);
+
+	appendCandidateTransition(paired.source, "restart-pending", "mutating", {
+		attemptId: "attempt-pending",
+	});
+	appendCandidateTransition(paired.source, "restart-unknown", "push-unknown", {
+		attemptId: "attempt-unknown",
+	});
+	assert.deepEqual(
+		(await reconcileAutonomousImprovement(paired.source)).sort(),
+		["restart-pending", "restart-unknown"],
+	);
+	assert.equal(
+		readCandidateState(paired.source).candidates.get("restart-pending").state,
+		"deferred",
+	);
+	assert.equal(
+		readCandidateState(paired.source).candidates.get("restart-unknown").state,
+		"manual-recovery",
+	);
 
 	for (const artifactCase of ["swap", "oversize", "symlink"]) {
 		const caseDir = path.join(rpcRoot, artifactCase);

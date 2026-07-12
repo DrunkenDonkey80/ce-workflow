@@ -59,6 +59,12 @@ If it reports independent review required, launch exactly one `bead-reviewer`, r
 - **migrate** — exact `bead-migrator`; source and branch inspection is read-only.
 - **init/status/report/usage/telemetry/roadmap/add/pause/finish** — deterministic extension paths; no agent.
 
+## Opt-in autonomous workflow improvement
+
+This is off by default behind `workResume.selfImproving`. Terminal workflows are analyzed once in code; ordinary signals accumulate before any model launch, while hard regressions may become actionable after one run. Source resolution is `workImprovement.sourceCheckout`, then `CE_WORKFLOW_SOURCE_DIR`, then a valid package-root Git checkout. Missing or unsafe source state defers without consumer edits. Improvement, benchmark, validation, and revert markers never generate nested candidates.
+
+Normal work does not push by default. The narrow opt-in exception lets the coded coordinator commit and push the synchronized current source branch only after lease, verification, benchmark, and independent-review gates pass. Post-push failure uses a normal revert commit; never force-push or discard unrelated work. Print and JSON report modes do not queue autonomy.
+
 ## Handoff hygiene
 
 Use compact helper commands (`bd-summary`, `bd-children-summary`, `blocker-search`, `search-summary`, `json-assert`) instead of raw epic JSON, CLI help, broad scans, or repeated status/diff. Specialist children receive one Bead ID, concrete acceptance, relevant paths, verification, and known unrelated dirt; they must not launch subagents.

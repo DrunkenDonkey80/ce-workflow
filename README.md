@@ -205,6 +205,9 @@ Settings are optional and live in `.pi/settings.json`:
     "selfImproving": true,
     "newSessionBetweenIterations": true
   },
+  "workImprovement": {
+    "sourceCheckout": "/absolute/path/to/ce-workflow"
+  },
   "workOrchestrator": {
     "context": {
       "enabled": true,
@@ -217,7 +220,9 @@ Settings are optional and live in `.pi/settings.json`:
 }
 ```
 
-Warp notifications auto-enable when Warp's env vars are present; set `"warp": { "enabled": true }` to force them or `false` to disable. `/work-resume` self-improvement is off by default for external projects; set `"workResume": { "selfImproving": true }` only when the agent should fix ce-workflow friction it observes while running target-project goals. `/work-catch-up` is registered only in that self-improving mode; after releases, update `extensions/work-catch-up-baseline.json` so the command can diff from the versions that built that release. `/work-resume` also starts each automatic continuation in a fresh session by default; set `"workResume": { "newSessionBetweenIterations": false }` only if you want one growing chat. Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Compacting is still useful inside a noisy single agent turn, but overnight project loops should rely on Beads/git plus fresh-session continuations.
+Warp notifications auto-enable when Warp's env vars are present; set `"warp": { "enabled": true }` to force them or `false` to disable. Autonomous workflow self-improvement is off by default. When `"workResume": { "selfImproving": true }` is set, each correlated terminal workflow gets one coded, model-free analysis pass. Ordinary evidence first accumulates across two distinct runs; a hard regression is actionable after one. Only an actionable candidate may resolve and mutate the ce-workflow source checkout. Source precedence is `workImprovement.sourceCheckout`, then `CE_WORKFLOW_SOURCE_DIR`, then this package root only when it is a valid Git checkout. Missing, dirty, detached, unsynchronized, or locked sources defer without editing the consumer repository. Improvement, benchmark, validation, and revert activity is excluded from recursive analysis. `/work-telemetry` and `/work-usage` expose bounded candidate state and evidence counts.
+
+The normal no-push policy still applies. The sole exception is an explicitly opted-in autonomous improvement: after source identity, clean current symbolic branch, synchronized upstream, single-writer lease, package verification, representative benchmark, and independent review all pass, the coordinator may commit and normally push that **current branch**. Failed post-push validation creates and pushes a normal revert commit; it never force-pushes or cleans unrelated work. Print and JSON report modes analyze but never queue autonomous work. `/work-catch-up` is registered only in that self-improving mode; after releases, update `extensions/work-catch-up-baseline.json` so the command can diff from the versions that built that release. `/work-resume` also starts each automatic continuation in a fresh session by default; set `"workResume": { "newSessionBetweenIterations": false }` only if you want one growing chat. Pi keeps the recent suffix according to `compaction.keepRecentTokens`; `/work-context on` writes at least 30k there. Compacting is still useful inside a noisy single agent turn, but overnight project loops should rely on Beads/git plus fresh-session continuations.
 
 ## Migrating existing projects
 
@@ -492,7 +497,7 @@ Known runtime follow-up: current Pi on this Windows bench prints `The system can
 ## MVP limits
 
 - No custom dashboard.
-- No push automation by default.
+- No push automation by default; the opt-in autonomous workflow-improvement exception is limited to gated current-branch push and normal revert described above.
 - No parallel writers in one checkout.
 - No package-owned task database.
 - No markdown TODO ledger as source of truth.

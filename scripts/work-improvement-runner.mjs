@@ -166,7 +166,7 @@ export function resolveSourceCheckout(options = {}) {
 	];
 	for (const [source, value] of choices) {
 		if (typeof value !== "string" || !value.trim()) continue;
-		const checked = validateSource(path.resolve(value), {
+		const checked = validateSource(path.resolve(options.baseCwd ?? process.cwd(), value), {
 			runGit,
 			expectedPackageName,
 		});
@@ -839,7 +839,11 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 			});
 		}
 	};
-	const claimed = transition("claimed");
+	const claimed = transition("claimed", {
+		branch: expected.branch,
+		baseHead: expected.head,
+		upstream: expected.upstream,
+	});
 	if (!claimed.ok)
 		return { ...claimed, state: "deferred", attemptId };
 	const initialBoundary = revalidateMutationBoundary(expected, {
@@ -1067,6 +1071,9 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 				cwd: worktreeCwd,
 				changedPaths: audit.paths,
 				plan: benchmarkPlan,
+				candidateId: candidate.candidateId,
+				attemptId,
+				signal: options.signal,
 			}),
 			seams.benchmarkTimeoutMs ?? 30 * 60 * 1000,
 			"benchmark gate",
@@ -1209,6 +1216,9 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 		const recorded = transition("committed", {
 			commitSha: commit.output,
 			candidateRef,
+			changedPaths: audit.paths,
+			benchmarkMeasurements: benchmark,
+			resultMeasurements: packageVerification,
 		});
 		const cleanup = removeAttemptWorktree(sourceCwd, worktreeCwd, runGit);
 		if (!recorded.ok || !cleanup.ok)
@@ -1838,6 +1848,8 @@ export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 			integrationSha,
 			remoteSha: integrationSha,
 			validation,
+			resultMeasurements: validation,
+			benchmarkMeasurements: validation.benchmark,
 			...validationEvidence,
 		});
 	}
@@ -1882,7 +1894,322 @@ export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 		revertSha,
 		remoteSha: revertSha,
 		validation,
+		resultMeasurements: validation,
+		benchmarkMeasurements: validation.benchmark,
 		activity: "revert",
 		...validationEvidence,
 	});
+}
+
+const DEFAULT_CANDIDATE_SCOPE = Object.freeze([
+	"extensions/",
+	"scripts/",
+	"agents/",
+	"skills/",
+	"README.md",
+	"package.json",
+]);
+
+function deferCandidate(sourceCwd, candidate, reason) {
+	if (sourceCwd && existsSync(sourceCwd))
+		appendCandidateTransition(sourceCwd, candidate.candidateId, "deferred", {
+			blockerSignature: reason,
+			activity: "improvement",
+		});
+	return { ok: false, state: "deferred", reason };
+}
+
+/** Return the blocker signature used to decide whether a deferred candidate is retryable. */
+export function currentAutonomousBlocker(options = {}, seams = {}) {
+	const resolved = resolveSourceCheckout({
+		settings: options.settings,
+		env: options.env,
+		packageRoot: options.packageRoot,
+		baseCwd: options.consumerCwd,
+		runGit: seams.runGit,
+	});
+	if (!resolved.ok) return resolved.reason;
+	const preflight = gitPreflight(resolved.sourceCwd, { runGit: seams.runGit });
+	return preflight.ok ? "ready" : preflight.reason;
+}
+
+function fixtureCost(cwd, fixtureId) {
+	const started = Date.now();
+	try {
+		const output = execFileSync(process.execPath, [path.join("scripts", fixtureId)], {
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+			timeout: 5 * 60 * 1000,
+		});
+		return {
+			passed: true,
+			hard: {
+				outcomes: { completed: true },
+				gates: { verification: true },
+				telemetry: true,
+				errors: 0,
+			},
+			cost: {
+				tokens: 0,
+				latencyMs: Math.max(1, Date.now() - started),
+				outputChars: output.length,
+				calls: 1,
+				retries: 0,
+			},
+		};
+	} catch (error) {
+		return {
+			passed: false,
+			output: bounded(error?.stderr ?? error?.message),
+		};
+	}
+}
+
+function benchmarkAgentPrompt(scenario) {
+	const fixture = {
+		small: "test-work-auto.mjs",
+		medium: "test-work-resume.mjs",
+		large: "test-work-resume.mjs",
+		goal: "test-work-goal.mjs",
+		review: "test-work-start-finish.mjs",
+		finalization: "test-work-start-finish.mjs",
+	}[scenario];
+	if (!fixture) throw new Error(`unknown benchmark scenario: ${scenario}`);
+	return `Run exactly this read-only benchmark command once: node scripts/${fixture}\nScenario: ${scenario}\nIf it fails, report failure. If it passes, return only JSON with this shape: {"hard":{"outcomes":{"completed":true},"gates":{"verification":true},"telemetry":true,"errors":0},"cost":{"tokens":0,"retries":0}}`;
+}
+
+function parseBenchmarkAgentSample(response, elapsedMs) {
+	if (!response?.ok || typeof response.output !== "string") return null;
+	let parsed;
+	try {
+		parsed = JSON.parse(response.output.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""));
+	} catch {
+		return null;
+	}
+	const usage = response.status?.usage ?? response.status?.result?.usage ?? {};
+	return {
+		hard: parsed.hard,
+		cost: {
+			tokens: Number(usage.totalTokens ?? usage.total_tokens ?? parsed.cost?.tokens),
+			latencyMs: Math.max(1, elapsedMs),
+			outputChars: response.output.length,
+			calls: Math.max(1, Number(response.status?.steps?.length ?? 1)),
+			retries: Number(parsed.cost?.retries ?? response.status?.retries ?? 0),
+		},
+	};
+}
+
+export async function runAutonomousImprovementBenchmark(sourceCwd, request, dispatchAgent) {
+	const { buildBenchmarkPlan, captureBenchmarkEvidence, evaluateBenchmarkEvidence } = await import("./work-improvement-benchmark.mjs");
+	const plan = request.plan ?? buildBenchmarkPlan(request.changedPaths);
+	if (plan.agentScenarioIds.length && typeof dispatchAgent !== "function")
+		return { passed: false, reason: "agent-benchmark-capability-unavailable" };
+	if (plan.agentScenarioIds.length) {
+		const sourceSha = git(defaultRunGit, sourceCwd, ["rev-parse", "HEAD"]);
+		if (!sourceSha.ok) return { passed: false, reason: "benchmark-source-unavailable" };
+		const environment = { agent: { provider: "pi-subagents", model: "runtime", modelSettings: { agent: "workflow-benchmark" } } };
+		const capture = (cwd, sha, baselineSourceSha) => captureBenchmarkEvidence({
+			sourceSha: sha,
+			baselineSourceSha,
+			changedPaths: request.changedPaths,
+			environment,
+			seams: {
+				runPackageVerify: async () => ({ passed: true }),
+				runDeterministicFixture: (fixtureId) => fixtureCost(cwd, fixtureId),
+				runAgentScenario: async (scenario) => {
+					const started = Date.now();
+					const response = await dispatchAgent({
+						agent: "workflow-benchmark",
+						task: benchmarkAgentPrompt(scenario),
+						cwd,
+						context: "fresh",
+						async: true,
+						clarify: false,
+						acceptance: false,
+						outputMode: "file-only",
+						activity: "benchmark",
+						candidateId: request.candidateId ?? "benchmark",
+						attemptId: `${request.attemptId ?? "benchmark"}-${scenario}-${randomUUID()}`,
+						readOnly: true,
+						artifactDir: path.join(sourceCwd, ".pi", "work-improvement", "artifacts", "benchmark"),
+						signal: request.signal,
+					});
+					return parseBenchmarkAgentSample(response, Date.now() - started) ?? { hard: {}, cost: {} };
+				},
+			},
+		});
+		try {
+			const baseline = await capture(sourceCwd, sourceSha.output, null);
+			const candidate = await capture(request.cwd, `candidate-${sourceSha.output}`, sourceSha.output);
+			return { ...evaluateBenchmarkEvidence(baseline, candidate, { expectedBaselineSha: sourceSha.output }), baseline, candidate };
+		} catch (error) {
+			return { passed: false, reason: "agent-benchmark-failed", output: bounded(error?.message ?? error) };
+		}
+	}
+	const baseline = [];
+	const candidate = [];
+	for (const fixtureId of plan.deterministicFixtureIds) {
+		baseline.push(fixtureCost(sourceCwd, fixtureId));
+		candidate.push(fixtureCost(request.cwd, fixtureId));
+	}
+	if (
+		baseline.length === 0 ||
+		baseline.some((item) => !item.passed) ||
+		candidate.some((item) => !item.passed)
+	)
+		return { passed: false, reason: "deterministic-benchmark-failed", baseline, candidate };
+	const dimensions = ["tokens", "latencyMs", "outputChars", "calls", "retries"];
+	const totals = (runs) =>
+		Object.fromEntries(
+			dimensions.map((key) => [
+				key,
+				runs.reduce((sum, item) => sum + item.cost[key], 0),
+			]),
+		);
+	const before = totals(baseline);
+	const after = totals(candidate);
+	const ratios = dimensions.map((key) =>
+		before[key] === 0 ? (after[key] === 0 ? 0 : Infinity) : (after[key] - before[key]) / before[key],
+	);
+	const score = ratios.reduce((sum, value) => sum + value, 0) / dimensions.length;
+	return {
+		passed:
+		ratios.every((value) => value <= 0.1) &&
+		ratios.some((value) => value < 0) &&
+		score <= -0.05,
+		before,
+		after,
+		score,
+	};
+}
+
+/**
+ * Resolve, gate, lease, isolate, and (only after coded gates pass) deliver one
+ * selected candidate. Missing benchmark capabilities reject rather than invent metrics.
+ */
+export async function runAutonomousImprovement(options = {}, seams = {}) {
+	const candidate = options.candidate;
+	if (!candidate?.candidateId) throw new TypeError("candidate is required");
+	const resolved = resolveSourceCheckout({
+		settings: options.settings,
+		env: options.env,
+		packageRoot: options.packageRoot,
+		baseCwd: options.consumerCwd,
+		runGit: seams.runGit,
+	});
+	if (!resolved.ok)
+		return { ok: false, state: "deferred", reason: resolved.reason };
+	const sourceCwd = resolved.sourceCwd;
+	const preflight = gitPreflight(sourceCwd, { runGit: seams.runGit });
+	if (!preflight.ok) return deferCandidate(sourceCwd, candidate, preflight.reason);
+	const attemptId = options.attemptId ?? randomUUID();
+	const lease = acquireLease(sourceCwd, {
+		session: options.session,
+		candidate: candidate.candidateId,
+		attempt: attemptId,
+		branch: preflight.branch,
+		head: preflight.head,
+	}, seams.lease);
+	if (!lease.ok) return deferCandidate(sourceCwd, candidate, lease.reason);
+	const expected = { ...preflight, lease: lease.lease };
+	try {
+		const lifecycle = await runImprovementLifecycle(
+			{
+				sourceCwd,
+				candidate: {
+					...candidate,
+					scopePaths:
+						candidate.scopePaths?.length > 0
+							? candidate.scopePaths
+							: DEFAULT_CANDIDATE_SCOPE,
+				},
+				attemptId,
+				expected,
+			},
+			{
+				...seams,
+				dispatchAgent: seams.dispatchAgent,
+				runBenchmarkGate:
+					seams.runBenchmarkGate ??
+					((request) => runAutonomousImprovementBenchmark(sourceCwd, request, seams.dispatchAgent)),
+			},
+		);
+		if (!lifecycle.ok || lifecycle.state !== "committed") return lifecycle;
+		const delivery = await runImprovementDelivery(
+			{
+				sourceCwd,
+				candidateId: candidate.candidateId,
+				attemptId,
+				candidateRef: lifecycle.candidateRef,
+				commitSha: lifecycle.commitSha,
+				changedPaths: lifecycle.changedPaths,
+				expected,
+			},
+			seams,
+		);
+		return delivery;
+	} finally {
+		const released = releaseLease(sourceCwd, lease.lease);
+		if (!released.ok && typeof seams.onReleaseError === "function") seams.onReleaseError(released);
+	}
+}
+
+const PRECOMMIT_RECOVERY_STATES = new Set(["claimed", "preparing", "mutating", "verifying", "commit-pending"]);
+const DELIVERY_RECOVERY_STATES = new Set(["committed", "integration-pending", "push-pending", "push-unknown", "pushed", "validating", "revert-pending", "revert-push-unknown", "cleanup-pending", "accepted", "reverted"]);
+
+/** Recover persisted attempts only after atomically proving no live writer owns the checkout. */
+export async function reconcileAutonomousImprovement(sourceCwd, options = {}, seams = {}) {
+	const state = readCandidateState(sourceCwd);
+	const reconciled = [];
+	for (const candidate of state.candidates.values()) {
+		if (!PRECOMMIT_RECOVERY_STATES.has(candidate.state) && !DELIVERY_RECOVERY_STATES.has(candidate.state)) continue;
+		const lease = acquireLease(sourceCwd, {
+			session: options.session,
+			candidate: candidate.candidateId,
+			attempt: candidate.attemptId,
+			branch: candidate.branch,
+			head: candidate.baseHead,
+		}, seams.lease);
+		if (!lease.ok) continue;
+		try {
+			if (PRECOMMIT_RECOVERY_STATES.has(candidate.state)) {
+				appendCandidateTransition(sourceCwd, candidate.candidateId, "deferred", {
+					attemptId: candidate.attemptId,
+					blockerSignature: `restart-pending:${candidate.state}`,
+					activity: "improvement",
+				});
+				reconciled.push(candidate.candidateId);
+				continue;
+			}
+			if (!candidate.candidateRef || !candidate.commitSha || !candidate.branch || !candidate.baseHead || !candidate.upstream) {
+				appendCandidateTransition(sourceCwd, candidate.candidateId, "manual-recovery", {
+					attemptId: candidate.attemptId,
+					blockerSignature: "restart-metadata-missing",
+					activity: "improvement",
+				});
+				reconciled.push(candidate.candidateId);
+				continue;
+			}
+			await runImprovementDelivery({
+				sourceCwd,
+				candidateId: candidate.candidateId,
+				attemptId: candidate.attemptId,
+				candidateRef: candidate.candidateRef,
+				commitSha: candidate.commitSha,
+				integrationSha: candidate.integrationSha,
+				remoteSha: candidate.remoteSha,
+				revertSha: candidate.revertSha,
+				changedPaths: candidate.changedPaths ?? [],
+				state: candidate.state,
+				cleanupState: candidate.cleanupState,
+				expected: { sourceCwd, branch: candidate.branch, head: candidate.baseHead, upstream: candidate.upstream, lease: lease.lease },
+			}, seams);
+			reconciled.push(candidate.candidateId);
+		} finally {
+			const released = releaseLease(sourceCwd, lease.lease);
+			if (!released.ok && typeof seams.onReleaseError === "function") seams.onReleaseError(released);
+		}
+	}
+	return reconciled;
 }

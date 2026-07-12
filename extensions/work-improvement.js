@@ -25,12 +25,14 @@ const ACTIVE_STATES = new Set([
 	"verifying",
 	"commit-pending",
 	"committed",
+	"integration-pending",
 	"push-pending",
 	"push-unknown",
 	"pushed",
 	"validating",
 	"revert-pending",
 	"revert-push-unknown",
+	"cleanup-pending",
 ]);
 const LARGE_OUTPUT_CHARS = 10_000;
 
@@ -558,6 +560,8 @@ export function readCandidateState(sourceCwd, policy = {}) {
 		} else if (event.transition !== "observed") {
 			candidate.state = event.transition;
 			candidate.updatedAt = event.timestamp;
+			if (event.blockerSignature)
+				candidate.blockerSignature = text(event.blockerSignature, 200);
 			for (const key of [
 				"candidateRef",
 				"commitSha",
@@ -568,6 +572,12 @@ export function readCandidateState(sourceCwd, policy = {}) {
 				"packagePassed",
 				"benchmarkPassed",
 				"cleanupState",
+				"branch",
+				"baseHead",
+				"upstream",
+				"changedPaths",
+				"benchmarkMeasurements",
+				"resultMeasurements",
 			])
 				if (event[key] !== undefined) candidate[key] = event[key];
 			if (event.transition === "claimed") {
@@ -612,6 +622,9 @@ export function appendCandidateTransition(
 		"integrationSha",
 		"remoteSha",
 		"revertSha",
+		"branch",
+		"baseHead",
+		"upstream",
 	]) {
 		const value = text(details[key], 240);
 		if (value) event[key] = value;
@@ -620,6 +633,14 @@ export function appendCandidateTransition(
 		if (typeof details[key] === "boolean") event[key] = details[key];
 	const cleanupState = text(details.cleanupState, 40);
 	if (cleanupState) event.cleanupState = cleanupState;
+	if (Array.isArray(details.changedPaths))
+		event.changedPaths = details.changedPaths.map((item) => text(item, 240)).filter(Boolean).slice(0, 40);
+	for (const key of ["benchmarkMeasurements", "resultMeasurements"]) {
+		try {
+			const serialized = JSON.stringify(details[key]);
+			if (serialized && serialized.length <= 16_000) event[key] = JSON.parse(serialized);
+		} catch {}
+	}
 	appendEvent(sourceCwd, event);
 	return event;
 }

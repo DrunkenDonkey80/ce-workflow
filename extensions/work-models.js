@@ -18,7 +18,7 @@ import {
 	writeFileSync,
 	writeSync,
 } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
 	basename,
 	delimiter,
@@ -28,6 +28,12 @@ import {
 	relative,
 	resolve,
 } from "node:path";
+import {
+	ANALYZER_VERSION,
+	analyzeWorkflow,
+	readCandidateState,
+	selectCandidate,
+} from "./work-improvement.js";
 
 const CONFIG_DIR_NAME = ".pi";
 const TELEMETRY_DIR_NAME = "work-runs";
@@ -253,6 +259,8 @@ let workGoalRecovery = null;
 let workGoalCompactionResume = null;
 let workGoalProgressTimer = null;
 let workGoalUsageLimitTimer = null;
+const activeImprovementRuns = new Map();
+let workExtensionPi;
 
 function clearWorkGoalUsageLimitTimer() {
 	if (!workGoalUsageLimitTimer) return;
@@ -694,31 +702,239 @@ function workflowClaimPath(cwd, workflowRunId) {
 	return join(telemetryDir(cwd), "claims", `${key}.complete`);
 }
 
-function completeWorkflowOnce(cwd, completion) {
+function recordImprovementError(cwd, terminal, reason, error) {
+	try {
+		recordWorkTelemetry(cwd, {
+			type: "improvement-status",
+			workflowRunId: terminal?.workflowRunId,
+			activity: "improvement",
+			ok: false,
+			reason,
+			error: error ? truncate(error?.message ?? error, 300) : undefined,
+		});
+	} catch {}
+}
+
+function processTerminalAttached(cwd, terminal, runtime) {
+	return Promise.resolve(processTerminalWorkflow(cwd, terminal, runtime)).catch((error) => {
+		recordImprovementError(cwd, terminal, "terminal-processing-failed", error);
+		return { status: "deferred", reason: "terminal-processing-failed" };
+	});
+}
+
+function completeWorkflowOnce(cwd, completion, runtime = {}) {
 	if (!cwd || !completion?.workflowRunId) return "";
 	const claim = workflowClaimPath(cwd, completion.workflowRunId);
 	mkdirSync(dirname(claim), { recursive: true });
 	let descriptor;
+	let terminal = completion;
 	try {
 		descriptor = openSync(claim, "wx");
-		writeSync(
-			descriptor,
-			`${JSON.stringify({
-				version: 1,
-				id: telemetryId("workflow-complete"),
-				timestamp: new Date().toISOString(),
-				type: "workflow-complete",
-				...completion,
-				terminal: true,
-			})}\n`,
-		);
+		terminal = {
+			version: 1,
+			id: telemetryId("workflow-complete"),
+			timestamp: new Date().toISOString(),
+			type: "workflow-complete",
+			...completion,
+			terminal: true,
+		};
+		writeSync(descriptor, `${JSON.stringify(terminal)}\n`);
 	} catch (error) {
-		if (error?.code === "EEXIST") return "";
-		throw error;
+		if (error?.code !== "EEXIST") throw error;
+		try {
+			terminal = JSON.parse(readFileSync(claim, "utf8").trim());
+		} catch (readError) {
+			recordImprovementError(cwd, completion, "terminal-claim-read-failed", readError);
+			return "";
+		}
 	} finally {
 		if (descriptor !== undefined) closeSync(descriptor);
 	}
+	void processTerminalAttached(cwd, terminal, runtime);
 	return claim;
+}
+
+export async function recoverTerminalWorkflowClaims(cwd, runtime = {}) {
+	const claims = join(telemetryDir(cwd), "claims");
+	if (!existsSync(claims)) return [];
+	const recovered = [];
+	for (const name of readdirSync(claims).filter((item) => item.endsWith(".complete"))) {
+		let terminal;
+		try {
+			terminal = JSON.parse(readFileSync(join(claims, name), "utf8").trim());
+		} catch (error) {
+			recordImprovementError(cwd, {}, "startup-claim-read-failed", error);
+			continue;
+		}
+		try {
+			const result = await processTerminalWorkflow(cwd, terminal, runtime);
+			if (result.status !== "already-analyzed") recovered.push(terminal.workflowRunId);
+		} catch (error) {
+			recordImprovementError(cwd, terminal, "startup-analysis-failed", error);
+		}
+	}
+	return recovered;
+}
+
+function improvementStateCwd(cwd) {
+	const settings = readSettings(cwd);
+	const configured = settings.workImprovement?.sourceCheckout;
+	return resolve(
+		cwd,
+		typeof configured === "string" && configured.trim()
+			? configured
+			: process.env.CE_WORKFLOW_SOURCE_DIR || WORKFLOW_REPO_DIR,
+	);
+}
+
+function improvementStatus(cwd) {
+	if (!workResumeSettings(cwd).selfImproving)
+		return { enabled: false, state: "off", candidates: 0 };
+	try {
+		const state = readCandidateState(improvementStateCwd(cwd));
+		const candidates = [...state.candidates.values()];
+		const current = candidates.sort((a, b) =>
+			String(b.updatedAt).localeCompare(String(a.updatedAt)),
+		)[0];
+		return {
+			enabled: true,
+			state: current?.state ?? "observing",
+			candidates: candidates.length,
+			candidateId: current?.candidateId?.slice(0, 16),
+			evidenceCount: current?.evidenceCount ?? 0,
+			attemptId: current?.attemptId?.slice(0, 40),
+			manualRecoveryReason:
+				current?.state === "manual-recovery"
+					? current.blockerSignature
+					: undefined,
+			benchmarkMeasurements: current?.benchmarkMeasurements,
+			resultMeasurements: current?.resultMeasurements,
+		};
+	} catch {
+		return { enabled: true, state: "status-unavailable", candidates: 0 };
+	}
+}
+
+/** Analyze one terminal run in code and queue at most one autonomous attempt. */
+export async function processTerminalWorkflow(cwd, terminal, runtime = {}) {
+	if (!workResumeSettings(cwd).selfImproving) return { status: "disabled" };
+	// Output-only modes must not even resolve the source because resolution can be injected or stateful.
+	if (runtime.mode === "print" || runtime.json === true)
+		return { status: "suppressed", reason: "output-only-mode" };
+	const runner = await import(
+		pathToFileURL(join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs")).href
+	);
+	const settings = readSettings(cwd);
+	const resolved = runner.resolveSourceCheckout({
+		settings,
+		packageRoot: WORKFLOW_REPO_DIR,
+		baseCwd: cwd,
+		runGit: runtime.improvementSeams?.runGit,
+	});
+	if (!resolved.ok) {
+		recordImprovementError(cwd, terminal, truncate(resolved.reason, 120));
+		return { status: "deferred", reason: resolved.reason };
+	}
+	const sourceCwd = resolved.sourceCwd;
+	const events = readTelemetryEvents(cwd).filter(
+		(event) => event.workflowRunId === terminal.workflowRunId,
+	);
+	const analysis = analyzeWorkflow({
+		sourceCwd,
+		workflowRunId: terminal.workflowRunId,
+		terminal: { ...terminal, type: "workflow-complete" },
+		events,
+		extensionRevision: extensionRevision(),
+	});
+	let candidate = null;
+	if (analysis.status !== "excluded") {
+		const blockerSignatures = {};
+		for (const item of readCandidateState(sourceCwd).candidates.values())
+			if (item.state === "deferred")
+				blockerSignatures[item.candidateId] = runner.currentAutonomousBlocker(
+					{ consumerCwd: cwd, settings, packageRoot: WORKFLOW_REPO_DIR },
+					runtime.improvementSeams,
+				);
+		candidate = selectCandidate(sourceCwd, { blockerSignatures });
+	}
+	if (!candidate || runtime.allowLaunch === false)
+		return { status: analysis.status, candidate: candidate?.candidateId };
+	if (activeImprovementRuns.has(sourceCwd))
+		return {
+			status: analysis.status,
+			candidate: candidate.candidateId,
+			queued: false,
+		};
+	const controller = new AbortController();
+	const dispatchAgent = (payload) =>
+		dispatchWorkflowImprovementAgent(runtime.pi, {
+			...payload,
+			signal: controller.signal,
+		});
+	const runPackageVerify = async ({ cwd: verifyCwd }) => {
+		try {
+			execFileSync(
+				process.execPath,
+				["scripts/verify-package.mjs", "--quiet"],
+				{ cwd: verifyCwd, stdio: "pipe", timeout: 2 * 60 * 1000 },
+			);
+			return { passed: true };
+		} catch (error) {
+			return {
+				passed: false,
+				output: truncate(error?.message ?? error, 300),
+			};
+		}
+	};
+	const runBenchmarkGate = (request) =>
+		runner.runAutonomousImprovementBenchmark(
+			sourceCwd,
+			{ ...request, signal: controller.signal },
+			dispatchAgent,
+		);
+	const run = (async () => {
+		return runner.runAutonomousImprovement(
+			{
+				consumerCwd: cwd,
+				candidate,
+				settings,
+				packageRoot: WORKFLOW_REPO_DIR,
+				session: runtime.session,
+			},
+			{
+				dispatchAgent,
+				runPackageVerify,
+				runBenchmarkGate,
+				onReleaseError: (error) =>
+					recordImprovementError(
+						cwd,
+						terminal,
+						"lease-release-failed",
+						error.reason,
+					),
+				...runtime.improvementSeams,
+			},
+		);
+	})();
+	activeImprovementRuns.set(sourceCwd, { controller, promise: run, cwd, terminal });
+	run
+		.catch((error) =>
+			recordImprovementError(cwd, terminal, "autonomous-run-failed", error),
+		)
+		.finally(() => activeImprovementRuns.delete(sourceCwd));
+	return {
+		status: analysis.status,
+		candidate: candidate.candidateId,
+		queued: true,
+	};
+}
+
+function extensionRevision() {
+	try {
+		return `package-${JSON.parse(readFileSync(join(WORKFLOW_REPO_DIR, "package.json"), "utf8")).version ?? "unknown"}`;
+	} catch {
+		return "installed";
+	}
 }
 
 function pendingDirectPath(cwd) {
@@ -790,7 +1006,7 @@ function directStatusComplete(status) {
 	);
 }
 
-function reconcilePendingDirectRuns(cwd) {
+function reconcilePendingDirectRuns(cwd, runtime = {}) {
 	try {
 		const events = readPendingDirectEvents(cwd);
 		const completed = new Set(
@@ -843,14 +1059,18 @@ function reconcilePendingDirectRuns(cwd) {
 						{ name: "subagent", runId: run.runId, subagentDetails: details },
 					],
 				});
-				completeWorkflowOnce(cwd, {
-					workflowRunId: run.workflowRunId,
-					activity: run.activity,
-					outcome: ok ? "completed" : "failed",
-					action: run.action,
-					epicId: run.epicId,
-					beadId: run.beadId,
-				});
+				completeWorkflowOnce(
+					cwd,
+					{
+						workflowRunId: run.workflowRunId,
+						activity: run.activity,
+						outcome: ok ? "completed" : "failed",
+						action: run.action,
+						epicId: run.epicId,
+						beadId: run.beadId,
+					},
+					runtime,
+				);
 				appendFileSync(
 					pendingDirectPath(cwd),
 					`${JSON.stringify({ version: 1, type: "completed", timestamp: new Date().toISOString(), workflowRunId: run.workflowRunId })}\n`,
@@ -1327,7 +1547,11 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 	return commandWorkflowStorage.run(workflow, async () => {
 		const startedAt = Date.now();
 		const contextBefore = usageSnapshot(ctx);
-		reconcilePendingDirectRuns(ctx.cwd);
+		reconcilePendingDirectRuns(ctx.cwd, {
+			pi: workExtensionPi,
+			mode: ctx.mode,
+			session: ctx.sessionManager?.getSessionId?.(),
+		});
 		recordWorkTelemetry(ctx.cwd, {
 			id: telemetryId("cmd-start"),
 			type: "command-start",
@@ -1373,14 +1597,23 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 					Boolean(state?.handoffPending) ||
 					(!state?.directHandoff && !state?.handoffFailed));
 			if (!awaitingAgent)
-				completeWorkflowOnce(ctx.cwd, {
-					workflowRunId: workflow.workflowRunId,
-					activity: workflow.activity,
-					outcome: event.ok ? "completed" : "failed",
-					action: summary.action,
-					epicId: summary.epicId,
-					beadId: summary.beadId,
-				});
+				completeWorkflowOnce(
+					ctx.cwd,
+					{
+						workflowRunId: workflow.workflowRunId,
+						activity: workflow.activity,
+						outcome: event.ok ? "completed" : "failed",
+						action: summary.action,
+						epicId: summary.epicId,
+						beadId: summary.beadId,
+					},
+					{
+						pi: workExtensionPi,
+						mode: ctx.mode,
+						json: /(?:^|\s)--jsonl?(?:\s|$)/.test(String(args)),
+						session: ctx.sessionManager?.getSessionId?.(),
+					},
+				);
 			cleanupBenignInstructionDirt(ctx.cwd);
 		}
 	});
@@ -1618,6 +1851,7 @@ function buildWorkTelemetryState(cwd, args = "") {
 		byPhase: [...byPhase.values()].sort((a, b) => b.durationMs - a.durationMs),
 		byBead: [...byBead.values()].sort((a, b) => b.durationMs - a.durationMs),
 		outputWaste: optimizationTelemetry(events),
+		improvement: improvementStatus(cwd),
 		slowest: [...events]
 			.sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0))
 			.slice(0, 5)
@@ -1653,6 +1887,7 @@ function renderWorkTelemetryText(state) {
 		`Tools: ${state.totals.toolCalls} calls, ${state.totals.subagentRuns} subagent runs, ${state.totals.testRuns} test runs, ${state.totals.toolOutputChars} tool-output chars • messages: ${state.totals.messageChars} chars`,
 		`Handoffs: ${state.totals.handoffsQueued} queued, ${state.totals.handoffsStarted} started`,
 		`Max recorded context: ${state.maxContextTokens || "unknown"} tokens`,
+		`Self-improvement: ${state.improvement.state} • candidates ${state.improvement.candidates} • evidence ${state.improvement.evidenceCount ?? 0}${state.improvement.candidateId ? ` • current ${state.improvement.candidateId}` : ""}${state.improvement.attemptId ? ` • attempt ${state.improvement.attemptId}` : ""}${state.improvement.manualRecoveryReason ? ` • manual ${state.improvement.manualRecoveryReason}` : ""}${state.improvement.benchmarkMeasurements ? ` • benchmark ${truncate(JSON.stringify(state.improvement.benchmarkMeasurements), 180)}` : ""}${state.improvement.resultMeasurements ? ` • result ${truncate(JSON.stringify(state.improvement.resultMeasurements), 180)}` : ""}`,
 		"",
 		"Stop reasons:",
 		...(state.stopReasons.length
@@ -1993,7 +2228,7 @@ body{font-family:ui-sans-serif,system-ui,sans-serif;margin:2rem;color:#111827;ba
 </style>
 <h1>Work usage</h1>
 <p class="muted">Scope: <strong>${escapeHtml(state.filter.scope)} ${escapeHtml(state.filter.value)}</strong></p>
-<div class="cards"><div class="card"><b>${state.summary.events}</b><span>events</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.durationMs))}</b><span>time</span></div><div class="card"><b>${escapeHtml(state.summary.tokens || "unknown")}</b><span>tokens</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.subagents))}</b><span>subagents</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.tools))}</b><span>tools</span></div></div>
+<div class="cards"><div class="card"><b>${state.summary.events}</b><span>events</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.durationMs))}</b><span>time</span></div><div class="card"><b>${escapeHtml(state.summary.tokens || "unknown")}</b><span>tokens</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.subagents))}</b><span>subagents</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.tools))}</b><span>tools</span></div><div class="card"><b>${escapeHtml(state.summary.improvement.state)}</b><span>self-improvement (${state.summary.improvement.candidates} candidates)${state.summary.improvement.attemptId ? ` · attempt ${escapeHtml(state.summary.improvement.attemptId)}` : ""}${state.summary.improvement.manualRecoveryReason ? ` · manual ${escapeHtml(state.summary.improvement.manualRecoveryReason)}` : ""}${state.summary.improvement.benchmarkMeasurements ? ` · benchmark ${escapeHtml(truncate(JSON.stringify(state.summary.improvement.benchmarkMeasurements), 180))}` : ""}${state.summary.improvement.resultMeasurements ? ` · result ${escapeHtml(truncate(JSON.stringify(state.summary.improvement.resultMeasurements), 180))}` : ""}</span></div></div>
 <p class="muted">Missing data: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}. Generated from ${state.files.length ? state.files.map(escapeHtml).join(", ") : escapeHtml(state.dir)}.</p>
 ${usageSubagentSummaryHtml(state.summary)}
 <input id="filter" placeholder="filter rows" aria-label="filter rows">
@@ -2043,7 +2278,10 @@ function buildWorkUsageState(cwd, args = "") {
 		dir: telemetryDir(cwd),
 		files: [...new Set(events.map((event) => event.file).filter(Boolean))],
 		rows,
-		summary: usageSummary(events, rows),
+		summary: {
+			...usageSummary(events, rows),
+			improvement: improvementStatus(cwd),
+		},
 		open: scoped.open,
 		format: scoped.format ?? "html",
 	};
@@ -5003,18 +5241,20 @@ export async function dispatchWorkflowImprovementAgent(
 	params,
 	timeoutMs = 30 * 60 * 1000,
 ) {
-	if (!isAbsolute(params.artifactDir ?? ""))
+	const { signal, ...rpcParams } = params;
+	if (signal?.aborted) return { ok: false, aborted: true, message: "agent dispatch aborted" };
+	if (!isAbsolute(rpcParams.artifactDir ?? ""))
 		return { ok: false, message: "absolute artifactDir is required" };
-	mkdirSync(params.artifactDir, { recursive: true });
+	mkdirSync(rpcParams.artifactDir, { recursive: true });
 	const artifactPath = resolve(
-		params.artifactDir,
-		`workflow-${safeArtifactPart(params.candidateId)}-${safeArtifactPart(params.attemptId)}-${safeArtifactPart(params.agent)}.md`,
+		rpcParams.artifactDir,
+		`workflow-${safeArtifactPart(rpcParams.candidateId)}-${safeArtifactPart(rpcParams.attemptId)}-${safeArtifactPart(rpcParams.agent)}.md`,
 	);
 	const started = Date.now();
 	const response = await spawnSubagentRpc(
 		pi,
 		{
-			...params,
+			...rpcParams,
 			artifactDir: undefined,
 			context: "fresh",
 			async: true,
@@ -5031,6 +5271,8 @@ export async function dispatchWorkflowImprovementAgent(
 	if (!identity.runId || !isAbsolute(identity.asyncDir ?? ""))
 		return { ok: false, message: "pi-subagents returned no async run identity", ...identity };
 	for (;;) {
+		if (signal?.aborted)
+			return { ok: false, aborted: true, message: "agent dispatch aborted", ...identity };
 		if (Date.now() - started >= timeoutMs)
 			return { ok: false, timedOut: true, message: "agent run timed out", ...identity };
 		const statusPath = join(identity.asyncDir, "status.json");
@@ -5050,7 +5292,7 @@ export async function dispatchWorkflowImprovementAgent(
 			const reported = identity.artifact ?? artifactPath;
 			const safeArtifact = readContainedFile(
 				reported,
-				params.artifactDir,
+				rpcParams.artifactDir,
 				WORKFLOW_AGENT_OUTPUT_BYTES,
 			);
 			if (!safeArtifact)
@@ -5064,7 +5306,10 @@ export async function dispatchWorkflowImprovementAgent(
 				output: safeArtifact.text,
 			};
 		}
-		await new Promise((resolvePoll) => setTimeout(resolvePoll, WORKFLOW_AGENT_POLL_MS));
+		await new Promise((resolvePoll) => {
+			const timer = setTimeout(resolvePoll, WORKFLOW_AGENT_POLL_MS);
+			signal?.addEventListener("abort", () => { clearTimeout(timer); resolvePoll(); }, { once: true });
+		});
 	}
 }
 
@@ -10379,6 +10624,7 @@ export {
 };
 
 export default function workModelsExtension(pi) {
+	workExtensionPi = pi;
 	exposeBundledSubagentAgents();
 
 	if (typeof pi.registerTool === "function") {
@@ -10440,7 +10686,12 @@ export default function workModelsExtension(pi) {
 	}
 
 	pi.on("session_start", (_event, ctx) => {
-		reconcilePendingDirectRuns(ctx.cwd);
+		const runtime = {
+			pi,
+			mode: ctx.mode,
+			session: ctx.sessionManager?.getSessionId?.(),
+		};
+		if (ctx.mode !== "print") reconcilePendingDirectRuns(ctx.cwd, runtime);
 		registerWorkCatchUpCommand(pi, ctx);
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
@@ -10454,17 +10705,89 @@ export default function workModelsExtension(pi) {
 		ctx.ui.notify("work-orchestrator loaded · F7 roadmaps · F8 menu", "info");
 		resetWarpTitle(ctx);
 		startWorkGoalProgressTimer(ctx);
+		if (workResumeSettings(ctx.cwd).selfImproving && ctx.mode !== "print")
+			void (async () => {
+				await recoverTerminalWorkflowClaims(ctx.cwd, runtime);
+				const runner = await import(
+					pathToFileURL(
+						join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs"),
+					).href,
+				);
+				const settings = readSettings(ctx.cwd);
+				const resolved = runner.resolveSourceCheckout({
+					settings,
+					packageRoot: WORKFLOW_REPO_DIR,
+					baseCwd: ctx.cwd,
+				});
+				if (!resolved.ok) {
+					recordImprovementError(ctx.cwd, {}, resolved.reason);
+					return;
+				}
+				await runner.reconcileAutonomousImprovement(
+					resolved.sourceCwd,
+					{ session: runtime.session },
+					{
+						dispatchAgent: (payload) =>
+							dispatchWorkflowImprovementAgent(pi, payload),
+						runPackageVerify: async ({ cwd }) => {
+							try {
+								execFileSync(
+									process.execPath,
+									["scripts/verify-package.mjs", "--quiet"],
+									{ cwd, stdio: "pipe", timeout: 2 * 60 * 1000 },
+								);
+								return { passed: true };
+							} catch (error) {
+								return {
+									passed: false,
+									output: truncate(error?.message ?? error, 300),
+								};
+							}
+						},
+						runBenchmarkGate: (request) =>
+							runner.runAutonomousImprovementBenchmark(
+								resolved.sourceCwd,
+								request,
+								(payload) => dispatchWorkflowImprovementAgent(pi, payload),
+							),
+						onReleaseError: (error) =>
+							recordImprovementError(
+								ctx.cwd,
+								{},
+								"startup-lease-release-failed",
+								error.reason,
+							),
+					},
+				);
+			})().catch((error) =>
+				recordImprovementError(ctx.cwd, {}, "startup-recovery-failed", error),
+			);
 	});
 
-	pi.on("session_shutdown", (_event, ctx) => {
+	pi.on("session_shutdown", async (_event, ctx) => {
 		persistWorkGoal(pi);
 		clearWorkGoalUsageLimitTimer();
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 		stopWorkGoalProgressTimer(ctx);
+		const active = [...activeImprovementRuns.values()].filter((run) => run.cwd === ctx.cwd);
+		for (const run of active) run.controller.abort(new Error("session shutdown"));
+		if (active.length) {
+			let timer;
+			const settled = await Promise.race([
+				Promise.allSettled(active.map((run) => run.promise)).then(() => true),
+				new Promise((resolveWait) => { timer = setTimeout(() => resolveWait(false), 2_000); }),
+			]);
+			clearTimeout(timer);
+			if (!settled) recordImprovementError(ctx.cwd, {}, "shutdown-cleanup-deferred");
+		}
 	});
 
 	pi.on("input", async (event, ctx) => {
-		reconcilePendingDirectRuns(ctx.cwd);
+		reconcilePendingDirectRuns(ctx.cwd, {
+			pi,
+			mode: ctx.mode,
+			session: ctx.sessionManager?.getSessionId?.(),
+		});
 		recordSelfImprovementHistory(ctx, "input", event);
 		if (!extractWorkGoalContinuationMarker(event.text)) clearWorkGoalRecovery();
 		if (await maybeResumeWorkGoalFromUserInput(event, ctx, pi))
@@ -10605,14 +10928,22 @@ export default function workModelsExtension(pi) {
 			context: { before: run.contextBefore, after: usageSnapshot(ctx) },
 		};
 		const file = recordWorkTelemetry(run.cwd, telemetry);
-		completeWorkflowOnce(run.cwd, {
-			workflowRunId: run.meta.workflowRunId,
-			activity: run.meta.activity,
-			outcome: hasWorkAgentFailure(event, telemetry) ? "failed" : "completed",
-			action: run.meta.action,
-			epicId: run.meta.epicId,
-			beadId: run.meta.beadId,
-		});
+		completeWorkflowOnce(
+			run.cwd,
+			{
+				workflowRunId: run.meta.workflowRunId,
+				activity: run.meta.activity,
+				outcome: hasWorkAgentFailure(event, telemetry) ? "failed" : "completed",
+				action: run.meta.action,
+				epicId: run.meta.epicId,
+				beadId: run.meta.beadId,
+			},
+			{
+				pi,
+				mode: ctx.mode,
+				session: ctx.sessionManager?.getSessionId?.(),
+			},
+		);
 		appendTelemetryNote(run.cwd, run.meta.beadId, telemetry, file);
 		appendFailureStatusNote(
 			run.cwd,
@@ -11170,7 +11501,8 @@ function workSettingsStatus(ctx) {
 		`  ${SUBMENU_ARROW} ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
 		"",
 		"Resume automation",
-		`  ${onOff(resume.selfImproving)} self-improving workflow fixes`,
+		`  ${onOff(resume.selfImproving)} self-improving workflow fixes (autonomous source delivery)`,
+		`  source: ${readSettings(ctx.cwd).workImprovement?.sourceCheckout ?? process.env.CE_WORKFLOW_SOURCE_DIR ?? "package checkout fallback"}`,
 		`  ${onOff(resume.newSessionBetweenIterations)} new session between iterations`,
 	];
 	notify(ctx, lines.join("\n"), "info");

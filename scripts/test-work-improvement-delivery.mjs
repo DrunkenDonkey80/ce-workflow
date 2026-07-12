@@ -18,8 +18,11 @@ const {
 	acquireLease,
 	gitPreflight,
 	releaseLease,
+	reconcileAutonomousImprovement,
 	runImprovementDelivery,
 } = await import(pathToFileURL(realpathSync(path.join(import.meta.dirname, "work-improvement-runner.mjs"))).href);
+
+const { appendCandidateTransition, readCandidateState } = await import(pathToFileURL(realpathSync(path.join(import.meta.dirname, "../extensions/work-improvement.js"))).href);
 
 const roots = [];
 function git(cwd, ...args) {
@@ -328,6 +331,59 @@ try {
 		/needed a single revision|Command failed/,
 	);
 	assert.equal(releaseLease(cleanupPending.repo.source, cleanupPending.repo.lease.lease).ok, true);
+
+	const recoveryMetadata = (repo) => ({
+		attemptId: `attempt-${path.basename(repo.root).split("-").at(-1)}`,
+		candidateRef: repo.candidateRef,
+		commitSha: repo.commitSha,
+		branch: repo.expected.branch,
+		baseHead: repo.expected.head,
+		upstream: repo.expected.upstream,
+		changedPaths: ["lib.txt"],
+	});
+	const seedRecovery = (repo, candidateId, state, details = {}) => {
+		const metadata = recoveryMetadata(repo);
+		appendCandidateTransition(repo.source, candidateId, "claimed", metadata);
+		appendCandidateTransition(repo.source, candidateId, state, { ...metadata, ...details });
+	};
+	const liveRecovery = fixture("restart-live-owner");
+	seedRecovery(liveRecovery, "candidate-restart-live-owner", "committed");
+	const liveEventCount = readCandidateState(liveRecovery.source).events.length;
+	assert.deepEqual(await reconcileAutonomousImprovement(liveRecovery.source), [], "a second live session cannot take the writer lease");
+	assert.equal(readCandidateState(liveRecovery.source).events.length, liveEventCount, "live-owner recovery must not rewrite candidate state");
+	assert.equal(releaseLease(liveRecovery.source, liveRecovery.lease.lease).ok, true);
+
+	const pushRecovery = fixture("restart-push");
+	seedRecovery(pushRecovery, "candidate-restart-push", "committed");
+	assert.equal(releaseLease(pushRecovery.source, pushRecovery.lease.lease).ok, true);
+	assert.deepEqual(await reconcileAutonomousImprovement(pushRecovery.source, {}, {
+		runGit: (cwd, args) => git(cwd, ...args),
+		runPackageVerify: async () => ({ passed: true }),
+		runBenchmarkGate: async () => ({ passed: true }),
+	}), ["candidate-restart-push"]);
+	assert.equal(readCandidateState(pushRecovery.source).candidates.get("candidate-restart-push").state, "accepted", "restart resumes push and validation");
+
+	const revertRecovery = fixture("restart-revert");
+	seedRecovery(revertRecovery, "candidate-restart-revert", "committed");
+	assert.equal(releaseLease(revertRecovery.source, revertRecovery.lease.lease).ok, true);
+	await reconcileAutonomousImprovement(revertRecovery.source, {}, {
+		runGit: (cwd, args) => git(cwd, ...args),
+		runPackageVerify: async () => ({ passed: true }),
+		runBenchmarkGate: async () => ({ passed: false }),
+	});
+	assert.equal(readCandidateState(revertRecovery.source).candidates.get("candidate-restart-revert").state, "reverted", "restart resumes validation failure through revert cleanup");
+
+	const cleanupRecovery = fixture("restart-cleanup");
+	git(cleanupRecovery.source, "merge", "--ff-only", cleanupRecovery.candidateRef);
+	git(cleanupRecovery.source, "push");
+	seedRecovery(cleanupRecovery, "candidate-restart-cleanup", "cleanup-pending", {
+		integrationSha: cleanupRecovery.commitSha,
+		remoteSha: cleanupRecovery.commitSha, cleanupState: "accepted",
+	});
+	assert.equal(releaseLease(cleanupRecovery.source, cleanupRecovery.lease.lease).ok, true);
+	await reconcileAutonomousImprovement(cleanupRecovery.source, {}, { runGit: (cwd, args) => git(cwd, ...args) });
+	assert.equal(readCandidateState(cleanupRecovery.source).candidates.get("candidate-restart-cleanup").state, "accepted", "restart finishes durable cleanup intent");
+	assert.throws(() => git(cleanupRecovery.source, "rev-parse", "--verify", cleanupRecovery.candidateRef), /needed a single revision|Command failed/);
 
 	git(accepted.repo.source, "update-ref", accepted.repo.candidateRef, accepted.repo.commitSha);
 	const terminalRestart = await runImprovementDelivery(accepted.options, {
