@@ -5197,7 +5197,7 @@ function directRoleTask(state, cwd) {
 		.join("\n");
 }
 
-function directRoleHandoffParams(state, cwd) {
+function directRoleHandoffParams(state, cwd, selectionNote = "") {
 	const agent = directRoleAgent(state);
 	if (!agent || !state?.handoffPrompt) return null;
 	const target = safeArtifactPart(
@@ -5207,7 +5207,7 @@ function directRoleHandoffParams(state, cwd) {
 		agent,
 		params: {
 			agent,
-			task: directRoleTask(state, cwd),
+			task: withSelectionNote(directRoleTask(state, cwd), selectionNote),
 			workflowRunId: currentCommandWorkflow()?.workflowRunId,
 			activity: workflowActivityMarker(),
 			context: "fresh",
@@ -10293,7 +10293,9 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = buildWorkResumeState(ctx.cwd, args);
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-resume");
-	const direct = state.ok ? directRoleHandoffParams(state, ctx.cwd) : null;
+	const direct = state.ok
+		? directRoleHandoffParams(state, ctx.cwd, selectionNote)
+		: null;
 	notify(
 		ctx,
 		renderWorkResumeText(
@@ -10400,7 +10402,9 @@ async function handleWorkflowAction(
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const state = builder(ctx.cwd, args);
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-action");
-	const direct = state.ok ? directRoleHandoffParams(state, ctx.cwd) : null;
+	const direct = state.ok
+		? directRoleHandoffParams(state, ctx.cwd, selectionNote)
+		: null;
 	notify(
 		ctx,
 		renderWorkflowActionText(

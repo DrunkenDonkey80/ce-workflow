@@ -864,13 +864,17 @@ try {
 
 	delete process.env.WORK_RESUME_SCENARIO;
 	let rpcReply;
+	let rpcRequest;
 	const rpcPi = {
 		events: {
 			on: (_name, reply) => {
 				rpcReply = reply;
 				return () => {};
 			},
-			emit: () => queueMicrotask(() => rpcReply({ success: true, data: {} })),
+			emit: (_name, request) => {
+				rpcRequest = request;
+				queueMicrotask(() => rpcReply({ success: true, data: {} }));
+			},
 		},
 	};
 	const directResult = await handleWorkResumeCommand(
@@ -882,6 +886,11 @@ try {
 				sent.push({ message, options }),
 		},
 		rpcPi,
+		"the terminal is next to the probe",
+	);
+	assert(
+		rpcRequest?.params?.task?.includes("the terminal is next to the probe"),
+		"numbered-selection notes reach direct role handoffs",
 	);
 	assert(
 		directResult.directHandoff?.agent === "bead-debugger" &&
