@@ -251,6 +251,7 @@ let activeWorkAgent = null;
 let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
 let activeWorkGoalRunning = false;
+let pendingWorkGoalTurn = false;
 let workGoalContinuationPending = null;
 let workGoalContinuationRetry = null;
 let workGoalRecovery = null;
@@ -8744,7 +8745,7 @@ function parseWorkGoalCommand(args = "") {
 			? { kind: "status", error: "--tokens only applies to start/edit" }
 			: { kind: "status" };
 	if (command === "pause") return { kind: "pause" };
-	if (command === "resume") return { kind: "resume" };
+	if (command === "resume") return { kind: "resume", answer: rest.trim() };
 	if (command === "clear" || command === "stop") return { kind: "clear" };
 	return attach({ kind: "start", objective: trimmed });
 }
@@ -9450,7 +9451,7 @@ ${escapeXmlText(goal.objective)}
 }
 
 function buildWorkGoalKickoffPrompt(goal) {
-	return `Work-goal mode is active. Complete this objective fully:\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>`;
+	return `Work-goal mode is active. Complete this objective fully:\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\n${workGoalMarkerComment(workGoalContinuationMarker(goal))}`;
 }
 
 function workGoalContinuationMarker(goal) {
@@ -9868,7 +9869,9 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 			buildWorkGoalContinuePrompt(
 				activeWorkGoal,
 				workGoalContinuationMarker(activeWorkGoal),
-				"User resumed the goal.",
+				command.answer
+					? `User resumed the goal with this answer:\n\n${truncate(command.answer, 2_000)}`
+					: "User resumed the goal.",
 			),
 		);
 		return;
@@ -10042,13 +10045,6 @@ async function handleWorkGoalResetCommand(args, ctx) {
 	}
 }
 
-function workGoalHumanInputKind(text) {
-	const value = String(text ?? "").trim();
-	if (/^(answer|decide|decision)\s*:/i.test(value)) return "answer";
-	if (/^\d+\s*[).,:-]?/.test(value)) return "answer";
-	return "clarify";
-}
-
 function buildWorkGoalPausedPrompt(goal) {
 	return `Paused /work-goal waiting for a human decision:
 <work_goal_objective>
@@ -10058,31 +10054,7 @@ ${escapeXmlText(goal.objective)}
 Pending decision:
 ${formatWorkGoalDecision(goal.decision)}
 
-Answer the user's clarification only. Do not continue the work-goal until the user explicitly replies with \`answer: ...\` or a numbered option.`;
-}
-
-async function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
-	if (event.source === "extension") return false;
-	if (!activeWorkGoal || activeWorkGoal.status !== "needs_human") return false;
-	const answer = String(event.text ?? "").trim();
-	if (workGoalHumanInputKind(answer) === "clarify") return false;
-	activeWorkGoal = {
-		...activeWorkGoal,
-		status: "active",
-		decision: undefined,
-		updatedAt: Date.now(),
-	};
-	const note = `The human answered the pending decision. Act on this answer immediately, then resume the objective:\n\n${truncate(answer, 2_000)}`;
-	persistWorkGoal(pi);
-	updateWorkGoalStatus(ctx);
-	startWarpWork(
-		ctx,
-		workWarpMode(activeWorkGoal.mode, activeWorkGoal),
-		"human answered",
-	);
-	if (!(await sendWorkGoalAnswerContinuation(pi, ctx, activeWorkGoal, note)))
-		workGoalContinuationRetry = { goalId: activeWorkGoal.id, note };
-	return true;
+Answer the user's clarification only. Ordinary chat never resumes this goal; only \`/work-goal resume <answer>\` does.`;
 }
 
 async function flushWorkGoalContinuationRetry(ctx, pi) {
@@ -10796,7 +10768,6 @@ export {
 	renderWorkResumeText,
 	warpNotificationEnabled,
 	warpPayload,
-	workGoalHumanInputKind,
 	workWarpMode,
 	workWarpTitle,
 };
@@ -10873,7 +10844,16 @@ export default function workModelsExtension(pi) {
 		registerWorkCatchUpCommand(pi, ctx);
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
+		if (activeWorkGoal?.status === "active") {
+			activeWorkGoal = {
+				...activeWorkGoal,
+				status: "paused",
+				updatedAt: Date.now(),
+			};
+			persistWorkGoal(pi);
+		}
 		activeWorkGoalRunning = false;
+		pendingWorkGoalTurn = false;
 		workGoalContinuationPending = null;
 		clearWorkGoalRecovery();
 		if (activeWorkGoal?.status === "waiting_usage_limit")
@@ -10974,8 +10954,6 @@ export default function workModelsExtension(pi) {
 		});
 		recordSelfImprovementHistory(ctx, "input", event);
 		if (!extractWorkGoalContinuationMarker(event.text)) clearWorkGoalRecovery();
-		if (await maybeResumeWorkGoalFromUserInput(event, ctx, pi))
-			return { action: "handled" };
 		const parsed = parseNumberedWorkActionInput(event.text);
 		if (parsed && recentNumberedWorkAction(ctx.cwd, parsed.number)) {
 			if (await maybeRunNumberedWorkAction(event, ctx, pi))
@@ -10985,6 +10963,19 @@ export default function workModelsExtension(pi) {
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		markWorkGoalContinuationDelivered(event.prompt);
+		const marker = extractWorkGoalContinuationMarker(event.prompt);
+		pendingWorkGoalTurn = Boolean(
+			activeWorkGoal && marker?.startsWith(`${activeWorkGoal.id}:`),
+		);
+		if (pendingWorkGoalTurn && activeWorkGoal?.status === "paused") {
+			activeWorkGoal = {
+				...activeWorkGoal,
+				status: "active",
+				updatedAt: Date.now(),
+			};
+			persistWorkGoal(pi);
+			updateWorkGoalStatus(ctx);
+		}
 		const meta = parseWorkPromptMeta(event.prompt);
 		pendingWorkPrompt = meta
 			? {
@@ -11002,7 +10993,7 @@ export default function workModelsExtension(pi) {
 				systemPrompt: `${event.systemPrompt}\n\n${buildWorkGoalPausedPrompt(activeWorkGoal)}`,
 			};
 		}
-		if (activeWorkGoal.status !== "active") return;
+		if (activeWorkGoal.status !== "active" || !pendingWorkGoalTurn) return;
 		return {
 			systemPrompt: `${event.systemPrompt}\n\n${buildWorkGoalSystemPrompt(activeWorkGoal)}`,
 		};
@@ -11010,9 +11001,13 @@ export default function workModelsExtension(pi) {
 
 	pi.on("agent_start", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "agent_start", event);
+		activeWorkGoalRunning = pendingWorkGoalTurn;
+		pendingWorkGoalTurn = false;
 		if (!pendingWorkPrompt) {
-			if (["active", "stopping"].includes(activeWorkGoal?.status)) {
-				activeWorkGoalRunning = true;
+			if (
+				activeWorkGoalRunning &&
+				["active", "stopping"].includes(activeWorkGoal?.status)
+			) {
 				startWarpWork(
 					ctx,
 					workWarpMode(activeWorkGoal.mode, activeWorkGoal),
@@ -11061,15 +11056,17 @@ export default function workModelsExtension(pi) {
 	pi.on("agent_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "agent_end", event);
 		if (!activeWorkAgent) {
+			const wasWorkGoalTurn = activeWorkGoalRunning;
 			activeWorkGoalRunning = false;
 			const hadWorkGoal = Boolean(activeWorkGoal);
-			await handleWorkGoalAgentEnd(event, ctx, pi);
+			if (wasWorkGoalTurn) await handleWorkGoalAgentEnd(event, ctx, pi);
 			activeHistoryTask = null;
 			if (!hadWorkGoal) resetWarpTitle(ctx);
 			return;
 		}
 		const run = activeWorkAgent;
 		activeWorkAgent = null;
+		const wasWorkGoalTurn = activeWorkGoalRunning;
 		activeWorkGoalRunning = false;
 		const usage = messageUsage(event.messages);
 		const durationMs = Math.max(0, Date.now() - run.startedAt);
@@ -11143,7 +11140,7 @@ export default function workModelsExtension(pi) {
 			workWarpMode(run.meta.mode),
 			assistantVisibleText(finalAssistantMessage(event.messages)),
 		);
-		await handleWorkGoalAgentEnd(event, ctx, pi);
+		if (wasWorkGoalTurn) await handleWorkGoalAgentEnd(event, ctx, pi);
 		activeHistoryTask = null;
 	});
 

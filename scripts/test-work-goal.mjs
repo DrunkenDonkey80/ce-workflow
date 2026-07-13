@@ -23,6 +23,10 @@ const mod = await import(
 
 assert.equal(mod.parseWorkGoalCommand("").kind, "status");
 assert.deepEqual(mod.parseWorkGoalCommand("pause"), { kind: "pause" });
+assert.deepEqual(mod.parseWorkGoalCommand("resume use repo A"), {
+	kind: "resume",
+	answer: "use repo A",
+});
 assert.deepEqual(mod.parseWorkGoalCommand("edit ship it"), {
 	kind: "edit",
 	objective: "ship it",
@@ -125,15 +129,6 @@ assert.deepEqual(
 	{ project: "C:/soft/git/path with spaces", task: "first blocker" },
 );
 assert.equal(mod.workWarpMode("generic"), "goal");
-assert.equal(mod.workGoalHumanInputKind("2, but add this"), "answer");
-assert.equal(mod.workGoalHumanInputKind("clarify: what changed?"), "clarify");
-assert.equal(mod.workGoalHumanInputKind("What changed?"), "clarify");
-assert.equal(
-	mod.workGoalHumanInputKind(
-		"regarding com7, you made custom firmware that removed the blocker right",
-	),
-	"clarify",
-);
 assert.equal(
 	mod.workWarpMode("self-improving", { objective: "Project autopilot policy" }),
 	"project",
@@ -315,6 +310,7 @@ try {
 	);
 	assert.match(before.systemPrompt, /Active \/work-goal/);
 	assert.match(before.systemPrompt, /work_goal_human_decision/);
+	await tempHooks.agent_start({}, ctx);
 
 	await tempHooks.agent_end(
 		{
@@ -335,6 +331,7 @@ try {
 		{ prompt: sent[1].message, systemPrompt: "base" },
 		ctx,
 	);
+	await tempHooks.agent_start({}, ctx);
 	await tempHooks.agent_end(
 		{
 			messages: [
@@ -386,18 +383,24 @@ try {
 	assert.equal(statuses["work-goal"], "🟣❓ needs human");
 	assert.equal(sent.length, 2);
 
-	const inputResult = await tempHooks.input?.(
+	const answerInputResult = await tempHooks.input?.(
 		{
 			source: "user",
 			text: "2, but use the AI-Wedge connected proof and add a connect button.",
 		},
 		ctx,
 	);
-	assert.deepEqual(inputResult, { action: "handled" });
+	assert.equal(answerInputResult, undefined);
+	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	assert.equal(sent.length, 2);
+
+	await tempCommands["work-goal"].handler(
+		"resume 2, but use the AI-Wedge connected proof and add a connect button.",
+		ctx,
+	);
 	assert.equal(statuses["work-goal"], "▶️ active #1");
 	assert.equal(sent.length, 3);
-	assert.match(sent[2].message, /Act on this answer immediately/);
-	assert.match(sent[2].message, /perform an action, do that action first/);
+	assert.match(sent[2].message, /User resumed the goal with this answer/);
 	assert.match(sent[2].message, /add a connect button/);
 
 	await tempHooks.before_agent_start(
@@ -426,6 +429,41 @@ try {
 		"work-resume reports coded Beads target resolution without a goal kickoff",
 	);
 
+	writeFileSync(
+		path.join(cwd, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({
+			workGoal: {
+				id: "wg-inert-restart",
+				mode: "self-improving",
+				objective: "must resume by command",
+				status: "active",
+				iteration: 1,
+			},
+		}),
+	);
+	tempHooks.session_start?.({}, ctx);
+	assert.equal(statuses["work-goal"], "⏸️ paused");
+	const beforeOrdinaryChat = sent.length;
+	const ordinaryBefore = await tempHooks.before_agent_start(
+		{ prompt: "regarding com7, is it fixed right", systemPrompt: "base" },
+		ctx,
+	);
+	assert.equal(ordinaryBefore, undefined);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Answered normal chat." }],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(sent.length, beforeOrdinaryChat);
+
+	entries.length = 0;
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
 		path.join(cwd, ".pi", "work-orchestrator-state.json"),
@@ -445,7 +483,12 @@ try {
 		{ source: "user", text: "4, waive only disconnection screenshot" },
 		ctx,
 	);
-	assert.deepEqual(restartedInput, { action: "handled" });
+	assert.equal(restartedInput, undefined);
+	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	await tempCommands["work-goal"].handler(
+		"resume 4, waive only disconnection screenshot",
+		ctx,
+	);
 	assert.match(sent.at(-1).message, /waive only disconnection screenshot/);
 
 	writeFileSync(
@@ -497,6 +540,11 @@ try {
 	process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = "1";
 	await tempCommands["work-goal"].handler("survive usage windows", ctx);
 	const beforeUsageRetry = sent.length;
+	await tempHooks.before_agent_start(
+		{ prompt: sent.at(-1).message, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
 	await tempHooks.agent_end(
 		{
 			messages: [
