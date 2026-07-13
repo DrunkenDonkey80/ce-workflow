@@ -179,8 +179,9 @@ const prompt = mod.buildWorkGoalSystemPrompt({
 	iteration: 0,
 });
 assert.match(prompt, /Do not stop for plan approval/);
-assert.match(prompt, /work_goal_human_decision only when/);
-assert.match(prompt, /ask the user to make that state available/);
+assert.match(prompt, /Use ask_user for every question/);
+assert.match(prompt, /use ask_user to ask the user to make that state available/);
+assert.match(prompt, /work_goal_human_decision is only a durable fallback/);
 assert.match(prompt, /WORK_GOAL_NEEDS_HUMAN_DECISION/);
 assert.match(prompt, /work_goal_complete/);
 
@@ -189,6 +190,7 @@ const tools = {};
 const hooks = {};
 const shortcuts = {};
 mod.default({
+	getActiveTools: () => ["ask_user", "work_goal_human_decision"],
 	on: (name, handler) => {
 		hooks[name] = handler;
 	},
@@ -218,6 +220,24 @@ assert.ok(tools.work_goal_human_decision);
 assert.equal(tools.work_goal_human_decision.parameters.required[0], "question");
 assert.ok(hooks.before_agent_start);
 assert.ok(hooks.agent_end);
+assert.deepEqual(
+	hooks.tool_call(
+		{ toolName: "work_goal_human_decision" },
+		{ hasUI: true },
+	),
+	{
+		block: true,
+		reason:
+			"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
+	},
+);
+assert.equal(
+	hooks.tool_call(
+		{ toolName: "work_goal_human_decision" },
+		{ hasUI: false },
+	),
+	undefined,
+);
 
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-work-goal-"));
 try {

@@ -9443,9 +9443,9 @@ ${escapeXmlText(goal.objective)}
 - Work directly in this session by default. Do not call subagent list, delegate routine implementation/verification/commit work, or launch duplicate reviewers. Spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
 - Prefer coded helpers and deterministic checks over asking an LLM to classify, summarize, validate, stage, commit, close, or choose an agent.
 - Do not stop for plan approval, permission to continue, or obvious implementation choices. Pick the clear winner and continue.
-- Use work_goal_human_decision only when progress truly depends on user-only information: product intent, credentials/accounts, destructive or risky action, production/billing/legal impact, ambiguous priority/scope with no clear winner, hardware/environment access, or a target path/project choice you cannot infer.
-- If evidence depends on external hardware/account/environment state, ask the user to make that state available. Once they answer that it is available or tell you to proceed, capture/inspect the artifact yourself immediately instead of asking again.
-- If tools are unavailable, end with ${WORK_GOAL_DECISION_MARKER}: and the question instead of asking a plain-text question.
+- Use ask_user for every question that truly needs human input: product intent, credentials/accounts, destructive or risky action, production/billing/legal impact, ambiguous priority/scope with no clear winner, hardware/environment access, or a target path/project choice you cannot infer. Ask one focused question and continue from its answer.
+- If evidence depends on external hardware/account/environment state, use ask_user to ask the user to make that state available. Once they answer that it is available or tell you to proceed, capture/inspect the artifact yourself immediately instead of asking again.
+- work_goal_human_decision is only a durable fallback after ask_user is unavailable or cancelled; never use it as the first prompt path. If both tools are unavailable, end with ${WORK_GOAL_DECISION_MARKER}: and the question instead of asking a plain-text question.
 - When complete, call work_goal_complete with verification evidence. If the tool is unavailable, end with ${WORK_GOAL_COMPLETE_MARKER}: and the evidence.
 - Do not call completion for partial progress, blockers, failing tests, or unverified work. Summaries that say the work is incomplete or tests still fail are rejected.${budgetLine}`;
 }
@@ -9476,7 +9476,7 @@ function markWorkGoalContinuationDelivered(prompt) {
 }
 
 function buildWorkGoalContinuePrompt(goal, marker, note = "") {
-	return `Continue the active /work-goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. If the human answer asked you to perform an action, do that action first before unrelated work. Do not ask the same question again unless the answer is impossible to act on. Use work_goal_human_decision only for real human-decision blockers; otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
+	return `Continue the active /work-goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. If the human answer asked you to perform an action, do that action first before unrelated work. Do not ask the same question again unless the answer is impossible to act on. Use ask_user for real human-decision blockers; use work_goal_human_decision only if ask_user is unavailable or cancelled. Otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
 }
 
 function buildWorkGoalCompactInstructions(goal) {
@@ -10654,10 +10654,12 @@ async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
 			handleWorkReportCommand(args, ctx),
 		);
 	else if (command === "work-resume")
-		await handleWorkResumeGoalCommand(
-			withSelectionNote(args, selectionNote),
-			pi,
+		await withCommandTelemetry(
+			command,
+			args,
 			ctx,
+			() => handleWorkResumeCommand(args, ctx, pi, selectionNote),
+			true,
 		);
 	else if (builders[command])
 		await withCommandTelemetry(
@@ -10734,6 +10736,7 @@ export {
 	workflowTaskSummary,
 	writeEvidenceSummary,
 	directRoleHandoffParams,
+	executeNumberedWorkAction,
 	completeWorkflowOnce,
 	withCommandTelemetry,
 	parseWorkPromptMeta,
@@ -10805,11 +10808,12 @@ export default function workModelsExtension(pi) {
 			name: "work_goal_human_decision",
 			label: "Work Goal Human Decision",
 			description:
-				"Pause the active /work-goal only for real user-only decisions; do not use for plan approval, permission to continue, clear-winner choices, or artifacts that are already available to capture.",
-			promptSnippet: "Pause /work-goal for a real human decision factor",
+				"Durably pause the active /work-goal only when ask_user is unavailable or cancelled. Never use this as the first prompt path.",
+			promptSnippet:
+				"Persist a human-decision blocker only after ask_user is unavailable or cancelled",
 			promptGuidelines: [
-				"Use work_goal_human_decision only for user-only product, credential, destructive/risky, priority/scope, environment, or no-clear-winner decisions.",
-				"For screenshots/logs/browser state tied to external hardware or accounts, ask only to make the state available; after the user says proceed, capture it yourself immediately.",
+				"Use ask_user for every interactive work-goal question; use work_goal_human_decision only as a durable fallback when ask_user is unavailable or cancelled.",
+				"Do not use work_goal_human_decision for plan approval, permission to continue, clear-winner choices, or artifacts the agent can capture.",
 			],
 			parameters: {
 				...WORK_GOAL_TOOL_SCHEMA,
@@ -10837,6 +10841,19 @@ export default function workModelsExtension(pi) {
 			},
 		});
 	}
+
+	pi.on("tool_call", (event, ctx) => {
+		if (
+			event.toolName === "work_goal_human_decision" &&
+			ctx.hasUI &&
+			pi.getActiveTools?.().includes("ask_user")
+		)
+			return {
+				block: true,
+				reason:
+					"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
+			};
+	});
 
 	pi.on("session_start", (_event, ctx) => {
 		const runtime = {

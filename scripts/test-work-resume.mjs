@@ -15,6 +15,7 @@ import process from "node:process";
 const {
 	buildWorkResumeState,
 	directRoleHandoffParams,
+	executeNumberedWorkAction,
 	handleWorkResumeCommand,
 	renderWorkResumeText,
 } = await import(
@@ -896,6 +897,31 @@ try {
 		directResult.directHandoff?.agent === "bead-debugger" &&
 			directResult.handoffClaimed,
 		"live resume directly launches and claims the exact specialist without a duplicate-writer window",
+	);
+
+	rpcRequest = undefined;
+	const sentBeforeNumberedResume = sent.length;
+	assert(
+		await executeNumberedWorkAction(
+			"/work-resume E-1",
+			{
+				cwd: process.cwd(),
+				ui: { notify: (message, level) => notices.push({ message, level }) },
+				sendUserMessage: async (message, options) =>
+					sent.push({ message, options }),
+			},
+			rpcPi,
+			"the terminal is next to the probe",
+		),
+		"numbered /work-resume action executes",
+	);
+	assert(
+		rpcRequest?.params?.task?.includes("the terminal is next to the probe"),
+		"numbered /work-resume keeps the note on the coded direct handoff",
+	);
+	assert(
+		sent.length === sentBeforeNumberedResume,
+		"numbered /work-resume does not start an autonomous work-goal prompt",
 	);
 
 	process.env.WORK_RESUME_SCENARIO = "blocked";
