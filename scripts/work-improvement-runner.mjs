@@ -166,10 +166,13 @@ export function resolveSourceCheckout(options = {}) {
 	];
 	for (const [source, value] of choices) {
 		if (typeof value !== "string" || !value.trim()) continue;
-		const checked = validateSource(path.resolve(options.baseCwd ?? process.cwd(), value), {
-			runGit,
-			expectedPackageName,
-		});
+		const checked = validateSource(
+			path.resolve(options.baseCwd ?? process.cwd(), value),
+			{
+				runGit,
+				expectedPackageName,
+			},
+		);
 		return { ...checked, resolutionSource: source };
 	}
 	return result("source-unavailable");
@@ -518,7 +521,13 @@ function boundedRegularFile(file, maxBytes = PATCH_EVIDENCE_BYTES) {
 		const buffer = Buffer.alloc(info.size);
 		let offset = 0;
 		while (offset < buffer.length) {
-			const count = readSync(descriptor, buffer, offset, buffer.length - offset, null);
+			const count = readSync(
+				descriptor,
+				buffer,
+				offset,
+				buffer.length - offset,
+				null,
+			);
 			if (count === 0) break;
 			offset += count;
 		}
@@ -533,7 +542,12 @@ function boundedRegularFile(file, maxBytes = PATCH_EVIDENCE_BYTES) {
 function unsafeChangedPath(cwd, paths, runGit) {
 	for (const item of paths) {
 		const file = path.join(cwd, item);
-		const tracked = git(runGit, cwd, ["ls-files", "--error-unmatch", "--", item]);
+		const tracked = git(runGit, cwd, [
+			"ls-files",
+			"--error-unmatch",
+			"--",
+			item,
+		]);
 		try {
 			lstatSync(file);
 		} catch (error) {
@@ -633,12 +647,8 @@ function preservePatchEvidence(sourceCwd, attemptId, worktreeCwd, runGit) {
 		? audit.paths.flatMap((item) => {
 				const file = path.join(worktreeCwd, item);
 				if (
-					git(runGit, worktreeCwd, [
-						"ls-files",
-						"--error-unmatch",
-						"--",
-						item,
-					]).ok
+					git(runGit, worktreeCwd, ["ls-files", "--error-unmatch", "--", item])
+						.ok
 				)
 					return [];
 				const content = boundedRegularFile(file, 8_000);
@@ -709,7 +719,12 @@ function removeAttemptWorktree(sourceCwd, worktreeCwd, runGit) {
 }
 
 function registeredWorktrees(sourceCwd, runGit) {
-	const listed = git(runGit, sourceCwd, ["worktree", "list", "--porcelain", "-z"]);
+	const listed = git(runGit, sourceCwd, [
+		"worktree",
+		"list",
+		"--porcelain",
+		"-z",
+	]);
 	if (!listed.ok)
 		return result("stale-worktree-registration-scan-failed", {
 			detail: bounded(listed.output),
@@ -844,8 +859,7 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 		baseHead: expected.head,
 		upstream: expected.upstream,
 	});
-	if (!claimed.ok)
-		return { ...claimed, state: "deferred", attemptId };
+	if (!claimed.ok) return { ...claimed, state: "deferred", attemptId };
 	const initialBoundary = revalidateMutationBoundary(expected, {
 		runGit,
 		now: seams.now,
@@ -906,8 +920,7 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 				patchArtifact,
 				cleanup,
 			};
-		if (!recorded.ok)
-			return { ...recorded, state, attemptId, patchArtifact };
+		if (!recorded.ok) return { ...recorded, state, attemptId, patchArtifact };
 		return {
 			ok: false,
 			state,
@@ -976,23 +989,23 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 		if (!mutating.ok) return reject(mutating.reason);
 		const improver = await withTimeout(
 			dispatchAgent({
-			agent: "workflow-improver",
-			task: lifecyclePrompt(candidate, attemptId, "workflow-improver"),
-			cwd: worktreeCwd,
-			context: "fresh",
-			async: true,
-			clarify: false,
-			acceptance: false,
-			outputMode: "file-only",
-			activity: "improvement",
-			candidateId: candidate.candidateId,
+				agent: "workflow-improver",
+				task: lifecyclePrompt(candidate, attemptId, "workflow-improver"),
+				cwd: worktreeCwd,
+				context: "fresh",
+				async: true,
+				clarify: false,
+				acceptance: false,
+				outputMode: "file-only",
+				activity: "improvement",
+				candidateId: candidate.candidateId,
 				attemptId,
 				artifactDir: path.join(
 					sourceCwd,
 					".pi",
 					"work-improvement",
 					"artifacts",
-					 safePart(attemptId),
+					safePart(attemptId),
 				),
 			}),
 			seams.agentTimeoutMs ?? 30 * 60 * 1000,
@@ -1011,8 +1024,7 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 		if (!agentOutput(improver)) return reject("improver-empty-output");
 		edited = true;
 		const postImproverBoundary = boundary();
-		if (!postImproverBoundary.ok)
-			return reject(postImproverBoundary.reason);
+		if (!postImproverBoundary.ok) return reject(postImproverBoundary.reason);
 		const worktreeHead = git(runGit, worktreeCwd, ["rev-parse", "HEAD"]);
 		if (!worktreeHead.ok || worktreeHead.output !== expected.head)
 			return reject("agent-created-commit");
@@ -1026,7 +1038,8 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 		if (!audit.ok) return reject(audit.reason);
 		if (audit.paths.length === 0) return reject("empty-candidate-change");
 		const unsafePath = unsafeChangedPath(worktreeCwd, audit.paths, runGit);
-		if (unsafePath) return reject("unsafe-candidate-file", { path: unsafePath });
+		if (unsafePath)
+			return reject("unsafe-candidate-file", { path: unsafePath });
 		const scope = auditCandidatePaths(audit.paths, candidate);
 		if (!scope.ok) return reject(scope.reason, { path: scope.path });
 		const verifying = transition("verifying", { activity: "validation" });
@@ -1090,25 +1103,25 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 		if (beforeReview === "unsafe-file") return reject("unsafe-candidate-file");
 		const reviewer = await withTimeout(
 			dispatchAgent({
-			agent: "workflow-improvement-reviewer",
-			task: lifecyclePrompt(
-				candidate,
-				attemptId,
-				"workflow-improvement-reviewer",
-				{
-					changedPaths: audit.paths,
-					verification: packageVerification,
-					benchmark,
-				},
-			),
-			cwd: worktreeCwd,
-			context: "fresh",
-			async: true,
-			clarify: false,
-			acceptance: false,
-			outputMode: "file-only",
-			activity: "validation",
-			candidateId: candidate.candidateId,
+				agent: "workflow-improvement-reviewer",
+				task: lifecyclePrompt(
+					candidate,
+					attemptId,
+					"workflow-improvement-reviewer",
+					{
+						changedPaths: audit.paths,
+						verification: packageVerification,
+						benchmark,
+					},
+				),
+				cwd: worktreeCwd,
+				context: "fresh",
+				async: true,
+				clarify: false,
+				acceptance: false,
+				outputMode: "file-only",
+				activity: "validation",
+				candidateId: candidate.candidateId,
 				attemptId,
 				readOnly: true,
 				artifactDir: path.join(
@@ -1251,7 +1264,13 @@ export async function runImprovementLifecycle(options = {}, seams = {}) {
 	}
 }
 
-function deliveryTransition(sourceCwd, candidateId, attemptId, state, details = {}) {
+function deliveryTransition(
+	sourceCwd,
+	candidateId,
+	attemptId,
+	state,
+	details = {},
+) {
 	try {
 		appendCandidateTransition(sourceCwd, candidateId, state, {
 			attemptId,
@@ -1356,7 +1375,12 @@ function candidateIntegration(sourceCwd, baseSha, candidateSha, runGit) {
 			`${baseSha}..HEAD`,
 		]);
 		const equivalent = git(runGit, sourceCwd, ["cherry", "HEAD", candidateSha]);
-		if (count.ok && count.output === "1" && equivalent.ok && equivalent.output.startsWith("-"))
+		if (
+			count.ok &&
+			count.output === "1" &&
+			equivalent.ok &&
+			equivalent.output.startsWith("-")
+		)
 			return { ok: true, integrationSha: head.output, recovered: true };
 		return result("integration-diverged");
 	}
@@ -1369,7 +1393,8 @@ function candidateIntegration(sourceCwd, baseSha, candidateSha, runGit) {
 	const integrated = ancestor.ok
 		? git(runGit, sourceCwd, ["merge", "--ff-only", candidateSha])
 		: git(runGit, sourceCwd, ["cherry-pick", candidateSha]);
-	if (!integrated.ok) return result("integration-failed", { detail: bounded(integrated.output) });
+	if (!integrated.ok)
+		return result("integration-failed", { detail: bounded(integrated.output) });
 	const integratedHead = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
 	return integratedHead.ok
 		? { ok: true, integrationSha: integratedHead.output }
@@ -1499,7 +1524,10 @@ async function cancellableValidation(
 
 async function validateRemoteRevision(options, seams, remoteSha, transition) {
 	const runGit = seams.runGit ?? defaultRunGit;
-	const intent = transition("validating", { remoteSha, activity: "validation" });
+	const intent = transition("validating", {
+		remoteSha,
+		activity: "validation",
+	});
 	if (!intent.ok) return intent;
 	const boundary = deliveryBoundary(options.expected, remoteSha, remoteSha, {
 		runGit,
@@ -1525,13 +1553,16 @@ async function validateRemoteRevision(options, seams, remoteSha, transition) {
 	const resolvedValidationCwd = path.resolve(validationCwd);
 	ACTIVE_VALIDATION_WORKTREES.add(resolvedValidationCwd);
 	let heartbeatFailure;
-	const heartbeatTimer = setInterval(() => {
-		const beat = heartbeatLease(options.sourceCwd, options.expected.lease, {
-			now: seams.now,
-			durationMs: seams.leaseDurationMs,
-		});
-		if (!beat.ok) heartbeatFailure = beat;
-	}, seams.heartbeatIntervalMs ?? Math.max(1_000, LEASE_DURATION_MS / 3));
+	const heartbeatTimer = setInterval(
+		() => {
+			const beat = heartbeatLease(options.sourceCwd, options.expected.lease, {
+				now: seams.now,
+				durationMs: seams.leaseDurationMs,
+			});
+			if (!beat.ok) heartbeatFailure = beat;
+		},
+		seams.heartbeatIntervalMs ?? Math.max(1_000, LEASE_DURATION_MS / 3),
+	);
 	heartbeatTimer.unref?.();
 	let validation;
 	try {
@@ -1540,7 +1571,8 @@ async function validateRemoteRevision(options, seams, remoteSha, transition) {
 			"--porcelain=v1",
 			"--untracked-files=all",
 		]);
-		if (!clean.ok || clean.output) validation = result("validation-worktree-dirty");
+		if (!clean.ok || clean.output)
+			validation = result("validation-worktree-dirty");
 		else {
 			if (typeof seams.runPackageVerify !== "function")
 				throw new TypeError("runPackageVerify is required");
@@ -1597,7 +1629,11 @@ async function validateRemoteRevision(options, seams, remoteSha, transition) {
 	}
 	if (validation.reason === "validation-unknown") return validation;
 	ACTIVE_VALIDATION_WORKTREES.delete(resolvedValidationCwd);
-	const cleanup = removeAttemptWorktree(options.sourceCwd, validationCwd, runGit);
+	const cleanup = removeAttemptWorktree(
+		options.sourceCwd,
+		validationCwd,
+		runGit,
+	);
 	return cleanup.ok
 		? validation
 		: result("validation-worktree-cleanup-failed", { cleanup, validation });
@@ -1607,17 +1643,28 @@ async function validateRemoteRevision(options, seams, remoteSha, transition) {
 export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 	const options = deliveryState(rawOptions);
 	const runGit = seams.runGit ?? defaultRunGit;
-	const { sourceCwd, candidateId, attemptId, candidateRef, commitSha } = options;
+	const { sourceCwd, candidateId, attemptId, candidateRef, commitSha } =
+		options;
 	const expected = { ...rawOptions.expected, sourceCwd };
 	options.expected = expected;
 	if (!sourceCwd || !candidateId || !attemptId || !candidateRef || !commitSha)
-		throw new TypeError("sourceCwd, candidateId, attemptId, candidateRef, and commitSha are required");
-	if (!expected.head || !expected.branch || !expected.upstream || !expected.lease)
+		throw new TypeError(
+			"sourceCwd, candidateId, attemptId, candidateRef, and commitSha are required",
+		);
+	if (
+		!expected.head ||
+		!expected.branch ||
+		!expected.upstream ||
+		!expected.lease
+	)
 		throw new TypeError("expected source preflight and lease are required");
 	const transition = (state, details = {}) =>
 		deliveryTransition(sourceCwd, candidateId, attemptId, state, details);
 	const stop = (state, reason, details = {}) => {
-		const recorded = transition(state, { blockerSignature: reason, ...details });
+		const recorded = transition(state, {
+			blockerSignature: reason,
+			...details,
+		});
 		return {
 			ok: false,
 			state,
@@ -1664,7 +1711,10 @@ export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 				...details,
 			};
 		const beforeDelete = candidateRefValue();
-		if (!beforeDelete.ok || (beforeDelete.output && beforeDelete.output !== commitSha))
+		if (
+			!beforeDelete.ok ||
+			(beforeDelete.output && beforeDelete.output !== commitSha)
+		)
 			return stop("manual-recovery", "candidate-ref-mismatch", details);
 		if (beforeDelete.output) {
 			const removed = git(runGit, sourceCwd, [
@@ -1696,12 +1746,16 @@ export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 			: { ...recorded, state: "manual-recovery" };
 	};
 	if (["accepted", "reverted"].includes(options.state))
-		return terminal(options.state, {
-			commitSha,
-			integrationSha: options.integrationSha,
-			revertSha: options.revertSha,
-			remoteSha: options.remoteSha,
-		}, false);
+		return terminal(
+			options.state,
+			{
+				commitSha,
+				integrationSha: options.integrationSha,
+				revertSha: options.revertSha,
+				remoteSha: options.remoteSha,
+			},
+			false,
+		);
 	if (options.state === "cleanup-pending") {
 		if (!["accepted", "reverted"].includes(options.cleanupState))
 			return stop("manual-recovery", "cleanup-state-invalid");
@@ -1713,25 +1767,46 @@ export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 		});
 	}
 	if (options.state === "manual-recovery")
-		return { ok: false, state: options.state, reason: "manual-recovery-persisted" };
+		return {
+			ok: false,
+			state: options.state,
+			reason: "manual-recovery-persisted",
+		};
 	const verifiedRef = candidateRefValue();
 	if (!verifiedRef.ok || verifiedRef.output !== commitSha)
 		return stop("manual-recovery", "candidate-ref-mismatch");
 
 	let integrationSha = options.integrationSha;
 	if (!integrationSha) {
-		const intent = transition("integration-pending", { candidateRef, commitSha });
+		const intent = transition("integration-pending", {
+			candidateRef,
+			commitSha,
+		});
 		if (!intent.ok) return stop("deferred", intent.reason);
 		const currentHead = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
 		if (!currentHead.ok) return stop("deferred", "head-unavailable");
 		if (currentHead.output === expected.head) {
-			const boundary = deliveryBoundary(expected, expected.head, expected.head, { runGit, now: seams.now });
+			const boundary = deliveryBoundary(
+				expected,
+				expected.head,
+				expected.head,
+				{ runGit, now: seams.now },
+			);
 			if (!boundary.ok) return stop("deferred", boundary.reason);
 		}
-		const integrated = candidateIntegration(sourceCwd, expected.head, commitSha, runGit);
+		const integrated = candidateIntegration(
+			sourceCwd,
+			expected.head,
+			commitSha,
+			runGit,
+		);
 		if (!integrated.ok) return stop("manual-recovery", integrated.reason);
 		integrationSha = integrated.integrationSha;
-		const recorded = transition("push-pending", { candidateRef, commitSha, integrationSha });
+		const recorded = transition("push-pending", {
+			candidateRef,
+			commitSha,
+			integrationSha,
+		});
 		if (!recorded.ok) return stop("manual-recovery", recorded.reason);
 	}
 
@@ -1744,65 +1819,128 @@ export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 		const restoresBase = local.ok
 			? git(runGit, sourceCwd, ["diff", "--quiet", expected.head, local.output])
 			: result("head-unavailable");
-		if (local.ok && local.output !== integrationSha && parent.ok &&
-			parent.output === integrationSha && restoresBase.ok) {
+		if (
+			local.ok &&
+			local.output !== integrationSha &&
+			parent.ok &&
+			parent.output === integrationSha &&
+			restoresBase.ok
+		) {
 			revertSha = local.output;
 			const recovered = transition("revert-pending", {
-				commitSha, integrationSha, revertSha, activity: "revert",
+				commitSha,
+				integrationSha,
+				revertSha,
+				activity: "revert",
 			});
 			if (!recovered.ok) return stop("manual-recovery", recovered.reason);
 		}
 	}
 	if (revertSha) {
-		let revertRemote = reconcileRemote(sourceCwd, integrationSha, revertSha, runGit);
+		let revertRemote = reconcileRemote(
+			sourceCwd,
+			integrationSha,
+			revertSha,
+			runGit,
+		);
 		if (revertRemote.ok && revertRemote.classification === "proven-absent")
-			revertRemote = normalPush(sourceCwd, integrationSha, revertSha, pushTarget, runGit,
+			revertRemote = normalPush(
+				sourceCwd,
+				integrationSha,
+				revertSha,
+				pushTarget,
+				runGit,
 				(attempt) => {
-					const intent = transition(attempt ? "revert-push-unknown" : "revert-pending", {
-						commitSha, integrationSha, revertSha, activity: "revert",
-					});
+					const intent = transition(
+						attempt ? "revert-push-unknown" : "revert-pending",
+						{
+							commitSha,
+							integrationSha,
+							revertSha,
+							activity: "revert",
+						},
+					);
 					return intent.ok
-						? deliveryBoundary(expected, revertSha, integrationSha, { runGit, now: seams.now })
+						? deliveryBoundary(expected, revertSha, integrationSha, {
+								runGit,
+								now: seams.now,
+							})
 						: intent;
-				});
+				},
+			);
 		if (!revertRemote.ok)
 			return stop(
-				["fetch-failed", "push-reconciliation-failed"].includes(revertRemote.reason)
+				["fetch-failed", "push-reconciliation-failed"].includes(
+					revertRemote.reason,
+				)
 					? "revert-push-unknown"
 					: "manual-recovery",
 				revertRemote.reason,
 				{ integrationSha, revertSha },
 			);
 		return terminal("reverted", {
-			commitSha, integrationSha, revertSha, remoteSha: revertSha, activity: "revert",
+			commitSha,
+			integrationSha,
+			revertSha,
+			remoteSha: revertSha,
+			activity: "revert",
 		});
 	}
 
-	let reconciliation = reconcileRemote(sourceCwd, expected.head, integrationSha, runGit);
+	let reconciliation = reconcileRemote(
+		sourceCwd,
+		expected.head,
+		integrationSha,
+		runGit,
+	);
 	if (!reconciliation.ok)
 		return stop(
-			["fetch-failed", "push-reconciliation-failed"].includes(reconciliation.reason)
+			["fetch-failed", "push-reconciliation-failed"].includes(
+				reconciliation.reason,
+			)
 				? "push-unknown"
 				: "manual-recovery",
 			reconciliation.reason,
 			{ integrationSha },
 		);
 	if (reconciliation.classification === "proven-absent") {
-		const boundary = deliveryBoundary(expected, integrationSha, expected.head, { runGit, now: seams.now });
+		const boundary = deliveryBoundary(expected, integrationSha, expected.head, {
+			runGit,
+			now: seams.now,
+		});
 		if (!boundary.ok)
-			return stop(boundary.reason === "upstream-diverged" ? "manual-recovery" : "deferred", boundary.reason, { integrationSha });
-		reconciliation = normalPush(sourceCwd, expected.head, integrationSha, pushTarget, runGit,
+			return stop(
+				boundary.reason === "upstream-diverged"
+					? "manual-recovery"
+					: "deferred",
+				boundary.reason,
+				{ integrationSha },
+			);
+		reconciliation = normalPush(
+			sourceCwd,
+			expected.head,
+			integrationSha,
+			pushTarget,
+			runGit,
 			(attempt) => {
 				const intent = transition(attempt ? "push-unknown" : "push-pending", {
-					candidateRef, commitSha, integrationSha,
+					candidateRef,
+					commitSha,
+					integrationSha,
 				});
 				return intent.ok
-					? deliveryBoundary(expected, integrationSha, expected.head, { runGit, now: seams.now })
+					? deliveryBoundary(expected, integrationSha, expected.head, {
+							runGit,
+							now: seams.now,
+						})
 					: intent;
-			});
+			},
+		);
 		if (!reconciliation.ok)
 			return stop(
-				["fetch-failed", "push-reconciliation-failed"].includes(reconciliation.reason)
+				["fetch-failed", "push-reconciliation-failed"].includes(
+					reconciliation.reason,
+				)
 					? "push-unknown"
 					: reconciliation.reason === "remote-diverged"
 						? "manual-recovery"
@@ -1811,10 +1949,19 @@ export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 				{ integrationSha },
 			);
 	}
-	const pushed = transition("pushed", { candidateRef, commitSha, integrationSha, remoteSha: integrationSha });
+	const pushed = transition("pushed", {
+		candidateRef,
+		commitSha,
+		integrationSha,
+		remoteSha: integrationSha,
+	});
 	if (!pushed.ok) return stop("manual-recovery", pushed.reason);
 	const validation = await validateRemoteRevision(
-		{ ...options, expected, integrationSha }, seams, integrationSha, transition);
+		{ ...options, expected, integrationSha },
+		seams,
+		integrationSha,
+		transition,
+	);
 	const validationEvidence = {
 		validationPassed: validation.ok,
 		packagePassed: validation.packageVerification?.passed === true,
@@ -1862,24 +2009,57 @@ export async function runImprovementDelivery(rawOptions = {}, seams = {}) {
 		...validationEvidence,
 	});
 	if (!revertIntent.ok) return stop("manual-recovery", revertIntent.reason);
-	const beforeRevert = deliveryBoundary(expected, integrationSha, integrationSha, { runGit, now: seams.now });
+	const beforeRevert = deliveryBoundary(
+		expected,
+		integrationSha,
+		integrationSha,
+		{ runGit, now: seams.now },
+	);
 	if (!beforeRevert.ok)
-		return stop("manual-recovery", beforeRevert.reason, { integrationSha, validation });
-	const reverted = git(runGit, sourceCwd, ["revert", "--no-edit", integrationSha]);
-	if (!reverted.ok)
-		return stop("manual-recovery", "revert-failed", { integrationSha, validation });
-	const revertHead = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
-	if (!revertHead.ok) return stop("manual-recovery", "revert-sha-unavailable", { integrationSha });
-	revertSha = revertHead.output;
-	const revertPush = normalPush(sourceCwd, integrationSha, revertSha, pushTarget, runGit,
-		(attempt) => {
-			const intent = transition(attempt ? "revert-push-unknown" : "revert-pending", {
-				commitSha, integrationSha, revertSha, activity: "revert",
-			});
-			return intent.ok
-				? deliveryBoundary(expected, revertSha, integrationSha, { runGit, now: seams.now })
-				: intent;
+		return stop("manual-recovery", beforeRevert.reason, {
+			integrationSha,
+			validation,
 		});
+	const reverted = git(runGit, sourceCwd, [
+		"revert",
+		"--no-edit",
+		integrationSha,
+	]);
+	if (!reverted.ok)
+		return stop("manual-recovery", "revert-failed", {
+			integrationSha,
+			validation,
+		});
+	const revertHead = git(runGit, sourceCwd, ["rev-parse", "HEAD"]);
+	if (!revertHead.ok)
+		return stop("manual-recovery", "revert-sha-unavailable", {
+			integrationSha,
+		});
+	revertSha = revertHead.output;
+	const revertPush = normalPush(
+		sourceCwd,
+		integrationSha,
+		revertSha,
+		pushTarget,
+		runGit,
+		(attempt) => {
+			const intent = transition(
+				attempt ? "revert-push-unknown" : "revert-pending",
+				{
+					commitSha,
+					integrationSha,
+					revertSha,
+					activity: "revert",
+				},
+			);
+			return intent.ok
+				? deliveryBoundary(expected, revertSha, integrationSha, {
+						runGit,
+						now: seams.now,
+					})
+				: intent;
+		},
+	);
 	if (!revertPush.ok)
 		return stop(
 			["fetch-failed", "push-reconciliation-failed"].includes(revertPush.reason)
@@ -1936,12 +2116,16 @@ export function currentAutonomousBlocker(options = {}, seams = {}) {
 function fixtureCost(cwd, fixtureId) {
 	const started = Date.now();
 	try {
-		const output = execFileSync(process.execPath, [path.join("scripts", fixtureId)], {
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
-			timeout: 5 * 60 * 1000,
-		});
+		const output = execFileSync(
+			process.execPath,
+			[path.join("scripts", fixtureId)],
+			{
+				cwd,
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "pipe"],
+				timeout: 5 * 60 * 1000,
+			},
+		);
 		return {
 			passed: true,
 			hard: {
@@ -1983,7 +2167,9 @@ function parseBenchmarkAgentSample(response, elapsedMs) {
 	if (!response?.ok || typeof response.output !== "string") return null;
 	let parsed;
 	try {
-		parsed = JSON.parse(response.output.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""));
+		parsed = JSON.parse(
+			response.output.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""),
+		);
 	} catch {
 		return null;
 	}
@@ -1991,7 +2177,9 @@ function parseBenchmarkAgentSample(response, elapsedMs) {
 	return {
 		hard: parsed.hard,
 		cost: {
-			tokens: Number(usage.totalTokens ?? usage.total_tokens ?? parsed.cost?.tokens),
+			tokens: Number(
+				usage.totalTokens ?? usage.total_tokens ?? parsed.cost?.tokens,
+			),
 			latencyMs: Math.max(1, elapsedMs),
 			outputChars: response.output.length,
 			calls: Math.max(1, Number(response.status?.steps?.length ?? 1)),
@@ -2000,51 +2188,92 @@ function parseBenchmarkAgentSample(response, elapsedMs) {
 	};
 }
 
-export async function runAutonomousImprovementBenchmark(sourceCwd, request, dispatchAgent) {
-	const { buildBenchmarkPlan, captureBenchmarkEvidence, evaluateBenchmarkEvidence } = await import("./work-improvement-benchmark.mjs");
+export async function runAutonomousImprovementBenchmark(
+	sourceCwd,
+	request,
+	dispatchAgent,
+) {
+	const {
+		buildBenchmarkPlan,
+		captureBenchmarkEvidence,
+		evaluateBenchmarkEvidence,
+	} = await import("./work-improvement-benchmark.mjs");
 	const plan = request.plan ?? buildBenchmarkPlan(request.changedPaths);
 	if (plan.agentScenarioIds.length && typeof dispatchAgent !== "function")
 		return { passed: false, reason: "agent-benchmark-capability-unavailable" };
 	if (plan.agentScenarioIds.length) {
 		const sourceSha = git(defaultRunGit, sourceCwd, ["rev-parse", "HEAD"]);
-		if (!sourceSha.ok) return { passed: false, reason: "benchmark-source-unavailable" };
-		const environment = { agent: { provider: "pi-subagents", model: "runtime", modelSettings: { agent: "workflow-benchmark" } } };
-		const capture = (cwd, sha, baselineSourceSha) => captureBenchmarkEvidence({
-			sourceSha: sha,
-			baselineSourceSha,
-			changedPaths: request.changedPaths,
-			environment,
-			seams: {
-				runPackageVerify: async () => ({ passed: true }),
-				runDeterministicFixture: (fixtureId) => fixtureCost(cwd, fixtureId),
-				runAgentScenario: async (scenario) => {
-					const started = Date.now();
-					const response = await dispatchAgent({
-						agent: "workflow-benchmark",
-						task: benchmarkAgentPrompt(scenario),
-						cwd,
-						context: "fresh",
-						async: true,
-						clarify: false,
-						acceptance: false,
-						outputMode: "file-only",
-						activity: "benchmark",
-						candidateId: request.candidateId ?? "benchmark",
-						attemptId: `${request.attemptId ?? "benchmark"}-${scenario}-${randomUUID()}`,
-						readOnly: true,
-						artifactDir: path.join(sourceCwd, ".pi", "work-improvement", "artifacts", "benchmark"),
-						signal: request.signal,
-					});
-					return parseBenchmarkAgentSample(response, Date.now() - started) ?? { hard: {}, cost: {} };
-				},
+		if (!sourceSha.ok)
+			return { passed: false, reason: "benchmark-source-unavailable" };
+		const environment = {
+			agent: {
+				provider: "pi-subagents",
+				model: "runtime",
+				modelSettings: { agent: "workflow-benchmark" },
 			},
-		});
+		};
+		const capture = (cwd, sha, baselineSourceSha) =>
+			captureBenchmarkEvidence({
+				sourceSha: sha,
+				baselineSourceSha,
+				changedPaths: request.changedPaths,
+				environment,
+				seams: {
+					runPackageVerify: async () => ({ passed: true }),
+					runDeterministicFixture: (fixtureId) => fixtureCost(cwd, fixtureId),
+					runAgentScenario: async (scenario) => {
+						const started = Date.now();
+						const response = await dispatchAgent({
+							agent: "workflow-benchmark",
+							task: benchmarkAgentPrompt(scenario),
+							cwd,
+							context: "fresh",
+							async: true,
+							clarify: false,
+							acceptance: false,
+							outputMode: "file-only",
+							activity: "benchmark",
+							candidateId: request.candidateId ?? "benchmark",
+							attemptId: `${request.attemptId ?? "benchmark"}-${scenario}-${randomUUID()}`,
+							readOnly: true,
+							artifactDir: path.join(
+								sourceCwd,
+								".pi",
+								"work-improvement",
+								"artifacts",
+								"benchmark",
+							),
+							signal: request.signal,
+						});
+						return (
+							parseBenchmarkAgentSample(response, Date.now() - started) ?? {
+								hard: {},
+								cost: {},
+							}
+						);
+					},
+				},
+			});
 		try {
 			const baseline = await capture(sourceCwd, sourceSha.output, null);
-			const candidate = await capture(request.cwd, `candidate-${sourceSha.output}`, sourceSha.output);
-			return { ...evaluateBenchmarkEvidence(baseline, candidate, { expectedBaselineSha: sourceSha.output }), baseline, candidate };
+			const candidate = await capture(
+				request.cwd,
+				`candidate-${sourceSha.output}`,
+				sourceSha.output,
+			);
+			return {
+				...evaluateBenchmarkEvidence(baseline, candidate, {
+					expectedBaselineSha: sourceSha.output,
+				}),
+				baseline,
+				candidate,
+			};
 		} catch (error) {
-			return { passed: false, reason: "agent-benchmark-failed", output: bounded(error?.message ?? error) };
+			return {
+				passed: false,
+				reason: "agent-benchmark-failed",
+				output: bounded(error?.message ?? error),
+			};
 		}
 	}
 	const baseline = [];
@@ -2058,7 +2287,12 @@ export async function runAutonomousImprovementBenchmark(sourceCwd, request, disp
 		baseline.some((item) => !item.passed) ||
 		candidate.some((item) => !item.passed)
 	)
-		return { passed: false, reason: "deterministic-benchmark-failed", baseline, candidate };
+		return {
+			passed: false,
+			reason: "deterministic-benchmark-failed",
+			baseline,
+			candidate,
+		};
 	const dimensions = ["tokens", "latencyMs", "outputChars", "calls", "retries"];
 	const totals = (runs) =>
 		Object.fromEntries(
@@ -2070,14 +2304,19 @@ export async function runAutonomousImprovementBenchmark(sourceCwd, request, disp
 	const before = totals(baseline);
 	const after = totals(candidate);
 	const ratios = dimensions.map((key) =>
-		before[key] === 0 ? (after[key] === 0 ? 0 : Infinity) : (after[key] - before[key]) / before[key],
+		before[key] === 0
+			? after[key] === 0
+				? 0
+				: Infinity
+			: (after[key] - before[key]) / before[key],
 	);
-	const score = ratios.reduce((sum, value) => sum + value, 0) / dimensions.length;
+	const score =
+		ratios.reduce((sum, value) => sum + value, 0) / dimensions.length;
 	return {
 		passed:
-		ratios.every((value) => value <= 0.1) &&
-		ratios.some((value) => value < 0) &&
-		score <= -0.05,
+			ratios.every((value) => value <= 0.1) &&
+			ratios.some((value) => value < 0) &&
+			score <= -0.05,
 		before,
 		after,
 		score,
@@ -2102,15 +2341,20 @@ export async function runAutonomousImprovement(options = {}, seams = {}) {
 		return { ok: false, state: "deferred", reason: resolved.reason };
 	const sourceCwd = resolved.sourceCwd;
 	const preflight = gitPreflight(sourceCwd, { runGit: seams.runGit });
-	if (!preflight.ok) return deferCandidate(sourceCwd, candidate, preflight.reason);
+	if (!preflight.ok)
+		return deferCandidate(sourceCwd, candidate, preflight.reason);
 	const attemptId = options.attemptId ?? randomUUID();
-	const lease = acquireLease(sourceCwd, {
-		session: options.session,
-		candidate: candidate.candidateId,
-		attempt: attemptId,
-		branch: preflight.branch,
-		head: preflight.head,
-	}, seams.lease);
+	const lease = acquireLease(
+		sourceCwd,
+		{
+			session: options.session,
+			candidate: candidate.candidateId,
+			attempt: attemptId,
+			branch: preflight.branch,
+			head: preflight.head,
+		},
+		seams.lease,
+	);
 	if (!lease.ok) return deferCandidate(sourceCwd, candidate, lease.reason);
 	const expected = { ...preflight, lease: lease.lease };
 	try {
@@ -2132,7 +2376,12 @@ export async function runAutonomousImprovement(options = {}, seams = {}) {
 				dispatchAgent: seams.dispatchAgent,
 				runBenchmarkGate:
 					seams.runBenchmarkGate ??
-					((request) => runAutonomousImprovementBenchmark(sourceCwd, request, seams.dispatchAgent)),
+					((request) =>
+						runAutonomousImprovementBenchmark(
+							sourceCwd,
+							request,
+							seams.dispatchAgent,
+						)),
 			},
 		);
 		if (!lifecycle.ok || lifecycle.state !== "committed") return lifecycle;
@@ -2151,64 +2400,121 @@ export async function runAutonomousImprovement(options = {}, seams = {}) {
 		return delivery;
 	} finally {
 		const released = releaseLease(sourceCwd, lease.lease);
-		if (!released.ok && typeof seams.onReleaseError === "function") seams.onReleaseError(released);
+		if (!released.ok && typeof seams.onReleaseError === "function")
+			seams.onReleaseError(released);
 	}
 }
 
-const PRECOMMIT_RECOVERY_STATES = new Set(["claimed", "preparing", "mutating", "verifying", "commit-pending"]);
-const DELIVERY_RECOVERY_STATES = new Set(["committed", "integration-pending", "push-pending", "push-unknown", "pushed", "validating", "revert-pending", "revert-push-unknown", "cleanup-pending", "accepted", "reverted"]);
+const PRECOMMIT_RECOVERY_STATES = new Set([
+	"claimed",
+	"preparing",
+	"mutating",
+	"verifying",
+	"commit-pending",
+]);
+const DELIVERY_RECOVERY_STATES = new Set([
+	"committed",
+	"integration-pending",
+	"push-pending",
+	"push-unknown",
+	"pushed",
+	"validating",
+	"revert-pending",
+	"revert-push-unknown",
+	"cleanup-pending",
+	"accepted",
+	"reverted",
+]);
 
 /** Recover persisted attempts only after atomically proving no live writer owns the checkout. */
-export async function reconcileAutonomousImprovement(sourceCwd, options = {}, seams = {}) {
+export async function reconcileAutonomousImprovement(
+	sourceCwd,
+	options = {},
+	seams = {},
+) {
 	const state = readCandidateState(sourceCwd);
 	const reconciled = [];
 	for (const candidate of state.candidates.values()) {
-		if (!PRECOMMIT_RECOVERY_STATES.has(candidate.state) && !DELIVERY_RECOVERY_STATES.has(candidate.state)) continue;
-		const lease = acquireLease(sourceCwd, {
-			session: options.session,
-			candidate: candidate.candidateId,
-			attempt: candidate.attemptId,
-			branch: candidate.branch,
-			head: candidate.baseHead,
-		}, seams.lease);
+		if (
+			!PRECOMMIT_RECOVERY_STATES.has(candidate.state) &&
+			!DELIVERY_RECOVERY_STATES.has(candidate.state)
+		)
+			continue;
+		const lease = acquireLease(
+			sourceCwd,
+			{
+				session: options.session,
+				candidate: candidate.candidateId,
+				attempt: candidate.attemptId,
+				branch: candidate.branch,
+				head: candidate.baseHead,
+			},
+			seams.lease,
+		);
 		if (!lease.ok) continue;
 		try {
 			if (PRECOMMIT_RECOVERY_STATES.has(candidate.state)) {
-				appendCandidateTransition(sourceCwd, candidate.candidateId, "deferred", {
-					attemptId: candidate.attemptId,
-					blockerSignature: `restart-pending:${candidate.state}`,
-					activity: "improvement",
-				});
+				appendCandidateTransition(
+					sourceCwd,
+					candidate.candidateId,
+					"deferred",
+					{
+						attemptId: candidate.attemptId,
+						blockerSignature: `restart-pending:${candidate.state}`,
+						activity: "improvement",
+					},
+				);
 				reconciled.push(candidate.candidateId);
 				continue;
 			}
-			if (!candidate.candidateRef || !candidate.commitSha || !candidate.branch || !candidate.baseHead || !candidate.upstream) {
-				appendCandidateTransition(sourceCwd, candidate.candidateId, "manual-recovery", {
-					attemptId: candidate.attemptId,
-					blockerSignature: "restart-metadata-missing",
-					activity: "improvement",
-				});
+			if (
+				!candidate.candidateRef ||
+				!candidate.commitSha ||
+				!candidate.branch ||
+				!candidate.baseHead ||
+				!candidate.upstream
+			) {
+				appendCandidateTransition(
+					sourceCwd,
+					candidate.candidateId,
+					"manual-recovery",
+					{
+						attemptId: candidate.attemptId,
+						blockerSignature: "restart-metadata-missing",
+						activity: "improvement",
+					},
+				);
 				reconciled.push(candidate.candidateId);
 				continue;
 			}
-			await runImprovementDelivery({
-				sourceCwd,
-				candidateId: candidate.candidateId,
-				attemptId: candidate.attemptId,
-				candidateRef: candidate.candidateRef,
-				commitSha: candidate.commitSha,
-				integrationSha: candidate.integrationSha,
-				remoteSha: candidate.remoteSha,
-				revertSha: candidate.revertSha,
-				changedPaths: candidate.changedPaths ?? [],
-				state: candidate.state,
-				cleanupState: candidate.cleanupState,
-				expected: { sourceCwd, branch: candidate.branch, head: candidate.baseHead, upstream: candidate.upstream, lease: lease.lease },
-			}, seams);
+			await runImprovementDelivery(
+				{
+					sourceCwd,
+					candidateId: candidate.candidateId,
+					attemptId: candidate.attemptId,
+					candidateRef: candidate.candidateRef,
+					commitSha: candidate.commitSha,
+					integrationSha: candidate.integrationSha,
+					remoteSha: candidate.remoteSha,
+					revertSha: candidate.revertSha,
+					changedPaths: candidate.changedPaths ?? [],
+					state: candidate.state,
+					cleanupState: candidate.cleanupState,
+					expected: {
+						sourceCwd,
+						branch: candidate.branch,
+						head: candidate.baseHead,
+						upstream: candidate.upstream,
+						lease: lease.lease,
+					},
+				},
+				seams,
+			);
 			reconciled.push(candidate.candidateId);
 		} finally {
 			const released = releaseLease(sourceCwd, lease.lease);
-			if (!released.ok && typeof seams.onReleaseError === "function") seams.onReleaseError(released);
+			if (!released.ok && typeof seams.onReleaseError === "function")
+				seams.onReleaseError(released);
 		}
 	}
 	return reconciled;

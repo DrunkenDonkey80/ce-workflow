@@ -715,10 +715,17 @@ function recordImprovementError(cwd, terminal, reason, error) {
 }
 
 function processTerminalAttached(cwd, terminal, runtime) {
-	return Promise.resolve(processTerminalWorkflow(cwd, terminal, runtime)).catch((error) => {
-		recordImprovementError(cwd, terminal, "terminal-processing-failed", error);
-		return { status: "deferred", reason: "terminal-processing-failed" };
-	});
+	return Promise.resolve(processTerminalWorkflow(cwd, terminal, runtime)).catch(
+		(error) => {
+			recordImprovementError(
+				cwd,
+				terminal,
+				"terminal-processing-failed",
+				error,
+			);
+			return { status: "deferred", reason: "terminal-processing-failed" };
+		},
+	);
 }
 
 function completeWorkflowOnce(cwd, completion, runtime = {}) {
@@ -743,7 +750,12 @@ function completeWorkflowOnce(cwd, completion, runtime = {}) {
 		try {
 			terminal = JSON.parse(readFileSync(claim, "utf8").trim());
 		} catch (readError) {
-			recordImprovementError(cwd, completion, "terminal-claim-read-failed", readError);
+			recordImprovementError(
+				cwd,
+				completion,
+				"terminal-claim-read-failed",
+				readError,
+			);
 			return "";
 		}
 	} finally {
@@ -757,7 +769,9 @@ export async function recoverTerminalWorkflowClaims(cwd, runtime = {}) {
 	const claims = join(telemetryDir(cwd), "claims");
 	if (!existsSync(claims)) return [];
 	const recovered = [];
-	for (const name of readdirSync(claims).filter((item) => item.endsWith(".complete"))) {
+	for (const name of readdirSync(claims).filter((item) =>
+		item.endsWith(".complete"),
+	)) {
 		let terminal;
 		try {
 			terminal = JSON.parse(readFileSync(join(claims, name), "utf8").trim());
@@ -767,7 +781,8 @@ export async function recoverTerminalWorkflowClaims(cwd, runtime = {}) {
 		}
 		try {
 			const result = await processTerminalWorkflow(cwd, terminal, runtime);
-			if (result.status !== "already-analyzed") recovered.push(terminal.workflowRunId);
+			if (result.status !== "already-analyzed")
+				recovered.push(terminal.workflowRunId);
 		} catch (error) {
 			recordImprovementError(cwd, terminal, "startup-analysis-failed", error);
 		}
@@ -821,7 +836,9 @@ export async function processTerminalWorkflow(cwd, terminal, runtime = {}) {
 	if (runtime.mode === "print" || runtime.json === true)
 		return { status: "suppressed", reason: "output-only-mode" };
 	const runner = await import(
-		pathToFileURL(join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs")).href
+		pathToFileURL(
+			join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs"),
+		).href
 	);
 	const settings = readSettings(cwd);
 	const resolved = runner.resolveSourceCheckout({
@@ -915,7 +932,12 @@ export async function processTerminalWorkflow(cwd, terminal, runtime = {}) {
 			},
 		);
 	})();
-	activeImprovementRuns.set(sourceCwd, { controller, promise: run, cwd, terminal });
+	activeImprovementRuns.set(sourceCwd, {
+		controller,
+		promise: run,
+		cwd,
+		terminal,
+	});
 	run
 		.catch((error) =>
 			recordImprovementError(cwd, terminal, "autonomous-run-failed", error),
@@ -5190,7 +5212,11 @@ function readContainedFile(file, directory, maxBytes) {
 		if (!rel || dirname(rel) !== "." || isAbsolute(rel)) return null;
 		const target = join(realpathSync(directory), rel);
 		const pathInfo = lstatSync(target);
-		if (!pathInfo.isFile() || pathInfo.isSymbolicLink() || pathInfo.size > maxBytes)
+		if (
+			!pathInfo.isFile() ||
+			pathInfo.isSymbolicLink() ||
+			pathInfo.size > maxBytes
+		)
 			return null;
 		descriptor = openSync(
 			target,
@@ -5207,7 +5233,13 @@ function readContainedFile(file, directory, maxBytes) {
 		const buffer = Buffer.alloc(info.size);
 		let offset = 0;
 		while (offset < buffer.length) {
-			const count = readSync(descriptor, buffer, offset, buffer.length - offset, null);
+			const count = readSync(
+				descriptor,
+				buffer,
+				offset,
+				buffer.length - offset,
+				null,
+			);
 			if (count === 0) break;
 			offset += count;
 		}
@@ -5241,7 +5273,8 @@ export async function dispatchWorkflowImprovementAgent(
 	timeoutMs = 30 * 60 * 1000,
 ) {
 	const { signal, ...rpcParams } = params;
-	if (signal?.aborted) return { ok: false, aborted: true, message: "agent dispatch aborted" };
+	if (signal?.aborted)
+		return { ok: false, aborted: true, message: "agent dispatch aborted" };
 	if (!isAbsolute(rpcParams.artifactDir ?? ""))
 		return { ok: false, message: "absolute artifactDir is required" };
 	mkdirSync(rpcParams.artifactDir, { recursive: true });
@@ -5268,12 +5301,26 @@ export async function dispatchWorkflowImprovementAgent(
 		return { ...response, timedOut: Boolean(response.ambiguous) };
 	const identity = asyncRunIdentity(response);
 	if (!identity.runId || !isAbsolute(identity.asyncDir ?? ""))
-		return { ok: false, message: "pi-subagents returned no async run identity", ...identity };
+		return {
+			ok: false,
+			message: "pi-subagents returned no async run identity",
+			...identity,
+		};
 	for (;;) {
 		if (signal?.aborted)
-			return { ok: false, aborted: true, message: "agent dispatch aborted", ...identity };
+			return {
+				ok: false,
+				aborted: true,
+				message: "agent dispatch aborted",
+				...identity,
+			};
 		if (Date.now() - started >= timeoutMs)
-			return { ok: false, timedOut: true, message: "agent run timed out", ...identity };
+			return {
+				ok: false,
+				timedOut: true,
+				message: "agent run timed out",
+				...identity,
+			};
 		const statusPath = join(identity.asyncDir, "status.json");
 		let status;
 		try {
@@ -5295,7 +5342,12 @@ export async function dispatchWorkflowImprovementAgent(
 				WORKFLOW_AGENT_OUTPUT_BYTES,
 			);
 			if (!safeArtifact)
-				return { ok: false, message: "unsafe or missing agent artifact", status, ...identity };
+				return {
+					ok: false,
+					message: "unsafe or missing agent artifact",
+					status,
+					...identity,
+				};
 			return {
 				ok: true,
 				response,
@@ -5307,7 +5359,14 @@ export async function dispatchWorkflowImprovementAgent(
 		}
 		await new Promise((resolvePoll) => {
 			const timer = setTimeout(resolvePoll, WORKFLOW_AGENT_POLL_MS);
-			signal?.addEventListener("abort", () => { clearTimeout(timer); resolvePoll(); }, { once: true });
+			signal?.addEventListener(
+				"abort",
+				() => {
+					clearTimeout(timer);
+					resolvePoll();
+				},
+				{ once: true },
+			);
 		});
 	}
 }
@@ -10710,7 +10769,7 @@ export default function workModelsExtension(pi) {
 				const runner = await import(
 					pathToFileURL(
 						join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs"),
-					).href,
+					).href
 				);
 				const settings = readSettings(ctx.cwd);
 				const resolved = runner.resolveSourceCheckout({
@@ -10768,16 +10827,22 @@ export default function workModelsExtension(pi) {
 		clearWorkGoalUsageLimitTimer();
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 		stopWorkGoalProgressTimer(ctx);
-		const active = [...activeImprovementRuns.values()].filter((run) => run.cwd === ctx.cwd);
-		for (const run of active) run.controller.abort(new Error("session shutdown"));
+		const active = [...activeImprovementRuns.values()].filter(
+			(run) => run.cwd === ctx.cwd,
+		);
+		for (const run of active)
+			run.controller.abort(new Error("session shutdown"));
 		if (active.length) {
 			let timer;
 			const settled = await Promise.race([
 				Promise.allSettled(active.map((run) => run.promise)).then(() => true),
-				new Promise((resolveWait) => { timer = setTimeout(() => resolveWait(false), 2_000); }),
+				new Promise((resolveWait) => {
+					timer = setTimeout(() => resolveWait(false), 2_000);
+				}),
 			]);
 			clearTimeout(timer);
-			if (!settled) recordImprovementError(ctx.cwd, {}, "shutdown-cleanup-deferred");
+			if (!settled)
+				recordImprovementError(ctx.cwd, {}, "shutdown-cleanup-deferred");
 		}
 	});
 
