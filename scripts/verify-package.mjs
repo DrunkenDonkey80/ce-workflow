@@ -698,6 +698,7 @@ for (const script of [
 	"test-work-settings.mjs",
 	"test-work-intake.mjs",
 	"test-work-pause.mjs",
+	"test-work-plan-open-questions.mjs",
 	"test-work-debug.mjs",
 	"test-work-add.mjs",
 	"test-work-auto.mjs",

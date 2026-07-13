@@ -55,7 +55,7 @@ If it reports independent review required, launch exactly one `bead-reviewer`, r
 - **goal** — autonomous current-session loop with on-demand microcompaction. Work inline; exact specialists only for the cases above. Completion requires verified evidence.
 - **debug** — exact `bead-debugger`, then one scoped reviewer only after a verified fix; coded finalizer commits.
 - **auto** — trust the extension's deterministic classification; do not reclassify with an LLM.
-- **plan/master** — use `ce-plan` and planner/advisor only when requirements are genuinely semantic or uncertain.
+- **plan/master** — use `ce-plan` and planner/advisor only when requirements are genuinely semantic or uncertain. master mode must clear the Open Question Gate: `/work-plan` scans the plan for unresolved open questions (including non-blocking ones with a stated default) and blocks epic creation until each is resolved via one `ask_user`, then re-run.
 - **migrate** — exact `bead-migrator`; source and branch inspection is read-only.
 - **init/status/report/usage/telemetry/roadmap/add/pause/finish** — deterministic extension paths; no agent.
 

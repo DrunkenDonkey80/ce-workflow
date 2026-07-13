@@ -196,8 +196,9 @@ try {
 		"work-plan initializes before ce-plan handoff",
 	);
 	assert(
-		state.nextAction.includes("/work-plan <plan-path>"),
-		"raw work-plan reports next command",
+		state.nextAction.includes("bootstrap-plan-epic") &&
+			!state.nextAction.includes("/work-plan <plan-path>"),
+		"raw work-plan bootstraps the epic in-flow instead of asking to re-run /work-plan",
 	);
 	assert(
 		state.handoffPrompt.includes("Preserve every decided requirement") &&

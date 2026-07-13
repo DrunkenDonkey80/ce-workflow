@@ -5,11 +5,8 @@ argument-hint: "<idea-or-plan-file>"
 
 Use the `work-orchestrator` skill in mode: `master` via `/work-plan`.
 
-If the input is a raw idea or non-plan artifact, run `ce-plan` first, asking clarification questions one at a time when the input is broad, important, or underspecified. Auto-accept only skips the final write-confirmation after discovery is clear; it does not skip questions. Then call `/work-plan <created-plan-path>`.
+If the input is a raw idea or non-plan artifact, run `ce-plan` first, asking clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions. Then create the epic in-flow via `node scripts/work-helper.mjs bootstrap-plan-epic <created-plan-path>` — that helper enforces the Open Question Gate, so resolve each remaining open question via one `ask_user`, fold it into the plan, and re-run until it creates the epic.
 
 Task: $ARGUMENTS
 
-Final line must be one of:
-
-- `Next: /work-plan <created-plan-path>` after ce-plan writes a plan.
-- `Next: /work-resume` after the epic and first planning Bead exists.
+Final line: once the helper creates the epic, `Next: /work-resume <epic-id>` (then plan and start each slice).

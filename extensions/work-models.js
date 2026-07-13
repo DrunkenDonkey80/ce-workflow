@@ -6922,6 +6922,148 @@ function planEpicFields(cwd, rel) {
 	};
 }
 
+export function scanPlanOpenQuestions(text) {
+	const body = stripFrontmatter(String(text ?? ""));
+	const lines = body.split(/\r?\n/);
+	const questions = [];
+	const seen = new Set();
+	const isOpenQuestionHeading = (heading) =>
+		/^\s*#{1,4}\s+.*\bopen\s+questions?\b/i.test(heading) &&
+		!/resolved|remain|closed|answered|decided|waived/i.test(heading);
+	const isResolvedMarker = (line) =>
+		/\b(?:confirmed|resolved|decided|waived|closed)\b/i.test(line) ||
+		/→\s*confirmed/i.test(line);
+	const pushQuestion = (raw) => {
+		const clean = String(raw).replace(/`/g, "").replace(/\*\*/g, "").trim();
+		if (!clean || isResolvedMarker(clean)) return;
+		const id = clean.match(/\b(OQ-\d+|Q\d+)\b/i)?.[1] ?? null;
+		const dedupe = id || clean.slice(0, 120);
+		if (seen.has(dedupe)) return;
+		seen.add(dedupe);
+		const defaultMatch =
+			clean.match(
+				/\bdefault(?:\s+if\s+no\s+answer)?\s*[:-]\s*(.+?)(?:[.;]\s|$)/i,
+			) || clean.match(/\(default[:\s]+(.+?)\)/i);
+		const suggested = defaultMatch
+			? defaultMatch[1].replace(/[.;].*$/, "").trim()
+			: null;
+		questions.push({ id, text: clean, suggested_default: suggested });
+	};
+	let inSection = false;
+	let sectionLevel = 99;
+	for (const line of lines) {
+		const heading = line.match(/^(#{1,4})\s+(.*)$/);
+		if (heading) {
+			if (inSection && heading[1].length <= sectionLevel) inSection = false;
+			else if (!inSection && isOpenQuestionHeading(line)) {
+				inSection = true;
+				sectionLevel = heading[1].length;
+			}
+			continue;
+		}
+		if (!inSection) continue;
+		const bullet = line.match(/^\s*(?:[-*+]|\d+[.)])\s+(.*)$/);
+		if (bullet) pushQuestion(bullet[1]);
+	}
+	for (const line of lines) {
+		if (!/\b(OQ-\d+|Q\d+)\b/i.test(line) || isResolvedMarker(line)) continue;
+		const bullet = line.match(/^\s*(?:[-*+]|\d+[.)])\s+(.*)$/);
+		if (bullet) pushQuestion(bullet[1]);
+	}
+	return questions;
+}
+
+function openQuestionsBlockState(cwd, rel, questions, command, git, init) {
+	const listing = questions
+		.map((question, index) => {
+			const id = question.id || `OQ-${index + 1}`;
+			const suffix = question.suggested_default
+				? ` (suggested default: ${question.suggested_default})`
+				: "";
+			return `- ${id}: ${question.text}${suffix}`;
+		})
+		.join("\n");
+	return {
+		ok: true,
+		action: "open-questions-block",
+		plan: rel,
+		open_questions: questions,
+		git,
+		message: `${init?.initialized ? `${init.message} ` : ""}Epic creation blocked: ${rel} has ${questions.length} unresolved open question(s). Resolve them, then re-run ${command} ${rel}.`,
+		warnings: git?.warnings ?? [],
+		handoffPrompt: [
+			`work-orchestrator OPEN-QUESTION GATE: ${command} is blocked because ${rel} still has ${questions.length} open question(s). Do NOT create the epic until the plan is decision-complete.`,
+			"Resolve every open question in the current session, one ask_user call per question:",
+			`Open questions:\n${listing}`,
+			"For EACH question run exactly one ask_user call: show the question text, offer its suggested default as the recommended option, allow a freeform answer, and allow an explicit 'waive — defer to a decision Bead' option. A default is a suggestion to present, never a silent resolution; do not skip a question or accept its default without asking.",
+			"After each answer, edit the plan to fold the decision in: move the item out of the Open Questions section into Decisions/Assumptions as a confirmed decision (or, for a waiver, mark it 'waived' and create/reuse a decision Bead). Items marked confirmed/resolved/decided/waived are ignored by the gate.",
+			`When zero open questions remain, re-run ${command} ${rel}; the extension re-scans and creates the epic automatically.`,
+			ROLE_TIMEOUT_GUIDANCE,
+		].join("\n"),
+		suggestedCommands: [`${command} ${rel}`],
+		nextAction: `Next: resolve the ${questions.length} open question(s) via ask_user, then re-run ${command} ${rel}.`,
+	};
+}
+
+export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
+	const planText = readFileSync(join(cwd, rel), "utf8");
+	const gitReport = git ?? resumeGitReport(cwd, [rel]);
+	const initReport = init ?? ensureBeadsInitialized(cwd);
+	const openQuestions = scanPlanOpenQuestions(planText);
+	if (openQuestions.length)
+		return openQuestionsBlockState(
+			cwd,
+			rel,
+			openQuestions,
+			command,
+			gitReport,
+			initReport,
+		);
+	if (!safeForPlanBootstrap(cwd, gitReport, rel))
+		return planBootstrapDirtyStop(cwd, gitReport, rel, command);
+	const fields = planEpicFields(cwd, rel);
+	const epic = createBead(cwd, {
+		title: fields.title,
+		type: "epic",
+		description: fields.description,
+		designFile: fields.designFile,
+		acceptance: fields.acceptance,
+		notes: fields.notes,
+	});
+	rememberWorkflowEpic(cwd, epic);
+	const planning = createBead(cwd, {
+		title: `Plan next slice for ${fields.title}`,
+		type: "task",
+		parent: idOf(epic),
+		notes: workflowBeadNotes(command, fields.title, [
+			"wo:planning",
+			`source plan: ${rel}`,
+			fields.ideaId ? `idea-id=${fields.ideaId}` : "",
+			"create one executable slice by default",
+		]),
+	});
+	if (fields.ideaId)
+		appendBeadNote(
+			cwd,
+			fields.ideaId,
+			`wo:idea status=discussed plan-path=${rel} epic-id=${idOf(epic)} task-id=${idOf(planning)}`,
+		);
+	return withHandoffPrompt(
+		{
+			ok: true,
+			action: "run-planner",
+			epic: issueSummary(epic),
+			selectedBead: issueSummary(planning),
+			git: gitReport,
+			message: `${initReport.initialized ? `${initReport.message} ` : ""}Created epic ${idOf(epic)} and planning Bead ${idOf(planning)} from ${rel}.`,
+			warnings: gitReport.warnings,
+			suggestedCommands: [`/work-resume ${idOf(epic)}`],
+			nextAction: `Next: run /work-resume ${idOf(epic)} to plan and start the first slice.`,
+		},
+		cwd,
+	);
+}
+
 const IDEA_ACTIONS = new Set([
 	"accept",
 	"reject",
@@ -7783,7 +7925,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			message: `${init.initialized ? `${init.message} ` : ""}${message}`,
 			...extra,
 			handoffPrompt: [
-				"Use ce-plan to convert this input into a detailed master roadmap plan, then run /work-plan with the produced plan path.",
+				"Use ce-plan to convert this input into a detailed master roadmap plan, then create the epic from it in this same flow; do not stop and ask the user to re-run /work-plan.",
 				sourceArtifacts.length
 					? `Source artifacts to read and cite verbatim in the final plan: ${sourceArtifacts.join(", ")}`
 					: "",
@@ -7792,7 +7934,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				"Trace each source decision into exactly one place: plan requirement, implementation unit, verification/acceptance proof, explicit open question, or intentionally dropped-with-rationale note.",
 				"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
 				"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker Bead instruction, or an explicit user waiver; never leave it as passive risk prose.",
-				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Only then return the plan path and run /work-plan <plan-path>.",
+				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Then create the epic in this same flow: run `node scripts/work-helper.mjs bootstrap-plan-epic <plan-path>`. That helper enforces the Open Question Gate; if it reports open-questions-block, resolve each open question via one ask_user (show the question and its suggested default), fold the answer into the plan, and re-run the helper until it creates the epic. Do NOT run /work-resume before the epic exists. Once the helper returns the epic id, end with Next: /work-resume <epic-id>.",
 				"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
 				detail,
 				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
@@ -7803,9 +7945,9 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			].join("\n"),
 			git: masterGit,
 			warnings: masterGit.warnings,
-			suggestedCommands: ["/work-plan <path-to-created-plan>"],
+			suggestedCommands: [],
 			nextAction:
-				"Next: after ce-plan writes the roadmap, run /work-plan <plan-path>.",
+				"Next: after ce-plan writes the plan, bootstrap the epic with `node scripts/work-helper.mjs bootstrap-plan-epic <plan-path>` (runs the Open Question Gate), then resume the epic.",
 		});
 		const planTarget = splitPlanTarget(input);
 		const targetLooksEpic =
@@ -7896,8 +8038,6 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				"Source artifact needs ce-plan before epic creation.",
 				`Source: ${first}`,
 			);
-		if (!safeForPlanBootstrap(cwd, masterGit, first))
-			return planBootstrapDirtyStop(cwd, masterGit, first, command);
 		const alignment = planSourceAlignmentReport(cwd, first);
 		if (!alignment.ok)
 			return errorState(
@@ -7909,47 +8049,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					suggestedCommands: [`${command} ${first}`],
 				},
 			);
-		const fields = planEpicFields(cwd, first);
-		const epic = createBead(cwd, {
-			title: fields.title,
-			type: "epic",
-			description: fields.description,
-			designFile: fields.designFile,
-			acceptance: fields.acceptance,
-			notes: fields.notes,
-		});
-		rememberWorkflowEpic(cwd, epic);
-		const planning = createBead(cwd, {
-			title: `Plan next slice for ${fields.title}`,
-			type: "task",
-			parent: idOf(epic),
-			notes: workflowBeadNotes(command, fields.title, [
-				"wo:planning",
-				`source plan: ${first}`,
-				fields.ideaId ? `idea-id=${fields.ideaId}` : "",
-				"create one executable slice by default",
-			]),
-		});
-		if (fields.ideaId)
-			appendBeadNote(
-				cwd,
-				fields.ideaId,
-				`wo:idea status=discussed plan-path=${first} epic-id=${idOf(epic)} task-id=${idOf(planning)}`,
-			);
-		return withHandoffPrompt(
-			{
-				ok: true,
-				action: "run-planner",
-				epic: issueSummary(epic),
-				selectedBead: issueSummary(planning),
-				git: masterGit,
-				message: `${init.initialized ? `${init.message} ` : ""}Created epic ${idOf(epic)} and planning Bead ${idOf(planning)}.`,
-				warnings: masterGit.warnings,
-				suggestedCommands: [`/work-resume ${idOf(epic)}`],
-				nextAction: `Next: planner will create the first slice; then run /work-resume ${idOf(epic)}.`,
-			},
-			cwd,
-		);
+		return bootstrapPlanEpic(cwd, first, command, masterGit, init);
 	} catch (error) {
 		return errorState(error.reason ?? "beads-error", error.message, {
 			action: error.reason ?? "beads-error",

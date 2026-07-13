@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
@@ -600,6 +601,37 @@ try {
 			else if (args[i] === "--remove") argv.push("--remove-label", args[++i]);
 		}
 		print(summary(one(bd(argv)), 300));
+	} else if (command === "bootstrap-plan-epic") {
+		const [rel] = positional();
+		if (!rel) throw new Error("usage: bootstrap-plan-epic <plan-path>");
+		const modUrl = pathToFileURL(
+			path.join(import.meta.dirname, "..", "extensions", "work-models.js"),
+		).href;
+		const bridge = `(async () => {
+			const { bootstrapPlanEpic } = await import(${JSON.stringify(modUrl)});
+			const s = bootstrapPlanEpic(${JSON.stringify(cwd)}, ${JSON.stringify(rel)});
+			const slim = {
+				ok: !!s.ok,
+				action: s.action,
+				epic_id: s.epic?.id ?? null,
+				epic_title: s.epic?.title ?? null,
+				planning_id: s.selectedBead?.id ?? null,
+				open_questions: s.open_questions ?? [],
+				message: s.message ?? "",
+				nextAction: s.nextAction ?? "",
+			};
+			process.stdout.write(JSON.stringify(slim));
+		})();`;
+		let raw = "";
+		try {
+			raw = run(process.execPath, ["--input-type=module", "-e", bridge]);
+		} catch (error) {
+			raw = String(error.stdout ?? "");
+			if (!raw) throw error;
+		}
+		const parsed = JSON.parse(raw || "{}");
+		print(parsed);
+		if (parsed.action !== "run-planner") process.exitCode = 1;
 	} else if (command === "json-assert") {
 		const failures = jsonAssertionFailures(args[0]);
 		print({
@@ -609,7 +641,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <bd-summary|bd-children-summary|bd-ready-summary|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|bd-claim|bd-note|bd-block|bd-label|json-assert> ...",
+			"usage: work-helper <bd-summary|bd-children-summary|bd-ready-summary|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|bd-claim|bd-note|bd-block|bd-label|bootstrap-plan-epic|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}
