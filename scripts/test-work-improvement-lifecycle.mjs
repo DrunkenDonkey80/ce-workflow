@@ -905,11 +905,10 @@ try {
 	const benchmarkRepo = fixture("production-benchmark");
 	mkdirSync(path.join(benchmarkRepo.source, "scripts"));
 	mkdirSync(path.join(benchmarkRepo.source, "agents"));
-	for (const script of ["test-work-models.mjs", "test-work-settings.mjs"])
-		writeFileSync(
-			path.join(benchmarkRepo.source, "scripts", script),
-			"Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 150); process.stdout.write('ok')\n",
-		);
+	writeFileSync(
+		path.join(benchmarkRepo.source, "scripts", "test-work-settings.mjs"),
+		"Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 150); process.stdout.write('ok')\n",
+	);
 	writeFileSync(
 		path.join(benchmarkRepo.source, "agents", "workflow-benchmark.md"),
 		"# Workflow benchmark\nRun read-only and return the requested JSON metrics.\n",
@@ -922,11 +921,10 @@ try {
 		"benchmark-candidate",
 	);
 	mkdirSync(path.join(benchmarkCandidate, "scripts"), { recursive: true });
-	for (const script of ["test-work-models.mjs", "test-work-settings.mjs"])
-		writeFileSync(
-			path.join(benchmarkCandidate, "scripts", script),
-			"process.stdout.write('ok')\n",
-		);
+	writeFileSync(
+		path.join(benchmarkCandidate, "scripts", "test-work-settings.mjs"),
+		"process.stdout.write('ok')\n",
+	);
 	let agentBenchmarkCalls = 0;
 	const productionBenchmark = await runAutonomousImprovementBenchmark(
 		benchmarkRepo.source,

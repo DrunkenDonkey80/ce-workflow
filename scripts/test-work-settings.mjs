@@ -165,7 +165,6 @@ try {
 		"brainstorm stays low default",
 	);
 
-	// Submenu loop: opening then choosing "done" exits cleanly.
 	const commands = {};
 	mod.default({
 		on: () => {},
@@ -173,18 +172,95 @@ try {
 			commands[name] = config;
 		},
 	});
+	assert(!commands["work-models"], "redundant work-models command removed");
+
 	const notices = [];
+	const customUi = (actions, options = {}) => ({
+		notify: (message, level) => notices.push({ message, level }),
+		input: options.input ?? (async () => undefined),
+		select: options.select ?? (async () => undefined),
+		custom: async (factory) => {
+			let result;
+			let closed = false;
+			const component = factory(
+				{ requestRender() {} },
+				{
+					fg: (color, text) => `[${color}]${text}[/${color}]`,
+					bold: (text) => text,
+				},
+				{
+					matches: (data, id) =>
+						(id === "tui.select.up" && data === "up") ||
+						(id === "tui.select.down" && data === "down") ||
+						(id === "tui.select.confirm" && data === "enter") ||
+						(id === "tui.select.cancel" && data === "escape"),
+				},
+				(value) => {
+					result = value;
+					closed = true;
+				},
+			);
+			const action = actions.shift();
+			assert(action, "unexpected settings render");
+			let lines = component.render(140);
+			if (action.expectInitial)
+				assert(
+					lines.some(
+						(line) =>
+							line.includes("> ") && line.includes(action.expectInitial),
+					),
+					`cursor did not stay on ${action.expectInitial}`,
+				);
+			if (action.expectText)
+				assert(
+					lines.some((line) => line.includes(action.expectText)),
+					`missing ${action.expectText}`,
+				);
+			for (const character of action.typeText ?? "")
+				component.handleInput(character);
+			if (action.target) {
+				for (let guard = 0; guard < 100; guard += 1) {
+					lines = component.render(140);
+					if (
+						lines.some(
+							(line) => line.includes("> ") && line.includes(action.target),
+						)
+					)
+						break;
+					component.handleInput("down");
+				}
+				lines = component.render(140);
+				assert(
+					lines.some(
+						(line) => line.includes("> ") && line.includes(action.target),
+					),
+					`missing settings choice ${action.target}`,
+				);
+			}
+			action.capture?.(lines);
+			component.handleInput(action.key);
+			assert(closed, `settings action ${action.key} did not close selector`);
+			return result;
+		},
+	});
 	const ctx = {
 		cwd,
 		model: { provider: "p", id: "m" },
 		modelRegistry: { getAvailable: async () => [] },
-		ui: {
-			notify: (message, level) => notices.push({ message, level }),
-			select: async () => "done — Exit settings",
-		},
+		ui: customUi([{ key: "escape" }]),
 	};
 	await commands["work-settings"].handler("", ctx);
-	assert(notices.length === 0, "done exits without notify");
+	assert(notices.length === 0, "escape exits without notify");
+	await commands["work-settings"].handler("", {
+		...ctx,
+		mode: "rpc",
+		ui: {
+			notify: ctx.ui.notify,
+			select: async (_title, labels) =>
+				labels.find((label) => label.startsWith("done")),
+		},
+	});
+	assert(notices.length === 0, "non-TUI settings fallback exits cleanly");
 
 	// status reports the advisor slot and gates.
 	await commands["work-settings"].handler("status", ctx);
@@ -192,103 +268,112 @@ try {
 		notices.at(-1).message.includes("Work settings\n\nProfile"),
 		"status is grouped and readable",
 	);
-	assert(
-		notices.at(-1).message.includes("› advisor (critic)"),
-		"status lists advisor slot as submenu",
-	);
-	assert(
-		notices.at(-1).message.includes("› advisor backup"),
-		"status lists backup advisor slot as submenu",
-	);
-	assert(
-		notices.at(-1).message.includes("planner writes slice plan before work"),
-		"status lists slice planning gate",
-	);
-	assert(
-		notices
-			.at(-1)
-			.message.includes("agent slice planner for messy/large slices"),
-		"status lists agent slice-planner gate",
-	);
-	assert(
-		notices.at(-1).message.includes("ce-plan slice depth: Lightweight"),
-		"status lists ce-plan slice depth",
-	);
-	assert(
-		notices
-			.at(-1)
-			.message.includes("full ce-code-review for risky/large commits"),
-		"status lists code-review gate",
-	);
-	assert(
-		notices.at(-1).message.includes("ce-simplify-code before review"),
-		"status lists simplify gate",
-	);
-	assert(
-		notices.at(-1).message.includes("ce-test-browser when diff touches UI"),
-		"status lists browser-test gate",
-	);
-	assert(
-		notices.at(-1).message.includes("self-improving workflow fixes"),
-		"status lists self-improving toggle",
-	);
-	assert(
-		notices.at(-1).message.includes("new session between iterations"),
-		"status lists fresh-session toggle",
-	);
+	for (const phrase of [
+		"› advisor (critic)",
+		"› advisor backup",
+		"planner writes slice plan before work",
+		"agent slice planner for messy/large slices",
+		"ce-plan slice depth: Lightweight",
+		"full ce-code-review for risky/large commits",
+		"ce-simplify-code before review",
+		"ce-test-browser when diff touches UI",
+		"self-improving workflow fixes",
+		"new session between iterations",
+	])
+		assert(notices.at(-1).message.includes(phrase), `status lists ${phrase}`);
 	assert(existsSync(settingsFile()), "settings file exists");
 
-	// Live submenu: flip a critic gate off through the UI loop.
+	// Enter and Space both flip booleans, retain the cursor, and color state.
 	mod.applyProfile((settings = readSettings()), "medium");
 	writeSettings(settings);
-	assert(
-		mod.workOrchSettings(cwd).critic.brainstorm === true,
-		"medium critic brainstorm on",
-	);
-	let flipped = false;
-	const flipCtx = {
-		cwd,
-		model: { provider: "p", id: "m" },
-		modelRegistry: { getAvailable: async () => [] },
-		ui: {
-			notify: () => {},
-			select: async (_title, labels) => {
-				if (!flipped) {
-					flipped = true;
-					return labels.find((label) => label.includes("critic on brainstorm"));
-				}
-				return labels.find((label) => label.startsWith("done"));
+	let enabledRender = "";
+	let disabledRender = "";
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi([
+			{
+				target: "critic on brainstorm",
+				key: " ",
+				capture: (lines) => {
+					enabledRender = lines.join("\n");
+				},
 			},
-		},
-	};
-	await commands["work-settings"].handler("", flipCtx);
+			{
+				expectInitial: "critic on brainstorm",
+				target: "critic on plan",
+				key: "enter",
+				capture: (lines) => {
+					disabledRender = lines.join("\n");
+				},
+			},
+			{ expectInitial: "critic on plan", key: "escape" },
+		]),
+	});
 	assert(
-		mod.workOrchSettings(cwd).critic.brainstorm === false,
-		"UI loop flipped critic brainstorm off",
+		mod.workOrchSettings(cwd).critic.brainstorm === false &&
+			mod.workOrchSettings(cwd).critic.plan === false,
+		"Space and Enter flip booleans",
 	);
+	assert(enabledRender.includes("[success]"), "enabled options render green");
+	assert(disabledRender.includes("[dim]"), "disabled options render dim");
 
-	let flippedResume = false;
-	const resumeCtx = {
-		cwd,
-		model: { provider: "p", id: "m" },
-		modelRegistry: { getAvailable: async () => [] },
-		ui: {
-			notify: () => {},
-			select: async (_title, labels) => {
-				if (!flippedResume) {
-					flippedResume = true;
-					return labels.find((label) =>
-						label.includes("self-improving workflow fixes"),
-					);
-				}
-				return labels.find((label) => label.startsWith("done"));
-			},
-		},
+	// Model picker starts on the current model and filters its visible list live.
+	settings = readSettings();
+	settings.subagents ??= {};
+	settings.subagents.agentOverrides ??= {};
+	settings.subagents.agentOverrides["bead-reviewer"] = {
+		model: "test/gpt-5.6-high",
+		thinking: "xhigh",
 	};
-	await commands["work-settings"].handler("", resumeCtx);
+	writeSettings(settings);
+	let filteredModels = "";
+	await commands["work-settings"].handler("", {
+		...ctx,
+		modelRegistry: {
+			getAvailable: async () => [
+				{ provider: "test", id: "other", name: "Other Model" },
+				{ provider: "test", id: "gpt-5.6-high", name: "GPT 5.6 High" },
+				{ provider: "test", id: "gpt-5.6-mini", name: "GPT 5.6 Mini" },
+				{ provider: "test", id: "gpt-5.6-codex", name: "GPT 5.6 Codex" },
+			],
+		},
+		ui: customUi(
+			[
+				{ target: "review ›", key: "enter" },
+				{
+					expectInitial: "test/gpt-5.6-high",
+					expectText: "Current: test/gpt-5.6-high",
+					typeText: "5.6",
+					target: "test/gpt-5.6-mini",
+					key: "enter",
+					capture: (lines) => {
+						filteredModels = lines.join("\n");
+					},
+				},
+				{ expectInitial: "review ›", key: "escape" },
+			],
+			{
+				select: async (_title, labels) =>
+					labels.find((label) => label.startsWith("xhigh")),
+			},
+		),
+	});
+	settings = readSettings();
 	assert(
-		readSettings().workResume.selfImproving === true,
-		"UI loop flipped self-improving on",
+		["gpt-5.6-high", "gpt-5.6-mini", "gpt-5.6-codex"].every((id) =>
+			filteredModels.includes(id),
+		),
+		"typing filters and keeps all matching models visible",
+	);
+	assert(!filteredModels.includes("test/other"), "filter hides non-matches");
+	assert(
+		settings.subagents.agentOverrides["bead-reviewer"].model ===
+			"test/gpt-5.6-mini",
+		"filtered model picker selects highlighted model",
+	);
+	assert(
+		settings.subagents.agentOverrides["bead-reviewer"].thinking === "xhigh",
+		"typed model flow still selects effort",
 	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

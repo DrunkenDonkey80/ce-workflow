@@ -71,8 +71,7 @@ The workflow initializes Beads with `bd init --non-interactive --skip-agents` so
 | `/work-status [epic-id\|last]` | Inspect state | Extension command: cheap deterministic Beads/git status with epic title, progress %, ready/in-progress/planned/decision counts, and next command |
 | `/work-goal [--tokens 100k] <objective>` | Run a raw autonomous goal | Extension command: appends goal-management rules, microcompacts before continuations, retries transient provider/context errors, caps optional token budgets, rejects contradictory completion summaries, auto-consumes clear-winner questions, and pauses on human-decision blockers |
 | `/work-context [status\|compact\|on\|off\|set <tokens>]` | Prevent context rot | Extension command and hook for proactive instant compaction; no extra LLM call, drops reasoning/full tool logs |
-| `/work-models [status\|reset]` | Pick role models/effort | Extension command with model/effort picker; persists overrides to `.pi/settings.json` |
-| `/work-settings [status]` | Settings submenu | Extension command: effort profiles (low/medium/high/max), role + advisor model/effort, and advisor/critic gates; enter flips booleans live |
+| `/work-settings [status]` | Settings submenu | Extension command: effort profiles, searchable role/advisor model selection, effort, and advisor/critic gates; Enter or Space flips booleans live without moving the cursor |
 
 ## Mental model
 
@@ -397,7 +396,7 @@ Inline work or workers run that contract; coded gates and risk-triggered reviewe
 
 ## Model and effort tuning
 
-`/work-settings` is the umbrella submenu: effort profiles, per-role (and advisor) model + effort, and the advisor/critic gates. Enter on a boolean flips it immediately and writes `.pi/settings.json`; selecting a profile copies its effort levels and gates onto your current settings (your chosen models are kept). `/work-models` remains as a focused role model/effort picker that writes the same settings.
+`/work-settings` is the umbrella submenu: effort profiles, per-role (and advisor) model + effort, and the advisor/critic gates. Enter or Space on a boolean flips it immediately, writes `.pi/settings.json`, and keeps the cursor on that row. Selecting a profile copies its effort levels and gates onto your current settings (your chosen models are kept).
 
 ### Effort profiles
 
@@ -421,9 +420,9 @@ The advisor (`bead-advisor`, read-only, xhigh by default) is reserved for semant
 - **browser tests on UI diff** — run browser verification only when affected UI acceptance requires it.
 - **full code review before commit** — reserved for max-profile/high-risk diffs; deterministic bounded work uses the coded finalizer.
 
-Use `/work-models` for the easy path: pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `advisor`, or `advisor backup`, then choose from available models and effort levels. Blank model means “inherit the current control-session model.” Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; `/work-settings status` (and `/work-models status`) make the tuning visible and `/work-settings` lets you flip gates live.
+Use `/work-settings` to pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `advisor`, or `advisor backup`. The model picker starts on the current model, shows the available list, and filters it live as you type (for example, `5.6`); then choose an effort level. The inherit row uses the current control-session model. Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; use `/work-settings status` to make the tuning visible.
 
-Routine work stays in the current session. Specialist role prompts use fresh child context and file-only artifacts so tool logs and master plans do not spill back. The extension directly launches exact package roles without an agent-list/LLM-selection turn; if a required specialist cannot start, it stops rather than duplicating work. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-models` writes the same `subagents.agentOverrides` settings you can edit by hand:
+Routine work stays in the current session. Specialist role prompts use fresh child context and file-only artifacts so tool logs and master plans do not spill back. The extension directly launches exact package roles without an agent-list/LLM-selection turn; if a required specialist cannot start, it stops rather than duplicating work. Real role agents should not get tiny timeouts: omit explicit timeouts when possible, or use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Role prompts set effort defaults: migrator/planner/debugger high, worker/fixer/reviewer medium, committer low. `/work-settings` writes the same `subagents.agentOverrides` settings you can edit by hand:
 
 ```json
 {
@@ -504,5 +503,5 @@ Known runtime follow-up: current Pi on this Windows bench prints `The system can
 - No automatic branch checkout, merge, rebase, or deletion during migration.
 - No mandatory `pi-intercom`; it is used when installed, with Beads as the fallback.
 - No `ce-compound` on routine small tasks; it runs only for big/master/debug work with reusable learning.
-- No provider-specific model IDs baked into the package; use `/work-models` or Pi settings overrides.
+- No provider-specific model IDs baked into the package; use `/work-settings` or Pi settings overrides.
 - No external ultracompact dependency; the built-in `/work-context` guard is intentionally smaller.

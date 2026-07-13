@@ -35,7 +35,6 @@ const TELEMETRY_FIXTURES = [
 	...LIFECYCLE_FIXTURES,
 ];
 const ORCHESTRATION_FIXTURES = [
-	"test-work-models.mjs",
 	"test-work-settings.mjs",
 	"test-work-goal.mjs",
 	"test-work-resume.mjs",
@@ -74,7 +73,7 @@ export const CHANGED_PATH_FIXTURE_MANIFEST = Object.freeze([
 	},
 	{
 		match: /^(prompts|agents)\//,
-		deterministic: ["test-work-models.mjs", "test-work-settings.mjs"],
+		deterministic: ["test-work-settings.mjs"],
 		agentBacked: AGENT_SCENARIOS,
 	},
 	{

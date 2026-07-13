@@ -42,7 +42,6 @@ const WORK_STATE_FILE = "work-orchestrator-state.json";
 const WORK_SHORTCUT_STATUS = "F7 roadmaps · F8 menu";
 const INHERIT_MODEL = "__inherit_model__";
 const DEFAULT_THINKING = "__default_thinking__";
-const RESET_ALL = "__reset_all__";
 const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
@@ -2692,11 +2691,144 @@ function thinkingItemsFor(slot, settings) {
 	};
 }
 
+function matchesModelQuery(item, query) {
+	const needle = query.trim().toLowerCase();
+	return (
+		!needle ||
+		[item.value, item.label, item.description]
+			.filter(Boolean)
+			.some((value) => String(value).toLowerCase().includes(needle))
+	);
+}
+
+async function chooseModel(ctx, title, currentModel = INHERIT_MODEL) {
+	const items = await modelItems(ctx);
+	const currentText =
+		currentModel === INHERIT_MODEL
+			? `inherit (${items[0]?.description ?? "control-session model"})`
+			: currentModel;
+	if ((ctx.mode && ctx.mode !== "tui") || typeof ctx.ui.custom !== "function") {
+		return choose(
+			ctx,
+			title,
+			items.map((item) =>
+				item.value === currentModel
+					? { ...item, label: `${item.label} (current)` }
+					: item,
+			),
+		);
+	}
+
+	return ctx.ui.custom((tui, theme, keybindings, done) => {
+		let query = "";
+		let filtered = items;
+		let selectedIndex = Math.max(
+			0,
+			items.findIndex((item) => item.value === currentModel),
+		);
+		const applyFilter = () => {
+			filtered = items.filter((item) => matchesModelQuery(item, query));
+			selectedIndex = 0;
+		};
+
+		return {
+			render(width) {
+				const lines = [
+					theme.fg("accent", theme.bold(title)),
+					theme.fg("dim", fitUiLine(`Current: ${currentText}`, width)),
+					fitUiLine(`Search: ${query}▌`, width),
+					"",
+				];
+				if (filtered.length === 0) {
+					lines.push(theme.fg("warning", "  No matching models"));
+				} else {
+					const visible = Math.min(filtered.length, 10);
+					const start = Math.max(
+						0,
+						Math.min(
+							selectedIndex - Math.floor(visible / 2),
+							filtered.length - visible,
+						),
+					);
+					for (let index = start; index < start + visible; index += 1) {
+						const item = filtered[index];
+						const current = item.value === currentModel ? "  (current)" : "";
+						const description = item.description ? `  ${item.description}` : "";
+						const line = fitUiLine(
+							`${index === selectedIndex ? "> " : "  "}${item.label}${current}${description}`,
+							width,
+						);
+						lines.push(
+							index === selectedIndex
+								? theme.fg("accent", line)
+								: item.value === currentModel
+									? theme.fg("success", line)
+									: line,
+						);
+					}
+					if (filtered.length > visible)
+						lines.push(
+							theme.fg("dim", `  (${selectedIndex + 1}/${filtered.length})`),
+						);
+				}
+				lines.push(
+					"",
+					theme.fg(
+						"dim",
+						fitUiLine(
+							"  Type to filter · ↑↓ navigate · Enter select · Esc cancel",
+							width,
+						),
+					),
+				);
+				return lines;
+			},
+			handleInput(data) {
+				if (keybindings.matches(data, "tui.select.up")) {
+					if (filtered.length)
+						selectedIndex =
+							(selectedIndex - 1 + filtered.length) % filtered.length;
+				} else if (keybindings.matches(data, "tui.select.down")) {
+					if (filtered.length)
+						selectedIndex = (selectedIndex + 1) % filtered.length;
+				} else if (keybindings.matches(data, "tui.select.confirm")) {
+					if (filtered[selectedIndex]) done(filtered[selectedIndex].value);
+					return;
+				} else if (keybindings.matches(data, "tui.select.cancel")) {
+					done(undefined);
+					return;
+				} else if (
+					keybindings.matches(data, "tui.editor.deleteCharBackward") ||
+					data === "\b" ||
+					data === "\x7f"
+				) {
+					query = [...query].slice(0, -1).join("");
+					applyFilter();
+				} else if (keybindings.matches(data, "tui.editor.deleteToLineStart")) {
+					query = "";
+					applyFilter();
+				} else {
+					const text = data
+						.replace(/^\x1b\[200~/, "")
+						.replace(/\x1b\[201~$/, "");
+					if (!text || /[\x00-\x1f\x7f]/u.test(text)) return;
+					query += text;
+					applyFilter();
+				}
+				tui.requestRender();
+			},
+			invalidate() {},
+		};
+	});
+}
+
 async function editSlotModel(ctx, settings, slot) {
-	const model = await choose(
+	const currentModel =
+		overrides(settings)[slot.agents[0]]?.model ?? INHERIT_MODEL;
+	const model = await chooseModel(
 		ctx,
 		`${slot.label}: choose model`,
-		await modelItems(ctx),
+		currentModel,
 	);
 	if (model === undefined) return false;
 	const { selectedThinking, items } = thinkingItemsFor(slot, settings);
@@ -2710,15 +2842,6 @@ async function editSlotModel(ctx, settings, slot) {
 	writeSettings(ctx.cwd, settings);
 	ctx.ui.notify(`Saved ${slot.label}: ${slotSummary(slot, settings)}`, "info");
 	return true;
-}
-
-function notifySummary(ctx, settings) {
-	ctx.ui.notify(
-		SLOTS.map((slot) => `${slot.label}: ${slotSummary(slot, settings)}`).join(
-			"\n",
-		),
-		"info",
-	);
 }
 
 function truncate(value, max = 800) {
@@ -11465,67 +11588,6 @@ export default function workModelsExtension(pi) {
 		},
 	});
 
-	pi.registerCommand("work-models", {
-		description:
-			"Configure persisted model/effort overrides for work-orchestrator role agents",
-		handler: async (args, ctx) => {
-			let settings;
-			try {
-				settings = readSettings(ctx.cwd);
-			} catch (error) {
-				ctx.ui.notify(
-					`Could not read ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
-					"error",
-				);
-				return;
-			}
-
-			if (args.trim() === "status") {
-				notifySummary(ctx, settings);
-				return;
-			}
-
-			if (args.trim() === "reset") {
-				resetAll(settings);
-				writeSettings(ctx.cwd, settings);
-				ctx.ui.notify("Cleared work-orchestrator model overrides", "info");
-				return;
-			}
-
-			const slotItems = SLOTS.map((slot) => ({
-				value: slot.key,
-				label: slot.label,
-				description: `${slot.description} — ${slotSummary(slot, settings)}`,
-			}));
-			slotItems.push({
-				value: RESET_ALL,
-				label: "reset all",
-				description: "Remove model/effort overrides for these work roles",
-			});
-
-			const slotKey = await choose(ctx, "Work models: choose task", slotItems);
-			if (!slotKey) return;
-
-			if (slotKey === RESET_ALL) {
-				resetAll(settings);
-				writeSettings(ctx.cwd, settings);
-				ctx.ui.notify("Cleared work-orchestrator model overrides", "info");
-				return;
-			}
-
-			const slot = SLOTS.find((item) => item.key === slotKey);
-			if (!slot) return;
-			try {
-				await editSlotModel(ctx, readSettings(ctx.cwd), slot);
-			} catch (error) {
-				ctx.ui.notify(
-					`Could not write ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
-					"error",
-				);
-			}
-		},
-	});
-
 	pi.registerCommand("work-settings", {
 		description:
 			"Work-orchestrator settings submenu: effort profiles, role/advisor model+effort, and advisor/critic gates",
@@ -11579,12 +11641,99 @@ const SETTINGS_RESET = "__reset__";
 function boolLabel(label, value) {
 	return {
 		label: `${onOff(value)} ${label}`,
-		description: "enter to flip",
 		settingLabel: label,
+		enabled: value,
 	};
 }
 
+function fitUiLine(text, width) {
+	if (width < 2) return "";
+	return text.length <= width ? text : `${text.slice(0, width - 1)}…`;
+}
+
+async function chooseWorkSetting(ctx, items, selectedIndex) {
+	if ((ctx.mode && ctx.mode !== "tui") || typeof ctx.ui.custom !== "function") {
+		const labels = items.map(labelFor);
+		const selected = await ctx.ui.select("Work settings", labels);
+		const index = labels.indexOf(selected);
+		return index < 0 ? undefined : { pick: items[index], index };
+	}
+	return ctx.ui.custom((tui, theme, keybindings, done) => {
+		let index = Math.max(0, Math.min(selectedIndex, items.length - 1));
+		return {
+			render(width) {
+				const maxVisible = Math.min(items.length, 12);
+				const start = Math.max(
+					0,
+					Math.min(
+						index - Math.floor(maxVisible / 2),
+						items.length - maxVisible,
+					),
+				);
+				const end = Math.min(start + maxVisible, items.length);
+				const lines = [theme.fg("accent", theme.bold("Work settings")), ""];
+				for (let i = start; i < end; i += 1) {
+					const item = items[i];
+					const color =
+						item.enabled === true
+							? "success"
+							: item.enabled === false
+								? "dim"
+								: i === index
+									? "accent"
+									: "text";
+					lines.push(
+						theme.fg(
+							color,
+							fitUiLine(`${i === index ? "> " : "  "}${item.label}`, width),
+						),
+					);
+				}
+				if (start > 0 || end < items.length)
+					lines.push(
+						theme.fg(
+							"dim",
+							fitUiLine(`  (${index + 1}/${items.length})`, width),
+						),
+					);
+				if (items[index]?.description)
+					lines.push(
+						"",
+						theme.fg(
+							"muted",
+							fitUiLine(`  ${items[index].description}`, width),
+						),
+					);
+				lines.push(
+					"",
+					theme.fg(
+						"dim",
+						fitUiLine("  ↑↓ navigate · Enter/Space change · Esc close", width),
+					),
+				);
+				return lines;
+			},
+			invalidate() {},
+			handleInput(data) {
+				if (keybindings.matches(data, "tui.select.up"))
+					index = index === 0 ? items.length - 1 : index - 1;
+				else if (keybindings.matches(data, "tui.select.down"))
+					index = index === items.length - 1 ? 0 : index + 1;
+				else if (
+					keybindings.matches(data, "tui.select.confirm") ||
+					data === " "
+				)
+					return done({ pick: items[index], index });
+				else if (keybindings.matches(data, "tui.select.cancel"))
+					return done(undefined);
+				tui.requestRender();
+			},
+		};
+	});
+}
+
 async function workSettingsLoop(ctx) {
+	let selectedIndex = 0;
 	for (;;) {
 		let settings;
 		try {
@@ -11648,13 +11797,11 @@ async function workSettingsLoop(ctx) {
 				description: "Exit settings",
 			},
 		];
-		const labels = items.map(labelFor);
-		const selected = await ctx.ui.select(
-			"Work settings (enter flips booleans)",
-			labels,
-		);
-		const pick = items[labels.indexOf(selected)];
-		if (!pick || pick.kind === "done") return;
+		const selected = await chooseWorkSetting(ctx, items, selectedIndex);
+		if (!selected) return;
+		selectedIndex = selected.index;
+		const { pick } = selected;
+		if (pick.kind === "done") return;
 		if (pick.kind === "reset") {
 			resetAll(settings);
 			delete settings.workOrchestrator;

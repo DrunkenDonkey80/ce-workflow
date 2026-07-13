@@ -24,7 +24,16 @@ function read(rel) {
 }
 
 function json(rel) {
-	return JSON.parse(read(rel));
+	try {
+		return JSON.parse(read(rel));
+	} catch (error) {
+		check(
+			`${rel} is valid JSON`,
+			false,
+			error instanceof Error ? error.message : String(error),
+		);
+		return {};
+	}
 }
 
 function frontmatter(text) {
@@ -170,7 +179,7 @@ for (const phrase of [
 	"real hardware",
 	"Cost and Model Policy",
 	"subagents.agentOverrides",
-	"/work-models",
+	"/work-settings",
 	"/work-context",
 	"Pi's native/ultracompact auto-compaction remains responsible",
 	"default opt-in trigger is 150k tokens",
@@ -473,7 +482,7 @@ check(
 		extensionSource.includes('"agents"'),
 );
 for (const phrase of [
-	'registerCommand("work-models"',
+	'registerCommand("work-settings"',
 	"ctx.modelRegistry.getAvailable",
 	"subagents",
 	"agentOverrides",
@@ -616,7 +625,6 @@ for (const phrase of [
 	"--tokens 100k",
 	"retryable provider/context-error recovery",
 	"contradictory completion summaries",
-	"/work-models",
 	"/work-settings",
 	"/work-context",
 	"Context management",
@@ -644,7 +652,7 @@ for (const phrase of [
 	"Model and effort tuning",
 	"Effort profiles",
 	"subagents.agentOverrides",
-	"Blank model means",
+	"The inherit row uses",
 	"fresh Pi session",
 	"wo:execution-agent",
 	"exact package roles",
@@ -687,7 +695,6 @@ for (const script of [
 	"test-work-brainstorm.mjs",
 	"test-work-usage.mjs",
 	"test-work-roadmap.mjs",
-	"test-work-models.mjs",
 	"test-work-settings.mjs",
 	"test-work-intake.mjs",
 	"test-work-pause.mjs",
