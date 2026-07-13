@@ -4600,13 +4600,55 @@ function isWindowsReservedName(path) {
 	);
 }
 
+export function isGeneratedBuildArtifact(path) {
+	const file = normalizedRepoPath(path);
+	const segments = file.split("/");
+	const base = segments[segments.length - 1];
+	const dirs = new Set(segments.slice(0, -1));
+	return (
+		dirs.has("build") ||
+		dirs.has("dist") ||
+		dirs.has("__pycache__") ||
+		dirs.has("node_modules") ||
+		dirs.has("target") ||
+		dirs.has(".pytest_cache") ||
+		dirs.has(".mypy_cache") ||
+		dirs.has(".ruff_cache") ||
+		dirs.has(".tox") ||
+		dirs.has(".gradle") ||
+		/\.py[cod]$/i.test(base) ||
+		/\.egg-info(?:\.json)?$/i.test(base) ||
+		/\.dist-info$/i.test(base) ||
+		base === ".DS_Store"
+	);
+}
+
+function isFormatterOnlyDirt(cwd, item) {
+	if (item.x !== " " || item.y !== "M") return false;
+	try {
+		run(cwd, "git", [
+			"diff",
+			"--quiet",
+			"--ignore-all-space",
+			"--ignore-blank-lines",
+			"--",
+			item.path,
+		]);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 export function isWorkflowDirt(cwd, item, planPaths = []) {
 	const file = normalizedRepoPath(item.path);
 	return (
 		isBeadsDirt(file) ||
 		isPiRuntimeArtifact(file) ||
 		isWindowsReservedName(file) ||
+		isGeneratedBuildArtifact(file) ||
 		isAllowedPlanDirt(file, planPaths) ||
+		isFormatterOnlyDirt(cwd, item) ||
 		isBenignInstructionDirt(cwd, item)
 	);
 }
@@ -5971,9 +6013,7 @@ function ensureWorkflowGitignore(cwd) {
 		const existing = existsSync(gitignorePath)
 			? readFileSync(gitignorePath, "utf8")
 			: "";
-		const lines = new Set(
-			existing.split(/\r?\n/).map((line) => line.trim()),
-		);
+		const lines = new Set(existing.split(/\r?\n/).map((line) => line.trim()));
 		const missing = [".pi/", ".pi-subagents/"].filter(
 			(entry) => !lines.has(entry),
 		);

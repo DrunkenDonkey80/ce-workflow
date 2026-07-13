@@ -430,6 +430,7 @@ const args = process.argv.slice(2);
 const dirty = process.env.WORK_RESUME_GIT_DIRTY || "clean";
 if (process.env.WORK_RESUME_GIT_FAIL === "1") process.exit(1);
 if (args[0] === "diff") {
+  if (dirty === "unknown") process.exit(1);
   if (dirty === "instruction-substantive") process.exit(1);
   if (dirty === "instruction-formatter" && !args.includes("--ignore-blank-lines")) {
     console.log([

@@ -68,6 +68,26 @@ function isRuntimePath(file) {
 	);
 }
 
+function isGeneratedBuildPath(file) {
+	const segments = file.replaceAll("\\", "/").split("/");
+	const base = segments[segments.length - 1];
+	const dirs = new Set(segments.slice(0, -1));
+	return (
+		dirs.has("build") ||
+		dirs.has("dist") ||
+		dirs.has("__pycache__") ||
+		dirs.has("node_modules") ||
+		dirs.has("target") ||
+		dirs.has(".pytest_cache") ||
+		dirs.has(".mypy_cache") ||
+		dirs.has(".ruff_cache") ||
+		dirs.has(".tox") ||
+		/\.py[cod]$/i.test(base) ||
+		/\.egg-info(?:\.json)?$/i.test(base) ||
+		base === ".DS_Store"
+	);
+}
+
 function cleanupGeneratedInstructions() {
 	for (const file of gitStatusPaths()) {
 		if (!/(?:^|\/)AGENTS\.md$/i.test(file) || !existsSync(file)) continue;
@@ -184,7 +204,9 @@ function finishTask() {
 			`wo:verify-check PASS\nCommand: ${verificationCommand}\nOutput: ${output.slice(-500)}`,
 		]);
 	}
-	const changed = gitStatusPaths().filter((file) => !isRuntimePath(file));
+	const changed = gitStatusPaths().filter(
+		(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
+	);
 	if (!changed.length) throw new Error("no related changes to commit");
 	const implementationFiles = changed.filter(
 		(file) => !file.replaceAll("\\", "/").startsWith(".beads/"),
