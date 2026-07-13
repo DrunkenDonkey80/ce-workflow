@@ -4589,11 +4589,23 @@ function isAllowedPlanDirt(path, planPaths = []) {
 	return planPaths.map(normalizedRepoPath).includes(file);
 }
 
-function isWorkflowDirt(cwd, item, planPaths = []) {
+function isWindowsReservedName(path) {
+	if (process.platform !== "win32") return false;
+	const segments = String(path ?? "")
+		.replace(/\\/g, "/")
+		.split("/")
+		.filter(Boolean);
+	return segments.some((segment) =>
+		/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..+)?$/i.test(segment),
+	);
+}
+
+export function isWorkflowDirt(cwd, item, planPaths = []) {
 	const file = normalizedRepoPath(item.path);
 	return (
 		isBeadsDirt(file) ||
 		isPiRuntimeArtifact(file) ||
+		isWindowsReservedName(file) ||
 		isAllowedPlanDirt(file, planPaths) ||
 		isBenignInstructionDirt(cwd, item)
 	);
@@ -5953,6 +5965,29 @@ function expandNumericBeadShorthand(cwd, target, kind = "any") {
 	};
 }
 
+function ensureWorkflowGitignore(cwd) {
+	try {
+		const gitignorePath = join(cwd, ".gitignore");
+		const existing = existsSync(gitignorePath)
+			? readFileSync(gitignorePath, "utf8")
+			: "";
+		const lines = new Set(
+			existing.split(/\r?\n/).map((line) => line.trim()),
+		);
+		const missing = [".pi/", ".pi-subagents/"].filter(
+			(entry) => !lines.has(entry),
+		);
+		if (!missing.length) return;
+		const prefix = existing && !/\n$/.test(existing) ? "\n" : "";
+		writeFileSync(
+			gitignorePath,
+			`${existing}${prefix}\n# Pi / ce-workflow runtime artifacts (added at init)\n${missing.join("\n")}\n`,
+		);
+	} catch {
+		// non-fatal: .gitignore is a convenience, not required for correctness
+	}
+}
+
 function ensureBeadsInitialized(cwd) {
 	try {
 		run(cwd, "bd", ["where", "--json"]);
@@ -5970,6 +6005,7 @@ function ensureBeadsInitialized(cwd) {
 	}
 	try {
 		run(cwd, "bd", ["init", "--non-interactive", "--skip-agents"]);
+		ensureWorkflowGitignore(cwd);
 		return {
 			initialized: true,
 			message: "Initialized Beads with bd init --skip-agents.",
