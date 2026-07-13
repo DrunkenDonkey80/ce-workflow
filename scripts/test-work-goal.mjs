@@ -129,6 +129,12 @@ assert.equal(mod.workGoalHumanInputKind("2, but add this"), "answer");
 assert.equal(mod.workGoalHumanInputKind("clarify: what changed?"), "clarify");
 assert.equal(mod.workGoalHumanInputKind("What changed?"), "clarify");
 assert.equal(
+	mod.workGoalHumanInputKind(
+		"regarding com7, you made custom firmware that removed the blocker right",
+	),
+	"clarify",
+);
+assert.equal(
 	mod.workWarpMode("self-improving", { objective: "Project autopilot policy" }),
 	"project",
 );
@@ -368,6 +374,17 @@ try {
 		pausedBefore.systemPrompt,
 		/Answer the user's clarification only/,
 	);
+
+	const conversationalResult = await tempHooks.input?.(
+		{
+			source: "user",
+			text: "regarding com7, you made custom firmware that removed the blocker right",
+		},
+		ctx,
+	);
+	assert.equal(conversationalResult, undefined);
+	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	assert.equal(sent.length, 2);
 
 	const inputResult = await tempHooks.input?.(
 		{

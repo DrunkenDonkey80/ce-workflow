@@ -10044,12 +10044,9 @@ async function handleWorkGoalResetCommand(args, ctx) {
 
 function workGoalHumanInputKind(text) {
 	const value = String(text ?? "").trim();
-	if (!value) return "clarify";
 	if (/^(answer|decide|decision)\s*:/i.test(value)) return "answer";
 	if (/^\d+\s*[).,:-]?/.test(value)) return "answer";
-	if (/^(ask|clarify|question|q)\s*:/i.test(value)) return "clarify";
-	if (/\?\s*$/.test(value)) return "clarify";
-	return "answer";
+	return "clarify";
 }
 
 function buildWorkGoalPausedPrompt(goal) {
@@ -10061,7 +10058,7 @@ ${escapeXmlText(goal.objective)}
 Pending decision:
 ${formatWorkGoalDecision(goal.decision)}
 
-Answer the user's clarification only. Do not continue the work-goal until the user gives a decision/answer.`;
+Answer the user's clarification only. Do not continue the work-goal until the user explicitly replies with \`answer: ...\` or a numbered option.`;
 }
 
 async function maybeResumeWorkGoalFromUserInput(event, ctx, pi) {
