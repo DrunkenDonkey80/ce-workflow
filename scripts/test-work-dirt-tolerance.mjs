@@ -11,7 +11,9 @@ const { assert } = await import(
 );
 const { isWorkflowDirt, isGeneratedBuildArtifact } = await import(
 	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+		realpathSync(
+			path.join(import.meta.dirname, "../extensions/work-models.js"),
+		),
 	).href
 );
 
@@ -21,7 +23,10 @@ const dirt = (file) => isWorkflowDirt(cwd, { path: file });
 // The workflow's own runtime artifacts must never block a transition.
 assert(dirt(".beads/interactions.jsonl"), "beads state dirt is tolerated");
 assert(dirt(".beads/issues.jsonl"), "beads issues dirt is tolerated");
-assert(dirt(".pi/work-runs/2026-07-13.jsonl"), ".pi/work-runs dirt is tolerated");
+assert(
+	dirt(".pi/work-runs/2026-07-13.jsonl"),
+	".pi/work-runs dirt is tolerated",
+);
 assert(
 	dirt(".pi/work-orchestrator-state.json"),
 	".pi orchestrator state is tolerated",
@@ -41,9 +46,15 @@ assert(
 	isGeneratedBuildArtifact("tools/x/dist/app.exe"),
 	"dist/ output is a generated artifact",
 );
-assert(isGeneratedBuildArtifact("pkg/__pycache__/m.pyc"), "__pycache__ is generated");
+assert(
+	isGeneratedBuildArtifact("pkg/__pycache__/m.pyc"),
+	"__pycache__ is generated",
+);
 assert(isGeneratedBuildArtifact("src/m.pyc"), "*.pyc is generated");
-assert(isGeneratedBuildArtifact("a/b/node_modules/lib/index.js"), "node_modules is generated");
+assert(
+	isGeneratedBuildArtifact("a/b/node_modules/lib/index.js"),
+	"node_modules is generated",
+);
 assert(
 	dirt("tools/barcode-display-gui/build/barcode-display-gui/PYZ-00.toc"),
 	"generated build output is tolerated (non-blocking)",
@@ -52,7 +63,10 @@ assert(
 	dirt("tools/barcode-display-gui/dist/barcode-display-gui.exe"),
 	"generated dist output is tolerated (non-blocking)",
 );
-assert(!isGeneratedBuildArtifact("src/main.py"), "source is not a build artifact");
+assert(
+	!isGeneratedBuildArtifact("src/main.py"),
+	"source is not a build artifact",
+);
 assert(
 	!isGeneratedBuildArtifact("docs/build-guide.md"),
 	"a file named build-guide.md is not a build/ directory",
@@ -73,7 +87,10 @@ assert(
 // Windows reserved-name junk (e.g. a stray `nul`) cannot be real source.
 if (process.platform === "win32") {
 	assert(dirt("nul"), "Windows reserved-name junk (nul) is tolerated");
-	assert(dirt("src/CON.log"), "Windows reserved name in a subpath is tolerated");
+	assert(
+		dirt("src/CON.log"),
+		"Windows reserved name in a subpath is tolerated",
+	);
 }
 
 // Real source/config is NOT tolerated — these correctly remain blockers.
