@@ -701,6 +701,7 @@ for (const script of [
 	"test-work-plan-open-questions.mjs",
 	"test-work-debug.mjs",
 	"test-work-dirt-tolerance.mjs",
+	"test-work-untracked-hygiene.mjs",
 	"test-work-add.mjs",
 	"test-work-auto.mjs",
 	"test-work-goal.mjs",

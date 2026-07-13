@@ -4616,6 +4616,9 @@ export function isGeneratedBuildArtifact(path) {
 		dirs.has(".ruff_cache") ||
 		dirs.has(".tox") ||
 		dirs.has(".gradle") ||
+		[...dirs].some(
+			(dir) => /\.egg-info$/i.test(dir) || /\.dist-info$/i.test(dir),
+		) ||
 		/\.py[cod]$/i.test(base) ||
 		/\.egg-info(?:\.json)?$/i.test(base) ||
 		/\.dist-info$/i.test(base) ||

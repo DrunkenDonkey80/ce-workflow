@@ -10,6 +10,11 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+	isGeneratedBuildPath,
+	isRuntimePath,
+	tidyUntrackedFiles,
+} from "./work-hygiene.mjs";
 
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
@@ -60,32 +65,6 @@ function gitStatusPaths() {
 		if (/[RC]/.test(code) && records[i + 1]) paths.push(records[++i]);
 	}
 	return [...new Set(paths)].filter(Boolean);
-}
-
-function isRuntimePath(file) {
-	return /^(?:\.pi(?:-subagents)?\/|work-[^/]+-(?:bead-small|bead-worker)\.md$)/.test(
-		file.replaceAll("\\", "/"),
-	);
-}
-
-function isGeneratedBuildPath(file) {
-	const segments = file.replaceAll("\\", "/").split("/");
-	const base = segments[segments.length - 1];
-	const dirs = new Set(segments.slice(0, -1));
-	return (
-		dirs.has("build") ||
-		dirs.has("dist") ||
-		dirs.has("__pycache__") ||
-		dirs.has("node_modules") ||
-		dirs.has("target") ||
-		dirs.has(".pytest_cache") ||
-		dirs.has(".mypy_cache") ||
-		dirs.has(".ruff_cache") ||
-		dirs.has(".tox") ||
-		/\.py[cod]$/i.test(base) ||
-		/\.egg-info(?:\.json)?$/i.test(base) ||
-		base === ".DS_Store"
-	);
 }
 
 function cleanupGeneratedInstructions() {
@@ -204,12 +183,21 @@ function finishTask() {
 			`wo:verify-check PASS\nCommand: ${verificationCommand}\nOutput: ${output.slice(-500)}`,
 		]);
 	}
+	const tidy = tidyUntrackedFiles({ cwd, gitBin });
+	if (tidy.unrecognized.length)
+		throw new Error(
+			`untracked files need a decision before commit (add, gitignore, or remove):\n` +
+				tidy.unrecognized.map((file) => `  - ${file}`).join("\n") +
+				`\nResolve each, then re-run finish-task.`,
+		);
 	const changed = gitStatusPaths().filter(
 		(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
 	);
 	if (!changed.length) throw new Error("no related changes to commit");
 	const implementationFiles = changed.filter(
-		(file) => !file.replaceAll("\\", "/").startsWith(".beads/"),
+		(file) =>
+			!file.replaceAll("\\", "/").startsWith(".beads/") &&
+			file.replaceAll("\\", "/") !== ".gitignore",
 	);
 	if (implementationFiles.length > maxFiles)
 		throw new Error(
