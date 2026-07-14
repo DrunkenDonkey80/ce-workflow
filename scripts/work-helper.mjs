@@ -18,7 +18,13 @@ import {
 
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
-const bdBin = process.env.WORK_ORCH_BD_BIN || (process.platform === "win32" ? "bd.cmd" : "bd");
+const npmBd = path.join(
+	process.env.APPDATA || "",
+	"npm/node_modules/@beads/bd/bin/bd.js",
+);
+const bdBin =
+	process.env.WORK_ORCH_BD_BIN ||
+	(process.platform === "win32" && existsSync(npmBd) ? npmBd : "bd");
 const gitBin = process.env.WORK_ORCH_GIT_BIN || "git";
 
 function run(bin, argv, options = {}) {
