@@ -51,8 +51,8 @@ If it reports independent review required, launch exactly one `bead-reviewer`, r
 - **small** — inline, two implementation files maximum.
 - **med** — inline by default, eight files maximum; escalate to big if semantic slicing is needed.
 - **big** — one `wo:planning` Bead and one exact `bead-planner`; propagate `wo:execution-agent` to risky executable children.
-- **resume** — coded one-Bead boundary. Inline routine work; exact planner/debugger/high-risk worker only when policy requires it. Stop after one executable Bead.
-- **goal** — autonomous current-session loop with on-demand microcompaction. Work inline; exact specialists only for the cases above. Completion requires verified evidence.
+- **resume** — autonomous slice loop. Run each ready Bead inline by default (set `sliceExecutionMode=agent` in `/work-settings` to route each slice to an isolated `bead-worker`); exact planner/debugger/reviewer only when policy requires it. Do NOT ask how to run each slice — apply the coded execution policy and run. After a slice closes, continue to the next ready Bead automatically (re-run `/work-resume`; use `/work-goal` for automatic `/new` per slice). Stop the loop only for: an open `type=decision` Bead needing human input, a blocker/debug-needed Bead, epic completion, or `/work-stop`.
+- **goal** — autonomous current-session loop with on-demand microcompaction. Work inline; exact specialists only for the cases above. Completion requires verified evidence. Stop with `/work-stop`.
 - **debug** — exact `bead-debugger`, then one scoped reviewer only after a verified fix; coded finalizer commits.
 - **auto** — trust the extension's deterministic classification; do not reclassify with an LLM.
 - **plan/master** — use `ce-plan` and planner/advisor only when requirements are genuinely semantic or uncertain. master mode must clear the Open Question Gate: `/work-plan` scans the plan for unresolved open questions (including non-blocking ones with a stated default) and blocks epic creation until each is resolved via one `ask_user`, then re-run.

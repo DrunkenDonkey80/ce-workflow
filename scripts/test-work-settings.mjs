@@ -65,6 +65,10 @@ try {
 		"medium light review",
 	);
 	assert(
+		mod.workOrchSettings(cwd).sliceExecutionMode === "inline",
+		"medium inline slice execution",
+	);
+	assert(
 		mod.workOrchSettings(cwd).simplifyBeforeReview === false,
 		"medium no simplify",
 	);
@@ -107,6 +111,7 @@ try {
 	mod.setWorkOrchBoolean(settings, "slicePlanBeforeWork", false);
 	mod.setWorkOrchBoolean(settings, "slicePlanWithCePlan", false);
 	mod.setWorkOrchReviewLevel(settings, "off");
+	mod.setWorkOrchSliceExecution(settings, "agent");
 	writeSettings(settings);
 	assert(
 		mod.workOrchSettings(cwd).advisorVerifyTask === false,
@@ -123,6 +128,10 @@ try {
 	assert(
 		mod.workOrchSettings(cwd).codeReviewBeforeCommit === "off",
 		"flipped review off",
+	);
+	assert(
+		mod.workOrchSettings(cwd).sliceExecutionMode === "agent",
+		"flipped slice execution to agent",
 	);
 	assert(
 		mod.workOrchSettings(cwd).profile === "max",

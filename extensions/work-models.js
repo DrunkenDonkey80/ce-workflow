@@ -2444,7 +2444,16 @@ function workOrchSettings(cwd) {
 	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
 	const codeReviewBeforeCommit =
 		raw.codeReviewBeforeCommit ?? base.codeReviewBeforeCommit;
-	return { profile, critic, slicePlanCeDepth, codeReviewBeforeCommit, ...flags };
+	const sliceExecutionMode =
+		raw.sliceExecutionMode === "agent" ? "agent" : "inline";
+	return {
+		profile,
+		critic,
+		slicePlanCeDepth,
+		codeReviewBeforeCommit,
+		sliceExecutionMode,
+		...flags,
+	};
 }
 
 function applyProfile(settings, profileKey) {
@@ -2478,6 +2487,11 @@ function setWorkOrchBoolean(settings, key, value) {
 function setWorkOrchReviewLevel(settings, value) {
 	const block = workOrchBlock(settings);
 	block.codeReviewBeforeCommit = REVIEW_LEVELS.includes(value) ? value : "off";
+}
+
+function setWorkOrchSliceExecution(settings, value) {
+	const block = workOrchBlock(settings);
+	block.sliceExecutionMode = value === "agent" ? "agent" : "inline";
 }
 
 function setWorkOrchCritic(settings, key, value) {
@@ -2559,7 +2573,7 @@ function applyInlineSlicePlan(cwd, state, issue) {
 				selectedBead: issueSummary(planned),
 				message:
 					"Added coded slice-plan note and continued directly to implementation; no planner boundary needed.",
-			}),
+			}, cwd),
 			cwd,
 		);
 	} catch (error) {
@@ -4793,8 +4807,14 @@ function highRiskImplementation(issue) {
 	);
 }
 
-function implementationExecutionPolicy(state) {
+function implementationExecutionPolicy(state, cwd) {
 	const issue = state?.selectedBead;
+	if (cwd && workOrchSettings(cwd).sliceExecutionMode === "agent")
+		return {
+			kind: "agent",
+			level: "isolated",
+			reason: "sliceExecutionMode=agent routes each slice to an isolated bead-worker",
+		};
 	if (highRiskImplementation(issue))
 		return {
 			kind: "agent",
@@ -4808,8 +4828,8 @@ function implementationExecutionPolicy(state) {
 	return { kind: "inline", level: "medium", maxFiles: 8 };
 }
 
-function withImplementationPolicy(state) {
-	const policy = implementationExecutionPolicy(state);
+function withImplementationPolicy(state, cwd) {
+	const policy = implementationExecutionPolicy(state, cwd);
 	return {
 		...state,
 		executionPolicy: policy,
@@ -5043,7 +5063,7 @@ function planResumeAction(state, cwd) {
 			...state,
 			action: "run-implementation",
 			selectedBead: activeImplementation,
-		});
+		}, cwd);
 		if (activeImplementation.reviewPassed)
 			return {
 				...routed,
@@ -5143,7 +5163,7 @@ function planResumeAction(state, cwd) {
 				...state,
 				action: "run-implementation",
 				selectedBead: implementation,
-			}),
+			}, cwd),
 			cwd,
 		);
 	}
@@ -5730,7 +5750,7 @@ function agentLaunchReason(state) {
 function withHandoffPrompt(state, cwd) {
 	const routed =
 		state.action === "run-implementation"
-			? withImplementationPolicy(state)
+			? withImplementationPolicy(state, cwd)
 			: state;
 	return {
 		...routed,
@@ -6838,7 +6858,7 @@ function buildWorkMedState(cwd, args = "") {
 				git,
 				message: `Created ${idOf(bead)} under ${idOf(resolved.epic)} for inline medium work.`,
 				warnings: git.warnings,
-			}),
+			}, cwd),
 			cwd,
 		);
 	} catch (error) {
@@ -9492,7 +9512,7 @@ function workGoalSummary(goal = activeWorkGoal) {
 		goal.decision
 			? `Human decision: ${formatWorkGoalDecision(goal.decision)}`
 			: "",
-		"Commands: /work-goal pause|resume|clear|status|edit <objective>; /work-goal --tokens 100k <objective>; /work-resume-stop for clean project-loop stop",
+		"Commands: /work-goal pause|resume|clear|status|edit <objective>; /work-goal --tokens 100k <objective>; /work-stop for a clean stop",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -10128,40 +10148,52 @@ async function handleWorkResumeGoalCommand(args, pi, ctx) {
 }
 
 async function handleWorkResumeStopCommand(args, pi, ctx) {
-	if (!activeWorkGoal || activeWorkGoal.mode !== "project") {
-		ctx.ui.notify("No active /work-resume project loop.", "warning");
-		return;
-	}
-	const working = activeWorkAgent || !ctx.isIdle?.();
-	activeWorkGoal = {
-		...activeWorkGoal,
-		status: working ? "stopping" : "stopped",
-		stopReason: String(args ?? "").trim() || "user requested stop",
-		updatedAt: Date.now(),
-	};
-	workGoalContinuationPending = null;
-	persistWorkGoal(pi);
-	updateWorkGoalStatus(ctx);
-	ctx.ui.notify(
-		working
-			? "/work-resume stopping after the current clean phase."
-			: "/work-resume stopped. Run /work-resume to resume.",
-		"info",
-	);
-	if (working) {
-		try {
-			const send =
-				typeof ctx.sendUserMessage === "function"
-					? ctx.sendUserMessage.bind(ctx)
-					: pi?.sendUserMessage?.bind(pi);
-			const prompt =
-				"Clean stop requested. Checkpoint current Beads/git state, stop at the next safe phase boundary, and do not start another Bead.";
-			if (send) {
+	const reason = String(args ?? "").trim() || "user requested stop";
+	const send =
+		typeof ctx.sendUserMessage === "function"
+			? ctx.sendUserMessage.bind(ctx)
+			: pi?.sendUserMessage?.bind(pi);
+	const prompt =
+		"Clean stop requested. Checkpoint current Beads/git state, stop at the next safe phase boundary, and do not start another Bead.";
+	if (activeWorkGoal) {
+		const working = activeWorkAgent || !ctx.isIdle?.();
+		activeWorkGoal = {
+			...activeWorkGoal,
+			status: working ? "stopping" : "stopped",
+			stopReason: reason,
+			updatedAt: Date.now(),
+		};
+		workGoalContinuationPending = null;
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		ctx.ui.notify(
+			working
+				? "/work-stop requested: stopping after the current clean phase."
+				: "/work-stop: work stopped. Run /work-resume to resume.",
+			"info",
+		);
+		if (working && send) {
+			try {
 				if (ctx.isIdle?.()) await send(prompt);
 				else await send(prompt, { deliverAs: "steer" });
+			} catch {
+				// Stop flag is persisted; the current turn may still finish normally.
 			}
+		}
+		return;
+	}
+	const working = !ctx.isIdle?.();
+	ctx.ui.notify(
+		working
+			? "/work-stop requested: checkpoint and stop at the next safe phase boundary."
+			: "/work-stop: nothing active to stop.",
+		working ? "info" : "warning",
+	);
+	if (working && send) {
+		try {
+			await send(prompt, { deliverAs: "steer" });
 		} catch {
-			// Stop flag is persisted; the current turn may still finish normally.
+			// Best-effort steer; the user can also just stop typing.
 		}
 	}
 }
@@ -10176,7 +10208,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		{
 			value: "stop",
 			label: "stop after current phase",
-			description: "Run /work-resume-stop",
+			description: "Run /work-stop",
 		},
 		{
 			value: "roadmap",
@@ -10953,6 +10985,7 @@ export {
 	applyProfile,
 	setWorkOrchBoolean,
 	setWorkOrchReviewLevel,
+	setWorkOrchSliceExecution,
 	setWorkOrchCritic,
 	workOrchSettings,
 	renderWorkIdeateText,
@@ -11458,8 +11491,15 @@ export default function workModelsExtension(pi) {
 		},
 	});
 
+	pi.registerCommand("work-stop", {
+		description: "Cleanly stop autonomous work at the next safe boundary",
+		handler: async (args, ctx) => {
+			await handleWorkResumeStopCommand(args, pi, ctx);
+		},
+	});
+
 	pi.registerCommand("work-resume-stop", {
-		description: "Cleanly stop /work-resume at the next safe boundary",
+		description: "Alias for /work-stop",
 		handler: async (args, ctx) => {
 			await handleWorkResumeStopCommand(args, pi, ctx);
 		},
@@ -11832,6 +11872,7 @@ function workSettingsStatus(ctx) {
 		),
 		`  ${SUBMENU_ARROW} ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
 		`  ${SUBMENU_ARROW} pre-commit review: ${resolved.codeReviewBeforeCommit}`,
+		`  ${SUBMENU_ARROW} slice execution: ${resolved.sliceExecutionMode}`,
 		"",
 		"Resume automation",
 		`  ${onOff(resume.selfImproving)} self-improving workflow fixes (autonomous source delivery)`,
@@ -11985,6 +12026,12 @@ async function workSettingsLoop(ctx) {
 				description: resolved.codeReviewBeforeCommit,
 			},
 			{
+				kind: "sliceExec",
+				value: "sliceExecutionMode",
+				label: `slice execution ${SUBMENU_ARROW}`,
+				description: resolved.sliceExecutionMode,
+			},
+			{
 				kind: "resumeBool",
 				value: "selfImproving",
 				...boolLabel("self-improving workflow fixes", resume.selfImproving),
@@ -12063,6 +12110,27 @@ async function workSettingsLoop(ctx) {
 			setWorkOrchReviewLevel(settings, level);
 			writeSettings(ctx.cwd, settings);
 			ctx.ui.notify(`Pre-commit review: ${level}`, "info");
+			continue;
+		}
+		if (pick.kind === "sliceExec") {
+			const mode = await choose(ctx, "Slice execution", [
+				{
+					value: "inline",
+					label: "inline",
+					description: "run each slice in the current session (default)",
+				},
+				{
+					value: "agent",
+					label: "agent",
+					description:
+						"route each slice to an isolated bead-worker subagent",
+				},
+			]);
+			if (!mode) continue;
+			settings = readSettings(ctx.cwd);
+			setWorkOrchSliceExecution(settings, mode);
+			writeSettings(ctx.cwd, settings);
+			ctx.ui.notify(`Slice execution: ${mode}`, "info");
 			continue;
 		}
 		if (pick.kind === "slot") {

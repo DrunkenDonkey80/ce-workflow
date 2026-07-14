@@ -9,7 +9,7 @@ Use this skill for `/work-plan`, `/work-init`, `/work-master`, `/work-migrate`, 
 
 ## Common execution policy
 
-Work directly in the current session by default. Use code for intake, routing, bounded validation, commit, close, and push. Do not call `subagent list`; the extension selects exact specialist names. Launch a role only when it adds distinct judgment: `bead-planner` for ambiguous/large slicing, `bead-debugger` for root-cause work, `bead-worker` for high-risk isolation, `bead-reviewer` for sensitive/large/ambiguous evidence, and `bead-fixer` only for concrete findings. Routine work gets no planner, reviewer, or committer agent.
+Work directly in the current session by default. Use code for intake, routing, bounded validation, commit, close, and push. Do not call `subagent list`; the extension selects exact specialist names. Launch a role only when it adds distinct judgment: `bead-planner` for ambiguous/large slicing, `bead-debugger` for root-cause work, `bead-worker` for high-risk isolation, `bead-reviewer` for sensitive/large/ambiguous evidence, and `bead-fixer` only for concrete findings. Routine work gets no planner, reviewer, or committer agent. Do not ask the user how to run each slice; apply the coded execution policy and proceed. Set `sliceExecutionMode` (`inline` default, or `agent`) in `/work-settings` to control whether each slice runs in-session or via an isolated `bead-worker`.
 
 ## Source of Truth
 
@@ -18,7 +18,7 @@ Work directly in the current session by default. Use code for intake, routing, b
 - Chat memory is not source of truth. A fresh session must resume from `bd ready --json`, `bd list --status=in_progress --json`, and `git status`.
 - Work one ready Bead at a time unless isolated worktrees are explicitly used.
 - The current session is the default worker for clear bounded work. Intake, implementation, verification, and commit/close use coded helpers inline; role agents are reserved for semantic planning, root-cause debugging, high-risk isolated writing, and independent review when risk evidence requires it.
-- One executable Bead is the default session boundary: after committing/closing it, stop with the next `/work-resume` command instead of dragging old context into the next slice.
+- Each executable Bead is a fresh-context session boundary: after committing/closing one, continue the autonomous loop with the next ready Bead in a fresh session (`/new`) instead of dragging old context into the next slice. Use `/work-stop` to halt the loop at the next safe phase.
 - Do not overwrite manual edits silently.
 
 ## Preflight
@@ -254,7 +254,7 @@ Loop:
 12. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
 13. After commit/close, always run a clean-boundary gate: `git status --short`, the Bead verification if any related source files changed after commit, `bd children <epic-id> --json`, and `/work-status <epic-id>` or the same status calculation.
 14. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
-15. Stop after one executable Bead closes. Final output must include the epic ID, closed Bead ID, status summary, and numbered recommended actions when there is a next command (`1. /work-resume`, `2. ...`) so the user can type the number; also include the final one-line next action: `Next: /work-resume` when work remains, the exact blocker/debug command when blocked, or `Next: epic <epic-id> "<title>" is complete; close it explicitly with /work-roadmap close <epic-id>.` when truly complete.
+15. Do not stop and ask after a Bead closes — continue the autonomous loop to the next ready Bead (fresh `/new` per slice when practical; `/work-goal` does this automatically). Stop the loop only when (a) an open `type=decision` Bead needs human input, (b) a blocker/debug-needed Bead cannot proceed, (c) the epic has no remaining executable work, or (d) the user ran `/work-stop`. When the loop stops, the final output must include the epic ID, the last closed Bead ID, a status summary, and the one-line next action: `Next: /work-resume` when work remains, the exact blocker/debug command when blocked, or `Next: epic <epic-id> "<title>" is complete; close it explicitly with /work-roadmap close <epic-id>.` when truly complete.
 
 ## Mode: roadmap
 
@@ -323,10 +323,10 @@ Beads and git preserve the memory; Pi chat is disposable working context. The pa
 - before any compact/restart boundary, write the current decision, changed files, verification, blockers, and next command into Bead notes;
 - rely on `/work-context status` for current token/trigger state; default opt-in trigger is 150k tokens, capped by model context, and keeps at least the latest 30k tokens via Pi compaction settings;
 - compact only inside a single Bead when context gets high or after a noisy debug/review phase;
-- `/work-resume` stops after one coded Bead boundary; start the next slice in a fresh session when practical;
+- `/work-resume` is an autonomous slice loop; each slice still gets a fresh-context boundary, but the loop continues to the next ready Bead until a decision, blocker, completion, or `/work-stop`;
 - self-improving ce-workflow fixes during explicit target-project goals are off by default; opt in only with `workResume.selfImproving: true`;
-- `/work-resume-stop` requests a clean stop for an active project-mode goal: checkpoint Beads/git, finish the current safe phase, and do not start another Bead;
-- after one executable Bead is committed and closed, stop and report the next `/work-resume` command.
+- `/work-stop` requests a clean stop for any active work (project goal, resume loop, or inline slice): checkpoint Beads/git, finish the current safe phase, and do not start another Bead; (`/work-resume-stop` is a kept alias)
+- after a Bead is committed and closed, continue to the next ready Bead automatically rather than stopping to ask.
 
 ## Cost and Model Policy
 

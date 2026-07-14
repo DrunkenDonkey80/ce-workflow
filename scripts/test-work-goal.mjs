@@ -207,6 +207,7 @@ mod.default({
 assert.ok(commands["work-goal"]);
 assert.ok(commands["work-resume"]);
 assert.ok(commands["work-resume-stop"]);
+assert.ok(commands["work-stop"]);
 assert.ok(commands["work-menu"]);
 assert.ok(commands["work-goal-reset-continue"]);
 assert.ok(shortcuts.f7);
