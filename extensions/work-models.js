@@ -154,7 +154,7 @@ const EFFORT_PROFILES = {
 		slicePlanCeDepth: "Lightweight",
 		simplifyBeforeReview: false,
 		browserTestsOnUiDiff: false,
-		codeReviewBeforeCommit: false,
+		codeReviewBeforeCommit: "off",
 	},
 	medium: {
 		plan: "medium",
@@ -170,7 +170,7 @@ const EFFORT_PROFILES = {
 		slicePlanCeDepth: "Lightweight",
 		simplifyBeforeReview: false,
 		browserTestsOnUiDiff: true,
-		codeReviewBeforeCommit: false,
+		codeReviewBeforeCommit: "light",
 	},
 	high: {
 		plan: "high",
@@ -186,7 +186,7 @@ const EFFORT_PROFILES = {
 		slicePlanCeDepth: "Standard",
 		simplifyBeforeReview: true,
 		browserTestsOnUiDiff: true,
-		codeReviewBeforeCommit: false,
+		codeReviewBeforeCommit: "light",
 	},
 	max: {
 		plan: "xhigh",
@@ -202,7 +202,7 @@ const EFFORT_PROFILES = {
 		slicePlanCeDepth: "Deep",
 		simplifyBeforeReview: true,
 		browserTestsOnUiDiff: true,
-		codeReviewBeforeCommit: true,
+		codeReviewBeforeCommit: "full",
 	},
 };
 const DEFAULT_PROFILE = "medium";
@@ -224,12 +224,14 @@ const WORK_ORCH_BOOLEANS = [
 		key: "browserTestsOnUiDiff",
 		label: "ce-test-browser when diff touches UI",
 	},
-	{
-		key: "codeReviewBeforeCommit",
-		label: "full ce-code-review for risky/large commits",
-	},
 ];
 const WORK_ORCH_CRITIC_KEYS = ["brainstorm", "plan"];
+const REVIEW_LEVELS = ["off", "light", "full"];
+const REVIEW_LEVEL_DESC = {
+	off: "no pre-commit review (low profile)",
+	light: "one bead-reviewer pass on the scoped diff (medium/high)",
+	full: "full ce-code-review skill on the slice diff (max)",
+};
 const SUBMENU_ARROW = "›";
 
 function slotByKey(key) {
@@ -2440,7 +2442,9 @@ function workOrchSettings(cwd) {
 	const flags = {};
 	for (const { key } of WORK_ORCH_BOOLEANS) flags[key] = raw[key] ?? base[key];
 	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
-	return { profile, critic, slicePlanCeDepth, ...flags };
+	const codeReviewBeforeCommit =
+		raw.codeReviewBeforeCommit ?? base.codeReviewBeforeCommit;
+	return { profile, critic, slicePlanCeDepth, codeReviewBeforeCommit, ...flags };
 }
 
 function applyProfile(settings, profileKey) {
@@ -2462,12 +2466,18 @@ function applyProfile(settings, profileKey) {
 	block.critic = { ...profile.critic };
 	for (const { key } of WORK_ORCH_BOOLEANS) block[key] = profile[key];
 	block.slicePlanCeDepth = profile.slicePlanCeDepth;
+	block.codeReviewBeforeCommit = profile.codeReviewBeforeCommit;
 	return true;
 }
 
 function setWorkOrchBoolean(settings, key, value) {
 	const block = workOrchBlock(settings);
 	block[key] = Boolean(value);
+}
+
+function setWorkOrchReviewLevel(settings, value) {
+	const block = workOrchBlock(settings);
+	block.codeReviewBeforeCommit = REVIEW_LEVELS.includes(value) ? value : "off";
 }
 
 function setWorkOrchCritic(settings, key, value) {
@@ -2583,10 +2593,10 @@ function cePlanSliceStep(issue, cwd, masterPlanPath, depth = "Lightweight") {
 	].join("\n");
 }
 
-function codeReviewBeforeCommitStep() {
-	return [
-		`Pre-commit code-review gate: before committing, run the full ce-code-review skill on the current diff for this slice. Resolve any blocking findings (or record an explicit user waiver) before the committer commits and closes the Bead.`,
-	].join("\n");
+function codeReviewBeforeCommitStep(level) {
+	if (level === "light")
+		return "Pre-commit review gate (light): before committing, launch exactly one bead-reviewer on the scoped slice diff and persist its PASS evidence, then commit and close the Bead. If it reports blocking findings, run one bead-fixer pass and re-review; never skip review silently.";
+	return "Pre-commit code-review gate: before committing, run the full ce-code-review skill on the current diff for this slice. Resolve any blocking findings (or record an explicit user waiver) before the committer commits and closes the Bead.";
 }
 
 function simplifyBeforeReviewStep() {
@@ -8407,10 +8417,11 @@ function buildWorkFinishState(cwd, args = "") {
 				{ relatedFiles: related },
 			);
 		const gates = workOrchSettings(cwd);
+		const reviewLevel = gates.codeReviewBeforeCommit;
 		const reviewBeforeCommit =
-			gates.codeReviewBeforeCommit && !isSmallDiff(cwd, related);
+			reviewLevel && reviewLevel !== "off" && !isSmallDiff(cwd, related);
 		const preCommitSteps = [
-			reviewBeforeCommit ? codeReviewBeforeCommitStep() : "",
+			reviewBeforeCommit ? codeReviewBeforeCommitStep(reviewLevel) : "",
 			gates.browserTestsOnUiDiff && related.some(isUiPath)
 				? browserTestsOnUiDiffStep()
 				: "",
@@ -10941,6 +10952,7 @@ export {
 	progressBar,
 	applyProfile,
 	setWorkOrchBoolean,
+	setWorkOrchReviewLevel,
 	setWorkOrchCritic,
 	workOrchSettings,
 	renderWorkIdeateText,
@@ -11819,6 +11831,7 @@ function workSettingsStatus(ctx) {
 			(flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`,
 		),
 		`  ${SUBMENU_ARROW} ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
+		`  ${SUBMENU_ARROW} pre-commit review: ${resolved.codeReviewBeforeCommit}`,
 		"",
 		"Resume automation",
 		`  ${onOff(resume.selfImproving)} self-improving workflow fixes (autonomous source delivery)`,
@@ -11966,6 +11979,12 @@ async function workSettingsLoop(ctx) {
 				...boolLabel(flag.label, resolved[flag.key]),
 			})),
 			{
+				kind: "reviewLevel",
+				value: "codeReviewBeforeCommit",
+				label: `pre-commit review ${SUBMENU_ARROW}`,
+				description: resolved.codeReviewBeforeCommit,
+			},
+			{
 				kind: "resumeBool",
 				value: "selfImproving",
 				...boolLabel("self-improving workflow fixes", resume.selfImproving),
@@ -12014,7 +12033,8 @@ async function workSettingsLoop(ctx) {
 						[
 							EFFORT_PROFILES[key].simplifyBeforeReview && "simplify",
 							EFFORT_PROFILES[key].browserTestsOnUiDiff && "browser",
-							EFFORT_PROFILES[key].codeReviewBeforeCommit && "review",
+							EFFORT_PROFILES[key].codeReviewBeforeCommit !== "off" &&
+								`review:${EFFORT_PROFILES[key].codeReviewBeforeCommit}`,
 						]
 							.filter(Boolean)
 							.join("/") || "none"
@@ -12026,6 +12046,23 @@ async function workSettingsLoop(ctx) {
 			applyProfile(settings, profileKey);
 			writeSettings(ctx.cwd, settings);
 			ctx.ui.notify(`Applied ${profileKey} profile`, "info");
+			continue;
+		}
+		if (pick.kind === "reviewLevel") {
+			const level = await choose(
+				ctx,
+				"Pre-commit review level",
+				REVIEW_LEVELS.map((value) => ({
+					value,
+					label: value,
+					description: REVIEW_LEVEL_DESC[value],
+				})),
+			);
+			if (!level) continue;
+			settings = readSettings(ctx.cwd);
+			setWorkOrchReviewLevel(settings, level);
+			writeSettings(ctx.cwd, settings);
+			ctx.ui.notify(`Pre-commit review: ${level}`, "info");
 			continue;
 		}
 		if (pick.kind === "slot") {

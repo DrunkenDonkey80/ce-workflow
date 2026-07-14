@@ -418,7 +418,7 @@ The advisor (`bead-advisor`, read-only, xhigh by default) is reserved for semant
 - **task-vs-plan verification** — code first compares Bead acceptance, plan unit, diff, and verification evidence; launch an advisor only when ambiguity remains.
 - **simplify before review** — inspect the scoped diff directly first; invoke `ce-simplify-code` only for a non-trivial cleanup.
 - **browser tests on UI diff** — run browser verification only when affected UI acceptance requires it.
-- **full code review before commit** — reserved for max-profile/high-risk diffs; deterministic bounded work uses the coded finalizer.
+- **pre-commit review** — profile-driven 3-state: off on low, one `bead-reviewer` pass on medium/high, full `ce-code-review` on max. Skips small diffs automatically.
 
 Use `/work-settings` to pick `brainstorm/plan/migration`, `work`, `debug`, `review`, `advisor`, or `advisor backup`. The model picker starts on the current model, shows the available list, and filters it live as you type (for example, `5.6`); then choose an effort level. The inherit row uses the current control-session model. Blank effort means “use the role default.” Settings persist in `.pi/settings.json`; use `/work-settings status` to make the tuning visible.
 
@@ -442,7 +442,7 @@ Routine work stays in the current session. Specialist role prompts use fresh chi
     "slicePlanCeDepth": "Deep",
     "simplifyBeforeReview": true,
     "browserTestsOnUiDiff": true,
-    "codeReviewBeforeCommit": true
+    "codeReviewBeforeCommit": "full"
   }
 }
 ```

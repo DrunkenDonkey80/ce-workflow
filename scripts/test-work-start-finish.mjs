@@ -305,7 +305,7 @@ try {
 		JSON.stringify({
 			workOrchestrator: {
 				browserTestsOnUiDiff: false,
-				codeReviewBeforeCommit: false,
+				codeReviewBeforeCommit: "off",
 			},
 		}),
 	);

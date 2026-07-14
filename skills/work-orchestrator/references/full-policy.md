@@ -461,7 +461,7 @@ Responsibilities:
 - **advisor verifies task vs plan** — use `bead-advisor` only when plan-to-diff alignment remains ambiguous after the coded acceptance/evidence check.
 - **simplify before review** — use `ce-simplify-code` only when a non-trivial risky diff would materially benefit; routine bounded changes stay inline.
 - **browser tests on UI diff** — at finish, run browser verification when UI acceptance requires it; backend/CLI/docs-only diffs skip it.
-- **ce-code-review before commit** — reserve full review for max-profile or high-risk diffs; deterministic bounded work uses the coded gate.
+- **pre-commit review** — profile-driven 3-state: off (low), one `bead-reviewer` pass on the scoped diff (medium/high), or full `ce-code-review` (max). Skips small diffs automatically.
 
 Gates are orthogonal to role effort. Flip any of them live without changing models.
 

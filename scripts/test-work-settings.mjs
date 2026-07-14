@@ -61,8 +61,8 @@ try {
 		"medium lightweight slice depth",
 	);
 	assert(
-		mod.workOrchSettings(cwd).codeReviewBeforeCommit === false,
-		"medium no code review",
+		mod.workOrchSettings(cwd).codeReviewBeforeCommit === "light",
+		"medium light review",
 	);
 	assert(
 		mod.workOrchSettings(cwd).simplifyBeforeReview === false,
@@ -81,7 +81,7 @@ try {
 	assert(max.profile === "max", "profile max");
 	assert(max.critic.plan === true, "max critic plan");
 	assert(max.advisorVerifyTask === true, "max advisor verify");
-	assert(max.codeReviewBeforeCommit === true, "max code review");
+	assert(max.codeReviewBeforeCommit === "full", "max full review");
 	assert(max.slicePlanWithCePlan === true, "max agent slice planner available");
 	assert(max.slicePlanCeDepth === "Deep", "max ce-plan deep");
 	assert(max.simplifyBeforeReview === true, "max simplify");
@@ -106,7 +106,7 @@ try {
 	mod.setWorkOrchBoolean(settings, "advisorVerifyTask", false);
 	mod.setWorkOrchBoolean(settings, "slicePlanBeforeWork", false);
 	mod.setWorkOrchBoolean(settings, "slicePlanWithCePlan", false);
-	mod.setWorkOrchBoolean(settings, "codeReviewBeforeCommit", false);
+	mod.setWorkOrchReviewLevel(settings, "off");
 	writeSettings(settings);
 	assert(
 		mod.workOrchSettings(cwd).advisorVerifyTask === false,
@@ -121,7 +121,7 @@ try {
 		"flipped ce-plan per slice off",
 	);
 	assert(
-		mod.workOrchSettings(cwd).codeReviewBeforeCommit === false,
+		mod.workOrchSettings(cwd).codeReviewBeforeCommit === "off",
 		"flipped review off",
 	);
 	assert(
@@ -149,7 +149,7 @@ try {
 	assert(low.slicePlanBeforeWork === true, "low lightweight slice planning");
 	assert(low.slicePlanWithCePlan === false, "low no ce-plan per slice");
 	assert(low.slicePlanCeDepth === "Lightweight", "low ce-plan depth unused");
-	assert(low.codeReviewBeforeCommit === false, "low no code review");
+	assert(low.codeReviewBeforeCommit === "off", "low no review");
 	assert(low.simplifyBeforeReview === false, "low no simplify");
 	assert(low.browserTestsOnUiDiff === false, "low no browser tests");
 
@@ -274,7 +274,7 @@ try {
 		"planner writes slice plan before work",
 		"agent slice planner for messy/large slices",
 		"ce-plan slice depth: Lightweight",
-		"full ce-code-review for risky/large commits",
+		"pre-commit review:",
 		"ce-simplify-code before review",
 		"ce-test-browser when diff touches UI",
 		"self-improving workflow fixes",
