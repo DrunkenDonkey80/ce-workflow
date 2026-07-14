@@ -18,7 +18,7 @@ import {
 
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
-const bdBin = process.env.WORK_ORCH_BD_BIN || "bd";
+const bdBin = process.env.WORK_ORCH_BD_BIN || (process.platform === "win32" ? "bd.cmd" : "bd");
 const gitBin = process.env.WORK_ORCH_GIT_BIN || "git";
 
 function run(bin, argv, options = {}) {
