@@ -2567,13 +2567,16 @@ function applyInlineSlicePlan(cwd, state, issue) {
 			notes: `${notesOf(issue)}\n${plan}`,
 		};
 		return withHandoffPrompt(
-			withImplementationPolicy({
-				...state,
-				action: "run-implementation",
-				selectedBead: issueSummary(planned),
-				message:
-					"Added coded slice-plan note and continued directly to implementation; no planner boundary needed.",
-			}, cwd),
+			withImplementationPolicy(
+				{
+					...state,
+					action: "run-implementation",
+					selectedBead: issueSummary(planned),
+					message:
+						"Added coded slice-plan note and continued directly to implementation; no planner boundary needed.",
+				},
+				cwd,
+			),
 			cwd,
 		);
 	} catch (error) {
@@ -4813,7 +4816,8 @@ function implementationExecutionPolicy(state, cwd) {
 		return {
 			kind: "agent",
 			level: "isolated",
-			reason: "sliceExecutionMode=agent routes each slice to an isolated bead-worker",
+			reason:
+				"sliceExecutionMode=agent routes each slice to an isolated bead-worker",
 		};
 	if (highRiskImplementation(issue))
 		return {
@@ -5059,11 +5063,14 @@ function planResumeAction(state, cwd) {
 			],
 		};
 	if (activeImplementation) {
-		const routed = withImplementationPolicy({
-			...state,
-			action: "run-implementation",
-			selectedBead: activeImplementation,
-		}, cwd);
+		const routed = withImplementationPolicy(
+			{
+				...state,
+				action: "run-implementation",
+				selectedBead: activeImplementation,
+			},
+			cwd,
+		);
 		if (activeImplementation.reviewPassed)
 			return {
 				...routed,
@@ -5159,11 +5166,14 @@ function planResumeAction(state, cwd) {
 			return applyInlineSlicePlan(cwd, state, implementation);
 		}
 		return withHandoffPrompt(
-			withImplementationPolicy({
-				...state,
-				action: "run-implementation",
-				selectedBead: implementation,
-			}, cwd),
+			withImplementationPolicy(
+				{
+					...state,
+					action: "run-implementation",
+					selectedBead: implementation,
+				},
+				cwd,
+			),
 			cwd,
 		);
 	}
@@ -6847,18 +6857,21 @@ function buildWorkMedState(cwd, args = "") {
 			}),
 		);
 		return withHandoffPrompt(
-			withImplementationPolicy({
-				ok: true,
-				action: "run-implementation",
-				inlineWork: true,
-				inlineLevel: "medium",
-				smallTask: compactTaskSummary(bead, { notesTail: 1200 }),
-				epic: issueSummary(resolved.epic),
-				selectedBead: issueSummary(bead),
-				git,
-				message: `Created ${idOf(bead)} under ${idOf(resolved.epic)} for inline medium work.`,
-				warnings: git.warnings,
-			}, cwd),
+			withImplementationPolicy(
+				{
+					ok: true,
+					action: "run-implementation",
+					inlineWork: true,
+					inlineLevel: "medium",
+					smallTask: compactTaskSummary(bead, { notesTail: 1200 }),
+					epic: issueSummary(resolved.epic),
+					selectedBead: issueSummary(bead),
+					git,
+					message: `Created ${idOf(bead)} under ${idOf(resolved.epic)} for inline medium work.`,
+					warnings: git.warnings,
+				},
+				cwd,
+			),
 			cwd,
 		);
 	} catch (error) {
@@ -12122,8 +12135,7 @@ async function workSettingsLoop(ctx) {
 				{
 					value: "agent",
 					label: "agent",
-					description:
-						"route each slice to an isolated bead-worker subagent",
+					description: "route each slice to an isolated bead-worker subagent",
 				},
 			]);
 			if (!mode) continue;

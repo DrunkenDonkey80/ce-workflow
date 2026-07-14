@@ -180,7 +180,10 @@ const prompt = mod.buildWorkGoalSystemPrompt({
 });
 assert.match(prompt, /Do not stop for plan approval/);
 assert.match(prompt, /Use ask_user for every question/);
-assert.match(prompt, /use ask_user to ask the user to make that state available/);
+assert.match(
+	prompt,
+	/use ask_user to ask the user to make that state available/,
+);
 assert.match(prompt, /work_goal_human_decision is only a durable fallback/);
 assert.match(prompt, /WORK_GOAL_NEEDS_HUMAN_DECISION/);
 assert.match(prompt, /work_goal_complete/);
@@ -222,10 +225,7 @@ assert.equal(tools.work_goal_human_decision.parameters.required[0], "question");
 assert.ok(hooks.before_agent_start);
 assert.ok(hooks.agent_end);
 assert.deepEqual(
-	hooks.tool_call(
-		{ toolName: "work_goal_human_decision" },
-		{ hasUI: true },
-	),
+	hooks.tool_call({ toolName: "work_goal_human_decision" }, { hasUI: true }),
 	{
 		block: true,
 		reason:
@@ -233,10 +233,7 @@ assert.deepEqual(
 	},
 );
 assert.equal(
-	hooks.tool_call(
-		{ toolName: "work_goal_human_decision" },
-		{ hasUI: false },
-	),
+	hooks.tool_call({ toolName: "work_goal_human_decision" }, { hasUI: false }),
 	undefined,
 );
 
