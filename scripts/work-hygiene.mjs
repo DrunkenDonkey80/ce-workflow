@@ -40,26 +40,24 @@ const SOURCE_EXTS = new Set(
 );
 
 // Basenames (no meaningful extension) that are always intended source/config.
-const SOURCE_BASENAMES = new Set(
-	[
-		"Makefile",
-		"Dockerfile",
-		"Rakefile",
-		"Gemfile",
-		"Vagrantfile",
-		"CMakeLists.txt",
-		"requirements.txt",
-		"package.json",
-		"tsconfig.json",
-		"pyproject.toml",
-		"Cargo.toml",
-		"go.mod",
-		"go.sum",
-		".gitignore",
-		".gitattributes",
-		".editorconfig",
-	],
-);
+const SOURCE_BASENAMES = new Set([
+	"Makefile",
+	"Dockerfile",
+	"Rakefile",
+	"Gemfile",
+	"Vagrantfile",
+	"CMakeLists.txt",
+	"requirements.txt",
+	"package.json",
+	"tsconfig.json",
+	"pyproject.toml",
+	"Cargo.toml",
+	"go.mod",
+	"go.sum",
+	".gitignore",
+	".gitattributes",
+	".editorconfig",
+]);
 
 export function isRuntimePath(file) {
 	const norm = file.replaceAll("\\", "/");
@@ -125,9 +123,14 @@ export function appendGitignorePatterns(dir, patterns) {
 		/* no existing .gitignore */
 	}
 	const present = new Set(
-		existing.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+		existing
+			.split(/\r?\n/)
+			.map((line) => line.trim())
+			.filter(Boolean),
 	);
-	const fresh = [...new Set(patterns)].filter((pattern) => !present.has(pattern));
+	const fresh = [...new Set(patterns)].filter(
+		(pattern) => !present.has(pattern),
+	);
 	if (!fresh.length) return false;
 	const sep = hadFile && existing && !existing.endsWith("\n") ? "\n" : "";
 	const block = `${sep}\n# ce-workflow: auto-ignored build/cache artifacts\n${fresh.join("\n")}\n`;
@@ -152,7 +155,9 @@ export function tidyUntrackedFiles({ cwd, gitBin = "git" }) {
 	const untracked = status
 		.split(/\r?\n/)
 		.filter((line) => line.startsWith("??"))
-		.map((line) => line.slice(3).trim().replace(/^"|"$/g, "").replaceAll("\\", "/"))
+		.map((line) =>
+			line.slice(3).trim().replace(/^"|"$/g, "").replaceAll("\\", "/"),
+		)
 		.filter(Boolean);
 	const toIgnore = new Set();
 	const unrecognized = [];

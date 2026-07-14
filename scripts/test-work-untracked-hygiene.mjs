@@ -29,11 +29,13 @@ const {
 
 // --- pure classification by stack ---
 assert(
-	ignorePatternForBuildArtifact("tools/x/build/pkg/Analysis-00.toc") === "build/",
+	ignorePatternForBuildArtifact("tools/x/build/pkg/Analysis-00.toc") ===
+		"build/",
 	"build/ dir maps to build/",
 );
 assert(
-	ignorePatternForBuildArtifact("tools/x/dist/barcode-display-gui.exe") === "dist/",
+	ignorePatternForBuildArtifact("tools/x/dist/barcode-display-gui.exe") ===
+		"dist/",
 	"dist/ dir maps to dist/",
 );
 assert(
@@ -53,8 +55,14 @@ assert(
 	ignorePatternForBuildArtifact("foo/bar.egg-info/PKG-INFO") === "*.egg-info/",
 	".egg-info maps to *.egg-info/",
 );
-assert(ignorePatternForBuildArtifact(".DS_Store") === ".DS_Store", ".DS_Store maps to itself");
-assert(ignorePatternForBuildArtifact("src/main.py") === null, "source is not a build artifact");
+assert(
+	ignorePatternForBuildArtifact(".DS_Store") === ".DS_Store",
+	".DS_Store maps to itself",
+);
+assert(
+	ignorePatternForBuildArtifact("src/main.py") === null,
+	"source is not a build artifact",
+);
 
 // recognized source must be decided WITHOUT touching git (ext + basename paths)
 const noGit = () => {
@@ -62,15 +70,25 @@ const noGit = () => {
 };
 assert(isRecognizedSource("src/main.py", noGit), ".py is recognized source");
 assert(isRecognizedSource("README.md", noGit), ".md is recognized source");
-assert(isRecognizedSource("pyproject.toml", noGit), ".toml is recognized source");
-assert(isRecognizedSource("Dockerfile", noGit), "Dockerfile basename is recognized");
+assert(
+	isRecognizedSource("pyproject.toml", noGit),
+	".toml is recognized source",
+);
+assert(
+	isRecognizedSource("Dockerfile", noGit),
+	"Dockerfile basename is recognized",
+);
 assert(isRecognizedSource(".gitignore", noGit), ".gitignore is recognized");
 assert(!isRecognizedSource("mystery.dat", noGit), ".dat is NOT recognized");
 assert(!isRecognizedSource("dump.bin", noGit), ".bin is NOT recognized");
 
 // --- .gitignore writer dedups and does not rewrite when nothing new ---
 const tmpA = mkdtempSync(path.join(tmpdir(), "wo-gi-"));
-const written1 = appendGitignorePatterns(tmpA, ["__pycache__/", "*.py[cod]", "build/"]);
+const written1 = appendGitignorePatterns(tmpA, [
+	"__pycache__/",
+	"*.py[cod]",
+	"build/",
+]);
 const gi1 = readFileSync(path.join(tmpA, ".gitignore"), "utf8");
 assert(written1, "first write reports a change");
 assert(
@@ -79,14 +97,14 @@ assert(
 		gi1.includes("ce-workflow: auto-ignored"),
 	"patterns + header written",
 );
-const written2 = appendGitignorePatterns(tmpA, ["__pycache__/", "node_modules/"]);
+const written2 = appendGitignorePatterns(tmpA, [
+	"__pycache__/",
+	"node_modules/",
+]);
 const gi2 = readFileSync(path.join(tmpA, ".gitignore"), "utf8");
 assert(written2, "new node_modules/ pattern is a change");
 const dupCount = (gi2.match(/__pycache__/g) || []).length;
-assert(
-	dupCount === 1,
-	"existing __pycache__/ pattern is not duplicated",
-);
+assert(dupCount === 1, "existing __pycache__/ pattern is not duplicated");
 assert(gi2.includes("node_modules/"), "new node_modules/ pattern appended");
 const written3 = appendGitignorePatterns(tmpA, ["__pycache__/", "build/"]);
 assert(!written3, "no new patterns -> no rewrite");
@@ -130,21 +148,32 @@ assert(
 	"build/cache artifacts collected as canonical patterns",
 );
 assert(
-	sorted(tidy.unrecognized).join(",") === sorted(["mystery.dat", "data.bin"]).join(","),
+	sorted(tidy.unrecognized).join(",") ===
+		sorted(["mystery.dat", "data.bin"]).join(","),
 	"only the unknown extensions are escalated",
 );
-assert(!tidy.unrecognized.includes("src/new.py"), "new source is not escalated");
-assert(!tidy.unrecognized.includes(".beads/interactions.jsonl"), "workflow-managed dirt is ignored");
+assert(
+	!tidy.unrecognized.includes("src/new.py"),
+	"new source is not escalated",
+);
+assert(
+	!tidy.unrecognized.includes(".beads/interactions.jsonl"),
+	"workflow-managed dirt is ignored",
+);
 assert(tidy.gitignoreWritten, ".gitignore was written");
 const gi = readFileSync(path.join(repo, ".gitignore"), "utf8");
-assert(gi.includes("*.py[cod]") && gi.includes("node_modules/"), "patterns landed in .gitignore");
+assert(
+	gi.includes("*.py[cod]") && gi.includes("node_modules/"),
+	"patterns landed in .gitignore",
+);
 
 // idempotent: a second run finds no new build/cache (already ignored) and does not rewrite.
 const tidy2 = tidyUntrackedFiles({ cwd: repo });
 assert(tidy2.ignored.length === 0, "second run collects no new artifacts");
 assert(!tidy2.gitignoreWritten, "second run does not rewrite .gitignore");
 assert(
-	sorted(tidy2.unrecognized).join(",") === sorted(["mystery.dat", "data.bin"]).join(","),
+	sorted(tidy2.unrecognized).join(",") ===
+		sorted(["mystery.dat", "data.bin"]).join(","),
 	"unknown files remain escalated on the second run",
 );
 
