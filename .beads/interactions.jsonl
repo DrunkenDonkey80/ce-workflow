@@ -1,1 +1,2 @@
 {"id":"int-366697a49d08ab55e10e6b500b734ff9","kind":"field_change","created_at":"2026-07-15T08:10:06.9382703Z","actor":"Flex","issue_id":"ce-workflow-dqh.1","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Completed by coded inline work path"}}
+{"id":"int-1b69d8f5d8d633d9aaa6cbc3a7b8d94e","kind":"field_change","created_at":"2026-07-15T08:11:02.8986975Z","actor":"Flex","issue_id":"ce-workflow-dqh","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"All brainstorm deliverables completed and verified"}}
