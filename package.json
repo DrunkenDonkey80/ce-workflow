@@ -1,9 +1,21 @@
 {
-  "name": "pi-work-orchestrator",
+  "name": "@shvax/pi-work-orchestrator",
   "version": "0.1.0",
   "description": "Beads-backed Pi workflow package for staged software work orchestration.",
   "type": "module",
   "license": "MIT",
+  "author": "DrunkenDonkey80",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DrunkenDonkey80/ce-workflow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DrunkenDonkey80/ce-workflow/issues"
+  },
+  "homepage": "https://github.com/DrunkenDonkey80/ce-workflow#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "pi-package",
     "pi",
@@ -15,13 +27,16 @@
     "agents/",
     "extensions/",
     "prompts/",
-    "scripts/",
+    "scripts/*.mjs",
+    "!scripts/test-*.mjs",
     "skills/",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "verify": "node scripts/verify-package.mjs",
-    "verify:quiet": "node scripts/verify-package.mjs --quiet"
+    "verify:quiet": "node scripts/verify-package.mjs --quiet",
+    "prepublishOnly": "node scripts/verify-package.mjs"
   },
   "pi": {
     "extensions": [

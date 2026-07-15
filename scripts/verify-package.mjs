@@ -52,10 +52,21 @@ function frontmatter(text) {
 const pkg = json("package.json");
 
 check(
-	"package name is pi-work-orchestrator",
-	pkg.name === "pi-work-orchestrator",
+	"package name is @shvax/pi-work-orchestrator",
+	pkg.name === "@shvax/pi-work-orchestrator",
 );
 check("package is ESM", pkg.type === "module");
+check("package has license", pkg.license === "MIT");
+check(
+	"package declares repository",
+	Boolean(pkg.repository?.url?.includes("ce-workflow")),
+);
+check("npm publish is public", pkg.publishConfig?.access === "public");
+check("LICENSE file exists", existsSync(path.join(root, "LICENSE")));
+check(
+	"npm files field excludes dev-only test scripts",
+	Array.isArray(pkg.files) && pkg.files.includes("!scripts/test-*.mjs"),
+);
 check(
 	"verify script exists",
 	pkg.scripts?.verify === "node scripts/verify-package.mjs" &&

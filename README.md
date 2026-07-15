@@ -464,6 +464,27 @@ npm run verify:quiet
 
 Use `verify:quiet` in agent chats and `verify` when you want the full local log. The verifier checks package manifest paths, prompt routing, skill coverage, role-agent boundaries, migration policy, CE integration hooks, optional `pi-intercom` policy, and MVP non-goals.
 
+## Publishing
+
+This package publishes to npm as [`@shvax/pi-work-orchestrator`](https://www.npmjs.com/package/@shvax/pi-work-orchestrator) via GitHub Actions. There is no manual `npm publish` step.
+
+1. Bump `version` in `package.json` (semver) and update `CHANGELOG` notes in the PR description if relevant.
+2. Land the version bump on `main`. `.github/workflows/ci.yml` runs `npm run verify` and `npm pack --dry-run` on every push and PR.
+3. Cut a GitHub Release with a tag matching the new version prefixed with `v` (for example `v0.2.0`).
+4. Publishing the release triggers `.github/workflows/publish.yml`, which re-runs verification, checks the tag matches `package.json` version, and runs `npm publish --provenance --access public` using npm **Trusted Publishing (OIDC)** — no npm token or GitHub secret is stored in this repository.
+5. The workflow can also be run manually (`workflow_dispatch`) to (re)publish under a specific npm dist-tag, for example `next`.
+
+One-time setup for maintainers (npm-side only, no GitHub repo secrets needed):
+
+- On [npmjs.com](https://www.npmjs.com), the npm account that will own `@shvax/pi-work-orchestrator` configures a **Trusted Publisher** for the package (Package Settings > Trusted Publisher, or when reserving a not-yet-published package name), pointing at:
+  - Provider: GitHub Actions
+  - Repository: this repo's `owner/name`
+  - Workflow file: `.github/workflows/publish.yml`
+  - Environment: `npm` (matches the `environment: npm` in the workflow)
+- Because the trust relationship is keyed off the exact repo + workflow file + environment (all public metadata), the person configuring it on npm does **not** need write/admin access to this GitHub repo, and the repo owner does **not** need to create or store any secret. Only whoever can trigger the `publish.yml` workflow (via a GitHub Release or manual dispatch) needs write access here.
+- `id-token: write` (already set in the workflow) lets GitHub issue the short-lived OIDC token npm exchanges for a publish credential at run time; nothing long-lived is stored anywhere.
+- If the package has never been published, the first Trusted Publishing run also claims the `@shvax/pi-work-orchestrator` name on npm for that account; add other npm co-maintainers afterward with `npm owner add <username> @shvax/pi-work-orchestrator`.
+
 ## Disposable repo smoke test
 
 After static verification passes, test behavior in a throwaway repo:

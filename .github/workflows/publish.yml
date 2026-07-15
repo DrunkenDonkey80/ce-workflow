@@ -1,0 +1,51 @@
+name: Publish to npm
+
+# Uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret required.
+# The trust relationship is configured on npmjs.com against this exact
+# repo + workflow file (and optionally the "npm" environment below), not
+# via any secret stored in this repository.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "npm dist-tag to publish under"
+        required: false
+        default: "latest"
+
+permissions:
+  contents: read
+  id-token: write # required for npm OIDC trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Verify package
+        run: node scripts/verify-package.mjs
+
+      - name: Check version matches release tag
+        if: github.event_name == 'release'
+        run: |
+          RELEASE_TAG="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$RELEASE_TAG" != "$PKG_VERSION" ]; then
+            echo "Release tag ($GITHUB_REF_NAME) does not match package.json version ($PKG_VERSION)" >&2
+            exit 1
+          fi
+
+      - name: Publish
+        run: npm publish --provenance --access public --tag "${{ inputs.tag || 'latest' }}"
