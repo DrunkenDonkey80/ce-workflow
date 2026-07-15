@@ -88,6 +88,16 @@ function forbiddenWrite(event, options) {
 	return null;
 }
 
+export function reconcileWorkflowTelemetry(records) {
+	if (!Array.isArray(records) || records.length === 0) throw new Error("workflow telemetry is missing");
+	const correlated = records.filter((record) => record?.workflowRunId);
+	const ids = [...new Set(correlated.map((record) => record.workflowRunId))];
+	if (ids.length !== 1) throw new Error("workflow telemetry is ambiguous");
+	const terminal = correlated.filter((record) => record.type === "workflow-complete");
+	if (terminal.length !== 1) throw new Error("workflow terminal telemetry must be exactly once");
+	return { workflowRunId: ids[0], events: correlated, terminal: terminal[0] };
+}
+
 function defaultSpawn(command, args, options) { return spawn(command, args, options); }
 
 function terminate(child) {

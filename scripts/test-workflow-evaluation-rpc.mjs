@@ -7,6 +7,7 @@ import {
 	answerUiRequest,
 	createJsonlParser,
 	preflightRpcSample,
+	reconcileWorkflowTelemetry,
 	runRpcSample,
 } from "./workflow-evaluation-rpc.mjs";
 
@@ -30,6 +31,9 @@ assert.doesNotThrow(() => preflightRpcSample({ packageRoot, revision: "abc", exp
 assert.throws(() => preflightRpcSample({ packageRoot, revision: "abc", expectedRevision: "def", tools: ["read"], expectedTools: ["read"], trusted: true }));
 assert.throws(() => preflightRpcSample({ packageRoot, revision: "abc", expectedRevision: "abc", tools: ["read", "write"], expectedTools: ["read"], trusted: true }));
 assert.throws(() => preflightRpcSample({ packageRoot, revision: "abc", expectedRevision: "abc", tools: ["read"], expectedTools: ["read"], trusted: false, isolation: "path" }), /sandbox/);
+assert.equal(reconcileWorkflowTelemetry([{ type: "command", workflowRunId: "wf-1" }, { type: "workflow-complete", workflowRunId: "wf-1" }]).workflowRunId, "wf-1");
+assert.throws(() => reconcileWorkflowTelemetry([{ type: "workflow-complete", workflowRunId: "wf-1" }, { type: "workflow-complete", workflowRunId: "wf-1" }]), /exactly once/);
+assert.throws(() => reconcileWorkflowTelemetry([{ type: "workflow-complete", workflowRunId: "wf-1" }, { type: "workflow-complete", workflowRunId: "wf-2" }]), /ambiguous/);
 
 function fakeProcess(events) {
 	const child = new EventEmitter();
