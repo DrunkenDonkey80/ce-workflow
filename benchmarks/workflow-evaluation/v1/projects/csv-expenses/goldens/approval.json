@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "approved": false,
+  "approvedBy": null,
+  "approvedAt": null,
+  "bundleSha": "3e8d95dfa07a9bcee94e6b0f01a590d8973de31753de7428d11632d82aaeb89b",
+  "brainstormSha": "45b639386af3bae85aa23fcee44ada5aaee2f74cff406860643924d8fc3a34fb",
+  "planSha": "6a474ff8a790894160485dd653acd8f35c9187e65ba8e8ce6a56344da42615ca",
+  "acceptancePassed": true,
+  "evidence": null
+}

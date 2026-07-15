@@ -1,0 +1,1 @@
+Build a dependency-free Node.js CLI that summarizes a CSV expense file into a deterministic text report. Plan and execute it in at least two independently verifiable slices.

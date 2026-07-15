@@ -1,0 +1,4 @@
+Food: 15.75
+Travel: 20.00
+Total: 35.75
+Rows: 3

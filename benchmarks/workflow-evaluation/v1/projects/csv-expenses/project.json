@@ -1,0 +1,13 @@
+{
+  "id": "csv-expenses",
+  "version": 1,
+  "request": "Build a dependency-free Node.js CLI that summarizes a CSV expense file into a deterministic text report.",
+  "stageInputs": {
+    "brainstorm": "request.txt",
+    "plan": "goldens/brainstorm.md",
+    "work": "goldens/plan.md"
+  },
+  "slices": ["parse and validate CSV input", "aggregate and render the report"],
+  "acceptance": "acceptance/verify.mjs",
+  "rubric": "rubric.json"
+}

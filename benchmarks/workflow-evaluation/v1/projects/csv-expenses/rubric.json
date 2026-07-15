@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "stageDimensions": {
+    "brainstorm": ["question-quality", "requirements", "scope"],
+    "plan": ["requirements", "traceability", "slicing", "verification"],
+    "work": ["behavior", "plan-adherence", "implementation-quality", "unnecessary-work"]
+  },
+  "anchors": { "0": "missing or harmful", "1": "major gaps", "2": "usable with gaps", "3": "complete", "4": "exceptionally clear and complete" },
+  "criticalDimensions": ["requirements", "traceability", "behavior"],
+  "ties": "Equal scores are ties; no hidden tie-break.",
+  "unexpectedQuestions": "Any increase is a regression.",
+  "evaluatorFailure": "Malformed, missing, or timed-out evaluation invalidates the comparison."
+}
