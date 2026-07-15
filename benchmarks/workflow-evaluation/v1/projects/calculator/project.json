@@ -1,0 +1,13 @@
+{
+  "id": "calculator",
+  "version": 1,
+  "request": "Build a responsive calculator with light/dark themes, persistence, keyboard support, and accessible controls.",
+  "stageInputs": {
+    "brainstorm": "request.txt",
+    "plan": "goldens/brainstorm.md",
+    "work": "goldens/plan.md"
+  },
+  "slices": ["calculator behavior and keyboard input", "theme, accessibility, and responsive presentation"],
+  "acceptance": "acceptance/verify.mjs",
+  "rubric": "rubric.json"
+}

@@ -1,0 +1,1 @@
+Build a responsive calculator with light and dark themes, persisted theme selection, keyboard support, accessible controls, and fixed-viewport screenshot evidence. Plan and execute it in at least two slices.

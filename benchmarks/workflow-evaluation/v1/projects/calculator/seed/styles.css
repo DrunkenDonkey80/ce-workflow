@@ -1,0 +1,5 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { min-height: 100vh; margin: 0; display: grid; place-items: center; }
+.calculator { width: min(22rem, calc(100vw - 2rem)); }
+button:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
+.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }

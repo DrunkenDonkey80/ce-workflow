@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "expected": {
+    "operation order": "Evaluate chained operations left-to-right.",
+    "division by zero": "Show Error and recover on the next digit or clear.",
+    "theme": "Provide light and dark themes and persist under calculator-theme.",
+    "viewport": "Use 390 by 844 CSS pixels for required screenshot evidence.",
+    "dependencies": "Use plain HTML, CSS, and JavaScript."
+  },
+  "fallback": {
+    "default theme": "Use the system preference on first visit, then persist explicit choice.",
+    "rounding": "Display at most ten significant decimal digits without exponential notation for ordinary inputs."
+  }
+}
