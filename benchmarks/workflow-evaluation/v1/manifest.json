@@ -1,18 +1,82 @@
 {
   "version": 1,
-  "projects": ["calculator", "csv-expenses"],
-  "hiddenResources": ["product-contract.md", "acceptance/"],
-  "metrics": ["tokens", "wallMs", "toolCalls", "subagentCalls", "toolOutputChars", "retries", "contextTokens", "questions"],
+  "projects": [
+    "calculator",
+    "csv-expenses"
+  ],
+  "hiddenResources": [
+    "product-contract.md",
+    "acceptance/"
+  ],
+  "metrics": [
+    "tokens",
+    "wallMs",
+    "toolCalls",
+    "subagentCalls",
+    "toolOutputChars",
+    "retries",
+    "contextTokens",
+    "questions"
+  ],
   "depths": {
-    "smoke": { "samples": 1, "tokenCeiling": 100000, "wallMsCeiling": 900000 },
-    "decision": { "samples": 3, "tokenCeiling": 300000, "wallMsCeiling": 2700000 },
-    "sentinel": { "samples": 1, "tokenCeiling": 500000, "wallMsCeiling": 5400000 },
-    "calibration": { "samples": 3, "tokenCeiling": 300000, "wallMsCeiling": 2700000 }
+    "smoke": {
+      "samples": 1,
+      "tokenCeiling": 100000,
+      "wallMsCeiling": 900000
+    },
+    "decision": {
+      "samples": 3,
+      "tokenCeiling": 300000,
+      "wallMsCeiling": 2700000
+    },
+    "sentinel": {
+      "samples": 1,
+      "tokenCeiling": 500000,
+      "wallMsCeiling": 5400000
+    },
+    "calibration": {
+      "samples": 3,
+      "tokenCeiling": 300000,
+      "wallMsCeiling": 2700000
+    }
   },
   "rubric": {
     "version": 1,
-    "anchors": [0, 1, 2, 3, 4],
-    "criticalDimensions": ["behavior", "requirements", "traceability"]
+    "anchors": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "criticalDimensions": [
+      "behavior",
+      "requirements",
+      "traceability"
+    ]
   },
-  "approvals": {}
+  "approvals": {
+    "calculator": {
+      "version": 1,
+      "approved": true,
+      "approvedBy": "Flex (interactive approval)",
+      "approvedAt": "2026-07-15T13:16:15.069Z",
+      "bundleSha": "e72596a4811cc5e261f01ce7d1ef76b3854a954195161e95680fa6abd840b10b",
+      "brainstormSha": "fe2204b44c48cd50fa4bcc516a81dc2174424a08883ff422c393746763407a46",
+      "planSha": "5330c5c186a36d0de6e979320c083cef1c2f8d40cb8ca0084e6c41aa42c93005",
+      "acceptancePassed": true,
+      "evidence": "node scripts/test-workflow-evaluation-calculator.mjs; npm run verify:quiet"
+    },
+    "csv-expenses": {
+      "version": 1,
+      "approved": true,
+      "approvedBy": "Flex (interactive approval)",
+      "approvedAt": "2026-07-15T13:16:15.069Z",
+      "bundleSha": "76d008083d3c3d3024d8e4279741be0c3f7c49a8f6a8bca663ee014a27828d10",
+      "brainstormSha": "45b639386af3bae85aa23fcee44ada5aaee2f74cff406860643924d8fc3a34fb",
+      "planSha": "6a474ff8a790894160485dd653acd8f35c9187e65ba8e8ce6a56344da42615ca",
+      "acceptancePassed": true,
+      "evidence": "node scripts/test-workflow-evaluation-csv.mjs; npm run verify:quiet"
+    }
+  }
 }

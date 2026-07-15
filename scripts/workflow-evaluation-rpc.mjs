@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -69,9 +69,13 @@ function commandName(stage) { return stage === "work" ? "work-resume" : `work-${
 
 function validateCommands(commands, options) {
 	const expected = commandName(options.stage);
-	const owners = (commands ?? []).filter((item) => item.name === expected);
+	const matches = (commands ?? []).filter((item) => item.name === expected);
+	const owners = matches.filter((item) => item.source === "extension");
 	if (owners.length !== 1) throw new Error(`command provenance mismatch for ${expected}`);
-	if (!owners[0].path || !contained(options.packageRoot, owners[0].path)) throw new Error(`command ${expected} is not owned by selected package`);
+	for (const item of matches) {
+		const ownerPath = item.path ?? item.sourceInfo?.path;
+		if (!ownerPath || !contained(options.packageRoot, ownerPath)) throw new Error(`command ${expected} is not owned by selected package`);
+	}
 	return owners[0];
 }
 
@@ -98,11 +102,17 @@ export function reconcileWorkflowTelemetry(records) {
 	return { workflowRunId: ids[0], events: correlated, terminal: terminal[0] };
 }
 
+export function piInvocation(args, override) {
+	if (override) return [override, args];
+	const script = path.join(process.env.APPDATA ?? "", "npm", "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
+	return process.platform === "win32" && path.isAbsolute(script) ? [process.execPath, [script, ...args]] : ["pi", args];
+}
+
 function defaultSpawn(command, args, options) { return spawn(command, args, options); }
 
 function terminate(child) {
 	if (!child?.pid) return child?.kill?.("SIGTERM");
-	if (process.platform === "win32") spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+	if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore", timeout: 30_000 });
 	else child.kill("SIGTERM");
 }
 
@@ -113,13 +123,17 @@ export async function runRpcSample(options) {
 	const args = ["--mode", "rpc", "--no-session", "--offline", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "-e", preflight.packageRoot, "--tools", options.tools.join(",")];
 	if (options.provider) args.push("--provider", options.provider);
 	if (options.model) args.push("--model", options.model);
-	const child = (options.spawnProcess ?? defaultSpawn)(options.piCommand ?? "pi", args, { cwd: options.workspaceRoot ?? process.cwd(), env: options.env ?? process.env, stdio: ["pipe", "pipe", "pipe"] });
+	const [piCommand, piArgs] = piInvocation(args, options.piCommand);
+	const child = (options.spawnProcess ?? defaultSpawn)(piCommand, piArgs, { cwd: options.workspaceRoot ?? process.cwd(), env: options.env ?? process.env, stdio: ["pipe", "pipe", "pipe"] });
 	const events = [];
 	const questions = [];
 	let stderr = "";
 	let done = false;
 	let prompted = false;
 	let settled = false;
+	let promptIndex = 0;
+	const prompts = options.prompts ?? [options.prompt];
+	let pendingResult = null;
 	return await new Promise((resolve) => {
 		const finish = (result) => {
 			if (done) return;
@@ -128,16 +142,19 @@ export async function runRpcSample(options) {
 			resolve({ ...result, events, questions, stderr: stderr.slice(-8000), provenance: { packageRoot: preflight.packageRoot, revision: options.revision, tools: options.tools, isolation: preflight.isolation, trusted: options.trusted } });
 		};
 		const send = (command) => { if (!child.stdin.destroyed) child.stdin.write(`${JSON.stringify(command)}\n`); };
-		const fail = (failure, error) => {
-			if (done) return;
-			finish({ status: "failed", failure, error });
+		const settle = (result) => {
+			if (done || pendingResult) return;
+			pendingResult = result;
 			terminate(child);
+			setTimeout(() => finish(pendingResult), 250);
 		};
+		const fail = (failure, error) => settle({ status: "failed", failure, error });
 		const parser = createJsonlParser((event) => {
 			events.push(event);
 			const target = forbiddenWrite(event, options);
 			if (target) return fail("forbidden-write", target);
 			if (event.type === "extension_error") return fail("extension-error", event.error ?? "extension failed");
+			if (event.type === "message_end" && event.message?.role === "assistant" && (event.message.stopReason === "error" || event.message.errorMessage)) return fail("provider-error", event.message.errorMessage ?? "assistant failed");
 			if (event.type === "extension_ui_request" && DIALOGS.has(event.method)) {
 				const response = answerUiRequest(event, options.answers);
 				questions.push({ title: event.title ?? "", method: event.method, expected: Boolean(response), response: response?.value ?? response?.confirmed });
@@ -149,22 +166,29 @@ export async function runRpcSample(options) {
 				try { validateCommands(event.data?.commands, options); }
 				catch (error) { return fail("resource-provenance", error instanceof Error ? error.message : String(error)); }
 				prompted = true;
-				send({ id: "prompt", type: "prompt", message: options.prompt });
+				send({ id: `prompt-${promptIndex}`, type: "prompt", message: prompts[promptIndex] });
+				promptIndex += 1;
 			}
 			if (event.type === "agent_settled") {
-				settled = true;
-				send({ id: "stats", type: "get_session_stats" });
+				if (promptIndex < prompts.length) {
+					send({ id: `prompt-${promptIndex}`, type: "prompt", message: prompts[promptIndex] });
+					promptIndex += 1;
+				} else {
+					settled = true;
+					send({ id: "stats", type: "get_session_stats" });
+				}
 			}
 			if (event.type === "response" && event.id === "stats") {
-				if (!settled || !event.success || !event.data?.tokens || !Number.isFinite(event.data.tokens.total)) return fail("missing-usage", event.error ?? "session usage missing");
-				finish({ status: "completed", usage: event.data });
+				if (!settled || !event.success || !event.data?.tokens || !Number.isFinite(event.data.tokens.total) || event.data.tokens.total <= 0) return fail("missing-usage", event.error ?? "session usage missing");
+				settle({ status: "completed", usage: event.data });
 			}
 		}, (error) => fail("malformed-rpc", error instanceof Error ? error.message : String(error)));
 		child.stdout.on("data", (chunk) => parser.write(chunk));
 		child.stdout.on("end", () => parser.end());
 		child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
 		child.on("error", (error) => fail("process-error", error.message));
-		child.on("exit", (code, signal) => { if (!done) fail("process-exit", `RPC exited ${code ?? signal}${prompted ? " after dispatch" : " before dispatch"}`); });
+		child.on("exit", (code, signal) => { if (!done && !pendingResult) fail("process-exit", `RPC exited ${code ?? signal}${prompted ? " after dispatch" : " before dispatch"}`); });
+		child.on("close", () => { if (pendingResult) finish(pendingResult); });
 		const timer = setTimeout(() => { send({ type: "abort" }); fail("timeout", `RPC exceeded ${options.timeoutMs}ms`); }, options.timeoutMs);
 		send({ id: "commands", type: "get_commands" });
 	});

@@ -60,6 +60,7 @@ assert.ok(candidateFailure.attempts.some((attempt) => attempt.failure === "timeo
 
 const decision = await runDecisionExperiment({ ...descriptor, mode: "decision" }, {
 	sourceRoot,
+	skipApproval: true,
 	initializeWorkspace() {},
 	async runSample(sample) {
 		const cost = sample.side === "candidate" ? 90 : 100;

@@ -51,7 +51,10 @@ function validSample(sample, rubric) {
 
 function invalid(reason, pairs = []) { return { status: "invalid", reason, pairs }; }
 function rejected(reason, pairs = []) { return { status: "candidate-rejected", reason, pairs }; }
-function improvement(baseline, candidate) { return baseline === 0 ? (candidate === 0 ? 0 : -Infinity) : (baseline - candidate) / baseline; }
+function improvement(baseline, candidate) {
+	if (baseline !== 0) return (baseline - candidate) / baseline;
+	return candidate === 0 ? 0 : -Infinity;
+}
 
 export function evaluateDecision(inputPairs, rubric, options = {}) {
 	if (!Array.isArray(inputPairs) || inputPairs.length !== 3) return invalid("decision-requires-three-pairs");

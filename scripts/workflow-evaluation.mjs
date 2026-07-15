@@ -6,9 +6,11 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { fingerprint } from "./workflow-evaluation-contract.mjs";
-import { runRpcSample } from "./workflow-evaluation-rpc.mjs";
+import { fingerprint, validateExperimentPair } from "./workflow-evaluation-contract.mjs";
+import { piInvocation, reconcileWorkflowTelemetry, runRpcSample } from "./workflow-evaluation-rpc.mjs";
 import { blindArtifacts, evaluateDecision, validateEvaluatorResult } from "./workflow-evaluation-score.mjs";
+import { verifyCsvProject } from "../benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/verify.mjs";
+import { verifyCalculatorProject } from "../benchmarks/workflow-evaluation/v1/projects/calculator/acceptance/verify.mjs";
 
 const scriptRoot = path.dirname(fileURLToPath(import.meta.url));
 const defaultSourceRoot = path.dirname(scriptRoot);
@@ -23,13 +25,34 @@ function readJson(file, label = file) {
 	catch (error) { throw new Error(`invalid ${label}: ${error instanceof Error ? error.message : String(error)}`); }
 }
 
+function quietCommand(cwd, executable, args, timeout = 120_000) {
+	const result = spawnSync(executable, args, { cwd, stdio: "ignore", timeout, env: { ...process.env, BD_NON_INTERACTIVE: "1" } });
+	if (result.status !== 0) throw new Error(`${executable} ${args.join(" ")} failed${result.error ? `: ${result.error.message}` : ""}`);
+}
+
+function beadsInvocation(args) {
+	const script = path.join(process.env.APPDATA ?? "", "npm", "node_modules", "@beads", "bd", "bin", "bd.js");
+	return process.platform === "win32" && existsSync(script) ? [process.execPath, [script, ...args]] : ["bd", args];
+}
+
 function initializeWorkspace(cwd) {
 	command(cwd, "git", ["init", "--quiet"]);
 	command(cwd, "git", ["config", "user.email", "workflow-evaluation@example.invalid"]);
 	command(cwd, "git", ["config", "user.name", "Workflow Evaluation"]);
-	command(cwd, "bd", ["init", "--non-interactive", "--stealth"]);
+	const [bd, initArgs] = beadsInvocation(["init", "--non-interactive", "--stealth"]);
+	quietCommand(cwd, bd, initArgs);
 	command(cwd, "git", ["add", "-A"]);
 	command(cwd, "git", ["commit", "--quiet", "-m", "seed"]);
+}
+
+function cleanupWorkspace(cwd) {
+	if (existsSync(path.join(cwd, ".beads"))) {
+		const [bd, stopArgs] = beadsInvocation(["dolt", "stop"]);
+		spawnSync(bd, stopArgs, { cwd, stdio: "ignore", timeout: 30_000 });
+		// ponytail: embedded bd can retain its Windows cwd handle briefly; remove this wait when bd releases it synchronously.
+		if (process.platform === "win32") Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3_000);
+	}
+	rmSync(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 });
 }
 
 function treeHash(root) {
@@ -67,6 +90,33 @@ function appendLifecycle(file, state, details = {}) {
 
 function projectRoot(sourceRoot, project) { return path.join(sourceRoot, "benchmarks", "workflow-evaluation", "v1", "projects", project); }
 
+function resolvedPair(descriptor) {
+	const common = {
+		project: descriptor.project,
+		stage: descriptor.stage,
+		bundleVersion: 1,
+		role: descriptor.role ?? descriptor.stage,
+		provider: descriptor.provider ?? "configured",
+		model: descriptor.model ?? "configured",
+		effort: descriptor.effort ?? "medium",
+		evaluator: descriptor.evaluator ?? { provider: "configured", model: "configured" },
+		runtime: { node: process.versions.node, platform: process.platform, arch: process.arch },
+		dependencies: descriptor.dependencies ?? { package: "local" },
+		browser: descriptor.browser ?? { status: "unavailable" },
+		rubricVersion: 1,
+		tools: descriptor.tools,
+	};
+	return {
+		baseline: { ...common, ...descriptor.baseline },
+		candidate: { ...common, ...descriptor.candidate },
+	};
+}
+
+function validateDescriptor(descriptor) {
+	const pair = resolvedPair(descriptor);
+	return validateExperimentPair({ ...pair, factor: descriptor.factor, interaction: descriptor.interaction === true });
+}
+
 function stageInput(stage) {
 	if (stage === "brainstorm") return "request.txt";
 	if (stage === "plan") return path.join("goldens", "brainstorm.md");
@@ -102,9 +152,25 @@ function disposition(attempts) {
 	return "diagnostic-pass";
 }
 
+function workTelemetry(root) {
+	const directory = path.join(root, ".pi", "work-runs");
+	if (!existsSync(directory)) return [];
+	const records = [];
+	for (const name of readdirSync(directory)) {
+		if (!name.endsWith(".jsonl")) continue;
+		for (const line of readFileSync(path.join(directory, name), "utf8").split(/\r?\n/).filter(Boolean)) {
+			try { records.push(JSON.parse(line)); }
+			catch (error) { throw new Error(`malformed workflow telemetry: ${error instanceof Error ? error.message : String(error)}`); }
+		}
+	}
+	return records;
+}
+
 async function defaultRunSample(sample, descriptor, sourceRoot) {
 	const side = descriptor[sample.side];
-	const prompt = descriptor.prompt ?? `${sample.stage === "work" ? "/work-resume" : `/work-${sample.stage}`} ${sample.promptInput}`;
+	const commandName = sample.stage === "work" ? "work-resume" : `work-${sample.stage}`;
+	const prompt = descriptor.prompt ?? `/${commandName} ${sample.promptInput}`;
+	const prompts = sample.stage === "work" && !descriptor.prompt ? [`/work-migrate ${sample.promptInput}`, "/work-resume"] : [prompt];
 	const started = Date.now();
 	const rpc = await runRpcSample({
 		packageRoot: path.resolve(side.packageRoot ?? sourceRoot),
@@ -116,15 +182,39 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		isolation: descriptor.isolation,
 		stage: sample.stage,
 		prompt,
+		prompts,
 		answers: sample.answers,
 		timeoutMs: descriptor.budgets.wallMsCeiling,
 		workspaceRoot: sample.workspaceRoot,
 		sourceRoot,
 		bundleRoot: sample.projectDir,
 		provider: side.provider,
-		model: side.model,
+		model: side.model && side.effort ? `${side.model}:${side.effort}` : side.model,
 	});
-	return { ...rpc, wallMs: Date.now() - started, verifier: { passed: rpc.status === "completed" }, prompt };
+	const wallMs = Date.now() - started;
+	const output = [...(rpc.events ?? [])].reverse().find((event) => event.type === "message_end" && event.message?.role === "assistant" && messageText(event.message))?.message;
+	const outputText = messageText(output);
+	let telemetry = null;
+	let telemetryError = null;
+	if (rpc.status === "completed") {
+		try { telemetry = reconcileWorkflowTelemetry(workTelemetry(sample.workspaceRoot)); }
+		catch (error) { telemetryError = error instanceof Error ? error.message : String(error); }
+	}
+	const gitStatus = spawnSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], { cwd: sample.workspaceRoot, encoding: "utf8" }).stdout.split(/\r?\n/).filter((line) => line && !/^[? ][? ] \.pi\//.test(line));
+	const usage = rpc.usage ?? {};
+	const toolEvents = (rpc.events ?? []).filter((event) => event.type === "tool_execution_end");
+	const metrics = {
+		tokens: usage.tokens?.total,
+		wallMs,
+		toolCalls: usage.toolCalls,
+		subagentCalls: (rpc.events ?? []).filter((event) => event.type === "tool_execution_start" && event.toolName === "subagent").length,
+		toolOutputChars: toolEvents.reduce((sum, event) => sum + JSON.stringify(event.result ?? {}).length, 0),
+		retries: (rpc.events ?? []).filter((event) => event.type === "auto_retry_start").length,
+		contextTokens: usage.contextUsage?.tokens,
+		questions: rpc.questions?.length ?? 0,
+	};
+	const verifier = { passed: rpc.status === "completed" && Boolean(outputText) && Boolean(telemetry) && gitStatus.length === 0, output: Boolean(outputText), telemetry: telemetryError ?? "complete", gitClean: gitStatus.length === 0 };
+	return { ...rpc, wallMs, metrics, telemetry, artifacts: outputText ? [outputText] : [], output: outputText, diff: gitStatus.join("\n"), verifier, prompt, prompts };
 }
 
 function messageText(message) {
@@ -147,7 +237,8 @@ function defaultEvaluatePair(baselineArtifact, candidateArtifact, rubric, descri
 	if (evaluator.provider) args.push("--provider", evaluator.provider);
 	if (evaluator.model) args.push("--model", evaluator.model);
 	const started = Date.now();
-	const run = spawnSync(descriptor.piCommand ?? "pi", args, { input: JSON.stringify(blinded.evaluatorInput), encoding: "utf8", timeout: evaluator.timeoutMs ?? 900_000, maxBuffer: 16 * 1024 * 1024 });
+	const [piCommand, piArgs] = piInvocation(args, descriptor.piCommand);
+	const run = spawnSync(piCommand, piArgs, { input: JSON.stringify(blinded.evaluatorInput), encoding: "utf8", timeout: evaluator.timeoutMs ?? 900_000, maxBuffer: 16 * 1024 * 1024 });
 	if (run.status !== 0) throw new Error(`evaluator failed: ${run.stderr || run.stdout}`);
 	const events = run.stdout.split(/\r?\n/).filter(Boolean).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
 	const assistant = events.filter((event) => event.type === "message_end" && event.message?.role === "assistant").at(-1)?.message;
@@ -180,7 +271,9 @@ function infrastructureFailure(results) {
 
 export async function runDecisionExperiment(descriptor, seams = {}) {
 	if (descriptor.mode !== "decision") throw new Error("runDecisionExperiment requires decision mode");
+	if (!descriptor.calibration) validateDescriptor(descriptor);
 	const sourceRoot = path.resolve(seams.sourceRoot ?? defaultSourceRoot);
+	if (!seams.skipApproval) validateGoldenApproval(projectRoot(sourceRoot, descriptor.project), readJson(path.join(projectRoot(sourceRoot, descriptor.project), "goldens", "approval.json"), `${descriptor.project} approval`));
 	const before = sourceState(sourceRoot);
 	const evidenceRoot = seams.evidenceRoot ?? mkdtempSync(path.join(os.tmpdir(), "ce-workflow-evidence-"));
 	const runId = `decision-${Date.now()}-${randomUUID().slice(0, 8)}`;
@@ -208,7 +301,7 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 					appendLifecycle(lifecycle, "dispatched", { pairIndex, attemptIndex, side });
 					try { raw[side] = await (seams.runSample ? seams.runSample({ ...sample, side, stage: descriptor.stage, pairIndex, attemptIndex, answers }) : defaultRunSample({ ...sample, side, stage: descriptor.stage, answers }, descriptor, sourceRoot)); }
 					catch (error) { raw[side] = { status: "failed", failure: "harness-error", error: error instanceof Error ? error.message : String(error) }; }
-					rmSync(sample.workspaceRoot, { recursive: true, force: true });
+					cleanupWorkspace(sample.workspaceRoot);
 				}
 				const infra = infrastructureFailure(Object.values(raw));
 				if (infra) {
@@ -242,9 +335,168 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 	} finally { rmSync(runRoot, { recursive: true, force: true }); }
 }
 
+function projectBundleHash(root) {
+	const hash = createHash("sha256");
+	function visit(directory, relative = "") {
+		for (const name of readdirSync(directory).sort()) {
+			const absolute = path.join(directory, name);
+			const rel = path.join(relative, name).replaceAll("\\", "/");
+			if (rel === "goldens/approval.json") continue;
+			const stat = statSync(absolute);
+			if (stat.isDirectory()) visit(absolute, rel);
+			else hash.update(`${rel}\0`).update(readFileSync(absolute));
+		}
+	}
+	visit(root);
+	return hash.digest("hex");
+}
+
+function fileSha(file) { return createHash("sha256").update(readFileSync(file)).digest("hex"); }
+
+export function buildGoldenApproval(projectDirectory, metadata = {}) {
+	return {
+		version: 1,
+		approved: metadata.approved === true,
+		approvedBy: metadata.approvedBy ?? null,
+		approvedAt: metadata.approvedAt ?? null,
+		bundleSha: projectBundleHash(projectDirectory),
+		brainstormSha: fileSha(path.join(projectDirectory, "goldens", "brainstorm.md")),
+		planSha: fileSha(path.join(projectDirectory, "goldens", "plan.md")),
+		acceptancePassed: metadata.acceptancePassed === true,
+		evidence: metadata.evidence ?? null,
+	};
+}
+
+export function validateGoldenApproval(projectDirectory, approval) {
+	if (!approval?.approved || !approval.approvedBy || !approval.approvedAt) throw new Error("human golden approval is required");
+	if (!approval.acceptancePassed || !approval.evidence) throw new Error("golden acceptance evidence is required");
+	const current = buildGoldenApproval(projectDirectory, approval);
+	for (const field of ["bundleSha", "brainstormSha", "planSha"]) if (approval[field] !== current[field]) throw new Error(`golden approval is stale: ${field}`);
+	return approval;
+}
+
+export function deriveCalibration(pairs) {
+	if (!Array.isArray(pairs) || pairs.length !== 3) throw new Error("calibration requires three unchanged pairs");
+	const values = (side, metric) => pairs.map((pair) => pair[side]?.[metric]);
+	for (const side of ["baseline", "candidate"]) for (const metric of ["tokens", "wallMs"]) if (!values(side, metric).every(Number.isFinite)) throw new Error(`calibration ${metric} is incomplete`);
+	const noise = pairs.flatMap((pair) => [Math.abs(pair.candidate.tokens - pair.baseline.tokens) / Math.max(1, pair.baseline.tokens), Math.abs(pair.candidate.wallMs - pair.baseline.wallMs) / Math.max(1, pair.baseline.wallMs)]);
+	return {
+		minimumImprovement: Math.max(0.05, ...noise),
+		maximumDimensionRegression: Math.max(0.1, ...noise),
+		tokenCeiling: Math.ceil(Math.max(...values("baseline", "tokens"), ...values("candidate", "tokens")) * 1.2),
+		wallMsCeiling: Math.ceil(Math.max(...values("baseline", "wallMs"), ...values("candidate", "wallMs")) * 1.2),
+	};
+}
+
+export function requiresSentinel(changedPaths, declaredChangeType = "") {
+	if (/handoff|artifact|routing|finalization|default-behavior/.test(declaredChangeType)) return true;
+	const knownNarrow = /^(README\.md|docs\/|scripts\/test-|benchmarks\/workflow-evaluation\/)/;
+	return changedPaths.some((file) => /^(extensions\/work-models\.js|skills\/ce-(brainstorm|plan|work)\/|prompts\/work-|agents\/bead-)/.test(file.replaceAll("\\", "/")) || !knownNarrow.test(file.replaceAll("\\", "/")));
+}
+
+export async function runSentinelExperiment(descriptor, seams = {}) {
+	if (descriptor.mode !== "sentinel") throw new Error("runSentinelExperiment requires sentinel mode");
+	const sourceRoot = path.resolve(descriptor.sourceRoot ?? seams.sourceRoot ?? defaultSourceRoot);
+	const before = sourceState(sourceRoot);
+	const evidenceRoot = seams.evidenceRoot ?? mkdtempSync(path.join(os.tmpdir(), "ce-workflow-evidence-"));
+	const runId = `sentinel-${Date.now()}-${randomUUID().slice(0, 8)}`;
+	const controlRoot = path.join(evidenceRoot, runId);
+	const runRoot = path.join(os.tmpdir(), `ce-workflow-samples-${runId}`);
+	mkdirSync(controlRoot, { recursive: true });
+	mkdirSync(runRoot, { recursive: true });
+	const results = [];
+	const runStage = seams.runStage ?? (async ({ side, stage, input, workspaceRoot, projectDir }) => {
+		const answers = readJson(path.join(projectDir, "answers.json"), `${path.basename(projectDir)} answer bank`);
+		const result = await defaultRunSample({ side, stage, promptInput: input, workspaceRoot, projectDir, answers }, descriptor, sourceRoot);
+		return { ...result, artifact: result.output };
+	});
+	const verifyProject = seams.verifyProject ?? (async ({ project, workspaceRoot }) => {
+		if (project === "csv-expenses") return verifyCsvProject(workspaceRoot);
+		return verifyCalculatorProject(workspaceRoot, null);
+	});
+	try {
+		for (const project of descriptor.projects ?? ["calculator", "csv-expenses"]) {
+			const projectDir = projectRoot(sourceRoot, project);
+			if (!seams.skipApproval) validateGoldenApproval(projectDir, readJson(path.join(projectDir, "goldens", "approval.json"), `${project} approval`));
+			for (const side of descriptor.sides ?? ["baseline", "candidate"]) {
+				const workspaceRoot = mkdtempSync(path.join(runRoot, `${project}-${side}-`));
+				cpSync(path.join(projectDir, "seed"), workspaceRoot, { recursive: true });
+				(seams.initializeWorkspace ?? initializeWorkspace)(workspaceRoot);
+				const projectResult = { project, side, stages: [], acceptance: null };
+				let input = readFileSync(path.join(projectDir, "request.txt"), "utf8");
+				let inputSource = "original-request";
+				for (const stage of ["brainstorm", "plan", "work"]) {
+					let stageResult;
+					try { stageResult = await runStage({ project, side, stage, input, inputSource, workspaceRoot, projectDir }); }
+					catch (error) { stageResult = { status: "failed", failure: "harness-error", error: error instanceof Error ? error.message : String(error) }; }
+					if (!stageResult) stageResult = { status: "failed", failure: "live-stage-adapter-unavailable" };
+					projectResult.stages.push(sanitize({ stage, inputSource, inputSha: fingerprint(input), ...stageResult }));
+					if (stageResult.status !== "completed" || stageResult.verifier?.passed === false || stageResult.usedGolden) break;
+					input = String(stageResult.artifact ?? "");
+					inputSource = `actual:${stage}`;
+				}
+				if (projectResult.stages.length === 3 && projectResult.stages.every((stage) => stage.status === "completed" && stage.verifier?.passed !== false)) projectResult.acceptance = await verifyProject({ project, side, workspaceRoot, projectDir });
+				results.push(projectResult);
+				cleanupWorkspace(workspaceRoot);
+			}
+		}
+		const status = results.every((project) => project.stages.length === 3 && project.stages.every((stage) => stage.status === "completed" && stage.verifier?.passed !== false && !stage.usedGolden) && project.acceptance?.passed) ? "passed" : "failed";
+		const evidencePath = path.join(controlRoot, "evidence.json");
+		writeFileSync(evidencePath, `${JSON.stringify(sanitize({ contract: "ce-workflow-evidence/v1", runId, mode: "sentinel", status, projects: results, source: before }), null, 2)}\n`);
+		if (JSON.stringify(sourceState(sourceRoot)) !== JSON.stringify(before)) throw new Error("source checkout or benchmark bundle changed during sentinel");
+		return { runId, mode: "sentinel", status, projects: results, evidencePath };
+	} finally { rmSync(runRoot, { recursive: true, force: true }); }
+}
+
+export async function runCalibrationExperiment(descriptor, seams = {}) {
+	if (descriptor.mode !== "calibration") throw new Error("runCalibrationExperiment requires calibration mode");
+	const decision = await runDecisionExperiment({ ...descriptor, mode: "decision", factor: "unchanged-calibration", calibration: true }, seams);
+	if (!decision.verdict?.pairs || decision.verdict.pairs.length !== 3) return { ...decision, mode: "calibration", status: "invalid-calibration" };
+	const pairs = decision.verdict.pairs.map((pair) => {
+		const attempt = pair.attempts[pair.selectedAttempt];
+		return { baseline: { tokens: attempt.baseline.metrics.tokens, wallMs: attempt.baseline.metrics.wallMs }, candidate: { tokens: attempt.candidate.metrics.tokens, wallMs: attempt.candidate.metrics.wallMs } };
+	});
+	const calibration = deriveCalibration(pairs);
+	const calibrationPath = path.join(path.dirname(decision.evidencePath), "calibration.json");
+	writeFileSync(calibrationPath, `${JSON.stringify({ project: descriptor.project, stage: descriptor.stage, generatedAt: new Date().toISOString(), ...calibration }, null, 2)}\n`);
+	return { ...decision, mode: "calibration", status: "calibrated", calibration, calibrationPath };
+}
+
+export function runGoldenUpdate(descriptor, seams = {}) {
+	if (descriptor.mode !== "golden-update") throw new Error("runGoldenUpdate requires golden-update mode");
+	const sourceRoot = path.resolve(seams.sourceRoot ?? defaultSourceRoot);
+	const projectDir = projectRoot(sourceRoot, descriptor.project);
+	const approvalFile = path.join(projectDir, "goldens", "approval.json");
+	const before = existsSync(approvalFile) ? readJson(approvalFile, `${descriptor.project} prior approval`) : null;
+	if (descriptor.contractChanged && !descriptor.humanApproved) throw new Error("contract changes require explicit human approval before mutation");
+	if (descriptor.contractChanged) {
+		const projectFile = path.join(projectDir, "project.json");
+		const project = readJson(projectFile, `${descriptor.project} project`);
+		writeFileSync(projectFile, `${JSON.stringify({ ...project, version: Number(project.version ?? 0) + 1 }, null, 2)}\n`);
+	}
+	const next = buildGoldenApproval(projectDir, {
+		approved: descriptor.humanApproved === true,
+		approvedBy: descriptor.approvedBy,
+		approvedAt: descriptor.approvedAt ?? (descriptor.humanApproved ? new Date().toISOString() : null),
+		acceptancePassed: descriptor.acceptancePassed === true,
+		evidence: descriptor.acceptanceEvidence,
+	});
+	const evidenceRoot = seams.evidenceRoot ?? mkdtempSync(path.join(os.tmpdir(), "ce-workflow-evidence-"));
+	const updateRoot = path.join(evidenceRoot, `golden-update-${Date.now()}-${randomUUID().slice(0, 8)}`);
+	mkdirSync(updateRoot, { recursive: true });
+	const evidencePath = path.join(updateRoot, "evidence.json");
+	writeFileSync(evidencePath, `${JSON.stringify({ project: descriptor.project, before, after: next, contractChanged: Boolean(descriptor.contractChanged) }, null, 2)}\n`);
+	if (!descriptor.humanApproved) return { mode: "golden-update", status: "pending-human-approval", candidate: next, evidencePath };
+	validateGoldenApproval(projectDir, next);
+	writeFileSync(approvalFile, `${JSON.stringify(next, null, 2)}\n`);
+	return { mode: "golden-update", status: "approved", approvalPath: approvalFile, evidencePath };
+}
+
 export async function runSmokeExperiment(descriptor, seams = {}) {
 	if (descriptor.mode !== "smoke") throw new Error("runSmokeExperiment requires smoke mode");
+	validateDescriptor(descriptor);
 	const sourceRoot = path.resolve(seams.sourceRoot ?? defaultSourceRoot);
+	if (["plan", "work"].includes(descriptor.stage) && !seams.skipApproval) validateGoldenApproval(projectRoot(sourceRoot, descriptor.project), readJson(path.join(projectRoot(sourceRoot, descriptor.project), "goldens", "approval.json"), `${descriptor.project} approval`));
 	const before = sourceState(sourceRoot);
 	const evidenceRoot = seams.evidenceRoot ?? mkdtempSync(path.join(os.tmpdir(), "ce-workflow-evidence-"));
 	const runId = `smoke-${Date.now()}-${randomUUID().slice(0, 8)}`;
@@ -265,9 +517,14 @@ export async function runSmokeExperiment(descriptor, seams = {}) {
 			try { result = await (seams.runSample ? seams.runSample({ ...sample, side, stage: descriptor.stage, answers }) : defaultRunSample({ ...sample, side, stage: descriptor.stage, answers }, descriptor, sourceRoot)); }
 			catch (error) { result = { status: "failed", failure: "harness-error", error: error instanceof Error ? error.message : String(error) }; }
 			const ok = passed(result, descriptor.budgets);
-			attempts.push(sanitize({ side, pairIndex: 0, passed: ok, failure: ok ? null : result.failure ?? (result.status === "completed" ? "hard-gate" : result.status), result }));
+			let failure = null;
+			if (!ok) {
+				failure = result.failure;
+				if (!failure) failure = result.status === "completed" ? "hard-gate" : result.status;
+			}
+			attempts.push(sanitize({ side, pairIndex: 0, passed: ok, failure, result }));
 			appendLifecycle(lifecycle, ok ? "verified" : "retained", { side, passed: ok });
-			rmSync(sample.workspaceRoot, { recursive: true, force: true });
+			cleanupWorkspace(sample.workspaceRoot);
 			appendLifecycle(lifecycle, "cleaned", { side });
 		}
 		const status = disposition(attempts);
@@ -300,7 +557,12 @@ export async function runSmokeExperiment(descriptor, seams = {}) {
 }
 
 function usage() {
-	return "Usage: node scripts/workflow-evaluation.mjs <descriptor.json>\nModes: smoke (diagnostic), decision, calibration, golden-update, sentinel";
+	return [
+		"Usage: node scripts/workflow-evaluation.mjs <descriptor.json>",
+		"Modes: smoke (one pair, diagnostic only), decision (three approved pairs), calibration (three unchanged pairs), golden-update, sentinel.",
+		"Decision/sentinel require fresh SHA-bound human approvals and calibration. Missing credentials, evaluator, browser, provenance, metrics, or approvals fail closed.",
+		"Reports and retained evidence are written under the printed operating-system temporary path; disposable workspaces are removed.",
+	].join("\n");
 }
 
 async function main() {
@@ -310,7 +572,10 @@ async function main() {
 	catch (error) { throw new Error(`${error instanceof Error ? error.message : String(error)}\n${usage()}`); }
 	if (descriptor.mode === "smoke") console.log(JSON.stringify(await runSmokeExperiment(descriptor), null, 2));
 	else if (descriptor.mode === "decision") console.log(JSON.stringify(await runDecisionExperiment(descriptor), null, 2));
-	else throw new Error(`mode ${descriptor.mode} is not implemented yet`);
+	else if (descriptor.mode === "calibration") console.log(JSON.stringify(await runCalibrationExperiment(descriptor), null, 2));
+	else if (descriptor.mode === "golden-update") console.log(JSON.stringify(runGoldenUpdate(descriptor), null, 2));
+	else if (descriptor.mode === "sentinel") console.log(JSON.stringify(await runSentinelExperiment(descriptor), null, 2));
+	else throw new Error(`unsupported mode ${descriptor.mode}`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
