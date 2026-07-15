@@ -8,6 +8,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { fingerprint } from "./workflow-evaluation-contract.mjs";
 import { runRpcSample } from "./workflow-evaluation-rpc.mjs";
+import { blindArtifacts, evaluateDecision, validateEvaluatorResult } from "./workflow-evaluation-score.mjs";
 
 const scriptRoot = path.dirname(fileURLToPath(import.meta.url));
 const defaultSourceRoot = path.dirname(scriptRoot);
@@ -126,6 +127,121 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 	return { ...rpc, wallMs: Date.now() - started, verifier: { passed: rpc.status === "completed" }, prompt };
 }
 
+function messageText(message) {
+	return (message?.content ?? []).filter((item) => item.type === "text").map((item) => item.text).join("\n");
+}
+
+function parseJsonObject(text, label) {
+	const start = text.indexOf("{");
+	const end = text.lastIndexOf("}");
+	if (start < 0 || end <= start) throw new Error(`${label} did not return JSON`);
+	try { return JSON.parse(text.slice(start, end + 1)); }
+	catch (error) { throw new Error(`invalid ${label} JSON: ${error instanceof Error ? error.message : String(error)}`); }
+}
+
+function defaultEvaluatePair(baselineArtifact, candidateArtifact, rubric, descriptor) {
+	const blinded = blindArtifacts(baselineArtifact, candidateArtifact, rubric);
+	const system = readFileSync(path.join(descriptor.sourceRoot ?? defaultSourceRoot, "agents", "workflow-evaluator.md"), "utf8");
+	const evaluator = descriptor.evaluator ?? {};
+	const args = ["--mode", "json", "--print", "--no-session", "--offline", "--no-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--system-prompt", system];
+	if (evaluator.provider) args.push("--provider", evaluator.provider);
+	if (evaluator.model) args.push("--model", evaluator.model);
+	const started = Date.now();
+	const run = spawnSync(descriptor.piCommand ?? "pi", args, { input: JSON.stringify(blinded.evaluatorInput), encoding: "utf8", timeout: evaluator.timeoutMs ?? 900_000, maxBuffer: 16 * 1024 * 1024 });
+	if (run.status !== 0) throw new Error(`evaluator failed: ${run.stderr || run.stdout}`);
+	const events = run.stdout.split(/\r?\n/).filter(Boolean).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
+	const assistant = events.filter((event) => event.type === "message_end" && event.message?.role === "assistant").at(-1)?.message;
+	const result = parseJsonObject(messageText(assistant), "evaluator");
+	const dimensions = rubric.stageDimensions?.[descriptor.stage] ?? rubric.criticalDimensions;
+	validateEvaluatorResult(result, dimensions, rubric);
+	const scores = Object.fromEntries(Object.entries(blinded.control.mapping).map(([label, side]) => [side, result[label]]));
+	return { scores, control: blinded.control, evaluator: { provider: evaluator.provider, model: evaluator.model, wallMs: Date.now() - started, usage: assistant?.usage ?? null } };
+}
+
+function decisionSample(result, scores, budgets) {
+	const usage = result.usage ?? {};
+	const metrics = result.metrics ?? {
+		tokens: usage.tokens?.total,
+		wallMs: result.wallMs,
+		toolCalls: usage.toolCalls,
+		subagentCalls: result.telemetry?.subagentCalls,
+		toolOutputChars: result.telemetry?.toolOutputChars,
+		retries: result.telemetry?.retries,
+		contextTokens: usage.contextUsage?.tokens,
+		questions: result.questions?.length,
+	};
+	return { hard: { passed: passed(result, budgets) }, metrics, scores, unexpectedQuestions: (result.questions ?? []).filter((item) => item.expected === false).length };
+}
+
+function infrastructureFailure(results) {
+	const failures = results.map((result) => result.failure).filter(Boolean);
+	return failures.find((failure) => /timeout|rate-limit|provider|process-error|browser-unavailable/.test(failure)) ?? null;
+}
+
+export async function runDecisionExperiment(descriptor, seams = {}) {
+	if (descriptor.mode !== "decision") throw new Error("runDecisionExperiment requires decision mode");
+	const sourceRoot = path.resolve(seams.sourceRoot ?? defaultSourceRoot);
+	const before = sourceState(sourceRoot);
+	const evidenceRoot = seams.evidenceRoot ?? mkdtempSync(path.join(os.tmpdir(), "ce-workflow-evidence-"));
+	const runId = `decision-${Date.now()}-${randomUUID().slice(0, 8)}`;
+	const controlRoot = path.join(evidenceRoot, runId);
+	const runRoot = path.join(os.tmpdir(), `ce-workflow-samples-${runId}`);
+	mkdirSync(controlRoot, { recursive: true });
+	mkdirSync(runRoot, { recursive: true });
+	const lifecycle = path.join(controlRoot, "lifecycle.jsonl");
+	const initialize = seams.initializeWorkspace ?? initializeWorkspace;
+	const fullRubric = readJson(path.join(projectRoot(sourceRoot, descriptor.project), "rubric.json"), `${descriptor.project} rubric`);
+	const dimensions = fullRubric.stageDimensions?.[descriptor.stage] ?? fullRubric.criticalDimensions;
+	const rubric = { ...fullRubric, dimensions, criticalDimensions: fullRubric.criticalDimensions.filter((dimension) => dimensions.includes(dimension)) };
+	const pairs = [];
+	const evaluatorEvidence = [];
+	const evaluatorControl = [];
+	try {
+		for (let pairIndex = 0; pairIndex < 3; pairIndex += 1) {
+			const order = pairIndex % 2 ? ["candidate", "baseline"] : ["baseline", "candidate"];
+			const attempts = [];
+			for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
+				const raw = {};
+				for (const side of order) {
+					const sample = provision({ sourceRoot, project: descriptor.project, stage: descriptor.stage, side, pairIndex, runRoot, initialize });
+					const answers = readJson(path.join(sample.projectDir, "answers.json"), `${descriptor.project} answer bank`);
+					appendLifecycle(lifecycle, "dispatched", { pairIndex, attemptIndex, side });
+					try { raw[side] = await (seams.runSample ? seams.runSample({ ...sample, side, stage: descriptor.stage, pairIndex, attemptIndex, answers }) : defaultRunSample({ ...sample, side, stage: descriptor.stage, answers }, descriptor, sourceRoot)); }
+					catch (error) { raw[side] = { status: "failed", failure: "harness-error", error: error instanceof Error ? error.message : String(error) }; }
+					rmSync(sample.workspaceRoot, { recursive: true, force: true });
+				}
+				const infra = infrastructureFailure(Object.values(raw));
+				if (infra) {
+					attempts.push({ infrastructureFailure: infra, baseline: decisionSample(raw.baseline, {}, descriptor.budgets), candidate: decisionSample(raw.candidate, {}, descriptor.budgets), raw: sanitize(raw) });
+					if (attemptIndex === 0) continue;
+					break;
+				}
+				let evaluation;
+				try {
+					evaluation = await (seams.evaluatePair ? seams.evaluatePair(raw.baseline, raw.candidate, rubric, { pairIndex, attemptIndex }) : defaultEvaluatePair(raw.baseline.artifacts ?? raw.baseline.output ?? "", raw.candidate.artifacts ?? raw.candidate.output ?? "", rubric, { ...descriptor, sourceRoot }));
+				} catch (error) {
+					attempts.push({ evaluatorFailure: error instanceof Error ? error.message : String(error), baseline: decisionSample(raw.baseline, {}, descriptor.budgets), candidate: decisionSample(raw.candidate, {}, descriptor.budgets), raw: sanitize(raw) });
+					break;
+				}
+				evaluatorEvidence.push(evaluation.evaluator ?? {});
+				evaluatorControl.push({ pairIndex, attemptIndex, ...evaluation.control });
+				attempts.push({ baseline: decisionSample(raw.baseline, evaluation.scores.baseline, descriptor.budgets), candidate: decisionSample(raw.candidate, evaluation.scores.candidate, descriptor.budgets), raw: sanitize(raw) });
+				break;
+			}
+			pairs.push({ pairIndex, order, attempts });
+		}
+		const verdict = evaluateDecision(pairs, rubric, { primaryMetric: descriptor.primaryMetric, minimumImprovement: descriptor.minimumImprovement });
+		const evidence = sanitize({ contract: "ce-workflow-evidence/v1", runId, mode: "decision", decisionGrade: true, fingerprints: { descriptor: fingerprint(descriptor), source: before }, declaredFactor: descriptor.factor, pairs, evaluator: evaluatorEvidence, verdict });
+		const evidencePath = path.join(controlRoot, "evidence.json");
+		writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+		writeFileSync(path.join(controlRoot, "evaluator-control.json"), `${JSON.stringify(evaluatorControl, null, 2)}\n`);
+		const reportPath = path.join(controlRoot, "report.json");
+		writeFileSync(reportPath, `${JSON.stringify({ runId, mode: "decision", status: verdict.status, evidencePath, verdict }, null, 2)}\n`);
+		if (JSON.stringify(sourceState(sourceRoot)) !== JSON.stringify(before)) throw new Error("source checkout or benchmark bundle changed during comparison");
+		return { runId, mode: "decision", status: verdict.status, verdict, evidencePath, reportPath };
+	} finally { rmSync(runRoot, { recursive: true, force: true }); }
+}
+
 export async function runSmokeExperiment(descriptor, seams = {}) {
 	if (descriptor.mode !== "smoke") throw new Error("runSmokeExperiment requires smoke mode");
 	const sourceRoot = path.resolve(seams.sourceRoot ?? defaultSourceRoot);
@@ -192,8 +308,9 @@ async function main() {
 	let descriptor;
 	try { descriptor = readJson(path.resolve(process.argv[2]), "experiment descriptor"); }
 	catch (error) { throw new Error(`${error instanceof Error ? error.message : String(error)}\n${usage()}`); }
-	if (descriptor.mode !== "smoke") throw new Error(`mode ${descriptor.mode} is not implemented yet; smoke is diagnostic only`);
-	console.log(JSON.stringify(await runSmokeExperiment(descriptor), null, 2));
+	if (descriptor.mode === "smoke") console.log(JSON.stringify(await runSmokeExperiment(descriptor), null, 2));
+	else if (descriptor.mode === "decision") console.log(JSON.stringify(await runDecisionExperiment(descriptor), null, 2));
+	else throw new Error(`mode ${descriptor.mode} is not implemented yet`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });

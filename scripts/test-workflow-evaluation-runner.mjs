@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runSmokeExperiment } from "./workflow-evaluation.mjs";
+import { runDecisionExperiment, runSmokeExperiment } from "./workflow-evaluation.mjs";
 
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const descriptor = {
@@ -57,4 +57,18 @@ const candidateFailure = await runSmokeExperiment(descriptor, {
 });
 assert.equal(candidateFailure.status, "candidate-rejected");
 assert.ok(candidateFailure.attempts.some((attempt) => attempt.failure === "timeout"));
-console.log("ok - workflow evaluation smoke lifecycle fixtures");
+
+const decision = await runDecisionExperiment({ ...descriptor, mode: "decision" }, {
+	sourceRoot,
+	initializeWorkspace() {},
+	async runSample(sample) {
+		const cost = sample.side === "candidate" ? 90 : 100;
+		return { status: "completed", verifier: { passed: true }, usage: { tokens: { total: cost } }, metrics: { tokens: cost, wallMs: cost, toolCalls: cost, subagentCalls: cost, toolOutputChars: cost, retries: cost, contextTokens: cost, questions: 0 }, questions: [], artifacts: [`${sample.side}-artifact`] };
+	},
+	async evaluatePair() {
+		return { scores: { baseline: { "question-quality": 3, requirements: 3, scope: 3 }, candidate: { "question-quality": 3, requirements: 3, scope: 3 } }, control: { mapping: { A: "baseline", B: "candidate" } }, evaluator: { usage: { tokens: 10 } } };
+	},
+});
+assert.equal(decision.status, "candidate-accepted");
+assert.equal(decision.verdict.pairs.length, 3);
+console.log("ok - workflow evaluation smoke and decision lifecycle fixtures");
