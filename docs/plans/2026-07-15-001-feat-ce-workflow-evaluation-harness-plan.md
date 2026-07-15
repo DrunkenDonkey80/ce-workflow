@@ -4,9 +4,10 @@ type: feat
 date: 2026-07-15
 topic: ce-workflow-evaluation-harness
 artifact_contract: ce-unified-plan/v1
-artifact_readiness: requirements-only
+artifact_readiness: implementation-ready
 product_contract_source: ce-brainstorm
 execution: code
+deepened: 2026-07-15
 ---
 
 # CE Workflow Evaluation Harness - Plan
@@ -15,11 +16,16 @@ execution: code
 
 - **Objective:** Make ce-workflow optimization measurable through repeatable quality, reliability, token, and runtime comparisons.
 - **Product authority:** The versioned benchmark project contracts, approved golden handoffs, acceptance suites, and scoring rubrics define expected behavior.
-- **Open blockers:** None for planning; the first decision-capable run depends on one-time human approval of the generated golden brainstorms and plans.
+- **Open blockers:** None for implementation; decision-grade use still requires one-time human approval of each generated golden brainstorm and plan.
+- **Execution profile:** Deep, dependency-ordered implementation with deterministic fixtures before credentialed provider or browser runs.
+- **Stop conditions:** Stop rather than weaken hidden-contract isolation, quality gates, telemetry completeness, or one-factor comparability; unavailable credentials or browser capability block only the affected live evidence gate.
+- **Tail ownership:** The executor owns code, fixtures, evidence, and verification; a human owns golden approval and any benchmark-contract change.
 
 ---
 
 ## Product Contract
+
+**Product Contract preservation:** unchanged.
 
 ### Summary
 
@@ -186,3 +192,376 @@ flowchart TB
 - `agents/workflow-benchmark.md` defines the current read-only benchmark runner boundary.
 - `README.md` documents the staged workflow, role and effort configuration, review levels, telemetry, browser gate, simplify gate, and resume behavior this harness must evaluate.
 - `docs/plans/2026-07-11-001-feat-autonomous-workflow-improvement-plan.md` established the earlier requirement for representative quality and workflow-cost scenarios.
+
+---
+
+## Planning Contract
+
+### Key Technical Decisions
+
+- KTD1. **Ship a standalone Node.js harness before adding another `/work-*` command.** `node scripts/workflow-evaluation.mjs` is the single local entry point; extension UI integration is deferred until the standalone path is reliable.
+- KTD2. **Store immutable benchmark inputs under one versioned control-plane root.** `benchmarks/workflow-evaluation/v1/` contains project contracts, answer banks, acceptance checks, rubrics, seed repositories, goldens, and approval records; tested agents receive only copied stage inputs inside disposable projects.
+- KTD3. **Run every sample in a fresh Pi RPC subprocess.** RPC provides process isolation, exact model/thinking configuration, lifecycle events, tool events, token statistics, and an extension-UI protocol that can answer `ask_user` prompts from the scripted answer bank. The client uses strict LF-delimited JSONL parsing rather than Node `readline`.
+- KTD4. **Load and verify the exact ce-workflow revision for each side.** Each RPC process loads the selected local package checkout, records command/resource provenance, and fails before dispatch when the resolved workflow resources do not fingerprint to that checkout or when baseline and candidate differ outside the declared factor.
+- KTD5. **Keep the harness control plane outside tested working directories.** Hidden contracts, acceptance checks, non-input goldens, side labels, evaluator identity, and retained evidence never enter agent-visible context; filesystem audits reject writes to the source checkout, bundle root, or sibling sample directories.
+- KTD6. **Model each sample as a durable, idempotent lifecycle.** State transitions and evidence are append-only so interruption can be reconciled without selective retry; completion requires structured RPC settlement plus artifact, Git, Beads, telemetry, and acceptance evidence rather than an assistant prose claim.
+- KTD7. **Reuse quality-first scoring policy without forcing the old synthetic evidence shape onto representative runs.** The new scorer imports the existing 5% improvement and 10% per-dimension regression thresholds, but owns paired order, raw samples, spread, unexpected questions, rubric judgments, retry classification, and the larger required metric set.
+- KTD8. **Separate deterministic gates from blinded qualitative judgment.** Acceptance behavior, artifact validity, lifecycle state, telemetry, repository finalization, and forbidden writes are coded gates; a fixed `workflow-evaluator` role sees normalized, randomly labeled artifacts and a versioned rubric only after deterministic gates pass.
+- KTD9. **Treat browser execution as a capability adapter, not a hidden dependency.** Calculator acceptance declares a fixed viewport and screenshot contract behind an injected browser runner; an unavailable or mismatched runner produces an explicit invalid live run, while deterministic tests use a fake adapter.
+- KTD10. **Calibrate before permitting decision verdicts.** Unchanged baseline pairs establish stage/project budgets and noise floors; calibration may raise the Product Contract thresholds but never lower them or waive quality gates.
+- KTD11. **Treat evaluated package revisions as trusted code, not sandboxed input.** Pi extensions run with the user's system permissions, so path guards protect against accidental agent/tool leakage but not a malicious extension. V1 refuses untrusted revisions unless the operator supplies an external OS/container sandbox; reports name the trust posture.
+
+### High-Level Technical Design
+
+#### Component and data-flow topology
+
+```mermaid
+flowchart TB
+  CLI[Experiment descriptor and CLI] --> Contract[Bundle and factor validator]
+  Contract --> Pair[Paired run scheduler]
+  Pair --> Workspace[Disposable project and control-plane evidence dir]
+  Workspace --> RPC[Fresh Pi RPC process]
+  RPC --> Workflow[Workflow stage under test]
+  Workflow --> Raw[Transcript, artifacts, Git, Beads, telemetry]
+  Raw --> Gates[Deterministic verifier]
+  Raw --> Blind[Artifact normalizer and label randomizer]
+  Blind --> Judge[Fixed evaluator]
+  Gates --> Verdict[Quality-first comparison]
+  Judge --> Verdict
+  Verdict --> Report[Compact report and retained evidence bundle]
+```
+
+#### One sample protocol
+
+```mermaid
+sequenceDiagram
+  participant H as Harness
+  participant P as Pi RPC process
+  participant W as Workflow under test
+  participant S as Scripted user
+  participant V as Verifier
+  H->>P: Start with pinned package, model, tools, cwd, and budget
+  P->>W: Dispatch selected stage input
+  W->>S: Emit extension UI question
+  S-->>W: Return contract-grounded answer or fail
+  W-->>P: Produce artifacts and terminal workflow state
+  P-->>H: agent_settled, messages, tools, and usage
+  H->>V: Verify outputs, lifecycle, telemetry, repository, and acceptance
+  V-->>H: Structured gate results and evidence references
+```
+
+#### Sample lifecycle
+
+```mermaid
+stateDiagram-v2
+  [*] --> provisioned
+  provisioned --> dispatched
+  dispatched --> running
+  running --> awaiting_scripted_answer
+  awaiting_scripted_answer --> running
+  running --> completed
+  running --> failed
+  running --> timed_out
+  completed --> verified
+  failed --> retained
+  timed_out --> retained
+  verified --> retained
+  retained --> cleaned
+  cleaned --> [*]
+```
+
+#### Quality-first verdict flow
+
+```mermaid
+flowchart TB
+  Start[All paired attempts retained] --> Base{Every baseline sample passes?}
+  Base -->|no| Invalid[Invalid comparison]
+  Base -->|yes| Candidate{Every candidate sample passes?}
+  Candidate -->|no| Reject[Reject candidate]
+  Candidate -->|yes| Metrics{Required metrics complete?}
+  Metrics -->|no| Invalid
+  Metrics -->|yes| Quality{Median and critical qualitative dimensions non-regressed?}
+  Quality -->|no| Reject
+  Quality -->|yes| Questions{Unexpected questions non-increasing?}
+  Questions -->|no| Reject
+  Questions -->|yes| Cost{Primary cost improves enough with bounded regressions?}
+  Cost -->|no| NoWin[Quality pass, no cost win]
+  Cost -->|yes| Accept[Accept candidate]
+```
+
+#### Run-depth matrix
+
+| Depth | Samples | Inputs | Purpose | Decision authority |
+| --- | ---: | --- | --- | --- |
+| Smoke | One fresh pair | One project and one stage | Fast failure detection | Diagnostic only |
+| Decision | Three fresh alternating pairs | One project and one stage | Quality and cost comparison | Candidate verdict |
+| Sentinel | One fresh run per side and project | Actual brainstorm to plan to work handoffs | Composition regression detection | Required for trigger classes in R27 |
+| Calibration | Three unchanged fresh pairs | Same revision and configuration on both sides | Noise floor and budgets | Enables later decision verdicts |
+
+### Output Structure
+
+```text
+benchmarks/workflow-evaluation/v1/
+├── manifest.json
+└── projects/
+    ├── calculator/
+    │   ├── project.json
+    │   ├── product-contract.md
+    │   ├── answers.json
+    │   ├── rubric.json
+    │   ├── acceptance/
+    │   ├── goldens/
+    │   └── seed/
+    └── csv-expenses/
+        ├── project.json
+        ├── product-contract.md
+        ├── answers.json
+        ├── rubric.json
+        ├── acceptance/
+        ├── goldens/
+        └── seed/
+scripts/
+├── workflow-evaluation-contract.mjs
+├── workflow-evaluation-rpc.mjs
+├── workflow-evaluation-score.mjs
+└── workflow-evaluation.mjs
+```
+
+Runtime workspaces and evidence live under the operating system temporary directory, never under this tracked structure.
+
+### Sequencing
+
+1. Establish the versioned contract and deterministic bundle validators.
+2. Make each project independently executable and verifiable from a copied seed.
+3. Prove RPC question handling, isolation, telemetry, and completion with fake protocol fixtures.
+4. Add smoke lifecycle and retained evidence before comparison scoring.
+5. Add blinded evaluation, decision sampling, calibration, and sentinels only after one-sample behavior is trustworthy.
+6. Wire package verification and documentation last so the existing package gate covers the finished surface.
+
+### Implementation Constraints
+
+- Use Node.js built-ins and existing peer packages; add no runtime dependency unless the browser capability probe proves the host cannot satisfy R1 and the user approves the dependency.
+- Bound transcript, tool-output, patch, and evaluator payload sizes; retain full raw files outside model context and place references in reports.
+- Use strict JSON parsing and explicit schema checks at every trust boundary; malformed bundle, RPC, telemetry, evaluator, or acceptance data invalidates the affected run.
+- Do not expose credentials in experiment descriptors, fingerprints, reports, or retained evidence.
+- Do not mutate the Product Contract, benchmark bundles, or source checkouts during ordinary comparisons.
+- Keep the existing `workflow-benchmark` role and synthetic benchmark operational as the fast package-surface gate; representative evidence comes only from this harness.
+
+### Deferred Implementation Notes
+
+- Exact helper names and internal JSON field ordering may change during implementation as long as the versioned artifact contracts and evidence semantics remain stable.
+- The browser adapter may bind to an existing host capability or an approved dependency after capability probing; the fixed viewport, screenshot evidence, and fail-closed behavior are not deferred.
+- Provider-specific transient-error classifiers should begin with documented RPC retry events and bounded known patterns, then expand only from retained infrastructure failures.
+
+### System-Wide Impact
+
+- **Package resources:** RPC runs must disable ambient ce-workflow resources and load an explicit allowlist containing the selected package revision plus pinned dependency packages. Command, skill, prompt, extension, and role provenance becomes comparison evidence; duplicate ownership is a preflight failure.
+- **Credentials and trust:** Provider credentials remain outside evidence but are available to the Pi process. Only maintainer-trusted revisions may run without an external sandbox, and the report must state whether isolation is path-level or OS-level.
+- **Telemetry:** Session usage and `.pi/work-runs` events share one sample identity. Reconciliation must exclude harness/evaluator activity, prevent duplicate terminal accounting, and preserve workflow, harness, and evaluator cost as separate totals.
+- **Git and Beads:** Each work sample owns an independent repository and Beads state. Full sentinels share these only across sequential stages of the same sample; no state crosses sides, pairs, replacements, or projects.
+- **Published package:** Adding benchmark bundles increases package contents and verification time. Runtime evidence, screenshots, temporary settings, copied credentials, and disposable repositories remain excluded from the package and Git.
+- **Existing improvement loop:** The synthetic `workflow-benchmark` gate remains unchanged. The representative harness can become a later gate only after local calibration proves its cost and reliability.
+- **Cross-platform execution:** Process-tree termination, path containment, file permissions, line endings, and browser discovery must be verified on Windows and one POSIX environment before results are considered portable.
+
+### Risks & Dependencies
+
+- **Full-permission candidate code — high:** A malicious extension can read credentials or files outside the disposable cwd despite tool guards. Restrict V1 to trusted revisions, surface the trust posture, and require an external sandbox for untrusted code.
+- **Hidden-contract leakage — high:** Paths, errors, transcripts, environment variables, or evaluator packaging can reveal authority data. Use opaque control-plane identifiers, content redaction, symlink-aware containment checks, and negative leakage fixtures over every retained artifact.
+- **Ambient resource drift — high:** Global packages, project settings, context files, or duplicate commands can silently change behavior. Build an explicit resource allowlist, record provenance and hashes, and fail preflight on missing, extra, or ambiguous workflow resources.
+- **Incorrect stage cost attribution — high:** Retries, compaction, subagents, queued continuations, evaluator work, or duplicate terminal events can contaminate selected-stage metrics. Correlate all events to one sample identity and invalidate incomplete or multiply-accounted telemetry.
+- **Evaluator instability — high:** Model drift, label clues, malformed scoring, or rubric ambiguity can change verdicts. Pin evaluator identity/settings, normalize artifacts, version anchors and tie rules, and invalidate rather than retry selectively.
+- **Provider and browser flakiness — medium:** Rate limits, unavailable credentials, process crashes, viewport drift, or missing screenshot support can dominate small samples. Classify infrastructure failures narrowly, retain attempts, calibrate ceilings, and allow only the Product Contract's symmetric single replacement.
+- **Runaway cost — medium:** Decision and sentinel modes multiply agent and evaluator usage. Enforce pre-dispatch token/wall budgets, abort full process trees at ceilings, and require successful smoke before expensive depths.
+- **Cross-platform cleanup — medium:** Windows process trees, reserved paths, locks, and CRLF handling can leave stale samples or corrupt RPC framing. Reuse existing Windows process/Beads handling, test strict LF framing, and make cleanup recoverable and idempotent.
+- **Browser adapter availability — medium:** No browser dependency is currently declared. Capability discovery and one real fixed-viewport smoke must pass before calculator evidence is authoritative; dependency adoption requires explicit approval.
+- **Human approval dependency — medium:** Generated goldens cannot become decision inputs automatically. Decision and sentinel commands stop with a clear approval requirement until exact artifact and bundle SHAs have durable human approval.
+
+---
+
+## Implementation Units
+
+### U1. Versioned benchmark contract and validation
+
+- **Goal:** Establish the immutable V1 bundle, experiment descriptor, fingerprint, approval, and evidence contracts before any live execution.
+- **Requirements:** R3-R6, R13-R14, R20, R24-R26, R29-R31; F4; AE2, AE9-AE10.
+- **Dependencies:** None.
+- **Files:** `benchmarks/workflow-evaluation/v1/manifest.json`, `scripts/workflow-evaluation-contract.mjs`, `scripts/test-workflow-evaluation-contract.mjs`, `package.json`.
+- **Approach:** Validate bundle versions, project inventory, selected stage inputs, SHA-bound golden approvals, rubric anchors and critical dimensions, run-depth budgets, declared factor paths, complete non-factor fingerprints, and evidence references. Reject undeclared, multi-factor, and no-op deltas before provisioning.
+- **Execution note:** Start with failing contract fixtures for malformed and leaking bundles; no provider or browser is needed.
+- **Patterns to follow:** `benchmarkEnvironment()` and canonical fingerprinting in `scripts/work-improvement-benchmark.mjs`; standalone assert-based fixtures in `scripts/test-work-improvement-benchmark.mjs`.
+- **Test scenarios:**
+  1. A complete V1 manifest with both project bundles and matching approval SHAs validates and yields a stable fingerprint independent of object key order.
+  2. A changed non-factor model setting, bundle version, evaluator, browser, runtime, dependency, or rubric invalidates a pair.
+  3. A declared factor that changes zero or multiple allowed fields is rejected unless the descriptor explicitly marks an interaction test.
+  4. Missing metric definitions, rubric anchors, critical dimensions, depth budgets, golden approvals, or required hidden-resource declarations fail validation.
+  5. A stage input that references a hidden contract, unrelated golden, evaluator label, or path outside the bundle fails the leakage audit.
+- **Verification:** Contract fixtures prove valid bundles are stable and every malformed, ambiguous, or leaking case fails closed.
+
+### U2. CSV expense analyzer benchmark project
+
+- **Goal:** Add a deterministic logic-heavy project whose seed requires at least two execution slices and whose verifier can independently prove behavior.
+- **Requirements:** R2-R6, R9, R19-R20, R28-R29; F1-F4; AE2, AE4-AE5, AE8-AE10.
+- **Dependencies:** U1.
+- **Files:** `benchmarks/workflow-evaluation/v1/projects/csv-expenses/project.json`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/product-contract.md`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/answers.json`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/rubric.json`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/goldens/brainstorm.md`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/goldens/plan.md`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/goldens/approval.json`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/seed/package.json`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/seed/src/analyze.mjs`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/seed/test/analyze.test.mjs`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/verify.mjs`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/fixtures/valid.csv`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/fixtures/malformed.csv`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/fixtures/expected-report.txt`, `scripts/test-workflow-evaluation-csv.mjs`.
+- **Approach:** Keep product authority and acceptance checks outside the copied seed. The seed exposes a small Node CLI skeleton and tests without revealing expected aggregation logic; the hidden verifier checks accepted rows, malformed-row policy, deterministic category totals, output ordering, exit behavior, and clean repository finalization.
+- **Execution note:** Prove the hidden acceptance runner against known good and intentionally broken local implementations before using an agent.
+- **Patterns to follow:** Node ESM and assert-style fixture scripts used throughout `scripts/`; no dependency install required.
+- **Test scenarios:**
+  1. Valid rows with repeated categories produce exact totals and stable report ordering.
+  2. Empty input, header-only input, decimal values, and category whitespace follow the product contract.
+  3. A malformed row follows the declared continue-or-fail policy and produces the required diagnostic and exit status.
+  4. Missing files, unreadable input, invalid amounts, and unsupported columns fail deterministically without partial output.
+  5. Mutating the seed, hidden contract, expected report, or acceptance runner outside the disposable project is detected.
+  6. The approved plan describes at least two executable slices and its recorded SHA matches the bundle.
+- **Verification:** The fixture verifier distinguishes known good and broken implementations and emits structured hard-gate evidence without exposing expected answers to the tested workflow.
+
+### U3. Themed calculator benchmark project and browser adapter
+
+- **Goal:** Add a UI-heavy project with deterministic calculations, theme persistence, accessibility basics, fixed-viewport browser interaction, and screenshot evidence.
+- **Requirements:** R1, R3-R6, R9, R19-R20, R26, R28-R29; F1-F4; AE1, AE3-AE5, AE7-AE10.
+- **Dependencies:** U1.
+- **Files:** `benchmarks/workflow-evaluation/v1/projects/calculator/project.json`, `benchmarks/workflow-evaluation/v1/projects/calculator/product-contract.md`, `benchmarks/workflow-evaluation/v1/projects/calculator/answers.json`, `benchmarks/workflow-evaluation/v1/projects/calculator/rubric.json`, `benchmarks/workflow-evaluation/v1/projects/calculator/goldens/brainstorm.md`, `benchmarks/workflow-evaluation/v1/projects/calculator/goldens/plan.md`, `benchmarks/workflow-evaluation/v1/projects/calculator/goldens/approval.json`, `benchmarks/workflow-evaluation/v1/projects/calculator/seed/index.html`, `benchmarks/workflow-evaluation/v1/projects/calculator/seed/app.js`, `benchmarks/workflow-evaluation/v1/projects/calculator/seed/styles.css`, `benchmarks/workflow-evaluation/v1/projects/calculator/acceptance/verify.mjs`, `scripts/test-workflow-evaluation-calculator.mjs`.
+- **Approach:** Define browser operations as an injected adapter with capability and version fingerprints. Acceptance checks cover arithmetic state, keyboard input, focus and labels, theme toggle and reload persistence, fixed viewport, console errors, and retained screenshots; deterministic fixtures use a fake adapter and live runs fail invalid when required browser evidence is unavailable.
+- **Execution note:** Build the adapter contract and deterministic fake first; a real browser smoke is the final proof for this unit.
+- **Patterns to follow:** Existing conditional browser-gate policy in `extensions/work-models.js`; injected execution seams and bounded timeouts in `scripts/work-improvement-runner.mjs`.
+- **Test scenarios:**
+  1. Pointer and keyboard input perform the required arithmetic, clear, decimal, sign, and chained-operation behavior.
+  2. Division by zero and invalid operation sequences enter the specified recoverable display state without uncaught errors.
+  3. Theme selection changes the required UI tokens, persists across reload, and produces screenshots at the exact viewport.
+  4. Interactive controls have accessible names, visible focus, keyboard activation, and no critical browser-console errors.
+  5. Missing browser capability, wrong viewport, missing screenshot, timeout, or browser version mismatch invalidates rather than passes the run.
+  6. The hidden acceptance runner detects intentional calculation, persistence, accessibility, and screenshot omissions.
+- **Verification:** Fake-adapter fixtures cover protocol and failure classification; one real local browser run captures and validates the required screenshot evidence.
+
+### U4. Isolated Pi RPC stage adapter and scripted user
+
+- **Goal:** Execute brainstorm, plan, and resume/work through the real package resources while preserving strict stage inputs, fresh contexts, and complete raw evidence.
+- **Requirements:** R4, R7-R12, R23-R24, R26, R29-R31; A2-A3; F1-F3; AE1-AE4, AE8, AE10.
+- **Dependencies:** U1.
+- **Files:** `scripts/workflow-evaluation-rpc.mjs`, `scripts/test-workflow-evaluation-rpc.mjs`.
+- **Approach:** Spawn one RPC process per sample with the selected package checkout, cwd, provider/model/thinking, tool allowlist, offline startup, and explicit budget. Parse strict JSONL events, answer extension UI requests from the fixed answer bank, record unexpected questions, wait for `agent_settled`, request session statistics, and reconcile `.pi/work-runs` by workflow identity. Prove command provenance before dispatch and terminate the full process tree on timeout.
+- **Execution note:** Use a fake RPC child to characterize framing, dialogs, retries, settlement, abort, and malformed output before starting a paid model run.
+- **Patterns to follow:** `spawnSubagentRpc()`/`dispatchWorkflowImprovementAgent()` lifecycle handling in `extensions/work-models.js`; correlated and exactly-once telemetry behavior in `scripts/test-work-telemetry.mjs`; Pi RPC `extension_ui_request`, `agent_settled`, and session-stat contracts.
+- **Test scenarios:**
+  1. Fragmented LF-delimited JSON, CRLF input tolerance, and Unicode line separators inside JSON strings are parsed without record corruption.
+  2. Expected select, confirm, input, and editor requests receive the exact fixed response and are recorded once.
+  3. An unexpected but contract-grounded question is answered and increments the critical metric; an unanswerable question aborts and fails the sample.
+  4. Resource provenance mismatch, duplicate/ambiguous command ownership, missing package revision, or changed tool allowlist fails before stage dispatch.
+  5. `agent_end` followed by retry or compaction does not finalize early; only `agent_settled` plus structured workflow evidence can complete the sample.
+  6. Timeout, abort, process exit, malformed RPC, extension error, missing usage, and duplicate terminal telemetry yield distinct retained failure classifications.
+  7. Tool writes outside the disposable root, source checkout, or bundle root are blocked or detected and fail the sample.
+  8. Ambient global/project resources, duplicate command ownership, or unpinned dependency packages fail provenance preflight.
+  9. A run marked untrusted is refused without an external sandbox, and evidence distinguishes path-level from OS-level isolation.
+- **Verification:** Fake-process fixtures prove deterministic protocol handling; one credentialed brainstorm smoke proves the selected package revision, scripted answer, telemetry, and artifact capture path end to end.
+
+### U5. Disposable lifecycle, smoke runner, and evidence bundle
+
+- **Goal:** Provide the one-command smoke path that provisions clean projects, executes one fresh pair, verifies each sample, and retains reproducible evidence.
+- **Requirements:** R7-R15, R18-R19, R23-R26, R29-R31; F1; AE1-AE4, AE9-AE10.
+- **Dependencies:** U2-U4.
+- **Files:** `scripts/workflow-evaluation.mjs`, `scripts/test-workflow-evaluation-runner.mjs`.
+- **Approach:** Read one experiment descriptor, create control-plane and disposable directories, copy and initialize the chosen seed, materialize only the stage input, run baseline/candidate in alternating configured order, apply project and stage gates, fingerprint all inputs, and emit a compact non-decision-grade report plus bounded evidence references. Use append-only lifecycle events and cleanup only after retained evidence is durable.
+- **Execution note:** Make a complete single-pair smoke work before adding three-pair aggregation or evaluator cost.
+- **Patterns to follow:** Authoritative source preflight, leases, bounded evidence, worktree cleanup, and cancellation in `scripts/work-improvement-runner.mjs`; generated runtime files remain ignored like `.pi/work-runs/`.
+- **Test scenarios:**
+  1. A passing fake baseline/candidate pair receives separate fresh roots and produces a diagnostic smoke report labeled non-decision-grade.
+  2. Baseline failure invalidates the comparison; candidate failure rejects the candidate before cost analysis.
+  3. Stage timeout or token ceiling aborts the process, retains partial evidence, and cannot pass.
+  4. Evidence contains fingerprints, prompts, exchanges, artifacts, diffs, telemetry, verifier output, screenshots when applicable, failed attempts, and final disposition without secrets or hidden contract contents.
+  5. Cleanup removes disposable workspaces only after evidence durability and recovers stale workspaces without touching live samples.
+  6. Running from the ce-workflow checkout leaves its tracked and untracked state unchanged.
+- **Verification:** Deterministic runner fixtures prove lifecycle, gate ordering, cleanup, evidence completeness, and source-checkout immutability; one smoke per stage proves live adapters incrementally.
+
+### U6. Blinded evaluator and decision-grade paired scoring
+
+- **Goal:** Add stable qualitative judgment and three-pair quality-first cost verdicts without selective retries or label leakage.
+- **Requirements:** R13-R26, R29-R30; A4-A5; F2; AE1-AE6, AE8-AE10.
+- **Dependencies:** U5.
+- **Files:** `agents/workflow-evaluator.md`, `scripts/workflow-evaluation-score.mjs`, `scripts/test-workflow-evaluation-score.mjs`, `scripts/workflow-evaluation.mjs`.
+- **Approach:** Normalize artifacts, randomize side labels with a retained control-plane mapping, run one fixed evaluator configuration against both sides and the versioned rubric, validate structured scores, then aggregate three alternating fresh pairs. Preserve every attempt, allow one symmetric replacement only for confirmed infrastructure failure, and apply hard gates, qualitative medians/critical dimensions, unexpected-question counts, and cost thresholds in that order.
+- **Execution note:** Characterize all verdict branches with synthetic evidence before paying for evaluator runs.
+- **Patterns to follow:** `mandatoryQuality()` and `evaluateBenchmarkEvidence()` ordering and thresholds in `scripts/work-improvement-benchmark.mjs`; bounded role artifacts in `dispatchWorkflowImprovementAgent()`.
+- **Test scenarios:**
+  1. Randomized evaluator labels cannot be derived from filenames, metadata, prompts, ordering, timestamps, or project paths.
+  2. Malformed scores, evaluator timeout, changed evaluator fingerprint, ties not handled by the rubric, or missing critical dimensions invalidate the comparison.
+  3. Lower candidate median, any critical-dimension regression, or increased unexpected questions rejects the candidate regardless of cost.
+  4. A 5% primary or equal-weight aggregate improvement passes only when at least one dimension improves and no required dimension regresses by more than 10%.
+  5. Three pair order alternates, raw deltas and min/median/max are retained, and the smoke result is never included in decision aggregation.
+  6. One confirmed infrastructure failure replaces its whole pair once; a second failure or selective side retry invalidates the verdict.
+  7. Missing metrics, equal baseline/candidate hard failure, baseline product failure, and candidate product failure produce the distinct Product Contract outcomes.
+- **Verification:** Score fixtures cover every verdict and invalidation branch; one blinded live smoke confirms evaluator packaging and label isolation before a full decision run.
+
+### U7. Calibration, golden approval, and full-pipeline sentinels
+
+- **Goal:** Make budgets, goldens, and cross-stage composition governed evidence rather than mutable setup details.
+- **Requirements:** R3-R6, R16-R17, R26-R30; F3-F4; AE5, AE7-AE10.
+- **Dependencies:** U2-U6.
+- **Files:** `scripts/workflow-evaluation.mjs`, `scripts/test-workflow-evaluation-sentinel.mjs`, `benchmarks/workflow-evaluation/v1/projects/calculator/goldens/approval.json`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/goldens/approval.json`.
+- **Approach:** Add unchanged-pair calibration, approval-record generation, and sentinel mode. Golden updates require exact bundle/artifact SHAs, acceptance results, reviewer identity, timestamp, and retained evidence. Sentinel runs pass actual brainstorm output to planning and actual planning output through all work slices for both projects; trigger classification is coded from changed paths and declared change type.
+- **Execution note:** Run sentinels only after isolated smoke paths pass; preserve actual handoffs for review rather than substituting goldens.
+- **Patterns to follow:** Changed-path manifest expansion in `buildBenchmarkPlan()` and conservative unknown-path handling; source revision validation in the autonomous improvement runner.
+- **Test scenarios:**
+  1. Unchanged three-pair calibration derives per-project/stage/depth ceilings and may raise but never lower the fixed threshold floors.
+  2. Unapproved, stale-SHA, failed-acceptance, or silently changed goldens cannot start plan/work decision runs.
+  3. A golden update retains before/after artifacts and approval evidence and increments the bundle version when contract semantics change.
+  4. Handoff, artifact, routing, finalization, or default-behavior changes require both project sentinels; unrelated narrow changes do not.
+  5. Sentinel evidence proves actual outputs crossed each stage boundary and detects any golden substitution.
+  6. A failure at any stage or final acceptance gate fails the sentinel and preserves the partial pipeline.
+- **Verification:** Deterministic sentinel fixtures exercise trigger classification, actual-handoff identity, approval freshness, and partial failure; credentialed sentinels for both projects provide the final integration proof.
+
+### U8. Package gate, documentation, and operational acceptance
+
+- **Goal:** Make the harness discoverable, package-verified, bounded, and ready for repeatable maintainer use.
+- **Requirements:** R15-R16, R23-R31; F1-F4; all Success Criteria.
+- **Dependencies:** U1-U7.
+- **Files:** `scripts/verify-package.mjs`, `package.json`, `README.md`, `scripts/workflow-evaluation.mjs`.
+- **Approach:** Add benchmark bundles to the published package, register every deterministic test in the package verifier, document experiment descriptors, depth labels, evidence/report locations, calibration and golden approval, mandatory sentinel triggers, and failure classifications. Keep CI gating and dashboards deferred.
+- **Execution note:** Finish with package verification, one smoke for every project-stage combination, and both full sentinels when credentials and browser capability are available.
+- **Patterns to follow:** Explicit fixture inventory in `scripts/verify-package.mjs`; concise command and telemetry guidance in `README.md`.
+- **Test scenarios:**
+  1. The published package inventory includes all bundle inputs but excludes generated workspaces, evidence, credentials, and runtime state.
+  2. `npm run verify:quiet` runs every new deterministic fixture and fails when a required bundle file or test registration is removed.
+  3. Help and invalid-descriptor output explain smoke versus decision authority, required calibration/approval, and evidence location without exposing secrets.
+  4. Documentation examples resolve to valid descriptors and never imply that smoke evidence is decision-grade.
+  5. A complete operational acceptance run leaves the source checkout and retained bundles unchanged and produces reproducible report/evidence links.
+  6. Security documentation states that candidate extensions have full process permissions and refuses to describe path guards as a hostile-code sandbox.
+  7. Windows and POSIX smoke fixtures prove process termination, path containment, RPC framing, and cleanup semantics.
+  8. Windows-reserved filenames such as `NUL` cannot persist as child-run artifacts after evidence capture and cleanup.
+- **Verification:** Package verification passes from a clean checkout; documented deterministic examples work offline; live acceptance evidence records any unavailable credential/browser gate explicitly.
+
+---
+
+## Verification Contract
+
+| Gate | Command or evidence | Applies to | Pass signal |
+| --- | --- | --- | --- |
+| Bundle contract | `node scripts/test-workflow-evaluation-contract.mjs` | U1 | Valid contracts fingerprint stably; malformed, stale, or leaking contracts fail closed |
+| CSV project | `node scripts/test-workflow-evaluation-csv.mjs` | U2 | Known-good behavior passes and seeded defects fail the hidden verifier |
+| Calculator project | `node scripts/test-workflow-evaluation-calculator.mjs` | U3 | Fake browser protocol and intentional UI defects are distinguished |
+| RPC adapter | `node scripts/test-workflow-evaluation-rpc.mjs` | U4 | Framing, scripted dialogs, settlement, failure classes, and path isolation pass |
+| Smoke lifecycle | `node scripts/test-workflow-evaluation-runner.mjs` | U5 | Fresh roots, hard-gate ordering, evidence retention, cleanup, and source immutability pass |
+| Decision scorer | `node scripts/test-workflow-evaluation-score.mjs` | U6 | Every quality, retry, evaluator, metric, and cost verdict branch passes |
+| Sentinel lifecycle | `node scripts/test-workflow-evaluation-sentinel.mjs` | U7 | Trigger rules, approval freshness, and actual handoff identity pass |
+| Package regression | `npm run verify:quiet` | U1-U8 | Existing and new package checks pass from a clean checkout |
+| Live stage acceptance | Retained smoke evidence for both projects across brainstorm, plan, and work | U3-U5 | Each sample passes stage gates, project acceptance, telemetry, and source immutability |
+| Decision calibration | Three unchanged pairs for each project-stage bundle | U6-U7 | Noise and approved budgets are recorded without weakening fixed quality/cost floors |
+| Full integration | Retained calculator and CSV sentinel evidence | U7-U8 | Actual brainstorm, plan, and work outputs compose and final products pass acceptance |
+
+A live gate may be recorded as unavailable only when credentials, evaluator, or browser capability is genuinely absent; unavailable evidence never becomes a passing comparison or sentinel.
+
+---
+
+## Definition of Done
+
+- The Product Contract remains unchanged and every implementation-affecting R/F/AE is traced to at least one implementation unit and verification gate.
+- The V1 package contains both immutable project bundles, hidden acceptance contracts, answer banks, versioned rubrics, two-slice seed projects, golden artifacts, and SHA-bound approval records.
+- One local command can run smoke, decision, calibration, golden-update, and sentinel modes in fresh disposable roots without modifying the source checkout or retained bundles.
+- Every sample proves exact package/resource provenance, fresh context and workspace isolation, scripted question handling, structured completion, complete telemetry, project acceptance, Git/Beads finalization, and forbidden-write absence.
+- Smoke results are visibly non-decision-grade; decision results retain three alternating fresh pairs, all attempts, raw deltas, median and spread, blinded evaluator evidence, and quality-first verdicts.
+- Mandatory sentinel trigger classes run both projects through actual brainstorm-to-plan-to-work handoffs without golden substitution.
+- `npm run verify:quiet` includes and passes every new deterministic fixture while all pre-existing checks remain green.
+- Credentialed live evidence passes for each project-stage combination and both full sentinels, or the missing external capability is reported as a genuine blocker rather than waived.
+- Generated goldens receive human approval against exact bundle versions before any decision verdict is trusted.
+- Reports and evidence contain no credentials, hidden contract files, authority data beyond answers shown to the tested workflow, unselected goldens, evaluator labels, or undeclared environment differences.
+- Documentation states the operational commands, authority of each run depth, calibration/approval requirements, evidence layout, and deferred scope.
+- Abandoned experiments, stale workspaces, dead code, temporary debug hooks, and generated runtime artifacts are removed before completion; retained evidence remains outside the tracked source tree.
