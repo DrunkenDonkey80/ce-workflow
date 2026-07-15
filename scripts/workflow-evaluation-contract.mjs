@@ -1,0 +1,78 @@
+import { createHash } from "node:crypto";
+import path from "node:path";
+
+const SHA256 = /^[a-f0-9]{64}$/i;
+const REQUIRED_METRICS = ["tokens", "wallMs", "toolCalls", "subagentCalls", "toolOutputChars", "retries", "contextTokens", "questions"];
+const REQUIRED_DEPTHS = ["smoke", "decision", "sentinel", "calibration"];
+const REQUIRED_INPUTS = ["workflowRevision", "project", "stage", "bundleVersion", "role", "provider", "model", "effort", "evaluator", "runtime", "dependencies", "browser", "rubricVersion", "tools"];
+
+export function canonical(value) {
+	if (Array.isArray(value)) return value.map(canonical);
+	if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, nested]) => [key, canonical(nested)]));
+	return value;
+}
+
+export function fingerprint(value) {
+	return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+}
+
+function requireValue(condition, message) {
+	if (!condition) throw new Error(message);
+}
+
+export function validateBundle(bundle) {
+	requireValue(bundle?.version === 1, "bundle version must be 1");
+	requireValue(Array.isArray(bundle.projects) && ["calculator", "csv-expenses"].every((id) => bundle.projects.includes(id)), "both projects are required");
+	requireValue(Array.isArray(bundle.hiddenResources) && bundle.hiddenResources.length > 0, "hidden resources are required");
+	requireValue(REQUIRED_METRICS.every((metric) => bundle.metrics?.includes(metric)), "required metric definitions are missing");
+	for (const depth of REQUIRED_DEPTHS) {
+		const value = bundle.depths?.[depth];
+		requireValue(Number.isInteger(value?.samples) && value.samples > 0, `${depth} samples are required`);
+		requireValue(Number.isFinite(value?.tokenCeiling) && value.tokenCeiling > 0, `${depth} token ceiling is required`);
+		requireValue(Number.isFinite(value?.wallMsCeiling) && value.wallMsCeiling > 0, `${depth} wall ceiling is required`);
+	}
+	requireValue(Array.isArray(bundle.rubric?.anchors) && bundle.rubric.anchors.length >= 3, "rubric anchors are required");
+	requireValue(Array.isArray(bundle.rubric?.criticalDimensions) && bundle.rubric.criticalDimensions.length > 0, "critical rubric dimensions are required");
+	for (const project of bundle.projects) {
+		const approval = bundle.approvals?.[project];
+		requireValue(approval && [approval.bundleSha, approval.brainstormSha, approval.planSha].every((sha) => SHA256.test(sha)), `${project} golden approval SHAs are required`);
+		requireValue(typeof approval.approvedBy === "string" && approval.approvedBy.length > 0, `${project} approver is required`);
+	}
+	return bundle;
+}
+
+function changedPaths(baseline, candidate, prefix = "") {
+	const keys = new Set([...Object.keys(baseline ?? {}), ...Object.keys(candidate ?? {})]);
+	const changed = [];
+	for (const key of keys) {
+		const name = prefix ? `${prefix}.${key}` : key;
+		const a = baseline?.[key];
+		const b = candidate?.[key];
+		if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) changed.push(...changedPaths(a, b, name));
+		else if (JSON.stringify(canonical(a)) !== JSON.stringify(canonical(b))) changed.push(name);
+	}
+	return changed;
+}
+
+export function validateExperimentPair({ baseline, candidate, factor, interaction = false }) {
+	for (const side of [baseline, candidate]) for (const field of REQUIRED_INPUTS) requireValue(side?.[field] !== undefined, `missing experiment input: ${field}`);
+	const factors = Array.isArray(factor) ? factor : [factor];
+	requireValue(factors.every((item) => typeof item === "string" && item.length > 0), "declared factor is required");
+	const changed = changedPaths(baseline, candidate);
+	requireValue(changed.length > 0, "no-op factor is invalid");
+	const allowed = changed.every((name) => factors.some((factorName) => name === factorName || name.startsWith(`${factorName}.`)));
+	requireValue(allowed, "multiple or undeclared factor changes are invalid");
+	requireValue(interaction || factors.length === 1, "multiple factors require an interaction test");
+	return { factor, interaction, changed, baselineFingerprint: fingerprint(baseline), candidateFingerprint: fingerprint(candidate) };
+}
+
+export function auditStageInput(input, stage) {
+	requireValue(typeof input === "string" && input.length > 0, "stage input is required");
+	const normalized = input.replaceAll("\\", "/");
+	requireValue(!path.isAbsolute(input) && !normalized.split("/").includes(".."), "stage input must stay inside the bundle");
+	requireValue(!/(product-contract|acceptance|evaluator)/i.test(normalized), "stage input leaks a hidden resource or evaluator label");
+	if (stage === "plan") requireValue(/^goldens\/brainstorm\.md$/i.test(normalized), "plan stage must use only the approved brainstorm golden");
+	if (stage === "work") requireValue(/^goldens\/plan\.md$/i.test(normalized), "work stage must use only the approved plan golden");
+	if (stage === "brainstorm") requireValue(!/goldens\//i.test(normalized), "brainstorm stage cannot use a golden");
+	return normalized;
+}

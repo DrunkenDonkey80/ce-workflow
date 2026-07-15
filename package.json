@@ -13,6 +13,7 @@
   ],
   "files": [
     "agents/",
+    "benchmarks/",
     "extensions/",
     "prompts/",
     "scripts/",

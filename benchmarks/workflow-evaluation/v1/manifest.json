@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "projects": ["calculator", "csv-expenses"],
+  "hiddenResources": ["product-contract.md", "acceptance/"],
+  "metrics": ["tokens", "wallMs", "toolCalls", "subagentCalls", "toolOutputChars", "retries", "contextTokens", "questions"],
+  "depths": {
+    "smoke": { "samples": 1, "tokenCeiling": 100000, "wallMsCeiling": 900000 },
+    "decision": { "samples": 3, "tokenCeiling": 300000, "wallMsCeiling": 2700000 },
+    "sentinel": { "samples": 1, "tokenCeiling": 500000, "wallMsCeiling": 5400000 },
+    "calibration": { "samples": 3, "tokenCeiling": 300000, "wallMsCeiling": 2700000 }
+  },
+  "rubric": {
+    "version": 1,
+    "anchors": [0, 1, 2, 3, 4],
+    "criticalDimensions": ["behavior", "requirements", "traceability"]
+  },
+  "approvals": {}
+}
