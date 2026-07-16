@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 import {
 	appendFileSync,
 	existsSync,
@@ -64,7 +65,12 @@ function telemetryEvents(cwd) {
 const cwd = mkdtempSync(path.join(tmpdir(), "work-telemetry-"));
 const now = Date.now();
 seedNativeStore(cwd, [
-	{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Active epic" },
+	{
+		id: "E-1",
+		issue_type: "epic",
+		status: "in_progress",
+		title: "Active epic",
+	},
 ]);
 try {
 	const parsedMarker = parseWorkPromptMeta(
@@ -88,8 +94,7 @@ try {
 	assert(
 		buildWorkTelemetryState(cwd, "today").slowest.filter(
 			(event) =>
-				event.type === "workflow-complete" &&
-				event.workflowRunId === "wf-once",
+				event.type === "workflow-complete" && event.workflowRunId === "wf-once",
 		).length === 1,
 		"terminal workflow records are exactly once",
 	);
@@ -179,12 +184,12 @@ try {
 
 	assert(
 		recordPendingDirectRun(cwd, { workflowRunId: "wf-untrackable" }) === "" &&
-		Boolean(
-			recordPendingDirectRun(cwd, {
-				workflowRunId: "wf-ambiguous-trackable",
-				runId: "run-known-after-timeout",
-			}),
-		),
+			Boolean(
+				recordPendingDirectRun(cwd, {
+					workflowRunId: "wf-ambiguous-trackable",
+					runId: "run-known-after-timeout",
+				}),
+			),
 		"ambiguous launches persist real identifiers without fabricating trackability",
 	);
 	appendFileSync(pendingFile, "not-json\nnull\n{}\n");
@@ -333,12 +338,18 @@ try {
 		"phase summary includes commit agent",
 	);
 
-	const workItem = JSON.parse(buildWorkTelemetry(cwd, "workItem TASK-1 --json"));
+	const workItem = JSON.parse(
+		buildWorkTelemetry(cwd, "workItem TASK-1 --json"),
+	);
 	assert(workItem.events === 5, "workItem filter isolates one task");
-	assert(workItem.byWorkItem[0].key === "TASK-1", "workItem JSON groups by selected workItem");
+	assert(
+		workItem.byWorkItem[0].key === "TASK-1",
+		"workItem JSON groups by selected workItem",
+	);
 	assert(workItem.files.length === 1, "json reports backing telemetry file");
 	assert(
-		!Array.isArray(workItem.slowest[0].tools) && workItem.slowest[0].tools.count >= 0,
+		!Array.isArray(workItem.slowest[0].tools) &&
+			workItem.slowest[0].tools.count >= 0,
 		"json reports compact tool summaries instead of full tool arrays",
 	);
 
@@ -390,6 +401,59 @@ try {
 		);
 	} finally {
 		rmSync(blockedCwd, { recursive: true, force: true });
+	}
+
+	const dirtySource = mkdtempSync(
+		path.join(tmpdir(), "work-improvement-dirty-"),
+	);
+	const dirtyConsumer = mkdtempSync(
+		path.join(tmpdir(), "work-improvement-consumer-"),
+	);
+	try {
+		execFileSync("git", ["init", "--quiet"], { cwd: dirtySource });
+		writeFileSync(path.join(dirtySource, "uncommitted.txt"), "dirty\n");
+		mkdirSync(path.join(dirtyConsumer, ".pi"), { recursive: true });
+		writeFileSync(
+			path.join(dirtyConsumer, ".pi", "settings.json"),
+			`${JSON.stringify({
+				workResume: { selfImproving: true },
+				workImprovement: { sourceCheckout: dirtySource },
+			})}\n`,
+		);
+		let confirmations = 0;
+		let commandRan = false;
+		await withCommandTelemetry(
+			"dirty-source-warning",
+			"",
+			{
+				cwd: dirtyConsumer,
+				mode: "tui",
+				hasUI: true,
+				getContextUsage: () => ({ tokens: 0 }),
+				ui: {
+					confirm: async (title, message) => {
+						confirmations += 1;
+						assert(
+							title.includes("Self-improvement") &&
+								message.includes("uncommitted.txt"),
+							"dirty-source confirmation identifies the blocker",
+						);
+						return false;
+					},
+				},
+			},
+			async () => {
+				commandRan = true;
+				return { ok: true, handoffPrompt: "test", handoffPending: true };
+			},
+		);
+		assert(
+			confirmations === 1 && !commandRan,
+			"enabled self-improvement asks before starting against a dirty source",
+		);
+	} finally {
+		rmSync(dirtySource, { recursive: true, force: true });
+		rmSync(dirtyConsumer, { recursive: true, force: true });
 	}
 
 	const commandCtx = {
@@ -476,7 +540,8 @@ try {
 	releaseFirst();
 	await secondCommand;
 	const secondEvent = telemetryEvents(cwd).find(
-		(event) => event.type === "command" && event.command === "concurrent-second",
+		(event) =>
+			event.type === "command" && event.command === "concurrent-second",
 	);
 	assert(
 		secondMeta.workflowRunId === secondEvent.workflowRunId,
@@ -510,7 +575,10 @@ try {
 		await hooks.session_start({}, hookCtx);
 		await hooks.input({ text: "ordinary input", source: "user" }, hookCtx);
 		await hooks.session_shutdown({}, hookCtx);
-		assert(true, "session and input hooks tolerate malformed reconciliation data");
+		assert(
+			true,
+			"session and input hooks tolerate malformed reconciliation data",
+		);
 		process.env.WORK_ORCH_ACTIVITY_MARKER = "validation";
 		await commands["work-small"].handler("Add tiny thing", {
 			cwd,
@@ -527,7 +595,10 @@ try {
 		});
 		delete process.env.WORK_ORCH_ACTIVITY_MARKER;
 		const commandSummary = buildWorkTelemetryState(cwd, "workItem E-1.1");
-		assert(commandSummary.events === 1, "extension command writes telemetry before inline completion");
+		assert(
+			commandSummary.events === 1,
+			"extension command writes telemetry before inline completion",
+		);
 		assert(
 			commandSummary.byPhase[0].key === "command/work-small/run-implementation",
 			"extension command records command/action phase",

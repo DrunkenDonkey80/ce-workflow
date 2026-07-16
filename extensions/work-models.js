@@ -106,7 +106,8 @@ const SLOTS = [
 		label: "brainstorm/plan/migration",
 		agents: ["work-planner", "work-migrator"],
 		defaultThinking: "high",
-		description: "Creating or importing epics and slicing executable native work-item store",
+		description:
+			"Creating or importing epics and slicing executable native work-item store",
 	},
 	{
 		key: "work",
@@ -622,7 +623,9 @@ function stateTelemetry(state) {
 function telemetryFingerprint(event) {
 	if (process.env.WORK_ORCH_TELEMETRY_DEDUPE_OFF === "1") return "";
 	if (event.type === "large-task-read")
-		return [event.type, event.command ?? "", event.workItemId ?? ""].join("\u001f");
+		return [event.type, event.command ?? "", event.workItemId ?? ""].join(
+			"\u001f",
+		);
 	if (
 		event.type !== "command" ||
 		event.command !== "work-resume" ||
@@ -1172,7 +1175,9 @@ function historyTaskFromText(value) {
 	const workItemId = labeled && labeled !== "none" ? labeled : undefined;
 	return {
 		key:
-			workItemId ?? text.match(/\b[A-Za-z][A-Za-z0-9_.-]*-\d+\b/)?.[0] ?? "session",
+			workItemId ??
+			text.match(/\b[A-Za-z][A-Za-z0-9_.-]*-\d+\b/)?.[0] ??
+			"session",
 		workItemId,
 	};
 }
@@ -1273,7 +1278,8 @@ function parseWorkPromptMeta(prompt) {
 	const selectedId = selected.match(/^([^\s]+)/)?.[1];
 	let workItemId;
 	if (target && target !== "none") workItemId = target;
-	else if (selectedId && !selectedId.startsWith("none")) workItemId = selectedId;
+	else if (selectedId && !selectedId.startsWith("none"))
+		workItemId = selectedId;
 	const inlineLevel = text.match(
 		/WO_INLINE_V1: complete this (small|medium)/,
 	)?.[1];
@@ -1414,7 +1420,11 @@ function failureStatusNote(run, event, telemetry, file) {
 function appendFailureStatusNote(cwd, workItemId, run, event, telemetry, file) {
 	if (!workItemId || !hasWorkAgentFailure(event, telemetry)) return;
 	try {
-		appendWorkflowWorkItemNote(cwd, workItemId, failureStatusNote(run, event, telemetry, file));
+		appendWorkflowWorkItemNote(
+			cwd,
+			workItemId,
+			failureStatusNote(run, event, telemetry, file),
+		);
 	} catch {
 		// Failure-status capture must never mask the original task result.
 	}
@@ -1571,7 +1581,40 @@ function notify(ctx, message, level = "info") {
 	if (ctx.mode === "print" || ctx.hasUI === false) console.log(message);
 }
 
+async function confirmDirtySelfImprovementSource(ctx) {
+	if (
+		!workResumeSettings(ctx.cwd).selfImproving ||
+		ctx.mode === "print" ||
+		ctx.mode === "json" ||
+		ctx.hasUI === false ||
+		typeof ctx.ui?.confirm !== "function"
+	)
+		return true;
+	const sourceCwd = improvementStateCwd(ctx.cwd);
+	const status = safeRun(sourceCwd, "git", [
+		"status",
+		"--porcelain=v1",
+		"--untracked-files=all",
+	]).trim();
+	if (!status) return true;
+	const files = status.split(/\r?\n/);
+	const shown = files
+		.slice(0, 8)
+		.map((line) => line.slice(3))
+		.join("\n");
+	const remaining = files.length > 8 ? `\n…and ${files.length - 8} more` : "";
+	return ctx.ui.confirm(
+		"Self-improvement is blocked",
+		`${sourceCwd} has uncommitted changes, so autonomous optimization will be deferred.\n\n${shown}${remaining}\n\nContinue this workflow without autonomous optimization?`,
+	);
+}
+
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
+	if (
+		!commandWorkflowStorage.getStore() &&
+		!(await confirmDirtySelfImprovementSource(ctx))
+	)
+		return;
 	const workflow = {
 		workflowRunId: telemetryId("workflow"),
 		activity:
@@ -1884,7 +1927,9 @@ function buildWorkTelemetryState(cwd, args = "") {
 			(a, b) => b.durationMs - a.durationMs,
 		),
 		byPhase: [...byPhase.values()].sort((a, b) => b.durationMs - a.durationMs),
-		byWorkItem: [...byWorkItem.values()].sort((a, b) => b.durationMs - a.durationMs),
+		byWorkItem: [...byWorkItem.values()].sort(
+			(a, b) => b.durationMs - a.durationMs,
+		),
 		outputWaste: optimizationTelemetry(events),
 		improvement: improvementStatus(cwd),
 		slowest: [...events]
@@ -2545,7 +2590,8 @@ function hasSlicePlan(issue) {
 function issueRefText(issue) {
 	const summary = issueRef(issue);
 	return (
-		[summary.id, summary.title].filter(Boolean).join(" — ") || "unknown WorkItem"
+		[summary.id, summary.title].filter(Boolean).join(" — ") ||
+		"unknown WorkItem"
 	);
 }
 
@@ -2897,7 +2943,10 @@ function compactWorkItemTitle(value) {
 
 function appendOriginalWorkItemTitle(notes, originalTitle) {
 	const title = String(originalTitle ?? "").trim();
-	if (title.length <= WORK_ITEM_TITLE_MAX || String(notes ?? "").includes(title))
+	if (
+		title.length <= WORK_ITEM_TITLE_MAX ||
+		String(notes ?? "").includes(title)
+	)
 		return notes;
 	return [notes, `Full title/request:\n${title}`].filter(Boolean).join("\n\n");
 }
@@ -3108,13 +3157,18 @@ function nodeScript(value) {
 }
 
 function run(cwd, command, args) {
-	const override = command === "git" ? process.env.WORK_ORCH_GIT_BIN : undefined;
+	const override =
+		command === "git" ? process.env.WORK_ORCH_GIT_BIN : undefined;
 	const script = nodeScript(override) ? override : undefined;
-	return execFileSync(script ? process.execPath : (override ?? command), script ? [script, ...args] : args, {
-		cwd,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
-	}).trimEnd();
+	return execFileSync(
+		script ? process.execPath : (override ?? command),
+		script ? [script, ...args] : args,
+		{
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		},
+	).trimEnd();
 }
 
 const LARGE_OUTPUT_THRESHOLD = 10_000;
@@ -3156,7 +3210,8 @@ function commandSignature(command, args = []) {
 }
 
 function runBounded(cwd, command, args = [], options = {}) {
-	const override = command === "git" ? process.env.WORK_ORCH_GIT_BIN : undefined;
+	const override =
+		command === "git" ? process.env.WORK_ORCH_GIT_BIN : undefined;
 	const script = nodeScript(override) ? override : undefined;
 	const actualCommand = script ? process.execPath : (override ?? command);
 	const actualArgs = script ? [script, ...args] : args;
@@ -3714,8 +3769,14 @@ function loadNativeWorkStore(cwd) {
 	try {
 		return loadStore(cwd);
 	} catch (error) {
-		if (error instanceof WorkStoreError && error.category === "missing" && existsSync(join(cwd, ".beads"))) {
-			const legacy = new Error("Legacy tracker state requires /work-remove-beads before normal commands can run.");
+		if (
+			error instanceof WorkStoreError &&
+			error.category === "missing" &&
+			existsSync(join(cwd, ".beads"))
+		) {
+			const legacy = new Error(
+				"Legacy tracker state requires /work-remove-beads before normal commands can run.",
+			);
 			legacy.reason = "migration-required";
 			throw legacy;
 		}
@@ -3745,7 +3806,10 @@ function normalReadGate(cwd) {
 		return null;
 	} catch (error) {
 		return {
-			reason: error.reason === "migration-required" ? "migration-required" : "recovery-required",
+			reason:
+				error.reason === "migration-required"
+					? "migration-required"
+					: "recovery-required",
 			message: error.message,
 		};
 	}
@@ -3814,7 +3878,9 @@ function titleOf(issue) {
 }
 
 function updatedAt(issue) {
-	return field(issue, "updatedAt", "updated_at", "updated", "modified_at") ?? "";
+	return (
+		field(issue, "updatedAt", "updated_at", "updated", "modified_at") ?? ""
+	);
 }
 
 function createdAt(issue) {
@@ -3833,7 +3899,9 @@ function byUpdatedDesc(a, b) {
 
 function listEpics(cwd, status) {
 	try {
-		const items = allWorkItems(cwd).filter((item) => item.type === "epic" && item.status === status);
+		const items = allWorkItems(cwd).filter(
+			(item) => item.type === "epic" && item.status === status,
+		);
 		return Array.isArray(items) ? items : [];
 	} catch {
 		return [];
@@ -3842,8 +3910,7 @@ function listEpics(cwd, status) {
 
 function resolveEpic(cwd, target) {
 	const wanted = target.trim();
-	if (wanted && wanted !== "last")
-		return { epic: readWorkItem(cwd, wanted) };
+	if (wanted && wanted !== "last") return { epic: readWorkItem(cwd, wanted) };
 
 	const candidates = [
 		...listEpics(cwd, "in_progress"),
@@ -4390,7 +4457,8 @@ function resolveReportTarget(cwd, target) {
 	].sort(byUpdatedDesc);
 	if (candidates.length === 0) {
 		try {
-			candidates = allWorkItems(cwd).filter((item) => item.type === "epic")
+			candidates = allWorkItems(cwd)
+				.filter((item) => item.type === "epic")
 				.filter((epic) => statusOf(epic) !== "closed")
 				.sort(byUpdatedDesc);
 		} catch {
@@ -4918,7 +4986,8 @@ function resolveResumeTarget(cwd, target) {
 	let candidates = epicsByStatus(cwd, "open").sort(byUpdatedDesc);
 	if (candidates.length === 0) {
 		try {
-			candidates = allWorkItems(cwd).filter((item) => item.type === "epic")
+			candidates = allWorkItems(cwd)
+				.filter((item) => item.type === "epic")
 				.filter((epic) => statusOf(epic) !== "closed")
 				.sort(byUpdatedDesc);
 		} catch {
@@ -5307,7 +5376,11 @@ function markDirectHandoffStarted(cwd, state) {
 	try {
 		const claimed = claimWorkflowWorkItem(cwd, selected);
 		return idOf(claimed)
-			? { ...state, selectedWorkItem: issueSummary(claimed), handoffClaimed: true }
+			? {
+					...state,
+					selectedWorkItem: issueSummary(claimed),
+					handoffClaimed: true,
+				}
 			: state;
 	} catch {
 		return state;
@@ -5692,7 +5765,9 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 			: "",
 		...extraLines.filter(Boolean),
 		"Do not rediscover target selection. Verify native work-item store/git freshness, then run exactly this action and stop after one work-item or planning boundary.",
-		selected?.id ? `Target work item: ${selected.id}` : "Target work item: none",
+		selected?.id
+			? `Target work item: ${selected.id}`
+			: "Target work item: none",
 	].join("\n");
 }
 
@@ -5969,7 +6044,8 @@ function activeEpicCandidates(cwd) {
 	].sort(byUpdatedDesc);
 	if (candidates.length) return candidates;
 	try {
-		candidates = allWorkItems(cwd).filter((item) => item.type === "epic")
+		candidates = allWorkItems(cwd)
+			.filter((item) => item.type === "epic")
 			.filter((epic) => statusOf(epic) !== "closed")
 			.sort(byUpdatedDesc);
 	} catch {
@@ -6038,9 +6114,13 @@ function ensureWorkflowGitignore(cwd) {
 function ensureWorkStoreInitialized(cwd) {
 	try {
 		loadStore(cwd);
-		return { initialized: false, message: "Native work store already initialized." };
+		return {
+			initialized: false,
+			message: "Native work store already initialized.",
+		};
 	} catch (error) {
-		if (!(error instanceof WorkStoreError) || error.category !== "missing") throw error;
+		if (!(error instanceof WorkStoreError) || error.category !== "missing")
+			throw error;
 	}
 	initStore(cwd);
 	ensureWorkflowGitignore(cwd);
@@ -6052,43 +6132,84 @@ function nativeIssue(item) {
 		(item.dependencyEdges ?? []).map((edge) => [edge.toId, edge]),
 	);
 	return {
-		id: item.id, issue_type: item.type, status: item.status, title: item.title,
-		parent_id: item.parentId, created_at: item.createdAt, updated_at: item.updatedAt,
-		description: item.description, acceptance_criteria: item.acceptance,
-		owner: item.owner, priority: item.priority, labels: item.labels ?? [],
-		notes: (item.notes ?? []).join("\n"), document_links: item.documentLinks,
+		id: item.id,
+		issue_type: item.type,
+		status: item.status,
+		title: item.title,
+		parent_id: item.parentId,
+		created_at: item.createdAt,
+		updated_at: item.updatedAt,
+		description: item.description,
+		acceptance_criteria: item.acceptance,
+		owner: item.owner,
+		priority: item.priority,
+		labels: item.labels ?? [],
+		notes: (item.notes ?? []).join("\n"),
+		document_links: item.documentLinks,
 		design: item.documentLinks?.design,
 		dependencies: [
-			...(item.dependencyEdges ?? []).map(({ fromId, toId, type, ...edge }) => ({
-				issue_id: fromId, depends_on_id: toId, type, ...edge,
-			})),
+			...(item.dependencyEdges ?? []).map(
+				({ fromId, toId, type, ...edge }) => ({
+					issue_id: fromId,
+					depends_on_id: toId,
+					type,
+					...edge,
+				}),
+			),
 			...(item.dependencies ?? [])
 				.filter((id) => !edges.has(id))
 				.map((depends_on_id) => ({
-					issue_id: item.id, depends_on_id, type: "blocks",
+					issue_id: item.id,
+					depends_on_id,
+					type: "blocks",
 				})),
 		],
 	};
 }
 
-function createWorkflowWorkItem(cwd, { title, type = "task", parent, notes, description, design, designFile, acceptance }) {
+function createWorkflowWorkItem(
+	cwd,
+	{
+		title,
+		type = "task",
+		parent,
+		notes,
+		description,
+		design,
+		designFile,
+		acceptance,
+	},
+) {
 	const item = mutateStore(cwd, (store) =>
 		createWorkItem(store, {
-			title: compactWorkItemTitle(title), type, parentId: parent,
-			notes: appendOriginalWorkItemTitle(notes, title) ? [appendOriginalWorkItemTitle(notes, title)] : [],
-			description, acceptance,
-			documentLinks: designFile ? { design: designFile } : design ? { design } : undefined,
+			title: compactWorkItemTitle(title),
+			type,
+			parentId: parent,
+			notes: appendOriginalWorkItemTitle(notes, title)
+				? [appendOriginalWorkItemTitle(notes, title)]
+				: [],
+			description,
+			acceptance,
+			documentLinks: designFile
+				? { design: designFile }
+				: design
+					? { design }
+					: undefined,
 		}),
 	);
 	return nativeIssue(item);
 }
 
 function appendWorkflowWorkItemNote(cwd, id, note) {
-	return nativeIssue(mutateStore(cwd, (store) => appendWorkNote(store, id, note)));
+	return nativeIssue(
+		mutateStore(cwd, (store) => appendWorkNote(store, id, note)),
+	);
 }
 
 function updateWorkItemNative(cwd, id, changes) {
-	return nativeIssue(mutateStore(cwd, (store) => updateWorkItem(store, id, changes)));
+	return nativeIssue(
+		mutateStore(cwd, (store) => updateWorkItem(store, id, changes)),
+	);
 }
 
 function addWorkDependency(cwd, id, dependency) {
@@ -6161,7 +6282,12 @@ function resolveWorkflowEpic(cwd, target = "") {
 
 function buildWorkflowIntakeState(cwd, args = "") {
 	const gate = normalReadGate(cwd);
-	if (gate) return errorState(gate.reason, gate.message, { action: gate.reason, suggestedCommands: gate.reason === "migration-required" ? ["/work-remove-beads"] : [] });
+	if (gate)
+		return errorState(gate.reason, gate.message, {
+			action: gate.reason,
+			suggestedCommands:
+				gate.reason === "migration-required" ? ["/work-remove-beads"] : [],
+		});
 	const { target } = parseWorkReportArgs(args);
 	try {
 		const resolved = resolveWorkflowEpic(cwd, target);
@@ -6197,7 +6323,9 @@ function checkpointNote({ epic, workItem, git, userNote }) {
 	return [
 		"work-pause checkpoint",
 		`epic: ${idOf(epic)} — ${titleOf(epic)}`,
-		workItem ? `workItem: ${idOf(workItem)} — ${titleOf(workItem)}` : "workItem: none",
+		workItem
+			? `workItem: ${idOf(workItem)} — ${titleOf(workItem)}`
+			: "workItem: none",
 		`git: ${dirty}`,
 		`last verification: ${details.commands?.at(-1) ?? "unknown"}`,
 		`failures: ${details.reason || "none recorded"}`,
@@ -6305,9 +6433,13 @@ function debugHandoff(state, guidance = "", cwd) {
 function buildWorkDebugState(cwd, args = "") {
 	let { target, guidance } = splitTargetGuidance(args);
 	if (!target)
-		return errorState("usage", "Usage: /work-debug <bug-or-work-item-id|symptom>", {
-			action: "usage",
-		});
+		return errorState(
+			"usage",
+			"Usage: /work-debug <bug-or-work-item-id|symptom>",
+			{
+				action: "usage",
+			},
+		);
 	try {
 		const expanded = expandNumericWorkItemShorthand(cwd, target);
 		if (expanded.error)
@@ -6335,10 +6467,7 @@ function buildWorkDebugState(cwd, args = "") {
 				typeOf(source) === "epic" ? idOf(source) : parentOf(source);
 			if (!parentId)
 				return errorState("unknown-parent", "Debug target has no parent epic.");
-			epic =
-				typeOf(source) === "epic"
-					? source
-					: readWorkItem(cwd, parentId);
+			epic = typeOf(source) === "epic" ? source : readWorkItem(cwd, parentId);
 			if (!bug) {
 				bug = createWorkflowWorkItem(cwd, {
 					title: `Debug ${titleOf(source)}`,
@@ -6368,7 +6497,10 @@ function buildWorkDebugState(cwd, args = "") {
 			if (isBlockedIssue(bug))
 				bug = updateWorkItemNative(cwd, idOf(bug), {
 					status: "open",
-					notes: [...(loadStore(cwd).items[idOf(bug)]?.notes ?? []), `retry-guidance: ${guidance}`],
+					notes: [
+						...(loadStore(cwd).items[idOf(bug)]?.notes ?? []),
+						`retry-guidance: ${guidance}`,
+					],
 				});
 			else appendWorkflowWorkItemNote(cwd, idOf(bug), `guidance: ${guidance}`);
 		}
@@ -6633,7 +6765,10 @@ function buildWorkSmallState(cwd, args = "") {
 		if (isWorkItemId(firstTarget) && firstTarget !== "--epic") {
 			const issue = readWorkItem(cwd, firstTarget);
 			if (!issue)
-				return errorState("unknown-target", `No WorkItem found for ${firstTarget}`);
+				return errorState(
+					"unknown-target",
+					`No WorkItem found for ${firstTarget}`,
+				);
 			if (typeOf(issue) !== "epic") {
 				const epic = readWorkItem(cwd, parentOf(issue));
 				const claimed = claimWorkflowWorkItem(cwd, issue);
@@ -7782,7 +7917,12 @@ function renderWorkBrainstormText(state) {
 
 function buildWorkIdeateState(cwd, args = "") {
 	const gate = normalReadGate(cwd);
-	if (gate) return errorState(gate.reason, gate.message, { action: gate.reason, suggestedCommands: gate.reason === "migration-required" ? ["/work-remove-beads"] : [] });
+	if (gate)
+		return errorState(gate.reason, gate.message, {
+			action: gate.reason,
+			suggestedCommands:
+				gate.reason === "migration-required" ? ["/work-remove-beads"] : [],
+		});
 	const parsed = parseWorkIdeateArgs(args);
 	try {
 		const resolved = resolveWorkflowEpic(cwd, "");
@@ -7935,8 +8075,7 @@ function buildWorkInitState(cwd, _args = "") {
 		const reason = error.reason ?? "native-store-error";
 		return errorState(reason, error.message, {
 			action: reason,
-			suggestedCommands:
-				["/work-remove-beads"],
+			suggestedCommands: ["/work-remove-beads"],
 		});
 	}
 }
@@ -8378,8 +8517,10 @@ function executeWorkFinishState(cwd, state) {
 		// ponytail: only the canonical state needs restoring; Git reset restores the commit.
 		try {
 			const canonicalPath = join(cwd, ".ce-workflow/work-items.json");
-			if (typeof canonicalBefore === "string") writeFileSync(canonicalPath, canonicalBefore);
-			if (typeof headBefore === "string") run(cwd, "git", ["reset", "--mixed", headBefore]);
+			if (typeof canonicalBefore === "string")
+				writeFileSync(canonicalPath, canonicalBefore);
+			if (typeof headBefore === "string")
+				run(cwd, "git", ["reset", "--mixed", headBefore]);
 		} catch {
 			// Preserve the original finalization failure.
 		}
@@ -8503,7 +8644,8 @@ function buildWorkFinishState(cwd, args = "") {
 
 function allRoadmaps(cwd) {
 	try {
-		return allWorkItems(cwd).filter((item) => item.type === "epic")
+		return allWorkItems(cwd)
+			.filter((item) => item.type === "epic")
 			.filter((epic) => typeOf(epic) === "epic")
 			.sort(byUpdatedDesc);
 	} catch {
@@ -8540,7 +8682,10 @@ function resolveRoadmapTarget(cwd, target = "") {
 	if (expanded.error) return expanded;
 	const epic = readWorkItem(cwd, expanded.target);
 	if (!epic)
-		return { error: "unknown-target", message: `No WorkItem found for ${text}` };
+		return {
+			error: "unknown-target",
+			message: `No WorkItem found for ${text}`,
+		};
 	if (typeOf(epic) !== "epic")
 		return {
 			error: "not-roadmap",
@@ -8763,7 +8908,9 @@ function renderWorkReportText(state) {
 				: ["- none"]),
 			"",
 			"Failure artifact / notes:",
-			state.workItem.notes.reason || state.workItem.notes.rawExcerpt || "- none",
+			state.workItem.notes.reason ||
+				state.workItem.notes.rawExcerpt ||
+				"- none",
 			"",
 			"Git:",
 			compactMultiline(state.git.status),
@@ -11571,7 +11718,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-init", {
-		description: "Initialize native work-item store for work-orchestrator without AGENTS noise",
+		description:
+			"Initialize native work-item store for work-orchestrator without AGENTS noise",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-init", args, ctx, () =>
 				handleWorkflowAction(buildWorkInitState, args, ctx, pi),
@@ -11580,7 +11728,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-status", {
-		description: "Show deterministic native work-item store/git work-orchestrator status",
+		description:
+			"Show deterministic native work-item store/git work-orchestrator status",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-status", args, ctx, () =>
 				handleWorkStatusCommand(args, ctx),
@@ -11589,7 +11738,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-report", {
-		description: "Show deterministic native work-item store/git blocker handoff report",
+		description:
+			"Show deterministic native work-item store/git blocker handoff report",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-report", args, ctx, () =>
 				handleWorkReportCommand(args, ctx),
@@ -11598,7 +11748,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-roadmap", {
-		description: "List, select, close, reopen, and inspect native work-item store epics",
+		description:
+			"List, select, close, reopen, and inspect native work-item store epics",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-roadmap", args, ctx, () =>
 				handleWorkRoadmapCommand(args, ctx, pi),
@@ -11663,7 +11814,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-pause", {
-		description: "Checkpoint current native work-item store-backed work and stop",
+		description:
+			"Checkpoint current native work-item store-backed work and stop",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-pause", args, ctx, () =>
 				handleWorkflowAction(buildWorkPauseState, args, ctx, pi),
@@ -11798,7 +11950,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-add", {
-		description: "Create explicit work under the active native work-item store epic",
+		description:
+			"Create explicit work under the active native work-item store epic",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-add", args, ctx, () =>
 				handleWorkflowAction(buildWorkAddState, args, ctx, pi),
