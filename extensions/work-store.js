@@ -20,6 +20,7 @@ const STATUSES = new Set([
 	"closed",
 	"blocked",
 	"planned",
+	"deferred",
 ]);
 
 export class WorkStoreError extends Error {

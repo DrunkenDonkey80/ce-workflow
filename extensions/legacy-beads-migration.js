@@ -28,6 +28,7 @@ const STATUSES = new Set([
 	"closed",
 	"blocked",
 	"planned",
+	"deferred",
 ]);
 const ROLE_KEYS = [
 	"advisor",

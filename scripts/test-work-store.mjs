@@ -107,6 +107,13 @@ try {
 		title: "not executable",
 		parentId: "epic-1",
 	});
+	item(graph, {
+		id: "epic-1.4",
+		type: "task",
+		status: "deferred",
+		title: "not ready",
+		parentId: "epic-1",
+	});
 	assert.deepEqual(
 		readyWorkItems(graph).map((entry) => entry.id),
 		["epic-1.1"],

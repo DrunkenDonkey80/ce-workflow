@@ -96,6 +96,15 @@ const records = [
 		created_at: "2026-01-01",
 		updated_at: "2026-01-02",
 	},
+	{
+		id: "ce-1.4",
+		issue_type: "task",
+		status: "deferred",
+		title: "Deferred task",
+		parent_id: "ce-1",
+		created_at: "2026-01-01",
+		updated_at: "2026-01-02",
+	},
 ];
 try {
 	// Full mapping, explicit export needs no bd, preserves fields and creates validated backup.
@@ -137,7 +146,9 @@ try {
 		"ce-1.1",
 		"ce-1.2",
 		"ce-1.3",
+		"ce-1.4",
 	]);
+	assert.equal(store.items["ce-1.4"].status, "deferred");
 	assert.equal(store.items["ce-1.1"].parentId, "ce-1");
 	assert.deepEqual(store.items["ce-1.1"].dependencies, ["ce-0"]);
 	assert.deepEqual(
