@@ -506,6 +506,7 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 			TEMP: runtimeTemp,
 			TMP: runtimeTemp,
 			TMPDIR: runtimeTemp,
+			CE_SCRATCH_ROOT: path.join(runtimeTemp, "compound-engineering"),
 		},
 		workspaceRoot: sample.workspaceRoot,
 		sourceRoot,
