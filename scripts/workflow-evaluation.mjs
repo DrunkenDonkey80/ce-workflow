@@ -285,6 +285,8 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		requiredCommands = ["work-migrate", "work-goal"];
 	}
 	const prompt = prompts[0];
+	const runtimeTemp = path.join(sample.workspaceRoot, ".pi", "tmp");
+	mkdirSync(runtimeTemp, { recursive: true });
 	const started = Date.now();
 	const rpc = await runRpcSample({
 		packageRoot: path.resolve(side.packageRoot ?? sourceRoot),
@@ -300,6 +302,7 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		prompts,
 		answers: sample.answers,
 		timeoutMs: descriptor.budgets.wallMsCeiling,
+		env: { ...process.env, TEMP: runtimeTemp, TMP: runtimeTemp, TMPDIR: runtimeTemp },
 		workspaceRoot: sample.workspaceRoot,
 		sourceRoot,
 		bundleRoot: sample.projectDir,

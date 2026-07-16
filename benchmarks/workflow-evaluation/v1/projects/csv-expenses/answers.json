@@ -1,18 +1,34 @@
 {
   "version": 1,
   "expected": {
-    "primary user": "A developer using it in scripts or CI",
-    "information must the text report show": "Show category totals followed by Total and Rows.",
-    "report scope": "Overall + category totals",
-    "CSV columns": "Use exactly date,category,amount.",
-    "command invocation": "Use node src/analyze.mjs <input.csv> <report.txt>.",
-    "malformed rows": "Fail the whole command with exit code 2 and do not leave a report.",
-    "I/O failures": "Exit 1 and leave no partial report.",
-    "empty input": "Treat an empty file like zero rows and emit Total: 0.00 and Rows: 0.",
-    "category casing": "Preserve the first trimmed spelling while grouping case-insensitively.",
-    "output order": "Sort categories case-insensitively, then emit Total and Rows.",
-    "dependencies": "Use only Node.js built-ins.",
-    "execution slices": "First parse and validate; then aggregate and render."
+    "primary user|intended user|first user|specific person|specific user|user segment|narrow user|primarily for": [
+      "A developer using it in scripts or CI",
+      "Automation/CI"
+    ],
+    "decision or task|user-facing purpose|report purpose|should become easier": "Help a developer produce a deterministic category summary for automated checks.",
+    "evidence of need|already done|observable need": "Developers maintain ad hoc scripts that repeatedly fail on malformed input or unstable output.",
+    "smallest useful|smallest version": "Support one fixed CSV schema and a deterministic category summary.",
+    "information must the text report show|information must the first report contain|report contain|report scope|report summarize|summary dimensions": [
+      "Show category totals followed by Total and Rows.",
+      "Overall + category totals",
+      "Totals by category",
+      "Totals by category (Recommended)"
+    ],
+    "do today to summarize|do today to produce|do today when|produce or verify|same expense summary|current workaround|workaround": "They use ad hoc scripts whose inconsistent validation and output break automation.",
+    "input columns|input-column contract|CSV input contract|column contract|CSV columns": [
+      "Use exactly date,category,amount.",
+      "date,category,amount",
+      "date + category + amount",
+      "Fixed required columns (recommended)"
+    ],
+    "command invocation|CLI invocation|command shape": "Use node src/analyze.mjs <input.csv> <report.txt>.",
+    "malformed rows|invalid rows|invalid input": "Fail the whole command with exit code 2 and do not leave a report.",
+    "I/O failures|unreadable input|unwritable output": "Exit 1 and leave no partial report.",
+    "empty input|empty file|header-only": "Treat an empty file like zero rows and emit Total: 0.00 and Rows: 0.",
+    "category casing|case-insensitive": "Preserve the first trimmed spelling while grouping case-insensitively.",
+    "output order|deterministic order|sort categories": "Sort categories case-insensitively, then emit Total and Rows.",
+    "dependencies|runtime dependencies|Node.js built-ins": "Use only Node.js built-ins.",
+    "execution slices|delivery slices|work slices": "First parse and validate; then aggregate and render."
   },
   "fallback": {}
 }

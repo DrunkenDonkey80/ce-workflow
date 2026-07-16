@@ -35,19 +35,22 @@ function normalize(value) { return String(value ?? "").toLowerCase().replace(/[^
 
 export function answerUiRequest(request, bank) {
 	if (!DIALOGS.has(request?.method)) return { ignored: true };
-	const question = normalize([request.title, request.message].filter(Boolean).join(" "));
+	const question = normalize([request.title, request.message].filter(Boolean).join(" ").split(/\n\s*\nContext:/i)[0]);
 	const expected = Object.entries(bank?.expected ?? {}).map((entry) => ({ entry, unexpected: false }));
 	const fallback = Object.entries(bank?.fallback ?? {}).map((entry) => ({ entry, unexpected: true }));
-	const match = [...expected, ...fallback].find(({ entry: [key] }) => question.includes(normalize(key)) || normalize(key).includes(question));
+	const aliases = (key) => String(key).split("|").map(normalize);
+	const match = [...expected, ...fallback]
+		.sort((left, right) => Math.max(...aliases(right.entry[0]).map((alias) => alias.length)) - Math.max(...aliases(left.entry[0]).map((alias) => alias.length)))
+		.find(({ entry: [key] }) => aliases(key).some((alias) => question.includes(alias) || alias.includes(question)));
 	if (!match) return null;
-	const value = match.entry[1];
-	if (request.method === "confirm") return { type: "extension_ui_response", id: request.id, confirmed: /^(yes|true|continue|confirm)$/i.test(String(value)), unexpected: match.unexpected };
+	const values = Array.isArray(match.entry[1]) ? match.entry[1] : [match.entry[1]];
+	if (request.method === "confirm") return { type: "extension_ui_response", id: request.id, confirmed: /^(yes|true|continue|confirm)$/i.test(String(values[0])), unexpected: match.unexpected };
 	if (request.method === "select") {
-		const option = request.options?.find((item) => normalize(item) === normalize(value));
+		const option = request.options?.find((item) => values.some((value) => normalize(item) === normalize(value)));
 		if (!option) return null;
 		return { type: "extension_ui_response", id: request.id, value: option, unexpected: match.unexpected };
 	}
-	return { type: "extension_ui_response", id: request.id, value: String(value), unexpected: match.unexpected };
+	return { type: "extension_ui_response", id: request.id, value: String(values[0]), unexpected: match.unexpected };
 }
 
 function sameStrings(left, right) { return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort()); }

@@ -34,6 +34,10 @@ assert.equal(answerUiRequest({ id: "3", method: "input", title: "Name" }, answer
 assert.equal(answerUiRequest({ id: "4", method: "editor", title: "Details" }, answers).value, "Line 1\nLine 2");
 assert.equal(answerUiRequest({ id: "5", method: "input", title: "Unknown" }, answers), null);
 assert.equal(answerUiRequest({ id: "6", method: "input", title: "Empty input" }, answers).unexpected, true);
+assert.equal(answerUiRequest({ id: "7", method: "input", title: "Unknown\n\nContext:\nContinue with the fixture." }, answers), null);
+const flexibleAnswers = { expected: { "primary user|intended user": ["Developer", "Individual"] } };
+assert.equal(answerUiRequest({ id: "8", method: "input", title: "Who is the intended user?" }, flexibleAnswers).value, "Developer");
+assert.equal(answerUiRequest({ id: "9", method: "select", title: "Choose the primary user", options: ["Individual", "Team"] }, flexibleAnswers).value, "Individual");
 
 const packageRoot = path.resolve(".");
 assert.doesNotThrow(() => preflightRpcSample({ packageRoot, revision: "abc", expectedRevision: "abc", tools: ["read"], expectedTools: ["read"], trusted: true, isolation: "path" }));
