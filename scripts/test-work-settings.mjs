@@ -91,17 +91,17 @@ try {
 	assert(max.simplifyBeforeReview === true, "max simplify");
 	assert(max.browserTestsOnUiDiff === true, "max browser tests");
 	assert(
-		readSettings().subagents.agentOverrides["bead-advisor"].thinking ===
+		readSettings().subagents.agentOverrides["work-advisor"].thinking ===
 			"xhigh",
 		"advisor effort xhigh",
 	);
 	assert(
-		readSettings().subagents.agentOverrides["bead-advisor-backup"].thinking ===
+		readSettings().subagents.agentOverrides["work-advisor-backup"].thinking ===
 			"high",
 		"backup advisor effort high",
 	);
 	assert(
-		readSettings().subagents.agentOverrides["bead-worker"].thinking === "xhigh",
+		readSettings().subagents.agentOverrides["work-worker"].thinking === "xhigh",
 		"worker effort xhigh",
 	);
 
@@ -330,7 +330,7 @@ try {
 	settings = readSettings();
 	settings.subagents ??= {};
 	settings.subagents.agentOverrides ??= {};
-	settings.subagents.agentOverrides["bead-reviewer"] = {
+	settings.subagents.agentOverrides["work-reviewer"] = {
 		model: "test/gpt-5.6-high",
 		thinking: "xhigh",
 	};
@@ -376,12 +376,12 @@ try {
 	);
 	assert(!filteredModels.includes("test/other"), "filter hides non-matches");
 	assert(
-		settings.subagents.agentOverrides["bead-reviewer"].model ===
+		settings.subagents.agentOverrides["work-reviewer"].model ===
 			"test/gpt-5.6-mini",
 		"filtered model picker selects highlighted model",
 	);
 	assert(
-		settings.subagents.agentOverrides["bead-reviewer"].thinking === "xhigh",
+		settings.subagents.agentOverrides["work-reviewer"].thinking === "xhigh",
 		"typed model flow still selects effort",
 	);
 } finally {

@@ -2,6 +2,7 @@
 import {
 	chmodSync,
 	mkdtempSync,
+	mkdirSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -10,6 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
+import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const { buildWorkReport } = await import(
 	pathToFileURL(
@@ -93,34 +95,7 @@ function assert(ok, message) {
 
 function installFakeCommands() {
 	const dir = mkdtempSync(path.join(tmpdir(), "work-report-bin-"));
-	const bd = path.join(dir, "fake-bd.mjs");
 	const git = path.join(dir, "fake-git.mjs");
-	writeFileSync(
-		bd,
-		`#!/usr/bin/env node
-const epic = ${JSON.stringify(epic)};
-const children = ${JSON.stringify(children)};
-const scenario = process.env.WORK_REPORT_SCENARIO || "default";
-const args = process.argv.slice(2).filter((arg) => arg !== "--json");
-const activeEpic = scenario === "closed" ? {...epic, status: "closed"} : epic;
-const activeChildren = scenario === "closed" ? children.map((issue) => ({...issue, status: "closed", labels: [], depends_on: []})) : children;
-function out(value) { console.log(JSON.stringify(value)); }
-if (scenario === "no-beads") { console.error("Error: no beads database found"); process.exit(1); }
-if (scenario === "invalid-json") { process.stdout.write("{"); process.exit(0); }
-if (args[0] === "list" && args.includes("--type=epic")) {
-  if (scenario === "ambiguous" && args.some((arg) => arg === "--status=in_progress")) out([{...epic, id:"E-1"}, {...epic, id:"E-2", title:"Second epic"}]);
-  else if (args.some((arg) => arg === "--status=in_progress")) out(scenario === "closed" ? [] : [activeEpic]);
-  else out([]);
-} else if (args[0] === "show") {
-  const id = args[1];
-  if (id === "E-1") out(activeEpic);
-  else if (activeChildren.find((issue) => issue.id === id)) out(activeChildren.find((issue) => issue.id === id));
-  else { console.error("not found"); process.exit(2); }
-} else if (args[0] === "children") out(activeChildren);
-else if (args[0] === "ready") out(activeChildren.filter((issue) => scenario !== "closed" && issue.id === "BUG-1"));
-else out([]);
-`,
-	);
 	writeFileSync(
 		git,
 		`#!/usr/bin/env node
@@ -129,39 +104,48 @@ console.log("## feat/coded-work-report");
 console.log(" M extensions/work-models.js");
 `,
 	);
-	for (const name of ["bd", "git"]) {
-		const source = name === "bd" ? bd : git;
-		writeFileSync(
-			path.join(dir, name),
-			`#!/bin/sh\nexec node "${source.replaceAll("\\", "/")}" "$@"\n`,
-		);
-		chmodSync(path.join(dir, name), 0o755);
-		writeFileSync(
-			path.join(dir, `${name}.cmd`),
-			`@node "%~dp0\\fake-${name}.mjs" %*\r\n`,
-		);
-	}
+	chmodSync(git, 0o755);
 	return dir;
 }
 
+const cwd = mkdtempSync(path.join(tmpdir(), "work-report-cwd-"));
+function resetNative(scenario = "default") {
+	const activeEpic =
+		scenario === "closed" ? { ...epic, status: "closed" } : epic;
+	const activeChildren =
+		scenario === "closed"
+			? children.map((issue) => ({
+				...issue,
+				status: "closed",
+				labels: [],
+				depends_on: [],
+			}))
+			: children;
+	seedNativeStore(cwd, [
+		activeEpic,
+		...(scenario === "ambiguous"
+			? [{ ...epic, id: "E-2", title: "Second epic" }]
+			: []),
+		...activeChildren,
+	]);
+}
+resetNative();
 const bin = installFakeCommands();
-const oldBdBin = process.env.WORK_ORCH_BD_BIN;
 const oldGitBin = process.env.WORK_ORCH_GIT_BIN;
 const oldScenario = process.env.WORK_REPORT_SCENARIO;
 const oldGitFail = process.env.WORK_REPORT_GIT_FAIL;
-process.env.WORK_ORCH_BD_BIN = path.join(bin, "fake-bd.mjs");
 process.env.WORK_ORCH_GIT_BIN = path.join(bin, "fake-git.mjs");
 try {
 	delete process.env.WORK_REPORT_SCENARIO;
 	delete process.env.WORK_REPORT_GIT_FAIL;
-	const text = buildWorkReport(process.cwd(), "E-1");
+	const text = buildWorkReport(cwd, "E-1");
 	assert(
 		text.includes("Current blockers:"),
 		"text report includes blockers section",
 	);
 	assert(
 		text.includes("B-1 🟢 open task"),
-		"text report includes blocked bead",
+		"text report includes blocked workItem",
 	);
 	assert(
 		text.includes("command: Command: rtk cmake"),
@@ -173,17 +157,17 @@ try {
 	);
 	assert(text.includes("/work-debug BUG-1"), "text report suggests debug bug");
 
-	const defaultJson = JSON.parse(buildWorkReport(process.cwd(), "--json"));
+	const defaultJson = JSON.parse(buildWorkReport(cwd, "--json"));
 	assert(
 		defaultJson.ok === true && defaultJson.epic.id === "E-1",
 		"default target resolves one active epic",
 	);
 
-	const json = JSON.parse(buildWorkReport(process.cwd(), "E-1 --json"));
+	const json = JSON.parse(buildWorkReport(cwd, "E-1 --json"));
 	assert(json.ok === true, "json report succeeds");
 	assert(
 		json.blockers.some((item) => item.id === "B-1"),
-		"json includes blocked bead",
+		"json includes blocked workItem",
 	);
 	assert(
 		json.blockers
@@ -203,56 +187,56 @@ try {
 	);
 	assert(
 		!JSON.stringify(json).includes("FULL_PLAN_SHOULD_NOT_LEAK"),
-		"json omits full Beads description/design/acceptance/notes",
+		"json omits full WorkItems description/design/acceptance/notes",
 	);
 	assert(
 		json.downstreamBlocked.some(
-			(item) => item.bead.id === "B-2" && item.blockedBy.id === "B-1",
+			(item) => item.workItem.id === "B-2" && item.blockedBy.id === "B-1",
 		),
 		"json includes downstream work blocked by B-1",
 	);
 	assert(
 		!json.downstreamBlocked.some(
-			(item) => item.bead.id === "B-2" && item.blockedBy.id === "DONE-1",
+			(item) => item.workItem.id === "B-2" && item.blockedBy.id === "DONE-1",
 		),
 		"json excludes downstream work whose dependency is closed",
 	);
 
-	const shorthand = buildWorkReport(process.cwd(), "2");
+	const shorthand = buildWorkReport(cwd, "2");
 	assert(
-		shorthand.includes("Bead: Downstream JSON renderer"),
-		"numeric shorthand resolves focused bead report",
+		shorthand.includes("WorkItem: Downstream JSON renderer"),
+		"numeric shorthand resolves focused workItem report",
 	);
-	const punctuatedShorthand = buildWorkReport(process.cwd(), "2.");
+	const punctuatedShorthand = buildWorkReport(cwd, "2.");
 	assert(
-		punctuatedShorthand.includes("Bead: Downstream JSON renderer"),
+		punctuatedShorthand.includes("WorkItem: Downstream JSON renderer"),
 		"numeric shorthand tolerates copied sentence punctuation",
 	);
 
-	const bead = buildWorkReport(process.cwd(), "B-1");
+	const workItem = buildWorkReport(cwd, "B-1");
 	assert(
-		bead.includes("Bead: Blocked C compiler verification"),
-		"focused bead report renders bead",
+		workItem.includes("WorkItem: Blocked C compiler verification"),
+		"focused workItem report renders workItem",
 	);
-	const punctuatedBead = buildWorkReport(process.cwd(), "B-1.");
+	const punctuatedWorkItem = buildWorkReport(cwd, "B-1.");
 	assert(
-		punctuatedBead.includes("Bead: Blocked C compiler verification"),
-		"focused bead report tolerates copied sentence punctuation",
-	);
-	assert(
-		bead.includes("D-1"),
-		"focused bead report includes direct dependency",
+		punctuatedWorkItem.includes("WorkItem: Blocked C compiler verification"),
+		"focused workItem report tolerates copied sentence punctuation",
 	);
 	assert(
-		bead.includes("Next: Next: install linker and rerun"),
-		"focused bead report uses latest next action",
+		workItem.includes("D-1"),
+		"focused workItem report includes direct dependency",
 	);
 	assert(
-		!bead.includes("E-1"),
-		"focused bead report ignores parent-child dependency",
+		workItem.includes("Next: Next: install linker and rerun"),
+		"focused workItem report uses latest next action",
+	);
+	assert(
+		!workItem.includes("E-1"),
+		"focused workItem report ignores parent-child dependency",
 	);
 
-	const decision = buildWorkReport(process.cwd(), "D-1");
+	const decision = buildWorkReport(cwd, "D-1");
 	assert(
 		decision.includes("CMake missing compiler"),
 		"focused decision report normalizes escaped note newlines",
@@ -262,20 +246,20 @@ try {
 		"focused decision report uses explicit next action instead of self-loop",
 	);
 
-	const rawFallback = buildWorkReport(process.cwd(), "BUG-1");
+	const rawFallback = buildWorkReport(cwd, "BUG-1");
 	assert(
 		rawFallback.includes("Run: abc123"),
-		"focused bead report includes raw note fallback",
+		"focused workItem report includes raw note fallback",
 	);
 
-	const unknown = JSON.parse(buildWorkReport(process.cwd(), "NOPE --json"));
+	const unknown = JSON.parse(buildWorkReport(cwd, "NOPE --json"));
 	assert(
 		unknown.ok === false && unknown.reason === "unknown-target",
 		"unknown explicit target is parseable JSON",
 	);
 
-	process.env.WORK_REPORT_SCENARIO = "ambiguous";
-	const ambiguous = JSON.parse(buildWorkReport(process.cwd(), "last --json"));
+	resetNative("ambiguous");
+	const ambiguous = JSON.parse(buildWorkReport(cwd, "last --json"));
 	assert(
 		ambiguous.ok === false && ambiguous.reason === "ambiguous-target",
 		"ambiguous target is parseable JSON",
@@ -285,43 +269,46 @@ try {
 		"ambiguous target includes candidates",
 	);
 
-	process.env.WORK_REPORT_SCENARIO = "closed";
-	const closed = buildWorkReport(process.cwd(), "E-1");
+	resetNative("closed");
+	const closed = buildWorkReport(cwd, "E-1");
 	assert(
 		closed.includes("Status: ✅ closed") &&
 			closed.includes('Next: epic E-1 "Add coded work report" is complete.'),
 		"closed completed epic reports completion next action",
 	);
-	const closedJson = JSON.parse(buildWorkReport(process.cwd(), "E-1 --json"));
+	const closedJson = JSON.parse(buildWorkReport(cwd, "E-1 --json"));
 	assert(
 		closedJson.suggestedCommands.length === 0,
 		"closed completed epic JSON has no suggested command",
 	);
 
-	process.env.WORK_REPORT_SCENARIO = "no-beads";
-	const noBeads = JSON.parse(buildWorkReport(process.cwd(), "--json"));
+	rmSync(path.join(cwd, ".ce-workflow"), { recursive: true, force: true });
+	rmSync(path.join(cwd, ".pi", "work-store"), { recursive: true, force: true });
+	mkdirSync(path.join(cwd, ".beads"), { recursive: true });
+	const migrationRequired = JSON.parse(buildWorkReport(cwd, "--json"));
 	assert(
-		noBeads.ok === false && noBeads.reason === "beads-unavailable",
-		"missing Beads is parseable JSON",
+		migrationRequired.ok === false && migrationRequired.reason === "migration-required",
+		"legacy work state requires migration",
 	);
 
-	process.env.WORK_REPORT_SCENARIO = "invalid-json";
-	const invalidJson = JSON.parse(buildWorkReport(process.cwd(), "--json"));
+	resetNative();
+	writeFileSync(path.join(cwd, ".ce-workflow", "work-items.json"), "{");
+	rmSync(path.join(cwd, ".pi", "work-store"), { recursive: true, force: true });
+	const recoveryRequired = JSON.parse(buildWorkReport(cwd, "--json"));
 	assert(
-		invalidJson.ok === false && invalidJson.reason === "beads-error",
-		"invalid Beads JSON is parseable JSON",
+		recoveryRequired.ok === false && recoveryRequired.reason === "recovery-required",
+		"invalid native store is parseable JSON",
 	);
 
-	delete process.env.WORK_REPORT_SCENARIO;
+	rmSync(path.join(cwd, ".ce-workflow"), { recursive: true, force: true });
+	resetNative();
 	process.env.WORK_REPORT_GIT_FAIL = "1";
-	const gitWarning = JSON.parse(buildWorkReport(process.cwd(), "E-1 --json"));
+	const gitWarning = JSON.parse(buildWorkReport(cwd, "E-1 --json"));
 	assert(
 		gitWarning.warnings.includes("git status unavailable"),
 		"git failure degrades to warning",
 	);
 } finally {
-	if (oldBdBin === undefined) delete process.env.WORK_ORCH_BD_BIN;
-	else process.env.WORK_ORCH_BD_BIN = oldBdBin;
 	if (oldGitBin === undefined) delete process.env.WORK_ORCH_GIT_BIN;
 	else process.env.WORK_ORCH_GIT_BIN = oldGitBin;
 	if (oldScenario === undefined) delete process.env.WORK_REPORT_SCENARIO;
@@ -329,6 +316,7 @@ try {
 	if (oldGitFail === undefined) delete process.env.WORK_REPORT_GIT_FAIL;
 	else process.env.WORK_REPORT_GIT_FAIL = oldGitFail;
 	rmSync(bin, { recursive: true, force: true });
+	rmSync(cwd, { recursive: true, force: true });
 }
 
 console.log("ok - coded work-report behavior");

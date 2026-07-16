@@ -1,13 +1,12 @@
 {
   "name": "pi-work-orchestrator",
   "version": "0.1.0",
-  "description": "Beads-backed Pi workflow package for staged software work orchestration.",
+  "description": "Native work-item Pi workflow package for staged software work orchestration.",
   "type": "module",
   "license": "MIT",
   "keywords": [
     "pi-package",
     "pi",
-    "beads",
     "subagents",
     "workflow"
   ],
@@ -30,9 +29,6 @@
     ],
     "skills": [
       "./skills"
-    ],
-    "prompts": [
-      "./prompts"
     ],
     "subagents": {
       "agents": [

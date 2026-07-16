@@ -12,50 +12,45 @@ const { buildWorkAddState } = await import(
 	).href
 );
 
-const fixture = installWorkflowFixture();
+const fixture = installWorkflowFixture({ native: true });
 try {
-	let state = buildWorkAddState(process.cwd(), "Add coded pause tests");
-	assert(state.ok && state.action === "work-added", "task creates child Bead");
+	let state = buildWorkAddState(fixture.cwd, "Add coded pause tests");
+	assert(state.ok && state.action === "work-added", "task creates child WorkItem");
 	assert(state.epic.id === "E-1", "task is created under active epic");
 	assert(
-		fixture
-			.logs()
-			.some(
-				(entry) =>
-					entry.op === "create" &&
-					entry.issue.title === "Add coded pause tests",
-			),
-		"create command is recorded",
+		fixture.store().items[state.selectedWorkItem.id].title === "Add coded pause tests" &&
+			fixture.logs().length === 0,
+		"creation is one native mutation without bd",
 	);
 
-	state = buildWorkAddState(process.cwd(), "");
+	state = buildWorkAddState(fixture.cwd, "");
 	assert(
 		!state.ok && state.reason === "usage",
 		"empty task returns usage stop",
 	);
 
 	fixture.reset("ambiguous");
-	state = buildWorkAddState(process.cwd(), "Needs explicit parent");
+	state = buildWorkAddState(fixture.cwd, "Needs explicit parent");
 	assert(
 		!state.ok && state.reason === "ambiguous-target",
 		"ambiguous active epic without --epic stops",
 	);
-	assert(fixture.logs().length === 0, "ambiguous add does not create Beads");
+	assert(fixture.logs().length === 0, "ambiguous add does not invoke bd");
 
 	fixture.reset("openReadyAmbiguous");
-	state = buildWorkAddState(process.cwd(), "Must not guess open ready epic");
+	state = buildWorkAddState(fixture.cwd, "Must not guess open ready epic");
 	assert(
 		!state.ok && state.reason === "no-active-epic",
 		"mutating add does not guess among open epics",
 	);
 	assert(
 		fixture.logs().length === 0,
-		"open epic heuristic does not mutate Beads",
+		"open epic heuristic does not invoke bd",
 	);
 
 	fixture.reset("ambiguous");
 	state = buildWorkAddState(
-		process.cwd(),
+		fixture.cwd,
 		"--epic E-1 Add explicit parent task",
 	);
 	assert(
@@ -65,7 +60,7 @@ try {
 
 	fixture.reset("debug");
 	state = buildWorkAddState(
-		process.cwd(),
+		fixture.cwd,
 		"--blocked-by BUG-1 Add blocked task",
 	);
 	assert(
@@ -73,34 +68,30 @@ try {
 		"--blocked-by is preserved",
 	);
 	assert(
-		fixture
-			.logs()
-			.some((entry) => entry.op === "dep-add" && entry.earlier === "BUG-1"),
-		"dependency is added in correct direction",
+		fixture.store().items[state.selectedWorkItem.id].dependencies.includes("BUG-1") &&
+			fixture.logs().length === 0,
+		"dependency is added natively in correct direction",
 	);
 
 	fixture.reset("active");
-	state = buildWorkAddState(process.cwd(), "Add independent task");
+	state = buildWorkAddState(fixture.cwd, "Add independent task");
 	assert(state.ok && !state.blockedBy, "no blocker creates no dependency");
 	assert(
-		!fixture.logs().some((entry) => entry.op === "dep-add"),
-		"no blocker target means no dep add",
+		fixture.store().items[state.selectedWorkItem.id].dependencies.length === 0,
+		"no blocker target means no dependency",
 	);
 
 	fixture.reset("active", "unknown");
-	state = buildWorkAddState(process.cwd(), "Should not create");
+	state = buildWorkAddState(fixture.cwd, "Should not create");
 	assert(
 		!state.ok && state.reason === "dirty-stop",
 		"unsafe dirty state stops before mutation",
 	);
-	assert(fixture.logs().length === 0, "dirty stop does not create Beads");
+	assert(fixture.logs().length === 0, "dirty stop does not create WorkItems");
 
 	fixture.reset("create-fail");
-	state = buildWorkAddState(process.cwd(), "Create fails");
-	assert(
-		!state.ok && state.message.includes("create failed"),
-		"create failure preserves native text",
-	);
+	state = buildWorkAddState(fixture.cwd, "Native create succeeds without command fixture");
+	assert(state.ok && fixture.logs().length === 0, "native create never invokes bd");
 } finally {
 	fixture.cleanup();
 }

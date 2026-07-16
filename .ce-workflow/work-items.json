@@ -1,0 +1,708 @@
+{
+  "items": {
+    "ce-workflow-6dl": {
+      "acceptance": "All U1-U8 verification gates and package verification pass; live unavailable capabilities are reported fail-closed.",
+      "createdAt": "2026-07-15T09:14:07Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Execute docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md to Definition of Done.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "All U1-U8 verification gates and package verification pass; live unavailable capabilities are reported fail-closed.",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:07Z",
+        "created_by": "Flex",
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Execute docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md to Definition of Done.",
+        "id": "ce-workflow-6dl",
+        "issue_type": "epic",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "status": "open",
+        "title": "Implement CE workflow evaluation harness",
+        "updated_at": "2026-07-15T09:14:07Z"
+      },
+      "notes": [],
+      "owner": "mailflex@gmail.com",
+      "priority": 2,
+      "status": "open",
+      "title": "Implement CE workflow evaluation harness",
+      "type": "epic",
+      "updatedAt": "2026-07-15T09:14:07Z"
+    },
+    "ce-workflow-6dl.1": {
+      "acceptance": "U1 verification contract passes.",
+      "closedAt": "2026-07-15T09:21:07Z",
+      "createdAt": "2026-07-15T09:14:10Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T12:14:10Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-6dl.1",
+          "metadata": "{}",
+          "toId": "ce-workflow-6dl",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Implement and verify U1 from the authoritative plan.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Contract fixtures pass"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl.1",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "U1 verification contract passes.",
+        "close_reason": "Contract fixtures pass",
+        "closed_at": "2026-07-15T09:21:07Z",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:10Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T12:14:10Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-6dl",
+            "issue_id": "ce-workflow-6dl.1",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Implement and verify U1 from the authoritative plan.",
+        "id": "ce-workflow-6dl.1",
+        "issue_type": "task",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "started_at": "2026-07-15T09:14:46Z",
+        "status": "closed",
+        "title": "U1: workflow evaluation harness",
+        "updated_at": "2026-07-15T09:21:07Z"
+      },
+      "notes": [],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-6dl",
+      "priority": 2,
+      "startedAt": "2026-07-15T09:14:46Z",
+      "status": "closed",
+      "title": "U1: workflow evaluation harness",
+      "type": "task",
+      "updatedAt": "2026-07-15T09:21:07Z"
+    },
+    "ce-workflow-6dl.2": {
+      "acceptance": "U2 verification contract passes.",
+      "closedAt": "2026-07-15T09:27:31Z",
+      "createdAt": "2026-07-15T09:14:13Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T12:14:13Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-6dl.2",
+          "metadata": "{}",
+          "toId": "ce-workflow-6dl",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Implement and verify U2 from the authoritative plan.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "CSV hidden acceptance distinguishes known-good and defective implementations"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl.2",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "U2 verification contract passes.",
+        "close_reason": "CSV hidden acceptance distinguishes known-good and defective implementations",
+        "closed_at": "2026-07-15T09:27:31Z",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:13Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T12:14:13Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-6dl",
+            "issue_id": "ce-workflow-6dl.2",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Implement and verify U2 from the authoritative plan.",
+        "id": "ce-workflow-6dl.2",
+        "issue_type": "task",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "started_at": "2026-07-15T09:21:28Z",
+        "status": "closed",
+        "title": "U2: workflow evaluation harness",
+        "updated_at": "2026-07-15T09:27:31Z"
+      },
+      "notes": [],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-6dl",
+      "priority": 2,
+      "startedAt": "2026-07-15T09:21:28Z",
+      "status": "closed",
+      "title": "U2: workflow evaluation harness",
+      "type": "task",
+      "updatedAt": "2026-07-15T09:27:31Z"
+    },
+    "ce-workflow-6dl.3": {
+      "acceptance": "U3 verification contract passes.",
+      "closedAt": "2026-07-15T09:35:44Z",
+      "createdAt": "2026-07-15T09:14:17Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T12:14:17Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-6dl.3",
+          "metadata": "{}",
+          "toId": "ce-workflow-6dl",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Implement and verify U3 from the authoritative plan.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Fake browser acceptance covers protocol; local browser capability unavailable and will be recorded fail-closed"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl.3",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "U3 verification contract passes.",
+        "close_reason": "Fake browser acceptance covers protocol; local browser capability unavailable and will be recorded fail-closed",
+        "closed_at": "2026-07-15T09:35:44Z",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:17Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T12:14:17Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-6dl",
+            "issue_id": "ce-workflow-6dl.3",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Implement and verify U3 from the authoritative plan.",
+        "id": "ce-workflow-6dl.3",
+        "issue_type": "task",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "started_at": "2026-07-15T09:27:54Z",
+        "status": "closed",
+        "title": "U3: workflow evaluation harness",
+        "updated_at": "2026-07-15T09:35:44Z"
+      },
+      "notes": [],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-6dl",
+      "priority": 2,
+      "startedAt": "2026-07-15T09:27:54Z",
+      "status": "closed",
+      "title": "U3: workflow evaluation harness",
+      "type": "task",
+      "updatedAt": "2026-07-15T09:35:44Z"
+    },
+    "ce-workflow-6dl.4": {
+      "acceptance": "U4 verification contract passes.",
+      "closedAt": "2026-07-15T12:31:24Z",
+      "createdAt": "2026-07-15T09:14:20Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T12:14:20Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-6dl.4",
+          "metadata": "{}",
+          "toId": "ce-workflow-6dl",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Implement and verify U4 from the authoritative plan.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Strict RPC framing, scripted dialogs, provenance, trust, timeout, settlement, and usage fixtures pass; credentialed smoke deferred to runner integration"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl.4",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "U4 verification contract passes.",
+        "close_reason": "Strict RPC framing, scripted dialogs, provenance, trust, timeout, settlement, and usage fixtures pass; credentialed smoke deferred to runner integration",
+        "closed_at": "2026-07-15T12:31:24Z",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:20Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T12:14:20Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-6dl",
+            "issue_id": "ce-workflow-6dl.4",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Implement and verify U4 from the authoritative plan.",
+        "id": "ce-workflow-6dl.4",
+        "issue_type": "task",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "status": "closed",
+        "title": "U4: workflow evaluation harness",
+        "updated_at": "2026-07-15T12:31:24Z"
+      },
+      "notes": [],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-6dl",
+      "priority": 2,
+      "status": "closed",
+      "title": "U4: workflow evaluation harness",
+      "type": "task",
+      "updatedAt": "2026-07-15T12:31:24Z"
+    },
+    "ce-workflow-6dl.5": {
+      "acceptance": "U5 verification contract passes.",
+      "closedAt": "2026-07-15T12:36:45Z",
+      "createdAt": "2026-07-15T09:14:23Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T12:14:23Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-6dl.5",
+          "metadata": "{}",
+          "toId": "ce-workflow-6dl",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Implement and verify U5 from the authoritative plan.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Smoke lifecycle fixtures prove fresh roots, hard-gate outcomes, durable evidence, cleanup, and source immutability"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl.5",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "U5 verification contract passes.",
+        "close_reason": "Smoke lifecycle fixtures prove fresh roots, hard-gate outcomes, durable evidence, cleanup, and source immutability",
+        "closed_at": "2026-07-15T12:36:45Z",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:23Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T12:14:23Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-6dl",
+            "issue_id": "ce-workflow-6dl.5",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Implement and verify U5 from the authoritative plan.",
+        "id": "ce-workflow-6dl.5",
+        "issue_type": "task",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "started_at": "2026-07-15T12:31:45Z",
+        "status": "closed",
+        "title": "U5: workflow evaluation harness",
+        "updated_at": "2026-07-15T12:36:45Z"
+      },
+      "notes": [],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-6dl",
+      "priority": 2,
+      "startedAt": "2026-07-15T12:31:45Z",
+      "status": "closed",
+      "title": "U5: workflow evaluation harness",
+      "type": "task",
+      "updatedAt": "2026-07-15T12:36:45Z"
+    },
+    "ce-workflow-6dl.6": {
+      "acceptance": "U6 verification contract passes.",
+      "closedAt": "2026-07-15T12:44:44Z",
+      "createdAt": "2026-07-15T09:14:27Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T12:14:26Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-6dl.6",
+          "metadata": "{}",
+          "toId": "ce-workflow-6dl",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Implement and verify U6 from the authoritative plan.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Decision scoring fixtures cover blinding, quality-first gates, three alternating pairs, retries, metrics, and cost thresholds"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl.6",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "U6 verification contract passes.",
+        "close_reason": "Decision scoring fixtures cover blinding, quality-first gates, three alternating pairs, retries, metrics, and cost thresholds",
+        "closed_at": "2026-07-15T12:44:44Z",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:27Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T12:14:26Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-6dl",
+            "issue_id": "ce-workflow-6dl.6",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Implement and verify U6 from the authoritative plan.",
+        "id": "ce-workflow-6dl.6",
+        "issue_type": "task",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "started_at": "2026-07-15T12:37:06Z",
+        "status": "closed",
+        "title": "U6: workflow evaluation harness",
+        "updated_at": "2026-07-15T12:44:44Z"
+      },
+      "notes": [],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-6dl",
+      "priority": 2,
+      "startedAt": "2026-07-15T12:37:06Z",
+      "status": "closed",
+      "title": "U6: workflow evaluation harness",
+      "type": "task",
+      "updatedAt": "2026-07-15T12:44:44Z"
+    },
+    "ce-workflow-6dl.7": {
+      "acceptance": "U7 verification contract passes.",
+      "closedAt": "2026-07-15T13:37:44Z",
+      "createdAt": "2026-07-15T09:14:30Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T12:14:30Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-6dl.7",
+          "metadata": "{}",
+          "toId": "ce-workflow-6dl",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Implement and verify U7 from the authoritative plan.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Calibration, SHA-bound human approvals, trigger classification, actual-handoff sentinel fixtures, and retained unavailable live evidence complete"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl.7",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "U7 verification contract passes.",
+        "close_reason": "Calibration, SHA-bound human approvals, trigger classification, actual-handoff sentinel fixtures, and retained unavailable live evidence complete",
+        "closed_at": "2026-07-15T13:37:44Z",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:30Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T12:14:30Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-6dl",
+            "issue_id": "ce-workflow-6dl.7",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Implement and verify U7 from the authoritative plan.",
+        "id": "ce-workflow-6dl.7",
+        "issue_type": "task",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "started_at": "2026-07-15T12:45:16Z",
+        "status": "closed",
+        "title": "U7: workflow evaluation harness",
+        "updated_at": "2026-07-15T13:37:44Z"
+      },
+      "notes": [],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-6dl",
+      "priority": 2,
+      "startedAt": "2026-07-15T12:45:16Z",
+      "status": "closed",
+      "title": "U7: workflow evaluation harness",
+      "type": "task",
+      "updatedAt": "2026-07-15T13:37:44Z"
+    },
+    "ce-workflow-6dl.8": {
+      "acceptance": "U8 verification contract passes.",
+      "createdAt": "2026-07-15T09:14:33Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T12:14:33Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-6dl.8",
+          "metadata": "{}",
+          "toId": "ce-workflow-6dl",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Implement and verify U8 from the authoritative plan.",
+      "documentLinks": {
+        "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      },
+      "evidence": [],
+      "executionMode": "auto",
+      "id": "ce-workflow-6dl.8",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "acceptance_criteria": "U8 verification contract passes.",
+        "comment_count": 0,
+        "created_at": "2026-07-15T09:14:33Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T12:14:33Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-6dl",
+            "issue_id": "ce-workflow-6dl.8",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Implement and verify U8 from the authoritative plan.",
+        "id": "ce-workflow-6dl.8",
+        "issue_type": "task",
+        "notes": "PAUSED by user. U1-U7 implemented and committed. U8 package/docs work is in progress with uncommitted review fixes. Latest full package verification passed before the newest manual-review hardening; focused RPC/runner/scorer/project tests also passed before final warning cleanup. Remaining: finish warning cleanup, rerun all deterministic gates + npm pack, complete manual requirement audit, commit/close U8 and epic. Live evidence is fail-closed: provider quota unavailable at C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-NRM6GM/smoke-1784122060301-13f1c18c/evidence.json; browser unavailable at C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-capabilities-65dCAH/capabilities.json.",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "spec_id": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "started_at": "2026-07-15T13:37:58Z",
+        "status": "in_progress",
+        "title": "U8: workflow evaluation harness",
+        "updated_at": "2026-07-15T15:01:36Z"
+      },
+      "notes": [
+        "PAUSED by user. U1-U7 implemented and committed. U8 package/docs work is in progress with uncommitted review fixes. Latest full package verification passed before the newest manual-review hardening; focused RPC/runner/scorer/project tests also passed before final warning cleanup. Remaining: finish warning cleanup, rerun all deterministic gates + npm pack, complete manual requirement audit, commit/close U8 and epic. Live evidence is fail-closed: provider quota unavailable at C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-NRM6GM/smoke-1784122060301-13f1c18c/evidence.json; browser unavailable at C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-capabilities-65dCAH/capabilities.json."
+      ],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-6dl",
+      "priority": 2,
+      "startedAt": "2026-07-15T13:37:58Z",
+      "status": "in_progress",
+      "title": "U8: workflow evaluation harness",
+      "type": "task",
+      "updatedAt": "2026-07-15T15:01:36Z"
+    },
+    "ce-workflow-dqh": {
+      "closedAt": "2026-07-15T08:11:03Z",
+      "createdAt": "2026-07-14T21:06:41Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Brainstorm workspace created by /work-brainstorm for: look at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance, accuracy and token usage. different modes, different agents we use (like own reviewer vs ce-code review agents, different thinking levels, etc).that system should be both simple enough to be fast to test ce-workflow and complex enough to actually test the full suite. the goal is to further optimize ce-workflow while ensuring it is still working great",
+      "evidence": [
+        {
+          "closeEvidence": "All brainstorm deliverables completed and verified"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-dqh",
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "close_reason": "All brainstorm deliverables completed and verified",
+        "closed_at": "2026-07-15T08:11:03Z",
+        "comment_count": 0,
+        "created_at": "2026-07-14T21:06:41Z",
+        "created_by": "Flex",
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Brainstorm workspace created by /work-brainstorm for: look at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance, accuracy and token usage. different modes, different agents we use (like own reviewer vs ce-code review agents, different thinking levels, etc).that system should be both simple enough to be fast to test ce-workflow and complex enough to actually test the full suite. the goal is to further optimize ce-workflow while ensuring it is still working great",
+        "id": "ce-workflow-dqh",
+        "issue_type": "epic",
+        "notes": "created by /work-brainstorm\nwo:brainstorm\nauto-created for standalone brainstorm\ntask: look at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance, accuracy and token usage. different modes, different agents we use (like own reviewer vs ce-code review agents, different thinking levels, etc).that system should be both simple enough to be fast to test ce-workflow and complex enough to actually test the full suite. the goal is to further optimize ce-workflow while ensuring it is still working great\nRole timeout guidance: prefer no explicit timeout; if one is required, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout as infrastructure failure evidence, not implementation failure.",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "status": "closed",
+        "title": "Brainstorm: look at this repo, clone it to temp and analyze + the description. the… [e3pzr1]",
+        "updated_at": "2026-07-15T08:11:03Z"
+      },
+      "notes": [
+        "created by /work-brainstorm\nwo:brainstorm\nauto-created for standalone brainstorm\ntask: look at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance, accuracy and token usage. different modes, different agents we use (like own reviewer vs ce-code review agents, different thinking levels, etc).that system should be both simple enough to be fast to test ce-workflow and complex enough to actually test the full suite. the goal is to further optimize ce-workflow while ensuring it is still working great\nRole timeout guidance: prefer no explicit timeout; if one is required, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout as infrastructure failure evidence, not implementation failure."
+      ],
+      "owner": "mailflex@gmail.com",
+      "priority": 2,
+      "status": "closed",
+      "title": "Brainstorm: look at this repo, clone it to temp and analyze + the description. the… [e3pzr1]",
+      "type": "epic",
+      "updatedAt": "2026-07-15T08:11:03Z"
+    },
+    "ce-workflow-dqh.1": {
+      "closedAt": "2026-07-15T08:10:07Z",
+      "createdAt": "2026-07-14T21:06:46Z",
+      "dependencies": [],
+      "dependencyEdges": [
+        {
+          "createdAt": "2026-07-15T00:06:46Z",
+          "createdBy": "Flex",
+          "fromId": "ce-workflow-dqh.1",
+          "metadata": "{}",
+          "toId": "ce-workflow-dqh",
+          "type": "parent-child"
+        }
+      ],
+      "description": "Idea created by /work-brainstorm.\n\nFull brainstorm request:\nlook at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance, accuracy and token usage. different modes, different agents we use (like own reviewer vs ce-code review agents, different thinking levels, etc).that system should be both simple enough to be fast to test ce-workflow and complex enough to actually test the full suite. the goal is to further optimize ce-workflow while ensuring it is still working great",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "executionMode": "auto",
+      "id": "ce-workflow-dqh.1",
+      "ideaLineage": {
+        "action": "selected-brainstorm",
+        "brainstorm-path": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "brainstormed-at": "2026-07-15T06:36:34.585Z",
+        "schema": "1",
+        "status": "discussed"
+      },
+      "labels": [],
+      "legacy": {
+        "_type": "issue",
+        "close_reason": "Completed by coded inline work path",
+        "closed_at": "2026-07-15T08:10:07Z",
+        "comment_count": 0,
+        "created_at": "2026-07-14T21:06:46Z",
+        "created_by": "Flex",
+        "dependencies": [
+          {
+            "created_at": "2026-07-15T00:06:46Z",
+            "created_by": "Flex",
+            "depends_on_id": "ce-workflow-dqh",
+            "issue_id": "ce-workflow-dqh.1",
+            "metadata": "{}",
+            "type": "parent-child"
+          }
+        ],
+        "dependency_count": 0,
+        "dependent_count": 0,
+        "description": "Idea created by /work-brainstorm.\n\nFull brainstorm request:\nlook at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance, accuracy and token usage. different modes, different agents we use (like own reviewer vs ce-code review agents, different thinking levels, etc).that system should be both simple enough to be fast to test ce-workflow and complex enough to actually test the full suite. the goal is to further optimize ce-workflow while ensuring it is still working great",
+        "id": "ce-workflow-dqh.1",
+        "issue_type": "task",
+        "notes": "wo:idea schema=1 status=discussed\nBrainstorm critic gate (bead-advisor) reviewed `docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md` and returned CONCERNS. Concrete findings: define positive cost thresholds and missing-metric outcomes; require every baseline/candidate sample to pass hard gates; define paired-run order/isolation/retry rules; version rubric anchors, critical dimensions, ties, and evaluator failures; fingerprint all non-factor settings and reject undeclared/no-op deltas; make project contracts and golden approvals testable and non-leaking; make full-pipeline sentinel triggers mandatory; require explicit per-depth time/token budgets. Artifact revised to address all eight findings in R1-R31 and AE1-AE10. First advisor output: `C:/tmp/compound-engineering/ce-brainstorm/workflow-eval-e3pzr1/advisor.md`.\nwo:idea status=discussed action=selected-brainstorm brainstorm-path=docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md brainstormed-at=2026-07-15T06:36:34.585Z\nBrainstorm critic gate rerun: bead-advisor CLEAN. Prior eight concerns are resolved by R1-R31 and AE1-AE10; no brainstorm-level blocking gaps remain. Evidence: C:/tmp/compound-engineering/ce-brainstorm/workflow-eval-e3pzr1/advisor-rerun.md\nwo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed\nwo:review PASS - existing bead-advisor rerun returned CLEAN after all eight concerns were resolved; evidence: C:/tmp/compound-engineering/ce-brainstorm/workflow-eval-e3pzr1/advisor-rerun.md\nwo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed",
+        "owner": "mailflex@gmail.com",
+        "priority": 2,
+        "status": "closed",
+        "title": "look at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance… [e3pzr1]",
+        "updated_at": "2026-07-15T08:10:07Z"
+      },
+      "notes": [
+        "wo:idea schema=1 status=discussed\nBrainstorm critic gate (bead-advisor) reviewed `docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md` and returned CONCERNS. Concrete findings: define positive cost thresholds and missing-metric outcomes; require every baseline/candidate sample to pass hard gates; define paired-run order/isolation/retry rules; version rubric anchors, critical dimensions, ties, and evaluator failures; fingerprint all non-factor settings and reject undeclared/no-op deltas; make project contracts and golden approvals testable and non-leaking; make full-pipeline sentinel triggers mandatory; require explicit per-depth time/token budgets. Artifact revised to address all eight findings in R1-R31 and AE1-AE10. First advisor output: `C:/tmp/compound-engineering/ce-brainstorm/workflow-eval-e3pzr1/advisor.md`.\nwo:idea status=discussed action=selected-brainstorm brainstorm-path=docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md brainstormed-at=2026-07-15T06:36:34.585Z\nBrainstorm critic gate rerun: bead-advisor CLEAN. Prior eight concerns are resolved by R1-R31 and AE1-AE10; no brainstorm-level blocking gaps remain. Evidence: C:/tmp/compound-engineering/ce-brainstorm/workflow-eval-e3pzr1/advisor-rerun.md\nwo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed\nwo:review PASS - existing bead-advisor rerun returned CLEAN after all eight concerns were resolved; evidence: C:/tmp/compound-engineering/ce-brainstorm/workflow-eval-e3pzr1/advisor-rerun.md\nwo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "owner": "mailflex@gmail.com",
+      "parentId": "ce-workflow-dqh",
+      "priority": 2,
+      "reviewResult": "PASS",
+      "status": "closed",
+      "title": "look at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance… [e3pzr1]",
+      "type": "task",
+      "updatedAt": "2026-07-15T08:10:07Z",
+      "verificationSummary": {
+        "result": "PASS",
+        "source": "legacy-note"
+      }
+    }
+  },
+  "metadata": {
+    "migratedFrom": "beads",
+    "migration": {
+      "exportedAt": "2026-07-15T22:09:39.335Z",
+      "recordCount": 11,
+      "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
+    }
+  },
+  "schemaVersion": 1
+}

@@ -33,6 +33,18 @@ import {
 	readCandidateState,
 	selectCandidate,
 } from "./work-improvement.js";
+import { migrateLegacyBeads } from "./legacy-beads-migration.js";
+import {
+	appendWorkNote,
+	createWorkItem,
+	initStore,
+	loadStore,
+	mutateStore,
+	readyWorkItems,
+	storePath,
+	updateWorkItem,
+	WorkStoreError,
+} from "./work-store.js";
 
 const CONFIG_DIR_NAME = ".pi";
 const TELEMETRY_DIR_NAME = "work-runs";
@@ -45,7 +57,7 @@ const DEFAULT_THINKING = "__default_thinking__";
 const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
-const BEAD_TITLE_MAX = 180;
+const WORK_ITEM_TITLE_MAX = 180;
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
 const WORKFLOW_REPO_DIR = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -92,35 +104,35 @@ const SLOTS = [
 	{
 		key: "plan",
 		label: "brainstorm/plan/migration",
-		agents: ["bead-planner", "bead-migrator"],
+		agents: ["work-planner", "work-migrator"],
 		defaultThinking: "high",
-		description: "Creating or importing epics and slicing executable Beads",
+		description: "Creating or importing epics and slicing executable native work-item store",
 	},
 	{
 		key: "work",
 		label: "work",
-		agents: ["bead-worker", "bead-fixer"],
+		agents: ["work-worker", "work-fixer"],
 		defaultThinking: "medium",
 		description: "Implementation and reviewer-requested fixes",
 	},
 	{
 		key: "debug",
 		label: "debug",
-		agents: ["bead-debugger"],
+		agents: ["work-debugger"],
 		defaultThinking: "high",
 		description: "Root-cause investigation and bug fixes",
 	},
 	{
 		key: "review",
 		label: "review",
-		agents: ["bead-reviewer"],
+		agents: ["work-reviewer"],
 		defaultThinking: "medium",
 		description: "Read-only diff/acceptance/verification review",
 	},
 	{
 		key: "advisor",
 		label: "advisor (critic)",
-		agents: ["bead-advisor"],
+		agents: ["work-advisor"],
 		defaultThinking: "xhigh",
 		description:
 			"Optional critic for plans/brainstorms and task-vs-plan verification; defaults to inherit model with xhigh effort",
@@ -128,7 +140,7 @@ const SLOTS = [
 	{
 		key: "advisorBackup",
 		label: "advisor backup",
-		agents: ["bead-advisor-backup"],
+		agents: ["work-advisor-backup"],
 		defaultThinking: "medium",
 		description:
 			"Lower-cost fallback critic when the primary advisor model is unavailable",
@@ -229,7 +241,7 @@ const WORK_ORCH_CRITIC_KEYS = ["brainstorm", "plan"];
 const REVIEW_LEVELS = ["off", "light", "full"];
 const REVIEW_LEVEL_DESC = {
 	off: "no pre-commit review (low profile)",
-	light: "one bead-reviewer pass on the scoped diff (medium/high)",
+	light: "one work-reviewer pass on the scoped diff (medium/high)",
 	full: "full ce-code-review skill on the slice diff (max)",
 };
 const SUBMENU_ARROW = "›";
@@ -503,7 +515,7 @@ function rememberedWorkflowEpic(cwd) {
 	const id = readWorkState(cwd).lastEpicId;
 	if (!id) return undefined;
 	try {
-		const epic = one(bdJsonRequired(cwd, ["show", id]));
+		const epic = readWorkItem(cwd, id);
 		if (epic && typeOf(epic) === "epic" && statusOf(epic) !== "closed")
 			return epic;
 	} catch {
@@ -589,8 +601,8 @@ function stateTelemetry(state) {
 		reason: state?.reason,
 		stopReason: stopReason(state),
 		epicId: state?.epic?.id,
-		beadId: state?.selectedBead?.id ?? state?.bead?.id,
-		beadType: state?.selectedBead?.type ?? state?.bead?.type,
+		workItemId: state?.selectedWorkItem?.id ?? state?.workItem?.id,
+		workItemType: state?.selectedWorkItem?.type ?? state?.workItem?.type,
 		handoff: {
 			queued: handoffQueued,
 			started: false,
@@ -610,7 +622,7 @@ function stateTelemetry(state) {
 function telemetryFingerprint(event) {
 	if (process.env.WORK_ORCH_TELEMETRY_DEDUPE_OFF === "1") return "";
 	if (event.type === "large-task-read")
-		return [event.type, event.command ?? "", event.beadId ?? ""].join("\u001f");
+		return [event.type, event.command ?? "", event.workItemId ?? ""].join("\u001f");
 	if (
 		event.type !== "command" ||
 		event.command !== "work-resume" ||
@@ -622,7 +634,7 @@ function telemetryFingerprint(event) {
 		event.command,
 		event.action,
 		event.epicId ?? event.meta?.epicId ?? "",
-		event.beadId ?? event.meta?.beadId ?? "",
+		event.workItemId ?? event.meta?.workItemId ?? "",
 		event.reason ?? "",
 	].join("\u001f");
 }
@@ -1075,7 +1087,7 @@ function reconcilePendingDirectRuns(cwd, runtime = {}) {
 					action: run.action,
 					role: handoffRole(run.agent ?? run.action),
 					epicId: run.epicId,
-					beadId: run.beadId,
+					workItemId: run.workItemId,
 					ok,
 					handoff: { queued: false, started: true, role: run.agent },
 					tools: [
@@ -1090,7 +1102,7 @@ function reconcilePendingDirectRuns(cwd, runtime = {}) {
 						outcome: ok ? "completed" : "failed",
 						action: run.action,
 						epicId: run.epicId,
-						beadId: run.beadId,
+						workItemId: run.workItemId,
 					},
 					runtime,
 				);
@@ -1155,13 +1167,13 @@ function selfImprovementHistoryEnabled(ctx) {
 function historyTaskFromText(value) {
 	const text = String(value ?? "");
 	const labeled = text.match(
-		/(?:Target Bead ID|Selected Bead|Target|Bead ID|bead)\s*:\s*([^\s]+)/i,
+		/(?:Target WorkItem ID|Selected WorkItem|Target|WorkItem ID|workItem)\s*:\s*([^\s]+)/i,
 	)?.[1];
-	const beadId = labeled && labeled !== "none" ? labeled : undefined;
+	const workItemId = labeled && labeled !== "none" ? labeled : undefined;
 	return {
 		key:
-			beadId ?? text.match(/\b[A-Za-z][A-Za-z0-9_.-]*-\d+\b/)?.[0] ?? "session",
-		beadId,
+			workItemId ?? text.match(/\b[A-Za-z][A-Za-z0-9_.-]*-\d+\b/)?.[0] ?? "session",
+		workItemId,
 	};
 }
 
@@ -1170,7 +1182,7 @@ function selfImprovementHistoryTask(event) {
 	const fallback = activeHistoryTask ?? historyTaskFromText(event?.prompt);
 	const goal = activeWorkGoal;
 	const key =
-		meta.beadId ??
+		meta.workItemId ??
 		meta.epicId ??
 		fallback.key ??
 		(goal ? `${goal.mode}-${goal.id}` : "session");
@@ -1179,7 +1191,7 @@ function selfImprovementHistoryTask(event) {
 		mode: meta.mode ?? goal?.mode,
 		action: meta.action,
 		epicId: meta.epicId,
-		beadId: meta.beadId ?? fallback.beadId,
+		workItemId: meta.workItemId ?? fallback.workItemId,
 		goalId: goal?.id,
 		objective: goal?.objective,
 	};
@@ -1229,8 +1241,8 @@ function recordSelfImprovementHistory(ctx, type, event = {}) {
 	}
 }
 
-function appendTelemetryNote(cwd, beadId, event, file) {
-	if (!beadId || process.env.WORK_ORCH_TELEMETRY_NOTES !== "1") return;
+function appendTelemetryNote(cwd, workItemId, event, file) {
+	if (!workItemId || process.env.WORK_ORCH_TELEMETRY_NOTES !== "1") return;
 	const parts = [
 		`telemetry: run=${event.id} type=${event.type} phase=${event.phase ?? event.command ?? event.mode ?? "work"} duration=${formatDuration(event.durationMs ?? 0)}`,
 	];
@@ -1239,7 +1251,7 @@ function appendTelemetryNote(cwd, beadId, event, file) {
 		parts.push(`context_after=${event.context.after.tokens}`);
 	if (file) parts.push(`artifact=${file}`);
 	try {
-		appendBeadNote(cwd, beadId, parts.join(" "));
+		appendWorkflowWorkItemNote(cwd, workItemId, parts.join(" "));
 	} catch {
 		// Telemetry must never block work execution.
 	}
@@ -1255,13 +1267,13 @@ function parseWorkPromptMeta(prompt) {
 			?.slice(label.length + 1)
 			.trim();
 	const epic = line("Epic") ?? "";
-	const selected = line("Selected Bead") ?? "";
-	const target = line("Target Bead ID") ?? line("Target") ?? "";
+	const selected = line("Selected WorkItem") ?? "";
+	const target = line("Target WorkItem ID") ?? line("Target") ?? "";
 	const epicId = epic.match(/^([^\s]+)/)?.[1];
 	const selectedId = selected.match(/^([^\s]+)/)?.[1];
-	let beadId;
-	if (target && target !== "none") beadId = target;
-	else if (selectedId && !selectedId.startsWith("none")) beadId = selectedId;
+	let workItemId;
+	if (target && target !== "none") workItemId = target;
+	else if (selectedId && !selectedId.startsWith("none")) workItemId = selectedId;
 	const inlineLevel = text.match(
 		/WO_INLINE_V1: complete this (small|medium)/,
 	)?.[1];
@@ -1271,7 +1283,7 @@ function parseWorkPromptMeta(prompt) {
 		activity: line("Activity"),
 		action: line("Action"),
 		epicId: epicId === "none" ? undefined : epicId,
-		beadId,
+		workItemId,
 		inlineWork: Boolean(inlineLevel),
 		inlineLevel,
 		fastSmall: inlineLevel === "small",
@@ -1340,7 +1352,7 @@ function failedSubagents(tools = []) {
 }
 
 function finalTextIndicatesRecoveredWork(text) {
-	return /\b(Outcome:\s*PASS|Review:\s*PASS|Planning boundary complete|Done and pushed|Committed and pushed|Closed (?:Bead|planning Bead)|Created next ready Bead)\b/i.test(
+	return /\b(Outcome:\s*PASS|Review:\s*PASS|Planning boundary complete|Done and pushed|Committed and pushed|Closed (?:WorkItem|planning WorkItem)|Created next ready WorkItem)\b/i.test(
 		text,
 	);
 }
@@ -1394,15 +1406,15 @@ function failureStatusNote(run, event, telemetry, file) {
 					`subagent: ${item.agent} status=${item.status}${item.artifact ? ` artifact=${item.artifact}` : ""}`,
 			),
 		...latestMessageExcerpts(event.messages).map((line) => `latest: ${line}`),
-		run.meta.beadId ? `next: /work-report ${run.meta.beadId}` : "",
+		run.meta.workItemId ? `next: /work-report ${run.meta.workItemId}` : "",
 	];
 	return lines.filter(Boolean).join("\n");
 }
 
-function appendFailureStatusNote(cwd, beadId, run, event, telemetry, file) {
-	if (!beadId || !hasWorkAgentFailure(event, telemetry)) return;
+function appendFailureStatusNote(cwd, workItemId, run, event, telemetry, file) {
+	if (!workItemId || !hasWorkAgentFailure(event, telemetry)) return;
 	try {
-		appendBeadNote(cwd, beadId, failureStatusNote(run, event, telemetry, file));
+		appendWorkflowWorkItemNote(cwd, workItemId, failureStatusNote(run, event, telemetry, file));
 	} catch {
 		// Failure-status capture must never mask the original task result.
 	}
@@ -1521,7 +1533,7 @@ function toolKind(name, args) {
 		return "test";
 	if (/\b(smoke_|smoke-|adb|emulator|powershell|pwsh)\b/.test(command))
 		return "live-smoke";
-	if (/\b(git|bd)\b/.test(command)) return "state";
+	if (/\bgit\b/.test(command)) return "state";
 	return "shell";
 }
 
@@ -1611,7 +1623,7 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 			};
 			const file = recordWorkTelemetry(ctx.cwd, event);
 			if (note && state?.handoffPrompt)
-				appendTelemetryNote(ctx.cwd, summary.beadId, event, file);
+				appendTelemetryNote(ctx.cwd, summary.workItemId, event, file);
 			const awaitingAgent =
 				Boolean(state?.handoffPrompt) &&
 				!state?.handoffFailed &&
@@ -1628,7 +1640,7 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 						outcome: event.ok ? "completed" : "failed",
 						action: summary.action,
 						epicId: summary.epicId,
-						beadId: summary.beadId,
+						workItemId: summary.workItemId,
 					},
 					{
 						pi: workExtensionPi,
@@ -1686,14 +1698,14 @@ function matchesTelemetryScope(event, { scope, value }) {
 	if (scope === "all") return true;
 	if (scope === "epic")
 		return event.epicId === value || event.meta?.epicId === value;
-	if (scope === "bead" || scope === "task")
-		return event.beadId === value || event.meta?.beadId === value;
+	if (scope === "workItem" || scope === "task")
+		return event.workItemId === value || event.meta?.workItemId === value;
 	if (scope.includes("-"))
 		return (
 			event.epicId === scope ||
-			event.beadId === scope ||
+			event.workItemId === scope ||
 			event.meta?.epicId === scope ||
-			event.meta?.beadId === scope
+			event.meta?.workItemId === scope
 		);
 	return event.timestamp?.slice(0, 10) === scope;
 }
@@ -1747,7 +1759,7 @@ function summarizeTelemetryEvent(event) {
 		stopReason: event.stopReason,
 		handoff: event.handoff,
 		epicId: event.epicId,
-		beadId: event.beadId ?? event.meta?.beadId,
+		workItemId: event.workItemId ?? event.meta?.workItemId,
 		durationMs: event.durationMs,
 		usage: event.usage,
 		messages: event.messages,
@@ -1766,7 +1778,7 @@ function buildWorkTelemetryState(cwd, args = "") {
 		matchesTelemetryScope(event, filter),
 	);
 	const byPhase = new Map();
-	const byBead = new Map();
+	const byWorkItem = new Map();
 	const totals = {
 		durationMs: 0,
 		tokens: 0,
@@ -1853,8 +1865,8 @@ function buildWorkTelemetryState(cwd, args = "") {
 				.join("/"),
 			event,
 		);
-		const bead = event.beadId ?? event.meta?.beadId;
-		if (bead) addMetric(byBead, bead, event);
+		const workItem = event.workItemId ?? event.meta?.workItemId;
+		if (workItem) addMetric(byWorkItem, workItem, event);
 	}
 	return {
 		ok: true,
@@ -1872,7 +1884,7 @@ function buildWorkTelemetryState(cwd, args = "") {
 			(a, b) => b.durationMs - a.durationMs,
 		),
 		byPhase: [...byPhase.values()].sort((a, b) => b.durationMs - a.durationMs),
-		byBead: [...byBead.values()].sort((a, b) => b.durationMs - a.durationMs),
+		byWorkItem: [...byWorkItem.values()].sort((a, b) => b.durationMs - a.durationMs),
 		outputWaste: optimizationTelemetry(events),
 		improvement: improvementStatus(cwd),
 		slowest: [...events]
@@ -1928,8 +1940,8 @@ function renderWorkTelemetryText(state) {
 		"By phase:",
 		...renderMetricRows(state.byPhase),
 		"",
-		"By Bead:",
-		...renderMetricRows(state.byBead),
+		"By WorkItem:",
+		...renderMetricRows(state.byWorkItem),
 		"",
 		"Output waste:",
 		...(state.outputWaste?.largeOutputs?.length
@@ -1944,7 +1956,7 @@ function renderWorkTelemetryText(state) {
 		"Slowest:",
 		...(state.slowest.length
 			? state.slowest.map((event) =>
-					`- ${event.id} ${event.type}/${event.command ?? event.mode ?? "agent"}/${event.action ?? ""}: ${formatDuration(event.durationMs)} ${event.beadId ?? event.meta?.beadId ?? ""}`.trim(),
+					`- ${event.id} ${event.type}/${event.command ?? event.mode ?? "agent"}/${event.action ?? ""}: ${formatDuration(event.durationMs)} ${event.workItemId ?? event.meta?.workItemId ?? ""}`.trim(),
 				)
 			: ["- none"]),
 		"",
@@ -2019,8 +2031,8 @@ function usageScope(cwd, args = "") {
 
 function reviewTelemetry(meta = {}, event = {}) {
 	const review = event.review ?? event.reviewOutcome;
-	const scope = meta.beadId
-		? `bead ${meta.beadId}`
+	const scope = meta.workItemId
+		? `workItem ${meta.workItemId}`
 		: meta.epicId
 			? `diff for epic ${meta.epicId}`
 			: "current diff";
@@ -2107,7 +2119,7 @@ function usageEventRows(events) {
 			return {
 				id: event.id ?? "unknown",
 				timestamp: event.timestamp ?? "unknown",
-				task: event.beadId ?? event.meta?.beadId ?? "unknown",
+				task: event.workItemId ?? event.meta?.workItemId ?? "unknown",
 				agent:
 					event.type === "agent"
 						? (event.mode ?? "agent")
@@ -2508,18 +2520,18 @@ function setWorkResumeBoolean(settings, key, value) {
 // ponytail: settings are prompt-live; the steps below are appended to the
 // role/plan/brainstorm/finish handoff prompts so the advisor actually runs.
 function advisorFallbackText() {
-	return "If bead-advisor is unavailable, usage-limited, or fails to start, run bead-advisor-backup once instead; do not wait or retry the primary.";
+	return "If work-advisor is unavailable, usage-limited, or fails to start, run work-advisor-backup once instead; do not wait or retry the primary.";
 }
 
 function advisorCriticStep(target) {
 	return [
-		`Advisor critic gate (read-only): launch the bead-advisor subagent (agent: "bead-advisor", context: fresh) on the ${target} to hunt weak or missing requirements, unverified acceptance, incomplete decisions, ambiguous scope, and untested assumptions. ${advisorFallbackText()} Record concrete findings as notes on the relevant Bead; convert any blocking gap into a decision/blocker Bead under the epic before proceeding. Skip if the ${target} is trivial and obviously complete.`,
+		`Advisor critic gate (read-only): launch the work-advisor subagent (agent: "work-advisor", context: fresh) on the ${target} to hunt weak or missing requirements, unverified acceptance, incomplete decisions, ambiguous scope, and untested assumptions. ${advisorFallbackText()} Record concrete findings as notes on the relevant WorkItem; convert any blocking gap into a decision/blocker WorkItem under the epic before proceeding. Skip if the ${target} is trivial and obviously complete.`,
 	].join("\n");
 }
 
 function advisorVerifyStep() {
 	return [
-		"Coded task-verification checklist: once a slice is implemented and self-verified but before finish, compare the Bead notes/diff against the epic plan's acceptance and implementation unit yourself. Append a compact Bead note headed `wo:verify-check` with: plan match, acceptance covered, verification command/proof, known gaps/waivers. Do not launch bead-advisor unless the plan or evidence is ambiguous after this checklist.",
+		"Coded task-verification checklist: once a slice is implemented and self-verified but before finish, compare the WorkItem notes/diff against the epic plan's acceptance and implementation unit yourself. Append a compact WorkItem note headed `wo:verify-check` with: plan match, acceptance covered, verification command/proof, known gaps/waivers. Do not launch work-advisor unless the plan or evidence is ambiguous after this checklist.",
 	].join("\n");
 }
 
@@ -2533,7 +2545,7 @@ function hasSlicePlan(issue) {
 function issueRefText(issue) {
 	const summary = issueRef(issue);
 	return (
-		[summary.id, summary.title].filter(Boolean).join(" — ") || "unknown Bead"
+		[summary.id, summary.title].filter(Boolean).join(" — ") || "unknown WorkItem"
 	);
 }
 
@@ -2550,17 +2562,17 @@ function inlineSlicePlanNote(issue, state, cwd) {
 		"wo:slice-plan",
 		`plan-path: ${plan}`,
 		`target: ${issueRefText(issue)}`,
-		"approach: implement the Bead's acceptance with the smallest localized diff; reuse existing helpers before adding code.",
-		"likely files: derive from the Bead notes/design before editing; do not broaden scope.",
-		"verification: run the Bead's named check, or the smallest focused command that proves the acceptance.",
-		"risks/out-of-scope: create a blocker Bead instead of guessing when acceptance, hardware/live proof, or ownership is unclear.",
+		"approach: implement the WorkItem's acceptance with the smallest localized diff; reuse existing helpers before adding code.",
+		"likely files: derive from the WorkItem notes/design before editing; do not broaden scope.",
+		"verification: run the WorkItem's named check, or the smallest focused command that proves the acceptance.",
+		"risks/out-of-scope: create a blocker WorkItem instead of guessing when acceptance, hardware/live proof, or ownership is unclear.",
 	].join("\n");
 }
 
 function applyInlineSlicePlan(cwd, state, issue) {
 	try {
 		const plan = inlineSlicePlanNote(issue, state, cwd);
-		run(cwd, "bd", ["update", idOf(issue), "--append-notes", plan]);
+		appendWorkflowWorkItemNote(cwd, idOf(issue), plan);
 		const planned = {
 			...issue,
 			labels: [...new Set([...labelsOf(issue), "wo:slice-planned"])],
@@ -2571,7 +2583,7 @@ function applyInlineSlicePlan(cwd, state, issue) {
 				{
 					...state,
 					action: "run-implementation",
-					selectedBead: issueSummary(planned),
+					selectedWorkItem: issueSummary(planned),
 					message:
 						"Added coded slice-plan note and continued directly to implementation; no planner boundary needed.",
 				},
@@ -2586,7 +2598,7 @@ function applyInlineSlicePlan(cwd, state, issue) {
 			{
 				...state,
 				action: "slice-plan-stop",
-				selectedBead: issueSummary(issue),
+				selectedWorkItem: issueSummary(issue),
 			},
 		);
 	}
@@ -2594,8 +2606,8 @@ function applyInlineSlicePlan(cwd, state, issue) {
 
 function cePlanSliceStep(issue, cwd, masterPlanPath, depth = "Lightweight") {
 	const scopeLine = masterPlanPath
-		? `Scope: this Bead's acceptance/design plus the matching Implementation Unit from ${relative(cwd, masterPlanPath)}.`
-		: `Scope: this Bead's acceptance/design and notes.`;
+		? `Scope: this WorkItem's acceptance/design plus the matching Implementation Unit from ${relative(cwd, masterPlanPath)}.`
+		: `Scope: this WorkItem's acceptance/design and notes.`;
 	const depthLine =
 		depth === "Deep"
 			? "Use Deep depth for the full ce-plan research/deepening pass."
@@ -2603,17 +2615,17 @@ function cePlanSliceStep(issue, cwd, masterPlanPath, depth = "Lightweight") {
 				? "Use Standard depth (ce-plan's normal tier) so flow analysis runs without Deep extensions."
 				: "Use Lightweight depth so ce-plan skips flow analysis and external research when local patterns are strong.";
 	return [
-		`Slice-planning pass (ce-plan) before implementation: target ${issueRefText(issue)} already exists as executable work. Do not create child Beads and do not dispatch bead-planner.`,
+		`Slice-planning pass (ce-plan) before implementation: target ${issueRefText(issue)} already exists as executable work. Do not create child native work-item store and do not dispatch work-planner.`,
 		scopeLine,
 		`Invoke the ce-plan skill in the control session on this slice to produce a compact plan doc at docs/plans/YYYY-MM-DD-NNN-slice-${safeArtifactPart(idOf(issue))}-plan.md with a single Implementation Unit (Goal, Files, Approach, Test scenarios, Verification). ${depthLine}`,
-		`Then append a Bead note headed \`wo:slice-plan\` containing \`plan-path: <repo-relative plan doc path>\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the Bead title.`,
+		`Then append a WorkItem note headed \`wo:slice-plan\` containing \`plan-path: <repo-relative plan doc path>\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the WorkItem title.`,
 	].join("\n");
 }
 
 function codeReviewBeforeCommitStep(level) {
 	if (level === "light")
-		return "Pre-commit review gate (light): before committing, launch exactly one bead-reviewer on the scoped slice diff and persist its PASS evidence, then commit and close the Bead. If it reports blocking findings, run one bead-fixer pass and re-review; never skip review silently.";
-	return "Pre-commit code-review gate: before committing, run the full ce-code-review skill on the current diff for this slice. Resolve any blocking findings (or record an explicit user waiver) before the committer commits and closes the Bead.";
+		return "Pre-commit review gate (light): before committing, launch exactly one work-reviewer on the scoped slice diff and persist its PASS evidence, then commit and close the WorkItem. If it reports blocking findings, run one work-fixer pass and re-review; never skip review silently.";
+	return "Pre-commit code-review gate: before committing, run the full ce-code-review skill on the current diff for this slice. Resolve any blocking findings (or record an explicit user waiver) before the committer commits and closes the WorkItem.";
 }
 
 function simplifyBeforeReviewStep() {
@@ -2879,13 +2891,13 @@ function truncate(value, max = 800) {
 	return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-function compactBeadTitle(value) {
-	return truncate(value, BEAD_TITLE_MAX);
+function compactWorkItemTitle(value) {
+	return truncate(value, WORK_ITEM_TITLE_MAX);
 }
 
-function appendOriginalBeadTitle(notes, originalTitle) {
+function appendOriginalWorkItemTitle(notes, originalTitle) {
 	const title = String(originalTitle ?? "").trim();
-	if (title.length <= BEAD_TITLE_MAX || String(notes ?? "").includes(title))
+	if (title.length <= WORK_ITEM_TITLE_MAX || String(notes ?? "").includes(title))
 		return notes;
 	return [notes, `Full title/request:\n${title}`].filter(Boolean).join("\n\n");
 }
@@ -3018,7 +3030,7 @@ function instantSummary(preparation, customInstructions = "") {
 	const previous = truncate(preparation.previousSummary ?? "", 1_500);
 	const summary = [
 		"## Work-orchestrator instant compaction",
-		"Assistant reasoning and full tool results were intentionally dropped; Beads, git, and files are the source of truth.",
+		"Assistant reasoning and full tool results were intentionally dropped; native work-item store, git, and files are the source of truth.",
 		customInstructions
 			? `\n## Instructions\n${truncate(customInstructions, 1_000)}`
 			: "",
@@ -3035,7 +3047,7 @@ function instantSummary(preparation, customInstructions = "") {
 		files.modified.length
 			? `\n<modified-files>\n${files.modified.join("\n")}\n</modified-files>`
 			: "",
-		"\n## Next recovery step\nRun `/work-status` or `bd ready --json`, then continue with `/work-resume`.",
+		"\n## Next recovery step\nRun `/work-status` or `node scripts/work-helper.mjs work-ready-summary`, then continue with `/work-resume`.",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -3072,7 +3084,7 @@ function maybeCompact(ctx, settings, reason) {
 	contextCompactState.inFlight = true;
 	contextCompactState.requested = true;
 	ctx.compact({
-		customInstructions: `work-orchestrator proactive ${reason}: preserve goals, Beads/git state, file changes, blockers, and next command; omit reasoning and full tool logs.`,
+		customInstructions: `work-orchestrator proactive ${reason}: preserve goals, native work-item store/git state, file changes, blockers, and next command; omit reasoning and full tool logs.`,
 		onComplete: () => {
 			contextCompactState.inFlight = false;
 			contextCompactState.requested = false;
@@ -3095,67 +3107,19 @@ function nodeScript(value) {
 	return /\.[cm]?js$/i.test(value ?? "");
 }
 
-function pathEntries() {
-	return (process.env.PATH ?? "").split(delimiter).filter(Boolean);
-}
-
-function windowsBeadsBinScript(command, override) {
-	if (process.platform !== "win32" || command !== "bd") return undefined;
-	const dirs = override ? [dirname(resolve(override))] : pathEntries();
-	for (const dir of dirs) {
-		const script = join(dir, "node_modules", "@beads", "bd", "bin", "bd.js");
-		if (existsSync(script)) return script;
-	}
-	return undefined;
-}
-
 function run(cwd, command, args) {
-	let override;
-	if (command === "bd") override = process.env.WORK_ORCH_BD_BIN;
-	else if (command === "git") override = process.env.WORK_ORCH_GIT_BIN;
-	const script = nodeScript(override)
-		? override
-		: windowsBeadsBinScript(command, override);
-	const actualCommand = script ? process.execPath : (override ?? command);
-	const actualArgs = script ? [script, ...args] : args;
-	try {
-		return execFileSync(actualCommand, actualArgs, {
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
-		}).trimEnd();
-	} catch (error) {
-		throw error;
-	}
+	const override = command === "git" ? process.env.WORK_ORCH_GIT_BIN : undefined;
+	const script = nodeScript(override) ? override : undefined;
+	return execFileSync(script ? process.execPath : (override ?? command), script ? [script, ...args] : args, {
+		cwd,
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+	}).trimEnd();
 }
 
 const LARGE_OUTPUT_THRESHOLD = 10_000;
 const BOUNDED_OUTPUT_CAP = 10_000;
 const TASK_RAW_THRESHOLD = 10_000;
-const BD_JSON_CACHE_MAX = 80;
-const bdJsonCache = new Map();
-
-function beadsDbSignature(cwd) {
-	const file = join(cwd, ".beads", "issues.jsonl");
-	try {
-		const stat = statSync(file);
-		return `${stat.mtimeMs}:${stat.size}`;
-	} catch {
-		return undefined;
-	}
-}
-
-function bdJsonCacheKey(cwd, args) {
-	const signature = beadsDbSignature(cwd);
-	return signature ? JSON.stringify([resolve(cwd), signature, args]) : "";
-}
-
-function rememberBdJson(key, value) {
-	if (bdJsonCache.size >= BD_JSON_CACHE_MAX)
-		bdJsonCache.delete(bdJsonCache.keys().next().value);
-	bdJsonCache.set(key, value);
-	return value;
-}
 
 function artifactPath(cwd, group, prefix, ext = "txt") {
 	const dir = join(telemetryDir(cwd), group);
@@ -3192,12 +3156,8 @@ function commandSignature(command, args = []) {
 }
 
 function runBounded(cwd, command, args = [], options = {}) {
-	let override;
-	if (command === "bd") override = process.env.WORK_ORCH_BD_BIN;
-	else if (command === "git") override = process.env.WORK_ORCH_GIT_BIN;
-	const script = nodeScript(override)
-		? override
-		: windowsBeadsBinScript(command, override);
+	const override = command === "git" ? process.env.WORK_ORCH_GIT_BIN : undefined;
+	const script = nodeScript(override) ? override : undefined;
 	const actualCommand = script ? process.execPath : (override ?? command);
 	const actualArgs = script ? [script, ...args] : args;
 	let stdout = "";
@@ -3287,7 +3247,7 @@ function compactTaskSummary(issue, options = {}) {
 }
 
 function workflowTaskSummary(cwd, taskId, options = {}) {
-	const issue = one(bdJsonRequired(cwd, ["show", taskId]));
+	const issue = readWorkItem(cwd, taskId);
 	const raw = JSON.stringify(issue, null, "\t");
 	const summary = compactTaskSummary(issue, options);
 	if (options.full || raw.length > TASK_RAW_THRESHOLD) {
@@ -3301,7 +3261,7 @@ function workflowTaskSummary(cwd, taskId, options = {}) {
 		if (raw.length > TASK_RAW_THRESHOLD)
 			recordWorkTelemetry(cwd, {
 				type: "large-task-read",
-				beadId: taskId,
+				workItemId: taskId,
 				ok: true,
 				outputChars: raw.length,
 				threshold: TASK_RAW_THRESHOLD,
@@ -3469,29 +3429,31 @@ function searchSummary(cwd, query, paths = ["."], options = {}) {
 }
 
 function prepareTaskExportForGate(cwd, taskIds = []) {
-	const exportedPath = join(cwd, ".beads", "issues.jsonl");
 	const changed = changedFilesSummary(cwd);
 	const staged = stagedFilesSummary(cwd);
-	if (!existsSync(exportedPath))
+	let store;
+	try {
+		store = loadStore(cwd);
+	} catch (error) {
 		return {
 			status: "SKIP",
-			exported_path: exportedPath,
+			exported_path: storePath(cwd),
 			changed_files: changed.changed_files,
 			staged_files: staged.staged_files,
-			summary: "No .beads/issues.jsonl export found.",
+			summary: error.message,
 		};
-	const consistency = jsonlRecordSummary(exportedPath, taskIds);
-	const missing = taskIds.filter((id) => !consistency.records[id]);
+	}
+	const missing = taskIds.filter((id) => !store.items[id]);
 	return {
 		status: missing.length ? "FAIL" : "PASS",
-		exported_path: exportedPath,
+		exported_path: storePath(cwd),
 		consistency_status: missing.length ? "FAIL" : "PASS",
 		missing_ids: missing,
 		changed_files: changed.changed_files,
 		staged_files: staged.staged_files,
 		summary: missing.length
-			? `Missing exported tasks: ${missing.join(", ")}`
-			: `Export covers ${taskIds.length} task(s).`,
+			? `Missing native work items: ${missing.join(", ")}`
+			: `Native store covers ${taskIds.length} work item(s).`,
 	};
 }
 
@@ -3747,13 +3709,45 @@ function gitSnapshot(cwd) {
 	};
 }
 
-function bdJson(cwd, args) {
-	const raw = run(cwd, "bd", [...args, "--json"]);
-	if (!raw) return [];
+// Normal workflow paths read the native store directly. Legacy state is handled only by /work-remove-beads.
+function loadNativeWorkStore(cwd) {
 	try {
-		return JSON.parse(raw);
-	} catch {
-		return [];
+		return loadStore(cwd);
+	} catch (error) {
+		if (error instanceof WorkStoreError && error.category === "missing" && existsSync(join(cwd, ".beads"))) {
+			const legacy = new Error("Legacy tracker state requires /work-remove-beads before normal commands can run.");
+			legacy.reason = "migration-required";
+			throw legacy;
+		}
+		throw error;
+	}
+}
+
+function readWorkItem(cwd, id) {
+	return loadNativeWorkStore(cwd).items[id];
+}
+
+function allWorkItems(cwd) {
+	return Object.values(loadNativeWorkStore(cwd).items);
+}
+
+function childWorkItems(cwd, parentId) {
+	return allWorkItems(cwd).filter((item) => item.parentId === parentId);
+}
+
+function readyNativeWorkItems(cwd) {
+	return readyWorkItems(loadNativeWorkStore(cwd));
+}
+
+function normalReadGate(cwd) {
+	try {
+		loadNativeWorkStore(cwd);
+		return null;
+	} catch (error) {
+		return {
+			reason: error.reason === "migration-required" ? "migration-required" : "recovery-required",
+			message: error.message,
+		};
 	}
 }
 
@@ -3820,11 +3814,11 @@ function titleOf(issue) {
 }
 
 function updatedAt(issue) {
-	return field(issue, "updated_at", "updated", "modified_at") ?? "";
+	return field(issue, "updatedAt", "updated_at", "updated", "modified_at") ?? "";
 }
 
 function createdAt(issue) {
-	return field(issue, "created_at", "created") ?? "";
+	return field(issue, "createdAt", "created_at", "created") ?? "";
 }
 
 function shortDate(value) {
@@ -3839,7 +3833,7 @@ function byUpdatedDesc(a, b) {
 
 function listEpics(cwd, status) {
 	try {
-		const items = bdJson(cwd, ["list", "--type=epic", `--status=${status}`]);
+		const items = allWorkItems(cwd).filter((item) => item.type === "epic" && item.status === status);
 		return Array.isArray(items) ? items : [];
 	} catch {
 		return [];
@@ -3849,7 +3843,7 @@ function listEpics(cwd, status) {
 function resolveEpic(cwd, target) {
 	const wanted = target.trim();
 	if (wanted && wanted !== "last")
-		return { epic: one(bdJson(cwd, ["show", wanted])) };
+		return { epic: readWorkItem(cwd, wanted) };
 
 	const candidates = [
 		...listEpics(cwd, "in_progress"),
@@ -3862,14 +3856,7 @@ function resolveEpic(cwd, target) {
 
 function childrenOf(cwd, epicId) {
 	try {
-		const children = bdJson(cwd, ["children", epicId]);
-		if (Array.isArray(children)) return children;
-	} catch {
-		// Older bd versions may not have `children`.
-	}
-	try {
-		const children = bdJson(cwd, ["list", `--parent=${epicId}`]);
-		return Array.isArray(children) ? children : [];
+		return childWorkItems(cwd, epicId);
 	} catch {
 		return [];
 	}
@@ -3878,7 +3865,7 @@ function childrenOf(cwd, epicId) {
 function readyIds(cwd, epicId) {
 	try {
 		return new Set(
-			bdJson(cwd, ["ready"])
+			readyNativeWorkItems(cwd)
 				.filter((issue) => parentOf(issue) === epicId)
 				.map(idOf),
 		);
@@ -3896,6 +3883,8 @@ function lineFor(issue) {
 }
 
 function buildWorkStatus(cwd, target) {
+	const gate = normalReadGate(cwd);
+	if (gate) return `${gate.reason}: ${gate.message}`;
 	const resolved = resolveEpic(cwd, target);
 	if (resolved.choices) {
 		if (resolved.choices.length === 0)
@@ -3948,7 +3937,7 @@ function buildWorkStatus(cwd, target) {
 	})();
 
 	const next = (() => {
-		if (decisions.length) return "Resolve decision Beads first.";
+		if (decisions.length) return "Resolve decision WorkItems first.";
 		if (readySlices.length)
 			return `Run /work-resume ${epicId} to handle ${idOf(readySlices[0])}.`;
 		if (blockers.length) {
@@ -3960,7 +3949,7 @@ function buildWorkStatus(cwd, target) {
 		if (planning.length)
 			return `Run /work-resume ${epicId}; planner should create the next slice.`;
 		if (statusOf(epic) === "closed") return "Epic is closed.";
-		return "No ready slices. /work-resume should ask bead-planner to compare the epic plan against closed children and create the next slice, or report done. Close the roadmap only with /work-roadmap close.";
+		return "No ready slices. /work-resume should ask work-planner to compare the epic plan against closed children and create the next slice, or report done. Close the roadmap only with /work-roadmap close.";
 	})();
 
 	return [
@@ -4007,50 +3996,6 @@ function commandErrorText(error) {
 		.map(String)
 		.join("\n")
 		.trim();
-}
-
-function classifyBdError(error, args = []) {
-	const text = commandErrorText(error);
-	if (
-		args[0] === "show" &&
-		/not found|no such|unknown|does not exist/i.test(text)
-	)
-		return "unknown-target";
-	if (/ENOENT|not recognized/i.test(text)) return "bd-missing";
-	if (/no beads database|bd init/i.test(text)) return "beads-unavailable";
-	return "beads-error";
-}
-
-function bdJsonRequired(cwd, args) {
-	const cacheKey = bdJsonCacheKey(cwd, args);
-	if (cacheKey && bdJsonCache.has(cacheKey)) return bdJsonCache.get(cacheKey);
-	try {
-		const raw = run(cwd, "bd", [...args, "--json"]);
-		if (raw.length > TASK_RAW_THRESHOLD) {
-			const artifact = writeArtifact(
-				cwd,
-				"tasks",
-				`bd-${args[0] ?? "json"}`,
-				"json",
-				raw,
-			);
-			recordWorkTelemetry(cwd, {
-				type: "large-task-read",
-				command: `bd ${args.join(" ")} --json`,
-				beadId: args[1],
-				ok: true,
-				outputChars: raw.length,
-				threshold: TASK_RAW_THRESHOLD,
-				artifact,
-			});
-		}
-		const parsed = raw ? JSON.parse(raw) : [];
-		return cacheKey ? rememberBdJson(cacheKey, parsed) : parsed;
-	} catch (error) {
-		const err = new Error(commandErrorText(error) || "bd command failed");
-		err.reason = classifyBdError(error, args);
-		throw err;
-	}
 }
 
 function asArray(value) {
@@ -4132,6 +4077,7 @@ function ideaMetadata(issue) {
 	);
 	return {
 		...direct,
+		...objectMetadata(issue?.ideaLineage),
 		...objectMetadata(direct.workOrchestrator),
 		...objectMetadata(direct.work_orchestrator),
 		...objectMetadata(direct.wo),
@@ -4140,6 +4086,7 @@ function ideaMetadata(issue) {
 }
 
 function isIdeaIssue(issue) {
+	if (typeOf(issue) === "idea") return true;
 	const labels = labelsOf(issue);
 	const metadata = ideaMetadata(issue);
 	return (
@@ -4328,7 +4275,7 @@ function noteDetails(issue) {
 		.filter(Boolean);
 	const commands = lines
 		.filter((line) =>
-			/(^|\s)(bd|git|node|npm|npx|rtk|uv|pytest|cmake|ctest|ninja|\/work-)\b/i.test(
+			/(^|\s)(git|node|npm|npx|rtk|uv|pytest|cmake|ctest|ninja|\/work-)\b/i.test(
 				line,
 			),
 		)
@@ -4383,7 +4330,7 @@ function normalizeCommandTarget(target) {
 	const text = String(target ?? "").trim();
 	const cleaned = text.replace(/[.,;:)\]]+$/, "");
 	return cleaned !== text &&
-		(isBeadId(cleaned) || isNumericBeadShorthand(cleaned))
+		(isWorkItemId(cleaned) || isNumericWorkItemShorthand(cleaned))
 		? cleaned
 		: text;
 }
@@ -4400,21 +4347,18 @@ function parseWorkReportArgs(args = "") {
 }
 
 function epicsByStatus(cwd, status) {
-	const items = bdJsonRequired(cwd, [
-		"list",
-		"--type=epic",
-		`--status=${status}`,
-	]);
-	return Array.isArray(items) ? items : [];
+	return allWorkItems(cwd).filter(
+		(item) => item.type === "epic" && item.status === status,
+	);
 }
 
 function childrenOfRequired(cwd, epicId) {
 	try {
-		const children = bdJsonRequired(cwd, ["children", epicId]);
+		const children = childWorkItems(cwd, epicId);
 		if (Array.isArray(children)) return children;
 	} catch (error) {
 		try {
-			const children = bdJsonRequired(cwd, ["list", `--parent=${epicId}`]);
+			const children = childWorkItems(cwd, epicId);
 			return Array.isArray(children) ? children : [];
 		} catch {
 			throw error;
@@ -4426,18 +4370,18 @@ function childrenOfRequired(cwd, epicId) {
 function resolveReportTarget(cwd, target) {
 	let wanted = target.trim();
 	if (wanted && wanted !== "last") {
-		const expanded = expandNumericBeadShorthand(cwd, wanted);
+		const expanded = expandNumericWorkItemShorthand(cwd, wanted);
 		if (expanded.error) return expanded;
 		wanted = expanded.target;
-		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
+		const issue = readWorkItem(cwd, wanted);
 		if (!issue)
 			return {
 				error: "unknown-target",
-				message: `No Bead found for ${wanted}`,
+				message: `No WorkItem found for ${wanted}`,
 			};
 		return typeOf(issue) === "epic"
 			? { kind: "epic", epic: issue }
-			: { kind: "bead", bead: issue };
+			: { kind: "workItem", workItem: issue };
 	}
 
 	let candidates = [
@@ -4446,7 +4390,7 @@ function resolveReportTarget(cwd, target) {
 	].sort(byUpdatedDesc);
 	if (candidates.length === 0) {
 		try {
-			candidates = bdJsonRequired(cwd, ["list", "--type=epic"])
+			candidates = allWorkItems(cwd).filter((item) => item.type === "epic")
 				.filter((epic) => statusOf(epic) !== "closed")
 				.sort(byUpdatedDesc);
 		} catch {
@@ -4606,9 +4550,9 @@ function isPiRuntimeArtifact(path) {
 	);
 }
 
-function isBeadsDirt(path) {
+function isWorkStoreDirt(path) {
 	const file = normalizedRepoPath(path);
-	return file === ".beads" || file.startsWith(".beads/");
+	return file === ".ce-workflow" || file.startsWith(".ce-workflow/");
 }
 
 function isAllowedPlanDirt(path, planPaths = []) {
@@ -4673,7 +4617,7 @@ function isFormatterOnlyDirt(cwd, item) {
 export function isWorkflowDirt(cwd, item, planPaths = []) {
 	const file = normalizedRepoPath(item.path);
 	return (
-		isBeadsDirt(file) ||
+		isWorkStoreDirt(file) ||
 		isPiRuntimeArtifact(file) ||
 		isWindowsReservedName(file) ||
 		isGeneratedBuildArtifact(file) ||
@@ -4722,7 +4666,7 @@ function planBootstrapDirtyStop(cwd, git, planPath, command) {
 	);
 	return dirtyStopState(
 		{ ...git, blockedPaths: blockers },
-		`Dirty files must be resolved before ${command} can mutate Beads. Blocking files: ${compactList(blockers) || "unknown"}.`,
+		`Dirty files must be resolved before ${command} can mutate native work-item store. Blocking files: ${compactList(blockers) || "unknown"}.`,
 	);
 }
 
@@ -4811,13 +4755,13 @@ function highRiskImplementation(issue) {
 }
 
 function implementationExecutionPolicy(state, cwd) {
-	const issue = state?.selectedBead;
+	const issue = state?.selectedWorkItem;
 	if (cwd && workOrchSettings(cwd).sliceExecutionMode === "agent")
 		return {
 			kind: "agent",
 			level: "isolated",
 			reason:
-				"sliceExecutionMode=agent routes each slice to an isolated bead-worker",
+				"sliceExecutionMode=agent routes each slice to an isolated work-worker",
 		};
 	if (highRiskImplementation(issue))
 		return {
@@ -4880,7 +4824,7 @@ function buildEpicChildState(cwd, epic) {
 			depsOf(issue)
 				.filter((dependencyId) => statusOf(byId.get(dependencyId)) !== "closed")
 				.map((dependencyId) => ({
-					bead: issueSummary(issue),
+					workItem: issueSummary(issue),
 					blockedBy: issueSummary(
 						byId.get(dependencyId) ?? { id: dependencyId },
 					),
@@ -4931,7 +4875,7 @@ function candidateSummary(cwd, epic) {
 function resolveResumeTarget(cwd, target) {
 	let wanted = normalizePathToken(target.trim());
 	if (wanted && wanted !== "last") {
-		const expanded = expandNumericBeadShorthand(cwd, wanted);
+		const expanded = expandNumericWorkItemShorthand(cwd, wanted);
 		if (expanded.error) return expanded;
 		wanted = expanded.target;
 		if (looksLikePath(wanted))
@@ -4940,16 +4884,16 @@ function resolveResumeTarget(cwd, target) {
 				message: `${wanted} looks like a plan path, not an epic ID. Use /work-plan ${wanted}.`,
 				suggestedCommands: [`/work-plan ${wanted}`],
 			};
-		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
+		const issue = readWorkItem(cwd, wanted);
 		if (!issue)
 			return {
 				error: "unknown-target",
-				message: `No Bead found for ${wanted}`,
+				message: `No WorkItem found for ${wanted}`,
 			};
 		if (typeOf(issue) === "epic") return { kind: "epic", epic: issue };
 		return {
 			error: "unsupported-target",
-			message: `${wanted} is a child Bead; run /work-resume ${parentOf(issue) ?? "<epic-id>"} or /work-debug ${wanted}`,
+			message: `${wanted} is a child WorkItem; run /work-resume ${parentOf(issue) ?? "<epic-id>"} or /work-debug ${wanted}`,
 		};
 	}
 
@@ -4967,14 +4911,14 @@ function resolveResumeTarget(cwd, target) {
 			if (buildEpicChildState(cwd, remembered).children.length > 0)
 				return { kind: "epic", epic: remembered };
 		} catch {
-			// Ignore stale remembered state and fall back to Beads discovery.
+			// Ignore stale remembered state and fall back to native work-item store discovery.
 		}
 	}
 
 	let candidates = epicsByStatus(cwd, "open").sort(byUpdatedDesc);
 	if (candidates.length === 0) {
 		try {
-			candidates = bdJsonRequired(cwd, ["list", "--type=epic"])
+			candidates = allWorkItems(cwd).filter((item) => item.type === "epic")
 				.filter((epic) => statusOf(epic) !== "closed")
 				.sort(byUpdatedDesc);
 		} catch {
@@ -5003,11 +4947,17 @@ function resolveResumeTarget(cwd, target) {
 }
 
 function resumeBlockers(childState) {
-	return childState.blockers.map((issue) => ({
-		...issueSummary(issue),
-		dependencies: depsOf(issue),
-		notes: noteDetails(issue),
-	}));
+	return childState.blockers
+		.map((issue) => ({
+			...issueSummary(issue),
+			dependencies: depsOf(issue),
+			notes: noteDetails(issue),
+		}))
+		.sort(
+			(left, right) =>
+				Number(Boolean(right.notes.nextAction)) -
+				Number(Boolean(left.notes.nextAction)),
+		);
 }
 
 function planResumeAction(state, cwd) {
@@ -5054,11 +5004,11 @@ function planResumeAction(state, cwd) {
 		return {
 			...state,
 			action: "close-stale-planning",
-			selectedBead: state.readyPlanning[0],
+			selectedWorkItem: state.readyPlanning[0],
 			message:
-				"A ready planning Bead exists after executable children were created; close or update it before resuming.",
+				"A ready planning WorkItem exists after executable children were created; close or update it before resuming.",
 			suggestedCommands: [
-				`bd close ${state.readyPlanning[0].id}`,
+				`node ${WORK_HELPER_SCRIPT} work-close ${state.readyPlanning[0].id}`,
 				`/work-resume ${state.epic.id}`,
 			],
 		};
@@ -5067,7 +5017,7 @@ function planResumeAction(state, cwd) {
 			{
 				...state,
 				action: "run-implementation",
-				selectedBead: activeImplementation,
+				selectedWorkItem: activeImplementation,
 			},
 			cwd,
 		);
@@ -5122,7 +5072,7 @@ function planResumeAction(state, cwd) {
 				...routed,
 				action: "in-progress-agent",
 				message:
-					"High-risk Bead is already in progress; not launching a duplicate writer. Check the active-run widget or record a blocker before retrying.",
+					"High-risk WorkItem is already in progress; not launching a duplicate writer. Check the active-run widget or record a blocker before retrying.",
 			};
 		}
 		return withHandoffPrompt(routed, cwd);
@@ -5133,7 +5083,7 @@ function planResumeAction(state, cwd) {
 			{
 				...state,
 				action: "run-debug",
-				selectedBead: debug,
+				selectedWorkItem: debug,
 			},
 			cwd,
 		);
@@ -5151,7 +5101,7 @@ function planResumeAction(state, cwd) {
 					{
 						...state,
 						action: "run-planner",
-						selectedBead: implementation,
+						selectedWorkItem: implementation,
 						handoffExtra: [
 							cePlanSliceStep(
 								implementation,
@@ -5170,7 +5120,7 @@ function planResumeAction(state, cwd) {
 				{
 					...state,
 					action: "run-implementation",
-					selectedBead: implementation,
+					selectedWorkItem: implementation,
 				},
 				cwd,
 			),
@@ -5182,7 +5132,7 @@ function planResumeAction(state, cwd) {
 			{
 				...state,
 				action: "run-planner",
-				selectedBead: state.readyPlanning[0],
+				selectedWorkItem: state.readyPlanning[0],
 			},
 			cwd,
 		);
@@ -5195,7 +5145,7 @@ function planResumeAction(state, cwd) {
 			...state,
 			action: "report-blocked",
 			message:
-				"No runnable Bead is ready; blockers or decisions need attention.",
+				"No runnable WorkItem is ready; blockers or decisions need attention.",
 			suggestedCommands: suggestedCommands(
 				state.epic.id,
 				state.blockers,
@@ -5241,17 +5191,17 @@ function safeArtifactPart(value) {
 function directRoleAgent(state) {
 	if (state?.inlineWork) return undefined;
 	const action = String(state?.action ?? "");
-	if (action === "run-planner") return "bead-planner";
-	if (action === "handoff-migrate") return "bead-migrator";
-	if (action === "run-implementation") return "bead-worker";
-	if (action === "run-review") return "bead-reviewer";
-	if (action === "run-fix") return "bead-fixer";
-	if (/debug/.test(action)) return "bead-debugger";
+	if (action === "run-planner") return "work-planner";
+	if (action === "handoff-migrate") return "work-migrator";
+	if (action === "run-implementation") return "work-worker";
+	if (action === "run-review") return "work-reviewer";
+	if (action === "run-fix") return "work-fixer";
+	if (/debug/.test(action)) return "work-debugger";
 	return undefined;
 }
 
 function directRoleTask(state, cwd) {
-	const selected = state.selectedBead;
+	const selected = state.selectedWorkItem;
 	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
 	const expectedImplementationDiff =
 		["run-review", "run-fix"].includes(state.action) &&
@@ -5262,8 +5212,8 @@ function directRoleTask(state, cwd) {
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
 		`Action: ${state.action}`,
 		selected
-			? `Target: ${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
-			: "Target: no selected Bead; create/reuse the next planning Bead only if required.",
+			? `Target work item: ${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
+			: "Target: no selected work item; create/reuse the next planning work item only if required.",
 		`Git: ${expectedImplementationDiff ? `expected implementation diff (${selected.changedPaths.length} files)` : gitDirtyClassification(state.git)}`,
 		state.git?.dirtyPaths?.length
 			? expectedImplementationDiff
@@ -5271,7 +5221,7 @@ function directRoleTask(state, cwd) {
 				: `Known workflow-owned dirt: ${state.git.dirtyPaths.length} paths; avoid it and do not enumerate it again.`
 			: "Known dirt: none",
 		selected?.id && existsSync(WORK_HELPER_SCRIPT)
-			? `Read the compact task first: node ${helper} bd-summary ${selected.id}`
+			? `Read the compact task first: node ${helper} work-summary ${selected.id}`
 			: "Read only the compact fields needed for this action.",
 		state.action === "run-review" && selected?.changedPaths?.length
 			? `Review only: ${selected.changedPaths.join(", ")}`
@@ -5279,16 +5229,16 @@ function directRoleTask(state, cwd) {
 		state.epic?.id &&
 		["run-planner", "run-debug"].includes(state.action) &&
 		existsSync(WORK_HELPER_SCRIPT)
-			? `For child state use: node ${helper} bd-children-summary ${state.epic.id}`
+			? `For child state use: node ${helper} work-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
-			? `Use only the helper summaries plus targeted project files; never run bd prime/help, pwd/list/find, raw bd show, or raw bd ready. Create the minimum executable Beads required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} bd-ready-summary ${state.epic?.id ?? "<epic>"}, close the planning Bead, then stop.`
+			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<epic>"}, close the planning work item, then stop.`
 			: "",
 		state.action === "run-implementation" || state.action === "run-debug"
 			? planReference(state, cwd)
 			: "",
 		...(state.handoffExtra ?? []).filter(Boolean),
-		"Persist concise evidence/blockers in Beads. Do not read Pi session transcripts. Run exactly this action and stop at one Bead or planning boundary.",
+		"Persist concise evidence/blockers with work-note/work-label/work-block. Do not read Pi session transcripts. Run exactly this action and stop at one work-item or planning boundary.",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -5298,7 +5248,7 @@ function directRoleHandoffParams(state, cwd, selectionNote = "") {
 	const agent = directRoleAgent(state);
 	if (!agent || !state?.handoffPrompt) return null;
 	const target = safeArtifactPart(
-		state.selectedBead?.id ?? state.epic?.id ?? state.action ?? agent,
+		state.selectedWorkItem?.id ?? state.epic?.id ?? state.action ?? agent,
 	);
 	return {
 		agent,
@@ -5346,18 +5296,18 @@ function recordSpawnedDirectRun(cwd, state, direct, spawned) {
 		action: state.action,
 		agent: direct.agent,
 		epicId: state.epic?.id,
-		beadId: state.selectedBead?.id,
+		workItemId: state.selectedWorkItem?.id,
 		...identity,
 	});
 }
 
 function markDirectHandoffStarted(cwd, state) {
-	const selected = state?.selectedBead;
+	const selected = state?.selectedWorkItem;
 	if (!selected?.id || selected.status !== "open") return state;
 	try {
-		const claimed = claimWorkflowBead(cwd, selected);
+		const claimed = claimWorkflowWorkItem(cwd, selected);
 		return idOf(claimed)
-			? { ...state, selectedBead: issueSummary(claimed), handoffClaimed: true }
+			? { ...state, selectedWorkItem: issueSummary(claimed), handoffClaimed: true }
 			: state;
 	} catch {
 		return state;
@@ -5595,18 +5545,18 @@ export async function dispatchWorkflowImprovementAgent(
 function workflowHelperGuidance(cwd, state) {
 	if (!cwd || !existsSync(WORK_HELPER_SCRIPT)) return [];
 	const script = JSON.stringify(WORK_HELPER_SCRIPT);
-	const selectedId = state.selectedBead?.id;
+	const selectedId = state.selectedWorkItem?.id;
 	const epicId = state.epic?.id;
 	return [
 		`Workflow helper: node ${script} <command> ...`,
 		selectedId
-			? `Use compact task reads: node ${script} bd-summary ${selectedId}`
-			: "Use compact task reads: node <helper> bd-summary <bead-id>",
+			? `Use compact task reads: node ${script} work-summary ${selectedId}`
+			: "Use compact task reads: node <helper> work-summary <work-item-id>",
 		epicId
-			? `Use compact child/blocker reads: node ${script} bd-children-summary ${epicId}; node ${script} blocker-search ${epicId} "<query>"`
-			: "Use compact child/blocker reads: node <helper> bd-children-summary <epic-id>",
+			? `Use compact child/blocker reads: node ${script} work-children-summary ${epicId}; node ${script} blocker-search ${epicId} "<query>"`
+			: "Use compact child/blocker reads: node <helper> work-children-summary <epic-id>",
 		`Use bounded scans/checks instead of dumping logs: node ${script} search-summary "<regex>" <paths...>; node ${script} scan-capability "<term>" <paths...>; node ${script} json-assert <file> --required key.path`,
-		`Use Beads/git helpers instead of CLI-help spelunking: node ${script} bd-note <id> <note-or-note-file>; node ${script} bd-block <task-id> --by <blocker-id>; node ${script} ensure-no-staged --allow-beads`,
+		`Use native work-item store/git helpers instead of CLI-help spelunking: node ${script} work-note <id> <note-or-note-file>; node ${script} work-block <task-id> --by <blocker-id>; node ${script} ensure-no-staged --allow-work-store`,
 	];
 }
 
@@ -5621,7 +5571,7 @@ function scoreBlocker(issue, terms) {
 
 function blockerPreflightLines(cwd, state) {
 	const epicId = state.epic?.id;
-	const title = state.selectedBead?.title ?? "";
+	const title = state.selectedWorkItem?.title ?? "";
 	if (!cwd || !epicId || !title) return [];
 	const terms = title
 		.toLowerCase()
@@ -5659,7 +5609,7 @@ function blockerPreflightLines(cwd, state) {
 }
 
 function inlineWorkHandoffPrompt(state, extraLines = [], cwd) {
-	const selected = state.selectedBead;
+	const selected = state.selectedWorkItem;
 	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
 	const level = state.inlineLevel ?? state.executionPolicy?.level ?? "medium";
 	const maxFiles =
@@ -5682,14 +5632,14 @@ function inlineWorkHandoffPrompt(state, extraLines = [], cwd) {
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
 		`Target: ${selected?.id ?? "none"}`,
 		`Task: ${JSON.stringify(contract)}`,
-		`Git intake: ${state.git?.status ?? "unknown"}; later runtime/Beads dirt is expected.`,
+		`Git intake: ${state.git?.status ?? "unknown"}; later runtime/native work-item store dirt is expected.`,
 		`Helper: node ${helper}`,
 		evidenceOnly
-			? "Evidence-only task: prove the exact requested condition; do not substitute a broader suite or edit product/workflow source. Read project instructions, search once for the narrowest existing probe, then run it. Evidence plus Beads changes may be the only commit."
+			? "Evidence-only task: prove the exact requested condition; do not substitute a broader suite or edit product/workflow source. Read project instructions, search once for the narrowest existing probe, then run it. Evidence plus native work-item store changes may be the only commit."
 			: `Implement with targeted reads only and keep the change within ${maxFiles} implementation files. Greenfield tasks naming output files should create them immediately.`,
 		`Finish once: finish-task ${selected?.id ?? "<id>"} --max-files ${maxFiles} --message "<summary>" --verify "<smallest real check>" [--expect "<exact stdout>"] --immediate-format --push. Pass the check directly; use --json <file> --equals <path=value> for JSON. For a multiline check, write one runtime script under .pi first instead of retrying shell quoting. The helper settles Pi's managed formatter before verification and commit.`,
-		"When the task names files, read those files directly: no pwd/list/find. Do not reread successful edits, run verification separately, or inspect diff/status; finish-task performs those checks. Do not rediscover/claim, dump raw Beads JSON, run broad scans/help, or modify the work-orchestrator package/helper as a workaround. Use one stdlib transform for deterministic text/JSON work.",
-		"If finish-task requires independent review, launch exactly bead-reviewer once, persist PASS, then rerun with --reviewed. On scope conflict, failed verification, or a real decision, persist the blocker and stop open/uncommitted.",
+		"When the task names files, read those files directly: no pwd/list/find. Do not reread successful edits, run verification separately, or inspect diff/status; finish-task performs those checks. Do not rediscover/claim, dump raw native work-item store JSON, run broad scans/help, or modify the work-orchestrator package/helper as a workaround. Use one stdlib transform for deterministic text/JSON work.",
+		"If finish-task requires independent review, launch exactly work-reviewer once, persist PASS, then rerun with --reviewed. On scope conflict, failed verification, or a real decision, persist the blocker and stop open/uncommitted.",
 		planReference(state, cwd),
 		...extraLines.filter(Boolean),
 		"After finish-task succeeds, return its compact result and stop.",
@@ -5700,14 +5650,14 @@ function inlineWorkHandoffPrompt(state, extraLines = [], cwd) {
 
 function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 	if (state.inlineWork) return inlineWorkHandoffPrompt(state, extraLines, cwd);
-	const selected = state.selectedBead;
+	const selected = state.selectedWorkItem;
 	const selectedLine = selected
 		? `${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
-		: "none; create/reuse a wo:planning Bead if needed";
+		: "none; create/reuse a wo:planning work item if needed";
 	const plannerLines =
 		state.action === "run-planner"
 			? [
-					"Planner efficiency: do not run raw `bd show <epic-id> --json`; project epics can contain full roadmap plans. Use compact bd show projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
+					"Planner efficiency: do not run raw raw store JSON; project epics can contain full roadmap plans. Use compact helper projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
 				]
 			: [];
 	const settings = cwd ? workOrchSettings(cwd) : null;
@@ -5720,7 +5670,7 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 		...workflowPromptMetadata(),
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
 		`Action: ${state.action}`,
-		`Selected Bead: ${selectedLine}`,
+		`Selected work item: ${selectedLine}`,
 		`Git dirty classification: ${gitDirtyClassification(state.git)}`,
 		state.git?.dirtyPaths?.length
 			? `Known dirty paths: ${state.git.dirtyPaths.join(", ")}`
@@ -5729,10 +5679,10 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 		...workflowHelperGuidance(cwd, state),
 		...blockerPreflightLines(cwd, state),
 		"Subagent output guidance: set outputMode:file-only with a short relative output filename unless the full result is under 20 lines; do not pass .pi-subagents/ paths because the subagent tool owns the artifact directory.",
-		"Beads output hygiene: raw `bd ready --json`, `bd children --json`, or epic `bd show --json` can dump full roadmap plans; use the workflow helper compact commands first, or pipe through python/node projections that print only ids, status, titles, and needed fields.",
-		"Closure rule: worker/reviewer/fixer/debugger roles leave Beads open; the coded finish gate commits and closes after required verification/review.",
+		"Native helper hygiene: use work-summary, work-children-summary, work-ready-summary, blocker-search, work-claim, work-note, work-label, and work-block; never dump raw store JSON.",
+		"Closure rule: worker/reviewer/fixer/debugger roles leave work items open; the coded finish gate commits and closes after required verification/review.",
 		selected?.id
-			? `Review scope default: current Bead ${selected.id} and its diff/verification evidence; do not run broad whole-repo review unless this Bead explicitly requires it.`
+			? `Review scope default: current work item ${selected.id} and its diff/verification evidence; do not run broad whole-repo review unless this work item explicitly requires it.`
 			: "Review scope default: current diff for this epic; do not run broad whole-repo review unless the action explicitly requires it.",
 		...plannerLines,
 		...simplifyLines,
@@ -5741,19 +5691,19 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 			? planReference(state, cwd)
 			: "",
 		...extraLines.filter(Boolean),
-		"Do not rediscover target selection. Verify Beads/git freshness, then run exactly this action and stop after one Bead or planning boundary.",
-		selected?.id ? `Target Bead ID: ${selected.id}` : "Target Bead ID: none",
+		"Do not rediscover target selection. Verify native work-item store/git freshness, then run exactly this action and stop after one work-item or planning boundary.",
+		selected?.id ? `Target work item: ${selected.id}` : "Target work item: none",
 	].join("\n");
 }
 
 function agentLaunchReason(state) {
 	if (state?.handoffReason) return state.handoffReason;
 	if (state?.action === "run-debug")
-		return "debug Bead requires root-cause agent";
+		return "debug WorkItem requires root-cause agent";
 	if (state?.action === "run-planner")
 		return "planning/ambiguous scope needs planner agent";
 	if (state?.action === "run-implementation")
-		return "implementation writer for selected Bead";
+		return "implementation writer for selected WorkItem";
 	return state?.action;
 }
 
@@ -5775,22 +5725,22 @@ function withHandoffPrompt(state, cwd) {
 }
 
 function planReference(state, cwd) {
-	const bead = state.selectedBead;
-	if (!bead) return "";
-	const slicePlanned = bead.labels?.includes("wo:slice-planned");
+	const workItem = state.selectedWorkItem;
+	if (!workItem) return "";
+	const slicePlanned = workItem.labels?.includes("wo:slice-planned");
 	const planPath = state.planPath
 		? isAbsolute(state.planPath)
 			? relative(cwd, state.planPath)
 			: state.planPath
 		: undefined;
 	if (slicePlanned) {
-		const line = `Plan: execute the wo:slice-plan note on Bead ${bead.id} as your spec; if the note references a plan-path doc, that doc is your spec. The Bead is the tracking item, not the spec — do not invent scope beyond it.`;
+		const line = `Plan: execute the wo:slice-plan note on WorkItem ${workItem.id} as your spec; if the note references a plan-path doc, that doc is your spec. The WorkItem is the tracking item, not the spec — do not invent scope beyond it.`;
 		return planPath
 			? `${line} Epic master plan for context: ${planPath}.`
 			: line;
 	}
 	if (planPath)
-		return `Plan: execute the matching Implementation Unit from ${planPath} for Bead ${bead.id}; the Bead is the tracking item, the plan is your spec.`;
+		return `Plan: execute the matching Implementation Unit from ${planPath} for WorkItem ${workItem.id}; the WorkItem is the tracking item, the plan is your spec.`;
 	return "";
 }
 
@@ -5799,6 +5749,13 @@ function parseWorkResumeArgs(args = "") {
 }
 
 function buildWorkResumeState(cwd, args = "") {
+	const gate = normalReadGate(cwd);
+	if (gate)
+		return errorState(gate.reason, gate.message, {
+			action: gate.reason,
+			suggestedCommands:
+				gate.reason === "migration-required" ? ["/work-remove-beads"] : [],
+		});
 	const { target } = parseWorkResumeArgs(args);
 	try {
 		const resolved = resolveResumeTarget(cwd, target);
@@ -5858,8 +5815,8 @@ function buildWorkResumeState(cwd, args = "") {
 		};
 		return planResumeAction(base, cwd);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: "work-store-error",
 			suggestedCommands: [],
 		});
 	}
@@ -5916,29 +5873,29 @@ function buildEpicReportState(cwd, epic) {
 	};
 }
 
-function buildBeadReportState(cwd, bead) {
-	const parentId = parentOf(bead);
+function buildWorkItemReportState(cwd, workItem) {
+	const parentId = parentOf(workItem);
 	if (parentId) {
 		try {
-			rememberWorkflowEpic(cwd, one(bdJsonRequired(cwd, ["show", parentId])));
+			rememberWorkflowEpic(cwd, readWorkItem(cwd, parentId));
 		} catch {
 			// Best-effort memory only; report should not fail on parent lookup.
 		}
 	}
 	const siblings = parentId ? childrenOfRequired(cwd, parentId) : [];
 	const byId = new Map(siblings.map((issue) => [idOf(issue), issue]));
-	const dependencyIds = depsOf(bead);
+	const dependencyIds = depsOf(workItem);
 	const dependents = siblings.filter((issue) =>
-		depsOf(issue).includes(idOf(bead)),
+		depsOf(issue).includes(idOf(workItem)),
 	);
 	const git = gitReport(cwd);
-	const notes = noteDetails(bead);
+	const notes = noteDetails(workItem);
 	return {
 		ok: true,
-		target: { requested: idOf(bead), kind: "bead" },
+		target: { requested: idOf(workItem), kind: "workItem" },
 		epic: parentId ? { id: parentId } : undefined,
-		bead: {
-			...issueSummary(bead),
+		workItem: {
+			...issueSummary(workItem),
 			dependencies: dependencyIds.map((id) => issueRef(byId.get(id) ?? { id })),
 			dependents: dependents.map(issueSummary),
 			notes,
@@ -5949,18 +5906,18 @@ function buildBeadReportState(cwd, bead) {
 		},
 		blockers: dependencyIds.map((id) => issueRef(byId.get(id) ?? { id })),
 		downstreamBlocked: dependents.map((issue) => ({
-			bead: issueSummary(issue),
-			blockedBy: issueSummary(bead),
+			workItem: issueSummary(issue),
+			blockedBy: issueSummary(workItem),
 		})),
 		openDecisions: [],
 		readyWork: [],
 		git,
 		suggestedCommands: [
 			notes.nextAction ||
-				suggestedCommands(parentId ?? idOf(bead), [], [bead])[0],
+				suggestedCommands(parentId ?? idOf(workItem), [], [workItem])[0],
 		].filter(Boolean),
-		noteExcerpts: notesOf(bead)
-			? [{ id: idOf(bead), text: noteExcerpt(bead, 800) }]
+		noteExcerpts: notesOf(workItem)
+			? [{ id: idOf(workItem), text: noteExcerpt(workItem, 800) }]
 			: [],
 		warnings: git.warnings,
 	};
@@ -5976,21 +5933,28 @@ function suggestedCommands(epicId, blockers = [], decisions = []) {
 		return [`/work-debug ${idOf(runnableDebug)}: investigate blocker`];
 	const blockedDecision = decisions[0];
 	if (blockedDecision) return [`/work-report ${idOf(blockedDecision)}`];
-	const externalBlocker = blockers.find(
+	const externalBlockers = blockers.filter(
 		(issue) =>
 			statusOf(issue) === "blocked" || labelsOf(issue).includes("wo:blocked"),
 	);
+	const externalBlocker =
+		externalBlockers.find(
+			(issue) =>
+				!depsOf(issue).some((id) =>
+					externalBlockers.some((other) => idOf(other) === id),
+				),
+		) ?? externalBlockers[0];
 	if (externalBlocker) return [`/work-report ${idOf(externalBlocker)}`];
 	const blockedWork = blockers[0];
 	if (blockedWork) return [`/work-report ${idOf(blockedWork)}`];
 	return epicId ? [`/work-report ${epicId}`] : [];
 }
 
-function isBeadId(value) {
+function isWorkItemId(value) {
 	return /^[A-Za-z][A-Za-z0-9_-]*-[A-Za-z0-9_.-]+$/.test(value ?? "");
 }
 
-function isNumericBeadShorthand(value) {
+function isNumericWorkItemShorthand(value) {
 	return /^\d+$/.test(String(value ?? "").trim());
 }
 
@@ -6005,7 +5969,7 @@ function activeEpicCandidates(cwd) {
 	].sort(byUpdatedDesc);
 	if (candidates.length) return candidates;
 	try {
-		candidates = bdJsonRequired(cwd, ["list", "--type=epic"])
+		candidates = allWorkItems(cwd).filter((item) => item.type === "epic")
 			.filter((epic) => statusOf(epic) !== "closed")
 			.sort(byUpdatedDesc);
 	} catch {
@@ -6014,9 +5978,9 @@ function activeEpicCandidates(cwd) {
 	return candidates;
 }
 
-function expandNumericBeadShorthand(cwd, target, kind = "any") {
+function expandNumericWorkItemShorthand(cwd, target, kind = "any") {
 	const text = String(target ?? "").trim();
-	if (!isNumericBeadShorthand(text)) return { target: text };
+	if (!isNumericWorkItemShorthand(text)) return { target: text };
 	const epics = activeEpicCandidates(cwd);
 	const children = [];
 	if (kind !== "epic") {
@@ -6029,10 +5993,10 @@ function expandNumericBeadShorthand(cwd, target, kind = "any") {
 		}
 	}
 	const epicsMatching =
-		kind === "bead"
+		kind === "workItem"
 			? []
 			: epics.filter((epic) => idHasNumericSuffix(idOf(epic), text));
-	// Prefer child Beads for the common `/work-debug 19:` case when the epic is E-1.
+	// Prefer child native work-item store for the common `/work-debug 19:` case when the epic is E-1.
 	const matches = children.length ? children : epicsMatching;
 	const unique = [
 		...new Map(matches.map((issue) => [idOf(issue), issue])).values(),
@@ -6041,12 +6005,12 @@ function expandNumericBeadShorthand(cwd, target, kind = "any") {
 	if (unique.length > 1)
 		return {
 			error: "ambiguous-target",
-			message: `Numeric Bead shorthand ${text} matches multiple Beads; use the full ID.`,
+			message: `Numeric WorkItem shorthand ${text} matches multiple native work-item store; use the full ID.`,
 			candidates: unique.map(issueSummary),
 		};
 	return {
 		error: "unknown-target",
-		message: `No active Bead matches numeric shorthand ${text}; use the full ID.`,
+		message: `No active WorkItem matches numeric shorthand ${text}; use the full ID.`,
 	};
 }
 
@@ -6071,62 +6035,73 @@ function ensureWorkflowGitignore(cwd) {
 	}
 }
 
-function ensureBeadsInitialized(cwd) {
+function ensureWorkStoreInitialized(cwd) {
 	try {
-		run(cwd, "bd", ["where", "--json"]);
-		return {
-			initialized: false,
-			message: "Beads workspace already initialized.",
-		};
+		loadStore(cwd);
+		return { initialized: false, message: "Native work store already initialized." };
 	} catch (error) {
-		const reason = classifyBdError(error, ["where"]);
-		if (reason !== "beads-unavailable") {
-			const err = new Error(commandErrorText(error) || "bd command failed");
-			err.reason = reason;
-			throw err;
-		}
+		if (!(error instanceof WorkStoreError) || error.category !== "missing") throw error;
 	}
-	try {
-		run(cwd, "bd", ["init", "--non-interactive", "--skip-agents"]);
-		ensureWorkflowGitignore(cwd);
-		return {
-			initialized: true,
-			message: "Initialized Beads with bd init --skip-agents.",
-		};
-	} catch (error) {
-		const err = new Error(commandErrorText(error) || "bd init failed");
-		err.reason = classifyBdError(error, ["init"]);
-		throw err;
-	}
+	initStore(cwd);
+	ensureWorkflowGitignore(cwd);
+	return { initialized: true, message: "Initialized native work store." };
 }
 
-function createBead(
-	cwd,
-	{
-		title,
-		type = "task",
-		parent,
-		notes,
-		description,
-		design,
-		designFile,
-		acceptance,
-	},
-) {
-	const beadTitle = compactBeadTitle(title);
-	const beadNotes = appendOriginalBeadTitle(notes, title);
-	const args = ["create", beadTitle, "--type", type];
-	if (parent) args.push("--parent", parent);
-	if (description) args.push("--description", description);
-	if (designFile) args.push("--design-file", designFile);
-	else if (design) args.push("--design", design);
-	if (acceptance) args.push("--acceptance", acceptance);
-	if (beadNotes) args.push("--notes", beadNotes);
-	return one(bdJsonRequired(cwd, args));
+function nativeIssue(item) {
+	const edges = new Map(
+		(item.dependencyEdges ?? []).map((edge) => [edge.toId, edge]),
+	);
+	return {
+		id: item.id, issue_type: item.type, status: item.status, title: item.title,
+		parent_id: item.parentId, created_at: item.createdAt, updated_at: item.updatedAt,
+		description: item.description, acceptance_criteria: item.acceptance,
+		owner: item.owner, priority: item.priority, labels: item.labels ?? [],
+		notes: (item.notes ?? []).join("\n"), document_links: item.documentLinks,
+		design: item.documentLinks?.design,
+		dependencies: [
+			...(item.dependencyEdges ?? []).map(({ fromId, toId, type, ...edge }) => ({
+				issue_id: fromId, depends_on_id: toId, type, ...edge,
+			})),
+			...(item.dependencies ?? [])
+				.filter((id) => !edges.has(id))
+				.map((depends_on_id) => ({
+					issue_id: item.id, depends_on_id, type: "blocks",
+				})),
+		],
+	};
 }
 
-function appendBeadNote(cwd, id, note) {
-	return one(bdJsonRequired(cwd, ["update", id, "--append-notes", note]));
+function createWorkflowWorkItem(cwd, { title, type = "task", parent, notes, description, design, designFile, acceptance }) {
+	const item = mutateStore(cwd, (store) =>
+		createWorkItem(store, {
+			title: compactWorkItemTitle(title), type, parentId: parent,
+			notes: appendOriginalWorkItemTitle(notes, title) ? [appendOriginalWorkItemTitle(notes, title)] : [],
+			description, acceptance,
+			documentLinks: designFile ? { design: designFile } : design ? { design } : undefined,
+		}),
+	);
+	return nativeIssue(item);
+}
+
+function appendWorkflowWorkItemNote(cwd, id, note) {
+	return nativeIssue(mutateStore(cwd, (store) => appendWorkNote(store, id, note)));
+}
+
+function updateWorkItemNative(cwd, id, changes) {
+	return nativeIssue(mutateStore(cwd, (store) => updateWorkItem(store, id, changes)));
+}
+
+function addWorkDependency(cwd, id, dependency) {
+	const item = loadStore(cwd).items[id];
+	return updateWorkItemNative(cwd, id, {
+		dependencies: [...(item?.dependencies ?? []), dependency],
+		dependencyEdges: [
+			...(item?.dependencyEdges ?? []),
+			...(item?.dependencyEdges?.some((edge) => edge.toId === dependency)
+				? []
+				: [{ fromId: id, toId: dependency, type: "blocks" }]),
+		],
+	});
 }
 
 function debugNeededId(issue) {
@@ -6137,14 +6112,14 @@ function debugNeededId(issue) {
 function resolveWorkflowEpic(cwd, target = "") {
 	let wanted = normalizeCommandTarget(target);
 	if (wanted && wanted !== "last") {
-		const expanded = expandNumericBeadShorthand(cwd, wanted, "epic");
+		const expanded = expandNumericWorkItemShorthand(cwd, wanted, "epic");
 		if (expanded.error) return expanded;
 		wanted = expanded.target;
-		const issue = one(bdJsonRequired(cwd, ["show", wanted]));
+		const issue = readWorkItem(cwd, wanted);
 		if (!issue)
 			return {
 				error: "unknown-target",
-				message: `No Bead found for ${wanted}`,
+				message: `No WorkItem found for ${wanted}`,
 			};
 		if (typeOf(issue) !== "epic")
 			return {
@@ -6168,7 +6143,7 @@ function resolveWorkflowEpic(cwd, target = "") {
 		return {
 			error: "ambiguous-target",
 			message:
-				"Multiple active epics found; pass --epic <id> or target a Bead.",
+				"Multiple active epics found; pass --epic <id> or target a WorkItem.",
 			candidates: active.map((epic) => candidateSummary(cwd, epic)),
 		};
 
@@ -6185,6 +6160,8 @@ function resolveWorkflowEpic(cwd, target = "") {
 }
 
 function buildWorkflowIntakeState(cwd, args = "") {
+	const gate = normalReadGate(cwd);
+	if (gate) return errorState(gate.reason, gate.message, { action: gate.reason, suggestedCommands: gate.reason === "migration-required" ? ["/work-remove-beads"] : [] });
 	const { target } = parseWorkReportArgs(args);
 	try {
 		const resolved = resolveWorkflowEpic(cwd, target);
@@ -6210,17 +6187,17 @@ function buildWorkflowIntakeState(cwd, args = "") {
 			warnings: git.warnings,
 		};
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message);
+		return errorState(error.reason ?? "work-store-error", error.message);
 	}
 }
 
-function checkpointNote({ epic, bead, git, userNote }) {
-	const details = bead ? noteDetails(bead) : {};
+function checkpointNote({ epic, workItem, git, userNote }) {
+	const details = workItem ? noteDetails(workItem) : {};
 	const dirty = git.dirtyPaths?.length ? git.dirtyPaths.join(", ") : "clean";
 	return [
 		"work-pause checkpoint",
 		`epic: ${idOf(epic)} — ${titleOf(epic)}`,
-		bead ? `bead: ${idOf(bead)} — ${titleOf(bead)}` : "bead: none",
+		workItem ? `workItem: ${idOf(workItem)} — ${titleOf(workItem)}` : "workItem: none",
 		`git: ${dirty}`,
 		`last verification: ${details.commands?.at(-1) ?? "unknown"}`,
 		`failures: ${details.reason || "none recorded"}`,
@@ -6243,15 +6220,15 @@ function buildWorkPauseState(cwd, args = "") {
 			});
 		const childState = buildEpicChildState(cwd, resolved.epic);
 		const git = resumeGitReport(cwd);
-		const bead =
+		const workItem =
 			childState.inProgress.length === 1 ? childState.inProgress[0] : undefined;
 		const noteText = checkpointNote({
 			epic: resolved.epic,
-			bead,
+			workItem,
 			git,
 			userNote: note,
 		});
-		if (!bead)
+		if (!workItem)
 			return {
 				ok: true,
 				action: "draft-checkpoint",
@@ -6259,25 +6236,25 @@ function buildWorkPauseState(cwd, args = "") {
 				git,
 				note: noteText,
 				message:
-					"No single in-progress Bead found; checkpoint draft was not appended.",
+					"No single in-progress WorkItem found; checkpoint draft was not appended.",
 				warnings: git.warnings,
 				json,
 			};
-		appendBeadNote(cwd, idOf(bead), noteText);
+		appendWorkflowWorkItemNote(cwd, idOf(workItem), noteText);
 		return {
 			ok: true,
 			action: "checkpoint-appended",
 			epic: issueSummary(resolved.epic),
-			selectedBead: issueSummary(bead),
+			selectedWorkItem: issueSummary(workItem),
 			git,
 			note: noteText,
-			message: `Checkpoint appended to ${idOf(bead)}.`,
+			message: `Checkpoint appended to ${idOf(workItem)}.`,
 			warnings: git.warnings,
 			json,
 		};
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: "work-store-error",
 		});
 	}
 }
@@ -6291,7 +6268,7 @@ function splitTargetGuidance(args = "") {
 			guidance: text.slice(colon + 1).trim(),
 		};
 	const [first, rest] = splitFirstWord(text);
-	if (rest && (isBeadId(first) || isNumericBeadShorthand(first)))
+	if (rest && (isWorkItemId(first) || isNumericWorkItemShorthand(first)))
 		return { target: first, guidance: rest.trim() };
 	return { target: text, guidance: "" };
 }
@@ -6316,9 +6293,9 @@ function debugHandoff(state, guidance = "", cwd) {
 			state,
 			"debug",
 			[
-				`Debug Bead: ${state.selectedBead.id} — ${state.selectedBead.title}`,
+				`Debug WorkItem: ${state.selectedWorkItem.id} — ${state.selectedWorkItem.title}`,
 				guidance ? `Guidance: ${guidance}` : "Guidance: none",
-				"Do not rediscover the debug target. Verify Beads/git freshness, then run the debug loop for this Bead.",
+				"Do not rediscover the debug target. Verify native work-item store/git freshness, then run the debug loop for this WorkItem.",
 			],
 			cwd,
 		),
@@ -6328,11 +6305,11 @@ function debugHandoff(state, guidance = "", cwd) {
 function buildWorkDebugState(cwd, args = "") {
 	let { target, guidance } = splitTargetGuidance(args);
 	if (!target)
-		return errorState("usage", "Usage: /work-debug <bug-or-bead-id|symptom>", {
+		return errorState("usage", "Usage: /work-debug <bug-or-work-item-id|symptom>", {
 			action: "usage",
 		});
 	try {
-		const expanded = expandNumericBeadShorthand(cwd, target);
+		const expanded = expandNumericWorkItemShorthand(cwd, target);
 		if (expanded.error)
 			return errorState(expanded.error, expanded.message, expanded);
 		target = expanded.target;
@@ -6345,12 +6322,12 @@ function buildWorkDebugState(cwd, args = "") {
 		let source;
 		let bug;
 		let epic;
-		if (isBeadId(target)) {
-			source = one(bdJsonRequired(cwd, ["show", target]));
+		if (isWorkItemId(target)) {
+			source = readWorkItem(cwd, target);
 			if (!source)
-				return errorState("unknown-target", `No Bead found for ${target}`);
+				return errorState("unknown-target", `No WorkItem found for ${target}`);
 			const linked = debugNeededId(source);
-			if (linked) bug = one(bdJsonRequired(cwd, ["show", linked]));
+			if (linked) bug = readWorkItem(cwd, linked);
 			if (!bug && (isDebugIssue(source) || isBlockedIssue(source)))
 				bug = source;
 			if (!bug) bug = findExistingDebugBug(cwd, source);
@@ -6361,16 +6338,16 @@ function buildWorkDebugState(cwd, args = "") {
 			epic =
 				typeOf(source) === "epic"
 					? source
-					: one(bdJsonRequired(cwd, ["show", parentId]));
+					: readWorkItem(cwd, parentId);
 			if (!bug) {
-				bug = createBead(cwd, {
+				bug = createWorkflowWorkItem(cwd, {
 					title: `Debug ${titleOf(source)}`,
 					type: "bug",
 					parent: parentId,
 					notes: `debug target: ${idOf(source)}`,
 				});
 				if (typeOf(source) !== "epic")
-					run(cwd, "bd", ["dep", "add", idOf(source), idOf(bug)]);
+					addWorkDependency(cwd, idOf(source), idOf(bug));
 			}
 		} else {
 			const resolved = resolveWorkflowEpic(cwd, "");
@@ -6380,36 +6357,30 @@ function buildWorkDebugState(cwd, args = "") {
 					candidates: resolved.candidates ?? [],
 				});
 			epic = resolved.epic;
-			bug = createBead(cwd, {
+			bug = createWorkflowWorkItem(cwd, {
 				title: target,
 				type: "bug",
 				parent: idOf(epic),
 				notes: guidance ? `guidance: ${guidance}` : "created by /work-debug",
 			});
 		}
-		if (guidance && bug && !(source === undefined && !isBeadId(target))) {
+		if (guidance && bug && !(source === undefined && !isWorkItemId(target))) {
 			if (isBlockedIssue(bug))
-				bug = one(
-					bdJsonRequired(cwd, [
-						"update",
-						idOf(bug),
-						"--status",
-						"open",
-						"--append-notes",
-						`retry-guidance: ${guidance}`,
-					]),
-				);
-			else appendBeadNote(cwd, idOf(bug), `guidance: ${guidance}`);
+				bug = updateWorkItemNative(cwd, idOf(bug), {
+					status: "open",
+					notes: [...(loadStore(cwd).items[idOf(bug)]?.notes ?? []), `retry-guidance: ${guidance}`],
+				});
+			else appendWorkflowWorkItemNote(cwd, idOf(bug), `guidance: ${guidance}`);
 		}
 		if (bug && isBlockedIssue(bug) && !guidance)
 			return {
 				ok: true,
 				action: "debug-blocked",
 				epic: issueSummary(epic ?? { id: parentOf(bug) }),
-				selectedBead: issueSummary(bug),
-				sourceBead: source ? issueSummary(source) : undefined,
+				selectedWorkItem: issueSummary(bug),
+				sourceWorkItem: source ? issueSummary(source) : undefined,
 				git,
-				message: `Debug Bead ${idOf(bug)} is already blocked. Add guidance after ':' to retry, otherwise use /work-report ${idOf(bug)}.`,
+				message: `Debug WorkItem ${idOf(bug)} is already blocked. Add guidance after ':' to retry, otherwise use /work-report ${idOf(bug)}.`,
 				suggestedCommands: [
 					`/work-report ${idOf(bug)}`,
 					`/work-debug ${idOf(bug)}: <what changed / what to retry>`,
@@ -6424,8 +6395,8 @@ function buildWorkDebugState(cwd, args = "") {
 						? "debug-resolved"
 						: "debug-ready",
 				epic: issueSummary(epic ?? { id: parentOf(bug) }),
-				selectedBead: issueSummary(bug),
-				sourceBead: source ? issueSummary(source) : undefined,
+				selectedWorkItem: issueSummary(bug),
+				sourceWorkItem: source ? issueSummary(source) : undefined,
 				git,
 				message: `Debug target ready: ${idOf(bug)}.`,
 				warnings: git.warnings,
@@ -6434,8 +6405,8 @@ function buildWorkDebugState(cwd, args = "") {
 			cwd,
 		);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -6459,7 +6430,7 @@ function buildWorkAddState(cwd, args = "") {
 	if (!parsed.task)
 		return errorState(
 			"usage",
-			"Usage: /work-add [--epic <id>] [--blocked-by <bead-id>] <task>",
+			"Usage: /work-add [--epic <id>] [--blocked-by <work-item-id>] <task>",
 			{
 				action: "usage",
 			},
@@ -6471,7 +6442,7 @@ function buildWorkAddState(cwd, args = "") {
 		if (!git.safeForHandoff)
 			return dirtyStopState(
 				git,
-				"Dirty files must be resolved before /work-add can mutate Beads.",
+				"Dirty files must be resolved before /work-add can mutate native work-item store.",
 			);
 		const resolved = resolveParsedEpic(cwd, parsed);
 		if (resolved.error)
@@ -6481,40 +6452,40 @@ function buildWorkAddState(cwd, args = "") {
 			});
 		let blocker;
 		if (parsed.blockedBy) {
-			const expanded = expandNumericBeadShorthand(
+			const expanded = expandNumericWorkItemShorthand(
 				cwd,
 				parsed.blockedBy,
-				"bead",
+				"workItem",
 			);
 			if (expanded.error)
 				return errorState(expanded.error, expanded.message, expanded);
-			blocker = one(bdJsonRequired(cwd, ["show", expanded.target]));
+			blocker = readWorkItem(cwd, expanded.target);
 		}
-		const bead = createBead(cwd, {
+		const workItem = createWorkflowWorkItem(cwd, {
 			title: parsed.task,
 			type: "task",
 			parent: idOf(resolved.epic),
 			notes: "created by /work-add",
 		});
-		if (blocker) run(cwd, "bd", ["dep", "add", idOf(bead), idOf(blocker)]);
+		if (blocker) addWorkDependency(cwd, idOf(workItem), idOf(blocker));
 		return {
 			ok: true,
 			action: "work-added",
 			epic: issueSummary(resolved.epic),
-			selectedBead: issueSummary(bead),
+			selectedWorkItem: issueSummary(workItem),
 			blockedBy: blocker ? issueSummary(blocker) : undefined,
 			git,
-			message: `Created ${idOf(bead)} under ${idOf(resolved.epic)}.`,
+			message: `Created ${idOf(workItem)} under ${idOf(resolved.epic)}.`,
 			warnings: git.warnings,
 		};
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
 
-function explicitBeadIn(text) {
+function explicitWorkItemIn(text) {
 	return (
 		String(text).match(/\b[A-Za-z][A-Za-z0-9_-]*-[A-Za-z0-9_.-]+\b/)?.[0] ?? ""
 	);
@@ -6568,11 +6539,11 @@ function buildWorkAutoState(cwd, args = "") {
 				git,
 				"Dirty files must be resolved before /work-auto can launch writers.",
 			);
-		const beadId = explicitBeadIn(task);
-		if (beadId) {
-			const issue = one(bdJsonRequired(cwd, ["show", beadId]));
+		const workItemId = explicitWorkItemIn(task);
+		if (workItemId) {
+			const issue = readWorkItem(cwd, workItemId);
 			if (issue && (isBlockedIssue(issue) || debugNeededId(issue)))
-				return buildWorkDebugState(cwd, beadId);
+				return buildWorkDebugState(cwd, workItemId);
 		}
 		const classification = classifyAutoTask(task);
 		const builders = {
@@ -6592,13 +6563,13 @@ function buildWorkAutoState(cwd, args = "") {
 				: routed.message,
 		};
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
 
-function workflowBeadNotes(command, task, extra = [], roleAgent = true) {
+function workflowWorkItemNotes(command, task, extra = [], roleAgent = true) {
 	return [
 		`created by ${command}`,
 		...extra,
@@ -6611,9 +6582,9 @@ function workflowBeadNotes(command, task, extra = [], roleAgent = true) {
 
 function resolveParsedEpic(cwd, parsed) {
 	if (!parsed.epic) return resolveWorkflowEpic(cwd, "");
-	const expanded = expandNumericBeadShorthand(cwd, parsed.epic, "epic");
+	const expanded = expandNumericWorkItemShorthand(cwd, parsed.epic, "epic");
 	if (expanded.error) return expanded;
-	const epic = one(bdJsonRequired(cwd, ["show", expanded.target]));
+	const epic = readWorkItem(cwd, expanded.target);
 	return typeOf(epic) === "epic"
 		? { kind: "epic", epic }
 		: {
@@ -6622,16 +6593,14 @@ function resolveParsedEpic(cwd, parsed) {
 			};
 }
 
-function claimWorkflowBead(cwd, issue) {
+function claimWorkflowWorkItem(cwd, issue) {
 	if (statusOf(issue) === "closed") {
-		const error = new Error(`Bead ${idOf(issue)} is already closed.`);
+		const error = new Error(`WorkItem ${idOf(issue)} is already closed.`);
 		error.reason = "closed-target";
 		throw error;
 	}
 	if (statusOf(issue) === "in_progress") return issue;
-	return one(
-		bdJsonRequired(cwd, ["update", idOf(issue), "--status", "in_progress"]),
-	);
+	return updateWorkItemNative(cwd, idOf(issue), { status: "in_progress" });
 }
 
 function buildWorkSmallState(cwd, args = "") {
@@ -6639,7 +6608,7 @@ function buildWorkSmallState(cwd, args = "") {
 	if (!raw)
 		return errorState(
 			"usage",
-			"Usage: /work-small [--epic <id>|<bead-id>] <task>",
+			"Usage: /work-small [--epic <id>|<work-item-id>] <task>",
 			{ action: "usage" },
 		);
 	try {
@@ -6653,7 +6622,7 @@ function buildWorkSmallState(cwd, args = "") {
 		const expandedFirst =
 			first === "--epic"
 				? { target: first }
-				: expandNumericBeadShorthand(cwd, first);
+				: expandNumericWorkItemShorthand(cwd, first);
 		if (expandedFirst.error)
 			return errorState(
 				expandedFirst.error,
@@ -6661,13 +6630,13 @@ function buildWorkSmallState(cwd, args = "") {
 				expandedFirst,
 			);
 		const firstTarget = expandedFirst.target;
-		if (isBeadId(firstTarget) && firstTarget !== "--epic") {
-			const issue = one(bdJsonRequired(cwd, ["show", firstTarget]));
+		if (isWorkItemId(firstTarget) && firstTarget !== "--epic") {
+			const issue = readWorkItem(cwd, firstTarget);
 			if (!issue)
-				return errorState("unknown-target", `No Bead found for ${firstTarget}`);
+				return errorState("unknown-target", `No WorkItem found for ${firstTarget}`);
 			if (typeOf(issue) !== "epic") {
-				const epic = one(bdJsonRequired(cwd, ["show", parentOf(issue)]));
-				const claimed = claimWorkflowBead(cwd, issue);
+				const epic = readWorkItem(cwd, parentOf(issue));
+				const claimed = claimWorkflowWorkItem(cwd, issue);
 				return withHandoffPrompt(
 					{
 						ok: true,
@@ -6677,7 +6646,7 @@ function buildWorkSmallState(cwd, args = "") {
 						inlineLevel: "small",
 						smallTask: compactTaskSummary(claimed, { notesTail: 800 }),
 						epic: issueSummary(epic),
-						selectedBead: issueSummary(claimed),
+						selectedWorkItem: issueSummary(claimed),
 						git,
 						message: `Using existing ${idOf(issue)}.`,
 						warnings: git.warnings,
@@ -6693,13 +6662,13 @@ function buildWorkSmallState(cwd, args = "") {
 				return errorState("usage", "Usage: /work-small <epic-id> <task>", {
 					action: "usage",
 				});
-			const bead = claimWorkflowBead(
+			const workItem = claimWorkflowWorkItem(
 				cwd,
-				createBead(cwd, {
+				createWorkflowWorkItem(cwd, {
 					title: task,
 					type: "task",
 					parent: idOf(issue),
-					notes: workflowBeadNotes(
+					notes: workflowWorkItemNotes(
 						"/work-small",
 						task,
 						["wo:implementation"],
@@ -6714,11 +6683,11 @@ function buildWorkSmallState(cwd, args = "") {
 					fastSmall: true,
 					inlineWork: true,
 					inlineLevel: "small",
-					smallTask: compactTaskSummary(bead, { notesTail: 800 }),
+					smallTask: compactTaskSummary(workItem, { notesTail: 800 }),
 					epic: issueSummary(issue),
-					selectedBead: issueSummary(bead),
+					selectedWorkItem: issueSummary(workItem),
 					git,
-					message: `Created ${idOf(bead)} under ${idOf(issue)}.`,
+					message: `Created ${idOf(workItem)} under ${idOf(issue)}.`,
 					warnings: git.warnings,
 				},
 				cwd,
@@ -6731,13 +6700,13 @@ function buildWorkSmallState(cwd, args = "") {
 				action: "ask-target",
 				candidates: resolved.candidates ?? [],
 			});
-		const bead = claimWorkflowBead(
+		const workItem = claimWorkflowWorkItem(
 			cwd,
-			createBead(cwd, {
+			createWorkflowWorkItem(cwd, {
 				title: parsed.task,
 				type: "task",
 				parent: idOf(resolved.epic),
-				notes: workflowBeadNotes(
+				notes: workflowWorkItemNotes(
 					"/work-small",
 					parsed.task,
 					["wo:implementation"],
@@ -6752,18 +6721,18 @@ function buildWorkSmallState(cwd, args = "") {
 				fastSmall: true,
 				inlineWork: true,
 				inlineLevel: "small",
-				smallTask: compactTaskSummary(bead, { notesTail: 800 }),
+				smallTask: compactTaskSummary(workItem, { notesTail: 800 }),
 				epic: issueSummary(resolved.epic),
-				selectedBead: issueSummary(bead),
+				selectedWorkItem: issueSummary(workItem),
 				git,
-				message: `Created ${idOf(bead)} under ${idOf(resolved.epic)}.`,
+				message: `Created ${idOf(workItem)} under ${idOf(resolved.epic)}.`,
 				warnings: git.warnings,
 			},
 			cwd,
 		);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -6779,7 +6748,7 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 		if (!git.safeForHandoff)
 			return dirtyStopState(
 				git,
-				`Dirty files must be resolved before /work-${size} can mutate Beads.`,
+				`Dirty files must be resolved before /work-${size} can mutate native work-item store.`,
 			);
 		const resolved = resolveParsedEpic(cwd, parsed);
 		if (resolved.error)
@@ -6789,13 +6758,13 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 			});
 		const posture =
 			size === "big"
-				? "big slice: split into executable Beads and decision Beads before implementation"
-				: "medium slice: create one executable child Bead by default before implementation; create up to three only for obvious low-risk sequences";
-		const bead = createBead(cwd, {
+				? "big slice: split into executable native work-item store and decision native work-item store before implementation"
+				: "medium slice: create one executable child WorkItem by default before implementation; create up to three only for obvious low-risk sequences";
+		const workItem = createWorkflowWorkItem(cwd, {
 			title: parsed.task,
 			type: "task",
 			parent: idOf(resolved.epic),
-			notes: workflowBeadNotes(`/work-${size}`, parsed.task, [
+			notes: workflowWorkItemNotes(`/work-${size}`, parsed.task, [
 				"wo:planning",
 				posture,
 			]),
@@ -6805,20 +6774,20 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 				ok: true,
 				action: "run-planner",
 				epic: issueSummary(resolved.epic),
-				selectedBead: issueSummary(bead),
+				selectedWorkItem: issueSummary(workItem),
 				git,
-				message: `Created planning Bead ${idOf(bead)} under ${idOf(resolved.epic)}.`,
+				message: `Created planning WorkItem ${idOf(workItem)} under ${idOf(resolved.epic)}.`,
 				warnings: git.warnings,
 				handoffExtra: [
 					posture,
-					`Planner must verify dependency direction once with node ${JSON.stringify(WORK_HELPER_SCRIPT)} bd-ready-summary ${idOf(resolved.epic)}.`,
+					`Planner must verify dependency direction once with node ${JSON.stringify(WORK_HELPER_SCRIPT)} work-ready-summary ${idOf(resolved.epic)}.`,
 				],
 			},
 			cwd,
 		);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -6842,13 +6811,13 @@ function buildWorkMedState(cwd, args = "") {
 				action: "ask-target",
 				candidates: resolved.candidates ?? [],
 			});
-		const bead = claimWorkflowBead(
+		const workItem = claimWorkflowWorkItem(
 			cwd,
-			createBead(cwd, {
+			createWorkflowWorkItem(cwd, {
 				title: parsed.task,
 				type: "task",
 				parent: idOf(resolved.epic),
-				notes: workflowBeadNotes(
+				notes: workflowWorkItemNotes(
 					"/work-med",
 					parsed.task,
 					["wo:implementation", "wo:execution-inline"],
@@ -6863,11 +6832,11 @@ function buildWorkMedState(cwd, args = "") {
 					action: "run-implementation",
 					inlineWork: true,
 					inlineLevel: "medium",
-					smallTask: compactTaskSummary(bead, { notesTail: 1200 }),
+					smallTask: compactTaskSummary(workItem, { notesTail: 1200 }),
 					epic: issueSummary(resolved.epic),
-					selectedBead: issueSummary(bead),
+					selectedWorkItem: issueSummary(workItem),
 					git,
-					message: `Created ${idOf(bead)} under ${idOf(resolved.epic)} for inline medium work.`,
+					message: `Created ${idOf(workItem)} under ${idOf(resolved.epic)} for inline medium work.`,
 					warnings: git.warnings,
 				},
 				cwd,
@@ -6875,8 +6844,8 @@ function buildWorkMedState(cwd, args = "") {
 			cwd,
 		);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -7117,8 +7086,8 @@ function openQuestionsBlockState(cwd, rel, questions, command, git, init) {
 			`work-orchestrator OPEN-QUESTION GATE: ${command} is blocked because ${rel} still has ${questions.length} open question(s). Do NOT create the epic until the plan is decision-complete.`,
 			"Resolve every open question in the current session, one ask_user call per question:",
 			`Open questions:\n${listing}`,
-			"For EACH question run exactly one ask_user call: show the question text, offer its suggested default as the recommended option, allow a freeform answer, and allow an explicit 'waive — defer to a decision Bead' option. A default is a suggestion to present, never a silent resolution; do not skip a question or accept its default without asking.",
-			"After each answer, edit the plan to fold the decision in: move the item out of the Open Questions section into Decisions/Assumptions as a confirmed decision (or, for a waiver, mark it 'waived' and create/reuse a decision Bead). Items marked confirmed/resolved/decided/waived are ignored by the gate.",
+			"For EACH question run exactly one ask_user call: show the question text, offer its suggested default as the recommended option, allow a freeform answer, and allow an explicit 'waive — defer to a decision WorkItem' option. A default is a suggestion to present, never a silent resolution; do not skip a question or accept its default without asking.",
+			"After each answer, edit the plan to fold the decision in: move the item out of the Open Questions section into Decisions/Assumptions as a confirmed decision (or, for a waiver, mark it 'waived' and create/reuse a decision WorkItem). Items marked confirmed/resolved/decided/waived are ignored by the gate.",
 			`When zero open questions remain, re-run ${command} ${rel}; the extension re-scans and creates the epic automatically.`,
 			ROLE_TIMEOUT_GUIDANCE,
 		].join("\n"),
@@ -7130,7 +7099,7 @@ function openQuestionsBlockState(cwd, rel, questions, command, git, init) {
 export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 	const planText = readFileSync(join(cwd, rel), "utf8");
 	const gitReport = git ?? resumeGitReport(cwd, [rel]);
-	const initReport = init ?? ensureBeadsInitialized(cwd);
+	const initReport = init ?? ensureWorkStoreInitialized(cwd);
 	const openQuestions = scanPlanOpenQuestions(planText);
 	if (openQuestions.length)
 		return openQuestionsBlockState(
@@ -7144,7 +7113,7 @@ export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 	if (!safeForPlanBootstrap(cwd, gitReport, rel))
 		return planBootstrapDirtyStop(cwd, gitReport, rel, command);
 	const fields = planEpicFields(cwd, rel);
-	const epic = createBead(cwd, {
+	const epic = createWorkflowWorkItem(cwd, {
 		title: fields.title,
 		type: "epic",
 		description: fields.description,
@@ -7153,11 +7122,11 @@ export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 		notes: fields.notes,
 	});
 	rememberWorkflowEpic(cwd, epic);
-	const planning = createBead(cwd, {
+	const planning = createWorkflowWorkItem(cwd, {
 		title: `Plan next slice for ${fields.title}`,
 		type: "task",
 		parent: idOf(epic),
-		notes: workflowBeadNotes(command, fields.title, [
+		notes: workflowWorkItemNotes(command, fields.title, [
 			"wo:planning",
 			`source plan: ${rel}`,
 			fields.ideaId ? `idea-id=${fields.ideaId}` : "",
@@ -7165,7 +7134,7 @@ export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 		]),
 	});
 	if (fields.ideaId)
-		appendBeadNote(
+		appendWorkflowWorkItemNote(
 			cwd,
 			fields.ideaId,
 			`wo:idea status=discussed plan-path=${rel} epic-id=${idOf(epic)} task-id=${idOf(planning)}`,
@@ -7175,9 +7144,9 @@ export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 			ok: true,
 			action: "run-planner",
 			epic: issueSummary(epic),
-			selectedBead: issueSummary(planning),
+			selectedWorkItem: issueSummary(planning),
 			git: gitReport,
-			message: `${initReport.initialized ? `${initReport.message} ` : ""}Created epic ${idOf(epic)} and planning Bead ${idOf(planning)} from ${rel}.`,
+			message: `${initReport.initialized ? `${initReport.message} ` : ""}Created epic ${idOf(epic)} and planning WorkItem ${idOf(planning)} from ${rel}.`,
 			warnings: gitReport.warnings,
 			suggestedCommands: [`/work-resume ${idOf(epic)}`],
 			nextAction: `Next: run /work-resume ${idOf(epic)} to plan and start the first slice.`,
@@ -7362,14 +7331,14 @@ function resolveIdeaTarget(cwd, epicId, target) {
 	if (matches.length > 1)
 		return {
 			error: "ambiguous-target",
-			message: `Multiple ideas match ${text}; use a Bead ID.`,
+			message: `Multiple ideas match ${text}; use a WorkItem ID.`,
 			candidates: matches,
 		};
 	return { error: "unknown-target", message: `No idea found for ${text}.` };
 }
 
 function appendIdeaStatus(cwd, id, status, action) {
-	return appendBeadNote(
+	return appendWorkflowWorkItemNote(
 		cwd,
 		id,
 		`wo:idea status=${status} action=${action} updated-at=${new Date().toISOString()}`,
@@ -7390,9 +7359,9 @@ function importIdea(cwd, epic, target) {
 	const existing = ideas.find((idea) => ideaSourcePath(idea) === rel);
 	const title = artifactTitle(cwd, rel);
 	const note = `wo:idea status=accepted source-path=${rel} imported-at=${new Date().toISOString()}`;
-	const bead = existing
-		? appendBeadNote(cwd, idOf(existing), note)
-		: createBead(cwd, {
+	const workItem = existing
+		? appendWorkflowWorkItemNote(cwd, idOf(existing), note)
+		: createWorkflowWorkItem(cwd, {
 				title,
 				type: "task",
 				parent: idOf(epic),
@@ -7403,9 +7372,9 @@ function importIdea(cwd, epic, target) {
 		ok: true,
 		action: existing ? "import-updated" : "import-created",
 		epic: issueSummary(epic),
-		idea: issueSummary(bead),
-		message: `${existing ? "Updated" : "Created"} idea ${idOf(bead)} from ${rel}.`,
-		suggestedCommands: [`/work-ideate ${idOf(bead)} inspect`],
+		idea: issueSummary(workItem),
+		message: `${existing ? "Updated" : "Created"} idea ${idOf(workItem)} from ${rel}.`,
+		suggestedCommands: [`/work-ideate ${idOf(workItem)} inspect`],
 	};
 }
 
@@ -7487,7 +7456,7 @@ function captureIdeationIdeas(
 ) {
 	const parsed = parseIdeationIdeas(output);
 	if (!parsed.length) {
-		const recovery = createBead(cwd, {
+		const recovery = createWorkflowWorkItem(cwd, {
 			title: `Recover ideation output: ${String(topic ?? "ideas").slice(0, 80)}`,
 			type: "decision",
 			parent: idOf(epic),
@@ -7501,7 +7470,7 @@ function captureIdeationIdeas(
 			recovery: issueSummary(recovery),
 			saved: [],
 			unsaved: [],
-			message: `Could not parse ideation output; created recovery Bead ${idOf(recovery)}.`,
+			message: `Could not parse ideation output; created recovery WorkItem ${idOf(recovery)}.`,
 		};
 	}
 	const saved = [];
@@ -7514,16 +7483,16 @@ function captureIdeationIdeas(
 				idea,
 			);
 			const note = `wo:idea schema=${IDEA_SCHEMA_VERSION} status=${idea.status} source-run-id=${runId} source-index=${idea.index} title-hash=${idea.hash}`;
-			const bead = existing
-				? appendBeadNote(cwd, idOf(existing), note)
-				: createBead(cwd, {
+			const workItem = existing
+				? appendWorkflowWorkItemNote(cwd, idOf(existing), note)
+				: createWorkflowWorkItem(cwd, {
 						title: idea.title,
 						type: "task",
 						parent: idOf(epic),
 						description: idea.summary || `Idea from /work-ideate ${topic}.`,
 						notes: note,
 					});
-			saved.push(issueSummary(bead));
+			saved.push(issueSummary(workItem));
 		} catch (error) {
 			unsaved.push({ title: idea.title, error: commandErrorText(error) });
 		}
@@ -7548,8 +7517,8 @@ function ideationHandoffPrompt(epic, topic, runId) {
 		`Topic: ${topic}`,
 		`Run ID: ${runId}`,
 		`Structured capture contract: ${captureIdeationIdeas.name} expects JSON ideas[] plus optional topPicks.`,
-		"Generate roughly 20 ideas, mark about 7 top picks as accepted, the rest as contenders, then create Beads under the epic with wo:idea notes and source-run/source-index metadata.",
-		"If structured capture fails, preserve the raw output in a recovery decision Bead and report saved vs unsaved ideas.",
+		"Generate roughly 20 ideas, mark about 7 top picks as accepted, the rest as contenders, then create native work-item store under the epic with wo:idea notes and source-run/source-index metadata.",
+		"If structured capture fails, preserve the raw output in a recovery decision WorkItem and report saved vs unsaved ideas.",
 		ROLE_TIMEOUT_GUIDANCE,
 	].join("\n");
 }
@@ -7584,11 +7553,11 @@ function brainstormEpicTitle(topic) {
 }
 
 function createBrainstormEpic(cwd, topic) {
-	const epic = createBead(cwd, {
+	const epic = createWorkflowWorkItem(cwd, {
 		title: brainstormEpicTitle(topic),
 		type: "epic",
 		description: `Brainstorm workspace created by /work-brainstorm for: ${topic}`,
-		notes: workflowBeadNotes("/work-brainstorm", topic, [
+		notes: workflowWorkItemNotes("/work-brainstorm", topic, [
 			"wo:brainstorm",
 			"auto-created for standalone brainstorm",
 		]),
@@ -7621,7 +7590,7 @@ function possibleDuplicateIdeas(ideas, title) {
 }
 
 function createBrainstormIdea(cwd, epic, topic, artifact = "") {
-	return createBead(cwd, {
+	return createWorkflowWorkItem(cwd, {
 		title: compactBrainstormTitle(topic),
 		type: "task",
 		parent: idOf(epic),
@@ -7674,7 +7643,7 @@ function buildWorkBrainstormState(cwd, args = "") {
 			{ action: "usage" },
 		);
 	try {
-		const init = ensureBeadsInitialized(cwd);
+		const init = ensureWorkStoreInitialized(cwd);
 		const resolved = resolveWorkflowEpic(cwd, "");
 		let createdEpic = false;
 		let epic = resolved.epic;
@@ -7703,7 +7672,7 @@ function buildWorkBrainstormState(cwd, args = "") {
 					action: resolvedIdea.error,
 					candidates: resolvedIdea.candidates ?? [],
 				});
-			const bead = appendBeadNote(
+			const workItem = appendWorkflowWorkItemNote(
 				cwd,
 				resolvedIdea.idea.id,
 				ideaBrainstormNote(artifact, "selected-brainstorm"),
@@ -7712,7 +7681,7 @@ function buildWorkBrainstormState(cwd, args = "") {
 				ok: true,
 				action: "brainstorm-linked",
 				epic: issueSummary(epic),
-				idea: issueSummary(bead),
+				idea: issueSummary(workItem),
 				artifact,
 				topic: parsed.topic,
 				message: `Linked brainstorm${artifact ? ` ${artifact}` : ""} to ${resolvedIdea.idea.id}.`,
@@ -7727,8 +7696,8 @@ function buildWorkBrainstormState(cwd, args = "") {
 				action: match.error,
 				candidates: match.candidates ?? [],
 			});
-		const bead = match.idea
-			? appendBeadNote(
+		const workItem = match.idea
+			? appendWorkflowWorkItemNote(
 					cwd,
 					match.idea.id,
 					ideaBrainstormNote(artifact, "freeform-brainstorm"),
@@ -7742,24 +7711,24 @@ function buildWorkBrainstormState(cwd, args = "") {
 					? "brainstorm-reused"
 					: "brainstorm-created",
 			epic: issueSummary(epic),
-			idea: issueSummary(bead),
+			idea: issueSummary(workItem),
 			artifact,
 			topic: parsed.topic,
 			possibleDuplicates: match.possibleDuplicates,
 			message: [
 				init.initialized ? init.message : "",
 				createdEpic ? `Created epic ${idOf(epic)}.` : "",
-				`${match.reused ? "Updated" : "Created"} idea ${idOf(bead)} for brainstorm ${parsed.topic}.`,
+				`${match.reused ? "Updated" : "Created"} idea ${idOf(workItem)} for brainstorm ${parsed.topic}.`,
 			]
 				.filter(Boolean)
 				.join(" "),
 			suggestedCommands: artifact
 				? [`/work-plan ${artifact}`]
-				: [`/work-brainstorm idea ${idOf(bead)} <brainstorm-path>`],
+				: [`/work-brainstorm idea ${idOf(workItem)} <brainstorm-path>`],
 		};
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -7812,6 +7781,8 @@ function renderWorkBrainstormText(state) {
 }
 
 function buildWorkIdeateState(cwd, args = "") {
+	const gate = normalReadGate(cwd);
+	if (gate) return errorState(gate.reason, gate.message, { action: gate.reason, suggestedCommands: gate.reason === "migration-required" ? ["/work-remove-beads"] : [] });
 	const parsed = parseWorkIdeateArgs(args);
 	try {
 		const resolved = resolveWorkflowEpic(cwd, "");
@@ -7871,34 +7842,34 @@ function buildWorkIdeateState(cwd, args = "") {
 					`${idea.id} is ${status}; use abandon/defer/conflict resolution instead of direct reject.`,
 					{ action: "reject-refused", idea },
 				);
-			const bead = appendIdeaStatus(cwd, idea.id, "rejected", "reject");
+			const workItem = appendIdeaStatus(cwd, idea.id, "rejected", "reject");
 			return {
 				ok: true,
 				action: "rejected",
 				epic: issueSummary(epic),
-				idea: issueSummary(bead),
+				idea: issueSummary(workItem),
 				message: `Rejected ${idea.id}; it remains inspectable and resume-ineligible.`,
 				suggestedCommands: [`/work-ideate ${idea.id} inspect`],
 			};
 		}
 		if (parsed.action === "accept") {
-			const bead = appendIdeaStatus(cwd, idea.id, "accepted", "accept");
+			const workItem = appendIdeaStatus(cwd, idea.id, "accepted", "accept");
 			return {
 				ok: true,
 				action: "accepted",
 				epic: issueSummary(epic),
-				idea: issueSummary(bead),
+				idea: issueSummary(workItem),
 				message: `Accepted ${idea.id}.`,
 				suggestedCommands: [`/work-ideate ${idea.id} discuss`],
 			};
 		}
 		if (parsed.action === "discuss") {
-			const bead = appendIdeaStatus(cwd, idea.id, "discussed", "discuss");
+			const workItem = appendIdeaStatus(cwd, idea.id, "discussed", "discuss");
 			return {
 				ok: true,
 				action: "discussed",
 				epic: issueSummary(epic),
-				idea: issueSummary(bead),
+				idea: issueSummary(workItem),
 				message: `Marked ${idea.id} as discussed; next use /work-brainstorm idea ${idea.id}.`,
 				suggestedCommands: [`/work-brainstorm idea ${idea.id}`],
 			};
@@ -7911,8 +7882,8 @@ function buildWorkIdeateState(cwd, args = "") {
 			},
 		);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -7952,7 +7923,7 @@ function renderWorkIdeateText(state) {
 
 function buildWorkInitState(cwd, _args = "") {
 	try {
-		const init = ensureBeadsInitialized(cwd);
+		const init = ensureWorkStoreInitialized(cwd);
 		return {
 			ok: true,
 			action: init.initialized ? "initialized" : "already-initialized",
@@ -7961,13 +7932,11 @@ function buildWorkInitState(cwd, _args = "") {
 			nextAction: "Next: /work-plan <idea-or-plan-file>",
 		};
 	} catch (error) {
-		const reason = error.reason ?? "beads-error";
+		const reason = error.reason ?? "native-store-error";
 		return errorState(reason, error.message, {
 			action: reason,
 			suggestedCommands:
-				reason === "bd-missing"
-					? ["npm install -g @beads/bd", "bd --help"]
-					: ["bd --help"],
+				["/work-remove-beads"],
 		});
 	}
 }
@@ -8038,7 +8007,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			return errorState("missing-source", `Source path not found: ${first}`, {
 				action: "missing-source",
 			});
-		const init = ensureBeadsInitialized(cwd);
+		const init = ensureWorkStoreInitialized(cwd);
 		const masterGit = resumeGitReport(cwd);
 		const sourceArtifacts = extractRepoArtifactRefs(input);
 		const handoffPlan = (message, detail, extra = {}) => ({
@@ -8055,7 +8024,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				"Preserve every decided requirement, constraint, non-goal, reference, acceptance example, and open question from the source; the implementor must not need to guess.",
 				"Trace each source decision into exactly one place: plan requirement, implementation unit, verification/acceptance proof, explicit open question, or intentionally dropped-with-rationale note.",
 				"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
-				"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker Bead instruction, or an explicit user waiver; never leave it as passive risk prose.",
+				"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker WorkItem instruction, or an explicit user waiver; never leave it as passive risk prose.",
 				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Then create the epic in this same flow: run `node scripts/work-helper.mjs bootstrap-plan-epic <plan-path>`. That helper enforces the Open Question Gate; if it reports open-questions-block, resolve each open question via one ask_user (show the question and its suggested default), fold the answer into the plan, and re-run the helper until it creates the epic. Do NOT run /work-resume before the epic exists. Once the helper returns the epic id, end with Next: /work-resume <epic-id>.",
 				"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
 				detail,
@@ -8074,8 +8043,8 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 		const planTarget = splitPlanTarget(input);
 		const targetLooksEpic =
 			["current", "last"].includes(planTarget.target) ||
-			isBeadId(planTarget.target) ||
-			isNumericBeadShorthand(planTarget.target);
+			isWorkItemId(planTarget.target) ||
+			isNumericWorkItemShorthand(planTarget.target);
 		if (targetLooksEpic) {
 			const resolved = resolveWorkflowEpic(cwd, planTarget.target);
 			if (resolved.error)
@@ -8173,8 +8142,8 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			);
 		return bootstrapPlanEpic(cwd, first, command, masterGit, init);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -8202,6 +8171,30 @@ function parseMigrateSources(cwd, input) {
 	return { files, branches, text: text.join(" "), missing };
 }
 
+function buildWorkRemoveBeadsState(cwd, args = "") {
+	try {
+		const source = String(args).trim();
+		const result = migrateLegacyBeads(
+			cwd,
+			source ? { exportPath: source } : {},
+		);
+		return {
+			ok: true,
+			action: result.action,
+			message:
+				result.action === "already-migrated"
+					? "Native work store already matches the completed migration."
+					: `Migrated legacy work state to ${result.store}.`,
+			suggestedCommands: ["/work-status"],
+		};
+	} catch (error) {
+		return errorState(error.category ?? "migration-error", error.message, {
+			action: error.category ?? "migration-error",
+			suggestedCommands: ["/work-remove-beads"],
+		});
+	}
+}
+
 function buildWorkMigrateState(cwd, args = "") {
 	const input = String(args).trim();
 	if (!input)
@@ -8222,7 +8215,7 @@ function buildWorkMigrateState(cwd, args = "") {
 			action: "handoff-migrate",
 			git,
 			sources,
-			message: "Migration sources normalized for bead-migrator.",
+			message: "Migration sources normalized for work-migrator.",
 			handoffPrompt: [
 				"Use the work-orchestrator skill in mode: migrate with this precomputed extension state.",
 				`Files: ${sources.files.length ? sources.files.join(", ") : "none"}`,
@@ -8234,8 +8227,8 @@ function buildWorkMigrateState(cwd, args = "") {
 			warnings: git.warnings,
 		};
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -8323,8 +8316,8 @@ function samePathSet(left = [], right = []) {
 	return a.size === b.size && [...a].every((item) => b.has(item));
 }
 
-function isBeadsPath(file) {
-	return normalizedRepoPath(file).startsWith(".beads/");
+function isWorkStorePath(file) {
+	return normalizedRepoPath(file).startsWith(".ce-workflow/");
 }
 
 function ensureOnlyStaged(cwd, files) {
@@ -8352,30 +8345,44 @@ function executeWorkFinishState(cwd, state) {
 			"Pre-commit gates are still required before coded commit/close.",
 			state,
 		);
+	let headBefore;
+	let canonicalBefore;
 	try {
 		const files = state.relatedFiles ?? [];
-		run(cwd, "git", ["add", "--", ...files]);
-		ensureOnlyStaged(cwd, files);
+		const canonical = ".ce-workflow/work-items.json";
+		headBefore = run(cwd, "git", ["rev-parse", "HEAD"]);
+		const canonicalPath = join(cwd, canonical);
+		canonicalBefore = existsSync(canonicalPath)
+			? readFileSync(canonicalPath, "utf8")
+			: undefined;
+		run(cwd, "git", ["add", "--", ...files, canonical]);
+		ensureOnlyStaged(cwd, [...files, canonical]);
 		run(cwd, "git", ["commit", "-m", state.commitMessage]);
 		amendIfOnly(cwd, gitDirty(cwd), files, "Post-commit dirty files");
-		run(cwd, "bd", ["close", state.selectedBead.id]);
+		updateWorkItemNative(cwd, state.selectedWorkItem.id, { status: "closed" });
 		const closeDirty = gitDirty(cwd);
-		amendIfOnly(
-			cwd,
-			closeDirty,
-			closeDirty.map((item) => item.path).filter(isBeadsPath),
-			"Bead close changed non-Beads files",
-		);
+		if (closeDirty.some((item) => normalizedRepoPath(item.path) !== canonical))
+			throw new Error("Work-item close changed other files");
+		run(cwd, "git", ["add", "--", canonical]);
+		run(cwd, "git", ["commit", "--amend", "--no-edit"]);
 		const commitHash = run(cwd, "git", ["rev-parse", "--short", "HEAD"]);
 		return {
 			...state,
 			action: "finish-committed",
 			commitHash,
-			message: "Committed related files and closed the Bead.",
+			message: "Committed related files and closed the WorkItem.",
 			note: `Commit: ${commitHash} ${state.commitMessage}`,
 			nextAction: `Next: /work-resume ${state.epic.id}`,
 		};
 	} catch (error) {
+		// ponytail: only the canonical state needs restoring; Git reset restores the commit.
+		try {
+			const canonicalPath = join(cwd, ".ce-workflow/work-items.json");
+			if (typeof canonicalBefore === "string") writeFileSync(canonicalPath, canonicalBefore);
+			if (typeof headBefore === "string") run(cwd, "git", ["reset", "--mixed", headBefore]);
+		} catch {
+			// Preserve the original finalization failure.
+		}
 		return errorState(
 			"finish-execute-failed",
 			commandErrorText(error) || error.message,
@@ -8387,54 +8394,54 @@ function executeWorkFinishState(cwd, state) {
 function buildWorkFinishState(cwd, args = "") {
 	let target = String(args).trim();
 	if (!target)
-		return errorState("usage", "Usage: /work-finish <bead-id|epic-id>", {
+		return errorState("usage", "Usage: /work-finish <work-item-id|epic-id>", {
 			action: "usage",
 		});
 	try {
-		const expanded = expandNumericBeadShorthand(cwd, target);
+		const expanded = expandNumericWorkItemShorthand(cwd, target);
 		if (expanded.error)
 			return errorState(expanded.error, expanded.message, expanded);
 		target = expanded.target;
-		const issue = one(bdJsonRequired(cwd, ["show", target]));
+		const issue = readWorkItem(cwd, target);
 		if (!issue)
-			return errorState("unknown-target", `No Bead found for ${target}`);
-		let bead = issue;
+			return errorState("unknown-target", `No WorkItem found for ${target}`);
+		let workItem = issue;
 		let epic = issue;
 		if (typeOf(issue) === "epic") {
 			const childState = buildEpicChildState(cwd, issue);
-			bead = childState.inProgress[0] ?? childState.readyWork[0];
-			if (!bead)
+			workItem = childState.inProgress[0] ?? childState.readyWork[0];
+			if (!workItem)
 				return errorState(
-					"no-selected-bead",
-					"No child Bead is ready for finish gate.",
+					"no-selected-workItem",
+					"No child WorkItem is ready for finish gate.",
 					{
 						epic: issueSummary(issue),
 						action: "finish-stop",
 					},
 				);
 		} else {
-			epic = one(bdJsonRequired(cwd, ["show", parentOf(issue)]));
+			epic = readWorkItem(cwd, parentOf(issue));
 		}
 		const git = resumeGitReport(cwd);
 		const stop = (reason, message, extra = {}) =>
 			errorState(reason, message, {
 				action: "finish-stop",
 				epic: issueSummary(epic),
-				selectedBead: issueSummary(bead),
+				selectedWorkItem: issueSummary(workItem),
 				git,
 				...extra,
 			});
-		const raw = notesOf(bead);
+		const raw = notesOf(workItem);
 		const dirty = git.dirtyPaths ?? [];
 		const related = dirty.filter(
 			(file) => raw.includes(file) || raw.includes(file.split(/[\\/]/).pop()),
 		);
-		const verified = hasVerificationEvidence(bead);
+		const verified = hasVerificationEvidence(workItem);
 		const codedReview =
-			!hasReviewPass(bead) && verified && isSmallDiff(cwd, related);
-		if (isBlockedIssue(bead) || debugNeededId(bead))
-			return stop("blocked", "Selected Bead is blocked/debug-needed.");
-		if (!hasReviewPass(bead) && !codedReview)
+			!hasReviewPass(workItem) && verified && isSmallDiff(cwd, related);
+		if (isBlockedIssue(workItem) || debugNeededId(workItem))
+			return stop("blocked", "Selected WorkItem is blocked/debug-needed.");
+		if (!hasReviewPass(workItem) && !codedReview)
 			return stop("missing-review", "PASS review evidence is missing.");
 		if (!verified)
 			return stop("missing-verification", "Verification evidence is missing.");
@@ -8446,7 +8453,7 @@ function buildWorkFinishState(cwd, args = "") {
 		if (related.length !== dirty.length)
 			return stop(
 				"unrelated-dirty-files",
-				"Dirty files are not all tied to the selected Bead notes.",
+				"Dirty files are not all tied to the selected WorkItem notes.",
 				{ relatedFiles: related },
 			);
 		const gates = workOrchSettings(cwd);
@@ -8464,39 +8471,39 @@ function buildWorkFinishState(cwd, args = "") {
 			ok: true,
 			action: "commit-ready",
 			epic: issueSummary(epic),
-			selectedBead: issueSummary(bead),
+			selectedWorkItem: issueSummary(workItem),
 			git,
 			relatedFiles: related,
-			commitMessage: `${idOf(bead)}: ${titleOf(bead)}`,
+			commitMessage: `${idOf(workItem)}: ${titleOf(workItem)}`,
 			message: gated
 				? "Finish gate passed; pre-commit gates required before commit."
 				: "Finish gate has review, verification, and related dirty files.",
-			note: `Commit seed: ${idOf(bead)}: ${titleOf(bead)}\nFiles: ${related.join(
+			note: `Commit seed: ${idOf(workItem)}: ${titleOf(workItem)}\nFiles: ${related.join(
 				", ",
 			)}${codedReview ? "\nReview: coded small-diff check" : ""}${gated ? `\nGates: ${preCommitSteps.length}` : ""}`,
 			handoffPrompt: gated
 				? [
 						"Use the work-orchestrator skill in mode: finish with this precomputed extension state.",
 						`Epic: ${idOf(epic)} — ${titleOf(epic)}`,
-						`Bead: ${idOf(bead)} — ${titleOf(bead)}`,
-						`Commit message: ${idOf(bead)}: ${titleOf(bead)}`,
+						`WorkItem: ${idOf(workItem)} — ${titleOf(workItem)}`,
+						`Commit message: ${idOf(workItem)}: ${titleOf(workItem)}`,
 						`Files: ${related.join(", ")}`,
 						...preCommitSteps,
-						"After the gates pass (or explicit user waivers), commit with the seed message and close the Bead; do not rediscover the target.",
+						"After the gates pass (or explicit user waivers), commit with the seed message and close the WorkItem; do not rediscover the target.",
 					].join("\n")
 				: undefined,
 			warnings: git.warnings,
 		};
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
 
 function allRoadmaps(cwd) {
 	try {
-		return bdJsonRequired(cwd, ["list", "--type=epic"])
+		return allWorkItems(cwd).filter((item) => item.type === "epic")
 			.filter((epic) => typeOf(epic) === "epic")
 			.sort(byUpdatedDesc);
 	} catch {
@@ -8511,7 +8518,7 @@ function allRoadmaps(cwd) {
 function currentRoadmap(cwd) {
 	const id = readWorkState(cwd).lastEpicId;
 	if (id) {
-		const epic = one(bdJsonRequired(cwd, ["show", id]));
+		const epic = readWorkItem(cwd, id);
 		if (epic && typeOf(epic) === "epic") return epic;
 	}
 	const active = activeEpicCandidates(cwd);
@@ -8529,11 +8536,11 @@ function resolveRoadmapTarget(cwd, target = "") {
 					message: "No current roadmap is selected.",
 				};
 	}
-	const expanded = expandNumericBeadShorthand(cwd, text, "epic");
+	const expanded = expandNumericWorkItemShorthand(cwd, text, "epic");
 	if (expanded.error) return expanded;
-	const epic = one(bdJsonRequired(cwd, ["show", expanded.target]));
+	const epic = readWorkItem(cwd, expanded.target);
 	if (!epic)
-		return { error: "unknown-target", message: `No Bead found for ${text}` };
+		return { error: "unknown-target", message: `No WorkItem found for ${text}` };
 	if (typeOf(epic) !== "epic")
 		return {
 			error: "not-roadmap",
@@ -8569,6 +8576,13 @@ function groupedRoadmapTasks(cwd, epic) {
 }
 
 function buildWorkRoadmapState(cwd, args = "") {
+	const gate = normalReadGate(cwd);
+	if (gate)
+		return errorState(gate.reason, gate.message, {
+			action: gate.reason,
+			suggestedCommands:
+				gate.reason === "migration-required" ? ["/work-remove-beads"] : [],
+		});
 	try {
 		const { command, target, flags } = splitRoadmapArgs(args);
 		const current = (() => {
@@ -8629,13 +8643,13 @@ function buildWorkRoadmapState(cwd, args = "") {
 					action: "roadmap-close-needs-confirmation",
 					epic: issueSummary(resolved.epic),
 					unresolved: unresolved.map(issueSummary),
-					message: `${unresolved.length} unresolved child Bead(s). Close anyway?`,
+					message: `${unresolved.length} unresolved child WorkItem(s). Close anyway?`,
 					suggestedCommands: [
 						`/work-roadmap tasks ${idOf(resolved.epic)}`,
 						`/work-roadmap close ${idOf(resolved.epic)} --force`,
 					],
 				};
-			run(cwd, "bd", ["close", idOf(resolved.epic)]);
+			updateWorkItemNative(cwd, idOf(resolved.epic), { status: "closed" });
 			rememberWorkflowEpic(cwd, { ...resolved.epic, status: "closed" });
 			return {
 				ok: true,
@@ -8648,7 +8662,7 @@ function buildWorkRoadmapState(cwd, args = "") {
 			const resolved = resolveRoadmapTarget(cwd, target);
 			if (resolved.error)
 				return errorState(resolved.error, resolved.message, resolved);
-			run(cwd, "bd", ["reopen", idOf(resolved.epic)]);
+			updateWorkItemNative(cwd, idOf(resolved.epic), { status: "open" });
 			rememberWorkflowEpic(cwd, { ...resolved.epic, status: "open" });
 			return {
 				ok: true,
@@ -8663,8 +8677,8 @@ function buildWorkRoadmapState(cwd, args = "") {
 			{ action: "usage" },
 		);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message, {
-			action: error.reason ?? "beads-error",
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
 		});
 	}
 }
@@ -8680,6 +8694,13 @@ function errorState(reason, message, extra = {}) {
 }
 
 function buildWorkReportState(cwd, args = "") {
+	const gate = normalReadGate(cwd);
+	if (gate)
+		return errorState(gate.reason, gate.message, {
+			action: gate.reason,
+			suggestedCommands:
+				gate.reason === "migration-required" ? ["/work-remove-beads"] : [],
+		});
 	const { target } = parseWorkReportArgs(args);
 	try {
 		const resolved = resolveReportTarget(cwd, target);
@@ -8688,11 +8709,11 @@ function buildWorkReportState(cwd, args = "") {
 				candidates: resolved.candidates?.map(issueSummary) ?? [],
 			});
 		}
-		return resolved.kind === "bead"
-			? buildBeadReportState(cwd, resolved.bead)
+		return resolved.kind === "workItem"
+			? buildWorkItemReportState(cwd, resolved.workItem)
 			: buildEpicReportState(cwd, resolved.epic);
 	} catch (error) {
-		return errorState(error.reason ?? "beads-error", error.message);
+		return errorState(error.reason ?? "work-store-error", error.message);
 	}
 }
 
@@ -8725,24 +8746,24 @@ function renderWorkReportText(state) {
 			...renderRecommendedActions(recommendedActions(state)),
 		].join("\n");
 	}
-	if (state.bead) {
+	if (state.workItem) {
 		return [
-			`Bead: ${state.bead.title} (${state.bead.id})`,
-			`Status: ${statusLabel(state.bead.status)} • type: ${state.bead.type}`,
+			`WorkItem: ${state.workItem.title} (${state.workItem.id})`,
+			`Status: ${statusLabel(state.workItem.status)} • type: ${state.workItem.type}`,
 			"",
 			"Dependencies / blockers:",
-			...renderIssueList(state.bead.dependencies),
+			...renderIssueList(state.workItem.dependencies),
 			"",
 			"Downstream blocked:",
 			...(state.downstreamBlocked.length
 				? state.downstreamBlocked.map(
 						(item) =>
-							`- ${item.bead.id} blocked by ${item.blockedBy.id} — ${item.bead.title}`,
+							`- ${item.workItem.id} blocked by ${item.blockedBy.id} — ${item.workItem.title}`,
 					)
 				: ["- none"]),
 			"",
 			"Failure artifact / notes:",
-			state.bead.notes.reason || state.bead.notes.rawExcerpt || "- none",
+			state.workItem.notes.reason || state.workItem.notes.rawExcerpt || "- none",
 			"",
 			"Git:",
 			compactMultiline(state.git.status),
@@ -8770,7 +8791,7 @@ function renderWorkReportText(state) {
 		...(state.downstreamBlocked.length
 			? state.downstreamBlocked.map(
 					(item) =>
-						`- ${item.bead.id} blocked by ${item.blockedBy.id} — ${item.bead.title}`,
+						`- ${item.workItem.id} blocked by ${item.blockedBy.id} — ${item.workItem.title}`,
 				)
 			: ["- none"]),
 		"",
@@ -8890,8 +8911,8 @@ function renderWorkResumeText(state) {
 		`Epic: ${state.epic.title} (${state.epic.id})`,
 		`Action: ${state.action}`,
 		`Ready: ${state.counts.ready} • executable: ${state.counts.readyExecutable} • planning: ${state.counts.planning} • 🟠 blockers: ${state.counts.blockers} • 🟣❓ decisions: ${state.counts.decisions}`,
-		state.selectedBead
-			? `Selected: ${state.selectedBead.id} ${statusLabel(state.selectedBead.status)} ${state.selectedBead.type} — ${state.selectedBead.title}`
+		state.selectedWorkItem
+			? `Selected: ${state.selectedWorkItem.id} ${statusLabel(state.selectedWorkItem.status)} ${state.selectedWorkItem.type} — ${state.selectedWorkItem.title}`
 			: "Selected: none",
 		state.message ? `Reason: ${state.message}` : "",
 		...renderResumeBlockedLines(state),
@@ -8975,7 +8996,7 @@ function parseWorkGoalCommand(args = "") {
 
 function workGoalSelfImprovingAppendix() {
 	return `Self-improving overlay:
-- Use the ce-workflow/work-orchestrator process where it applies; prefer /work-init, /work-plan, /work-resume, /work-status, /work-report, and Beads-backed state over chat-only tracking.
+- Use the ce-workflow/work-orchestrator process where it applies; prefer /work-init, /work-plan, /work-resume, /work-status, /work-report, and native work-item store-backed state over chat-only tracking.
 - If a live or disposable target project exposes ce-workflow friction, fix this ce-workflow package in code before declaring done, or record one concrete follow-up when a safe fix is not possible now.
 - Prefer coded automation over prompt-only guidance when workflow behavior can be handled in this extension.
 - Use work telemetry and /work-context microcompaction to keep loops cheap, quiet, and resumable.
@@ -9187,12 +9208,12 @@ function registerWorkCatchUpCommand(pi, ctx) {
 
 function workProjectAutopilotAppendix() {
 	return `Project autopilot policy:
-- Treat the target directory as the source of truth: verify git and Beads state there before mutating anything.
+- Treat the target directory as the source of truth: verify git and native work-item store state there before mutating anything.
 - Work directly in the current session by default. Intake, target selection, bounded implementation, verification, commit, close, and push are inline/coded work, not separate agents.
-- Do not call subagent list or ask an LLM to select a role. When specialization is genuinely required, call the exact role directly: bead-planner for ambiguous/large slicing, bead-debugger for root-cause failures, bead-worker for high-risk isolated writing, bead-reviewer for sensitive/large/ambiguous diffs, and bead-fixer only for concrete review findings.
-- Never launch bead-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
-- Use /work-resume for one deterministic Bead boundary. Use /work-goal only when the user explicitly wants a multi-step autonomous loop.
-- Obey the user instruction literally; if it says one task only, stop after one executable Bead closes. If it says N tasks, stop after N executable Beads close.
+- Do not call subagent list or ask an LLM to select a role. When specialization is genuinely required, call the exact role directly: work-planner for ambiguous/large slicing, work-debugger for root-cause failures, work-worker for high-risk isolated writing, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
+- Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
+- Use /work-resume for one deterministic WorkItem boundary. Use /work-goal only when the user explicitly wants a multi-step autonomous loop.
+- Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it says N tasks, stop after N executable native work-item store close.
 - At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
 - Stop only when the requested scope is done, the epic is complete, or a real product/credential/hardware/destructive/verification decision is required.`;
 }
@@ -9443,10 +9464,11 @@ function projectGoalProgressState(cwd, goal = activeWorkGoal) {
 	if (!goal || !["active", "needs_human"].includes(goal.status))
 		return undefined;
 	if (workWarpMode(goal.mode, goal) !== "project") return undefined;
+	if (normalReadGate(cwd)) return undefined;
 	let epic = currentRoadmap(cwd);
 	if (!epic) return undefined;
 	try {
-		epic = one(bdJsonRequired(cwd, ["show", idOf(epic)])) ?? epic;
+		epic = readWorkItem(cwd, idOf(epic)) ?? epic;
 	} catch {
 		// list output is enough for the slice fallback.
 	}
@@ -9662,7 +9684,7 @@ ${escapeXmlText(goal.objective)}
 /work-goal management rules:
 - The user's objective above is the work prompt; these rules only manage looping, compaction, and human-decision stops.
 - Keep working autonomously until the objective is complete and verified.
-- Before each continuation, /work-goal will microcompact old reasoning and tool noise; treat Beads, git, files, tests, and command output as source of truth.
+- Before each continuation, /work-goal will microcompact old reasoning and tool noise; treat native work-item store, git, files, tests, and command output as source of truth.
 - Work directly in this session by default. Do not call subagent list, delegate routine implementation/verification/commit work, or launch duplicate reviewers. Spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
 - Prefer coded helpers and deterministic checks over asking an LLM to classify, summarize, validate, stage, commit, close, or choose an agent.
 - Do not stop for plan approval, permission to continue, or obvious implementation choices. Pick the clear winner and continue.
@@ -9703,7 +9725,7 @@ function buildWorkGoalContinuePrompt(goal, marker, note = "") {
 }
 
 function buildWorkGoalCompactInstructions(goal) {
-	return `work-context work-goal microcompact: preserve the active /work-goal objective, human decisions, Beads/git state, files changed/read, blockers, verification evidence, and next step. Omit old reasoning and full tool logs. Objective: ${truncate(goal.objective, 1_200)}`;
+	return `work-context work-goal microcompact: preserve the active /work-goal objective, human decisions, native work-item store/git state, files changed/read, blockers, verification evidence, and next step. Omit old reasoning and full tool logs. Objective: ${truncate(goal.objective, 1_200)}`;
 }
 
 function workGoalHasPendingMessages(ctx) {
@@ -9841,7 +9863,7 @@ function scheduleWorkGoalUsageLimitRetry(pi, ctx, goal = activeWorkGoal) {
 			pi,
 			ctx,
 			activeWorkGoal,
-			"The previous turn hit a usage/rate limit. Resume exactly where you left off; re-check Beads/git and continue.",
+			"The previous turn hit a usage/rate limit. Resume exactly where you left off; re-check native work-item store/git and continue.",
 		);
 		if (!sent && activeWorkGoal?.id === goal.id) {
 			activeWorkGoal = {
@@ -10167,7 +10189,7 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 			? ctx.sendUserMessage.bind(ctx)
 			: pi?.sendUserMessage?.bind(pi);
 	const prompt =
-		"Clean stop requested. Checkpoint current Beads/git state, stop at the next safe phase boundary, and do not start another Bead.";
+		"Clean stop requested. Checkpoint current native work-item store/git state, stop at the next safe phase boundary, and do not start another WorkItem.";
 	if (activeWorkGoal) {
 		const working = activeWorkAgent || !ctx.isIdle?.();
 		activeWorkGoal = {
@@ -10265,7 +10287,7 @@ async function handleWorkGoalResetCommand(args, ctx) {
 	const prompt = buildWorkGoalContinuePrompt(
 		goal,
 		marker || workGoalContinuationMarker(goal),
-		"Started in a fresh session; resume from Beads/git and avoid relying on prior chat.",
+		"Started in a fresh session; resume from native work-item store/git and avoid relying on prior chat.",
 	);
 	const parentSession = ctx.sessionManager?.getSessionFile?.();
 	const result = await ctx.newSession({
@@ -10473,7 +10495,7 @@ function unsupportedPrintWorkflow(ctx) {
 		ok: false,
 		action: "unsupported-mode",
 		message:
-			"Work commands that launch implementation turns require TUI or RPC mode. Print/JSON mode stopped before creating or claiming a Bead.",
+			"Work commands that launch implementation turns require TUI or RPC mode. Print/JSON mode stopped before creating or claiming a WorkItem.",
 	};
 	notify(ctx, state.message, "warning");
 	return state;
@@ -10512,7 +10534,7 @@ async function sendWorkflowFollowUp(ctx, message, pi, state) {
 		try {
 			ctx.compact({
 				customInstructions:
-					"work-context: keep current repo state, decisions, modified files, verification, and Bead IDs; the queued handoff is self-contained.",
+					"work-context: keep current repo state, decisions, modified files, verification, and WorkItem IDs; the queued handoff is self-contained.",
 				onComplete: finish,
 				onError: finish,
 			});
@@ -10607,8 +10629,8 @@ function renderWorkflowActionText(state) {
 	return [
 		`Action: ${state.action}`,
 		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "",
-		state.selectedBead
-			? `Bead: ${state.selectedBead.id} — ${state.selectedBead.title}`
+		state.selectedWorkItem
+			? `WorkItem: ${state.selectedWorkItem.id} — ${state.selectedWorkItem.title}`
 			: "",
 		state.message ? `Result: ${state.message}` : "",
 		state.git ? `Git: ${state.git.status}` : "",
@@ -10748,14 +10770,14 @@ async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 		notify(ctx, renderWorkRoadmapText(state), "info");
 		return stateTelemetry(state);
 	}
-	const [group, beadId] = task.split(":", 2);
+	const [group, workItemId] = task.split(":", 2);
 	const ops = [{ value: "summary", label: "summary" }];
 	if (group === "blocker")
 		ops.push({ value: "debug", label: "debug / full info" });
-	const op = await choose(ctx, `${beadId}: operation`, ops);
+	const op = await choose(ctx, `${workItemId}: operation`, ops);
 	if (op === "debug")
-		return handleWorkflowAction(buildWorkDebugState, beadId, ctx, pi);
-	return handleWorkReportCommand(beadId, ctx);
+		return handleWorkflowAction(buildWorkDebugState, workItemId, ctx, pi);
+	return handleWorkReportCommand(workItemId, ctx);
 }
 
 async function handleWorkRoadmapCommand(args, ctx, pi) {
@@ -10874,6 +10896,7 @@ async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
 		"work-plan": buildWorkPlanState,
 		"work-master": buildWorkMasterState,
 		"work-migrate": buildWorkMigrateState,
+		"work-remove-beads": buildWorkRemoveBeadsState,
 		"work-finish": buildWorkFinishState,
 		"work-debug": buildWorkDebugState,
 		"work-add": buildWorkAddState,
@@ -10943,6 +10966,7 @@ export {
 	buildWorkMedState,
 	buildWorkPlanState,
 	buildWorkMigrateState,
+	buildWorkRemoveBeadsState,
 	buildWorkPauseState,
 	buildWorkReport,
 	buildWorkReportState,
@@ -10950,6 +10974,7 @@ export {
 	buildWorkResume,
 	buildWorkResumeState,
 	buildWorkSmallState,
+	buildWorkStatus,
 	buildWorkTelemetry,
 	buildWorkTelemetryState,
 	buildWorkUsageState,
@@ -11344,7 +11369,7 @@ export default function workModelsExtension(pi) {
 			role,
 			handoff: { queued: false, started: true, role },
 			epicId: run.meta.epicId,
-			beadId: run.meta.beadId,
+			workItemId: run.meta.workItemId,
 			durationMs,
 			promptChars: run.promptChars,
 			messages: summarizeMessages(event.messages),
@@ -11375,7 +11400,7 @@ export default function workModelsExtension(pi) {
 				outcome: hasWorkAgentFailure(event, telemetry) ? "failed" : "completed",
 				action: run.meta.action,
 				epicId: run.meta.epicId,
-				beadId: run.meta.beadId,
+				workItemId: run.meta.workItemId,
 			},
 			{
 				pi,
@@ -11383,10 +11408,10 @@ export default function workModelsExtension(pi) {
 				session: ctx.sessionManager?.getSessionId?.(),
 			},
 		);
-		appendTelemetryNote(run.cwd, run.meta.beadId, telemetry, file);
+		appendTelemetryNote(run.cwd, run.meta.workItemId, telemetry, file);
 		appendFailureStatusNote(
 			run.cwd,
-			run.meta.beadId,
+			run.meta.workItemId,
 			run,
 			event,
 			telemetry,
@@ -11492,7 +11517,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-resume", {
-		description: "Run the next coded Beads/git work step",
+		description: "Run the next coded native work-item store/git work step",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-resume",
@@ -11546,7 +11571,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-init", {
-		description: "Initialize Beads for work-orchestrator without AGENTS noise",
+		description: "Initialize native work-item store for work-orchestrator without AGENTS noise",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-init", args, ctx, () =>
 				handleWorkflowAction(buildWorkInitState, args, ctx, pi),
@@ -11555,7 +11580,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-status", {
-		description: "Show deterministic Beads/git work-orchestrator status",
+		description: "Show deterministic native work-item store/git work-orchestrator status",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-status", args, ctx, () =>
 				handleWorkStatusCommand(args, ctx),
@@ -11564,7 +11589,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-report", {
-		description: "Show deterministic Beads/git blocker handoff report",
+		description: "Show deterministic native work-item store/git blocker handoff report",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-report", args, ctx, () =>
 				handleWorkReportCommand(args, ctx),
@@ -11573,7 +11598,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-roadmap", {
-		description: "List, select, close, reopen, and inspect Beads epics",
+		description: "List, select, close, reopen, and inspect native work-item store epics",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-roadmap", args, ctx, () =>
 				handleWorkRoadmapCommand(args, ctx, pi),
@@ -11606,7 +11631,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-ideate", {
-		description: "Show and mutate Beads-backed idea state",
+		description: "Show and mutate native work-item store-backed idea state",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-ideate", args, ctx, async () => {
 				cleanupBenignInstructionDirt(ctx.cwd);
@@ -11620,7 +11645,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-brainstorm", {
-		description: "Link brainstorms back to Beads-backed ideas",
+		description: "Link brainstorms back to native work-item store-backed ideas",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-brainstorm", args, ctx, async () => {
 				cleanupBenignInstructionDirt(ctx.cwd);
@@ -11638,7 +11663,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-pause", {
-		description: "Checkpoint current Beads-backed work and stop",
+		description: "Checkpoint current native work-item store-backed work and stop",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-pause", args, ctx, () =>
 				handleWorkflowAction(buildWorkPauseState, args, ctx, pi),
@@ -11647,7 +11672,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-small", {
-		description: "Create one implementation Bead and hand off safely",
+		description: "Create one implementation WorkItem and hand off safely",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-small",
@@ -11660,7 +11685,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-med", {
-		description: "Create one bounded medium Bead and execute it inline",
+		description: "Create one bounded medium WorkItem and execute it inline",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-med",
@@ -11673,7 +11698,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-big", {
-		description: "Create one large-slice planning Bead and hand off safely",
+		description: "Create one large-slice planning WorkItem and hand off safely",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-big",
@@ -11686,7 +11711,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-plan", {
-		description: "Plan an idea and bootstrap the Beads epic",
+		description: "Plan an idea and bootstrap the native work-item store epic",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-plan",
@@ -11711,6 +11736,15 @@ export default function workModelsExtension(pi) {
 		},
 	});
 
+	pi.registerCommand("work-remove-beads", {
+		description: "Verify and migrate a legacy workspace to native work state",
+		handler: async (args, ctx) => {
+			await withCommandTelemetry("work-remove-beads", args, ctx, () =>
+				handleWorkflowAction(buildWorkRemoveBeadsState, args, ctx, pi),
+			);
+		},
+	});
+
 	pi.registerCommand("work-migrate", {
 		description: "Normalize migration sources and hand off safely",
 		handler: async (args, ctx) => {
@@ -11726,7 +11760,7 @@ export default function workModelsExtension(pi) {
 
 	pi.registerCommand("work-finish", {
 		description:
-			"Commit reviewed work and close the Bead when deterministic gates pass",
+			"Commit reviewed work and close the WorkItem when deterministic gates pass",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-finish", args, ctx, async () => {
 				cleanupBenignInstructionDirt(ctx.cwd);
@@ -11751,7 +11785,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-debug", {
-		description: "Resolve or create a debug Bead and hand off safely",
+		description: "Resolve or create a debug WorkItem and hand off safely",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-debug",
@@ -11764,7 +11798,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-add", {
-		description: "Create explicit work under the active Beads epic",
+		description: "Create explicit work under the active native work-item store epic",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-add", args, ctx, () =>
 				handleWorkflowAction(buildWorkAddState, args, ctx, pi),
@@ -11804,7 +11838,7 @@ export default function workModelsExtension(pi) {
 				contextCompactState.requested = true;
 				ctx.compact({
 					customInstructions:
-						"manual work-context compact: preserve Beads/git state, files, blockers, and next command; omit reasoning and full tool logs.",
+						"manual work-context compact: preserve native work-item store/git state, files, blockers, and next command; omit reasoning and full tool logs.",
 					onComplete: () => {
 						contextCompactState.requested = false;
 						ctx.ui.notify("Work context compacted", "info");
@@ -12135,7 +12169,7 @@ async function workSettingsLoop(ctx) {
 				{
 					value: "agent",
 					label: "agent",
-					description: "route each slice to an isolated bead-worker subagent",
+					description: "route each slice to an isolated work-worker subagent",
 				},
 			]);
 			if (!mode) continue;

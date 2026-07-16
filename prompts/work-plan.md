@@ -1,5 +1,5 @@
 ---
-description: Plan an idea or roadmap into a Beads epic
+description: Plan an idea or roadmap into a work items epic
 argument-hint: "<idea-or-plan-file>"
 ---
 

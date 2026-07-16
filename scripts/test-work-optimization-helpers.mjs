@@ -11,6 +11,12 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+	createWorkItem,
+	initStore,
+	loadStore,
+	saveStore,
+} from "../extensions/work-store.js";
 
 const mod = await import(
 	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
@@ -45,46 +51,21 @@ try {
 		"task summary includes dependency ids",
 	);
 
-	mkdirSync(path.join(cwd, ".beads"), { recursive: true });
-	writeFileSync(
-		path.join(cwd, ".beads", "issues.jsonl"),
-		`${JSON.stringify(issue)}\n`,
-	);
+	const store = initStore(cwd);
+	createWorkItem(store, { id: "E-1", type: "epic", status: "in_progress", title: "Epic" });
+	createWorkItem(store, { id: "DEP-1", type: "task", status: "closed", title: "Dependency", parentId: "E-1" });
+	createWorkItem(store, { id: "TASK-123", type: "task", status: "open", title: "Native task", parentId: "E-1", dependencies: ["DEP-1"], notes: [issue.notes], acceptance: "must pass" });
+	saveStore(cwd, store);
 	const oldBd = process.env.WORK_ORCH_BD_BIN;
-	const fakeBd = path.join(cwd, "fake-bd.mjs");
-	const countFile = path.join(cwd, "bd-count.txt");
-	writeFileSync(
-		fakeBd,
-		`#!/usr/bin/env node\nimport { readFileSync, writeFileSync, existsSync } from "node:fs";\nconst countFile = ${JSON.stringify(countFile)};\nconst count = existsSync(countFile) ? Number(readFileSync(countFile, "utf8")) : 0;\nwriteFileSync(countFile, String(count + 1));\nconsole.log(JSON.stringify([{ id: "TASK-123", title: "Cached", status: "open", issue_type: "task", parent_id: "E-1" }]));\n`,
-	);
-	process.env.WORK_ORCH_BD_BIN = fakeBd;
-	mod.workflowTaskSummary(cwd, "TASK-123");
-	mod.workflowTaskSummary(cwd, "TASK-123");
-	assert(
-		readFileSync(countFile, "utf8") === "1",
-		"bd JSON reads are cached for unchanged Beads DB",
-	);
-	const ready = JSON.parse(
-		execFileSync(
-			process.execPath,
-			[
-				path.join(import.meta.dirname, "work-helper.mjs"),
-				"bd-ready-summary",
-				"E-1",
-			],
-			{
-				cwd,
-				encoding: "utf8",
-				env: { ...process.env, WORK_ORCH_BD_BIN: fakeBd },
-			},
-		),
-	);
-	assert(
-		ready.length === 1 && ready[0].id === "TASK-123" && !ready[0].notes_tail,
-		"ready helper returns only compact execution fields",
-	);
-	if (oldBd === undefined) delete process.env.WORK_ORCH_BD_BIN;
-	else process.env.WORK_ORCH_BD_BIN = oldBd;
+	process.env.WORK_ORCH_BD_BIN = path.join(cwd, "bd-must-not-run");
+	try {
+		assert(mod.workflowTaskSummary(cwd, "TASK-123").title === "Native task", "native task summary avoids bd");
+		const ready = JSON.parse(execFileSync(process.execPath, [path.join(import.meta.dirname, "work-helper.mjs"), "work-ready-summary", "E-1"], { cwd, encoding: "utf8" }));
+		assert(ready.length === 1 && ready[0].id === "TASK-123" && !ready[0].notes_tail, "native ready helper returns compact execution fields without bd");
+	} finally {
+		if (oldBd === undefined) delete process.env.WORK_ORCH_BD_BIN;
+		else process.env.WORK_ORCH_BD_BIN = oldBd;
+	}
 
 	const bounded = mod.runBounded(
 		cwd,
@@ -109,7 +90,8 @@ try {
 		"temp check returns compact pass JSON",
 	);
 
-	const jsonl = path.join(cwd, ".beads", "issues.jsonl");
+	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+	const jsonl = path.join(cwd, ".pi", "test-records.jsonl");
 	writeFileSync(jsonl, `${JSON.stringify(issue)}\n`);
 	const recordSummary = mod.jsonlRecordSummary(jsonl, ["TASK-123"]);
 	assert(
@@ -117,11 +99,11 @@ try {
 		"jsonl summary selects record",
 	);
 	const gate = mod.prepareTaskExportForGate(cwd, ["TASK-123"]);
-	assert(gate.status === "PASS", "export preflight catches present task");
+	assert(gate.status === "PASS", "native preflight catches present work item");
 	const missing = mod.prepareTaskExportForGate(cwd, ["NOPE"]);
 	assert(
 		missing.status === "FAIL" && missing.missing_ids[0] === "NOPE",
-		"export preflight catches stale export",
+		"native preflight catches missing work item",
 	);
 
 	const evidencePath = mod.writeEvidenceSummary(cwd, {
@@ -228,16 +210,22 @@ try {
 	);
 
 	const finishCwd = path.join(cwd, "finish-task");
-	mkdirSync(path.join(finishCwd, ".beads"), { recursive: true });
+	mkdirSync(finishCwd, { recursive: true });
+	const finishStore = initStore(finishCwd);
+	createWorkItem(finishStore, {
+		id: "TASK-1", type: "task", status: "open", title: "Routine task",
+	});
+	for (const id of ["TASK-2", "TASK-3", "TASK-4", "TASK-ROLLBACK"])
+		createWorkItem(finishStore, { id, type: "task", status: "open", title: "Routine task" });
+	createWorkItem(finishStore, {
+		id: "TASK-5", type: "task", status: "open", title: "Update authentication permission checks",
+	});
+	saveStore(finishCwd, finishStore);
 	execFileSync("git", ["init"], { cwd: finishCwd, stdio: "ignore" });
 	execFileSync("git", ["config", "user.email", "test@example.com"], {
 		cwd: finishCwd,
 	});
 	execFileSync("git", ["config", "user.name", "Test"], { cwd: finishCwd });
-	writeFileSync(
-		path.join(finishCwd, ".beads", "issues.jsonl"),
-		'{"id":"TASK-1","status":"open"}\n',
-	);
 	writeFileSync(
 		path.join(finishCwd, "result.js"),
 		"const result = 'before';\n",
@@ -257,11 +245,7 @@ try {
 		path.join(finishCwd, "AGENTS.md"),
 		"<!-- BEGIN COMPOUND PI TOOL MAP -->\ngenerated\n<!-- END COMPOUND PI TOOL MAP -->\n",
 	);
-	const fakeBdScript = path.join(finishCwd, "fake-bd.mjs");
-	writeFileSync(
-		fakeBdScript,
-		'#!/usr/bin/env node\nimport { appendFileSync } from "node:fs";\nconst op = process.argv[2];\nif (op === "show") { const id = process.argv[3]; console.log(JSON.stringify([{ id, title: id === "TASK-5" ? "Update authentication permission checks" : "Routine task", notes: "" }])); process.exit(0); }\nif (op === "update") { appendFileSync(".beads/issues.jsonl", JSON.stringify({ id: process.argv[3], note: process.argv.at(-1) }) + "\\n"); console.log("updated"); process.exit(0); }\nif (op === "reopen") { console.log("reopened"); process.exit(0); }\nif (op !== "close") process.exit(2);\nif (process.env.FAIL_CLOSE === "1") { console.error("close failed"); process.exit(3); }\nappendFileSync(".beads/issues.jsonl", JSON.stringify({ id: process.argv[3], status: "closed" }) + "\\n");\nconsole.log("closed");\n',
-	);
+	const fakeBdScript = path.join(finishCwd, "tracker-must-not-run");
 	const finished = JSON.parse(
 		execFileSync(
 			process.execPath,
@@ -306,7 +290,7 @@ try {
 			cwd: finishCwd,
 			encoding: "utf8",
 		}).trim() === "TASK-1: record result",
-		"finish-task creates the Bead commit",
+		"finish-task creates the WorkItem commit",
 	);
 
 	writeFileSync(
@@ -343,12 +327,26 @@ try {
 		"finish-task validates JSON inline without a nested shell command",
 	);
 
-	const headBeforeRollback = execFileSync("git", ["rev-parse", "HEAD"], {
+	const headBeforePush = execFileSync("git", ["rev-parse", "HEAD"], {
 		cwd: finishCwd,
 		encoding: "utf8",
 	}).trim();
-	writeFileSync(path.join(finishCwd, "rollback.txt"), "keep dirty\n");
-	let rollbackError = "";
+	writeFileSync(path.join(finishCwd, "rollback.js"), "export default true;\n");
+	const failingGit = path.join(cwd, "git-push-fails.mjs");
+	writeFileSync(
+		failingGit,
+		`#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+const args = process.argv.slice(2);
+if (args[0] === "push") process.exit(7);
+if (args[0] === "rev-parse" && args.includes("@{upstream}")) { console.log("origin/main"); process.exit(0); }
+const result = spawnSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+process.stdout.write(result.stdout ?? "");
+process.stderr.write(result.stderr ?? "");
+process.exit(result.status ?? 1);
+`,
+	);
+	let pushFailed = false;
 	try {
 		execFileSync(
 			process.execPath,
@@ -359,34 +357,32 @@ try {
 				"--max-files",
 				"2",
 				"--message",
-				"rollback close failure",
+				"rollback push",
 				"--verify",
 				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+				"--expect",
+				"ok",
+				"--push",
 			],
 			{
 				cwd: finishCwd,
 				encoding: "utf8",
-				env: {
-					...process.env,
-					WORK_ORCH_BD_BIN: fakeBdScript,
-					FAIL_CLOSE: "1",
-				},
+				env: { ...process.env, WORK_ORCH_GIT_BIN: failingGit },
 			},
 		);
-	} catch (error) {
-		rollbackError = String(error.stdout ?? "");
+	} catch {
+		pushFailed = true;
 	}
+	assert(pushFailed, "push failure is reported");
 	assert(
-		rollbackError.includes("finalization rolled back") &&
-			execFileSync("git", ["rev-parse", "HEAD"], {
-				cwd: finishCwd,
-				encoding: "utf8",
-			}).trim() === headBeforeRollback &&
-			existsSync(path.join(finishCwd, "rollback.txt")),
-		"finish-task rolls back a created commit when Bead close fails",
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: finishCwd,
+			encoding: "utf8",
+		}).trim() === headBeforePush &&
+			loadStore(finishCwd).items["TASK-ROLLBACK"].status === "open",
+		"push failure rolls Git and native closure back to a resumable item",
 	);
-	execFileSync("git", ["restore", ".beads/issues.jsonl"], { cwd: finishCwd });
-	rmSync(path.join(finishCwd, "rollback.txt"));
+	rmSync(path.join(finishCwd, "rollback.js"));
 
 	for (const file of ["one.txt", "two.txt", "three.txt"])
 		writeFileSync(path.join(finishCwd, file), file);
@@ -418,7 +414,6 @@ try {
 		scopeError.includes("scope exceeds 2 implementation files"),
 		"finish-task enforces the coded file boundary before commit",
 	);
-	execFileSync("git", ["restore", ".beads/issues.jsonl"], { cwd: finishCwd });
 	for (const file of ["one.txt", "two.txt", "three.txt"])
 		rmSync(path.join(finishCwd, file));
 
@@ -482,9 +477,8 @@ try {
 	}
 	assert(
 		forgedReviewError.includes("durable wo:review PASS evidence"),
-		"finish-task rejects a forged reviewed flag without Beads evidence",
+		"finish-task rejects a forged reviewed flag without WorkItems evidence",
 	);
-	execFileSync("git", ["restore", ".beads/issues.jsonl"], { cwd: finishCwd });
 	rmSync(path.join(finishCwd, "auth"), { recursive: true, force: true });
 	writeFileSync(path.join(finishCwd, "config.js"), "export default true;\n");
 	let contractReviewError = "";
@@ -513,7 +507,7 @@ try {
 	}
 	assert(
 		contractReviewError.includes("sensitive task contract"),
-		"finish-task enforces sensitive Bead review even for neutral file paths",
+		"finish-task enforces sensitive WorkItem review even for neutral file paths",
 	);
 
 	console.log("ok - workflow optimization helpers");

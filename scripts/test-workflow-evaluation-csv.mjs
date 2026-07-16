@@ -57,7 +57,7 @@ try {
 	const sha = (name) => createHash("sha256").update(readFileSync(path.join(project, "goldens", name))).digest("hex");
 	assert.equal(approval.brainstormSha, sha("brainstorm.md"));
 	assert.equal(approval.planSha, sha("plan.md"));
-	console.log("ok - CSV workflow evaluation project fixtures");
+	process.stdout.write("ok - CSV workflow evaluation project fixtures\n");
 } finally {
 	rmSync(temp, { recursive: true, force: true });
 }

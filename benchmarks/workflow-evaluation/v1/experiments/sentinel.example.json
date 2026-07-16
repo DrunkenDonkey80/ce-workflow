@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "mode": "sentinel",
+  "projects": ["calculator", "csv-expenses"],
+  "factor": "effort",
+  "sides": ["baseline", "candidate"],
+  "baseline": { "workflowRevision": "local", "effort": "medium" },
+  "candidate": { "workflowRevision": "local", "effort": "high" },
+  "trusted": true,
+  "isolation": "path",
+  "tools": ["read", "bash", "edit", "write"],
+  "calibrations": {
+    "calculator:brainstorm": "replace-with-calibration.json",
+    "calculator:plan": "replace-with-calibration.json",
+    "calculator:work": "replace-with-calibration.json",
+    "csv-expenses:brainstorm": "replace-with-calibration.json",
+    "csv-expenses:plan": "replace-with-calibration.json",
+    "csv-expenses:work": "replace-with-calibration.json"
+  },
+  "budgets": { "tokenCeiling": 500000, "wallMsCeiling": 5400000 }
+}

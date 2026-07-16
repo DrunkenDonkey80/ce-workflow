@@ -13,8 +13,14 @@ function allowedAnchors(rubric) {
 	return Array.isArray(rubric.anchors) ? rubric.anchors : Object.keys(rubric.anchors ?? {}).map(Number);
 }
 
+function artifactText(item) {
+	if (typeof item === "string") return item;
+	return item?.text ?? item?.content ?? "";
+}
+
 function cleanArtifact(artifact) {
-	if (typeof artifact === "string") return artifact;
+	if (typeof artifact === "string") return { text: artifact };
+	if (Array.isArray(artifact)) return { text: artifact.map(artifactText).join("\n\n") };
 	if (artifact && typeof artifact === "object") return { text: String(artifact.text ?? artifact.content ?? "") };
 	return { text: "" };
 }
@@ -43,7 +49,8 @@ function validSample(sample, rubric) {
 	if (sample.hard?.passed !== true) return "hard gate failed";
 	if (!REQUIRED_METRICS.every((metric) => Number.isFinite(sample.metrics?.[metric]) && sample.metrics[metric] >= 0)) return "required metrics missing";
 	const dimensions = Object.keys(sample.scores ?? {});
-	if (!dimensions.length || rubric.criticalDimensions.some((dimension) => !dimensions.includes(dimension))) return "rubric dimensions missing";
+	const required = rubric.dimensions ?? rubric.criticalDimensions;
+	if (!dimensions.length || required.some((dimension) => !dimensions.includes(dimension))) return "rubric dimensions missing";
 	if (!dimensions.every((dimension) => allowedAnchors(rubric).includes(sample.scores[dimension]))) return "rubric score invalid";
 	if (!Number.isFinite(sample.unexpectedQuestions) || sample.unexpectedQuestions < 0) return "unexpected question metric missing";
 	return null;
@@ -74,6 +81,10 @@ export function evaluateDecision(inputPairs, rubric, options = {}) {
 			if (selected.infrastructureFailure) return invalid("second-infrastructure-failure", pairs);
 		} else if (pair.attempts.length !== 1) return invalid("selective-retry-invalid", pairs);
 		if (!selected.baseline || !selected.candidate) return invalid("paired-samples-required", pairs);
+		if (selected.comparisonFailure) return invalid(selected.comparisonFailure, pairs);
+		if (selected.evaluatorFailure) return invalid("evaluator-failure", pairs);
+		if (selected.baseline.hard?.passed !== true) return invalid("baseline-hard-gate-failed", pairs);
+		if (selected.candidate.hard?.passed !== true) return rejected("candidate-hard-gate-failed", pairs);
 		const baselineIssue = validSample(selected.baseline, rubric);
 		if (baselineIssue) return invalid(`baseline-${baselineIssue}`, pairs);
 		const candidateIssue = validSample(selected.candidate, rubric);
@@ -104,10 +115,14 @@ export function evaluateDecision(inputPairs, rubric, options = {}) {
 		return [metric, { baseline: { min: Math.min(...baselineValues), median: baselineMedian, max: Math.max(...baselineValues) }, candidate: { min: Math.min(...candidateValues), median: candidateMedian, max: Math.max(...candidateValues) }, delta: candidateMedian - baselineMedian, improvement: improvement(baselineMedian, candidateMedian) }];
 	}));
 	const improved = REQUIRED_METRICS.filter((metric) => summary[metric].candidate.median < summary[metric].baseline.median);
-	const regressedTooFar = REQUIRED_METRICS.some((metric) => summary[metric].candidate.median > summary[metric].baseline.median * (1 + MAXIMUM_DIMENSION_REGRESSION));
+	const maximumRegression = Math.max(MAXIMUM_DIMENSION_REGRESSION, options.maximumDimensionRegression ?? 0);
+	const regressedTooFar = REQUIRED_METRICS.some((metric) => summary[metric].candidate.median > summary[metric].baseline.median * (1 + maximumRegression));
 	const primary = options.primaryMetric;
 	const aggregate = REQUIRED_METRICS.reduce((sum, metric) => sum + Math.max(-1, summary[metric].improvement), 0) / REQUIRED_METRICS.length;
 	const threshold = Math.max(MINIMUM_IMPROVEMENT, options.minimumImprovement ?? 0);
 	const costWin = (primary ? summary[primary]?.improvement : aggregate) >= threshold && improved.length > 0 && !regressedTooFar;
-	return { status: costWin ? "candidate-accepted" : "quality-pass-no-cost-win", reason: costWin ? "quality-and-cost-pass" : "cost-threshold-not-met", pairs, summary, qualitative, unexpectedQuestions: { baseline: baselineQuestions, candidate: candidateQuestions }, aggregateImprovement: aggregate };
+	let reason = "cost-threshold-not-met";
+	if (costWin) reason = "quality-and-cost-pass";
+	else if (regressedTooFar) reason = "cost-dimension-regression";
+	return { status: costWin ? "candidate-accepted" : "quality-pass-no-cost-win", reason, pairs, summary, qualitative, unexpectedQuestions: { baseline: baselineQuestions, candidate: candidateQuestions }, aggregateImprovement: aggregate };
 }

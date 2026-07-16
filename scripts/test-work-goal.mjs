@@ -115,7 +115,7 @@ assert.match(
 assert.match(oneTaskObjective, /Project autopilot policy/);
 assert.match(
 	oneTaskObjective,
-	/if it says one task only, stop after one executable Bead closes/,
+	/if it says one task only, stop after one executable WorkItem closes/,
 );
 assert.deepEqual(
 	mod.parseWorkProjectGoalInput("C:/soft/git/AI-Wedge task 19"),
@@ -444,7 +444,7 @@ try {
 	);
 	assert.ok(
 		notices.length > beforeResumeNotices,
-		"work-resume reports coded Beads target resolution without a goal kickoff",
+		"work-resume reports coded WorkItems target resolution without a goal kickoff",
 	);
 
 	writeFileSync(

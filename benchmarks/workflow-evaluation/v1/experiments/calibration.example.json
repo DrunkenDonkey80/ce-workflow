@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "mode": "calibration",
+  "project": "csv-expenses",
+  "stage": "brainstorm",
+  "baseline": { "workflowRevision": "local", "effort": "medium" },
+  "candidate": { "workflowRevision": "local", "effort": "medium" },
+  "evaluator": { "timeoutMs": 900000 },
+  "trusted": true,
+  "isolation": "path",
+  "tools": ["read", "bash", "edit", "write"],
+  "budgets": { "tokenCeiling": 300000, "wallMsCeiling": 2700000 }
+}

@@ -21,8 +21,8 @@ const cwd = process.cwd();
 const dirt = (file) => isWorkflowDirt(cwd, { path: file });
 
 // The workflow's own runtime artifacts must never block a transition.
-assert(dirt(".beads/interactions.jsonl"), "beads state dirt is tolerated");
-assert(dirt(".beads/issues.jsonl"), "beads issues dirt is tolerated");
+assert(dirt(".ce-workflow/work-items.json"), "work-store state dirt is tolerated");
+assert(dirt(".ce-workflow/work-items.json"), "work-store dirt is tolerated");
 assert(
 	dirt(".pi/work-runs/2026-07-13.jsonl"),
 	".pi/work-runs dirt is tolerated",

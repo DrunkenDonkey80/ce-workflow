@@ -1,11 +1,11 @@
 {
   "version": 1,
   "approved": true,
-  "approvedBy": "Flex (interactive approval)",
-  "approvedAt": "2026-07-15T13:16:15.069Z",
-  "bundleSha": "e72596a4811cc5e261f01ce7d1ef76b3854a954195161e95680fa6abd840b10b",
+  "approvedBy": "Flex (interactive re-approval)",
+  "approvedAt": "2026-07-15T14:33:22.856Z",
+  "bundleSha": "4f99bb6def57cdc578d5497af5dcc928ab059e2db82333824ff270827230a81a",
   "brainstormSha": "fe2204b44c48cd50fa4bcc516a81dc2174424a08883ff422c393746763407a46",
   "planSha": "5330c5c186a36d0de6e979320c083cef1c2f8d40cb8ca0084e6c41aa42c93005",
   "acceptancePassed": true,
-  "evidence": "node scripts/test-workflow-evaluation-calculator.mjs; npm run verify:quiet"
+  "evidence": "node scripts/test-workflow-evaluation-calculator.mjs; retained PNG assertion; npm run verify:quiet"
 }

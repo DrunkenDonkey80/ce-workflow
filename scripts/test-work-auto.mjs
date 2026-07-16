@@ -12,9 +12,9 @@ const { buildWorkAutoState } = await import(
 	).href
 );
 
-const fixture = installWorkflowFixture();
+const fixture = installWorkflowFixture({ native: true });
 try {
-	let state = buildWorkAutoState(process.cwd(), "");
+	let state = buildWorkAutoState(fixture.cwd, "");
 	assert(
 		!state.ok && state.reason === "usage",
 		"empty auto input returns usage",
@@ -22,26 +22,26 @@ try {
 	assert(!state.handoffPrompt, "empty auto input sends no follow-up");
 
 	fixture.reset("blocked");
-	state = buildWorkAutoState(process.cwd(), "BLOCK-1");
+	state = buildWorkAutoState(fixture.cwd, "BLOCK-1");
 	assert(
 		state.ok && state.action === "debug-blocked",
-		"blocked Bead routes through debug intake without retrying blindly",
+		"blocked WorkItem routes through debug intake without retrying blindly",
 	);
 	assert(
 		state.suggestedCommands[0] === "/work-report BLOCK-1",
-		"blocked Bead points to report handoff",
+		"blocked WorkItem points to report handoff",
 	);
 
 	fixture.reset("debug");
-	state = buildWorkAutoState(process.cwd(), "IMP-2");
+	state = buildWorkAutoState(fixture.cwd, "IMP-2");
 	assert(
-		state.ok && state.selectedBead.id === "BUG-1",
-		"debug-needed Bead routes through debug intake",
+		state.ok && state.selectedWorkItem.id === "BUG-1",
+		"debug-needed WorkItem routes through debug intake",
 	);
 
 	fixture.reset("active");
 	state = buildWorkAutoState(
-		process.cwd(),
+		fixture.cwd,
 		"test failure: expected 200 got 500",
 	);
 	assert(
@@ -51,7 +51,7 @@ try {
 		"failing-test prose routes directly to the debugger policy",
 	);
 
-	state = buildWorkAutoState(process.cwd(), "migrate old TODO list");
+	state = buildWorkAutoState(fixture.cwd, "migrate old TODO list");
 	assert(
 		state.ok &&
 			state.action === "handoff-migrate" &&
@@ -59,7 +59,7 @@ try {
 		"migration-like prose routes directly to migration",
 	);
 
-	state = buildWorkAutoState(process.cwd(), "add a tiny status helper");
+	state = buildWorkAutoState(fixture.cwd, "add a tiny status helper");
 	assert(
 		state.ok &&
 			state.action === "run-implementation" &&
@@ -69,7 +69,7 @@ try {
 	);
 
 	fixture.reset("active", "unknown");
-	state = buildWorkAutoState(process.cwd(), "add a feature");
+	state = buildWorkAutoState(fixture.cwd, "add a feature");
 	assert(
 		!state.ok && state.reason === "dirty-stop",
 		"unsafe dirty state blocks auto handoff",

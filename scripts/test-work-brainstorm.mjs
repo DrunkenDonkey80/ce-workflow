@@ -1,12 +1,9 @@
 #!/usr/bin/env node
 import {
 	mkdirSync,
-	mkdtempSync,
 	realpathSync,
-	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -29,8 +26,8 @@ const {
 	).href
 );
 
-const fixture = installWorkflowFixture();
-const cwd = mkdtempSync(path.join(tmpdir(), "work-brainstorm-cwd-"));
+const fixture = installWorkflowFixture({ native: true });
+const cwd = fixture.cwd;
 try {
 	const brainstormDir = path.join(cwd, "docs", "brainstorms");
 	const planDir = path.join(cwd, "docs", "plans");
@@ -46,40 +43,32 @@ try {
 		"# Raw idea with animation\n",
 	);
 
-	fixture.reset("no-beads-empty");
+	fixture.reset("no-legacy-empty");
 	let state = buildWorkBrainstormState(
 		cwd,
 		"Explore a standalone reporting dashboard with filters and CSV export",
 	);
 	assert(
 		state.ok && state.action === "brainstorm-epic-created",
-		"standalone brainstorm initializes Beads and creates an epic",
+		"standalone brainstorm initializes native state and creates an epic",
 	);
 	assert(
-		state.epic.id.startsWith("E-NEW-") && state.idea.id.startsWith("TASK-NEW-"),
-		"standalone brainstorm creates an epic and idea Bead",
+		state.epic.type === "epic" && state.idea.type === "task",
+		"standalone brainstorm creates an epic and native idea",
 	);
 	assert(
-		fixture.logs().some((entry) => entry.op === "init"),
-		"standalone brainstorm initializes missing Beads workspace",
-	);
-	assert(
-		fixture
-			.logs()
-			.some(
-				(entry) =>
-					entry.op === "create" && entry.issue.notes.includes("wo:brainstorm"),
-			),
-		"standalone brainstorm epic is marked as brainstorm-created",
+		fixture.store().items[state.epic.id].notes.join("\n").includes("wo:brainstorm") &&
+			fixture.logs().length === 0,
+		"standalone brainstorm is marked natively without bd",
 	);
 
 	fixture.reset("ideas");
 	const longPrompt = `Modernize the LPGSlim Android interface to match the Linea Pro demo look and feel with smooth transitions, graphics, animations, connected-device startup states, and updated screens while preserving the full detailed request for brainstorming. ${"Use the attached Pixel device and inspect the installed demo UI source before proposing screen-by-screen changes. ".repeat(8)}`;
 	state = buildWorkBrainstormState(cwd, longPrompt);
-	const longPromptIdea = fixture.logs().at(-1).issue;
+	const longPromptIdea = fixture.store().items[state.idea.id];
 	assert(
 		state.ok && longPromptIdea.title.length <= 180,
-		"freeform brainstorm stores a compact Beads title",
+		"freeform brainstorm stores a compact WorkItems title",
 	);
 	assert(
 		longPromptIdea.title !== longPrompt &&
@@ -106,10 +95,7 @@ try {
 		"selected idea derives brainstormed status",
 	);
 	assert(
-		fixture
-			.logs()
-			.at(-1)
-			.notes.includes("brainstorm-path=docs/brainstorms/accepted.md"),
+		fixture.store().items["IDEA-2"].notes.some((note) => note.includes("brainstorm-path=docs/brainstorms/accepted.md")),
 		"selected idea note includes brainstorm path",
 	);
 	assert(
@@ -150,9 +136,8 @@ try {
 		"exact normalized title reuses existing idea",
 	);
 	assert(
-		fixture.logs().at(-1).op === "update" &&
-			fixture.logs().at(-1).id === "IDEA-2",
-		"exact match updates existing idea",
+		fixture.store().items["IDEA-2"].notes.length > 1,
+		"exact match updates existing native idea",
 	);
 
 	state = buildWorkBrainstormState(
@@ -182,15 +167,8 @@ try {
 		"idea-linked plan bootstraps epic",
 	);
 	assert(
-		fixture
-			.logs()
-			.some(
-				(entry) =>
-					entry.op === "update" &&
-					entry.id === "IDEA-2" &&
-					entry.notes.includes("plan-path=docs/plans/idea-plan.md"),
-			),
-		"planning appends idea backlink",
+		fixture.store().items["IDEA-2"].notes.some((note) => note.includes("plan-path=docs/plans/idea-plan.md")),
+		"planning appends native idea backlink",
 	);
 
 	assert(
@@ -202,7 +180,6 @@ try {
 	);
 } finally {
 	fixture.cleanup();
-	rmSync(cwd, { recursive: true, force: true });
 }
 
 console.log("ok - work-brainstorm behavior");

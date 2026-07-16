@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 const { assert, installWorkflowFixture } = await import(
@@ -70,9 +69,9 @@ assert(
 );
 
 // Integration: /work-plan blocks epic creation while open questions remain.
-const fixture = installWorkflowFixture();
+const fixture = installWorkflowFixture({ native: true });
 try {
-	const cwd = mkdtempSync(path.join(tmpdir(), "wo-open-questions-"));
+	const cwd = fixture.cwd;
 	const planRel = path.join("docs", "plans", "demo-plan.md");
 	mkdirSync(path.join(cwd, "docs", "plans"), { recursive: true });
 	writeFileSync(path.join(cwd, planRel), planWithOpenQuestions, "utf8");
@@ -92,8 +91,8 @@ try {
 		"handoff prompt drives a per-question ask_user loop with suggested defaults",
 	);
 	assert(
-		fixture.logs().filter((entry) => entry.op === "create").length === 0,
-		"no epic or task Bead is created while open questions remain",
+		Object.keys(fixture.store().items).length === 2,
+		"no epic or task is created while open questions remain",
 	);
 
 	// bootstrapPlanEpic (the agent's in-flow epic creator) also blocks on open questions.
@@ -104,11 +103,11 @@ try {
 		"bootstrapPlanEpic blocks epic creation on open questions",
 	);
 	assert(
-		fixture.logs().filter((entry) => entry.op === "create").length === 0,
-		"bootstrapPlanEpic creates no Bead while open questions remain",
+		Object.keys(fixture.store().items).length === 2,
+		"bootstrapPlanEpic creates no item while open questions remain",
 	);
 
-	// A clean plan bootstraps the epic + first planning Bead directly.
+	// A clean plan bootstraps the epic + first planning WorkItem directly.
 	const cleanPlanRel = path.join("docs", "plans", "clean-plan.md");
 	writeFileSync(
 		path.join(cwd, cleanPlanRel),
@@ -131,8 +130,9 @@ try {
 		"bootstrapPlanEpic creates the epic for a clean plan",
 	);
 	assert(
-		fixture.logs().filter((entry) => entry.op === "create").length === 2,
-		"bootstrap creates exactly the epic plus one planning Bead",
+		Object.keys(fixture.store().items).length === 4 &&
+			fixture.store().items[bootstrapped.epic.id]?.documentLinks?.design === cleanPlanRel,
+		"bootstrap creates the epic plus one planning task with a plan link",
 	);
 } finally {
 	fixture.cleanup();

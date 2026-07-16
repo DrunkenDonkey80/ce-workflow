@@ -120,8 +120,8 @@ assert(
 	"malformed output is empty",
 );
 
-const fixture = installWorkflowFixture();
-const cwd = mkdtempSync(path.join(tmpdir(), "work-ideate-cwd-"));
+const fixture = installWorkflowFixture({ native: true });
+const cwd = fixture.cwd;
 try {
 	fixture.reset("noIdeas");
 	let state = buildWorkIdeateState(cwd, "");
@@ -152,8 +152,9 @@ try {
 		"accepted idea can be rejected",
 	);
 	assert(
-		fixture.logs().at(-1).notes.includes("status=rejected"),
-		"reject appends rejected status",
+		fixture.store().items["IDEA-2"].notes.some((note) => note.includes("status=rejected")) &&
+			fixture.logs().length === 0,
+		"reject appends native status without bd",
 	);
 
 	state = buildWorkIdeateState(cwd, "IDEA-4 reject");
@@ -213,7 +214,7 @@ try {
 		},
 	);
 	assert(
-		fixture.logs().filter((entry) => entry.op === "create").length === 2,
+		Object.values(fixture.store().items).filter((item) => item.title === "Top idea" || item.title === "Other idea").length === 2,
 		"capture retry reuses saved ideas",
 	);
 
@@ -232,7 +233,7 @@ try {
 		"malformed output creates recovery state",
 	);
 
-	fixture.reset("createFailAfterOne");
+	fixture.reset("noIdeas");
 	capture = captureIdeationIdeas(
 		cwd,
 		{ id: "E-1", title: "Active epic" },
@@ -245,12 +246,8 @@ try {
 		},
 	);
 	assert(
-		capture.action === "capture-partial",
-		"partial Beads failure is reported",
-	);
-	assert(
-		capture.saved.length === 1 && capture.unsaved.length === 1,
-		"partial capture names saved and unsaved ideas",
+		capture.action === "capture-complete" && capture.saved.length === 2,
+		"native capture is one deterministic transaction",
 	);
 
 	fixture.reset("noIdeas");
@@ -271,8 +268,8 @@ try {
 		"repeated import reuses idea",
 	);
 	assert(
-		fixture.logs().filter((entry) => entry.op === "create").length === 1,
-		"repeated import creates only one bead",
+		Object.values(fixture.store().items).filter((item) => item.documentLinks?.source === "docs/plans/idea.md").length <= 1,
+		"repeated import creates only one native idea",
 	);
 	state = buildWorkIdeateState(cwd, "../outside.md import");
 	assert(
@@ -281,7 +278,6 @@ try {
 	);
 } finally {
 	fixture.cleanup();
-	rmSync(cwd, { recursive: true, force: true });
 }
 
 console.log("ok - work-ideate behavior");

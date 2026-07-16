@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -13,39 +13,41 @@ const { buildWorkflowIntakeState } = await import(
 	).href
 );
 
-const fixture = installWorkflowFixture();
+const fixture = installWorkflowFixture({ native: true });
+const cwd = fixture.cwd;
 const oldStateDir = process.env.WORK_ORCH_STATE_DIR;
 const stateDir = mkdtempSync(path.join(tmpdir(), "work-intake-state-"));
 process.env.WORK_ORCH_STATE_DIR = stateDir;
 try {
-	let state = buildWorkflowIntakeState(process.cwd(), "E-1");
+	let state = buildWorkflowIntakeState(cwd, "E-1");
 	assert(state.ok, "clean explicit epic returns intake state");
 	assert(state.epic.id === "E-1", "intake includes epic");
 	assert(state.git.safeForHandoff, "clean git is safe");
 
 	fixture.reset("oneOpen");
-	state = buildWorkflowIntakeState(process.cwd(), "");
+	state = buildWorkflowIntakeState(cwd, "");
 	assert(
 		state.ok && state.epic.id === "E-1",
 		"single open epic resolves default when no epic is active",
 	);
 	fixture.reset("openReadyAmbiguous");
-	state = buildWorkflowIntakeState(process.cwd(), "last");
+	state = buildWorkflowIntakeState(cwd, "last");
 	assert(
 		state.ok && state.epic.id === "E-1",
 		"remembered epic resolves explicit last among open epics",
 	);
 
 	rmSync(stateDir, { recursive: true, force: true });
-	fixture.reset("no-beads");
-	state = buildWorkflowIntakeState(process.cwd(), "last");
+	fixture.reset("no-store");
+	mkdirSync(path.join(cwd, ".beads"), { recursive: true });
+	state = buildWorkflowIntakeState(cwd, "last");
 	assert(
-		!state.ok && state.reason === "beads-unavailable",
-		"missing Beads is parseable",
+		!state.ok && state.reason === "migration-required",
+		"legacy work state requires migration",
 	);
 
 	fixture.reset("ambiguous");
-	state = buildWorkflowIntakeState(process.cwd(), "last");
+	state = buildWorkflowIntakeState(cwd, "last");
 	assert(
 		!state.ok && state.reason === "ambiguous-target",
 		"ambiguous epic stops",
@@ -53,7 +55,7 @@ try {
 	assert(state.candidates.length === 2, "ambiguous stop includes candidates");
 
 	fixture.reset("active", "unknown");
-	state = buildWorkflowIntakeState(process.cwd(), "E-1");
+	state = buildWorkflowIntakeState(cwd, "E-1");
 	assert(!state.git.safeForHandoff, "unknown dirty file is unsafe");
 	assert(
 		state.git.dirtyPaths.includes("extensions/work-models.js"),
@@ -61,22 +63,22 @@ try {
 	);
 
 	fixture.reset("active", "benign");
-	state = buildWorkflowIntakeState(process.cwd(), "E-1");
+	state = buildWorkflowIntakeState(cwd, "E-1");
 	assert(
 		state.git.safeForHandoff && state.git.benignDirty,
 		"whitespace-only instruction dirt is benign",
 	);
 
 	fixture.reset("active", "instruction-substantive");
-	state = buildWorkflowIntakeState(process.cwd(), "E-1");
+	state = buildWorkflowIntakeState(cwd, "E-1");
 	assert(!state.git.safeForHandoff, "substantive instruction dirt is unsafe");
 
 	fixture.reset("active", "staged-instruction");
-	state = buildWorkflowIntakeState(process.cwd(), "E-1");
+	state = buildWorkflowIntakeState(cwd, "E-1");
 	assert(!state.git.safeForHandoff, "staged instruction dirt is unsafe");
 
 	fixture.reset("active", "untracked-instruction");
-	state = buildWorkflowIntakeState(process.cwd(), "E-1");
+	state = buildWorkflowIntakeState(cwd, "E-1");
 	assert(!state.git.safeForHandoff, "untracked instruction dirt is unsafe");
 } finally {
 	fixture.cleanup();

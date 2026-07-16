@@ -1,5 +1,5 @@
 ---
-description: Plan and execute bounded Beads-backed work
+description: Plan and execute bounded native work-item work
 argument-hint: "<task>"
 ---
 

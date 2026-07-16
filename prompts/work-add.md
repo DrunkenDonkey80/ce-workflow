@@ -1,6 +1,6 @@
 ---
-description: Add urgent or discovered work to the current Beads flow
-argument-hint: "[--epic <id>] [--blocked-by <bead-id>] <task>"
+description: Add urgent or discovered work to the current work items flow
+argument-hint: "[--epic <id>] [--blocked-by <work-item-id>] <task>"
 ---
 
 Fallback when the extension command is unavailable: use the `work-orchestrator` skill in mode: `add`.

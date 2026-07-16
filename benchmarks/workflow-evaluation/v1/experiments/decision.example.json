@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "mode": "decision",
+  "project": "csv-expenses",
+  "stage": "brainstorm",
+  "factor": "effort",
+  "primaryMetric": "tokens",
+  "calibrationPath": "replace-with-calibration.json",
+  "baseline": { "workflowRevision": "local", "effort": "medium" },
+  "candidate": { "workflowRevision": "local", "effort": "high" },
+  "evaluator": { "timeoutMs": 900000 },
+  "trusted": true,
+  "isolation": "path",
+  "tools": ["read", "bash", "edit", "write"],
+  "budgets": { "tokenCeiling": 300000, "wallMsCeiling": 2700000 }
+}

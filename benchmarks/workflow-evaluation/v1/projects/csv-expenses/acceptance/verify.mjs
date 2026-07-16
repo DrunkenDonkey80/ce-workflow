@@ -48,6 +48,8 @@ export function verifyCsvProject(root) {
 
 		const missing = run(root, path.join(temp, "missing.csv"), path.join(temp, "missing.txt"));
 		gates.push(gate("missing-input", missing.status === 1, missing.stderr));
+		const unwritable = run(root, path.join(fixtures, "valid.csv"), temp);
+		gates.push(gate("output-error", unwritable.status === 1 && existsSync(temp), unwritable.stderr));
 	} finally {
 		rmSync(temp, { recursive: true, force: true });
 	}

@@ -1,5 +1,5 @@
 ---
-description: Create and complete a small Beads-backed work item
+description: Create and complete a small native work-item work item
 argument-hint: "<task>"
 ---
 

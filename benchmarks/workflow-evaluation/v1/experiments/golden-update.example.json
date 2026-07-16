@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "mode": "golden-update",
+  "project": "csv-expenses",
+  "humanApproved": false,
+  "acceptancePassed": true,
+  "acceptanceEvidence": "replace-with-retained-evidence-path",
+  "contractChanged": false
+}

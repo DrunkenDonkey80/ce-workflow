@@ -137,8 +137,8 @@ writeFileSync(path.join(repo, "mystery.dat"), "x");
 writeFileSync(path.join(repo, "data.bin"), "x");
 mkdirSync(path.join(repo, "node_modules", "lib"), { recursive: true });
 writeFileSync(path.join(repo, "node_modules", "lib", "index.js"), "x");
-mkdirSync(path.join(repo, ".beads"), { recursive: true });
-writeFileSync(path.join(repo, ".beads", "interactions.jsonl"), "{}");
+mkdirSync(path.join(repo, ".ce-workflow"), { recursive: true });
+writeFileSync(path.join(repo, ".ce-workflow", "work-items.json"), "{}");
 
 const tidy = tidyUntrackedFiles({ cwd: repo });
 const sorted = (arr) => [...arr].sort();
@@ -157,8 +157,8 @@ assert(
 	"new source is not escalated",
 );
 assert(
-	!tidy.unrecognized.includes(".beads/interactions.jsonl"),
-	"workflow-managed dirt is ignored",
+	!tidy.unrecognized.includes(".ce-workflow/work-items.json"),
+	"canonical workflow state is preserved",
 );
 assert(tidy.gitignoreWritten, ".gitignore was written");
 const gi = readFileSync(path.join(repo, ".gitignore"), "utf8");

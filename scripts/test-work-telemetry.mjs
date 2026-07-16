@@ -33,7 +33,7 @@ const {
 		),
 	).href
 );
-const { installWorkflowFixture } = await import(
+const { installWorkflowFixture, seedNativeStore } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
 	).href
@@ -51,12 +51,21 @@ function telemetryEvents(cwd) {
 			readFileSync(path.join(dir, file), "utf8")
 				.split(/\r?\n/)
 				.filter(Boolean)
-				.map((line) => JSON.parse(line)),
+				.flatMap((line) => {
+					try {
+						return [JSON.parse(line)];
+					} catch {
+						return [];
+					}
+				}),
 		);
 }
 
 const cwd = mkdtempSync(path.join(tmpdir(), "work-telemetry-"));
 const now = Date.now();
+seedNativeStore(cwd, [
+	{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Active epic" },
+]);
 try {
 	const parsedMarker = parseWorkPromptMeta(
 		"work-orchestrator mode: resume\nWorkflow Run ID: wf-marker\nActivity: validation",
@@ -91,14 +100,14 @@ try {
 		workflowRunId: "wf-direct",
 		activity: "benchmark",
 		action: "run-review",
-		agent: "bead-reviewer",
+		agent: "work-reviewer",
 		asyncDir: directDir,
 	});
 	writeFileSync(
 		path.join(directDir, "status.json"),
 		JSON.stringify({
 			state: "complete",
-			steps: [{ agent: "bead-reviewer", status: "complete" }],
+			steps: [{ agent: "work-reviewer", status: "complete" }],
 		}),
 	);
 	assert(
@@ -150,7 +159,7 @@ try {
 	recordPendingDirectRun(cwd, {
 		workflowRunId: "wf-direct-failed",
 		action: "run-review",
-		agent: "bead-reviewer",
+		agent: "work-reviewer",
 		asyncDir: failedDir,
 	});
 	writeFileSync(
@@ -201,7 +210,7 @@ try {
 		stopReason: "handoff-queued",
 		handoff: { queued: true, started: false, role: "worker" },
 		epicId: "E-1",
-		beadId: "TASK-1",
+		workItemId: "TASK-1",
 		durationMs: 120,
 		context: { after: { tokens: 1200 } },
 	});
@@ -213,7 +222,7 @@ try {
 		action: "run-implementation",
 		role: "worker",
 		epicId: "E-1",
-		beadId: "TASK-1",
+		workItemId: "TASK-1",
 		durationMs: 420_000,
 		usage: { input: 9000, output: 2000, totalTokens: 11_000, cost: 0.15 },
 		payoff: {
@@ -237,7 +246,7 @@ try {
 		mode: "resume",
 		action: "review",
 		epicId: "E-1",
-		beadId: "TASK-1",
+		workItemId: "TASK-1",
 		durationMs: 180_000,
 		usage: { input: 7000, output: 1000, totalTokens: 8000, cost: 0.09 },
 		context: { after: { tokens: 24_000 } },
@@ -250,7 +259,7 @@ try {
 		mode: "debug",
 		action: "compound",
 		epicId: "E-1",
-		beadId: "TASK-1",
+		workItemId: "TASK-1",
 		durationMs: 60_000,
 		usage: { input: 3000, output: 600, totalTokens: 3600, cost: 0.04 },
 		tools: [{ name: "ce-compound", durationMs: 55_000 }],
@@ -262,7 +271,7 @@ try {
 		mode: "finish",
 		action: "commit",
 		epicId: "E-1",
-		beadId: "TASK-1",
+		workItemId: "TASK-1",
 		durationMs: 30_000,
 		usage: { input: 1500, output: 300, totalTokens: 1800, cost: 0.02 },
 	});
@@ -273,7 +282,7 @@ try {
 		command: "work-big",
 		action: "run-planner",
 		epicId: "E-1",
-		beadId: "PLAN-1",
+		workItemId: "PLAN-1",
 		durationMs: 250,
 		context: { after: { tokens: 1300 } },
 	});
@@ -284,7 +293,7 @@ try {
 		mode: "big",
 		action: "run-planner",
 		epicId: "E-1",
-		beadId: "PLAN-1",
+		workItemId: "PLAN-1",
 		durationMs: 300_000,
 		usage: { input: 6000, output: 1200, totalTokens: 7200, cost: 0.08 },
 		context: { after: { tokens: 15_000 } },
@@ -294,7 +303,7 @@ try {
 	assert(text.includes("Work telemetry: today"), "text renders today summary");
 	assert(text.includes("work-small"), "text includes work-small command phase");
 	assert(text.includes("work-big"), "text includes work-big command phase");
-	assert(text.includes("TASK-1"), "text groups by task bead");
+	assert(text.includes("TASK-1"), "text groups by task workItem");
 	assert(text.includes("24000"), "text reports max context tokens");
 	assert(text.includes("Handoffs: 1 queued"), "text reports handoff outcomes");
 	assert(text.includes("handoff-queued"), "text reports stop reasons");
@@ -324,12 +333,12 @@ try {
 		"phase summary includes commit agent",
 	);
 
-	const bead = JSON.parse(buildWorkTelemetry(cwd, "bead TASK-1 --json"));
-	assert(bead.events === 5, "bead filter isolates one task");
-	assert(bead.byBead[0].key === "TASK-1", "bead JSON groups by selected bead");
-	assert(bead.files.length === 1, "json reports backing telemetry file");
+	const workItem = JSON.parse(buildWorkTelemetry(cwd, "workItem TASK-1 --json"));
+	assert(workItem.events === 5, "workItem filter isolates one task");
+	assert(workItem.byWorkItem[0].key === "TASK-1", "workItem JSON groups by selected workItem");
+	assert(workItem.files.length === 1, "json reports backing telemetry file");
 	assert(
-		!Array.isArray(bead.slowest[0].tools) && bead.slowest[0].tools.count >= 0,
+		!Array.isArray(workItem.slowest[0].tools) && workItem.slowest[0].tools.count >= 0,
 		"json reports compact tool summaries instead of full tool arrays",
 	);
 
@@ -343,9 +352,9 @@ try {
 			command: "work-resume",
 			action: "report-blocked",
 			epicId: "E-BLOCKED",
-			beadId: "BLOCKER-1",
+			workItemId: "BLOCKER-1",
 			reason:
-				"No runnable Bead is ready; blockers or decisions need attention.",
+				"No runnable WorkItem is ready; blockers or decisions need attention.",
 		};
 		recordWorkTelemetry(blockedCwd, { ...blockedEvent, id: "blocked-1" });
 		recordWorkTelemetry(blockedCwd, {
@@ -474,7 +483,7 @@ try {
 		"overlapping commands retain independent workflow identities",
 	);
 
-	const fixture = installWorkflowFixture();
+	const fixture = installWorkflowFixture({ native: true });
 	try {
 		const commands = {};
 		const hooks = {};
@@ -517,7 +526,7 @@ try {
 			ui: { notify: () => {} },
 		});
 		delete process.env.WORK_ORCH_ACTIVITY_MARKER;
-		const commandSummary = buildWorkTelemetryState(cwd, "bead TASK-NEW-1");
+		const commandSummary = buildWorkTelemetryState(cwd, "workItem E-1.1");
 		assert(commandSummary.events === 1, "extension command writes telemetry before inline completion");
 		assert(
 			commandSummary.byPhase[0].key === "command/work-small/run-implementation",
@@ -555,20 +564,20 @@ try {
 		assert(
 			fixture.logs().every((entry) => entry.op !== "create") &&
 				sent.length === 1,
-			"print mode fails safely before creating a queued or duplicate Bead",
+			"print mode fails safely before creating a queued or duplicate WorkItem",
 		);
 
 		fixture.reset("blocked");
 		const statusNotices = [];
 		await commands["work-status"].handler("E-1", {
-			cwd,
+			cwd: fixture.cwd,
 			getContextUsage: () => ({ tokens: 2222 }),
 			ui: { notify: (message) => statusNotices.push(message) },
 		});
 		assert(
 			statusNotices[0]?.includes("blockers: 1") &&
 				statusNotices[0].includes("Next: Run /work-report BLOCK-1"),
-			"work-status reports blocked Beads instead of only active/ready state",
+			"work-status reports blocked WorkItems instead of only active/ready state",
 		);
 		fixture.reset("active");
 
@@ -582,7 +591,7 @@ try {
 		await hooks.agent_start();
 		await hooks.tool_execution_start({
 			toolCallId: "subagent-retry",
-			args: JSON.stringify({ agent: "bead-planner" }),
+			args: JSON.stringify({ agent: "work-planner" }),
 		});
 		await hooks.tool_execution_end(
 			{
@@ -592,8 +601,8 @@ try {
 				result: {
 					details: {
 						results: [
-							{ agent: "bead-planner", status: "failed" },
-							{ agent: "bead-planner", status: "completed" },
+							{ agent: "work-planner", status: "failed" },
+							{ agent: "work-planner", status: "completed" },
 						],
 					},
 				},
@@ -606,7 +615,7 @@ try {
 					{
 						role: "assistant",
 						content:
-							"Planning boundary complete and pushed. Created next ready Bead TASK-NEW-2.",
+							"Planning boundary complete and pushed. Created next ready WorkItem TASK-NEW-2.",
 					},
 				],
 				review: {
@@ -617,7 +626,7 @@ try {
 			},
 			{ cwd, getContextUsage: () => ({ tokens: 3100 }) },
 		);
-		const reviewSummary = buildWorkTelemetryState(cwd, "bead TASK-NEW-1");
+		const reviewSummary = buildWorkTelemetryState(cwd, "workItem E-1.1");
 		const correlated = reviewSummary.slowest.filter(
 			(event) => event.workflowRunId === inlineMeta.workflowRunId,
 		);
@@ -632,7 +641,7 @@ try {
 		assert(
 			reviewSummary.slowest.some(
 				(event) =>
-					event.review?.scope === "bead TASK-NEW-1" &&
+					event.review?.scope === "workItem E-1.1" &&
 					event.review.outcome === "PASS",
 			),
 			"review telemetry records scoped outcome fields",
@@ -689,7 +698,7 @@ try {
 			".pi",
 			"work-runs",
 			"history",
-			"TASK-NEW-1",
+			"E-1.1",
 			"sess-history.jsonl",
 		);
 		assert(existsSync(historyFile), "self-improving history writes per task");
@@ -703,8 +712,8 @@ try {
 			"self-improving history records messages and tool results",
 		);
 		assert(
-			historyLines.every((line) => line.task.beadId === "TASK-NEW-1"),
-			"self-improving history is grouped by Bead task",
+			historyLines.every((line) => line.task.workItemId === "E-1.1"),
+			"self-improving history is grouped by WorkItem task",
 		);
 		assert(
 			!fixture

@@ -22,7 +22,7 @@ const {
 		),
 	).href
 );
-const { assert, installWorkflowFixture } = await import(
+const { assert, installWorkflowFixture, seedNativeStore } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "./work-command-fixture.mjs")),
 	).href
@@ -30,6 +30,9 @@ const { assert, installWorkflowFixture } = await import(
 
 const cwd = mkdtempSync(path.join(tmpdir(), "work-usage-"));
 const now = Date.now();
+seedNativeStore(cwd, [
+	{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Active epic" },
+]);
 try {
 	recordWorkTelemetry(cwd, {
 		id: "agent-html",
@@ -38,7 +41,7 @@ try {
 		mode: "resume",
 		action: "<review>&fix",
 		epicId: "E-1",
-		beadId: "TASK-1",
+		workItemId: "TASK-1",
 		durationMs: 90_000,
 		usage: { totalTokens: 1234, input: 1000, output: 234, cost: 0.01 },
 		context: { after: { tokens: 9000 } },
@@ -66,7 +69,7 @@ try {
 			{ name: "bash" },
 		],
 		review: {
-			scope: "bead TASK-1",
+			scope: "workItem TASK-1",
 			outcome: "PASS",
 			findings: 0,
 			fixer: false,
@@ -79,7 +82,7 @@ try {
 		command: "work-small",
 		action: "run",
 		epicId: "E-1",
-		beadId: "TASK-2",
+		workItemId: "TASK-2",
 		durationMs: 500,
 	});
 	recordWorkTelemetry(cwd, {
@@ -89,7 +92,7 @@ try {
 		mode: "big",
 		action: "plan",
 		epicId: "E-2",
-		beadId: "PLAN-1",
+		workItemId: "PLAN-1",
 		durationMs: 700,
 		usage: { totalTokens: 77 },
 	});
@@ -136,7 +139,7 @@ try {
 		html.includes("New subagent runs also record child tokens"),
 		"usage report explains new subagent detail capture",
 	);
-	assert(html.includes("bead TASK-1"), "usage report shows review scope");
+	assert(html.includes("workItem TASK-1"), "usage report shows review scope");
 	assert(html.includes("1m 30s"), "usage report formats readable durations");
 	assert(html.includes("read(2), bash(1)"), "usage report groups tool calls");
 	assert(
@@ -190,15 +193,18 @@ try {
 
 	const all = buildWorkUsageState(cwd, "all");
 	assert(all.rows.length === 2, "all scope excludes empty and self events");
-	const bead = buildWorkUsageState(cwd, "bead TASK-1");
+	const workItem = buildWorkUsageState(cwd, "workItem TASK-1");
 	assert(
-		bead.rows.length === 1 && bead.rows[0].task === "TASK-1",
-		"bead scope isolates one task",
+		workItem.rows.length === 1 && workItem.rows[0].task === "TASK-1",
+		"workItem scope isolates one task",
 	);
 
-	const fixture = installWorkflowFixture();
+	const fixture = installWorkflowFixture({ native: true });
 	try {
 		fixture.reset("active");
+		seedNativeStore(cwd, [
+			{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Active epic" },
+		]);
 		const byDefault = buildWorkUsageState(cwd, "");
 		assert(
 			byDefault.ok &&
@@ -207,6 +213,10 @@ try {
 			"blank usage defaults to one active epic",
 		);
 		fixture.reset("ambiguous");
+		seedNativeStore(cwd, [
+			{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Active epic" },
+			{ id: "E-2", issue_type: "epic", status: "in_progress", title: "Second epic" },
+		]);
 		const ambiguous = buildWorkUsageState(cwd, "");
 		assert(
 			!ambiguous.ok && ambiguous.candidates.length === 2,

@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
+import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
 	buildWorkResumeState,
@@ -201,7 +202,7 @@ const childrenByScenario = {
 			parent_id: "E-1",
 			issue_type: "task",
 			status: "open",
-			title: "Old planning bead",
+			title: "Old planning workItem",
 			labels: ["wo:planning"],
 			created_at: "2026-07-03T01:00:00Z",
 		},
@@ -219,7 +220,7 @@ const childrenByScenario = {
 			parent_id: "E-1",
 			issue_type: "task",
 			status: "open",
-			title: "Old planning bead",
+			title: "Old planning workItem",
 			labels: ["wo:planning"],
 			created_at: "2026-07-03T01:00:00Z",
 		},
@@ -387,42 +388,7 @@ function assert(ok, message) {
 
 function installFakeCommands() {
 	const dir = mkdtempSync(path.join(tmpdir(), "work-resume-bin-"));
-	const bd = path.join(dir, "fake-bd.mjs");
 	const git = path.join(dir, "fake-git.mjs");
-	writeFileSync(
-		bd,
-		`#!/usr/bin/env node
-const epics = ${JSON.stringify(epics)};
-const childrenByScenario = ${JSON.stringify(childrenByScenario)};
-const scenario = process.env.WORK_RESUME_SCENARIO || "default";
-const args = process.argv.slice(2).filter((arg) => arg !== "--json");
-function out(value) { console.log(JSON.stringify(value)); }
-function childrenFor(id) {
-  if (scenario === "open-ready") return id === "O-1" ? childrenByScenario.openReady : (id === "O-2" ? childrenByScenario.openBlocked : []);
-  if (scenario === "open-two-ready") return id === "O-1" ? childrenByScenario.openReady : (id === "O-2" ? [{...childrenByScenario.openReady[0], id:"OPEN-READY-2", parent_id:"O-2"}] : []);
-  if (scenario === "remembered-blocked") return id === "E-1" ? childrenByScenario.blocked : (id === "O-1" ? childrenByScenario.openReady : (id === "O-2" ? childrenByScenario.openBlocked : []));
-  const rows = childrenByScenario[scenario] || childrenByScenario.default;
-  return rows.filter((issue) => issue.parent_id === id);
-}
-if (scenario === "no-beads") { console.error("Error: no beads database found"); process.exit(1); }
-if (args[0] === "list" && args.includes("--type=epic")) {
-  if (args.some((arg) => arg === "--status=in_progress")) out(scenario === "ambiguous" ? epics.slice(0, 2) : ["open-ready", "open-two-ready", "remembered-blocked"].includes(scenario) ? [] : [epics[0]]);
-  else if (args.some((arg) => arg === "--status=open")) out(["open-ready", "open-two-ready", "remembered-blocked"].includes(scenario) ? [epics[2], epics[3]] : []);
-  else out(epics.filter((epic) => epic.status !== "closed"));
-} else if (args[0] === "show") {
-  const id = args[1];
-  const issue = epics.find((item) => item.id === id) || Object.values(childrenByScenario).flat().find((item) => item.id === id);
-  if (issue) out(issue);
-  else { console.error("not found"); process.exit(2); }
-} else if (args[0] === "children") out(childrenFor(args[1]));
-else if (args[0] === "ready") out(childrenFor(args[1]).filter((issue) => issue.status === "open"));
-else if (args[0] === "update") {
-  const issue = Object.values(childrenByScenario).flat().find((item) => item.id === args[1]);
-  out(issue ? { ...issue, status: args[args.indexOf("--status") + 1] || issue.status } : []);
-}
-else out([]);
-`,
-	);
 	writeFileSync(
 		git,
 		`#!/usr/bin/env node
@@ -430,17 +396,9 @@ const args = process.argv.slice(2);
 const dirty = process.env.WORK_RESUME_GIT_DIRTY || "clean";
 if (process.env.WORK_RESUME_GIT_FAIL === "1") process.exit(1);
 if (args[0] === "diff") {
-  if (dirty === "unknown") process.exit(1);
-  if (dirty === "instruction-substantive") process.exit(1);
+  if (dirty === "unknown" || dirty === "instruction-substantive") process.exit(1);
   if (dirty === "instruction-formatter" && !args.includes("--ignore-blank-lines")) {
-    console.log([
-      "diff --git a/AGENTS.md b/AGENTS.md",
-      "--- a/AGENTS.md",
-      "+++ b/AGENTS.md",
-      "@@ -1 +1 @@",
-      "-See https://example.com/docs for details.",
-      "+See <https://example.com/docs> for details."
-    ].join("\\n"));
+    console.log(["diff --git a/AGENTS.md b/AGENTS.md", "--- a/AGENTS.md", "+++ b/AGENTS.md", "@@ -1 +1 @@", "-See https://example.com/docs for details.", "+See <https://example.com/docs> for details."].join("\\n"));
     process.exit(0);
   }
   if (dirty === "benign" && !args.includes("--ignore-blank-lines")) process.exit(1);
@@ -448,59 +406,86 @@ if (args[0] === "diff") {
 }
 function printDirty() {
   if (dirty === "unknown") console.log(" M extensions/work-models.js");
-  if (dirty === "benign" || dirty === "instruction-substantive" || dirty === "instruction-formatter" || dirty === "workflow") console.log(" M AGENTS.md");
+  if (["benign", "instruction-substantive", "instruction-formatter", "workflow"].includes(dirty)) console.log(" M AGENTS.md");
   if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
   if (dirty === "workflow") {
-    console.log("M  .beads/issues.jsonl");
+    console.log("M  .ce-workflow/work-items.json");
     console.log("?? docs/plans/2026-07-05-001-feat-rflib-card-emulation-plan.md");
     console.log("?? pi-session-2026-07-05T17-02-37-680Z_abc.html");
     console.log("?? .pi-subagents/artifacts/run-output.md");
   }
 }
 if (args.includes("--porcelain=v1")) printDirty();
-else {
-  console.log("## feat/coded-work-resume");
-  printDirty();
-}
+else { console.log("## feat/coded-work-resume"); printDirty(); }
 `,
 	);
-	for (const name of ["bd", "git"]) {
-		const source = name === "bd" ? bd : git;
-		writeFileSync(
-			path.join(dir, name),
-			`#!/bin/sh\nexec node "${source.replaceAll("\\", "/")}" "$@"\n`,
-		);
-		chmodSync(path.join(dir, name), 0o755);
-		writeFileSync(
-			path.join(dir, `${name}.cmd`),
-			`@node "%~dp0\\fake-${name}.mjs" %*\r\n`,
-		);
-	}
+	chmodSync(git, 0o755);
 	return dir;
 }
 
+const cwd = mkdtempSync(path.join(tmpdir(), "work-resume-cwd-"));
 const bin = installFakeCommands();
 const oldEnv = {
-	bd: process.env.WORK_ORCH_BD_BIN,
 	git: process.env.WORK_ORCH_GIT_BIN,
 	scenario: process.env.WORK_RESUME_SCENARIO,
 	dirty: process.env.WORK_RESUME_GIT_DIRTY,
 	gitFail: process.env.WORK_RESUME_GIT_FAIL,
 };
-process.env.WORK_ORCH_BD_BIN = path.join(bin, "fake-bd.mjs");
 process.env.WORK_ORCH_GIT_BIN = path.join(bin, "fake-git.mjs");
+function sourcesForScenario(scenario = "default") {
+	const closed = epics.find((epic) => epic.id === "E-C");
+	if (["open-ready", "open-two-ready", "remembered-blocked"].includes(scenario)) {
+		const children =
+			scenario === "open-two-ready"
+				? [
+						...childrenByScenario.openReady,
+						{ ...childrenByScenario.openReady[0], id: "OPEN-READY-2", parent_id: "O-2" },
+					]
+				: scenario === "remembered-blocked"
+					? [
+							...childrenByScenario.blocked,
+							...childrenByScenario.openReady,
+							...childrenByScenario.openBlocked,
+						]
+					: [...childrenByScenario.openReady, ...childrenByScenario.openBlocked];
+		return [
+			...(scenario === "remembered-blocked" ? [epics[0]] : []),
+			epics[2],
+			epics[3],
+			closed,
+			...children,
+		];
+	}
+	if (scenario === "ambiguous") return [...epics.slice(0, 2), closed];
+	return [
+		epics[0],
+		closed,
+		{ id: "IMP-OLD", issue_type: "task", status: "closed", title: "Historical discovery" },
+		...(childrenByScenario[scenario] ?? childrenByScenario.default),
+	];
+}
+function setScenario(scenario = "default") {
+	process.env.WORK_RESUME_SCENARIO = scenario;
+	if (scenario === "no-legacy") {
+		rmSync(path.join(cwd, ".ce-workflow"), { recursive: true, force: true });
+		rmSync(path.join(cwd, ".pi", "work-store"), { recursive: true, force: true });
+		mkdirSync(path.join(cwd, ".beads"), { recursive: true });
+		return;
+	}
+	seedNativeStore(cwd, sourcesForScenario(scenario));
+}
 try {
-	delete process.env.WORK_RESUME_SCENARIO;
+	setScenario();
 	delete process.env.WORK_RESUME_GIT_DIRTY;
-	let state = buildWorkResumeState(process.cwd(), "E-1");
+	let state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.ok && state.action === "run-debug",
-		"ready debug bug wins even when Beads echoes non-blocking dependencies",
+		"ready debug bug wins even when native store echoes non-blocking dependencies",
 	);
-	assert(state.selectedBead.id === "BUG-1", "debug bug selected");
+	assert(state.selectedWorkItem.id === "BUG-1", "debug bug selected");
 	assert(
-		state.handoffPrompt.includes("Target Bead ID: BUG-1"),
-		"handoff targets selected bead",
+		state.handoffPrompt.includes("Target work item: BUG-1"),
+		"handoff targets selected workItem",
 	);
 	assert(
 		!state.handoffPrompt.includes("Large unrelated notes"),
@@ -508,16 +493,16 @@ try {
 	);
 	assert(
 		!JSON.stringify(state).includes("Large unrelated notes"),
-		"resume state omits full Beads notes",
+		"resume state omits full work-item notes",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "implementation";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("implementation");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-implementation" && state.inlineWork,
 		"unplanned implementation gets a coded slice plan and continues inline",
 	);
-	assert(state.selectedBead.id === "IMP-1", "implementation bead selected");
+	assert(state.selectedWorkItem.id === "IMP-1", "implementation workItem selected");
 	assert(
 		state.handoffPrompt?.includes("WO_INLINE_V1"),
 		"inline slice planning avoids a separate planner boundary",
@@ -530,107 +515,107 @@ try {
 		"coded slice-plan target stays compact and readable",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "implementationAgent";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("implementationAgent");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-implementation" &&
 			!state.inlineWork &&
-			state.selectedBead.executionMode === "agent",
+			state.selectedWorkItem.executionMode === "agent",
 		"coded slice planning preserves the big/high-risk isolated-writer boundary",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "ideasOnly";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("ideasOnly");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-planner",
 		"idea records alone launch planning rather than implementation",
 	);
 	assert(state.counts.readyExecutable === 0, "idea records are not executable");
-	assert(!state.selectedBead, "idea record is never selected as a bead");
+	assert(!state.selectedWorkItem, "idea record is never selected as a workItem");
 
-	process.env.WORK_RESUME_SCENARIO = "plannedIdea";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("plannedIdea");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-implementation" && state.inlineWork,
 		"planned idea selects linked executable child inline",
 	);
-	assert(state.selectedBead.id === "IMP-1", "linked task selected over idea");
+	assert(state.selectedWorkItem.id === "IMP-1", "linked task selected over idea");
 	assert(
 		state.handoffPrompt.includes(
-			"Plan: execute the wo:slice-plan note on Bead IMP-1 as your spec",
+			"Plan: execute the wo:slice-plan note on WorkItem IMP-1 as your spec",
 		),
-		"implementation handoff points to the slice plan, not the bead alone",
+		"implementation handoff points to the slice plan, not the workItem alone",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "planning";
-	state = buildWorkResumeState(process.cwd(), "E-1");
-	assert(state.action === "run-planner", "planning bead selected when alone");
-	assert(state.selectedBead.id === "PLAN-1", "planning bead selected");
+	setScenario("planning");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(state.action === "run-planner", "planning workItem selected when alone");
+	assert(state.selectedWorkItem.id === "PLAN-1", "planning workItem selected");
 
-	process.env.WORK_RESUME_SCENARIO = "stalePlanning";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("stalePlanning");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "close-stale-planning",
 		"stale planning stops for cleanup when no executable work is ready",
 	);
 	assert(
 		state.counts.slices === 1,
-		"planning beads are not counted as executable slices",
+		"planning work items are not counted as executable slices",
 	);
 	assert(
 		state.counts.closed === 1,
-		"closed executable slice count excludes planning beads",
+		"closed executable slice count excludes planning work items",
 	);
 	assert(!state.handoffPrompt, "cleanup stop does not inject handoff");
 
-	process.env.WORK_RESUME_SCENARIO = "stalePlanningReady";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("stalePlanningReady");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-implementation" && state.inlineWork,
 		"ready executable work proceeds inline despite stale planning cleanup",
 	);
-	assert(state.selectedBead.id === "IMP-1", "ready implementation wins");
+	assert(state.selectedWorkItem.id === "IMP-1", "ready implementation wins");
 
-	process.env.WORK_RESUME_SCENARIO = "inProgressSensitiveContract";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("inProgressSensitiveContract");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "in-progress-agent" &&
-			!state.selectedBead.verificationReady,
+			!state.selectedWorkItem.verificationReady,
 		"verification requirements do not masquerade as passing evidence or launch review early",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "inProgressReviewFail";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("inProgressReviewFail");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-fix" &&
-			directRoleHandoffParams(state, process.cwd())?.agent === "bead-fixer",
+			directRoleHandoffParams(state, cwd)?.agent === "work-fixer",
 		"concrete review FAIL routes directly to exactly one fixer",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "inProgressFixReady";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("inProgressFixReady");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-review" &&
-			directRoleHandoffParams(state, process.cwd())?.agent === "bead-reviewer",
+			directRoleHandoffParams(state, cwd)?.agent === "work-reviewer",
 		"verified fixer result routes directly to one scoped re-review",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "inProgressReviewPass";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("inProgressReviewPass");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "finish-ready" && !state.handoffPrompt,
 		"durable review PASS skips duplicate reviewer and writer agents",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "inProgressReviewCap";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("inProgressReviewCap");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "review-blocked" && !state.handoffPrompt,
 		"three review failures stop the coded loop instead of spawning forever",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "blocked";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("blocked");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "report-blocked",
 		"blocked epic stops with report action",
@@ -644,55 +629,55 @@ try {
 		"blocked resume output numbers the executable next action",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "externalBlocked";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("externalBlocked");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.suggestedCommands[0] === "/work-report HW-1",
 		"blocked epic points at external hardware blocker before downstream debug",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "plannerGap";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("plannerGap");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-planner",
 		"empty unblocked epic launches planner handoff",
 	);
 	assert(
-		state.handoffPrompt.includes("Target Bead ID: none"),
-		"planner gap has no selected bead",
+		state.handoffPrompt.includes("Target work item: none"),
+		"planner gap has no selected workItem",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "open-ready";
-	state = buildWorkResumeState(process.cwd(), "last");
+	setScenario("open-ready");
+	state = buildWorkResumeState(cwd, "last");
 	assert(
 		state.ok && state.epic.id === "O-1",
 		"single open epic with ready work resolves when no in-progress epic exists",
 	);
 	assert(state.candidates === undefined, "ready open epic is not ambiguous");
 
-	process.env.WORK_RESUME_SCENARIO = "remembered-blocked";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("remembered-blocked");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(state.ok && state.epic.id === "E-1", "explicit target is remembered");
-	state = buildWorkResumeState(process.cwd(), "last");
+	state = buildWorkResumeState(cwd, "last");
 	assert(
 		state.ok && state.epic.id === "E-1" && state.action === "report-blocked",
 		"remembered blocked epic wins over unrelated ready open epics",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "open-two-ready";
-	state = buildWorkResumeState(process.cwd(), "O-1");
+	setScenario("open-two-ready");
+	state = buildWorkResumeState(cwd, "O-1");
 	assert(
 		state.ok && state.epic.id === "O-1",
 		"explicit open target refreshes remembered epic",
 	);
-	state = buildWorkResumeState(process.cwd(), "last");
+	state = buildWorkResumeState(cwd, "last");
 	assert(
 		state.ok && state.epic.id === "O-1",
 		"latest open epic with ready work wins when multiple open epics are ready",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "ambiguous";
-	state = buildWorkResumeState(process.cwd(), "last");
+	setScenario("ambiguous");
+	state = buildWorkResumeState(cwd, "last");
 	assert(
 		!state.ok && state.reason === "ambiguous-target",
 		"ambiguous target returns parseable stop",
@@ -705,15 +690,15 @@ try {
 	for (const key of ["id", "status", "title", "created", "updated", "counts"])
 		assert(state.candidates[0][key] !== undefined, `candidate includes ${key}`);
 
-	delete process.env.WORK_RESUME_SCENARIO;
-	state = buildWorkResumeState(process.cwd(), "BUG-1");
+	setScenario();
+	state = buildWorkResumeState(cwd, "BUG-1");
 	assert(
 		!state.ok && state.reason === "unsupported-target",
 		"explicit child target is rejected instead of silently replanned",
 	);
 
 	state = buildWorkResumeState(
-		process.cwd(),
+		cwd,
 		"@docs/plans/2026-07-05-001-feat-rflib-card-emulation-plan.md",
 	);
 	assert(
@@ -726,21 +711,21 @@ try {
 		"plan path target strips autocomplete @ marker",
 	);
 
-	state = buildWorkResumeState(process.cwd(), "NOPE");
+	state = buildWorkResumeState(cwd, "NOPE");
 	assert(
 		!state.ok && state.reason === "unknown-target",
 		"unknown target is parseable",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "no-beads";
-	state = buildWorkResumeState(process.cwd(), "last");
+	setScenario("no-legacy");
+	state = buildWorkResumeState(cwd, "last");
 	assert(
-		!state.ok && state.reason === "beads-unavailable",
-		"missing Beads is parseable",
+		!state.ok && state.reason === "migration-required",
+		"legacy work state requires migration",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "openDecision";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("openDecision");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "report-blocked",
 		"open decision without ready work reports blocked",
@@ -751,9 +736,9 @@ try {
 	);
 	assert(!state.handoffPrompt, "open decision does not inject handoff");
 
-	delete process.env.WORK_RESUME_SCENARIO;
+	setScenario();
 	process.env.WORK_RESUME_GIT_FAIL = "1";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(state.git.ok === false, "git failure is represented");
 	assert(state.action === "dirty-stop", "git unavailable stops writer handoff");
 	assert(
@@ -763,7 +748,7 @@ try {
 	delete process.env.WORK_RESUME_GIT_FAIL;
 
 	process.env.WORK_RESUME_GIT_DIRTY = "unknown";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "dirty-stop",
 		"unknown dirty file stops writer handoff",
@@ -774,17 +759,17 @@ try {
 	);
 	assert(!state.handoffPrompt, "dirty stop does not inject handoff");
 
-	process.env.WORK_RESUME_SCENARIO = "inProgressVerifiedAgent";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	setScenario("inProgressVerifiedAgent");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-review" &&
-			state.selectedBead.changedPaths.includes("extensions/work-models.js"),
+			state.selectedWorkItem.changedPaths.includes("extensions/work-models.js"),
 		"verified detached-writer files may cross the dirty gate into scoped review",
 	);
-	process.env.WORK_RESUME_SCENARIO = "debug";
+	setScenario("debug");
 
 	process.env.WORK_RESUME_GIT_DIRTY = "workflow";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-debug",
 		`workflow-owned dirt allows handoff, got ${state.action}: ${state.message ?? ""}`,
@@ -796,7 +781,7 @@ try {
 	);
 
 	process.env.WORK_RESUME_GIT_DIRTY = "benign";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-debug",
 		`benign instruction-file dirt allows handoff, got ${state.action}: ${state.message ?? ""}`,
@@ -804,7 +789,7 @@ try {
 	assert(state.git.benignDirty, "benign dirt is represented in state");
 
 	process.env.WORK_RESUME_GIT_DIRTY = "instruction-formatter";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-debug",
 		"formatter-only instruction-file dirt allows handoff",
@@ -812,21 +797,21 @@ try {
 	assert(state.git.benignDirty, "formatter-only dirt is represented as benign");
 
 	process.env.WORK_RESUME_GIT_DIRTY = "instruction-substantive";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "dirty-stop",
 		"substantive instruction-file dirt is not benign",
 	);
 
 	process.env.WORK_RESUME_GIT_DIRTY = "untracked-instruction";
-	state = buildWorkResumeState(process.cwd(), "E-1");
+	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "dirty-stop",
 		"untracked instruction-file dirt is not benign",
 	);
 
 	delete process.env.WORK_RESUME_GIT_DIRTY;
-	state = buildWorkResumeState(process.cwd(), "E-C");
+	state = buildWorkResumeState(cwd, "E-C");
 	assert(state.action === "done-candidate", "closed epic does not launch work");
 	assert(
 		state.suggestedCommands.length === 0,
@@ -835,9 +820,9 @@ try {
 
 	const sent = [];
 	const notices = [];
-	process.env.WORK_RESUME_SCENARIO = "plannedIdea";
+	setScenario("plannedIdea");
 	await handleWorkResumeCommand("E-1", {
-		cwd: process.cwd(),
+		cwd: cwd,
 		ui: { notify: (message, level) => notices.push({ message, level }) },
 		sendUserMessage: async (message, options) =>
 			sent.push({ message, options }),
@@ -852,7 +837,7 @@ try {
 	await handleWorkResumeCommand(
 		"E-1",
 		{
-			cwd: process.cwd(),
+			cwd: cwd,
 			ui: { notify: (message, level) => notices.push({ message, level }) },
 		},
 		{
@@ -864,7 +849,7 @@ try {
 		"inline handler falls back to pi.sendUserMessage when ctx helper is absent",
 	);
 
-	delete process.env.WORK_RESUME_SCENARIO;
+	setScenario();
 	let rpcReply;
 	let rpcRequest;
 	const rpcPi = {
@@ -882,7 +867,7 @@ try {
 	const directResult = await handleWorkResumeCommand(
 		"E-1",
 		{
-			cwd: process.cwd(),
+			cwd: cwd,
 			ui: { notify: (message, level) => notices.push({ message, level }) },
 			sendUserMessage: async (message, options) =>
 				sent.push({ message, options }),
@@ -895,18 +880,19 @@ try {
 		"numbered-selection notes reach direct role handoffs",
 	);
 	assert(
-		directResult.directHandoff?.agent === "bead-debugger" &&
+		directResult.directHandoff?.agent === "work-debugger" &&
 			directResult.handoffClaimed,
 		"live resume directly launches and claims the exact specialist without a duplicate-writer window",
 	);
 
+	setScenario();
 	rpcRequest = undefined;
 	const sentBeforeNumberedResume = sent.length;
 	assert(
 		await executeNumberedWorkAction(
 			"/work-resume E-1",
 			{
-				cwd: process.cwd(),
+				cwd: cwd,
 				ui: { notify: (message, level) => notices.push({ message, level }) },
 				sendUserMessage: async (message, options) =>
 					sent.push({ message, options }),
@@ -925,10 +911,10 @@ try {
 		"numbered /work-resume does not start an autonomous work-goal prompt",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "blocked";
+	setScenario("blocked");
 	sent.length = 0;
 	await handleWorkResumeCommand("E-1", {
-		cwd: process.cwd(),
+		cwd: cwd,
 		ui: { notify: (message, level) => notices.push({ message, level }) },
 		sendUserMessage: async (message, options) =>
 			sent.push({ message, options }),
@@ -940,9 +926,9 @@ try {
 		"blocked resume output includes the compact blocker ledger",
 	);
 
-	process.env.WORK_RESUME_SCENARIO = "externalBlocked";
+	setScenario("externalBlocked");
 	await handleWorkResumeCommand("E-1", {
-		cwd: process.cwd(),
+		cwd: cwd,
 		ui: { notify: (message, level) => notices.push({ message, level }) },
 		sendUserMessage: async (message, options) =>
 			sent.push({ message, options }),
@@ -954,7 +940,7 @@ try {
 	);
 
 	// normal profiles add the slice-plan note inline; max can still launch a planner for messy/large slices.
-	process.env.WORK_RESUME_SCENARIO = "implementation";
+	setScenario("implementation");
 	for (const profile of ["low", "medium", "high"]) {
 		const inlineCwd = mkdtempSync(path.join(tmpdir(), "work-resume-inline-"));
 		mkdirSync(path.join(inlineCwd, ".pi"), { recursive: true });
@@ -962,6 +948,7 @@ try {
 			path.join(inlineCwd, ".pi", "settings.json"),
 			JSON.stringify({ workOrchestrator: { profile } }),
 		);
+		seedNativeStore(inlineCwd, sourcesForScenario("implementation"));
 		const inlineState = buildWorkResumeState(inlineCwd, "E-1");
 		assert(
 			inlineState.action === "run-implementation" &&
@@ -974,19 +961,18 @@ try {
 
 	const maxCwd = mkdtempSync(path.join(tmpdir(), "work-resume-ce-"));
 	mkdirSync(path.join(maxCwd, ".pi"), { recursive: true });
-	writeFileSync(
+writeFileSync(
 		path.join(maxCwd, ".pi", "settings.json"),
 		JSON.stringify({ workOrchestrator: { profile: "max" } }),
-	);
-	const maxState = buildWorkResumeState(maxCwd, "E-1");
+);
+seedNativeStore(maxCwd, sourcesForScenario("implementation"));
+const maxState = buildWorkResumeState(maxCwd, "E-1");
 	assert(
 		maxState.action === "run-implementation" && maxState.inlineWork,
 		"max still skips a planner boundary for simple slices",
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
 } finally {
-	if (oldEnv.bd === undefined) delete process.env.WORK_ORCH_BD_BIN;
-	else process.env.WORK_ORCH_BD_BIN = oldEnv.bd;
 	if (oldEnv.git === undefined) delete process.env.WORK_ORCH_GIT_BIN;
 	else process.env.WORK_ORCH_GIT_BIN = oldEnv.git;
 	if (oldEnv.scenario === undefined) delete process.env.WORK_RESUME_SCENARIO;
@@ -996,6 +982,7 @@ try {
 	if (oldEnv.gitFail === undefined) delete process.env.WORK_RESUME_GIT_FAIL;
 	else process.env.WORK_RESUME_GIT_FAIL = oldEnv.gitFail;
 	rmSync(bin, { recursive: true, force: true });
+	rmSync(cwd, { recursive: true, force: true });
 }
 
 console.log("ok - coded work-resume behavior");

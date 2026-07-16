@@ -98,7 +98,7 @@ assert(
 	"one unrecognized path conservatively selects the full scenario set",
 );
 
-const promptPlan = buildBenchmarkPlan(["agents/bead-worker.md"]);
+const promptPlan = buildBenchmarkPlan(["agents/work-worker.md"]);
 assert(
 	["small", "medium", "large", "goal", "review", "finalization"].every((id) =>
 		promptPlan.agentScenarioIds.includes(id),
@@ -139,7 +139,7 @@ let missingAgentConfigurationRejected = false;
 try {
 	await captureBenchmarkEvidence({
 		sourceSha: "missing-agent",
-		changedPaths: ["agents/bead-worker.md"],
+		changedPaths: ["agents/work-worker.md"],
 		environment: { platform: "fixture", arch: "fixture", node: "fixture" },
 		seams: {},
 	});
@@ -227,7 +227,7 @@ let noisyIndex = 0;
 const noisy = await captureBenchmarkEvidence({
 	sourceSha: "noisy",
 	baselineSourceSha: "base-sha",
-	changedPaths: ["agents/bead-worker.md"],
+	changedPaths: ["agents/work-worker.md"],
 	environment: {
 		platform: "fixture",
 		arch: "fixture",
@@ -377,7 +377,7 @@ assert(
 
 const failedPackage = await captureBenchmarkEvidence({
 	sourceSha: "failed",
-	changedPaths: ["agents/bead-worker.md"],
+	changedPaths: ["agents/work-worker.md"],
 	environment: {
 		platform: "fixture",
 		arch: "fixture",

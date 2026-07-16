@@ -5,6 +5,7 @@ const SHA256 = /^[a-f0-9]{64}$/i;
 const REQUIRED_METRICS = ["tokens", "wallMs", "toolCalls", "subagentCalls", "toolOutputChars", "retries", "contextTokens", "questions"];
 const REQUIRED_DEPTHS = ["smoke", "decision", "sentinel", "calibration"];
 const REQUIRED_INPUTS = ["workflowRevision", "project", "stage", "bundleVersion", "role", "provider", "model", "effort", "evaluator", "runtime", "dependencies", "browser", "rubricVersion", "tools"];
+const ALLOWED_FACTORS = new Set(["workflowRevision", "mode", "role", "reviewer", "effort", "prompt"]);
 
 export function canonical(value) {
 	if (Array.isArray(value)) return value.map(canonical);
@@ -36,7 +37,8 @@ export function validateBundle(bundle) {
 	for (const project of bundle.projects) {
 		const approval = bundle.approvals?.[project];
 		requireValue(approval && [approval.bundleSha, approval.brainstormSha, approval.planSha].every((sha) => SHA256.test(sha)), `${project} golden approval SHAs are required`);
-		requireValue(typeof approval.approvedBy === "string" && approval.approvedBy.length > 0, `${project} approver is required`);
+		requireValue(approval.approved === true && typeof approval.approvedBy === "string" && approval.approvedBy.length > 0 && typeof approval.approvedAt === "string" && approval.approvedAt.length > 0, `${project} human approval is required`);
+		requireValue(approval.acceptancePassed === true && approval.evidence, `${project} approval acceptance evidence is required`);
 	}
 	return bundle;
 }
@@ -58,6 +60,7 @@ export function validateExperimentPair({ baseline, candidate, factor, interactio
 	for (const side of [baseline, candidate]) for (const field of REQUIRED_INPUTS) requireValue(side?.[field] !== undefined, `missing experiment input: ${field}`);
 	const factors = Array.isArray(factor) ? factor : [factor];
 	requireValue(factors.every((item) => typeof item === "string" && item.length > 0), "declared factor is required");
+	requireValue(factors.every((item) => ALLOWED_FACTORS.has(item.split(".")[0])), "declared factor is outside the V1 allowlist");
 	const changed = changedPaths(baseline, candidate);
 	requireValue(changed.length > 0, "no-op factor is invalid");
 	const allowed = changed.every((name) => factors.some((factorName) => name === factorName || name.startsWith(`${factorName}.`)));

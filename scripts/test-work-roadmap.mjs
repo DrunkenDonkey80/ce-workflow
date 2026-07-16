@@ -1,11 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import {
-	chmodSync,
-	existsSync,
 	mkdirSync,
 	mkdtempSync,
-	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -14,6 +11,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
+import { loadStore } from "../extensions/work-store.js";
+import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
 	buildWorkPlanState,
@@ -29,47 +28,8 @@ const {
 );
 
 const root = mkdtempSync(path.join(tmpdir(), "work-roadmap-"));
-const binRoot = mkdtempSync(path.join(tmpdir(), "work-roadmap-bin-"));
 execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
-const log = path.join(binRoot, "bd.log");
-const commandLog = path.join(binRoot, "bd-commands.log");
-const bd = path.join(binRoot, "bd-fake.mjs");
 mkdirSync(path.join(root, ".pi"));
-
-writeFileSync(
-	bd,
-	`#!/usr/bin/env node
-import { appendFileSync } from 'node:fs';
-const epics = [
-  { id: 'E-1', issue_type: 'epic', status: 'in_progress', title: 'Current roadmap', notes: 'brainstorm-path=docs/brainstorms/accepted.md', updated_at: '2026-07-03T10:00:00Z' },
-  { id: 'E-2', issue_type: 'epic', status: 'open', title: 'Open roadmap', updated_at: '2026-07-02T10:00:00Z' },
-  { id: 'E-3', issue_type: 'epic', status: 'closed', title: 'Closed roadmap', updated_at: '2026-07-01T10:00:00Z' },
-];
-const activeChildren = [
-  { id: 'BUG-1', parent_id: 'E-1', issue_type: 'bug', status: 'open', title: 'Fix blocker', labels: ['wo:debug'] },
-  { id: 'TASK-1', parent_id: 'E-1', issue_type: 'task', status: 'open', title: 'Build feature' },
-  { id: 'DONE-1', parent_id: 'E-1', issue_type: 'task', status: 'closed', title: 'Finished task' },
-];
-const closedChildren = [{ id: 'DONE-2', parent_id: 'E-3', issue_type: 'task', status: 'closed', title: 'Done' }];
-const args = process.argv.slice(2).filter(arg => arg !== '--json');
-appendFileSync(${JSON.stringify(commandLog)}, args.join(' ') + '\\n');
-const issues = [...epics, ...activeChildren, ...closedChildren];
-const out = value => process.stdout.write(JSON.stringify(value));
-if (args[0] === 'list' && args.includes('--type=epic')) {
-  const status = args.find(arg => arg.startsWith('--status='))?.slice(9);
-  out(status ? epics.filter(epic => epic.status === status) : epics);
-} else if (args[0] === 'show') {
-  out(issues.filter(issue => issue.id === args[1]));
-} else if (args[0] === 'children') {
-  out(args[1] === 'E-3' ? closedChildren : args[1] === 'E-1' ? activeChildren : []);
-} else if (args[0] === 'close' || args[0] === 'reopen') {
-  appendFileSync(${JSON.stringify(log)}, args.join(' ') + '\\n');
-} else {
-  out([]);
-}
-`,
-);
-chmodSync(bd, 0o755);
 mkdirSync(path.join(root, "docs", "plans"), { recursive: true });
 mkdirSync(path.join(root, "docs", "brainstorms"), { recursive: true });
 writeFileSync(
@@ -104,6 +64,15 @@ writeFileSync(
 	path.join(root, ".pi", "work-orchestrator-state.json"),
 	JSON.stringify({ lastEpicId: "E-1" }),
 );
+seedNativeStore(root, [
+	{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Current roadmap", notes: "brainstorm-path=docs/brainstorms/accepted.md", updated_at: "2026-07-03T10:00:00Z" },
+	{ id: "E-2", issue_type: "epic", status: "open", title: "Open roadmap", updated_at: "2026-07-02T10:00:00Z" },
+	{ id: "E-3", issue_type: "epic", status: "closed", title: "Closed roadmap", updated_at: "2026-07-01T10:00:00Z" },
+	{ id: "BUG-1", parent_id: "E-1", issue_type: "bug", status: "open", title: "Fix blocker", labels: ["wo:debug"] },
+	{ id: "TASK-1", parent_id: "E-1", issue_type: "task", status: "open", title: "Build feature" },
+	{ id: "DONE-1", parent_id: "E-1", issue_type: "task", status: "closed", title: "Finished task" },
+	{ id: "DONE-2", parent_id: "E-3", issue_type: "task", status: "closed", title: "Done" },
+]);
 execFileSync("git", ["add", "."], { cwd: root, stdio: "ignore" });
 execFileSync(
 	"git",
@@ -118,8 +87,6 @@ execFileSync(
 	],
 	{ cwd: root, stdio: "ignore" },
 );
-process.env.WORK_ORCH_BD_BIN = bd;
-
 try {
 	const list = buildWorkRoadmapState(root, "list");
 	console.assert(
@@ -134,11 +101,6 @@ try {
 		renderWorkRoadmapText(list).includes("* E-1"),
 		"renders current marker",
 	);
-	console.assert(
-		!readFileSync(commandLog, "utf8").includes("children"),
-		"roadmap list does not fetch every child list",
-	);
-
 	const tasks = buildWorkRoadmapState(root, "tasks current");
 	console.assert(
 		tasks.tasks.blockers[0].id === "BUG-1",
@@ -168,7 +130,7 @@ try {
 		{},
 	);
 	console.assert(
-		notices.some((message) => message.includes("Bead: Fix blocker")),
+		notices.some((message) => message.includes("WorkItem: Fix blocker")),
 		"interactive task menu opens task summary",
 	);
 	console.assert(
@@ -199,14 +161,12 @@ try {
 	const planCreated = buildWorkPlanState(root, "docs/plans/overhaul.md");
 	if (
 		!planCreated.ok ||
-		!readFileSync(commandLog, "utf8").includes("create Plan next slice")
+		!Object.values(loadStore(root).items).some((item) =>
+			item.notes.join("\n").includes("source brainstorm"),
+		)
 	)
 		throw new Error(
-			`plan file creates roadmap epic in temp repo: ${JSON.stringify(planCreated)}\n${readFileSync(commandLog, "utf8")}`,
-		);
-	if (!readFileSync(commandLog, "utf8").includes("source brainstorm"))
-		throw new Error(
-			`created roadmap keeps linked brainstorm artifacts in Beads notes\n${readFileSync(commandLog, "utf8")}`,
+			`plan file creates native roadmap work: ${JSON.stringify(planCreated)}`,
 		);
 
 	const handoffs = [];
@@ -235,7 +195,10 @@ try {
 		closeNeedsConfirm.suggestedCommands[1].includes("--force"),
 		"offers force close command",
 	);
-	console.assert(!existsSync(log), "no implicit close was run");
+	console.assert(
+		loadStore(root).items["E-1"].status === "in_progress",
+		"no implicit close was run",
+	);
 
 	const forced = buildWorkRoadmapState(root, "close current --force");
 	console.assert(
@@ -243,8 +206,8 @@ try {
 		"force closes by explicit request",
 	);
 	console.assert(
-		readFileSync(log, "utf8").includes("close E-1"),
-		"close command was run",
+		loadStore(root).items["E-1"].status === "closed",
+		"close updates the native roadmap",
 	);
 
 	const reopened = buildWorkRoadmapState(root, "reopen E-3");
@@ -253,11 +216,9 @@ try {
 		"reopens explicit roadmap",
 	);
 	console.assert(
-		readFileSync(log, "utf8").includes("reopen E-3"),
-		"reopen command was run",
+		loadStore(root).items["E-3"].status === "open",
+		"reopen updates the native roadmap",
 	);
 } finally {
-	delete process.env.WORK_ORCH_BD_BIN;
 	rmSync(root, { recursive: true, force: true });
-	rmSync(binRoot, { recursive: true, force: true });
 }

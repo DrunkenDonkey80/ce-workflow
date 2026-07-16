@@ -12,28 +12,28 @@ const { buildWorkDebugState } = await import(
 	).href
 );
 
-const fixture = installWorkflowFixture();
+const fixture = installWorkflowFixture({ native: true });
 try {
 	fixture.reset("debug");
-	let state = buildWorkDebugState(process.cwd(), "BUG-1");
+	let state = buildWorkDebugState(fixture.cwd, "BUG-1");
 	assert(
-		state.ok && state.selectedBead.id === "BUG-1",
+		state.ok && state.selectedWorkItem.id === "BUG-1",
 		"explicit bug target is used",
 	);
 	assert(
-		state.handoffPrompt.includes("Debug Bead: BUG-1"),
+		state.handoffPrompt.includes("Debug WorkItem: BUG-1"),
 		"debug handoff names target",
 	);
 
 	fixture.reset("debug");
-	state = buildWorkDebugState(process.cwd(), "IMP-2");
+	state = buildWorkDebugState(fixture.cwd, "IMP-2");
 	assert(
-		state.ok && state.selectedBead.id === "BUG-1",
+		state.ok && state.selectedWorkItem.id === "BUG-1",
 		"debug-needed marker is followed",
 	);
 
 	fixture.reset("blocked");
-	state = buildWorkDebugState(process.cwd(), "BLOCK-1");
+	state = buildWorkDebugState(fixture.cwd, "BLOCK-1");
 	assert(
 		state.ok && state.action === "debug-blocked" && !state.handoffPrompt,
 		"blocked debug target stops without explicit retry guidance",
@@ -44,9 +44,9 @@ try {
 	);
 
 	fixture.reset("blocked");
-	state = buildWorkDebugState(process.cwd(), "BLOCK-1: device is available");
+	state = buildWorkDebugState(fixture.cwd, "BLOCK-1: device is available");
 	assert(
-		state.ok && state.selectedBead.id === "BLOCK-1",
+		state.ok && state.selectedWorkItem.id === "BLOCK-1",
 		"explicit blocked target with guidance is debugged directly",
 	);
 	assert(
@@ -54,28 +54,23 @@ try {
 		"blocked target guidance is preserved",
 	);
 	assert(
-		fixture
-			.logs()
-			.some(
-				(entry) =>
-					entry.op === "update" &&
-					entry.id === "BLOCK-1" &&
-					entry.status === "open",
-			),
-		"blocked target with retry guidance is reopened before handoff",
+		fixture.store().items["BLOCK-1"].status === "open" &&
+			fixture.store().items["BLOCK-1"].notes.some((note) => note.includes("retry-guidance")) &&
+			fixture.logs().length === 0,
+		"blocked target is reopened natively before handoff",
 	);
 
 	fixture.reset("blocked");
-	state = buildWorkDebugState(process.cwd(), "1: device is available");
+	state = buildWorkDebugState(fixture.cwd, "1: device is available");
 	assert(
-		state.ok && state.selectedBead.id === "BLOCK-1",
-		"numeric shorthand resolves to active epic child bead",
+		state.ok && state.selectedWorkItem.id === "BLOCK-1",
+		"numeric shorthand resolves to active epic child workItem",
 	);
 
 	fixture.reset("blocked");
-	state = buildWorkDebugState(process.cwd(), "1 device is available");
+	state = buildWorkDebugState(fixture.cwd, "1 device is available");
 	assert(
-		state.ok && state.selectedBead.id === "BLOCK-1",
+		state.ok && state.selectedWorkItem.id === "BLOCK-1",
 		"numeric shorthand plus prose is treated as retry guidance, not a new bug",
 	);
 	assert(
@@ -84,9 +79,9 @@ try {
 	);
 
 	fixture.reset("debug");
-	state = buildWorkDebugState(process.cwd(), "IMP-1: rerun: npm test");
+	state = buildWorkDebugState(fixture.cwd, "IMP-1: rerun: npm test");
 	assert(
-		state.ok && state.selectedBead.id === "BUG-1",
+		state.ok && state.selectedWorkItem.id === "BUG-1",
 		"existing debug dependency is reused",
 	);
 	assert(
@@ -94,18 +89,18 @@ try {
 		"guidance after first colon is preserved",
 	);
 	assert(
-		!fixture.logs().some((entry) => entry.op === "create"),
+		Object.values(fixture.store().items).filter((item) => item.type === "bug").length === 1,
 		"reuse path does not create duplicate bug",
 	);
 
 	fixture.reset("active");
-	state = buildWorkDebugState(process.cwd(), "terminal hangs: inspect COM8");
+	state = buildWorkDebugState(fixture.cwd, "terminal hangs: inspect COM8");
 	assert(
-		state.ok && state.selectedBead.id.startsWith("BUG-NEW-"),
-		"symptom-only request creates bug",
+		state.ok && state.selectedWorkItem.type === "bug",
+		"symptom-only request creates native bug",
 	);
 	assert(
-		state.selectedBead.title === "terminal hangs",
+		state.selectedWorkItem.title === "terminal hangs",
 		"symptom title is preserved",
 	);
 	assert(
@@ -114,7 +109,7 @@ try {
 	);
 
 	fixture.reset("ambiguous");
-	state = buildWorkDebugState(process.cwd(), "ambiguous symptom");
+	state = buildWorkDebugState(fixture.cwd, "ambiguous symptom");
 	assert(
 		!state.ok && state.reason === "ambiguous-target",
 		"symptom-only ambiguous epic stops",
@@ -122,22 +117,18 @@ try {
 	assert(fixture.logs().length === 0, "ambiguous debug does not create bug");
 
 	fixture.reset("debug");
-	state = buildWorkDebugState(process.cwd(), "NOPE-1");
+	state = buildWorkDebugState(fixture.cwd, "NOPE-1");
 	assert(
 		!state.ok && state.reason === "unknown-target",
-		"unknown Bead target stops",
+		"unknown WorkItem target stops",
 	);
 
-	fixture.reset("no-beads");
-	state = buildWorkDebugState(process.cwd(), "broken thing");
-	assert(
-		!state.ok && state.reason === "beads-unavailable",
-		"Beads failure is parseable",
-	);
-	assert(fixture.logs().length === 0, "Beads failure does not create bug");
+	fixture.reset("active");
+	state = buildWorkDebugState(fixture.cwd, "broken thing");
+	assert(state.ok && fixture.logs().length === 0, "native debug does not require bd");
 
 	fixture.reset("active", "unknown");
-	state = buildWorkDebugState(process.cwd(), "IMP-1");
+	state = buildWorkDebugState(fixture.cwd, "IMP-1");
 	assert(
 		!state.ok && state.reason === "dirty-stop",
 		"dirty git stops debug handoff",

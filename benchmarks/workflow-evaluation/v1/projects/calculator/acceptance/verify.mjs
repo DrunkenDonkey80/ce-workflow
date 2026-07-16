@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -7,11 +7,13 @@ const REQUIRED = ["arithmetic", "keyboard", "error-recovery", "theme-persistence
 
 function fail(reason, gates = []) { return { project: "calculator", passed: false, reason, gates }; }
 
-export async function verifyCalculatorProject(root, browser) {
+export async function verifyCalculatorProject(root, browser, options = {}) {
 	if (!browser || typeof browser.capability !== "function") return fail("browser-unavailable");
 	const capability = await browser.capability();
 	if (!capability?.name || !capability?.version || capability.screenshot !== true) return fail("browser-capability-mismatch");
-	const temp = mkdtempSync(path.join(os.tmpdir(), "ce-calculator-acceptance-"));
+	const ownedTemp = !options.evidenceDirectory;
+	const temp = options.evidenceDirectory ? path.resolve(options.evidenceDirectory) : mkdtempSync(path.join(os.tmpdir(), "ce-calculator-acceptance-"));
+	mkdirSync(temp, { recursive: true });
 	const gates = [];
 	try {
 		await browser.setViewport(VIEWPORT);
@@ -32,7 +34,7 @@ export async function verifyCalculatorProject(root, browser) {
 		return fail(error?.code === "ETIMEDOUT" ? "browser-timeout" : "browser-error", [...gates, { name: "browser", passed: false, detail: error instanceof Error ? error.message : String(error) }]);
 	} finally {
 		await browser?.close?.();
-		rmSync(temp, { recursive: true, force: true });
+		if (ownedTemp) rmSync(temp, { recursive: true, force: true });
 	}
 }
 

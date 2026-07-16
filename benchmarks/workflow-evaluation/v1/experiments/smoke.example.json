@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "mode": "smoke",
+  "project": "csv-expenses",
+  "stage": "brainstorm",
+  "factor": "effort",
+  "baseline": { "workflowRevision": "local", "effort": "medium" },
+  "candidate": { "workflowRevision": "local", "effort": "high" },
+  "trusted": true,
+  "isolation": "path",
+  "tools": ["read", "bash", "edit", "write"],
+  "budgets": { "tokenCeiling": 100000, "wallMsCeiling": 900000 }
+}

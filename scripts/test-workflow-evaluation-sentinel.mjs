@@ -1,22 +1,42 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	buildGoldenApproval,
 	deriveCalibration,
 	requiresSentinel,
+	runGoldenUpdate,
 	runSentinelExperiment,
 	validateGoldenApproval,
 } from "./workflow-evaluation.mjs";
 
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+function readJson(file) {
+	try { return JSON.parse(readFileSync(file, "utf8")); }
+	catch (error) { throw new Error(`invalid JSON ${file}: ${error instanceof Error ? error.message : String(error)}`); }
+}
 const csv = path.join(sourceRoot, "benchmarks", "workflow-evaluation", "v1", "projects", "csv-expenses");
 const approval = buildGoldenApproval(csv, { approved: true, approvedBy: "fixture-human", approvedAt: "2026-07-15T00:00:00.000Z", acceptancePassed: true, evidence: "fixture" });
 assert.equal(validateGoldenApproval(csv, approval).approved, true);
 assert.throws(() => validateGoldenApproval(csv, { ...approval, planSha: "0".repeat(64) }), /stale/);
 assert.throws(() => validateGoldenApproval(csv, { ...approval, approved: false }), /approval/);
 assert.throws(() => validateGoldenApproval(csv, { ...approval, acceptancePassed: false }), /acceptance/);
+
+const updateRoot = mkdtempSync(path.join(os.tmpdir(), "ce-golden-update-fixture-"));
+try {
+	const bundle = path.join(updateRoot, "benchmarks", "workflow-evaluation", "v1");
+	mkdirSync(path.join(bundle, "projects"), { recursive: true });
+	cpSync(path.join(sourceRoot, "benchmarks", "workflow-evaluation", "v1", "manifest.json"), path.join(bundle, "manifest.json"));
+	cpSync(csv, path.join(bundle, "projects", "csv-expenses"), { recursive: true });
+	const updated = runGoldenUpdate({ mode: "golden-update", project: "csv-expenses", humanApproved: true, approvedBy: "fixture-human", approvedAt: "2026-07-15T00:00:00.000Z", acceptancePassed: true, acceptanceEvidence: "fixture", contractChanged: false }, { sourceRoot: updateRoot, evidenceRoot: path.join(updateRoot, "evidence") });
+	const manifest = readJson(updated.manifestPath);
+	assert.deepEqual(manifest.approvals["csv-expenses"], readJson(updated.approvalPath));
+} finally {
+	rmSync(updateRoot, { recursive: true, force: true });
+}
 
 const calibration = deriveCalibration([
 	{ baseline: { tokens: 100, wallMs: 1000 }, candidate: { tokens: 102, wallMs: 980 } },
@@ -63,4 +83,4 @@ const partial = await runSentinelExperiment({ mode: "sentinel", projects: ["csv-
 });
 assert.equal(partial.status, "failed");
 assert.equal(partial.projects[0].stages.length, 2);
-console.log("ok - workflow evaluation calibration, approval, and sentinel fixtures");
+process.stdout.write("ok - workflow evaluation calibration, approval, and sentinel fixtures\n");

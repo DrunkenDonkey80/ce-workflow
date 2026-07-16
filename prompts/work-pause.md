@@ -1,5 +1,5 @@
 ---
-description: Checkpoint active Beads-backed work and stop safely
+description: Checkpoint active native work-item work and stop safely
 argument-hint: "[note]"
 ---
 
@@ -7,4 +7,4 @@ Fallback when the extension command is unavailable: use the `work-orchestrator` 
 
 Note: $ARGUMENTS
 
-Checkpoint current state in Beads and stop at a safe boundary.
+Checkpoint current state in work items and stop at a safe boundary.

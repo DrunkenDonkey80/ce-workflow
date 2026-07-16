@@ -59,24 +59,24 @@
     "calculator": {
       "version": 1,
       "approved": true,
-      "approvedBy": "Flex (interactive approval)",
-      "approvedAt": "2026-07-15T13:16:15.069Z",
-      "bundleSha": "e72596a4811cc5e261f01ce7d1ef76b3854a954195161e95680fa6abd840b10b",
+      "approvedBy": "Flex (interactive re-approval)",
+      "approvedAt": "2026-07-15T14:33:22.856Z",
+      "bundleSha": "4f99bb6def57cdc578d5497af5dcc928ab059e2db82333824ff270827230a81a",
       "brainstormSha": "fe2204b44c48cd50fa4bcc516a81dc2174424a08883ff422c393746763407a46",
       "planSha": "5330c5c186a36d0de6e979320c083cef1c2f8d40cb8ca0084e6c41aa42c93005",
       "acceptancePassed": true,
-      "evidence": "node scripts/test-workflow-evaluation-calculator.mjs; npm run verify:quiet"
+      "evidence": "node scripts/test-workflow-evaluation-calculator.mjs; retained PNG assertion; npm run verify:quiet"
     },
     "csv-expenses": {
       "version": 1,
       "approved": true,
-      "approvedBy": "Flex (interactive approval)",
-      "approvedAt": "2026-07-15T13:16:15.069Z",
-      "bundleSha": "76d008083d3c3d3024d8e4279741be0c3f7c49a8f6a8bca663ee014a27828d10",
+      "approvedBy": "Flex (interactive re-approval)",
+      "approvedAt": "2026-07-15T14:09:53.691Z",
+      "bundleSha": "0be959396ffba8b129dc59b8eebbdda206b4fb4bc0a54ba592b13d467aa66d70",
       "brainstormSha": "45b639386af3bae85aa23fcee44ada5aaee2f74cff406860643924d8fc3a34fb",
       "planSha": "6a474ff8a790894160485dd653acd8f35c9187e65ba8e8ce6a56344da42615ca",
       "acceptancePassed": true,
-      "evidence": "node scripts/test-workflow-evaluation-csv.mjs; npm run verify:quiet"
+      "evidence": "node scripts/test-workflow-evaluation-csv.mjs; npm run verify:quiet; added output-error gate"
     }
   }
 }

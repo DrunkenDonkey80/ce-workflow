@@ -1,31 +1,31 @@
 ---
 name: work-orchestrator
-description: Drive uncomputed Beads-backed /work-* requests. Do not load for WO_INLINE_V1 or prompts that already contain precomputed extension state; those prompts are self-contained.
+description: Drive uncomputed /work-* requests, including verified legacy work items migration. Do not load for WO_INLINE_V1 or prompts that already contain precomputed extension state; those prompts are self-contained.
 ---
 
 # Work Orchestrator
 
 ## Fast rule
 
-When the prompt contains `WO_INLINE_V1` or says it has precomputed extension state, trust that state. The prompt is the execution contract: do not rediscover the epic/Bead, reread this skill, dump Beads JSON, or load the full policy reference. Verify only that named files/state are still fresh, then execute the named action.
+When the prompt contains `WO_INLINE_V1` or says it has precomputed extension state, trust that state. The prompt is the execution contract: do not rediscover the epic/work item, reread this skill, dump work items JSON, or load the full policy reference. Verify only that named files/state are still fresh, then execute the named action.
 
 Work directly in the current session by default. Use code for intake, routing, bounded validation, commit, close, and push. Do not call `subagent list`; the extension selects exact specialist names. Launch a role only when it adds distinct judgment:
 
-- `bead-planner`: ambiguous, architectural, or large semantic slicing;
-- `bead-debugger`: reproduced failure needing root-cause investigation;
-- `bead-worker`: high-risk work that benefits from an isolated writer;
-- `bead-reviewer`: sensitive, large, hardware/live-evidence, UI-acceptance, or ambiguous diff;
-- `bead-fixer`: concrete reviewer findings only;
-- `bead-migrator`: legacy artifact/branch reconciliation.
+- `work-planner`: ambiguous, architectural, or large semantic slicing;
+- `work-debugger`: reproduced failure needing root-cause investigation;
+- `work-worker`: high-risk work that benefits from an isolated writer;
+- `work-reviewer`: sensitive, large, hardware/live-evidence, UI-acceptance, or ambiguous diff;
+- `work-fixer`: concrete reviewer findings only;
+- `work-migrator`: legacy artifact/branch reconciliation.
 
-Routine work gets no planner, reviewer, or committer agent. Never launch a second writer/reviewer when equivalent passing evidence exists. `bead-committer` is an exceptional fallback only; normal commits use the coded finalizer.
+Routine work gets no planner, reviewer, or committer agent. Never launch a second writer/reviewer when equivalent passing evidence exists. `work-committer` is an exceptional fallback only; normal commits use the coded finalizer.
 
 ## Source of truth and safety
 
-- Beads is durable work state; git is code state; chat is disposable.
+- work items is durable work state; git is code state; chat is disposable.
 - Never overwrite manual edits. Stop for conflicting dirt, credentials, destructive production actions, or a genuine product/architecture decision.
 - Project verification contracts are mandatory, including real hardware evidence when required.
-- Failed verification stays open and becomes compact Bead evidence. Root-cause work becomes/reuses a `wo:debug` bug; unavailable external prerequisites become a blocked decision.
+- Failed verification stays open and becomes compact work item evidence. Root-cause work becomes/reuses a `wo:debug` bug; unavailable external prerequisites become a blocked decision.
 - Work one writer at a time unless isolated worktrees were explicitly chosen.
 
 ## Inline execution
@@ -39,24 +39,25 @@ For small/medium/routine resume work:
 5. Finish once with:
 
 ```text
-node <work-helper.mjs> finish-task <bead-id> --max-files <2|8> --message "<summary>" --verify "<command>" [--expect "<stdout>"] --push
+node <work-helper.mjs> finish-task <work-item-id> --max-files <2|8> --message "<summary>" --verify "<command>" [--expect "<stdout>"] --push
 ```
 
-For JSON use `--json <file> --equals <path=value>`. The helper enforces file scope and sensitive-path review, records `wo:verify-check`, commits, closes, amends Beads close state, pushes only with an upstream, and checks cleanliness.
+For JSON use `--json <file> --equals <path=value>`. The helper enforces file scope and sensitive-path review, records `wo:verify-check`, commits, closes, amends work items close state, pushes only with an upstream, and checks cleanliness.
 
-If it reports independent review required, launch exactly one `bead-reviewer`, record PASS in the Bead, and rerun with `--reviewed`. If scope or verification fails, do not commit/close.
+If it reports independent review required, launch exactly one `work-reviewer`, record PASS in the work item, and rerun with `--reviewed`. If scope or verification fails, do not commit/close.
 
 ## Modes
 
 - **small** — inline, two implementation files maximum.
 - **med** — inline by default, eight files maximum; escalate to big if semantic slicing is needed.
-- **big** — one `wo:planning` Bead and one exact `bead-planner`; propagate `wo:execution-agent` to risky executable children.
-- **resume** — autonomous slice loop. Run each ready Bead inline by default (set `sliceExecutionMode=agent` in `/work-settings` to route each slice to an isolated `bead-worker`); exact planner/debugger/reviewer only when policy requires it. Do NOT ask how to run each slice — apply the coded execution policy and run. After a slice closes, continue to the next ready Bead automatically (re-run `/work-resume`; use `/work-goal` for automatic `/new` per slice). Stop the loop only for: an open `type=decision` Bead needing human input, a blocker/debug-needed Bead, epic completion, or `/work-stop`.
+- **big** — one `wo:planning` work item and one exact `work-planner`; propagate `wo:execution-agent` to risky executable children.
+- **resume** — autonomous slice loop. Run each ready work item inline by default (set `sliceExecutionMode=agent` in `/work-settings` to route each slice to an isolated `work-worker`); exact planner/debugger/reviewer only when policy requires it. Do NOT ask how to run each slice — apply the coded execution policy and run. After a slice closes, continue to the next ready work item automatically (re-run `/work-resume`; use `/work-goal` for automatic `/new` per slice). Stop the loop only for: an open `type=decision` work item needing human input, a blocker/debug-needed work item, epic completion, or `/work-stop`.
 - **goal** — autonomous current-session loop with on-demand microcompaction. Work inline; exact specialists only for the cases above. Completion requires verified evidence. Stop with `/work-stop`.
-- **debug** — exact `bead-debugger`, then one scoped reviewer only after a verified fix; coded finalizer commits.
+- **debug** — exact `work-debugger`, then one scoped reviewer only after a verified fix; coded finalizer commits.
 - **auto** — trust the extension's deterministic classification; do not reclassify with an LLM.
 - **plan/master** — use `ce-plan` and planner/advisor only when requirements are genuinely semantic or uncertain. master mode must clear the Open Question Gate: `/work-plan` scans the plan for unresolved open questions (including non-blocking ones with a stated default) and blocks epic creation until each is resolved via one `ask_user`, then re-run.
-- **migrate** — exact `bead-migrator`; source and branch inspection is read-only.
+- **remove-beads** — deterministic one-way legacy migration; it verifies export parity and backup, never commits, and stops on any mismatch.
+- **migrate** — exact `work-migrator`; source and branch inspection is read-only.
 - **init/status/report/usage/telemetry/roadmap/add/pause/finish** — deterministic extension paths; no agent.
 
 ## Opt-in autonomous workflow improvement
@@ -67,7 +68,7 @@ Normal work does not push by default. The narrow opt-in exception lets the coded
 
 ## Handoff hygiene
 
-Use compact helper commands (`bd-summary`, `bd-children-summary`, `blocker-search`, `search-summary`, `json-assert`) instead of raw epic JSON, CLI help, broad scans, or repeated status/diff. Specialist children receive one Bead ID, concrete acceptance, relevant paths, verification, and known unrelated dirt; they must not launch subagents.
+Use compact helper commands (`work-summary`, `work-children-summary`, `blocker-search`, `search-summary`, `json-assert`) instead of raw epic JSON, CLI help, broad scans, or repeated status/diff. Specialist children receive one work item ID, concrete acceptance, relevant paths, verification, and known unrelated dirt; they must not launch subagents.
 
 An ambiguous subagent RPC acknowledgement must not trigger a fallback writer because the first launch may already be active. Check the active-run widget before retrying.
 

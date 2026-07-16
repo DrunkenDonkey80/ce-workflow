@@ -9,7 +9,7 @@ import path from "node:path";
 
 const RUNTIME_PREFIXES = [
 	/^\.pi(?:-subagents)?\//,
-	/^work-[^/]+-(?:bead-small|bead-worker)\.md$/,
+	/^work-[^/]+-(?:workItem-small|workItem-worker)\.md$/,
 ];
 
 // dir segment -> canonical .gitignore pattern
@@ -64,11 +64,11 @@ export function isRuntimePath(file) {
 	return RUNTIME_PREFIXES.some((re) => re.test(norm));
 }
 
-// Workflow-managed state that must never be escalated or gitignored by this gate:
-// pi runtime + the Beads database (which the workflow tracks/commits itself).
+// Workflow-managed state that must never be escalated or gitignored by this gate.
+// The canonical native snapshot is tracked source; runtime state remains under .pi.
 export function isWorkflowManaged(file) {
 	const norm = file.replaceAll("\\", "/");
-	return isRuntimePath(file) || norm === ".beads" || norm.startsWith(".beads/");
+	return isRuntimePath(file) || norm === ".ce-workflow/work-items.json";
 }
 
 export function ignorePatternForBuildArtifact(file) {

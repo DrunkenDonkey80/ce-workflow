@@ -28,24 +28,24 @@ const {
 	).href
 );
 
-const fixture = installWorkflowFixture();
+const fixture = installWorkflowFixture({ native: true });
 try {
-	let state = buildWorkSmallState(process.cwd(), "Add coded start gate");
+	let state = buildWorkSmallState(fixture.cwd, "Add coded start gate");
 	assert(
 		state.ok && state.action === "run-implementation",
 		"small creates implementation handoff",
 	);
 	assert(
-		state.selectedBead.id.startsWith("TASK-NEW-") &&
-			state.selectedBead.status === "in_progress",
-		"small creates and claims one task Bead in coded intake",
+		state.selectedWorkItem.id.startsWith("E-1.") &&
+			state.selectedWorkItem.status === "in_progress",
+		"small creates and claims one native task",
 	);
 	assert(
 		state.inlineWork && state.handoffPrompt.includes("WO_INLINE_V1"),
 		"small uses concise inline fast path",
 	);
 	assert(
-		directRoleHandoffParams(state, process.cwd()) === null,
+		directRoleHandoffParams(state, fixture.cwd) === null,
 		"small does not launch a subagent",
 	);
 	assert(
@@ -56,13 +56,14 @@ try {
 		"small handoff is compact, coded, and discovery-free",
 	);
 	assert(
-		fixture.logs().filter((entry) => entry.op === "create").length === 1,
-		"small creates exactly one Bead",
+		fixture.store().items[state.selectedWorkItem.id].type === "task" &&
+			fixture.logs().length === 0,
+		"small creates exactly one native task without bd",
 	);
 
 	fixture.reset("active");
 	state = buildWorkSmallState(
-		process.cwd(),
+		fixture.cwd,
 		"try the hardware probe to verify the device without changing source",
 	);
 	assert(
@@ -78,27 +79,27 @@ try {
 
 	fixture.reset("active");
 	const longTask = `Implement the wedge workflow ${"with careful acceptance details ".repeat(20)}`;
-	state = buildWorkSmallState(process.cwd(), longTask);
-	const longCreate = fixture.logs().find((entry) => entry.op === "create");
-	assert(longCreate.issue.title.length <= 181, "small clamps long Bead title");
+	state = buildWorkSmallState(fixture.cwd, longTask);
+	const longCreate = fixture.store().items[state.selectedWorkItem.id];
+	assert(longCreate.title.length <= 181, "small clamps long task title");
 	assert(
-		longCreate.args.join(" ").includes(longTask.trim()),
-		"small keeps full request in Bead notes",
+		longCreate.notes.join("\n").includes(longTask.trim()),
+		"small keeps full request in native notes",
 	);
 
 	fixture.reset("active");
-	state = buildWorkSmallState(process.cwd(), "IMP-1 extra guidance");
+	state = buildWorkSmallState(fixture.cwd, "IMP-1 extra guidance");
 	assert(
-		state.ok && state.selectedBead.id === "IMP-1",
-		"small explicit Bead reuses target",
+		state.ok && state.selectedWorkItem.id === "IMP-1",
+		"small explicit WorkItem reuses target",
 	);
-	assert(fixture.logs().length === 0, "small explicit Bead creates nothing");
+	assert(fixture.logs().length === 0, "small explicit WorkItem creates nothing");
 
-	state = buildWorkSmallState(process.cwd(), "");
+	state = buildWorkSmallState(fixture.cwd, "");
 	assert(!state.ok && state.reason === "usage", "small empty task stops");
 
 	fixture.reset("ambiguous");
-	state = buildWorkSmallState(process.cwd(), "Needs explicit epic");
+	state = buildWorkSmallState(fixture.cwd, "Needs explicit epic");
 	assert(
 		!state.ok && state.reason === "ambiguous-target",
 		"small ambiguous epic stops",
@@ -106,7 +107,7 @@ try {
 	assert(fixture.logs().length === 0, "small ambiguous creates nothing");
 
 	fixture.reset("active", "unknown");
-	state = buildWorkSmallState(process.cwd(), "Dirty should stop");
+	state = buildWorkSmallState(fixture.cwd, "Dirty should stop");
 	assert(
 		!state.ok && state.reason === "dirty-stop",
 		"small dirty state stops before mutation",
@@ -114,87 +115,84 @@ try {
 	assert(fixture.logs().length === 0, "small dirty stop creates nothing");
 
 	fixture.reset("active", "work-state");
-	state = buildWorkSmallState(process.cwd(), "Continue after coded intake");
+	state = buildWorkSmallState(fixture.cwd, "Continue after coded intake");
 	assert(
 		state.ok && state.git.workflowDirty && state.git.blockedPaths.length === 0,
 		"workflow state written by the extension never blocks the next action",
 	);
 
 	fixture.reset("active");
-	state = buildWorkMedState(process.cwd(), "Split a bounded feature");
+	state = buildWorkMedState(fixture.cwd, "Split a bounded feature");
 	assert(
 		state.ok && state.action === "run-implementation" && state.inlineWork,
 		"med creates one inline executable handoff",
 	);
 	assert(
-		state.selectedBead.status === "in_progress" &&
-			fixture.logs()[0].issue.notes.includes("wo:execution-inline"),
-		"med creates and claims an inline-marked Bead",
+		state.selectedWorkItem.status === "in_progress" &&
+			fixture.store().items[state.selectedWorkItem.id].notes.join("\n").includes("wo:execution-inline"),
+		"med creates and claims an inline-marked task",
 	);
 	assert(
-		directRoleHandoffParams(state, process.cwd()) === null &&
+		directRoleHandoffParams(state, fixture.cwd) === null &&
 			state.handoffPrompt.includes("--max-files 8"),
 		"med skips planner/worker agents and uses bounded coded finalization",
 	);
 
 	fixture.reset("active");
 	state = buildWorkSmallState(
-		process.cwd(),
+		fixture.cwd,
 		"Update authentication permission checks",
 	);
-	const riskyDirect = directRoleHandoffParams(state, process.cwd());
+	const riskyDirect = directRoleHandoffParams(state, fixture.cwd);
 	assert(
-		!state.inlineWork && riskyDirect?.agent === "bead-worker",
+		!state.inlineWork && riskyDirect?.agent === "work-worker",
 		"sensitive small requests escalate to the exact isolated writer",
 	);
 
 	fixture.reset("active");
-	state = buildWorkAutoState(process.cwd(), "Add docs note");
+	state = buildWorkAutoState(fixture.cwd, "Add docs note");
 	assert(
 		state.autoClassification === "small" && state.inlineWork,
 		"auto classifies obvious small work in code",
 	);
 
 	fixture.reset("active");
-	state = buildWorkBigState(process.cwd(), "Design a risky feature");
+	state = buildWorkBigState(fixture.cwd, "Design a risky feature");
 	assert(
 		state.ok && state.action === "run-planner",
 		"big creates planner handoff",
 	);
-	const bigDirect = directRoleHandoffParams(state, process.cwd());
+	const bigDirect = directRoleHandoffParams(state, fixture.cwd);
 	assert(
 		state.handoffPrompt.includes("big slice") &&
-			bigDirect?.agent === "bead-planner",
+			bigDirect?.agent === "work-planner",
 		"big handoff carries big posture and directly selects the planner",
 	);
 	assert(
 		bigDirect.params.task.length < 1800 &&
-			bigDirect.params.task.includes(`Target: ${state.selectedBead.id}`) &&
-			bigDirect.params.task.includes("bd-ready-summary") &&
-			!bigDirect.params.task.includes("bd ready --json") &&
+			bigDirect.params.task.includes(`Target work item: ${state.selectedWorkItem.id}`) &&
+			bigDirect.params.task.includes("work-ready-summary") &&
+			!bigDirect.params.task.includes("raw store readiness") &&
 			!bigDirect.params.task.includes("Subagent output guidance") &&
 			bigDirect.params.acceptance === false,
 		"big sends the planner a compact direct contract without generic acceptance boilerplate",
 	);
 
-	fixture.reset("no-beads");
-	state = buildWorkInitState(process.cwd());
+	fixture.reset("no-store");
+	state = buildWorkInitState(fixture.cwd);
 	assert(
-		state.ok && state.action === "initialized",
-		"work-init initializes Beads",
+		state.ok && ["initialized", "already-initialized"].includes(state.action),
+		"work-init uses native store",
 	);
-	assert(fixture.logs()[0].op === "init", "work-init runs bd init");
+	assert(fixture.logs().length === 0, "work-init does not run bd");
 
-	fixture.reset("no-beads");
-	state = buildWorkPlanState(process.cwd(), "raw product idea");
+	fixture.reset("no-store");
+	state = buildWorkPlanState(fixture.cwd, "raw product idea");
 	assert(
 		state.ok && state.action === "handoff-plan",
 		"raw work-plan input routes to ce-plan",
 	);
-	assert(
-		fixture.logs().some((entry) => entry.op === "init"),
-		"work-plan initializes before ce-plan handoff",
-	);
+	assert(fixture.logs().length === 0, "work-plan does not initialize bd");
 	assert(
 		state.nextAction.includes("bootstrap-plan-epic") &&
 			!state.nextAction.includes("/work-plan <plan-path>"),
@@ -209,14 +207,14 @@ try {
 	);
 
 	fixture.reset("active");
-	state = buildWorkMasterState(process.cwd(), "raw product idea");
+	state = buildWorkMasterState(fixture.cwd, "raw product idea");
 	assert(
 		state.ok && state.action === "handoff-plan",
 		"raw master input routes to ce-plan",
 	);
-	assert(fixture.logs().length === 0, "raw master input does not mutate Beads");
+	assert(fixture.logs().length === 0, "raw master input does not mutate WorkItems");
 
-	state = buildWorkMasterState(process.cwd(), "missing-plan.md");
+	state = buildWorkMasterState(fixture.cwd, "missing-plan.md");
 	assert(
 		!state.ok && state.reason === "missing-source",
 		"missing master source stops",
@@ -224,20 +222,20 @@ try {
 
 	fixture.reset("active");
 	state = buildWorkMasterState(
-		process.cwd(),
+		fixture.cwd,
 		"@docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md",
 	);
 	assert(
-		state.ok && state.epic.id.startsWith("E-NEW-"),
-		"@ plan path creates epic",
+		state.ok && state.epic.type === "epic",
+		"@ plan path creates native epic",
 	);
 	assert(
-		state.selectedBead.id.startsWith("TASK-NEW-"),
-		"@ plan path creates one planning Bead",
+		state.selectedWorkItem.type === "task",
+		"@ plan path creates one native planning task",
 	);
 	assert(
-		fixture.logs()[0].issue.design.includes("file:docs/plans/"),
-		"@ plan path stores master plan in epic design",
+		fixture.store().items[state.epic.id].documentLinks.design.includes("docs/plans/"),
+		"@ plan path links master plan without embedding it",
 	);
 	assert(
 		state.nextAction.includes(`/work-resume ${state.epic.id}`),
@@ -246,7 +244,7 @@ try {
 
 	fixture.reset("active", "pi-session");
 	state = buildWorkMasterState(
-		process.cwd(),
+		fixture.cwd,
 		"docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md",
 	);
 	assert(
@@ -256,12 +254,12 @@ try {
 
 	fixture.reset("active", "unknown");
 	state = buildWorkMasterState(
-		process.cwd(),
+		fixture.cwd,
 		"docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md",
 	);
 	assert(
 		!state.ok && state.reason === "dirty-stop",
-		"master dirty state stops before Beads mutation",
+		"master dirty state stops before WorkItems mutation",
 	);
 	assert(
 		state.message.includes("extensions/work-models.js"),
@@ -270,7 +268,7 @@ try {
 
 	fixture.reset("active");
 	state = buildWorkMigrateState(
-		process.cwd(),
+		fixture.cwd,
 		"docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md origin/old-feature legacy notes",
 	);
 	assert(
@@ -286,19 +284,19 @@ try {
 		state.handoffPrompt.includes("do not checkout"),
 		"migrate handoff forbids branch mutation",
 	);
-	assert(fixture.logs().length === 0, "migrate does not mutate Beads");
+	assert(fixture.logs().length === 0, "migrate does not mutate WorkItems");
 	assert(
-		directRoleHandoffParams(state, process.cwd())?.agent === "bead-migrator",
+		directRoleHandoffParams(state, fixture.cwd)?.agent === "work-migrator",
 		"migrate directly selects the exact specialist without agent discovery",
 	);
 
-	state = buildWorkMigrateState(process.cwd(), "missing-source.md");
+	state = buildWorkMigrateState(fixture.cwd, "missing-source.md");
 	assert(
 		!state.ok && state.reason === "missing-source",
 		"migrate missing path stops",
 	);
 
-	const finishCwd = fixture.dir;
+	const finishCwd = fixture.cwd;
 	mkdirSync(path.join(finishCwd, ".pi"), { recursive: true });
 	writeFileSync(
 		path.join(finishCwd, ".pi", "settings.json"),
@@ -326,21 +324,18 @@ try {
 		"finish commits and closes without a committer agent",
 	);
 	assert(
-		fixture
-			.logs()
-			.some((entry) => entry.tool === "git" && entry.op === "commit") &&
-			fixture.logs().some((entry) => entry.op === "close") &&
-			fixture
-				.logs()
-				.some((entry) => entry.tool === "git" && entry.op === "amend"),
-		"finish stages work, closes Bead, and amends Beads metadata",
+		fixture.logs().some((entry) => entry.tool === "git" && entry.op === "commit") &&
+			fixture.logs().some((entry) => entry.tool === "git" && entry.op === "amend") &&
+			fixture.store().items["FIN-1"].status === "closed" &&
+			!fixture.logs().some((entry) => entry.op === "close"),
+		"finish stages work, closes native state, and amends one commit without bd",
 	);
 
 	fixture.reset("finishReady", "unknown");
 	state = buildWorkFinishState(finishCwd, "1");
 	assert(
-		state.ok && state.selectedBead.id === "FIN-1",
-		"finish accepts numeric shorthand for active epic child bead",
+		state.ok && state.selectedWorkItem.id === "FIN-1",
+		"finish accepts numeric shorthand for active epic child workItem",
 	);
 
 	fixture.reset("finishMissingReview", "unknown");

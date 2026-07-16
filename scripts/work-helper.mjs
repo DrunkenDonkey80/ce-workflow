@@ -11,6 +11,15 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+	appendWorkNote,
+	createWorkItem,
+	loadStore,
+	mutateStore,
+	readyWorkItems,
+	storePath,
+	updateWorkItem,
+} from "../extensions/work-store.js";
+import {
 	isGeneratedBuildPath,
 	isRuntimePath,
 	tidyUntrackedFiles,
@@ -18,13 +27,6 @@ import {
 
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
-const npmBd = path.join(
-	process.env.APPDATA || "",
-	"npm/node_modules/@beads/bd/bin/bd.js",
-);
-const bdBin =
-	process.env.WORK_ORCH_BD_BIN ||
-	(process.platform === "win32" && existsSync(npmBd) ? npmBd : "bd");
 const gitBin = process.env.WORK_ORCH_GIT_BIN || "git";
 
 function run(bin, argv, options = {}) {
@@ -46,8 +48,24 @@ function run(bin, argv, options = {}) {
 	});
 }
 
-function bd(argv) {
-	return JSON.parse(run(bdBin, [...argv, "--json"]) || "[]");
+function readWorkItem(id) {
+	return loadStore(cwd).items[id];
+}
+
+function childWorkItems(parentId) {
+	return Object.values(loadStore(cwd).items).filter((item) => item.parentId === parentId);
+}
+
+function readyNativeWorkItems() {
+	return readyWorkItems(loadStore(cwd));
+}
+
+function updateNativeWorkItem(id, changes) {
+	return mutateStore(cwd, (store) => {
+		const current = store.items[id];
+		if (!current) throw new Error(`Work item not found: ${id}`);
+		return updateWorkItem(store, id, changes(current));
+	});
 }
 
 function git(argv) {
@@ -125,7 +143,7 @@ function finishTask() {
 	);
 	if (!id || !message || !Number.isInteger(maxFiles) || maxFiles < 1)
 		throw new Error(
-			"usage: finish-task <bead-id> --max-files <n> --message <summary> [--verify <command> --expect <stdout> | --json <file> --equals <path=value>] [--immediate-format] [--reviewed] [--push]",
+			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> --expect <stdout> | --json <file> --equals <path=value>] [--immediate-format] [--reviewed] [--push]",
 		);
 	cleanupGeneratedInstructions();
 	const formatted = formatPendingFiles();
@@ -133,7 +151,7 @@ function finishTask() {
 		.split(/\r?\n/)
 		.filter(Boolean);
 	const unexpectedStaged = stagedBefore.filter(
-		(file) => !file.replaceAll("\\", "/").startsWith(".beads/"),
+		(file) => !file.replaceAll("\\", "/").startsWith(".ce-workflow/"),
 	);
 	if (unexpectedStaged.length)
 		throw new Error(
@@ -168,12 +186,13 @@ function finishTask() {
 				);
 		}
 	} catch (error) {
-		run(bdBin, [
-			"update",
-			id,
-			"--append-notes",
-			`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${String(error.stderr ?? error.message ?? error).slice(-500)}`,
-		]);
+		mutateStore(cwd, (store) =>
+			appendWorkNote(
+				store,
+				id,
+				`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${String(error.stderr ?? error.message ?? error).slice(-500)}`,
+			),
+		);
 		throw new Error(`verification failed: ${verificationCommand}`);
 	}
 	if (verificationCommand) {
@@ -182,12 +201,13 @@ function finishTask() {
 			status: "PASS",
 			output: output.slice(-500),
 		};
-		run(bdBin, [
-			"update",
-			id,
-			"--append-notes",
-			`wo:verify-check PASS\nCommand: ${verificationCommand}\nOutput: ${output.slice(-500)}`,
-		]);
+		mutateStore(cwd, (store) =>
+			appendWorkNote(
+				store,
+				id,
+				`wo:verify-check PASS\nCommand: ${verificationCommand}\nOutput: ${output.slice(-500)}`,
+			),
+		);
 	}
 	const tidy = tidyUntrackedFiles({ cwd, gitBin });
 	if (tidy.unrecognized.length)
@@ -201,15 +221,20 @@ function finishTask() {
 	);
 	if (!changed.length) throw new Error("no related changes to commit");
 	const implementationFiles = changed.filter(
-		(file) =>
-			!file.replaceAll("\\", "/").startsWith(".beads/") &&
-			file.replaceAll("\\", "/") !== ".gitignore",
+		(file) => {
+			const normalized = file.replaceAll("\\", "/");
+			return (
+				!normalized.startsWith(".ce-workflow/") &&
+				normalized !== ".ce-workflow/work-items.json" &&
+				normalized !== ".gitignore"
+			);
+		},
 	);
 	if (implementationFiles.length > maxFiles)
 		throw new Error(
 			`scope exceeds ${maxFiles} implementation files: ${implementationFiles.join(", ")}`,
 		);
-	const task = one(bd(["show", id]));
+	const task = readWorkItem(id);
 	const taskText = `${titleOf(task)}\n${notesOf(task)}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
 	const evidenceOnly =
 		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
@@ -277,62 +302,50 @@ function finishTask() {
 	if (!staged.length)
 		throw new Error("no staged changes after filtering runtime files");
 	const headBefore = git(["rev-parse", "HEAD"]).trim();
-	let closed = false;
+	const canonical = storePath(cwd);
+	const canonicalBefore = existsSync(canonical) ? readFileSync(canonical, "utf8") : null;
+	let push = "skipped";
 	try {
 		git(["commit", "-m", `${id}: ${message}`]);
-		run(bdBin, [
-			"close",
-			id,
-			"--reason",
-			"Completed by coded inline work path",
-		]);
-		closed = true;
-		const closeChanges = gitStatusPaths().filter(
-			(file) => !isRuntimePath(file),
+		mutateStore(cwd, (store) =>
+			updateWorkItem(store, id, {
+				status: "closed",
+				evidence: [
+					...(store.items[id]?.evidence ?? []),
+					{ closeEvidence: "Completed by coded inline work path" },
+				],
+			}),
 		);
-		if (
-			closeChanges.some(
-				(file) => !file.replaceAll("\\", "/").startsWith(".beads/"),
-			)
-		)
-			throw new Error(
-				`non-Beads files changed during close: ${closeChanges.join(", ")}`,
-			);
-		if (closeChanges.length) {
-			git(["add", "-A", "--", ...closeChanges]);
-			git(["commit", "--amend", "--no-edit"]);
-		}
+		const closeChanges = gitStatusPaths().filter((file) => !isRuntimePath(file));
+		if (closeChanges.some((file) => file.replaceAll("\\", "/") !== ".ce-workflow/work-items.json"))
+			throw new Error(`non-work-store files changed during close: ${closeChanges.join(", ")}`);
+		git(["add", "--", ".ce-workflow/work-items.json"]);
+		git(["commit", "--amend", "--no-edit"]);
 		const remaining = gitStatusPaths().filter((file) => !isRuntimePath(file));
 		if (remaining.length)
 			throw new Error(`related files remain dirty: ${remaining.join(", ")}`);
-	} catch (error) {
-		if (closed) {
+		if (args.includes("--push")) {
 			try {
-				run(bdBin, ["reopen", id]);
-			} catch {
-				// Preserve the original failure; Beads notes still show the attempted close.
+				git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]);
+			} catch (error) {
+				if (/upstream/i.test(String(error.stderr ?? error.message ?? error)))
+					push = "skipped-no-upstream";
+				else throw error;
+			}
+			if (push !== "skipped-no-upstream") {
+				git(["push"]);
+				push = "passed";
 			}
 		}
+	} catch (error) {
+		if (canonicalBefore === null) rmSync(canonical, { force: true });
+		else writeFileSync(canonical, canonicalBefore);
 		git(["reset", "--mixed", headBefore]);
-		throw new Error(
-			`finalization rolled back before close: ${error.message ?? error}`,
-		);
-	}
-	let push = "skipped";
-	if (args.includes("--push")) {
-		try {
-			git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]);
-			git(["push"]);
-			push = "passed";
-		} catch (error) {
-			push = /upstream/i.test(String(error.stderr ?? error.message ?? error))
-				? "skipped-no-upstream"
-				: "failed";
-		}
+		throw new Error(`finalization rolled back before close: ${error.message ?? error}`);
 	}
 	return {
 		status: "PASS",
-		bead_id: id,
+		work_item_id: id,
 		commit: git(["rev-parse", "--short", "HEAD"]).trim(),
 		files: staged,
 		verification: verificationResult,
@@ -342,16 +355,14 @@ function finishTask() {
 	};
 }
 
-function one(value) {
-	return Array.isArray(value) ? value[0] : value;
-}
-
 function arr(value) {
-	return Array.isArray(value) ? value : value == null ? [] : [value];
+	if (Array.isArray(value)) return value;
+	return value === null || value === undefined ? [] : [value];
 }
 
 function field(issue, ...names) {
-	for (const name of names) if (issue?.[name] != null) return issue[name];
+	for (const name of names)
+		if (issue?.[name] !== null && issue?.[name] !== undefined) return issue[name];
 }
 
 function idOf(issue) {
@@ -375,12 +386,16 @@ function labelsOf(issue) {
 }
 
 function parentOf(issue) {
-	return field(issue, "parent", "parent_id", "epic_id") ?? "";
+	return field(issue, "parentId", "parent", "parent_id", "epic_id") ?? "";
 }
 
 function notesOf(issue) {
 	const notes = field(issue, "notes", "description", "body") ?? "";
-	return typeof notes === "string" ? notes : JSON.stringify(notes ?? "");
+	return Array.isArray(notes)
+		? notes.join("\n")
+		: typeof notes === "string"
+			? notes
+			: JSON.stringify(notes ?? "");
 }
 
 function depsOf(issue) {
@@ -398,12 +413,12 @@ function summary(issue, notesTail = 2000) {
 		id: idOf(issue),
 		title: titleOf(issue),
 		status: statusOf(issue),
-		issue_type: typeOf(issue),
+		type: typeOf(issue),
 		priority: issue?.priority,
 		labels: labelsOf(issue),
-		parent: parentOf(issue),
+		parentId: parentOf(issue),
 		dependencies: depsOf(issue),
-		updated_at: field(issue, "updated_at", "updatedAt"),
+		updatedAt: field(issue, "updatedAt", "updated_at"),
 		notes_tail: notesOf(issue).slice(-notesTail),
 	};
 }
@@ -460,10 +475,17 @@ function jsonPath(object, key) {
 }
 
 function jsonAssertionFailures(file) {
-	const data = JSON.parse(readFileSync(file, "utf8"));
+	let data;
+	try {
+		data = JSON.parse(readFileSync(file, "utf8"));
+	} catch (error) {
+		return [`invalid JSON assertion file: ${error.message}`];
+	}
 	const failures = [];
-	for (const key of String(option("--required", "")).split(",").filter(Boolean))
-		if (jsonPath(data, key) == null) failures.push(`missing ${key}`);
+	for (const key of String(option("--required", "")).split(",").filter(Boolean)) {
+		const value = jsonPath(data, key);
+		if (value === null || value === undefined) failures.push(`missing ${key}`);
+	}
 	for (let i = 1; i < args.length; i += 1) {
 		if (args[i] === "--equals") {
 			const [key, expected] = String(args[++i]).split("=", 2);
@@ -479,27 +501,27 @@ function jsonAssertionFailures(file) {
 }
 
 try {
-	if (command === "bd-summary") {
-		const issue = one(bd(["show", args[0]]));
+	if (command === "work-summary") {
+		const issue = readWorkItem(args[0]);
 		print(summary(issue));
-	} else if (command === "bd-children-summary") {
+	} else if (command === "work-children-summary") {
 		print(
-			bd(["children", args[0]]).map((issue) => ({
+			childWorkItems(args[0]).map((issue) => ({
 				...summary(issue, 300),
 				notes_tail: undefined,
 			})),
 		);
-	} else if (command === "bd-ready-summary") {
+	} else if (command === "work-ready-summary") {
 		const epic = args[0];
 		print(
-			bd(["ready"])
+			readyNativeWorkItems()
 				.filter((issue) => !epic || parentOf(issue) === epic)
 				.map((issue) => ({
 					id: idOf(issue),
 					title: titleOf(issue),
 					status: statusOf(issue),
-					issue_type: typeOf(issue),
-					parent: parentOf(issue),
+					type: typeOf(issue),
+					parentId: parentOf(issue),
 					dependencies: depsOf(issue),
 				})),
 		);
@@ -510,7 +532,7 @@ try {
 			.toLowerCase()
 			.split(/[^a-z0-9]+/)
 			.filter((term) => term.length >= 4);
-		const matches = bd(["children", epic])
+		const matches = childWorkItems(epic)
 			.filter((issue) => statusOf(issue) !== "closed")
 			.filter(
 				(issue) =>
@@ -573,14 +595,14 @@ try {
 	} else if (command === "finish-small" || command === "finish-task") {
 		print(finishTask());
 	} else if (command === "ensure-no-staged") {
-		const allowBeads = args.includes("--allow-beads");
+		const allowWorkStore = args.includes("--allow-work-store");
 		const staged = git(["diff", "--cached", "--name-only"])
 			.split(/\r?\n/)
 			.filter(Boolean);
-		const allowed = allowBeads
+		const allowed = allowWorkStore
 			? staged.filter(
 					(file) =>
-						file === ".beads/issues.jsonl" || file.startsWith(".beads/"),
+						file === ".ce-workflow/issues.jsonl" || file.startsWith(".ce-workflow/"),
 				)
 			: [];
 		if (allowed.length) git(["restore", "--staged", ...allowed]);
@@ -592,31 +614,71 @@ try {
 			unstaged: allowed,
 			remaining_staged: remaining,
 		});
-	} else if (command === "bd-claim") {
-		print(
-			summary(one(bd(["update", args[0], "--status", "in_progress"])), 300),
+	} else if (command === "work-create") {
+		const [title] = positional();
+		if (!title)
+			throw new Error("usage: work-create <title> [--parent <id>] [--type <type>] [--description <text>] [--acceptance <text>] [--note <text>] [--label <label>]");
+		const labels = args.flatMap((arg, index) =>
+			arg === "--label" && args[index + 1] ? [args[index + 1]] : [],
 		);
-	} else if (command === "bd-note") {
+		const created = mutateStore(cwd, (store) =>
+			createWorkItem(store, {
+				title,
+				parentId: option("--parent"),
+				type: option("--type", "task"),
+				description: option("--description", ""),
+				acceptance: option("--acceptance", ""),
+				notes: option("--note") ? [option("--note")] : [],
+				labels,
+			}),
+		);
+		print(summary(created, 300));
+	} else if (command === "work-close") {
+		const id = args[0];
+		if (!id) throw new Error("usage: work-close <work-item-id> [--note <text>]");
+		const closed = mutateStore(cwd, (store) => {
+			const current = store.items[id];
+			if (!current) throw new Error(`WorkItem not found: ${id}`);
+			return updateWorkItem(store, id, {
+				status: "closed",
+				notes: option("--note")
+					? [...current.notes, option("--note")]
+					: current.notes,
+			});
+		});
+		print(summary(closed, 300));
+	} else if (command === "work-claim") {
+		print(
+			summary(updateNativeWorkItem(args[0], (current) => ({ ...current, status: "in_progress" })), 300),
+		);
+	} else if (command === "work-note") {
 		const [id, noteArg] = args;
 		const note = existsSync(noteArg)
 			? readFileSync(noteArg, "utf8")
 			: args.slice(1).join(" ");
-		print(summary(one(bd(["update", id, "--append-notes", note])), 500));
-	} else if (command === "bd-block") {
+		print(summary(updateNativeWorkItem(id, (current) => ({ ...current, notes: [...current.notes, note] })), 500));
+	} else if (command === "work-block") {
 		const task = args[0];
 		const blocker = option("--by");
 		if (!task || !blocker)
-			throw new Error("usage: bd-block <task-id> --by <blocker-id>");
-		run(bdBin, ["dep", "add", task, blocker]);
+			throw new Error("usage: work-block <task-id> --by <blocker-id>");
+		mutateStore(cwd, (store) => {
+			const current = store.items[task];
+			if (!current || !store.items[blocker])
+				throw new Error("task or blocker work item is missing");
+			updateWorkItem(store, task, {
+				dependencies: [...new Set([...current.dependencies, blocker])],
+			});
+		});
 		print({ status: "PASS", task, blocker });
-	} else if (command === "bd-label") {
+	} else if (command === "work-label") {
 		const id = args[0];
-		const argv = ["update", id];
-		for (let i = 1; i < args.length; i += 1) {
-			if (args[i] === "--add") argv.push("--add-label", args[++i]);
-			else if (args[i] === "--remove") argv.push("--remove-label", args[++i]);
-		}
-		print(summary(one(bd(argv)), 300));
+		const add = option("--add");
+		const remove = option("--remove");
+		print(summary(updateNativeWorkItem(id, (current) => ({
+			...current,
+			labels: current.labels.filter((label) => label !== remove).concat(add ? [add] : []),
+		})), 300));
 	} else if (command === "bootstrap-plan-epic") {
 		const [rel] = positional();
 		if (!rel) throw new Error("usage: bootstrap-plan-epic <plan-path>");
@@ -631,7 +693,7 @@ try {
 				action: s.action,
 				epic_id: s.epic?.id ?? null,
 				epic_title: s.epic?.title ?? null,
-				planning_id: s.selectedBead?.id ?? null,
+				planning_id: s.selectedWorkItem?.id ?? null,
 				open_questions: s.open_questions ?? [],
 				message: s.message ?? "",
 				nextAction: s.nextAction ?? "",
@@ -657,7 +719,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <bd-summary|bd-children-summary|bd-ready-summary|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|bd-claim|bd-note|bd-block|bd-label|bootstrap-plan-epic|json-assert> ...",
+			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|bootstrap-plan-epic|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}
