@@ -1,13 +1,18 @@
 {
   "version": 1,
   "expected": {
+    "primary user": "A developer using it in scripts or CI",
+    "information must the text report show": "Show category totals followed by Total and Rows.",
+    "report scope": "Overall + category totals",
+    "CSV columns": "Use exactly date,category,amount.",
+    "command invocation": "Use node src/analyze.mjs <input.csv> <report.txt>.",
     "malformed rows": "Fail the whole command with exit code 2 and do not leave a report.",
+    "I/O failures": "Exit 1 and leave no partial report.",
+    "empty input": "Treat an empty file like zero rows and emit Total: 0.00 and Rows: 0.",
+    "category casing": "Preserve the first trimmed spelling while grouping case-insensitively.",
     "output order": "Sort categories case-insensitively, then emit Total and Rows.",
     "dependencies": "Use only Node.js built-ins.",
     "execution slices": "First parse and validate; then aggregate and render."
   },
-  "fallback": {
-    "empty input": "Treat an empty file like zero rows and emit Total: 0.00 and Rows: 0.",
-    "category casing": "Preserve the first trimmed spelling while grouping case-insensitively."
-  }
+  "fallback": {}
 }

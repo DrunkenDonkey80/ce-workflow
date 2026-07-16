@@ -70,13 +70,13 @@
     "csv-expenses": {
       "version": 1,
       "approved": true,
-      "approvedBy": "Flex (interactive re-approval)",
-      "approvedAt": "2026-07-15T14:09:53.691Z",
-      "bundleSha": "0be959396ffba8b129dc59b8eebbdda206b4fb4bc0a54ba592b13d467aa66d70",
+      "approvedBy": "Flex (interactive approval)",
+      "approvedAt": "2026-07-16T07:13:30.879Z",
+      "bundleSha": "31ac8bbe37bf8a1c49567153dded775ab9e4fb1847737fe6118f0649fefcd938",
       "brainstormSha": "45b639386af3bae85aa23fcee44ada5aaee2f74cff406860643924d8fc3a34fb",
       "planSha": "6a474ff8a790894160485dd653acd8f35c9187e65ba8e8ce6a56344da42615ca",
       "acceptancePassed": true,
-      "evidence": "node scripts/test-workflow-evaluation-csv.mjs; npm run verify:quiet; added output-error gate"
+      "evidence": "node scripts/test-workflow-evaluation-csv.mjs; interactive approval of scripted answers for bundle 31ac8bbe37bf8a1c49567153dded775ab9e4fb1847737fe6118f0649fefcd938"
     }
   }
 }
