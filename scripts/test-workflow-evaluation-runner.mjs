@@ -37,20 +37,26 @@ const descriptor = {
 };
 
 const roots = [];
+const reservedArtifacts = [];
 const passing = await runSmokeExperiment(descriptor, {
 	sourceRoot,
 	initializeWorkspace() {},
 	async runSample(sample) {
 		roots.push(sample.workspaceRoot);
-		spawnSync("bash", ["-lc", "printf reserved-path-fixture > NUL"], { cwd: sample.workspaceRoot });
-		return { status: "completed", usage: { tokens: { total: 20 }, toolCalls: 2 }, questions: [], events: [{ type: "agent_settled" }], artifacts: ["requirements.md", "sk-1234567890abcdefghijkl"], diff: "fixture", telemetry: { complete: true }, verifier: { passed: true }, screenshots: [] };
+		const reserved = process.platform === "win32"
+			? spawnSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", "echo reserved-path-fixture>NUL"], { cwd: sample.workspaceRoot })
+			: spawnSync("sh", ["-c", "printf reserved-path-fixture > NUL"], { cwd: sample.workspaceRoot });
+		assert.equal(reserved.status, 0, `reserved-path child exited cleanly: ${reserved.stderr}`);
+		reservedArtifacts.push(existsSync(path.join(sample.workspaceRoot, "NUL")));
+		return { status: "completed", usage: { tokens: { total: 20 }, toolCalls: 2 }, questions: [], events: [{ type: "agent_settled" }], artifacts: ["requirements.md", "goldens/plan.md", "answers.json", "sk-1234567890abcdefghijkl"], hiddenContract: "fixture-hidden-contract", apiKey: "fixture-secret", diff: "fixture", telemetry: { complete: true }, verifier: { passed: true }, screenshots: [] };
 	},
 	async evaluatePair() { return { scores: { baseline: { "question-quality": 3, requirements: 3, scope: 3 }, candidate: { "question-quality": 3, requirements: 3, scope: 3 } }, evaluator: { wallMs: 1 } }; },
 });
 assert.equal(passing.status, "diagnostic-pass");
 assert.equal(passing.decisionGrade, false);
 assert.equal(new Set(roots).size, 2, "each side gets a fresh root");
-assert.ok(roots.every((root) => !existsSync(root)), "workspaces clean after durable evidence");
+assert.deepEqual(reservedArtifacts, [process.platform !== "win32", process.platform !== "win32"], "Windows NUL is a device while POSIX NUL artifacts stay inside the disposable root");
+assert.ok(roots.every((root) => !existsSync(root)), "workspaces and reserved-name artifacts are gone after durable evidence");
 assert.ok(existsSync(passing.evidencePath));
 let evidence;
 try {
@@ -59,7 +65,7 @@ try {
 	throw new Error(`invalid retained evidence: ${error instanceof Error ? error.message : String(error)}`);
 }
 for (const field of ["fingerprints", "prompts", "exchanges", "artifacts", "diffs", "telemetry", "verifier", "testOutput", "bugs", "screenshots", "attempts", "disposition", "evaluator"]) assert.ok(field in evidence, `evidence includes ${field}`);
-assert.doesNotMatch(JSON.stringify(evidence), /product-contract\.md|sk-1234567890abcdefghijkl|fixture-secret/);
+assert.doesNotMatch(JSON.stringify(evidence), /product-contract\.md|goldens\/plan\.md|answers\.json|sk-1234567890abcdefghijkl|fixture-secret|fixture-hidden-contract/);
 
 const qualitativeFailure = await runSmokeExperiment(descriptor, {
 	sourceRoot,

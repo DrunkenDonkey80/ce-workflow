@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,5 +98,17 @@ for (const project of actual.projects) {
 	assert.deepEqual(actual.approvals[project], approval, `${project} manifest approval matches its record`);
 	validateGoldenApproval(directory, approval);
 }
+
+const cli = path.join(root, "scripts", "workflow-evaluation.mjs");
+const help = spawnSync(process.execPath, [cli, "--help"], { encoding: "utf8" });
+assert.equal(help.status, 0);
+assert.match(help.stdout, /smoke \(one pair, diagnostic only\)/);
+assert.match(help.stdout, /calibration.*approval/i);
+assert.match(help.stdout, /temporary path/i);
+const invalid = spawnSync(process.execPath, [cli, path.join(bundleRoot, "manifest.json")], { encoding: "utf8" });
+assert.notEqual(invalid.status, 0);
+assert.match(`${invalid.stdout}\n${invalid.stderr}`, /smoke \(one pair, diagnostic only\)/);
+assert.match(`${invalid.stdout}\n${invalid.stderr}`, /calibration.*approval/i);
+assert.match(`${invalid.stdout}\n${invalid.stderr}`, /temporary path/i);
 
 process.stdout.write("ok - workflow evaluation contract fixtures\n");

@@ -35,6 +35,10 @@ check(
 	pkg.pi?.extensions?.includes("extensions/work-models.js"),
 );
 check("native store is packaged", pkg.files?.includes("extensions/"));
+check(
+	"evaluation bundles are packaged",
+	pkg.files?.includes("benchmarks/") && pkg.files?.includes("scripts/") && pkg.files?.includes("agents/"),
+);
 
 const roles = [
 	"advisor",
@@ -85,6 +89,77 @@ for (const rel of normalPaths) {
 		legacy.join(", "),
 	);
 }
+
+const evaluationFiles = [
+	"agents/workflow-evaluator.md",
+	"benchmarks/workflow-evaluation/v1/experiments/calibration.example.json",
+	"benchmarks/workflow-evaluation/v1/experiments/decision.example.json",
+	"benchmarks/workflow-evaluation/v1/experiments/golden-update.example.json",
+	"benchmarks/workflow-evaluation/v1/experiments/sentinel.example.json",
+	"benchmarks/workflow-evaluation/v1/experiments/smoke.example.json",
+	"benchmarks/workflow-evaluation/v1/manifest.json",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/acceptance/verify.mjs",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/answers.json",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/goldens/approval.json",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/goldens/brainstorm.md",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/goldens/plan.md",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/product-contract.md",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/project.json",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/request.txt",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/rubric.json",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/seed/app.js",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/seed/index.html",
+	"benchmarks/workflow-evaluation/v1/projects/calculator/seed/styles.css",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/fixtures/expected-report.txt",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/fixtures/malformed.csv",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/fixtures/valid.csv",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/verify.mjs",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/answers.json",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/goldens/approval.json",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/goldens/brainstorm.md",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/goldens/plan.md",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/product-contract.md",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/project.json",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/request.txt",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/rubric.json",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/seed/package.json",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/seed/src/analyze.mjs",
+	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/seed/test/analyze.test.mjs",
+	"scripts/test-workflow-evaluation-calculator.mjs",
+	"scripts/test-workflow-evaluation-contract.mjs",
+	"scripts/test-workflow-evaluation-csv.mjs",
+	"scripts/test-workflow-evaluation-rpc.mjs",
+	"scripts/test-workflow-evaluation-runner.mjs",
+	"scripts/test-workflow-evaluation-score.mjs",
+	"scripts/test-workflow-evaluation-sentinel.mjs",
+	"scripts/workflow-evaluation-contract.mjs",
+	"scripts/workflow-evaluation-rpc.mjs",
+	"scripts/workflow-evaluation-score.mjs",
+	"scripts/workflow-evaluation.mjs",
+];
+const missingEvaluationFiles = evaluationFiles.filter((rel) => !existsSync(path.join(root, rel)));
+check(
+	"complete workflow evaluation inventory",
+	missingEvaluationFiles.length === 0,
+	missingEvaluationFiles.join(", "),
+);
+for (const rel of evaluationFiles.filter((file) => file.endsWith(".json"))) {
+	try {
+		JSON.parse(read(rel));
+		check(`${rel} is valid JSON`, true);
+	} catch (error) {
+		check(`${rel} is valid JSON`, false, error instanceof Error ? error.message : String(error));
+	}
+}
+const evaluationDocs = read("README.md");
+check(
+	"evaluation authority and operations are documented",
+	["smoke", "decision", "calibration", "golden-update", "sentinel", "non-decision-grade", "evidencePath", ".ce-workflow/work-items.json"].every((term) => evaluationDocs.includes(term)),
+);
+check(
+	"evaluation security boundary is documented",
+	evaluationDocs.includes("full process permissions") && evaluationDocs.includes("not a hostile-code sandbox") && evaluationDocs.includes("sandboxCommand"),
+);
 const models = read("extensions/work-models.js");
 const packagedPromptCommands = pkg.pi?.prompts?.length
 	? listed("prompts").map((name) => name.replace(/\.md$/, ""))

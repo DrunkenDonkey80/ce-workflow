@@ -26,11 +26,6 @@ function readJson(file, label = file) {
 	catch (error) { throw new Error(`invalid ${label}: ${error instanceof Error ? error.message : String(error)}`); }
 }
 
-function quietCommand(cwd, executable, args, timeout = 120_000) {
-	const result = spawnSync(executable, args, { cwd, stdio: "ignore", timeout, env: { ...process.env, BD_NON_INTERACTIVE: "1" } });
-	if (result.status !== 0) throw new Error(`${executable} ${args.join(" ")} failed${result.error ? `: ${result.error.message}` : ""}`);
-}
-
 function initializeWorkspace(cwd) {
 	command(cwd, "git", ["init", "--quiet"]);
 	command(cwd, "git", ["config", "user.email", "workflow-evaluation@example.invalid"]);
@@ -109,7 +104,10 @@ function sanitize(value, key = "") {
 	}
 	if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).filter(([name]) => !/hiddenContract|productContract/i.test(name)).map(([name, nested]) => [name, sanitize(nested, name)]));
 	if (typeof value === "string") {
-		const redacted = value.replaceAll(/product-contract\.md/gi, "[hidden-resource]").replace(/\b(?:sk-[A-Za-z0-9_-]{16,}|Bearer\s+[A-Za-z0-9._~+/-]{16,}|AKIA[A-Z0-9]{16})\b/g, "[redacted]");
+		const redacted = value
+			.replaceAll(/product-contract\.md/gi, "[hidden-resource]")
+			.replaceAll(/(?:goldens[\\/](?:brainstorm|plan)\.md|answers\.json)/gi, "[authority-resource]")
+			.replace(/\b(?:sk-[A-Za-z0-9_-]{16,}|Bearer\s+[A-Za-z0-9._~+/-]{16,}|AKIA[A-Z0-9]{16})\b/g, "[redacted]");
 		return redacted.length > 65_536 ? `${redacted.slice(0, 65_536)}\n[truncated ${redacted.length - 65_536} chars]` : redacted;
 	}
 	return value;
@@ -825,7 +823,7 @@ async function main() {
 	else if (descriptor.mode === "calibration") result = await runCalibrationExperiment(descriptor);
 	else if (descriptor.mode === "golden-update") result = runGoldenUpdate(descriptor);
 	else if (descriptor.mode === "sentinel") result = await runSentinelExperiment(descriptor);
-	else throw new Error(`unsupported mode ${descriptor.mode}`);
+	else throw new Error(`unsupported mode ${descriptor.mode}\n${usage()}`);
 	process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 	if (["invalid", "failed", "candidate-rejected", "invalid-calibration", "pending-human-approval"].includes(result.status)) process.exitCode = 1;
 }

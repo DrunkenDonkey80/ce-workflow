@@ -50,6 +50,7 @@ assert.ok(calibration.wallMsCeiling >= 1010);
 
 assert.equal(requiresSentinel(["skills/ce-plan/SKILL.md"], "handoff"), true);
 assert.equal(requiresSentinel(["extensions/work-models.js"], "default-behavior"), true);
+assert.equal(requiresSentinel(["agents/work-worker.md"], "agent"), true);
 assert.equal(requiresSentinel(["README.md"], "docs"), false);
 assert.equal(requiresSentinel(["unknown/new-surface.mjs"], "narrow"), true);
 

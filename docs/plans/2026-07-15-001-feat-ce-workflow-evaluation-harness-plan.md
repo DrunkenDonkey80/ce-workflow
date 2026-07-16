@@ -204,7 +204,7 @@ flowchart TB
 - KTD3. **Run every sample in a fresh Pi RPC subprocess.** RPC provides process isolation, exact model/thinking configuration, lifecycle events, tool events, token statistics, and an extension-UI protocol that can answer `ask_user` prompts from the scripted answer bank. The client uses strict LF-delimited JSONL parsing rather than Node `readline`.
 - KTD4. **Load and verify the exact ce-workflow revision for each side.** Each RPC process loads the selected local package checkout, records command/resource provenance, and fails before dispatch when the resolved workflow resources do not fingerprint to that checkout or when baseline and candidate differ outside the declared factor.
 - KTD5. **Keep the harness control plane outside tested working directories.** Hidden contracts, acceptance checks, non-input goldens, side labels, evaluator identity, and retained evidence never enter agent-visible context; filesystem audits reject writes to the source checkout, bundle root, or sibling sample directories.
-- KTD6. **Model each sample as a durable, idempotent lifecycle.** State transitions and evidence are append-only so interruption can be reconciled without selective retry; completion requires structured RPC settlement plus artifact, Git, Beads, telemetry, and acceptance evidence rather than an assistant prose claim.
+- KTD6. **Model each sample as a durable, idempotent lifecycle.** State transitions and evidence are append-only so interruption can be reconciled without selective retry; completion requires structured RPC settlement plus artifact, Git, native work-item state, telemetry, and acceptance evidence rather than an assistant prose claim.
 - KTD7. **Reuse quality-first scoring policy without forcing the old synthetic evidence shape onto representative runs.** The new scorer imports the existing 5% improvement and 10% per-dimension regression thresholds, but owns paired order, raw samples, spread, unexpected questions, rubric judgments, retry classification, and the larger required metric set.
 - KTD8. **Separate deterministic gates from blinded qualitative judgment.** Acceptance behavior, artifact validity, lifecycle state, telemetry, repository finalization, and forbidden writes are coded gates; a fixed `workflow-evaluator` role sees normalized, randomly labeled artifacts and a versioned rubric only after deterministic gates pass.
 - KTD9. **Treat browser execution as a capability adapter, not a hidden dependency.** Calculator acceptance declares a fixed viewport and screenshot contract behind an injected browser runner; an unavailable or mismatched runner produces an explicit invalid live run, while deterministic tests use a fake adapter.
@@ -222,7 +222,7 @@ flowchart TB
   Pair --> Workspace[Disposable project and control-plane evidence dir]
   Workspace --> RPC[Fresh Pi RPC process]
   RPC --> Workflow[Workflow stage under test]
-  Workflow --> Raw[Transcript, artifacts, Git, Beads, telemetry]
+  Workflow --> Raw[Transcript, artifacts, Git, native work-item state, telemetry]
   Raw --> Gates[Deterministic verifier]
   Raw --> Blind[Artifact normalizer and label randomizer]
   Blind --> Judge[Fixed evaluator]
@@ -358,7 +358,7 @@ Runtime workspaces and evidence live under the operating system temporary direct
 - **Package resources:** RPC runs must disable ambient ce-workflow resources and load an explicit allowlist containing the selected package revision plus pinned dependency packages. Command, skill, prompt, extension, and role provenance becomes comparison evidence; duplicate ownership is a preflight failure.
 - **Credentials and trust:** Provider credentials remain outside evidence but are available to the Pi process. Only maintainer-trusted revisions may run without an external sandbox, and the report must state whether isolation is path-level or OS-level.
 - **Telemetry:** Session usage and `.pi/work-runs` events share one sample identity. Reconciliation must exclude harness/evaluator activity, prevent duplicate terminal accounting, and preserve workflow, harness, and evaluator cost as separate totals.
-- **Git and Beads:** Each work sample owns an independent repository and Beads state. Full sentinels share these only across sequential stages of the same sample; no state crosses sides, pairs, replacements, or projects.
+- **Git and native work-item state:** Each work sample owns an independent repository and `.ce-workflow/work-items.json` store. Full sentinels share these only across sequential stages of the same sample; no state crosses sides, pairs, replacements, or projects.
 - **Published package:** Adding benchmark bundles increases package contents and verification time. Runtime evidence, screenshots, temporary settings, copied credentials, and disposable repositories remain excluded from the package and Git.
 - **Existing improvement loop:** The synthetic `workflow-benchmark` gate remains unchanged. The representative harness can become a later gate only after local calibration proves its cost and reliability.
 - **Cross-platform execution:** Process-tree termination, path containment, file permissions, line endings, and browser discovery must be verified on Windows and one POSIX environment before results are considered portable.
@@ -372,7 +372,7 @@ Runtime workspaces and evidence live under the operating system temporary direct
 - **Evaluator instability — high:** Model drift, label clues, malformed scoring, or rubric ambiguity can change verdicts. Pin evaluator identity/settings, normalize artifacts, version anchors and tie rules, and invalidate rather than retry selectively.
 - **Provider and browser flakiness — medium:** Rate limits, unavailable credentials, process crashes, viewport drift, or missing screenshot support can dominate small samples. Classify infrastructure failures narrowly, retain attempts, calibrate ceilings, and allow only the Product Contract's symmetric single replacement.
 - **Runaway cost — medium:** Decision and sentinel modes multiply agent and evaluator usage. Enforce pre-dispatch token/wall budgets, abort full process trees at ceilings, and require successful smoke before expensive depths.
-- **Cross-platform cleanup — medium:** Windows process trees, reserved paths, locks, and CRLF handling can leave stale samples or corrupt RPC framing. Reuse existing Windows process/Beads handling, test strict LF framing, and make cleanup recoverable and idempotent.
+- **Cross-platform cleanup — medium:** Windows process trees, reserved paths, locks, and CRLF handling can leave stale samples or corrupt RPC framing. Reuse existing Windows process/native-store handling, test strict LF framing, and make cleanup recoverable and idempotent.
 - **Browser adapter availability — medium:** No browser dependency is currently declared. Capability discovery and one real fixed-viewport smoke must pass before calculator evidence is authoritative; dependency adoption requires explicit approval.
 - **Human approval dependency — medium:** Generated goldens cannot become decision inputs automatically. Decision and sentinel commands stop with a clear approval requirement until exact artifact and bundle SHAs have durable human approval.
 
@@ -556,7 +556,7 @@ A live gate may be recorded as unavailable only when credentials, evaluator, or 
 - The Product Contract remains unchanged and every implementation-affecting R/F/AE is traced to at least one implementation unit and verification gate.
 - The V1 package contains both immutable project bundles, hidden acceptance contracts, answer banks, versioned rubrics, two-slice seed projects, golden artifacts, and SHA-bound approval records.
 - One local command can run smoke, decision, calibration, golden-update, and sentinel modes in fresh disposable roots without modifying the source checkout or retained bundles.
-- Every sample proves exact package/resource provenance, fresh context and workspace isolation, scripted question handling, structured completion, complete telemetry, project acceptance, Git/Beads finalization, and forbidden-write absence.
+- Every sample proves exact package/resource provenance, fresh context and workspace isolation, scripted question handling, structured completion, complete telemetry, project acceptance, Git/native-work-item finalization, and forbidden-write absence.
 - Smoke results are visibly non-decision-grade; decision results retain three alternating fresh pairs, all attempts, raw deltas, median and spread, blinded evaluator evidence, and quality-first verdicts.
 - Mandatory sentinel trigger classes run both projects through actual brainstorm-to-plan-to-work handoffs without golden substitution.
 - `npm run verify:quiet` includes and passes every new deterministic fixture while all pre-existing checks remain green.
