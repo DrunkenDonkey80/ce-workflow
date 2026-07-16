@@ -37,7 +37,9 @@ check(
 check("native store is packaged", pkg.files?.includes("extensions/"));
 check(
 	"evaluation bundles are packaged",
-	pkg.files?.includes("benchmarks/") && pkg.files?.includes("scripts/") && pkg.files?.includes("agents/"),
+	pkg.files?.includes("benchmarks/") &&
+		pkg.files?.includes("scripts/") &&
+		pkg.files?.includes("agents/"),
 );
 
 const roles = [
@@ -137,7 +139,9 @@ const evaluationFiles = [
 	"scripts/workflow-evaluation-score.mjs",
 	"scripts/workflow-evaluation.mjs",
 ];
-const missingEvaluationFiles = evaluationFiles.filter((rel) => !existsSync(path.join(root, rel)));
+const missingEvaluationFiles = evaluationFiles.filter(
+	(rel) => !existsSync(path.join(root, rel)),
+);
 check(
 	"complete workflow evaluation inventory",
 	missingEvaluationFiles.length === 0,
@@ -148,17 +152,32 @@ for (const rel of evaluationFiles.filter((file) => file.endsWith(".json"))) {
 		JSON.parse(read(rel));
 		check(`${rel} is valid JSON`, true);
 	} catch (error) {
-		check(`${rel} is valid JSON`, false, error instanceof Error ? error.message : String(error));
+		check(
+			`${rel} is valid JSON`,
+			false,
+			error instanceof Error ? error.message : String(error),
+		);
 	}
 }
 const evaluationDocs = read("README.md");
 check(
 	"evaluation authority and operations are documented",
-	["smoke", "decision", "calibration", "golden-update", "sentinel", "non-decision-grade", "evidencePath", ".ce-workflow/work-items.json"].every((term) => evaluationDocs.includes(term)),
+	[
+		"smoke",
+		"decision",
+		"calibration",
+		"golden-update",
+		"sentinel",
+		"non-decision-grade",
+		"evidencePath",
+		".ce-workflow/work-items.json",
+	].every((term) => evaluationDocs.includes(term)),
 );
 check(
 	"evaluation security boundary is documented",
-	evaluationDocs.includes("full process permissions") && evaluationDocs.includes("not a hostile-code sandbox") && evaluationDocs.includes("sandboxCommand"),
+	evaluationDocs.includes("full process permissions") &&
+		evaluationDocs.includes("not a hostile-code sandbox") &&
+		evaluationDocs.includes("sandboxCommand"),
 );
 const models = read("extensions/work-models.js");
 const packagedPromptCommands = pkg.pi?.prompts?.length
