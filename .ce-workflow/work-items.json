@@ -2,6 +2,7 @@
   "items": {
     "ce-workflow-6dl": {
       "acceptance": "All U1-U8 verification gates and package verification pass; live unavailable capabilities are reported fail-closed.",
+      "closedAt": "2026-07-16T08:01:57.820Z",
       "createdAt": "2026-07-15T09:14:07Z",
       "dependencies": [],
       "dependencyEdges": [],
@@ -9,7 +10,12 @@
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "U1-U8 deterministic verification complete; package inventory passes; current human approvals are SHA-bound; unavailable browser and isolated external scratch capabilities retained fail-closed",
+          "completedAt": "2026-07-16T08:01:57.820Z"
+        }
+      ],
       "executionMode": "auto",
       "id": "ce-workflow-6dl",
       "labels": [],
@@ -31,13 +37,15 @@
         "title": "Implement CE workflow evaluation harness",
         "updated_at": "2026-07-15T09:14:07Z"
       },
-      "notes": [],
+      "notes": [
+        "Epic completed at 2026-07-16T08:01:57.820Z; see ce-workflow-6dl.8 evidence for final package, audit, and live capability results."
+      ],
       "owner": "mailflex@gmail.com",
       "priority": 2,
-      "status": "open",
+      "status": "closed",
       "title": "Implement CE workflow evaluation harness",
       "type": "epic",
-      "updatedAt": "2026-07-15T09:14:07Z"
+      "updatedAt": "2026-07-16T08:01:57.820Z"
     },
     "ce-workflow-6dl.1": {
       "acceptance": "U1 verification contract passes.",
@@ -515,6 +523,7 @@
     },
     "ce-workflow-6dl.8": {
       "acceptance": "U8 verification contract passes.",
+      "closedAt": "2026-07-16T08:01:57.820Z",
       "createdAt": "2026-07-15T09:14:33Z",
       "dependencies": [],
       "dependencyEdges": [
@@ -531,7 +540,35 @@
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "commits": [
+            "bce2449",
+            "cba00f2",
+            "d956496",
+            "92b7cd8",
+            "00191ed"
+          ],
+          "gate": "npm run verify:quiet",
+          "package": "npm pack --dry-run: 118 files; required evaluation assets present; no runtime, evidence, credential, or legacy state",
+          "review": "final residual review passed for U8 changes; external scratch isolation remained fail-closed",
+          "status": "passed"
+        },
+        {
+          "authority": "not passing and not decision-grade; no live gate was waived",
+          "browser": "unavailable: no browser executable or Playwright/Puppeteer/Selenium adapter",
+          "capabilitiesEvidence": "C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-capabilities-A3Ynpj/capabilities.json",
+          "pathIsolation": "unavailable: installed ce-brainstorm requires hard-coded shared /tmp/compound-engineering and this host has no per-sample OS temp namespace; write rejected fail-closed",
+          "provider": "available: openai-codex/gpt-5.6-sol completed live RPC and scripted ask_user exchanges",
+          "providerEvidence": "C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-I2k4w2/smoke-1784187579652-f6f469b3/evidence.json"
+        },
+        {
+          "approvals": "calculator approval current; CSV bundle d2c915d5c704a3e341fce4d1ad9824d931cfde19aec66aa1103f22bcb14a3c01 interactively approved by Flex; golden artifact SHAs unchanged",
+          "deferredScope": "CI gating, dashboards, and /work-* wrapper remain intentionally deferred by the Product Contract",
+          "deterministicCoverage": "bundle contracts, both projects, RPC, lifecycle, scorer, calibration/approval, sentinel handoffs, native finalization, evidence redaction, CLI guidance, Windows reserved paths, cleanup, package inventory",
+          "result": "U8 and Definition of Done audited requirement-by-requirement"
+        }
+      ],
       "executionMode": "auto",
       "id": "ce-workflow-6dl.8",
       "labels": [],
@@ -566,16 +603,17 @@
         "updated_at": "2026-07-15T15:01:36Z"
       },
       "notes": [
-        "PAUSED by user. U1-U7 implemented and committed. U8 package/docs work is in progress with uncommitted review fixes. Latest full package verification passed before the newest manual-review hardening; focused RPC/runner/scorer/project tests also passed before final warning cleanup. Remaining: finish warning cleanup, rerun all deterministic gates + npm pack, complete manual requirement audit, commit/close U8 and epic. Live evidence is fail-closed: provider quota unavailable at C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-NRM6GM/smoke-1784122060301-13f1c18c/evidence.json; browser unavailable at C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-capabilities-65dCAH/capabilities.json."
+        "PAUSED by user. U1-U7 implemented and committed. U8 package/docs work is in progress with uncommitted review fixes. Latest full package verification passed before the newest manual-review hardening; focused RPC/runner/scorer/project tests also passed before final warning cleanup. Remaining: finish warning cleanup, rerun all deterministic gates + npm pack, complete manual requirement audit, commit/close U8 and epic. Live evidence is fail-closed: provider quota unavailable at C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-NRM6GM/smoke-1784122060301-13f1c18c/evidence.json; browser unavailable at C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-capabilities-65dCAH/capabilities.json.",
+        "Completed U8 at 2026-07-16T08:01:57.820Z. Deterministic package gate and pack inventory pass. Live provider/browser/isolation capability evidence is retained fail-closed and never promoted to decision-grade."
       ],
       "owner": "mailflex@gmail.com",
       "parentId": "ce-workflow-6dl",
       "priority": 2,
       "startedAt": "2026-07-15T13:37:58Z",
-      "status": "in_progress",
+      "status": "closed",
       "title": "U8: workflow evaluation harness",
       "type": "task",
-      "updatedAt": "2026-07-15T15:01:36Z"
+      "updatedAt": "2026-07-16T08:01:57.820Z"
     },
     "ce-workflow-dqh": {
       "closedAt": "2026-07-15T08:11:03Z",
@@ -702,7 +740,8 @@
       "exportedAt": "2026-07-15T22:09:39.335Z",
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
-    }
+    },
+    "updatedAt": "2026-07-16T08:01:57.824Z"
   },
   "schemaVersion": 1
 }
