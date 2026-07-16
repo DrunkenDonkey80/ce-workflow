@@ -8,7 +8,7 @@
   "candidate": { "workflowRevision": "local", "effort": "high" },
   "trusted": true,
   "isolation": "path",
-  "tools": ["read", "bash", "edit", "write"],
+  "tools": ["read", "bash", "edit", "write", "ask_user", "subagent"],
   "calibrations": {
     "calculator:brainstorm": "replace-with-calibration.json",
     "calculator:plan": "replace-with-calibration.json",

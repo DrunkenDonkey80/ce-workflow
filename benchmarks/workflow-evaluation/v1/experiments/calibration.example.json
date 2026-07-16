@@ -8,6 +8,6 @@
   "evaluator": { "timeoutMs": 900000 },
   "trusted": true,
   "isolation": "path",
-  "tools": ["read", "bash", "edit", "write"],
+  "tools": ["read", "bash", "edit", "write", "ask_user", "subagent"],
   "budgets": { "tokenCeiling": 300000, "wallMsCeiling": 2700000 }
 }

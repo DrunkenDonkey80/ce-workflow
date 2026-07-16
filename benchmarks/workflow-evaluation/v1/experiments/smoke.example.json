@@ -8,6 +8,6 @@
   "candidate": { "workflowRevision": "local", "effort": "high" },
   "trusted": true,
   "isolation": "path",
-  "tools": ["read", "bash", "edit", "write"],
+  "tools": ["read", "bash", "edit", "write", "ask_user", "subagent"],
   "budgets": { "tokenCeiling": 100000, "wallMsCeiling": 900000 }
 }

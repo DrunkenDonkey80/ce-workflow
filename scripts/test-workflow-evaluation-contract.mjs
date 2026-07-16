@@ -92,6 +92,10 @@ for (const leaking of ["product-contract.md", "acceptance/verify.mjs", "goldens/
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const bundleRoot = path.join(root, "benchmarks", "workflow-evaluation", "v1");
 const actual = validateBundle(readJson(path.join(bundleRoot, "manifest.json")));
+for (const mode of ["smoke", "decision", "calibration", "sentinel"]) {
+	const example = readJson(path.join(bundleRoot, "experiments", `${mode}.example.json`));
+	assert.ok(example.tools.includes("ask_user") && example.tools.includes("subagent"), `${mode} supports scripted questions and workflow roles`);
+}
 for (const project of actual.projects) {
 	const directory = path.join(bundleRoot, "projects", project);
 	const approval = readJson(path.join(directory, "goldens", "approval.json"));
