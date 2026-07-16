@@ -116,6 +116,10 @@ assert.equal(failed.failure, "unanswerable-question");
 const escaping = fakeProcess([{ type: "tool_execution_start", toolName: "write", args: { path: "../escape.txt" } }]);
 const blocked = await runRpcSample({ packageRoot, workspaceRoot: packageRoot, revision: "abc", expectedRevision: "abc", tools: ["write"], expectedTools: ["write"], trusted: true, isolation: "path", stage: "brainstorm", prompt: "x", answers, timeoutMs: 1000, spawnProcess: () => escaping });
 assert.equal(blocked.failure, "forbidden-write");
+const dependencyScript = path.join(packageRoot, "scripts", "repo-profile-cache.py");
+const dependencyRead = fakeProcess([{ type: "tool_execution_start", toolName: "bash", args: { command: `python "${dependencyScript}"` } }, { type: "agent_settled" }]);
+const allowedDependencyRead = await runRpcSample({ packageRoot, sourceRoot: path.join(packageRoot, "source-only"), bundleRoot: path.join(packageRoot, "bundle-only"), workspaceRoot: path.join(path.dirname(packageRoot), "fixture-workspace"), dependencyRoots: [packageRoot], revision: "abc", expectedRevision: "abc", tools: ["bash"], expectedTools: ["bash"], trusted: true, isolation: "path", stage: "brainstorm", prompt: "x", answers, timeoutMs: 1000, spawnProcess: () => dependencyRead });
+assert.equal(allowedDependencyRead.status, "completed");
 const classify = (processFixture, timeoutMs = 1000, signal) => runRpcSample({ packageRoot, revision: "abc", expectedRevision: "abc", tools: ["read"], expectedTools: ["read"], trusted: true, isolation: "path", stage: "brainstorm", prompt: "x", answers, timeoutMs, signal, spawnProcess: () => processFixture });
 async function expectFailure(processFixture, expected, timeoutMs) {
 	const classified = await classify(processFixture, timeoutMs);

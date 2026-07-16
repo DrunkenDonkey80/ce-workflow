@@ -137,7 +137,9 @@ function forbiddenWrite(event, options) {
 	}
 	if (event.toolName === "bash" && /(^|\s)(?:\.\.[\\/])+/.test(String(event.args?.command ?? ""))) return "relative traversal in bash command";
 	for (const target of absolutePaths(event.args)) {
-		if (contained(options.sourceRoot, target) || contained(options.bundleRoot, target) || !contained(workspace, target)) return target;
+		if (contained(options.sourceRoot, target) || contained(options.bundleRoot, target)) return target;
+		if (contained(workspace, target) || (options.dependencyRoots ?? []).some((root) => contained(root, target))) continue;
+		return target;
 	}
 	return null;
 }
@@ -223,7 +225,7 @@ export async function runRpcSample(options) {
 			if (done || pendingResult) return;
 			pendingResult = result;
 			terminate(child);
-			setTimeout(() => finish(pendingResult), 250);
+			setTimeout(() => finish(pendingResult), process.platform === "win32" && child?.pid ? 5_000 : 250);
 		};
 		const fail = (failure, error) => settle({ status: "failed", failure, error });
 		const onAbort = () => { send({ type: "abort" }); fail("aborted", "RPC sample aborted"); };
