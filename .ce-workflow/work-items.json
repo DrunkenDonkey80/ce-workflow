@@ -732,6 +732,74 @@
         "result": "PASS",
         "source": "legacy-note"
       }
+    },
+    "work-1": {
+      "acceptance": "### Acceptance Examples\n\n- AE1. Given identical context and role maps, when only `work-worker.model` changes, then validation reports exactly that observed field delta and rejects any other role, prompt, tool, or runtime drift.\n- AE2. Given a requested Opus critic, when the runtime silently falls back to another model, then the sample is `fallback-used-off-config`, retains provider evidence, and contributes to no Opus verdict.\n- AE3. Given the main orchestrator dispatches worker, reviewer, and fixer as sibling role agents, when telemetry settles, then every agent's tokens, active wall interval, tools, retries, parent identity, and artifact hashes reconcile exactly once while sample wall time remains the dispatch-to-terminal critical path rather than the sum of overlapping agents.\n- AE4. Given a seeded plan omission, when the critic finds it without seeing its defect ID and the fixed reviser applies the finding, then the finding receives credit only after the revised artifact passes the matching hard or dual-evaluator proof.\n- AE5. Given a verbose critique with no unique accepted finding or verified downstream improvement, when scored, then it records cost and no demonstrated value rather than a win.\n- AE6. Given Sol and Opus judges choose opposite qualitative winners, when cost favors one side, then the result is `evaluator-disagreement-no-winner`; cost does not adjudicate quality.\n- AE7. Given Sol-high and Sol-xhigh brainstorms both pass quality, when xhigh's uplift remains within calibrated noise while costing more, then the default recommendation retains Sol-high and records no demonstrated xhigh value.\n- AE8. Given Terra-medium worker fails calculator persistence but Terra-high passes, when both are cheaper than Sol-high, then medium is rejected and high may advance; no cost metric waives the product failure.\n- AE9. Given the same generator, when Sol-high and Opus-high critics run on frozen cases, then each sees identical authorized bytes and differs only by compound model assignment; separate Sol-xhigh and Opus-xhigh contrasts measure effort effects while the evaluator panel measures valid unique findings, false positives, fixes, regressions, and marginal cost.\n- AE10. Given a role finalist passes isolated decisions but its integrated mapping fails a calculator or CSV sentinel, then adoption fails and the prior baseline remains active.\n- AE11. Given no candidate clears the quality and evaluator-agreement gates, when the tournament ends, then `no-winner` is a valid completed result with retained evidence and no default change.\n- AE12. Given a candidate wins only one project class, when reporting, then the recommendation is scoped to that class or marked `needs-more-evidence`; it is not generalized to every workflow.\n- AE13. Given a cross-provider candidate uses fewer raw tokens but its frozen price-table calculation costs more, when the default profile is selected, then normalized billed cost governs the cost claim and both raw token totals remain visible.\n- AE14. Given a recommendation is older than 30 days without immutable provider revision metadata, when settings guidance is rendered, then it is marked stale and the provider-neutral baseline remains active until a fresh qualifying run.\n- AE15. Given a role or prompt-injected artifact tries to read credentials, hidden answers, evaluator controls, or a sibling evidence root, when the tool executes, then access is denied, the sample fails, and retained diagnostics contain no secret or authority content.",
+      "createdAt": "2026-07-16T19:18:17.235Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Master roadmap plan from docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md.\n\n## Goal Capsule\n\n- **Objective:** Extend the workflow evaluation harness, then use it to produce evidence-backed model and effort recommendations for each ce-workflow role and for same-family versus cross-family critique.\n- **Authority hierarchy:** This plan governs the roadmap; the existing V1 benchmark contract and approved project bundles govern unchanged harness behavior; retained experiment evidence governs recommendations; current code patterns govern implementation details when they do not conflict.\n- **Execution profile:** Deep, dependency-ordered work. Implement deterministic contracts before paid runs, then progress through smoke, calibration, decision, and sentinel evidence.\n- **Stop conditions:** Stop rather than accept undeclared configuration drift, incomplete role telemetry, hidden-resource leakage, silent model fallback, evaluator disagreement, failed hard gates, stale calibration, or missing provider capability as evidence of a winner.\n- **Tail ownership:** The executor owns code, fixtures, descriptors, experiment runs, evidence, and documentation. A maintainer owns provider access, benchmark-contract approval, rubric correction followed by fresh blinded reruns, and adoption of a provider-specific recommendation; maintainers cannot adjudicate a winner in place.\n\n---",
+      "documentLinks": {
+        "design": "docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md"
+      },
+      "evidence": [],
+      "id": "work-1",
+      "labels": [],
+      "notes": [
+        "created by /work-plan\nsource plan: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\nsource artifact: docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+      ],
+      "status": "open",
+      "title": "Model Role Evaluation Roadmap - Plan",
+      "type": "epic",
+      "updatedAt": "2026-07-16T19:18:17.235Z"
+    },
+    "work-1.1": {
+      "createdAt": "2026-07-16T19:18:17.405Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "evidence": [],
+      "id": "work-1.1",
+      "labels": [],
+      "notes": [
+        "created by /work-plan\nwo:planning\nsource plan: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\ncreate one executable slice by default\ntask: Model Role Evaluation Roadmap - Plan\nRole timeout guidance: prefer no explicit timeout; if one is required, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout as infrastructure failure evidence, not implementation failure.",
+        "wo:advisor-review PASS — initial findings were folded into the plan: atomic provider-qualified modelAssignment factors; metric-specific telemetry reconciliation; complete same/cross-family critic factorial with shared-effort controls; fixed-reviser empty control; dual-evaluator no-winner policy; frozen campaign and halving schedule; conditional-role coverage; normalized cross-provider cost; recommendation expiry; and credential, evidence-retention, and provider-egress contracts. Final work-advisor verdict CLEAN with no P0/P1 blockers. Workflow Run ID: workflow-mrnneuci-hizyqm",
+        "Planned next slice: created work-1.2 (U1 Model and role factor contract), the dependency-free Phase 1 foundation and next unsliced master-plan unit. One-slice default posture; U2-U11 remain unsliced pending U1. No new dependencies needed (U1 has none). No decisions deferred. Prerequisite flagged on work-1.2: pre-existing scripts/workflow-evaluation.mjs diff must be resolved by its owner before writer execution (worker finish gate owns cleanliness)."
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "Plan next slice for Model Role Evaluation Roadmap - Plan",
+      "type": "task",
+      "updatedAt": "2026-07-16T19:21:18.172Z"
+    },
+    "work-1.2": {
+      "acceptance": "GATE: node scripts/test-workflow-evaluation-contract.mjs passes - canonical one-factor model/role descriptors pass and every ambiguous or multi-factor configuration fails closed. Scenarios: (1) a top-level or one-role modelAssignment delta may change provider+exact model together as one logical factor; (2) provider/model changes outside a declared compound assignment fail as partial/undeclared deltas, effort+assignment still requires an interaction experiment; (3) unknown roles, incomplete role cells, ambient overrides, no-op aliases, unsupported effort, and undeclared fallback fail before provisioning; (4) key-order differences do not change the role-map fingerprint; (5) existing workflowRevision/effort/prompt/mode/reviewer descriptors remain compatible. Package regression: npm run verify:quiet stays green. AC1 (V1 harness compatibility) and AC2 (role configuration) must not regress; no source mutation of approved bundles/goldens.",
+      "createdAt": "2026-07-16T19:21:11.697Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "First executable slice of the Model Role Evaluation Roadmap (epic work-1), Phase 1 Measurement contracts. PROBLEM: the V1 harness factor allowlist cannot validly compare top-level models or nested role overrides. SCOPE: extend the factor allowlist and resolved-pair schema with a complete canonical role map, compound modelAssignment values (provider + exact model bound as one factor), role-scoped factor paths, and independently testable effort factors for every ce-workflow role under test. APPROACH: reuse recursive changed-path validation and canonical fingerprints already in scripts/workflow-evaluation-contract.mjs; mirror the existing subagents.agentOverrides shape from extensions/work-models.js. Fail preflight on partial provider/model deltas, aliases resolving differently, ambient overrides, unsupported role keys, fallback-policy drift, no-op changes, or more than the declared delta; require an explicit interaction declaration for effort+assignment. Preserve existing workflowRevision/effort/prompt/mode/reviewer descriptor compatibility and key-order-independent fingerprints. Add failing contract fixtures BEFORE changing live descriptor handling. Requirements R1-R6, R20-R22; AE1-AE2. Depends on: none. Files: scripts/workflow-evaluation-contract.mjs, scripts/workflow-evaluation.mjs, benchmarks/workflow-evaluation/v1/experiments/smoke.example.json, benchmarks/workflow-evaluation/v1/experiments/decision.example.json, scripts/test-workflow-evaluation-contract.mjs.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.2",
+      "labels": [],
+      "notes": [
+        "source plan: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md (U1). Slice of epic work-1, planned by work-1.1. One-slice default posture. PREREQUISITE: pre-existing uncommitted diff in scripts/workflow-evaluation.mjs must be resolved by its owner (commit/stash/discard) so 'git status --short -- scripts/workflow-evaluation.mjs' is empty before writer execution; the worker finish gate owns this cleanliness check - do not absorb, revert, or commit that diff. Patterns: recursive changed-path validation + canonical fingerprints in workflow-evaluation-contract.mjs; subagents.agentOverrides in extensions/work-models.js.",
+        "wo:slice-plan\nplan-path: docs\\plans\\2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\ntarget: work-1.2 — U1 Model and role factor contract\napproach: implement the WorkItem's acceptance with the smallest localized diff; reuse existing helpers before adding code.\nlikely files: derive from the WorkItem notes/design before editing; do not broaden scope.\nverification: run the WorkItem's named check, or the smallest focused command that proves the acceptance.\nrisks/out-of-scope: create a blocker WorkItem instead of guessing when acceptance, hardware/live proof, or ownership is unclear.",
+        "",
+        "wo:failure-summary run=agent-mrnwg1ye-9fqoso role=inline-medium action=work duration=4m 32s\nreason: Paused. No further action taken. Current state of work-1.2: - Edited `scripts/workflow-evaluation-contract.mjs` — added `modelAssignment` compound factor, canonical role-map validation (`validateRoleMap`), role-scoped factor expansion, and fail-closed checks (unknown role, incomplete cell, unsupported effort, undeclared fallback, ambient override, no-op alias). - **Not yet done:** test scenarios in `scripts/test-workflow-evaluation-contract.mjs`, running the gate + `finish-task`. Nothing committ…\nartifact: C:\\soft\\ce-workflow\\.pi\\work-runs\\2026-07-16.jsonl\ntool-error: bash 636 chars\nlatest: assistant: Now I understand the task. U1 requires extending the contract to support compound `modelAssignment` factors and a canonical role map. The gate test currently passes but doesn't exercise these. Let me implement the contract extension and the fixtures.\nlatest: toolResult: Successfully replaced 2 block(s) in C:\\soft\\ce-workflow\\scripts\\workflow-evaluation-contract.mjs. ✓ JavaScript/TypeScript clean · 4202ms\nlatest: user: pause\nlatest: assistant: Paused. No further action taken. Current state of work-1.2: - Edited `scripts/workflow-evaluation-contract.mjs` — added `modelAssignment` compound factor, canonical role-map validation (`validateRoleMap`), role-scoped factor expansion, and fail-closed checks (…\nnext: /work-report work-1.2",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed",
+        "wo:review FAIL — scripts/workflow-evaluation-contract.mjs:194 accepts an omitted roleMap, so modelAssignment pairs can pass without the required complete canonical role map; require roleMap for assignment/role-scoped descriptors and add an omission fixture.",
+        "wo:review PASS — scoped contract diff now requires complete role maps for modelAssignment/role-scoped factors; focused fixtures and omission regression check pass, with no scoped staged files.",
+        "wo:review PASS — work-reviewer run 807e6c8c: scoped diff satisfies the model-assignment contract and omission regression; focused gate passes; no bundle/golden files changed. Artifact: .pi-subagents/artifacts/807e6c8c_work-reviewer_output.md",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U1 Model and role factor contract",
+      "type": "task",
+      "updatedAt": "2026-07-16T19:47:56.850Z"
     }
   },
   "metadata": {
@@ -741,7 +809,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-16T08:01:57.824Z"
+    "updatedAt": "2026-07-16T19:47:56.850Z"
   },
   "schemaVersion": 1
 }

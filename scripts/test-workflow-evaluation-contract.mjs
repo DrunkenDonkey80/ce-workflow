@@ -87,6 +87,35 @@ for (const mutation of [
 	assert.throws(() => validateBundle(broken));
 }
 
+const roles = [
+	"main",
+	"work-planner",
+	"work-migrator",
+	"work-worker",
+	"work-fixer",
+	"work-debugger",
+	"work-reviewer",
+	"work-advisor",
+	"work-advisor-backup",
+];
+function completeRoleMap() {
+	return Object.fromEntries(
+		roles.map((role) => [
+			role,
+			{
+				provider: "fixture",
+				model: `${role}-model-v1`,
+				effort: "medium",
+				prompt: "fixture-v1",
+				tools: ["read", "write"],
+				context: { compact: true },
+				fallback: "none",
+				runtime: { contextWindow: 100_000 },
+			},
+		]),
+	);
+}
+
 const base = {
 	workflowRevision: "base",
 	project: "calculator",
@@ -96,6 +125,10 @@ const base = {
 	provider: "fixture",
 	model: "fixture",
 	effort: "medium",
+	prompt: "fixture-v1",
+	mode: "decision",
+	reviewer: "fixture-reviewer",
+	roleMap: completeRoleMap(),
 	evaluator: "fixture-evaluator",
 	runtime: { node: "fixture", platform: "fixture" },
 	dependencies: { package: "fixture" },
@@ -149,6 +182,170 @@ assert.throws(
 		}),
 	/allowlist/,
 );
+
+const topAssignment = structuredClone(base);
+topAssignment.provider = "other-provider";
+topAssignment.model = "other-model-v2";
+assert.deepEqual(
+	validateExperimentPair({
+		baseline: base,
+		candidate: topAssignment,
+		factor: "modelAssignment",
+	}).changed,
+	["provider", "model"],
+);
+const missingRoleMapBase = structuredClone(base);
+const missingRoleMapCandidate = structuredClone(topAssignment);
+delete missingRoleMapBase.roleMap;
+delete missingRoleMapCandidate.roleMap;
+assert.throws(
+	() =>
+		validateExperimentPair({
+			baseline: missingRoleMapBase,
+			candidate: missingRoleMapCandidate,
+			factor: "modelAssignment",
+		}),
+	/complete role map/,
+);
+
+const roleAssignment = structuredClone(base);
+roleAssignment.roleMap["work-worker"].provider = "other-provider";
+roleAssignment.roleMap["work-worker"].model = "worker-model-v2";
+assert.deepEqual(
+	validateExperimentPair({
+		baseline: base,
+		candidate: roleAssignment,
+		factor: "modelAssignment.work-worker",
+	}).changed,
+	["roleMap.work-worker.provider", "roleMap.work-worker.model"],
+);
+const exactRoleDelta = structuredClone(base);
+exactRoleDelta.roleMap["work-worker"].model = "worker-model-v2";
+assert.deepEqual(
+	validateExperimentPair({
+		baseline: base,
+		candidate: exactRoleDelta,
+		factor: "modelAssignment.work-worker",
+	}).changed,
+	["roleMap.work-worker.model"],
+);
+assert.throws(
+	() =>
+		validateExperimentPair({
+			baseline: base,
+			candidate: roleAssignment,
+			factor: "effort",
+		}),
+	/undeclared/,
+);
+const assignmentAndEffort = structuredClone(roleAssignment);
+assignmentAndEffort.roleMap["work-worker"].effort = "high";
+assert.throws(
+	() =>
+		validateExperimentPair({
+			baseline: base,
+			candidate: assignmentAndEffort,
+			factor: ["modelAssignment.work-worker", "effort.work-worker"],
+		}),
+	/interaction/,
+);
+assert.doesNotThrow(() =>
+	validateExperimentPair({
+		baseline: base,
+		candidate: assignmentAndEffort,
+		factor: ["modelAssignment.work-worker", "effort.work-worker"],
+		interaction: true,
+	}),
+);
+
+for (const mutate of [
+	(value) => {
+		value.roleMap.unknown = structuredClone(value.roleMap.main);
+	},
+	(value) => {
+		delete value.roleMap["work-worker"].provider;
+	},
+	(value) => {
+		delete value.roleMap["work-fixer"];
+	},
+	(value) => {
+		value.ambientOverrides = { model: "ambient" };
+	},
+	(value) => {
+		value.roleMap["work-worker"].alias = "worker-latest";
+	},
+	(value) => {
+		value.effort = "ultra";
+	},
+	(value) => {
+		value.roleMap["work-worker"].effort = "ultra";
+	},
+	(value) => {
+		value.roleMap["work-worker"].fallback = "automatic";
+	},
+]) {
+	const invalidRoleMap = structuredClone(base);
+	mutate(invalidRoleMap);
+	assert.throws(() =>
+		validateExperimentPair({
+			baseline: base,
+			candidate: invalidRoleMap,
+			factor: "modelAssignment.work-worker",
+		}),
+	);
+}
+assert.throws(
+	() =>
+		validateExperimentPair({
+			baseline: base,
+			candidate: base,
+			factor: "modelAssignment.work-worker",
+		}),
+	/no-op/,
+);
+assert.throws(
+	() =>
+		validateExperimentPair({
+			baseline: base,
+			candidate: roleAssignment,
+			factor: "modelAssignment.work-committer",
+		}),
+	/unknown role/,
+);
+const reversedRoleMap = Object.fromEntries(
+	Object.entries(base.roleMap)
+		.toReversed()
+		.map(([role, cell]) => [
+			role,
+			Object.fromEntries(Object.entries(cell).toReversed()),
+		]),
+);
+assert.equal(fingerprint(base.roleMap), fingerprint(reversedRoleMap));
+assert.equal(
+	validateExperimentPair({
+		baseline: base,
+		candidate: topAssignment,
+		factor: "modelAssignment",
+	}).baselineRoleMapFingerprint,
+	fingerprint(reversedRoleMap),
+);
+for (const [field, value] of [
+	["workflowRevision", "next"],
+	["prompt", "fixture-v2"],
+	["mode", "sentinel"],
+	["reviewer", "other-reviewer"],
+]) {
+	const compatible = structuredClone(base);
+	compatible[field] = value;
+	assert.doesNotThrow(() =>
+		validateExperimentPair({
+			baseline: base,
+			candidate: compatible,
+			factor: field,
+		}),
+	);
+}
+
 for (const field of [
 	"model",
 	"provider",
