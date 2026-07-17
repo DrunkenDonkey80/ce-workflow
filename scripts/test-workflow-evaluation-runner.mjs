@@ -13,7 +13,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+	buildEvaluationSettings,
 	recoverStaleWorkspaces,
+	writeEvaluationSettings,
 	runDecisionExperiment,
 	runSmokeExperiment,
 } from "./workflow-evaluation.mjs";
@@ -41,6 +43,94 @@ try {
 } finally {
 	rmSync(recoveryRoot, { recursive: true, force: true });
 }
+const roleSettings = buildEvaluationSettings({
+	roleMap: {
+		main: {
+			provider: "main-provider",
+			model: "main-model",
+			effort: "medium",
+			context: { compaction: { enabled: true, reserveTokens: 20_000 } },
+		},
+		"work-worker": {
+			provider: "worker-provider",
+			model: "worker-model",
+			effort: "high",
+		},
+	},
+});
+assert.deepEqual(roleSettings, {
+	defaultProvider: "main-provider",
+	defaultModel: "main-model",
+	defaultThinkingLevel: "medium",
+	compaction: { enabled: true, reserveTokens: 20_000 },
+	subagents: {
+		agentOverrides: {
+			"work-worker": {
+				model: "worker-provider/worker-model",
+				thinking: "high",
+			},
+		},
+	},
+});
+assert.equal("main" in roleSettings.subagents.agentOverrides, false);
+const isolatedSettingsRoot = mkdtempSync(
+	path.join(os.tmpdir(), "ce-role-settings-fixture-"),
+);
+try {
+	const file = writeEvaluationSettings(isolatedSettingsRoot, {
+		roleMap: {
+			main: {
+				provider: "main-provider",
+				model: "main-model",
+				effort: "medium",
+			},
+			"work-worker": {
+				provider: "worker-provider",
+				model: "worker-model",
+				effort: "high",
+			},
+		},
+	});
+	assert.equal(file, path.join(isolatedSettingsRoot, ".pi", "settings.json"));
+	assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), {
+		defaultProvider: "main-provider",
+		defaultModel: "main-model",
+		defaultThinkingLevel: "medium",
+		subagents: {
+			agentOverrides: {
+				"work-worker": {
+					model: "worker-provider/worker-model",
+					thinking: "high",
+				},
+			},
+		},
+	});
+} finally {
+	rmSync(isolatedSettingsRoot, { recursive: true, force: true });
+}
+assert.throws(() =>
+	buildEvaluationSettings(
+		{ roleMap: { main: { provider: "p", model: "m", effort: "low" } } },
+		{ defaultModel: "ambient" },
+	),
+);
+assert.throws(() =>
+	buildEvaluationSettings(
+		{
+			roleMap: {
+				main: {
+					provider: "p",
+					model: "credential-canary-fixture",
+					effort: "low",
+				},
+			},
+		},
+		null,
+		"credential-canary-fixture",
+	),
+);
+assert.doesNotMatch(JSON.stringify(roleSettings), /credential-canary-fixture/);
+
 const descriptor = {
 	version: 1,
 	mode: "smoke",
@@ -201,7 +291,7 @@ const candidateFailure = await runSmokeExperiment(descriptor, {
 				};
 	},
 });
-assert.equal(candidateFailure.status, "candidate-rejected");
+assert.equal(candidateFailure.status, "invalid");
 assert.ok(
 	candidateFailure.attempts.some((attempt) => attempt.failure === "timeout"),
 );
@@ -262,6 +352,111 @@ const decision = await runDecisionExperiment(
 );
 assert.equal(decision.status, "candidate-accepted");
 assert.equal(decision.verdict.pairs.length, 3);
+
+function successfulDecisionSample(side) {
+	return {
+		status: "completed",
+		verifier: { passed: true },
+		usage: { tokens: { total: 100 } },
+		metrics: {
+			tokens: 100,
+			wallMs: 100,
+			toolCalls: 1,
+			subagentCalls: 0,
+			toolOutputChars: 1,
+			retries: 0,
+			contextTokens: 1,
+			questions: 0,
+		},
+		questions: [],
+		artifacts: [`${side}-artifact`],
+	};
+}
+const equalEvaluation = async () => ({
+	scores: {
+		baseline: { "question-quality": 3, requirements: 3, scope: 3 },
+		candidate: { "question-quality": 3, requirements: 3, scope: 3 },
+	},
+	control: { mapping: { A: "baseline", B: "candidate" } },
+	evaluator: { usage: { tokens: 10 } },
+});
+const replacementCalls = [];
+const replacedDecision = await runDecisionExperiment(
+	{ ...descriptor, mode: "decision" },
+	{
+		sourceRoot,
+		skipApproval: true,
+		skipCalibration: true,
+		initializeWorkspace() {},
+		async runSample(sample) {
+			replacementCalls.push({
+				pairIndex: sample.pairIndex,
+				attemptIndex: sample.attemptIndex,
+				side: sample.side,
+			});
+			if (
+				sample.pairIndex === 0 &&
+				sample.attemptIndex === 0 &&
+				sample.side === "candidate"
+			)
+				return {
+					status: "failed",
+					failure: "provider-error",
+					error: "quota exceeded",
+				};
+			return successfulDecisionSample(sample.side);
+		},
+		evaluatePair: equalEvaluation,
+	},
+);
+assert.equal(replacedDecision.verdict.pairs[0].attempts.length, 2);
+assert.equal(
+	replacedDecision.verdict.pairs[0].attempts[0].infrastructureFailure,
+	"quota",
+);
+for (const side of ["baseline", "candidate"])
+	assert.equal(
+		replacementCalls.filter(
+			(call) => call.pairIndex === 0 && call.side === side,
+		).length,
+		2,
+	);
+const twiceFailedDecision = await runDecisionExperiment(
+	{ ...descriptor, mode: "decision" },
+	{
+		sourceRoot,
+		skipApproval: true,
+		skipCalibration: true,
+		initializeWorkspace() {},
+		async runSample(sample) {
+			if (sample.pairIndex === 0 && sample.side === "candidate")
+				return {
+					status: "failed",
+					failure: "provider-error",
+					error: "quota exceeded",
+				};
+			return successfulDecisionSample(sample.side);
+		},
+		evaluatePair: equalEvaluation,
+	},
+);
+assert.equal(twiceFailedDecision.status, "invalid");
+let twiceFailedEvidence;
+try {
+	twiceFailedEvidence = JSON.parse(
+		readFileSync(twiceFailedDecision.evidencePath, "utf8"),
+	);
+} catch (error) {
+	throw new Error(
+		`invalid retained retry evidence: ${error instanceof Error ? error.message : String(error)}`,
+	);
+}
+assert.equal(twiceFailedEvidence.pairs[0].attempts.length, 2);
+assert.equal(
+	twiceFailedEvidence.pairs[0].attempts[1].infrastructureFailure,
+	"quota",
+);
+
 let evaluatorCalls = 0;
 const gatedDecision = await runDecisionExperiment(
 	{ ...descriptor, mode: "decision" },

@@ -22,6 +22,7 @@ import {
 	validateExperimentPair,
 } from "./workflow-evaluation-contract.mjs";
 import {
+	classifyInfrastructureFailure,
 	piInvocation,
 	reconcileWorkflowTelemetry,
 	runRpcSample,
@@ -234,12 +235,10 @@ function appendResultLifecycle(file, details, result) {
 		});
 		appendLifecycle(file, "running", details);
 	}
-	const terminal =
-		result.status === "completed"
-			? "completed"
-			: result.failure === "timeout" || result.status === "timed_out"
-				? "timed_out"
-				: "failed";
+	let terminal = "failed";
+	if (result.status === "completed") terminal = "completed";
+	else if (result.failure === "timeout" || result.status === "timed_out")
+		terminal = "timed_out";
 	appendLifecycle(file, terminal, { ...details, failure: result.failure });
 	const verified =
 		details.passed ??
@@ -272,6 +271,54 @@ function requiredStageResources(stage) {
 	if (stage === "brainstorm") return ["skill:ce-brainstorm"];
 	if (stage === "plan") return ["skill:ce-plan"];
 	return ["skill:work-orchestrator"];
+}
+
+export function buildEvaluationSettings(
+	side,
+	ambientSettings,
+	credentialCanary,
+) {
+	if (!side.roleMap) return ambientSettings ?? null;
+	if (ambientSettings && Object.keys(ambientSettings).length > 0)
+		throw new Error("ambient settings are invalid for a canonical role map");
+	const main = side.roleMap.main;
+	const settings = {
+		defaultProvider: main.provider,
+		defaultModel: main.model,
+		defaultThinkingLevel: main.effort,
+		...(main.context && typeof main.context === "object" ? main.context : {}),
+		subagents: {
+			agentOverrides: Object.fromEntries(
+				Object.entries(side.roleMap)
+					.filter(([role]) => role !== "main")
+					.map(([role, cell]) => [
+						role,
+						{ model: `${cell.provider}/${cell.model}`, thinking: cell.effort },
+					]),
+			),
+		},
+	};
+	if (credentialCanary && JSON.stringify(settings).includes(credentialCanary))
+		throw new Error("credential canary reached serialized settings");
+	return settings;
+}
+
+export function writeEvaluationSettings(
+	workspaceRoot,
+	side,
+	ambientSettings,
+	credentialCanary,
+) {
+	const settings = buildEvaluationSettings(
+		side,
+		ambientSettings,
+		credentialCanary,
+	);
+	if (!settings) return null;
+	const file = path.join(workspaceRoot, ".pi", "settings.json");
+	mkdirSync(path.dirname(file), { recursive: true });
+	writeFileSync(file, `${JSON.stringify(settings, null, 2)}\n`);
+	return file;
 }
 
 function resolvedPair(descriptor) {
@@ -352,7 +399,13 @@ function provision({
 function comparableProvenance(result, factor) {
 	const provenance = structuredClone(result?.provenance ?? {});
 	const factors = new Set(Array.isArray(factor) ? factor : [factor]);
-	if (factors.has("effort")) delete provenance.thinking;
+	delete provenance.roles;
+	if ([...factors].some((item) => item.startsWith("modelAssignment")))
+		delete provenance.model;
+	if ([...factors].some((item) => item.startsWith("effort")))
+		delete provenance.thinking;
+	if ([...factors].some((item) => item.startsWith("prompt")))
+		delete provenance.payload;
 	if (factors.has("workflowRevision")) {
 		delete provenance.packageRoot;
 		delete provenance.revision;
@@ -454,14 +507,12 @@ function workTelemetry(root) {
 
 async function defaultRunSample(sample, descriptor, sourceRoot) {
 	const side = descriptor[sample.side];
-	const settings = side.settings ?? descriptor.settings;
-	if (settings) {
-		mkdirSync(path.join(sample.workspaceRoot, ".pi"), { recursive: true });
-		writeFileSync(
-			path.join(sample.workspaceRoot, ".pi", "settings.json"),
-			`${JSON.stringify(settings, null, 2)}\n`,
-		);
-	}
+	writeEvaluationSettings(
+		sample.workspaceRoot,
+		side,
+		side.settings ?? descriptor.settings,
+		descriptor.credentialCanary,
+	);
 	const commandName =
 		sample.stage === "work" ? "work-resume" : `work-${sample.stage}`;
 	const argument =
@@ -484,6 +535,20 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		requiredCommands = ["work-migrate", "work-goal"];
 	}
 	const prompt = prompts[0];
+	const mainRole = side.roleMap?.main;
+	const providerPolicy =
+		side.visibility || descriptor.visibility
+			? {
+					visibility: side.visibility ?? descriptor.visibility,
+					endpoint: side.endpoint ?? descriptor.endpoint,
+					approvedEndpoints: descriptor.approvedEndpoints,
+					credentialCanary: descriptor.credentialCanary,
+				}
+			: null;
+	if (side.roleMap && !providerPolicy)
+		throw new Error(
+			"canonical role maps require a declared provider payload policy",
+		);
 	const runtimeTemp = path.join(sample.workspaceRoot, ".pi", "tmp");
 	mkdirSync(runtimeTemp, { recursive: true });
 	const started = Date.now();
@@ -514,9 +579,13 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		dependencyRoots: dependencyRoots(descriptor),
 		requiredResources,
 		requiredCommands,
-		provider: side.provider ?? descriptor.provider,
-		model: side.model ?? descriptor.model,
-		thinking: side.effort ?? descriptor.effort,
+		provider: mainRole?.provider ?? side.provider ?? descriptor.provider,
+		model: mainRole?.model ?? side.model ?? descriptor.model,
+		thinking: mainRole?.effort ?? side.effort ?? descriptor.effort,
+		context: mainRole?.context,
+		roleMap: side.roleMap,
+		expectedRoles: side.expectedRoles ?? descriptor.expectedRoles,
+		providerPolicy,
 	});
 	const totalRpcWallMs = Date.now() - started;
 	const wallMs = rpc.stageWallMs ?? totalRpcWallMs;
@@ -623,7 +692,9 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		rpc.provenance?.revision &&
 			rpc.provenance?.resources &&
 			rpc.provenance?.model &&
-			rpc.provenance?.isolation,
+			rpc.provenance?.isolation &&
+			rpc.provenance?.roles?.valid !== false &&
+			(!providerPolicy || rpc.provenance?.payload),
 	);
 	const verifier = {
 		passed:
@@ -819,11 +890,14 @@ function decisionSample(result, scores, budgets) {
 }
 
 function infrastructureFailure(results) {
-	const failures = results.map((result) => result.failure).filter(Boolean);
 	return (
-		failures.find((failure) =>
-			/rate-limit|provider|process-error|browser-unavailable/.test(failure),
-		) ?? null
+		results
+			.map(
+				(result) =>
+					result.infrastructureClass ??
+					classifyInfrastructureFailure(result.failure, result.error),
+			)
+			.find(Boolean) ?? null
 	);
 }
 

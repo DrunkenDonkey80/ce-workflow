@@ -5,6 +5,172 @@ import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
 const DIALOGS = new Set(["select", "confirm", "input", "editor"]);
+const VISIBILITY_CLASSES = new Set(["public", "internal", "confidential"]);
+
+function stable(value) {
+	if (Array.isArray(value)) return value.map(stable);
+	if (value && typeof value === "object")
+		return Object.fromEntries(
+			Object.entries(value)
+				.sort(([left], [right]) => left.localeCompare(right))
+				.map(([key, nested]) => [key, stable(nested)]),
+		);
+	return value;
+}
+
+export function provenanceHash(value) {
+	return createHash("sha256")
+		.update(JSON.stringify(stable(value)) ?? "undefined")
+		.digest("hex");
+}
+
+function redactCredentialCanary(value, canary) {
+	if (!canary) return value;
+	if (Array.isArray(value))
+		return value.map((item) => redactCredentialCanary(item, canary));
+	if (value && typeof value === "object")
+		return Object.fromEntries(
+			Object.entries(value).map(([key, nested]) => [
+				key,
+				redactCredentialCanary(nested, canary),
+			]),
+		);
+	return typeof value === "string"
+		? value.replaceAll(canary, "[redacted]")
+		: value;
+}
+
+function roleIdentity(cell) {
+	return {
+		provider: cell?.provider,
+		model: cell?.model ?? cell?.id,
+		effort: cell?.effort ?? cell?.thinkingLevel,
+		promptHash: cell?.promptHash ?? provenanceHash(cell?.prompt),
+		toolsHash: cell?.toolsHash ?? provenanceHash(cell?.tools),
+		contextHash: cell?.contextHash ?? provenanceHash(cell?.context),
+	};
+}
+
+export function requestedRoleProvenance(options) {
+	const prompts = options.prompts ?? [options.prompt];
+	const main = options.roleMap?.main ?? {
+		provider: options.provider,
+		model: options.model?.split("/").at(-1),
+		effort: options.thinking,
+		prompt: prompts.length === 1 ? prompts[0] : prompts,
+		tools: options.tools,
+		context: options.context,
+	};
+	return Object.fromEntries(
+		Object.entries({ ...(options.roleMap ?? {}), main }).map(([role, cell]) => [
+			role,
+			roleIdentity(cell),
+		]),
+	);
+}
+
+function observedRoleEvents(events) {
+	const observed = {};
+	for (const event of events) {
+		let record = null;
+		if (event.type === "subagent_provenance") record = event;
+		else if (
+			event.type === "tool_execution_end" &&
+			event.toolName === "subagent"
+		)
+			record = event.result?.provenance;
+		if (record?.role) observed[record.role] = roleIdentity(record);
+	}
+	return observed;
+}
+
+export function reconcileRoleProvenance({
+	requested,
+	observedMain,
+	events = [],
+	expectedRoles = ["main"],
+}) {
+	const observed = {
+		...observedRoleEvents(events),
+		main: roleIdentity(observedMain),
+	};
+	const required = new Set([
+		"main",
+		...expectedRoles,
+		...Object.keys(requested),
+		...Object.keys(observed),
+	]);
+	const mismatches = [];
+	for (const role of required) {
+		if (!requested[role]) mismatches.push(`${role}:undeclared`);
+		else if (!observed[role]) mismatches.push(`${role}:missing`);
+		else
+			for (const field of [
+				"provider",
+				"model",
+				"effort",
+				"promptHash",
+				"toolsHash",
+				"contextHash",
+			])
+				if (requested[role][field] !== observed[role][field])
+					mismatches.push(`${role}:${field}`);
+	}
+	return { valid: mismatches.length === 0, requested, observed, mismatches };
+}
+
+export function classifyInfrastructureFailure(failure, error = "") {
+	const text = `${failure ?? ""} ${error}`.toLowerCase();
+	if (/model[^\n]*(?:not found|unknown|unavailable)|no such model/.test(text))
+		return "model-not-found";
+	if (/auth|unauthori[sz]ed|invalid api.?key|\b401\b|\b403\b/.test(text))
+		return "authentication";
+	if (/quota|rate.?limit|too many requests|\b429\b/.test(text)) return "quota";
+	if (/timeout|timed.?out/.test(text)) return "timeout";
+	if (/refus|content policy|safety policy|blocked response/.test(text))
+		return "refusal";
+	if (/malformed|invalid json|parse error|unexpected response/.test(text))
+		return "malformed-response";
+	if (
+		/rpc.?crash|process-(?:error|exit)|extension-error|broken pipe|econnreset/.test(
+			text,
+		)
+	)
+		return "rpc-crash";
+	return null;
+}
+
+export function snapshotProviderPayload({
+	payload,
+	provider,
+	visibility,
+	endpoint,
+	approvedEndpoints,
+	credentialCanary,
+}) {
+	if (!provider) throw new Error("provider payload is not bound to a provider");
+	if (!VISIBILITY_CLASSES.has(visibility))
+		throw new Error("undeclared provider payload visibility class");
+	if (!endpoint || !approvedEndpoints?.includes(endpoint))
+		throw new Error("provider payload endpoint is not approved");
+	const serialized = JSON.stringify(stable(payload));
+	if (credentialCanary && serialized.includes(credentialCanary))
+		throw new Error("credential canary reached provider payload");
+	if (
+		/ignore (?:all |the )?(?:previous|prior) instructions|reveal (?:the )?(?:system prompt|secret)|product-contract\.md|goldens[\\/]|answers\.json/i.test(
+			serialized,
+		)
+	)
+		throw new Error(
+			"provider payload contains denied prompt injection or hidden authority data",
+		);
+	return {
+		provider,
+		visibility,
+		endpoint,
+		sha256: createHash("sha256").update(serialized).digest("hex"),
+	};
+}
 
 export function createJsonlParser(
 	onRecord,
@@ -385,6 +551,25 @@ export async function runRpcSample(options) {
 			error: error instanceof Error ? error.message : String(error),
 		};
 	}
+	let payloadSnapshot = null;
+	try {
+		if (options.providerPolicy)
+			payloadSnapshot = snapshotProviderPayload({
+				...options.providerPolicy,
+				provider: options.provider,
+				payload: {
+					prompts: options.prompts ?? [options.prompt],
+					tools: options.tools,
+					context: options.context ?? options.roleMap?.main?.context,
+				},
+			});
+	} catch (error) {
+		return {
+			status: "failed",
+			failure: "payload-policy",
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
 	const args = [
 		"--mode",
 		"rpc",
@@ -433,25 +618,63 @@ export async function runRpcSample(options) {
 			done = true;
 			clearTimeout(timer);
 			options.signal?.removeEventListener("abort", onAbort);
-			resolve({
-				...result,
-				stageWallMs: stageStartedAt ? Date.now() - stageStartedAt : 0,
-				initialUsage,
-				events,
-				questions,
-				stderr: stderr.slice(-8000),
-				provenance: {
-					packageRoot: preflight.packageRoot,
-					revision: preflight.revision,
-					dependencies: preflight.dependencies,
-					resources: resourceProvenance,
-					tools: options.tools,
-					isolation: preflight.isolation,
-					trusted: options.trusted,
-					model: runtimeState?.model ?? null,
-					thinking: options.thinking ?? runtimeState?.thinkingLevel,
-				},
+			const requestedRoles = requestedRoleProvenance({
+				...options,
+				provider: options.provider ?? runtimeState?.model?.provider,
+				model: options.model ?? runtimeState?.model?.id,
+				thinking: options.thinking ?? runtimeState?.thinkingLevel,
 			});
+			const roleProvenance = reconcileRoleProvenance({
+				requested: requestedRoles,
+				observedMain: {
+					provider: runtimeState?.model?.provider,
+					model: runtimeState?.model?.id,
+					effort: runtimeState?.thinkingLevel,
+					prompt: prompts.length === 1 ? prompts[0] : prompts,
+					tools: options.tools,
+					context: options.context,
+				},
+				events,
+				expectedRoles: options.expectedRoles,
+			});
+			const settledResult =
+				result.status === "completed" && !roleProvenance.valid
+					? {
+							status: "failed",
+							failure: "role-provenance",
+							error: roleProvenance.mismatches.join(", "),
+						}
+					: result;
+			resolve(
+				redactCredentialCanary(
+					{
+						...settledResult,
+						infrastructureClass: classifyInfrastructureFailure(
+							settledResult.failure,
+							settledResult.error,
+						),
+						stageWallMs: stageStartedAt ? Date.now() - stageStartedAt : 0,
+						initialUsage,
+						events,
+						questions,
+						stderr: stderr.slice(-8000),
+						provenance: {
+							packageRoot: preflight.packageRoot,
+							revision: preflight.revision,
+							dependencies: preflight.dependencies,
+							resources: resourceProvenance,
+							tools: options.tools,
+							isolation: preflight.isolation,
+							trusted: options.trusted,
+							model: runtimeState?.model ?? null,
+							thinking: runtimeState?.thinkingLevel,
+							roles: roleProvenance,
+							payload: payloadSnapshot,
+						},
+					},
+					options.providerPolicy?.credentialCanary,
+				),
+			);
 		};
 		const send = (command) => {
 			if (!child.stdin.destroyed)
@@ -565,6 +788,12 @@ export async function runRpcSample(options) {
 					const expectedModel = options.model?.split("/").at(-1);
 					if (expectedModel && event.data.model.id !== expectedModel)
 						return fail("model-provenance", "model mismatch");
+					if (
+						options.providerPolicy &&
+						(event.data.model.baseUrl ?? event.data.model.endpoint) !==
+							options.providerPolicy.endpoint
+					)
+						return fail("model-provenance", "provider endpoint mismatch");
 					send({ id: "initial-stats", type: "get_session_stats" });
 				}
 				if (event.type === "response" && event.id === "initial-stats") {
@@ -588,6 +817,31 @@ export async function runRpcSample(options) {
 							"model-provenance",
 							event.error ?? "thinking level unavailable",
 						);
+					send({ id: "state-after-thinking", type: "get_state" });
+				}
+				if (event.type === "response" && event.id === "state-after-thinking") {
+					if (!event.success || !event.data?.model)
+						return fail(
+							"model-provenance",
+							event.error ??
+								"configured model is unavailable after effort update",
+						);
+					runtimeState = event.data;
+					if (event.data.thinkingLevel !== options.thinking)
+						return fail("model-provenance", "effort mismatch");
+					if (
+						(options.provider &&
+							event.data.model.provider !== options.provider) ||
+						(options.model &&
+							event.data.model.id !== options.model.split("/").at(-1))
+					)
+						return fail("model-provenance", "silent model fallback");
+					if (
+						options.providerPolicy &&
+						(event.data.model.baseUrl ?? event.data.model.endpoint) !==
+							options.providerPolicy.endpoint
+					)
+						return fail("model-provenance", "provider endpoint mismatch");
 					dispatchPrompt();
 				}
 				if (
