@@ -7,6 +7,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -14,10 +15,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	buildEvaluationSettings,
+	expireEvidenceStore,
+	finalizeEvidenceStore,
+	prepareEvidenceStore,
 	recoverStaleWorkspaces,
-	writeEvaluationSettings,
 	runDecisionExperiment,
 	runSmokeExperiment,
+	writeEvaluationSettings,
 } from "./workflow-evaluation.mjs";
 
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -42,6 +46,49 @@ try {
 	assert.equal(existsSync(live), true, "live workspace lease is preserved");
 } finally {
 	rmSync(recoveryRoot, { recursive: true, force: true });
+}
+const retentionRoot = mkdtempSync(
+	path.join(os.tmpdir(), "ce-evidence-retention-fixture-"),
+);
+const undurableRoot = mkdtempSync(
+	path.join(os.tmpdir(), "ce-evidence-undurable-fixture-"),
+);
+try {
+	prepareEvidenceStore(retentionRoot, 0);
+	writeFileSync(path.join(retentionRoot, "raw.json"), "raw evidence\n");
+	writeFileSync(path.join(retentionRoot, "report.json"), "compact report\n");
+	const manifest = finalizeEvidenceStore(retentionRoot, undefined, 1);
+	assert.equal(manifest.visibility, "authority-only");
+	assert.equal(manifest.rawFiles.includes("raw.json"), true);
+	assert.match(manifest.hashes["raw.json"], /^[a-f0-9]{64}$/);
+	assert.equal(expireEvidenceStore(retentionRoot, 1), false);
+	assert.equal(
+		expireEvidenceStore(retentionRoot, 31 * 24 * 60 * 60 * 1000),
+		true,
+	);
+	assert.equal(existsSync(path.join(retentionRoot, "raw.json")), false);
+	assert.equal(existsSync(path.join(retentionRoot, "report.json")), true);
+	let retainedManifest;
+	try {
+		retainedManifest = JSON.parse(
+			readFileSync(path.join(retentionRoot, "evidence-manifest.json"), "utf8"),
+		);
+	} catch (error) {
+		throw new Error(
+			`invalid retained evidence manifest: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+	assert.match(retainedManifest.hashes["raw.json"], /^[a-f0-9]{64}$/);
+	if (process.platform !== "win32")
+		assert.equal(statSync(retentionRoot).mode & 0o777, 0o700);
+
+	prepareEvidenceStore(undurableRoot, 0);
+	assert.throws(() =>
+		expireEvidenceStore(undurableRoot, 31 * 24 * 60 * 60 * 1000),
+	);
+} finally {
+	rmSync(retentionRoot, { recursive: true, force: true });
+	rmSync(undurableRoot, { recursive: true, force: true });
 }
 const roleSettings = buildEvaluationSettings({
 	roleMap: {

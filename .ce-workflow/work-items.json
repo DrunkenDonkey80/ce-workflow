@@ -746,7 +746,8 @@
       "id": "work-1",
       "labels": [],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\nsource artifact: docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
+        "created by /work-plan\nsource plan: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\nsource artifact: docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
+        "wo:workflow-feedback — planner run 47300174 successfully created native WorkItem work-1.4 but the subagent wrapper marked it failed because native-store-only planning produced no implementation diff; U3 note had to be recovered from the master plan. Follow-up: make planner acceptance recognize native work-item mutations and require persisted wo:slice-plan before reporting readiness."
       ],
       "status": "open",
       "title": "Model Role Evaluation Roadmap - Plan",
@@ -829,6 +830,33 @@
       "title": "U2 Effective role configuration and provenance",
       "type": "task",
       "updatedAt": "2026-07-17T01:21:06.087Z"
+    },
+    "work-1.4": {
+      "acceptance": "Deterministic acceptance (AC3 Per-agent telemetry, with AC7-AC8 safety): (1) fixtures reconcile main/planner/reviewer/fixer token, timing, tool, retry, question, terminal, parent, treatment, and artifact evidence exactly once while overlapping sample wall time is not double-counted; (2) orphan, duplicate, missing-terminal, wrong-parent, overlapping-invalid, missing-core-metric, and total-mismatch evidence fail closed; (3) provider token categories remain distinct and capability-conditional unsupported fields serialize as unavailable, never estimated or zero; (4) append-only ledger events for production, authorized visibility/consumption, critique receipt, accepted/rejected finding, revision, verification, and regression retain stable IDs and valid content/resource hashes; (5) workflow-role, critic, reviser, harness, and evaluator totals remain separate, harness/evaluator usage never enters workflow-role totals, and ordinary telemetry reports remain backward compatible; (6) authority-only evidence roots, sibling denial, expiry, compact hashes after raw deletion, and durability-before-deletion are deterministically covered; (7) named verification passes: node scripts/test-work-telemetry.mjs; node scripts/test-workflow-evaluation-rpc.mjs; node scripts/test-workflow-evaluation-runner.mjs; npm run verify:quiet.",
+      "createdAt": "2026-07-17T01:33:58.778Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Implement only roadmap unit U3: extend existing work-run/subagent reconciliation with stable sample, pair, attempt, agent, parent, role, treatment, and artifact identities; observed configuration; per-agent metrics; and an append-only artifact visibility/consumption ledger. Preserve ordinary work telemetry compatibility and separate workflow-role, critic, reviser, harness, and evaluator accounting. Exclude U4-U11 corpus, scoring, campaign, live-run, recommendation, and adoption work.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.4",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan\nplan-path: docs\\plans\\2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\ntarget: work-1.4 — U3 Per-agent telemetry and artifact ledger\nacceptance: (1) main, planner, reviewer, and fixer executions carry stable sample/pair/attempt/parent/agent/role/treatment/artifact IDs and exact provider/model/effort plus per-agent core metrics; (2) tokens/tool calls/output bytes/subagent calls/retries/questions reconcile exactly once while sample wall is critical-path elapsed and overlapping agent intervals stay separate; (3) orphan, duplicate, missing-terminal, wrong-parent, overlap, or missing-required-metric records fail closed, unsupported capability fields are explicitly unavailable; (4) append-only artifact events cover producer/consumer/visibility/prompt/resource/content hashes and critic/reviser/finding/revision/verification/regression causality with stable IDs; (5) harness/evaluator costs stay outside role totals; (6) authority-only evidence roots enforce sibling denial, user-only controls where supported, 30-day expiry, durability-before-deletion, and compact hash retention with no credential leakage; (7) ordinary work telemetry remains backward compatible.\nverification: node scripts/test-work-telemetry.mjs; node scripts/test-workflow-evaluation-rpc.mjs; node scripts/test-workflow-evaluation-runner.mjs; npm run verify:quiet\nfiles: extensions/work-models.js, scripts/workflow-evaluation-rpc.mjs, scripts/workflow-evaluation.mjs, scripts/test-work-telemetry.mjs, scripts/test-workflow-evaluation-rpc.mjs, scripts/test-workflow-evaluation-runner.mjs\nout-of-scope: U4-U11.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-telemetry.mjs && node scripts/test-workflow-evaluation-rpc.mjs && node scripts/test-workflow-evaluation-runner.mjs && npm run verify:quiet\nOutput: Work commands that launch implementation turns require TUI or RPC mode. Print/JSON mode stopped before creating or claiming a WorkItem.\nok - work telemetry behavior\nok - workflow evaluation RPC fixtures\nok - workflow evaluation smoke and decision lifecycle fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed",
+        "wo:blocker mandatory independent review unavailable — work-reviewer runs 8fd2e49d (600s), 5dd11c58 (300s), and ef77a0e4 (bounded 1073-line diff, 300s) all timed out with no observed activity or verdict. All four required verification gates pass. WorkItem remains open and changes remain uncommitted; external reviewer runtime/provider recovery or an explicit review-policy decision is required.",
+        "wo:blocker persists — post-recovery retry work-reviewer run 0ae0ef35 also timed out after 600s with no observed activity or verdict on the bounded diff. Default reviewer runtime remains unavailable; alternate reviewer model authorization or explicit review-policy decision required.",
+        "wo:review PASS — work-reviewer run 6f93bf2f via authorized alternate model: exact-once accounting, overlap/critical-path metrics, fail-closed ledgers, artifact authorization, separate cost scopes, 30-day durable evidence retention, and v1 compatibility reviewed with no blockers. Artifact: .pi-subagents/artifacts/6f93bf2f_work-reviewer_0_output.md",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-telemetry.mjs && node scripts/test-workflow-evaluation-rpc.mjs && node scripts/test-workflow-evaluation-runner.mjs && npm run verify:quiet\nOutput: Work commands that launch implementation turns require TUI or RPC mode. Print/JSON mode stopped before creating or claiming a WorkItem.\nok - work telemetry behavior\nok - workflow evaluation RPC fixtures\nok - workflow evaluation smoke and decision lifecycle fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U3 Per-agent telemetry and artifact ledger",
+      "type": "task",
+      "updatedAt": "2026-07-17T06:51:47.487Z"
     }
   },
   "metadata": {
@@ -838,7 +866,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-17T01:21:06.088Z"
+    "updatedAt": "2026-07-17T06:51:47.487Z"
   },
   "schemaVersion": 1
 }

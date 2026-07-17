@@ -99,6 +99,54 @@ try {
 		"terminal workflow records are exactly once",
 	);
 
+	process.env.CE_EVAL_SAMPLE_ID = "sample-fixture";
+	process.env.CE_EVAL_PAIR_ID = "pair-fixture";
+	process.env.CE_EVAL_ATTEMPT_ID = "attempt-fixture";
+	process.env.CE_EVAL_TREATMENT_ID = "treatment-fixture";
+	recordWorkTelemetry(cwd, {
+		type: "agent-dispatched",
+		role: "main",
+		parentAgentId: null,
+		startedAt: new Date(now).toISOString(),
+	});
+	recordWorkTelemetry(cwd, {
+		type: "agent-terminal",
+		role: "main",
+		parentAgentId: null,
+		endedAt: new Date(now + 10).toISOString(),
+		provider: "fixture",
+		model: "fixture-model",
+		effort: "medium",
+		tokens: { input: 8, output: 2, total: 10 },
+		toolCalls: 0,
+		toolOutputBytes: 0,
+		subagentCalls: 0,
+		retries: 0,
+		questions: 0,
+		artifactIds: [],
+		terminalReason: "completed",
+	});
+	for (const name of [
+		"CE_EVAL_SAMPLE_ID",
+		"CE_EVAL_PAIR_ID",
+		"CE_EVAL_ATTEMPT_ID",
+		"CE_EVAL_TREATMENT_ID",
+	])
+		delete process.env[name];
+	const evaluationEvents = telemetryEvents(cwd).filter(
+		(event) => event.sampleId === "sample-fixture",
+	);
+	assert(
+		evaluationEvents.length === 2 &&
+			evaluationEvents.every(
+				(event) =>
+					event.version === 2 &&
+					event.pairId === "pair-fixture" &&
+					event.agentId === "sample-fixture:main",
+			),
+		"evaluation telemetry adds stable identity without changing ordinary records",
+	);
+
 	const directDir = path.join(cwd, ".pi-subagents", "direct-1");
 	mkdirSync(directDir, { recursive: true });
 	recordPendingDirectRun(cwd, {
@@ -811,4 +859,4 @@ try {
 	rmSync(cwd, { recursive: true, force: true });
 }
 
-console.log("ok - work telemetry behavior");
+process.stdout.write("ok - work telemetry behavior\n");

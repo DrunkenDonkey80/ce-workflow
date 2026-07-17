@@ -172,6 +172,281 @@ export function snapshotProviderPayload({
 	};
 }
 
+const CORE_AGENT_METRICS = [
+	"toolCalls",
+	"toolOutputBytes",
+	"subagentCalls",
+	"retries",
+	"questions",
+];
+const OPTIONAL_AGENT_METRICS = [
+	"reasoningTokens",
+	"cacheReadTokens",
+	"cacheWriteTokens",
+	"providerLatencyMs",
+	"queueLatencyMs",
+	"contextGrowth",
+	"compactions",
+	"cost",
+];
+const HASH = /^[a-f0-9]{64}$/i;
+
+function requireLedger(value, message) {
+	if (!value) throw new Error(message);
+}
+
+export function reconcileAgentLedger(records) {
+	requireLedger(
+		Array.isArray(records) && records.length > 0,
+		"agent ledger is missing",
+	);
+	const starts = new Map();
+	const terminals = new Map();
+	for (const record of records) {
+		if (!new Set(["agent-dispatched", "agent-terminal"]).has(record?.type))
+			continue;
+		for (const field of [
+			"sampleId",
+			"pairId",
+			"attemptId",
+			"agentId",
+			"role",
+			"treatmentId",
+		])
+			requireLedger(
+				record[field] !== undefined && record[field] !== "",
+				`agent ledger missing ${field}`,
+			);
+		requireLedger(
+			"parentAgentId" in record,
+			"agent ledger missing parentAgentId",
+		);
+		const target = record.type === "agent-dispatched" ? starts : terminals;
+		requireLedger(
+			!target.has(record.agentId),
+			`duplicate ${record.type}: ${record.agentId}`,
+		);
+		target.set(record.agentId, record);
+	}
+	requireLedger(starts.size > 0, "agent ledger has no dispatches");
+	const sampleIds = new Set(
+		[...starts.values()].map((record) => record.sampleId),
+	);
+	const pairIds = new Set([...starts.values()].map((record) => record.pairId));
+	const attemptIds = new Set(
+		[...starts.values()].map((record) => record.attemptId),
+	);
+	requireLedger(
+		sampleIds.size === 1 && pairIds.size === 1 && attemptIds.size === 1,
+		"agent ledger mixes sample identities",
+	);
+	const agents = [];
+	for (const [agentId, start] of starts) {
+		const terminal = terminals.get(agentId);
+		requireLedger(terminal, `missing terminal agent event: ${agentId}`);
+		for (const field of [
+			"sampleId",
+			"pairId",
+			"attemptId",
+			"role",
+			"treatmentId",
+			"parentAgentId",
+		])
+			requireLedger(
+				terminal[field] === start[field],
+				`agent identity drift: ${agentId}:${field}`,
+			);
+		if (start.parentAgentId !== null)
+			requireLedger(
+				starts.has(start.parentAgentId),
+				`orphan or wrong parent: ${agentId}`,
+			);
+		const startedAt = Date.parse(start.startedAt);
+		const endedAt = Date.parse(terminal.endedAt);
+		requireLedger(
+			Number.isFinite(startedAt) &&
+				Number.isFinite(endedAt) &&
+				endedAt >= startedAt,
+			`invalid agent interval: ${agentId}`,
+		);
+		for (const field of ["provider", "model", "effort", "terminalReason"])
+			requireLedger(
+				terminal[field] !== undefined && terminal[field] !== "",
+				`agent terminal missing ${field}: ${agentId}`,
+			);
+		const tokens = terminal.tokens;
+		requireLedger(
+			Number.isFinite(tokens?.input) &&
+				Number.isFinite(tokens?.output) &&
+				Number.isFinite(tokens?.total) &&
+				tokens.input >= 0 &&
+				tokens.output >= 0 &&
+				tokens.total >= tokens.input + tokens.output,
+			`agent terminal missing provider token totals: ${agentId}`,
+		);
+		for (const field of CORE_AGENT_METRICS)
+			requireLedger(
+				Number.isFinite(terminal[field]) && terminal[field] >= 0,
+				`agent terminal missing ${field}: ${agentId}`,
+			);
+		requireLedger(
+			Array.isArray(terminal.artifactIds),
+			`agent terminal missing artifactIds: ${agentId}`,
+		);
+		agents.push({
+			...terminal,
+			startedAt: start.startedAt,
+			activeWallMs: endedAt - startedAt,
+			capabilities: Object.fromEntries(
+				OPTIONAL_AGENT_METRICS.map((field) => [
+					field,
+					terminal[field] ?? "unavailable",
+				]),
+			),
+		});
+	}
+	requireLedger(terminals.size === starts.size, "orphan terminal agent event");
+	const roleAgents = agents.filter(
+		(agent) => !["harness", "evaluator"].includes(agent.costScope),
+	);
+	const totalsFor = (selected) => ({
+		tokens: selected.reduce((sum, agent) => sum + agent.tokens.total, 0),
+		toolCalls: selected.reduce((sum, agent) => sum + agent.toolCalls, 0),
+		toolOutputBytes: selected.reduce(
+			(sum, agent) => sum + agent.toolOutputBytes,
+			0,
+		),
+		subagentCalls: selected.reduce(
+			(sum, agent) => sum + agent.subagentCalls,
+			0,
+		),
+		retries: selected.reduce((sum, agent) => sum + agent.retries, 0),
+		questions: selected.reduce((sum, agent) => sum + agent.questions, 0),
+		activeWallMs: selected.reduce((sum, agent) => sum + agent.activeWallMs, 0),
+	});
+	const first = Math.min(...agents.map((agent) => Date.parse(agent.startedAt)));
+	const last = Math.max(...agents.map((agent) => Date.parse(agent.endedAt)));
+	const overlaps = [];
+	for (let left = 0; left < agents.length; left += 1)
+		for (let right = left + 1; right < agents.length; right += 1) {
+			const a = agents[left];
+			const b = agents[right];
+			if (
+				Date.parse(a.startedAt) < Date.parse(b.endedAt) &&
+				Date.parse(b.startedAt) < Date.parse(a.endedAt)
+			)
+				overlaps.push([a.agentId, b.agentId]);
+		}
+	return {
+		version: 2,
+		sampleId: [...sampleIds][0],
+		pairId: [...pairIds][0],
+		attemptId: [...attemptIds][0],
+		agents,
+		sampleWallMs: last - first,
+		overlaps,
+		totals: {
+			workflowRoles: totalsFor(roleAgents),
+			harness: totalsFor(
+				agents.filter((agent) => agent.costScope === "harness"),
+			),
+			evaluator: totalsFor(
+				agents.filter((agent) => agent.costScope === "evaluator"),
+			),
+		},
+	};
+}
+
+export function reconcileArtifactLedger(events) {
+	requireLedger(Array.isArray(events), "artifact ledger must be an array");
+	const eventIds = new Set();
+	const artifacts = new Map();
+	const findings = new Map();
+	let previousTime = -Infinity;
+	for (const event of events) {
+		requireLedger(
+			event?.eventId && !eventIds.has(event.eventId),
+			"duplicate or missing artifact eventId",
+		);
+		eventIds.add(event.eventId);
+		const timestamp = Date.parse(event.timestamp);
+		requireLedger(
+			Number.isFinite(timestamp) && timestamp >= previousTime,
+			"artifact ledger is not append ordered",
+		);
+		previousTime = timestamp;
+		if (event.type === "artifact-produced") {
+			requireLedger(
+				!artifacts.has(event.artifactId),
+				`duplicate artifact: ${event.artifactId}`,
+			);
+			for (const field of [
+				"artifactId",
+				"producerAgentId",
+				"visibility",
+				"promptHash",
+				"resourceHash",
+				"contentHash",
+			])
+				requireLedger(event[field], `artifact production missing ${field}`);
+			requireLedger(
+				Array.isArray(event.allowedConsumers),
+				"artifact production missing allowedConsumers",
+			);
+			requireLedger(
+				[event.promptHash, event.resourceHash, event.contentHash].every(
+					(hash) => HASH.test(hash),
+				),
+				"artifact production has invalid hash",
+			);
+			artifacts.set(event.artifactId, { ...event, events: [event.eventId] });
+			continue;
+		}
+		const artifact = artifacts.get(event.artifactId);
+		requireLedger(artifact, `orphan artifact event: ${event.artifactId}`);
+		artifact.events.push(event.eventId);
+		if (event.type === "artifact-consumed")
+			requireLedger(
+				artifact.allowedConsumers.includes(event.consumerAgentId),
+				`artifact consumer denied: ${event.consumerAgentId}`,
+			);
+		if (event.type === "finding-received") {
+			requireLedger(
+				event.findingId && !findings.has(event.findingId),
+				"duplicate or missing finding receipt",
+			);
+			findings.set(event.findingId, "received");
+		}
+		if (["finding-accepted", "finding-rejected"].includes(event.type)) {
+			requireLedger(
+				findings.get(event.findingId) === "received",
+				`finding decision without receipt: ${event.findingId}`,
+			);
+			findings.set(
+				event.findingId,
+				event.type === "finding-accepted" ? "accepted" : "rejected",
+			);
+		}
+		if (event.type === "revision-produced")
+			for (const findingId of event.findingIds ?? [])
+				requireLedger(
+					findings.get(findingId) === "accepted",
+					`revision uses unaccepted finding: ${findingId}`,
+				);
+		if (["verification-passed", "regression-detected"].includes(event.type))
+			requireLedger(
+				event.revisionArtifactId && artifacts.has(event.revisionArtifactId),
+				"verification or regression lacks revision artifact",
+			);
+	}
+	return {
+		version: 1,
+		events: events.length,
+		artifacts: Object.fromEntries(artifacts),
+		findings: Object.fromEntries(findings),
+	};
+}
+
 export function createJsonlParser(
 	onRecord,
 	onError = (error) => {

@@ -537,6 +537,25 @@ function telemetryId(prefix = "wr") {
 	return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function evaluationTelemetryIdentity(event = {}) {
+	const sampleId = event.sampleId ?? process.env.CE_EVAL_SAMPLE_ID;
+	if (!sampleId) return null;
+	const role = event.role ?? process.env.CE_EVAL_ROLE ?? "main";
+	return {
+		sampleId,
+		pairId: event.pairId ?? process.env.CE_EVAL_PAIR_ID,
+		attemptId: event.attemptId ?? process.env.CE_EVAL_ATTEMPT_ID,
+		agentId:
+			event.agentId ?? process.env.CE_EVAL_AGENT_ID ?? `${sampleId}:${role}`,
+		parentAgentId:
+			event.parentAgentId ??
+			(role === "main" ? null : process.env.CE_EVAL_PARENT_AGENT_ID),
+		role,
+		treatmentId:
+			event.treatmentId ?? process.env.CE_EVAL_TREATMENT_ID ?? "control",
+	};
+}
+
 function usageSnapshot(ctx) {
 	const usage = ctx?.getContextUsage?.();
 	if (!usage) return undefined;
@@ -677,9 +696,11 @@ function isDuplicateTelemetry(file, record) {
 function recordWorkTelemetry(cwd, event) {
 	if (!cwd || process.env.WORK_ORCH_TELEMETRY_OFF === "1") return "";
 	const enriched = telemetryWithTranscript(event);
+	const identity = evaluationTelemetryIdentity(enriched);
 	const timestamp = enriched.timestamp ?? Date.now();
 	const record = {
-		version: 1,
+		version: identity ? 2 : 1,
+		...identity,
 		...enriched,
 		id: enriched.id ?? telemetryId(),
 		timestamp: new Date(timestamp).toISOString(),
@@ -11461,6 +11482,13 @@ export default function workModelsExtension(pi) {
 			workWarpMode(activeWorkAgent.meta.mode),
 			`/work-${activeWorkAgent.meta.mode ?? "work"}`,
 		);
+		const evaluationIdentity = evaluationTelemetryIdentity({ role: "main" });
+		if (evaluationIdentity)
+			recordWorkTelemetry(activeWorkAgent.cwd, {
+				type: "agent-dispatched",
+				...evaluationIdentity,
+				startedAt: new Date(activeWorkAgent.startedAt).toISOString(),
+			});
 		updateWorkGoalStatus(ctx);
 		pendingWorkPrompt = null;
 	});
@@ -11538,6 +11566,43 @@ export default function workModelsExtension(pi) {
 			},
 			context: { before: run.contextBefore, after: usageSnapshot(ctx) },
 		};
+		const evaluationIdentity = evaluationTelemetryIdentity({ role: "main" });
+		if (evaluationIdentity)
+			recordWorkTelemetry(run.cwd, {
+				type: "agent-terminal",
+				...evaluationIdentity,
+				endedAt: new Date().toISOString(),
+				provider: ctx.model?.provider ?? process.env.CE_EVAL_PROVIDER,
+				model: ctx.model?.id ?? process.env.CE_EVAL_MODEL,
+				effort:
+					ctx.getThinkingLevel?.() ??
+					ctx.thinkingLevel ??
+					process.env.CE_EVAL_EFFORT,
+				tokens: {
+					input: Number(usage.input ?? 0),
+					output: Number(usage.output ?? 0),
+					total: Math.max(
+						Number(usage.totalTokens ?? 0),
+						Number(usage.input ?? 0) + Number(usage.output ?? 0),
+					),
+				},
+				toolCalls: run.tools.length,
+				toolOutputBytes: run.tools.reduce(
+					(sum, tool) => sum + Number(tool.outputChars ?? 0),
+					0,
+				),
+				subagentCalls: run.tools.filter((tool) => tool.name === "subagent")
+					.length,
+				retries: 0,
+				questions: run.tools.filter((tool) => tool.name === "ask_user").length,
+				artifactIds: [
+					...new Set(run.tools.map((tool) => tool.artifact).filter(Boolean)),
+				],
+				terminalReason: hasWorkAgentFailure(event, telemetry)
+					? "failed"
+					: "completed",
+				costScope: "workflow-role",
+			});
 		const file = recordWorkTelemetry(run.cwd, telemetry);
 		completeWorkflowOnce(
 			run.cwd,

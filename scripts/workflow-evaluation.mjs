@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
 	appendFileSync,
+	chmodSync,
 	cpSync,
 	existsSync,
 	mkdirSync,
@@ -24,6 +25,7 @@ import {
 import {
 	classifyInfrastructureFailure,
 	piInvocation,
+	reconcileAgentLedger,
 	reconcileWorkflowTelemetry,
 	runRpcSample,
 } from "./workflow-evaluation-rpc.mjs";
@@ -127,6 +129,101 @@ function cleanupWorkspace(cwd) {
 		maxRetries: 10,
 		retryDelay: 250,
 	});
+}
+
+function writeEvidenceManifest(root, manifest) {
+	const file = path.join(root, "evidence-manifest.json");
+	writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`, {
+		mode: 0o600,
+	});
+	if (process.platform !== "win32") chmodSync(file, 0o600);
+	return manifest;
+}
+
+export function prepareEvidenceStore(root, now = Date.now()) {
+	mkdirSync(root, { recursive: true, mode: 0o700 });
+	const authorityRoot = path.join(root, "authority");
+	mkdirSync(authorityRoot, { recursive: true, mode: 0o700 });
+	if (process.platform !== "win32") {
+		chmodSync(root, 0o700);
+		chmodSync(authorityRoot, 0o700);
+	}
+	return writeEvidenceManifest(root, {
+		version: 1,
+		visibility: "authority-only",
+		authorityRoot: "authority",
+		createdAt: new Date(now).toISOString(),
+		expiresAt: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+		durableAt: null,
+		rawDeletedAt: null,
+		hashes: {},
+		rawFiles: [],
+	});
+}
+
+function evidenceRawFiles(root) {
+	const files = [];
+	function visit(directory) {
+		for (const name of readdirSync(directory)) {
+			const file = path.join(directory, name);
+			const relative = path.relative(root, file);
+			if (
+				relative === "authority" ||
+				relative.startsWith(`authority${path.sep}`)
+			)
+				continue;
+			if (["evidence-manifest.json", "report.json"].includes(relative))
+				continue;
+			if (statSync(file).isDirectory()) visit(file);
+			else files.push(relative);
+		}
+	}
+	visit(root);
+	return files;
+}
+
+export function finalizeEvidenceStore(
+	root,
+	rawFiles = evidenceRawFiles(root),
+	now = Date.now(),
+) {
+	const manifest = readJson(
+		path.join(root, "evidence-manifest.json"),
+		"evidence manifest",
+	);
+	manifest.rawFiles = [...new Set(rawFiles)].sort();
+	manifest.hashes = Object.fromEntries(
+		manifest.rawFiles.map((relative) => {
+			const file = path.resolve(root, relative);
+			if (
+				!file.startsWith(`${path.resolve(root)}${path.sep}`) ||
+				!existsSync(file)
+			)
+				throw new Error(`invalid raw evidence path: ${relative}`);
+			return [relative.replaceAll("\\", "/"), fileSha(file)];
+		}),
+	);
+	manifest.durableAt = new Date(now).toISOString();
+	return writeEvidenceManifest(root, manifest);
+}
+
+export function expireEvidenceStore(root, now = Date.now()) {
+	const manifest = readJson(
+		path.join(root, "evidence-manifest.json"),
+		"evidence manifest",
+	);
+	if (now < Date.parse(manifest.expiresAt)) return false;
+	if (!manifest.durableAt)
+		throw new Error("raw evidence cannot expire before durability");
+	for (const relative of manifest.rawFiles) {
+		const file = path.resolve(root, relative);
+		if (!file.startsWith(`${path.resolve(root)}${path.sep}`))
+			throw new Error(`invalid raw evidence path: ${relative}`);
+		rmSync(file, { force: true, recursive: true });
+	}
+	manifest.rawDeletedAt = new Date(now).toISOString();
+	writeEvidenceManifest(root, manifest);
+	return true;
 }
 
 function hashTree(root, exclude = () => false) {
@@ -549,6 +646,13 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		throw new Error(
 			"canonical role maps require a declared provider payload policy",
 		);
+	const provider = mainRole?.provider ?? side.provider ?? descriptor.provider;
+	const model = mainRole?.model ?? side.model ?? descriptor.model;
+	const effort = mainRole?.effort ?? side.effort ?? descriptor.effort;
+	const pairIndex = sample.pairIndex ?? 0;
+	const attemptIndex = sample.attemptIndex ?? 0;
+	const pairId = `${descriptor.mode}:${sample.stage}:${pairIndex}`;
+	const sampleId = `${pairId}:${attemptIndex}:${sample.side}`;
 	const runtimeTemp = path.join(sample.workspaceRoot, ".pi", "tmp");
 	mkdirSync(runtimeTemp, { recursive: true });
 	const started = Date.now();
@@ -572,6 +676,15 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 			TMP: runtimeTemp,
 			TMPDIR: runtimeTemp,
 			CE_SCRATCH_ROOT: path.join(runtimeTemp, "compound-engineering"),
+			CE_EVAL_SAMPLE_ID: sampleId,
+			CE_EVAL_PAIR_ID: pairId,
+			CE_EVAL_ATTEMPT_ID: String(attemptIndex),
+			CE_EVAL_AGENT_ID: `${sampleId}:main`,
+			CE_EVAL_ROLE: "main",
+			CE_EVAL_TREATMENT_ID: `${Array.isArray(descriptor.factor) ? descriptor.factor.join("+") : descriptor.factor}:${sample.side}`,
+			CE_EVAL_PROVIDER: provider,
+			CE_EVAL_MODEL: model,
+			CE_EVAL_EFFORT: effort,
 		},
 		workspaceRoot: sample.workspaceRoot,
 		sourceRoot,
@@ -579,9 +692,9 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		dependencyRoots: dependencyRoots(descriptor),
 		requiredResources,
 		requiredCommands,
-		provider: mainRole?.provider ?? side.provider ?? descriptor.provider,
-		model: mainRole?.model ?? side.model ?? descriptor.model,
-		thinking: mainRole?.effort ?? side.effort ?? descriptor.effort,
+		provider,
+		model,
+		thinking: effort,
 		context: mainRole?.context,
 		roleMap: side.roleMap,
 		expectedRoles: side.expectedRoles ?? descriptor.expectedRoles,
@@ -602,9 +715,13 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 	let telemetryError = null;
 	if (rpc.status === "completed") {
 		try {
-			telemetry = reconcileWorkflowTelemetry(
-				workTelemetry(sample.workspaceRoot),
+			const records = workTelemetry(sample.workspaceRoot);
+			telemetry = reconcileWorkflowTelemetry(records);
+			const agentRecords = records.filter(
+				(record) => record.sampleId === sampleId,
 			);
+			if (agentRecords.length > 0)
+				telemetry.agentLedger = reconcileAgentLedger(agentRecords);
 		} catch (error) {
 			telemetryError = error instanceof Error ? error.message : String(error);
 		}
@@ -983,7 +1100,7 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 	const runId = `decision-${Date.now()}-${randomUUID().slice(0, 8)}`;
 	const controlRoot = path.join(evidenceRoot, runId);
 	const runRoot = path.join(os.tmpdir(), `ce-workflow-samples-${runId}`);
-	mkdirSync(controlRoot, { recursive: true });
+	prepareEvidenceStore(controlRoot);
 	markRunRoot(runRoot);
 	const lifecycle = path.join(controlRoot, "lifecycle.jsonl");
 	const initialize = seams.initializeWorkspace ?? initializeWorkspace;
@@ -1057,7 +1174,14 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 									answers,
 								})
 							: defaultRunSample(
-									{ ...sample, side, stage: descriptor.stage, answers },
+									{
+										...sample,
+										side,
+										stage: descriptor.stage,
+										pairIndex,
+										attemptIndex,
+										answers,
+									},
 									descriptor,
 									sourceRoot,
 								));
@@ -1270,6 +1394,7 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 			reportPath,
 			`${JSON.stringify({ runId, mode: "decision", status: verdict.status, evidencePath, deterministicFacts: { hardGateStatus: verdict.status, pairCount: pairs.length }, evaluatorJudgments: verdict.qualitative ?? null, workflowCosts: verdict.summary ?? costs.workflow, harnessCost: costs.harness, evaluatorCost: costs.evaluator, infrastructureFailures, invalid: verdict.status === "invalid", benchmarkContractChanged: false, verdict: compactVerdict(verdict) }, null, 2)}\n`,
 		);
+		finalizeEvidenceStore(controlRoot);
 		if (JSON.stringify(sourceState(sourceRoot)) !== JSON.stringify(before))
 			throw new Error(
 				"source checkout or benchmark bundle changed during comparison",
@@ -1391,7 +1516,7 @@ export async function runSentinelExperiment(descriptor, seams = {}) {
 	const runId = `sentinel-${Date.now()}-${randomUUID().slice(0, 8)}`;
 	const controlRoot = path.join(evidenceRoot, runId);
 	const runRoot = path.join(os.tmpdir(), `ce-workflow-samples-${runId}`);
-	mkdirSync(controlRoot, { recursive: true });
+	prepareEvidenceStore(controlRoot);
 	markRunRoot(runRoot);
 	const lifecycle = path.join(controlRoot, "lifecycle.jsonl");
 	const results = [];
@@ -1587,6 +1712,7 @@ export async function runSentinelExperiment(descriptor, seams = {}) {
 			reportPath,
 			`${JSON.stringify({ runId, mode: "sentinel", status, evidencePath, projects: projectSummary }, null, 2)}\n`,
 		);
+		finalizeEvidenceStore(controlRoot);
 		if (JSON.stringify(sourceState(sourceRoot)) !== JSON.stringify(before))
 			throw new Error(
 				"source checkout or benchmark bundle changed during sentinel",
@@ -1782,7 +1908,7 @@ export async function runSmokeExperiment(descriptor, seams = {}) {
 	const runId = `smoke-${Date.now()}-${randomUUID().slice(0, 8)}`;
 	const controlRoot = path.join(evidenceRoot, runId);
 	const runRoot = path.join(os.tmpdir(), `ce-workflow-samples-${runId}`);
-	mkdirSync(controlRoot, { recursive: true });
+	prepareEvidenceStore(controlRoot);
 	markRunRoot(runRoot);
 	const lifecycle = path.join(controlRoot, "lifecycle.jsonl");
 	const attempts = [];
@@ -1833,7 +1959,14 @@ export async function runSmokeExperiment(descriptor, seams = {}) {
 							answers,
 						})
 					: defaultRunSample(
-							{ ...sample, side, stage: descriptor.stage, answers },
+							{
+								...sample,
+								side,
+								stage: descriptor.stage,
+								pairIndex: 0,
+								attemptIndex: 0,
+								answers,
+							},
 							descriptor,
 							sourceRoot,
 						));
@@ -1997,6 +2130,7 @@ export async function runSmokeExperiment(descriptor, seams = {}) {
 			path.join(controlRoot, "report.json"),
 			`${JSON.stringify({ runId, mode: "smoke", decisionGrade: false, status, evidencePath, deterministicFacts: attempts.map(({ side, passed, failure }) => ({ side, passed, failure })), evaluatorJudgments: evaluation?.scores ?? null, workflowCosts: evidence.costs.workflow, harnessCost: evidence.costs.harness, evaluatorCost: evidence.costs.evaluator, infrastructureFailures, invalid: status === "invalid", benchmarkContractChanged: false }, null, 2)}\n`,
 		);
+		finalizeEvidenceStore(controlRoot);
 		const after = sourceState(sourceRoot);
 		if (JSON.stringify(after) !== JSON.stringify(before))
 			throw new Error(

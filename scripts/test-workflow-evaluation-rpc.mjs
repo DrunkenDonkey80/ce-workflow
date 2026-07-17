@@ -10,6 +10,8 @@ import {
 	lexicallyContained,
 	preflightRpcSample,
 	provenanceHash,
+	reconcileAgentLedger,
+	reconcileArtifactLedger,
 	reconcileRoleProvenance,
 	reconcileWorkflowTelemetry,
 	requestedRoleProvenance,
@@ -346,6 +348,168 @@ assert.equal(
 		observedMain: { ...roleMap.main, effort: "low" },
 	}).valid,
 	false,
+);
+
+const agentBase = {
+	sampleId: "sample-1",
+	pairId: "pair-1",
+	attemptId: "attempt-1",
+	treatmentId: "treatment-1",
+};
+function agentEvents(
+	agentId,
+	role,
+	parentAgentId,
+	start,
+	end,
+	total,
+	costScope = "workflow-role",
+) {
+	return [
+		{
+			...agentBase,
+			type: "agent-dispatched",
+			agentId,
+			role,
+			parentAgentId,
+			startedAt: new Date(start).toISOString(),
+		},
+		{
+			...agentBase,
+			type: "agent-terminal",
+			agentId,
+			role,
+			parentAgentId,
+			endedAt: new Date(end).toISOString(),
+			provider: "fixture",
+			model: `${role}-model`,
+			effort: "high",
+			tokens: { input: total - 10, output: 10, total },
+			toolCalls: 2,
+			toolOutputBytes: 20,
+			subagentCalls: role === "main" ? 3 : 0,
+			retries: 0,
+			questions: 0,
+			artifactIds: [`artifact-${role}`],
+			terminalReason: "completed",
+			costScope,
+		},
+	];
+}
+const agentRecords = [
+	...agentEvents("main", "main", null, 0, 1000, 100),
+	...agentEvents("planner", "work-planner", "main", 100, 500, 50),
+	...agentEvents("reviewer", "work-reviewer", "main", 400, 800, 40),
+	...agentEvents("fixer", "work-fixer", "main", 700, 900, 30),
+	...agentEvents("harness", "harness", null, 0, 1000, 20, "harness"),
+	...agentEvents("evaluator", "evaluator", null, 1000, 1100, 10, "evaluator"),
+];
+const agentLedger = reconcileAgentLedger(agentRecords);
+assert.equal(agentLedger.sampleWallMs, 1100);
+assert.equal(agentLedger.totals.workflowRoles.tokens, 220);
+assert.equal(agentLedger.totals.harness.tokens, 20);
+assert.equal(agentLedger.totals.evaluator.tokens, 10);
+assert.ok(agentLedger.overlaps.length > 0);
+assert.equal(
+	agentLedger.agents.find((agent) => agent.agentId === "planner").capabilities
+		.reasoningTokens,
+	"unavailable",
+);
+for (const invalid of [
+	agentRecords.slice(0, -1),
+	[...agentRecords, agentRecords[1]],
+	agentRecords.map((record) =>
+		record.agentId === "planner" && record.type === "agent-dispatched"
+			? { ...record, parentAgentId: "missing" }
+			: record,
+	),
+	agentRecords.map((record) =>
+		record.agentId === "fixer" && record.type === "agent-terminal"
+			? { ...record, toolCalls: undefined }
+			: record,
+	),
+])
+	assert.throws(() => reconcileAgentLedger(invalid));
+
+const hash = provenanceHash("artifact");
+const artifactEvents = [
+	{
+		eventId: "event-1",
+		type: "artifact-produced",
+		timestamp: new Date(0).toISOString(),
+		artifactId: "critique-1",
+		producerAgentId: "reviewer",
+		allowedConsumers: ["fixer"],
+		visibility: "internal",
+		promptHash: hash,
+		resourceHash: hash,
+		contentHash: hash,
+	},
+	{
+		eventId: "event-2",
+		type: "artifact-consumed",
+		timestamp: new Date(1).toISOString(),
+		artifactId: "critique-1",
+		consumerAgentId: "fixer",
+	},
+	{
+		eventId: "event-3",
+		type: "finding-received",
+		timestamp: new Date(2).toISOString(),
+		artifactId: "critique-1",
+		findingId: "finding-1",
+	},
+	{
+		eventId: "event-4",
+		type: "finding-accepted",
+		timestamp: new Date(3).toISOString(),
+		artifactId: "critique-1",
+		findingId: "finding-1",
+	},
+	{
+		eventId: "event-5",
+		type: "artifact-produced",
+		timestamp: new Date(4).toISOString(),
+		artifactId: "revision-1",
+		producerAgentId: "fixer",
+		allowedConsumers: ["verifier"],
+		visibility: "internal",
+		promptHash: hash,
+		resourceHash: hash,
+		contentHash: hash,
+	},
+	{
+		eventId: "event-6",
+		type: "revision-produced",
+		timestamp: new Date(5).toISOString(),
+		artifactId: "revision-1",
+		findingIds: ["finding-1"],
+	},
+	{
+		eventId: "event-7",
+		type: "verification-passed",
+		timestamp: new Date(6).toISOString(),
+		artifactId: "critique-1",
+		revisionArtifactId: "revision-1",
+	},
+];
+const artifactLedger = reconcileArtifactLedger(artifactEvents);
+assert.equal(artifactLedger.findings["finding-1"], "accepted");
+assert.equal(artifactLedger.events, 7);
+assert.throws(() =>
+	reconcileArtifactLedger(
+		artifactEvents.map((event) =>
+			event.eventId === "event-2"
+				? { ...event, consumerAgentId: "sibling" }
+				: event,
+		),
+	),
+);
+assert.throws(() =>
+	reconcileArtifactLedger([
+		...artifactEvents.slice(0, 4),
+		{ ...artifactEvents[3], eventId: "event-reject", type: "finding-rejected" },
+	]),
 );
 
 function fakeProcess(events, options = {}) {
