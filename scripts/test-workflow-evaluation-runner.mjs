@@ -15,13 +15,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	buildEvaluationSettings,
+	calibrationBinding,
+	combineCalibrations,
 	expireEvidenceStore,
 	finalizeEvidenceStore,
 	prepareEvidenceStore,
 	recoverStaleWorkspaces,
+	runCalibrationExperiment,
 	runDecisionExperiment,
 	runSmokeExperiment,
 	writeEvaluationSettings,
+	loadCalibrationPair,
 } from "./workflow-evaluation.mjs";
 
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -40,12 +44,42 @@ const campaign = readFixture(
 const roleSmoke = readFixture(
 	"benchmarks/workflow-evaluation/v1/experiments/role-smoke.example.json",
 );
+const roleCalibration = readFixture(
+	"benchmarks/workflow-evaluation/v1/experiments/role-calibration.example.json",
+);
 assert.equal(campaign.frozenBeforeFirstSample, true);
 assert.equal(roleSmoke.campaignFingerprint, campaign.fingerprint);
 assert.equal(roleSmoke.decisionGrade, false);
 assert.equal(roleSmoke.rules.rankCandidates, false);
 assert.equal(roleSmoke.rules.promoteByAbsence, false);
 assert.equal(roleSmoke.rules.unavailableLanePolicy, "block-only-that-lane");
+assert.equal(roleCalibration.mode, "calibration");
+assert.equal(roleCalibration.decisionGrade, false);
+assert.equal(roleCalibration.campaignFingerprint, campaign.fingerprint);
+assert.equal(
+	roleCalibration.priceTableFingerprint,
+	campaign.priceTable.fingerprint,
+);
+assert.equal(roleCalibration.seed, campaign.seed);
+assert.equal(roleCalibration.calibrationTarget, "baseline");
+assert.equal(roleCalibration.coverage.pairsPerCell, 3);
+assert.equal(roleCalibration.coverage.requireTwoSidedFinalistCalibration, true);
+assert.deepEqual(roleCalibration.coverage.projects, campaign.projects);
+assert.deepEqual(
+	roleCalibration.coverage.lanes,
+	campaign.lanes
+		.map((lane) => lane.role)
+		.filter((role) => role !== "work-committer"),
+);
+assert.deepEqual(roleCalibration.baseline, roleCalibration.candidate);
+assert.equal(
+	Object.keys(roleCalibration.roleMap).length,
+	roleCalibration.coverage.lanes.length,
+);
+assert.deepEqual(
+	calibrationBinding(roleCalibration, sourceRoot).assignment.roleMap,
+	roleCalibration.roleMap,
+);
 assert.equal(campaign.protocol.symmetricInfrastructureReplacements, 1);
 assert.equal(campaign.evidence.expiryDays, 30);
 assert.equal(campaign.evidence.durabilityBeforeDeletion, true);
@@ -478,6 +512,201 @@ const equalEvaluation = async () => ({
 	control: { mapping: { A: "baseline", B: "candidate" } },
 	evaluator: { usage: { tokens: 10 } },
 });
+const calibrationCommon = {
+	...descriptor,
+	mode: "calibration",
+	campaignFingerprint: campaign.fingerprint,
+	seed: campaign.seed,
+	priceTableFingerprint: campaign.priceTable.fingerprint,
+	evaluatorPanel: campaign.evaluators,
+	providerEndpoint: campaign.providers["openai-codex"].approvedEndpoint,
+	visibility: "internal",
+};
+const calibrationSeams = {
+	sourceRoot,
+	skipApproval: true,
+	initializeWorkspace() {},
+	async runSample(sample) {
+		return successfulDecisionSample(sample.side);
+	},
+	evaluatePair: equalEvaluation,
+};
+const calibrationRoles = [
+	"main",
+	"work-planner",
+	"work-migrator",
+	"work-worker",
+	"work-fixer",
+	"work-debugger",
+	"work-reviewer",
+	"work-advisor",
+	"work-advisor-backup",
+];
+const calibrationSide = (effort) => ({
+	workflowRevision: "base",
+	provider: "openai-codex",
+	model: "gpt-5.6-sol",
+	effort,
+	roleMap: Object.fromEntries(
+		calibrationRoles.map((role) => [
+			role,
+			{
+				provider: "openai-codex",
+				model: "gpt-5.6-sol",
+				effort: role === "main" ? effort : "medium",
+				prompt: "role-prompt-v1",
+				tools: descriptor.tools,
+				context: { compaction: { enabled: true } },
+				fallback: "none",
+				runtime: { contextWindow: 372_000 },
+			},
+		]),
+	),
+});
+const baselineCalibration = await runCalibrationExperiment(
+	{
+		...calibrationCommon,
+		calibrationTarget: "baseline",
+		baseline: calibrationSide("medium"),
+		candidate: calibrationSide("medium"),
+	},
+	calibrationSeams,
+);
+const candidateCalibration = await runCalibrationExperiment(
+	{
+		...calibrationCommon,
+		calibrationTarget: "candidate",
+		baseline: calibrationSide("high"),
+		candidate: calibrationSide("high"),
+	},
+	{
+		...calibrationSeams,
+		async runSample(sample) {
+			const result = successfulDecisionSample(sample.side);
+			result.usage.tokens.total = 200;
+			result.metrics.tokens = 200;
+			result.metrics.wallMs = 200;
+			return result;
+		},
+	},
+);
+for (const result of [baselineCalibration, candidateCalibration]) {
+	assert.equal(result.status, "calibrated");
+	const retained = readFixture(path.relative(sourceRoot, result.evidencePath));
+	assert.equal(retained.mode, "calibration");
+	assert.equal(retained.decisionGrade, false);
+}
+const calibratedDecision = {
+	...descriptor,
+	mode: "decision",
+	factor: ["effort", "effort.main"],
+	interaction: true,
+	campaignFingerprint: campaign.fingerprint,
+	seed: campaign.seed,
+	priceTableFingerprint: campaign.priceTable.fingerprint,
+	evaluatorPanel: campaign.evaluators,
+	providerEndpoint: campaign.providers["openai-codex"].approvedEndpoint,
+	visibility: "internal",
+	baseline: calibrationSide("medium"),
+	candidate: calibrationSide("high"),
+	calibrationPaths: {
+		baseline: baselineCalibration.calibrationPath,
+		candidate: candidateCalibration.calibrationPath,
+	},
+};
+const twoSidedCalibration = loadCalibrationPair(calibratedDecision, sourceRoot);
+assert.equal(twoSidedCalibration.twoSided, true);
+assert.equal(twoSidedCalibration.tokenCeiling, 240);
+assert.equal(twoSidedCalibration.wallMsCeiling, 240);
+const calibratedRun = await runDecisionExperiment(
+	{
+		...calibratedDecision,
+		budgets: { tokenCeiling: 110, wallMsCeiling: 110 },
+	},
+	{
+		...calibrationSeams,
+		async runSample(sample) {
+			const result = successfulDecisionSample(sample.side);
+			result.usage.tokens.total = 200;
+			result.metrics.tokens = 200;
+			result.metrics.wallMs = 200;
+			return result;
+		},
+	},
+);
+assert.equal(calibratedRun.status, "quality-pass-no-cost-win");
+for (const mutate of [
+	(item) => (item.seed += 1),
+	(item) => (item.campaignFingerprint += "-changed"),
+	(item) => (item.priceTableFingerprint += "-changed"),
+	(item) => (item.evaluatorPanel = item.evaluatorPanel.toReversed()),
+	(item) => (item.providerEndpoint += "/changed"),
+	(item) => (item.candidate.roleMap.main.prompt = "changed"),
+	(item) => item.candidate.roleMap.main.tools.push("changed"),
+	(item) => (item.candidate.roleMap.main.context.compaction.enabled = false),
+]) {
+	const stale = structuredClone(calibratedDecision);
+	mutate(stale);
+	assert.throws(() => loadCalibrationPair(stale, sourceRoot), /stale/);
+}
+const tamperedRoot = mkdtempSync(
+	path.join(os.tmpdir(), "ce-calibration-tamper-"),
+);
+try {
+	const tamperedPath = path.join(tamperedRoot, "candidate.json");
+	const tampered = JSON.parse(
+		readFileSync(candidateCalibration.calibrationPath, "utf8"),
+	);
+	tampered.tokenCeiling += 1;
+	writeFileSync(tamperedPath, `${JSON.stringify(tampered, null, 2)}\n`);
+	assert.throws(
+		() =>
+			loadCalibrationPair(
+				{
+					...calibratedDecision,
+					calibrationPaths: {
+						...calibratedDecision.calibrationPaths,
+						candidate: tamperedPath,
+					},
+				},
+				sourceRoot,
+			),
+		/tampered/,
+	);
+} finally {
+	rmSync(tamperedRoot, { recursive: true, force: true });
+}
+assert.deepEqual(
+	combineCalibrations(
+		{
+			minimumImprovement: 0.05,
+			maximumDimensionRegression: 0.1,
+			tokenCeiling: 100,
+			wallMsCeiling: 1000,
+		},
+		{
+			minimumImprovement: 0.08,
+			maximumDimensionRegression: 0.12,
+			tokenCeiling: 90,
+			wallMsCeiling: 1200,
+		},
+	),
+	{
+		minimumImprovement: 0.08,
+		maximumDimensionRegression: 0.12,
+		tokenCeiling: 100,
+		wallMsCeiling: 1200,
+		twoSided: true,
+	},
+);
+const missingFinalistCalibration = await runDecisionExperiment(
+	{
+		...calibratedDecision,
+		calibrationPaths: { baseline: baselineCalibration.calibrationPath },
+	},
+	{ sourceRoot, skipApproval: true },
+);
+assert.equal(missingFinalistCalibration.status, "needs-more-evidence");
 const replacementCalls = [];
 const replacedDecision = await runDecisionExperiment(
 	{ ...descriptor, mode: "decision" },

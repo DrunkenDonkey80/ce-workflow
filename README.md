@@ -87,6 +87,14 @@ evaluator identities, and 30-day evidence expiry must be fingerprinted before
 the first paid sample. Provider credentials remain in host provider clients and
 live smoke requires explicit billing authorization.
 
+`role-calibration.example.json` freezes three unchanged pairs per applicable
+project/role cell. Incumbent and finalist calibrations bind the exact bundle,
+role map, prompt/tools/context, evaluator panel, seed, price table, endpoint,
+rubric, and runtime fingerprints. Decisions use the conservative maximum of
+both records; a missing finalist record returns `needs-more-evidence`, while a
+stale or tampered record fails closed. Calibration evidence is explicitly
+non-decision-grade and never enters decision aggregation.
+
 The other files in `benchmarks/workflow-evaluation/v1/experiments/` are starting templates. Replace every `replace-with-*` value with a retained path before running them. Missing provider credentials, evaluator access, browser capability, provenance, telemetry, calibration, or approval fails closed and cannot become passing or decision-grade evidence. Sentinel runs are mandatory for handoff, artifact, routing, finalization, default-behavior, extension, prompt, skill, agent, or otherwise non-narrow changes; documentation, benchmark-fixture, and focused test-only changes are narrow.
 
 Candidate extensions execute with full process permissions. Path containment and fresh disposable roots protect benchmark integrity but are **not a hostile-code sandbox**. Only run trusted candidates with `"trusted": true`; untrusted candidates require `"isolation": "os"` plus an external `sandboxCommand`. Reports sanitize credential-like fields and authority-resource paths; hidden contracts, unshown answer-bank data, unselected goldens, evaluator labels, and undeclared environment differences are never exposed to the tested workflow.

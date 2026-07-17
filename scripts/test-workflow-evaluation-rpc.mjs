@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
+import os from "node:os";
 import path from "node:path";
 import {
 	answerUiRequest,
@@ -52,6 +53,17 @@ const answers = {
 		continue: "Yes",
 		name: "Ada",
 		details: "Line 1\nLine 2",
+		"user-facing purpose|report purpose|should become easier":
+			"Automate reports",
+		"primary user|first user": [
+			"A developer using it in scripts or CI",
+			"Automation/CI",
+		],
+		"report scope|report summarize": [
+			"Overall + category totals",
+			"Totals by category",
+		],
+		"evidence of need|observable need": "Unstable scripts fail automation",
 	},
 	fallback: { "empty input": "Allowed" },
 };
@@ -71,6 +83,52 @@ assert.equal(
 	answerUiRequest({ id: "2", method: "confirm", title: "Continue?" }, answers)
 		.confirmed,
 	true,
+);
+assert.equal(
+	answerUiRequest(
+		{
+			id: "purpose",
+			method: "input",
+			title: "What should they understand or do after reading the report?",
+		},
+		answers,
+	).value,
+	"Automate reports",
+);
+assert.equal(
+	answerUiRequest(
+		{
+			id: "user",
+			method: "select",
+			title: "Who is the primary user for the first release?",
+			options: ["Individual tracker", "Developer or automation script"],
+		},
+		answers,
+	).value,
+	"Developer or automation script",
+);
+assert.equal(
+	answerUiRequest(
+		{
+			id: "report",
+			method: "select",
+			title: "What should the deterministic report summarize?",
+			options: ["Categories only", "Grand total + categories"],
+		},
+		answers,
+	).value,
+	"Grand total + categories",
+);
+assert.equal(
+	answerUiRequest(
+		{
+			id: "failure",
+			method: "input",
+			title: "What concrete automation failure should this prevent?",
+		},
+		answers,
+	).value,
+	"Unstable scripts fail automation",
 );
 assert.equal(
 	answerUiRequest({ id: "3", method: "input", title: "Name" }, answers).value,
@@ -310,6 +368,18 @@ const roleMap = {
 	},
 };
 const requestedRoles = requestedRoleProvenance({ roleMap });
+const runtimeMain = requestedRoleProvenance({
+	roleMap,
+	prompt: "runtime-prompt",
+	tools: ["read", "bash"],
+	context: { compaction: { enabled: false } },
+}).main;
+assert.equal(runtimeMain.promptHash, provenanceHash("runtime-prompt"));
+assert.equal(runtimeMain.toolsHash, provenanceHash(["read", "bash"]));
+assert.equal(
+	runtimeMain.contextHash,
+	provenanceHash({ compaction: { enabled: false } }),
+);
 const worker = roleMap["work-worker"];
 const roleProof = reconcileRoleProvenance({
 	requested: requestedRoles,
@@ -668,6 +738,57 @@ const blocked = await runRpcSample({
 	spawnProcess: () => escaping,
 });
 assert.equal(blocked.failure, "forbidden-write");
+const scratchRoot = path.join(os.tmpdir(), "compound-engineering");
+const scratchWrite = fakeProcess([
+	{
+		type: "tool_execution_start",
+		toolName: "write",
+		args: { path: path.join(scratchRoot, "ce-brainstorm", "fixture.md") },
+	},
+	{ type: "agent_settled" },
+]);
+const allowedScratch = await runRpcSample({
+	packageRoot,
+	workspaceRoot: packageRoot,
+	revision: "abc",
+	expectedRevision: "abc",
+	tools: ["write"],
+	expectedTools: ["write"],
+	trusted: true,
+	isolation: "path",
+	stage: "brainstorm",
+	prompt: "x",
+	answers,
+	timeoutMs: 1000,
+	allowedWriteRoots: [scratchRoot],
+	spawnProcess: () => scratchWrite,
+});
+assert.notEqual(allowedScratch.failure, "forbidden-write");
+const sourceWrite = fakeProcess([
+	{
+		type: "tool_execution_start",
+		toolName: "write",
+		args: { path: path.join(packageRoot, "source-write.txt") },
+	},
+]);
+const deniedSource = await runRpcSample({
+	packageRoot,
+	workspaceRoot: packageRoot,
+	sourceRoot: packageRoot,
+	revision: "abc",
+	expectedRevision: "abc",
+	tools: ["write"],
+	expectedTools: ["write"],
+	trusted: true,
+	isolation: "path",
+	stage: "brainstorm",
+	prompt: "x",
+	answers,
+	timeoutMs: 1000,
+	allowedWriteRoots: [packageRoot],
+	spawnProcess: () => sourceWrite,
+});
+assert.equal(deniedSource.failure, "forbidden-write");
 const dependencyScript = path.join(
 	packageRoot,
 	"scripts",

@@ -577,6 +577,7 @@ function resolvedPair(descriptor) {
 		browser: descriptor.browser ?? { status: "unavailable" },
 		rubricVersion: 1,
 		tools: descriptor.tools,
+		roleMap: descriptor.roleMap,
 	};
 	return {
 		baseline: { ...common, ...descriptor.baseline },
@@ -740,7 +741,10 @@ function workTelemetry(root) {
 }
 
 async function defaultRunSample(sample, descriptor, sourceRoot) {
-	const side = descriptor[sample.side];
+	const side = {
+		...descriptor[sample.side],
+		roleMap: descriptor[sample.side].roleMap ?? descriptor.roleMap,
+	};
 	writeEvaluationSettings(
 		sample.workspaceRoot,
 		side,
@@ -836,6 +840,9 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		roleMap: side.roleMap,
 		expectedRoles: side.expectedRoles ?? descriptor.expectedRoles,
 		providerPolicy,
+		// ponytail: CE skills currently hardcode this disposable scratch root;
+		// remove the exception when upstream accepts a per-run scratch setting.
+		allowedWriteRoots: descriptor.allowedScratchRoots ?? [],
 	});
 	const totalRpcWallMs = Date.now() - started;
 	const wallMs = rpc.stageWallMs ?? totalRpcWallMs;
@@ -1169,12 +1176,46 @@ function compactVerdict(verdict) {
 	};
 }
 
-function loadCalibration(descriptor, sourceRoot) {
-	if (!descriptor.calibrationPath)
-		throw new Error("decision mode requires an approved calibrationPath");
+export function calibrationBinding(descriptor, sourceRoot, side = "baseline") {
+	return {
+		project: descriptor.project,
+		stage: descriptor.stage,
+		bundleSha: projectBundleHash(projectRoot(sourceRoot, descriptor.project)),
+		assignment: resolvedPair(descriptor)[side],
+		campaignFingerprint: descriptor.campaignFingerprint ?? null,
+		seed: descriptor.seed ?? null,
+		priceTableFingerprint:
+			descriptor.priceTableFingerprint ??
+			descriptor.priceTable?.fingerprint ??
+			null,
+		evaluatorPanel:
+			descriptor.evaluatorPanel ??
+			descriptor.evaluators ??
+			descriptor.evaluator ??
+			null,
+		rubricSha: fileSha(
+			path.join(projectRoot(sourceRoot, descriptor.project), "rubric.json"),
+		),
+		providerEndpoint:
+			descriptor[side]?.endpoint ??
+			descriptor.providerEndpoint ??
+			descriptor.endpoint ??
+			null,
+		visibility: descriptor[side]?.visibility ?? descriptor.visibility ?? null,
+	};
+}
+
+export function loadCalibration(
+	descriptor,
+	sourceRoot,
+	side = "baseline",
+	calibrationPath = descriptor.calibrationPath,
+) {
+	if (!calibrationPath)
+		throw new Error(`decision mode requires approved ${side} calibration`);
 	const calibration = readJson(
-		path.resolve(descriptor.calibrationPath),
-		"calibration evidence",
+		path.resolve(calibrationPath),
+		`${side} calibration evidence`,
 	);
 	if (
 		calibration.project !== descriptor.project ||
@@ -1186,17 +1227,75 @@ function loadCalibration(descriptor, sourceRoot) {
 		projectBundleHash(projectRoot(sourceRoot, descriptor.project))
 	)
 		throw new Error("calibration bundle is stale");
-	if (
+	if (calibration.recordFingerprint) {
+		const { recordFingerprint, ...record } = calibration;
+		if (recordFingerprint !== fingerprint(record))
+			throw new Error("calibration record is tampered");
+	}
+	if (calibration.bindingFingerprint) {
+		if (
+			calibration.bindingFingerprint !== fingerprint(calibration.binding) ||
+			calibration.bindingFingerprint !==
+				fingerprint(calibrationBinding(descriptor, sourceRoot, side))
+		)
+			throw new Error("calibration environment is stale");
+	} else if (
+		side !== "baseline" ||
 		calibration.baselineFingerprint !==
-		fingerprint(resolvedPair(descriptor).baseline)
+			fingerprint(resolvedPair(descriptor).baseline)
 	)
 		throw new Error("calibration environment is stale");
 	if (
 		!(calibration.minimumImprovement >= 0.05) ||
-		!(calibration.maximumDimensionRegression >= 0.1)
+		!(calibration.maximumDimensionRegression >= 0.1) ||
+		!Number.isFinite(calibration.tokenCeiling) ||
+		!Number.isFinite(calibration.wallMsCeiling)
 	)
 		throw new Error("calibration weakens fixed threshold floors");
 	return calibration;
+}
+
+export function combineCalibrations(baseline, candidate) {
+	return {
+		minimumImprovement: Math.max(
+			baseline.minimumImprovement,
+			candidate.minimumImprovement,
+		),
+		maximumDimensionRegression: Math.max(
+			baseline.maximumDimensionRegression,
+			candidate.maximumDimensionRegression,
+		),
+		tokenCeiling: Math.max(baseline.tokenCeiling, candidate.tokenCeiling),
+		wallMsCeiling: Math.max(baseline.wallMsCeiling, candidate.wallMsCeiling),
+		twoSided: true,
+	};
+}
+
+export function loadCalibrationPair(descriptor, sourceRoot) {
+	if (!descriptor.calibrationPaths)
+		return loadCalibration(descriptor, sourceRoot);
+	const missing = ["baseline", "candidate"].filter(
+		(side) => !descriptor.calibrationPaths[side],
+	);
+	if (missing.length)
+		return {
+			status: "needs-more-evidence",
+			reason: `missing ${missing.join(" and ")} calibration`,
+		};
+	return combineCalibrations(
+		loadCalibration(
+			descriptor,
+			sourceRoot,
+			"baseline",
+			descriptor.calibrationPaths.baseline,
+		),
+		loadCalibration(
+			descriptor,
+			sourceRoot,
+			"candidate",
+			descriptor.calibrationPaths.candidate,
+		),
+	);
 }
 
 export async function runDecisionExperiment(descriptor, seams = {}) {
@@ -1208,7 +1307,14 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 	const calibration =
 		descriptor.calibration || seams.skipCalibration
 			? null
-			: loadCalibration(descriptor, sourceRoot);
+			: loadCalibrationPair(descriptor, sourceRoot);
+	if (calibration?.status === "needs-more-evidence")
+		return {
+			mode: "decision",
+			decisionGrade: true,
+			status: calibration.status,
+			reason: calibration.reason,
+		};
 	if (calibration)
 		descriptor = {
 			...descriptor,
@@ -1234,7 +1340,8 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 	const evidenceRoot =
 		seams.evidenceRoot ??
 		mkdtempSync(path.join(os.tmpdir(), "ce-workflow-evidence-"));
-	const runId = `decision-${Date.now()}-${randomUUID().slice(0, 8)}`;
+	const evidenceMode = descriptor.calibration ? "calibration" : "decision";
+	const runId = `${evidenceMode}-${Date.now()}-${randomUUID().slice(0, 8)}`;
 	const controlRoot = path.join(evidenceRoot, runId);
 	const runRoot = path.join(os.tmpdir(), `ce-workflow-samples-${runId}`);
 	prepareEvidenceStore(controlRoot);
@@ -1492,8 +1599,8 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 		const evidence = sanitize({
 			contract: "ce-workflow-evidence/v1",
 			runId,
-			mode: "decision",
-			decisionGrade: true,
+			mode: evidenceMode,
+			decisionGrade: !descriptor.calibration,
 			fingerprints: {
 				descriptor: fingerprint(descriptor),
 				calibration: calibration ? fingerprint(calibration) : null,
@@ -1529,7 +1636,7 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 			.map((sample) => ({ failure: sample.failure, error: sample.error }));
 		writeFileSync(
 			reportPath,
-			`${JSON.stringify({ runId, mode: "decision", status: verdict.status, evidencePath, deterministicFacts: { hardGateStatus: verdict.status, pairCount: pairs.length }, evaluatorJudgments: verdict.qualitative ?? null, workflowCosts: verdict.summary ?? costs.workflow, harnessCost: costs.harness, evaluatorCost: costs.evaluator, infrastructureFailures, invalid: verdict.status === "invalid", benchmarkContractChanged: false, verdict: compactVerdict(verdict) }, null, 2)}\n`,
+			`${JSON.stringify({ runId, mode: evidenceMode, decisionGrade: !descriptor.calibration, status: verdict.status, evidencePath, deterministicFacts: { hardGateStatus: verdict.status, pairCount: pairs.length }, evaluatorJudgments: verdict.qualitative ?? null, workflowCosts: verdict.summary ?? costs.workflow, harnessCost: costs.harness, evaluatorCost: costs.evaluator, infrastructureFailures, invalid: verdict.status === "invalid", benchmarkContractChanged: false, verdict: compactVerdict(verdict) }, null, 2)}\n`,
 		);
 		finalizeEvidenceStore(controlRoot);
 		if (JSON.stringify(sourceState(sourceRoot)) !== JSON.stringify(before))
@@ -1538,7 +1645,8 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 			);
 		return {
 			runId,
-			mode: "decision",
+			mode: evidenceMode,
+			decisionGrade: !descriptor.calibration,
 			status: verdict.status,
 			verdict,
 			evidencePath,
@@ -1903,14 +2011,22 @@ export async function runCalibrationExperiment(descriptor, seams = {}) {
 	});
 	const calibration = deriveCalibration(pairs);
 	const sourceRoot = path.resolve(seams.sourceRoot ?? defaultSourceRoot);
+	const target = descriptor.calibrationTarget ?? "baseline";
+	if (!new Set(["baseline", "candidate"]).has(target))
+		throw new Error("calibrationTarget must be baseline or candidate");
+	const binding = calibrationBinding(descriptor, sourceRoot, target);
 	const calibrationRecord = {
 		project: descriptor.project,
 		stage: descriptor.stage,
-		bundleSha: projectBundleHash(projectRoot(sourceRoot, descriptor.project)),
+		target,
+		bundleSha: binding.bundleSha,
 		baselineFingerprint: fingerprint(resolvedPair(descriptor).baseline),
+		binding,
+		bindingFingerprint: fingerprint(binding),
 		generatedAt: new Date().toISOString(),
 		...calibration,
 	};
+	calibrationRecord.recordFingerprint = fingerprint(calibrationRecord);
 	const calibrationPath = path.join(
 		path.dirname(decision.evidencePath),
 		"calibration.json",

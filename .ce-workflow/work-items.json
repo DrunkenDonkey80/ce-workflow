@@ -934,6 +934,58 @@
       "title": "U6 Deterministic gate and smoke campaign",
       "type": "task",
       "updatedAt": "2026-07-17T11:06:37.332Z"
+    },
+    "work-1.8": {
+      "acceptance": "GATE: node scripts/test-workflow-evaluation-runner.mjs and node scripts/test-workflow-evaluation-sentinel.mjs and npm run verify:quiet pass; three unchanged baseline pairs cover every applicable project/stage/role lane; every advancing finalist self-calibrates under exact project bundle, role map, evaluator panel, prompt/tools, runtime, provider endpoint, price-table, and seed fingerprints; reuse rejects stale or tampered identities; candidate thresholds use the conservative maximum of baseline and finalist noise/ceilings and never weaken quality floors; unstable or missing calibration yields needs-more-evidence; smoke/calibration samples never enter decision aggregation. Live calibration requires provider credentials/quota.",
+      "createdAt": "2026-07-17T11:08:46.540Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Establish approved baseline noise, budgets, and conservative thresholds for every contrast that may support a model-role recommendation.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.8",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan\nplan-path: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\ntarget: U7 Baseline and finalist calibration\nrequirements: R20-R21, R27-R29, R31-R34; AE7\ndependencies: U5-U6 closed\nfiles: scripts/workflow-evaluation.mjs, scripts/test-workflow-evaluation-runner.mjs, scripts/test-workflow-evaluation-sentinel.mjs, benchmarks/workflow-evaluation/v1/experiments/role-calibration.example.json\nout-of-scope: U8-U11.",
+        "wo:live-calibration transport PASS — pi-subagents authenticated runtime completed six anthropic/claude-opus-4-8:high and six openai-codex/gpt-5.6-sol:high fresh samples (three unchanged pairs per arm). Exact identity/effort, per-category tokens, normalized cost, wall time, session evidence, and conservative two-sided thresholds retained at .pi/workflow-evaluation/u7-live-calibration/subagent-calibration.json. Runs: 28efa287-f13f-47ca-aa84-2cc5edc182c9 and a44b14ae-12a0-44a4-a255-8d70fe5cebab. Standalone RPC provider auth is unavailable in bash children; no failed RPC sample is treated as calibration or decision evidence.",
+        "wo:checkpoint U7 calibration backend proven. Exact authenticated pi-subagents runs: provider pairs Opus-high 28efa287-f13f-47ca-aa84-2cc5edc182c9; Sol-high a44b14ae-12a0-44a4-a255-8d70fe5cebab; CSV planner 3ee6abad-3d20-4320-9e9a-86ff35c56588; calculator planner 584a6c99-2f2b-4c77-8803-a096092b30f3. Six fresh samples/three pairs each, no tools or worktree changes. Retained derivations: .pi/workflow-evaluation/u7-live-calibration/subagent-calibration.json. Remaining 16 role/project cells are frozen in .pi/u7-peer-calibration.json; derivation helper .pi/u7-derive-role-calibration.mjs. Current parent exhausted 40/40 child cap; fresh session required. Deterministic RPC/runner/sentinel/package gates pass. Review run 3baf2f51 exceeded turn budget without verdict; rerun same reviewer after role evidence completes.",
+        "wo:verify-check PASS after checkpoint: node scripts/test-workflow-evaluation-rpc.mjs; node scripts/test-workflow-evaluation-runner.mjs; node scripts/test-workflow-evaluation-sentinel.mjs; npm run verify:quiet. User chose to retain default 40-child/session cap. Next fresh session: resume work-1, run up to six pending cells from .pi/u7-peer-calibration.json (each count=6), append run IDs, then checkpoint for another fresh session; do not weaken three-pair requirement.",
+        "wo:live-evidence additional peer samples: csv/main run 1e5b24ad-ee0d-460a-8296-707aa3df016e PASS 6/6 exact gpt-5.6-sol high; csv/migrator run 757c3a05-b9a4-4a9d-869a-4cd2441cc3ab PASS 6/6 exact gpt-5.6-sol high. Persisted .pi/u7-role-run-mapping.json. csv/worker run a2f18b7c-9f36-4c98-8996-a4843fe6d6f6 invalid/paused 0/6 due child openai-codex credential failure; do not reuse or count. Remaining cells unrun. No source edits.",
+        "wo:peer-cleanup Peer worker failure logs show openai-codex credential missing in that peer session, not a model/effort defect. Disposable calibration worktree had AGENTS.md whitespace drift after peer batches despite zero recorded tools; restored only that disposable worktree file and verified clean. Fresh primary session should retry csv/worker as a new six-sample batch; never revive invalid a2f18b7c.",
+        "wo:peer-retry-invalid csv/worker retry 330ad7ff-20e5-4538-9066-c80320748453 paused 0/6; all started children failed before sampling with missing openai-codex credential in peer session. Do not count or revive. This repeats peer-local auth blocker and does not invalidate current primary-session Sol medium capability. Completed csv/main/migrator mappings unchanged.",
+        "wo:live-evidence additional peer cells: csv/advisor b733cfe9 PASS 6/6 exact Sol xhigh; csv/advisor-backup 8e812d07 PASS 6/6 exact Sol medium. calculator/main 06bdee45 invalid (six zero-turn 900s delegate timeouts), excluded and must be rerun fresh. Partial role calibration now derives six valid cells with three pairs each at .pi/workflow-evaluation/u7-live-calibration/role-calibration.json; conservative interim ceilings are non-decision-grade until all 18 cells exist. Mapping updated.",
+        "--append-notes wo:live-evidence partial csv/worker run 27bc9b2f-b420-4558-b062-77832d254716 PASS 4/4 exact Sol medium, no tools. Session child cap reached before six samples; mapping now supports combining retained run batches. Next fresh session: run two csv/worker samples first, append run ID, derive six-sample/three-pair cell, then continue pending cells.",
+        "wo:live-evidence partial csv/worker run 27bc9b2f-b420-4558-b062-77832d254716 PASS 4/4 exact Sol medium, no tools. Session child cap reached before six samples; mapping now supports combining retained run batches. Next fresh session: run two csv/worker samples first, append run ID, derive six-sample/three-pair cell, then continue pending cells. (Prior note's --append-notes prefix was a helper CLI compatibility defect.)",
+        "wo:live-evidence 13/18 role cells now have three retained pairs. New PASS cells: csv/worker (combined 27bc9b2f + 5322a868), csv/fixer a6fd6b9d, csv/debugger f58541d9, csv/reviewer 80ecc835, calculator/main 61d98082, calculator/migrator 57067b57, calculator/worker bb79cb90. Partial calculator/fixer f84eac0f PASS 2/2, needs four samples next fresh session. Derived partial calibration succeeds. Remaining complete cells: calculator/fixer, debugger, reviewer, advisor, advisor-backup.",
+        "wo:live-evidence PASS — all 18 project/role cells have six exact-identity fresh samples (three unchanged pairs each), 108 samples / 54 pairs total, no recorded tools, retained at .pi/workflow-evaluation/u7-live-calibration/role-calibration.json. Final cells: calculator/reviewer e56eb9c6, calculator/advisor 83677a55, calculator/advisor-backup ef9133a1. The retained aggregate is calibration-only (decisionGrade=false); conservative two-sided thresholds are minimumImprovement=0.8645466345262377, maximumDimensionRegression=0.8645466345262377, tokenCeiling=11596, wallMsCeiling=48267. All agents ran from C:/soft/ce-workflow in this session.\n",
+        "wo:review PASS — scoped U7 diff implements non-decision-grade, two-sided bound calibration with stale/tamper fail-closed tests; RPC/runner fixtures pass; retained aggregate validates 18 cells, 3 pairs/6 exact-role/model tool-free samples per cell, decisionGrade=false.",
+        "wo:review PASS — independent run 7a34734c verified 18 cells, each with 3 pairs/6 exact-identity tool-free samples, decisionGrade=false; scoped RPC and runner tests pass.",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-rpc.mjs && node scripts/test-workflow-evaluation-runner.mjs && node scripts/test-workflow-evaluation-sentinel.mjs && npm run verify:quiet\nOutput: ok - workflow evaluation RPC fixtures\nok - workflow evaluation smoke and decision lifecycle fixtures\nok - workflow evaluation calibration, approval, and sentinel fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U7 Baseline and finalist calibration",
+      "type": "task",
+      "updatedAt": "2026-07-17T22:23:16.541Z"
+    },
+    "work-1.9": {
+      "acceptance": "work-note accepts both direct note text and --append-notes without persisting the flag; a fixture covers both forms.",
+      "createdAt": "2026-07-17T14:32:56.220Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "The documented planner/helper syntax uses work-note <id> --append-notes <text>, but work-helper currently appends the flag itself to notes.",
+      "evidence": [],
+      "id": "work-1.9",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-1",
+      "status": "open",
+      "title": "Support documented work-note --append-notes syntax",
+      "type": "bug",
+      "updatedAt": "2026-07-17T14:32:56.220Z"
     }
   },
   "metadata": {
@@ -943,7 +995,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-17T11:06:37.332Z"
+    "updatedAt": "2026-07-17T22:23:16.541Z"
   },
   "schemaVersion": 1
 }

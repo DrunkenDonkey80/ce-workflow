@@ -53,13 +53,15 @@ function roleIdentity(cell) {
 
 export function requestedRoleProvenance(options) {
 	const prompts = options.prompts ?? [options.prompt];
-	const main = options.roleMap?.main ?? {
-		provider: options.provider,
-		model: options.model?.split("/").at(-1),
-		effort: options.thinking,
-		prompt: prompts.length === 1 ? prompts[0] : prompts,
-		tools: options.tools,
-		context: options.context,
+	const runtimePrompt = prompts.length === 1 ? prompts[0] : prompts;
+	const declaredMain = options.roleMap?.main ?? {};
+	const main = {
+		provider: declaredMain.provider ?? options.provider,
+		model: declaredMain.model ?? options.model?.split("/").at(-1),
+		effort: declaredMain.effort ?? options.thinking,
+		prompt: runtimePrompt ?? declaredMain.prompt,
+		tools: options.tools ?? declaredMain.tools,
+		context: options.context ?? declaredMain.context,
 	};
 	return Object.fromEntries(
 		Object.entries({ ...(options.roleMap ?? {}), main }).map(([role, cell]) => [
@@ -496,6 +498,68 @@ function normalize(value) {
 		.trim();
 }
 
+function questionIntents(question) {
+	const intents = [];
+	if (/\bfirst person\b|\bwho is the primary user\b/.test(question))
+		intents.push("primary user", "first user", "specific person");
+	if (
+		/\bprimary use case\b|\bwhat should .*\b(?:understand|do)\b|\bwhat .* difficult today\b/.test(
+			question,
+		)
+	)
+		intents.push(
+			"user facing purpose",
+			"report purpose",
+			"should become easier",
+		);
+	if (
+		/\binformation must .*\breport\b.*\b(?:include|show|contain)\b|\bwhat should .*\breport\b.*\bsummarize\b|\bquestion .*\breport should answer\b/.test(
+			question,
+		)
+	)
+		intents.push("report contain", "report scope", "report summarize");
+	if (/\bwhich csv schema\b|\bwhat exact csv columns\b/.test(question))
+		intents.push("csv input contract", "input columns", "csv columns");
+	if (/\bsmallest report\b/.test(question))
+		intents.push("smallest useful", "smallest version");
+	if (
+		/\bconcrete automation failure\b|\bfailure risk .*\bworkaround\b/.test(
+			question,
+		)
+	)
+		intents.push("evidence of need", "observable need");
+	return intents;
+}
+
+function optionTokens(value) {
+	return new Set(
+		normalize(value)
+			.split(" ")
+			.filter((token) => token.length > 2)
+			.map((token) => {
+				if (token === "grand" || token === "overall") return "total";
+				if (token.endsWith("ies")) return `${token.slice(0, -3)}y`;
+				if (token.endsWith("s")) return token.slice(0, -1);
+				return token;
+			}),
+	);
+}
+
+function closestOption(options, values) {
+	let best = null;
+	for (const option of options ?? []) {
+		const optionSet = optionTokens(option);
+		const score = Math.max(
+			...values.map((value) => {
+				const expected = optionTokens(value);
+				return [...expected].filter((token) => optionSet.has(token)).length;
+			}),
+		);
+		if (!best || score > best.score) best = { option, score };
+	}
+	return best?.score >= 2 ? best.option : null;
+}
+
 export function answerUiRequest(request, bank) {
 	if (!DIALOGS.has(request?.method)) return { ignored: true };
 	const question = normalize(
@@ -513,6 +577,7 @@ export function answerUiRequest(request, bank) {
 		unexpected: true,
 	}));
 	const aliases = (key) => String(key).split("|").map(normalize);
+	const questions = [question, ...questionIntents(question)];
 	const match = [...expected, ...fallback]
 		.sort(
 			(left, right) =>
@@ -520,8 +585,10 @@ export function answerUiRequest(request, bank) {
 				Math.max(...aliases(left.entry[0]).map((alias) => alias.length)),
 		)
 		.find(({ entry: [key] }) =>
-			aliases(key).some(
-				(alias) => question.includes(alias) || alias.includes(question),
+			aliases(key).some((alias) =>
+				questions.some(
+					(candidate) => candidate.includes(alias) || alias.includes(candidate),
+				),
 			),
 		);
 	if (!match) return null;
@@ -536,9 +603,10 @@ export function answerUiRequest(request, bank) {
 			unexpected: match.unexpected,
 		};
 	if (request.method === "select") {
-		const option = request.options?.find((item) =>
-			values.some((value) => normalize(item) === normalize(value)),
-		);
+		const option =
+			request.options?.find((item) =>
+				values.some((value) => normalize(item) === normalize(value)),
+			) ?? closestOption(request.options, values);
 		if (!option) return null;
 		return {
 			type: "extension_ui_response",
@@ -732,10 +800,13 @@ function forbiddenWrite(event, options) {
 		const target = path.isAbsolute(value)
 			? value
 			: path.resolve(workspace, value);
+		const allowedScratch = (options.allowedWriteRoots ?? []).some((root) =>
+			contained(root, target),
+		);
 		if (
 			contained(options.sourceRoot, target) ||
 			contained(options.bundleRoot, target) ||
-			!contained(workspace, target)
+			(!allowedScratch && !contained(workspace, target))
 		)
 			return target;
 	}
@@ -752,7 +823,8 @@ function forbiddenWrite(event, options) {
 			return target;
 		if (
 			contained(workspace, target) ||
-			(options.dependencyRoots ?? []).some((root) => contained(root, target))
+			(options.dependencyRoots ?? []).some((root) => contained(root, target)) ||
+			(options.allowedWriteRoots ?? []).some((root) => contained(root, target))
 		)
 			continue;
 		return target;

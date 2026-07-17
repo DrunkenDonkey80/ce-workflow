@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "mode": "calibration",
+  "decisionGrade": false,
+  "campaign": "model-role-campaign.example.json",
+  "campaignFingerprint": "model-role-campaign-v1-frozen",
+  "priceTableFingerprint": "pricing-v1-example",
+  "seed": 56001,
+  "project": "csv-expenses",
+  "stage": "brainstorm",
+  "role": "main",
+  "calibrationTarget": "baseline",
+  "incumbentCapture": "replace-with-observed-pre-smoke-role-map-fingerprint",
+  "coverage": {
+    "projects": ["csv-expenses", "calculator"],
+    "pairsPerCell": 3,
+    "requireTwoSidedFinalistCalibration": true,
+    "lanes": [
+      "main",
+      "work-planner",
+      "work-migrator",
+      "work-worker",
+      "work-fixer",
+      "work-debugger",
+      "work-reviewer",
+      "work-advisor",
+      "work-advisor-backup"
+    ]
+  },
+  "evaluatorPanel": [
+    { "provider": "openai-codex", "model": "gpt-5.6-sol", "effort": "high" },
+    { "provider": "anthropic", "model": "claude-opus-4-8", "effort": "high" }
+  ],
+  "providerEndpoint": "https://chatgpt.com/backend-api",
+  "visibility": "internal",
+  "allowedScratchRoots": ["/tmp/compound-engineering"],
+  "roleMap": {
+      "main": {
+        "provider": "openai-codex",
+        "model": "gpt-5.6-sol",
+        "effort": "high",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash", "edit", "write", "ask_user", "subagent"],
+        "context": { "compaction": "configured" },
+        "fallback": "none",
+        "runtime": { "contextWindow": "observed" }
+      },
+      "work-planner": {
+        "provider": "replace-with-observed-provider",
+        "model": "replace-with-exact-model",
+        "effort": "replace-with-observed-effort",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash"],
+        "context": { "compaction": "configured" },
+        "fallback": "none",
+        "runtime": { "contextWindow": "observed" }
+      },
+      "work-migrator": {
+        "provider": "replace-with-observed-provider",
+        "model": "replace-with-exact-model",
+        "effort": "replace-with-observed-effort",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash"],
+        "context": { "compaction": "configured" },
+        "fallback": "none",
+        "runtime": { "contextWindow": "observed" }
+      },
+      "work-worker": {
+        "provider": "replace-with-observed-provider",
+        "model": "replace-with-exact-model",
+        "effort": "replace-with-observed-effort",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash", "edit", "write"],
+        "context": { "compaction": "configured" },
+        "fallback": "none",
+        "runtime": { "contextWindow": "observed" }
+      },
+      "work-fixer": {
+        "provider": "replace-with-observed-provider",
+        "model": "replace-with-exact-model",
+        "effort": "replace-with-observed-effort",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash", "edit", "write"],
+        "context": { "compaction": "configured" },
+        "fallback": "none",
+        "runtime": { "contextWindow": "observed" }
+      },
+      "work-debugger": {
+        "provider": "replace-with-observed-provider",
+        "model": "replace-with-exact-model",
+        "effort": "replace-with-observed-effort",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash", "edit", "write"],
+        "context": { "compaction": "configured" },
+        "fallback": "none",
+        "runtime": { "contextWindow": "observed" }
+      },
+      "work-reviewer": {
+        "provider": "replace-with-observed-provider",
+        "model": "replace-with-exact-model",
+        "effort": "replace-with-observed-effort",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash"],
+        "context": { "compaction": "configured" },
+        "fallback": "none",
+        "runtime": { "contextWindow": "observed" }
+      },
+      "work-advisor": {
+        "provider": "replace-with-observed-provider",
+        "model": "replace-with-exact-model",
+        "effort": "replace-with-observed-effort",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash"],
+        "context": { "compaction": "configured" },
+        "fallback": "advisor-backup",
+        "runtime": { "contextWindow": "observed" }
+      },
+      "work-advisor-backup": {
+        "provider": "replace-with-observed-provider",
+        "model": "replace-with-exact-model",
+        "effort": "replace-with-observed-effort",
+        "prompt": "role-prompts-v1",
+        "tools": ["read", "bash"],
+        "context": { "compaction": "configured" },
+        "fallback": "none",
+        "runtime": { "contextWindow": "observed" }
+      }
+  },
+  "baseline": {
+    "workflowRevision": "local",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "effort": "high"
+  },
+  "candidate": {
+    "workflowRevision": "local",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "effort": "high"
+  },
+  "calibrationPaths": {
+    "baseline": "replace-with-retained-incumbent-calibration.json",
+    "candidate": "replace-with-retained-finalist-calibration.json"
+  },
+  "trusted": true,
+  "isolation": "path",
+  "tools": ["read", "bash", "edit", "write", "ask_user", "subagent"],
+  "budgets": { "tokenCeiling": 300000, "wallMsCeiling": 2700000 }
+}
