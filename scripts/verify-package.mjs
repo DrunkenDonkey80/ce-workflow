@@ -10,11 +10,11 @@ const quiet =
 const failures = [];
 const check = (label, ok, detail = "") => {
 	if (ok) {
-		if (!quiet) console.log(`ok - ${label}`);
+		if (!quiet) process.stdout.write(`ok - ${label}\n`);
 		return;
 	}
 	failures.push(`${label}${detail ? `: ${detail}` : ""}`);
-	console.error(`FAIL - ${label}${detail ? `: ${detail}` : ""}`);
+	process.stderr.write(`FAIL - ${label}${detail ? `: ${detail}` : ""}\n`);
 };
 const read = (rel) => readFileSync(path.join(root, rel), "utf8");
 const listed = (dir) => readdirSync(path.join(root, dir)).sort();
@@ -100,6 +100,8 @@ const evaluationFiles = [
 	"benchmarks/workflow-evaluation/v1/experiments/sentinel.example.json",
 	"benchmarks/workflow-evaluation/v1/experiments/smoke.example.json",
 	"benchmarks/workflow-evaluation/v1/manifest.json",
+	"benchmarks/workflow-evaluation/v1/role-cases/calculator/corpus.json",
+	"benchmarks/workflow-evaluation/v1/role-cases/csv-expenses/corpus.json",
 	"benchmarks/workflow-evaluation/v1/projects/calculator/acceptance/verify.mjs",
 	"benchmarks/workflow-evaluation/v1/projects/calculator/answers.json",
 	"benchmarks/workflow-evaluation/v1/projects/calculator/goldens/approval.json",
@@ -129,6 +131,7 @@ const evaluationFiles = [
 	"benchmarks/workflow-evaluation/v1/projects/csv-expenses/seed/test/analyze.test.mjs",
 	"scripts/test-workflow-evaluation-calculator.mjs",
 	"scripts/test-workflow-evaluation-contract.mjs",
+	"scripts/test-workflow-evaluation-critique.mjs",
 	"scripts/test-workflow-evaluation-csv.mjs",
 	"scripts/test-workflow-evaluation-rpc.mjs",
 	"scripts/test-workflow-evaluation-runner.mjs",
@@ -263,10 +266,10 @@ for (const script of [...new Set(tests)]) {
 }
 
 if (failures.length) {
-	console.error(`\n${failures.length} verification check(s) failed:`);
-	for (const failure of failures) console.error(`- ${failure}`);
+	process.stderr.write(`\n${failures.length} verification check(s) failed:\n`);
+	for (const failure of failures) process.stderr.write(`- ${failure}\n`);
 	process.exit(1);
 }
-console.log(
-	quiet ? "ok - package checks passed" : "\nAll package checks passed.",
+process.stdout.write(
+	`${quiet ? "ok - package checks passed" : "\nAll package checks passed."}\n`,
 );

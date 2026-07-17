@@ -1,0 +1,114 @@
+{
+	"version": 1,
+	"campaignRevision": "role-corpus-v1",
+	"project": "calculator",
+	"roles": [
+		{
+			"role": "main-brainstorm",
+			"trigger": "/work-brainstorm",
+			"inputKind": "request"
+		},
+		{
+			"role": "work-planner",
+			"trigger": "/work-plan",
+			"inputKind": "brainstorm"
+		},
+		{
+			"role": "work-migrator",
+			"trigger": "/work-migrate",
+			"inputKind": "legacy-plan"
+		},
+		{
+			"role": "work-worker",
+			"trigger": "/work-resume",
+			"inputKind": "approved-plan"
+		},
+		{
+			"role": "work-fixer",
+			"trigger": "review-failure",
+			"inputKind": "review-findings"
+		},
+		{
+			"role": "work-debugger",
+			"trigger": "/work-debug",
+			"inputKind": "failing-project"
+		},
+		{
+			"role": "work-reviewer",
+			"trigger": "review-gate",
+			"inputKind": "implementation-diff"
+		},
+		{
+			"role": "work-committer",
+			"trigger": "finish-gate",
+			"inputKind": "verified-diff"
+		},
+		{
+			"role": "work-advisor",
+			"trigger": "critic-gate",
+			"inputKind": "candidate-artifact"
+		},
+		{
+			"role": "work-advisor-backup",
+			"trigger": "primary-unavailable",
+			"inputKind": "candidate-artifact"
+		}
+	],
+	"freeze": {
+		"promptRevision": "role-prompts-v1",
+		"resourceRevision": "calculator-role-resources-v1",
+		"seed": 41001,
+		"order": ["clean", "seeded", "holdout"],
+		"deliveryAtMs": 50,
+		"tools": ["read", "write", "edit", "bash"],
+		"context": { "compaction": "disabled", "tokenCeiling": 60000 },
+		"budgets": { "tokens": 60000, "wallMs": 600000, "outputChars": 120000 },
+		"reviser": {
+			"id": "fixed-reviser-v1",
+			"provider": "fixture",
+			"model": "reviser-v1",
+			"effort": "high"
+		}
+	},
+	"partitions": {
+		"clean": {
+			"visible": {
+				"artifact": "A calculator implementation that already satisfies its declared behavior.",
+				"instruction": "Preserve correct behavior and report only verified issues."
+			},
+			"authority": {
+				"defectId": "CALC-CLEAN-000",
+				"expectedFix": "none",
+				"canary": "authority-calc-clean-x7",
+				"mustInclude": ["verified"],
+				"mustExclude": ["regression"]
+			}
+		},
+		"seeded": {
+			"visible": {
+				"artifact": "A calculator implementation with one observable edge-case failure.",
+				"instruction": "Find the root cause and verify the smallest complete correction."
+			},
+			"authority": {
+				"defectId": "CALC-SEED-017",
+				"expectedFix": "preserve operand replacement after equals",
+				"canary": "authority-calc-seed-q4",
+				"mustInclude": ["operand replacement verified"],
+				"mustExclude": ["regression"]
+			}
+		},
+		"holdout": {
+			"visible": {
+				"artifact": "A calculator implementation reserved for confirmation with an undisclosed invariant.",
+				"instruction": "Use only visible behavior and produce independently verifiable evidence."
+			},
+			"authority": {
+				"defectId": "CALC-HOLD-031",
+				"expectedFix": "retain keyboard and button parity",
+				"canary": "authority-calc-hold-p9",
+				"mustInclude": ["input parity verified"],
+				"mustExclude": ["regression"]
+			}
+		}
+	}
+}

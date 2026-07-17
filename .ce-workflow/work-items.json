@@ -857,6 +857,31 @@
       "title": "U3 Per-agent telemetry and artifact ledger",
       "type": "task",
       "updatedAt": "2026-07-17T06:51:47.487Z"
+    },
+    "work-1.5": {
+      "acceptance": "GATE: node scripts/test-workflow-evaluation-critique.mjs, node scripts/test-workflow-evaluation-calculator.mjs, node scripts/test-workflow-evaluation-csv.mjs, and npm run verify:quiet pass. Cases cover brainstorm, plan, implementation diff, reviewer, fixer, debugger, migrator, committer control, advisor, and advisor-backup; freeze visible bytes, prompt/resource revision, seed/order/timing, signed empty-critique control, fixed reviser identity, tools/context/budgets; clean controls pass and seeded defects fail; holdout authority, defect IDs, expected fixes, labels, paths, and canaries never leak to agent-visible files/prompts/errors/telemetry/payloads; wrong-arm, modified, ignored, duplicated, or unverified critique gets no causal credit.",
+      "createdAt": "2026-07-17T06:52:30.799Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Add versioned leakage-safe clean, seeded, and holdout role/critique replay cases for both benchmark projects.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.5",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan\nplan-path: docs\\plans\\2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\ntarget: U4 Frozen role and critique replay corpus\nrequirements: R2, R12-R17, R22-R26, R39; AE4-AE5, AE9, AE15\ndependencies: U1-U3 closed\nfiles: benchmarks/workflow-evaluation/v1/role-cases/calculator/, benchmarks/workflow-evaluation/v1/role-cases/csv-expenses/, scripts/workflow-evaluation.mjs, scripts/test-workflow-evaluation-critique.mjs, scripts/verify-package.mjs\nout-of-scope: U5-U11.",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-critique.mjs && node scripts/test-workflow-evaluation-calculator.mjs && node scripts/test-workflow-evaluation-csv.mjs && npm run verify:quiet\nOutput: ok - workflow evaluation critique replay fixtures\nok - calculator workflow evaluation project fixtures\nok - CSV workflow evaluation project fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed",
+        "wo:review PASS — alternate-model work-reviewer run 1b821e08: all ten roles and three partitions covered; authority isolation, frozen replay inputs, signed controls, treatment causality, and no-credit failure branches reviewed with no blockers. Artifact: .pi-subagents/artifacts/1b821e08_work-reviewer_0_output.md",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-critique.mjs && node scripts/test-workflow-evaluation-calculator.mjs && node scripts/test-workflow-evaluation-csv.mjs && npm run verify:quiet\nOutput: ok - workflow evaluation critique replay fixtures\nok - calculator workflow evaluation project fixtures\nok - CSV workflow evaluation project fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U4 Frozen role and critique replay corpus",
+      "type": "task",
+      "updatedAt": "2026-07-17T07:10:43.778Z"
     }
   },
   "metadata": {
@@ -866,7 +891,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-17T06:51:47.487Z"
+    "updatedAt": "2026-07-17T07:10:43.778Z"
   },
   "schemaVersion": 1
 }

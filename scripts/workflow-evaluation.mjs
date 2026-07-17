@@ -64,6 +64,143 @@ function readJson(file, label = file) {
 	}
 }
 
+function requireRoleCase(value, message) {
+	if (!value) throw new Error(message);
+}
+
+export function visibleRoleCase(corpus, role, partition) {
+	const roleDefinition = corpus.roles?.find((item) => item.role === role);
+	const partitionDefinition = corpus.partitions?.[partition];
+	requireRoleCase(roleDefinition, `unknown role case: ${role}`);
+	requireRoleCase(partitionDefinition, `unknown role partition: ${partition}`);
+	return {
+		contract: "ce-workflow-role-case/v1",
+		campaignRevision: corpus.campaignRevision,
+		project: corpus.project,
+		arm: `${role}:${partition}`,
+		role: roleDefinition,
+		partition,
+		input: partitionDefinition.visible,
+		freeze: corpus.freeze,
+	};
+}
+
+export function critiqueEnvelope(arm, findings = []) {
+	const envelope = {
+		schema: "critique-envelope/v1",
+		arm,
+		kind: findings.length ? "critique" : "empty",
+		findings,
+	};
+	return { ...envelope, signature: fingerprint(envelope) };
+}
+
+export function verifyRoleCaseOutput(corpus, partition, output) {
+	const authority = corpus.partitions?.[partition]?.authority;
+	requireRoleCase(authority, `missing authority partition: ${partition}`);
+	const text = String(output ?? "");
+	return {
+		passed:
+			(authority.mustInclude ?? []).every((value) => text.includes(value)) &&
+			(authority.mustExclude ?? []).every((value) => !text.includes(value)),
+	};
+}
+
+export function replayCritiqueCase(corpus, role, partition, run) {
+	const visible = visibleRoleCase(corpus, role, partition);
+	const expectedFingerprint = fingerprint(visible);
+	requireRoleCase(
+		run.targetArm === visible.arm,
+		"critique delivered to wrong arm",
+	);
+	requireRoleCase(
+		run.visibleFingerprint === expectedFingerprint,
+		"visible role case bytes changed in transit",
+	);
+	requireRoleCase(
+		run.deliveredAtMs === corpus.freeze.deliveryAtMs,
+		"critique delivery timing changed",
+	);
+	requireRoleCase(
+		run.reviserId === corpus.freeze.reviser.id,
+		"fixed reviser identity changed",
+	);
+	const envelope = run.envelope;
+	requireRoleCase(
+		envelope?.signature ===
+			fingerprint({
+				schema: envelope.schema,
+				arm: envelope.arm,
+				kind: envelope.kind,
+				findings: envelope.findings,
+			}),
+		"critique envelope signature mismatch",
+	);
+	requireRoleCase(
+		envelope.arm === visible.arm,
+		"critique envelope arm mismatch",
+	);
+	requireRoleCase(
+		(envelope.findings.length === 0) === (envelope.kind === "empty"),
+		"empty critique control schema mismatch",
+	);
+	const eventIds = new Set();
+	for (const event of run.events ?? []) {
+		requireRoleCase(
+			event.id && !eventIds.has(event.id),
+			"duplicate critique event",
+		);
+		eventIds.add(event.id);
+	}
+	const consumed = (run.events ?? []).some(
+		(event) => event.type === "critique-consumed",
+	);
+	const findingIds = envelope.findings.map((finding) => finding.id);
+	requireRoleCase(
+		new Set(findingIds).size === findingIds.length,
+		"duplicate critique finding",
+	);
+	const accepted = new Set(
+		(run.events ?? [])
+			.filter((event) => event.type === "finding-accepted")
+			.map((event) => event.findingId),
+	);
+	const applied = new Set(
+		(run.events ?? [])
+			.filter((event) => event.type === "finding-applied")
+			.map((event) => event.findingId),
+	);
+	for (const findingId of [...accepted, ...applied])
+		requireRoleCase(
+			findingIds.includes(findingId),
+			`unknown critique finding: ${findingId}`,
+		);
+	const verified = (run.events ?? []).some(
+		(event) => event.type === "revision-verified" && event.passed === true,
+	);
+	const regressed = (run.events ?? []).some(
+		(event) => event.type === "regression-detected",
+	);
+	const creditedFindings = findingIds.filter(
+		(findingId) => accepted.has(findingId) && applied.has(findingId),
+	);
+	return {
+		visibleFingerprint: expectedFingerprint,
+		replayFingerprint: fingerprint({ visible, envelope, events: run.events }),
+		cost: run.cost ?? { tokens: 0, wallMs: 0 },
+		consumed,
+		creditedFindings,
+		verified,
+		regressed,
+		credit:
+			envelope.kind === "critique" &&
+			consumed &&
+			creditedFindings.length > 0 &&
+			verified &&
+			!regressed,
+	};
+}
+
 function initializeWorkspace(cwd) {
 	command(cwd, "git", ["init", "--quiet"]);
 	command(cwd, "git", [
