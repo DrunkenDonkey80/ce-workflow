@@ -97,6 +97,8 @@ const evaluationFiles = [
 	"benchmarks/workflow-evaluation/v1/experiments/calibration.example.json",
 	"benchmarks/workflow-evaluation/v1/experiments/decision.example.json",
 	"benchmarks/workflow-evaluation/v1/experiments/golden-update.example.json",
+	"benchmarks/workflow-evaluation/v1/experiments/model-role-campaign.example.json",
+	"benchmarks/workflow-evaluation/v1/experiments/role-smoke.example.json",
 	"benchmarks/workflow-evaluation/v1/experiments/sentinel.example.json",
 	"benchmarks/workflow-evaluation/v1/experiments/smoke.example.json",
 	"benchmarks/workflow-evaluation/v1/manifest.json",

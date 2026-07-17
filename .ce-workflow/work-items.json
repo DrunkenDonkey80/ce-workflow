@@ -908,6 +908,32 @@
       "title": "U5 Dual evaluator and Pareto scoring",
       "type": "task",
       "updatedAt": "2026-07-17T07:30:45.138Z"
+    },
+    "work-1.7": {
+      "acceptance": "GATE: npm run verify:quiet and node scripts/test-workflow-evaluation-runner.mjs and node scripts/test-workflow-evaluation-sentinel.mjs pass; campaign/price/credential-source/approved endpoint/visibility/role capability/retry/budget/seed/30-day expiry/stopping rules are frozen and fingerprinted; every exact candidate identity and role trigger has one retained diagnostic pair with requested/observed provenance and panel capability; smoke never ranks or promotes by absence; unavailable lane blocks only itself; cancellation/durability failure terminates safely; reports visibly non-decision-grade. Live provider smoke requires explicit billing/credential availability.",
+      "createdAt": "2026-07-17T07:31:08.008Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Freeze the model-role campaign and prove every selected lane is safely wired with non-decision-grade smoke evidence.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.7",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan\nplan-path: docs\\plans\\2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\ntarget: U6 Deterministic gate and smoke campaign\nrequirements: R6, R20-R27, R33-R39; F1-F2; AE13-AE15\ndependencies: U1-U5 closed\nfiles: scripts/verify-package.mjs, package.json, README.md, benchmarks/workflow-evaluation/v1/experiments/model-role-campaign.example.json, benchmarks/workflow-evaluation/v1/experiments/role-smoke.example.json, scripts/test-workflow-evaluation-runner.mjs, scripts/test-workflow-evaluation-sentinel.mjs\nout-of-scope: U7-U11.",
+        "wo:live-smoke 5/7 PASS — Sol-high, Sol-xhigh, Terra-medium, Terra-high, Luna-medium completed with exact requested/observed provenance and usage. Opus-high and Opus-xhigh are lane-local non-ranking quota blockers after provider reachability/provenance passed. Evidence: .pi/workflow-evaluation/u6-live-smoke/capabilities.json (expires 2026-08-16). Harness feedback fixed: observed endpoint freezing, stdin EPIPE safety, and 'out of extra usage' quota classification.",
+        "wo:review FAIL npm run verify:quiet timed out at 120s; provide a completed package-regression result before acceptance.",
+        "wo:review PASS — independent work-reviewer run 158d1745; RPC/runner/sentinel fixtures pass, npm run verify:quiet passes, no remaining blockers. Artifact: .pi-subagents/artifacts/158d1745_work-reviewer_output.md",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-rpc.mjs && node scripts/test-workflow-evaluation-runner.mjs && node scripts/test-workflow-evaluation-sentinel.mjs && npm run verify:quiet\nOutput: ok - workflow evaluation RPC fixtures\nok - workflow evaluation smoke and decision lifecycle fixtures\nok - workflow evaluation calibration, approval, and sentinel fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U6 Deterministic gate and smoke campaign",
+      "type": "task",
+      "updatedAt": "2026-07-17T11:06:37.332Z"
     }
   },
   "metadata": {
@@ -917,7 +943,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-17T07:30:45.138Z"
+    "updatedAt": "2026-07-17T11:06:37.332Z"
   },
   "schemaVersion": 1
 }

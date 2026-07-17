@@ -125,7 +125,12 @@ export function classifyInfrastructureFailure(failure, error = "") {
 		return "model-not-found";
 	if (/auth|unauthori[sz]ed|invalid api.?key|\b401\b|\b403\b/.test(text))
 		return "authentication";
-	if (/quota|rate.?limit|too many requests|\b429\b/.test(text)) return "quota";
+	if (
+		/quota|rate.?limit|too many requests|out of (?:extra )?usage|\b429\b/.test(
+			text,
+		)
+	)
+		return "quota";
 	if (/timeout|timed.?out/.test(text)) return "timeout";
 	if (/refus|content policy|safety policy|blocked response/.test(text))
 		return "refusal";
@@ -976,6 +981,13 @@ export async function runRpcSample(options) {
 		};
 		const fail = (failure, error) =>
 			settle({ status: "failed", failure, error });
+		child.stdin.on("error", (error) => {
+			if (error?.code !== "EPIPE")
+				fail(
+					"process-error",
+					error instanceof Error ? error.message : String(error),
+				);
+		});
 		const onAbort = () => {
 			send({ type: "abort" });
 			fail("aborted", "RPC sample aborted");

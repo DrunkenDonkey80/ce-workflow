@@ -76,6 +76,17 @@ Every invocation uses `node scripts/workflow-evaluation.mjs <descriptor.json>` a
 | `golden-update` | Records generated artifact hashes and acceptance evidence; it mutates approval records only after explicit human approval. |
 | `sentinel` | Runs both projects through actual brainstorm → plan → work handoffs without golden substitution. Requires current approvals and calibration for all six project-stage combinations. |
 
+The frozen model-role campaign lives in
+`benchmarks/workflow-evaluation/v1/experiments/model-role-campaign.example.json`.
+Its companion `role-smoke.example.json` is always non-decision-grade: one
+retained diagnostic pair per exact role/model/effort arm may block only that
+arm for wiring, capability, provenance, or harness failure. Smoke never ranks
+candidates or promotes one because another provider is unavailable. Campaign,
+pricing, seed, budgets, retry policy, approved endpoints, payload visibility,
+evaluator identities, and 30-day evidence expiry must be fingerprinted before
+the first paid sample. Provider credentials remain in host provider clients and
+live smoke requires explicit billing authorization.
+
 The other files in `benchmarks/workflow-evaluation/v1/experiments/` are starting templates. Replace every `replace-with-*` value with a retained path before running them. Missing provider credentials, evaluator access, browser capability, provenance, telemetry, calibration, or approval fails closed and cannot become passing or decision-grade evidence. Sentinel runs are mandatory for handoff, artifact, routing, finalization, default-behavior, extension, prompt, skill, agent, or otherwise non-narrow changes; documentation, benchmark-fixture, and focused test-only changes are narrow.
 
 Candidate extensions execute with full process permissions. Path containment and fresh disposable roots protect benchmark integrity but are **not a hostile-code sandbox**. Only run trusted candidates with `"trusted": true`; untrusted candidates require `"isolation": "os"` plus an external `sandboxCommand`. Reports sanitize credential-like fields and authority-resource paths; hidden contracts, unshown answer-bank data, unselected goldens, evaluator labels, and undeclared environment differences are never exposed to the tested workflow.

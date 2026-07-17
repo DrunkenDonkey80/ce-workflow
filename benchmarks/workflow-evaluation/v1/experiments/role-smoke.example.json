@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "mode": "smoke-campaign",
+  "campaign": "model-role-campaign.example.json",
+  "campaignFingerprint": "model-role-campaign-v1-frozen",
+  "decisionGrade": false,
+  "pairsPerArm": 1,
+  "projects": ["csv-expenses", "calculator"],
+  "retain": [
+    "requestedIdentity",
+    "observedIdentity",
+    "roleCapability",
+    "evaluatorCapability",
+    "hardGates",
+    "failureClassification",
+    "evidencePath"
+  ],
+  "rules": {
+    "rankCandidates": false,
+    "promoteByAbsence": false,
+    "unavailableLanePolicy": "block-only-that-lane",
+    "requireExactProviderModelEffort": true,
+    "requireDurableEvidence": true,
+    "cancelSafely": true
+  }
+}

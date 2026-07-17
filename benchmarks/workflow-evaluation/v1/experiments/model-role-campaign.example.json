@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "campaignRevision": "model-role-campaign-v1",
+  "fingerprint": "model-role-campaign-v1-frozen",
+  "frozenBeforeFirstSample": true,
+  "seed": 56001,
+  "projects": ["csv-expenses", "calculator"],
+  "priceTable": {
+    "path": "benchmarks/workflow-evaluation/v1/pricing.example.json",
+    "fingerprint": "pricing-v1-example"
+  },
+  "credentials": {
+    "source": "host-provider-clients",
+    "serialized": false,
+    "leastPrivilege": true
+  },
+  "providers": {
+    "openai-codex": {
+      "approvedEndpoint": "https://chatgpt.com/backend-api",
+      "visibility": "internal"
+    },
+    "anthropic": {
+      "approvedEndpoint": "https://api.anthropic.com",
+      "visibility": "internal"
+    }
+  },
+  "evaluators": [
+    { "provider": "openai-codex", "model": "gpt-5.6-sol", "effort": "high" },
+    { "provider": "anthropic", "model": "claude-opus-4-8", "effort": "high" }
+  ],
+  "evidence": {
+    "visibility": "authority-only",
+    "expiryDays": 30,
+    "durabilityBeforeDeletion": true
+  },
+  "protocol": {
+    "smokePairs": 1,
+    "decisionPairs": 3,
+    "symmetricInfrastructureReplacements": 1,
+    "rankSmoke": false,
+    "unavailableLanePolicy": "block-only-that-lane",
+    "promotionByAbsence": false,
+    "stopOnCancellation": true,
+    "stopOnDurabilityFailure": true
+  },
+  "budgets": {
+    "tokensPerSample": 100000,
+    "wallMsPerSample": 900000,
+    "retries": 1
+  },
+  "models": {
+    "Sol-high": { "provider": "openai-codex", "model": "gpt-5.6-sol", "effort": "high" },
+    "Sol-xhigh": { "provider": "openai-codex", "model": "gpt-5.6-sol", "effort": "xhigh" },
+    "Terra-medium": { "provider": "openai-codex", "model": "gpt-5.6-terra", "effort": "medium" },
+    "Terra-high": { "provider": "openai-codex", "model": "gpt-5.6-terra", "effort": "high" },
+    "Luna-medium": { "provider": "openai-codex", "model": "gpt-5.6-luna", "effort": "medium" },
+    "Opus-high": { "provider": "anthropic", "model": "claude-opus-4-8", "effort": "high" },
+    "Opus-xhigh": { "provider": "anthropic", "model": "claude-opus-4-8", "effort": "xhigh" }
+  },
+  "lanes": [
+    { "role": "main", "trigger": "/work-brainstorm", "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"] },
+    { "role": "work-planner", "trigger": "/work-plan", "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"] },
+    { "role": "work-migrator", "trigger": "/work-migrate", "candidates": ["Luna-medium", "Terra-medium", "Sol-high"] },
+    { "role": "work-worker", "trigger": "/work-resume", "candidates": ["Terra-medium", "Terra-high", "Sol-high"] },
+    { "role": "work-fixer", "trigger": "review-failure", "candidates": ["Terra-medium", "Terra-high", "Sol-high"] },
+    { "role": "work-debugger", "trigger": "/work-debug", "candidates": ["Terra-high", "Sol-high", "Sol-xhigh"] },
+    { "role": "work-reviewer", "trigger": "review-gate", "candidates": ["Terra-high", "Sol-high", "Opus-high", "Opus-xhigh"] },
+    { "role": "work-advisor", "trigger": "critic-gate", "candidates": ["Sol-high", "Sol-xhigh", "Opus-high", "Opus-xhigh"] },
+    { "role": "work-advisor-backup", "trigger": "primary-unavailable", "candidates": ["Luna-medium", "Terra-medium", "Sol-high"] },
+    { "role": "work-committer", "trigger": "finish-gate", "candidates": ["configured-control"] }
+  ]
+}

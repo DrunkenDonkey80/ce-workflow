@@ -233,6 +233,7 @@ assert.deepEqual(
 		["provider-error", "model not found"],
 		["provider-error", "401 unauthorized"],
 		["provider-error", "quota exceeded"],
+		["provider-error", "You're out of extra usage"],
 		["timeout", ""],
 		["provider-error", "safety refusal"],
 		["malformed-rpc", "invalid json"],
@@ -241,6 +242,7 @@ assert.deepEqual(
 	[
 		"model-not-found",
 		"authentication",
+		"quota",
 		"quota",
 		"timeout",
 		"refusal",
@@ -834,7 +836,10 @@ const endpointMismatch = await runRpcSample({
 assert.equal(endpointMismatch.failure, "model-provenance");
 assert.match(endpointMismatch.error, /endpoint mismatch/);
 await expectFailure(fakeProcess(["{malformed"]), "malformed-rpc");
-await expectFailure(fakeProcess(["__exit"]), "process-exit");
+const exitedProcess = fakeProcess(["__exit"]);
+await expectFailure(exitedProcess, "process-exit");
+const brokenPipe = Object.assign(new Error("broken pipe"), { code: "EPIPE" });
+assert.doesNotThrow(() => exitedProcess.stdin.emit("error", brokenPipe));
 await expectFailure(
 	fakeProcess([{ type: "agent_settled" }], {
 		stats: { contextUsage: { tokens: 10 } },

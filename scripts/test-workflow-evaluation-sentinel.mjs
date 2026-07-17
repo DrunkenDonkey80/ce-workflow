@@ -23,6 +23,35 @@ function readJson(file) {
 		);
 	}
 }
+const campaign = readJson(
+	path.join(
+		sourceRoot,
+		"benchmarks",
+		"workflow-evaluation",
+		"v1",
+		"experiments",
+		"model-role-campaign.example.json",
+	),
+);
+assert.deepEqual(
+	campaign.lanes.map((lane) => lane.role),
+	[
+		"main",
+		"work-planner",
+		"work-migrator",
+		"work-worker",
+		"work-fixer",
+		"work-debugger",
+		"work-reviewer",
+		"work-advisor",
+		"work-advisor-backup",
+		"work-committer",
+	],
+);
+assert.equal(
+	campaign.lanes.every((lane) => lane.trigger && lane.candidates.length > 0),
+	true,
+);
 const csv = path.join(
 	sourceRoot,
 	"benchmarks",

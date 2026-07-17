@@ -25,6 +25,57 @@ import {
 } from "./workflow-evaluation.mjs";
 
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+function readFixture(relative) {
+	try {
+		return JSON.parse(readFileSync(path.join(sourceRoot, relative), "utf8"));
+	} catch (error) {
+		throw new Error(
+			`invalid fixture ${relative}: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+}
+const campaign = readFixture(
+	"benchmarks/workflow-evaluation/v1/experiments/model-role-campaign.example.json",
+);
+const roleSmoke = readFixture(
+	"benchmarks/workflow-evaluation/v1/experiments/role-smoke.example.json",
+);
+assert.equal(campaign.frozenBeforeFirstSample, true);
+assert.equal(roleSmoke.campaignFingerprint, campaign.fingerprint);
+assert.equal(roleSmoke.decisionGrade, false);
+assert.equal(roleSmoke.rules.rankCandidates, false);
+assert.equal(roleSmoke.rules.promoteByAbsence, false);
+assert.equal(roleSmoke.rules.unavailableLanePolicy, "block-only-that-lane");
+assert.equal(campaign.protocol.symmetricInfrastructureReplacements, 1);
+assert.equal(campaign.evidence.expiryDays, 30);
+assert.equal(campaign.evidence.durabilityBeforeDeletion, true);
+assert.equal(new Set(campaign.evaluators.map((item) => item.provider)).size, 2);
+assert.equal(
+	campaign.lanes.every((lane) =>
+		lane.candidates.every(
+			(candidate) =>
+				candidate === "configured-control" || campaign.models[candidate],
+		),
+	),
+	true,
+);
+assert.equal(
+	JSON.stringify(campaign).match(/api.?key|bearer|credential-canary/i),
+	null,
+);
+const roundContract = ({ seed, budgets, protocol, projects }) =>
+	JSON.stringify({ seed, budgets, protocol, projects });
+assert.notEqual(
+	roundContract(campaign),
+	roundContract({ ...campaign, seed: campaign.seed + 1 }),
+);
+assert.notEqual(
+	roundContract(campaign),
+	roundContract({
+		...campaign,
+		budgets: { ...campaign.budgets, retries: 2 },
+	}),
+);
 const recoveryRoot = mkdtempSync(
 	path.join(os.tmpdir(), "ce-workspace-recovery-fixture-"),
 );
