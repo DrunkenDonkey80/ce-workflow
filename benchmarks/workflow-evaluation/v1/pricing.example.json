@@ -1,0 +1,13 @@
+{
+	"version": 1,
+	"fingerprint": "pricing-v1-example",
+	"currency": "USD",
+	"unit": "per-million-tokens",
+	"prices": {
+		"input": 3,
+		"output": 15,
+		"reasoning": 15,
+		"cacheRead": 0.3,
+		"cacheWrite": 3.75
+	}
+}

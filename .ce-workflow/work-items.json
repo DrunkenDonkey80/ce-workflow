@@ -882,6 +882,32 @@
       "title": "U4 Frozen role and critique replay corpus",
       "type": "task",
       "updatedAt": "2026-07-17T07:10:43.778Z"
+    },
+    "work-1.6": {
+      "acceptance": "GATE: node scripts/test-workflow-evaluation-score.mjs, node scripts/test-workflow-evaluation-panel.mjs, and npm run verify:quiet pass. Agreeing valid evaluators permit scoring; opposite winners or critical disagreement return no-winner; malformed/timeout/identity drift invalidate; blinded inputs leak no labels, paths, timestamps, configs, peer result, or hidden authority; seeded objective evidence settles only matching defects; Pareto retains quality/tokens/cost/time/tools/retries/questions/rework/critic overhead without scalar collapse; new recommendations require the panel while historical single-evaluator evidence remains readable; cross-provider lower-cost claims require complete matching frozen price categories/fingerprint.",
+      "createdAt": "2026-07-17T07:11:39.807Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Add independent pinned GPT/Claude judgments, role-specific scoring, Pareto reporting, and no-winner decisions.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.6",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan\nplan-path: docs\\plans\\2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\ntarget: U5 Dual evaluator and Pareto scoring\nrequirements: R17-R19, R28-R36; AE5-AE7, AE11-AE14\ndependencies: U1, U3-U4 closed\nfiles: agents/workflow-evaluator.md, benchmarks/workflow-evaluation/v1/pricing.example.json, scripts/workflow-evaluation-score.mjs, scripts/workflow-evaluation.mjs, scripts/test-workflow-evaluation-score.mjs, scripts/test-workflow-evaluation-panel.mjs\nout-of-scope: U6-U11.",
+        "wo:verify-check FAIL\nCommand: node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-panel.mjs && npm run verify:quiet\nRR_ASSERTION]: Expected values to be strictly deep-equal:\r\n+ actual - expected\r\n\r\n  [\r\n+   'incumbent',\r\n    'challenger'\r\n  ]\r\n\r\n    at file:///C:/soft/ce-workflow/scripts/test-workflow-evaluation-panel.mjs:215:8\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\r\n  generatedMessage: true,\r\n  code: 'ERR_ASSERTION',\r\n  actual: [ 'incumbent', 'challenger' ],\r\n  expected: [ 'challenger' ],\r\n  operator: 'deepStrictEqual',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.14.0\r\n",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-panel.mjs && npm run verify:quiet\nOutput: ok - workflow evaluation decision scoring fixtures\nok - workflow evaluation dual panel and Pareto fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed",
+        "wo:review PASS — alternate-model work-reviewer run e9d38d82: independent identities/blinding, disagreement and invalidation, objective matching, panel requirement, paired uncertainty, Pareto dimensions, and price-fingerprint gating reviewed with no blockers. Artifact: .pi-subagents/artifacts/e9d38d82_work-reviewer_0_output.md",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-panel.mjs && npm run verify:quiet\nOutput: ok - workflow evaluation decision scoring fixtures\nok - workflow evaluation dual panel and Pareto fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U5 Dual evaluator and Pareto scoring",
+      "type": "task",
+      "updatedAt": "2026-07-17T07:30:45.138Z"
     }
   },
   "metadata": {
@@ -891,7 +917,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-17T07:10:43.778Z"
+    "updatedAt": "2026-07-17T07:30:45.138Z"
   },
   "schemaVersion": 1
 }
