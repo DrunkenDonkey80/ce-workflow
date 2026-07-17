@@ -53,7 +53,9 @@ function readWorkItem(id) {
 }
 
 function childWorkItems(parentId) {
-	return Object.values(loadStore(cwd).items).filter((item) => item.parentId === parentId);
+	return Object.values(loadStore(cwd).items).filter(
+		(item) => item.parentId === parentId,
+	);
 }
 
 function readyNativeWorkItems() {
@@ -220,16 +222,14 @@ function finishTask() {
 		(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
 	);
 	if (!changed.length) throw new Error("no related changes to commit");
-	const implementationFiles = changed.filter(
-		(file) => {
-			const normalized = file.replaceAll("\\", "/");
-			return (
-				!normalized.startsWith(".ce-workflow/") &&
-				normalized !== ".ce-workflow/work-items.json" &&
-				normalized !== ".gitignore"
-			);
-		},
-	);
+	const implementationFiles = changed.filter((file) => {
+		const normalized = file.replaceAll("\\", "/");
+		return (
+			!normalized.startsWith(".ce-workflow/") &&
+			normalized !== ".ce-workflow/work-items.json" &&
+			normalized !== ".gitignore"
+		);
+	});
 	if (implementationFiles.length > maxFiles)
 		throw new Error(
 			`scope exceeds ${maxFiles} implementation files: ${implementationFiles.join(", ")}`,
@@ -303,7 +303,9 @@ function finishTask() {
 		throw new Error("no staged changes after filtering runtime files");
 	const headBefore = git(["rev-parse", "HEAD"]).trim();
 	const canonical = storePath(cwd);
-	const canonicalBefore = existsSync(canonical) ? readFileSync(canonical, "utf8") : null;
+	const canonicalBefore = existsSync(canonical)
+		? readFileSync(canonical, "utf8")
+		: null;
 	let push = "skipped";
 	try {
 		git(["commit", "-m", `${id}: ${message}`]);
@@ -316,9 +318,17 @@ function finishTask() {
 				],
 			}),
 		);
-		const closeChanges = gitStatusPaths().filter((file) => !isRuntimePath(file));
-		if (closeChanges.some((file) => file.replaceAll("\\", "/") !== ".ce-workflow/work-items.json"))
-			throw new Error(`non-work-store files changed during close: ${closeChanges.join(", ")}`);
+		const closeChanges = gitStatusPaths().filter(
+			(file) => !isRuntimePath(file),
+		);
+		if (
+			closeChanges.some(
+				(file) => file.replaceAll("\\", "/") !== ".ce-workflow/work-items.json",
+			)
+		)
+			throw new Error(
+				`non-work-store files changed during close: ${closeChanges.join(", ")}`,
+			);
 		git(["add", "--", ".ce-workflow/work-items.json"]);
 		git(["commit", "--amend", "--no-edit"]);
 		const remaining = gitStatusPaths().filter((file) => !isRuntimePath(file));
@@ -326,7 +336,12 @@ function finishTask() {
 			throw new Error(`related files remain dirty: ${remaining.join(", ")}`);
 		if (args.includes("--push")) {
 			try {
-				git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]);
+				git([
+					"rev-parse",
+					"--abbrev-ref",
+					"--symbolic-full-name",
+					"@{upstream}",
+				]);
 			} catch (error) {
 				if (/upstream/i.test(String(error.stderr ?? error.message ?? error)))
 					push = "skipped-no-upstream";
@@ -341,7 +356,9 @@ function finishTask() {
 		if (canonicalBefore === null) rmSync(canonical, { force: true });
 		else writeFileSync(canonical, canonicalBefore);
 		git(["reset", "--mixed", headBefore]);
-		throw new Error(`finalization rolled back before close: ${error.message ?? error}`);
+		throw new Error(
+			`finalization rolled back before close: ${error.message ?? error}`,
+		);
 	}
 	return {
 		status: "PASS",
@@ -362,7 +379,8 @@ function arr(value) {
 
 function field(issue, ...names) {
 	for (const name of names)
-		if (issue?.[name] !== null && issue?.[name] !== undefined) return issue[name];
+		if (issue?.[name] !== null && issue?.[name] !== undefined)
+			return issue[name];
 }
 
 function idOf(issue) {
@@ -482,7 +500,9 @@ function jsonAssertionFailures(file) {
 		return [`invalid JSON assertion file: ${error.message}`];
 	}
 	const failures = [];
-	for (const key of String(option("--required", "")).split(",").filter(Boolean)) {
+	for (const key of String(option("--required", ""))
+		.split(",")
+		.filter(Boolean)) {
 		const value = jsonPath(data, key);
 		if (value === null || value === undefined) failures.push(`missing ${key}`);
 	}
@@ -602,7 +622,8 @@ try {
 		const allowed = allowWorkStore
 			? staged.filter(
 					(file) =>
-						file === ".ce-workflow/issues.jsonl" || file.startsWith(".ce-workflow/"),
+						file === ".ce-workflow/issues.jsonl" ||
+						file.startsWith(".ce-workflow/"),
 				)
 			: [];
 		if (allowed.length) git(["restore", "--staged", ...allowed]);
@@ -617,7 +638,9 @@ try {
 	} else if (command === "work-create") {
 		const [title] = positional();
 		if (!title)
-			throw new Error("usage: work-create <title> [--parent <id>] [--type <type>] [--description <text>] [--acceptance <text>] [--note <text>] [--label <label>]");
+			throw new Error(
+				"usage: work-create <title> [--parent <id>] [--type <type>] [--description <text>] [--acceptance <text>] [--note <text>] [--label <label>]",
+			);
 		const labels = args.flatMap((arg, index) =>
 			arg === "--label" && args[index + 1] ? [args[index + 1]] : [],
 		);
@@ -635,7 +658,8 @@ try {
 		print(summary(created, 300));
 	} else if (command === "work-close") {
 		const id = args[0];
-		if (!id) throw new Error("usage: work-close <work-item-id> [--note <text>]");
+		if (!id)
+			throw new Error("usage: work-close <work-item-id> [--note <text>]");
 		const closed = mutateStore(cwd, (store) => {
 			const current = store.items[id];
 			if (!current) throw new Error(`WorkItem not found: ${id}`);
@@ -649,14 +673,34 @@ try {
 		print(summary(closed, 300));
 	} else if (command === "work-claim") {
 		print(
-			summary(updateNativeWorkItem(args[0], (current) => ({ ...current, status: "in_progress" })), 300),
+			summary(
+				updateNativeWorkItem(args[0], (current) => ({
+					...current,
+					status: "in_progress",
+				})),
+				300,
+			),
 		);
 	} else if (command === "work-note") {
-		const [id, noteArg] = args;
-		const note = existsSync(noteArg)
-			? readFileSync(noteArg, "utf8")
-			: args.slice(1).join(" ");
-		print(summary(updateNativeWorkItem(id, (current) => ({ ...current, notes: [...current.notes, note] })), 500));
+		const [id] = args;
+		const noteArgs = args.slice(args[1] === "--append-notes" ? 2 : 1);
+		if (!id || !noteArgs.length)
+			throw new Error(
+				"usage: work-note <work-item-id> [--append-notes] <note>",
+			);
+		const note =
+			noteArgs.length === 1 && existsSync(noteArgs[0])
+				? readFileSync(noteArgs[0], "utf8")
+				: noteArgs.join(" ");
+		print(
+			summary(
+				updateNativeWorkItem(id, (current) => ({
+					...current,
+					notes: [...current.notes, note],
+				})),
+				500,
+			),
+		);
 	} else if (command === "work-block") {
 		const task = args[0];
 		const blocker = option("--by");
@@ -675,10 +719,17 @@ try {
 		const id = args[0];
 		const add = option("--add");
 		const remove = option("--remove");
-		print(summary(updateNativeWorkItem(id, (current) => ({
-			...current,
-			labels: current.labels.filter((label) => label !== remove).concat(add ? [add] : []),
-		})), 300));
+		print(
+			summary(
+				updateNativeWorkItem(id, (current) => ({
+					...current,
+					labels: current.labels
+						.filter((label) => label !== remove)
+						.concat(add ? [add] : []),
+				})),
+				300,
+			),
+		);
 	} else if (command === "bootstrap-plan-epic") {
 		const [rel] = positional();
 		if (!rel) throw new Error("usage: bootstrap-plan-epic <plan-path>");

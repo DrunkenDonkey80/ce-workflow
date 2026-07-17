@@ -772,6 +772,22 @@
       "type": "task",
       "updatedAt": "2026-07-16T19:21:18.172Z"
     },
+    "work-1.10": {
+      "acceptance": "test-work-improvement-delivery retries transient recursive cleanup failures and the focused test plus npm run verify:quiet pass.",
+      "createdAt": "2026-07-17T22:23:35.160Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "npm run verify:quiet intermittently fails with EPERM when a just-used Git fixture root is removed on Windows.",
+      "evidence": [],
+      "id": "work-1.10",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-1",
+      "status": "open",
+      "title": "Retry Windows fixture cleanup",
+      "type": "bug",
+      "updatedAt": "2026-07-17T22:23:35.160Z"
+    },
     "work-1.2": {
       "acceptance": "GATE: node scripts/test-workflow-evaluation-contract.mjs passes - canonical one-factor model/role descriptors pass and every ambiguous or multi-factor configuration fails closed. Scenarios: (1) a top-level or one-role modelAssignment delta may change provider+exact model together as one logical factor; (2) provider/model changes outside a declared compound assignment fail as partial/undeclared deltas, effort+assignment still requires an interaction experiment; (3) unknown roles, incomplete role cells, ambient overrides, no-op aliases, unsupported effort, and undeclared fallback fail before provisioning; (4) key-order differences do not change the role-map fingerprint; (5) existing workflowRevision/effort/prompt/mode/reviewer descriptors remain compatible. Package regression: npm run verify:quiet stays green. AC1 (V1 harness compatibility) and AC2 (role configuration) must not regress; no source mutation of approved bundles/goldens.",
       "createdAt": "2026-07-16T19:21:11.697Z",
@@ -977,15 +993,21 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "The documented planner/helper syntax uses work-note <id> --append-notes <text>, but work-helper currently appends the flag itself to notes.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-1.9",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
       "parentId": "work-1",
-      "status": "open",
+      "status": "closed",
       "title": "Support documented work-note --append-notes syntax",
       "type": "bug",
-      "updatedAt": "2026-07-17T14:32:56.220Z"
+      "updatedAt": "2026-07-17T22:23:44.814Z"
     }
   },
   "metadata": {
@@ -995,7 +1017,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-17T22:23:16.541Z"
+    "updatedAt": "2026-07-17T22:23:44.814Z"
   },
   "schemaVersion": 1
 }

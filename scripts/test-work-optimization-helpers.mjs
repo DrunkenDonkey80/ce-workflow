@@ -52,16 +52,63 @@ try {
 	);
 
 	const store = initStore(cwd);
-	createWorkItem(store, { id: "E-1", type: "epic", status: "in_progress", title: "Epic" });
-	createWorkItem(store, { id: "DEP-1", type: "task", status: "closed", title: "Dependency", parentId: "E-1" });
-	createWorkItem(store, { id: "TASK-123", type: "task", status: "open", title: "Native task", parentId: "E-1", dependencies: ["DEP-1"], notes: [issue.notes], acceptance: "must pass" });
+	createWorkItem(store, {
+		id: "E-1",
+		type: "epic",
+		status: "in_progress",
+		title: "Epic",
+	});
+	createWorkItem(store, {
+		id: "DEP-1",
+		type: "task",
+		status: "closed",
+		title: "Dependency",
+		parentId: "E-1",
+	});
+	createWorkItem(store, {
+		id: "TASK-123",
+		type: "task",
+		status: "open",
+		title: "Native task",
+		parentId: "E-1",
+		dependencies: ["DEP-1"],
+		notes: [issue.notes],
+		acceptance: "must pass",
+	});
 	saveStore(cwd, store);
 	const oldBd = process.env.WORK_ORCH_BD_BIN;
 	process.env.WORK_ORCH_BD_BIN = path.join(cwd, "bd-must-not-run");
 	try {
-		assert(mod.workflowTaskSummary(cwd, "TASK-123").title === "Native task", "native task summary avoids bd");
-		const ready = JSON.parse(execFileSync(process.execPath, [path.join(import.meta.dirname, "work-helper.mjs"), "work-ready-summary", "E-1"], { cwd, encoding: "utf8" }));
-		assert(ready.length === 1 && ready[0].id === "TASK-123" && !ready[0].notes_tail, "native ready helper returns compact execution fields without bd");
+		assert(
+			mod.workflowTaskSummary(cwd, "TASK-123").title === "Native task",
+			"native task summary avoids bd",
+		);
+		const helper = path.join(import.meta.dirname, "work-helper.mjs");
+		const ready = JSON.parse(
+			execFileSync(process.execPath, [helper, "work-ready-summary", "E-1"], {
+				cwd,
+				encoding: "utf8",
+			}),
+		);
+		assert(
+			ready.length === 1 && ready[0].id === "TASK-123" && !ready[0].notes_tail,
+			"native ready helper returns compact execution fields without bd",
+		);
+		execFileSync(
+			process.execPath,
+			[helper, "work-note", "TASK-123", "direct note"],
+			{ cwd },
+		);
+		execFileSync(
+			process.execPath,
+			[helper, "work-note", "TASK-123", "--append-notes", "flagged note"],
+			{ cwd },
+		);
+		const notes = loadStore(cwd).items["TASK-123"].notes;
+		assert(
+			notes.at(-2) === "direct note" && notes.at(-1) === "flagged note",
+			"work-note accepts direct and --append-notes forms without persisting the flag",
+		);
 	} finally {
 		if (oldBd === undefined) delete process.env.WORK_ORCH_BD_BIN;
 		else process.env.WORK_ORCH_BD_BIN = oldBd;
@@ -213,12 +260,23 @@ try {
 	mkdirSync(finishCwd, { recursive: true });
 	const finishStore = initStore(finishCwd);
 	createWorkItem(finishStore, {
-		id: "TASK-1", type: "task", status: "open", title: "Routine task",
+		id: "TASK-1",
+		type: "task",
+		status: "open",
+		title: "Routine task",
 	});
 	for (const id of ["TASK-2", "TASK-3", "TASK-4", "TASK-ROLLBACK"])
-		createWorkItem(finishStore, { id, type: "task", status: "open", title: "Routine task" });
+		createWorkItem(finishStore, {
+			id,
+			type: "task",
+			status: "open",
+			title: "Routine task",
+		});
 	createWorkItem(finishStore, {
-		id: "TASK-5", type: "task", status: "open", title: "Update authentication permission checks",
+		id: "TASK-5",
+		type: "task",
+		status: "open",
+		title: "Update authentication permission checks",
 	});
 	saveStore(finishCwd, finishStore);
 	execFileSync("git", ["init"], { cwd: finishCwd, stdio: "ignore" });
