@@ -594,10 +594,15 @@ try {
 
 	setScenario("inProgressFixReady");
 	state = buildWorkResumeState(cwd, "E-1");
+	const reviewerHandoff = directRoleHandoffParams(state, cwd);
 	assert(
-		state.action === "run-review" &&
-			directRoleHandoffParams(state, cwd)?.agent === "work-reviewer",
+		state.action === "run-review" && reviewerHandoff?.agent === "work-reviewer",
 		"verified fixer result routes directly to one scoped re-review",
+	);
+	assert(
+		reviewerHandoff.params.async === true &&
+			reviewerHandoff.params.control?.needsAttentionAfterMs === 30_000,
+		"reviewer launches asynchronously with a liveness watchdog",
 	);
 
 	setScenario("inProgressReviewPass");

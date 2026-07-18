@@ -113,6 +113,7 @@ assert.match(
 	/User instruction for the target project: one task only: fix login/,
 );
 assert.match(oneTaskObjective, /Project autopilot policy/);
+assert.match(oneTaskObjective, /launch it async/);
 assert.match(
 	oneTaskObjective,
 	/if it says one task only, stop after one executable WorkItem closes/,
@@ -187,6 +188,9 @@ assert.match(
 assert.match(prompt, /work_goal_human_decision is only a durable fallback/);
 assert.match(prompt, /WORK_GOAL_NEEDS_HUMAN_DECISION/);
 assert.match(prompt, /work_goal_complete/);
+assert.match(prompt, /launch it async/);
+assert.match(prompt, /needsAttentionAfterMs/);
+assert.match(prompt, /never block the TUI on a foreground child/);
 
 const commands = {};
 const tools = {};

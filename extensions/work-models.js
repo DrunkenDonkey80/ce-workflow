@@ -5254,7 +5254,7 @@ function planResumeAction(state, cwd) {
 }
 
 const ROLE_TIMEOUT_GUIDANCE =
-	"Role timeout guidance: prefer no explicit timeout; if one is required, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout as infrastructure failure evidence, not implementation failure.";
+	"Role liveness guidance: launch specialists async with control.needsAttentionAfterMs=30000 and use wait/status; never block the TUI on a foreground child. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure.";
 
 function gitDirtyClassification(git) {
 	if (!git) return "unknown";
@@ -5351,6 +5351,10 @@ function directRoleHandoffParams(state, cwd, selectionNote = "") {
 			cwd,
 			async: true,
 			clarify: false,
+			control: {
+				enabled: true,
+				needsAttentionAfterMs: 30_000,
+			},
 			output: `work-${target}-${agent}.md`,
 			outputMode: "file-only",
 			acceptance: false,
@@ -9379,6 +9383,7 @@ function workProjectAutopilotAppendix() {
 - Treat the target directory as the source of truth: verify git and native work-item store state there before mutating anything.
 - Work directly in the current session by default. Intake, target selection, bounded implementation, verification, commit, close, and push are inline/coded work, not separate agents.
 - Do not call subagent list or ask an LLM to select a role. When specialization is genuinely required, call the exact role directly: work-planner for ambiguous/large slicing, work-debugger for root-cause failures, work-worker for high-risk isolated writing, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
+- When a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use wait/status; never block the TUI on a foreground child.
 - Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
 - Use /work-resume for one deterministic WorkItem boundary. Use /work-goal only when the user explicitly wants a multi-step autonomous loop.
 - Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it says N tasks, stop after N executable native work-item store close.
@@ -9854,6 +9859,7 @@ ${escapeXmlText(goal.objective)}
 - Keep working autonomously until the objective is complete and verified.
 - Before each continuation, /work-goal will microcompact old reasoning and tool noise; treat native work-item store, git, files, tests, and command output as source of truth.
 - Work directly in this session by default. Do not call subagent list, delegate routine implementation/verification/commit work, or launch duplicate reviewers. Spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
+- When any specialist or decision evaluator is required, launch it async with control.needsAttentionAfterMs=30000 and use wait/status; never block the TUI on a foreground child. Treat startup/auth failure as unavailable infrastructure evidence, not a reason to wait indefinitely or retry blindly.
 - Prefer coded helpers and deterministic checks over asking an LLM to classify, summarize, validate, stage, commit, close, or choose an agent.
 - Do not stop for plan approval, permission to continue, or obvious implementation choices. Pick the clear winner and continue.
 - Use ask_user for every question that truly needs human input: product intent, credentials/accounts, destructive or risky action, production/billing/legal impact, ambiguous priority/scope with no clear winner, hardware/environment access, or a target path/project choice you cannot infer. Ask one focused question and continue from its answer.
