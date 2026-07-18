@@ -395,6 +395,27 @@ function readGlobalSettings() {
 	);
 }
 
+function mergeSettings(base, override) {
+	const merged = { ...base };
+	for (const [key, value] of Object.entries(override)) {
+		const prior = merged[key];
+		merged[key] =
+			value &&
+			typeof value === "object" &&
+			!Array.isArray(value) &&
+			prior &&
+			typeof prior === "object" &&
+			!Array.isArray(prior)
+				? mergeSettings(prior, value)
+				: value;
+	}
+	return merged;
+}
+
+function readEffectiveSettings(cwd) {
+	return mergeSettings(readGlobalSettings(), readSettings(cwd));
+}
+
 function writeSettings(cwd, settings) {
 	const dir = join(cwd, CONFIG_DIR_NAME);
 	mkdirSync(dir, { recursive: true });
@@ -413,7 +434,7 @@ const WORK_WARP_ICONS = {
 };
 
 function warpSettings(cwd) {
-	const value = readSettings(cwd).warp;
+	const value = readEffectiveSettings(cwd).warp;
 	return typeof value === "object" && value !== null
 		? value
 		: { enabled: value };
@@ -886,7 +907,7 @@ export async function recoverTerminalWorkflowClaims(cwd, runtime = {}) {
 }
 
 function improvementStateCwd(cwd) {
-	const settings = readSettings(cwd);
+	const settings = readEffectiveSettings(cwd);
 	const configured = settings.workImprovement?.sourceCheckout;
 	return resolve(
 		cwd,
@@ -935,7 +956,7 @@ export async function processTerminalWorkflow(cwd, terminal, runtime = {}) {
 			join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs"),
 		).href
 	);
-	const settings = readSettings(cwd);
+	const settings = readEffectiveSettings(cwd);
 	const resolved = runner.resolveSourceCheckout({
 		settings,
 		packageRoot: WORKFLOW_REPO_DIR,
@@ -2568,7 +2589,7 @@ function workOrchBlock(settings) {
 }
 
 function workOrchSettings(cwd) {
-	const raw = readSettings(cwd).workOrchestrator ?? {};
+	const raw = readEffectiveSettings(cwd).workOrchestrator ?? {};
 	const profile = EFFORT_PROFILES[raw.profile] ? raw.profile : DEFAULT_PROFILE;
 	const base = EFFORT_PROFILES[profile];
 	const advisorEnabled = Object.fromEntries(
@@ -2653,7 +2674,7 @@ function setWorkResumeBoolean(settings, key, value) {
 // ponytail: settings are prompt-live; the steps below are appended to the
 // role/plan/brainstorm handoff prompts so configured advisors actually run.
 function advisorCriticStep(cwd, target, usage = "all") {
-	const slots = configuredAdvisorSlots(readSettings(cwd), usage);
+	const slots = configuredAdvisorSlots(readEffectiveSettings(cwd), usage);
 	if (!slots.length) return "";
 	const agents = slots.map((slot) => slot.agents[0]);
 	const first = agents[0];
@@ -9320,16 +9341,14 @@ function workGoalSelfImprovingAppendix() {
 }
 
 function workResumeSettings(cwd) {
-	const value = readSettings(cwd).workResume;
+	const value = readEffectiveSettings(cwd).workResume;
 	const project = typeof value === "object" && value !== null ? value : {};
-	const globalDefault =
-		readGlobalSettings().workResume?.selfImprovingDefault === true;
+	const globalDefault = project.selfImprovingDefault === true;
 	return {
 		selfImproving:
 			project.selfImproving === true ||
 			(project.selfImproving !== false && globalDefault),
-		newSessionBetweenIterations:
-			project.newSessionBetweenIterations !== false,
+		newSessionBetweenIterations: project.newSessionBetweenIterations !== false,
 	};
 }
 
@@ -10859,7 +10878,8 @@ async function sendWorkflowFollowUp(ctx, message, pi, state) {
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
 	let compactEnabled = true;
 	try {
-		compactEnabled = contextSettings(readSettings(ctx.cwd)).enabled !== false;
+		compactEnabled =
+			contextSettings(readEffectiveSettings(ctx.cwd)).enabled !== false;
 	} catch {
 		// Keep the safe default when project settings are unreadable.
 	}
@@ -11379,6 +11399,7 @@ export {
 	setWorkOrchAdvisorSliceUsage,
 	advisorCriticStep,
 	workOrchSettings,
+	readEffectiveSettings as effectiveSettingsForTest,
 	workResumeSettings as workResumeSettingsForTest,
 	renderWorkIdeateText,
 	renderWorkBrainstormText,
@@ -11508,7 +11529,7 @@ export default function workModelsExtension(pi) {
 						join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs"),
 					).href
 				);
-				const settings = readSettings(ctx.cwd);
+				const settings = readEffectiveSettings(ctx.cwd);
 				const resolved = runner.resolveSourceCheckout({
 					settings,
 					packageRoot: WORKFLOW_REPO_DIR,
@@ -11842,9 +11863,9 @@ export default function workModelsExtension(pi) {
 			return;
 		let settings = {};
 		try {
-			settings = readSettings(ctx.cwd);
+			settings = readEffectiveSettings(ctx.cwd);
 		} catch {
-			// Ignore unreadable project settings and keep compaction safe.
+			// Ignore unreadable settings and keep compaction safe.
 		}
 		const current = contextSettings(settings);
 		if (current.enabled === false && !contextCompactState.requested) return;
@@ -11890,7 +11911,7 @@ export default function workModelsExtension(pi) {
 	pi.on("turn_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "turn_end", event);
 		try {
-			maybeCompact(ctx, readSettings(ctx.cwd), "turn boundary");
+			maybeCompact(ctx, readEffectiveSettings(ctx.cwd), "turn boundary");
 		} catch {
 			maybeCompact(ctx, {}, "turn boundary");
 		}
@@ -12224,10 +12245,10 @@ export default function workModelsExtension(pi) {
 		handler: async (args, ctx) => {
 			let settings;
 			try {
-				settings = readSettings(ctx.cwd);
+				settings = readEffectiveSettings(ctx.cwd);
 			} catch (error) {
 				ctx.ui.notify(
-					`Could not read ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
+					`Could not read settings: ${error instanceof Error ? error.message : String(error)}`,
 					"error",
 				);
 				return;
@@ -12258,18 +12279,21 @@ export default function workModelsExtension(pi) {
 				return;
 			}
 			if (command === "off" || command === "disable") {
+				settings = readSettings(ctx.cwd);
 				setContextSettings(settings, { enabled: false, autoCompact: false });
 				writeSettings(ctx.cwd, settings);
 				ctx.ui.notify("Disabled work context guard", "info");
 				return;
 			}
 			if (command === "on" || command === "enable") {
+				settings = readSettings(ctx.cwd);
 				setContextSettings(settings, { enabled: true, autoCompact: true });
 				writeSettings(ctx.cwd, settings);
 				ctx.ui.notify("Enabled work context guard", "info");
 				return;
 			}
 			if (command === "set") {
+				settings = readSettings(ctx.cwd);
 				setContextSettings(settings, {
 					compactAtTokens: clampCompactAt(value),
 				});
@@ -12300,7 +12324,7 @@ function onOff(value) {
 }
 
 function workSettingsStatus(ctx) {
-	const settings = readSettings(ctx.cwd);
+	const settings = readEffectiveSettings(ctx.cwd);
 	const resolved = workOrchSettings(ctx.cwd);
 	const resume = workResumeSettings(ctx.cwd);
 	const lines = [
@@ -12326,7 +12350,7 @@ function workSettingsStatus(ctx) {
 		"",
 		"Resume automation",
 		`  ${onOff(resume.selfImproving)} self-improving workflow fixes (autonomous source delivery)`,
-		`  source: ${readSettings(ctx.cwd).workImprovement?.sourceCheckout ?? process.env.CE_WORKFLOW_SOURCE_DIR ?? "package checkout fallback"}`,
+		`  source: ${settings.workImprovement?.sourceCheckout ?? process.env.CE_WORKFLOW_SOURCE_DIR ?? "package checkout fallback"}`,
 		`  ${onOff(resume.newSessionBetweenIterations)} new session between iterations`,
 	];
 	notify(ctx, lines.join("\n"), "info");
@@ -12435,10 +12459,10 @@ async function workSettingsLoop(ctx) {
 	for (;;) {
 		let settings;
 		try {
-			settings = readSettings(ctx.cwd);
+			settings = readEffectiveSettings(ctx.cwd);
 		} catch (error) {
 			ctx.ui.notify(
-				`Could not read ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
+				`Could not read settings: ${error instanceof Error ? error.message : String(error)}`,
 				"error",
 			);
 			return;
@@ -12514,9 +12538,10 @@ async function workSettingsLoop(ctx) {
 		const { pick } = selected;
 		if (pick.kind === "done") return;
 		if (pick.kind === "reset") {
-			resetAll(settings);
-			delete settings.workOrchestrator;
-			writeSettings(ctx.cwd, settings);
+			const projectSettings = readSettings(ctx.cwd);
+			resetAll(projectSettings);
+			delete projectSettings.workOrchestrator;
+			writeSettings(ctx.cwd, projectSettings);
 			ctx.ui.notify("Cleared work-orchestrator role/gate overrides", "info");
 			continue;
 		}

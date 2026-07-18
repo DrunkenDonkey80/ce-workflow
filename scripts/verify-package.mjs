@@ -295,6 +295,10 @@ for (const script of [...new Set(tests)]) {
 		execFileSync(process.execPath, [path.join("scripts", script)], {
 			cwd: root,
 			stdio: quiet ? "pipe" : "inherit",
+			env: {
+				...process.env,
+				PI_CODING_AGENT_DIR: path.join(root, ".pi-test-empty-agent"),
+			},
 		});
 		check(`${script} passes`, true);
 	} catch (error) {

@@ -40,16 +40,56 @@ try {
 	assert(!existsSync(settingsFile()), "no default source mutation");
 	writeFileSync(
 		path.join(globalDir, "settings.json"),
-		JSON.stringify({ workResume: { selfImprovingDefault: true } }),
+		JSON.stringify({
+			workResume: { selfImprovingDefault: true },
+			workOrchestrator: {
+				profile: "high",
+				advisorEnabled: {
+					advisor: true,
+					advisor2: true,
+					advisor3: true,
+				},
+			},
+			subagents: {
+				agentOverrides: {
+					"work-advisor-2": {
+						model: "global-model",
+						thinking: "high",
+					},
+				},
+			},
+		}),
 	);
 	assert(
 		mod.workResumeSettingsForTest(cwd).selfImproving === true,
 		"global hidden default enables self improvement",
 	);
-	writeSettings({ workResume: { selfImproving: false } });
+	writeSettings({
+		workResume: { selfImproving: false },
+		workOrchestrator: { advisorEnabled: { advisor2: false } },
+		subagents: {
+			agentOverrides: {
+				"work-advisor-2": { thinking: "medium" },
+			},
+		},
+	});
 	assert(
 		mod.workResumeSettingsForTest(cwd).selfImproving === false,
 		"project setting can opt out of the global default",
+	);
+	const effective = mod.effectiveSettingsForTest(cwd);
+	assert(
+		mod.workOrchSettings(cwd).profile === "high" &&
+			mod.workOrchSettings(cwd).advisorEnabled.advisor2 === false &&
+			mod.workOrchSettings(cwd).advisorEnabled.advisor3 === true,
+		"global workflow defaults merge with project overrides",
+	);
+	assert(
+		effective.subagents.agentOverrides["work-advisor-2"].model ===
+			"global-model" &&
+			effective.subagents.agentOverrides["work-advisor-2"].thinking ===
+				"medium",
+		"nested project model settings override only selected global fields",
 	);
 	writeSettings({});
 	writeFileSync(path.join(globalDir, "settings.json"), "{}\n");
