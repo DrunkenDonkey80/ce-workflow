@@ -9,6 +9,7 @@ const { assert, installWorkflowFixture } = await import(
 );
 
 const {
+	bootstrapPlanEpic,
 	buildWorkAutoState,
 	buildWorkBigState,
 	buildWorkFinishState,
@@ -93,7 +94,10 @@ try {
 		state.ok && state.selectedWorkItem.id === "IMP-1",
 		"small explicit WorkItem reuses target",
 	);
-	assert(fixture.logs().length === 0, "small explicit WorkItem creates nothing");
+	assert(
+		fixture.logs().length === 0,
+		"small explicit WorkItem creates nothing",
+	);
 
 	state = buildWorkSmallState(fixture.cwd, "");
 	assert(!state.ok && state.reason === "usage", "small empty task stops");
@@ -129,7 +133,10 @@ try {
 	);
 	assert(
 		state.selectedWorkItem.status === "in_progress" &&
-			fixture.store().items[state.selectedWorkItem.id].notes.join("\n").includes("wo:execution-inline"),
+			fixture
+				.store()
+				.items[state.selectedWorkItem.id].notes.join("\n")
+				.includes("wo:execution-inline"),
 		"med creates and claims an inline-marked task",
 	);
 	assert(
@@ -170,7 +177,9 @@ try {
 	);
 	assert(
 		bigDirect.params.task.length < 1800 &&
-			bigDirect.params.task.includes(`Target work item: ${state.selectedWorkItem.id}`) &&
+			bigDirect.params.task.includes(
+				`Target work item: ${state.selectedWorkItem.id}`,
+			) &&
 			bigDirect.params.task.includes("work-ready-summary") &&
 			!bigDirect.params.task.includes("raw store readiness") &&
 			!bigDirect.params.task.includes("Subagent output guidance") &&
@@ -212,7 +221,10 @@ try {
 		state.ok && state.action === "handoff-plan",
 		"raw master input routes to ce-plan",
 	);
-	assert(fixture.logs().length === 0, "raw master input does not mutate WorkItems");
+	assert(
+		fixture.logs().length === 0,
+		"raw master input does not mutate WorkItems",
+	);
 
 	state = buildWorkMasterState(fixture.cwd, "missing-plan.md");
 	assert(
@@ -221,20 +233,26 @@ try {
 	);
 
 	fixture.reset("active");
-	state = buildWorkMasterState(
-		fixture.cwd,
-		"@docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md",
+	const masterPlan =
+		"docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md";
+	state = buildWorkMasterState(fixture.cwd, `@${masterPlan}`);
+	assert(
+		state.ok && state.action === "review-plan-before-bootstrap",
+		"@ plan path runs advisors before bootstrap",
 	);
+	state = bootstrapPlanEpic(fixture.cwd, masterPlan);
 	assert(
 		state.ok && state.epic.type === "epic",
-		"@ plan path creates native epic",
+		"reviewed @ plan path creates native epic",
 	);
 	assert(
 		state.selectedWorkItem.type === "task",
 		"@ plan path creates one native planning task",
 	);
 	assert(
-		fixture.store().items[state.epic.id].documentLinks.design.includes("docs/plans/"),
+		fixture
+			.store()
+			.items[state.epic.id].documentLinks.design.includes("docs/plans/"),
 		"@ plan path links master plan without embedding it",
 	);
 	assert(
@@ -243,10 +261,12 @@ try {
 	);
 
 	fixture.reset("active", "pi-session");
-	state = buildWorkMasterState(
-		fixture.cwd,
-		"docs/plans/2026-07-03-004-feat-coded-start-finish-gates-plan.md",
+	state = buildWorkMasterState(fixture.cwd, masterPlan);
+	assert(
+		state.ok && state.action === "review-plan-before-bootstrap",
+		"plan review ignores pi-session HTML artifacts",
 	);
+	state = bootstrapPlanEpic(fixture.cwd, masterPlan);
 	assert(
 		state.ok && state.action === "run-planner",
 		"plan bootstrap ignores pi-session HTML artifacts",
@@ -324,8 +344,12 @@ try {
 		"finish commits and closes without a committer agent",
 	);
 	assert(
-		fixture.logs().some((entry) => entry.tool === "git" && entry.op === "commit") &&
-			fixture.logs().some((entry) => entry.tool === "git" && entry.op === "amend") &&
+		fixture
+			.logs()
+			.some((entry) => entry.tool === "git" && entry.op === "commit") &&
+			fixture
+				.logs()
+				.some((entry) => entry.tool === "git" && entry.op === "amend") &&
 			fixture.store().items["FIN-1"].status === "closed" &&
 			!fixture.logs().some((entry) => entry.op === "close"),
 		"finish stages work, closes native state, and amends one commit without bd",
@@ -376,4 +400,4 @@ try {
 	fixture.cleanup();
 }
 
-console.log("ok - coded work start/finish behavior");
+process.stdout.write("ok - coded work start/finish behavior\n");

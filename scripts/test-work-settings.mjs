@@ -41,8 +41,14 @@ try {
 		"default profile medium",
 	);
 	assert(
-		mod.workOrchSettings(cwd).critic.brainstorm === true,
-		"medium critic brainstorm",
+		mod.workOrchSettings(cwd).advisorEnabled.advisor === true &&
+			mod.workOrchSettings(cwd).advisorEnabled.advisor2 === false &&
+			mod.workOrchSettings(cwd).advisorEnabled.advisor3 === false,
+		"medium defaults to one inherited advisor",
+	);
+	assert(
+		mod.workOrchSettings(cwd).advisorUsageForSlicePlans === "first",
+		"medium uses first advisor on slice plans",
 	);
 	assert(
 		mod.workOrchSettings(cwd).advisorVerifyTask === true,
@@ -83,23 +89,21 @@ try {
 	writeSettings(settings);
 	const max = mod.workOrchSettings(cwd);
 	assert(max.profile === "max", "profile max");
-	assert(max.critic.plan === true, "max critic plan");
+	assert(
+		max.advisorUsageForSlicePlans === "all",
+		"max uses all configured advisors on slice plans",
+	);
 	assert(max.advisorVerifyTask === true, "max advisor verify");
 	assert(max.codeReviewBeforeCommit === "full", "max full review");
 	assert(max.slicePlanWithCePlan === true, "max agent slice planner available");
 	assert(max.slicePlanCeDepth === "Deep", "max ce-plan deep");
 	assert(max.simplifyBeforeReview === true, "max simplify");
 	assert(max.browserTestsOnUiDiff === true, "max browser tests");
-	assert(
-		readSettings().subagents.agentOverrides["work-advisor"].thinking ===
-			"xhigh",
-		"advisor effort xhigh",
-	);
-	assert(
-		readSettings().subagents.agentOverrides["work-advisor-backup"].thinking ===
-			"high",
-		"backup advisor effort high",
-	);
+	for (const agent of ["work-advisor", "work-advisor-2", "work-advisor-3"])
+		assert(
+			readSettings().subagents.agentOverrides[agent].thinking === "high",
+			`${agent} effort high`,
+		);
 	assert(
 		readSettings().subagents.agentOverrides["work-worker"].thinking === "xhigh",
 		"worker effort xhigh",
@@ -145,6 +149,10 @@ try {
 	mod.applyProfile((settings = readSettings()), "high");
 	writeSettings(settings);
 	assert(
+		mod.workOrchSettings(cwd).slicePlanWithCePlan === true,
+		"high enables agent slice planner",
+	);
+	assert(
 		mod.workOrchSettings(cwd).slicePlanCeDepth === "Standard",
 		"high slice-plan standard when agent planner is enabled",
 	);
@@ -153,7 +161,10 @@ try {
 	mod.applyProfile((settings = readSettings()), "low");
 	writeSettings(settings);
 	const low = mod.workOrchSettings(cwd);
-	assert(low.critic.brainstorm === false, "low no critic brainstorm");
+	assert(
+		low.advisorUsageForSlicePlans === "none",
+		"low skips advisors on slice plans",
+	);
 	assert(low.advisorVerifyTask === false, "low no advisor verify");
 	assert(low.slicePlanBeforeWork === true, "low lightweight slice planning");
 	assert(low.slicePlanWithCePlan === false, "low no ce-plan per slice");
@@ -162,16 +173,12 @@ try {
 	assert(low.simplifyBeforeReview === false, "low no simplify");
 	assert(low.browserTestsOnUiDiff === false, "low no browser tests");
 
-	// Toggle a critic gate explicitly.
-	mod.setWorkOrchCritic((settings = readSettings()), "plan", true);
+	// Override slice-plan advisor usage explicitly.
+	mod.setWorkOrchAdvisorSliceUsage((settings = readSettings()), "all");
 	writeSettings(settings);
 	assert(
-		mod.workOrchSettings(cwd).critic.plan === true,
-		"explicit critic plan on",
-	);
-	assert(
-		mod.workOrchSettings(cwd).critic.brainstorm === false,
-		"brainstorm stays low default",
+		mod.workOrchSettings(cwd).advisorUsageForSlicePlans === "all",
+		"explicit slice-plan advisor usage",
 	);
 
 	const commands = {};
@@ -278,8 +285,10 @@ try {
 		"status is grouped and readable",
 	);
 	for (const phrase of [
-		"› advisor (critic)",
-		"› advisor backup",
+		"› advisor: model:inherit current",
+		"› advisor 2: model:none",
+		"› advisor 3: model:none",
+		"advisor usage for slice plans: all",
 		"planner writes slice plan before work",
 		"agent slice planner for messy/large slices",
 		"ce-plan slice depth: Lightweight",
@@ -301,26 +310,26 @@ try {
 		...ctx,
 		ui: customUi([
 			{
-				target: "critic on brainstorm",
+				target: "ce-test-browser when diff touches UI",
 				key: " ",
 				capture: (lines) => {
 					enabledRender = lines.join("\n");
 				},
 			},
 			{
-				expectInitial: "critic on brainstorm",
-				target: "critic on plan",
+				expectInitial: "ce-test-browser when diff touches UI",
+				target: "coded task-vs-plan checklist",
 				key: "enter",
 				capture: (lines) => {
 					disabledRender = lines.join("\n");
 				},
 			},
-			{ expectInitial: "critic on plan", key: "escape" },
+			{ expectInitial: "coded task-vs-plan checklist", key: "escape" },
 		]),
 	});
 	assert(
-		mod.workOrchSettings(cwd).critic.brainstorm === false &&
-			mod.workOrchSettings(cwd).critic.plan === false,
+		mod.workOrchSettings(cwd).browserTestsOnUiDiff === false &&
+			mod.workOrchSettings(cwd).advisorVerifyTask === false,
 		"Space and Enter flip booleans",
 	);
 	assert(enabledRender.includes("[success]"), "enabled options render green");
@@ -363,7 +372,7 @@ try {
 			],
 			{
 				select: async (_title, labels) =>
-					labels.find((label) => label.startsWith("xhigh")),
+					labels.find((label) => label.startsWith("high")),
 			},
 		),
 	});
@@ -381,11 +390,93 @@ try {
 		"filtered model picker selects highlighted model",
 	);
 	assert(
-		settings.subagents.agentOverrides["work-reviewer"].thinking === "xhigh",
+		settings.subagents.agentOverrides["work-reviewer"].thinking === "high",
 		"typed model flow still selects effort",
+	);
+
+	// Every advisor model picker supports none and inherit; none skips effort.
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi(
+			[
+				{ target: "advisor 2 ›", key: "enter" },
+				{
+					expectInitial: "none",
+					expectText: "Current: none",
+					target: "inherit current control-session model",
+					key: "enter",
+				},
+				{ expectInitial: "advisor 2 ›", key: "escape" },
+			],
+			{
+				select: async (_title, labels) =>
+					labels.find((label) => label.startsWith("high")),
+			},
+		),
+	});
+	settings = readSettings();
+	assert(
+		mod.workOrchSettings(cwd).advisorEnabled.advisor2 === true &&
+			!settings.subagents.agentOverrides["work-advisor-2"].model &&
+			settings.subagents.agentOverrides["work-advisor-2"].thinking === "high",
+		"advisor 2 can inherit the current model at high effort",
+	);
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi([
+			{ target: "advisor 2 ›", key: "enter" },
+			{
+				expectInitial: "inherit current control-session model",
+				target: "none",
+				key: "enter",
+			},
+			{ expectInitial: "advisor 2 ›", key: "escape" },
+		]),
+	});
+	assert(
+		mod.workOrchSettings(cwd).advisorEnabled.advisor2 === false,
+		"advisor none disables its run slot",
+	);
+
+	settings = readSettings();
+	settings.workOrchestrator.advisorEnabled = {
+		advisor: true,
+		advisor2: true,
+		advisor3: true,
+	};
+	writeSettings(settings);
+	const allAdvisors = mod.advisorCriticStep(cwd, "master plan", "all");
+	for (const agent of ["work-advisor", "work-advisor-2", "work-advisor-3"])
+		assert(allAdvisors.includes(agent), `parallel gate includes ${agent}`);
+	assert(
+		allAdvisors.includes("exactly one parallel subagent call") &&
+			allAdvisors.includes("never invoke ce-doc-review") &&
+			allAdvisors.includes("one focused re-review by work-advisor") &&
+			allAdvisors.includes("Never start a recursive review loop"),
+		"parallel synthesis and bounded first-advisor re-review are explicit",
+	);
+	const firstAdvisor = mod.advisorCriticStep(cwd, "slice plan", "first");
+	assert(
+		firstAdvisor.includes("work-advisor") &&
+			!firstAdvisor.includes("work-advisor-2"),
+		"first runs only the first configured advisor",
+	);
+	assert(
+		mod.advisorCriticStep(cwd, "slice plan", "none") === "",
+		"none skips slice-plan advisors",
+	);
+	settings.workOrchestrator.advisorEnabled = {
+		advisor: false,
+		advisor2: false,
+		advisor3: false,
+	};
+	writeSettings(settings);
+	assert(
+		mod.advisorCriticStep(cwd, "master plan") === "",
+		"all advisor slots set to none skip artifact review",
 	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });
 }
 
-console.log("ok - work-settings behavior");
+process.stdout.write("ok - work-settings behavior\n");

@@ -1,9 +1,5 @@
 #!/usr/bin/env node
-import {
-	mkdirSync,
-	realpathSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -16,6 +12,7 @@ const {
 	brainstormHandoffPrompt,
 	buildWorkBrainstormState,
 	buildWorkPlanState,
+	bootstrapPlanEpic,
 	deriveIdeaStatus,
 	renderWorkBrainstormText,
 } = await import(
@@ -57,8 +54,10 @@ try {
 		"standalone brainstorm creates an epic and native idea",
 	);
 	assert(
-		fixture.store().items[state.epic.id].notes.join("\n").includes("wo:brainstorm") &&
-			fixture.logs().length === 0,
+		fixture
+			.store()
+			.items[state.epic.id].notes.join("\n")
+			.includes("wo:brainstorm") && fixture.logs().length === 0,
 		"standalone brainstorm is marked natively without bd",
 	);
 
@@ -95,7 +94,11 @@ try {
 		"selected idea derives brainstormed status",
 	);
 	assert(
-		fixture.store().items["IDEA-2"].notes.some((note) => note.includes("brainstorm-path=docs/brainstorms/accepted.md")),
+		fixture
+			.store()
+			.items["IDEA-2"].notes.some((note) =>
+				note.includes("brainstorm-path=docs/brainstorms/accepted.md"),
+			),
 		"selected idea note includes brainstorm path",
 	);
 	assert(
@@ -163,11 +166,22 @@ try {
 	);
 	state = buildWorkPlanState(cwd, "docs/plans/idea-plan.md");
 	assert(
+		state.ok &&
+			state.action === "review-plan-before-bootstrap" &&
+			state.handoffPrompt.includes("work-advisor"),
+		"idea-linked plan runs configured advisors before bootstrap",
+	);
+	state = bootstrapPlanEpic(cwd, "docs/plans/idea-plan.md");
+	assert(
 		state.ok && state.action === "run-planner",
-		"idea-linked plan bootstraps epic",
+		"reviewed idea-linked plan bootstraps epic",
 	);
 	assert(
-		fixture.store().items["IDEA-2"].notes.some((note) => note.includes("plan-path=docs/plans/idea-plan.md")),
+		fixture
+			.store()
+			.items["IDEA-2"].notes.some((note) =>
+				note.includes("plan-path=docs/plans/idea-plan.md"),
+			),
 		"planning appends native idea backlink",
 	);
 

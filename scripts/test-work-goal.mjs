@@ -12,6 +12,12 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+	createWorkItem,
+	initStore,
+	mutateStore,
+	updateWorkItem,
+} from "../extensions/work-store.js";
 
 const mod = await import(
 	pathToFileURL(
@@ -118,6 +124,48 @@ assert.match(
 	oneTaskObjective,
 	/if it says one task only, stop after one executable WorkItem closes/,
 );
+const workItemObjective = mod.buildWorkSelfImprovingObjective(
+	"C:/soft/git/AI-Wedge work-2",
+	{ project: true },
+);
+assert.match(workItemObjective, /Target work item or epic ID: work-2/);
+assert.match(
+	workItemObjective,
+	/Identifiers such as work-2 are targets, never task counts/,
+);
+assert.match(
+	mod.buildWorkSelfImprovingObjective("C:/soft/git/AI-Wedge fix-login", {
+		project: true,
+	}),
+	/User instruction for the target project: fix-login/,
+);
+const targetCwd = mkdtempSync(path.join(tmpdir(), "ce-work-goal-target-"));
+try {
+	initStore(targetCwd);
+	mutateStore(targetCwd, (store) =>
+		createWorkItem(store, {
+			id: "work-2",
+			type: "epic",
+			title: "Target epic",
+		}),
+	);
+	const targetGoal = {
+		mode: "project",
+		objective: mod.buildWorkSelfImprovingObjective(`${targetCwd} -- work-2`, {
+			project: true,
+		}),
+	};
+	assert.match(
+		mod.workGoalCompletionBlocker(targetGoal, targetCwd),
+		/target work-2 is still open/,
+	);
+	mutateStore(targetCwd, (store) =>
+		updateWorkItem(store, "work-2", { status: "closed" }),
+	);
+	assert.equal(mod.workGoalCompletionBlocker(targetGoal, targetCwd), undefined);
+} finally {
+	rmSync(targetCwd, { recursive: true, force: true });
+}
 assert.deepEqual(
 	mod.parseWorkProjectGoalInput("C:/soft/git/AI-Wedge task 19"),
 	{

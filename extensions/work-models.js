@@ -53,6 +53,7 @@ const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
 const WORK_SHORTCUT_STATUS = "F7 roadmaps · F8 menu";
 const INHERIT_MODEL = "__inherit_model__";
+const NONE_MODEL = "__none_model__";
 const DEFAULT_THINKING = "__default_thinking__";
 const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
@@ -132,19 +133,28 @@ const SLOTS = [
 	},
 	{
 		key: "advisor",
-		label: "advisor (critic)",
+		label: "advisor",
 		agents: ["work-advisor"],
-		defaultThinking: "xhigh",
+		defaultThinking: "high",
+		defaultEnabled: true,
 		description:
-			"Optional critic for plans/brainstorms and task-vs-plan verification; defaults to inherit model with xhigh effort",
+			"Primary read-only critic; none disables it, inherit uses the control-session model",
 	},
 	{
-		key: "advisorBackup",
-		label: "advisor backup",
-		agents: ["work-advisor-backup"],
-		defaultThinking: "medium",
-		description:
-			"Lower-cost fallback critic when the primary advisor model is unavailable",
+		key: "advisor2",
+		label: "advisor 2",
+		agents: ["work-advisor-2"],
+		defaultThinking: "high",
+		defaultEnabled: false,
+		description: "Optional second parallel read-only critic",
+	},
+	{
+		key: "advisor3",
+		label: "advisor 3",
+		agents: ["work-advisor-3"],
+		defaultThinking: "high",
+		defaultEnabled: false,
+		description: "Optional third parallel read-only critic",
 	},
 ];
 
@@ -158,9 +168,10 @@ const EFFORT_PROFILES = {
 		work: "low",
 		debug: "medium",
 		review: "low",
-		advisor: "medium",
-		advisorBackup: "low",
-		critic: { brainstorm: false, plan: false },
+		advisor: "high",
+		advisor2: "high",
+		advisor3: "high",
+		advisorUsageForSlicePlans: "none",
 		advisorVerifyTask: false,
 		slicePlanBeforeWork: true,
 		slicePlanWithCePlan: false,
@@ -175,8 +186,9 @@ const EFFORT_PROFILES = {
 		debug: "high",
 		review: "medium",
 		advisor: "high",
-		advisorBackup: "medium",
-		critic: { brainstorm: true, plan: true },
+		advisor2: "high",
+		advisor3: "high",
+		advisorUsageForSlicePlans: "first",
 		advisorVerifyTask: true,
 		slicePlanBeforeWork: true,
 		slicePlanWithCePlan: false,
@@ -190,12 +202,13 @@ const EFFORT_PROFILES = {
 		work: "high",
 		debug: "high",
 		review: "high",
-		advisor: "xhigh",
-		advisorBackup: "medium",
-		critic: { brainstorm: true, plan: true },
+		advisor: "high",
+		advisor2: "high",
+		advisor3: "high",
+		advisorUsageForSlicePlans: "all",
 		advisorVerifyTask: true,
 		slicePlanBeforeWork: true,
-		slicePlanWithCePlan: false,
+		slicePlanWithCePlan: true,
 		slicePlanCeDepth: "Standard",
 		simplifyBeforeReview: true,
 		browserTestsOnUiDiff: true,
@@ -206,9 +219,10 @@ const EFFORT_PROFILES = {
 		work: "xhigh",
 		debug: "xhigh",
 		review: "high",
-		advisor: "xhigh",
-		advisorBackup: "high",
-		critic: { brainstorm: true, plan: true },
+		advisor: "high",
+		advisor2: "high",
+		advisor3: "high",
+		advisorUsageForSlicePlans: "all",
 		advisorVerifyTask: true,
 		slicePlanBeforeWork: true,
 		slicePlanWithCePlan: true,
@@ -238,7 +252,12 @@ const WORK_ORCH_BOOLEANS = [
 		label: "ce-test-browser when diff touches UI",
 	},
 ];
-const WORK_ORCH_CRITIC_KEYS = ["brainstorm", "plan"];
+const SLICE_PLAN_ADVISOR_USAGE = ["none", "first", "all"];
+const SLICE_PLAN_ADVISOR_USAGE_DESC = {
+	none: "skip advisor review for slice plans",
+	first: "run the first configured advisor",
+	all: "run all configured advisors in parallel",
+};
 const REVIEW_LEVELS = ["off", "light", "full"];
 const REVIEW_LEVEL_DESC = {
 	off: "no pre-commit review (low profile)",
@@ -249,6 +268,31 @@ const SUBMENU_ARROW = "›";
 
 function slotByKey(key) {
 	return SLOTS.find((slot) => slot.key === key);
+}
+
+function isAdvisorSlot(slot) {
+	return slot?.defaultEnabled !== undefined;
+}
+
+function advisorEnabledForSlot(settings, slot) {
+	return (
+		settings.workOrchestrator?.advisorEnabled?.[slot.key] ?? slot.defaultEnabled
+	);
+}
+
+function setAdvisorEnabled(settings, slot, enabled) {
+	const block = workOrchBlock(settings);
+	block.advisorEnabled ??= {};
+	block.advisorEnabled[slot.key] = Boolean(enabled);
+}
+
+function configuredAdvisorSlots(settings, usage = "all") {
+	const active = SLOTS.filter(
+		(slot) => isAdvisorSlot(slot) && advisorEnabledForSlot(settings, slot),
+	);
+	if (usage === "none") return [];
+	if (usage === "first") return active.slice(0, 1);
+	return active;
 }
 const DEFAULT_CONTEXT = {
 	enabled: true,
@@ -2489,6 +2533,7 @@ function overrides(settings) {
 function compactOverrides(settings) {
 	const current = settings.subagents?.agentOverrides;
 	if (!current) return;
+	delete current["work-advisor-backup"];
 	for (const [agent, value] of Object.entries(current)) {
 		if (!value.model && !value.thinking) delete current[agent];
 	}
@@ -2513,10 +2558,17 @@ function workOrchSettings(cwd) {
 	const raw = readSettings(cwd).workOrchestrator ?? {};
 	const profile = EFFORT_PROFILES[raw.profile] ? raw.profile : DEFAULT_PROFILE;
 	const base = EFFORT_PROFILES[profile];
-	const critic = {
-		brainstorm: raw.critic?.brainstorm ?? base.critic.brainstorm,
-		plan: raw.critic?.plan ?? base.critic.plan,
-	};
+	const advisorEnabled = Object.fromEntries(
+		SLOTS.filter(isAdvisorSlot).map((slot) => [
+			slot.key,
+			raw.advisorEnabled?.[slot.key] ?? slot.defaultEnabled,
+		]),
+	);
+	const advisorUsageForSlicePlans = SLICE_PLAN_ADVISOR_USAGE.includes(
+		raw.advisorUsageForSlicePlans,
+	)
+		? raw.advisorUsageForSlicePlans
+		: base.advisorUsageForSlicePlans;
 	const flags = {};
 	for (const { key } of WORK_ORCH_BOOLEANS) flags[key] = raw[key] ?? base[key];
 	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
@@ -2526,7 +2578,8 @@ function workOrchSettings(cwd) {
 		raw.sliceExecutionMode === "agent" ? "agent" : "inline";
 	return {
 		profile,
-		critic,
+		advisorEnabled,
+		advisorUsageForSlicePlans,
 		slicePlanCeDepth,
 		codeReviewBeforeCommit,
 		sliceExecutionMode,
@@ -2550,8 +2603,8 @@ function applyProfile(settings, profileKey) {
 	compactOverrides(settings);
 	const block = workOrchBlock(settings);
 	block.profile = profileKey;
-	block.critic = { ...profile.critic };
 	for (const { key } of WORK_ORCH_BOOLEANS) block[key] = profile[key];
+	block.advisorUsageForSlicePlans = profile.advisorUsageForSlicePlans;
 	block.slicePlanCeDepth = profile.slicePlanCeDepth;
 	block.codeReviewBeforeCommit = profile.codeReviewBeforeCommit;
 	return true;
@@ -2572,10 +2625,11 @@ function setWorkOrchSliceExecution(settings, value) {
 	block.sliceExecutionMode = value === "agent" ? "agent" : "inline";
 }
 
-function setWorkOrchCritic(settings, key, value) {
+function setWorkOrchAdvisorSliceUsage(settings, value) {
 	const block = workOrchBlock(settings);
-	block.critic ??= {};
-	block.critic[key] = Boolean(value);
+	block.advisorUsageForSlicePlans = SLICE_PLAN_ADVISOR_USAGE.includes(value)
+		? value
+		: "none";
 }
 
 function setWorkResumeBoolean(settings, key, value) {
@@ -2584,14 +2638,17 @@ function setWorkResumeBoolean(settings, key, value) {
 }
 
 // ponytail: settings are prompt-live; the steps below are appended to the
-// role/plan/brainstorm/finish handoff prompts so the advisor actually runs.
-function advisorFallbackText() {
-	return "If work-advisor is unavailable, usage-limited, or fails to start, run work-advisor-backup once instead; do not wait or retry the primary.";
-}
-
-function advisorCriticStep(target) {
+// role/plan/brainstorm handoff prompts so configured advisors actually run.
+function advisorCriticStep(cwd, target, usage = "all") {
+	const slots = configuredAdvisorSlots(readSettings(cwd), usage);
+	if (!slots.length) return "";
+	const agents = slots.map((slot) => slot.agents[0]);
+	const first = agents[0];
 	return [
-		`Advisor critic gate (read-only): launch the work-advisor subagent (agent: "work-advisor", context: fresh) on the ${target} to hunt weak or missing requirements, unverified acceptance, incomplete decisions, ambiguous scope, and untested assumptions. ${advisorFallbackText()} Record concrete findings as notes on the relevant WorkItem; convert any blocking gap into a decision/blocker WorkItem under the epic before proceeding. Skip if the ${target} is trivial and obviously complete.`,
+		`Advisor critic gate (read-only): after the exact ${target} path or WorkItem note is known, launch exactly one parallel subagent call in tasks mode with context:fresh, one task for each configured agent: ${agents.join(", ")}. Use only these packaged work-advisor roles; never invoke ce-doc-review.`,
+		`Give every advisor the same exact ${target}, its authoritative source artifacts, and the same review question. Require independent findings with concrete locations and smallest fixes. Advisors must not edit files, mutate WorkItems, or launch subagents.`,
+		"Wait for all configured advisors, deduplicate their findings, and apply only authority-grounded fixes. Complete this gate before any plan bootstrap, slicing, or implementation. Convert any unresolved blocking gap into a decision/blocker WorkItem before proceeding; an unavailable advisor is recorded and not replaced or retried.",
+		`If fixes changed the artifact, decide whether one focused re-review by ${first} is warranted. Re-run it once only for substantive cross-section changes, ambiguity resolution, or a fix that could create a new inconsistency; skip re-review for mechanical wording/traceability fixes. Never start a recursive review loop.`,
 	].join("\n");
 }
 
@@ -2645,6 +2702,11 @@ function applyInlineSlicePlan(cwd, state, issue) {
 			labels: [...new Set([...labelsOf(issue), "wo:slice-planned"])],
 			notes: `${notesOf(issue)}\n${plan}`,
 		};
+		const advisorStep = advisorCriticStep(
+			cwd,
+			`slice plan note on WorkItem ${idOf(issue)}`,
+			workOrchSettings(cwd).advisorUsageForSlicePlans,
+		);
 		return withHandoffPrompt(
 			withImplementationPolicy(
 				{
@@ -2653,6 +2715,7 @@ function applyInlineSlicePlan(cwd, state, issue) {
 					selectedWorkItem: issueSummary(planned),
 					message:
 						"Added coded slice-plan note and continued directly to implementation; no planner boundary needed.",
+					handoffExtra: advisorStep ? [advisorStep] : [],
 				},
 				cwd,
 			),
@@ -2671,22 +2734,36 @@ function applyInlineSlicePlan(cwd, state, issue) {
 	}
 }
 
-function cePlanSliceStep(issue, cwd, masterPlanPath, depth = "Lightweight") {
+function cePlanSliceStep(
+	issue,
+	cwd,
+	masterPlanPath,
+	depth = "Lightweight",
+	advisorUsage = "none",
+) {
 	const scopeLine = masterPlanPath
 		? `Scope: this WorkItem's acceptance/design plus the matching Implementation Unit from ${relative(cwd, masterPlanPath)}.`
 		: `Scope: this WorkItem's acceptance/design and notes.`;
-	const depthLine =
-		depth === "Deep"
-			? "Use Deep depth for the full ce-plan research/deepening pass."
-			: depth === "Standard"
-				? "Use Standard depth (ce-plan's normal tier) so flow analysis runs without Deep extensions."
-				: "Use Lightweight depth so ce-plan skips flow analysis and external research when local patterns are strong.";
+	let depthLine =
+		"Use Lightweight depth so ce-plan skips flow analysis and external research when local patterns are strong.";
+	if (depth === "Deep")
+		depthLine = "Use Deep depth for the full ce-plan research/deepening pass.";
+	else if (depth === "Standard")
+		depthLine =
+			"Use Standard depth (ce-plan's normal tier) so flow analysis runs without Deep extensions.";
 	return [
 		`Slice-planning pass (ce-plan) before implementation: target ${issueRefText(issue)} already exists as executable work. Do not create child native work-item store and do not dispatch work-planner.`,
 		scopeLine,
 		`Invoke the ce-plan skill in the control session on this slice to produce a compact plan doc at docs/plans/YYYY-MM-DD-NNN-slice-${safeArtifactPart(idOf(issue))}-plan.md with a single Implementation Unit (Goal, Files, Approach, Test scenarios, Verification). ${depthLine}`,
 		`Then append a WorkItem note headed \`wo:slice-plan\` containing \`plan-path: <repo-relative plan doc path>\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the WorkItem title.`,
-	].join("\n");
+		advisorCriticStep(
+			cwd,
+			`slice plan for WorkItem ${idOf(issue)}`,
+			advisorUsage,
+		),
+	]
+		.filter(Boolean)
+		.join("\n");
 }
 
 function codeReviewBeforeCommitStep(level) {
@@ -2708,6 +2785,8 @@ function browserTestsOnUiDiffStep() {
 }
 
 function slotSummary(slot, settings) {
+	if (isAdvisorSlot(slot) && !advisorEnabledForSlot(settings, slot))
+		return "model:none • effort:high";
 	const current = settings.subagents?.agentOverrides ?? {};
 	const model = commonValue(slot.agents.map((agent) => current[agent]?.model));
 	const thinking = commonValue(
@@ -2726,16 +2805,21 @@ async function choose(ctx, title, items) {
 	return items[labels.indexOf(selected)]?.value;
 }
 
-async function modelItems(ctx) {
-	const items = [
-		{
-			value: INHERIT_MODEL,
-			label: "(blank) use current control-session model",
-			description: ctx.model
-				? `${ctx.model.provider}/${ctx.model.id}`
-				: "subagent inherits whatever /model is active",
-		},
-	];
+async function modelItems(ctx, allowNone = false) {
+	const items = [];
+	if (allowNone)
+		items.push({
+			value: NONE_MODEL,
+			label: "none",
+			description: "do not run this advisor",
+		});
+	items.push({
+		value: INHERIT_MODEL,
+		label: "inherit current control-session model",
+		description: ctx.model
+			? `${ctx.model.provider}/${ctx.model.id}`
+			: "subagent inherits whatever /model is active",
+	});
 
 	try {
 		const models = await ctx.modelRegistry.getAvailable();
@@ -2773,6 +2857,7 @@ function resetAll(settings) {
 		for (const agent of slot.agents)
 			delete settings.subagents?.agentOverrides?.[agent];
 	}
+	delete settings.subagents?.agentOverrides?.["work-advisor-backup"];
 	compactOverrides(settings);
 }
 
@@ -2808,12 +2893,18 @@ function matchesModelQuery(item, query) {
 	);
 }
 
-async function chooseModel(ctx, title, currentModel = INHERIT_MODEL) {
-	const items = await modelItems(ctx);
-	const currentText =
-		currentModel === INHERIT_MODEL
-			? `inherit (${items[0]?.description ?? "control-session model"})`
-			: currentModel;
+async function chooseModel(
+	ctx,
+	title,
+	currentModel = INHERIT_MODEL,
+	allowNone = false,
+) {
+	const items = await modelItems(ctx, allowNone);
+	const inherit = items.find((item) => item.value === INHERIT_MODEL);
+	let currentText = currentModel;
+	if (currentModel === INHERIT_MODEL)
+		currentText = `inherit (${inherit?.description ?? "control-session model"})`;
+	else if (currentModel === NONE_MODEL) currentText = "none";
 	if ((ctx.mode && ctx.mode !== "tui") || typeof ctx.ui.custom !== "function") {
 		return choose(
 			ctx,
@@ -2930,14 +3021,24 @@ async function chooseModel(ctx, title, currentModel = INHERIT_MODEL) {
 }
 
 async function editSlotModel(ctx, settings, slot) {
-	const currentModel =
+	let currentModel =
 		overrides(settings)[slot.agents[0]]?.model ?? INHERIT_MODEL;
+	if (isAdvisorSlot(slot) && !advisorEnabledForSlot(settings, slot))
+		currentModel = NONE_MODEL;
 	const model = await chooseModel(
 		ctx,
 		`${slot.label}: choose model`,
 		currentModel,
+		isAdvisorSlot(slot),
 	);
 	if (model === undefined) return false;
+	if (model === NONE_MODEL) {
+		setAdvisorEnabled(settings, slot, false);
+		writeSettings(ctx.cwd, settings);
+		ctx.ui.notify(`Saved ${slot.label}: model:none`, "info");
+		return true;
+	}
+	if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
 	const { selectedThinking, items } = thinkingItemsFor(slot, settings);
 	const thinking = await choose(
 		ctx,
@@ -5198,6 +5299,7 @@ function planResumeAction(state, cwd) {
 								cwd,
 								state.planPath,
 								settings.slicePlanCeDepth,
+								settings.advisorUsageForSlicePlans,
 							),
 						],
 					},
@@ -6052,6 +6154,10 @@ function suggestedCommands(epicId, blockers = [], decisions = []) {
 
 function isWorkItemId(value) {
 	return /^[A-Za-z][A-Za-z0-9_-]*-[A-Za-z0-9_.-]+$/.test(value ?? "");
+}
+
+function isNativeWorkItemId(value) {
+	return /^work-\d+(?:\.\d+)*$/.test(value ?? "");
 }
 
 function isNumericWorkItemShorthand(value) {
@@ -7895,17 +8001,15 @@ function buildWorkBrainstormState(cwd, args = "") {
 
 function brainstormHandoffPrompt(state, cwd) {
 	const artifact = state.artifact;
-	const criticLines =
-		cwd && workOrchSettings(cwd).critic.brainstorm
-			? [advisorCriticStep("brainstorm artifact")]
-			: [];
+	const advisorStep = cwd ? advisorCriticStep(cwd, "brainstorm artifact") : "";
+	const criticLines = advisorStep ? [advisorStep] : [];
 	return [
 		`Use the work-orchestrator skill in mode: ${artifact ? "master" : "brainstorm"} with this precomputed extension state.`,
 		`Epic: ${state.epic.id} — ${state.epic.title}`,
 		`Idea: ${state.idea.id} — ${state.idea.title}`,
 		state.topic ? `Full brainstorm request:\n${state.topic}` : "",
 		artifact
-			? `Brainstorm artifact: ${artifact}\nRun /work-plan ${state.epic.id} now; do not use ce-brainstorm's post-doc planning menu.`
+			? `Brainstorm artifact: ${artifact}\n${advisorStep ? "After the advisor gate, run" : "Run"} /work-plan ${state.epic.id} now; do not use ce-brainstorm's post-doc planning menu.`
 			: `Run ce-brainstorm interactively, ask one question at a time until the requirements are clear, write only the brainstorm artifact, skip ce-brainstorm's post-doc planning menu, then rerun /work-brainstorm idea ${state.idea.id} <path>.`,
 		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can call ce-plan with the preservation and self-audit contract.",
 		"Never silently skip ce-brainstorm questions for broad, important, or underspecified work.",
@@ -8194,9 +8298,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				detail,
 				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
 				ROLE_TIMEOUT_GUIDANCE,
-				workOrchSettings(cwd).critic.plan
-					? advisorCriticStep("produced plan")
-					: "",
+				advisorCriticStep(cwd, "produced master plan"),
 			].join("\n"),
 			git: masterGit,
 			warnings: masterGit.warnings,
@@ -8304,6 +8406,35 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					suggestedCommands: [`${command} ${first}`],
 				},
 			);
+		const openQuestions = scanPlanOpenQuestions(
+			readFileSync(join(cwd, first), "utf8"),
+		);
+		if (openQuestions.length)
+			return openQuestionsBlockState(
+				cwd,
+				first,
+				openQuestions,
+				command,
+				masterGit,
+				init,
+			);
+		if (!safeForPlanBootstrap(cwd, masterGit, first))
+			return planBootstrapDirtyStop(cwd, masterGit, first, command);
+		const advisorStep = advisorCriticStep(cwd, `master plan ${first}`);
+		if (advisorStep)
+			return {
+				ok: true,
+				action: "review-plan-before-bootstrap",
+				message: `Reviewing ${first} before epic bootstrap.`,
+				handoffPrompt: [
+					advisorStep,
+					`After advisor fixes and any bounded first-advisor re-review, run \`node scripts/work-helper.mjs bootstrap-plan-epic ${first}\`. Do not bootstrap the epic before this review gate finishes.`,
+				].join("\n"),
+				git: masterGit,
+				warnings: masterGit.warnings,
+				suggestedCommands: [],
+				nextAction: `Next: review ${first}, then bootstrap it in this same flow.`,
+			};
 		return bootstrapPlanEpic(cwd, first, command, masterGit, init);
 	} catch (error) {
 		return errorState(error.reason ?? "work-store-error", error.message, {
@@ -9424,11 +9555,15 @@ function buildWorkSelfImprovingObjective(input = "", options = {}) {
 	const prompt = String(input ?? "").trim();
 	if (options.project) {
 		const { project, task } = parseWorkProjectGoalInput(prompt);
+		let target =
+			"Run the autonomous project work loop for the target project until the active work is complete or a real human decision is required.";
+		if (task)
+			target = isNativeWorkItemId(task)
+				? `Target work item or epic ID: ${task}`
+				: `User instruction for the target project: ${task}`;
 		return [
 			project ? `Target project: ${project}` : "",
-			task
-				? `User instruction for the target project: ${task}`
-				: "Run the autonomous project work loop for the target project until the active work is complete or a real human decision is required.",
+			target,
 			workProjectAutopilotAppendix(),
 			options.selfImproving === true ? workGoalSelfImprovingAppendix() : "",
 		]
@@ -10130,6 +10265,31 @@ function pauseWorkGoalForDecision(decision, ctx, pi) {
 	pauseWarpForDecision(ctx, decision);
 }
 
+function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
+	if (goal?.mode !== "project") return;
+	const objective = String(goal.objective ?? "");
+	const project = /^Target project:\s*(.+)$/m.exec(objective)?.[1]?.trim();
+	const explicit = /^Target work item or epic ID:\s*(\S+)$/m.exec(
+		objective,
+	)?.[1];
+	const legacy = /^User instruction for the target project:\s*(\S+)\s*$/m.exec(
+		objective,
+	)?.[1];
+	const id = explicit ?? (isNativeWorkItemId(legacy) ? legacy : undefined);
+	if (!project || !id) return;
+	try {
+		const item = readWorkItem(
+			isAbsolute(project) ? project : resolve(cwd ?? process.cwd(), project),
+			id,
+		);
+		if (!item) return `target ${id} was not found`;
+		if (statusOf(item) !== "closed")
+			return `target ${id} is still ${statusOf(item)}`;
+	} catch (error) {
+		return `target ${id} could not be verified: ${commandErrorText(error)}`;
+	}
+}
+
 function completeActiveWorkGoal(summary, ctx, pi) {
 	const goal = activeWorkGoal;
 	if (!goal) {
@@ -10140,11 +10300,11 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 		};
 	}
 	const trimmed = String(summary ?? "").trim();
-	const rejection = !trimmed
-		? "summary is empty"
-		: isContradictoryWorkGoalCompletion(trimmed)
-			? "summary says the goal is not complete"
-			: undefined;
+	let rejection;
+	if (!trimmed) rejection = "summary is empty";
+	else if (isContradictoryWorkGoalCompletion(trimmed))
+		rejection = "summary says the goal is not complete";
+	else rejection = workGoalCompletionBlocker(goal);
 	if (rejection) {
 		updateWorkGoalUsage(goal, ctx);
 		persistWorkGoal(pi);
@@ -11193,13 +11353,15 @@ export {
 	isWorkGoalContextOverflow,
 	isWorkGoalUsageLimit,
 	parseWorkProjectGoalInput,
+	workGoalCompletionBlocker,
 	planResumeAction,
 	progressBar,
 	applyProfile,
 	setWorkOrchBoolean,
 	setWorkOrchReviewLevel,
 	setWorkOrchSliceExecution,
-	setWorkOrchCritic,
+	setWorkOrchAdvisorSliceUsage,
+	advisorCriticStep,
 	workOrchSettings,
 	renderWorkIdeateText,
 	renderWorkBrainstormText,
@@ -12108,7 +12270,7 @@ export default function workModelsExtension(pi) {
 
 	pi.registerCommand("work-settings", {
 		description:
-			"Work-orchestrator settings submenu: effort profiles, role/advisor model+effort, and advisor/critic gates",
+			"Work-orchestrator settings submenu: effort profiles, three advisor model/effort slots, and review gates",
 		handler: async (args, ctx) => {
 			if (String(args).trim() === "status") return workSettingsStatus(ctx);
 			await workSettingsLoop(ctx);
@@ -12137,8 +12299,7 @@ function workSettingsStatus(ctx) {
 		),
 		"",
 		"Gates",
-		`  ${onOff(resolved.critic.brainstorm)} critic on brainstorm`,
-		`  ${onOff(resolved.critic.plan)} critic on plan`,
+		`  ${SUBMENU_ARROW} advisor usage for slice plans: ${resolved.advisorUsageForSlicePlans}`,
 		...WORK_ORCH_BOOLEANS.map(
 			(flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`,
 		),
@@ -12281,11 +12442,12 @@ async function workSettingsLoop(ctx) {
 				label: `${slot.label} ${SUBMENU_ARROW}`,
 				description: slotSummary(slot, settings),
 			})),
-			...WORK_ORCH_CRITIC_KEYS.map((key) => ({
-				kind: "critic",
-				value: `critic.${key}`,
-				...boolLabel(`critic on ${key}`, resolved.critic[key]),
-			})),
+			{
+				kind: "advisorSliceUsage",
+				value: "advisorUsageForSlicePlans",
+				label: `advisor usage for slice plans ${SUBMENU_ARROW}`,
+				description: resolved.advisorUsageForSlicePlans,
+			},
 			...WORK_ORCH_BOOLEANS.map((flag) => ({
 				kind: "bool",
 				value: flag.key,
@@ -12367,6 +12529,23 @@ async function workSettingsLoop(ctx) {
 			ctx.ui.notify(`Applied ${profileKey} profile`, "info");
 			continue;
 		}
+		if (pick.kind === "advisorSliceUsage") {
+			const usage = await choose(
+				ctx,
+				"Advisor usage for slice plans",
+				SLICE_PLAN_ADVISOR_USAGE.map((value) => ({
+					value,
+					label: value,
+					description: SLICE_PLAN_ADVISOR_USAGE_DESC[value],
+				})),
+			);
+			if (!usage) continue;
+			settings = readSettings(ctx.cwd);
+			setWorkOrchAdvisorSliceUsage(settings, usage);
+			writeSettings(ctx.cwd, settings);
+			ctx.ui.notify(`Advisor usage for slice plans: ${usage}`, "info");
+			continue;
+		}
 		if (pick.kind === "reviewLevel") {
 			const level = await choose(
 				ctx,
@@ -12419,16 +12598,10 @@ async function workSettingsLoop(ctx) {
 		}
 		// Boolean flip (live): write immediately.
 		settings = readSettings(ctx.cwd);
-		const criticKey = pick.value.split(".")[1];
 		const current =
-			pick.kind === "critic"
-				? resolved.critic[criticKey]
-				: pick.kind === "resumeBool"
-					? resume[pick.value]
-					: resolved[pick.value];
+			pick.kind === "resumeBool" ? resume[pick.value] : resolved[pick.value];
 		const next = !current;
-		if (pick.kind === "critic") setWorkOrchCritic(settings, criticKey, next);
-		else if (pick.kind === "resumeBool")
+		if (pick.kind === "resumeBool")
 			setWorkResumeBoolean(settings, pick.value, next);
 		else setWorkOrchBoolean(settings, pick.value, next);
 		writeSettings(ctx.cwd, settings);

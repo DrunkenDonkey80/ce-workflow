@@ -441,9 +441,9 @@ Responsibilities:
 - after close, re-run `git status --short`; if `node scripts/work-helper.mjs work-close` changed `.ce-workflow/work-items.json`, stage that canonical close record and amend the same work commit before finalizing;
 - push only when repo/session policy requires it.
 
-### work-advisor / work-advisor-backup
+### work-advisor / work-advisor-2 / work-advisor-3
 
-Read-only critic launched by the orchestrator from the work-settings gates (not a primary implementation role). Must not edit source code or mutate work items. If `work-advisor` is unavailable, usage-limited, or fails to start, run `work-advisor-backup` once instead; do not wait or retry the primary.
+Identical read-only critics launched by the orchestrator from `/work-settings` (not primary implementation roles). Each slot supports `none`, inherited current model, or an explicit model at high effort; the primary defaults to inherited/high and advisors 2–3 default to none/high. Run every configured advisor in one parallel call on brainstorms and master plans; slice plans use the configured `none` / `first` / `all` policy. Advisors must not edit source code, mutate work items, or launch subagents. Do not substitute `ce-doc-review`, fallback roles, or retries for an unavailable configured advisor.
 
 Responsibilities:
 
@@ -456,7 +456,8 @@ Responsibilities:
 
 `/work-settings` toggles these on or off; when on, the extension appends the gate step to the matching handoff prompt, so the receiving role actually runs it. Defaults come from the effort profile:
 
-- **critic on brainstorm/plan** — `work-advisor` on the artifact after `ce-brainstorm`/`ce-plan` (medium/high/max), falling back once to `work-advisor-backup`.
+- **advisor review on brainstorm/master plan** — run all configured advisor slots in one parallel call after `ce-brainstorm`/`ce-plan`; deduplicate findings and apply authority-grounded fixes. After fixes, the parent may rerun only the first configured advisor once when the change was substantive, never as a recursive loop.
+- **advisor usage for slice plans** — profile-driven 3-state: none (low), first configured advisor (medium), or all configured advisors in parallel (high/max).
 - **slice plan before work** — code writes a compact `wo:slice-plan` note for routine slices and continues without a planning boundary. Only genuinely ambiguous, architectural, or explicit big work launches planner/ce-plan.
 - **advisor verifies task vs plan** — use `work-advisor` only when plan-to-diff alignment remains ambiguous after the coded acceptance/evidence check.
 - **simplify before review** — use `ce-simplify-code` only when a non-trivial risky diff would materially benefit; routine bounded changes stay inline.

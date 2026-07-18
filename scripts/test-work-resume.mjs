@@ -434,12 +434,18 @@ const oldEnv = {
 process.env.WORK_ORCH_GIT_BIN = path.join(bin, "fake-git.mjs");
 function sourcesForScenario(scenario = "default") {
 	const closed = epics.find((epic) => epic.id === "E-C");
-	if (["open-ready", "open-two-ready", "remembered-blocked"].includes(scenario)) {
+	if (
+		["open-ready", "open-two-ready", "remembered-blocked"].includes(scenario)
+	) {
 		const children =
 			scenario === "open-two-ready"
 				? [
 						...childrenByScenario.openReady,
-						{ ...childrenByScenario.openReady[0], id: "OPEN-READY-2", parent_id: "O-2" },
+						{
+							...childrenByScenario.openReady[0],
+							id: "OPEN-READY-2",
+							parent_id: "O-2",
+						},
 					]
 				: scenario === "remembered-blocked"
 					? [
@@ -447,7 +453,10 @@ function sourcesForScenario(scenario = "default") {
 							...childrenByScenario.openReady,
 							...childrenByScenario.openBlocked,
 						]
-					: [...childrenByScenario.openReady, ...childrenByScenario.openBlocked];
+					: [
+							...childrenByScenario.openReady,
+							...childrenByScenario.openBlocked,
+						];
 		return [
 			...(scenario === "remembered-blocked" ? [epics[0]] : []),
 			epics[2],
@@ -460,7 +469,12 @@ function sourcesForScenario(scenario = "default") {
 	return [
 		epics[0],
 		closed,
-		{ id: "IMP-OLD", issue_type: "task", status: "closed", title: "Historical discovery" },
+		{
+			id: "IMP-OLD",
+			issue_type: "task",
+			status: "closed",
+			title: "Historical discovery",
+		},
 		...(childrenByScenario[scenario] ?? childrenByScenario.default),
 	];
 }
@@ -468,7 +482,10 @@ function setScenario(scenario = "default") {
 	process.env.WORK_RESUME_SCENARIO = scenario;
 	if (scenario === "no-legacy") {
 		rmSync(path.join(cwd, ".ce-workflow"), { recursive: true, force: true });
-		rmSync(path.join(cwd, ".pi", "work-store"), { recursive: true, force: true });
+		rmSync(path.join(cwd, ".pi", "work-store"), {
+			recursive: true,
+			force: true,
+		});
 		mkdirSync(path.join(cwd, ".beads"), { recursive: true });
 		return;
 	}
@@ -502,7 +519,10 @@ try {
 		state.action === "run-implementation" && state.inlineWork,
 		"unplanned implementation gets a coded slice plan and continues inline",
 	);
-	assert(state.selectedWorkItem.id === "IMP-1", "implementation workItem selected");
+	assert(
+		state.selectedWorkItem.id === "IMP-1",
+		"implementation workItem selected",
+	);
 	assert(
 		state.handoffPrompt?.includes("WO_INLINE_V1"),
 		"inline slice planning avoids a separate planner boundary",
@@ -531,7 +551,10 @@ try {
 		"idea records alone launch planning rather than implementation",
 	);
 	assert(state.counts.readyExecutable === 0, "idea records are not executable");
-	assert(!state.selectedWorkItem, "idea record is never selected as a workItem");
+	assert(
+		!state.selectedWorkItem,
+		"idea record is never selected as a workItem",
+	);
 
 	setScenario("plannedIdea");
 	state = buildWorkResumeState(cwd, "E-1");
@@ -539,7 +562,10 @@ try {
 		state.action === "run-implementation" && state.inlineWork,
 		"planned idea selects linked executable child inline",
 	);
-	assert(state.selectedWorkItem.id === "IMP-1", "linked task selected over idea");
+	assert(
+		state.selectedWorkItem.id === "IMP-1",
+		"linked task selected over idea",
+	);
 	assert(
 		state.handoffPrompt.includes(
 			"Plan: execute the wo:slice-plan note on WorkItem IMP-1 as your spec",
@@ -549,7 +575,10 @@ try {
 
 	setScenario("planning");
 	state = buildWorkResumeState(cwd, "E-1");
-	assert(state.action === "run-planner", "planning workItem selected when alone");
+	assert(
+		state.action === "run-planner",
+		"planning workItem selected when alone",
+	);
 	assert(state.selectedWorkItem.id === "PLAN-1", "planning workItem selected");
 
 	setScenario("stalePlanning");
@@ -966,12 +995,12 @@ try {
 
 	const maxCwd = mkdtempSync(path.join(tmpdir(), "work-resume-ce-"));
 	mkdirSync(path.join(maxCwd, ".pi"), { recursive: true });
-writeFileSync(
+	writeFileSync(
 		path.join(maxCwd, ".pi", "settings.json"),
 		JSON.stringify({ workOrchestrator: { profile: "max" } }),
-);
-seedNativeStore(maxCwd, sourcesForScenario("implementation"));
-const maxState = buildWorkResumeState(maxCwd, "E-1");
+	);
+	seedNativeStore(maxCwd, sourcesForScenario("implementation"));
+	const maxState = buildWorkResumeState(maxCwd, "E-1");
 	assert(
 		maxState.action === "run-implementation" && maxState.inlineWork,
 		"max still skips a planner boundary for simple slices",

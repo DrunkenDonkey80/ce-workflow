@@ -15,6 +15,7 @@ import { loadStore } from "../extensions/work-store.js";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
+	bootstrapPlanEpic,
 	buildWorkPlanState,
 	buildWorkRoadmapState,
 	handleWorkRoadmapCommand,
@@ -65,13 +66,57 @@ writeFileSync(
 	JSON.stringify({ lastEpicId: "E-1" }),
 );
 seedNativeStore(root, [
-	{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Current roadmap", notes: "brainstorm-path=docs/brainstorms/accepted.md", updated_at: "2026-07-03T10:00:00Z" },
-	{ id: "E-2", issue_type: "epic", status: "open", title: "Open roadmap", updated_at: "2026-07-02T10:00:00Z" },
-	{ id: "E-3", issue_type: "epic", status: "closed", title: "Closed roadmap", updated_at: "2026-07-01T10:00:00Z" },
-	{ id: "BUG-1", parent_id: "E-1", issue_type: "bug", status: "open", title: "Fix blocker", labels: ["wo:debug"] },
-	{ id: "TASK-1", parent_id: "E-1", issue_type: "task", status: "open", title: "Build feature" },
-	{ id: "DONE-1", parent_id: "E-1", issue_type: "task", status: "closed", title: "Finished task" },
-	{ id: "DONE-2", parent_id: "E-3", issue_type: "task", status: "closed", title: "Done" },
+	{
+		id: "E-1",
+		issue_type: "epic",
+		status: "in_progress",
+		title: "Current roadmap",
+		notes: "brainstorm-path=docs/brainstorms/accepted.md",
+		updated_at: "2026-07-03T10:00:00Z",
+	},
+	{
+		id: "E-2",
+		issue_type: "epic",
+		status: "open",
+		title: "Open roadmap",
+		updated_at: "2026-07-02T10:00:00Z",
+	},
+	{
+		id: "E-3",
+		issue_type: "epic",
+		status: "closed",
+		title: "Closed roadmap",
+		updated_at: "2026-07-01T10:00:00Z",
+	},
+	{
+		id: "BUG-1",
+		parent_id: "E-1",
+		issue_type: "bug",
+		status: "open",
+		title: "Fix blocker",
+		labels: ["wo:debug"],
+	},
+	{
+		id: "TASK-1",
+		parent_id: "E-1",
+		issue_type: "task",
+		status: "open",
+		title: "Build feature",
+	},
+	{
+		id: "DONE-1",
+		parent_id: "E-1",
+		issue_type: "task",
+		status: "closed",
+		title: "Finished task",
+	},
+	{
+		id: "DONE-2",
+		parent_id: "E-3",
+		issue_type: "task",
+		status: "closed",
+		title: "Done",
+	},
 ]);
 execFileSync("git", ["add", "."], { cwd: root, stdio: "ignore" });
 execFileSync(
@@ -158,7 +203,12 @@ try {
 		!weakPlan.ok && weakPlan.reason === "source-alignment-stop",
 		"weak plans with linked brainstorms stop before epic creation",
 	);
-	const planCreated = buildWorkPlanState(root, "docs/plans/overhaul.md");
+	const planReview = buildWorkPlanState(root, "docs/plans/overhaul.md");
+	console.assert(
+		planReview.ok && planReview.action === "review-plan-before-bootstrap",
+		"plan file runs advisors before native roadmap creation",
+	);
+	const planCreated = bootstrapPlanEpic(root, "docs/plans/overhaul.md");
 	if (
 		!planCreated.ok ||
 		!Object.values(loadStore(root).items).some((item) =>
@@ -166,7 +216,7 @@ try {
 		)
 	)
 		throw new Error(
-			`plan file creates native roadmap work: ${JSON.stringify(planCreated)}`,
+			`reviewed plan file creates native roadmap work: ${JSON.stringify(planCreated)}`,
 		);
 
 	const handoffs = [];

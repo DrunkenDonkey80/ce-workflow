@@ -44,7 +44,8 @@ check(
 
 const roles = [
 	"advisor",
-	"advisor-backup",
+	"advisor-2",
+	"advisor-3",
 	"committer",
 	"debugger",
 	"fixer",
@@ -57,8 +58,40 @@ const agentFiles = listed("agents");
 check(
 	"only work role agents ship",
 	roles.every((role) => agentFiles.includes(`work-${role}.md`)) &&
+		!agentFiles.includes("work-advisor-backup.md") &&
 		!agentFiles.some((name) => name.startsWith("bead-")),
 );
+const advisorFiles = [
+	"agents/work-advisor.md",
+	"agents/work-advisor-2.md",
+	"agents/work-advisor-3.md",
+];
+const advisorBodies = advisorFiles.map((rel) =>
+	read(rel).replace(/^---[\s\S]*?---\s*/, ""),
+);
+check(
+	"parallel advisors share one exact review contract",
+	advisorBodies.every((body) => body === advisorBodies[0]),
+);
+for (const rel of advisorFiles) {
+	const text = read(rel);
+	check(
+		`${rel} checks ordered plan feasibility`,
+		[
+			"weak or missing requirements",
+			"unverified",
+			"incomplete decisions",
+			"ambiguous scope",
+			"untested assumptions",
+		].every((signal) => text.includes(signal)) &&
+			text.includes("supplements, rather than replaces") &&
+			text.includes("declared order") &&
+			text.includes("before a slice uses it") &&
+			/independent(?:ly)? buildable and verifi|built and verified independently/.test(
+				text,
+			),
+	);
+}
 
 const normalPaths = [
 	"extensions/work-models.js",

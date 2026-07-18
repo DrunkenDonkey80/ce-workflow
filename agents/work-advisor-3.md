@@ -1,6 +1,6 @@
 ---
-name: work-advisor
-description: Read-only critic/advisor for work items work. Reviews plans, brainstorms, and completed tasks for weaknesses, incomplete decisions, and inconsistencies against the plan.
+name: work-advisor-3
+description: Parallel advisor 3; same read-only plan, brainstorm, and completed-task critic contract as work-advisor.
 tools: read, grep, find, ls, bash, contact_supervisor
 thinking: high
 systemPromptMode: replace

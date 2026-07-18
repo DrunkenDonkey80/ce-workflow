@@ -35,7 +35,7 @@ No tracker CLI is required for normal operation. In a new repository run:
 | `/work-settings`, `/work-context`, `/work-catch-up`, `/work-goal` | Configures orchestration and context behavior. |
 | `/work-remove-beads` | One-way migration for a detected legacy workspace. |
 
-Role agents are `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, and the two work-advisor roles. They use `scripts/work-helper.mjs` native helpers for compact work-item summaries, children, ready, claim, note, label, and blocker operations.
+Role agents are `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, and three identical configurable advisor roles: `work-advisor`, `work-advisor-2`, and `work-advisor-3`. Configured advisors review brainstorms and plans in parallel; slice plans use the profile's `none` / `first` / `all` policy. They use `scripts/work-helper.mjs` native helpers for compact work-item summaries, children, ready, claim, note, label, and blocker operations.
 
 ## Workflow rules
 
