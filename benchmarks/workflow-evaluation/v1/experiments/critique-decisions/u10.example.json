@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "mode": "critique-decision-campaign",
+  "unit": "U10",
+  "campaign": "../model-role-campaign.example.json",
+  "campaignFingerprint": "model-role-campaign-v1-frozen",
+  "priceTableFingerprint": "pricing-v1-example",
+  "seed": 56001,
+  "decisionGrade": true,
+  "projects": ["csv-expenses", "calculator"],
+  "pairsPerContrast": 3,
+  "generators": ["Sol-high", "Opus-high"],
+  "sharedHighCritics": ["empty-control", "Sol-high", "Opus-high"],
+  "effortCritics": ["Sol-xhigh", "Opus-xhigh"],
+  "fixedReviser": {
+    "id": "fixed-reviser-v1",
+    "provider": "fixture",
+    "model": "reviser-v1",
+    "effort": "high"
+  },
+  "evaluators": [
+    { "provider": "openai-codex", "model": "gpt-5.6-sol", "effort": "high" },
+    { "provider": "anthropic", "model": "claude-opus-4-8", "effort": "high" }
+  ],
+  "factorial": {
+    "sharedHigh": {
+      "type": "2x3",
+      "cells": [
+        ["Sol-high", "empty-control"],
+        ["Sol-high", "Sol-high"],
+        ["Sol-high", "Opus-high"],
+        ["Opus-high", "empty-control"],
+        ["Opus-high", "Sol-high"],
+        ["Opus-high", "Opus-high"]
+      ]
+    },
+    "effort": {
+      "type": "declared-within-generator",
+      "cells": [
+        ["Sol-high", "Sol-xhigh"],
+        ["Sol-high", "Opus-xhigh"],
+        ["Opus-high", "Sol-xhigh"],
+        ["Opus-high", "Opus-xhigh"]
+      ]
+    }
+  },
+  "envelopes": {
+    "signed": true,
+    "emptyControl": true,
+    "freezeExactBytes": true,
+    "identicalNonTreatmentLimits": true,
+    "requireConsumptionEvent": true
+  },
+  "dualCritic": {
+    "enabledOnlyAfterBothSingleCriticsPass": true,
+    "balancedRandomizedOrder": true,
+    "retainDuplicatesAndContradictions": true,
+    "analyzeAsInteraction": true
+  },
+  "writableFixture": {
+    "requiredForWriterAndReviserSamples": true,
+    "requireExecutableAcceptance": true,
+    "recordSourceMutations": true,
+    "wrapperRejectedReadOnlyOutput": "lifecycle-invalid"
+  },
+  "retain": [
+    "requestedIdentity",
+    "observedIdentity",
+    "configurationFingerprint",
+    "artifactHashes",
+    "consumptionEvents",
+    "acceptedUniqueFindings",
+    "falsePositives",
+    "verifiedFixes",
+    "regressions",
+    "artifactUplift",
+    "rework",
+    "criticTelemetry",
+    "reviserTelemetry",
+    "pairedUncertainty",
+    "evaluatorJudgments",
+    "terminalOutcome",
+    "evidencePath"
+  ],
+  "rules": {
+    "requireExactProviderModelEffort": true,
+    "requireDualEvaluatorAgreement": true,
+    "requireTwoSidedCalibration": true,
+    "preserveAllAttempts": true,
+    "rejectChangedCritiqueBytes": true,
+    "rejectMissingConsumption": true,
+    "unavailableIsPass": false,
+    "promoteByAbsence": false,
+    "allowNoWinner": true,
+    "allowNeedsMoreEvidence": true,
+    "changeDefaults": false,
+    "evidenceVisibility": "authority-only",
+    "expiryDays": 30
+  }
+}

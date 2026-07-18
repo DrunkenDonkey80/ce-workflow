@@ -53,6 +53,9 @@ const u8Decisions = readFixture(
 const u9Decisions = readFixture(
 	"benchmarks/workflow-evaluation/v1/experiments/role-decisions/u9.example.json",
 );
+const u10Decisions = readFixture(
+	"benchmarks/workflow-evaluation/v1/experiments/critique-decisions/u10.example.json",
+);
 assert.equal(campaign.frozenBeforeFirstSample, true);
 assert.equal(roleSmoke.campaignFingerprint, campaign.fingerprint);
 assert.equal(roleSmoke.decisionGrade, false);
@@ -149,6 +152,48 @@ assert.deepEqual(u9Decisions.hardGates, [
 	"repository-finalization",
 	"source-immutability",
 ]);
+assert.equal(u10Decisions.mode, "critique-decision-campaign");
+assert.equal(u10Decisions.decisionGrade, true);
+assert.equal(u10Decisions.campaignFingerprint, campaign.fingerprint);
+assert.equal(
+	u10Decisions.priceTableFingerprint,
+	campaign.priceTable.fingerprint,
+);
+assert.equal(u10Decisions.seed, campaign.seed);
+assert.equal(u10Decisions.pairsPerContrast, campaign.protocol.decisionPairs);
+assert.deepEqual(u10Decisions.projects, campaign.projects);
+assert.deepEqual(u10Decisions.generators, ["Sol-high", "Opus-high"]);
+assert.deepEqual(u10Decisions.sharedHighCritics, [
+	"empty-control",
+	"Sol-high",
+	"Opus-high",
+]);
+assert.deepEqual(u10Decisions.effortCritics, ["Sol-xhigh", "Opus-xhigh"]);
+assert.equal(u10Decisions.factorial.sharedHigh.cells.length, 6);
+assert.equal(u10Decisions.factorial.effort.cells.length, 4);
+assert.equal(u10Decisions.fixedReviser.id, "fixed-reviser-v1");
+assert.equal(u10Decisions.envelopes.emptyControl, true);
+assert.equal(u10Decisions.envelopes.freezeExactBytes, true);
+assert.equal(u10Decisions.envelopes.requireConsumptionEvent, true);
+assert.equal(
+	u10Decisions.dualCritic.enabledOnlyAfterBothSingleCriticsPass,
+	true,
+);
+assert.equal(u10Decisions.dualCritic.balancedRandomizedOrder, true);
+assert.equal(u10Decisions.dualCritic.analyzeAsInteraction, true);
+assert.equal(
+	u10Decisions.writableFixture.requiredForWriterAndReviserSamples,
+	true,
+);
+assert.equal(
+	u10Decisions.writableFixture.wrapperRejectedReadOnlyOutput,
+	"lifecycle-invalid",
+);
+assert.equal(u10Decisions.rules.requireDualEvaluatorAgreement, true);
+assert.equal(u10Decisions.rules.requireTwoSidedCalibration, true);
+assert.equal(u10Decisions.rules.rejectChangedCritiqueBytes, true);
+assert.equal(u10Decisions.rules.rejectMissingConsumption, true);
+assert.equal(u10Decisions.rules.changeDefaults, false);
 assert.equal(campaign.protocol.symmetricInfrastructureReplacements, 1);
 assert.equal(campaign.evidence.expiryDays, 30);
 assert.equal(campaign.evidence.durabilityBeforeDeletion, true);

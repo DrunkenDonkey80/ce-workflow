@@ -95,6 +95,7 @@ for (const rel of normalPaths) {
 const evaluationFiles = [
 	"agents/workflow-evaluator.md",
 	"benchmarks/workflow-evaluation/v1/experiments/calibration.example.json",
+	"benchmarks/workflow-evaluation/v1/experiments/critique-decisions/u10.example.json",
 	"benchmarks/workflow-evaluation/v1/experiments/decision.example.json",
 	"benchmarks/workflow-evaluation/v1/experiments/golden-update.example.json",
 	"benchmarks/workflow-evaluation/v1/experiments/model-role-campaign.example.json",

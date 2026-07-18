@@ -849,6 +849,35 @@
       "type": "task",
       "updatedAt": "2026-07-18T03:13:04.907Z"
     },
+    "work-1.13": {
+      "acceptance": "1. U10 descriptors encode the frozen R15 topology, fixed reviser, signed empty/control and critique envelopes, identical non-treatment limits, separate effort effects, three alternating confirmatory pairs per contrast/project-class scope, holdout confirmation, and fail-closed no-winner/invalid outcomes; dual critics are gated on both single critics passing and use balanced randomized order while retaining duplicate/contradictory findings. 2. Scores/evidence retain accepted unique findings, false positives, verified fixes, regressions, artifact uplift, rework, critic/reviser tokens, wall time, exact requested/observed provider-model-effort identities, hashes, consumption events, paired uncertainty, and evaluator agreement; leakage, changed bytes, missing consumption, identity drift, disagreement, incomplete calibration, or unavailable lanes cannot produce a winner. 3. Every writer/reviser-role decision sample runs against a real disposable writable fixture with executable acceptance checks and source-mutation accounting. Wrapper-rejected read-only output is lifecycle-invalid retained evidence, never a completed sample or win; if a writable fixture cannot be provisioned, fail closed as needs-more-evidence. 4. Raw live evidence stays in authority-only scratch storage with declared expiry; tracked changes are limited to U10 critique-decision descriptors/fixtures, focused harness tests or package registration required by U10, and concise README result/no-winner documentation. Do not modify or absorb scripts/test-work-resume.mjs. 5. Verify with: node scripts/test-workflow-evaluation-critique.mjs && node scripts/test-workflow-evaluation-calculator.mjs && node scripts/test-workflow-evaluation-csv.mjs && node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-panel.mjs && node scripts/test-workflow-evaluation-runner.mjs && npm run verify:quiet. Retained decision evidence must additionally prove three alternating pairs for each confirmatory contrast, seeded and holdout replay, hard gates, complete telemetry, fixed-reviser consumption, panel agreement, and either the bounded conclusion or explicit no-winner.",
+      "createdAt": "2026-07-18T03:14:49.330Z",
+      "dependencies": [
+        "work-1.11",
+        "work-1.12",
+        "work-1.7",
+        "work-1.8"
+      ],
+      "dependencyEdges": [],
+      "description": "Execute only roadmap unit U10: freeze the critic-topology decision descriptors, run the predeclared revision-loop contrasts, retain decision evidence outside the tracked source tree, and document a conditional same-family/cross-family conclusion or explicit no-winner. Cover Sol-high and Opus-high generators with empty, Sol-high, and Opus-high critique; add the declared Sol-xhigh/Opus-xhigh effort contrasts. Permit a balanced randomized dual-critic interaction only after both single critics pass. Excludes U11 integrated sentinels/adoption, settings/default changes, unrelated scripts/test-work-resume.mjs, and any generated raw evidence in tracked source.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.13",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan\nSource: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md, U10 and AC3-AC6/AC8-AC9. Extend the existing V1 critique replay/scoring/runner path only. Freeze and validate the single-critic plus effort matrix first; provision real disposable writable revision fixtures before decision sampling; run retained three-pair and holdout evidence; gate balanced randomized dual critics on both single critics passing. U9 limitation is binding: wrapper-rejected read-only writer/reviser output is lifecycle-invalid retained evidence, never a completed sample or win; unavailable writable fixtures fail closed as needs-more-evidence. Keep raw evidence outside tracked source, preserve provider-neutral behavior, defer U11 adoption, and do not touch scripts/test-work-resume.mjs.",
+        "wo:live-evidence U10 terminal report retained at .pi/u10-live-report.json with mapping .pi/u10-live-run-mapping.json. The frozen matrix records 20 project/generator/critic contrasts and 60 alternating pair slots. Every slot stopped at preflight as needs-more-evidence: U9 supplied no qualified writer/reviser mapping, no exact U7 calibration matches the critique/reviser prompt, and no safely coded disposable writable reviser fixture exists. Seeded/holdout corpus and fixed-reviser hashes are retained, but no sample, consumption, panel, or dual-critic run was fabricated; dual critics remain ineligible because both singles did not pass. Cost USD 0, source sample mutations empty, no recommendation/default changed, 30-day expiry. Tracked changes: README.md, u10.example.json, test-workflow-evaluation-runner.mjs, verify-package.mjs. Residual risk: decision-grade U10 requires the coded writable fixture path already recorded by U9.",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-critique.mjs && node scripts/test-workflow-evaluation-calculator.mjs && node scripts/test-workflow-evaluation-csv.mjs && node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-panel.mjs && node scripts/test-workflow-evaluation-runner.mjs && npm run verify:quiet\nOutput: ok - workflow evaluation critique replay fixtures\nok - calculator workflow evaluation project fixtures\nok - CSV workflow evaluation project fixtures\nok - workflow evaluation decision scoring fixtures\nok - workflow evaluation dual panel and Pareto fixtures\nok - workflow evaluation smoke and decision lifecycle fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U10 Critic topology and revision-loop decisions",
+      "type": "task",
+      "updatedAt": "2026-07-18T03:23:11.893Z"
+    },
     "work-1.2": {
       "acceptance": "GATE: node scripts/test-workflow-evaluation-contract.mjs passes - canonical one-factor model/role descriptors pass and every ambiguous or multi-factor configuration fails closed. Scenarios: (1) a top-level or one-role modelAssignment delta may change provider+exact model together as one logical factor; (2) provider/model changes outside a declared compound assignment fail as partial/undeclared deltas, effort+assignment still requires an interaction experiment; (3) unknown roles, incomplete role cells, ambient overrides, no-op aliases, unsupported effort, and undeclared fallback fail before provisioning; (4) key-order differences do not change the role-map fingerprint; (5) existing workflowRevision/effort/prompt/mode/reviewer descriptors remain compatible. Package regression: npm run verify:quiet stays green. AC1 (V1 harness compatibility) and AC2 (role configuration) must not regress; no source mutation of approved bundles/goldens.",
       "createdAt": "2026-07-16T19:21:11.697Z",
@@ -1078,7 +1107,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-18T03:13:04.907Z"
+    "updatedAt": "2026-07-18T03:23:11.893Z"
   },
   "schemaVersion": 1
 }
