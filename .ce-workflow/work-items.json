@@ -820,6 +820,35 @@
       "type": "task",
       "updatedAt": "2026-07-18T02:18:36.438Z"
     },
+    "work-1.12": {
+      "acceptance": "1. Worker contrasts cover Terra-medium, Terra-high, and Sol-high using approved plans; fixer contrasts cover the same candidates using seeded review/fix loops; debugger contrasts cover Terra-high, Sol-high, and Sol-xhigh using seeded shared-root-cause cases; reviewer contrasts cover Terra-high, Sol-high, Opus-high, and Opus-xhigh using holdout diffs. 2. Each exercised role has three alternating confirmatory pairs per applicable project/class scope, dual-evaluator agreement or an explicit no-winner/needs-more-evidence result, complete per-agent Pareto metrics and uncertainty, and retained provenance/fingerprints. 3. Worker gates include product behavior, plan adherence, implementation quality, unnecessary work, clean finalization, and first-pass verification; fixer gates prove only requested corrections, seeded-regression removal, no unrelated diff, and reduced rework; debugger gates prove root cause/shared-path repair with characterization evidence and no speculative refactor; reviewer accounting explicitly records unique consumed valid defects, duplicates, false positives, missed critical defects, and unconsumed findings. 4. U8 committer evidence is reused as the finalization gate rather than rerun; any candidate failing calculator persistence, CSV malformed-row behavior, verification, or repository finalization is rejected before cost scoring. 5. No defaults or presets change. Deterministic verification passes: node scripts/test-workflow-evaluation-calculator.mjs; node scripts/test-workflow-evaluation-csv.mjs; node scripts/test-workflow-evaluation-score.mjs; node scripts/test-workflow-evaluation-panel.mjs; npm run verify:quiet. Retained decision evidence demonstrates the required three-pair contrasts, role-specific outcomes/uncertainty, matching requested/observed identities, complete telemetry, source immutability, and either qualifying conditional Pareto decisions or explicit no-winner results. 6. Final acceptance evidence reports changed files, tests added/updated, commands and concise outputs, retained-evidence locations, residual risks/provider unavailability, and confirms no staged files.",
+      "createdAt": "2026-07-18T02:40:35.936Z",
+      "dependencies": [
+        "work-1.11",
+        "work-1.7",
+        "work-1.8"
+      ],
+      "dependencyEdges": [],
+      "description": "Execute only roadmap unit U9: produce confirmatory role-decision evidence for worker, fixer, debugger, and reviewer across the applicable calculator/CSV and holdout lanes. Add or update bounded U9 descriptors/evidence documentation under benchmarks/workflow-evaluation/v1/experiments/role-decisions/ and README.md; retained live evidence stays outside the source tree. Do not implement U10 critic-topology work, U11 adoption/sentinel changes, model-default changes, or unrelated workflow changes.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.12",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan\nSource: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md, U9 and Verification Contract. Dependency-ready after closed U6-U8 (work-1.7, work-1.8, work-1.11). Bound scope to role-decision descriptors, retained evidence, and README documentation for worker/fixer/debugger/reviewer. Reuse U8 committer evidence as the finalization gate; do not rerun committer per lane. Exclude U10 critic topology, U11 adoption/sentinels, default or preset changes, and unrelated workflow work. Live provider/evaluator unavailability is recorded as unavailable and cannot become a pass or recommendation. Preserve unrelated working-tree changes in scripts/test-work-goal.mjs and scripts/test-work-resume.mjs.",
+        "wo:checkpoint U9 descriptor and deterministic contract added; focused calculator/CSV/score/panel/runner tests and npm run verify:quiet pass. First six exact worker samples (Terra-medium and Terra-high, three each) produced retained artifacts under .pi-subagents/artifacts run 7f2997bf, but the generic implementation-agent wrapper marked all terminal attempts failed solely because this decision-sample task intentionally made no repository edits. Outputs and usage are retained; they are non-decision-grade until rerun in disposable writable fixtures or classified needs-more-evidence. Workflow friction: role evaluation needs a coded disposable-sample path instead of read-only prompts sent to writer agents. Continue remaining frozen arms; do not count wrapper-failed attempts as wins.",
+        "wo:live-evidence U9 terminal report retained at .pi/u9-live-report.json with mapping .pi/u9-live-run-mapping.json and telemetry .pi/u9-live-telemetry.json. Frozen 9 contrasts contain 27 paired attempts / 39 exact requested-observed role-model-effort samples. 14 completed and 25 writer-lifecycle-invalid attempts are retained; all nine outcomes are needs-more-evidence because writer-role read-only samples failed the implementation lifecycle gate and the combined cross-project prompt has no exact U7 calibration fingerprint. No invalid contrast reached evaluators, no recommendation/default changed, U8 committer evidence was hash-bound and reused, sample source mutations are empty, evidence expires in 30 days. Total observed cost: USD 1.824268. Changed source files: README.md, u9.example.json, test-workflow-evaluation-runner.mjs, verify-package.mjs. Tests updated: runner contract. Residual risk: future decision-grade U9 requires coded disposable writable role fixtures with exact per-project calibration binding.",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-calculator.mjs && node scripts/test-workflow-evaluation-csv.mjs && node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-panel.mjs && node scripts/test-workflow-evaluation-runner.mjs && npm run verify:quiet\nOutput: ok - calculator workflow evaluation project fixtures\nok - CSV workflow evaluation project fixtures\nok - workflow evaluation decision scoring fixtures\nok - workflow evaluation dual panel and Pareto fixtures\nok - workflow evaluation smoke and decision lifecycle fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U9 Worker, fixer, debugger, and reviewer decisions",
+      "type": "task",
+      "updatedAt": "2026-07-18T03:13:04.907Z"
+    },
     "work-1.2": {
       "acceptance": "GATE: node scripts/test-workflow-evaluation-contract.mjs passes - canonical one-factor model/role descriptors pass and every ambiguous or multi-factor configuration fails closed. Scenarios: (1) a top-level or one-role modelAssignment delta may change provider+exact model together as one logical factor; (2) provider/model changes outside a declared compound assignment fail as partial/undeclared deltas, effort+assignment still requires an interaction experiment; (3) unknown roles, incomplete role cells, ambient overrides, no-op aliases, unsupported effort, and undeclared fallback fail before provisioning; (4) key-order differences do not change the role-map fingerprint; (5) existing workflowRevision/effort/prompt/mode/reviewer descriptors remain compatible. Package regression: npm run verify:quiet stays green. AC1 (V1 harness compatibility) and AC2 (role configuration) must not regress; no source mutation of approved bundles/goldens.",
       "createdAt": "2026-07-16T19:21:11.697Z",
@@ -1049,7 +1078,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-18T02:18:36.439Z"
+    "updatedAt": "2026-07-18T03:13:04.907Z"
   },
   "schemaVersion": 1
 }

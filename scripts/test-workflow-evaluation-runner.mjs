@@ -50,6 +50,9 @@ const roleCalibration = readFixture(
 const u8Decisions = readFixture(
 	"benchmarks/workflow-evaluation/v1/experiments/role-decisions/u8.example.json",
 );
+const u9Decisions = readFixture(
+	"benchmarks/workflow-evaluation/v1/experiments/role-decisions/u9.example.json",
+);
 assert.equal(campaign.frozenBeforeFirstSample, true);
 assert.equal(roleSmoke.campaignFingerprint, campaign.fingerprint);
 assert.equal(roleSmoke.decisionGrade, false);
@@ -109,6 +112,43 @@ assert.equal(u8Decisions.rules.requireTwoSidedCalibration, true);
 assert.equal(u8Decisions.rules.promoteByAbsence, false);
 assert.equal(u8Decisions.controls["work-committer"], "configured-control");
 assert.equal(u8Decisions.controls.changeDefaults, false);
+assert.equal(u9Decisions.mode, "decision-campaign");
+assert.equal(u9Decisions.decisionGrade, true);
+assert.equal(u9Decisions.campaignFingerprint, campaign.fingerprint);
+assert.equal(
+	u9Decisions.priceTableFingerprint,
+	campaign.priceTable.fingerprint,
+);
+assert.equal(u9Decisions.seed, campaign.seed);
+assert.equal(u9Decisions.pairsPerContrast, campaign.protocol.decisionPairs);
+assert.deepEqual(u9Decisions.projects, campaign.projects);
+assert.deepEqual(
+	u9Decisions.lanes.map(({ role, candidates }) => ({ role, candidates })),
+	campaign.lanes
+		.filter(({ role }) =>
+			["work-worker", "work-fixer", "work-debugger", "work-reviewer"].includes(
+				role,
+			),
+		)
+		.map(({ role, candidates }) => ({ role, candidates })),
+);
+assert.equal(u9Decisions.evaluators.length, 2);
+assert.equal(u9Decisions.rules.requireDualEvaluatorAgreement, true);
+assert.equal(u9Decisions.rules.requireTwoSidedCalibration, true);
+assert.equal(u9Decisions.rules.rejectBeforeCostScoringOnHardGateFailure, true);
+assert.equal(u9Decisions.rules.promoteByAbsence, false);
+assert.equal(
+	u9Decisions.controls["work-committer"],
+	"reuse-u8-finalization-evidence",
+);
+assert.equal(u9Decisions.controls.changeDefaults, false);
+assert.deepEqual(u9Decisions.hardGates, [
+	"calculator-persistence",
+	"csv-malformed-row-behavior",
+	"verification",
+	"repository-finalization",
+	"source-immutability",
+]);
 assert.equal(campaign.protocol.symmetricInfrastructureReplacements, 1);
 assert.equal(campaign.evidence.expiryDays, 30);
 assert.equal(campaign.evidence.durabilityBeforeDeletion, true);

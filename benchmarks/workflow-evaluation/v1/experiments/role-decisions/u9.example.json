@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "mode": "decision-campaign",
+  "unit": "U9",
+  "campaign": "../model-role-campaign.example.json",
+  "campaignFingerprint": "model-role-campaign-v1-frozen",
+  "priceTableFingerprint": "pricing-v1-example",
+  "seed": 56001,
+  "decisionGrade": true,
+  "projects": ["csv-expenses", "calculator"],
+  "pairsPerContrast": 3,
+  "evaluators": [
+    { "provider": "openai-codex", "model": "gpt-5.6-sol", "effort": "high" },
+    { "provider": "anthropic", "model": "claude-opus-4-8", "effort": "high" }
+  ],
+  "lanes": [
+    {
+      "role": "work-worker",
+      "trigger": "/work-resume",
+      "candidates": ["Terra-medium", "Terra-high", "Sol-high"],
+      "caseScope": "approved-plan",
+      "dimensions": ["product-behavior", "plan-adherence", "implementation-quality", "unnecessary-work", "clean-finalization", "first-pass-verification", "cost"]
+    },
+    {
+      "role": "work-fixer",
+      "trigger": "review-failure",
+      "candidates": ["Terra-medium", "Terra-high", "Sol-high"],
+      "caseScope": "seeded-review-fix-loop",
+      "dimensions": ["requested-corrections-only", "regression-removal", "unrelated-diff", "total-rework", "cost"]
+    },
+    {
+      "role": "work-debugger",
+      "trigger": "/work-debug",
+      "candidates": ["Terra-high", "Sol-high", "Sol-xhigh"],
+      "caseScope": "seeded-shared-root-cause",
+      "dimensions": ["root-cause", "shared-path-repair", "characterization-evidence", "speculative-refactor", "cost"]
+    },
+    {
+      "role": "work-reviewer",
+      "trigger": "review-gate",
+      "candidates": ["Terra-high", "Sol-high", "Opus-high", "Opus-xhigh"],
+      "caseScope": "holdout-diff",
+      "dimensions": ["unique-consumed-valid-defects", "duplicates", "false-positives", "missed-critical-defects", "unconsumed-findings", "cost"]
+    }
+  ],
+  "controls": {
+    "work-committer": "reuse-u8-finalization-evidence",
+    "changeDefaults": false
+  },
+  "hardGates": [
+    "calculator-persistence",
+    "csv-malformed-row-behavior",
+    "verification",
+    "repository-finalization",
+    "source-immutability"
+  ],
+  "retain": [
+    "requestedIdentity",
+    "observedIdentity",
+    "configurationFingerprint",
+    "completeTelemetry",
+    "pairedDeltas",
+    "pairedRange",
+    "calibrationNoise",
+    "evaluatorJudgments",
+    "hardGates",
+    "terminalOutcome",
+    "evidencePath"
+  ],
+  "rules": {
+    "requireExactProviderModelEffort": true,
+    "requireDualEvaluatorAgreement": true,
+    "requireTwoSidedCalibration": true,
+    "preserveAllAttempts": true,
+    "rejectBeforeCostScoringOnHardGateFailure": true,
+    "unavailableIsPass": false,
+    "promoteByAbsence": false,
+    "allowNoWinner": true,
+    "allowNeedsMoreEvidence": true,
+    "evidenceVisibility": "authority-only",
+    "expiryDays": 30
+  }
+}

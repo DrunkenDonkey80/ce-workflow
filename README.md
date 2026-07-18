@@ -103,6 +103,11 @@ insufficient evidence can only produce unavailable, no-winner, or
 `needs-more-evidence`; U8 never changes defaults, and committer remains the
 configured deterministic control.
 
+`role-decisions/u9.example.json` applies the same fail-closed protocol to worker,
+fixer, debugger, and reviewer cases. Product behavior, verification, repository
+finalization, and source immutability are hard gates checked before cost; U9
+reuses U8 committer evidence and does not change defaults.
+
 The other files in `benchmarks/workflow-evaluation/v1/experiments/` are starting templates. Replace every `replace-with-*` value with a retained path before running them. Missing provider credentials, evaluator access, browser capability, provenance, telemetry, calibration, or approval fails closed and cannot become passing or decision-grade evidence. Sentinel runs are mandatory for handoff, artifact, routing, finalization, default-behavior, extension, prompt, skill, agent, or otherwise non-narrow changes; documentation, benchmark-fixture, and focused test-only changes are narrow.
 
 Candidate extensions execute with full process permissions. Path containment and fresh disposable roots protect benchmark integrity but are **not a hostile-code sandbox**. Only run trusted candidates with `"trusted": true`; untrusted candidates require `"isolation": "os"` plus an external `sandboxCommand`. Reports sanitize credential-like fields and authority-resource paths; hidden contracts, unshown answer-bank data, unselected goldens, evaluator labels, and undeclared environment differences are never exposed to the tested workflow.
