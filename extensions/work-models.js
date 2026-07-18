@@ -9386,7 +9386,8 @@ function workProjectAutopilotAppendix() {
 - When a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use wait/status; never block the TUI on a foreground child.
 - Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
 - Use /work-resume for one deterministic WorkItem boundary. Use /work-goal only when the user explicitly wants a multi-step autonomous loop.
-- Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it says N tasks, stop after N executable native work-item store close.
+- Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it explicitly says N tasks, stop after N executable native work-item store closes. Identifiers such as work-2 are targets, never task counts.
+- When given a target work item or epic ID, resolve that exact ID and continue until it is closed; an open epic with no ready children needs its next planned slice, not premature completion.
 - At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
 - Stop only when the requested scope is done, the epic is complete, or a real product/credential/hardware/destructive/verification decision is required.`;
 }
