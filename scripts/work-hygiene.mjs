@@ -35,7 +35,7 @@ const SOURCE_EXTS = new Set(
 		"c h cpp hpp cc hh cs fs vb clj cljs ex exs erl elm hs jl lua pl pm " +
 		"r dart vue svelte astro md mdx html htm xml svg rst adoc tex " +
 		"css scss sass less styl toml yaml yml json json5 jsonc ini cfg conf " +
-		"sh bash zsh fish ps1 psm1 bat cmd sql graphql gql proto txt lock csv tsv sha256"
+		"sh bash zsh fish ps1 psm1 bat cmd sql graphql gql proto txt lock csv tsv sha256 cmake"
 	).split(" "),
 );
 
