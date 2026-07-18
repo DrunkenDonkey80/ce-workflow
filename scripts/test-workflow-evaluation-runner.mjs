@@ -47,6 +47,9 @@ const roleSmoke = readFixture(
 const roleCalibration = readFixture(
 	"benchmarks/workflow-evaluation/v1/experiments/role-calibration.example.json",
 );
+const u8Decisions = readFixture(
+	"benchmarks/workflow-evaluation/v1/experiments/role-decisions/u8.example.json",
+);
 assert.equal(campaign.frozenBeforeFirstSample, true);
 assert.equal(roleSmoke.campaignFingerprint, campaign.fingerprint);
 assert.equal(roleSmoke.decisionGrade, false);
@@ -80,6 +83,32 @@ assert.deepEqual(
 	calibrationBinding(roleCalibration, sourceRoot).assignment.roleMap,
 	roleCalibration.roleMap,
 );
+assert.equal(u8Decisions.mode, "decision-campaign");
+assert.equal(u8Decisions.decisionGrade, true);
+assert.equal(u8Decisions.campaignFingerprint, campaign.fingerprint);
+assert.equal(
+	u8Decisions.priceTableFingerprint,
+	campaign.priceTable.fingerprint,
+);
+assert.equal(u8Decisions.seed, campaign.seed);
+assert.equal(u8Decisions.pairsPerContrast, campaign.protocol.decisionPairs);
+assert.deepEqual(u8Decisions.projects, campaign.projects);
+assert.deepEqual(
+	u8Decisions.lanes.map(({ role, candidates }) => ({ role, candidates })),
+	campaign.lanes
+		.filter(({ role }) =>
+			["main", "work-planner", "work-migrator", "work-advisor-backup"].includes(
+				role,
+			),
+		)
+		.map(({ role, candidates }) => ({ role, candidates })),
+);
+assert.equal(u8Decisions.evaluators.length, 2);
+assert.equal(u8Decisions.rules.requireDualEvaluatorAgreement, true);
+assert.equal(u8Decisions.rules.requireTwoSidedCalibration, true);
+assert.equal(u8Decisions.rules.promoteByAbsence, false);
+assert.equal(u8Decisions.controls["work-committer"], "configured-control");
+assert.equal(u8Decisions.controls.changeDefaults, false);
 assert.equal(campaign.protocol.symmetricInfrastructureReplacements, 1);
 assert.equal(campaign.evidence.expiryDays, 30);
 assert.equal(campaign.evidence.durabilityBeforeDeletion, true);

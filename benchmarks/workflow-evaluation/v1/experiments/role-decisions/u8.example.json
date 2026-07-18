@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "mode": "decision-campaign",
+  "unit": "U8",
+  "campaign": "../model-role-campaign.example.json",
+  "campaignFingerprint": "model-role-campaign-v1-frozen",
+  "priceTableFingerprint": "pricing-v1-example",
+  "seed": 56001,
+  "decisionGrade": true,
+  "projects": ["csv-expenses", "calculator"],
+  "pairsPerContrast": 3,
+  "evaluators": [
+    { "provider": "openai-codex", "model": "gpt-5.6-sol", "effort": "high" },
+    { "provider": "anthropic", "model": "claude-opus-4-8", "effort": "high" }
+  ],
+  "lanes": [
+    {
+      "role": "main",
+      "trigger": "/work-brainstorm",
+      "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"],
+      "dimensions": ["question-quality", "requirements", "scope", "unexpected-questions", "downstream-plan-readiness", "cost"]
+    },
+    {
+      "role": "work-planner",
+      "trigger": "/work-plan",
+      "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"],
+      "dimensions": ["preservation", "traceability", "slicing", "verification", "downstream-success", "cost"]
+    },
+    {
+      "role": "work-migrator",
+      "trigger": "/work-migrate",
+      "candidates": ["Luna-medium", "Terra-medium", "Sol-high"],
+      "dimensions": ["artifact-preservation", "relationship-preservation", "decision-preservation", "no-source-edits", "no-invented-work", "cost"]
+    },
+    {
+      "role": "work-advisor-backup",
+      "trigger": "primary-unavailable",
+      "candidates": ["Luna-medium", "Terra-medium", "Sol-high"],
+      "dimensions": ["valid-findings", "no-harm", "lower-cost"]
+    }
+  ],
+  "controls": {
+    "work-committer": "configured-control",
+    "changeDefaults": false
+  },
+  "retain": [
+    "requestedIdentity",
+    "observedIdentity",
+    "configurationFingerprint",
+    "completeTelemetry",
+    "pairedDeltas",
+    "pairedRange",
+    "calibrationNoise",
+    "evaluatorJudgments",
+    "hardGates",
+    "terminalOutcome",
+    "evidencePath"
+  ],
+  "rules": {
+    "requireExactProviderModelEffort": true,
+    "requireDualEvaluatorAgreement": true,
+    "requireTwoSidedCalibration": true,
+    "preserveAllAttempts": true,
+    "unavailableIsPass": false,
+    "promoteByAbsence": false,
+    "allowNoWinner": true,
+    "allowNeedsMoreEvidence": true,
+    "evidenceVisibility": "authority-only",
+    "expiryDays": 30
+  }
+}
