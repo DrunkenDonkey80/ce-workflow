@@ -47,6 +47,11 @@ assert(
 	"loose .pyc maps to *.py[cod]",
 );
 assert(
+	ignorePatternForBuildArtifact("rf-lib/build-host/rf_session_tests.pdb") ===
+		"*.pdb",
+	"MSVC debug symbols map to *.pdb",
+);
+assert(
 	ignorePatternForBuildArtifact("a/b/node_modules/lib/index.js") ===
 		"node_modules/",
 	"node_modules maps to node_modules/",

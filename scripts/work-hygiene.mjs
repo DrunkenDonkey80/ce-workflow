@@ -82,6 +82,7 @@ export function ignorePatternForBuildArtifact(file) {
 		if (/\.dist-info$/i.test(dir)) return "*.dist-info/";
 	}
 	if (/\.py[cod]$/i.test(base)) return "*.py[cod]";
+	if (/\.pdb$/i.test(base)) return "*.pdb";
 	if (/\.egg-info(?:\.json)?$/i.test(base)) return "*.egg-info/";
 	if (base === ".DS_Store") return ".DS_Store";
 	return null;
