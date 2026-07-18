@@ -749,10 +749,10 @@
         "created by /work-plan\nsource plan: docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md\nsource artifact: docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md",
         "wo:workflow-feedback — planner run 47300174 successfully created native WorkItem work-1.4 but the subagent wrapper marked it failed because native-store-only planning produced no implementation diff; U3 note had to be recovered from the master plan. Follow-up: make planner acceptance recognize native work-item mutations and require persisted wo:slice-plan before reporting readiness."
       ],
-      "status": "open",
+      "status": "closed",
       "title": "Model Role Evaluation Roadmap - Plan",
       "type": "epic",
-      "updatedAt": "2026-07-16T19:18:17.235Z"
+      "updatedAt": "2026-07-18T03:32:58.581Z"
     },
     "work-1.1": {
       "createdAt": "2026-07-16T19:18:17.405Z",
@@ -877,6 +877,35 @@
       "title": "U10 Critic topology and revision-loop decisions",
       "type": "task",
       "updatedAt": "2026-07-18T03:23:11.893Z"
+    },
+    "work-1.14": {
+      "acceptance": "1. U8-U10 no-winner/no-qualified-mapping outcomes flow to a baseline-retained adoption result; extensions/work-models.js provider-neutral defaults and settings behavior remain unchanged. 2. The adoption ledger/report names the scoped limitation and records that live calculator/CSV actual-handoff sentinels were not eligible because no qualified integrated mapping exists; it does not fabricate handoffs, samples, fingerprints, evidence paths, approvals, or provider claims. 3. Sentinel/adoption logic remains fail closed: missing/stale evidence, provider absence, identity drift/fallback, disagreement, sentinel failure, quality-pass-no-cost-win, or incomplete shared-role coverage cannot enable a preset or change a default. 4. Any documentation change states provider-neutral fallback and the evidence required before a future qualified mapping can trigger both real sentinels. 5. Verification: node scripts/test-workflow-evaluation-sentinel.mjs; node scripts/test-workflow-evaluation-calculator.mjs; node scripts/test-workflow-evaluation-csv.mjs; npm run verify:quiet. Deterministic fixtures must pass and demonstrate the no-qualified-mapping baseline-retained branch. No live sentinel is claimed or synthesized in this slice.",
+      "createdAt": "2026-07-18T03:24:49.220Z",
+      "dependencies": [
+        "work-1.11",
+        "work-1.12",
+        "work-1.13",
+        "work-1.8"
+      ],
+      "dependencyEdges": [],
+      "description": "Finalize U11 without manufacturing evidence. Consume the closed U8-U10 outcomes, which authorize no model/role or critic-topology recommendation. Keep provider-neutral defaults unchanged; produce only the bounded deterministic adoption/sentinel behavior and documentation needed to record why no mapping was adopted. Do not create integrated handoffs, live samples, or recommendation presets unless an actual qualified mapping already exists in retained evidence.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-1.14",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan: Final U11 is a bounded fail-closed adoption slice. Because closed U8-U10 produced no evidence-authorized mappings, retain provider-neutral defaults, record baseline-retained truthfully, exercise deterministic no-qualified-mapping sentinel/adoption checks, and run package regression. Do not fabricate live integrated handoffs, samples, fingerprints, evidence paths, or presets; real calculator/CSV handoff sentinels remain conditional on future qualified evidence. Do not touch scripts/test-work-resume.mjs.",
+        "wo:adoption-result U11 baseline retained. .pi/u11-adoption-report.json hash-binds U8-U10 reports, which contain zero qualified recommendations and no default changes. No integrated mapping exists; calculator/CSV actual-handoff sentinels were therefore ineligible, not attempted, and not claimed. extensions/work-models.js remained unchanged; no preset was created. Deterministic adoption checks reject missing/stale evidence, incomplete shared-role coverage, provider absence, identity drift/fallback, evaluator disagreement, quality-pass-no-cost-win, and sentinel failure. Future eligibility requires fresh exact-fingerprint evidence and both real sentinels. Tracked changes: scripts/workflow-evaluation.mjs, scripts/test-workflow-evaluation-sentinel.mjs, README.md.",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-sentinel.mjs && node scripts/test-workflow-evaluation-calculator.mjs && node scripts/test-workflow-evaluation-csv.mjs && npm run verify:quiet\nOutput: ok - workflow evaluation calibration, approval, and sentinel fixtures\nok - calculator workflow evaluation project fixtures\nok - CSV workflow evaluation project fixtures\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-1",
+      "status": "closed",
+      "title": "U11 Integrated sentinels and adoption",
+      "type": "task",
+      "updatedAt": "2026-07-18T03:32:52.803Z"
     },
     "work-1.2": {
       "acceptance": "GATE: node scripts/test-workflow-evaluation-contract.mjs passes - canonical one-factor model/role descriptors pass and every ambiguous or multi-factor configuration fails closed. Scenarios: (1) a top-level or one-role modelAssignment delta may change provider+exact model together as one logical factor; (2) provider/model changes outside a declared compound assignment fail as partial/undeclared deltas, effort+assignment still requires an interaction experiment; (3) unknown roles, incomplete role cells, ambient overrides, no-op aliases, unsupported effort, and undeclared fallback fail before provisioning; (4) key-order differences do not change the role-map fingerprint; (5) existing workflowRevision/effort/prompt/mode/reviewer descriptors remain compatible. Package regression: npm run verify:quiet stays green. AC1 (V1 harness compatibility) and AC2 (role configuration) must not regress; no source mutation of approved bundles/goldens.",
@@ -1107,7 +1136,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-18T03:23:11.893Z"
+    "updatedAt": "2026-07-18T03:32:58.581Z"
   },
   "schemaVersion": 1
 }

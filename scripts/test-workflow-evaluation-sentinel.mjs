@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+	adoptionDecision,
 	buildGoldenApproval,
 	deriveCalibration,
 	requiresSentinel,
@@ -154,6 +155,45 @@ assert.equal(
 assert.equal(requiresSentinel(["agents/work-worker.md"], "agent"), true);
 assert.equal(requiresSentinel(["README.md"], "docs"), false);
 assert.equal(requiresSentinel(["unknown/new-surface.mjs"], "narrow"), true);
+
+const noMapping = adoptionDecision();
+assert.deepEqual(noMapping, {
+	status: "baseline-retained",
+	reason: "no-qualified-mapping",
+	runSentinels: false,
+	changeDefaults: false,
+	preset: null,
+	fallback: "provider-neutral",
+});
+const qualified = {
+	qualifiedMapping: { profile: "fixture" },
+	evidenceStatus: "fresh",
+	sharedRoleCoverage: true,
+};
+for (const [change, reason] of [
+	[{ evidenceStatus: "stale" }, "missing-or-stale-evidence"],
+	[{ sharedRoleCoverage: false }, "incomplete-shared-role-coverage"],
+	[{ providerAvailable: false }, "provider-unavailable"],
+	[{ identityMatched: false }, "identity-drift-or-fallback"],
+	[{ evaluatorAgreement: false }, "evaluator-disagreement"],
+	[{ costWin: false }, "quality-pass-no-cost-win"],
+	[{ sentinelStatus: "failed" }, "sentinel-failed"],
+]) {
+	const decision = adoptionDecision({ ...qualified, ...change });
+	assert.equal(decision.status, "baseline-retained");
+	assert.equal(decision.reason, reason);
+	assert.equal(decision.changeDefaults, false);
+	assert.equal(decision.preset, null);
+}
+assert.equal(adoptionDecision(qualified).runSentinels, true);
+assert.deepEqual(adoptionDecision({ ...qualified, sentinelStatus: "passed" }), {
+	status: "eligible-for-adoption",
+	reason: "qualified-mapping-and-sentinels-passed",
+	runSentinels: false,
+	changeDefaults: false,
+	preset: null,
+	fallback: "provider-neutral",
+});
 
 const handoffs = [];
 const sentinel = await runSentinelExperiment(

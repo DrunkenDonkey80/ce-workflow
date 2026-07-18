@@ -1742,6 +1742,46 @@ export function requiresSentinel(changedPaths, declaredChangeType = "") {
 	);
 }
 
+export function adoptionDecision({
+	qualifiedMapping,
+	evidenceStatus = "missing",
+	sharedRoleCoverage = false,
+	providerAvailable = true,
+	identityMatched = true,
+	evaluatorAgreement = true,
+	costWin = true,
+	sentinelStatus = "not-run",
+} = {}) {
+	const retain = (reason, runSentinels = false) => ({
+		status: "baseline-retained",
+		reason,
+		runSentinels,
+		changeDefaults: false,
+		preset: null,
+		fallback: "provider-neutral",
+	});
+	if (!qualifiedMapping) return retain("no-qualified-mapping");
+	if (evidenceStatus !== "fresh") return retain("missing-or-stale-evidence");
+	if (!sharedRoleCoverage) return retain("incomplete-shared-role-coverage");
+	if (!providerAvailable) return retain("provider-unavailable");
+	if (!identityMatched) return retain("identity-drift-or-fallback");
+	if (!evaluatorAgreement) return retain("evaluator-disagreement");
+	if (!costWin) return retain("quality-pass-no-cost-win");
+	if (sentinelStatus !== "passed")
+		return retain(
+			sentinelStatus === "failed" ? "sentinel-failed" : "sentinel-required",
+			sentinelStatus !== "failed",
+		);
+	return {
+		status: "eligible-for-adoption",
+		reason: "qualified-mapping-and-sentinels-passed",
+		runSentinels: false,
+		changeDefaults: false,
+		preset: null,
+		fallback: "provider-neutral",
+	};
+}
+
 export async function runSentinelExperiment(descriptor, seams = {}) {
 	if (descriptor.mode !== "sentinel")
 		throw new Error("runSentinelExperiment requires sentinel mode");
