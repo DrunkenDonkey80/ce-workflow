@@ -84,6 +84,10 @@ assert(
 	"Dockerfile basename is recognized",
 );
 assert(isRecognizedSource(".gitignore", noGit), ".gitignore is recognized");
+assert(
+	isRecognizedSource("vendor-manifest.sha256", noGit),
+	"SHA-256 manifests are recognized source",
+);
 assert(!isRecognizedSource("mystery.dat", noGit), ".dat is NOT recognized");
 assert(!isRecognizedSource("dump.bin", noGit), ".bin is NOT recognized");
 
