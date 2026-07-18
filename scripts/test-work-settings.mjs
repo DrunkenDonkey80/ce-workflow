@@ -20,6 +20,9 @@ function assert(ok, message) {
 	if (!ok) throw new Error(message);
 }
 
+const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
+const globalDir = mkdtempSync(path.join(tmpdir(), "work-global-settings-"));
+process.env.PI_CODING_AGENT_DIR = globalDir;
 const cwd = mkdtempSync(path.join(tmpdir(), "work-settings-"));
 try {
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
@@ -28,12 +31,28 @@ try {
 		writeFileSync(settingsFile(), `${JSON.stringify(settings, null, "\t")}\n`);
 	const readSettings = () => JSON.parse(readFileSync(settingsFile(), "utf8"));
 
-	// Autonomous improvement remains opt-in and has no implicit source setting.
+	// Package default stays off; a hidden user default enables every project,
+	// while an explicit project false remains an escape hatch.
 	assert(
-		mod.workResumeSettingsForTest?.(cwd)?.selfImproving !== true,
+		mod.workResumeSettingsForTest(cwd).selfImproving === false,
 		"self improvement defaults off",
 	);
 	assert(!existsSync(settingsFile()), "no default source mutation");
+	writeFileSync(
+		path.join(globalDir, "settings.json"),
+		JSON.stringify({ workResume: { selfImprovingDefault: true } }),
+	);
+	assert(
+		mod.workResumeSettingsForTest(cwd).selfImproving === true,
+		"global hidden default enables self improvement",
+	);
+	writeSettings({ workResume: { selfImproving: false } });
+	assert(
+		mod.workResumeSettingsForTest(cwd).selfImproving === false,
+		"project setting can opt out of the global default",
+	);
+	writeSettings({});
+	writeFileSync(path.join(globalDir, "settings.json"), "{}\n");
 
 	// Default (no settings) resolves to medium profile.
 	assert(
@@ -477,6 +496,9 @@ try {
 	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });
+	rmSync(globalDir, { recursive: true, force: true });
+	if (previousConfigDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousConfigDir;
 }
 
 process.stdout.write("ok - work-settings behavior\n");

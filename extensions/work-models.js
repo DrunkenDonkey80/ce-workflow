@@ -18,6 +18,7 @@ import {
 	writeFileSync,
 	writeSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
 	basename,
@@ -372,14 +373,26 @@ function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
 }
 
-function readSettings(cwd) {
-	const file = settingsPath(cwd);
+function readJsonSettings(file) {
 	if (!existsSync(file)) return {};
 	try {
 		return JSON.parse(readFileSync(file, "utf8"));
 	} catch {
 		return {};
 	}
+}
+
+function readSettings(cwd) {
+	return readJsonSettings(settingsPath(cwd));
+}
+
+function readGlobalSettings() {
+	return readJsonSettings(
+		join(
+			process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
+			"settings.json",
+		),
+	);
 }
 
 function writeSettings(cwd, settings) {
@@ -9308,13 +9321,16 @@ function workGoalSelfImprovingAppendix() {
 
 function workResumeSettings(cwd) {
 	const value = readSettings(cwd).workResume;
-	return typeof value === "object" && value !== null
-		? {
-				selfImproving: value.selfImproving === true,
-				newSessionBetweenIterations:
-					value.newSessionBetweenIterations !== false,
-			}
-		: { selfImproving: false, newSessionBetweenIterations: true };
+	const project = typeof value === "object" && value !== null ? value : {};
+	const globalDefault =
+		readGlobalSettings().workResume?.selfImprovingDefault === true;
+	return {
+		selfImproving:
+			project.selfImproving === true ||
+			(project.selfImproving !== false && globalDefault),
+		newSessionBetweenIterations:
+			project.newSessionBetweenIterations !== false,
+	};
 }
 
 function readWorkCatchUpBaseline() {
@@ -11363,6 +11379,7 @@ export {
 	setWorkOrchAdvisorSliceUsage,
 	advisorCriticStep,
 	workOrchSettings,
+	workResumeSettings as workResumeSettingsForTest,
 	renderWorkIdeateText,
 	renderWorkBrainstormText,
 	renderWorkUsageText,

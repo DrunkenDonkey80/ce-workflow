@@ -64,6 +64,11 @@ function telemetryEvents(cwd) {
 
 const cwd = mkdtempSync(path.join(tmpdir(), "work-telemetry-"));
 const now = Date.now();
+mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+writeFileSync(
+	path.join(cwd, ".pi", "settings.json"),
+	`${JSON.stringify({ workResume: { selfImproving: false } })}\n`,
+);
 seedNativeStore(cwd, [
 	{
 		id: "E-1",
