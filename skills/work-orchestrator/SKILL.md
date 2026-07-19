@@ -18,7 +18,7 @@ Work directly in the current session by default. Use code for intake, routing, b
 - `work-fixer`: concrete reviewer findings only;
 - `work-migrator`: legacy artifact/branch reconciliation.
 
-Routine work gets no planner, reviewer, or committer agent. Never launch a second writer/reviewer when equivalent passing evidence exists. `work-committer` is an exceptional fallback only; normal commits use the coded finalizer.
+Routine work gets no planner, reviewer, or committer agent. Never launch a second writer/reviewer when equivalent passing evidence exists. Review budget is one initial cycle plus at most one targeted re-review after substantive production-code fixes; skip re-review for mechanical fixes and never launch a third cycle without an explicit user request. `work-committer` is an exceptional fallback only; normal commits use the coded finalizer.
 
 ## Source of truth and safety
 
@@ -44,7 +44,7 @@ node <work-helper.mjs> finish-task <work-item-id> --max-files <2|8> --message "<
 
 For JSON use `--json <file> --equals <path=value>`. The helper enforces file scope and sensitive-path review, records `wo:verify-check`, commits, closes, amends work items close state, pushes only with an upstream, and checks cleanliness.
 
-If it reports independent review required, launch exactly one `work-reviewer`, record PASS in the work item, and rerun with `--reviewed`. If scope or verification fails, do not commit/close.
+If it reports independent review required, use its complete labelled reviewer handoff verbatim; do not handcraft or broaden the reviewer task. Launch exactly one `work-reviewer`, require one durable `wo:review PASS|FAIL` note, and rerun the same finish command with `--reviewed` only after PASS. If scope or verification fails, do not commit/close.
 
 ## Modes
 

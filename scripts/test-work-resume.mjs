@@ -275,6 +275,17 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
+				"wo:execution-agent\nFiles changed: extensions/work-models.js, `scripts/file with space.js`, .ce-workflow/work-items.json, .pi-subagents/artifacts/review.md, .pi/work-runs/run.json.\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed and tests passed",
+		},
+	],
+	inProgressFixReadyNoPaths: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
 				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed and tests passed",
 		},
 	],
@@ -297,7 +308,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL - two\nwo:fix PASS\nwo:review FAIL - three",
+				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL - two",
 		},
 	],
 	blocked: [
@@ -424,13 +435,16 @@ else { console.log("## feat/coded-work-resume"); printDirty(); }
 }
 
 const cwd = mkdtempSync(path.join(tmpdir(), "work-resume-cwd-"));
+const globalDir = mkdtempSync(path.join(tmpdir(), "work-resume-global-"));
 const bin = installFakeCommands();
 const oldEnv = {
+	agentDir: process.env.PI_CODING_AGENT_DIR,
 	git: process.env.WORK_ORCH_GIT_BIN,
 	scenario: process.env.WORK_RESUME_SCENARIO,
 	dirty: process.env.WORK_RESUME_GIT_DIRTY,
 	gitFail: process.env.WORK_RESUME_GIT_FAIL,
 };
+process.env.PI_CODING_AGENT_DIR = globalDir;
 process.env.WORK_ORCH_GIT_BIN = path.join(bin, "fake-git.mjs");
 function sourcesForScenario(scenario = "default") {
 	const closed = epics.find((epic) => epic.id === "E-C");
@@ -628,10 +642,43 @@ try {
 		state.action === "run-review" && reviewerHandoff?.agent === "work-reviewer",
 		"verified fixer result routes directly to one scoped re-review",
 	);
+	const helper = JSON.stringify(
+		realpathSync(path.join(import.meta.dirname, "work-helper.mjs")),
+	);
 	assert(
 		reviewerHandoff.params.async === true &&
 			reviewerHandoff.params.control?.needsAttentionAfterMs === 30_000,
 		"reviewer launches asynchronously with a liveness watchdog",
+	);
+	assert(
+		!reviewerHandoff.params.task.includes(".ce-workflow/work-items.json") &&
+			!reviewerHandoff.params.task.includes(".pi-subagents/") &&
+			!reviewerHandoff.params.task.includes(".pi/work-runs/") &&
+			reviewerHandoff.params.task.includes("Work item: AUTH-1") &&
+			reviewerHandoff.params.task.includes(`Helper: ${helper}`) &&
+			reviewerHandoff.params.task.includes(
+				`Summary command: node ${helper} work-summary AUTH-1`,
+			) &&
+			reviewerHandoff.params.task.includes(
+				'Review only: "extensions/work-models.js", "scripts/file with space.js"',
+			) &&
+			reviewerHandoff.params.task.includes(
+				"durable `wo:review PASS|FAIL` note",
+			) &&
+			reviewerHandoff.params.task.includes("at least 10 minutes") &&
+			reviewerHandoff.params.task.includes(
+				"needsAttentionAfterMs=30000 is an attention notification, not a hard timeout",
+			),
+		"direct reviewer launch carries the complete bounded handoff and liveness contract",
+	);
+
+	setScenario("inProgressFixReadyNoPaths");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "review-scope-missing" &&
+			!state.handoffPrompt &&
+			directRoleHandoffParams(state, cwd) === null,
+		"missing review paths stop before launching or handcrafting a reviewer",
 	);
 
 	setScenario("inProgressReviewPass");
@@ -645,7 +692,7 @@ try {
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "review-blocked" && !state.handoffPrompt,
-		"three review failures stop the coded loop instead of spawning forever",
+		"one initial review plus one re-review is the hard coded limit",
 	);
 
 	setScenario("blocked");
@@ -1007,6 +1054,8 @@ try {
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
 } finally {
+	if (oldEnv.agentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = oldEnv.agentDir;
 	if (oldEnv.git === undefined) delete process.env.WORK_ORCH_GIT_BIN;
 	else process.env.WORK_ORCH_GIT_BIN = oldEnv.git;
 	if (oldEnv.scenario === undefined) delete process.env.WORK_RESUME_SCENARIO;
@@ -1017,6 +1066,7 @@ try {
 	else process.env.WORK_RESUME_GIT_FAIL = oldEnv.gitFail;
 	rmSync(bin, { recursive: true, force: true });
 	rmSync(cwd, { recursive: true, force: true });
+	rmSync(globalDir, { recursive: true, force: true });
 }
 
 console.log("ok - coded work-resume behavior");

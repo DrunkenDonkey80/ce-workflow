@@ -73,6 +73,14 @@ check(
 	"parallel advisors share one exact review contract",
 	advisorBodies.every((body) => body === advisorBodies[0]),
 );
+const reviewer = read("agents/work-reviewer.md");
+check(
+	"reviewer coordination timeouts stay blocked, not failed",
+	reviewer.includes("Outcome: PASS|FAIL|BLOCKED") &&
+		reviewer.includes("do not emit a verdict") &&
+		reviewer.includes("appending `wo:review FAIL`") &&
+		reviewer.includes("not an implementation or review failure"),
+);
 for (const rel of advisorFiles) {
 	const text = read(rel);
 	check(

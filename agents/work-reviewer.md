@@ -38,12 +38,12 @@ If the scoped code satisfies acceptance but an out-of-scope tracked instruction 
 
 For `FAIL`, give exact fix instructions and cite evidence. Create or update a fix work item only when the fix should be durable outside the current handoff.
 
-Stop and contact the supervisor when the change cannot be judged from the work item, diff, and verification evidence. If `contact_supervisor` is unavailable or times out, return `FAIL` with the blocker instead of guessing.
+Stop and contact the supervisor when the change cannot be judged from the work item, diff, and verification evidence. While that request is pending, do not emit a verdict. If `contact_supervisor` is unavailable or times out, return `BLOCKED` with the infrastructure blocker instead of guessing or appending `wo:review FAIL`; a coordination timeout is not an implementation or review failure.
 
 Final response must stay concise so the parent context stays small:
 
 ```text
-Outcome: PASS|FAIL
+Outcome: PASS|FAIL|BLOCKED
 Evidence:
 - ...
 Required fixes:

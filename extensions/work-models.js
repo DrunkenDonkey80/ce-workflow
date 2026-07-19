@@ -351,6 +351,11 @@ const WORK_GOAL_CONTEXT_OVERFLOW_RE =
 	/context[_\s-]*length|context window|input exceeds|prompt is too long|maximum context length/i;
 const WORK_GOAL_CONTRADICTORY_COMPLETION_RE =
 	/(?<!could\s)\bnot\s+(?:yet\s+)?(?:complete|completed|done|finished)\b|\bstill\s+(?:incomplete|failing|failing\s+tests?|fails?)\b|\btests?\s+(?:still\s+)?fail(?:ing)?\b|\bblocked\b|\bnot\s+verified\b/i;
+const REVIEW_CYCLE_BUDGET_PROMPT = `## Review cycle budget
+Use one initial review cycle, batch its actionable fixes, and run at most one targeted re-review only when those fixes materially changed production behavior. Skip re-review for test-only, documentation, formatting, traceability, or other mechanical fixes. A simplification pass is not another correctness review. After the targeted re-review, fix and report any residual findings without launching another reviewer. Do not launch a third review cycle unless the user explicitly requests it.
+
+## Verification budget
+During iteration, run only the smallest focused test that covers the changed behavior. Select it from the feature or nearby test names; a monolithic implementation file does not make every test relevant. Run the full package or regression suite once, at the final handoff, only when the acceptance contract requires it or the change is genuinely cross-cutting. Reuse valid full-suite evidence unless production or package-surface files changed afterward. Reviewers and fixers must not rerun an expensive gate when supplied evidence is adequate.`;
 const WORK_GOAL_TOOL_SCHEMA = {
 	type: "object",
 	properties: {
@@ -373,6 +378,13 @@ function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
 }
 
+function globalSettingsPath() {
+	return join(
+		process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
+		"settings.json",
+	);
+}
+
 function readJsonSettings(file) {
 	if (!existsSync(file)) return {};
 	try {
@@ -387,12 +399,7 @@ function readSettings(cwd) {
 }
 
 function readGlobalSettings() {
-	return readJsonSettings(
-		join(
-			process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
-			"settings.json",
-		),
-	);
+	return readJsonSettings(globalSettingsPath());
 }
 
 function mergeSettings(base, override) {
@@ -420,6 +427,22 @@ function writeSettings(cwd, settings) {
 	const dir = join(cwd, CONFIG_DIR_NAME);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(settingsPath(cwd), `${JSON.stringify(settings, null, "\t")}\n`);
+}
+
+function readScopedSettings(cwd, scope) {
+	return scope === "global" ? readGlobalSettings() : readSettings(cwd);
+}
+
+function writeScopedSettings(cwd, scope, settings) {
+	if (scope === "global") {
+		mkdirSync(dirname(globalSettingsPath()), { recursive: true });
+		writeFileSync(
+			globalSettingsPath(),
+			`${JSON.stringify(settings, null, "\t")}\n`,
+		);
+		return;
+	}
+	writeSettings(cwd, settings);
 }
 
 const WARP_TITLE = "warp://cli-agent";
@@ -2588,8 +2611,8 @@ function workOrchBlock(settings) {
 	return settings.workOrchestrator;
 }
 
-function workOrchSettings(cwd) {
-	const raw = readEffectiveSettings(cwd).workOrchestrator ?? {};
+function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
+	const raw = settings.workOrchestrator ?? {};
 	const profile = EFFORT_PROFILES[raw.profile] ? raw.profile : DEFAULT_PROFILE;
 	const base = EFFORT_PROFILES[profile];
 	const advisorEnabled = Object.fromEntries(
@@ -2802,8 +2825,8 @@ function cePlanSliceStep(
 
 function codeReviewBeforeCommitStep(level) {
 	if (level === "light")
-		return "Pre-commit review gate (light): before committing, launch exactly one work-reviewer on the scoped slice diff and persist its PASS evidence, then commit and close the WorkItem. If it reports blocking findings, run one work-fixer pass and re-review; never skip review silently.";
-	return "Pre-commit code-review gate: before committing, run the full ce-code-review skill on the current diff for this slice. Resolve any blocking findings (or record an explicit user waiver) before the committer commits and closes the WorkItem.";
+		return "Pre-commit review gate (light): launch exactly one work-reviewer on the scoped slice diff. Batch its blocking findings into one work-fixer pass, then run at most one scoped re-review only for substantive production-code fixes. Never re-review mechanical fixes or launch a third review cycle.";
+	return "Pre-commit code-review gate: run one full ce-code-review cycle on the current slice diff. Batch blocking fixes, then run at most one targeted re-review only for substantive production-code changes; never re-review mechanical fixes or launch a third review cycle.";
 }
 
 function simplifyBeforeReviewStep() {
@@ -2833,13 +2856,20 @@ function labelFor(item) {
 	return item.description ? `${item.label} — ${item.description}` : item.label;
 }
 
-async function choose(ctx, title, items) {
-	const labels = items.map(labelFor);
+async function choose(ctx, title, items, currentValue) {
+	const choices =
+		currentValue === undefined
+			? items
+			: [
+					...items.filter((item) => item.value === currentValue),
+					...items.filter((item) => item.value !== currentValue),
+				];
+	const labels = choices.map(labelFor);
 	const selected = await ctx.ui.select(title, labels);
-	return items[labels.indexOf(selected)]?.value;
+	return choices[labels.indexOf(selected)]?.value;
 }
 
-async function modelItems(ctx, allowNone = false) {
+async function modelItems(ctx, allowNone = false, projectScope = false) {
 	const items = [];
 	if (allowNone)
 		items.push({
@@ -2849,10 +2879,14 @@ async function modelItems(ctx, allowNone = false) {
 		});
 	items.push({
 		value: INHERIT_MODEL,
-		label: "inherit current control-session model",
-		description: ctx.model
-			? `${ctx.model.provider}/${ctx.model.id}`
-			: "subagent inherits whatever /model is active",
+		label: projectScope
+			? "use global model setting"
+			: "inherit current control-session model",
+		description: projectScope
+			? "remove the project model override"
+			: ctx.model
+				? `${ctx.model.provider}/${ctx.model.id}`
+				: "subagent inherits whatever /model is active",
 	});
 
 	try {
@@ -2895,7 +2929,7 @@ function resetAll(settings) {
 	compactOverrides(settings);
 }
 
-function thinkingItemsFor(slot, settings) {
+function thinkingItemsFor(slot, settings, projectScope = false) {
 	const current = settings.subagents?.agentOverrides ?? {};
 	const selectedThinking = commonValue(
 		slot.agents.map((agent) => current[agent]?.thinking),
@@ -2905,8 +2939,12 @@ function thinkingItemsFor(slot, settings) {
 		items: [
 			{
 				value: DEFAULT_THINKING,
-				label: `(blank) use role default (${slot.defaultThinking})`,
-				description: "stored as no override",
+				label: projectScope
+					? "(blank) use global effort setting"
+					: `(blank) use role default (${slot.defaultThinking})`,
+				description: projectScope
+					? "remove the project effort override"
+					: "stored as no override",
 			},
 			...THINKING_LEVELS.map((level) => ({
 				value: level,
@@ -2932,8 +2970,9 @@ async function chooseModel(
 	title,
 	currentModel = INHERIT_MODEL,
 	allowNone = false,
+	projectScope = false,
 ) {
-	const items = await modelItems(ctx, allowNone);
+	const items = await modelItems(ctx, allowNone, projectScope);
 	const inherit = items.find((item) => item.value === INHERIT_MODEL);
 	let currentText = currentModel;
 	if (currentModel === INHERIT_MODEL)
@@ -3054,7 +3093,7 @@ async function chooseModel(
 	});
 }
 
-async function editSlotModel(ctx, settings, slot) {
+async function editSlotModel(ctx, settings, slot, scope) {
 	let currentModel =
 		overrides(settings)[slot.agents[0]]?.model ?? INHERIT_MODEL;
 	if (isAdvisorSlot(slot) && !advisorEnabledForSlot(settings, slot))
@@ -3064,24 +3103,30 @@ async function editSlotModel(ctx, settings, slot) {
 		`${slot.label}: choose model`,
 		currentModel,
 		isAdvisorSlot(slot),
+		scope === "project",
 	);
 	if (model === undefined) return false;
 	if (model === NONE_MODEL) {
 		setAdvisorEnabled(settings, slot, false);
-		writeSettings(ctx.cwd, settings);
+		writeScopedSettings(ctx.cwd, scope, settings);
 		ctx.ui.notify(`Saved ${slot.label}: model:none`, "info");
 		return true;
 	}
 	if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
-	const { selectedThinking, items } = thinkingItemsFor(slot, settings);
+	const { selectedThinking, items } = thinkingItemsFor(
+		slot,
+		settings,
+		scope === "project",
+	);
 	const thinking = await choose(
 		ctx,
 		`${slot.label}: choose effort${selectedThinking ? ` (current ${selectedThinking})` : ""}`,
 		items,
+		selectedThinking,
 	);
 	if (thinking === undefined) return false;
 	setSlot(settings, slot, model, thinking);
-	writeSettings(ctx.cwd, settings);
+	writeScopedSettings(ctx.cwd, scope, settings);
 	ctx.ui.notify(`Saved ${slot.label}: ${slotSummary(slot, settings)}`, "info");
 	return true;
 }
@@ -4439,11 +4484,20 @@ function implementationPathsFromNotes(issue) {
 	return [
 		...notesOf(issue).matchAll(/(?:files changed|touched files):\s*([^\n]+)/gi),
 	]
-		.flatMap((match) => match[1].split(","))
-		.map((file) => file.trim().replace(/^`|[.`]$/g, ""))
-		.filter((file) => file && !/\s/.test(file))
-		.map(normalizedRepoPath)
-		.filter(Boolean);
+		.flatMap((match) => [...match[1].matchAll(/(?:\s*`([^`]+)`|\s*([^,]+))/g)])
+		.map((match) => ({
+			file: (match[1] ?? match[2]).trim().replace(/[.]$/g, ""),
+			quoted: Boolean(match[1]),
+		}))
+		.filter(({ file, quoted }) => file && (quoted || !/\s/.test(file)))
+		.map(({ file }) => normalizedRepoPath(file))
+		.filter(
+			(file) =>
+				file &&
+				!isWorkStorePath(file) &&
+				!isPiRuntimeArtifact(file) &&
+				file !== ".gitignore",
+		);
 }
 
 function issueSummary(issue) {
@@ -5246,6 +5300,17 @@ function planResumeAction(state, cwd) {
 			},
 			cwd,
 		);
+		const missingReviewScope = () => ({
+			...routed,
+			action: "review-scope-missing",
+			handoffPrompt: undefined,
+			message:
+				"Independent review requires an exact implementation file list; record `Files changed:` in the WorkItem before retrying.",
+			suggestedCommands: [
+				`node ${JSON.stringify(WORK_HELPER_SCRIPT)} work-summary ${activeImplementation.id}`,
+				`/work-report ${activeImplementation.id}`,
+			],
+		});
 		if (activeImplementation.reviewPassed)
 			return {
 				...routed,
@@ -5254,14 +5319,19 @@ function planResumeAction(state, cwd) {
 					"Implementation is verified and reviewed; use the coded finish gate.",
 				suggestedCommands: [`/work-finish ${activeImplementation.id}`],
 			};
-		if ((activeImplementation.reviewFailures ?? 0) >= 3)
+		if ((activeImplementation.reviewFailures ?? 0) >= 2)
 			return {
 				...routed,
 				action: "review-blocked",
 				message:
-					"Three review failures reached the coded cap; stop the loop and inspect the durable findings.",
+					"The initial review and one re-review both failed; stop the loop and inspect the durable findings.",
 				suggestedCommands: [`/work-report ${activeImplementation.id}`],
 			};
+		if (
+			activeImplementation.fixReadyForReview &&
+			!activeImplementation.changedPaths?.length
+		)
+			return missingReviewScope();
 		if (activeImplementation.fixReadyForReview)
 			return withHandoffPrompt(
 				{
@@ -5283,6 +5353,11 @@ function planResumeAction(state, cwd) {
 				cwd,
 			);
 		if (!routed.inlineWork) {
+			if (
+				activeImplementation.verificationReady &&
+				!activeImplementation.changedPaths?.length
+			)
+				return missingReviewScope();
 			if (activeImplementation.verificationReady)
 				return withHandoffPrompt(
 					{
@@ -5389,8 +5464,11 @@ function planResumeAction(state, cwd) {
 	);
 }
 
-const ROLE_TIMEOUT_GUIDANCE =
-	"Role liveness guidance: launch specialists async with control.needsAttentionAfterMs=30000 and use wait/status; never block the TUI on a foreground child. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure.";
+const ROLE_TIMEOUT_GUIDANCE = [
+	"Role liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure.",
+	"Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure.",
+	"Delayed supervisor guidance: query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name.",
+].join(" ");
 
 function gitDirtyClassification(git) {
 	if (!git) return "unknown";
@@ -5426,6 +5504,25 @@ function directRoleAgent(state) {
 	return undefined;
 }
 
+function reviewerHandoffLines(state) {
+	const selected = state.selectedWorkItem;
+	if (!selected?.id) return [];
+	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
+	const reviewOnly = (selected.changedPaths ?? [])
+		.map((file) => JSON.stringify(normalizedRepoPath(file)))
+		.join(", ");
+	return [
+		`Work item: ${selected.id}`,
+		`Helper: ${helper}`,
+		`Summary command: node ${helper} work-summary ${selected.id}`,
+		`Review only: ${reviewOnly}`,
+		`Review reasons: ${state.handoffReason ?? "coded independent review gate"}`,
+		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${selected.id}.`,
+		"Finish retry: rerun the same finish-task command with --reviewed only after durable PASS evidence.",
+		ROLE_TIMEOUT_GUIDANCE,
+	];
+}
+
 function directRoleTask(state, cwd) {
 	const selected = state.selectedWorkItem;
 	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
@@ -5446,11 +5543,15 @@ function directRoleTask(state, cwd) {
 				? "Known dirt is the scoped implementation diff plus workflow artifacts; avoid unrelated paths and do not enumerate them again."
 				: `Known workflow-owned dirt: ${state.git.dirtyPaths.length} paths; avoid it and do not enumerate it again.`
 			: "Known dirt: none",
-		selected?.id && existsSync(WORK_HELPER_SCRIPT)
-			? `Read the compact task first: node ${helper} work-summary ${selected.id}`
-			: "Read only the compact fields needed for this action.",
-		state.action === "run-review" && selected?.changedPaths?.length
-			? `Review only: ${selected.changedPaths.join(", ")}`
+		...(state.action === "run-review"
+			? reviewerHandoffLines(state)
+			: [
+					selected?.id && existsSync(WORK_HELPER_SCRIPT)
+						? `Read the compact task first: node ${helper} work-summary ${selected.id}`
+						: "Read only the compact fields needed for this action.",
+				]),
+		state.action === "run-fix" && selected?.changedPaths?.length
+			? `Fix only: ${selected.changedPaths.map((file) => JSON.stringify(file)).join(", ")}`
 			: "",
 		state.epic?.id &&
 		["run-planner", "run-debug"].includes(state.action) &&
@@ -5472,7 +5573,12 @@ function directRoleTask(state, cwd) {
 
 function directRoleHandoffParams(state, cwd, selectionNote = "") {
 	const agent = directRoleAgent(state);
-	if (!agent || !state?.handoffPrompt) return null;
+	if (
+		!agent ||
+		!state?.handoffPrompt ||
+		(agent === "work-reviewer" && !state.selectedWorkItem?.changedPaths?.length)
+	)
+		return null;
 	const target = safeArtifactPart(
 		state.selectedWorkItem?.id ?? state.epic?.id ?? state.action ?? agent,
 	);
@@ -9340,8 +9446,8 @@ function workGoalSelfImprovingAppendix() {
 - Finish only after target-project progress and ce-workflow improvements are verified.`;
 }
 
-function workResumeSettings(cwd) {
-	const value = readEffectiveSettings(cwd).workResume;
+function workResumeSettings(cwd, settings = readEffectiveSettings(cwd)) {
+	const value = settings.workResume;
 	const project = typeof value === "object" && value !== null ? value : {};
 	const globalDefault = project.selfImprovingDefault === true;
 	return {
@@ -10030,7 +10136,7 @@ ${escapeXmlText(goal.objective)}
 - Keep working autonomously until the objective is complete and verified.
 - Before each continuation, /work-goal will microcompact old reasoning and tool noise; treat native work-item store, git, files, tests, and command output as source of truth.
 - Work directly in this session by default. Do not call subagent list, delegate routine implementation/verification/commit work, or launch duplicate reviewers. Spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
-- When any specialist or decision evaluator is required, launch it async with control.needsAttentionAfterMs=30000 and use wait/status; never block the TUI on a foreground child. Treat startup/auth failure as unavailable infrastructure evidence, not a reason to wait indefinitely or retry blindly.
+- ${ROLE_TIMEOUT_GUIDANCE}
 - Prefer coded helpers and deterministic checks over asking an LLM to classify, summarize, validate, stage, commit, close, or choose an agent.
 - Do not stop for plan approval, permission to continue, or obvious implementation choices. Pick the clear winner and continue.
 - Use ask_user for every question that truly needs human input: product intent, credentials/accounts, destructive or risky action, production/billing/legal impact, ambiguous priority/scope with no clear winner, hardware/environment access, or a target path/project choice you cannot infer. Ask one focused question and continue from its answer.
@@ -11620,6 +11726,12 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
+		const baseSystemPrompt = String(event.systemPrompt ?? "");
+		const boundedSystemPrompt = baseSystemPrompt.includes(
+			"## Review cycle budget",
+		)
+			? baseSystemPrompt
+			: `${baseSystemPrompt}\n\n${REVIEW_CYCLE_BUDGET_PROMPT}`.trim();
 		markWorkGoalContinuationDelivered(event.prompt);
 		const marker = extractWorkGoalContinuationMarker(event.prompt);
 		pendingWorkGoalTurn = Boolean(
@@ -11645,15 +11757,16 @@ export default function workModelsExtension(pi) {
 				}
 			: null;
 		recordSelfImprovementHistory(ctx, "before_agent_start", event);
-		if (!activeWorkGoal) return;
+		if (!activeWorkGoal) return { systemPrompt: boundedSystemPrompt };
 		if (activeWorkGoal.status === "needs_human") {
 			return {
-				systemPrompt: `${event.systemPrompt}\n\n${buildWorkGoalPausedPrompt(activeWorkGoal)}`,
+				systemPrompt: `${boundedSystemPrompt}\n\n${buildWorkGoalPausedPrompt(activeWorkGoal)}`,
 			};
 		}
-		if (activeWorkGoal.status !== "active" || !pendingWorkGoalTurn) return;
+		if (activeWorkGoal.status !== "active" || !pendingWorkGoalTurn)
+			return { systemPrompt: boundedSystemPrompt };
 		return {
-			systemPrompt: `${event.systemPrompt}\n\n${buildWorkGoalSystemPrompt(activeWorkGoal)}`,
+			systemPrompt: `${boundedSystemPrompt}\n\n${buildWorkGoalSystemPrompt(activeWorkGoal)}`,
 		};
 	});
 
@@ -12373,10 +12486,92 @@ function fitUiLine(text, width) {
 	return text.length <= width ? text : `${text.slice(0, width - 1)}…`;
 }
 
-async function chooseWorkSetting(ctx, items, selectedIndex) {
+function owns(object, key) {
+	return Object.hasOwn(object ?? {}, key);
+}
+
+function hasProjectOverride(settings, item) {
+	const block = settings.workOrchestrator;
+	if (item.kind === "slot") {
+		const slot = slotByKey(item.value);
+		return Boolean(
+			slot?.agents.some((agent) => {
+				const override = settings.subagents?.agentOverrides?.[agent];
+				return owns(override, "model") || owns(override, "thinking");
+			}) ||
+				(isAdvisorSlot(slot) && owns(block?.advisorEnabled, slot.key)),
+		);
+	}
+	if (item.kind === "profile") return owns(block, "profile");
+	if (item.kind === "advisorSliceUsage")
+		return owns(block, "advisorUsageForSlicePlans");
+	if (item.kind === "reviewLevel") return owns(block, "codeReviewBeforeCommit");
+	if (item.kind === "sliceExec") return owns(block, "sliceExecutionMode");
+	if (item.kind === "bool") return owns(block, item.value);
+	if (item.kind === "resumeBool") return owns(settings.workResume, item.value);
+	return false;
+}
+
+function clearProfileOverride(settings) {
+	const block = settings.workOrchestrator;
+	const profile = EFFORT_PROFILES[block?.profile];
+	if (profile) {
+		for (const slot of SLOTS) {
+			for (const agent of slot.agents) {
+				const override = settings.subagents?.agentOverrides?.[agent];
+				if (override?.thinking === profile[slot.key]) delete override.thinking;
+			}
+		}
+		for (const { key } of WORK_ORCH_BOOLEANS)
+			if (block[key] === profile[key]) delete block[key];
+		for (const key of [
+			"advisorUsageForSlicePlans",
+			"slicePlanCeDepth",
+			"codeReviewBeforeCommit",
+		])
+			if (block[key] === profile[key]) delete block[key];
+	}
+	delete block.profile;
+	compactOverrides(settings);
+}
+
+function clearProjectOverride(settings, item) {
+	if (!hasProjectOverride(settings, item)) return false;
+	const block = settings.workOrchestrator;
+	if (item.kind === "slot") {
+		const slot = slotByKey(item.value);
+		for (const agent of slot?.agents ?? []) {
+			delete settings.subagents?.agentOverrides?.[agent]?.model;
+			delete settings.subagents?.agentOverrides?.[agent]?.thinking;
+		}
+		if (isAdvisorSlot(slot)) delete block?.advisorEnabled?.[slot.key];
+		if (block?.advisorEnabled && !Object.keys(block.advisorEnabled).length)
+			delete block.advisorEnabled;
+		compactOverrides(settings);
+	} else if (item.kind === "profile") clearProfileOverride(settings);
+	else if (item.kind === "advisorSliceUsage")
+		delete block.advisorUsageForSlicePlans;
+	else if (item.kind === "reviewLevel") delete block.codeReviewBeforeCommit;
+	else if (item.kind === "sliceExec") delete block.sliceExecutionMode;
+	else if (item.kind === "bool") delete block[item.value];
+	else if (item.kind === "resumeBool") delete settings.workResume[item.value];
+	if (
+		settings.workOrchestrator &&
+		!Object.keys(settings.workOrchestrator).length
+	)
+		delete settings.workOrchestrator;
+	if (settings.workResume && !Object.keys(settings.workResume).length)
+		delete settings.workResume;
+	return true;
+}
+
+async function chooseWorkSetting(ctx, items, selectedIndex, scope) {
 	if ((ctx.mode && ctx.mode !== "tui") || typeof ctx.ui.custom !== "function") {
 		const labels = items.map(labelFor);
-		const selected = await ctx.ui.select("Work settings", labels);
+		const selected = await ctx.ui.select(
+			`Settings: ${scope === "global" ? "Global" : "Project"}`,
+			labels,
+		);
 		const index = labels.indexOf(selected);
 		return index < 0 ? undefined : { pick: items[index], index };
 	}
@@ -12393,7 +12588,16 @@ async function chooseWorkSetting(ctx, items, selectedIndex) {
 					),
 				);
 				const end = Math.min(start + maxVisible, items.length);
-				const lines = [theme.fg("accent", theme.bold("Work settings")), ""];
+				const lines = [
+					theme.fg(
+						"accent",
+						theme.bold(
+							`Settings: ${scope === "global" ? "Global" : "Project"}`,
+						),
+					),
+					theme.fg("dim", "Tab to change scope"),
+					"",
+				];
 				for (let i = start; i < end; i += 1) {
 					const item = items[i];
 					const color =
@@ -12407,7 +12611,10 @@ async function chooseWorkSetting(ctx, items, selectedIndex) {
 					lines.push(
 						theme.fg(
 							color,
-							fitUiLine(`${i === index ? "> " : "  "}${item.label}`, width),
+							fitUiLine(
+								`${i === index ? "> " : "  "}${item.local ? "* " : "  "}${item.label}`,
+								width,
+							),
 						),
 					);
 				}
@@ -12430,13 +12637,29 @@ async function chooseWorkSetting(ctx, items, selectedIndex) {
 					"",
 					theme.fg(
 						"dim",
-						fitUiLine("  ↑↓ navigate · Enter/Space change · Esc close", width),
+						fitUiLine(
+							scope === "project"
+								? "  ↑↓ navigate · Enter/Space change · Backspace/Delete use global · Tab global · Esc close"
+								: "  ↑↓ navigate · Enter/Space change · * masked locally · Tab project · Esc close",
+							width,
+						),
 					),
 				);
 				return lines;
 			},
 			invalidate() {},
 			handleInput(data) {
+				if (data === "\t") return done({ action: "scope", index });
+				if (
+					scope === "project" &&
+					items[index]?.local &&
+					(keybindings.matches(data, "tui.editor.deleteCharBackward") ||
+						keybindings.matches(data, "tui.editor.deleteCharForward") ||
+						data === "\b" ||
+						data === "\x7f" ||
+						data === "\x1b[3~")
+				)
+					return done({ action: "clear", pick: items[index], index });
 				if (keybindings.matches(data, "tui.select.up"))
 					index = index === 0 ? items.length - 1 : index - 1;
 				else if (keybindings.matches(data, "tui.select.down"))
@@ -12456,10 +12679,16 @@ async function chooseWorkSetting(ctx, items, selectedIndex) {
 
 async function workSettingsLoop(ctx) {
 	let selectedIndex = 0;
+	let scope = "global";
 	for (;;) {
 		let settings;
+		let projectSettings;
 		try {
-			settings = readEffectiveSettings(ctx.cwd);
+			projectSettings = readSettings(ctx.cwd);
+			settings =
+				scope === "global"
+					? readGlobalSettings()
+					: mergeSettings(readGlobalSettings(), projectSettings);
 		} catch (error) {
 			ctx.ui.notify(
 				`Could not read settings: ${error instanceof Error ? error.message : String(error)}`,
@@ -12467,8 +12696,8 @@ async function workSettingsLoop(ctx) {
 			);
 			return;
 		}
-		const resolved = workOrchSettings(ctx.cwd);
-		const resume = workResumeSettings(ctx.cwd);
+		const resolved = workOrchSettings(ctx.cwd, settings);
+		const resume = workResumeSettings(ctx.cwd, settings);
 		const items = [
 			{
 				kind: "profile",
@@ -12522,8 +12751,14 @@ async function workSettingsLoop(ctx) {
 			{
 				kind: "reset",
 				value: SETTINGS_RESET,
-				label: "reset role/gate overrides",
-				description: "Clear work-orchestrator model/gate overrides",
+				label:
+					scope === "global"
+						? "reset global work settings"
+						: "clear project overrides",
+				description:
+					scope === "global"
+						? "Restore built-in workflow defaults"
+						: "Use global values for every workflow setting",
 			},
 			{
 				kind: "done",
@@ -12532,43 +12767,79 @@ async function workSettingsLoop(ctx) {
 				description: "Exit settings",
 			},
 		];
-		const selected = await chooseWorkSetting(ctx, items, selectedIndex);
+		for (const item of items)
+			item.local = hasProjectOverride(projectSettings, item);
+		const selected = await chooseWorkSetting(ctx, items, selectedIndex, scope);
 		if (!selected) return;
 		selectedIndex = selected.index;
+		if (selected.action === "scope") {
+			scope = scope === "global" ? "project" : "global";
+			continue;
+		}
 		const { pick } = selected;
+		if (selected.action === "clear") {
+			if (clearProjectOverride(projectSettings, pick)) {
+				writeSettings(ctx.cwd, projectSettings);
+				ctx.ui.notify(
+					`${pick.settingLabel ?? pick.label}: using global`,
+					"info",
+				);
+			}
+			continue;
+		}
 		if (pick.kind === "done") return;
 		if (pick.kind === "reset") {
-			const projectSettings = readSettings(ctx.cwd);
-			resetAll(projectSettings);
-			delete projectSettings.workOrchestrator;
-			writeSettings(ctx.cwd, projectSettings);
-			ctx.ui.notify("Cleared work-orchestrator role/gate overrides", "info");
+			if (
+				scope === "global" &&
+				typeof ctx.ui.confirm === "function" &&
+				!(await ctx.ui.confirm(
+					"Reset global work settings?",
+					"Every project without overrides will use the built-in defaults.",
+				))
+			)
+				continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			resetAll(settings);
+			delete settings.workOrchestrator;
+			delete settings.workResume;
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(
+				scope === "global"
+					? "Reset global work settings"
+					: "Cleared project workflow overrides",
+				"info",
+			);
 			continue;
 		}
 		if (pick.kind === "profile") {
-			const profileKey = await choose(ctx, "Choose effort profile", [
-				...Object.keys(EFFORT_PROFILES).map((key) => ({
-					value: key,
-					label: key,
-					description: `${SLOTS.map(
-						(slot) => `${slot.key}=${EFFORT_PROFILES[key][slot.key]}`,
-					).join(" ")} · gates:${
-						[
-							EFFORT_PROFILES[key].simplifyBeforeReview && "simplify",
-							EFFORT_PROFILES[key].browserTestsOnUiDiff && "browser",
-							EFFORT_PROFILES[key].codeReviewBeforeCommit !== "off" &&
-								`review:${EFFORT_PROFILES[key].codeReviewBeforeCommit}`,
-						]
-							.filter(Boolean)
-							.join("/") || "none"
-					}`,
-				})),
-			]);
+			const profileKey = await choose(
+				ctx,
+				"Choose effort profile",
+				[
+					...Object.keys(EFFORT_PROFILES).map((key) => ({
+						value: key,
+						label: key,
+						description: `${SLOTS.map(
+							(slot) => `${slot.key}=${EFFORT_PROFILES[key][slot.key]}`,
+						).join(" ")} · gates:${
+							[
+								EFFORT_PROFILES[key].simplifyBeforeReview && "simplify",
+								EFFORT_PROFILES[key].browserTestsOnUiDiff && "browser",
+								EFFORT_PROFILES[key].codeReviewBeforeCommit !== "off" &&
+									`review:${EFFORT_PROFILES[key].codeReviewBeforeCommit}`,
+							]
+								.filter(Boolean)
+								.join("/") || "none"
+						}`,
+					})),
+				],
+				resolved.profile,
+			);
 			if (!profileKey) continue;
-			settings = readSettings(ctx.cwd);
+			settings = readScopedSettings(ctx.cwd, scope);
 			applyProfile(settings, profileKey);
-			writeSettings(ctx.cwd, settings);
-			ctx.ui.notify(`Applied ${profileKey} profile`, "info");
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Applied ${profileKey} ${scope} profile`, "info");
 			continue;
 		}
 		if (pick.kind === "advisorSliceUsage") {
@@ -12580,11 +12851,12 @@ async function workSettingsLoop(ctx) {
 					label: value,
 					description: SLICE_PLAN_ADVISOR_USAGE_DESC[value],
 				})),
+				resolved.advisorUsageForSlicePlans,
 			);
 			if (!usage) continue;
-			settings = readSettings(ctx.cwd);
+			settings = readScopedSettings(ctx.cwd, scope);
 			setWorkOrchAdvisorSliceUsage(settings, usage);
-			writeSettings(ctx.cwd, settings);
+			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Advisor usage for slice plans: ${usage}`, "info");
 			continue;
 		}
@@ -12597,31 +12869,37 @@ async function workSettingsLoop(ctx) {
 					label: value,
 					description: REVIEW_LEVEL_DESC[value],
 				})),
+				resolved.codeReviewBeforeCommit,
 			);
 			if (!level) continue;
-			settings = readSettings(ctx.cwd);
+			settings = readScopedSettings(ctx.cwd, scope);
 			setWorkOrchReviewLevel(settings, level);
-			writeSettings(ctx.cwd, settings);
+			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Pre-commit review: ${level}`, "info");
 			continue;
 		}
 		if (pick.kind === "sliceExec") {
-			const mode = await choose(ctx, "Slice execution", [
-				{
-					value: "inline",
-					label: "inline",
-					description: "run each slice in the current session (default)",
-				},
-				{
-					value: "agent",
-					label: "agent",
-					description: "route each slice to an isolated work-worker subagent",
-				},
-			]);
+			const mode = await choose(
+				ctx,
+				"Slice execution",
+				[
+					{
+						value: "inline",
+						label: "inline",
+						description: "run each slice in the current session (default)",
+					},
+					{
+						value: "agent",
+						label: "agent",
+						description: "route each slice to an isolated work-worker subagent",
+					},
+				],
+				resolved.sliceExecutionMode,
+			);
 			if (!mode) continue;
-			settings = readSettings(ctx.cwd);
+			settings = readScopedSettings(ctx.cwd, scope);
 			setWorkOrchSliceExecution(settings, mode);
-			writeSettings(ctx.cwd, settings);
+			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Slice execution: ${mode}`, "info");
 			continue;
 		}
@@ -12629,24 +12907,31 @@ async function workSettingsLoop(ctx) {
 			const slot = slotByKey(pick.value);
 			if (slot)
 				try {
-					await editSlotModel(ctx, readSettings(ctx.cwd), slot);
+					await editSlotModel(
+						ctx,
+						readScopedSettings(ctx.cwd, scope),
+						slot,
+						scope,
+					);
 				} catch (error) {
+					const target =
+						scope === "global" ? globalSettingsPath() : settingsPath(ctx.cwd);
 					ctx.ui.notify(
-						`Could not write ${settingsPath(ctx.cwd)}: ${error instanceof Error ? error.message : String(error)}`,
+						`Could not write ${target}: ${error instanceof Error ? error.message : String(error)}`,
 						"error",
 					);
 				}
 			continue;
 		}
 		// Boolean flip (live): write immediately.
-		settings = readSettings(ctx.cwd);
+		settings = readScopedSettings(ctx.cwd, scope);
 		const current =
 			pick.kind === "resumeBool" ? resume[pick.value] : resolved[pick.value];
 		const next = !current;
 		if (pick.kind === "resumeBool")
 			setWorkResumeBoolean(settings, pick.value, next);
 		else setWorkOrchBoolean(settings, pick.value, next);
-		writeSettings(ctx.cwd, settings);
+		writeScopedSettings(ctx.cwd, scope, settings);
 		ctx.ui.notify(
 			`${pick.settingLabel ?? pick.label}: ${next ? "on" : "off"}`,
 			"info",

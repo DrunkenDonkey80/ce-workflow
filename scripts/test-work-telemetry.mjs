@@ -62,6 +62,9 @@ function telemetryEvents(cwd) {
 		);
 }
 
+const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+const globalDir = mkdtempSync(path.join(tmpdir(), "work-telemetry-global-"));
+process.env.PI_CODING_AGENT_DIR = globalDir;
 const cwd = mkdtempSync(path.join(tmpdir(), "work-telemetry-"));
 const now = Date.now();
 mkdirSync(path.join(cwd, ".pi"), { recursive: true });
@@ -518,12 +521,19 @@ try {
 		".pi-subagents",
 		"tracked-ambiguous",
 	);
+	const reviewHandoffState = {
+		action: "run-review",
+		handoffPrompt: "review",
+		selectedWorkItem: {
+			id: "TASK-REVIEW",
+			changedPaths: ["extensions/work-models.js"],
+		},
+	};
 	await withCommandTelemetry("ambiguous-tracking", "", commandCtx, async () => {
-		const state = { action: "run-review", handoffPrompt: "review" };
-		const direct = directRoleHandoffParams(state, cwd);
+		const direct = directRoleHandoffParams(reviewHandoffState, cwd);
 		assert(
 			Boolean(
-				recordSpawnedDirectRun(cwd, state, direct, {
+				recordSpawnedDirectRun(cwd, reviewHandoffState, direct, {
 					ambiguous: true,
 					data: { asyncDir: trackedAmbiguousDir },
 				}),
@@ -546,10 +556,7 @@ try {
 			});
 		} catch {}
 		outerAfterNested = parseWorkPromptMeta(
-			directRoleHandoffParams(
-				{ action: "run-review", handoffPrompt: "review" },
-				cwd,
-			).params.task,
+			directRoleHandoffParams(reviewHandoffState, cwd).params.task,
 		);
 		return { ok: true };
 	});
@@ -582,10 +589,7 @@ try {
 		async () => {
 			await firstCommand;
 			secondMeta = parseWorkPromptMeta(
-				directRoleHandoffParams(
-					{ action: "run-review", handoffPrompt: "review" },
-					cwd,
-				).params.task,
+				directRoleHandoffParams(reviewHandoffState, cwd).params.task,
 			);
 			return { ok: true };
 		},
@@ -861,6 +865,9 @@ try {
 		fixture.cleanup();
 	}
 } finally {
+	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+	rmSync(globalDir, { recursive: true, force: true });
 	rmSync(cwd, { recursive: true, force: true });
 }
 

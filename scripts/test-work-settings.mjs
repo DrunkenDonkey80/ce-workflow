@@ -27,9 +27,17 @@ const cwd = mkdtempSync(path.join(tmpdir(), "work-settings-"));
 try {
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	const settingsFile = () => path.join(cwd, ".pi", "settings.json");
+	const globalSettingsFile = () => path.join(globalDir, "settings.json");
 	const writeSettings = (settings) =>
 		writeFileSync(settingsFile(), `${JSON.stringify(settings, null, "\t")}\n`);
+	const writeGlobalSettings = (settings) =>
+		writeFileSync(
+			globalSettingsFile(),
+			`${JSON.stringify(settings, null, "\t")}\n`,
+		);
 	const readSettings = () => JSON.parse(readFileSync(settingsFile(), "utf8"));
+	const readGlobalSettings = () =>
+		JSON.parse(readFileSync(globalSettingsFile(), "utf8"));
 
 	// Package default stays off; a hidden user default enables every project,
 	// while an explicit project false remains an escape hatch.
@@ -254,6 +262,7 @@ try {
 		notify: (message, level) => notices.push({ message, level }),
 		input: options.input ?? (async () => undefined),
 		select: options.select ?? (async () => undefined),
+		confirm: options.confirm ?? (async () => true),
 		custom: async (factory) => {
 			let result;
 			let closed = false;
@@ -268,7 +277,9 @@ try {
 						(id === "tui.select.up" && data === "up") ||
 						(id === "tui.select.down" && data === "down") ||
 						(id === "tui.select.confirm" && data === "enter") ||
-						(id === "tui.select.cancel" && data === "escape"),
+						(id === "tui.select.cancel" && data === "escape") ||
+						(id === "tui.editor.deleteCharBackward" && data === "backspace") ||
+						(id === "tui.editor.deleteCharForward" && data === "delete"),
 				},
 				(value) => {
 					result = value;
@@ -322,7 +333,7 @@ try {
 		cwd,
 		model: { provider: "p", id: "m" },
 		modelRegistry: { getAvailable: async () => [] },
-		ui: customUi([{ key: "escape" }]),
+		ui: customUi([{ expectText: "Settings: Global", key: "escape" }]),
 	};
 	await commands["work-settings"].handler("", ctx);
 	assert(notices.length === 0, "escape exits without notify");
@@ -360,6 +371,211 @@ try {
 		assert(notices.at(-1).message.includes(phrase), `status lists ${phrase}`);
 	assert(existsSync(settingsFile()), "settings file exists");
 
+	// Global opens first; project overrides are marked and removable in-place.
+	writeGlobalSettings({ workOrchestrator: { advisorVerifyTask: true } });
+	writeSettings({ workOrchestrator: { advisorVerifyTask: false } });
+	let globalScopeRender = "";
+	let projectScopeRender = "";
+	let inheritedScopeRender = "";
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi([
+			{
+				target: "coded task-vs-plan checklist",
+				expectText: "Settings: Global",
+				key: "\t",
+				capture: (lines) => {
+					globalScopeRender = lines.join("\n");
+				},
+			},
+			{
+				expectInitial: "coded task-vs-plan checklist",
+				expectText: "Settings: Project",
+				key: "backspace",
+				capture: (lines) => {
+					projectScopeRender = lines.join("\n");
+				},
+			},
+			{
+				expectInitial: "coded task-vs-plan checklist",
+				key: "escape",
+				capture: (lines) => {
+					inheritedScopeRender = lines.join("\n");
+				},
+			},
+		]),
+	});
+	assert(
+		globalScopeRender.includes("* ✓ on coded task-vs-plan checklist") &&
+			projectScopeRender.includes("* ○ off coded task-vs-plan checklist"),
+		"local override marker is visible in both scopes",
+	);
+	assert(
+		!inheritedScopeRender.includes("* ✓ on coded task-vs-plan checklist") &&
+			mod.workOrchSettings(cwd).advisorVerifyTask === true &&
+			!Object.hasOwn(
+				readSettings().workOrchestrator ?? {},
+				"advisorVerifyTask",
+			),
+		"Backspace clears only the selected project override",
+	);
+	assert(
+		readGlobalSettings().workOrchestrator.advisorVerifyTask === true,
+		"clearing a project override preserves the global value",
+	);
+
+	// Reopening an enum picker starts on the persisted value in either scope.
+	writeGlobalSettings({
+		workOrchestrator: { advisorUsageForSlicePlans: "all" },
+	});
+	writeSettings({
+		workOrchestrator: { advisorUsageForSlicePlans: "first" },
+	});
+	let globalUsageChoices;
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi(
+			[
+				{ target: "advisor usage for slice plans ›", key: "enter" },
+				{
+					expectInitial: "advisor usage for slice plans ›",
+					key: "escape",
+				},
+			],
+			{
+				select: async (title, labels) => {
+					if (title === "Advisor usage for slice plans") {
+						globalUsageChoices = labels;
+						return labels.find((label) => label.startsWith("none"));
+					}
+					return undefined;
+				},
+			},
+		),
+	});
+	assert(
+		globalUsageChoices?.[0]?.startsWith("all"),
+		`global enum picker opens on its persisted value: ${JSON.stringify(globalUsageChoices)}`,
+	);
+	assert(
+		readGlobalSettings().workOrchestrator.advisorUsageForSlicePlans === "none",
+		"global enum selection persists",
+	);
+	let projectUsageChoices;
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi(
+			[
+				{ key: "\t" },
+				{ target: "advisor usage for slice plans ›", key: "enter" },
+				{
+					expectInitial: "advisor usage for slice plans ›",
+					key: "escape",
+				},
+			],
+			{
+				select: async (title, labels) => {
+					if (title === "Advisor usage for slice plans") {
+						projectUsageChoices = labels;
+						return labels.find((label) => label.startsWith("all"));
+					}
+					return undefined;
+				},
+			},
+		),
+	});
+	assert(
+		projectUsageChoices?.[0]?.startsWith("first"),
+		"project enum picker opens on its persisted override",
+	);
+	assert(
+		readSettings().workOrchestrator.advisorUsageForSlicePlans === "all",
+		"project enum selection persists",
+	);
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi([
+			{ target: "coded task-vs-plan checklist", key: "enter" },
+			{ expectInitial: "coded task-vs-plan checklist", key: "escape" },
+		]),
+	});
+	assert(
+		readGlobalSettings().workOrchestrator.advisorVerifyTask === false &&
+			!Object.hasOwn(
+				readSettings().workOrchestrator ?? {},
+				"advisorVerifyTask",
+			),
+		"global-first edits write only the global settings file",
+	);
+
+	const globalProfile = {};
+	mod.applyProfile(globalProfile, "high");
+	writeGlobalSettings(globalProfile);
+	const projectProfile = {};
+	mod.applyProfile(projectProfile, "low");
+	mod.setWorkOrchReviewLevel(projectProfile, "full");
+	writeSettings(projectProfile);
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi([
+			{ key: "\t" },
+			{ target: "profile ›", key: "backspace" },
+			{ expectInitial: "profile ›", key: "escape" },
+		]),
+	});
+	assert(
+		mod.workOrchSettings(cwd).profile === "high" &&
+			mod.workOrchSettings(cwd).advisorVerifyTask === true &&
+			mod.workOrchSettings(cwd).codeReviewBeforeCommit === "full" &&
+			!readSettings().subagents,
+		"clearing a project profile restores global profile values but preserves changed gates",
+	);
+
+	writeSettings({
+		workOrchestrator: { browserTestsOnUiDiff: false },
+		workResume: { selfImproving: false },
+		subagents: { agentOverrides: { "work-worker": { thinking: "low" } } },
+	});
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi([
+			{ key: "\t" },
+			{ target: "clear project overrides", key: "enter" },
+			{ expectInitial: "clear project overrides", key: "escape" },
+		]),
+	});
+	assert(
+		!readSettings().workOrchestrator &&
+			!readSettings().workResume &&
+			!readSettings().subagents,
+		"project reset removes workflow overrides only from the project",
+	);
+	writeGlobalSettings({
+		workOrchestrator: { browserTestsOnUiDiff: false },
+		workResume: { selfImproving: true },
+		subagents: {
+			agentOverrides: {
+				"work-worker": { thinking: "low" },
+				"other-agent": { thinking: "high" },
+			},
+		},
+	});
+	await commands["work-settings"].handler("", {
+		...ctx,
+		ui: customUi([
+			{ target: "reset global work settings", key: "enter" },
+			{ expectInitial: "reset global work settings", key: "escape" },
+		]),
+	});
+	assert(
+		!readGlobalSettings().workOrchestrator &&
+			!readGlobalSettings().workResume &&
+			!readGlobalSettings().subagents.agentOverrides["work-worker"] &&
+			readGlobalSettings().subagents.agentOverrides["other-agent"].thinking ===
+				"high",
+		"global reset restores workflow defaults without deleting unrelated agents",
+	);
+
 	// Enter and Space both flip booleans, retain the cursor, and color state.
 	mod.applyProfile((settings = readSettings()), "medium");
 	writeSettings(settings);
@@ -368,6 +584,7 @@ try {
 	await commands["work-settings"].handler("", {
 		...ctx,
 		ui: customUi([
+			{ expectText: "Settings: Global", key: "\t" },
 			{
 				target: "ce-test-browser when diff touches UI",
 				key: " ",
@@ -416,6 +633,7 @@ try {
 		},
 		ui: customUi(
 			[
+				{ expectText: "Settings: Global", key: "\t" },
 				{ target: "review ›", key: "enter" },
 				{
 					expectInitial: "test/gpt-5.6-high",
@@ -458,11 +676,12 @@ try {
 		...ctx,
 		ui: customUi(
 			[
+				{ expectText: "Settings: Global", key: "\t" },
 				{ target: "advisor 2 ›", key: "enter" },
 				{
 					expectInitial: "none",
 					expectText: "Current: none",
-					target: "inherit current control-session model",
+					target: "use global model setting",
 					key: "enter",
 				},
 				{ expectInitial: "advisor 2 ›", key: "escape" },
@@ -483,9 +702,10 @@ try {
 	await commands["work-settings"].handler("", {
 		...ctx,
 		ui: customUi([
+			{ expectText: "Settings: Global", key: "\t" },
 			{ target: "advisor 2 ›", key: "enter" },
 			{
-				expectInitial: "inherit current control-session model",
+				expectInitial: "use global model setting",
 				target: "none",
 				key: "enter",
 			},

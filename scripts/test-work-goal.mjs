@@ -237,7 +237,27 @@ assert.match(prompt, /work_goal_human_decision is only a durable fallback/);
 assert.match(prompt, /WORK_GOAL_NEEDS_HUMAN_DECISION/);
 assert.match(prompt, /work_goal_complete/);
 assert.match(prompt, /launch it async/);
-assert.match(prompt, /needsAttentionAfterMs/);
+assert.match(
+	prompt,
+	/needsAttentionAfterMs=30000 is an attention notification, not a hard timeout/,
+);
+assert.match(prompt, /at least 10 minutes/);
+assert.match(
+	prompt,
+	/do not handcraft a reviewer task when a coded handoff is available/,
+);
+assert.match(
+	prompt,
+	/waiting on contact_supervisor is not an implementation or review failure/,
+);
+assert.match(prompt, /intercom.*pending/);
+assert.match(prompt, /terminal.*stale/);
+assert.match(
+	prompt,
+	/stale.*do not reply, resume, append another verdict, or restart work/,
+);
+assert.match(prompt, /action.*reply/);
+assert.match(prompt, /replyTo.*message ID/);
 assert.match(prompt, /never block the TUI on a foreground child/);
 
 const commands = {};
@@ -369,6 +389,39 @@ try {
 			),
 		),
 	);
+	const ordinaryPolicy = await tempHooks.before_agent_start(
+		{ prompt: "make a small code fix", systemPrompt: "base" },
+		ctx,
+	);
+	assert.match(ordinaryPolicy.systemPrompt, /Review cycle budget/);
+	assert.match(ordinaryPolicy.systemPrompt, /one initial review cycle/);
+	assert.match(
+		ordinaryPolicy.systemPrompt,
+		/Do not launch a third review cycle/,
+	);
+	assert.match(ordinaryPolicy.systemPrompt, /Verification budget/);
+	assert.match(
+		ordinaryPolicy.systemPrompt,
+		/run only the smallest focused test/,
+	);
+	assert.match(
+		ordinaryPolicy.systemPrompt,
+		/full package or regression suite once, at the final handoff/,
+	);
+	assert.match(
+		ordinaryPolicy.systemPrompt,
+		/monolithic implementation file does not make every test relevant/,
+	);
+	const repeatedPolicy = await tempHooks.before_agent_start(
+		{ prompt: "continue", systemPrompt: ordinaryPolicy.systemPrompt },
+		ctx,
+	);
+	assert.equal(
+		repeatedPolicy.systemPrompt.match(/## Review cycle budget/g)?.length,
+		1,
+		"review budget is injected once",
+	);
+
 	await tempCommands["work-goal"].handler("write temp proof file", ctx);
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
@@ -518,7 +571,8 @@ try {
 		{ prompt: "regarding com7, is it fixed right", systemPrompt: "base" },
 		ctx,
 	);
-	assert.equal(ordinaryBefore, undefined);
+	assert.match(ordinaryBefore.systemPrompt, /Review cycle budget/);
+	assert.doesNotMatch(ordinaryBefore.systemPrompt, /Active \/work-goal/);
 	await tempHooks.agent_start({}, ctx);
 	await tempHooks.agent_end(
 		{

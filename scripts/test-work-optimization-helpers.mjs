@@ -5,6 +5,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -477,7 +478,7 @@ process.exit(result.status ?? 1);
 
 	mkdirSync(path.join(finishCwd, "auth"));
 	writeFileSync(
-		path.join(finishCwd, "auth", "policy.js"),
+		path.join(finishCwd, "auth", "policy file.js"),
 		"export default true;\n",
 	);
 	let reviewError = "";
@@ -504,9 +505,26 @@ process.exit(result.status ?? 1);
 	} catch (error) {
 		reviewError = String(error.stdout ?? "");
 	}
+	const reviewMessage = JSON.parse(reviewError).error;
+	const absoluteHelper = realpathSync(
+		path.join(import.meta.dirname, "work-helper.mjs"),
+	);
 	assert(
-		reviewError.includes("independent review required"),
-		"finish-task escalates sensitive paths instead of self-approving",
+		reviewMessage.includes("independent review required") &&
+			reviewMessage.includes("Work item: TASK-4") &&
+			reviewMessage.includes(`Helper: ${JSON.stringify(absoluteHelper)}`) &&
+			reviewMessage.includes(
+				`Summary command: node ${JSON.stringify(absoluteHelper)} work-summary TASK-4`,
+			) &&
+			reviewMessage.includes('Review only: "auth/policy file.js"') &&
+			reviewMessage.includes("Review reasons: sensitive paths") &&
+			reviewMessage.includes("durable `wo:review PASS|FAIL` note") &&
+			reviewMessage.includes("same finish-task command with --reviewed") &&
+			!reviewMessage
+				.split("Review only:")[1]
+				.split("\n")[0]
+				.includes(".ce-workflow/work-items.json"),
+		"finish-task returns a complete, safely quoted reviewer handoff",
 	);
 	let forgedReviewError = "";
 	try {

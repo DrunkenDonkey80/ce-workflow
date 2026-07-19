@@ -109,6 +109,24 @@ function cleanupGeneratedInstructions() {
 	}
 }
 
+function reviewerHandoff(id, implementationFiles, reviewReasons) {
+	const helper = path.resolve(process.argv[1]);
+	const reviewOnly = implementationFiles
+		.map((file) => JSON.stringify(file.replaceAll("\\", "/")))
+		.join(", ");
+	return [
+		"independent review required",
+		`Work item: ${id}`,
+		`Helper: ${JSON.stringify(helper)}`,
+		`Summary command: node ${JSON.stringify(helper)} work-summary ${id}`,
+		`Review only: ${reviewOnly}`,
+		`Review reasons: ${reviewReasons.join("; ")}`,
+		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${id}.`,
+		"Finish retry: rerun the same finish-task command with --reviewed only after durable PASS evidence.",
+		"Reviewer liveness: use the coded async handoff; needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. Prefer no explicit timeout; otherwise use at least 10 minutes. A reviewer waiting on contact_supervisor is not an implementation or review failure.",
+	].join("\n");
+}
+
 function formatPendingFiles() {
 	if (!args.includes("--immediate-format")) return [];
 	const files = gitStatusPaths().filter(
@@ -289,9 +307,7 @@ function finishTask() {
 		reviewReasons.push("hardware/live-evidence contract");
 	if (reviewReasons.length) {
 		if (!args.includes("--reviewed"))
-			throw new Error(
-				`independent review required for ${reviewReasons.join("; ")}`,
-			);
+			throw new Error(reviewerHandoff(id, implementationFiles, reviewReasons));
 		if (!/(?:wo:review|review(?: result)?):?\s*PASS\b/i.test(notesOf(task)))
 			throw new Error("--reviewed requires durable wo:review PASS evidence");
 	}
