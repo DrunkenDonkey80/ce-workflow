@@ -39,11 +39,15 @@ try {
 		path.join(brainstormDir, "near.md"),
 		"# Raw idea with animation\n",
 	);
+	writeFileSync(
+		path.join(planDir, "standalone-plan.md"),
+		"# Standalone plan\n\n## Summary\nBuild the reporting dashboard.\n",
+	);
 
 	fixture.reset("no-legacy-empty");
 	let state = buildWorkBrainstormState(
 		cwd,
-		"Explore a standalone reporting dashboard with filters and CSV export",
+		"Explore a standalone reporting dashboard with filters and CSV export docs/plans/standalone-plan.md",
 	);
 	assert(
 		state.ok && state.action === "brainstorm-epic-created",
@@ -59,6 +63,26 @@ try {
 			.items[state.epic.id].notes.join("\n")
 			.includes("wo:brainstorm") && fixture.logs().length === 0,
 		"standalone brainstorm is marked natively without bd",
+	);
+	const brainstormEpicId = state.epic.id;
+	const brainstormIdeaId = state.idea.id;
+	state = bootstrapPlanEpic(cwd, "docs/plans/standalone-plan.md");
+	const standaloneStore = fixture.store();
+	assert(
+		state.epic.id === brainstormEpicId &&
+			standaloneStore.items[state.selectedWorkItem.id].parentId ===
+				brainstormEpicId &&
+			standaloneStore.items[brainstormIdeaId].status === "closed",
+		"standalone brainstorm and master plan share one epic lifecycle",
+	);
+	assert(
+		standaloneStore.items[brainstormEpicId].description.includes(
+			"## Brainstorm",
+		) &&
+			standaloneStore.items[brainstormEpicId].description.includes(
+				"## Master plan",
+			),
+		"upgraded epic keeps brainstorm and master-plan components",
 	);
 
 	fixture.reset("ideas");
@@ -162,7 +186,7 @@ try {
 
 	writeFileSync(
 		path.join(planDir, "idea-plan.md"),
-		'---\ntitle: "Accepted idea plan"\nidea-id: IDEA-2\n---\n# Accepted idea plan\n\n## Summary\nPlan it.\n',
+		'---\ntitle: "Accepted idea plan"\n---\n# Accepted idea plan\n\n## Summary\nSource: docs/brainstorms/accepted.md\n\nPlan it.\n',
 	);
 	state = buildWorkPlanState(cwd, "docs/plans/idea-plan.md");
 	assert(
@@ -176,13 +200,25 @@ try {
 		state.ok && state.action === "run-planner",
 		"reviewed idea-linked plan bootstraps epic",
 	);
+	const plannedStore = fixture.store();
 	assert(
-		fixture
-			.store()
-			.items["IDEA-2"].notes.some((note) =>
+		state.epic.id === "E-1" &&
+			Object.values(plannedStore.items).filter((item) => item.type === "epic")
+				.length === 1,
+		"idea-linked plan upgrades the brainstorm epic instead of creating an empty sibling",
+	);
+	assert(
+		plannedStore.items[state.selectedWorkItem.id].parentId === "E-1" &&
+			plannedStore.items["E-1"].documentLinks.design ===
+				"docs/plans/idea-plan.md",
+		"master plan and planning work stay under the brainstorm epic",
+	);
+	assert(
+		plannedStore.items["IDEA-2"].status === "closed" &&
+			plannedStore.items["IDEA-2"].notes.some((note) =>
 				note.includes("plan-path=docs/plans/idea-plan.md"),
 			),
-		"planning appends native idea backlink",
+		"planning closes the consumed brainstorm idea and keeps its backlink",
 	);
 
 	assert(

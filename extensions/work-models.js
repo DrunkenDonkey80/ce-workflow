@@ -3096,11 +3096,11 @@ function contextStatus(ctx, settings) {
 	].join("\n");
 }
 
-function maybeCompact(ctx, settings, reason) {
+function maybeCompact(ctx, settings, reason, forceAutoCompact = false) {
 	const current = contextSettings(settings);
 	if (
 		current.enabled === false ||
-		current.autoCompact !== true ||
+		(current.autoCompact !== true && !forceAutoCompact) ||
 		contextCompactState.inFlight
 	)
 		return false;
@@ -7018,6 +7018,7 @@ function planEpicFields(cwd, rel) {
 			.filter(Boolean)
 			.join("\n"),
 		ideaId,
+		sourceArtifacts,
 	};
 }
 
@@ -7121,14 +7122,51 @@ export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 	if (!safeForPlanBootstrap(cwd, gitReport, rel))
 		return planBootstrapDirtyStop(cwd, gitReport, rel, command);
 	const fields = planEpicFields(cwd, rel);
-	const epic = createWorkflowWorkItem(cwd, {
-		title: fields.title,
-		type: "epic",
-		description: fields.description,
-		designFile: fields.designFile,
-		acceptance: fields.acceptance,
-		notes: fields.notes,
-	});
+	const sourcePaths = new Set(
+		[rel, ...fields.sourceArtifacts].map(normalizedRepoPath),
+	);
+	const linkedIdeas = fields.ideaId
+		? [readWorkItem(cwd, fields.ideaId)].filter(isIdeaIssue)
+		: allWorkItems(cwd).filter((item) => {
+				if (!isIdeaIssue(item)) return false;
+				const path = metadataValue(
+					ideaMetadata(item),
+					"brainstormPath",
+					"planPath",
+				);
+				return path && sourcePaths.has(normalizedRepoPath(path));
+			});
+	const idea = linkedIdeas.length === 1 ? linkedIdeas[0] : undefined;
+	const brainstormEpic = parentOf(idea)
+		? readWorkItem(cwd, parentOf(idea))
+		: undefined;
+	const reuseBrainstormEpic =
+		typeOf(brainstormEpic) === "epic" && statusOf(brainstormEpic) !== "closed";
+	let epic;
+	if (reuseBrainstormEpic) {
+		const brainstorm = idea.description || brainstormEpic.description;
+		epic = updateWorkItemNative(cwd, idOf(brainstormEpic), {
+			title: compactWorkItemTitle(fields.title),
+			description: brainstorm
+				? `## Brainstorm\n\n${brainstorm}\n\n## Master plan\n\n${fields.description}`
+				: fields.description,
+			acceptance: fields.acceptance,
+			documentLinks: {
+				...(brainstormEpic.documentLinks ?? {}),
+				design: fields.designFile,
+			},
+		});
+		epic = appendWorkflowWorkItemNote(cwd, idOf(epic), fields.notes);
+	} else {
+		epic = createWorkflowWorkItem(cwd, {
+			title: fields.title,
+			type: "epic",
+			description: fields.description,
+			designFile: fields.designFile,
+			acceptance: fields.acceptance,
+			notes: fields.notes,
+		});
+	}
 	rememberWorkflowEpic(cwd, epic);
 	const planning = createWorkflowWorkItem(cwd, {
 		title: `Plan next slice for ${fields.title}`,
@@ -7141,12 +7179,14 @@ export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 			"create one executable slice by default",
 		]),
 	});
-	if (fields.ideaId)
+	if (idea) {
 		appendWorkflowWorkItemNote(
 			cwd,
-			fields.ideaId,
+			idOf(idea),
 			`wo:idea status=discussed plan-path=${rel} epic-id=${idOf(epic)} task-id=${idOf(planning)}`,
 		);
+		updateWorkItemNative(cwd, idOf(idea), { status: "closed" });
+	}
 	return withHandoffPrompt(
 		{
 			ok: true,
@@ -7154,7 +7194,7 @@ export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 			epic: issueSummary(epic),
 			selectedWorkItem: issueSummary(planning),
 			git: gitReport,
-			message: `${initReport.initialized ? `${initReport.message} ` : ""}Created epic ${idOf(epic)} and planning WorkItem ${idOf(planning)} from ${rel}.`,
+			message: `${initReport.initialized ? `${initReport.message} ` : ""}${reuseBrainstormEpic ? "Updated" : "Created"} epic ${idOf(epic)} and planning WorkItem ${idOf(planning)} from ${rel}.`,
 			warnings: gitReport.warnings,
 			suggestedCommands: [`/work-resume ${idOf(epic)}`],
 			nextAction: `Next: run /work-resume ${idOf(epic)} to plan and start the first slice.`,
@@ -11144,7 +11184,9 @@ export default function workModelsExtension(pi) {
 			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 				const cwd = ctx?.cwd ?? process.cwd();
 				if (!workResumeSettings(cwd).selfImproving)
-					throw new Error("Workflow improvement reporting is disabled for this project.");
+					throw new Error(
+						"Workflow improvement reporting is disabled for this project.",
+					);
 				const workflow = currentCommandWorkflow();
 				const sessionId = ctx?.sessionManager?.getSessionId?.();
 				const sessionFile = ctx?.sessionManager?.getSessionFile?.();
@@ -11607,10 +11649,16 @@ export default function workModelsExtension(pi) {
 
 	pi.on("turn_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "turn_end", event);
+		const activeGoal = activeWorkGoal?.status === "active";
 		try {
-			maybeCompact(ctx, readEffectiveSettings(ctx.cwd), "turn boundary");
+			maybeCompact(
+				ctx,
+				readEffectiveSettings(ctx.cwd),
+				"turn boundary",
+				activeGoal,
+			);
 		} catch {
-			maybeCompact(ctx, {}, "turn boundary");
+			maybeCompact(ctx, {}, "turn boundary", activeGoal);
 		}
 		cleanupBenignInstructionDirt(ctx.cwd);
 		await flushWorkGoalContinuationRetry(ctx, pi);

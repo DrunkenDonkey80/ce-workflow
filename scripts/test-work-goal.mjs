@@ -109,7 +109,10 @@ const selfImprovingObjective = mod.buildWorkSelfImprovingObjective(
 );
 assert.match(selfImprovingObjective, /Self-improving overlay/);
 assert.match(selfImprovingObjective, /call work_report_improvement/);
-assert.match(selfImprovingObjective, /do not modify the ce-workflow source from the producer project/);
+assert.match(
+	selfImprovingObjective,
+	/do not modify the ce-workflow source from the producer project/,
+);
 const oneTaskObjective = mod.buildWorkSelfImprovingObjective(
 	"C:/soft/git/AI-Wedge one task only: fix login",
 	{ project: true },
@@ -320,6 +323,7 @@ try {
 	const statuses = {};
 	const notices = [];
 	const entries = [];
+	const compactions = [];
 	const pi = {
 		on: (name, handler) => {
 			tempHooks[name] = handler;
@@ -342,7 +346,10 @@ try {
 		sendUserMessage: async (message, options) => {
 			sent.push({ message, options });
 		},
-		compact: ({ onComplete }) => onComplete?.(),
+		compact: (options) => {
+			compactions.push(options);
+			options.onComplete?.();
+		},
 		sessionManager: { getBranch: () => entries },
 		ui: {
 			notify: (message, level) => notices.push({ message, level }),
@@ -427,6 +434,23 @@ try {
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
 	assert.equal(statuses["work-goal"], "▶️ active #0");
+
+	await tempHooks.turn_end(
+		{},
+		{
+			...ctx,
+			getContextUsage: () => ({ tokens: 160_000 }),
+		},
+	);
+	assert.equal(
+		compactions.length,
+		1,
+		"active work goals compact at turn boundaries even when opt-in auto-compaction is off",
+	);
+	assert.match(
+		compactions[0].customInstructions,
+		/work-orchestrator proactive/,
+	);
 
 	const before = await tempHooks.before_agent_start(
 		{ prompt: sent[0].message, systemPrompt: "base" },

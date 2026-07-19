@@ -1127,6 +1127,55 @@
       "title": "Support documented work-note --append-notes syntax",
       "type": "bug",
       "updatedAt": "2026-07-17T22:23:44.814Z"
+    },
+    "work-2": {
+      "createdAt": "2026-07-19T08:21:38.875Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "evidence": [],
+      "id": "work-2",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [],
+      "status": "open",
+      "title": "Self-improving",
+      "type": "epic",
+      "updatedAt": "2026-07-19T08:21:38.875Z"
+    },
+    "work-2.1": {
+      "createdAt": "2026-07-19T08:21:38.875Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task --immediate-format attempted to run Biome on the 1.3 MiB native runtime store .ce-workflow/work-items.json and failed before review/finalization because Biome's configured maximum is 1.0 MiB.\nExpected: The coded finalizer should treat .ce-workflow/work-items.json as runtime state and exclude it from immediate formatting, while still staging and committing it.\nImpact: A fully verified work item cannot reach the review/commit/close boundary when immediate formatting is requested, even though production files and the runtime store are valid.\nSuggested improvement: Filter isRuntimePath files before formatPendingFiles invokes Biome, or explicitly skip .ce-workflow/work-items.json.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/1a49241c-e58e-434f-a9fc-355f7fe83284",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3442481,
+              "file": "01-019f7814-1e63-71c7-ba9a-0b77c6092c4f.jsonl",
+              "sha256": "999cf0a92117466a85dc355b6be63043dc2a68ed575ff25c89004d6c86e1bfce"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-19T08:21:38.871Z",
+          "workflowId": "019f7814-1e63-71c7-ba9a-0b77c6092c4f"
+        }
+      ],
+      "id": "work-2.1",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: finish-task --immediate-format attempted to run Biome on the 1.3 MiB native runtime store .ce-workflow/work-items.json and failed ",
+      "type": "task",
+      "updatedAt": "2026-07-19T08:21:38.875Z"
     }
   },
   "metadata": {
@@ -1136,7 +1185,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-18T03:32:58.581Z"
+    "updatedAt": "2026-07-19T08:21:38.875Z"
   },
   "schemaVersion": 1
 }
