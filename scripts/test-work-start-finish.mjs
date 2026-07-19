@@ -183,7 +183,8 @@ try {
 			bigDirect.params.task.includes("work-ready-summary") &&
 			!bigDirect.params.task.includes("raw store readiness") &&
 			!bigDirect.params.task.includes("Subagent output guidance") &&
-			bigDirect.params.acceptance === false,
+			bigDirect.params.acceptance.level === "none" &&
+			bigDirect.params.acceptance.reason.includes("coded work-item"),
 		"big sends the planner a compact direct contract without generic acceptance boilerplate",
 	);
 

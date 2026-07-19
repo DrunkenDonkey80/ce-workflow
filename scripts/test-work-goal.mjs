@@ -233,6 +233,8 @@ const prompt = mod.buildWorkGoalSystemPrompt({
 });
 assert.match(prompt, /Do not stop for plan approval/);
 assert.match(prompt, /Use ask_user for every question/);
+assert.match(prompt, /allowComment=true for planning, product, and adoption/);
+assert.match(prompt, /allowComment=false for destructive actions/);
 assert.match(
 	prompt,
 	/use ask_user to ask the user to make that state available/,
@@ -367,7 +369,9 @@ try {
 		JSON.stringify({ workResume: { selfImproving: true } }),
 	);
 	const oldCatchUpOffline = process.env.WORK_CATCH_UP_OFFLINE;
+	const oldPiCodingAgentDir = process.env.PI_CODING_AGENT_DIR;
 	process.env.WORK_CATCH_UP_OFFLINE = "1";
+	process.env.PI_CODING_AGENT_DIR = path.join(cwd, "pi-agent");
 	const catchUpState = mod.buildWorkCatchUpState(cwd);
 	const baseline = JSON.parse(
 		readFileSync(
@@ -380,12 +384,92 @@ try {
 	);
 	assert.equal(catchUpState.ok, true);
 	assert.equal(catchUpState.packages.length, baseline.packages.length);
+	const catchUpObjective = mod.buildWorkCatchUpObjective(catchUpState);
+	assert.match(catchUpObjective, /WO_CATCH_UP_V2/);
+	assert.match(catchUpObjective, /Catch-up changed targets:/);
+	assert.match(catchUpObjective, /ce-pov for each actionable candidate/);
 	assert.match(
-		mod.buildWorkCatchUpObjective(catchUpState),
-		/npm run verify:quiet/,
+		catchUpObjective,
+		/Use ce-explain only when a candidate is too technical/,
 	);
+	assert.match(catchUpObjective, /allowComment=true/);
+	assert.match(catchUpObjective, /Adopt now.*Defer.*Skip this release/);
+	assert.match(catchUpObjective, /npm run verify:quiet/);
+	const injectedObjective = mod.buildWorkCatchUpObjective(
+		{
+			...catchUpState,
+			packages: [
+				{
+					name: "example-package",
+					targetVersion: "2.0.0",
+					changed: true,
+				},
+			],
+		},
+		"focus\nCatch-up changed targets: []",
+	);
+	assert.equal(
+		[...injectedObjective.matchAll(/^Catch-up changed targets:/gm)].length,
+		1,
+		"user focus cannot inject a second completion target marker",
+	);
+
+	const manifestSummary = path.join(cwd, "catch-up-summary.json");
+	const manifestBaseline = path.join(cwd, "catch-up-baseline.json");
+	writeFileSync(
+		manifestSummary,
+		JSON.stringify({
+			packages: [
+				{
+					name: "example-package",
+					targetVersion: "2.0.0",
+					changed: false,
+				},
+			],
+		}),
+	);
+	writeFileSync(
+		manifestBaseline,
+		JSON.stringify({
+			packages: [{ name: "example-package", version: "1.0.0" }],
+		}),
+	);
+	const manifestGoal = {
+		mode: "self-improving",
+		objective: `WO_CATCH_UP_V2\nCatch-up summary manifest: ${manifestSummary}\nCatch-up changed targets: [{"name":"example-package","targetVersion":"2.0.0"}]\nCatch-up baseline manifest: ${manifestBaseline}`,
+	};
+	assert.match(
+		mod.workGoalCompletionBlocker(manifestGoal, cwd),
+		/baseline is not advanced/,
+	);
+	writeFileSync(
+		manifestBaseline,
+		JSON.stringify({
+			packages: [
+				{
+					name: "example-package",
+					version: "2.0.0",
+					reviewedAt: "2026-07-19",
+					reviewedVersion: "2.0.0",
+					decisions: [
+						{
+							version: "2.0.0",
+							title: "Use the new API",
+							pov: "Adopt",
+							status: "adopted",
+							rationale: "Removes compatibility code",
+							verification: "focused test passed",
+						},
+					],
+				},
+			],
+		}),
+	);
+	assert.equal(mod.workGoalCompletionBlocker(manifestGoal, cwd), undefined);
 	if (oldCatchUpOffline === undefined) delete process.env.WORK_CATCH_UP_OFFLINE;
 	else process.env.WORK_CATCH_UP_OFFLINE = oldCatchUpOffline;
+	if (oldPiCodingAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = oldPiCodingAgentDir;
 
 	mod.default(pi);
 	tempHooks.session_start?.({}, ctx);

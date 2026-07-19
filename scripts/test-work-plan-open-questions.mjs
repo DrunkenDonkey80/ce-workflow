@@ -87,8 +87,9 @@ try {
 	);
 	assert(
 		/ask_user/.test(state.handoffPrompt) &&
-			/suggested default/.test(state.handoffPrompt),
-		"handoff prompt drives a per-question ask_user loop with suggested defaults",
+			/suggested default/.test(state.handoffPrompt) &&
+			/allowComment=true/.test(state.handoffPrompt),
+		"handoff prompt drives a nuanced per-question ask_user loop with suggested defaults",
 	);
 	assert(
 		Object.keys(fixture.store().items).length === 2,
@@ -131,7 +132,8 @@ try {
 	);
 	assert(
 		Object.keys(fixture.store().items).length === 4 &&
-			fixture.store().items[bootstrapped.epic.id]?.documentLinks?.design === cleanPlanRel,
+			fixture.store().items[bootstrapped.epic.id]?.documentLinks?.design ===
+				cleanPlanRel,
 		"bootstrap creates the epic plus one planning task with a plan link",
 	);
 } finally {

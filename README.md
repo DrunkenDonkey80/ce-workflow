@@ -32,7 +32,8 @@ No tracker CLI is required for normal operation. In a new repository run:
 | `/work-resume`, `/work-status`, `/work-report`, `/work-roadmap` | Reads native state without an agent or tracker subprocess. |
 | `/work-add`, `/work-debug`, `/work-pause`, `/work-finish` | Mutates, checkpoints, or finalizes a native work item. |
 | `/work-brainstorm`, `/work-ideate`, `/work-usage`, `/work-telemetry` | Manages ideas and local reports. |
-| `/work-settings`, `/work-context`, `/work-catch-up`, `/work-goal` | Configures orchestration and context behavior. |
+| `/work-settings`, `/work-context`, `/work-goal` | Configures orchestration and context behavior. |
+| `/work-catch-up` | Proactively reviews every changed monitored Pi/plugin release with `ce-pov`, asks Adopt/Defer/Skip one opportunity at a time, implements adopted wins, and records every decision before advancing the baseline. |
 | `/work-remove-beads` | One-way migration for a detected legacy workspace. |
 
 Role agents are `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, and three identical configurable advisor roles: `work-advisor`, `work-advisor-2`, and `work-advisor-3`. Configured advisors review brainstorms and plans in parallel; slice plans use the profile's `none` / `first` / `all` policy. They use `scripts/work-helper.mjs` native helpers for compact work-item summaries, children, ready, claim, note, label, and blocker operations.

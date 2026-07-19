@@ -1,22 +1,92 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-10",
+  "capturedAt": "2026-07-19",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "0.80.6"
+      "version": "0.80.10",
+      "reviewedAt": "2026-07-19",
+      "reviewedVersion": "0.80.10",
+      "decisions": [
+        {
+          "version": "0.80.10",
+          "title": "Use Pi's max thinking level",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "The max work profile should expose Pi's new supported ceiling instead of stopping at xhigh.",
+          "verification": "work-settings behavior and npm run verify:quiet passed"
+        },
+        {
+          "version": "0.80.10",
+          "title": "Unified model runtime and deferred Kimi tools",
+          "pov": "Not our problem",
+          "status": "no-action",
+          "rationale": "ce-workflow does not call the replaced SDK model registry APIs and has no Kimi-specific tool surface to simplify."
+        }
+      ]
     },
     {
       "name": "pi-compound-engineering",
-      "version": "3.13.1"
+      "version": "3.19.2",
+      "reviewedAt": "2026-07-19",
+      "reviewedVersion": "3.19.2",
+      "decisions": [
+        {
+          "version": "3.19.2",
+          "title": "Project-grounded proactive catch-up verdicts",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "ce-pov turns upstream release notes into repository-specific adoption decisions before the baseline advances.",
+          "verification": "work-catch-up objective and completion-gate tests passed"
+        },
+        {
+          "version": "3.19.2",
+          "title": "Technical explainers for difficult adoption choices",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "ce-explain is useful only when a candidate cannot be decided from the compact POV summary.",
+          "verification": "work-catch-up objective test covers conditional ce-explain guidance"
+        },
+        {
+          "version": "3.19.2",
+          "title": "Recurring external feedback sweep",
+          "pov": "Hold",
+          "status": "skipped",
+          "rationale": "ce-sweep overlaps the native work-item and improvement-reporting flow until Slack, GitHub Issues, or email ingestion is explicitly configured."
+        }
+      ]
     },
     {
       "name": "pi-subagents",
-      "version": "0.34.0"
+      "version": "0.35.1",
+      "reviewedAt": "2026-07-19",
+      "reviewedVersion": "0.35.1",
+      "decisions": [
+        {
+          "version": "0.35.1",
+          "title": "Current wait and acceptance contracts",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Direct handoffs should use subagent_wait guidance and reason-bearing acceptance instead of deprecated shorthand.",
+          "verification": "coded work start/finish behavior and npm run verify:quiet passed"
+        }
+      ]
     },
     {
       "name": "pi-ask-user",
-      "version": "0.12.0"
+      "version": "0.13.0",
+      "reviewedAt": "2026-07-19",
+      "reviewedVersion": "0.13.0",
+      "decisions": [
+        {
+          "version": "0.13.0",
+          "title": "Selective optional comments",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Planning and adoption choices benefit from caveats, while destructive binary approvals must explicitly disable comments.",
+          "verification": "open-question, work-goal, and dirty-recovery tests passed"
+        }
+      ]
     },
     {
       "name": "pi-intercom",
@@ -28,7 +98,18 @@
     },
     {
       "name": "pi-lens",
-      "version": "3.8.67"
+      "version": "3.8.70",
+      "reviewedAt": "2026-07-19",
+      "reviewedVersion": "3.8.70",
+      "decisions": [
+        {
+          "version": "3.8.70",
+          "title": "Subagent light mode and lifecycle optimizations",
+          "pov": "Adopt",
+          "status": "no-action",
+          "rationale": "The installed pi-lens runtime applies these improvements automatically; ce-workflow has no duplicate integration to add."
+        }
+      ]
     }
   ]
 }

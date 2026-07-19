@@ -172,8 +172,8 @@ try {
 			`${agent} effort high`,
 		);
 	assert(
-		readSettings().subagents.agentOverrides["work-worker"].thinking === "xhigh",
-		"worker effort xhigh",
+		readSettings().subagents.agentOverrides["work-worker"].thinking === "max",
+		"worker effort max",
 	);
 
 	// Flip a boolean live; profile label is preserved.
