@@ -43,7 +43,10 @@ try {
 } catch (error) {
 	throw new Error(`invalid calculator approval: ${error instanceof Error ? error.message : String(error)}`);
 }
-const sha = (name) => createHash("sha256").update(readFileSync(path.join(project, "goldens", name))).digest("hex");
+const sha = (name) =>
+	createHash("sha256")
+		.update(readFileSync(path.join(project, "goldens", name), "utf8").replace(/\r\n/g, "\n"))
+		.digest("hex");
 assert.equal(approval.brainstormSha, sha("brainstorm.md"));
 assert.equal(approval.planSha, sha("plan.md"));
 assert.match(readFileSync(path.join(project, "goldens", "plan.md"), "utf8"), /Slice 1[\s\S]*Slice 2/);

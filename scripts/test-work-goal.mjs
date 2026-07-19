@@ -108,7 +108,8 @@ const selfImprovingObjective = mod.buildWorkSelfImprovingObjective(
 	{ project: true, selfImproving: true },
 );
 assert.match(selfImprovingObjective, /Self-improving overlay/);
-assert.match(selfImprovingObjective, /fix this ce-workflow package in code/);
+assert.match(selfImprovingObjective, /call work_report_improvement/);
+assert.match(selfImprovingObjective, /do not modify the ce-workflow source from the producer project/);
 const oneTaskObjective = mod.buildWorkSelfImprovingObjective(
 	"C:/soft/git/AI-Wedge one task only: fix login",
 	{ project: true },

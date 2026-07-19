@@ -54,7 +54,10 @@ try {
 	const plan = readFileSync(path.join(project, "goldens", "plan.md"), "utf8");
 	assert.match(plan, /Slice 1[\s\S]*Slice 2/);
 	const approval = JSON.parse(readFileSync(path.join(project, "goldens", "approval.json"), "utf8"));
-	const sha = (name) => createHash("sha256").update(readFileSync(path.join(project, "goldens", name))).digest("hex");
+	const sha = (name) =>
+		createHash("sha256")
+			.update(readFileSync(path.join(project, "goldens", name), "utf8").replace(/\r\n/g, "\n"))
+			.digest("hex");
 	assert.equal(approval.brainstormSha, sha("brainstorm.md"));
 	assert.equal(approval.planSha, sha("plan.md"));
 	process.stdout.write("ok - CSV workflow evaluation project fixtures\n");

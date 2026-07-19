@@ -1,16 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { realpathSync } from "node:fs";
-import path from "node:path";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
-
-// Canonicalize on Windows so tooling does not load the runner twice under drive-letter casing variants.
-const { runBenchmarkGatePlan } = await import(
-	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "work-improvement-runner.mjs")),
-	).href
-);
 
 export const COST_WEIGHTS = Object.freeze({
 	tokens: 0.2,
@@ -53,15 +43,6 @@ const AGENT_SCENARIOS = [
 /** Existing fixtures selected for each changed surface. Unrecognized source paths take the conservative full set. */
 export const CHANGED_PATH_FIXTURE_MANIFEST = Object.freeze([
 	{
-		match:
-			/^(extensions\/work-improvement\.js|scripts\/test-work-improvement-analyzer\.mjs)$/,
-		deterministic: [
-			"test-work-improvement-analyzer.mjs",
-			...TELEMETRY_FIXTURES,
-		],
-		agentBacked: [],
-	},
-	{
 		match: /^scripts\/test-work-(telemetry|usage|optimization-helpers)\.mjs$/,
 		deterministic: TELEMETRY_FIXTURES,
 		agentBacked: [],
@@ -83,9 +64,9 @@ export const CHANGED_PATH_FIXTURE_MANIFEST = Object.freeze([
 		agentBacked: AGENT_SCENARIOS,
 	},
 	{
-		match: /^scripts\/work-improvement-runner\.mjs$/,
-		deterministic: ["test-work-improvement-git.mjs", ...ORCHESTRATION_FIXTURES],
-		agentBacked: AGENT_SCENARIOS,
+		match: /^(extensions\/work-improvement-reporting\.js|scripts\/test-work-improvement-reporting\.mjs)$/,
+		deterministic: ["test-work-improvement-reporting.mjs", ...TELEMETRY_FIXTURES],
+		agentBacked: [],
 	},
 ]);
 
@@ -94,6 +75,59 @@ const ALL_DETERMINISTIC = [
 		CHANGED_PATH_FIXTURE_MANIFEST.flatMap((entry) => entry.deterministic),
 	),
 ];
+
+/** Execute a benchmark plan through injected gates. */
+export async function runBenchmarkGatePlan(plan, seams = {}) {
+	if (typeof seams.runPackageVerify !== "function")
+		throw new TypeError("runPackageVerify is required");
+	if (typeof seams.runDeterministicFixture !== "function")
+		throw new TypeError("runDeterministicFixture is required");
+	if (
+		(plan.agentScenarioIds?.length ?? 0) > 0 &&
+		typeof seams.runAgentScenario !== "function"
+	)
+		throw new TypeError("runAgentScenario is required");
+	const timeoutMs = seams.timeoutMs ?? 2 * 60 * 1000;
+	const withTimeout = (promise, label) => {
+		let timer;
+		return Promise.race([
+			Promise.resolve(promise),
+			new Promise((_, reject) => {
+				timer = setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
+			}),
+		]).finally(() => clearTimeout(timer));
+	};
+	const packageVerification = await withTimeout(
+		seams.runPackageVerify(),
+		"package verification",
+	);
+	if (packageVerification?.passed !== true)
+		return { packageVerification, deterministic: [], agentBacked: [] };
+	const deterministic = [];
+	for (const fixtureId of plan.deterministicFixtureIds ?? [])
+		deterministic.push({
+			fixtureId,
+			samples: [
+				await withTimeout(
+					seams.runDeterministicFixture(fixtureId),
+					`benchmark fixture ${fixtureId}`,
+				),
+			],
+		});
+	const agentBacked = [];
+	for (const fixtureId of plan.agentScenarioIds ?? []) {
+		const samples = [];
+		for (let sample = 0; sample < 3; sample += 1)
+			samples.push(
+				await withTimeout(
+					seams.runAgentScenario(fixtureId),
+					`agent benchmark ${fixtureId}`,
+				),
+			);
+		agentBacked.push({ fixtureId, samples });
+	}
+	return { packageVerification, deterministic, agentBacked };
+}
 
 function normalizedPath(value) {
 	return String(value ?? "")

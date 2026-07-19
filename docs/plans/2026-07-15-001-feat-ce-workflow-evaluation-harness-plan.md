@@ -188,10 +188,9 @@ flowchart TB
 ### Sources / Research
 
 - `scripts/work-improvement-benchmark.mjs` defines the current benchmark manifest, cost dimensions, sampling, and quality-first acceptance policy.
-- `scripts/work-improvement-runner.mjs` shows that current named agent scenarios delegate existing test scripts rather than complete representative projects.
+- `scripts/work-improvement-benchmark.mjs` owns the reusable injected benchmark-gate executor; workflow evaluation remains standalone from producer reporting.
 - `agents/workflow-benchmark.md` defines the current read-only benchmark runner boundary.
 - `README.md` documents the staged workflow, role and effort configuration, review levels, telemetry, browser gate, simplify gate, and resume behavior this harness must evaluate.
-- `docs/plans/2026-07-11-001-feat-autonomous-workflow-improvement-plan.md` established the earlier requirement for representative quality and workflow-cost scenarios.
 
 ---
 
@@ -423,7 +422,7 @@ Runtime workspaces and evidence live under the operating system temporary direct
 - **Files:** `benchmarks/workflow-evaluation/v1/projects/calculator/project.json`, `benchmarks/workflow-evaluation/v1/projects/calculator/product-contract.md`, `benchmarks/workflow-evaluation/v1/projects/calculator/answers.json`, `benchmarks/workflow-evaluation/v1/projects/calculator/rubric.json`, `benchmarks/workflow-evaluation/v1/projects/calculator/goldens/brainstorm.md`, `benchmarks/workflow-evaluation/v1/projects/calculator/goldens/plan.md`, `benchmarks/workflow-evaluation/v1/projects/calculator/goldens/approval.json`, `benchmarks/workflow-evaluation/v1/projects/calculator/seed/index.html`, `benchmarks/workflow-evaluation/v1/projects/calculator/seed/app.js`, `benchmarks/workflow-evaluation/v1/projects/calculator/seed/styles.css`, `benchmarks/workflow-evaluation/v1/projects/calculator/acceptance/verify.mjs`, `scripts/test-workflow-evaluation-calculator.mjs`.
 - **Approach:** Define browser operations as an injected adapter with capability and version fingerprints. Acceptance checks cover arithmetic state, keyboard input, focus and labels, theme toggle and reload persistence, fixed viewport, console errors, and retained screenshots; deterministic fixtures use a fake adapter and live runs fail invalid when required browser evidence is unavailable.
 - **Execution note:** Build the adapter contract and deterministic fake first; a real browser smoke is the final proof for this unit.
-- **Patterns to follow:** Existing conditional browser-gate policy in `extensions/work-models.js`; injected execution seams and bounded timeouts in `scripts/work-improvement-runner.mjs`.
+- **Patterns to follow:** Existing conditional browser-gate policy in `extensions/work-models.js`; injected execution seams and bounded timeouts in `scripts/work-improvement-benchmark.mjs`.
 - **Test scenarios:**
   1. Pointer and keyboard input perform the required arithmetic, clear, decimal, sign, and chained-operation behavior.
   2. Division by zero and invalid operation sequences enter the specified recoverable display state without uncaught errors.
@@ -441,7 +440,7 @@ Runtime workspaces and evidence live under the operating system temporary direct
 - **Files:** `scripts/workflow-evaluation-rpc.mjs`, `scripts/test-workflow-evaluation-rpc.mjs`.
 - **Approach:** Spawn one RPC process per sample with the selected package checkout, cwd, provider/model/thinking, tool allowlist, offline startup, and explicit budget. Parse strict JSONL events, answer extension UI requests from the fixed answer bank, record unexpected questions, wait for `agent_settled`, request session statistics, and reconcile `.pi/work-runs` by workflow identity. Prove command provenance before dispatch and terminate the full process tree on timeout.
 - **Execution note:** Use a fake RPC child to characterize framing, dialogs, retries, settlement, abort, and malformed output before starting a paid model run.
-- **Patterns to follow:** `spawnSubagentRpc()`/`dispatchWorkflowImprovementAgent()` lifecycle handling in `extensions/work-models.js`; correlated and exactly-once telemetry behavior in `scripts/test-work-telemetry.mjs`; Pi RPC `extension_ui_request`, `agent_settled`, and session-stat contracts.
+- **Patterns to follow:** Correlated and exactly-once telemetry behavior in `scripts/test-work-telemetry.mjs`; Pi RPC `extension_ui_request`, `agent_settled`, and session-stat contracts.
 - **Test scenarios:**
   1. Fragmented LF-delimited JSON, CRLF input tolerance, and Unicode line separators inside JSON strings are parsed without record corruption.
   2. Expected select, confirm, input, and editor requests receive the exact fixed response and are recorded once.
@@ -462,7 +461,7 @@ Runtime workspaces and evidence live under the operating system temporary direct
 - **Files:** `scripts/workflow-evaluation.mjs`, `scripts/test-workflow-evaluation-runner.mjs`.
 - **Approach:** Read one experiment descriptor, create control-plane and disposable directories, copy and initialize the chosen seed, materialize only the stage input, run baseline/candidate in alternating configured order, apply project and stage gates, fingerprint all inputs, and emit a compact non-decision-grade report plus bounded evidence references. Use append-only lifecycle events and cleanup only after retained evidence is durable.
 - **Execution note:** Make a complete single-pair smoke work before adding three-pair aggregation or evaluator cost.
-- **Patterns to follow:** Authoritative source preflight, leases, bounded evidence, worktree cleanup, and cancellation in `scripts/work-improvement-runner.mjs`; generated runtime files remain ignored like `.pi/work-runs/`.
+- **Patterns to follow:** Bounded evidence and cancellation in the standalone harness; generated runtime files remain ignored like `.pi/work-runs/`.
 - **Test scenarios:**
   1. A passing fake baseline/candidate pair receives separate fresh roots and produces a diagnostic smoke report labeled non-decision-grade.
   2. Baseline failure invalidates the comparison; candidate failure rejects the candidate before cost analysis.
@@ -480,7 +479,7 @@ Runtime workspaces and evidence live under the operating system temporary direct
 - **Files:** `agents/workflow-evaluator.md`, `scripts/workflow-evaluation-score.mjs`, `scripts/test-workflow-evaluation-score.mjs`, `scripts/workflow-evaluation.mjs`.
 - **Approach:** Normalize artifacts, randomize side labels with a retained control-plane mapping, run one fixed evaluator configuration against both sides and the versioned rubric, validate structured scores, then aggregate three alternating fresh pairs. Preserve every attempt, allow one symmetric replacement only for confirmed infrastructure failure, and apply hard gates, qualitative medians/critical dimensions, unexpected-question counts, and cost thresholds in that order.
 - **Execution note:** Characterize all verdict branches with synthetic evidence before paying for evaluator runs.
-- **Patterns to follow:** `mandatoryQuality()` and `evaluateBenchmarkEvidence()` ordering and thresholds in `scripts/work-improvement-benchmark.mjs`; bounded role artifacts in `dispatchWorkflowImprovementAgent()`.
+- **Patterns to follow:** `mandatoryQuality()` and `evaluateBenchmarkEvidence()` ordering and thresholds in `scripts/work-improvement-benchmark.mjs`; bounded standalone role artifacts.
 - **Test scenarios:**
   1. Randomized evaluator labels cannot be derived from filenames, metadata, prompts, ordering, timestamps, or project paths.
   2. Malformed scores, evaluator timeout, changed evaluator fingerprint, ties not handled by the rubric, or missing critical dimensions invalidate the comparison.
@@ -499,7 +498,7 @@ Runtime workspaces and evidence live under the operating system temporary direct
 - **Files:** `scripts/workflow-evaluation.mjs`, `scripts/test-workflow-evaluation-sentinel.mjs`, `benchmarks/workflow-evaluation/v1/projects/calculator/goldens/approval.json`, `benchmarks/workflow-evaluation/v1/projects/csv-expenses/goldens/approval.json`.
 - **Approach:** Add unchanged-pair calibration, approval-record generation, and sentinel mode. Golden updates require exact bundle/artifact SHAs, acceptance results, reviewer identity, timestamp, and retained evidence. Sentinel runs pass actual brainstorm output to planning and actual planning output through all work slices for both projects; trigger classification is coded from changed paths and declared change type.
 - **Execution note:** Run sentinels only after isolated smoke paths pass; preserve actual handoffs for review rather than substituting goldens.
-- **Patterns to follow:** Changed-path manifest expansion in `buildBenchmarkPlan()` and conservative unknown-path handling; source revision validation in the autonomous improvement runner.
+- **Patterns to follow:** Changed-path manifest expansion in `buildBenchmarkPlan()` and conservative unknown-path handling; source revision validation in the standalone evaluation harness.
 - **Test scenarios:**
   1. Unchanged three-pair calibration derives per-project/stage/depth ceilings and may raise but never lower the fixed threshold floors.
   2. Unapproved, stale-SHA, failed-acceptance, or silently changed goldens cannot start plan/work decision runs.

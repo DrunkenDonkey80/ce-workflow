@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
 import {
 	appendFileSync,
 	existsSync,
@@ -67,7 +66,10 @@ const now = Date.now();
 mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 writeFileSync(
 	path.join(cwd, ".pi", "settings.json"),
-	`${JSON.stringify({ workResume: { selfImproving: false } })}\n`,
+	`${JSON.stringify({
+		workResume: { selfImproving: false },
+		workOrchestrator: { sliceExecutionMode: "inline" },
+	})}\n`,
 );
 seedNativeStore(cwd, [
 	{
@@ -454,59 +456,6 @@ try {
 		);
 	} finally {
 		rmSync(blockedCwd, { recursive: true, force: true });
-	}
-
-	const dirtySource = mkdtempSync(
-		path.join(tmpdir(), "work-improvement-dirty-"),
-	);
-	const dirtyConsumer = mkdtempSync(
-		path.join(tmpdir(), "work-improvement-consumer-"),
-	);
-	try {
-		execFileSync("git", ["init", "--quiet"], { cwd: dirtySource });
-		writeFileSync(path.join(dirtySource, "uncommitted.txt"), "dirty\n");
-		mkdirSync(path.join(dirtyConsumer, ".pi"), { recursive: true });
-		writeFileSync(
-			path.join(dirtyConsumer, ".pi", "settings.json"),
-			`${JSON.stringify({
-				workResume: { selfImproving: true },
-				workImprovement: { sourceCheckout: dirtySource },
-			})}\n`,
-		);
-		let confirmations = 0;
-		let commandRan = false;
-		await withCommandTelemetry(
-			"dirty-source-warning",
-			"",
-			{
-				cwd: dirtyConsumer,
-				mode: "tui",
-				hasUI: true,
-				getContextUsage: () => ({ tokens: 0 }),
-				ui: {
-					confirm: async (title, message) => {
-						confirmations += 1;
-						assert(
-							title.includes("Self-improvement") &&
-								message.includes("uncommitted.txt"),
-							"dirty-source confirmation identifies the blocker",
-						);
-						return false;
-					},
-				},
-			},
-			async () => {
-				commandRan = true;
-				return { ok: true, handoffPrompt: "test", handoffPending: true };
-			},
-		);
-		assert(
-			confirmations === 1 && !commandRan,
-			"enabled self-improvement asks before starting against a dirty source",
-		);
-	} finally {
-		rmSync(dirtySource, { recursive: true, force: true });
-		rmSync(dirtyConsumer, { recursive: true, force: true });
 	}
 
 	const commandCtx = {

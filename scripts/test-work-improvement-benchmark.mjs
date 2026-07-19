@@ -93,7 +93,7 @@ const mixedUnknownPlan = buildBenchmarkPlan([
 assert(
 	mixedUnknownPlan.agentScenarioIds.length === 6 &&
 		mixedUnknownPlan.deterministicFixtureIds.includes(
-			"test-work-improvement-git.mjs",
+			"test-work-settings.mjs",
 		),
 	"one unrecognized path conservatively selects the full scenario set",
 );

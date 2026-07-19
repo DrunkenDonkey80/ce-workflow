@@ -36,6 +36,20 @@ check(
 );
 check("native store is packaged", pkg.files?.includes("extensions/"));
 check(
+	"explicit improvement reporting is packaged",
+	existsSync(path.join(root, "extensions/work-improvement-reporting.js")) &&
+		existsSync(path.join(root, "scripts/test-work-improvement-reporting.mjs")),
+);
+check(
+	"autonomous improvement surface is absent",
+	![
+		"extensions/work-improvement.js",
+		"scripts/work-improvement-runner.mjs",
+		"agents/workflow-improver.md",
+		"agents/workflow-improvement-reviewer.md",
+	].some((rel) => existsSync(path.join(root, rel))),
+);
+check(
 	"evaluation bundles are packaged",
 	pkg.files?.includes("benchmarks/") &&
 		pkg.files?.includes("scripts/") &&
@@ -272,6 +286,7 @@ check(
 );
 
 const tests = [
+	"test-work-improvement-reporting.mjs",
 	"test-work-store.mjs",
 	"test-work-store-performance.mjs",
 	"test-work-remove-beads.mjs",
@@ -280,6 +295,7 @@ const tests = [
 		(name) =>
 			/^test-work-.*\.mjs$/.test(name) &&
 			![
+				"test-work-improvement-reporting.mjs",
 				"test-work-store.mjs",
 				"test-work-store-performance.mjs",
 				"test-work-remove-beads.mjs",

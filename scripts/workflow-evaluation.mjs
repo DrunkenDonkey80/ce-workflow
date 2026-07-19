@@ -363,6 +363,12 @@ export function expireEvidenceStore(root, now = Date.now()) {
 	return true;
 }
 
+function canonicalFileBytes(file) {
+	const bytes = readFileSync(file);
+	if (bytes.includes(0) || !bytes.includes("\r\n")) return bytes;
+	return Buffer.from(bytes.toString("utf8").replace(/\r\n/g, "\n"));
+}
+
 function hashTree(root, exclude = () => false) {
 	const hash = createHash("sha256");
 	function visit(directory, relative = "") {
@@ -372,7 +378,7 @@ function hashTree(root, exclude = () => false) {
 			if (exclude(rel, name)) continue;
 			const stat = statSync(absolute);
 			if (stat.isDirectory()) visit(absolute, rel);
-			else hash.update(`${rel}\0`).update(readFileSync(absolute));
+			else hash.update(`${rel}\0`).update(canonicalFileBytes(absolute));
 		}
 	}
 	visit(root);
@@ -1662,7 +1668,7 @@ function projectBundleHash(root) {
 }
 
 function fileSha(file) {
-	return createHash("sha256").update(readFileSync(file)).digest("hex");
+	return createHash("sha256").update(canonicalFileBytes(file)).digest("hex");
 }
 
 export function buildGoldenApproval(projectDirectory, metadata = {}) {

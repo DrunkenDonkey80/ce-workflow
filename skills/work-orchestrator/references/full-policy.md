@@ -324,7 +324,7 @@ work items and git preserve the memory; Pi chat is disposable working context. T
 - rely on `/work-context status` for current token/trigger state; default opt-in trigger is 150k tokens, capped by model context, and keeps at least the latest 30k tokens via Pi compaction settings;
 - compact only inside a single work item when context gets high or after a noisy debug/review phase;
 - `/work-resume` is an autonomous slice loop; each slice still gets a fresh-context boundary, but the loop continues to the next ready work item until a decision, blocker, completion, or `/work-stop`;
-- self-improving ce-workflow fixes during explicit target-project goals are off by default; opt in only with `workResume.selfImproving: true`;
+- self-improvement reporting is off by default; opt in with `workResume.selfImproving: true` and use `work_report_improvement` only for explicit evidence intake; it never changes the ce-workflow source from a producer project;
 - `/work-stop` requests a clean stop for any active work (project goal, resume loop, or inline slice): checkpoint native work-item store/git, finish the current safe phase, and do not start another work item; (`/work-resume-stop` is a kept alias)
 - after a work item is committed and closed, continue to the next ready work item automatically rather than stopping to ask.
 

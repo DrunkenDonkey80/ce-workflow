@@ -56,6 +56,10 @@ For a repository with the former tracker workspace, use only:
 
 The migration command is idempotent, validates export parity, keeps an ignored backup, migrates role settings, and stops safely on lock, source-change, corruption, or recovery errors. Normal commands stop and point to this command until migration completes. The migration boundary is the only packaged code that can invoke the legacy exporter.
 
+## Workflow improvement reporting
+
+Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` epic. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout; a maintainer later resumes the epic through the normal workflow.
+
 ## Workflow evaluation harness
 
 The standalone harness compares one declared workflow factor against immutable calculator and CSV-expenses bundles. Work-stage samples finalize native items in `.ce-workflow/work-items.json`; the harness does not require a tracker CLI.
