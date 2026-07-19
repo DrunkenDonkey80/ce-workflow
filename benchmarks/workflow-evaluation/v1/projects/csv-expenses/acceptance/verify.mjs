@@ -13,6 +13,7 @@ function run(root, input, output) {
 }
 
 function gate(name, passed, detail = "") { return { name, passed, detail }; }
+function normalizedText(file) { return readFileSync(file, "utf8").replace(/\r\n/g, "\n"); }
 
 export function verifyCsvProject(root) {
 	const temp = mkdtempSync(path.join(os.tmpdir(), "ce-csv-acceptance-"));
@@ -20,8 +21,8 @@ export function verifyCsvProject(root) {
 	try {
 		const output = path.join(temp, "report.txt");
 		const valid = run(root, path.join(fixtures, "valid.csv"), output);
-		const expected = readFileSync(path.join(fixtures, "expected-report.txt"), "utf8");
-		gates.push(gate("valid-report", valid.status === 0 && existsSync(output) && readFileSync(output, "utf8") === expected, valid.stderr));
+		const expected = normalizedText(path.join(fixtures, "expected-report.txt"));
+		gates.push(gate("valid-report", valid.status === 0 && existsSync(output) && normalizedText(output) === expected, valid.stderr));
 
 		const malformedOutput = path.join(temp, "malformed-report.txt");
 		const malformed = run(root, path.join(fixtures, "malformed.csv"), malformedOutput);

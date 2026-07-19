@@ -60,11 +60,11 @@ If it reports independent review required, use its complete labelled reviewer ha
 - **migrate** — exact `work-migrator`; source and branch inspection is read-only.
 - **init/status/report/usage/telemetry/roadmap/add/pause/finish** — deterministic extension paths; no agent.
 
-## Opt-in autonomous workflow improvement
+## Opt-in workflow improvement reporting
 
-This is off by default behind `workResume.selfImproving`. Terminal workflows are analyzed once in code; ordinary signals accumulate before any model launch, while hard regressions may become actionable after one run. Source resolution is `workImprovement.sourceCheckout`, then `CE_WORKFLOW_SOURCE_DIR`, then a valid package-root Git checkout. Missing or unsafe source state defers without consumer edits. Improvement, benchmark, validation, and revert markers never generate nested candidates.
+This is off by default behind `workResume.selfImproving`. When enabled, `work_report_improvement` is available for an explicit, concrete ce-workflow problem with observation, expected behavior, impact, and one or more local logs. It copies accepted evidence into ignored local storage and creates one child task under the ce-workflow checkout's `Self-improving` epic.
 
-Normal work does not push by default. The narrow opt-in exception lets the coded coordinator commit and push the synchronized current source branch only after lease, verification, benchmark, and independent-review gates pass. Post-push failure uses a normal revert commit; never force-push or discard unrelated work. Print and JSON report modes do not queue autonomy.
+Reporting never analyzes terminal workflows, launches an improver, changes, benchmarks, commits, pushes, reverts, or waits on the ce-workflow source. Source resolution is `workImprovement.sourceCheckout`, then `CE_WORKFLOW_SOURCE_DIR`, then the package checkout; a maintainer processes report tasks later through normal work-item flow.
 
 ## Handoff hygiene
 

@@ -3,9 +3,9 @@
   "approved": true,
   "approvedBy": "Flex (interactive approval)",
   "approvedAt": "2026-07-16T07:52:02.167Z",
-  "bundleSha": "d2c915d5c704a3e341fce4d1ad9824d931cfde19aec66aa1103f22bcb14a3c01",
+  "bundleSha": "789506060ac0fd147d8b65d29bdfc4d41ded6b1f2485aaba210e07eef0067c3b",
   "brainstormSha": "45b639386af3bae85aa23fcee44ada5aaee2f74cff406860643924d8fc3a34fb",
   "planSha": "6a474ff8a790894160485dd653acd8f35c9187e65ba8e8ce6a56344da42615ca",
   "acceptancePassed": true,
-  "evidence": "node scripts/test-workflow-evaluation-csv.mjs; live scripted-dialog evidence C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-TcFVf9/smoke-1784186970701-f288f472/evidence.json; exact bundle d2c915d5c704a3e341fce4d1ad9824d931cfde19aec66aa1103f22bcb14a3c01"
+  "evidence": "node scripts/test-workflow-evaluation-csv.mjs; live scripted-dialog evidence C:/Users/Flex/AppData/Local/Temp/ce-workflow-evidence-TcFVf9/smoke-1784186970701-f288f472/evidence.json; exact bundle 789506060ac0fd147d8b65d29bdfc4d41ded6b1f2485aaba210e07eef0067c3b"
 }

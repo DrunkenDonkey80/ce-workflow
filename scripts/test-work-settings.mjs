@@ -365,7 +365,7 @@ try {
 		"pre-commit review:",
 		"ce-simplify-code before review",
 		"ce-test-browser when diff touches UI",
-		"self-improving workflow fixes",
+		"self-improving workflow reporting",
 		"new session between iterations",
 	])
 		assert(notices.at(-1).message.includes(phrase), `status lists ${phrase}`);

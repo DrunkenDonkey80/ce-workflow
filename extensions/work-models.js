@@ -4,22 +4,16 @@ import { execFileSync } from "node:child_process";
 import {
 	appendFileSync,
 	closeSync,
-	constants as fsConstants,
 	existsSync,
-	fstatSync,
 	mkdirSync,
 	openSync,
 	readdirSync,
 	readFileSync,
-	readSync,
-	realpathSync,
-	lstatSync,
-	statSync,
 	writeFileSync,
 	writeSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import {
 	basename,
 	delimiter,
@@ -29,12 +23,8 @@ import {
 	relative,
 	resolve,
 } from "node:path";
-import {
-	analyzeWorkflow,
-	readCandidateState,
-	selectCandidate,
-} from "./work-improvement.js";
 import { migrateLegacyBeads } from "./legacy-beads-migration.js";
+import { submitImprovementReport } from "./work-improvement-reporting.js";
 import {
 	appendWorkNote,
 	createWorkItem,
@@ -47,7 +37,15 @@ import {
 	WorkStoreError,
 } from "./work-store.js";
 
+let withFileMutationQueue = async (_file, mutation) => mutation();
+try {
+	({ withFileMutationQueue } = await import("@earendil-works/pi-coding-agent"));
+} catch {
+	// Local fixture runs do not install Pi peer dependencies.
+}
+
 const CONFIG_DIR_NAME = ".pi";
+const IMPROVEMENT_REPORT_TOOL = "work_report_improvement";
 const TELEMETRY_DIR_NAME = "work-runs";
 const HISTORY_DIR_NAME = "history";
 const PENDING_DIRECT_FILE = "pending-direct.jsonl";
@@ -318,7 +316,6 @@ let workGoalRecovery = null;
 let workGoalCompactionResume = null;
 let workGoalProgressTimer = null;
 let workGoalUsageLimitTimer = null;
-const activeImprovementRuns = new Map();
 let workExtensionPi;
 
 function clearWorkGoalUsageLimitTimer() {
@@ -356,6 +353,36 @@ Use one initial review cycle, batch its actionable fixes, and run at most one ta
 
 ## Verification budget
 During iteration, run only the smallest focused test that covers the changed behavior. Select it from the feature or nearby test names; a monolithic implementation file does not make every test relevant. Run the full package or regression suite once, at the final handoff, only when the acceptance contract requires it or the change is genuinely cross-cutting. Reuse valid full-suite evidence unless production or package-surface files changed afterward. Reviewers and fixers must not rerun an expensive gate when supplied evidence is adequate.`;
+
+const IMPROVEMENT_REPORT_TOOL_SCHEMA = {
+	type: "object",
+	properties: {
+		observation: {
+			type: "string",
+			description: "What workflow problem was observed",
+		},
+		expectedBehavior: {
+			type: "string",
+			description: "What should have happened instead",
+		},
+		impact: {
+			type: "string",
+			description: "Why this problem matters",
+		},
+		logs: {
+			type: "array",
+			items: { type: "string" },
+			description: "At least one current-project or Pi runtime log path",
+		},
+		suggestedImprovement: {
+			type: "string",
+			description: "Optional non-authoritative fix suggestion",
+		},
+	},
+	required: ["observation", "expectedBehavior", "impact", "logs"],
+	additionalProperties: false,
+};
+
 const WORK_GOAL_TOOL_SCHEMA = {
 	type: "object",
 	properties: {
@@ -427,6 +454,16 @@ function writeSettings(cwd, settings) {
 	const dir = join(cwd, CONFIG_DIR_NAME);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(settingsPath(cwd), `${JSON.stringify(settings, null, "\t")}\n`);
+	syncImprovementReportTool(workExtensionPi, { cwd });
+}
+
+function syncImprovementReportTool(pi, ctx) {
+	if (!pi?.getActiveTools || !pi?.setActiveTools || !ctx?.cwd) return;
+	const active = new Set(Array.from(pi.getActiveTools() ?? []));
+	if (workResumeSettings(ctx.cwd).selfImproving)
+		active.add(IMPROVEMENT_REPORT_TOOL);
+	else active.delete(IMPROVEMENT_REPORT_TOOL);
+	pi.setActiveTools([...active]);
 }
 
 function readScopedSettings(cwd, scope) {
@@ -840,42 +877,14 @@ function workflowClaimPath(cwd, workflowRunId) {
 	return join(telemetryDir(cwd), "claims", `${key}.complete`);
 }
 
-function recordImprovementError(cwd, terminal, reason, error) {
-	try {
-		recordWorkTelemetry(cwd, {
-			type: "improvement-status",
-			workflowRunId: terminal?.workflowRunId,
-			activity: "improvement",
-			ok: false,
-			reason,
-			error: error ? truncate(error?.message ?? error, 300) : undefined,
-		});
-	} catch {}
-}
-
-function processTerminalAttached(cwd, terminal, runtime) {
-	return Promise.resolve(processTerminalWorkflow(cwd, terminal, runtime)).catch(
-		(error) => {
-			recordImprovementError(
-				cwd,
-				terminal,
-				"terminal-processing-failed",
-				error,
-			);
-			return { status: "deferred", reason: "terminal-processing-failed" };
-		},
-	);
-}
-
-function completeWorkflowOnce(cwd, completion, runtime = {}) {
+function completeWorkflowOnce(cwd, completion) {
 	if (!cwd || !completion?.workflowRunId) return "";
 	const claim = workflowClaimPath(cwd, completion.workflowRunId);
 	mkdirSync(dirname(claim), { recursive: true });
 	let descriptor;
-	let terminal = completion;
 	try {
 		descriptor = openSync(claim, "wx");
-		terminal = {
+		const terminal = {
 			version: 1,
 			id: telemetryId("workflow-complete"),
 			timestamp: new Date().toISOString(),
@@ -886,215 +895,16 @@ function completeWorkflowOnce(cwd, completion, runtime = {}) {
 		writeSync(descriptor, `${JSON.stringify(terminal)}\n`);
 	} catch (error) {
 		if (error?.code !== "EEXIST") throw error;
-		try {
-			terminal = JSON.parse(readFileSync(claim, "utf8").trim());
-		} catch (readError) {
-			recordImprovementError(
-				cwd,
-				completion,
-				"terminal-claim-read-failed",
-				readError,
-			);
-			return "";
-		}
 	} finally {
 		if (descriptor !== undefined) closeSync(descriptor);
 	}
-	void processTerminalAttached(cwd, terminal, runtime);
 	return claim;
 }
 
-export async function recoverTerminalWorkflowClaims(cwd, runtime = {}) {
-	const claims = join(telemetryDir(cwd), "claims");
-	if (!existsSync(claims)) return [];
-	const recovered = [];
-	for (const name of readdirSync(claims).filter((item) =>
-		item.endsWith(".complete"),
-	)) {
-		let terminal;
-		try {
-			terminal = JSON.parse(readFileSync(join(claims, name), "utf8").trim());
-		} catch (error) {
-			recordImprovementError(cwd, {}, "startup-claim-read-failed", error);
-			continue;
-		}
-		try {
-			const result = await processTerminalWorkflow(cwd, terminal, runtime);
-			if (result.status !== "already-analyzed")
-				recovered.push(terminal.workflowRunId);
-		} catch (error) {
-			recordImprovementError(cwd, terminal, "startup-analysis-failed", error);
-		}
-	}
-	return recovered;
-}
-
-function improvementStateCwd(cwd) {
-	const settings = readEffectiveSettings(cwd);
-	const configured = settings.workImprovement?.sourceCheckout;
-	return resolve(
-		cwd,
-		typeof configured === "string" && configured.trim()
-			? configured
-			: process.env.CE_WORKFLOW_SOURCE_DIR || WORKFLOW_REPO_DIR,
-	);
-}
-
 function improvementStatus(cwd) {
-	if (!workResumeSettings(cwd).selfImproving)
-		return { enabled: false, state: "off", candidates: 0 };
-	try {
-		const state = readCandidateState(improvementStateCwd(cwd));
-		const candidates = [...state.candidates.values()];
-		const current = candidates.sort((a, b) =>
-			String(b.updatedAt).localeCompare(String(a.updatedAt)),
-		)[0];
-		return {
-			enabled: true,
-			state: current?.state ?? "observing",
-			candidates: candidates.length,
-			candidateId: current?.candidateId?.slice(0, 16),
-			evidenceCount: current?.evidenceCount ?? 0,
-			attemptId: current?.attemptId?.slice(0, 40),
-			manualRecoveryReason:
-				current?.state === "manual-recovery"
-					? current.blockerSignature
-					: undefined,
-			benchmarkMeasurements: current?.benchmarkMeasurements,
-			resultMeasurements: current?.resultMeasurements,
-		};
-	} catch {
-		return { enabled: true, state: "status-unavailable", candidates: 0 };
-	}
-}
-
-/** Analyze one terminal run in code and queue at most one autonomous attempt. */
-export async function processTerminalWorkflow(cwd, terminal, runtime = {}) {
-	if (!workResumeSettings(cwd).selfImproving) return { status: "disabled" };
-	// Output-only modes must not even resolve the source because resolution can be injected or stateful.
-	if (runtime.mode === "print" || runtime.json === true)
-		return { status: "suppressed", reason: "output-only-mode" };
-	const runner = await import(
-		pathToFileURL(
-			join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs"),
-		).href
-	);
-	const settings = readEffectiveSettings(cwd);
-	const resolved = runner.resolveSourceCheckout({
-		settings,
-		packageRoot: WORKFLOW_REPO_DIR,
-		baseCwd: cwd,
-		runGit: runtime.improvementSeams?.runGit,
-	});
-	if (!resolved.ok) {
-		recordImprovementError(cwd, terminal, truncate(resolved.reason, 120));
-		return { status: "deferred", reason: resolved.reason };
-	}
-	const sourceCwd = resolved.sourceCwd;
-	const events = readTelemetryEvents(cwd).filter(
-		(event) => event.workflowRunId === terminal.workflowRunId,
-	);
-	const analysis = analyzeWorkflow({
-		sourceCwd,
-		workflowRunId: terminal.workflowRunId,
-		terminal: { ...terminal, type: "workflow-complete" },
-		events,
-		extensionRevision: extensionRevision(),
-	});
-	let candidate = null;
-	if (analysis.status !== "excluded") {
-		const blockerSignatures = {};
-		for (const item of readCandidateState(sourceCwd).candidates.values())
-			if (item.state === "deferred")
-				blockerSignatures[item.candidateId] = runner.currentAutonomousBlocker(
-					{ consumerCwd: cwd, settings, packageRoot: WORKFLOW_REPO_DIR },
-					runtime.improvementSeams,
-				);
-		candidate = selectCandidate(sourceCwd, { blockerSignatures });
-	}
-	if (!candidate || runtime.allowLaunch === false)
-		return { status: analysis.status, candidate: candidate?.candidateId };
-	if (activeImprovementRuns.has(sourceCwd))
-		return {
-			status: analysis.status,
-			candidate: candidate.candidateId,
-			queued: false,
-		};
-	const controller = new AbortController();
-	const dispatchAgent = (payload) =>
-		dispatchWorkflowImprovementAgent(runtime.pi, {
-			...payload,
-			signal: controller.signal,
-		});
-	const runPackageVerify = async ({ cwd: verifyCwd }) => {
-		try {
-			execFileSync(
-				process.execPath,
-				["scripts/verify-package.mjs", "--quiet"],
-				{ cwd: verifyCwd, stdio: "pipe", timeout: 2 * 60 * 1000 },
-			);
-			return { passed: true };
-		} catch (error) {
-			return {
-				passed: false,
-				output: truncate(error?.message ?? error, 300),
-			};
-		}
-	};
-	const runBenchmarkGate = (request) =>
-		runner.runAutonomousImprovementBenchmark(
-			sourceCwd,
-			{ ...request, signal: controller.signal },
-			dispatchAgent,
-		);
-	const run = (async () => {
-		return runner.runAutonomousImprovement(
-			{
-				consumerCwd: cwd,
-				candidate,
-				settings,
-				packageRoot: WORKFLOW_REPO_DIR,
-				session: runtime.session,
-			},
-			{
-				dispatchAgent,
-				runPackageVerify,
-				runBenchmarkGate,
-				onReleaseError: (error) =>
-					recordImprovementError(
-						cwd,
-						terminal,
-						"lease-release-failed",
-						error.reason,
-					),
-				...runtime.improvementSeams,
-			},
-		);
-	})();
-	activeImprovementRuns.set(sourceCwd, {
-		controller,
-		promise: run,
-		cwd,
-		terminal,
-	});
-	run
-		.catch((error) =>
-			recordImprovementError(cwd, terminal, "autonomous-run-failed", error),
-		)
-		.finally(() => activeImprovementRuns.delete(sourceCwd));
-	return {
-		status: analysis.status,
-		candidate: candidate.candidateId,
-		queued: true,
-	};
-}
-
-function extensionRevision() {
-	try {
-		return `package-${JSON.parse(readFileSync(join(WORKFLOW_REPO_DIR, "package.json"), "utf8")).version ?? "unknown"}`;
-	} catch {
-		return "installed";
-	}
+	return workResumeSettings(cwd).selfImproving
+		? { enabled: true, state: "explicit reporting" }
+		: { enabled: false, state: "off" };
 }
 
 function pendingDirectPath(cwd) {
@@ -1703,40 +1513,7 @@ function notify(ctx, message, level = "info") {
 	if (ctx.mode === "print" || ctx.hasUI === false) console.log(message);
 }
 
-async function confirmDirtySelfImprovementSource(ctx) {
-	if (
-		!workResumeSettings(ctx.cwd).selfImproving ||
-		ctx.mode === "print" ||
-		ctx.mode === "json" ||
-		ctx.hasUI === false ||
-		typeof ctx.ui?.confirm !== "function"
-	)
-		return true;
-	const sourceCwd = improvementStateCwd(ctx.cwd);
-	const status = safeRun(sourceCwd, "git", [
-		"status",
-		"--porcelain=v1",
-		"--untracked-files=all",
-	]).trim();
-	if (!status) return true;
-	const files = status.split(/\r?\n/);
-	const shown = files
-		.slice(0, 8)
-		.map((line) => line.slice(3))
-		.join("\n");
-	const remaining = files.length > 8 ? `\n…and ${files.length - 8} more` : "";
-	return ctx.ui.confirm(
-		"Self-improvement is blocked",
-		`${sourceCwd} has uncommitted changes, so autonomous optimization will be deferred.\n\n${shown}${remaining}\n\nContinue this workflow without autonomous optimization?`,
-	);
-}
-
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
-	if (
-		!commandWorkflowStorage.getStore() &&
-		!(await confirmDirtySelfImprovementSource(ctx))
-	)
-		return;
 	const workflow = {
 		workflowRunId: telemetryId("workflow"),
 		activity:
@@ -2089,7 +1866,7 @@ function renderWorkTelemetryText(state) {
 		`Tools: ${state.totals.toolCalls} calls, ${state.totals.subagentRuns} subagent runs, ${state.totals.testRuns} test runs, ${state.totals.toolOutputChars} tool-output chars • messages: ${state.totals.messageChars} chars`,
 		`Handoffs: ${state.totals.handoffsQueued} queued, ${state.totals.handoffsStarted} started`,
 		`Max recorded context: ${state.maxContextTokens || "unknown"} tokens`,
-		`Self-improvement: ${state.improvement.state} • candidates ${state.improvement.candidates} • evidence ${state.improvement.evidenceCount ?? 0}${state.improvement.candidateId ? ` • current ${state.improvement.candidateId}` : ""}${state.improvement.attemptId ? ` • attempt ${state.improvement.attemptId}` : ""}${state.improvement.manualRecoveryReason ? ` • manual ${state.improvement.manualRecoveryReason}` : ""}${state.improvement.benchmarkMeasurements ? ` • benchmark ${truncate(JSON.stringify(state.improvement.benchmarkMeasurements), 180)}` : ""}${state.improvement.resultMeasurements ? ` • result ${truncate(JSON.stringify(state.improvement.resultMeasurements), 180)}` : ""}`,
+		`Self-improvement: ${state.improvement.state}${state.improvement.enabled ? " • use work_report_improvement for explicit evidence intake" : ""}`,
 		"",
 		"Stop reasons:",
 		...(state.stopReasons.length
@@ -2430,7 +2207,7 @@ body{font-family:ui-sans-serif,system-ui,sans-serif;margin:2rem;color:#111827;ba
 </style>
 <h1>Work usage</h1>
 <p class="muted">Scope: <strong>${escapeHtml(state.filter.scope)} ${escapeHtml(state.filter.value)}</strong></p>
-<div class="cards"><div class="card"><b>${state.summary.events}</b><span>events</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.durationMs))}</b><span>time</span></div><div class="card"><b>${escapeHtml(state.summary.tokens || "unknown")}</b><span>tokens</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.subagents))}</b><span>subagents</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.tools))}</b><span>tools</span></div><div class="card"><b>${escapeHtml(state.summary.improvement.state)}</b><span>self-improvement (${state.summary.improvement.candidates} candidates)${state.summary.improvement.attemptId ? ` · attempt ${escapeHtml(state.summary.improvement.attemptId)}` : ""}${state.summary.improvement.manualRecoveryReason ? ` · manual ${escapeHtml(state.summary.improvement.manualRecoveryReason)}` : ""}${state.summary.improvement.benchmarkMeasurements ? ` · benchmark ${escapeHtml(truncate(JSON.stringify(state.summary.improvement.benchmarkMeasurements), 180))}` : ""}${state.summary.improvement.resultMeasurements ? ` · result ${escapeHtml(truncate(JSON.stringify(state.summary.improvement.resultMeasurements), 180))}` : ""}</span></div></div>
+<div class="cards"><div class="card"><b>${state.summary.events}</b><span>events</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.durationMs))}</b><span>time</span></div><div class="card"><b>${escapeHtml(state.summary.tokens || "unknown")}</b><span>tokens</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.subagents))}</b><span>subagents</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.tools))}</b><span>tools</span></div><div class="card"><b>${escapeHtml(state.summary.improvement.state)}</b><span>self-improvement${state.summary.improvement.enabled ? " · explicit reporting available" : ""}</span></div></div>
 <p class="muted">Missing data: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}. Generated from ${state.files.length ? state.files.map(escapeHtml).join(", ") : escapeHtml(state.dir)}.</p>
 ${usageSubagentSummaryHtml(state.summary)}
 <input id="filter" placeholder="filter rows" aria-label="filter rows">
@@ -4014,10 +3791,6 @@ function normalReadGate(cwd) {
 			message: error.message,
 		};
 	}
-}
-
-function one(value) {
-	return Array.isArray(value) ? value[0] : value;
 }
 
 function field(issue, ...names) {
@@ -5709,177 +5482,6 @@ async function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
 			});
 		}
 	});
-}
-
-const WORKFLOW_AGENT_OUTPUT_BYTES = 64 * 1024;
-const WORKFLOW_AGENT_STATUS_BYTES = 64 * 1024;
-const WORKFLOW_AGENT_POLL_MS = 100;
-
-function readContainedFile(file, directory, maxBytes) {
-	let descriptor;
-	try {
-		const requestedRoot = resolve(directory);
-		const rel = relative(requestedRoot, resolve(file));
-		if (!rel || dirname(rel) !== "." || isAbsolute(rel)) return null;
-		const target = join(realpathSync(directory), rel);
-		const pathInfo = lstatSync(target);
-		if (
-			!pathInfo.isFile() ||
-			pathInfo.isSymbolicLink() ||
-			pathInfo.size > maxBytes
-		)
-			return null;
-		descriptor = openSync(
-			target,
-			fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
-		);
-		const info = fstatSync(descriptor);
-		if (
-			!info.isFile() ||
-			info.size > maxBytes ||
-			info.dev !== pathInfo.dev ||
-			info.ino !== pathInfo.ino
-		)
-			return null;
-		const buffer = Buffer.alloc(info.size);
-		let offset = 0;
-		while (offset < buffer.length) {
-			const count = readSync(
-				descriptor,
-				buffer,
-				offset,
-				buffer.length - offset,
-				null,
-			);
-			if (count === 0) break;
-			offset += count;
-		}
-		return { path: target, text: buffer.subarray(0, offset).toString("utf8") };
-	} catch {
-		return null;
-	} finally {
-		if (descriptor !== undefined) closeSync(descriptor);
-	}
-}
-
-function asyncRunIdentity(response) {
-	const data = response.reply?.data ?? {};
-	const result = data.result ?? data;
-	const details = result.details ?? {};
-	return {
-		runId: data.runId ?? result.runId ?? result.id ?? details.runId,
-		asyncDir: data.asyncDir ?? result.asyncDir ?? details.asyncDir,
-		artifact:
-			result.artifactPaths?.outputPath ??
-			result.artifact ??
-			result.outputPath ??
-			data.outputPath,
-	};
-}
-
-/** Spawn a real asynchronous pi-subagents run, wait for terminal status, then read its bounded artifact. */
-export async function dispatchWorkflowImprovementAgent(
-	pi,
-	params,
-	timeoutMs = 30 * 60 * 1000,
-) {
-	const { signal, ...rpcParams } = params;
-	if (signal?.aborted)
-		return { ok: false, aborted: true, message: "agent dispatch aborted" };
-	if (!isAbsolute(rpcParams.artifactDir ?? ""))
-		return { ok: false, message: "absolute artifactDir is required" };
-	mkdirSync(rpcParams.artifactDir, { recursive: true });
-	const artifactPath = resolve(
-		rpcParams.artifactDir,
-		`workflow-${safeArtifactPart(rpcParams.candidateId)}-${safeArtifactPart(rpcParams.attemptId)}-${safeArtifactPart(rpcParams.agent)}.md`,
-	);
-	const started = Date.now();
-	const response = await spawnSubagentRpc(
-		pi,
-		{
-			...rpcParams,
-			artifactDir: undefined,
-			context: "fresh",
-			async: true,
-			clarify: false,
-			acceptance: false,
-			output: artifactPath,
-			outputMode: "file-only",
-		},
-		Math.min(timeoutMs, 30_000),
-	);
-	if (!response.ok)
-		return { ...response, timedOut: Boolean(response.ambiguous) };
-	const identity = asyncRunIdentity(response);
-	if (!identity.runId || !isAbsolute(identity.asyncDir ?? ""))
-		return {
-			ok: false,
-			message: "pi-subagents returned no async run identity",
-			...identity,
-		};
-	for (;;) {
-		if (signal?.aborted)
-			return {
-				ok: false,
-				aborted: true,
-				message: "agent dispatch aborted",
-				...identity,
-			};
-		if (Date.now() - started >= timeoutMs)
-			return {
-				ok: false,
-				timedOut: true,
-				message: "agent run timed out",
-				...identity,
-			};
-		const statusPath = join(identity.asyncDir, "status.json");
-		let status;
-		try {
-			const statusFile = readContainedFile(
-				statusPath,
-				identity.asyncDir,
-				WORKFLOW_AGENT_STATUS_BYTES,
-			);
-			if (statusFile) status = JSON.parse(statusFile.text);
-		} catch {}
-		const state = String(status?.state ?? status?.status ?? "").toLowerCase();
-		if (state === "failed")
-			return { ok: false, message: "agent run failed", status, ...identity };
-		if (state === "complete" || state === "completed") {
-			const reported = identity.artifact ?? artifactPath;
-			const safeArtifact = readContainedFile(
-				reported,
-				rpcParams.artifactDir,
-				WORKFLOW_AGENT_OUTPUT_BYTES,
-			);
-			if (!safeArtifact)
-				return {
-					ok: false,
-					message: "unsafe or missing agent artifact",
-					status,
-					...identity,
-				};
-			return {
-				ok: true,
-				response,
-				status,
-				...identity,
-				artifact: safeArtifact.path,
-				output: safeArtifact.text,
-			};
-		}
-		await new Promise((resolvePoll) => {
-			const timer = setTimeout(resolvePoll, WORKFLOW_AGENT_POLL_MS);
-			signal?.addEventListener(
-				"abort",
-				() => {
-					clearTimeout(timer);
-					resolvePoll();
-				},
-				{ once: true },
-			);
-		});
-	}
 }
 
 function workflowHelperGuidance(cwd, state) {
@@ -8745,14 +8347,14 @@ function normalizedPathSet(paths = []) {
 	return new Set(paths.map(normalizedRepoPath));
 }
 
+function isWorkStorePath(file) {
+	return normalizedRepoPath(file).startsWith(".ce-workflow/");
+}
+
 function samePathSet(left = [], right = []) {
 	const a = normalizedPathSet(left);
 	const b = normalizedPathSet(right);
 	return a.size === b.size && [...a].every((item) => b.has(item));
-}
-
-function isWorkStorePath(file) {
-	return normalizedRepoPath(file).startsWith(".ce-workflow/");
 }
 
 function ensureOnlyStaged(cwd, files) {
@@ -9440,10 +9042,10 @@ function parseWorkGoalCommand(args = "") {
 function workGoalSelfImprovingAppendix() {
 	return `Self-improving overlay:
 - Use the ce-workflow/work-orchestrator process where it applies; prefer /work-init, /work-plan, /work-resume, /work-status, /work-report, and native work-item store-backed state over chat-only tracking.
-- If a live or disposable target project exposes ce-workflow friction, fix this ce-workflow package in code before declaring done, or record one concrete follow-up when a safe fix is not possible now.
+- If a live or disposable target project exposes ce-workflow friction, call work_report_improvement with the observation, expected behavior, impact, and local logs; do not modify the ce-workflow source from the producer project.
 - Prefer coded automation over prompt-only guidance when workflow behavior can be handled in this extension.
 - Use work telemetry and /work-context microcompaction to keep loops cheap, quiet, and resumable.
-- Finish only after target-project progress and ce-workflow improvements are verified.`;
+- Finish after target-project progress is verified and any discovered ce-workflow issue is reported.`;
 }
 
 function workResumeSettings(cwd, settings = readEffectiveSettings(cwd)) {
@@ -11528,6 +11130,61 @@ export default function workModelsExtension(pi) {
 
 	if (typeof pi.registerTool === "function") {
 		pi.registerTool({
+			name: IMPROVEMENT_REPORT_TOOL,
+			label: "Report workflow improvement",
+			description:
+				"Explicitly record a ce-workflow problem with local evidence for later maintainer review.",
+			promptSnippet:
+				"Report a concrete ce-workflow problem only when self-improving reporting is enabled",
+			promptGuidelines: [
+				"Use work_report_improvement only for a concrete workflow problem with at least one local log.",
+				"work_report_improvement reports evidence; it never changes, benchmarks, commits, or pushes the ce-workflow source checkout.",
+			],
+			parameters: IMPROVEMENT_REPORT_TOOL_SCHEMA,
+			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+				const cwd = ctx?.cwd ?? process.cwd();
+				if (!workResumeSettings(cwd).selfImproving)
+					throw new Error("Workflow improvement reporting is disabled for this project.");
+				const workflow = currentCommandWorkflow();
+				const sessionId = ctx?.sessionManager?.getSessionId?.();
+				const sessionFile = ctx?.sessionManager?.getSessionFile?.();
+				try {
+					const result = await submitImprovementReport({
+						cwd,
+						packageRoot: WORKFLOW_REPO_DIR,
+						settings: readEffectiveSettings(cwd),
+						withFileMutationQueue,
+						approvedRoots: sessionFile ? [dirname(sessionFile)] : [],
+						report: {
+							...params,
+							producer: basename(cwd),
+							workflowId: workflow?.workflowRunId ?? sessionId,
+						},
+					});
+					const details = {
+						taskId: result.taskId,
+						epicId: result.epicId,
+						bundle: truncate(result.bundle, 240),
+						source: result.source,
+					};
+					return {
+						content: [
+							{
+								type: "text",
+								text: `Workflow improvement report recorded: task ${details.taskId}, epic ${details.epicId}, bundle ${details.bundle}.`,
+							},
+						],
+						details,
+					};
+				} catch (error) {
+					throw new Error(
+						`Could not record workflow improvement report: ${truncate(error instanceof Error ? error.message : String(error), 300)}`,
+					);
+				}
+			},
+		});
+
+		pi.registerTool({
 			name: "work_goal_complete",
 			label: "Work Goal Complete",
 			description:
@@ -11599,6 +11256,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_start", (_event, ctx) => {
+		syncImprovementReportTool(pi, ctx);
 		const runtime = {
 			pi,
 			mode: ctx.mode,
@@ -11627,63 +11285,6 @@ export default function workModelsExtension(pi) {
 		ctx.ui.notify("work-orchestrator loaded · F7 roadmaps · F8 menu", "info");
 		resetWarpTitle(ctx);
 		startWorkGoalProgressTimer(ctx);
-		if (workResumeSettings(ctx.cwd).selfImproving && ctx.mode !== "print")
-			void (async () => {
-				await recoverTerminalWorkflowClaims(ctx.cwd, runtime);
-				const runner = await import(
-					pathToFileURL(
-						join(WORKFLOW_REPO_DIR, "scripts", "work-improvement-runner.mjs"),
-					).href
-				);
-				const settings = readEffectiveSettings(ctx.cwd);
-				const resolved = runner.resolveSourceCheckout({
-					settings,
-					packageRoot: WORKFLOW_REPO_DIR,
-					baseCwd: ctx.cwd,
-				});
-				if (!resolved.ok) {
-					recordImprovementError(ctx.cwd, {}, resolved.reason);
-					return;
-				}
-				await runner.reconcileAutonomousImprovement(
-					resolved.sourceCwd,
-					{ session: runtime.session },
-					{
-						dispatchAgent: (payload) =>
-							dispatchWorkflowImprovementAgent(pi, payload),
-						runPackageVerify: async ({ cwd }) => {
-							try {
-								execFileSync(
-									process.execPath,
-									["scripts/verify-package.mjs", "--quiet"],
-									{ cwd, stdio: "pipe", timeout: 2 * 60 * 1000 },
-								);
-								return { passed: true };
-							} catch (error) {
-								return {
-									passed: false,
-									output: truncate(error?.message ?? error, 300),
-								};
-							}
-						},
-						runBenchmarkGate: (request) =>
-							runner.runAutonomousImprovementBenchmark(
-								resolved.sourceCwd,
-								request,
-								(payload) => dispatchWorkflowImprovementAgent(pi, payload),
-							),
-						onReleaseError: (error) =>
-							recordImprovementError(
-								ctx.cwd,
-								{},
-								"startup-lease-release-failed",
-								error.reason,
-							),
-					},
-				);
-			})().catch((error) =>
-				recordImprovementError(ctx.cwd, {}, "startup-recovery-failed", error),
-			);
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
@@ -11691,23 +11292,6 @@ export default function workModelsExtension(pi) {
 		clearWorkGoalUsageLimitTimer();
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 		stopWorkGoalProgressTimer(ctx);
-		const active = [...activeImprovementRuns.values()].filter(
-			(run) => run.cwd === ctx.cwd,
-		);
-		for (const run of active)
-			run.controller.abort(new Error("session shutdown"));
-		if (active.length) {
-			let timer;
-			const settled = await Promise.race([
-				Promise.allSettled(active.map((run) => run.promise)).then(() => true),
-				new Promise((resolveWait) => {
-					timer = setTimeout(() => resolveWait(false), 2_000);
-				}),
-			]);
-			clearTimeout(timer);
-			if (!settled)
-				recordImprovementError(ctx.cwd, {}, "shutdown-cleanup-deferred");
-		}
 	});
 
 	pi.on("input", async (event, ctx) => {
@@ -12462,7 +12046,7 @@ function workSettingsStatus(ctx) {
 		`  ${SUBMENU_ARROW} slice execution: ${resolved.sliceExecutionMode}`,
 		"",
 		"Resume automation",
-		`  ${onOff(resume.selfImproving)} self-improving workflow fixes (autonomous source delivery)`,
+		`  ${onOff(resume.selfImproving)} self-improving workflow reporting (explicit evidence intake)`,
 		`  source: ${settings.workImprovement?.sourceCheckout ?? process.env.CE_WORKFLOW_SOURCE_DIR ?? "package checkout fallback"}`,
 		`  ${onOff(resume.newSessionBetweenIterations)} new session between iterations`,
 	];
@@ -12738,7 +12322,7 @@ async function workSettingsLoop(ctx) {
 			{
 				kind: "resumeBool",
 				value: "selfImproving",
-				...boolLabel("self-improving workflow fixes", resume.selfImproving),
+				...boolLabel("self-improving workflow reporting", resume.selfImproving),
 			},
 			{
 				kind: "resumeBool",
