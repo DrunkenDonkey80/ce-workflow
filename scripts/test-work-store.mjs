@@ -10,6 +10,7 @@ import {
 	addWorkEvidence,
 	appendWorkNote,
 	createWorkItem,
+	deleteWorkItem,
 	initStore,
 	loadStore,
 	mutateStore,
@@ -17,6 +18,7 @@ import {
 	saveStore,
 	storePath,
 	updateWorkItem,
+	validateStore,
 } from "../extensions/work-store.js";
 
 const dirs = [];
@@ -33,6 +35,64 @@ function throwsCategory(fn, category) {
 }
 function item(store, input) {
 	return createWorkItem(store, { now: "2026-07-15T00:00:00.000Z", ...input });
+}
+function initiativeMetadata(childId = "initiative-1.1") {
+	return {
+		schemaVersion: 1,
+		sources: [
+			{
+				id: "brainstorm-1",
+				path: "docs/brainstorms/initiative.md",
+				hash: "source-hash",
+			},
+		],
+		coverage: [
+			{
+				id: "outcome-1",
+				provenance: "brainstorm-1:R1",
+				contentHash: "outcome-hash",
+				disposition: "accepted",
+				epicId: childId,
+			},
+		],
+		evidence: [],
+	};
+}
+function initiativeStore() {
+	const store = initStore(repo(), { now: "2026-07-15T00:00:00.000Z" });
+	const template = (id, title, extra = {}) => ({
+		id,
+		type: "epic",
+		status: "open",
+		title,
+		createdAt: "2026-07-15T00:00:00.000Z",
+		updatedAt: "2026-07-15T00:00:00.000Z",
+		dependencies: [],
+		labels: [],
+		notes: [],
+		evidence: [],
+		dependencyEdges: [],
+		...extra,
+	});
+	store.items = {
+		"standalone-1": template("standalone-1", "Standalone"),
+		"initiative-1": template("initiative-1", "Initiative", {
+			labels: ["initiative"],
+			initiative: initiativeMetadata(),
+			custom: { preserved: true },
+		}),
+		"initiative-1.1": template("initiative-1.1", "Child", {
+			parentId: "initiative-1",
+			documentLinks: [{ path: "docs/plans/child.md" }],
+		}),
+		"initiative-1.1.1": {
+			...template("initiative-1.1.1", "Task", {
+				parentId: "initiative-1.1",
+			}),
+			type: "task",
+		},
+	};
+	return store;
 }
 
 try {
@@ -83,6 +143,83 @@ try {
 	assert.deepEqual(loadStore(typedDir).items["project-1.1"].evidence, [
 		{ verification: "PASS" },
 	]);
+
+	// Initiative metadata and complete hierarchy validation preserve old stores.
+	const hierarchyDir = repo();
+	const hierarchy = initiativeStore();
+	validateStore(hierarchy);
+	saveStore(hierarchyDir, hierarchy);
+	const hierarchyBytes = readFileSync(storePath(hierarchyDir), "utf8");
+	assert.equal(loadStore(hierarchyDir).items["initiative-1"].custom.preserved, true);
+	assert.deepEqual(
+		loadStore(hierarchyDir).items["initiative-1.1"].documentLinks,
+		[{ path: "docs/plans/child.md" }],
+	);
+	assert.equal(saveStore(hierarchyDir, loadStore(hierarchyDir), { dryRun: true }), hierarchyBytes);
+
+	const invalidHierarchy = (change) => {
+		const candidate = structuredClone(hierarchy);
+		change(candidate);
+		throwsCategory(() => validateStore(candidate), "corrupt");
+	};
+	invalidHierarchy((store) => {
+		store.items["initiative-1.1"].type = "task";
+	});
+	invalidHierarchy((store) => {
+		store.items["initiative-1.1"].labels = ["initiative"];
+		store.items["initiative-1.1"].initiative = initiativeMetadata(
+			"initiative-1.1.1",
+		);
+	});
+	invalidHierarchy((store) => {
+		store.items["initiative-1"].initiative = { schemaVersion: 1 };
+	});
+	invalidHierarchy((store) => {
+		store.items["initiative-1"].initiative.coverage.push({
+			...store.items["initiative-1"].initiative.coverage[0],
+			id: "outcome-2",
+		});
+	});
+	invalidHierarchy((store) => {
+		store.items["initiative-1"].initiative.coverage[0].epicId = "missing";
+	});
+	invalidHierarchy((store) => {
+		store.items["initiative-1"].parentId = "initiative-1.1";
+	});
+	invalidHierarchy((store) => {
+		delete store.items["initiative-1"].initiative;
+	});
+
+	assert.throws(
+		() => updateWorkItem(hierarchy, "initiative-1.1", { parentId: undefined }),
+		(error) => error.category === "corrupt",
+	);
+	assert.throws(
+		() => deleteWorkItem(hierarchy, "initiative-1.1"),
+		(error) => error.category === "corrupt",
+	);
+	const promoted = initiativeStore();
+	const protectedChild = structuredClone(promoted.items["initiative-1.1"]);
+	assert.equal(protectedChild.id, "initiative-1.1");
+	assert.deepEqual(protectedChild.documentLinks, [{ path: "docs/plans/child.md" }]);
+
+	const corruptDir = repo();
+	const corruptStore = initStore(corruptDir);
+	item(corruptStore, { id: "cycle-a", type: "epic", title: "A" });
+	item(corruptStore, { id: "cycle-b", type: "epic", title: "B" });
+	corruptStore.items["cycle-a"].parentId = "cycle-b";
+	corruptStore.items["cycle-b"].parentId = "cycle-a";
+	const corruptBytes = `${JSON.stringify(corruptStore, null, "\t")}\n`;
+	writeFileSync(storePath(corruptDir), corruptBytes);
+	assert.throws(
+		() => loadStore(corruptDir),
+		(error) =>
+			error.category === "corrupt" &&
+			/parent cycle/i.test(error.message) &&
+			/repair/i.test(error.repair),
+	);
+	assert.throws(() => mutateStore(corruptDir, () => {}));
+	assert.equal(readFileSync(storePath(corruptDir), "utf8"), corruptBytes);
 
 	// Dependency readiness is ordered and ideas never execute.
 	const graphDir = repo();

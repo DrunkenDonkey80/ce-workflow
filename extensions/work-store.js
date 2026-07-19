@@ -13,6 +13,8 @@ import {
 import path from "node:path";
 
 export const WORK_STORE_VERSION = 1;
+export const INITIATIVE_LABEL = "initiative";
+export const INITIATIVE_SCHEMA_VERSION = 1;
 const TYPES = new Set(["epic", "task", "bug", "decision", "idea"]);
 const STATUSES = new Set([
 	"open",
@@ -291,6 +293,122 @@ function stringArray(value, field, file) {
 	if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string"))
 		throw error("corrupt", `Invalid ${field} in ${file ?? "work store"}`);
 }
+function plainObject(value) {
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+function hierarchyError(message, file, details = {}) {
+	return error("corrupt", `${message} in ${file}`, {
+		repair: "Repair the parent graph or initiative metadata before retrying mutation.",
+		...details,
+	});
+}
+function nonemptyString(value) {
+	return typeof value === "string" && Boolean(value.trim());
+}
+function validateInitiativeMetadata(item, file) {
+	const metadata = item.initiative;
+	if (!plainObject(metadata) || metadata.schemaVersion !== INITIATIVE_SCHEMA_VERSION)
+		throw hierarchyError(`Invalid initiative metadata for ${item.id}`, file);
+	if (!Array.isArray(metadata.sources) || metadata.sources.length === 0)
+		throw hierarchyError(`Initiative ${item.id} has no sources`, file);
+	const sourceIds = new Set();
+	for (const source of metadata.sources) {
+		if (
+			!plainObject(source) ||
+			!nonemptyString(source.id) ||
+			!nonemptyString(source.path) ||
+			source.path.includes("\\") ||
+			!nonemptyString(source.hash) ||
+			sourceIds.has(source.id)
+		)
+			throw hierarchyError(`Invalid initiative source for ${item.id}`, file);
+		sourceIds.add(source.id);
+	}
+	if (!Array.isArray(metadata.coverage) || metadata.coverage.length === 0)
+		throw hierarchyError(`Initiative ${item.id} has no outcome coverage`, file);
+	const ids = new Set();
+	const provenance = new Set();
+	for (const outcome of metadata.coverage) {
+		if (
+			!plainObject(outcome) ||
+			!nonemptyString(outcome.id) ||
+			!nonemptyString(outcome.provenance) ||
+			!nonemptyString(outcome.contentHash) ||
+			!["accepted", "rejected", "non_goal"].includes(outcome.disposition) ||
+			ids.has(outcome.id) ||
+			provenance.has(outcome.provenance)
+		)
+			throw hierarchyError(`Invalid initiative coverage for ${item.id}`, file);
+		if (
+			(outcome.disposition === "accepted") !== nonemptyString(outcome.epicId)
+		)
+			throw hierarchyError(`Invalid outcome mapping for ${outcome.id}`, file);
+		if (outcome.generated !== undefined && !plainObject(outcome.generated))
+			throw hierarchyError(`Invalid generated-field identity for ${outcome.id}`, file);
+		ids.add(outcome.id);
+		provenance.add(outcome.provenance);
+	}
+	if (
+		metadata.evidence !== undefined &&
+		(!Array.isArray(metadata.evidence) ||
+			metadata.evidence.some((entry) => !plainObject(entry)))
+	)
+		throw hierarchyError(`Invalid initiative evidence for ${item.id}`, file);
+	if (metadata.lastConfirmed !== undefined && !plainObject(metadata.lastConfirmed))
+		throw hierarchyError(`Invalid initiative confirmation for ${item.id}`, file);
+	return metadata;
+}
+function validateParentGraph(items, file) {
+	const complete = new Set();
+	for (const id of Object.keys(items)) {
+		const chain = new Set();
+		let cursor = id;
+		while (cursor && !complete.has(cursor)) {
+			if (chain.has(cursor))
+				throw hierarchyError(`Parent cycle detected at ${cursor}`, file, {
+					cycleAt: cursor,
+				});
+			chain.add(cursor);
+			cursor = items[cursor]?.parentId;
+		}
+		for (const entry of chain) complete.add(entry);
+	}
+}
+function validateInitiativeHierarchy(items, file) {
+	for (const item of Object.values(items)) {
+		const labels = item.labels ?? [];
+		const labelCount = labels.filter((label) => label === INITIATIVE_LABEL).length;
+		const hasMetadata = item.initiative !== undefined;
+		if ((labelCount === 1) !== hasMetadata)
+			throw hierarchyError(`Initiative label and metadata disagree for ${item.id}`, file);
+		if (labelCount > 1)
+			throw hierarchyError(`Duplicate initiative label for ${item.id}`, file);
+		if (!hasMetadata) continue;
+		if (item.type !== "epic" || item.parentId)
+			throw hierarchyError(`Initiative ${item.id} must be a top-level epic`, file);
+		const metadata = validateInitiativeMetadata(item, file);
+		const children = Object.values(items).filter(
+			(candidate) => candidate.parentId === item.id,
+		);
+		if (
+			children.some(
+				(child) => child.type !== "epic" || child.initiative !== undefined,
+			)
+		)
+			throw hierarchyError(`Initiative ${item.id} has an invalid direct child`, file);
+		const acceptedEpicIds = new Set(
+			metadata.coverage
+				.filter((outcome) => outcome.disposition === "accepted")
+				.map((outcome) => outcome.epicId),
+		);
+		for (const epicId of acceptedEpicIds)
+			if (!items[epicId] || items[epicId].parentId !== item.id || items[epicId].type !== "epic")
+				throw hierarchyError(`Outcome maps outside initiative ${item.id}: ${epicId}`, file);
+		for (const child of children)
+			if (!acceptedEpicIds.has(child.id))
+				throw hierarchyError(`Initiative child ${child.id} has no outcome coverage`, file);
+	}
+}
 
 export function validateStore(store, file = "work store") {
 	if (!store || typeof store !== "object" || Array.isArray(store))
@@ -377,6 +495,8 @@ export function validateStore(store, file = "work store") {
 			)
 				throw error("corrupt", `Invalid dependency edge for ${item.id} in ${file}`);
 	}
+	validateParentGraph(store.items, file);
+	validateInitiativeHierarchy(store.items, file);
 	return store;
 }
 
@@ -430,6 +550,9 @@ export function createWorkItem(store, input = {}) {
 		...(input.ideaLineage
 			? { ideaLineage: structuredClone(input.ideaLineage) }
 			: {}),
+		...(input.initiative
+			? { initiative: structuredClone(input.initiative) }
+			: {}),
 		...(input.reviewResult !== undefined
 			? { reviewResult: input.reviewResult }
 			: {}),
@@ -462,6 +585,9 @@ export function updateWorkItem(store, id, changes = {}) {
 		...(fields.labels ? { labels: [...fields.labels] } : {}),
 		...(fields.notes ? { notes: [...fields.notes] } : {}),
 		...(fields.evidence ? { evidence: [...fields.evidence] } : {}),
+		...(fields.initiative
+			? { initiative: structuredClone(fields.initiative) }
+			: {}),
 	};
 	validateStore({ ...store, items: { ...store.items, [id]: next } });
 	store.items[id] = next;
@@ -499,6 +625,9 @@ export function deleteWorkItem(store, id) {
 		)
 	)
 		throw error("corrupt", `Cannot delete referenced work item: ${id}`);
+	const items = { ...store.items };
+	delete items[id];
+	validateStore({ ...store, items });
 	delete store.items[id];
 	return store;
 }
