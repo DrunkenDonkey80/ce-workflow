@@ -7,6 +7,7 @@ systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
 defaultContext: fresh
+completionGuard: false
 ---
 
 You are `work-planner`, the planning role for the native work-item work orchestrator.

@@ -9,6 +9,7 @@ const prompt = readFileSync(
 );
 
 for (const requirement of [
+	"completionGuard: false",
 	"implementation units as traceability boundaries, never as the default child shape",
 	"A child may cover parts of several units",
 	"do not mirror them as sequential work items",
