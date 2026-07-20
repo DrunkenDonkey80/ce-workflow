@@ -25,6 +25,7 @@ import {
 } from "node:path";
 import { migrateLegacyBeads } from "./legacy-beads-migration.js";
 import { submitImprovementReport } from "./work-improvement-reporting.js";
+import { projectInitiativeHierarchy } from "./work-initiatives.js";
 import {
 	appendWorkNote,
 	createWorkItem,
@@ -8752,6 +8753,10 @@ function allRoadmaps(cwd) {
 	}
 }
 
+function buildInitiativeProjection(cwd, readinessByEpic = {}) {
+	return projectInitiativeHierarchy(loadNativeWorkStore(cwd), readinessByEpic);
+}
+
 function currentRoadmap(cwd) {
 	const id = readWorkState(cwd).lastEpicId;
 	if (id) {
@@ -11327,6 +11332,7 @@ export {
 	brainstormHandoffPrompt,
 	buildWorkflowIntakeState,
 	buildWorkInitState,
+	buildInitiativeProjection,
 	buildWorkMasterState,
 	buildWorkMedState,
 	buildWorkPlanState,
