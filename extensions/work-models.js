@@ -5869,6 +5869,7 @@ function workflowHelperGuidance(cwd, state) {
 			: "Use compact child/blocker reads: node <helper> work-children-summary <roadmap-id>",
 		`Use bounded scans/checks instead of dumping logs: node ${script} search-summary "<regex>" <paths...>; node ${script} scan-capability "<term>" <paths...>; node ${script} json-assert <file> --required key.path`,
 		`Use native work-item store/git helpers instead of CLI-help spelunking: node ${script} work-note <id> <note-or-note-file>; node ${script} work-block <task-id> --by <blocker-id>; node ${script} ensure-no-staged --allow-work-store`,
+		`Never guess another helper path, invoke a bare helper, or directly edit .ce-workflow/work-items.json. If this exact helper command is unavailable or malformed, return infrastructure BLOCKED without retrying through supervisor coordination.`,
 	];
 }
 

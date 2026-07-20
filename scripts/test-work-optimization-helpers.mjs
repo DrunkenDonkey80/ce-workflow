@@ -266,7 +266,13 @@ try {
 		status: "open",
 		title: "Routine task",
 	});
-	for (const id of ["TASK-2", "TASK-3", "TASK-4", "TASK-ROLLBACK"])
+	for (const id of [
+		"TASK-2",
+		"TASK-3",
+		"TASK-4",
+		"TASK-ROLLBACK",
+		"TASK-SHELL",
+	])
 		createWorkItem(finishStore, {
 			id,
 			type: "task",
@@ -295,10 +301,13 @@ try {
 		stdio: "ignore",
 	});
 	writeFileSync(path.join(finishCwd, "result.js"), "const result='after'\n");
+	const dirtyStore = loadStore(finishCwd);
+	dirtyStore.items["TASK-1"].notes.push("ready to finish");
+	saveStore(finishCwd, dirtyStore);
 	const fakeFormatter = path.join(cwd, "fake-biome.mjs");
 	writeFileSync(
 		fakeFormatter,
-		'#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nfor (const file of process.argv.slice(2)) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
+		'#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst files = process.argv.slice(2);\nif (files.some((file) => file.replaceAll("\\\\", "/").endsWith(".ce-workflow/work-items.json"))) throw new Error("runtime store must not be formatted");\nfor (const file of files) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
 	);
 	writeFileSync(
 		path.join(finishCwd, "AGENTS.md"),
@@ -350,6 +359,31 @@ try {
 			encoding: "utf8",
 		}).trim() === "TASK-1: record result",
 		"finish-task creates the WorkItem commit",
+	);
+
+	writeFileSync(path.join(finishCwd, "shell.js"), "export default true;\n");
+	const shellFinished = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-SHELL",
+				"--max-files",
+				"2",
+				"--message",
+				"honor active shell",
+				"--verify",
+				'WORK_ORCH_TEST_TOKEN=checked node -e "process.stdout.write(process.env.WORK_ORCH_TEST_TOKEN)"',
+				"--expect",
+				"checked",
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		),
+	);
+	assert(
+		shellFinished.verification?.output === "checked",
+		"finish-task verification honors Git Bash environment syntax on Windows",
 	);
 
 	writeFileSync(

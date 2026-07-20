@@ -22,6 +22,7 @@ import {
 import {
 	isGeneratedBuildPath,
 	isRuntimePath,
+	isWorkflowManaged,
 	tidyUntrackedFiles,
 } from "./work-hygiene.mjs";
 
@@ -131,7 +132,7 @@ function formatPendingFiles() {
 	if (!args.includes("--immediate-format")) return [];
 	const files = gitStatusPaths().filter(
 		(file) =>
-			!isRuntimePath(file) &&
+			!isWorkflowManaged(file) &&
 			/\.(?:[cm]?[jt]sx?|jsonc?|css|scss|sass|vue|svelte|html?)$/i.test(file) &&
 			existsSync(file),
 	);
@@ -153,6 +154,25 @@ function formatPendingFiles() {
 	if (!formatter) return [];
 	run(formatter, ["format", "--write", ...files]);
 	return files;
+}
+
+function runVerification(command) {
+	const options = {
+		cwd,
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+	};
+	const shell =
+		process.env.WORK_ORCH_VERIFY_SHELL ||
+		(process.platform === "win32" && process.env.MSYSTEM ? "bash" : "");
+	try {
+		return shell
+			? execFileSync(shell, ["-lc", command], options)
+			: execSync(command, options);
+	} catch (error) {
+		if (error instanceof Error) throw error;
+		throw new Error(String(error));
+	}
 }
 
 function finishTask() {
@@ -199,11 +219,7 @@ function finishTask() {
 			output = "all JSON assertions passed";
 		} else if (verify) {
 			verificationCommand = verify;
-			output = execSync(verify, {
-				cwd,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "pipe"],
-			}).trim();
+			output = runVerification(verify).trim();
 			const expected = option("--expect");
 			if (expected !== undefined && output !== expected)
 				throw new Error(

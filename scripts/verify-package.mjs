@@ -89,11 +89,11 @@ check(
 );
 const reviewer = read("agents/work-reviewer.md");
 check(
-	"reviewer coordination timeouts stay blocked, not failed",
+	"reviewer coordination gaps stay blocked, not failed",
 	reviewer.includes("Outcome: PASS|FAIL|BLOCKED") &&
-		reviewer.includes("do not emit a verdict") &&
-		reviewer.includes("appending `wo:review FAIL`") &&
-		reviewer.includes("not an implementation or review failure"),
+		reviewer.includes("Return `BLOCKED` immediately") &&
+		reviewer.includes("Do not guess or append `wo:review FAIL`") &&
+		reviewer.includes("not an implementation failure"),
 );
 for (const rel of advisorFiles) {
 	const text = read(rel);
@@ -304,6 +304,23 @@ check(
 		) &&
 		read("prompts/work-plan.md").includes("initiative-preview") &&
 		existsSync(path.join(root, "scripts", "test-work-initiative.mjs")),
+);
+const plannerAgent = read("agents/work-planner.md");
+const workerAgent = read("agents/work-worker.md");
+const reviewerAgent = read("agents/work-reviewer.md");
+check(
+	"role agents fail closed on missing native helper paths",
+	[plannerAgent, workerAgent, reviewerAgent].every(
+		(text) =>
+			text.includes("exact absolute `work-helper.mjs` path") &&
+			text.includes("directly edit `.ce-workflow/work-items.json`"),
+	) &&
+		models.includes("Never guess another helper path"),
+);
+check(
+	"reviewers never block on supervisor coordination",
+	!reviewerAgent.match(/^tools:.*contact_supervisor/m) &&
+		reviewerAgent.includes("Reviewers do not open blocking supervisor requests"),
 );
 check(
 	"migration command remains explicit",

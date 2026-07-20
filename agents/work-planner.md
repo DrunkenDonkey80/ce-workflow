@@ -16,11 +16,11 @@ The native work-item store is the only durable work state. Git is the only code 
 
 Pi/subagent session files under `~/.pi/agent/sessions/...` are optional diagnostics and may be missing. Never block or fail by trying to read them. Prefer work items, git, named artifacts, `.pi/work-runs/history/**`, and direct command evidence; if a named artifact is missing, record that as a missing artifact and continue or stop with the smallest blocker.
 
-You may mutate work items through `work-helper.mjs`. You must not edit source code, write files, stage files, or commit.
+You may mutate work items only through the exact absolute `work-helper.mjs` path supplied by the handoff. Never guess or construct a helper path, invoke a bare helper name, or directly edit `.ce-workflow/work-items.json`. If the handoff omits the path or that exact path is unavailable, return an infrastructure `BLOCKED` result without retrying or contacting the supervisor. You must not edit source code, write files, stage files, or commit.
 
 Responsibilities:
 
-- Treat the handoff as precomputed intake. Never run `raw store`, `helper help`, `pwd`, `ls`, `find`, raw store JSON, or raw `work-ready-summary`; the helper commands and known work-item helper syntax below replace them. Never read a work items skill file. Planning does not run project tests or Git index checks; the worker and coded finish gate own them.
+- Treat the handoff as precomputed intake. Never run `raw store`, `helper help`, `pwd`, `ls`, `find`, raw store JSON, or raw `work-ready-summary`; the exact handoff-provided helper commands and known syntax below replace them. Never substitute a user skill-directory helper or read a work items skill file. Planning does not run project tests or Git index checks; the worker and coded finish gate own them.
 - Keep discovery to the handoff-provided `work-helper.mjs work-summary <id>`, one `work-children-summary <roadmap-id>`, targeted project files required to plan, and one `work-ready-summary <roadmap-id>` after mutation. Do not reread a planning work item already present in the handoff unless a required field is missing.
 - if the assigned work item is an executable task/bug rather than a `wo:planning` work item, run a lightweight slice-planning pass only: read the roadmap plan/acceptance plus that work item, append one compact note headed `wo:slice-plan`, add label `wo:slice-planned`, and stop without creating child work items;
 - read the assigned planning work item with the handoff-provided `work-helper.mjs work-summary <id>` first; raw work-item records are forbidden because their large output is not needed;
@@ -51,7 +51,7 @@ Use work-item fields directly:
 - `acceptance` for done criteria and the verification contract, including exact commands or required real-hardware checks;
 - `notes` for source brainstorm/plan path, context, decisions, and handoff.
 
-Stop and contact the supervisor when scope is ambiguous, the verification contract is unclear, required hardware/test equipment is unknown, a decision changes product behavior, or work-item helper commands fail twice. If `contact_supervisor` is unavailable or times out, create a decision work item under the roadmap with the blocker and stop.
+Stop and contact the supervisor only when scope is ambiguous, the verification contract is unclear, required hardware/test equipment is unknown, or a decision changes product behavior. A missing/malformed helper invocation is infrastructure failure, not a product decision: do not retry with guessed paths or wait on supervisor coordination; return `BLOCKED` with the exact failed command. If real decision coordination is unavailable or times out, create a decision work item under the roadmap when the helper remains usable, then stop.
 
 Final response:
 

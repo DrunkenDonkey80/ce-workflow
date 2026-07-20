@@ -1145,7 +1145,9 @@
     },
     "work-2.1": {
       "createdAt": "2026-07-19T08:21:38.875Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.7"
+      ],
       "dependencyEdges": [],
       "description": "Observed: finish-task --immediate-format attempted to run Biome on the 1.3 MiB native runtime store .ce-workflow/work-items.json and failed before review/finalization because Biome's configured maximum is 1.0 MiB.\nExpected: The coded finalizer should treat .ce-workflow/work-items.json as runtime state and exclude it from immediate formatting, while still staging and committing it.\nImpact: A fully verified work item cannot reach the review/commit/close boundary when immediate formatting is requested, even though production files and the runtime store are valid.\nSuggested improvement: Filter isRuntimePath files before formatPendingFiles invokes Biome, or explicitly skip .ce-workflow/work-items.json.",
       "evidence": [
@@ -1175,11 +1177,14 @@
       "status": "open",
       "title": "Self-improvement report: finish-task --immediate-format attempted to run Biome on the 1.3 MiB native runtime store .ce-workflow/work-items.json and failed ",
       "type": "task",
-      "updatedAt": "2026-07-19T08:21:38.875Z"
+      "updatedAt": "2026-07-20T09:59:32.230Z"
     },
     "work-2.2": {
       "createdAt": "2026-07-20T01:40:10.511Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.7",
+        "work-2.8"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The work-planner bundled/default instructions attempted C:\\Users\\Flex\\.pi\\agent\\skills\\work-items\\scripts\\work-helper.mjs and C:\\Users\\Flex\\.pi\\agent\\skills\\work-items\\work-helper.mjs, neither of which exists. It then blocked for 10 minutes on supervisor contact and hit the 15-minute run timeout, even though the active workflow checkout exposes C:\\soft\\ce-workflow\\scripts\\work-helper.mjs. Attempting to resume also failed because the recovery descriptor persisted unsupported acceptance fields.\nExpected: Planner runs should receive the resolved work-helper.mjs absolute path in their coded handoff and asynchronous recovery descriptors should be valid for resume after timeout.\nImpact: Automatic epic slicing stopped before creating any WorkItem, consumed 15 minutes, and could not be resumed; unattended /work-goal execution can stall without durable progress.\nSuggested improvement: Include the resolved helper path in planner handoffs and sanitize persisted acceptance descriptors to fields accepted by resume.",
       "evidence": [
@@ -1209,11 +1214,13 @@
       "status": "open",
       "title": "Self-improvement report: The work-planner bundled/default instructions attempted C:\\Users\\Flex\\.pi\\agent\\skills\\work-items\\scripts\\work-helper.mjs and C:\\U",
       "type": "task",
-      "updatedAt": "2026-07-20T01:40:10.511Z"
+      "updatedAt": "2026-07-20T09:59:33.352Z"
     },
     "work-2.3": {
       "createdAt": "2026-07-20T02:00:16.639Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.7"
+      ],
       "dependencyEdges": [],
       "description": "Observed: `finish-task --verify` executes through Windows cmd.exe even when the active Pi shell is Git Bash. A verification command that had just passed interactively with POSIX inline environment syntax (`ANDROID_HOME='...' ./gradlew.bat ...`) failed in the coded finalizer as an unrecognized command and recorded a misleading failed verification note before the cmd syntax retry passed.\nExpected: The coded finalizer should either execute verification using the active project shell, provide/accept an explicit shell mode, or normalize/document environment-prefix commands so a previously passing verification command remains portable into finish-task.\nImpact: A valid build was recorded as a failed verification on the work item, requiring a second expensive gate and platform-specific command rewriting; unattended finishing can stall on Windows.\nSuggested improvement: Add a platform-neutral `--env NAME=value` option or execute `--verify` with the detected active shell, while recording the actual shell in verification evidence.",
       "evidence": [
@@ -1243,11 +1250,14 @@
       "status": "open",
       "title": "Self-improvement report: `finish-task --verify` executes through Windows cmd.exe even when the active Pi shell is Git Bash. A verification command that had",
       "type": "task",
-      "updatedAt": "2026-07-20T02:00:16.639Z"
+      "updatedAt": "2026-07-20T09:59:32.617Z"
     },
     "work-2.4": {
       "createdAt": "2026-07-20T02:33:35.267Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.7",
+        "work-2.8"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The work-reviewer for work-4.7 invoked contact_supervisor after receiving live parent steering, but the ask did not wake or reach the active parent before the child's 10-minute wait expired. The parent was blocked in subagent_wait and only received the stale pending ask after the entire 15-minute reviewer run timed out. The reviewer therefore produced no verdict despite having the correct helper path after one shell-path retry.\nExpected: Live child supervisor asks should wake subagent_wait immediately and be surfaced to the parent while the child remains live, so the parent can reply before the child timeout. Mid-run steering should not strand the child in an unobservable contact_supervisor wait.\nImpact: The mandatory independent public-API review consumed 15 minutes and failed without a verdict, forcing another reviewer cycle for infrastructure rather than code reasons.\nSuggested improvement: Bridge contact_supervisor pending events into subagent_wait wakeups and preserve enough run time after steering/ask delivery for the child to continue.",
       "evidence": [
@@ -1277,11 +1287,13 @@
       "status": "open",
       "title": "Self-improvement report: The work-reviewer for work-4.7 invoked contact_supervisor after receiving live parent steering, but the ask did not wake or reach ",
       "type": "task",
-      "updatedAt": "2026-07-20T02:33:35.267Z"
+      "updatedAt": "2026-07-20T09:59:33.543Z"
     },
     "work-2.5": {
       "createdAt": "2026-07-20T03:29:59.300Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.7"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The exact work-worker for work-4.11 directly edited `.ce-workflow/work-items.json`, omitted the comma after the notes array, and wrote noncanonical status `in-progress`. The coded finalizer then failed with `Work store is not valid JSON` until the parent manually repaired both fields.\nExpected: Specialist agents must mutate native work state only through resolved work-helper commands (`work-note`, `work-claim`, etc.), and the store layer should atomically validate serialization/status values before replacing the canonical file.\nImpact: The native source of truth became unreadable mid-goal, blocking all status, finalization, and recovery automation and risking loss of durable work state.\nSuggested improvement: Inject the resolved helper path and prohibit direct store writes in worker prompts; add atomic write-plus-schema validation and canonical status enforcement in the store mutation layer.",
       "evidence": [
@@ -1311,11 +1323,14 @@
       "status": "open",
       "title": "Self-improvement report: The exact work-worker for work-4.11 directly edited `.ce-workflow/work-items.json`, omitted the comma after the notes array, and w",
       "type": "task",
-      "updatedAt": "2026-07-20T03:29:59.300Z"
+      "updatedAt": "2026-07-20T09:59:32.992Z"
     },
     "work-2.6": {
       "createdAt": "2026-07-20T04:59:06.183Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.7",
+        "work-2.8"
+      ],
       "dependencyEdges": [],
       "description": "Observed: An exact work-planner run timed out after a malformed bare helper invocation, and the supported async resume path then rejected its own generated recovery descriptor because it persisted unsupported acceptance fields (`explicit`, `inferredReason`) and `level=reviewed`.\nExpected: The planner should receive the fully qualified helper invocation or recover after supervisor guidance; generated recovery descriptors must contain only resume-supported acceptance fields/levels so `subagent resume` can revive a failed run.\nImpact: The required planning specialist could not persist child work items, and the same specialist cannot be resumed through the documented recovery action, forcing parent-side replanning or a duplicate run.\nSuggested improvement: Sanitize persisted acceptance metadata to the resume schema and validate recovery descriptors when they are written; normalize helper references in work-planner prompts to `node <absolute>/work-helper.mjs`.",
       "evidence": [
@@ -1345,7 +1360,46 @@
       "status": "open",
       "title": "Self-improvement report: An exact work-planner run timed out after a malformed bare helper invocation, and the supported async resume path then rejected it",
       "type": "task",
-      "updatedAt": "2026-07-20T04:59:06.183Z"
+      "updatedAt": "2026-07-20T09:59:33.717Z"
+    },
+    "work-2.7": {
+      "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
+      "createdAt": "2026-07-20T09:58:53.226Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local fix for work-2.1, work-2.2, work-2.3, work-2.4, work-2.5, and work-2.6 atoms: exclude managed work state from immediate formatting; run verification in the active Git Bash shell on Windows; require exact helper paths; forbid direct store edits; and make reviewers/helper failures return BLOCKED instead of waiting on supervisor coordination.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.7",
+      "labels": [],
+      "notes": [
+        "wo:atomization local coverage: work-2.1 locally-owned formatter/store classification; work-2.2 locally-owned missing-helper fail-closed plus upstream supervisor timeout; work-2.3 locally-owned Windows shell mismatch; work-2.4 upstream supervisor wake defect with locally-owned reviewer mitigation; work-2.5 locally-owned direct-store mutation guard; work-2.6 locally-owned malformed-helper fail-closed plus upstream async-resume descriptor defect. Focused test: node scripts/test-work-optimization-helpers.mjs PASS. Full package: npm run verify:quiet PASS. Current supervisor defect reproduction: async 34f5769b-b7fb-4293-abae-803c0b49c71a.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Harden finalization and role-agent failure boundaries",
+      "type": "bug",
+      "updatedAt": "2026-07-20T10:04:39.723Z"
+    },
+    "work-2.8": {
+      "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
+      "createdAt": "2026-07-20T09:59:01.555Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Upstream-owned residual from work-2.2/work-2.4/work-2.6: pi-subagents 0.35.1 contact_supervisor requests can remain invisible to the parent after live steering, and async recovery descriptors persist resolved acceptance fields that resume validation rejects.",
+      "evidence": [],
+      "id": "work-2.8",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Track pi-subagents supervisor wake and async resume defects",
+      "type": "bug",
+      "updatedAt": "2026-07-20T09:59:01.555Z"
     }
   },
   "metadata": {
@@ -1355,7 +1409,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-20T04:59:06.183Z"
+    "updatedAt": "2026-07-20T10:04:39.724Z"
   },
   "schemaVersion": 1
 }
