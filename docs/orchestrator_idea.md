@@ -4,7 +4,7 @@ This package is a small Pi workflow layer for driving software work without repe
 
 ## Core model
 
-- An epic scopes a roadmap.
+- A roadmap scopes the work.
 - A planning work item creates the next executable work item or records a decision.
 - An implementation work item is one shippable slice.
 - Review, verification, commit, and closure are separate safety gates.

@@ -15,11 +15,14 @@ const { buildWorkAddState } = await import(
 const fixture = installWorkflowFixture({ native: true });
 try {
 	let state = buildWorkAddState(fixture.cwd, "Add coded pause tests");
-	assert(state.ok && state.action === "work-added", "task creates child WorkItem");
+	assert(
+		state.ok && state.action === "work-added",
+		"task creates child WorkItem",
+	);
 	assert(state.epic.id === "E-1", "task is created under active epic");
 	assert(
-		fixture.store().items[state.selectedWorkItem.id].title === "Add coded pause tests" &&
-			fixture.logs().length === 0,
+		fixture.store().items[state.selectedWorkItem.id].title ===
+			"Add coded pause tests" && fixture.logs().length === 0,
 		"creation is one native mutation without bd",
 	);
 
@@ -33,42 +36,41 @@ try {
 	state = buildWorkAddState(fixture.cwd, "Needs explicit parent");
 	assert(
 		!state.ok && state.reason === "ambiguous-target",
-		"ambiguous active epic without --epic stops",
+		"ambiguous active roadmap without --roadmap stops",
 	);
 	assert(fixture.logs().length === 0, "ambiguous add does not invoke bd");
 
 	fixture.reset("openReadyAmbiguous");
-	state = buildWorkAddState(fixture.cwd, "Must not guess open ready epic");
+	state = buildWorkAddState(fixture.cwd, "Must not guess open ready roadmap");
 	assert(
 		!state.ok && state.reason === "no-active-epic",
-		"mutating add does not guess among open epics",
+		"mutating add does not guess among open roadmaps",
 	);
 	assert(
 		fixture.logs().length === 0,
-		"open epic heuristic does not invoke bd",
+		"open roadmap heuristic does not invoke bd",
 	);
 
 	fixture.reset("ambiguous");
 	state = buildWorkAddState(
 		fixture.cwd,
-		"--epic E-1 Add explicit parent task",
+		"--roadmap E-1 Add explicit parent task",
 	);
 	assert(
 		state.ok && state.epic.id === "E-1",
-		"--epic resolves ambiguous active epics",
+		"--roadmap resolves ambiguous active roadmaps",
 	);
 
 	fixture.reset("debug");
-	state = buildWorkAddState(
-		fixture.cwd,
-		"--blocked-by BUG-1 Add blocked task",
-	);
+	state = buildWorkAddState(fixture.cwd, "--blocked-by BUG-1 Add blocked task");
 	assert(
 		state.ok && state.blockedBy.id === "BUG-1",
 		"--blocked-by is preserved",
 	);
 	assert(
-		fixture.store().items[state.selectedWorkItem.id].dependencies.includes("BUG-1") &&
+		fixture
+			.store()
+			.items[state.selectedWorkItem.id].dependencies.includes("BUG-1") &&
 			fixture.logs().length === 0,
 		"dependency is added natively in correct direction",
 	);
@@ -90,8 +92,14 @@ try {
 	assert(fixture.logs().length === 0, "dirty stop does not create WorkItems");
 
 	fixture.reset("create-fail");
-	state = buildWorkAddState(fixture.cwd, "Native create succeeds without command fixture");
-	assert(state.ok && fixture.logs().length === 0, "native create never invokes bd");
+	state = buildWorkAddState(
+		fixture.cwd,
+		"Native create succeeds without command fixture",
+	);
+	assert(
+		state.ok && fixture.logs().length === 0,
+		"native create never invokes bd",
+	);
 } finally {
 	fixture.cleanup();
 }

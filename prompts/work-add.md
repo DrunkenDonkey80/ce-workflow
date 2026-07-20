@@ -1,6 +1,6 @@
 ---
 description: Add urgent or discovered work to the current work items flow
-argument-hint: "[--epic <id>] [--blocked-by <work-item-id>] <task>"
+argument-hint: "[--roadmap <id>] [--blocked-by <work-item-id>] <task>"
 ---
 
 Fallback when the extension command is unavailable: use the `work-orchestrator` skill in mode: `add`.

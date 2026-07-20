@@ -31,6 +31,7 @@ import {
 	decodeInitiativeToken,
 	InitiativeError,
 	initiativeHash,
+	isInitiative,
 	normalizeInitiativeProposal,
 	previewInitiativeCandidate,
 	projectInitiativeHierarchy,
@@ -59,11 +60,12 @@ try {
 const CONFIG_DIR_NAME = ".pi";
 const IMPROVEMENT_REPORT_TOOL = "work_report_improvement";
 const DIRTY_CONTINUE_TOOL = "work_dirty_continue";
+const INITIATIVE_RECONCILE_TOOL = "work_initiative_reconcile";
 const TELEMETRY_DIR_NAME = "work-runs";
 const HISTORY_DIR_NAME = "history";
 const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
-const WORK_SHORTCUT_STATUS = "F7 roadmaps · F8 menu";
+const WORK_SHORTCUT_STATUS = "F7 roadmaps · F8 microcompact";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
 const DEFAULT_THINKING = "__default_thinking__";
@@ -87,6 +89,8 @@ const WORK_HELPER_SCRIPT = resolve(
 	"scripts",
 	"work-helper.mjs",
 );
+const NATIVE_EDIT_GUIDANCE =
+	"Use Pi's native edit tool for existing files and write tool for new files. Do not rewrite tracked files through Python, Node, or shell; if unavoidable, re-read immediately.";
 const SUBAGENT_RPC_REQUEST_EVENT = "subagents:rpc:v1:request";
 const SUBAGENT_RPC_REPLY_EVENT_PREFIX = "subagents:rpc:v1:reply:";
 
@@ -120,7 +124,7 @@ const SLOTS = [
 		agents: ["work-planner", "work-migrator"],
 		defaultThinking: "high",
 		description:
-			"Creating or importing epics and slicing executable native work-item store",
+			"Creating or importing roadmaps and slicing executable native work-item store",
 	},
 	{
 		key: "work",
@@ -322,9 +326,15 @@ const DEFAULT_CONTEXT = {
 	maxSummaryChars: 12_000,
 };
 const MIN_COMPACT_AT_TOKENS = 30_000;
-const contextCompactState = { inFlight: false, requested: false };
+const contextCompactState = {
+	generation: 0,
+	inFlight: false,
+	requested: false,
+};
+let manualMicrocompactPending = false;
 let pendingWorkPrompt = null;
 const pendingDirtyRecoveries = new Map();
+const pendingInitiativeConversions = new Map();
 const commandWorkflowStorage = new AsyncLocalStorage();
 let activeHistoryTask = null;
 let activeWorkAgent = null;
@@ -1530,9 +1540,23 @@ function summarizeToolResult(event, started) {
 	};
 }
 
+function roadmapTerminology(value) {
+	return String(value ?? "")
+		.replace(
+			/((?:--type[=\s]+|type\s*[:=]\s*["'`]?))epic\b/gi,
+			"$1__INTERNAL_ROADMAP_TYPE__",
+		)
+		.replace(/\bEpics\b/g, "Roadmaps")
+		.replace(/\bEpic\b/g, "Roadmap")
+		.replace(/\bepics\b/g, "roadmaps")
+		.replace(/\bepic\b/g, "roadmap")
+		.replace(/__INTERNAL_ROADMAP_TYPE__/g, "epic");
+}
+
 function notify(ctx, message, level = "info") {
-	ctx.ui.notify(message, level);
-	if (ctx.mode === "print" || ctx.hasUI === false) console.log(message);
+	const text = roadmapTerminology(message);
+	ctx.ui.notify(text, level);
+	if (ctx.mode === "print" || ctx.hasUI === false) console.log(text);
 }
 
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
@@ -1662,7 +1686,7 @@ function matchesTelemetryScope(event, { scope, value }) {
 	if (!scope || scope === "today")
 		return event.timestamp?.slice(0, 10) === today;
 	if (scope === "all") return true;
-	if (scope === "epic")
+	if (scope === "roadmap" || scope === "epic")
 		return event.epicId === value || event.meta?.epicId === value;
 	if (scope === "workItem" || scope === "task")
 		return event.workItemId === value || event.meta?.workItemId === value;
@@ -1989,7 +2013,7 @@ function usageScope(cwd, args = "") {
 			candidates: resolved.candidates ?? [],
 		};
 	return {
-		filter: { json: false, scope: "epic", value: idOf(resolved.epic) },
+		filter: { json: false, scope: "roadmap", value: idOf(resolved.epic) },
 		explicit: false,
 		open: parsedArgs.open,
 		format: parsedArgs.format,
@@ -2002,7 +2026,7 @@ function reviewTelemetry(meta = {}, event = {}) {
 	const scope = meta.workItemId
 		? `workItem ${meta.workItemId}`
 		: meta.epicId
-			? `diff for epic ${meta.epicId}`
+			? `diff for roadmap ${meta.epicId}`
 			: "current diff";
 	if (!review) return { scope, outcome: "unknown" };
 	return {
@@ -2218,7 +2242,7 @@ function usageHtml(state) {
 	const rowHtml = state.rows
 		.map(
 			(row, index) =>
-				`<tr class="event-row kind-${escapeHtml(row.kind)}" data-detail="detail-${index}" title="Click for details"><td>${escapeHtml(row.task)}</td><td>${escapeHtml(row.agent)}</td><td>${escapeHtml(row.phase)}</td><td class="num${usageTier(row.duration, 60_000, 300_000)}" data-sort="${Number(row.duration ?? -1)}">${escapeHtml(row.duration === undefined ? "unknown" : formatDuration(row.duration))}</td><td class="num${usageTier(row.tokens, 8_000, 32_000)}" data-sort="${Number(row.tokens ?? -1)}">${escapeHtml(unknown(row.tokens))}</td><td class="num${usageTier(row.context, 80_000, 160_000)}" data-sort="${Number(row.context ?? -1)}">${escapeHtml(unknown(row.context))}</td><td>${escapeHtml(row.tools)}</td><td>${escapeHtml(row.subagents)}</td><td>${escapeHtml(row.review?.scope ?? "unknown")}</td><td>${escapeHtml(reviewPayoff(row.review))}</td><td>${escapeHtml(row.timestamp)}</td></tr>`,
+				`<tr class="event-row kind-${escapeHtml(row.kind)}" data-detail="detail-${index}" title="Click for details"><td>${escapeHtml(row.task)}</td><td>${escapeHtml(row.agent)}</td><td>${escapeHtml(row.phase)}</td><td class="num${usageTier(row.duration, 60_000, 300_000)}" data-sort="${Number(row.duration ?? -1)}">${escapeHtml(row.duration === undefined ? "unknown" : formatDuration(row.duration))}</td><td class="num${usageTier(row.tokens, 8_000, 32_000)}" data-sort="${Number(row.tokens ?? -1)}">${escapeHtml(unknown(row.tokens))}</td><td class="num${usageTier(row.context, 80_000, 160_000)}" data-sort="${Number(row.context ?? -1)}">${escapeHtml(unknown(row.context))}</td><td>${escapeHtml(row.tools)}</td><td>${escapeHtml(row.subagents)}</td><td>${escapeHtml(roadmapTerminology(row.review?.scope ?? "unknown"))}</td><td>${escapeHtml(reviewPayoff(row.review))}</td><td>${escapeHtml(row.timestamp)}</td></tr>`,
 		)
 		.join("\n");
 	return `<!doctype html>
@@ -2230,7 +2254,7 @@ function usageHtml(state) {
 body{font-family:ui-sans-serif,system-ui,sans-serif;margin:2rem;color:#111827;background:#fff}h1{margin:.2rem 0 1rem}.cards{display:flex;gap:.75rem;flex-wrap:wrap;margin:1rem 0}.card{border:1px solid var(--b);border-radius:.75rem;padding:.75rem 1rem;background:#fff;box-shadow:0 1px 2px #0001}.card b{display:block;font-size:1.2rem}.muted{color:var(--muted)}.error{color:#b91c1c}input{width:100%;max-width:36rem;padding:.55rem .7rem;border:1px solid var(--b);border-radius:.6rem;margin:.75rem 0}table{border-collapse:separate;border-spacing:0;width:100%;font-size:.92rem}th,td{border-bottom:1px solid var(--b);padding:.5rem .55rem;text-align:left;vertical-align:top}th{cursor:pointer;background:var(--head);position:sticky;top:0;user-select:none}th::after{content:' ↕';color:#98a2b3;font-size:.8em}.num{text-align:right;font-variant-numeric:tabular-nums}.cool{background:var(--cool)}.warm{background:var(--warm)}.hot{background:var(--hot)}.kind-agent{background:var(--agent)}.kind-debug{background:var(--debug)}.kind-review{background:var(--review)}.kind-work{background:var(--work)}.kind-report{background:var(--report)}.event-row{cursor:pointer}.event-row:hover{outline:2px solid #93c5fd55}.modal{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:2rem;z-index:10}.modal[hidden]{display:none}.modal-card{background:#fff;color:#111827;border-radius:1rem;width:min(78rem,96vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px #0006}.modal-head{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.8rem 1rem;border-bottom:1px solid var(--b);background:inherit}.modal-body{padding:1rem}.close{font-size:1.2rem;border:1px solid var(--b);border-radius:.5rem;background:transparent;cursor:pointer}.detail-box{border:1px solid var(--b);border-radius:.75rem;padding:1rem;background:#fff;box-shadow:inset 0 1px 2px #00000008}.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.75rem;margin-bottom:.75rem}.detail-table th{position:static}.detail-table,.summary-table{font-size:.86rem;margin:.5rem 0 1rem}.summary-table th{position:static}h2{font-size:1.05rem;margin:1rem 0 .4rem}h3{margin:1rem 0 .4rem}@media (prefers-color-scheme:dark){body{background:#111827;color:#f9fafb}.card,th,.detail-box,.modal-card{background:#1f2937;color:#f9fafb}:root{--b:#374151;--muted:#9ca3af;--agent:#172554;--debug:#431407;--review:#2e1065;--work:#1f2937;--report:#052e16;--cool:#052e16;--warm:#422006;--hot:#450a0a}}
 </style>
 <h1>Work usage</h1>
-<p class="muted">Scope: <strong>${escapeHtml(state.filter.scope)} ${escapeHtml(state.filter.value)}</strong></p>
+<p class="muted">Scope: <strong>${escapeHtml(roadmapTerminology(state.filter.scope))} ${escapeHtml(state.filter.value)}</strong></p>
 <div class="cards"><div class="card"><b>${state.summary.events}</b><span>events</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.durationMs))}</b><span>time</span></div><div class="card"><b>${escapeHtml(state.summary.tokens || "unknown")}</b><span>tokens</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.subagents))}</b><span>subagents</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.tools))}</b><span>tools</span></div><div class="card"><b>${escapeHtml(state.summary.improvement.state)}</b><span>self-improvement${state.summary.improvement.enabled ? " · explicit reporting available" : ""}</span></div></div>
 <p class="muted">Missing data: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}. Generated from ${state.files.length ? state.files.map(escapeHtml).join(", ") : escapeHtml(state.dir)}.</p>
 ${usageSubagentSummaryHtml(state.summary)}
@@ -2512,7 +2536,7 @@ function advisorCriticStep(cwd, target, usage = "all") {
 
 function advisorVerifyStep() {
 	return [
-		"Coded task-verification checklist: once a slice is implemented and self-verified but before finish, compare the WorkItem notes/diff against the epic plan's acceptance and implementation unit yourself. Append a compact WorkItem note headed `wo:verify-check` with: plan match, acceptance covered, verification command/proof, known gaps/waivers. Do not launch work-advisor unless the plan or evidence is ambiguous after this checklist.",
+		"Coded task-verification checklist: once a slice is implemented and self-verified but before finish, compare the WorkItem notes/diff against the roadmap plan's acceptance and implementation unit yourself. Append a compact WorkItem note headed `wo:verify-check` with: plan match, acceptance covered, verification command/proof, known gaps/waivers. Do not launch work-advisor unless the plan or evidence is ambiguous after this checklist.",
 	].join("\n");
 }
 
@@ -2654,7 +2678,9 @@ function slotSummary(slot, settings) {
 }
 
 function labelFor(item) {
-	return item.description ? `${item.label} — ${item.description}` : item.label;
+	return roadmapTerminology(
+		item.description ? `${item.label} — ${item.description}` : item.label,
+	);
 }
 
 async function choose(ctx, title, items, currentValue) {
@@ -2666,7 +2692,7 @@ async function choose(ctx, title, items, currentValue) {
 					...items.filter((item) => item.value !== currentValue),
 				];
 	const labels = choices.map(labelFor);
-	const selected = await ctx.ui.select(title, labels);
+	const selected = await ctx.ui.select(roadmapTerminology(title), labels);
 	return choices[labels.indexOf(selected)]?.value;
 }
 
@@ -3120,6 +3146,27 @@ function contextStatus(ctx, settings) {
 	].join("\n");
 }
 
+function beginContextCompaction() {
+	manualMicrocompactPending = false;
+	contextCompactState.generation += 1;
+	contextCompactState.inFlight = true;
+	contextCompactState.requested = true;
+	return contextCompactState.generation;
+}
+
+function finishContextCompaction(generation) {
+	if (generation !== contextCompactState.generation) return false;
+	contextCompactState.inFlight = false;
+	contextCompactState.requested = false;
+	return true;
+}
+
+function resetContextCompaction() {
+	contextCompactState.generation += 1;
+	contextCompactState.inFlight = false;
+	contextCompactState.requested = false;
+}
+
 function maybeCompact(ctx, settings, reason, forceAutoCompact = false) {
 	const current = contextSettings(settings);
 	if (
@@ -3132,25 +3179,99 @@ function maybeCompact(ctx, settings, reason, forceAutoCompact = false) {
 	if (!usage?.tokens) return false;
 	const trigger = compactTriggerTokens(ctx, settings);
 	if (usage.tokens < trigger) return false;
-	contextCompactState.inFlight = true;
-	contextCompactState.requested = true;
-	ctx.compact({
-		customInstructions: `work-orchestrator proactive ${reason}: preserve goals, native work-item store/git state, file changes, blockers, and next command; omit reasoning and full tool logs.`,
-		onComplete: () => {
-			contextCompactState.inFlight = false;
-			contextCompactState.requested = false;
-			ctx.ui.notify("Work context compacted before rot", "info");
-		},
+	const generation = beginContextCompaction();
+	try {
+		ctx.compact({
+			customInstructions: `work-orchestrator proactive ${reason}: preserve goals, native work-item store/git state, file changes, blockers, and next command; omit reasoning and full tool logs.`,
+			onComplete: () => {
+				if (!finishContextCompaction(generation)) return;
+				ctx.ui.notify("Work context compacted before rot", "info");
+			},
 
-		onError: (error) => {
-			contextCompactState.inFlight = false;
-			contextCompactState.requested = false;
+			onError: (error) => {
+				if (!finishContextCompaction(generation)) return;
+				ctx.ui.notify(
+					`Work context compaction failed: ${error.message}`,
+					"warning",
+				);
+			},
+		});
+		return true;
+	} catch (error) {
+		finishContextCompaction(generation);
+		ctx.ui.notify(
+			`Work context compaction failed: ${formatError(error)}`,
+			"warning",
+		);
+		return false;
+	}
+}
+
+function runManualMicrocompact(ctx) {
+	if (typeof ctx.compact !== "function") {
+		manualMicrocompactPending = false;
+		ctx.ui.notify("Microcompaction is unavailable in this mode", "warning");
+		return false;
+	}
+	if (contextCompactState.inFlight) {
+		ctx.ui.notify("Microcompaction is already in progress", "info");
+		return false;
+	}
+	const resumeAfter =
+		manualMicrocompactPending && activeWorkGoal?.status !== "active";
+	const generation = beginContextCompaction();
+	const resume = () => {
+		if (!resumeAfter) return;
+		void sendFollowUp(
+			ctx,
+			"Continue from the compacted context and finish the current task.",
+			workExtensionPi,
+		).catch((error) =>
 			ctx.ui.notify(
-				`Work context compaction failed: ${error.message}`,
+				`Could not resume after microcompaction: ${formatError(error)}`,
 				"warning",
-			);
-		},
-	});
+			),
+		);
+	};
+	ctx.ui.notify("Microcompaction started", "info");
+	try {
+		ctx.compact({
+			customInstructions:
+				"work-context on-demand microcompact: preserve current goals, native work-item store/git state, file changes, blockers, and next action; omit reasoning and full tool logs.",
+			onComplete: () => {
+				if (!finishContextCompaction(generation)) return;
+				ctx.ui.notify(
+					resumeAfter
+						? "Microcompaction completed; resuming work"
+						: "Microcompaction completed",
+					"info",
+				);
+				resume();
+			},
+			onError: (error) => {
+				if (!finishContextCompaction(generation)) return;
+				ctx.ui.notify(`Microcompaction failed: ${error.message}`, "warning");
+				resume();
+			},
+		});
+		return true;
+	} catch (error) {
+		finishContextCompaction(generation);
+		ctx.ui.notify(`Microcompaction failed: ${formatError(error)}`, "warning");
+		resume();
+		return false;
+	}
+}
+
+function requestManualMicrocompact(ctx) {
+	if (typeof ctx.compact !== "function") return runManualMicrocompact(ctx);
+	if (contextCompactState.inFlight) {
+		ctx.ui.notify("Microcompaction is already in progress", "info");
+		return false;
+	}
+	if (ctx.isIdle?.() !== false) return runManualMicrocompact(ctx);
+	manualMicrocompactPending = true;
+	ctx.ui.notify("Microcompaction queued for the next idle boundary", "info");
 	return true;
 }
 
@@ -3953,9 +4074,9 @@ function buildWorkStatus(cwd, target) {
 	const resolved = resolveEpic(cwd, target);
 	if (resolved.choices) {
 		if (resolved.choices.length === 0)
-			return "No open or in-progress epic found. Use /work-plan or /work-migrate first.";
+			return "No open or in-progress roadmap found. Use /work-plan or /work-migrate first.";
 		return [
-			"Multiple active epics. Run /work-status <epic-id> or /work-resume with the epic id as guidance.",
+			"Multiple active roadmaps. Run /work-status <roadmap-id> or /work-resume with the roadmap id as guidance.",
 			...resolved.choices.map(
 				(epic) =>
 					`- ${idOf(epic)} ${statusLabel(statusOf(epic))} — ${titleOf(epic)} (updated ${shortDate(updatedAt(epic))})`,
@@ -3964,7 +4085,9 @@ function buildWorkStatus(cwd, target) {
 	}
 
 	const epic = resolved.epic;
-	const projection = epic.initiative ? buildInitiativeProjection(cwd) : undefined;
+	const projection = epic.initiative
+		? buildInitiativeProjection(cwd)
+		: undefined;
 	const projected = projection?.nodes.find((node) => node.id === idOf(epic));
 	if (projected?.role === "initiative") {
 		const children = projection.nodes.filter(
@@ -3981,16 +4104,16 @@ function buildWorkStatus(cwd, target) {
 		return [
 			`Initiative: ${projected.title} (${projected.id})`,
 			`Status: ${statusLabel(projected.status)}`,
-			`Progress: ${projected.aggregateProgress.closed}/${projected.aggregateProgress.total} child epics closed (${projected.aggregateProgress.percent}%)`,
+			`Progress: ${projected.aggregateProgress.closed}/${projected.aggregateProgress.total} child roadmaps closed (${projected.aggregateProgress.percent}%)`,
 			`Coverage: ${projected.coverage.accepted} accepted • ${projected.coverage.rejected} rejected • ${projected.coverage.non_goal} non-goal`,
 			"",
-			"Child epics:",
+			"Child roadmaps:",
 			...children.map(
 				(child) =>
 					`- ${child.id} [${statusLabel(child.status)}] [${child.readiness.state.replaceAll("_", " ")}] ${child.title}`,
 			),
 			"",
-			`Next: ${needsPlan ? `Run /work-plan ${needsPlan.id}.` : nextChild ? `Run /work-resume ${nextChild.id}.` : projected.closeAllowed ? `Close explicitly with /work-roadmap close ${projected.id}.` : "Resolve stale or unfinished child epics."}`,
+			`Next: ${needsPlan ? `Run /work-plan ${needsPlan.id}.` : nextChild ? `Run /work-resume ${nextChild.id}.` : projected.closeAllowed ? `Close explicitly with /work-roadmap close ${projected.id}.` : "Resolve stale or unfinished child roadmaps."}`,
 		].join("\n");
 	}
 	rememberWorkflowEpic(cwd, epic);
@@ -4042,12 +4165,12 @@ function buildWorkStatus(cwd, target) {
 			return `Continue or pause active slice ${idOf(active[0])}.`;
 		if (planning.length)
 			return `Run /work-resume ${epicId}; planner should create the next slice.`;
-		if (statusOf(epic) === "closed") return "Epic is closed.";
-		return "No ready slices. /work-resume should ask work-planner to compare the epic plan against closed children and create the next slice, or report done. Close the roadmap only with /work-roadmap close.";
+		if (statusOf(epic) === "closed") return "Roadmap is closed.";
+		return "No ready slices. /work-resume should ask work-planner to compare the roadmap plan against closed children and create the next slice, or report done. Close the roadmap only with /work-roadmap close.";
 	})();
 
 	return [
-		`Epic: ${titleOf(epic)} (${epicId})`,
+		`Roadmap: ${titleOf(epic)} (${epicId})`,
 		`Status: ${statusLabel(statusOf(epic))} • created ${shortDate(createdAt(epic))} • updated ${shortDate(updatedAt(epic))}`,
 		`Progress: ${done.length}/${slices.length} slices closed (${percent}%)`,
 		`Ready: ${readySlices.length} • 🔵 in progress: ${active.length} • planned ahead: ${planned.length} • 🟠 blockers: ${blockers.length} • 🟣❓ decisions: ${decisions.length}`,
@@ -4506,7 +4629,7 @@ function resolveReportTarget(cwd, target) {
 	if (candidates.length > 1) return { error: "ambiguous-target", candidates };
 	return {
 		error: "no-default-target",
-		message: "No open or in-progress epic found.",
+		message: "No open or in-progress roadmap found.",
 	};
 }
 
@@ -5126,7 +5249,7 @@ function resolveResumeTarget(cwd, target) {
 		if (looksLikePath(wanted))
 			return {
 				error: "plan-path-target",
-				message: `${wanted} looks like a plan path, not an epic ID. Use /work-plan ${wanted}.`,
+				message: `${wanted} looks like a plan path, not a roadmap ID. Use /work-plan ${wanted}.`,
 				suggestedCommands: [`/work-plan ${wanted}`],
 			};
 		const issue = readWorkItem(cwd, wanted);
@@ -5156,14 +5279,14 @@ function resolveResumeTarget(cwd, target) {
 					? "initiative-child-selection"
 					: "no-ready-child",
 				message: candidates.length
-					? `Select one child epic under initiative ${idOf(issue)}.`
-					: `Initiative ${idOf(issue)} has no open child epic.`,
+					? `Select one child roadmap under initiative ${idOf(issue)}.`
+					: `Initiative ${idOf(issue)} has no open child roadmap.`,
 				candidates: candidates.map((epic) => candidateSummary(cwd, epic)),
 			};
 		}
 		return {
 			error: "unsupported-target",
-			message: `${wanted} is a child WorkItem; run /work-resume ${parentOf(issue) ?? "<epic-id>"} or /work-debug ${wanted}`,
+			message: `${wanted} is a child WorkItem; run /work-resume ${parentOf(issue) ?? "<roadmap-id>"} or /work-debug ${wanted}`,
 		};
 	}
 
@@ -5217,7 +5340,7 @@ function resolveResumeTarget(cwd, target) {
 		};
 	return {
 		error: "no-default-target",
-		message: "No open or in-progress epic found.",
+		message: "No open or in-progress roadmap found.",
 	};
 }
 
@@ -5268,9 +5391,9 @@ function planResumeAction(state, cwd) {
 		return {
 			...state,
 			action: "done-candidate",
-			message: "Epic is closed.",
+			message: "Roadmap is closed.",
 			suggestedCommands: [],
-			nextAction: `Next: epic ${state.epic.id} "${state.epic.title}" is complete.`,
+			nextAction: `Next: roadmap ${state.epic.id} "${state.epic.title}" is complete.`,
 		};
 	if (
 		state.readyPlanning.length &&
@@ -5529,7 +5652,9 @@ function directRoleTask(state, cwd) {
 	return [
 		"Precomputed work-orchestrator handoff. Run this role directly; do not delegate or rediscover target selection.",
 		...workflowPromptMetadata(),
-		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
+		state.epic
+			? `Roadmap: ${state.epic.id} — ${state.epic.title}`
+			: "Roadmap: none",
 		`Action: ${state.action}`,
 		selected
 			? `Target work item: ${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
@@ -5556,10 +5681,13 @@ function directRoleTask(state, cwd) {
 			? `For child state use: node ${helper} work-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
-			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<epic>"}, close the planning work item, then stop.`
+			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop.`
 			: "",
 		state.action === "run-implementation" || state.action === "run-debug"
 			? planReference(state, cwd)
+			: "",
+		["run-implementation", "run-debug", "run-fix"].includes(state.action)
+			? NATIVE_EDIT_GUIDANCE
 			: "",
 		...(state.handoffExtra ?? []).filter(Boolean),
 		"Persist concise evidence/blockers with work-note/work-label/work-block. Do not read Pi session transcripts. Run exactly this action and stop at one work-item or planning boundary.",
@@ -5724,7 +5852,7 @@ function workflowHelperGuidance(cwd, state) {
 			: "Use compact task reads: node <helper> work-summary <work-item-id>",
 		epicId
 			? `Use compact child/blocker reads: node ${script} work-children-summary ${epicId}; node ${script} blocker-search ${epicId} "<query>"`
-			: "Use compact child/blocker reads: node <helper> work-children-summary <epic-id>",
+			: "Use compact child/blocker reads: node <helper> work-children-summary <roadmap-id>",
 		`Use bounded scans/checks instead of dumping logs: node ${script} search-summary "<regex>" <paths...>; node ${script} scan-capability "<term>" <paths...>; node ${script} json-assert <file> --required key.path`,
 		`Use native work-item store/git helpers instead of CLI-help spelunking: node ${script} work-note <id> <note-or-note-file>; node ${script} work-block <task-id> --by <blocker-id>; node ${script} ensure-no-staged --allow-work-store`,
 	];
@@ -5799,11 +5927,14 @@ function inlineWorkHandoffPrompt(state, extraLines = [], cwd) {
 	return [
 		`work-orchestrator WO_INLINE_V1: complete this ${level} task directly in the current session. Do not call subagent list and do not launch a worker, planner, or committer.`,
 		...workflowPromptMetadata(),
-		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
+		state.epic
+			? `Roadmap: ${state.epic.id} — ${state.epic.title}`
+			: "Roadmap: none",
 		`Target: ${selected?.id ?? "none"}`,
 		`Task: ${JSON.stringify(contract)}`,
 		`Git intake: ${state.git?.status ?? "unknown"}; later runtime/native work-item store dirt is expected.`,
 		`Helper: node ${helper}`,
+		NATIVE_EDIT_GUIDANCE,
 		evidenceOnly
 			? "Evidence-only task: prove the exact requested condition; do not substitute a broader suite or edit product/workflow source. Read project instructions, search once for the narrowest existing probe, then run it. Evidence plus native work-item store changes may be the only commit."
 			: `Implement with targeted reads only and keep the change within ${maxFiles} implementation files. Greenfield tasks naming output files should create them immediately.`,
@@ -5827,7 +5958,7 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 	const plannerLines =
 		state.action === "run-planner"
 			? [
-					"Planner efficiency: do not run raw raw store JSON; project epics can contain full roadmap plans. Use compact helper projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
+					"Planner efficiency: do not run raw raw store JSON; project roadmaps can contain full plans. Use compact helper projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
 				]
 			: [];
 	const settings = cwd ? workOrchSettings(cwd) : null;
@@ -5838,7 +5969,9 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 	return [
 		`Use the work-orchestrator skill in mode: ${mode} with this precomputed extension state.`,
 		...workflowPromptMetadata(),
-		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "Epic: none",
+		state.epic
+			? `Roadmap: ${state.epic.id} — ${state.epic.title}`
+			: "Roadmap: none",
 		`Action: ${state.action}`,
 		`Selected work item: ${selectedLine}`,
 		`Git dirty classification: ${gitDirtyClassification(state.git)}`,
@@ -5851,9 +5984,12 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 		"Subagent output guidance: set outputMode:file-only with a short relative output filename unless the full result is under 20 lines; do not pass .pi-subagents/ paths because the subagent tool owns the artifact directory.",
 		"Native helper hygiene: use work-summary, work-children-summary, work-ready-summary, blocker-search, work-claim, work-note, work-label, and work-block; never dump raw store JSON.",
 		"Closure rule: worker/reviewer/fixer/debugger roles leave work items open; the coded finish gate commits and closes after required verification/review.",
+		["run-implementation", "run-debug", "run-fix"].includes(state.action)
+			? NATIVE_EDIT_GUIDANCE
+			: "",
 		selected?.id
 			? `Review scope default: current work item ${selected.id} and its diff/verification evidence; do not run broad whole-repo review unless this work item explicitly requires it.`
-			: "Review scope default: current diff for this epic; do not run broad whole-repo review unless the action explicitly requires it.",
+			: "Review scope default: current diff for this roadmap; do not run broad whole-repo review unless the action explicitly requires it.",
 		...plannerLines,
 		...simplifyLines,
 		...advisorLines,
@@ -5908,7 +6044,7 @@ function planReference(state, cwd) {
 	if (slicePlanned) {
 		const line = `Plan: execute the wo:slice-plan note on WorkItem ${workItem.id} as your spec; if the note references a plan-path doc, that doc is your spec. The WorkItem is the tracking item, not the spec — do not invent scope beyond it.`;
 		return planPath
-			? `${line} Epic master plan for context: ${planPath}.`
+			? `${line} Roadmap master plan for context: ${planPath}.`
 			: line;
 	}
 	if (planPath)
@@ -5998,7 +6134,9 @@ function buildWorkResumeState(cwd, args = "") {
 }
 
 function buildEpicReportState(cwd, epic) {
-	const projection = epic.initiative ? buildInitiativeProjection(cwd) : undefined;
+	const projection = epic.initiative
+		? buildInitiativeProjection(cwd)
+		: undefined;
 	const projected = projection?.nodes.find((node) => node.id === idOf(epic));
 	if (projected?.role === "initiative") {
 		const children = projection.nodes.filter(
@@ -6067,7 +6205,7 @@ function buildEpicReportState(cwd, epic) {
 		readyWork: childState.readyWork.map(issueSummary),
 		git,
 		nextAction: complete
-			? `Next: epic ${childState.epicId} "${titleOf(epic)}" is complete.`
+			? `Next: roadmap ${childState.epicId} "${titleOf(epic)}" is complete.`
 			: undefined,
 		suggestedCommands: suggested,
 		noteExcerpts: childState.blockers
@@ -6378,7 +6516,7 @@ function resolveWorkflowEpic(cwd, target = "") {
 		if (typeOf(issue) !== "epic")
 			return {
 				error: "unsupported-target",
-				message: `${wanted} is not an epic.`,
+				message: `${wanted} is not a roadmap.`,
 			};
 		rememberWorkflowEpic(cwd, issue);
 		return { kind: "epic", epic: issue };
@@ -6397,7 +6535,7 @@ function resolveWorkflowEpic(cwd, target = "") {
 		return {
 			error: "ambiguous-target",
 			message:
-				"Multiple active epics found; pass --epic <id> or target a WorkItem.",
+				"Multiple active roadmaps found; pass --roadmap <id> or target a WorkItem.",
 			candidates: active.map((epic) => candidateSummary(cwd, epic)),
 		};
 
@@ -6408,7 +6546,7 @@ function resolveWorkflowEpic(cwd, target = "") {
 	}
 	return {
 		error: "no-active-epic",
-		message: "No active epic found; pass --epic <id>.",
+		message: "No active roadmap found; pass --roadmap <id>.",
 		candidates: open.map((epic) => candidateSummary(cwd, epic)),
 	};
 }
@@ -6455,7 +6593,7 @@ function checkpointNote({ epic, workItem, git, userNote }) {
 	const dirty = git.dirtyPaths?.length ? git.dirtyPaths.join(", ") : "clean";
 	return [
 		"work-pause checkpoint",
-		`epic: ${idOf(epic)} — ${titleOf(epic)}`,
+		`roadmap: ${idOf(epic)} — ${titleOf(epic)}`,
 		workItem
 			? `workItem: ${idOf(workItem)} — ${titleOf(workItem)}`
 			: "workItem: none",
@@ -6599,7 +6737,10 @@ function buildWorkDebugState(cwd, args = "") {
 			const parentId =
 				typeOf(source) === "epic" ? idOf(source) : parentOf(source);
 			if (!parentId)
-				return errorState("unknown-parent", "Debug target has no parent epic.");
+				return errorState(
+					"unknown-parent",
+					"Debug target has no parent roadmap.",
+				);
 			epic = typeOf(source) === "epic" ? source : readWorkItem(cwd, parentId);
 			if (!bug) {
 				bug = createWorkflowWorkItem(cwd, {
@@ -6683,7 +6824,7 @@ function parseWorkAddArgs(args = "") {
 	let blockedBy = "";
 	for (let index = 0; index < tokens.length; index += 1) {
 		const token = tokens[index];
-		if (token === "--epic") epic = tokens[++index] ?? "";
+		if (["--roadmap", "--epic"].includes(token)) epic = tokens[++index] ?? "";
 		else if (token === "--blocked-by") blockedBy = tokens[++index] ?? "";
 		else task.push(token);
 	}
@@ -6695,7 +6836,7 @@ function buildWorkAddState(cwd, args = "") {
 	if (!parsed.task)
 		return errorState(
 			"usage",
-			"Usage: /work-add [--epic <id>] [--blocked-by <work-item-id>] <task>",
+			"Usage: /work-add [--roadmap <id>] [--blocked-by <work-item-id>] <task>",
 			{
 				action: "usage",
 			},
@@ -6854,7 +6995,7 @@ function resolveParsedEpic(cwd, parsed) {
 		? { kind: "epic", epic }
 		: {
 				error: "unsupported-target",
-				message: `${parsed.epic} is not an epic.`,
+				message: `${parsed.epic} is not a roadmap.`,
 			};
 }
 
@@ -6873,7 +7014,7 @@ function buildWorkSmallState(cwd, args = "") {
 	if (!raw)
 		return errorState(
 			"usage",
-			"Usage: /work-small [--epic <id>|<work-item-id>] <task>",
+			"Usage: /work-small [--roadmap <id>|<work-item-id>] <task>",
 			{ action: "usage" },
 		);
 	try {
@@ -6884,10 +7025,10 @@ function buildWorkSmallState(cwd, args = "") {
 				"Dirty files must be resolved before /work-small can launch writers.",
 			);
 		const [first, ...rest] = raw.split(/\s+/);
-		const expandedFirst =
-			first === "--epic"
-				? { target: first }
-				: expandNumericWorkItemShorthand(cwd, first);
+		const roadmapFlag = ["--roadmap", "--epic"].includes(first);
+		const expandedFirst = roadmapFlag
+			? { target: first }
+			: expandNumericWorkItemShorthand(cwd, first);
 		if (expandedFirst.error)
 			return errorState(
 				expandedFirst.error,
@@ -6895,7 +7036,7 @@ function buildWorkSmallState(cwd, args = "") {
 				expandedFirst,
 			);
 		const firstTarget = expandedFirst.target;
-		if (isWorkItemId(firstTarget) && firstTarget !== "--epic") {
+		if (isWorkItemId(firstTarget) && !roadmapFlag) {
 			const issue = readWorkItem(cwd, firstTarget);
 			if (!issue)
 				return errorState(
@@ -6927,7 +7068,7 @@ function buildWorkSmallState(cwd, args = "") {
 			}
 			const task = rest.join(" ").trim();
 			if (!task)
-				return errorState("usage", "Usage: /work-small <epic-id> <task>", {
+				return errorState("usage", "Usage: /work-small <roadmap-id> <task>", {
 					action: "usage",
 				});
 			const workItem = claimWorkflowWorkItem(
@@ -7008,7 +7149,7 @@ function buildWorkSmallState(cwd, args = "") {
 function buildPlanningStartState(cwd, args = "", size = "med") {
 	const parsed = parseWorkAddArgs(args);
 	if (!parsed.task)
-		return errorState("usage", `Usage: /work-${size} [--epic <id>] <task>`, {
+		return errorState("usage", `Usage: /work-${size} [--roadmap <id>] <task>`, {
 			action: "usage",
 		});
 	try {
@@ -7063,7 +7204,7 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 function buildWorkMedState(cwd, args = "") {
 	const parsed = parseWorkAddArgs(args);
 	if (!parsed.task)
-		return errorState("usage", "Usage: /work-med [--epic <id>] <task>", {
+		return errorState("usage", "Usage: /work-med [--roadmap <id>] <task>", {
 			action: "usage",
 		});
 	try {
@@ -7349,15 +7490,15 @@ function openQuestionsBlockState(cwd, rel, questions, command, git, init) {
 		plan: rel,
 		open_questions: questions,
 		git,
-		message: `${init?.initialized ? `${init.message} ` : ""}Epic creation blocked: ${rel} has ${questions.length} unresolved open question(s). Resolve them, then re-run ${command} ${rel}.`,
+		message: `${init?.initialized ? `${init.message} ` : ""}Roadmap creation blocked: ${rel} has ${questions.length} unresolved open question(s). Resolve them, then re-run ${command} ${rel}.`,
 		warnings: git?.warnings ?? [],
 		handoffPrompt: [
-			`work-orchestrator OPEN-QUESTION GATE: ${command} is blocked because ${rel} still has ${questions.length} open question(s). Do NOT create the epic until the plan is decision-complete.`,
+			`work-orchestrator OPEN-QUESTION GATE: ${command} is blocked because ${rel} still has ${questions.length} open question(s). Do NOT create the roadmap until the plan is decision-complete.`,
 			"Resolve every open question in the current session, one ask_user call per question:",
 			`Open questions:\n${listing}`,
 			"For EACH question run exactly one ask_user call with allowComment=true: show the question text, offer its suggested default as the recommended option, allow a freeform answer, and allow an explicit 'waive — defer to a decision WorkItem' option. A default is a suggestion to present, never a silent resolution; do not skip a question or accept its default without asking.",
 			"After each answer, edit the plan to fold the decision in: move the item out of the Open Questions section into Decisions/Assumptions as a confirmed decision (or, for a waiver, mark it 'waived' and create/reuse a decision WorkItem). Items marked confirmed/resolved/decided/waived are ignored by the gate.",
-			`When zero open questions remain, re-run ${command} ${rel}; the extension re-scans and creates the epic automatically.`,
+			`When zero open questions remain, re-run ${command} ${rel}; the extension re-scans and creates the roadmap automatically.`,
 			ROLE_TIMEOUT_GUIDANCE,
 		].join("\n"),
 		suggestedCommands: [`${command} ${rel}`],
@@ -7373,6 +7514,12 @@ export function bootstrapPlanEpic(
 	init,
 	initiativeContext,
 ) {
+	rel = repoRelativePath(cwd, rel);
+	if (!rel)
+		throw new WorkStoreError(
+			"invalid-plan-path",
+			"Master plan path must be inside the project.",
+		);
 	const planText = readFileSync(join(cwd, rel), "utf8");
 	const gitReport = git ?? resumeGitReport(cwd, [rel]);
 	const initReport = init ?? ensureWorkStoreInitialized(cwd);
@@ -7389,6 +7536,70 @@ export function bootstrapPlanEpic(
 	if (!safeForPlanBootstrap(cwd, gitReport, rel))
 		return planBootstrapDirtyStop(cwd, gitReport, rel, command);
 	const fields = planEpicFields(cwd, rel);
+	if (initiativeContext?.targetEpicId) {
+		const attached = mutateStore(cwd, (store) => {
+			let epic = store.items[initiativeContext.targetEpicId];
+			if (!epic || epic.type !== "epic" || isInitiative(epic))
+				throw new WorkStoreError(
+					"invalid-target",
+					"Master plans can only be attached to an executable roadmap.",
+				);
+			const planMarker = `Master roadmap plan from ${rel}.`;
+			epic = updateWorkItem(store, epic.id, {
+				status: "open",
+				description: String(epic.description ?? "").includes(planMarker)
+					? epic.description
+					: [epic.description, "## Master plan", fields.description]
+							.filter(Boolean)
+							.join("\n\n"),
+				acceptance: fields.acceptance,
+				documentLinks: {
+					...(epic.documentLinks ?? {}),
+					design: fields.designFile,
+				},
+			});
+			if (!notesOf(epic).includes(`source plan: ${rel}`))
+				epic = appendWorkNote(store, epic.id, fields.notes);
+			let planning = Object.values(store.items).find(
+				(item) =>
+					item.parentId === epic.id &&
+					isPlanningIssue(item) &&
+					notesOf(item).includes(`source plan: ${rel}`),
+			);
+			if (!planning) {
+				const title = `Plan next slice for ${epic.title}`;
+				const notes = workflowWorkItemNotes(command, epic.title, [
+					"wo:planning",
+					`source plan: ${rel}`,
+					"create one executable slice by default",
+				]);
+				planning = createWorkItem(store, {
+					title: compactWorkItemTitle(title),
+					type: "task",
+					parentId: epic.id,
+					notes: appendOriginalWorkItemTitle(notes, title)
+						? [appendOriginalWorkItemTitle(notes, title)]
+						: [],
+				});
+			}
+			return { epic: nativeIssue(epic), planning: nativeIssue(planning) };
+		});
+		rememberWorkflowEpic(cwd, attached.epic);
+		return withHandoffPrompt(
+			{
+				ok: true,
+				action: "run-planner",
+				epic: issueSummary(attached.epic),
+				selectedWorkItem: issueSummary(attached.planning),
+				git: gitReport,
+				message: `Attached ${rel} to roadmap ${idOf(attached.epic)} and prepared its first planning boundary.`,
+				warnings: gitReport.warnings,
+				suggestedCommands: [`/work-resume ${idOf(attached.epic)}`],
+				nextAction: `Next: /work-resume ${idOf(attached.epic)}.`,
+			},
+			cwd,
+		);
+	}
 	const sourcePaths = new Set(
 		[rel, ...fields.sourceArtifacts].map(normalizedRepoPath),
 	);
@@ -7439,7 +7650,7 @@ export function bootstrapPlanEpic(
 		if (!selected)
 			throw new InitiativeError(
 				"incomplete_coverage",
-				"Initiative proposal has no selected child epic.",
+				"Initiative proposal has no selected child roadmap.",
 			);
 		let epic = readWorkItem(cwd, selected.id);
 		epic = updateWorkItemNative(cwd, selected.id, {
@@ -7544,7 +7755,7 @@ export function bootstrapPlanEpic(
 			epic: issueSummary(epic),
 			selectedWorkItem: issueSummary(planning),
 			git: gitReport,
-			message: `${initReport.initialized ? `${initReport.message} ` : ""}${reuseBrainstormEpic ? "Updated" : "Created"} epic ${idOf(epic)} and planning WorkItem ${idOf(planning)} from ${rel}.`,
+			message: `${initReport.initialized ? `${initReport.message} ` : ""}${reuseBrainstormEpic ? "Updated" : "Created"} roadmap ${idOf(epic)} and planning WorkItem ${idOf(planning)} from ${rel}.`,
 			warnings: gitReport.warnings,
 			suggestedCommands: [`/work-resume ${idOf(epic)}`],
 			nextAction: `Next: run /work-resume ${idOf(epic)} to plan and start the first slice.`,
@@ -7911,11 +8122,11 @@ function captureIdeationIdeas(
 function ideationHandoffPrompt(epic, topic, runId) {
 	return [
 		"Use the work-orchestrator skill in mode: ideate with this precomputed extension state.",
-		`Epic: ${idOf(epic)} — ${titleOf(epic)}`,
+		`Roadmap: ${idOf(epic)} — ${titleOf(epic)}`,
 		`Topic: ${topic}`,
 		`Run ID: ${runId}`,
 		`Structured capture contract: ${captureIdeationIdeas.name} expects JSON ideas[] plus optional topPicks.`,
-		"Generate roughly 20 ideas, mark about 7 top picks as accepted, the rest as contenders, then create native work-item store under the epic with wo:idea notes and source-run/source-index metadata.",
+		"Generate roughly 20 ideas, mark about 7 top picks as accepted, the rest as contenders, then create native work-item store under the roadmap with wo:idea notes and source-run/source-index metadata.",
 		"If structured capture fails, preserve the raw output in a recovery decision WorkItem and report saved vs unsaved ideas.",
 		ROLE_TIMEOUT_GUIDANCE,
 	].join("\n");
@@ -8115,7 +8326,7 @@ function buildWorkBrainstormState(cwd, args = "") {
 			possibleDuplicates: match.possibleDuplicates,
 			message: [
 				init.initialized ? init.message : "",
-				createdEpic ? `Created epic ${idOf(epic)}.` : "",
+				createdEpic ? `Created roadmap ${idOf(epic)}.` : "",
 				`${match.reused ? "Updated" : "Created"} idea ${idOf(workItem)} for brainstorm ${parsed.topic}.`,
 			]
 				.filter(Boolean)
@@ -8137,7 +8348,7 @@ function brainstormHandoffPrompt(state, cwd) {
 	const criticLines = advisorStep ? [advisorStep] : [];
 	return [
 		`Use the work-orchestrator skill in mode: ${artifact ? "master" : "brainstorm"} with this precomputed extension state.`,
-		`Epic: ${state.epic.id} — ${state.epic.title}`,
+		`Roadmap: ${state.epic.id} — ${state.epic.title}`,
 		`Idea: ${state.idea.id} — ${state.idea.title}`,
 		state.topic ? `Full brainstorm request:\n${state.topic}` : "",
 		artifact
@@ -8353,6 +8564,11 @@ function issueArtifactPaths(cwd, issue, kind) {
 	const direct = asArray(
 		field(issue, "design_file", "designFile", "source", "sourcePath"),
 	);
+	const links = objectMetadata(issue?.documentLinks);
+	const linked =
+		kind === "plan"
+			? [links.design, links.spec]
+			: [links.brainstorm, links.requirements];
 	const noted =
 		kind === "plan"
 			? notePaths(issue, ["source plan", "plan-path", "plan"])
@@ -8361,7 +8577,11 @@ function issueArtifactPaths(cwd, issue, kind) {
 					"source brainstorm",
 					"brainstorm",
 				]);
-	return [...direct, ...noted]
+	return [...direct, ...linked, ...noted]
+		.filter(
+			(item) =>
+				typeof item === "string" && item.length < 1000 && !/[\r\n]/.test(item),
+		)
 		.map((item) => repoRelativePath(cwd, item))
 		.filter((item) =>
 			kind === "plan"
@@ -8379,6 +8599,7 @@ function epicArtifacts(cwd, epic) {
 		children = [];
 	}
 	return {
+		children,
 		plans: [epic, ...children].flatMap((issue) =>
 			issueArtifactPaths(cwd, issue, "plan"),
 		),
@@ -8386,6 +8607,16 @@ function epicArtifacts(cwd, epic) {
 			issueArtifactPaths(cwd, issue, "brainstorm"),
 		),
 	};
+}
+
+function epicPlanningSources(cwd, epic, artifacts = epicArtifacts(cwd, epic)) {
+	const parent = parentOf(epic) ? readWorkItem(cwd, parentOf(epic)) : undefined;
+	const inherited = isInitiative(parent)
+		? asArray(parent.initiative?.sources).map((source) => source?.path)
+		: [];
+	return [...new Set([...artifacts.brainstorms, ...inherited])].filter(
+		(path) => path && existsSync(join(cwd, path)),
+	);
 }
 
 function splitPlanTarget(input) {
@@ -8416,7 +8647,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			message: `${init.initialized ? `${init.message} ` : ""}${message}`,
 			...extra,
 			handoffPrompt: [
-				"Use ce-plan to convert this input into a detailed master roadmap plan, then create the epic from it in this same flow; do not stop and ask the user to re-run /work-plan.",
+				"Use ce-plan to convert this input into a detailed master roadmap plan, then create the roadmap from it in this same flow; do not stop and ask the user to re-run /work-plan.",
 				sourceArtifacts.length
 					? `Source artifacts to read and cite verbatim in the final plan: ${sourceArtifacts.join(", ")}`
 					: "",
@@ -8425,7 +8656,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				"Trace each source decision into exactly one place: plan requirement, implementation unit, verification/acceptance proof, explicit open question, or intentionally dropped-with-rationale note.",
 				"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
 				"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker WorkItem instruction, or an explicit user waiver; never leave it as passive risk prose.",
-				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Then create the epic in this same flow: run `node scripts/work-helper.mjs bootstrap-plan-epic <plan-path>`. That helper enforces the Open Question Gate; if it reports open-questions-block, resolve each open question via one ask_user (show the question and its suggested default), fold the answer into the plan, and re-run the helper until it creates the epic. Do NOT run /work-resume before the epic exists. Once the helper returns the epic id, end with Next: /work-resume <epic-id>.",
+				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Then create the roadmap in this same flow: run `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>`. That helper enforces the Open Question Gate; if it reports open-questions-block, resolve each open question via one ask_user (show the question and its suggested default), fold the answer into the plan, and re-run the helper until it creates the roadmap. Do NOT run /work-resume before the roadmap exists. Once the helper returns the roadmap id, end with Next: /work-resume <roadmap-id>.",
 				"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
 				detail,
 				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
@@ -8436,7 +8667,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			warnings: masterGit.warnings,
 			suggestedCommands: [],
 			nextAction:
-				"Next: after ce-plan writes the plan, bootstrap the epic with `node scripts/work-helper.mjs bootstrap-plan-epic <plan-path>` (runs the Open Question Gate), then resume the epic.",
+				"Next: after ce-plan writes the plan, bootstrap the roadmap with `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>` (runs the Open Question Gate), then resume the roadmap.",
 		});
 		const planTarget = splitPlanTarget(input);
 		const targetLooksEpic =
@@ -8459,7 +8690,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					ok: true,
 					action: "plan-epic-has-plan",
 					epic: issueSummary(resolved.epic),
-					message: `Epic already has plan ${plan}. Choose how to use it.`,
+					message: `Roadmap already has plan ${plan}. Choose how to use it.`,
 					suggestedCommands: [
 						`${command} ${idOf(resolved.epic)} strengthen`,
 						brainstorm ? `${command} ${idOf(resolved.epic)} fork` : "",
@@ -8471,18 +8702,18 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				if (!brainstorm)
 					return errorState(
 						"missing-source",
-						`Epic ${idOf(resolved.epic)} has no linked brainstorm artifact.`,
+						`Roadmap ${idOf(resolved.epic)} has no linked brainstorm artifact.`,
 						{ action: "missing-source", epic: issueSummary(resolved.epic) },
 					);
 				return handoffPlan(
-					`Brainstorm from epic ${idOf(resolved.epic)} handed to ce-plan.`,
+					`Brainstorm from roadmap ${idOf(resolved.epic)} handed to ce-plan.`,
 					[
-						`Source epic: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
+						`Source roadmap: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
 						`Source brainstorm: ${brainstorm}`,
 						plan && mode === "replace"
 							? `Ignore weaker existing plan: ${plan}`
 							: "",
-						"Create a new hardened plan artifact from the brainstorm, then run /work-plan <plan-path> to create a new active roadmap epic.",
+						"Create a new hardened plan artifact from the brainstorm, then run /work-plan <plan-path> to create a new active roadmap.",
 					]
 						.filter(Boolean)
 						.join("\n"),
@@ -8493,13 +8724,13 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				if (!plan)
 					return errorState(
 						"missing-source",
-						`Epic ${idOf(resolved.epic)} has no linked plan artifact to strengthen.`,
+						`Roadmap ${idOf(resolved.epic)} has no linked plan artifact to strengthen.`,
 						{ action: "missing-source", epic: issueSummary(resolved.epic) },
 					);
 				return handoffPlan(
-					`Existing plan from epic ${idOf(resolved.epic)} handed to ce-plan for hardening.`,
+					`Existing plan from roadmap ${idOf(resolved.epic)} handed to ce-plan for hardening.`,
 					[
-						`Source epic: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
+						`Source roadmap: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
 						brainstorm
 							? `Source brainstorm: ${brainstorm}`
 							: "Source brainstorm: none linked",
@@ -8519,12 +8750,12 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 		}
 		if (!pathExists)
 			return handoffPlan(
-				"Raw idea handed to ce-plan before epic creation.",
+				"Raw idea handed to ce-plan before roadmap creation.",
 				`Task: ${input}`,
 			);
 		if (!/docs[\\/]plans[\\/].+\.(?:md|html)$/i.test(first))
 			return handoffPlan(
-				"Source artifact needs ce-plan before epic creation.",
+				"Source artifact needs ce-plan before roadmap creation.",
 				`Source: ${first}`,
 			);
 		const alignment = planSourceAlignmentReport(cwd, first);
@@ -8557,10 +8788,10 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			return {
 				ok: true,
 				action: "review-plan-before-bootstrap",
-				message: `Reviewing ${first} before epic bootstrap.`,
+				message: `Reviewing ${first} before roadmap bootstrap.`,
 				handoffPrompt: [
 					advisorStep,
-					`After advisor fixes and any bounded first-advisor re-review, run \`node scripts/work-helper.mjs bootstrap-plan-epic ${first}\`. Do not bootstrap the epic before this review gate finishes.`,
+					`After advisor fixes and any bounded first-advisor re-review, run \`node scripts/work-helper.mjs bootstrap-plan-roadmap ${first}\`. Do not bootstrap the roadmap before this review gate finishes.`,
 				].join("\n"),
 				git: masterGit,
 				warnings: masterGit.warnings,
@@ -8823,9 +9054,13 @@ function executeWorkFinishState(cwd, state) {
 function buildWorkFinishState(cwd, args = "") {
 	let target = String(args).trim();
 	if (!target)
-		return errorState("usage", "Usage: /work-finish <work-item-id|epic-id>", {
-			action: "usage",
-		});
+		return errorState(
+			"usage",
+			"Usage: /work-finish <work-item-id|roadmap-id>",
+			{
+				action: "usage",
+			},
+		);
 	try {
 		const expanded = expandNumericWorkItemShorthand(cwd, target);
 		if (expanded.error)
@@ -8837,7 +9072,7 @@ function buildWorkFinishState(cwd, args = "") {
 		if (issue.initiative)
 			return errorState(
 				"initiative-not-executable",
-				"Finish targets one child WorkItem or executable child epic; initiatives close explicitly through /work-roadmap.",
+				"Finish targets one child WorkItem or executable child roadmap; initiatives close explicitly through /work-roadmap.",
 				{
 					action: "finish-stop",
 					epic: issueSummary(issue),
@@ -8925,7 +9160,7 @@ function buildWorkFinishState(cwd, args = "") {
 			handoffPrompt: gated
 				? [
 						"Use the work-orchestrator skill in mode: finish with this precomputed extension state.",
-						`Epic: ${idOf(epic)} — ${titleOf(epic)}`,
+						`Roadmap: ${idOf(epic)} — ${titleOf(epic)}`,
 						`WorkItem: ${idOf(workItem)} — ${titleOf(workItem)}`,
 						`Commit message: ${idOf(workItem)}: ${titleOf(workItem)}`,
 						`Files: ${related.join(", ")}`,
@@ -9115,7 +9350,9 @@ function applyInitiativeReconciliation(cwd, input, token, options = {}) {
 			);
 		const store = loadNativeWorkStore(cwd);
 		if (preview.storeHash !== initiativeHash(store)) {
-			const committed = store.items[proposal.initiative.id]?.initiative?.evidence?.find(
+			const committed = store.items[
+				proposal.initiative.id
+			]?.initiative?.evidence?.find(
 				(entry) => entry.approvalTokenHash === initiativeHash(token),
 			);
 			if (committed) {
@@ -9151,7 +9388,8 @@ function applyInitiativeReconciliation(cwd, input, token, options = {}) {
 			throw new InitiativeError("stale_input", "Stale preview candidate.");
 		if (reconciliation.changed) {
 			const evidence =
-				reconciliation.candidate.items[proposal.initiative.id].initiative.evidence;
+				reconciliation.candidate.items[proposal.initiative.id].initiative
+					.evidence;
 			if (evidence.length)
 				evidence.at(-1).approvalTokenHash = initiativeHash(token);
 			reconciliation.candidate.metadata.updatedAt =
@@ -9177,7 +9415,7 @@ function renderInitiativePreview(preview) {
 	return [
 		`Initiative: ${preview.initiativeId}`,
 		"",
-		"Proposed child epics:",
+		"Proposed child roadmaps:",
 		...(preview.proposed.epics.length
 			? preview.proposed.epics.map(
 					(epic) =>
@@ -9196,6 +9434,116 @@ function renderInitiativePreview(preview) {
 		`Operations: ${preview.operations.map((operation) => operation.kind).join(", ") || "none"}`,
 		`Conflicts: ${preview.conflicts.length ? JSON.stringify(preview.conflicts) : "none"}`,
 	].join("\n");
+}
+
+function initiativeConversionKey(ctx) {
+	return (
+		ctx?.sessionManager?.getSessionId?.() ?? resolve(ctx?.cwd ?? process.cwd())
+	);
+}
+
+function initiativeConversionPrompt(cwd, epic) {
+	const sourceEpic = readWorkItem(cwd, idOf(epic)) ?? epic;
+	const artifacts = epicArtifacts(cwd, sourceEpic);
+	const sources = [...new Set([...artifacts.brainstorms, ...artifacts.plans])];
+	return [
+		"WO_INITIATIVE_CONVERT_V1",
+		`The user selected ${epic.id} — ${epic.title} and chose Convert to initiative. Complete that conversion interactively now.`,
+		"",
+		"Linked source artifacts:",
+		...(sources.length
+			? sources.map((source) => `- ${source}`)
+			: [
+					"- none detected; inspect the roadmap notes and nearby docs/brainstorms or docs/plans, then stop if no authoritative source exists",
+				]),
+		"",
+		`Run node ${JSON.stringify(WORK_HELPER_SCRIPT)} initiative-summary to scan every existing roadmap, then use work-summary or work-children-summary only for relevant candidates. Reuse semantic matches; never duplicate them.`,
+		"Read the linked brainstorm/plan, this roadmap's descendants, and relevant existing roadmaps. Separate already-covered outcomes, worthwhile unfinished outcomes, rejected ideas, and explicit non-goals. Create only the smallest independently completable future roadmap groups; implementation tasks stay inside a roadmap.",
+		"Ask the user with ask_user exactly one focused question at a time only when an outcome's disposition or grouping is genuinely ambiguous. Do not ask for proposal files, JSON, paths, hashes, approval to start, or decisions the sources already answer.",
+		`When the mapping is resolved, call ${INITIATIVE_RECONCILE_TOOL} once with targetId ${epic.id}. Pass source paths, concise delivery groups, and each outcome's sourceId plus exact source text. Mark exactly one group selected so existing non-roadmap children have a home. Reuse an existing roadmap with roadmapId when it already owns an outcome.`,
+		`${INITIATIVE_RECONCILE_TOOL} computes hashes, shows the final preview, asks for the single apply confirmation, and performs the atomic conversion. Do not write an initiative proposal file or edit the work-item store directly.`,
+	].join("\n");
+}
+
+function initiativeProposalFromTool(cwd, params) {
+	const targetId = String(params.targetId ?? "").trim();
+	const target = readWorkItem(cwd, targetId);
+	if (!target || target.type !== "epic" || target.initiative)
+		throw new InitiativeError(
+			"invalid_proposal",
+			"The selected target must still be a standalone roadmap.",
+		);
+	const sourceContents = new Map();
+	const sources = asArray(params.sources).map((source) => {
+		const sourcePath = repoRelativePath(cwd, source?.path);
+		let content;
+		try {
+			content = sourcePath && readFileSync(join(cwd, sourcePath), "utf8");
+		} catch {
+			content = undefined;
+		}
+		if (content === undefined)
+			throw new InitiativeError(
+				"invalid_proposal",
+				`Initiative source is missing: ${source?.path ?? ""}`,
+			);
+		const id = String(source.id ?? "").trim();
+		sourceContents.set(id, content);
+		return {
+			id,
+			path: sourcePath,
+			hash: createHash("sha256").update(content).digest("hex"),
+		};
+	});
+	return normalizeInitiativeProposal({
+		schemaVersion: 1,
+		mode: "convert",
+		targetId,
+		initiative: {
+			id: targetId,
+			title: String(params.title ?? target.title).trim(),
+			...(params.description !== undefined
+				? { description: String(params.description) }
+				: {}),
+		},
+		sources,
+		groups: asArray(params.groups).map((group) => ({
+			id: String(group?.id ?? "").trim(),
+			title: String(group?.title ?? "").trim(),
+			...(group?.description !== undefined
+				? { description: String(group.description) }
+				: {}),
+			...(String(group?.roadmapId ?? "").trim()
+				? { epicId: String(group.roadmapId).trim() }
+				: {}),
+			...(group?.selected === true ? { selected: true } : {}),
+		})),
+		outcomes: asArray(params.outcomes).map((outcome) => {
+			const content = String(outcome?.content ?? "");
+			const sourceId = String(outcome?.sourceId ?? "").trim();
+			const provenance = String(outcome?.provenance ?? "").trim();
+			if (
+				!content.trim() ||
+				!sourceContents.get(sourceId)?.includes(content) ||
+				!provenance.startsWith(`${sourceId}:`)
+			)
+				throw new InitiativeError(
+					"invalid_proposal",
+					`Initiative outcome is not exact text from source ${sourceId || "<missing>"}.`,
+				);
+			return {
+				...(String(outcome?.id ?? "").trim()
+					? { id: String(outcome.id).trim() }
+					: {}),
+				provenance,
+				contentHash: initiativeHash(content),
+				disposition: outcome?.disposition,
+				...(String(outcome?.groupId ?? "").trim()
+					? { groupId: String(outcome.groupId).trim() }
+					: {}),
+			};
+		}),
+	});
 }
 
 function currentRoadmap(cwd) {
@@ -9239,7 +9587,7 @@ function resolveRoadmapTarget(cwd, target = "") {
 	if (typeOf(epic) !== "epic")
 		return {
 			error: "not-roadmap",
-			message: `${idOf(epic)} is not a roadmap/epic.`,
+			message: `${idOf(epic)} is not a roadmap.`,
 		};
 	return { epic };
 }
@@ -9342,7 +9690,7 @@ function buildWorkRoadmapState(cwd, args = "") {
 			if (projected?.role === "initiative")
 				return errorState(
 					"initiative-not-executable",
-					"Select one child epic as the current executable roadmap.",
+					"Select one child roadmap as the current executable roadmap.",
 					{ action: "initiative-not-executable", epic: projected },
 				);
 			rememberWorkflowEpic(cwd, resolved.epic);
@@ -9368,7 +9716,7 @@ function buildWorkRoadmapState(cwd, args = "") {
 					epic: roadmapSummary(cwd, resolved.epic, undefined, projected),
 					blockers: projected.closeBlockers,
 					message:
-						"Initiative close is blocked until coverage, plans, and child epics are resolved.",
+						"Initiative close is blocked until coverage, plans, and child roadmaps are resolved.",
 					suggestedCommands: [`/work-roadmap tasks ${idOf(resolved.epic)}`],
 				};
 			const unresolved = childrenOfRequired(cwd, idOf(resolved.epic)).filter(
@@ -9411,7 +9759,7 @@ function buildWorkRoadmapState(cwd, args = "") {
 		}
 		return errorState(
 			"usage",
-			"Usage: /work-roadmap [list|tasks|plan|set-current|close|reopen] [epic-id|current] [--force]",
+			"Usage: /work-roadmap [list|tasks|plan|set-current|close|reopen] [roadmap-id|current] [--force]",
 			{ action: "usage" },
 		);
 	} catch (error) {
@@ -9515,10 +9863,10 @@ function renderWorkReportText(state) {
 	if (state.initiative)
 		return [
 			`Initiative: ${state.epic.title} (${state.epic.id})`,
-			`Status: ${statusLabel(state.epic.status)} • Progress: ${state.aggregateProgress.closed}/${state.aggregateProgress.total} child epics closed (${state.aggregateProgress.percent}%)`,
+			`Status: ${statusLabel(state.epic.status)} • Progress: ${state.aggregateProgress.closed}/${state.aggregateProgress.total} child roadmaps closed (${state.aggregateProgress.percent}%)`,
 			`Coverage: ${state.coverage.accepted} accepted • ${state.coverage.rejected} rejected • ${state.coverage.non_goal} non-goal`,
 			"",
-			"Child epics:",
+			"Child roadmaps:",
 			...state.children.map(
 				(child) =>
 					`- ${child.id} [${statusLabel(child.status)}] [${child.readiness.state.replaceAll("_", " ")}] ${child.title}`,
@@ -9532,7 +9880,7 @@ function renderWorkReportText(state) {
 			`Next: ${state.suggestedCommands[0] ?? `Use /work-roadmap close ${state.epic.id} when ready.`}`,
 		].join("\n");
 	return [
-		`Epic: ${state.epic.title} (${state.epic.id})`,
+		`Roadmap: ${state.epic.title} (${state.epic.id})`,
 		`Status: ${statusLabel(state.epic.status)} • Progress: ${state.counts.closed}/${state.counts.slices} slices closed`,
 		`Ready: ${state.counts.ready} • 🔵 in progress: ${state.counts.inProgress} • 🟠 blockers: ${state.counts.blockers} • 🟣❓ decisions: ${state.counts.decisions}`,
 		"",
@@ -9674,7 +10022,7 @@ function renderWorkResumeText(state) {
 		].join("\n");
 	}
 	return [
-		`Epic: ${state.epic.title} (${state.epic.id})`,
+		`Roadmap: ${state.epic.title} (${state.epic.id})`,
 		`Action: ${state.action}`,
 		`Ready: ${state.counts.ready} • executable: ${state.counts.readyExecutable} • planning: ${state.counts.planning} • 🟠 blockers: ${state.counts.blockers} • 🟣❓ decisions: ${state.counts.decisions}`,
 		state.selectedWorkItem
@@ -9688,7 +10036,7 @@ function renderWorkResumeText(state) {
 		compactMultiline(state.git.status),
 		"",
 		state.nextAction ??
-			`Next: ${state.handoffPrompt ? "handoff queued to work-orchestrator" : (state.suggestedCommands?.[0] ?? `epic ${state.epic.id} "${state.epic.title}" is complete.`)}`,
+			`Next: ${state.handoffPrompt ? "handoff queued to work-orchestrator" : (state.suggestedCommands?.[0] ?? `roadmap ${state.epic.id} "${state.epic.title}" is complete.`)}`,
 	]
 		.filter((line) => line !== "")
 		.join("\n");
@@ -9959,7 +10307,7 @@ function buildWorkCatchUpObjective(state, args = "") {
 		"4. Load and follow ce-pov for each actionable candidate (combine tightly related candidates). Frame it as whether ce-workflow should adopt that capability now; use the upstream artifact/docs as external evidence and current call sites as project evidence. Record the graded verdict. Use ce-explain only when a candidate is too technical for the user to decide from a concise POV summary.",
 		"Guided decision and implementation loop:",
 		"5. Rank viable candidates, then handle one at a time. Use exactly one ask_user call per candidate with allowFreeform=false, allowComment=true, and three options: Adopt now (recommended when the POV says Adopt), Defer as durable work item, or Skip this release. Include the POV, project benefit, cost/risk, and recommendation in context.",
-		"6. Adopt now: implement the smallest complete change immediately and run its focused check before presenting the next candidate. Defer: create/reuse one native upstream-catch-up epic and add a concrete child work item. Skip: retain the POV rationale plus the user's comment when supplied. Do not ask about findings graded Reject/Not-our-problem unless there is a real choice; record them as no-action.",
+		"6. Adopt now: implement the smallest complete change immediately and run its focused check before presenting the next candidate. Defer: create/reuse one native upstream-catch-up roadmap and add a concrete child work item. Skip: retain the POV rationale plus the user's comment when supplied. Do not ask about findings graded Reject/Not-our-problem unless there is a real choice; record them as no-action.",
 		"7. Persist every changed package review in its baseline package object before advancing it: reviewedAt, reviewedVersion matching the target, plus a non-empty decisions array. Every decision has version matching the target, title, pov, status (adopted|deferred|skipped|no-action), and rationale; adopted also has verification, deferred also has workItemId. Replace the prior release's decisions rather than carrying them forward. This completion manifest is coded-gated so no opportunity disappears.",
 		"8. Run npm run verify:quiet once after all adopted changes. Update capturedAt and each handled package version only after all its decisions are implemented, durably deferred, skipped with rationale, or recorded no-action. Do not advance a partially reviewed package.",
 		workGoalSelfImprovingAppendix(),
@@ -10058,9 +10406,9 @@ function workProjectAutopilotAppendix() {
 - Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
 - Use /work-resume for one deterministic WorkItem boundary. Use /work-goal only when the user explicitly wants a multi-step autonomous loop.
 - Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it explicitly says N tasks, stop after N executable native work-item store closes. Identifiers such as work-2 are targets, never task counts.
-- When given a target work item or epic ID, resolve that exact ID and continue until it is closed; an open epic with no ready children needs its next planned slice, not premature completion.
+- When given a target work item or roadmap ID, resolve that exact ID and continue until it is closed; an open roadmap with no ready children needs its next planned slice, not premature completion.
 - At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
-- Stop only when the requested scope is done, the epic is complete, or a real product/credential/hardware/destructive/verification decision is required.`;
+- Stop only when the requested scope is done, the roadmap is complete, or a real product/credential/hardware/destructive/verification decision is required.`;
 }
 
 function parseWorkProjectGoalInput(input = "") {
@@ -10099,7 +10447,7 @@ function buildWorkSelfImprovingObjective(input = "", options = {}) {
 			"Run the autonomous project work loop for the target project until the active work is complete or a real human decision is required.";
 		if (task)
 			target = isNativeWorkItemId(task)
-				? `Target work item or epic ID: ${task}`
+				? `Target work item or roadmap ID: ${task}`
 				: `User instruction for the target project: ${task}`;
 		return [
 			project ? `Target project: ${project}` : "",
@@ -10349,7 +10697,7 @@ function renderProjectGoalProgress(state) {
 	const left = Math.max(0, total - complete);
 	const noun = state.source === "plan" ? "units" : "slices";
 	const unsliced = state.unsliced ? ` · ${state.unsliced} unsliced` : "";
-	return `${state.title} ${progressBar(complete, total)} ✅ ${complete}/${total} ${noun} (${left} left${unsliced}) 🔴 ${state.failed} 🟠 ${state.blocked} ⏱️ ${formatDuration(state.elapsedMs)} · ${WORK_SHORTCUT_STATUS}`;
+	return `${roadmapTerminology(state.title)} ${progressBar(complete, total)} ✅ ${complete}/${total} ${noun} (${left} left${unsliced}) 🔴 ${state.failed} 🟠 ${state.blocked} ⏱️ ${formatDuration(state.elapsedMs)} · ${WORK_SHORTCUT_STATUS}`;
 }
 
 function updateWorkGoalProgress(ctx) {
@@ -10537,6 +10885,7 @@ ${escapeXmlText(goal.objective)}
 - Work directly in this session by default. Do not call subagent list, delegate routine implementation/verification/commit work, or launch duplicate reviewers. Spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
 - ${ROLE_TIMEOUT_GUIDANCE}
 - Prefer coded helpers and deterministic checks over asking an LLM to classify, summarize, validate, stage, commit, close, or choose an agent.
+- ${NATIVE_EDIT_GUIDANCE}
 - Do not stop for plan approval, permission to continue, or obvious implementation choices. Pick the clear winner and continue.
 - Use ask_user for every question that truly needs human input: product intent, credentials/accounts, destructive or risky action, production/billing/legal impact, ambiguous priority/scope with no clear winner, hardware/environment access, or a target path/project choice you cannot infer. Ask one focused question and continue from its answer.
 - Set allowComment=true for planning, product, and adoption choices where a selected option may need a caveat. Set allowComment=false for destructive actions and coded binary approvals. Do not enable comments globally as a substitute for choosing per-call semantics.
@@ -10590,8 +10939,8 @@ async function sendWorkGoalPrompt(pi, ctx, prompt) {
 				? ctx.sendUserMessage.bind(ctx)
 				: pi?.sendUserMessage?.bind(pi);
 		if (!send) return false;
-		if (ctx.isIdle?.()) await send(prompt);
-		else await send(prompt, { deliverAs: "followUp" });
+		if (ctx.isIdle?.()) await send(roadmapTerminology(prompt));
+		else await send(roadmapTerminology(prompt), { deliverAs: "followUp" });
 		return true;
 	} catch (error) {
 		ctx.ui.notify(
@@ -10605,15 +10954,16 @@ async function sendWorkGoalPrompt(pi, ctx, prompt) {
 async function microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt) {
 	if (typeof ctx.compact !== "function")
 		return sendWorkGoalPrompt(pi, ctx, prompt);
-	contextCompactState.inFlight = true;
-	contextCompactState.requested = true;
+	const generation = beginContextCompaction();
 	return new Promise((resolvePromise) => {
 		let settled = false;
 		const finish = async (warning) => {
 			if (settled) return;
 			settled = true;
-			contextCompactState.inFlight = false;
-			contextCompactState.requested = false;
+			if (!finishContextCompaction(generation)) {
+				resolvePromise(false);
+				return;
+			}
 			if (warning) ctx.ui.notify(warning, "warning");
 			if (
 				!activeWorkGoal ||
@@ -10812,7 +11162,7 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	if (goal?.mode !== "project") return;
 	const objective = String(goal.objective ?? "");
 	const project = /^Target project:\s*(.+)$/m.exec(objective)?.[1]?.trim();
-	const explicit = /^Target work item or epic ID:\s*(\S+)$/m.exec(
+	const explicit = /^Target work item or (?:roadmap|epic) ID:\s*(\S+)$/m.exec(
 		objective,
 	)?.[1];
 	const legacy = /^User instruction for the target project:\s*(\S+)\s*$/m.exec(
@@ -11129,6 +11479,11 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description: "Open /work-roadmap",
 		},
 		{
+			value: "microcompact",
+			label: "microcompact context",
+			description: "Compact now or at the next idle boundary",
+		},
+		{
 			value: "status",
 			label: "status",
 			description: "Show /work-status",
@@ -11142,6 +11497,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 	if (action === "resume") return handleWorkResumeGoalCommand("", pi, ctx);
 	if (action === "stop") return handleWorkResumeStopCommand("", pi, ctx);
 	if (action === "roadmap") return handleWorkRoadmapCommand("", ctx, pi);
+	if (action === "microcompact") return requestManualMicrocompact(ctx);
 	if (action === "status") return handleWorkStatusCommand("", ctx);
 	if (action === "report") return handleWorkReportCommand("", ctx);
 }
@@ -11353,16 +11709,17 @@ function formatError(error) {
 
 async function sendFollowUp(ctx, message, pi) {
 	if (!message) return;
+	const text = roadmapTerminology(message);
 	if (typeof ctx.sendUserMessage === "function") {
-		await ctx.sendUserMessage(message, { deliverAs: "followUp" });
+		await ctx.sendUserMessage(text, { deliverAs: "followUp" });
 		return;
 	}
 	if (typeof pi?.sendUserMessage === "function") {
-		pi.sendUserMessage(message, { deliverAs: "followUp" });
+		pi.sendUserMessage(text, { deliverAs: "followUp" });
 		return;
 	}
 	ctx.ui.notify(
-		`Could not queue role handoff automatically. Run this next:\n\n${message}`,
+		`Could not queue role handoff automatically. Run this next:\n\n${text}`,
 		"warning",
 	);
 }
@@ -11512,7 +11869,7 @@ function renderWorkflowActionText(state) {
 	}
 	return [
 		`Action: ${state.action}`,
-		state.epic ? `Epic: ${state.epic.id} — ${state.epic.title}` : "",
+		state.epic ? `Roadmap: ${state.epic.id} — ${state.epic.title}` : "",
 		state.selectedWorkItem
 			? `WorkItem: ${state.selectedWorkItem.id} — ${state.selectedWorkItem.title}`
 			: "",
@@ -11734,6 +12091,16 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 						label: "🧭 plan / strengthen",
 						description: "use linked brainstorm/plan",
 					},
+					...(selectedRoadmap?.role === "standalone_epic"
+						? [
+								{
+									value: "convert",
+									label: "🧩 convert to initiative",
+									description:
+										"scan intent, reuse roadmaps, ask only needed questions",
+								},
+							]
+						: []),
 					{ value: "set-current", label: "⭐ set current" },
 					selectedRoadmap.status === "closed"
 						? { value: "reopen", label: "♻️ reopen" }
@@ -11742,11 +12109,76 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 				],
 	);
 	if (!op) return { ok: true, action: "roadmap-cancel" };
-	if (op === "resume") return handleWorkResumeGoalCommand(selected, pi, ctx);
+	if (op === "resume") {
+		const selectedEpic = readWorkItem(ctx.cwd, selected);
+		const artifacts = epicArtifacts(ctx.cwd, selectedEpic);
+		const sources = epicPlanningSources(ctx.cwd, selectedEpic, artifacts);
+		const hasTasks = artifacts.children.some((item) => typeOf(item) !== "epic");
+		if (!hasTasks && !artifacts.plans.length && sources.length) {
+			const next = await choose(
+				ctx,
+				`${selected} has source intent, but no master plan or tasks`,
+				[
+					{
+						value: "plan",
+						label: "🧭 create master plan and resume",
+						description:
+							"run the normal ce-plan questions, attach the plan, then continue",
+					},
+					{ value: "cancel", label: "cancel" },
+				],
+			);
+			if (next !== "plan")
+				return { ok: true, action: "master-plan-resume-cancelled" };
+			const objective = [
+				buildWorkSelfImprovingObjective(`${ctx.cwd} -- ${selected}`, {
+					project: true,
+					...workResumeSettings(ctx.cwd),
+				}),
+				`Starting-state planning gate: ${selected} has source intent but no roadmap-specific master plan or executable child tasks.`,
+				`Source intent artifacts: ${sources.join(", ")}`,
+				"Before normal implementation, run ce-plan on those sources. Ask its genuine clarification questions one at a time and write the complete master plan; do not replace discovery questions with assumptions.",
+				`After ce-plan writes the plan, run \`node ${JSON.stringify(WORK_HELPER_SCRIPT)} bootstrap-plan-roadmap <plan-path> --roadmap ${selected}\` to attach it to this existing roadmap and create its planning WorkItem. Then continue the normal \`/work-resume ${selected}\` golden path in this same project goal.`,
+			].join("\n\n");
+			await startWorkGoal("project", objective, pi, ctx);
+			return {
+				ok: true,
+				action: "master-plan-resume-started",
+				epic: issueSummary(selectedEpic),
+				sources,
+			};
+		}
+		return handleWorkResumeGoalCommand(selected, pi, ctx);
+	}
 	if (op === "report") return handleWorkReportCommand(selected, ctx);
 	if (op === "tasks") return handleRoadmapTasksMenu(selected, ctx, pi);
 	if (op === "plan")
 		return handleWorkflowAction(buildWorkPlanState, selected, ctx, pi);
+	if (op === "convert") {
+		const key = initiativeConversionKey(ctx);
+		pendingInitiativeConversions.set(key, {
+			cwd: resolve(ctx.cwd),
+			targetId: selected,
+		});
+		try {
+			await sendFollowUp(
+				ctx,
+				initiativeConversionPrompt(ctx.cwd, selectedRoadmap),
+				pi,
+			);
+		} catch (error) {
+			pendingInitiativeConversions.delete(key);
+			throw error;
+		}
+		const state = {
+			ok: true,
+			action: "initiative-conversion-started",
+			epic: selectedRoadmap,
+			message: `Scanning ${selectedRoadmap.title} for initiative outcomes.`,
+		};
+		notify(ctx, state.message);
+		return stateTelemetry(state);
+	}
 	if (op === "preview") {
 		const proposalInput = await ctx.ui.input(
 			"Initiative proposal JSON or project path",
@@ -11787,7 +12219,9 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 				message: "Initiative preview has conflicts.",
 			});
 		}
-		if (!(await ctx.ui.confirm("Apply initiative reconciliation?", previewText)))
+		if (
+			!(await ctx.ui.confirm("Apply initiative reconciliation?", previewText))
+		)
 			return { ok: true, action: "initiative-preview-cancelled", preview };
 		const approval = approveInitiativeReconciliation(ctx.cwd, preview.token);
 		const result = applyInitiativeReconciliation(
@@ -11813,7 +12247,7 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 		const children = list.roadmaps.filter((epic) => epic.parentId === selected);
 		const child = await choose(
 			ctx,
-			`${selected}: child epic`,
+			`${selected}: child roadmap`,
 			children.map((epic) => ({
 				value: epic.id,
 				label: `${epic.id} [${epic.readiness.state.replaceAll("_", " ")}] ${epic.title}`,
@@ -12094,6 +12528,123 @@ export default function workModelsExtension(pi) {
 		});
 
 		pi.registerTool({
+			name: INITIATIVE_RECONCILE_TOOL,
+			label: "Convert roadmap to initiative",
+			description:
+				"Finish an F7-selected roadmap conversion after source analysis and any necessary ask_user decisions. Computes hashes, previews, confirms once, and applies atomically.",
+			parameters: {
+				type: "object",
+				properties: {
+					targetId: { type: "string" },
+					title: { type: "string" },
+					description: { type: "string" },
+					sources: {
+						type: "array",
+						minItems: 1,
+						items: {
+							type: "object",
+							properties: {
+								id: { type: "string" },
+								path: { type: "string" },
+							},
+							required: ["id", "path"],
+							additionalProperties: false,
+						},
+					},
+					groups: {
+						type: "array",
+						minItems: 1,
+						items: {
+							type: "object",
+							properties: {
+								id: { type: "string" },
+								title: { type: "string" },
+								description: { type: "string" },
+								roadmapId: { type: "string" },
+								selected: { type: "boolean" },
+							},
+							required: ["id", "title"],
+							additionalProperties: false,
+						},
+					},
+					outcomes: {
+						type: "array",
+						minItems: 1,
+						items: {
+							type: "object",
+							properties: {
+								id: { type: "string" },
+								sourceId: { type: "string" },
+								provenance: { type: "string" },
+								content: { type: "string" },
+								disposition: {
+									type: "string",
+									enum: ["accepted", "rejected", "non_goal"],
+								},
+								groupId: { type: "string" },
+							},
+							required: ["sourceId", "provenance", "content", "disposition"],
+							additionalProperties: false,
+						},
+					},
+				},
+				required: ["targetId", "sources", "groups", "outcomes"],
+				additionalProperties: false,
+			},
+			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+				const cwd = resolve(ctx?.cwd ?? process.cwd());
+				const key = initiativeConversionKey(ctx);
+				const pending = pendingInitiativeConversions.get(key);
+				if (
+					!pending ||
+					pending.cwd !== cwd ||
+					pending.targetId !== String(params.targetId ?? "").trim()
+				)
+					throw new Error(
+						"No matching F7 initiative conversion is active. Select the roadmap and choose Convert to initiative first.",
+					);
+				const proposal = initiativeProposalFromTool(cwd, params);
+				const preview = previewInitiativeReconciliation(cwd, proposal);
+				const previewText = renderInitiativePreview(preview);
+				if (preview.conflicts.length)
+					throw new Error(`Initiative preview conflicts:\n${previewText}`);
+				if (
+					!ctx?.hasUI ||
+					!(await ctx.ui.confirm("Convert roadmap to initiative?", previewText))
+				) {
+					pendingInitiativeConversions.delete(key);
+					return {
+						content: [
+							{ type: "text", text: "Initiative conversion cancelled." },
+						],
+						details: { cancelled: true, preview },
+						terminate: true,
+					};
+				}
+				return withFileMutationQueue(storePath(cwd), async () => {
+					const approval = approveInitiativeReconciliation(cwd, preview.token);
+					const result = applyInitiativeReconciliation(
+						cwd,
+						proposal,
+						preview.token,
+						{ approval },
+					);
+					pendingInitiativeConversions.delete(key);
+					return {
+						content: [
+							{
+								type: "text",
+								text: `Converted ${result.initiativeId} to an initiative with ${preview.proposed.epics.length} child roadmap(s).`,
+							},
+						],
+						details: { result, preview },
+						terminate: true,
+					};
+				});
+			},
+		});
+
+		pi.registerTool({
 			name: IMPROVEMENT_REPORT_TOOL,
 			label: "Report workflow improvement",
 			description:
@@ -12137,7 +12688,7 @@ export default function workModelsExtension(pi) {
 						content: [
 							{
 								type: "text",
-								text: `Workflow improvement report recorded: task ${details.taskId}, epic ${details.epicId}, bundle ${details.bundle}.`,
+								text: `Workflow improvement report recorded: task ${details.taskId}, roadmap ${details.epicId}, bundle ${details.bundle}.`,
 							},
 						],
 						details,
@@ -12241,21 +12792,27 @@ export default function workModelsExtension(pi) {
 			};
 			persistWorkGoal(pi);
 		}
+		pendingInitiativeConversions.clear();
 		activeWorkGoalRunning = false;
 		pendingWorkGoalTurn = false;
 		workGoalContinuationPending = null;
+		manualMicrocompactPending = false;
+		resetContextCompaction();
 		clearWorkGoalRecovery();
 		if (activeWorkGoal?.status === "waiting_usage_limit")
 			scheduleWorkGoalUsageLimitRetry(pi, ctx, activeWorkGoal);
 		updateWorkGoalStatus(ctx);
 		updateWorkGoalProgress(ctx);
-		ctx.ui.notify("work-orchestrator loaded · F7 roadmaps · F8 menu", "info");
+		ctx.ui.notify(`work-orchestrator loaded · ${WORK_SHORTCUT_STATUS}`, "info");
 		resetWarpTitle(ctx);
 		startWorkGoalProgressTimer(ctx);
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
 		pendingDirtyRecoveries.clear();
+		pendingInitiativeConversions.clear();
+		manualMicrocompactPending = false;
+		resetContextCompaction();
 		persistWorkGoal(pi);
 		clearWorkGoalUsageLimitTimer();
 		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
@@ -12544,6 +13101,7 @@ export default function workModelsExtension(pi) {
 				tokensBefore: event.preparation.tokensBefore,
 				details: {
 					kind: "work-orchestrator-instant",
+					generation: contextCompactState.generation,
 					reason: event.reason,
 					files: filesFromOps(event.preparation.fileOps),
 				},
@@ -12553,9 +13111,9 @@ export default function workModelsExtension(pi) {
 
 	pi.on("session_compact", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "session_compact", event);
-		const wasOurs = contextCompactState.inFlight;
-		contextCompactState.inFlight = false;
-		contextCompactState.requested = false;
+		const wasOurs =
+			event.compactionEntry?.details?.kind === "work-orchestrator-instant" ||
+			contextCompactState.inFlight;
 		if (
 			!wasOurs &&
 			activeWorkGoal?.status === "active" &&
@@ -12573,19 +13131,27 @@ export default function workModelsExtension(pi) {
 		}
 	});
 
+	pi.on("agent_settled", async (_event, ctx) => {
+		if (manualMicrocompactPending && ctx.isIdle?.() !== false)
+			runManualMicrocompact(ctx);
+	});
+
 	pi.on("turn_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "turn_end", event);
+		const manualMicrocompactStarted =
+			manualMicrocompactPending && runManualMicrocompact(ctx);
 		const activeGoal = activeWorkGoal?.status === "active";
-		try {
-			maybeCompact(
-				ctx,
-				readEffectiveSettings(ctx.cwd),
-				"turn boundary",
-				activeGoal,
-			);
-		} catch {
-			maybeCompact(ctx, {}, "turn boundary", activeGoal);
-		}
+		if (!manualMicrocompactStarted)
+			try {
+				maybeCompact(
+					ctx,
+					readEffectiveSettings(ctx.cwd),
+					"turn boundary",
+					activeGoal,
+				);
+			} catch {
+				maybeCompact(ctx, {}, "turn boundary", activeGoal);
+			}
 		cleanupBenignInstructionDirt(ctx.cwd);
 		await flushWorkGoalContinuationRetry(ctx, pi);
 	});
@@ -12654,9 +13220,9 @@ export default function workModelsExtension(pi) {
 		},
 	});
 	pi.registerShortcut?.("f8", {
-		description: "Open work menu",
+		description: "Microcompact work context",
 		handler: async (ctx) => {
-			await handleWorkMenuCommand(ctx, pi);
+			requestManualMicrocompact(ctx);
 		},
 	});
 
@@ -12692,7 +13258,7 @@ export default function workModelsExtension(pi) {
 
 	pi.registerCommand("work-roadmap", {
 		description:
-			"List, select, close, reopen, and inspect native work-item store epics",
+			"List, select, close, reopen, and inspect native work-item store roadmaps",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-roadmap", args, ctx, () =>
 				handleWorkRoadmapCommand(args, ctx, pi),
@@ -12806,7 +13372,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-plan", {
-		description: "Plan an idea and bootstrap the native work-item store epic",
+		description:
+			"Plan an idea and bootstrap the native work-item store roadmap",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-plan",
@@ -12819,7 +13386,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("work-master", {
-		description: "Alias for /work-plan master epic bootstrap",
+		description: "Alias for /work-plan master roadmap bootstrap",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry(
 				"work-master",
@@ -12894,7 +13461,7 @@ export default function workModelsExtension(pi) {
 
 	pi.registerCommand("work-add", {
 		description:
-			"Create explicit work under the active native work-item store epic",
+			"Create explicit work under the active native work-item store roadmap",
 		handler: async (args, ctx) => {
 			await withCommandTelemetry("work-add", args, ctx, () =>
 				handleWorkflowAction(buildWorkAddState, args, ctx, pi),

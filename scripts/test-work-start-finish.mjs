@@ -52,6 +52,8 @@ try {
 	assert(
 		state.handoffPrompt.includes("Do not call subagent list") &&
 			state.handoffPrompt.includes("finish-task") &&
+			state.handoffPrompt.includes("native edit tool") &&
+			state.handoffPrompt.includes("Do not rewrite tracked files") &&
 			state.handoffPrompt.includes("--immediate-format") &&
 			state.handoffPrompt.length < 2400,
 		"small handoff is compact, coded, and discovery-free",
@@ -152,8 +154,11 @@ try {
 	);
 	const riskyDirect = directRoleHandoffParams(state, fixture.cwd);
 	assert(
-		!state.inlineWork && riskyDirect?.agent === "work-worker",
-		"sensitive small requests escalate to the exact isolated writer",
+		!state.inlineWork &&
+			riskyDirect?.agent === "work-worker" &&
+			riskyDirect.params.task.includes("native edit tool") &&
+			riskyDirect.params.task.includes("Do not rewrite tracked files"),
+		"sensitive small requests escalate to a native-tool isolated writer",
 	);
 
 	fixture.reset("active");
@@ -204,9 +209,9 @@ try {
 	);
 	assert(fixture.logs().length === 0, "work-plan does not initialize bd");
 	assert(
-		state.nextAction.includes("bootstrap-plan-epic") &&
+		state.nextAction.includes("bootstrap-plan-roadmap") &&
 			!state.nextAction.includes("/work-plan <plan-path>"),
-		"raw work-plan bootstraps the epic in-flow instead of asking to re-run /work-plan",
+		"raw work-plan bootstraps the roadmap in-flow instead of asking to re-run /work-plan",
 	);
 	assert(
 		state.handoffPrompt.includes("Preserve every decided requirement") &&

@@ -1,5 +1,5 @@
 ---
-description: Debug a failing test, error, or broken behavior inside the active epic
+description: Debug a failing test, error, or broken behavior inside the active roadmap
 argument-hint: "<bug-or-work-item-id|symptom[: guidance]>"
 ---
 

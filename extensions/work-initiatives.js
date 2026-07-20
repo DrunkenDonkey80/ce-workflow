@@ -126,7 +126,7 @@ export function normalizeInitiativeProposal(input) {
 	if (new Set(explicitEpics).size !== explicitEpics.length)
 		return fail(
 			"ambiguous_lineage",
-			"An epic cannot represent multiple delivery groups.",
+			"A roadmap cannot represent multiple delivery groups.",
 		);
 	if (
 		(mode === "wrap" &&
@@ -144,7 +144,7 @@ export function normalizeInitiativeProposal(input) {
 	)
 		return fail(
 			"incomplete_coverage",
-			"Conversion requires exactly one selected child epic.",
+			"Conversion requires exactly one selected child roadmap.",
 		);
 	if (!Array.isArray(input.outcomes) || input.outcomes.length === 0)
 		return fail(
@@ -238,7 +238,7 @@ function mappedGroups(store, proposal) {
 		if (prior.size > 1)
 			return fail(
 				"ambiguous_lineage",
-				`Delivery group ${group.id} maps to multiple epics.`,
+				`Delivery group ${group.id} maps to multiple roadmaps.`,
 			);
 		const priorEpicId = [...prior][0];
 		if (group.epicId && priorEpicId && group.epicId !== priorEpicId)
@@ -277,7 +277,7 @@ export function buildInitiativeReconciliation(store, input) {
 	)
 		return fail(
 			"invalid_proposal",
-			"Initiative target must be a compatible epic.",
+			"Initiative target must be a compatible roadmap.",
 		);
 	const existingInitiative = store.items[proposal.initiative.id];
 	const currentInitiative = isInitiative(existingInitiative)
@@ -301,6 +301,7 @@ export function buildInitiativeReconciliation(store, input) {
 		if (proposal.mode === "convert")
 			candidate.items[proposal.initiative.id] = {
 				...candidate.items[proposal.targetId],
+				status: "open",
 				labels: [
 					...new Set([
 						...(candidate.items[proposal.targetId].labels ?? []),
@@ -376,7 +377,7 @@ export function buildInitiativeReconciliation(store, input) {
 		)
 			return fail(
 				"protected_field_conflict",
-				`Cannot attach epic ${group.epicId}.`,
+				`Cannot attach roadmap ${group.epicId}.`,
 			);
 		const prior = priorCoverage.find(
 			(outcome) => outcome.epicId === group.epicId,
@@ -623,7 +624,7 @@ export function projectInitiativeHierarchy(
 		const readiness = initiative
 			? {
 					state: "aggregate",
-					reason: "Child epics are planned independently.",
+					reason: "Child roadmaps are planned independently.",
 				}
 			: readinessFor(epic, readinessByEpic);
 		let conflicts = [];
@@ -631,8 +632,7 @@ export function projectInitiativeHierarchy(
 			conflicts = [
 				...childEpics
 					.filter(
-						(child) =>
-							readinessFor(child, readinessByEpic).state === "stale",
+						(child) => readinessFor(child, readinessByEpic).state === "stale",
 					)
 					.map((child) => `stale_plan:${child.id}`),
 				...(lineageByInitiative[epic.id]?.conflicts ?? []),

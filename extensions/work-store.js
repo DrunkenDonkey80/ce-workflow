@@ -402,9 +402,13 @@ function validateInitiativeHierarchy(items, file) {
 	for (const item of values) {
 		const parent = items[item.parentId];
 		const grandparent = items[parent?.parentId];
-		if (item.type === "epic" && parent?.type === "epic" && grandparent?.initiative)
+		if (
+			item.type === "epic" &&
+			parent?.type === "epic" &&
+			grandparent?.initiative
+		)
 			throw hierarchyError(
-				`Initiative ${grandparent.id} cannot contain nested epic ${item.id}`,
+				`Initiative ${grandparent.id} cannot contain nested roadmap ${item.id}`,
 				file,
 			);
 		const labels = item.labels ?? [];
@@ -422,7 +426,7 @@ function validateInitiativeHierarchy(items, file) {
 		if (!hasMetadata) continue;
 		if (item.type !== "epic" || item.parentId)
 			throw hierarchyError(
-				`Initiative ${item.id} must be a top-level epic`,
+				`Initiative ${item.id} must be a top-level roadmap`,
 				file,
 			);
 		const metadata = validateInitiativeMetadata(item, file);

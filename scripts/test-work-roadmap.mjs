@@ -17,6 +17,7 @@ import { initStore, loadStore, saveStore } from "../extensions/work-store.js";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
+	default: workModelsExtension,
 	bootstrapPlanEpic,
 	buildWorkPlanState,
 	buildWorkRoadmapState,
@@ -279,11 +280,18 @@ try {
 	execFileSync("git", ["init"], { cwd: initiativeRoot, stdio: "ignore" });
 	mkdirSync(path.join(initiativeRoot, ".pi"), { recursive: true });
 	mkdirSync(path.join(initiativeRoot, "docs", "plans"), { recursive: true });
+	mkdirSync(path.join(initiativeRoot, "docs", "brainstorms"), {
+		recursive: true,
+	});
 	const childPlan =
 		"---\nartifact_contract: ce-unified-plan/v1\nartifact_readiness: implementation-ready\nexecution: code\n---\n# Child\n";
 	writeFileSync(
 		path.join(initiativeRoot, "docs", "plans", "child.md"),
 		childPlan,
+	);
+	writeFileSync(
+		path.join(initiativeRoot, "docs", "brainstorms", "standalone.md"),
+		"# Standalone intent\n\n- Ship the remaining outcome.\n",
 	);
 	writeFileSync(
 		path.join(initiativeRoot, ".pi", "work-orchestrator-state.json"),
@@ -342,7 +350,9 @@ try {
 			documentLinks: { design: "docs/plans/child.md" },
 		}),
 		"I-1.2": item("I-1.2", "Needs plan", { parentId: "I-1" }),
-		"S-1": item("S-1", "Standalone"),
+		"S-1": item("S-1", "Standalone", {
+			documentLinks: { brainstorm: "docs/brainstorms/standalone.md" },
+		}),
 	};
 	saveStore(initiativeRoot, initiativeStore);
 	const tree = buildWorkRoadmapState(initiativeRoot, "list");
@@ -442,7 +452,7 @@ try {
 	);
 	const cancelled = await runPreview(false);
 	assert.equal(cancelled.state.action, "initiative-preview-cancelled");
-	assert.match(cancelled.previewText, /Proposed child epics:/);
+	assert.match(cancelled.previewText, /Proposed child roadmaps:/);
 	assert.match(cancelled.previewText, /Outcome coverage:/);
 	assert.equal(
 		readFileSync(
@@ -482,7 +492,220 @@ try {
 		const actions = await captureOps(id);
 		for (const expected of ["resume", "list tasks", "plan", "report", "close"])
 			assert.match(actions, new RegExp(expected, "i"));
+		if (id === "S-1") assert.match(actions, /convert to initiative/i);
+		else assert.doesNotMatch(actions, /convert to initiative/i);
 	}
+
+	// Resume explains the empty starting state, offers full ce-plan, then attaches its plan to this epic.
+	const planningPrompts = [];
+	const planningState = await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: initiativeRoot,
+			isIdle: () => false,
+			sessionManager: { getSessionId: () => "roadmap-planning-session" },
+			sendUserMessage: async (message) => planningPrompts.push(message),
+			ui: {
+				select: async (title, labels) => {
+					if (title.includes("operation"))
+						return labels.find((label) => /work-resume/i.test(label));
+					if (title.includes("master plan"))
+						return labels.find((label) => /create master plan/i.test(label));
+					return labels.find((label) => label.includes("I-1.2 ["));
+				},
+				confirm: async () => true,
+				notify: () => {},
+				setStatus: () => {},
+				setWidget: () => {},
+			},
+		},
+		{},
+	);
+	assert.equal(planningState.action, "master-plan-resume-started");
+	assert.match(planningPrompts[0], /ce-plan/);
+	assert.match(planningPrompts[0], /docs\/plans\/child\.md/);
+	assert.match(
+		planningPrompts[0],
+		/bootstrap-plan-roadmap (?:<|&lt;)plan-path(?:>|&gt;) --roadmap I-1\.2/,
+	);
+	assert.match(planningPrompts[0], /continue.*\/work-resume I-1\.2/i);
+
+	const childMasterPlan = "docs/plans/i-1-2.md";
+	writeFileSync(
+		path.join(initiativeRoot, childMasterPlan),
+		"# I-1.2 master plan\n\n## Acceptance\n\n- Focused verification passes.\n",
+	);
+	const attachedPlan = bootstrapPlanEpic(
+		initiativeRoot,
+		childMasterPlan,
+		"/work-plan",
+		{ safeForHandoff: true, warnings: [], dirtyPaths: [], dirtyFiles: [] },
+		{ initialized: false },
+		{ targetEpicId: "I-1.2" },
+	);
+	assert.equal(attachedPlan.epic.id, "I-1.2");
+	assert.equal(attachedPlan.action, "run-planner");
+	const plannedStore = loadStore(initiativeRoot);
+	assert.equal(
+		plannedStore.items["I-1.2"].documentLinks.design,
+		childMasterPlan,
+	);
+	assert.equal(
+		plannedStore.items[attachedPlan.selectedWorkItem.id].parentId,
+		"I-1.2",
+	);
+	const plannedDescription = plannedStore.items["I-1.2"].description;
+	const plannedChildCount = Object.values(plannedStore.items).filter(
+		(item) => item.parentId === "I-1.2",
+	).length;
+	bootstrapPlanEpic(
+		initiativeRoot,
+		`./${childMasterPlan}`,
+		"/work-plan",
+		{ safeForHandoff: true, warnings: [], dirtyPaths: [], dirtyFiles: [] },
+		{ initialized: false },
+		{ targetEpicId: "I-1.2" },
+	);
+	const repeatedPlanStore = loadStore(initiativeRoot);
+	assert.equal(
+		repeatedPlanStore.items["I-1.2"].description,
+		plannedDescription,
+	);
+	assert.equal(
+		Object.values(repeatedPlanStore.items).filter(
+			(item) => item.parentId === "I-1.2",
+		).length,
+		plannedChildCount,
+	);
+	execFileSync("git", ["add", "."], { cwd: initiativeRoot, stdio: "ignore" });
+	execFileSync(
+		"git",
+		[
+			"-c",
+			"user.name=Test",
+			"-c",
+			"user.email=test@example.com",
+			"commit",
+			"-m",
+			"fixture",
+		],
+		{ cwd: initiativeRoot, stdio: "ignore" },
+	);
+	const helperAttach = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"bootstrap-plan-roadmap",
+				childMasterPlan,
+				"--roadmap",
+				"I-1.2",
+			],
+			{ cwd: initiativeRoot, encoding: "utf8" },
+		),
+	);
+	assert.equal(helperAttach.roadmap_id, "I-1.2");
+	assert.equal(helperAttach.planning_id, attachedPlan.selectedWorkItem.id);
+
+	const closedConversionStore = loadStore(initiativeRoot);
+	closedConversionStore.items["S-1"].status = "closed";
+	saveStore(initiativeRoot, closedConversionStore);
+
+	// A selected standalone epic starts an agent-guided scan; the final tool owns preview + apply.
+	const tools = {};
+	workModelsExtension({
+		on: () => {},
+		registerCommand: () => {},
+		registerShortcut: () => {},
+		registerTool: (tool) => {
+			tools[tool.name] = tool;
+		},
+	});
+	const conversionPrompts = [];
+	const conversionCtx = {
+		cwd: initiativeRoot,
+		hasUI: true,
+		sessionManager: { getSessionId: () => "roadmap-conversion-session" },
+		ui: {
+			select: async (title, labels) =>
+				title.includes("operation")
+					? labels.find((label) => /convert to initiative/i.test(label))
+					: labels.find((label) => label.includes("S-1 [")),
+			confirm: async () => true,
+			notify: () => {},
+		},
+		sendUserMessage: async (message) => conversionPrompts.push(message),
+	};
+	const started = await handleWorkRoadmapCommand("", conversionCtx, {});
+	assert.equal(started.action, "initiative-conversion-started");
+	assert.match(conversionPrompts[0], /docs\/brainstorms\/standalone\.md/);
+	assert.match(conversionPrompts[0], /ask_user/);
+	assert.match(conversionPrompts[0], /work_initiative_reconcile/);
+	assert.ok(tools.work_initiative_reconcile);
+	const conversionParams = {
+		targetId: "S-1",
+		sources: [{ id: "brainstorm", path: "docs/brainstorms/standalone.md" }],
+		groups: [
+			{
+				id: "remaining",
+				title: "Ship remaining outcome",
+				selected: true,
+			},
+		],
+		outcomes: [
+			{
+				id: "remaining-outcome",
+				sourceId: "brainstorm",
+				provenance: "brainstorm:remaining outcome",
+				content: "Ship the remaining outcome.",
+				disposition: "accepted",
+				groupId: "remaining",
+			},
+		],
+	};
+	const beforeRejectedConversion = readFileSync(
+		path.join(initiativeRoot, ".ce-workflow", "work-items.json"),
+		"utf8",
+	);
+	await assert.rejects(
+		() =>
+			tools.work_initiative_reconcile.execute(
+				"tool-call",
+				{
+					...conversionParams,
+					outcomes: [
+						{
+							...conversionParams.outcomes[0],
+							content: "Invented outcome absent from the source.",
+						},
+					],
+				},
+				undefined,
+				undefined,
+				conversionCtx,
+			),
+		/not exact text from source brainstorm/,
+	);
+	assert.equal(
+		readFileSync(
+			path.join(initiativeRoot, ".ce-workflow", "work-items.json"),
+			"utf8",
+		),
+		beforeRejectedConversion,
+	);
+	const converted = await tools.work_initiative_reconcile.execute(
+		"tool-call",
+		conversionParams,
+		undefined,
+		undefined,
+		conversionCtx,
+	);
+	assert.match(converted.content[0].text, /converted S-1/i);
+	const convertedStore = loadStore(initiativeRoot);
+	assert.ok(convertedStore.items["S-1"].initiative);
+	assert.equal(convertedStore.items["S-1"].status, "open");
+	assert.equal(convertedStore.items["S-1.1"].parentId, "S-1");
+
 	const blockedInitiativeClose = buildWorkRoadmapState(
 		initiativeRoot,
 		"close I-1 --force",

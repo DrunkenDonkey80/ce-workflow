@@ -763,7 +763,7 @@ try {
 		if (!target) print(projection);
 		else {
 			const root = projection.nodes.find((node) => node.id === target);
-			if (!root) throw new Error(`Initiative or epic not found: ${target}`);
+			if (!root) throw new Error(`Initiative or roadmap not found: ${target}`);
 			print({
 				schemaVersion: projection.schemaVersion,
 				roots: [root.id],
@@ -809,20 +809,30 @@ try {
 				{ approval },
 			),
 		);
-	} else if (command === "bootstrap-plan-epic") {
+	} else if (
+		["bootstrap-plan-roadmap", "bootstrap-plan-epic"].includes(command)
+	) {
 		const [rel] = positional();
-		if (!rel) throw new Error("usage: bootstrap-plan-epic <plan-path>");
+		const targetEpicId = option("--roadmap") ?? option("--epic");
+		if (!rel)
+			throw new Error(
+				"usage: bootstrap-plan-roadmap <plan-path> [--roadmap <existing-roadmap-id>]",
+			);
 		const modUrl = pathToFileURL(
 			path.join(import.meta.dirname, "..", "extensions", "work-models.js"),
 		).href;
+		const roadmapIdField =
+			command === "bootstrap-plan-epic" ? "epic_id" : "roadmap_id";
+		const roadmapTitleField =
+			command === "bootstrap-plan-epic" ? "epic_title" : "roadmap_title";
 		const bridge = `(async () => {
 			const { bootstrapPlanEpic } = await import(${JSON.stringify(modUrl)});
-			const s = bootstrapPlanEpic(${JSON.stringify(cwd)}, ${JSON.stringify(rel)});
+			const s = bootstrapPlanEpic(${JSON.stringify(cwd)}, ${JSON.stringify(rel)}, "/work-plan", undefined, undefined, ${JSON.stringify(targetEpicId ? { targetEpicId } : undefined)});
 			const slim = {
 				ok: !!s.ok,
 				action: s.action,
-				epic_id: s.epic?.id ?? null,
-				epic_title: s.epic?.title ?? null,
+				[${JSON.stringify(roadmapIdField)}]: s.epic?.id ?? null,
+				[${JSON.stringify(roadmapTitleField)}]: s.epic?.title ?? null,
 				planning_id: s.selectedWorkItem?.id ?? null,
 				open_questions: s.open_questions ?? [],
 				message: s.message ?? "",
@@ -849,7 +859,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-epic|json-assert> ...",
+			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-roadmap|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}

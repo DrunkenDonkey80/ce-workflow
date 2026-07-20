@@ -115,11 +115,11 @@ function resetNative(scenario = "default") {
 	const activeChildren =
 		scenario === "closed"
 			? children.map((issue) => ({
-				...issue,
-				status: "closed",
-				labels: [],
-				depends_on: [],
-			}))
+					...issue,
+					status: "closed",
+					labels: [],
+					depends_on: [],
+				}))
 			: children;
 	seedNativeStore(cwd, [
 		activeEpic,
@@ -273,13 +273,13 @@ try {
 	const closed = buildWorkReport(cwd, "E-1");
 	assert(
 		closed.includes("Status: ✅ closed") &&
-			closed.includes('Next: epic E-1 "Add coded work report" is complete.'),
-		"closed completed epic reports completion next action",
+			closed.includes('Next: roadmap E-1 "Add coded work report" is complete.'),
+		"closed completed roadmap reports completion next action",
 	);
 	const closedJson = JSON.parse(buildWorkReport(cwd, "E-1 --json"));
 	assert(
 		closedJson.suggestedCommands.length === 0,
-		"closed completed epic JSON has no suggested command",
+		"closed completed roadmap JSON has no suggested command",
 	);
 
 	rmSync(path.join(cwd, ".ce-workflow"), { recursive: true, force: true });
@@ -287,7 +287,8 @@ try {
 	mkdirSync(path.join(cwd, ".beads"), { recursive: true });
 	const migrationRequired = JSON.parse(buildWorkReport(cwd, "--json"));
 	assert(
-		migrationRequired.ok === false && migrationRequired.reason === "migration-required",
+		migrationRequired.ok === false &&
+			migrationRequired.reason === "migration-required",
 		"legacy work state requires migration",
 	);
 
@@ -296,7 +297,8 @@ try {
 	rmSync(path.join(cwd, ".pi", "work-store"), { recursive: true, force: true });
 	const recoveryRequired = JSON.parse(buildWorkReport(cwd, "--json"));
 	assert(
-		recoveryRequired.ok === false && recoveryRequired.reason === "recovery-required",
+		recoveryRequired.ok === false &&
+			recoveryRequired.reason === "recovery-required",
 		"invalid native store is parseable JSON",
 	);
 

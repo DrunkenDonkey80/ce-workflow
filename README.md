@@ -27,9 +27,9 @@ No tracker CLI is required for normal operation. In a new repository run:
 | Command | Native behavior |
 | --- | --- |
 | `/work-init` | Creates the native store when absent. |
-| `/work-plan`, `/work-master` | Creates or resumes a plan epic. |
+| `/work-plan`, `/work-master` | Creates or resumes a plan roadmap. |
 | `/work-small`, `/work-med`, `/work-big`, `/work-auto` | Classifies and creates one scoped work item. |
-| `/work-resume`, `/work-status`, `/work-report`, `/work-roadmap` | Reads native state; F7 shows standalone epics beside initiative → child-epic trees with separate work and plan status. |
+| `/work-resume`, `/work-status`, `/work-report`, `/work-roadmap` | Reads native state; F7 shows roadmap trees and offers agent-guided conversion of standalone roadmaps into initiatives. F8 microcompacts context immediately when idle or at the next safe boundary. |
 | `/work-add`, `/work-debug`, `/work-pause`, `/work-finish` | Mutates, checkpoints, or finalizes a native work item. |
 | `/work-brainstorm`, `/work-ideate`, `/work-usage`, `/work-telemetry` | Manages ideas and local reports. |
 | `/work-settings`, `/work-context`, `/work-goal` | Configures orchestration and context behavior. |
@@ -41,9 +41,9 @@ Role agents are `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `w
 ## Workflow rules
 
 - One executable work item is the normal session boundary.
-- Use `/work-pause` to persist a checkpoint, then `/work-resume <epic-id>` in a fresh session.
+- Use `/work-pause` to persist a checkpoint, then `/work-resume <roadmap-id>` in a fresh session.
 - `/work-status` and `/work-report` are deterministic local projections; do not edit the store by hand during normal use.
-- Initiatives aggregate child progress but are never executable. Select one child epic to plan or resume; initiative close cannot be forced past unresolved coverage, stale source/plan lineage, or open children. F7 previews complete hierarchy and coverage before its confirmation mints the single-use apply receipt.
+- Initiatives aggregate child progress but are never executable. Select one child roadmap to plan or resume; initiative close cannot be forced past unresolved coverage, stale source/plan lineage, or open children. F7 previews complete hierarchy and coverage before its confirmation mints the single-use apply receipt.
 - Finish requires verification evidence and any required review before the store item closes.
 - Manual changes are classified before writer work starts. No parallel writers, automatic branch checkout, or push automation.
 - Put project verification contracts in project instructions. Real hardware or product proof is not replaced by mocks without approval.
@@ -60,7 +60,7 @@ The migration command is idempotent, validates export parity, keeps an ignored b
 
 ## Workflow improvement reporting
 
-Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` epic. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout; a maintainer later resumes the epic through the normal workflow.
+Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` roadmap. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout; a maintainer later resumes the roadmap through the normal workflow.
 
 ## Workflow evaluation harness
 

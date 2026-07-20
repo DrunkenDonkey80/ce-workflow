@@ -7,7 +7,7 @@ description: Drive uncomputed /work-* requests, including verified legacy work i
 
 ## Fast rule
 
-When the prompt contains `WO_INLINE_V1` or says it has precomputed extension state, trust that state. The prompt is the execution contract: do not rediscover the epic/work item, reread this skill, dump work items JSON, or load the full policy reference. Verify only that named files/state are still fresh, then execute the named action.
+When the prompt contains `WO_INLINE_V1` or says it has precomputed extension state, trust that state. The prompt is the execution contract: do not rediscover the roadmap/work item, reread this skill, dump work items JSON, or load the full policy reference. Verify only that named files/state are still fresh, then execute the named action.
 
 Work directly in the current session by default. Use code for intake, routing, bounded validation, commit, close, and push. Do not call `subagent list`; the extension selects exact specialist names. Launch a role only when it adds distinct judgment:
 
@@ -51,24 +51,24 @@ If it reports independent review required, use its complete labelled reviewer ha
 - **small** — inline, two implementation files maximum.
 - **med** — inline by default, eight files maximum; escalate to big if semantic slicing is needed.
 - **big** — one `wo:planning` work item and one exact `work-planner`; propagate `wo:execution-agent` to risky executable children.
-- **resume** — autonomous slice loop. Run each ready work item inline by default (set `sliceExecutionMode=agent` in `/work-settings` to route each slice to an isolated `work-worker`); exact planner/debugger/reviewer only when policy requires it. Do NOT ask how to run each slice — apply the coded execution policy and run. After a slice closes, continue to the next ready work item automatically (re-run `/work-resume`; use `/work-goal` for automatic `/new` per slice). Stop the loop only for: an open `type=decision` work item needing human input, a blocker/debug-needed work item, epic completion, or `/work-stop`.
+- **resume** — autonomous slice loop. Run each ready work item inline by default (set `sliceExecutionMode=agent` in `/work-settings` to route each slice to an isolated `work-worker`); exact planner/debugger/reviewer only when policy requires it. Do NOT ask how to run each slice — apply the coded execution policy and run. After a slice closes, continue to the next ready work item automatically (re-run `/work-resume`; use `/work-goal` for automatic `/new` per slice). Stop the loop only for: an open `type=decision` work item needing human input, a blocker/debug-needed work item, roadmap completion, or `/work-stop`.
 - **goal** — autonomous current-session loop with on-demand microcompaction. Work inline; exact specialists only for the cases above. Completion requires verified evidence. Stop with `/work-stop`.
 - **debug** — exact `work-debugger`, then one scoped reviewer only after a verified fix; coded finalizer commits.
 - **auto** — trust the extension's deterministic classification; do not reclassify with an LLM.
-- **plan/master** — use `ce-plan` and planner/advisor only when requirements are genuinely semantic or uncertain. master mode must clear the Open Question Gate: `/work-plan` scans the plan for unresolved open questions (including non-blocking ones with a stated default) and blocks epic creation until each is resolved via one `ask_user` with `allowComment=true`, then re-run. One delivery scope keeps the standalone epic path. Multiple independently completable scopes require a versioned semantic initiative proposal, coded preview, explicit approval, and coded apply; select one child for just-in-time planning and never plan or execute sibling stubs automatically.
+- **plan/master** — use `ce-plan` and planner/advisor only when requirements are genuinely semantic or uncertain. master mode must clear the Open Question Gate: `/work-plan` scans the plan for unresolved open questions (including non-blocking ones with a stated default) and blocks roadmap creation until each is resolved via one `ask_user` with `allowComment=true`, then re-run. One delivery scope keeps the standalone roadmap path. Multiple independently completable scopes require a versioned semantic initiative proposal, coded preview, explicit approval, and coded apply; select one child for just-in-time planning and never plan or execute sibling stubs automatically.
 - **remove-beads** — deterministic one-way legacy migration; it verifies export parity and backup, never commits, and stops on any mismatch.
 - **migrate** — exact `work-migrator`; source and branch inspection is read-only.
 - **init/status/report/usage/telemetry/roadmap/add/pause/finish** — deterministic extension paths; no agent.
 
 ## Opt-in workflow improvement reporting
 
-This is off by default behind `workResume.selfImproving`. When enabled, `work_report_improvement` is available for an explicit, concrete ce-workflow problem with observation, expected behavior, impact, and one or more local logs. It copies accepted evidence into ignored local storage and creates one child task under the ce-workflow checkout's `Self-improving` epic.
+This is off by default behind `workResume.selfImproving`. When enabled, `work_report_improvement` is available for an explicit, concrete ce-workflow problem with observation, expected behavior, impact, and one or more local logs. It copies accepted evidence into ignored local storage and creates one child task under the ce-workflow checkout's `Self-improving` roadmap.
 
 Reporting never analyzes terminal workflows, launches an improver, changes, benchmarks, commits, pushes, reverts, or waits on the ce-workflow source. Source resolution is `workImprovement.sourceCheckout`, then `CE_WORKFLOW_SOURCE_DIR`, then the package checkout; a maintainer processes report tasks later through normal work-item flow.
 
 ## Handoff hygiene
 
-Use compact helper commands (`work-summary`, `work-children-summary`, `blocker-search`, `search-summary`, `json-assert`) instead of raw epic JSON, CLI help, broad scans, or repeated status/diff. Specialist children receive one work item ID, concrete acceptance, relevant paths, verification, and known unrelated dirt; they must not launch subagents.
+Use compact helper commands (`work-summary`, `work-children-summary`, `blocker-search`, `search-summary`, `json-assert`) instead of raw roadmap JSON, CLI help, broad scans, or repeated status/diff. Specialist children receive one work item ID, concrete acceptance, relevant paths, verification, and known unrelated dirt; they must not launch subagents.
 
 An ambiguous subagent RPC acknowledgement must not trigger a fallback writer because the first launch may already be active. Check the active-run widget before retrying.
 

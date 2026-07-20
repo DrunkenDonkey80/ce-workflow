@@ -132,7 +132,7 @@ const workItemObjective = mod.buildWorkSelfImprovingObjective(
 	"C:/soft/git/AI-Wedge work-2",
 	{ project: true },
 );
-assert.match(workItemObjective, /Target work item or epic ID: work-2/);
+assert.match(workItemObjective, /Target work item or roadmap ID: work-2/);
 assert.match(
 	workItemObjective,
 	/Identifiers such as work-2 are targets, never task counts/,
@@ -208,7 +208,7 @@ assert.equal(
 		blocked: 2,
 		elapsedMs: 123_000,
 	}),
-	"Epic [██████░░░░░░] ✅ 3/6 units (3 left · 2 unsliced) 🔴 1 🟠 2 ⏱️ 2m 3s · F7 roadmaps · F8 menu",
+	"Roadmap [██████░░░░░░] ✅ 3/6 units (3 left · 2 unsliced) 🔴 1 🟠 2 ⏱️ 2m 3s · F7 roadmaps · F8 microcompact",
 );
 assert.deepEqual(
 	mod.warpPayload(
@@ -232,6 +232,8 @@ const prompt = mod.buildWorkGoalSystemPrompt({
 	iteration: 0,
 });
 assert.match(prompt, /Do not stop for plan approval/);
+assert.match(prompt, /native edit tool/);
+assert.match(prompt, /Do not rewrite tracked files/);
 assert.match(prompt, /Use ask_user for every question/);
 assert.match(prompt, /allowComment=true for planning, product, and adoption/);
 assert.match(prompt, /allowComment=false for destructive actions/);
@@ -292,7 +294,7 @@ assert.ok(commands["work-stop"]);
 assert.ok(commands["work-menu"]);
 assert.ok(commands["work-goal-reset-continue"]);
 assert.ok(shortcuts.f7);
-assert.ok(shortcuts.f8);
+assert.match(shortcuts.f8.description, /microcompact/i);
 assert.ok(!commands["work-self-improving-goal"]);
 assert.ok(!commands["work-project-goal"]);
 assert.ok(!commands["work-project"]);
@@ -321,6 +323,7 @@ try {
 	const tempCommands = {};
 	const tempHooks = {};
 	const tempTools = {};
+	const tempShortcuts = {};
 	const sent = [];
 	const statuses = {};
 	const notices = [];
@@ -336,7 +339,9 @@ try {
 		registerTool: (tool) => {
 			tempTools[tool.name] = tool;
 		},
-		registerShortcut: () => {},
+		registerShortcut: (key, config) => {
+			tempShortcuts[key] = config;
+		},
 		appendEntry: (customType, data) => {
 			entries.push({ type: "custom", customType, data });
 		},
@@ -354,6 +359,8 @@ try {
 		},
 		sessionManager: { getBranch: () => entries },
 		ui: {
+			select: async (_title, labels) =>
+				labels.find((label) => /microcompact/i.test(label)),
 			notify: (message, level) => notices.push({ message, level }),
 			setStatus: (key, value) => {
 				statuses[key] = value;
@@ -477,7 +484,7 @@ try {
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes(
-				"work-orchestrator loaded · F7 roadmaps · F8 menu",
+				"work-orchestrator loaded · F7 roadmaps · F8 microcompact",
 			),
 		),
 	);
@@ -513,6 +520,123 @@ try {
 		1,
 		"review budget is injected once",
 	);
+
+	await tempShortcuts.f8.handler({
+		...ctx,
+		isIdle: () => true,
+		ui: {
+			...ctx.ui,
+			select: async () => {
+				throw new Error("F8 must not open a menu");
+			},
+		},
+	});
+	assert.equal(compactions.length, 1, "idle F8 microcompacts immediately");
+	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
+	compactions.length = 0;
+	notices.length = 0;
+	await tempShortcuts.f8.handler(ctx);
+	assert.equal(
+		compactions.length,
+		0,
+		"busy F8 does not disturb the active turn",
+	);
+	assert.ok(
+		notices.some((notice) => String(notice.message).includes("queued")),
+		"busy F8 reports the queued microcompaction",
+	);
+	await tempHooks.turn_end(
+		{},
+		{ ...ctx, getContextUsage: () => ({ tokens: 1 }) },
+	);
+	assert.equal(
+		compactions.length,
+		1,
+		"queued F8 runs after the current turn and before the next one",
+	);
+	assert.equal(sent.length, 1, "queued F8 resumes work after compaction");
+	assert.match(sent[0].message, /Continue from the compacted context/);
+	assert.equal(sent[0].options?.deliverAs, "followUp");
+	assert.ok(
+		notices.some((notice) => String(notice.message).includes("resuming work")),
+		"queued F8 reports automatic resumption",
+	);
+	sent.length = 0;
+	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
+	assert.equal(compactions.length, 1, "settling does not repeat the request");
+	compactions.length = 0;
+
+	const unavailableNoticeCount = notices.length;
+	const unavailableCtx = { ...ctx, compact: undefined };
+	await tempShortcuts.f8.handler(unavailableCtx);
+	assert.ok(
+		notices.some((notice) =>
+			String(notice.message).includes("unavailable in this mode"),
+		),
+		"F8 reports unavailable compaction instead of queueing forever",
+	);
+	await tempHooks.agent_settled({}, { ...unavailableCtx, isIdle: () => true });
+	assert.equal(
+		notices.length,
+		unavailableNoticeCount + 1,
+		"unavailable F8 leaves no queued retry",
+	);
+
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workResume: { selfImproving: true },
+			workOrchestrator: { context: { autoCompact: true } },
+		}),
+	);
+	await tempShortcuts.f8.handler(ctx);
+	await tempHooks.turn_end(
+		{},
+		{ ...ctx, getContextUsage: () => ({ tokens: 160_000 }) },
+	);
+	assert.equal(
+		compactions.length,
+		1,
+		"queued F8 takes precedence over turn-end auto-compaction",
+	);
+	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
+	assert.equal(
+		sent.length,
+		1,
+		"queued F8 still resumes when auto-compaction is enabled",
+	);
+	sent.length = 0;
+	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
+	assert.equal(compactions.length, 1, "fulfilled F8 request is not repeated");
+	compactions.length = 0;
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({ workResume: { selfImproving: true } }),
+	);
+
+	const oldCompactions = [];
+	await tempShortcuts.f8.handler({
+		...ctx,
+		isIdle: () => true,
+		compact: (options) => oldCompactions.push(options),
+	});
+	await tempHooks.session_shutdown({}, ctx);
+	tempHooks.session_start?.({}, ctx);
+	const newCompactions = [];
+	const delayedCtx = {
+		...ctx,
+		isIdle: () => true,
+		compact: (options) => newCompactions.push(options),
+	};
+	await tempShortcuts.f8.handler(delayedCtx);
+	oldCompactions[0].onComplete?.();
+	await tempShortcuts.f8.handler(delayedCtx);
+	assert.equal(
+		newCompactions.length,
+		1,
+		"a stale callback cannot clear the new session's in-flight compaction",
+	);
+	newCompactions[0].onComplete?.();
 
 	await tempCommands["work-goal"].handler("write temp proof file", ctx);
 	assert.equal(sent.length, 1);

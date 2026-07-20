@@ -147,6 +147,24 @@ for (const rel of normalPaths) {
 	);
 }
 
+const userFacingDocs = [
+	"README.md",
+	"docs/orchestrator.md",
+	"docs/orchestrator_idea.md",
+	"skills/work-orchestrator/SKILL.md",
+	"skills/work-orchestrator/references/full-policy.md",
+	...agentFiles.map((name) => `agents/${name}`),
+	...listed("prompts").map((name) => `prompts/${name}`),
+];
+const staleRoadmapTerms = userFacingDocs.flatMap((rel) =>
+	[...read(rel).matchAll(/\bepics?\b/gi)].map((match) => `${rel}:${match[0]}`),
+);
+check(
+	"user-facing workflow vocabulary uses roadmap",
+	staleRoadmapTerms.length === 0,
+	staleRoadmapTerms.join(", "),
+);
+
 const evaluationFiles = [
 	"agents/workflow-evaluator.md",
 	"benchmarks/workflow-evaluation/v1/experiments/calibration.example.json",

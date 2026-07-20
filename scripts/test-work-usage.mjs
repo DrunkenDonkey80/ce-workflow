@@ -31,7 +31,12 @@ const { assert, installWorkflowFixture, seedNativeStore } = await import(
 const cwd = mkdtempSync(path.join(tmpdir(), "work-usage-"));
 const now = Date.now();
 seedNativeStore(cwd, [
-	{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Active epic" },
+	{
+		id: "E-1",
+		issue_type: "epic",
+		status: "in_progress",
+		title: "Active epic",
+	},
 ]);
 try {
 	recordWorkTelemetry(cwd, {
@@ -203,24 +208,39 @@ try {
 	try {
 		fixture.reset("active");
 		seedNativeStore(cwd, [
-			{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Active epic" },
+			{
+				id: "E-1",
+				issue_type: "epic",
+				status: "in_progress",
+				title: "Active epic",
+			},
 		]);
 		const byDefault = buildWorkUsageState(cwd, "");
 		assert(
 			byDefault.ok &&
-				byDefault.filter.scope === "epic" &&
+				byDefault.filter.scope === "roadmap" &&
 				byDefault.filter.value === "E-1",
-			"blank usage defaults to one active epic",
+			"blank usage defaults to one active roadmap",
 		);
 		fixture.reset("ambiguous");
 		seedNativeStore(cwd, [
-			{ id: "E-1", issue_type: "epic", status: "in_progress", title: "Active epic" },
-			{ id: "E-2", issue_type: "epic", status: "in_progress", title: "Second epic" },
+			{
+				id: "E-1",
+				issue_type: "epic",
+				status: "in_progress",
+				title: "Active epic",
+			},
+			{
+				id: "E-2",
+				issue_type: "epic",
+				status: "in_progress",
+				title: "Second epic",
+			},
 		]);
 		const ambiguous = buildWorkUsageState(cwd, "");
 		assert(
 			!ambiguous.ok && ambiguous.candidates.length === 2,
-			"blank usage stops on ambiguous active epics",
+			"blank usage stops on ambiguous active roadmaps",
 		);
 
 		const commands = {};
@@ -231,7 +251,7 @@ try {
 			},
 		});
 		const messages = [];
-		await commands["work-usage"].handler("epic E-1", {
+		await commands["work-usage"].handler("roadmap E-1", {
 			cwd,
 			getContextUsage: () => ({ tokens: 3333 }),
 			ui: { notify: (message) => messages.push(message) },

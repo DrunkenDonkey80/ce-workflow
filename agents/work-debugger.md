@@ -25,14 +25,14 @@ Responsibilities:
 - obey the work item's verification contract; when it requires real hardware, reproduce and verify on the affected hardware/module or stop for the parent;
 - update work item notes with symptoms, root cause, files changed, verification, hardware evidence when applicable, and result;
 - when reproduction, fix, or verification cannot proceed after a real attempt, attach a failure artifact with attempted commands, logs/artifact paths, current hypothesis, blocker reason, and the exact human decision needed;
-- do not hand back a diagnosis-only result while required verification still fails: either apply a verified fix, or create/reuse a blocker/decision/debug work item under the same epic, add it as a blocker for the assigned bug, mark the assigned bug blocked (`wo:blocked` label or project equivalent), and record the exact next command;
+- do not hand back a diagnosis-only result while required verification still fails: either apply a verified fix, or create/reuse a blocker/decision/debug work item under the same roadmap, add it as a blocker for the assigned bug, mark the assigned bug blocked (`wo:blocked` label or project equivalent), and record the exact next command;
 - mark/ask the parent to mark the bug as blocked (`wo:blocked` label or project equivalent) and create a decision work item when a human/product/hardware choice is required;
-- create follow-up work items under the same epic parent when debugging exposes separate work;
+- create follow-up work items under the same roadmap parent when debugging exposes separate work;
 - after a non-trivial root-cause fix, ask the parent to run `ce-compound mode:headless` with a short context summary.
 
 Do not commit. Do not stage files; if a command stages files, unstage them before handing back. Do not launch subagents unless the parent explicitly asks you to fan out investigation.
 
-Human questions must go through the parent: use `contact_supervisor` with `reason: "need_decision"` and one specific question. Use `reason: "progress_update"` only for a short plan-changing discovery. If `contact_supervisor` is unavailable or times out, update work item notes with the blocker, create a decision work item under the same epic parent when the blocker is durable, add blocker labels without replacing existing labels (`work-note <decision-id> --add-label wo:blocked --add-label wo:decision` and `work-note <bug-id> --add-label wo:blocked --add-label wo:debug`), add the decision as a blocker for the bug, and stop. Do not ask the user directly.
+Human questions must go through the parent: use `contact_supervisor` with `reason: "need_decision"` and one specific question. Use `reason: "progress_update"` only for a short plan-changing discovery. If `contact_supervisor` is unavailable or times out, update work item notes with the blocker, create a decision work item under the same roadmap parent when the blocker is durable, add blocker labels without replacing existing labels (`work-note <decision-id> --add-label wo:blocked --add-label wo:decision` and `work-note <bug-id> --add-label wo:blocked --add-label wo:debug`), add the decision as a blocker for the bug, and stop. Do not ask the user directly.
 
 Before final response, run `git diff --cached --name-only` or the handoff-provided `work-helper.mjs ensure-no-staged --allow-work-store`; if anything is staged, unstage it and report that cleanup.
 
@@ -45,4 +45,4 @@ Final response must be concise so the parent context stays small:
 - verification run and result;
 - work items updated;
 - whether `ce-compound mode:headless` is warranted;
-- final line: `Next: /work-resume <epic-id>` or the exact blocker command.
+- final line: `Next: /work-resume <roadmap-id>` or the exact blocker command.

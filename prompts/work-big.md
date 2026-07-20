@@ -1,5 +1,5 @@
 ---
-description: Add a large planned slice inside the active work items epic
+description: Add a large planned slice inside the active work items roadmap
 argument-hint: "<task>"
 ---
 

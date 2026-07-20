@@ -133,7 +133,7 @@ try {
 	assert(
 		Object.keys(fixture.store().items).length === 4 &&
 			fixture.store().items[bootstrapped.epic.id]?.documentLinks?.design ===
-				cleanPlanRel,
+				cleanPlanRel.replaceAll("\\", "/"),
 		"bootstrap creates the epic plus one planning task with a plan link",
 	);
 } finally {

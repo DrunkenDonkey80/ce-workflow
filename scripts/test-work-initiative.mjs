@@ -184,7 +184,7 @@ try {
 	assert.equal(draftReadiness.implementationReady, false);
 	const status = buildWorkStatus(dir, "initiative-1");
 	assert.match(status, /Initiative: Initiative/);
-	assert.match(status, /1\/2 child epics closed \(50%\)/);
+	assert.match(status, /1\/2 child roadmaps closed \(50%\)/);
 	const report = buildWorkReportState(dir, "initiative-1");
 	assert.equal(report.initiative, true);
 	assert.deepEqual(report.aggregateProgress, {
@@ -254,19 +254,15 @@ try {
 		path.join(dir, "docs", "brainstorms", "i.md"),
 		`${initiativeSourceText}changed\n`,
 	);
-	const staleClose = buildWorkRoadmapState(
-		dir,
-		"close initiative-1 --force",
-	);
+	const staleClose = buildWorkRoadmapState(dir, "close initiative-1 --force");
 	assert.equal(staleClose.action, "initiative-close-blocked");
 	assert(staleClose.blockers.includes("stale_source:docs/brainstorms/i.md"));
 	rmSync(path.join(dir, "docs", "brainstorms", "i.md"));
-	const missingClose = buildWorkRoadmapState(
-		dir,
-		"close initiative-1 --force",
-	);
+	const missingClose = buildWorkRoadmapState(dir, "close initiative-1 --force");
 	assert.equal(missingClose.action, "initiative-close-blocked");
-	assert(missingClose.blockers.includes("missing_source:docs/brainstorms/i.md"));
+	assert(
+		missingClose.blockers.includes("missing_source:docs/brainstorms/i.md"),
+	);
 
 	// Preview is pure; apply is identity-preserving, stale-safe, and idempotent.
 	const promotionStore = initStore(promotionDir, { now: timestamp });
@@ -512,11 +508,7 @@ try {
 			interruptAt: "replace",
 		}),
 	);
-	const recovered = applyApproved(
-		recoveryDir,
-		proposal,
-		replacePreview.token,
-	);
+	const recovered = applyApproved(recoveryDir, proposal, replacePreview.token);
 	assert.equal(recovered.recovered, true);
 	assert.equal(loadStore(recoveryDir).items["I-1"].parentId, undefined);
 

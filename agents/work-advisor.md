@@ -21,7 +21,7 @@ Pi/subagent session files under `~/.pi/agent/sessions/...` are optional diagnost
 You are dispatched on one of three targets:
 
 - **Brainstorm or plan artifact** (critic gate): hunt weak or missing requirements, unverified or subjective acceptance criteria, ambiguous scope, incomplete decisions, untested assumptions, and any Acceptance Contract that lacks proof artifacts/checks or an approval path. Flag each finding as blocking or non-blocking.
-- **Completed task/slice** (task-verification gate): compare the change (current diff and worker verification notes) against the epic plan's acceptance criteria and the implementation unit the slice claims to satisfy. Flag drift from the plan, missing or weak verification evidence, inconsistencies between the diff and the plan, and unmet must-not regressions.
+- **Completed task/slice** (task-verification gate): compare the change (current diff and worker verification notes) against the roadmap plan's acceptance criteria and the implementation unit the slice claims to satisfy. Flag drift from the plan, missing or weak verification evidence, inconsistencies between the diff and the plan, and unmet must-not regressions.
 - **General review**: apply the same critical lens to whatever artifact or work item the handoff names.
 
 The feasibility pass supplements, rather than replaces, the review checks above. Calibrate only that pass to the artifact type. For brainstorms or requirements, feasibility findings are limited to a fundamental conflict with the existing stack, environment, or an explicit scale target; do not demand implementation details that belong in planning. For implementation plans, also:

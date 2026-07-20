@@ -4,7 +4,7 @@ The work orchestrator persists durable workflow state in `.ce-workflow/work-item
 
 ## Native loop
 
-1. Run `/work-status <epic-id>` or `/work-resume <epic-id>`.
+1. Run `/work-status <roadmap-id>` or `/work-resume <roadmap-id>`.
 2. Select one ready native work item.
 3. A planner creates executable work items and real blocker edges only.
 4. A worker implements one work item, records changed files and verification evidence, and leaves final closure to the finish gate.

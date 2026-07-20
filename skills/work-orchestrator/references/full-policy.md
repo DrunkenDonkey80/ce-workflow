@@ -52,7 +52,7 @@ Children should not rediscover already-classified dirt from chat memory. Include
 
 Project instructions can define mandatory verification such as TDD, hardware-in-the-loop checks, fixture runs, safety tests, or exact commands. Treat those as a verification contract, not advice.
 
-During preflight, read the relevant project instructions (`AGENTS.md`, `CLAUDE.md`, `.pi/`, README/test docs when referenced) and extract only concrete verification rules that apply to the requested work. Propagate them into the epic and every child work item's `acceptance`/`notes` before implementation. If the contract says real hardware testing is required for affected modules, each affected work item must name the module/device check and require real hardware evidence.
+During preflight, read the relevant project instructions (`AGENTS.md`, `CLAUDE.md`, `.pi/`, README/test docs when referenced) and extract only concrete verification rules that apply to the requested work. Propagate them into the roadmap and every child work item's `acceptance`/`notes` before implementation. If the contract says real hardware testing is required for affected modules, each affected work item must name the module/device check and require real hardware evidence.
 
 Workers must run the contract or stop. Reviewers and committers must fail/hold the work item when contract evidence is missing. Do not replace required hardware verification with mocks, simulation, or static checks unless the contract or user explicitly allows that substitute.
 
@@ -60,7 +60,7 @@ Workers must run the contract or stop. Reviewers and committers must fail/hold t
 
 Use core work items fields before inventing metadata:
 
-- `type=epic`: master goal, master plan, scope, acceptance, constraints.
+- roadmap record: master goal, master plan, scope, acceptance, constraints.
 - `type=task`: executable implementation slice.
 - `type=decision`: human/product/architecture uncertainty.
 - `type=bug`: reviewer failure or regression fix.
@@ -70,7 +70,7 @@ Use core work items fields before inventing metadata:
 - `notes`: progress, files changed, verification result, handoff.
 - dependencies: only real blockers.
 
-Every non-epic work item created inside an epic must use work items hierarchy (`node scripts/work-helper.mjs work-create --parent <epic-id>` or the equivalent). Do not create top-level task/decision work items for epic work.
+Every non-roadmap work item created inside a roadmap must use work items hierarchy (`node scripts/work-helper.mjs work-create --parent <roadmap-id>` or the equivalent). Do not create top-level task/decision work items for roadmap work.
 
 Use labels for workflow state:
 
@@ -88,7 +88,7 @@ For discovered work, create a work item and include `discovered-from:<current-wo
 
 A failed verification or live evidence result is durable work state, not chat trivia. Record a compact failure artifact in the work item notes with: command/run ID, artifact paths, failing phase, exit code/status, observed vs expected result, touched files, suspected owner, latest relevant messages, and exact next debug/status command. The extension also auto-appends `wo:failure-summary` notes for failing role-agent runs; do not delete them. If the harness passes but product evidence says `failed`, `hardware-blocked`, `terminal-failed`, or similar, treat those as separate fields: the harness task may close only when its acceptance was evidence capture, but a follow-up debug work item must exist for the product failure before downstream dependent work proceeds.
 
-When an implementation work item fails its own acceptance or verification, do not close it. Create or reuse a `type=bug` child work item under the same epic, label it `wo:debug`, include `discovered-from:<failed-work-item-id>` and the failure artifact, then add a dependency so the failed work item and any downstream slices wait for the bug. Mark the failed work item notes with `debug-needed:<bug-id>` and `wo:debug-needed` when labels are available. If work items supports a blocked status in the project, use it; otherwise keep the blocker represented by dependencies and labels.
+When an implementation work item fails its own acceptance or verification, do not close it. Create or reuse a `type=bug` child work item under the same roadmap, label it `wo:debug`, include `discovered-from:<failed-work-item-id>` and the failure artifact, then add a dependency so the failed work item and any downstream slices wait for the bug. Mark the failed work item notes with `debug-needed:<bug-id>` and `wo:debug-needed` when labels are available. If work items supports a blocked status in the project, use it; otherwise keep the blocker represented by dependencies and labels.
 
 If mandatory verification cannot run because the environment is missing a toolchain, device, credential, or other external prerequisite, do not repeatedly re-run the same implementation work item. Create or reuse a `type=decision` child work item labeled `wo:blocked` with the exact missing prerequisite and next verification command, add it as a blocker for the failed work item, checkpoint any related code state if needed to leave git clean, and stop with that blocker as the next ready item.
 
@@ -104,38 +104,38 @@ Final output: `Next: /work-plan <idea-or-plan-file>`.
 
 ## Mode: master
 
-Use to create a new master epic from a brainstorm epic, brainstorm artifact, rough feature idea, or existing plan. Prefer the user-facing command name `/work-plan`; `/work-master` remains an alias.
+Use to create a new master roadmap from a brainstorm roadmap, brainstorm artifact, rough feature idea, or existing plan. Prefer the user-facing command name `/work-plan`; `/work-master` remains an alias.
 
-When the input points at a brainstorm epic, brainstorm artifact, or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. If the source is not already a plan file, write a new plan artifact rather than reusing or lightly updating an older weaker plan unless the user explicitly asks. The `/work-plan` handoff must preserve every decided requirement, constraint, non-goal, reference, acceptance example, and open question from the source; trace each into a plan requirement, implementation unit, verification/acceptance proof, open question, or dropped-with-rationale note. For any authoritative reference or target behavior, require a generic Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and approval path. This applies beyond UI: API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data invariants, security posture, hardware behavior, and visual parity are all the same pattern. Tell `ce-plan` to ask clarification questions one at a time when the source is broad, important, or underspecified; auto-accept only skips final write-confirmation after discovery is clear, not planning questions. Any material uncertainty, subjective acceptance, weak proof, missing input, or P0/P1 doc-review finding must become a plan fix, blocking question, decision/blocker work item instruction, or explicit user waiver — never passive risk prose. Repeat that hardening loop until no blocking uncertainty remains, asking the user only for decisions that cannot be inferred. Before creating the epic, the Open Question Gate scans the finalized plan for any remaining open questions — including non-blocking ones that carry a stated default — and `/work-plan` blocks epic creation if any remain, handing back a resolve loop: for each open question run exactly one `ask_user` with `allowComment=true` (show the question, offer its suggested default as the recommended option, allow a freeform answer and an explicit waive), fold the answer into the plan as a confirmed decision or waiver, then re-run `/work-plan <plan-path>`; the epic is created only when the scan is clean. A non-blocking open question with a default is never allowed to ship unresolved — the default is a suggestion to present, not a silent resolution. For a raw-idea source, ce-plan writes the plan and the orchestrator bootstraps the epic in the same flow via `node scripts/work-helper.mjs bootstrap-plan-epic <plan-path>` (no second `/work-plan`); for an existing plan file, `/work-plan <plan-path>` does the same bootstrap directly — both run the Open Question Gate first. Then create the epic work item from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification contract in `acceptance`, and the source brainstorm plus local plan path in `notes`. The native work-item store remains the source of truth; the plan file is a reference.
+When the input points at a brainstorm roadmap, brainstorm artifact, or asks for a master plan, run `ce-plan` first to turn that source into a detailed master plan for later slicing. If the source is not already a plan file, write a new plan artifact rather than reusing or lightly updating an older weaker plan unless the user explicitly asks. The `/work-plan` handoff must preserve every decided requirement, constraint, non-goal, reference, acceptance example, and open question from the source; trace each into a plan requirement, implementation unit, verification/acceptance proof, open question, or dropped-with-rationale note. For any authoritative reference or target behavior, require a generic Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and approval path. This applies beyond UI: API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data invariants, security posture, hardware behavior, and visual parity are all the same pattern. Tell `ce-plan` to ask clarification questions one at a time when the source is broad, important, or underspecified; auto-accept only skips final write-confirmation after discovery is clear, not planning questions. Any material uncertainty, subjective acceptance, weak proof, missing input, or P0/P1 doc-review finding must become a plan fix, blocking question, decision/blocker work item instruction, or explicit user waiver — never passive risk prose. Repeat that hardening loop until no blocking uncertainty remains, asking the user only for decisions that cannot be inferred. Before creating the roadmap, the Open Question Gate scans the finalized plan for any remaining open questions — including non-blocking ones that carry a stated default — and `/work-plan` blocks roadmap creation if any remain, handing back a resolve loop: for each open question run exactly one `ask_user` with `allowComment=true` (show the question, offer its suggested default as the recommended option, allow a freeform answer and an explicit waive), fold the answer into the plan as a confirmed decision or waiver, then re-run `/work-plan <plan-path>`; the roadmap is created only when the scan is clean. A non-blocking open question with a default is never allowed to ship unresolved — the default is a suggestion to present, not a silent resolution. For a raw-idea source, ce-plan writes the plan and the orchestrator bootstraps the roadmap in the same flow via `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>` (no second `/work-plan`); for an existing plan file, `/work-plan <plan-path>` does the same bootstrap directly — both run the Open Question Gate first. Then create the roadmap work item from the produced plan: put the summary/scope in `description`, key decisions and implementation units in `design`, acceptance/verification contract in `acceptance`, and the source brainstorm plus local plan path in `notes`. The native work-item store remains the source of truth; the plan file is a reference.
 
-Infer lifecycle shape from the confirmed delivery-scope mapping, not title or heading heuristics. One scope uses the standalone bootstrap unchanged. Multiple independently completable scopes require the planner to emit the versioned semantic proposal accepted by `initiative-preview --proposal-json <json>`; show that complete hierarchy and coverage in F7, then let that user-facing confirmation mint the single-use approval receipt and call `initiative-apply` with the confirmed token and receipt. Preserve the brainstorm epic as the initiative, retain idea and artifact backlinks, create only child epic stubs, and put one `wo:planning` item under the explicitly selected child. Empty, incomplete, stale, ambiguous, or unapproved proposals stop without mutation. Agents never edit the raw store.
+Infer lifecycle shape from the confirmed delivery-scope mapping, not title or heading heuristics. One scope uses the standalone bootstrap unchanged. Multiple independently completable scopes require the planner to emit the versioned semantic proposal accepted by `initiative-preview --proposal-json <json>`; show that complete hierarchy and coverage in F7, then let that user-facing confirmation mint the single-use approval receipt and call `initiative-apply` with the confirmed token and receipt. Preserve the brainstorm roadmap as the initiative, retain idea and artifact backlinks, create only child roadmap stubs, and put one `wo:planning` item under the explicitly selected child. Empty, incomplete, stale, ambiguous, or unapproved proposals stop without mutation. Agents never edit the raw store.
 
-1. Create only the master epic work item with the master plan captured in work items fields.
-2. Create only one initial `wo:planning` work item that tells `work-planner` to split the epic into the next executable slice, or at most three obvious low-risk slices.
+1. Create only the master roadmap work item with the master plan captured in work items fields.
+2. Create only one initial `wo:planning` work item that tells `work-planner` to split the roadmap into the next executable slice, or at most three obvious low-risk slices.
 3. Do not create executable task work items in the parent; that is only `work-planner`'s job.
 4. Launch `work-planner`.
 5. Planner creates or reuses executable work items and decision work items.
-6. Start `Mode: resume` for the epic.
+6. Start `Mode: resume` for the roadmap.
 
-Do not implement until the epic contains the master plan and durable executable work items exist. Do not create duplicate task work items for the same implementation unit.
+Do not implement until the roadmap contains the master plan and durable executable work items exist. Do not create duplicate task work items for the same implementation unit.
 
 ## Mode: ideate
 
 Prefer the extension command `/work-ideate` when available. It lists `wo:idea` work items, guards numeric dashboard indexes with a disposable snapshot, and mutates only the resolved idea for `accept`, `reject`, `discuss`, `inspect`, and `import`.
 
-Fallback behavior: read the active epic's child work items, filter idea records marked with `wo:idea`, and show their derived status. For a topic handoff, run CE ideation, ask for structured JSON with `ideas[]` and optional `topPicks`, save every parsed idea under the epic with `source-run-id` and `source-index` notes, and create a recovery decision work item if parsing or saving fails. Never treat an idea record as executable work; only linked planning/task descendants can be resumed.
+Fallback behavior: read the active roadmap's child work items, filter idea records marked with `wo:idea`, and show their derived status. For a topic handoff, run CE ideation, ask for structured JSON with `ideas[]` and optional `topPicks`, save every parsed idea under the roadmap with `source-run-id` and `source-index` notes, and create a recovery decision work item if parsing or saving fails. Never treat an idea record as executable work; only linked planning/task descendants can be resumed.
 
 ## Mode: brainstorm
 
 Prefer the extension command `/work-brainstorm` when available. It resolves `idea <target>` before freeform topics, reuses exact normalized title matches, refuses fuzzy auto-merge by reporting possible duplicates, and appends brainstorm/plan backlinks to `wo:idea` work items.
 
-Fallback behavior: if no active epic exists and the target is a freeform topic, initialize work items if needed and create one standalone brainstorm epic before saving ideas under it. When no artifact path is supplied, run `ce-brainstorm` interactively for the selected idea or topic, asking one question at a time until requirements are clear; do not silently synthesize broad, important, or underspecified brainstorms. Stop after the requirements artifact is written; skip ce-brainstorm's post-doc planning/build menu because `/work-brainstorm` owns the brainstorm→plan handoff. Save the artifact, link it back with `/work-brainstorm idea <id> <path>`, then run `/work-plan <path>` so the preservation/self-audit contract above is applied.
+Fallback behavior: if no active roadmap exists and the target is a freeform topic, initialize work items if needed and create one standalone brainstorm roadmap before saving ideas under it. When no artifact path is supplied, run `ce-brainstorm` interactively for the selected idea or topic, asking one question at a time until requirements are clear; do not silently synthesize broad, important, or underspecified brainstorms. Stop after the requirements artifact is written; skip ce-brainstorm's post-doc planning/build menu because `/work-brainstorm` owns the brainstorm→plan handoff. Save the artifact, link it back with `/work-brainstorm idea <id> <path>`, then run `/work-plan <path>` so the preservation/self-audit contract above is applied.
 
 ## Mode: usage
 
-Prefer the extension command `/work-usage` when available. It reads existing `.pi/work-runs` telemetry, defaults to the one active epic only when unambiguous, writes an escaped local HTML report under `.pi/work-runs/usage/`, prints machine-readable rows with `--jsonl`, opens a browser only with `--open`, and never creates or mutates work items.
+Prefer the extension command `/work-usage` when available. It reads existing `.pi/work-runs` telemetry, defaults to the one active roadmap only when unambiguous, writes an escaped local HTML report under `.pi/work-runs/usage/`, prints machine-readable rows with `--jsonl`, opens a browser only with `--open`, and never creates or mutates work items.
 
-Fallback behavior: summarize existing telemetry only. If multiple epics could match, ask for `epic <id>` instead of blending them.
+Fallback behavior: summarize existing telemetry only. If multiple roadmaps could match, ask for `roadmap <id>` instead of blending them.
 
 ## Mode: migrate
 
@@ -152,22 +152,22 @@ git log --all --decorate --date=short --pretty=format:'%h %ad %d %s' --max-count
 1. Require the user to name the artifacts, branches, tracker export, or description to migrate. If scope is too vague, ask first.
 2. If the source is a clean CE brainstorm/plan with no partial implementation to reconcile, prefer `Mode: master` instead.
 3. Launch `work-migrator` with the sources, current branch, suspected base branch, and instruction to mutate only work items.
-4. `work-migrator` creates or reuses exactly one epic unless the user asked for multiple epics.
-5. The epic notes must include provenance: artifacts read, branches inspected, current branch, base branch assumption, and migration date.
+4. `work-migrator` creates or reuses exactly one roadmap unless the user asked for multiple roadmaps.
+5. The roadmap notes must include provenance: artifacts read, branches inspected, current branch, base branch assumption, and migration date.
 6. Create closed child work items only for completed units with strong evidence from artifacts plus code/commit/test evidence. Git log is evidence, not truth; never create one work item per commit.
 7. Create open task/bug work items for remaining work and decision work items for ambiguity.
-8. For unmerged or stale branches, create review/integration work items or decision work items under the epic; never auto-merge or checkout branches during migration.
-9. If artifacts are messy but substantial, run `ce-plan` only to consolidate a reference plan, auto-accepting plan creation unless a real decision is needed, then store the resulting plan path in epic notes. The native work-item store remains the source of truth.
-10. After migration, show the created/reused epic ID and ask whether to start `Mode: resume` for that epic.
+8. For unmerged or stale branches, create review/integration work items or decision work items under the roadmap; never auto-merge or checkout branches during migration.
+9. If artifacts are messy but substantial, run `ce-plan` only to consolidate a reference plan, auto-accepting plan creation unless a real decision is needed, then store the resulting plan path in roadmap notes. The native work-item store remains the source of truth.
+10. After migration, show the created/reused roadmap ID and ask whether to start `Mode: resume` for that roadmap.
 
 Stop if completion evidence is weak but the user asked to mark work done, branch handling requires checkout/merge/rebase, artifact claims conflict with code, or dirty source changes make provenance unsafe.
 
 ## Mode: small
 
-Use for clear, low-risk changes in one or two files inside an existing epic.
+Use for clear, low-risk changes in one or two files inside an existing roadmap.
 
-1. Resolve the active epic first; if ambiguous, ask.
-2. Create a child work item under that epic (`--parent <epic-id>`) unless an existing work item already matches it.
+1. Resolve the active roadmap first; if ambiguous, ask.
+2. Create a child work item under that roadmap (`--parent <roadmap-id>`) unless an existing work item already matches it.
 3. Claim the work item during coded intake, then implement directly in the current session with targeted reads.
 4. Use `finish-task --max-files 2` for the smallest real verification, evidence note, commit, close, and push when an upstream exists. Deterministic JSON uses `--json <file> --equals <path=value>`.
 5. Do not list or launch agents for routine `/work-small`. If the coded finalizer detects sensitive paths, launch exactly one `work-reviewer`, persist PASS evidence, then rerun with `--reviewed`.
@@ -175,9 +175,9 @@ Use for clear, low-risk changes in one or two files inside an existing epic.
 
 ## Mode: med
 
-Use for bounded work inside an existing epic with a few choices and fewer than about ten files.
+Use for bounded work inside an existing roadmap with a few choices and fewer than about ten files.
 
-1. Resolve the active epic first; if ambiguous, ask.
+1. Resolve the active roadmap first; if ambiguous, ask.
 2. Create and claim one executable work item directly; do not create a planning work item or planner agent for an already explicit bounded request.
 3. Implement directly in the current session with a limit of eight implementation files.
 4. Use `finish-task --max-files 8` for verification and coded commit/close. Launch exactly one `work-reviewer` only when the coded risk gate, ambiguous acceptance, or failed evidence requires independent review.
@@ -187,27 +187,27 @@ Durable scope still goes into work items; a short in-session checklist is enough
 
 ## Mode: big
 
-Use for large, risky, cross-cutting, or architectural work inside an existing epic.
+Use for large, risky, cross-cutting, or architectural work inside an existing roadmap.
 
-1. Resolve the active epic first; if ambiguous, ask.
-2. Create a `wo:planning` work item under that epic describing the requested large slice.
+1. Resolve the active roadmap first; if ambiguous, ask.
+2. Create a `wo:planning` work item under that roadmap describing the requested large slice.
 3. Launch `work-planner` to split that slice into the next executable work item by default, plus any decision work items; create up to three executable work items only for obvious low-risk sequential work. Mark executable descendants with `wo:execution-agent` in notes so resume preserves the big/risky writer boundary.
-4. Start `Mode: resume` for the epic.
+4. Start `Mode: resume` for the roadmap.
 
-Do not create a new master epic here; use `Mode: master` for that.
+Do not create a new master roadmap here; use `Mode: master` for that.
 
 ## Mode: debug
 
-Use for failing tests, errors, regressions, blocked/debug-needed work items, or broken behavior inside an existing epic.
+Use for failing tests, errors, regressions, blocked/debug-needed work items, or broken behavior inside an existing roadmap.
 
-1. Resolve the active epic first; if ambiguous, ask.
+1. Resolve the active roadmap first; if ambiguous, ask.
 2. If the argument starts with an existing work item ID or numeric shorthand, inspect that work item instead of creating a duplicate. Treat text after `:` or after the first target token as human retry guidance, append it to the debug work item notes, and reopen a blocked target before debugging. If the target is an implementation work item with `debug-needed:<bug-id>`, debug the bug work item.
-3. Otherwise create a `type=bug` child work item under that epic (`--parent <epic-id>`) with the reported symptom, reproduction command, expected behavior, and failure artifact when supplied.
+3. Otherwise create a `type=bug` child work item under that roadmap (`--parent <roadmap-id>`) with the reported symptom, reproduction command, expected behavior, and failure artifact when supplied.
 4. Default path: launch `work-debugger` with that bug work item and require the `ce-debug` workflow: reproduce, root-cause, fix, verify.
 5. Interactive path: when the user explicitly asks to debug a blocked work item in the console or gives direct guidance (`/work-debug <work-item-id>: ...`), the parent may run the debug loop directly for observability. Keep native work-item store/git as source of truth, avoid unrelated edits, and then run the same review/commit/close gates as the agent path.
 6. If `ce-debug` fixes and verifies the issue, review the debug diff with `work-reviewer`; if it fails, return to `work-debugger` or `work-fixer` with exact findings.
 7. Commit and close through the coded `finish-task` gate after verification and review pass. Use `work-committer` only when unusual repository policy cannot be represented by that gate. Remove or satisfy blocking dependencies so `/work-resume` can continue downstream work.
-8. If debugging produced a reusable root-cause lesson, run `ce-compound mode:headless <short context>` after the fix commit and commit any generated learning docs before closing the epic.
+8. If debugging produced a reusable root-cause lesson, run `ce-compound mode:headless <short context>` after the fix commit and commit any generated learning docs before closing the roadmap.
 
 Stop and mark blocked when reproduction needs unavailable external state, the root cause requires a product/architecture decision, or `ce-debug` cannot verify safely. The blocked bug work item must contain the failure artifact, current hypothesis, attempted commands, and exact human decision needed.
 
@@ -218,25 +218,25 @@ Classify the task, then route:
 - small: clear, low-risk, one or two files;
 - med: bounded, some choices, fewer than about ten files;
 - debug: failing test, error, regression, stack trace, or broken behavior;
-- big: cross-cutting, high-risk, unclear, architecture/product decisions, or more than about ten files inside an existing epic;
-- master: new brainstorm, new product idea, or request to create a master plan/epic;
+- big: cross-cutting, high-risk, unclear, architecture/product decisions, or more than about ten files inside an existing roadmap;
+- master: new brainstorm, new product idea, or request to create a master plan/roadmap;
 - migrate: existing partially completed project, legacy TODO/issue tracker, non-CE artifact set, or branch/history reconciliation.
 
-If classification is big, master, migrate, or ambiguous, ask before starting. Do not silently turn a vague request into an epic.
+If classification is big, master, migrate, or ambiguous, ask before starting. Do not silently turn a vague request into a roadmap.
 
 ## Mode: resume
 
-Argument may be an explicit epic work item ID, `last`, empty, or project-loop guidance from `/work-resume`. Default behavior is one executable work item per invocation; the user can run `/work-resume` again from a fresh Pi session for the next slice.
+Argument may be an explicit roadmap work item ID, `last`, empty, or project-loop guidance from `/work-resume`. Default behavior is one executable work item per invocation; the user can run `/work-resume` again from a fresh Pi session for the next slice.
 
 When empty or `last`, resolve from work items, not chat memory:
 
-1. in-progress epic in the current repo;
-2. latest not-completed epic with ready descendants;
-3. if no single latest epic can be proven, list active not-completed epics and ask the user to pick one.
+1. in-progress roadmap in the current repo;
+2. latest not-completed roadmap with ready descendants;
+3. if no single latest roadmap can be proven, list active not-completed roadmaps and ask the user to pick one.
 
-Build the choice list with work items commands such as `node scripts/work-helper.mjs work-children-summary <epic-id>`, `native helper list --type=epic --status=in_progress --json`, and `node scripts/work-helper.mjs work-children-summary <epic-id>` when available. The choice list must include, for each epic: work item ID, created date, last worked date, status, ready/open/in-progress child counts when available, and a one-line description. Compute dates from work items JSON fields such as `created_at`/`updated_at` when available; otherwise use child updates, notes, or `unknown`. Do not guess from chat memory.
+Build the choice list with compact commands such as `node scripts/work-helper.mjs work-children-summary <roadmap-id>` when available. The choice list must include, for each roadmap: work item ID, created date, last worked date, status, ready/open/in-progress child counts when available, and a one-line description. Compute dates from work items JSON fields such as `created_at`/`updated_at` when available; otherwise use child updates, notes, or `unknown`. Do not guess from chat memory.
 
-If the prompt starts with "Use the work-orchestrator skill in mode: resume with this precomputed extension state", trust that extension-resolved epic/action/selected work item as the starting point. Verify native work-item store/git freshness, then continue at the matching loop step below instead of repeating target selection or ready-work discovery.
+If the prompt starts with "Use the work-orchestrator skill in mode: resume with this precomputed extension state", trust that extension-resolved roadmap/action/selected work item as the starting point. Verify native work-item store/git freshness, then continue at the matching loop step below instead of repeating target selection or ready-work discovery.
 
 If the prompt starts with a precomputed extension state for `small`, `med`, `big`, `master`, `migrate`, or `finish` (or for `debug`, `add`, `pause`, or `auto`), trust its resolved target/action as intake state, verify native work-item store/git freshness, then continue at that mode's role-loop or stop boundary instead of rediscovering the target.
 
@@ -244,32 +244,32 @@ Loop:
 
 1. Run `node scripts/work-helper.mjs work-ready-summary` unless precomputed extension state already names the selected action and work item for this invocation.
 2. Run the worktree hygiene gate and resolve/record dirty files before spawning any child. Prefer one parent cleanup over repeated child stop/retry loops. Repeat this gate after every child returns; restore whitespace-only tracked instruction-file changes such as `AGENTS.md` before interpreting review results or committing. Because some child starts can recreate this instruction-file dirt after the parent gate, include a startup allowlist telling children to continue when the only dirty file is whitespace/formatter-only `AGENTS.md`/instruction-file dirt, and to leave it for parent cleanup.
-3. Inspect `node scripts/work-helper.mjs work-children-summary <epic-id>` unless precomputed extension state already handled stale planning for this invocation. If ready contains `wo:planning` work items and executable child work items already exist, close the satisfied planning work item with a note naming the created children; do not run it as implementation work.
-4. Pick exactly one non-planning ready work item belonging to or blocking the target epic. Prefer `wo:debug` bug work items when they unblock in-progress/debug-needed work; otherwise pick the earliest unblocked implementation slice. Skip `wo:blocked` work items unless the user explicitly chose them with `/work-debug`.
-5. If no non-planning ready work item belongs to the target epic, inspect the epic master plan through compact fields or the referenced plan file section, not raw epic JSON. If open decisions, blocked/debug-needed children, or failed evidence exist, report them with `/work-report <epic-id>` style details and stop. If the epic is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` work item under the epic and launch `work-planner` to compare the master plan against closed/open children and create the next executable slice by default, or up to three obvious low-risk slices; require the planner to close the planning work item once executable children exist, verify `node scripts/work-helper.mjs work-ready-summary` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child work items are closed or deliberately deferred; never close the epic automatically.
-6. Do not dump raw `native helper show <id> --json` into the parent chat. Use the precomputed extension state, `/work-report <id> --json`, or small `native helper show ... | python/node` projections. Child role agents may read full child work items, but planner must not read full epic/master-plan JSON when a plan path or expected unit is available.
+3. Inspect `node scripts/work-helper.mjs work-children-summary <roadmap-id>` unless precomputed extension state already handled stale planning for this invocation. If ready contains `wo:planning` work items and executable child work items already exist, close the satisfied planning work item with a note naming the created children; do not run it as implementation work.
+4. Pick exactly one non-planning ready work item belonging to or blocking the target roadmap. Prefer `wo:debug` bug work items when they unblock in-progress/debug-needed work; otherwise pick the earliest unblocked implementation slice. Skip `wo:blocked` work items unless the user explicitly chose them with `/work-debug`.
+5. If no non-planning ready work item belongs to the target roadmap, inspect the roadmap master plan through compact fields or the referenced plan file section, not raw roadmap JSON. If open decisions, blocked/debug-needed children, or failed evidence exist, report them with `/work-report <roadmap-id>` style details and stop. If the roadmap is not closed and no blocker explains the empty ready set, create or reuse a `wo:planning` work item under the roadmap and launch `work-planner` to compare the master plan against closed/open children and create the next executable slice by default, or up to three obvious low-risk slices; require the planner to close the planning work item once executable children exist, verify `node scripts/work-helper.mjs work-ready-summary` now shows the earliest executable slice rather than a later dependent slice, then stop so the next `/work-resume` starts fresh. Only report "done" when the planner confirms no remaining implementation units and all child work items are closed or deliberately deferred; never close the roadmap automatically.
+6. Do not dump raw `native helper show <id> --json` into the parent chat. Use the precomputed extension state, `/work-report <id> --json`, or small `native helper show ... | python/node` projections. Child role agents may read full child work items, but planner must not read full roadmap/master-plan JSON when a plan path or expected unit is available.
 7. If it is a planning work item, launch `work-planner` with `context:fresh` and file-only/concise output when available, require it to close or update the planning work item, verify `node scripts/work-helper.mjs work-ready-summary` exposes the earliest executable slice and not the planning work item or a later dependent slice, then stop at the planning boundary.
 8. If it is an implementation work item, apply the coded execution policy. Clear bounded work runs directly in the current session and finishes with `finish-task`; high-risk markers (security/auth, persistence/migration, payments, concurrency, breaking API/ABI, destructive production work, or explicit big-mode provenance) launch exactly `work-worker` with `context:fresh`.
 9. Skip an independent reviewer when acceptance is explicit, deterministic verification passed, and the bounded diff is non-sensitive. Launch exactly one `work-reviewer` for high-risk, large, UI-acceptance, hardware/live-evidence, ambiguous, or failed/missing-verification changes. Never call `subagent list`; the extension resolves the exact role in code.
 10. If the initial review returns `FAIL` for fixable code, batch its exact findings into one `work-fixer` pass. Run at most one scoped re-review, and only when the fixes materially changed production behavior; skip it for test-only, documentation, formatting, traceability, or other mechanical fixes. If that re-review fails, stop with the durable findings instead of launching another fixer/reviewer cycle. If root-cause debugging is needed, create/reuse a `wo:debug` bug work item and stop so the next `/work-resume` selects `work-debugger`.
 11. Commit, close, amend work items state, and push through the coded finish helper. Do not launch `work-committer` for routine work; reserve it only for unusual repository commit policy that cannot be represented by the coded gate.
 12. For big/master/debug work only, run the learning-capture gate: if the work produced reusable debugging, architecture, workflow, or integration knowledge, run `ce-compound mode:headless <short context>` once and commit any generated learning docs. Skip this gate for routine small/med work to avoid token and time waste.
-13. After commit/close, always run a clean-boundary gate: `git status --short`, the work item verification if any related source files changed after commit, `node scripts/work-helper.mjs work-children-summary <epic-id>`, and `/work-status <epic-id>` or the same status calculation.
+13. After commit/close, always run a clean-boundary gate: `git status --short`, the work item verification if any related source files changed after commit, `node scripts/work-helper.mjs work-children-summary <roadmap-id>`, and `/work-status <roadmap-id>` or the same status calculation.
 14. If autoformat/test tooling changed related files after commit, verify and commit those related changes before stopping; do not report completion with dirty related files.
-15. Do not stop and ask after a work item closes — continue the autonomous loop to the next ready work item (fresh `/new` per slice when practical; `/work-goal` does this automatically). Stop the loop only when (a) an open `type=decision` work item needs human input, (b) a blocker/debug-needed work item cannot proceed, (c) the epic has no remaining executable work, or (d) the user ran `/work-stop`. When the loop stops, the final output must include the epic ID, the last closed work item ID, a status summary, and the one-line next action: `Next: /work-resume` when work remains, the exact blocker/debug command when blocked, or `Next: epic <epic-id> "<title>" is complete; close it explicitly with /work-roadmap close <epic-id>.` when truly complete.
+15. Do not stop and ask after a work item closes — continue the autonomous loop to the next ready work item (fresh `/new` per slice when practical; `/work-goal` does this automatically). Stop the loop only when (a) an open `type=decision` work item needs human input, (b) a blocker/debug-needed work item cannot proceed, (c) the roadmap has no remaining executable work, or (d) the user ran `/work-stop`. When the loop stops, the final output must include the roadmap ID, the last closed work item ID, a status summary, and the one-line next action: `Next: /work-resume` when work remains, the exact blocker/debug command when blocked, or `Next: roadmap <roadmap-id> "<title>" is complete; close it explicitly with /work-roadmap close <roadmap-id>.` when truly complete.
 
 ## Mode: roadmap
 
-Use when listing or managing roadmap epics. `/work-roadmap` opens an interactive menu when available; subcommands are `list`, `tasks`, `plan`, `set-current`, `close`, and `reopen`. `plan` hands the selected epic to `/work-plan`, so linked brainstorms/plans stay work items-first. The task menu groups blockers first; task summary uses the focused report, and blocker full-info/action goes through `/work-debug`. Closing an epic is manual only: if unresolved child work items remain, ask before `--force`.
+Use when listing or managing roadmaps. `/work-roadmap` opens an interactive menu when available; subcommands are `list`, `tasks`, `plan`, `set-current`, `close`, and `reopen`. `plan` hands the selected roadmap to `/work-plan`, so linked brainstorms/plans stay work items-first. The task menu groups blockers first; task summary uses the focused report, and blocker full-info/action goes through `/work-debug`. Closing a roadmap is manual only: if unresolved child work items remain, ask before `--force`.
 
 ## Mode: add
 
-Use when new work appears during an active epic.
+Use when new work appears during an active roadmap.
 
-1. Create a new work item under the active epic (`--parent <epic-id>`) with current context and `discovered-from:<current-work-item-id>` in notes.
+1. Create a new work item under the active roadmap (`--parent <roadmap-id>`) with current context and `discovered-from:<current-work-item-id>` in notes.
 2. If it blocks current work, add a real dependency.
 3. If optional or future, do not block the active work item.
-4. If the user says to do it now, run it as small or med work, then return to the previous epic.
+4. If the user says to do it now, run it as small or med work, then return to the previous roadmap.
 
 ## Mode: pause
 
@@ -284,11 +284,11 @@ Checkpoint and stop safely:
 
 Read-only summary. Prefer the extension command `/work-status` when available because it does not spend LLM context. If using the skill path, compute the same fields without mutating work items or git:
 
-- current epic ID, title, status, created date, last worked date, and one-line description;
+- current roadmap ID, title, status, created date, last worked date, and one-line description;
 - slice progress: closed executable slices / total executable slices and percent complete;
 - ready slices, in-progress slices, planned-ahead/open slices that are not ready, open decisions, and planning work items;
 - tasks completed and remaining by work items status;
-- whether `native helper ready` is empty because the epic is complete, blocked, or needs another `work-planner` slicing pass;
+- whether `native helper ready` is empty because the roadmap is complete, blocked, or needs another `work-planner` slicing pass;
 - git status;
 - active subagent runs when visible;
 - next command, usually `/work-resume`.
@@ -297,13 +297,13 @@ Do not mutate work items or git in status mode.
 
 ## Mode: report
 
-Prefer the extension command `/work-report` when available because it does not spend LLM context and can emit compact `--json`. The skill path is the fallback for environments where the extension command is not loaded. In the parent/control chat, do not run raw `native helper show --json` for epics unless debugging the extension itself; use `/work-report` or slim work items fields instead.
+Prefer the extension command `/work-report` when available because it does not spend LLM context and can emit compact `--json`. The skill path is the fallback for environments where the extension command is not loaded. In the parent/control chat, do not run raw `native helper show --json` for roadmaps unless debugging the extension itself; use `/work-report` or slim work items fields instead.
 
-Read-only detailed handoff for a whole epic or one blocked/debug-needed work item. Use when the user wants to know what is blocked, why, what failed, and what command/guidance to give next. Do not mutate work items or git.
+Read-only detailed handoff for a whole roadmap or one blocked/debug-needed work item. Use when the user wants to know what is blocked, why, what failed, and what command/guidance to give next. Do not mutate work items or git.
 
-For an epic target, report:
+For a roadmap target, report:
 
-- epic ID, title, status, progress percent, and next ready work item from `node scripts/work-helper.mjs work-ready-summary`;
+- roadmap ID, title, status, progress percent, and next ready work item from `node scripts/work-helper.mjs work-ready-summary`;
 - ready unblocked work that `/work-resume` can continue;
 - blocked/debug-needed work items, grouped by `wo:blocked`, `wo:debug-needed`, open decisions, and unmet dependencies;
 - for each blocked item: blocker work item/dependency, latest failure artifact summary, artifact paths, last verification command/result, owner/phase, and exact suggested command such as `/work-debug <bug-id>: <human guidance>`;
@@ -314,7 +314,7 @@ For a work item target, show the detailed failure artifact from notes: command, 
 
 ## Role Loop
 
-Work inline in the current session unless the coded policy requires specialization. Do not call `subagent list` during a workflow. When needed, launch the exact package role (`work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, `work-migrator`, or `work-advisor`) directly; do not substitute builtin roles. Children get concrete work item IDs and must not launch their own subagent workflows. Always use fresh context unless the user explicitly requests inherited history. Use `outputMode: "file-only"` with a short relative output filename for review/research/work outputs unless the complete result is under about 20 lines; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. Keep only a short structured summary in the parent; do not paste long tool logs, full `native helper show` epic JSON, raw `node scripts/work-helper.mjs work-ready-summary`, raw `native helper children --json`, or whole master plans back into the control session. Pipe work items JSON through python/node projections when only IDs/status/titles are needed.
+Work inline in the current session unless the coded policy requires specialization. Do not call `subagent list` during a workflow. When needed, launch the exact package role (`work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, `work-migrator`, or `work-advisor`) directly; do not substitute builtin roles. Children get concrete work item IDs and must not launch their own subagent workflows. Always use fresh context unless the user explicitly requests inherited history. Use `outputMode: "file-only"` with a short relative output filename for review/research/work outputs unless the complete result is under about 20 lines; do not pass `.pi-subagents/` paths because the subagent tool owns the artifact directory. Keep only a short structured summary in the parent; do not paste long tool logs, full `native helper show` roadmap JSON, raw `node scripts/work-helper.mjs work-ready-summary`, raw `native helper children --json`, or whole master plans back into the control session. Pipe work items JSON through python/node projections when only IDs/status/titles are needed.
 
 Do not put tiny wall-clock limits on real role agents. Prefer no explicit timeout; if the runtime requires one, use at least 10 minutes for planner/worker/reviewer/fixer/debugger/migrator and at least 3 minutes for committer. Use async/background for broad reviews, hardware work, or repo-scale investigation. A child timeout is an infrastructure failure artifact, not a review `FAIL` or implementation result.
 
@@ -332,7 +332,7 @@ work items and git preserve the memory; Pi chat is disposable working context. T
 
 ## Cost and Model Policy
 
-Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Use `/work-telemetry today`, `/work-telemetry epic <id>`, or `/work-usage epic <id> --jsonl` before changing role/model policy; they show command time, agent time, token usage, tool/subagent durations, context growth, and review payoff when telemetry recorded it. Do not add `--open` in spawned/agent runs. Do not hard-code provider-specific models in this package.
+Keep the parent/main orchestrator on the user's chosen model/effort. For role agents, use the cheapest setting that can satisfy the role: migrator/planner high, debugger high, worker/fixer/reviewer medium, committer low. `/work-models` is the friendly settings UI; it writes project `subagents.agentOverrides` for `brainstorm/plan/migration`, `work`, `debug`, `review`, and `commit`. Blank model means inherit the current control-session model. For spawned smoke-test Pi instances, use low/minimal effort unless explicitly stress-testing reasoning quality. Use `/work-telemetry today`, `/work-telemetry roadmap <id>`, or `/work-usage roadmap <id> --jsonl` before changing role/model policy; they show command time, agent time, token usage, tool/subagent durations, context growth, and review payoff when telemetry recorded it. Do not add `--open` in spawned/agent runs. Do not hard-code provider-specific models in this package.
 
 ## Optional Intercom Coordination
 
@@ -350,11 +350,11 @@ Allowed to mutate work items through `work-helper.mjs`. Must not edit source cod
 Responsibilities:
 
 - read requested artifacts and git branch/history evidence;
-- create or reuse one migration epic with provenance notes;
+- create or reuse one migration roadmap with provenance notes;
 - create closed child work items only for strongly evidenced completed units;
 - create open task/bug/decision work items for remaining or ambiguous work;
 - represent unfinished branches as review/integration work items or decision work items, not automatic merges;
-- hand back the epic ID for `Mode: resume`.
+- hand back the roadmap ID for `Mode: resume`.
 
 ### work-planner
 
@@ -362,12 +362,12 @@ Allowed to mutate work items through `work-helper.mjs`. Must not edit source cod
 
 Responsibilities:
 
-- read the planning work item and master epic through compact field extractors; do not dump raw epic JSON or full master plans into the transcript;
+- read the planning work item and master roadmap through compact field extractors; do not dump raw roadmap JSON or full master plans into the transcript;
 - prefer the referenced plan file and read only the expected next implementation-unit section plus the verification/hardware contract;
 - propagate the project verification contract into child work item acceptance;
-- list existing children of the epic before creating anything, summarized to ids/titles/status;
-- create the next executable work item under the epic (`--parent <epic-id>`) by default, only when no existing open/in-progress/closed child already covers that implementation unit; create up to three executable work items only when the next units are obvious, low-risk, and sequential; propagate `wo:execution-agent` from a big/risky planning work item into each executable child's notes;
-- create decision work items for uncertainty under the epic (`--parent <epic-id>`);
+- list existing children of the roadmap before creating anything, summarized to ids/titles/status;
+- create the next executable work item under the roadmap (`--parent <roadmap-id>`) by default, only when no existing open/in-progress/closed child already covers that implementation unit; create up to three executable work items only when the next units are obvious, low-risk, and sequential; propagate `wo:execution-agent` from a big/risky planning work item into each executable child's notes;
+- create decision work items for uncertainty under the roadmap (`--parent <roadmap-id>`);
 - add only real `blocks` dependencies, using `node scripts/work-helper.mjs work-block <later-id> --by <earlier-id>` when later slices must wait for earlier slices;
 - run `node scripts/work-helper.mjs work-ready-summary` after dependency changes and repair the order if the earliest executable slice is not ready first;
 - close or update the planning work item when durable work items exist.
@@ -411,7 +411,7 @@ Responsibilities:
 - use `ce-debug` discipline to reproduce, trace, root-cause, fix, and verify;
 - update work item notes with symptoms, causal chain, files changed, verification contract evidence, hardware evidence when applicable, and result;
 - when reproduction or verification fails after a real attempt, attach a failure artifact, label the bug `wo:blocked` when available, create a decision work item for any human question, and leave dependencies so `/work-resume` can move to unrelated ready work;
-- create follow-up work items under the same epic only for separate work;
+- create follow-up work items under the same roadmap only for separate work;
 - request `ce-compound mode:headless` when a non-trivial reusable lesson was learned.
 
 ### work-fixer

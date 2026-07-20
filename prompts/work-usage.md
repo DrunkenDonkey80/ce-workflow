@@ -1,6 +1,6 @@
 ---
 description: Render a local HTML usage report from work telemetry
-argument-hint: "[today|all|epic <id>|workItem <id>] [--open|--jsonl]"
+argument-hint: "[today|all|roadmap <id>|workItem <id>] [--open|--jsonl]"
 ---
 
 Fallback when the extension command is unavailable: use the `work-orchestrator` skill in mode: `usage`.

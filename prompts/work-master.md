@@ -1,12 +1,12 @@
 ---
-description: Alias for /work-plan; create a master epic from an idea or plan
+description: Alias for /work-plan; create a master roadmap from an idea or plan
 argument-hint: "<idea-or-plan-file>"
 ---
 
 Prefer `/work-plan` for new users. This legacy alias uses the `work-orchestrator` skill in mode: `master`.
 
-When this runs `ce-plan`, auto-accept plan creation unless a real human decision is needed, then create the epic in-flow via `node scripts/work-helper.mjs bootstrap-plan-epic <created-plan-path>` (runs the Open Question Gate). One delivery scope stays standalone; multiple scopes use the coded initiative proposal → preview → F7 approval receipt → apply path and select only one child for just-in-time planning.
+When this runs `ce-plan`, auto-accept plan creation unless a real human decision is needed, then create the roadmap in-flow via `node scripts/work-helper.mjs bootstrap-plan-roadmap <created-plan-path>` (runs the Open Question Gate). One delivery scope stays standalone; multiple scopes use the coded initiative proposal → preview → F7 approval receipt → apply path and select only one child for just-in-time planning.
 
 Task: $ARGUMENTS
 
-Final line must name the next command: `/work-resume <epic-id>` once the helper has created the epic.
+Final line must name the next command: `/work-resume <roadmap-id>` once the helper has created the roadmap.
