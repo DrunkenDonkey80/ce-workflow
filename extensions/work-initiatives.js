@@ -474,8 +474,8 @@ function readinessFor(item, readinessByEpic) {
 
 function epicActions(item) {
 	return item.status === "closed"
-		? ["plan", "tasks", "report", "reopen"]
-		: ["plan", "resume", "tasks", "report", "close"];
+		? ["plan", "tasks", "report", "set_current", "reopen"]
+		: ["plan", "resume", "tasks", "report", "set_current", "close"];
 }
 
 function initiativeActions(item) {

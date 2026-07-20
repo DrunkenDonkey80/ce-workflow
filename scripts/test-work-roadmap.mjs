@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
 	mkdirSync,
@@ -10,8 +11,11 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import process from "node:process";
-import { loadStore } from "../extensions/work-store.js";
+import {
+	initStore,
+	loadStore,
+	saveStore,
+} from "../extensions/work-store.js";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
@@ -29,6 +33,7 @@ const {
 );
 
 const root = mkdtempSync(path.join(tmpdir(), "work-roadmap-"));
+const initiativeRoot = mkdtempSync(path.join(tmpdir(), "work-initiative-roadmap-"));
 execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
 mkdirSync(path.join(root, ".pi"));
 mkdirSync(path.join(root, "docs", "plans"), { recursive: true });
@@ -269,6 +274,124 @@ try {
 		loadStore(root).items["E-3"].status === "open",
 		"reopen updates the native roadmap",
 	);
+
+	// Initiative rows are hierarchical and expose only level-appropriate actions.
+	execFileSync("git", ["init"], { cwd: initiativeRoot, stdio: "ignore" });
+	mkdirSync(path.join(initiativeRoot, ".pi"), { recursive: true });
+	mkdirSync(path.join(initiativeRoot, "docs", "plans"), { recursive: true });
+	writeFileSync(
+		path.join(initiativeRoot, "docs", "plans", "child.md"),
+		"---\nartifact_contract: ce-unified-plan/v1\nartifact_readiness: implementation-ready\nexecution: code\n---\n# Child\n",
+	);
+	writeFileSync(
+		path.join(initiativeRoot, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({ lastEpicId: "I-1.1" }),
+	);
+	const timestamp = "2026-07-19T00:00:00.000Z";
+	const item = (id, title, extra = {}) => ({
+		id,
+		type: "epic",
+		status: "open",
+		title,
+		createdAt: timestamp,
+		updatedAt: timestamp,
+		dependencies: [],
+		labels: [],
+		notes: [],
+		evidence: [],
+		dependencyEdges: [],
+		...extra,
+	});
+	const initiativeStore = initStore(initiativeRoot, { now: timestamp });
+	initiativeStore.items = {
+		"I-1": item("I-1", "Initiative", {
+			labels: ["initiative"],
+			initiative: {
+				schemaVersion: 1,
+				sources: [{ id: "s", path: "docs/plans/child.md", hash: "source" }],
+				coverage: [
+					{ id: "o1", provenance: "s:R1", contentHash: "1", disposition: "accepted", epicId: "I-1.1" },
+					{ id: "o2", provenance: "s:R2", contentHash: "2", disposition: "accepted", epicId: "I-1.2" },
+				],
+				evidence: [],
+			},
+		}),
+		"I-1.1": item("I-1.1", "Planned child", {
+			parentId: "I-1",
+			status: "closed",
+			documentLinks: { design: "docs/plans/child.md" },
+		}),
+		"I-1.2": item("I-1.2", "Needs plan", { parentId: "I-1" }),
+		"S-1": item("S-1", "Standalone"),
+	};
+	saveStore(initiativeRoot, initiativeStore);
+	const tree = buildWorkRoadmapState(initiativeRoot, "list");
+	assert.deepEqual(
+		tree.roadmaps.map((entry) => [entry.id, entry.role]),
+		[
+			["I-1", "initiative"],
+			["I-1.1", "child_epic"],
+			["I-1.2", "child_epic"],
+			["S-1", "standalone_epic"],
+		],
+	);
+	const treeText = renderWorkRoadmapText(tree);
+	assert.match(treeText, / {2}I-1\.1.*planned/i);
+	assert.match(treeText, / {2}I-1\.2.*needs.plan/i);
+	const initiativeOps = [];
+	await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: initiativeRoot,
+			ui: {
+				select: async (title, labels) => {
+					if (title.includes("operation")) {
+						initiativeOps.push(...labels);
+						return undefined;
+					}
+					return labels.find((label) => label.includes("I-1 ["));
+				},
+				notify: () => {},
+			},
+		},
+		{},
+	);
+	assert(initiativeOps.some((label) => /preview|reconcile/i.test(label)));
+	assert(initiativeOps.some((label) => /plan.*child/i.test(label)));
+	assert(!initiativeOps.some((label) => /resume|finish/i.test(label)));
+	const captureOps = async (id) => {
+		const labelsSeen = [];
+		await handleWorkRoadmapCommand(
+			"",
+			{
+				cwd: initiativeRoot,
+				ui: {
+					select: async (title, labels) => {
+						if (title.includes("operation")) {
+							labelsSeen.push(...labels);
+							return undefined;
+						}
+						return labels.find((label) => label.includes(id));
+					},
+					notify: () => {},
+				},
+			},
+			{},
+		);
+		return labelsSeen.join("\n");
+	};
+	for (const id of ["I-1.2", "S-1"]) {
+		const actions = await captureOps(id);
+		for (const expected of ["resume", "list tasks", "plan", "report", "close"])
+			assert.match(actions, new RegExp(expected, "i"));
+	}
+	const blockedInitiativeClose = buildWorkRoadmapState(
+		initiativeRoot,
+		"close I-1 --force",
+	);
+	assert.equal(blockedInitiativeClose.action, "initiative-close-blocked");
+	assert.equal(loadStore(initiativeRoot).items["I-1"].status, "open");
 } finally {
-	rmSync(root, { recursive: true, force: true });
+	for (const target of [root, initiativeRoot])
+		rmSync(target, { recursive: true, force: true });
 }

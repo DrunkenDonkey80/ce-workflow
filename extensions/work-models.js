@@ -7353,11 +7353,12 @@ export function bootstrapPlanEpic(
 		epic = updateWorkItemNative(cwd, selected.id, {
 			documentLinks: {
 				...(epic.documentLinks ?? {}),
-				design: fields.designFile,
+				master: fields.designFile,
 			},
 		});
-		if (!notesOf(epic).includes(fields.notes))
-			epic = appendWorkflowWorkItemNote(cwd, selected.id, fields.notes);
+		const sourceNote = `initiative source plan: ${rel}`;
+		if (!notesOf(epic).includes(sourceNote))
+			epic = appendWorkflowWorkItemNote(cwd, selected.id, sourceNote);
 		let planning = childrenOfRequired(cwd, selected.id).find(
 			(item) =>
 				isPlanningIssue(item) && notesOf(item).includes(`source plan: ${rel}`),
@@ -8852,8 +8853,38 @@ function allRoadmaps(cwd) {
 	}
 }
 
+function initiativeReadinessFacts(cwd, store) {
+	return Object.fromEntries(
+		Object.values(store.items)
+			.filter((item) => item.type === "epic" && !item.initiative)
+			.map((item) => {
+				const plan = item.documentLinks?.design;
+				if (!plan)
+					return [
+						item.id,
+						{ state: "needs_plan", reason: "No implementation-ready plan is linked." },
+					];
+				const file = join(cwd, plan);
+				if (!existsSync(file))
+					return [item.id, { state: "stale", reason: `Linked plan is missing: ${plan}` }];
+				const content = readFileSync(file, "utf8");
+				const readiness = content.match(/^artifact_readiness:\s*(\S+)/m)?.[1];
+				if (
+					(readiness && readiness !== "implementation-ready") ||
+					scanPlanOpenQuestions(content).length
+				)
+					return [item.id, { state: "stale", reason: "Linked plan is not implementation-ready." }];
+				return [item.id, { state: "planned", reason: "Plan is implementation-ready." }];
+			}),
+	);
+}
+
 function buildInitiativeProjection(cwd, readinessByEpic = {}) {
-	return projectInitiativeHierarchy(loadNativeWorkStore(cwd), readinessByEpic);
+	const store = loadNativeWorkStore(cwd);
+	return projectInitiativeHierarchy(store, {
+		...initiativeReadinessFacts(cwd, store),
+		...readinessByEpic,
+	});
 }
 
 function verifiedInitiativeSources(cwd, proposal) {
@@ -8981,8 +9012,12 @@ function resolveRoadmapTarget(cwd, target = "") {
 	return { epic };
 }
 
-function roadmapSummary(_cwd, epic, currentId) {
-	return { ...issueSummary(epic), current: idOf(epic) === currentId };
+function roadmapSummary(_cwd, epic, currentId, projection) {
+	return {
+		...issueSummary(epic),
+		...(projection ?? {}),
+		current: idOf(epic) === currentId,
+	};
 }
 
 function splitRoadmapArgs(args = "") {
@@ -9026,10 +9061,18 @@ function buildWorkRoadmapState(cwd, args = "") {
 		})();
 		const currentId = current ? idOf(current) : readWorkState(cwd).lastEpicId;
 		if (command === "list") {
-			const roadmaps = allRoadmaps(cwd).map((epic) =>
-				roadmapSummary(cwd, epic, currentId),
+			const store = loadNativeWorkStore(cwd);
+			const projection = buildInitiativeProjection(cwd);
+			const roadmaps = projection.nodes.map((node) =>
+				roadmapSummary(cwd, store.items[node.id], currentId, node),
 			);
-			return { ok: true, action: "roadmap-list", currentId, roadmaps };
+			return {
+				ok: true,
+				action: "roadmap-list",
+				currentId,
+				projectionVersion: projection.schemaVersion,
+				roadmaps,
+			};
 		}
 		if (command === "tasks") {
 			const resolved = resolveRoadmapTarget(cwd, target);
@@ -9053,6 +9096,15 @@ function buildWorkRoadmapState(cwd, args = "") {
 			const resolved = resolveRoadmapTarget(cwd, target);
 			if (resolved.error)
 				return errorState(resolved.error, resolved.message, resolved);
+			const projected = buildInitiativeProjection(cwd).nodes.find(
+				(node) => node.id === idOf(resolved.epic),
+			);
+			if (projected?.role === "initiative")
+				return errorState(
+					"initiative-not-executable",
+					"Select one child epic as the current executable roadmap.",
+					{ action: "initiative-not-executable", epic: projected },
+				);
 			rememberWorkflowEpic(cwd, resolved.epic);
 			return {
 				ok: true,
@@ -9066,6 +9118,18 @@ function buildWorkRoadmapState(cwd, args = "") {
 			const resolved = resolveRoadmapTarget(cwd, target);
 			if (resolved.error)
 				return errorState(resolved.error, resolved.message, resolved);
+			const projected = buildInitiativeProjection(cwd).nodes.find(
+				(node) => node.id === idOf(resolved.epic),
+			);
+			if (projected?.role === "initiative" && !projected.closeAllowed)
+				return {
+					ok: true,
+					action: "initiative-close-blocked",
+					epic: roadmapSummary(cwd, resolved.epic, undefined, projected),
+					blockers: projected.closeBlockers,
+					message: "Initiative close is blocked until coverage, plans, and child epics are resolved.",
+					suggestedCommands: [`/work-roadmap tasks ${idOf(resolved.epic)}`],
+				};
 			const unresolved = childrenOfRequired(cwd, idOf(resolved.epic)).filter(
 				(issue) => statusOf(issue) !== "closed",
 			);
@@ -9082,7 +9146,8 @@ function buildWorkRoadmapState(cwd, args = "") {
 					],
 				};
 			updateWorkItemNative(cwd, idOf(resolved.epic), { status: "closed" });
-			rememberWorkflowEpic(cwd, { ...resolved.epic, status: "closed" });
+			if (projected?.role !== "initiative")
+				rememberWorkflowEpic(cwd, { ...resolved.epic, status: "closed" });
 			return {
 				ok: true,
 				action: "roadmap-closed",
@@ -9261,10 +9326,11 @@ function renderTaskGroup(title, items) {
 function renderWorkRoadmapText(state) {
 	if (!state.ok) return `Work roadmap unavailable: ${state.message}`;
 	if (state.action === "roadmap-list") {
-		const rows = state.roadmaps.map(
-			(epic) =>
-				`- ${epic.current ? "*" : " "} ${epic.id} [${statusLabel(epic.status)}] ${epic.title}`,
-		);
+		const rows = state.roadmaps.map((epic) => {
+			const indent = epic.parentId ? "  " : "";
+			const readiness = epic.readiness?.state?.replaceAll("_", " ");
+			return `- ${epic.current ? "*" : " "} ${indent}${epic.id} [${statusLabel(epic.status)}]${readiness ? ` [${readiness}]` : ""} ${epic.title}`;
+		});
 		return ["🗺️ Roadmaps:", ...(rows.length ? rows : ["- none"])].join("\n");
 	}
 	if (state.action === "roadmap-tasks")
@@ -9273,6 +9339,12 @@ function renderWorkRoadmapText(state) {
 			...renderTaskGroup("🟠 Blockers:", state.tasks.blockers),
 			...renderTaskGroup("🟢 Open:", state.tasks.open),
 			...renderTaskGroup("✅ Closed:", state.tasks.closed),
+		].join("\n");
+	if (state.action === "initiative-close-blocked")
+		return [
+			`Initiative: ${state.epic.id} — ${state.epic.title}`,
+			state.message,
+			...state.blockers.map((blocker) => `- ${blocker}`),
 		].join("\n");
 	if (state.action === "roadmap-close-needs-confirmation")
 		return [
@@ -11363,41 +11435,85 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 		"🗺️ Work roadmaps",
 		list.roadmaps.map((epic) => ({
 			value: epic.id,
-			label: `${epic.current ? "* " : ""}${epic.id} [${statusLabel(epic.status)}] ${epic.title}`,
+			label: `${epic.current ? "* " : ""}${epic.parentId ? "  " : ""}${epic.id} [${statusLabel(epic.status)}] [${epic.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${epic.title}`,
 		})),
 	);
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
-	const op = await choose(ctx, `${selected}: operation`, [
-		{
-			value: "resume",
-			label: "▶️ work-resume",
-			description: "autonomous project loop for this roadmap",
-		},
-		{
-			value: "tasks",
-			label: "📋 list tasks",
-			description: "blockers, open, closed",
-		},
-		{
-			value: "plan",
-			label: "🧭 plan / strengthen",
-			description: "use linked brainstorm/plan",
-		},
-		{ value: "set-current", label: "⭐ set current" },
-		{
-			value: "close",
-			label: "✅ close",
-			description: "asks before unresolved tasks",
-		},
-		{ value: "reopen", label: "♻️ reopen" },
-		{ value: "report", label: "📄 full report" },
-	]);
+	const selectedRoadmap = list.roadmaps.find((epic) => epic.id === selected);
+	const initiative = selectedRoadmap?.role === "initiative";
+	const op = await choose(
+		ctx,
+		`${selected}: operation`,
+		initiative
+			? [
+					{ value: "report", label: "📄 inspect / report" },
+					{
+						value: "preview",
+						label: "🧩 preview / reconcile",
+						description: "show hierarchy and coverage before approval",
+					},
+					{ value: "plan-child", label: "🧭 plan a child" },
+					{ value: "select-child", label: "⭐ select current child" },
+					selectedRoadmap.status === "closed"
+						? { value: "reopen", label: "♻️ reopen" }
+						: { value: "close", label: "✅ guarded close" },
+				]
+			: [
+					{
+						value: "resume",
+						label: "▶️ work-resume",
+						description: "autonomous project loop for this roadmap",
+					},
+					{
+						value: "tasks",
+						label: "📋 list tasks",
+						description: "blockers, open, closed",
+					},
+					{
+						value: "plan",
+						label: "🧭 plan / strengthen",
+						description: "use linked brainstorm/plan",
+					},
+					{ value: "set-current", label: "⭐ set current" },
+					selectedRoadmap.status === "closed"
+						? { value: "reopen", label: "♻️ reopen" }
+						: { value: "close", label: "✅ close" },
+					{ value: "report", label: "📄 full report" },
+				],
+	);
 	if (!op) return { ok: true, action: "roadmap-cancel" };
 	if (op === "resume") return handleWorkResumeGoalCommand(selected, pi, ctx);
 	if (op === "report") return handleWorkReportCommand(selected, ctx);
 	if (op === "tasks") return handleRoadmapTasksMenu(selected, ctx, pi);
 	if (op === "plan")
 		return handleWorkflowAction(buildWorkPlanState, selected, ctx, pi);
+	if (op === "preview") {
+		const state = {
+			ok: true,
+			action: "initiative-proposal-required",
+			epic: selectedRoadmap,
+			message: "Create a semantic proposal, then run initiative-preview; apply remains disabled until that complete hierarchy and coverage is approved.",
+		};
+		notify(ctx, renderWorkRoadmapText(state));
+		return stateTelemetry(state);
+	}
+	if (op === "plan-child" || op === "select-child") {
+		const children = list.roadmaps.filter((epic) => epic.parentId === selected);
+		const child = await choose(
+			ctx,
+			`${selected}: child epic`,
+			children.map((epic) => ({
+				value: epic.id,
+				label: `${epic.id} [${epic.readiness.state.replaceAll("_", " ")}] ${epic.title}`,
+			})),
+		);
+		if (!child) return { ok: true, action: "roadmap-cancel" };
+		if (op === "plan-child")
+			return handleWorkflowAction(buildWorkPlanState, child, ctx, pi);
+		const state = buildWorkRoadmapState(ctx.cwd, `set-current ${child}`);
+		notify(ctx, renderWorkRoadmapText(state), state.ok ? "info" : "warning");
+		return stateTelemetry(state);
+	}
 	let state = buildWorkRoadmapState(ctx.cwd, `${op} ${selected}`);
 	if (state.action === "roadmap-close-needs-confirmation") {
 		const confirm = await choose(ctx, state.message, [
