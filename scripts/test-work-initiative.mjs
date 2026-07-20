@@ -27,6 +27,7 @@ import {
 } from "../extensions/work-initiatives.js";
 import {
 	applyInitiativeReconciliation,
+	approveInitiativeReconciliation,
 	buildInitiativeProjection,
 	buildWorkFinishState,
 	buildWorkReportState,
@@ -38,10 +39,17 @@ import {
 
 const dir = mkdtempSync(path.join(os.tmpdir(), "ce-initiative-"));
 const promotionDir = mkdtempSync(path.join(os.tmpdir(), "ce-promotion-"));
-const recoveryDir = mkdtempSync(path.join(os.tmpdir(), "ce-promotion-recovery-"));
+const recoveryDir = mkdtempSync(
+	path.join(os.tmpdir(), "ce-promotion-recovery-"),
+);
 const helperDir = mkdtempSync(path.join(os.tmpdir(), "ce-promotion-helper-"));
 const timestamp = "2026-07-19T00:00:00.000Z";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+const applyApproved = (cwd, proposal, token, options = {}) =>
+	applyInitiativeReconciliation(cwd, proposal, token, {
+		...options,
+		approval: approveInitiativeReconciliation(cwd, token),
+	});
 const record = (id, title, extra = {}) => ({
 	id,
 	type: "epic",
@@ -58,8 +66,12 @@ const record = (id, title, extra = {}) => ({
 });
 
 try {
+	const initiativeSourceText = "# Initiative intent\n";
 	assert.doesNotMatch(
-		readFileSync(new URL("../extensions/work-initiatives.js", import.meta.url), "utf8"),
+		readFileSync(
+			new URL("../extensions/work-initiatives.js", import.meta.url),
+			"utf8",
+		),
 		/from ["'].+work-models\.js["']/,
 	);
 	const store = initStore(dir, { now: timestamp });
@@ -70,7 +82,11 @@ try {
 			initiative: {
 				schemaVersion: 1,
 				sources: [
-					{ id: "brainstorm-1", path: "docs/brainstorms/i.md", hash: "s1" },
+					{
+						id: "brainstorm-1",
+						path: "docs/brainstorms/i.md",
+						hash: hash(initiativeSourceText),
+					},
 				],
 				coverage: [
 					{
@@ -103,6 +119,7 @@ try {
 		}),
 		"initiative-1.2": record("initiative-1.2", "Next child", {
 			parentId: "initiative-1",
+			documentLinks: { design: "docs/plans/draft.md" },
 		}),
 		"initiative-1.2.1": {
 			...record("initiative-1.2.1", "Task", {
@@ -112,10 +129,20 @@ try {
 		},
 	};
 	validateStore(store);
+	mkdirSync(path.join(dir, "docs", "brainstorms"), { recursive: true });
+	writeFileSync(
+		path.join(dir, "docs", "brainstorms", "i.md"),
+		initiativeSourceText,
+	);
+	mkdirSync(path.join(dir, "docs", "plans"), { recursive: true });
+	writeFileSync(path.join(dir, "docs", "plans", "draft.md"), "# Draft\n");
 	saveStore(dir, store);
 	const readiness = {
 		"standalone-1": { state: "stale", reason: "Linked plan is missing." },
-		"initiative-1.1": { state: "planned", reason: "Plan is implementation-ready." },
+		"initiative-1.1": {
+			state: "planned",
+			reason: "Plan is implementation-ready.",
+		},
 		"initiative-1.2": { state: "needs_plan", reason: "No plan is linked." },
 	};
 	const projection = projectInitiativeHierarchy(store, readiness);
@@ -139,6 +166,7 @@ try {
 	const next = projection.nodes.find((node) => node.id === "initiative-1.2");
 	assert.equal(next.role, "child_epic");
 	assert.equal(next.readiness.state, "needs_plan");
+	assert.equal(next.readiness.implementationReady, false);
 	assert.deepEqual(next.localProgress, { closed: 0, total: 1, percent: 0 });
 	assert(!projection.nodes.some((node) => node.id === "initiative-1.2.1"));
 	const standalone = projection.nodes.at(-1);
@@ -149,16 +177,25 @@ try {
 		projection,
 		"work-models adapter must expose the exact domain projection",
 	);
+	const draftReadiness = buildInitiativeProjection(dir).nodes.find(
+		(node) => node.id === "initiative-1.2",
+	).readiness;
+	assert.equal(draftReadiness.state, "stale");
+	assert.equal(draftReadiness.implementationReady, false);
 	const status = buildWorkStatus(dir, "initiative-1");
 	assert.match(status, /Initiative: Initiative/);
 	assert.match(status, /1\/2 child epics closed \(50%\)/);
 	const report = buildWorkReportState(dir, "initiative-1");
 	assert.equal(report.initiative, true);
-	assert.deepEqual(report.aggregateProgress, { closed: 1, total: 2, percent: 50 });
-	assert.deepEqual(report.children.map((child) => child.id), [
-		"initiative-1.1",
-		"initiative-1.2",
-	]);
+	assert.deepEqual(report.aggregateProgress, {
+		closed: 1,
+		total: 2,
+		percent: 50,
+	});
+	assert.deepEqual(
+		report.children.map((child) => child.id),
+		["initiative-1.1", "initiative-1.2"],
+	);
 	const resume = buildWorkResumeState(dir, "initiative-1");
 	assert.equal(resume.epic.id, "initiative-1.2");
 	assert.equal(resume.initiative.id, "initiative-1");
@@ -171,7 +208,10 @@ try {
 	);
 	const current = buildWorkRoadmapState(dir, "list");
 	assert.equal(current.currentId, "initiative-1.2");
-	assert.equal(current.roadmaps.find((item) => item.current)?.role, "child_epic");
+	assert.equal(
+		current.roadmaps.find((item) => item.current)?.role,
+		"child_epic",
+	);
 	const ambiguousStore = loadStore(dir);
 	ambiguousStore.items["initiative-1.3"] = record(
 		"initiative-1.3",
@@ -204,6 +244,29 @@ try {
 		buildInitiativeProjection(dir),
 		"helper hierarchy must equal the shared F7 projection",
 	);
+	const staleInitiative = loadStore(dir);
+	for (const child of Object.values(staleInitiative.items).filter(
+		(item) => item.parentId === "initiative-1" && item.type === "epic",
+	))
+		child.status = "closed";
+	saveStore(dir, staleInitiative);
+	writeFileSync(
+		path.join(dir, "docs", "brainstorms", "i.md"),
+		`${initiativeSourceText}changed\n`,
+	);
+	const staleClose = buildWorkRoadmapState(
+		dir,
+		"close initiative-1 --force",
+	);
+	assert.equal(staleClose.action, "initiative-close-blocked");
+	assert(staleClose.blockers.includes("stale_source:docs/brainstorms/i.md"));
+	rmSync(path.join(dir, "docs", "brainstorms", "i.md"));
+	const missingClose = buildWorkRoadmapState(
+		dir,
+		"close initiative-1 --force",
+	);
+	assert.equal(missingClose.action, "initiative-close-blocked");
+	assert(missingClose.blockers.includes("missing_source:docs/brainstorms/i.md"));
 
 	// Preview is pure; apply is identity-preserving, stale-safe, and idempotent.
 	const promotionStore = initStore(promotionDir, { now: timestamp });
@@ -224,7 +287,9 @@ try {
 		now: timestamp,
 	});
 	saveStore(promotionDir, promotionStore);
-	mkdirSync(path.join(promotionDir, "docs", "brainstorms"), { recursive: true });
+	mkdirSync(path.join(promotionDir, "docs", "brainstorms"), {
+		recursive: true,
+	});
 	const sourcePath = "docs/brainstorms/broad.md";
 	const sourceText = "# Broad intent\n\nR1 and R2\n";
 	writeFileSync(path.join(promotionDir, sourcePath), sourceText);
@@ -267,15 +332,18 @@ try {
 			},
 		],
 	};
-	assert.deepEqual(normalizeInitiativeProposal(proposal).groups.map((x) => x.id), [
-		"scope-1",
-		"scope-2",
-	]);
+	assert.deepEqual(
+		normalizeInitiativeProposal(proposal).groups.map((x) => x.id),
+		["scope-1", "scope-2"],
+	);
 	assert.throws(
 		() =>
 			normalizeInitiativeProposal({
 				...proposal,
-				outcomes: [proposal.outcomes[0], { ...proposal.outcomes[0], id: "duplicate" }],
+				outcomes: [
+					proposal.outcomes[0],
+					{ ...proposal.outcomes[0], id: "duplicate" },
+				],
 			}),
 		(error) => error.code === "ambiguous_lineage",
 	);
@@ -283,7 +351,9 @@ try {
 		() =>
 			normalizeInitiativeProposal({
 				...proposal,
-				outcomes: proposal.outcomes.filter((outcome) => outcome.groupId !== "scope-2"),
+				outcomes: proposal.outcomes.filter(
+					(outcome) => outcome.groupId !== "scope-2",
+				),
 			}),
 		(error) => error.code === "incomplete_coverage",
 	);
@@ -303,17 +373,19 @@ try {
 
 	writeFileSync(path.join(promotionDir, sourcePath), `${sourceText}changed\n`);
 	assert.throws(
-		() => applyInitiativeReconciliation(promotionDir, proposal, preview.token, { approved: true }),
+		() => applyApproved(promotionDir, proposal, preview.token),
 		/stale source/i,
 	);
 	writeFileSync(path.join(promotionDir, sourcePath), sourceText);
 	assert.throws(
 		() =>
-			applyInitiativeReconciliation(
+			applyApproved(
 				promotionDir,
-				{ ...proposal, initiative: { ...proposal.initiative, title: "Changed" } },
+				{
+					...proposal,
+					initiative: { ...proposal.initiative, title: "Changed" },
+				},
 				preview.token,
-				{ approved: true },
 			),
 		/stale proposal/i,
 	);
@@ -321,7 +393,7 @@ try {
 	updateWorkItem(drifted, "E-1", { notes: ["drift"], now: timestamp });
 	saveStore(promotionDir, drifted);
 	assert.throws(
-		() => applyInitiativeReconciliation(promotionDir, proposal, preview.token, { approved: true }),
+		() => applyApproved(promotionDir, proposal, preview.token),
 		/stale store/i,
 	);
 	writeFileSync(storePath(promotionDir), beforePreview);
@@ -329,12 +401,7 @@ try {
 		() => applyInitiativeReconciliation(promotionDir, proposal, preview.token),
 		/approval/i,
 	);
-	const applied = applyInitiativeReconciliation(
-		promotionDir,
-		proposal,
-		preview.token,
-		{ approved: true },
-	);
+	const applied = applyApproved(promotionDir, proposal, preview.token);
 	assert.equal(applied.changed, true);
 	const promoted = loadStore(promotionDir);
 	assert.equal(promoted.items["E-1"].parentId, "I-1");
@@ -343,39 +410,73 @@ try {
 	]);
 	assert.deepEqual(promoted.items["E-1"].evidence, [{ verification: "PASS" }]);
 	assert.equal(promoted.items["I-1.1"].parentId, "I-1");
+	const omittedOutcome = previewInitiativeReconciliation(promotionDir, {
+		...proposal,
+		outcomes: proposal.outcomes.filter((outcome) => outcome.id !== "outcome-3"),
+	});
+	assert.deepEqual(omittedOutcome.conflicts, [
+		{ kind: "missing_outcome", outcomeId: "outcome-3" },
+	]);
+	const changedIdentity = previewInitiativeReconciliation(promotionDir, {
+		...proposal,
+		outcomes: proposal.outcomes.map((outcome) =>
+			outcome.id === "outcome-1"
+				? { ...outcome, contentHash: "changed" }
+				: outcome,
+		),
+	});
+	assert.deepEqual(changedIdentity.conflicts, [
+		{ kind: "outcome_identity", outcomeId: "outcome-1" },
+	]);
+	const beforeIdentityConflict = readFileSync(storePath(promotionDir), "utf8");
 	assert.throws(
-		() => applyInitiativeReconciliation(promotionDir, proposal, preview.token, { approved: true }),
+		() =>
+			applyApproved(
+				promotionDir,
+				{
+					...proposal,
+					outcomes: proposal.outcomes.map((outcome) =>
+						outcome.id === "outcome-1"
+							? { ...outcome, contentHash: "changed" }
+							: outcome,
+					),
+				},
+				changedIdentity.token,
+			),
+		(error) => error.code === "protected_field_conflict",
+	);
+	assert.equal(
+		readFileSync(storePath(promotionDir), "utf8"),
+		beforeIdentityConflict,
+	);
+	assert.throws(
+		() => applyApproved(promotionDir, proposal, preview.token),
 		/replayed|stale store/i,
 	);
 	const noopPreview = previewInitiativeReconciliation(promotionDir, proposal);
 	assert.equal(noopPreview.noop, true);
 	const beforeNoop = readFileSync(storePath(promotionDir), "utf8");
 	assert.equal(
-		applyInitiativeReconciliation(promotionDir, proposal, noopPreview.token, {
-			approved: true,
-		}).changed,
+		applyApproved(promotionDir, proposal, noopPreview.token).changed,
 		false,
 	);
 	assert.equal(readFileSync(storePath(promotionDir), "utf8"), beforeNoop);
 	assert.throws(
-		() => applyInitiativeReconciliation(promotionDir, proposal, noopPreview.token, { approved: true }),
+		() => applyApproved(promotionDir, proposal, noopPreview.token),
 		/replayed/i,
 	);
 	const manual = loadStore(promotionDir);
 	manual.items["I-1.1"].title = "Manual title";
 	saveStore(promotionDir, manual);
-	const conflictPreview = previewInitiativeReconciliation(promotionDir, proposal);
+	const conflictPreview = previewInitiativeReconciliation(
+		promotionDir,
+		proposal,
+	);
 	assert.deepEqual(conflictPreview.conflicts, [
 		{ kind: "manual_field", epicId: "I-1.1", field: "title" },
 	]);
 	assert.throws(
-		() =>
-			applyInitiativeReconciliation(
-				promotionDir,
-				proposal,
-				conflictPreview.token,
-				{ approved: true },
-			),
+		() => applyApproved(promotionDir, proposal, conflictPreview.token),
 		(error) => error.code === "protected_field_conflict",
 	);
 
@@ -384,65 +485,151 @@ try {
 	writeFileSync(storePath(recoveryDir), beforePreview);
 	mkdirSync(path.join(recoveryDir, "docs", "brainstorms"), { recursive: true });
 	writeFileSync(path.join(recoveryDir, sourcePath), sourceText);
-	const recoveryPreview = previewInitiativeReconciliation(recoveryDir, proposal);
+	const recoveryPreview = previewInitiativeReconciliation(
+		recoveryDir,
+		proposal,
+	);
 	assert.throws(() =>
-		applyInitiativeReconciliation(recoveryDir, proposal, recoveryPreview.token, {
-			approved: true,
+		applyApproved(recoveryDir, proposal, recoveryPreview.token, {
 			interruptAt: "candidate",
 		}),
 	);
 	assert.equal(loadStore(recoveryDir).items["I-1"], undefined);
 	assert.equal(loadStore(recoveryDir).items["E-1"].parentId, undefined);
 	assert.equal(
-		applyInitiativeReconciliation(recoveryDir, proposal, recoveryPreview.token, {
-			approved: true,
-		}).changed,
+		applyApproved(recoveryDir, proposal, recoveryPreview.token).changed,
 		true,
 	);
-	assert.equal(loadStore(recoveryDir).items["I-1"].initiative.evidence.length, 1);
+	assert.equal(
+		loadStore(recoveryDir).items["I-1"].initiative.evidence.length,
+		1,
+	);
+
+	writeFileSync(storePath(recoveryDir), beforePreview);
+	const replacePreview = previewInitiativeReconciliation(recoveryDir, proposal);
+	assert.throws(() =>
+		applyApproved(recoveryDir, proposal, replacePreview.token, {
+			interruptAt: "replace",
+		}),
+	);
+	const recovered = applyApproved(
+		recoveryDir,
+		proposal,
+		replacePreview.token,
+	);
+	assert.equal(recovered.recovered, true);
+	assert.equal(loadStore(recoveryDir).items["I-1"].parentId, undefined);
 
 	// Helper preview/apply works across processes and enforces approval/replay.
 	mkdirSync(path.dirname(storePath(helperDir)), { recursive: true });
 	writeFileSync(storePath(helperDir), beforePreview);
 	mkdirSync(path.join(helperDir, "docs", "brainstorms"), { recursive: true });
 	writeFileSync(path.join(helperDir, sourcePath), sourceText);
-	const proposalFile = path.join(helperDir, "proposal.json");
-	writeFileSync(proposalFile, JSON.stringify(proposal));
+	const proposalJson = JSON.stringify(proposal);
 	const helperBefore = readFileSync(storePath(helperDir), "utf8");
 	const helperPreview = JSON.parse(
-		execFileSync(process.execPath, [helper, "initiative-preview", proposalFile], {
-			cwd: helperDir,
-			encoding: "utf8",
-		}),
+		execFileSync(
+			process.execPath,
+			[helper, "initiative-preview", "--proposal-json", proposalJson],
+			{
+				cwd: helperDir,
+				encoding: "utf8",
+			},
+		),
 	);
 	assert.equal(readFileSync(storePath(helperDir), "utf8"), helperBefore);
 	let missingApproval;
 	try {
 		execFileSync(
 			process.execPath,
-			[helper, "initiative-apply", proposalFile, "--token", helperPreview.token],
+			[
+				helper,
+				"initiative-apply",
+				"--proposal-json",
+				proposalJson,
+				"--token",
+				helperPreview.token,
+			],
 			{ cwd: helperDir, encoding: "utf8" },
 		);
 	} catch (error) {
 		missingApproval = JSON.parse(error.stdout);
 	}
 	assert.equal(missingApproval.status, "FAIL");
+	let selfAssertedApproval;
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				helper,
+				"initiative-apply",
+				"--proposal-json",
+				proposalJson,
+				"--token",
+				helperPreview.token,
+				"--approved",
+			],
+			{ cwd: helperDir, encoding: "utf8" },
+		);
+	} catch (error) {
+		selfAssertedApproval = JSON.parse(error.stdout);
+	}
+	assert.equal(selfAssertedApproval.status, "FAIL");
+	const helperApproval = approveInitiativeReconciliation(
+		helperDir,
+		helperPreview.token,
+	);
 	const helperApplied = JSON.parse(
 		execFileSync(
 			process.execPath,
 			[
 				helper,
 				"initiative-apply",
-				proposalFile,
+				"--proposal-json",
+				proposalJson,
 				"--token",
 				helperPreview.token,
-				"--approved",
+				"--approval",
+				helperApproval,
 			],
 			{ cwd: helperDir, encoding: "utf8" },
 		),
 	);
 	assert.equal(helperApplied.changed, true);
 	assert(loadStore(helperDir).items["I-1"]);
+	let unsafeClose;
+	try {
+		execFileSync(process.execPath, [helper, "work-close", "I-1"], {
+			cwd: helperDir,
+			encoding: "utf8",
+		});
+	} catch (error) {
+		unsafeClose = JSON.parse(error.stdout);
+	}
+	assert.match(unsafeClose.error, /guarded close/i);
+	assert.equal(loadStore(helperDir).items["I-1"].status, "open");
+	let unsafeFinish;
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				helper,
+				"finish-task",
+				"I-1",
+				"--max-files",
+				"1",
+				"--message",
+				"unsafe",
+				"--verify",
+				"ignored",
+			],
+			{ cwd: helperDir, encoding: "utf8" },
+		);
+	} catch (error) {
+		unsafeFinish = JSON.parse(error.stdout);
+	}
+	assert.match(unsafeFinish.error, /guarded close/i);
+	assert.equal(loadStore(helperDir).items["I-1"].status, "open");
 	console.log("work initiative tests passed");
 } finally {
 	for (const target of [dir, promotionDir, recoveryDir, helperDir])

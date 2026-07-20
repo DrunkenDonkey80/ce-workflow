@@ -165,6 +165,11 @@ function finishTask() {
 		throw new Error(
 			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> --expect <stdout> | --json <file> --equals <path=value>] [--immediate-format] [--reviewed] [--push]",
 		);
+	const task = readWorkItem(id);
+	if (task?.initiative)
+		throw new Error(
+			`Initiative ${id} must be closed through /work-roadmap guarded close.`,
+		);
 	cleanupGeneratedInstructions();
 	const formatted = formatPendingFiles();
 	const stagedBefore = git(["diff", "--cached", "--name-only"])
@@ -252,7 +257,6 @@ function finishTask() {
 		throw new Error(
 			`scope exceeds ${maxFiles} implementation files: ${implementationFiles.join(", ")}`,
 		);
-	const task = readWorkItem(id);
 	const taskText = `${titleOf(task)}\n${notesOf(task)}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
 	const evidenceOnly =
 		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
@@ -679,6 +683,10 @@ try {
 		const closed = mutateStore(cwd, (store) => {
 			const current = store.items[id];
 			if (!current) throw new Error(`WorkItem not found: ${id}`);
+			if (current.initiative)
+				throw new Error(
+					`Initiative ${id} must be closed through /work-roadmap guarded close.`,
+				);
 			return updateWorkItem(store, id, {
 				status: "closed",
 				notes: option("--note")
@@ -767,23 +775,28 @@ try {
 		}
 	} else if (command === "initiative-preview") {
 		const [proposalFile] = positional();
-		if (!proposalFile)
-			throw new Error("usage: initiative-preview <proposal-json-file>");
+		const proposalJson = option("--proposal-json");
+		if (!proposalFile && !proposalJson)
+			throw new Error(
+				"usage: initiative-preview [proposal-json-file | --proposal-json <json>]",
+			);
 		const { previewInitiativeReconciliation } = await import(
 			"../extensions/work-models.js"
 		);
 		print(
 			previewInitiativeReconciliation(
 				cwd,
-				JSON.parse(readFileSync(proposalFile, "utf8")),
+				JSON.parse(proposalJson ?? readFileSync(proposalFile, "utf8")),
 			),
 		);
 	} else if (command === "initiative-apply") {
 		const [proposalFile] = positional();
+		const proposalJson = option("--proposal-json");
 		const token = option("--token");
-		if (!proposalFile || !token || !args.includes("--approved"))
+		const approval = option("--approval");
+		if ((!proposalFile && !proposalJson) || !token || !approval)
 			throw new Error(
-				"usage: initiative-apply <proposal-json-file> --token <preview-token> --approved",
+				"usage: initiative-apply [proposal-json-file | --proposal-json <json>] --token <preview-token> --approval <receipt>",
 			);
 		const { applyInitiativeReconciliation } = await import(
 			"../extensions/work-models.js"
@@ -791,9 +804,9 @@ try {
 		print(
 			applyInitiativeReconciliation(
 				cwd,
-				JSON.parse(readFileSync(proposalFile, "utf8")),
+				JSON.parse(proposalJson ?? readFileSync(proposalFile, "utf8")),
 				token,
-				{ approved: true },
+				{ approval },
 			),
 		);
 	} else if (command === "bootstrap-plan-epic") {

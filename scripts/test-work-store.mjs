@@ -150,12 +150,18 @@ try {
 	validateStore(hierarchy);
 	saveStore(hierarchyDir, hierarchy);
 	const hierarchyBytes = readFileSync(storePath(hierarchyDir), "utf8");
-	assert.equal(loadStore(hierarchyDir).items["initiative-1"].custom.preserved, true);
+	assert.equal(
+		loadStore(hierarchyDir).items["initiative-1"].custom.preserved,
+		true,
+	);
 	assert.deepEqual(
 		loadStore(hierarchyDir).items["initiative-1.1"].documentLinks,
 		[{ path: "docs/plans/child.md" }],
 	);
-	assert.equal(saveStore(hierarchyDir, loadStore(hierarchyDir), { dryRun: true }), hierarchyBytes);
+	assert.equal(
+		saveStore(hierarchyDir, loadStore(hierarchyDir), { dryRun: true }),
+		hierarchyBytes,
+	);
 
 	const invalidHierarchy = (change) => {
 		const candidate = structuredClone(hierarchy);
@@ -167,9 +173,8 @@ try {
 	});
 	invalidHierarchy((store) => {
 		store.items["initiative-1.1"].labels = ["initiative"];
-		store.items["initiative-1.1"].initiative = initiativeMetadata(
-			"initiative-1.1.1",
-		);
+		store.items["initiative-1.1"].initiative =
+			initiativeMetadata("initiative-1.1.1");
 	});
 	invalidHierarchy((store) => {
 		store.items["initiative-1"].initiative = { schemaVersion: 1 };
@@ -187,6 +192,22 @@ try {
 		store.items["initiative-1"].parentId = "initiative-1.1";
 	});
 	invalidHierarchy((store) => {
+		store.items["initiative-1"].initiative.sources[0].path = "../outside.md";
+	});
+	invalidHierarchy((store) => {
+		store.items["initiative-1"].initiative.sources[0].path = "/outside.md";
+	});
+	invalidHierarchy((store) => {
+		store.items["initiative-1"].initiative.sources[0].path = "C:/outside.md";
+	});
+	invalidHierarchy((store) => {
+		store.items["initiative-1.1.1"] = {
+			...structuredClone(store.items["initiative-1.1"]),
+			id: "initiative-1.1.1",
+			parentId: "initiative-1.1",
+		};
+	});
+	invalidHierarchy((store) => {
 		delete store.items["initiative-1"].initiative;
 	});
 
@@ -201,7 +222,9 @@ try {
 	const promoted = initiativeStore();
 	const protectedChild = structuredClone(promoted.items["initiative-1.1"]);
 	assert.equal(protectedChild.id, "initiative-1.1");
-	assert.deepEqual(protectedChild.documentLinks, [{ path: "docs/plans/child.md" }]);
+	assert.deepEqual(protectedChild.documentLinks, [
+		{ path: "docs/plans/child.md" },
+	]);
 
 	const corruptDir = repo();
 	const corruptStore = initStore(corruptDir);

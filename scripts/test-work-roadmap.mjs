@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -11,11 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import {
-	initStore,
-	loadStore,
-	saveStore,
-} from "../extensions/work-store.js";
+import { initStore, loadStore, saveStore } from "../extensions/work-store.js";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
@@ -33,7 +31,9 @@ const {
 );
 
 const root = mkdtempSync(path.join(tmpdir(), "work-roadmap-"));
-const initiativeRoot = mkdtempSync(path.join(tmpdir(), "work-initiative-roadmap-"));
+const initiativeRoot = mkdtempSync(
+	path.join(tmpdir(), "work-initiative-roadmap-"),
+);
 execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
 mkdirSync(path.join(root, ".pi"));
 mkdirSync(path.join(root, "docs", "plans"), { recursive: true });
@@ -279,9 +279,11 @@ try {
 	execFileSync("git", ["init"], { cwd: initiativeRoot, stdio: "ignore" });
 	mkdirSync(path.join(initiativeRoot, ".pi"), { recursive: true });
 	mkdirSync(path.join(initiativeRoot, "docs", "plans"), { recursive: true });
+	const childPlan =
+		"---\nartifact_contract: ce-unified-plan/v1\nartifact_readiness: implementation-ready\nexecution: code\n---\n# Child\n";
 	writeFileSync(
 		path.join(initiativeRoot, "docs", "plans", "child.md"),
-		"---\nartifact_contract: ce-unified-plan/v1\nartifact_readiness: implementation-ready\nexecution: code\n---\n# Child\n",
+		childPlan,
 	);
 	writeFileSync(
 		path.join(initiativeRoot, ".pi", "work-orchestrator-state.json"),
@@ -308,10 +310,28 @@ try {
 			labels: ["initiative"],
 			initiative: {
 				schemaVersion: 1,
-				sources: [{ id: "s", path: "docs/plans/child.md", hash: "source" }],
+				sources: [
+					{
+						id: "s",
+						path: "docs/plans/child.md",
+						hash: createHash("sha256").update(childPlan).digest("hex"),
+					},
+				],
 				coverage: [
-					{ id: "o1", provenance: "s:R1", contentHash: "1", disposition: "accepted", epicId: "I-1.1" },
-					{ id: "o2", provenance: "s:R2", contentHash: "2", disposition: "accepted", epicId: "I-1.2" },
+					{
+						id: "o1",
+						provenance: "s:R1",
+						contentHash: "1",
+						disposition: "accepted",
+						epicId: "I-1.1",
+					},
+					{
+						id: "o2",
+						provenance: "s:R2",
+						contentHash: "2",
+						disposition: "accepted",
+						epicId: "I-1.2",
+					},
 				],
 				evidence: [],
 			},
@@ -359,6 +379,84 @@ try {
 	assert(initiativeOps.some((label) => /preview|reconcile/i.test(label)));
 	assert(initiativeOps.some((label) => /plan.*child/i.test(label)));
 	assert(!initiativeOps.some((label) => /resume|finish/i.test(label)));
+	const proposalPath = path.join(".pi", "initiative-proposal.json");
+	writeFileSync(
+		path.join(initiativeRoot, proposalPath),
+		JSON.stringify({
+			schemaVersion: 1,
+			mode: "convert",
+			targetId: "I-1",
+			initiative: { id: "I-1", title: "Initiative" },
+			sources: initiativeStore.items["I-1"].initiative.sources,
+			groups: [
+				{ id: "g1", title: "Planned child", epicId: "I-1.1", selected: true },
+				{ id: "g2", title: "Needs plan", epicId: "I-1.2" },
+			],
+			outcomes: [
+				{
+					id: "o1",
+					provenance: "s:R1",
+					contentHash: "1",
+					disposition: "accepted",
+					groupId: "g1",
+				},
+				{
+					id: "o2",
+					provenance: "s:R2",
+					contentHash: "2",
+					disposition: "accepted",
+					groupId: "g2",
+				},
+			],
+		}),
+	);
+	const runPreview = async (approved) => {
+		let previewText = "";
+		const state = await handleWorkRoadmapCommand(
+			"",
+			{
+				cwd: initiativeRoot,
+				ui: {
+					select: async (title, labels) =>
+						title.includes("operation")
+							? labels.find((label) => /preview|reconcile/i.test(label))
+							: labels.find((label) => label.includes("I-1 [")),
+					input: async () =>
+						approved
+							? readFileSync(path.join(initiativeRoot, proposalPath), "utf8")
+							: proposalPath,
+					confirm: async (_title, body) => {
+						previewText = body;
+						return approved;
+					},
+					notify: () => {},
+				},
+			},
+			{},
+		);
+		return { state, previewText };
+	};
+	const beforeCancel = readFileSync(
+		path.join(initiativeRoot, ".ce-workflow", "work-items.json"),
+		"utf8",
+	);
+	const cancelled = await runPreview(false);
+	assert.equal(cancelled.state.action, "initiative-preview-cancelled");
+	assert.match(cancelled.previewText, /Proposed child epics:/);
+	assert.match(cancelled.previewText, /Outcome coverage:/);
+	assert.equal(
+		readFileSync(
+			path.join(initiativeRoot, ".ce-workflow", "work-items.json"),
+			"utf8",
+		),
+		beforeCancel,
+	);
+	const reconciled = await runPreview(true);
+	assert.equal(reconciled.state.action, "initiative-reconciled");
+	assert.equal(
+		loadStore(initiativeRoot).items["I-1"].initiative.evidence.length,
+		1,
+	);
 	const captureOps = async (id) => {
 		const labelsSeen = [];
 		await handleWorkRoadmapCommand(

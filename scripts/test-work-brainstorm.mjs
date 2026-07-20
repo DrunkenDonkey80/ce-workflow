@@ -14,6 +14,7 @@ const {
 	buildWorkBrainstormState,
 	buildWorkPlanState,
 	bootstrapPlanEpic,
+	approveInitiativeReconciliation,
 	deriveIdeaStatus,
 	renderWorkBrainstormText,
 } = await import(
@@ -145,6 +146,10 @@ try {
 			!fixture.store().items[broad.epic.id].initiative,
 		"multi-scope bootstrap previews the complete hierarchy without mutation",
 	);
+	const broadApproval = approveInitiativeReconciliation(
+		cwd,
+		broadPreview.preview.token,
+	);
 	const broadApplied = bootstrapPlanEpic(
 		cwd,
 		"docs/plans/broad-plan.md",
@@ -154,7 +159,7 @@ try {
 		{
 			proposal: broadProposal,
 			token: broadPreview.preview.token,
-			approved: true,
+			approval: broadApproval,
 		},
 	);
 	const broadStore = fixture.store();
@@ -169,11 +174,12 @@ try {
 	);
 	assert(
 		broadStore.items[broadApplied.selectedWorkItem.id].parentId ===
-			broadApplied.epic.id &&
-			broadApplied.epic.parentId === broad.epic.id,
+			broadApplied.epic.id && broadApplied.epic.parentId === broad.epic.id,
 		"only the selected child receives a planning task",
 	);
-	const successor = broadChildren.find((child) => child.id !== broadApplied.epic.id);
+	const successor = broadChildren.find(
+		(child) => child.id !== broadApplied.epic.id,
+	);
 	assert(
 		!Object.values(broadStore.items).some(
 			(item) => item.parentId === successor.id && item.id !== broad.idea.id,
@@ -194,6 +200,10 @@ try {
 		undefined,
 		{ proposal: broadProposal },
 	);
+	const repeatApproval = approveInitiativeReconciliation(
+		cwd,
+		repeatPreview.preview.token,
+	);
 	const repeated = bootstrapPlanEpic(
 		cwd,
 		"docs/plans/broad-plan.md",
@@ -203,7 +213,7 @@ try {
 		{
 			proposal: broadProposal,
 			token: repeatPreview.preview.token,
-			approved: true,
+			approval: repeatApproval,
 		},
 	);
 	assert(

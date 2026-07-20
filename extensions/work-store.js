@@ -298,7 +298,8 @@ function plainObject(value) {
 }
 function hierarchyError(message, file, details = {}) {
 	return error("corrupt", `${message} in ${file}`, {
-		repair: "Repair the parent graph or initiative metadata before retrying mutation.",
+		repair:
+			"Repair the parent graph or initiative metadata before retrying mutation.",
 		...details,
 	});
 }
@@ -307,7 +308,10 @@ function nonemptyString(value) {
 }
 function validateInitiativeMetadata(item, file) {
 	const metadata = item.initiative;
-	if (!plainObject(metadata) || metadata.schemaVersion !== INITIATIVE_SCHEMA_VERSION)
+	if (
+		!plainObject(metadata) ||
+		metadata.schemaVersion !== INITIATIVE_SCHEMA_VERSION
+	)
 		throw hierarchyError(`Invalid initiative metadata for ${item.id}`, file);
 	if (!Array.isArray(metadata.sources) || metadata.sources.length === 0)
 		throw hierarchyError(`Initiative ${item.id} has no sources`, file);
@@ -318,6 +322,11 @@ function validateInitiativeMetadata(item, file) {
 			!nonemptyString(source.id) ||
 			!nonemptyString(source.path) ||
 			source.path.includes("\\") ||
+			path.posix.isAbsolute(source.path) ||
+			path.win32.isAbsolute(source.path) ||
+			path.posix.normalize(source.path) !== source.path ||
+			source.path === ".." ||
+			source.path.startsWith("../") ||
 			!nonemptyString(source.hash) ||
 			sourceIds.has(source.id)
 		)
@@ -339,12 +348,13 @@ function validateInitiativeMetadata(item, file) {
 			provenance.has(outcome.provenance)
 		)
 			throw hierarchyError(`Invalid initiative coverage for ${item.id}`, file);
-		if (
-			(outcome.disposition === "accepted") !== nonemptyString(outcome.epicId)
-		)
+		if ((outcome.disposition === "accepted") !== nonemptyString(outcome.epicId))
 			throw hierarchyError(`Invalid outcome mapping for ${outcome.id}`, file);
 		if (outcome.generated !== undefined && !plainObject(outcome.generated))
-			throw hierarchyError(`Invalid generated-field identity for ${outcome.id}`, file);
+			throw hierarchyError(
+				`Invalid generated-field identity for ${outcome.id}`,
+				file,
+			);
 		ids.add(outcome.id);
 		provenance.add(outcome.provenance);
 	}
@@ -354,8 +364,14 @@ function validateInitiativeMetadata(item, file) {
 			metadata.evidence.some((entry) => !plainObject(entry)))
 	)
 		throw hierarchyError(`Invalid initiative evidence for ${item.id}`, file);
-	if (metadata.lastConfirmed !== undefined && !plainObject(metadata.lastConfirmed))
-		throw hierarchyError(`Invalid initiative confirmation for ${item.id}`, file);
+	if (
+		metadata.lastConfirmed !== undefined &&
+		!plainObject(metadata.lastConfirmed)
+	)
+		throw hierarchyError(
+			`Invalid initiative confirmation for ${item.id}`,
+			file,
+		);
 	return metadata;
 }
 function validateParentGraph(items, file) {
@@ -384,16 +400,31 @@ function validateInitiativeHierarchy(items, file) {
 		childrenByParent.set(item.parentId, children);
 	}
 	for (const item of values) {
+		const parent = items[item.parentId];
+		const grandparent = items[parent?.parentId];
+		if (item.type === "epic" && parent?.type === "epic" && grandparent?.initiative)
+			throw hierarchyError(
+				`Initiative ${grandparent.id} cannot contain nested epic ${item.id}`,
+				file,
+			);
 		const labels = item.labels ?? [];
-		const labelCount = labels.filter((label) => label === INITIATIVE_LABEL).length;
+		const labelCount = labels.filter(
+			(label) => label === INITIATIVE_LABEL,
+		).length;
 		const hasMetadata = item.initiative !== undefined;
 		if ((labelCount === 1) !== hasMetadata)
-			throw hierarchyError(`Initiative label and metadata disagree for ${item.id}`, file);
+			throw hierarchyError(
+				`Initiative label and metadata disagree for ${item.id}`,
+				file,
+			);
 		if (labelCount > 1)
 			throw hierarchyError(`Duplicate initiative label for ${item.id}`, file);
 		if (!hasMetadata) continue;
 		if (item.type !== "epic" || item.parentId)
-			throw hierarchyError(`Initiative ${item.id} must be a top-level epic`, file);
+			throw hierarchyError(
+				`Initiative ${item.id} must be a top-level epic`,
+				file,
+			);
 		const metadata = validateInitiativeMetadata(item, file);
 		const children = childrenByParent.get(item.id) ?? [];
 		if (
@@ -401,18 +432,31 @@ function validateInitiativeHierarchy(items, file) {
 				(child) => child.type !== "epic" || child.initiative !== undefined,
 			)
 		)
-			throw hierarchyError(`Initiative ${item.id} has an invalid direct child`, file);
+			throw hierarchyError(
+				`Initiative ${item.id} has an invalid direct child`,
+				file,
+			);
 		const acceptedEpicIds = new Set(
 			metadata.coverage
 				.filter((outcome) => outcome.disposition === "accepted")
 				.map((outcome) => outcome.epicId),
 		);
 		for (const epicId of acceptedEpicIds)
-			if (!items[epicId] || items[epicId].parentId !== item.id || items[epicId].type !== "epic")
-				throw hierarchyError(`Outcome maps outside initiative ${item.id}: ${epicId}`, file);
+			if (
+				!items[epicId] ||
+				items[epicId].parentId !== item.id ||
+				items[epicId].type !== "epic"
+			)
+				throw hierarchyError(
+					`Outcome maps outside initiative ${item.id}: ${epicId}`,
+					file,
+				);
 		for (const child of children)
 			if (!acceptedEpicIds.has(child.id))
-				throw hierarchyError(`Initiative child ${child.id} has no outcome coverage`, file);
+				throw hierarchyError(
+					`Initiative child ${child.id} has no outcome coverage`,
+					file,
+				);
 	}
 }
 
@@ -499,7 +543,10 @@ export function validateStore(store, file = "work store") {
 				typeof edge.type !== "string" ||
 				!edge.type
 			)
-				throw error("corrupt", `Invalid dependency edge for ${item.id} in ${file}`);
+				throw error(
+					"corrupt",
+					`Invalid dependency edge for ${item.id} in ${file}`,
+				);
 	}
 	validateParentGraph(store.items, file);
 	validateInitiativeHierarchy(store.items, file);

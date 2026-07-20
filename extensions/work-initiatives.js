@@ -51,7 +51,9 @@ export function decodeInitiativeToken(token) {
 	try {
 		const [encoded, signature, extra] = String(token).split(".");
 		if (!encoded || !signature || extra) throw new Error("shape");
-		const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+		const payload = JSON.parse(
+			Buffer.from(encoded, "base64url").toString("utf8"),
+		);
 		if (initiativeHash(payload) !== signature) throw new Error("signature");
 		return payload;
 	} catch {
@@ -63,7 +65,10 @@ export function normalizeInitiativeProposal(input) {
 	if (!object(input) || input.schemaVersion !== INITIATIVE_PROPOSAL_VERSION)
 		return fail("invalid_proposal", "Unsupported initiative proposal schema.");
 	if ("patch" in input || "operations" in input)
-		return fail("invalid_proposal", "Initiative proposals cannot contain raw patches.");
+		return fail(
+			"invalid_proposal",
+			"Initiative proposals cannot contain raw patches.",
+		);
 	const mode = input.mode ?? "wrap";
 	if (
 		!["wrap", "convert"].includes(mode) ||
@@ -74,7 +79,10 @@ export function normalizeInitiativeProposal(input) {
 		(mode === "wrap" && input.initiative.id === input.targetId) ||
 		(mode === "convert" && input.initiative.id !== input.targetId)
 	)
-		return fail("invalid_proposal", "Initiative target and identity are invalid.");
+		return fail(
+			"invalid_proposal",
+			"Initiative target and identity are invalid.",
+		);
 	if (!Array.isArray(input.sources) || input.sources.length === 0)
 		return fail("invalid_proposal", "Initiative proposal requires sources.");
 	const sources = input.sources.map((source) => {
@@ -93,7 +101,10 @@ export function normalizeInitiativeProposal(input) {
 	if (new Set(sources.map((source) => source.id)).size !== sources.length)
 		return fail("ambiguous_lineage", "Initiative source IDs must be unique.");
 	if (!Array.isArray(input.groups) || input.groups.length === 0)
-		return fail("incomplete_coverage", "Initiative proposal requires delivery groups.");
+		return fail(
+			"incomplete_coverage",
+			"Initiative proposal requires delivery groups.",
+		);
 	const groups = input.groups.map((group) => {
 		if (!object(group) || !text(group.id) || !text(group.title))
 			return fail("invalid_proposal", "Initiative delivery group is invalid.");
@@ -113,16 +124,33 @@ export function normalizeInitiativeProposal(input) {
 		group.epicId ? [group.epicId] : [],
 	);
 	if (new Set(explicitEpics).size !== explicitEpics.length)
-		return fail("ambiguous_lineage", "An epic cannot represent multiple delivery groups.");
+		return fail(
+			"ambiguous_lineage",
+			"An epic cannot represent multiple delivery groups.",
+		);
 	if (
-		(mode === "wrap" && !groups.some((group) => group.epicId === input.targetId)) ||
-		(mode === "convert" && groups.some((group) => group.epicId === input.targetId))
+		(mode === "wrap" &&
+			!groups.some((group) => group.epicId === input.targetId)) ||
+		(mode === "convert" &&
+			groups.some((group) => group.epicId === input.targetId))
 	)
-		return fail("incomplete_coverage", "Delivery groups do not match the promotion mode.");
-	if (mode === "convert" && groups.filter((group) => group.selected).length !== 1)
-		return fail("incomplete_coverage", "Conversion requires exactly one selected child epic.");
+		return fail(
+			"incomplete_coverage",
+			"Delivery groups do not match the promotion mode.",
+		);
+	if (
+		mode === "convert" &&
+		groups.filter((group) => group.selected).length !== 1
+	)
+		return fail(
+			"incomplete_coverage",
+			"Conversion requires exactly one selected child epic.",
+		);
 	if (!Array.isArray(input.outcomes) || input.outcomes.length === 0)
-		return fail("incomplete_coverage", "Initiative proposal requires outcomes.");
+		return fail(
+			"incomplete_coverage",
+			"Initiative proposal requires outcomes.",
+		);
 	const groupIds = new Set(groups.map((group) => group.id));
 	const outcomes = input.outcomes.map((outcome) => {
 		if (
@@ -139,7 +167,10 @@ export function normalizeInitiativeProposal(input) {
 			(outcome.disposition === "accepted") !==
 			(text(outcome.groupId) && groupIds.has(outcome.groupId))
 		)
-			return fail("incomplete_coverage", `Outcome ${id} has incomplete coverage.`);
+			return fail(
+				"incomplete_coverage",
+				`Outcome ${id} has incomplete coverage.`,
+			);
 		return {
 			id,
 			provenance: outcome.provenance,
@@ -152,9 +183,13 @@ export function normalizeInitiativeProposal(input) {
 	});
 	if (
 		new Set(outcomes.map((outcome) => outcome.id)).size !== outcomes.length ||
-		new Set(outcomes.map((outcome) => outcome.provenance)).size !== outcomes.length
+		new Set(outcomes.map((outcome) => outcome.provenance)).size !==
+			outcomes.length
 	)
-		return fail("ambiguous_lineage", "Outcome IDs and provenance must be unique.");
+		return fail(
+			"ambiguous_lineage",
+			"Outcome IDs and provenance must be unique.",
+		);
 	for (const group of groups)
 		if (
 			!outcomes.some(
@@ -162,7 +197,10 @@ export function normalizeInitiativeProposal(input) {
 					outcome.disposition === "accepted" && outcome.groupId === group.id,
 			)
 		)
-			return fail("incomplete_coverage", `Delivery group ${group.id} has no accepted outcome.`);
+			return fail(
+				"incomplete_coverage",
+				`Delivery group ${group.id} has no accepted outcome.`,
+			);
 	return {
 		schemaVersion: INITIATIVE_PROPOSAL_VERSION,
 		mode,
@@ -181,7 +219,8 @@ export function normalizeInitiativeProposal(input) {
 }
 
 function mappedGroups(store, proposal) {
-	const priorCoverage = store.items[proposal.initiative.id]?.initiative?.coverage ?? [];
+	const priorCoverage =
+		store.items[proposal.initiative.id]?.initiative?.coverage ?? [];
 	const priorByOutcome = new Map(
 		priorCoverage
 			.filter((outcome) => outcome.disposition === "accepted")
@@ -197,10 +236,16 @@ function mappedGroups(store, proposal) {
 				.filter(Boolean),
 		);
 		if (prior.size > 1)
-			return fail("ambiguous_lineage", `Delivery group ${group.id} maps to multiple epics.`);
+			return fail(
+				"ambiguous_lineage",
+				`Delivery group ${group.id} maps to multiple epics.`,
+			);
 		const priorEpicId = [...prior][0];
 		if (group.epicId && priorEpicId && group.epicId !== priorEpicId)
-			return fail("ambiguous_lineage", `Delivery group ${group.id} conflicts with durable coverage.`);
+			return fail(
+				"ambiguous_lineage",
+				`Delivery group ${group.id} conflicts with durable coverage.`,
+			);
 		let epicId = group.epicId ?? priorEpicId;
 		while (!epicId) {
 			const candidate = `${proposal.initiative.id}.${suffix++}`;
@@ -226,9 +271,14 @@ export function buildInitiativeReconciliation(store, input) {
 		!target ||
 		target.type !== "epic" ||
 		(proposal.mode === "wrap" && isInitiative(target)) ||
-		(proposal.mode === "convert" && isInitiative(target) && target.id !== proposal.initiative.id)
+		(proposal.mode === "convert" &&
+			isInitiative(target) &&
+			target.id !== proposal.initiative.id)
 	)
-		return fail("invalid_proposal", "Initiative target must be a compatible epic.");
+		return fail(
+			"invalid_proposal",
+			"Initiative target must be a compatible epic.",
+		);
 	const existingInitiative = store.items[proposal.initiative.id];
 	const currentInitiative = isInitiative(existingInitiative)
 		? existingInitiative
@@ -238,46 +288,65 @@ export function buildInitiativeReconciliation(store, input) {
 		!currentInitiative &&
 		!(proposal.mode === "convert" && existingInitiative.id === target.id)
 	)
-		return fail("protected_field_conflict", "Initiative ID is already used by another record.");
+		return fail(
+			"protected_field_conflict",
+			"Initiative ID is already used by another record.",
+		);
 	const groups = mappedGroups(store, proposal);
 	const candidate = structuredClone(store);
 	const operations = [];
 	const conflicts = [];
 	const timestamp = store.metadata.updatedAt ?? store.metadata.createdAt;
 	if (!currentInitiative) {
-		candidate.items[proposal.initiative.id] =
-			proposal.mode === "convert"
-				? {
-						...candidate.items[proposal.targetId],
-						labels: [
-							...new Set([
-								...(candidate.items[proposal.targetId].labels ?? []),
-								INITIATIVE_LABEL,
-							]),
-						],
-					}
-				: {
-						id: proposal.initiative.id,
-						type: "epic",
-						status: "open",
-						title: proposal.initiative.title,
-						...(proposal.initiative.description !== undefined
-							? { description: proposal.initiative.description }
-							: {}),
-						createdAt: timestamp,
-						updatedAt: timestamp,
-						dependencies: [],
-						labels: [INITIATIVE_LABEL],
-						notes: [],
-						evidence: [],
-						dependencyEdges: [],
-					};
+		if (proposal.mode === "convert")
+			candidate.items[proposal.initiative.id] = {
+				...candidate.items[proposal.targetId],
+				labels: [
+					...new Set([
+						...(candidate.items[proposal.targetId].labels ?? []),
+						INITIATIVE_LABEL,
+					]),
+				],
+			};
+		else
+			candidate.items[proposal.initiative.id] = {
+				id: proposal.initiative.id,
+				type: "epic",
+				status: "open",
+				title: proposal.initiative.title,
+				...(proposal.initiative.description !== undefined
+					? { description: proposal.initiative.description }
+					: {}),
+				createdAt: timestamp,
+				updatedAt: timestamp,
+				dependencies: [],
+				labels: [INITIATIVE_LABEL],
+				notes: [],
+				evidence: [],
+				dependencyEdges: [],
+			};
 		operations.push({
-			kind: proposal.mode === "convert" ? "convert_to_initiative" : "create_initiative",
+			kind:
+				proposal.mode === "convert"
+					? "convert_to_initiative"
+					: "create_initiative",
 			id: proposal.initiative.id,
 		});
 	}
 	const priorCoverage = currentInitiative?.initiative?.coverage ?? [];
+	const proposedByOutcome = new Map(
+		proposal.outcomes.map((outcome) => [outcome.id, outcome]),
+	);
+	for (const prior of priorCoverage) {
+		const proposed = proposedByOutcome.get(prior.id);
+		if (!proposed)
+			conflicts.push({ kind: "missing_outcome", outcomeId: prior.id });
+		else if (
+			proposed.provenance !== prior.provenance ||
+			proposed.contentHash !== prior.contentHash
+		)
+			conflicts.push({ kind: "outcome_identity", outcomeId: prior.id });
+	}
 	for (const group of groups) {
 		const existing = candidate.items[group.epicId];
 		if (!existing) {
@@ -301,9 +370,17 @@ export function buildInitiativeReconciliation(store, input) {
 			operations.push({ kind: "create_epic", id: group.epicId });
 			continue;
 		}
-		if (existing.type !== "epic" || (existing.parentId && existing.parentId !== proposal.initiative.id))
-			return fail("protected_field_conflict", `Cannot attach epic ${group.epicId}.`);
-		const prior = priorCoverage.find((outcome) => outcome.epicId === group.epicId)?.generated;
+		if (
+			existing.type !== "epic" ||
+			(existing.parentId && existing.parentId !== proposal.initiative.id)
+		)
+			return fail(
+				"protected_field_conflict",
+				`Cannot attach epic ${group.epicId}.`,
+			);
+		const prior = priorCoverage.find(
+			(outcome) => outcome.epicId === group.epicId,
+		)?.generated;
 		if (prior) {
 			for (const [field, expectedHash] of [
 				["title", prior.titleHash],
@@ -327,8 +404,7 @@ export function buildInitiativeReconciliation(store, input) {
 	if (proposal.mode === "convert" && !currentInitiative) {
 		const selected = groups.find((group) => group.selected);
 		for (const child of Object.values(candidate.items).filter(
-			(item) =>
-				item.parentId === proposal.targetId && item.type !== "epic",
+			(item) => item.parentId === proposal.targetId && item.type !== "epic",
 		)) {
 			child.parentId = selected.epicId;
 			operations.push({ kind: "reparent_record", id: child.id });
@@ -358,7 +434,13 @@ export function buildInitiativeReconciliation(store, input) {
 		};
 	});
 	if (conflicts.length)
-		return { proposal, candidate: store, operations: [], conflicts, changed: false };
+		return {
+			proposal,
+			candidate: store,
+			operations: [],
+			conflicts,
+			changed: false,
+		};
 	const proposalHash = initiativeHash(proposal);
 	const identity = {
 		proposalHash,
@@ -369,12 +451,16 @@ export function buildInitiativeReconciliation(store, input) {
 	const priorMetadata = currentInitiative?.initiative;
 	const metadataChanged =
 		!priorMetadata ||
-		initiativeHash({ sources: priorMetadata.sources, coverage: priorMetadata.coverage }) !==
-			initiativeHash({ sources: proposal.sources, coverage });
+		initiativeHash({
+			sources: priorMetadata.sources,
+			coverage: priorMetadata.coverage,
+		}) !== initiativeHash({ sources: proposal.sources, coverage });
 	if (currentInitiative && metadataChanged)
 		operations.push({ kind: "update_coverage", id: proposal.initiative.id });
 	const initiative = candidate.items[proposal.initiative.id];
-	const evidence = priorMetadata?.evidence ? structuredClone(priorMetadata.evidence) : [];
+	const evidence = priorMetadata?.evidence
+		? structuredClone(priorMetadata.evidence)
+		: [];
 	if (operations.length)
 		evidence.push({
 			id: initiativeHash({ before: initiativeHash(store), proposalHash }),
@@ -410,7 +496,10 @@ export function previewInitiativeCandidate(store, input) {
 		storeHash: initiativeHash(store),
 		proposalHash: initiativeHash(reconciliation.proposal),
 		sourceHashes: Object.fromEntries(
-			reconciliation.proposal.sources.map((source) => [source.path, source.hash]),
+			reconciliation.proposal.sources.map((source) => [
+				source.path,
+				source.hash,
+			]),
 		),
 		candidateHash: initiativeHash(reconciliation.candidate),
 	};
@@ -459,7 +548,11 @@ function byUpdatedThenId(left, right) {
 function progress(items) {
 	const total = items.length;
 	const closed = items.filter((item) => item.status === "closed").length;
-	return { closed, total, percent: total ? Math.round((closed / total) * 100) : 0 };
+	return {
+		closed,
+		total,
+		percent: total ? Math.round((closed / total) * 100) : 0,
+	};
 }
 
 function readinessFor(item, readinessByEpic) {
@@ -469,8 +562,16 @@ function readinessFor(item, readinessByEpic) {
 		["needs_plan", "planned", "stale"].includes(readiness.state) &&
 		typeof readiness.reason === "string"
 	)
-		return { state: readiness.state, reason: readiness.reason };
-	return { state: "needs_plan", reason: "No implementation-ready plan is linked." };
+		return {
+			state: readiness.state,
+			reason: readiness.reason,
+			implementationReady: readiness.state === "planned",
+		};
+	return {
+		state: "needs_plan",
+		reason: "No implementation-ready plan is linked.",
+		implementationReady: false,
+	};
 }
 
 function epicActions(item) {
@@ -491,28 +592,29 @@ function initiativeActions(item) {
 	];
 }
 
-export function projectInitiativeHierarchy(store, readinessByEpic = {}) {
+export function projectInitiativeHierarchy(
+	store,
+	readinessByEpic = {},
+	lineageByInitiative = {},
+) {
 	validateStore(store);
 	const items = Object.values(store.items);
 	const epics = items.filter((item) => item.type === "epic");
-	const roots = epics
-		.filter((item) => !item.parentId)
-		.sort(byUpdatedThenId);
+	const roots = epics.filter((item) => !item.parentId).sort(byUpdatedThenId);
 	const childrenByParent = new Map();
 	const localItemsByParent = new Map();
 	for (const item of items.filter((entry) => entry.parentId)) {
-		const target =
-			item.type === "epic"
-				? childrenByParent
-				: item.type !== "decision" && item.type !== "idea"
-					? localItemsByParent
-					: undefined;
+		let target;
+		if (item.type === "epic") target = childrenByParent;
+		else if (item.type !== "decision" && item.type !== "idea")
+			target = localItemsByParent;
 		if (!target) continue;
 		const children = target.get(item.parentId) ?? [];
 		children.push(item);
 		target.set(item.parentId, children);
 	}
-	for (const children of childrenByParent.values()) children.sort(byUpdatedThenId);
+	for (const children of childrenByParent.values())
+		children.sort(byUpdatedThenId);
 
 	const nodeFor = (epic) => {
 		const initiative = isInitiative(epic);
@@ -524,13 +626,18 @@ export function projectInitiativeHierarchy(store, readinessByEpic = {}) {
 					reason: "Child epics are planned independently.",
 				}
 			: readinessFor(epic, readinessByEpic);
-		const conflicts = initiative
-			? childEpics
-					.filter((child) => readinessFor(child, readinessByEpic).state === "stale")
-					.map((child) => `stale_plan:${child.id}`)
-			: readiness.state === "stale"
-				? [`stale_plan:${epic.id}`]
-				: [];
+		let conflicts = [];
+		if (initiative)
+			conflicts = [
+				...childEpics
+					.filter(
+						(child) =>
+							readinessFor(child, readinessByEpic).state === "stale",
+					)
+					.map((child) => `stale_plan:${child.id}`),
+				...(lineageByInitiative[epic.id]?.conflicts ?? []),
+			];
+		else if (readiness.state === "stale") conflicts = [`stale_plan:${epic.id}`];
 		const closeBlockers = initiative
 			? [
 					...childEpics
@@ -548,20 +655,22 @@ export function projectInitiativeHierarchy(store, readinessByEpic = {}) {
 					{ accepted: 0, rejected: 0, non_goal: 0 },
 				)
 			: undefined;
+		let role = "standalone_epic";
+		if (initiative) role = "initiative";
+		else if (epic.parentId && isInitiative(store.items[epic.parentId]))
+			role = "child_epic";
 		return {
 			id: epic.id,
 			title: epic.title,
 			status: epic.status,
-			role: initiative
-				? "initiative"
-				: epic.parentId && isInitiative(store.items[epic.parentId])
-					? "child_epic"
-					: "standalone_epic",
+			role,
 			...(epic.parentId ? { parentId: epic.parentId } : {}),
 			children: childEpics.map((child) => child.id),
 			readiness,
 			localProgress: progress(localItems),
-			aggregateProgress: initiative ? progress(childEpics) : progress(localItems),
+			aggregateProgress: initiative
+				? progress(childEpics)
+				: progress(localItems),
 			conflicts,
 			...(initiative ? { coverage: dispositions, closeBlockers } : {}),
 			legalActions: initiative ? initiativeActions(epic) : epicActions(epic),

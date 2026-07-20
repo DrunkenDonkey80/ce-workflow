@@ -9,6 +9,7 @@ import {
 	openSync,
 	readdirSync,
 	readFileSync,
+	rmSync,
 	writeFileSync,
 	writeSync,
 } from "node:fs";
@@ -3963,17 +3964,19 @@ function buildWorkStatus(cwd, target) {
 	}
 
 	const epic = resolved.epic;
-	const projection = buildInitiativeProjection(cwd);
-	const projected = projection.nodes.find((node) => node.id === idOf(epic));
+	const projection = epic.initiative ? buildInitiativeProjection(cwd) : undefined;
+	const projected = projection?.nodes.find((node) => node.id === idOf(epic));
 	if (projected?.role === "initiative") {
 		const children = projection.nodes.filter(
 			(node) => node.parentId === projected.id,
 		);
 		const nextChild = children.find(
-			(child) => child.status !== "closed" && child.readiness.state === "planned",
+			(child) =>
+				child.status !== "closed" && child.readiness.state === "planned",
 		);
 		const needsPlan = children.find(
-			(child) => child.status !== "closed" && child.readiness.state === "needs_plan",
+			(child) =>
+				child.status !== "closed" && child.readiness.state === "needs_plan",
 		);
 		return [
 			`Initiative: ${projected.title} (${projected.id})`,
@@ -5133,6 +5136,7 @@ function resolveResumeTarget(cwd, target) {
 				message: `No WorkItem found for ${wanted}`,
 			};
 		if (typeOf(issue) === "epic") {
+			if (!issue.initiative) return { kind: "epic", epic: issue };
 			const store = loadNativeWorkStore(cwd);
 			const projection = buildInitiativeProjection(cwd, {}, store);
 			const projected = projection.nodes.find(
@@ -5142,8 +5146,7 @@ function resolveResumeTarget(cwd, target) {
 				return { kind: "epic", epic: issue };
 			const candidates = projection.nodes
 				.filter(
-					(node) =>
-						node.parentId === projected.id && node.status !== "closed",
+					(node) => node.parentId === projected.id && node.status !== "closed",
 				)
 				.map((node) => store.items[node.id]);
 			if (candidates.length === 1)
@@ -5995,8 +5998,8 @@ function buildWorkResumeState(cwd, args = "") {
 }
 
 function buildEpicReportState(cwd, epic) {
-	const projection = buildInitiativeProjection(cwd);
-	const projected = projection.nodes.find((node) => node.id === idOf(epic));
+	const projection = epic.initiative ? buildInitiativeProjection(cwd) : undefined;
+	const projected = projection?.nodes.find((node) => node.id === idOf(epic));
 	if (projected?.role === "initiative") {
 		const children = projection.nodes.filter(
 			(node) => node.parentId === projected.id,
@@ -7417,9 +7420,10 @@ export function bootstrapPlanEpic(
 				action: "initiative-preview-required",
 				preview,
 				git: gitReport,
-				message: "Review and confirm the complete initiative hierarchy before applying it.",
+				message:
+					"Review and confirm the complete initiative hierarchy before applying it.",
 			};
-		if (!initiativeContext.approved)
+		if (!initiativeContext.approval)
 			return errorState(
 				"approval-required",
 				"Initiative bootstrap requires explicit preview approval.",
@@ -7429,7 +7433,7 @@ export function bootstrapPlanEpic(
 			cwd,
 			initiativeContext.proposal,
 			initiativeContext.token,
-			{ approved: true },
+			{ approval: initiativeContext.approval },
 		);
 		const selected = preview.proposed.epics.find((epic) => epic.selected);
 		if (!selected)
@@ -8947,20 +8951,59 @@ function initiativeReadinessFacts(cwd, store) {
 				if (!plan)
 					return [
 						item.id,
-						{ state: "needs_plan", reason: "No implementation-ready plan is linked." },
+						{
+							state: "needs_plan",
+							reason: "No implementation-ready plan is linked.",
+						},
 					];
 				const file = join(cwd, plan);
 				if (!existsSync(file))
-					return [item.id, { state: "stale", reason: `Linked plan is missing: ${plan}` }];
+					return [
+						item.id,
+						{ state: "stale", reason: `Linked plan is missing: ${plan}` },
+					];
 				const content = readFileSync(file, "utf8");
 				const readiness = content.match(/^artifact_readiness:\s*(\S+)/m)?.[1];
 				if (
-					(readiness && readiness !== "implementation-ready") ||
+					readiness !== "implementation-ready" ||
 					scanPlanOpenQuestions(content).length
 				)
-					return [item.id, { state: "stale", reason: "Linked plan is not implementation-ready." }];
-				return [item.id, { state: "planned", reason: "Plan is implementation-ready." }];
+					return [
+						item.id,
+						{
+							state: "stale",
+							reason: "Linked plan is not implementation-ready.",
+						},
+					];
+				return [
+					item.id,
+					{ state: "planned", reason: "Plan is implementation-ready." },
+				];
 			}),
+	);
+}
+
+function initiativeLineageFacts(cwd, store) {
+	return Object.fromEntries(
+		Object.values(store.items)
+			.filter((item) => item.initiative)
+			.map((item) => [
+				item.id,
+				{
+					conflicts: item.initiative.sources.flatMap((source) => {
+						try {
+							const hash = createHash("sha256")
+								.update(readFileSync(join(cwd, source.path)))
+								.digest("hex");
+							return hash === source.hash
+								? []
+								: [`stale_source:${source.path}`];
+						} catch {
+							return [`missing_source:${source.path}`];
+						}
+					}),
+				},
+			]),
 	);
 }
 
@@ -8969,10 +9012,14 @@ function buildInitiativeProjection(
 	readinessByEpic = {},
 	store = loadNativeWorkStore(cwd),
 ) {
-	return projectInitiativeHierarchy(store, {
-		...initiativeReadinessFacts(cwd, store),
-		...readinessByEpic,
-	});
+	return projectInitiativeHierarchy(
+		store,
+		{
+			...initiativeReadinessFacts(cwd, store),
+			...readinessByEpic,
+		},
+		initiativeLineageFacts(cwd, store),
+	);
 }
 
 function verifiedInitiativeSources(cwd, proposal) {
@@ -9014,8 +9061,39 @@ function initiativeTokenMarker(cwd, token) {
 	);
 }
 
+function initiativeApprovalPath(cwd, token) {
+	return join(
+		cwd,
+		".pi",
+		"work-store",
+		"initiative-approvals",
+		initiativeHash(token),
+	);
+}
+
+function approveInitiativeReconciliation(cwd, token) {
+	decodeInitiativeToken(token);
+	if (existsSync(initiativeTokenMarker(cwd, token)))
+		throw new InitiativeError(
+			"approval_failure",
+			"Initiative preview token was replayed.",
+		);
+	const receipt = randomUUID();
+	const file = initiativeApprovalPath(cwd, token);
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, JSON.stringify({ receipt }), "utf8");
+	return receipt;
+}
+
 function applyInitiativeReconciliation(cwd, input, token, options = {}) {
-	if (!options.approved)
+	const approvalFile = initiativeApprovalPath(cwd, token);
+	let approval;
+	try {
+		approval = JSON.parse(readFileSync(approvalFile, "utf8")).receipt;
+	} catch {
+		approval = undefined;
+	}
+	if (!options.approval || options.approval !== approval)
 		throw new InitiativeError(
 			"approval_failure",
 			"Explicit approval of the initiative preview is required.",
@@ -9023,18 +9101,45 @@ function applyInitiativeReconciliation(cwd, input, token, options = {}) {
 	const proposal = normalizeInitiativeProposal(input);
 	const preview = decodeInitiativeToken(token);
 	if (preview.proposalHash !== initiativeHash(proposal))
-		throw new InitiativeError("stale_input", "Stale proposal: preview no longer matches.");
+		throw new InitiativeError(
+			"stale_input",
+			"Stale proposal: preview no longer matches.",
+		);
 	const lock = acquireLock(cwd);
 	try {
 		const marker = initiativeTokenMarker(cwd, token);
 		if (existsSync(marker))
-			throw new InitiativeError("approval_failure", "Initiative preview token was replayed.");
+			throw new InitiativeError(
+				"approval_failure",
+				"Initiative preview token was replayed.",
+			);
 		const store = loadNativeWorkStore(cwd);
-		if (preview.storeHash !== initiativeHash(store))
-			throw new InitiativeError("stale_input", "Stale store: preview no longer matches.");
+		if (preview.storeHash !== initiativeHash(store)) {
+			const committed = store.items[proposal.initiative.id]?.initiative?.evidence?.find(
+				(entry) => entry.approvalTokenHash === initiativeHash(token),
+			);
+			if (committed) {
+				mkdirSync(dirname(marker), { recursive: true });
+				writeFileSync(marker, "consumed\n", { flag: "wx" });
+				rmSync(approvalFile, { force: true });
+				return {
+					changed: true,
+					recovered: true,
+					initiativeId: proposal.initiative.id,
+					operations: committed.operations ?? [],
+				};
+			}
+			throw new InitiativeError(
+				"stale_input",
+				"Stale store: preview no longer matches.",
+			);
+		}
 		const sourceHashes = verifiedInitiativeSources(cwd, proposal);
 		if (initiativeHash(preview.sourceHashes) !== initiativeHash(sourceHashes))
-			throw new InitiativeError("stale_input", "Stale source: preview no longer matches.");
+			throw new InitiativeError(
+				"stale_input",
+				"Stale source: preview no longer matches.",
+			);
 		const reconciliation = buildInitiativeReconciliation(store, proposal);
 		if (reconciliation.conflicts.length)
 			throw new InitiativeError(
@@ -9045,6 +9150,10 @@ function applyInitiativeReconciliation(cwd, input, token, options = {}) {
 		if (preview.candidateHash !== initiativeHash(reconciliation.candidate))
 			throw new InitiativeError("stale_input", "Stale preview candidate.");
 		if (reconciliation.changed) {
+			const evidence =
+				reconciliation.candidate.items[proposal.initiative.id].initiative.evidence;
+			if (evidence.length)
+				evidence.at(-1).approvalTokenHash = initiativeHash(token);
 			reconciliation.candidate.metadata.updatedAt =
 				options.now ?? new Date().toISOString();
 			saveStore(cwd, reconciliation.candidate, {
@@ -9053,6 +9162,7 @@ function applyInitiativeReconciliation(cwd, input, token, options = {}) {
 		}
 		mkdirSync(dirname(marker), { recursive: true });
 		writeFileSync(marker, "consumed\n", { flag: "wx" });
+		rmSync(approvalFile, { force: true });
 		return {
 			changed: reconciliation.changed,
 			initiativeId: proposal.initiative.id,
@@ -9061,6 +9171,31 @@ function applyInitiativeReconciliation(cwd, input, token, options = {}) {
 	} finally {
 		lock.release();
 	}
+}
+
+function renderInitiativePreview(preview) {
+	return [
+		`Initiative: ${preview.initiativeId}`,
+		"",
+		"Proposed child epics:",
+		...(preview.proposed.epics.length
+			? preview.proposed.epics.map(
+					(epic) =>
+						`- ${epic.id}: ${epic.title}${epic.selected ? " (selected)" : ""}`,
+				)
+			: ["- none"]),
+		"",
+		"Outcome coverage:",
+		...(preview.proposed.coverage.length
+			? preview.proposed.coverage.map(
+					(outcome) =>
+						`- ${outcome.id}: ${outcome.disposition}${outcome.epicId ? ` → ${outcome.epicId}` : ""}`,
+				)
+			: ["- none"]),
+		"",
+		`Operations: ${preview.operations.map((operation) => operation.kind).join(", ") || "none"}`,
+		`Conflicts: ${preview.conflicts.length ? JSON.stringify(preview.conflicts) : "none"}`,
+	].join("\n");
 }
 
 function currentRoadmap(cwd) {
@@ -9157,7 +9292,9 @@ function buildWorkRoadmapState(cwd, args = "") {
 			}
 		})();
 		const rememberedId = readWorkState(cwd).lastEpicId;
-		const remembered = rememberedId ? readWorkItem(cwd, rememberedId) : undefined;
+		const remembered = rememberedId
+			? readWorkItem(cwd, rememberedId)
+			: undefined;
 		const currentId = current
 			? idOf(current)
 			: remembered?.initiative
@@ -9230,7 +9367,8 @@ function buildWorkRoadmapState(cwd, args = "") {
 					action: "initiative-close-blocked",
 					epic: roadmapSummary(cwd, resolved.epic, undefined, projected),
 					blockers: projected.closeBlockers,
-					message: "Initiative close is blocked until coverage, plans, and child epics are resolved.",
+					message:
+						"Initiative close is blocked until coverage, plans, and child epics are resolved.",
 					suggestedCommands: [`/work-roadmap tasks ${idOf(resolved.epic)}`],
 				};
 			const unresolved = childrenOfRequired(cwd, idOf(resolved.epic)).filter(
@@ -11610,13 +11748,65 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 	if (op === "plan")
 		return handleWorkflowAction(buildWorkPlanState, selected, ctx, pi);
 	if (op === "preview") {
+		const proposalInput = await ctx.ui.input(
+			"Initiative proposal JSON or project path",
+			".pi/initiative-proposal.json",
+		);
+		if (!proposalInput) return { ok: true, action: "roadmap-cancel" };
+		let proposal;
+		let preview;
+		try {
+			if (proposalInput.trimStart().startsWith("{"))
+				proposal = JSON.parse(proposalInput);
+			else {
+				const proposalFile = resolve(ctx.cwd, proposalInput);
+				const proposalRel = relative(ctx.cwd, proposalFile);
+				if (proposalRel.startsWith("..") || isAbsolute(proposalRel))
+					throw new InitiativeError(
+						"invalid_proposal",
+						"Initiative proposal must be inside the project.",
+					);
+				proposal = JSON.parse(readFileSync(proposalFile, "utf8"));
+			}
+			preview = previewInitiativeReconciliation(ctx.cwd, proposal);
+		} catch (error) {
+			const state = errorState(
+				error.code ?? "invalid-proposal",
+				error instanceof Error ? error.message : String(error),
+			);
+			notify(ctx, state.message, "warning");
+			return stateTelemetry(state);
+		}
+		const previewText = renderInitiativePreview(preview);
+		if (preview.conflicts.length) {
+			notify(ctx, previewText, "warning");
+			return stateTelemetry({
+				ok: false,
+				action: "initiative-preview-conflicts",
+				preview,
+				message: "Initiative preview has conflicts.",
+			});
+		}
+		if (!(await ctx.ui.confirm("Apply initiative reconciliation?", previewText)))
+			return { ok: true, action: "initiative-preview-cancelled", preview };
+		const approval = approveInitiativeReconciliation(ctx.cwd, preview.token);
+		const result = applyInitiativeReconciliation(
+			ctx.cwd,
+			proposal,
+			preview.token,
+			{ approval },
+		);
 		const state = {
 			ok: true,
-			action: "initiative-proposal-required",
+			action: "initiative-reconciled",
 			epic: selectedRoadmap,
-			message: "Create a semantic proposal, then run initiative-preview; apply remains disabled until that complete hierarchy and coverage is approved.",
+			preview,
+			result,
+			message: result.changed
+				? "Initiative reconciliation applied."
+				: "Initiative reconciliation was already current.",
 		};
-		notify(ctx, renderWorkRoadmapText(state));
+		notify(ctx, state.message);
 		return stateTelemetry(state);
 	}
 	if (op === "plan-child" || op === "select-child") {
@@ -11757,6 +11947,7 @@ export {
 	brainstormHandoffPrompt,
 	buildWorkflowIntakeState,
 	applyInitiativeReconciliation,
+	approveInitiativeReconciliation,
 	buildWorkInitState,
 	buildInitiativeProjection,
 	previewInitiativeReconciliation,

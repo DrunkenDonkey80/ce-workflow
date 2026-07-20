@@ -5,7 +5,7 @@ argument-hint: "<idea-or-plan-file>"
 
 Prefer `/work-plan` for new users. This legacy alias uses the `work-orchestrator` skill in mode: `master`.
 
-When this runs `ce-plan`, auto-accept plan creation unless a real human decision is needed, then create the epic in-flow via `node scripts/work-helper.mjs bootstrap-plan-epic <created-plan-path>` (runs the Open Question Gate). One delivery scope stays standalone; multiple scopes use the coded initiative proposal → preview → explicit approval → apply path and select only one child for just-in-time planning.
+When this runs `ce-plan`, auto-accept plan creation unless a real human decision is needed, then create the epic in-flow via `node scripts/work-helper.mjs bootstrap-plan-epic <created-plan-path>` (runs the Open Question Gate). One delivery scope stays standalone; multiple scopes use the coded initiative proposal → preview → F7 approval receipt → apply path and select only one child for just-in-time planning.
 
 Task: $ARGUMENTS
 

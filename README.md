@@ -43,7 +43,7 @@ Role agents are `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `w
 - One executable work item is the normal session boundary.
 - Use `/work-pause` to persist a checkpoint, then `/work-resume <epic-id>` in a fresh session.
 - `/work-status` and `/work-report` are deterministic local projections; do not edit the store by hand during normal use.
-- Initiatives aggregate child progress but are never executable. Select one child epic to plan or resume; initiative close cannot be forced past unresolved coverage, stale plans, or open children.
+- Initiatives aggregate child progress but are never executable. Select one child epic to plan or resume; initiative close cannot be forced past unresolved coverage, stale source/plan lineage, or open children. F7 previews complete hierarchy and coverage before its confirmation mints the single-use apply receipt.
 - Finish requires verification evidence and any required review before the store item closes.
 - Manual changes are classified before writer work starts. No parallel writers, automatic branch checkout, or push automation.
 - Put project verification contracts in project instructions. Real hardware or product proof is not replaced by mocks without approval.

@@ -281,7 +281,9 @@ check(
 	["initiative-summary", "initiative-preview", "initiative-apply"].every(
 		(command) => helper.includes(`command === "${command}"`),
 	) &&
-		read("agents/work-planner.md").includes("select exactly one needs-plan child") &&
+		read("agents/work-planner.md").includes(
+			"select exactly one needs-plan child",
+		) &&
 		read("prompts/work-plan.md").includes("initiative-preview") &&
 		existsSync(path.join(root, "scripts", "test-work-initiative.mjs")),
 );
