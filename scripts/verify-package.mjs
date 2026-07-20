@@ -270,6 +270,21 @@ check(
 	helper.includes('from "../extensions/work-store.js"') &&
 		!helper.includes("workItems(argv)"),
 );
+const initiatives = read("extensions/work-initiatives.js");
+check(
+	"initiative domain is packaged with one-way dependencies",
+	initiatives.includes("projectInitiativeHierarchy") &&
+		!initiatives.includes('from "./work-models.js"'),
+);
+check(
+	"initiative helper and planner contracts are packaged",
+	["initiative-summary", "initiative-preview", "initiative-apply"].every(
+		(command) => helper.includes(`command === "${command}"`),
+	) &&
+		read("agents/work-planner.md").includes("select exactly one needs-plan child") &&
+		read("prompts/work-plan.md").includes("initiative-preview") &&
+		existsSync(path.join(root, "scripts", "test-work-initiative.mjs")),
+);
 check(
 	"migration command remains explicit",
 	models.includes('registerCommand("work-remove-beads"') &&

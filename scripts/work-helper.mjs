@@ -746,6 +746,25 @@ try {
 				300,
 			),
 		);
+	} else if (command === "initiative-summary") {
+		const [target] = positional();
+		const { buildInitiativeProjection } = await import(
+			"../extensions/work-models.js"
+		);
+		const projection = buildInitiativeProjection(cwd);
+		if (!target) print(projection);
+		else {
+			const root = projection.nodes.find((node) => node.id === target);
+			if (!root) throw new Error(`Initiative or epic not found: ${target}`);
+			print({
+				schemaVersion: projection.schemaVersion,
+				roots: [root.id],
+				nodes: [
+					root,
+					...projection.nodes.filter((node) => node.parentId === root.id),
+				],
+			});
+		}
 	} else if (command === "initiative-preview") {
 		const [proposalFile] = positional();
 		if (!proposalFile)
@@ -817,7 +836,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-preview|initiative-apply|bootstrap-plan-epic|json-assert> ...",
+			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-epic|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}

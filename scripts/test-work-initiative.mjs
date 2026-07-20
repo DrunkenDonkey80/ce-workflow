@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	mkdirSync,
@@ -38,6 +39,7 @@ import {
 const dir = mkdtempSync(path.join(os.tmpdir(), "ce-initiative-"));
 const promotionDir = mkdtempSync(path.join(os.tmpdir(), "ce-promotion-"));
 const recoveryDir = mkdtempSync(path.join(os.tmpdir(), "ce-promotion-recovery-"));
+const helperDir = mkdtempSync(path.join(os.tmpdir(), "ce-promotion-helper-"));
 const timestamp = "2026-07-19T00:00:00.000Z";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const record = (id, title, extra = {}) => ({
@@ -190,6 +192,17 @@ try {
 	assert.equal(
 		buildWorkResumeState(dir, "initiative-1").reason,
 		"initiative-child-selection",
+	);
+	const helper = path.resolve("scripts/work-helper.mjs");
+	assert.deepEqual(
+		JSON.parse(
+			execFileSync(process.execPath, [helper, "initiative-summary"], {
+				cwd: dir,
+				encoding: "utf8",
+			}),
+		),
+		buildInitiativeProjection(dir),
+		"helper hierarchy must equal the shared F7 projection",
 	);
 
 	// Preview is pure; apply is identity-preserving, stale-safe, and idempotent.
@@ -387,8 +400,51 @@ try {
 		true,
 	);
 	assert.equal(loadStore(recoveryDir).items["I-1"].initiative.evidence.length, 1);
+
+	// Helper preview/apply works across processes and enforces approval/replay.
+	mkdirSync(path.dirname(storePath(helperDir)), { recursive: true });
+	writeFileSync(storePath(helperDir), beforePreview);
+	mkdirSync(path.join(helperDir, "docs", "brainstorms"), { recursive: true });
+	writeFileSync(path.join(helperDir, sourcePath), sourceText);
+	const proposalFile = path.join(helperDir, "proposal.json");
+	writeFileSync(proposalFile, JSON.stringify(proposal));
+	const helperBefore = readFileSync(storePath(helperDir), "utf8");
+	const helperPreview = JSON.parse(
+		execFileSync(process.execPath, [helper, "initiative-preview", proposalFile], {
+			cwd: helperDir,
+			encoding: "utf8",
+		}),
+	);
+	assert.equal(readFileSync(storePath(helperDir), "utf8"), helperBefore);
+	let missingApproval;
+	try {
+		execFileSync(
+			process.execPath,
+			[helper, "initiative-apply", proposalFile, "--token", helperPreview.token],
+			{ cwd: helperDir, encoding: "utf8" },
+		);
+	} catch (error) {
+		missingApproval = JSON.parse(error.stdout);
+	}
+	assert.equal(missingApproval.status, "FAIL");
+	const helperApplied = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				helper,
+				"initiative-apply",
+				proposalFile,
+				"--token",
+				helperPreview.token,
+				"--approved",
+			],
+			{ cwd: helperDir, encoding: "utf8" },
+		),
+	);
+	assert.equal(helperApplied.changed, true);
+	assert(loadStore(helperDir).items["I-1"]);
 	console.log("work initiative tests passed");
 } finally {
-	for (const target of [dir, promotionDir, recoveryDir])
+	for (const target of [dir, promotionDir, recoveryDir, helperDir])
 		rmSync(target, { recursive: true, force: true });
 }
