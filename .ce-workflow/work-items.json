@@ -1172,12 +1172,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconciliation PASS — atom classification: locally-owned. Canonical work-2.7 fixed immediate-format to exclude workflow-managed .ce-workflow/work-items.json while retaining commit staging. Verified by node scripts/test-work-optimization-helpers.mjs and npm run verify:quiet; commit 5899512."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: finish-task --immediate-format attempted to run Biome on the 1.3 MiB native runtime store .ce-workflow/work-items.json and failed ",
       "type": "task",
-      "updatedAt": "2026-07-20T09:59:32.230Z"
+      "updatedAt": "2026-07-20T10:05:06.326Z"
     },
     "work-2.2": {
       "createdAt": "2026-07-20T01:40:10.511Z",
@@ -1209,12 +1211,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconciliation PASS — atom A (guessed obsolete helper paths) locally-owned and fixed by exact-path/fail-closed planner contract in canonical work-2.7; atom B (supervisor request timeout) upstream-owned and related to work-2.4, routed to canonical work-2.8. Local helper failures now return BLOCKED without supervisor wait. Verified by npm run verify:quiet; commit 5899512."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The work-planner bundled/default instructions attempted C:\\Users\\Flex\\.pi\\agent\\skills\\work-items\\scripts\\work-helper.mjs and C:\\U",
       "type": "task",
-      "updatedAt": "2026-07-20T09:59:33.352Z"
+      "updatedAt": "2026-07-20T10:05:06.461Z"
     },
     "work-2.3": {
       "createdAt": "2026-07-20T02:00:16.639Z",
@@ -1245,12 +1249,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconciliation PASS — atom classification: locally-owned. Canonical work-2.7 runs finish-task verification through Git Bash on Windows when MSYSTEM is active (or WORK_ORCH_VERIFY_SHELL override), preserving active-shell env assignment syntax. Cross-platform focused regression and package verification PASS; commit 5899512."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: `finish-task --verify` executes through Windows cmd.exe even when the active Pi shell is Git Bash. A verification command that had",
       "type": "task",
-      "updatedAt": "2026-07-20T09:59:32.617Z"
+      "updatedAt": "2026-07-20T10:05:06.585Z"
     },
     "work-2.4": {
       "createdAt": "2026-07-20T02:33:35.267Z",
@@ -1282,12 +1288,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconciliation PASS — supervisor wake failure is upstream-owned, reproduced on installed pi-subagents 0.35.1 after delivered live steering in run 34f5769b-b7fb-4293-abae-803c0b49c71a, and routed durably to work-2.8. Canonical local mitigation work-2.7 removes blocking supervisor requests from work-reviewer; missing evidence/helper now returns BLOCKED immediately. npm run verify:quiet PASS; commit 5899512."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The work-reviewer for work-4.7 invoked contact_supervisor after receiving live parent steering, but the ask did not wake or reach ",
       "type": "task",
-      "updatedAt": "2026-07-20T09:59:33.543Z"
+      "updatedAt": "2026-07-20T10:05:06.729Z"
     },
     "work-2.5": {
       "createdAt": "2026-07-20T03:29:59.300Z",
@@ -1318,12 +1326,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconciliation PASS — atom classification: locally-owned, related-distinct from helper path guessing. Canonical work-2.7 explicitly forbids work-worker direct edits to .ce-workflow/work-items.json and requires the exact helper path or infrastructure BLOCKED. Package contract verification PASS; commit 5899512."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The exact work-worker for work-4.11 directly edited `.ce-workflow/work-items.json`, omitted the comma after the notes array, and w",
       "type": "task",
-      "updatedAt": "2026-07-20T09:59:32.992Z"
+      "updatedAt": "2026-07-20T10:05:06.871Z"
     },
     "work-2.6": {
       "createdAt": "2026-07-20T04:59:06.183Z",
@@ -1355,12 +1365,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconciliation PASS — atom A (malformed bare helper invocation) locally-owned and fixed by canonical work-2.7 fail-closed exact-path planner guidance; atom B (timeout caused by helper-failure coordination) locally mitigated by immediate BLOCKED; atom C (resume rejects resolved acceptance descriptor) upstream-owned and routed to work-2.8. Installed 0.35.1 source audit confirms async-execution writes internal resolved fields while async-resume validates AcceptanceInput. Package verification PASS; commit 5899512."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: An exact work-planner run timed out after a malformed bare helper invocation, and the supported async resume path then rejected it",
       "type": "task",
-      "updatedAt": "2026-07-20T09:59:33.717Z"
+      "updatedAt": "2026-07-20T10:05:06.985Z"
     },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
@@ -1409,7 +1421,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-20T10:04:39.724Z"
+    "updatedAt": "2026-07-20T10:05:06.986Z"
   },
   "schemaVersion": 1
 }

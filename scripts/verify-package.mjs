@@ -314,13 +314,14 @@ check(
 		(text) =>
 			text.includes("exact absolute `work-helper.mjs` path") &&
 			text.includes("directly edit `.ce-workflow/work-items.json`"),
-	) &&
-		models.includes("Never guess another helper path"),
+	) && models.includes("Never guess another helper path"),
 );
 check(
 	"reviewers never block on supervisor coordination",
 	!reviewerAgent.match(/^tools:.*contact_supervisor/m) &&
-		reviewerAgent.includes("Reviewers do not open blocking supervisor requests"),
+		reviewerAgent.includes(
+			"Reviewers do not open blocking supervisor requests",
+		),
 );
 check(
 	"migration command remains explicit",
