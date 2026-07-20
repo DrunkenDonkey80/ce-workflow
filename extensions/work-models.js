@@ -25,14 +25,24 @@ import {
 } from "node:path";
 import { migrateLegacyBeads } from "./legacy-beads-migration.js";
 import { submitImprovementReport } from "./work-improvement-reporting.js";
-import { projectInitiativeHierarchy } from "./work-initiatives.js";
 import {
+	buildInitiativeReconciliation,
+	decodeInitiativeToken,
+	InitiativeError,
+	initiativeHash,
+	normalizeInitiativeProposal,
+	previewInitiativeCandidate,
+	projectInitiativeHierarchy,
+} from "./work-initiatives.js";
+import {
+	acquireLock,
 	appendWorkNote,
 	createWorkItem,
 	initStore,
 	loadStore,
 	mutateStore,
 	readyWorkItems,
+	saveStore,
 	storePath,
 	updateWorkItem,
 	WorkStoreError,
@@ -8757,6 +8767,94 @@ function buildInitiativeProjection(cwd, readinessByEpic = {}) {
 	return projectInitiativeHierarchy(loadNativeWorkStore(cwd), readinessByEpic);
 }
 
+function verifiedInitiativeSources(cwd, proposal) {
+	const hashes = {};
+	for (const source of proposal.sources) {
+		let content;
+		try {
+			content = readFileSync(join(cwd, source.path));
+		} catch {
+			throw new InitiativeError(
+				"stale_input",
+				`Stale source: ${source.path} is missing.`,
+			);
+		}
+		const hash = createHash("sha256").update(content).digest("hex");
+		if (hash !== source.hash)
+			throw new InitiativeError(
+				"stale_input",
+				`Stale source: ${source.path} changed.`,
+			);
+		hashes[source.path] = hash;
+	}
+	return hashes;
+}
+
+function previewInitiativeReconciliation(cwd, input) {
+	const proposal = normalizeInitiativeProposal(input);
+	verifiedInitiativeSources(cwd, proposal);
+	return previewInitiativeCandidate(loadNativeWorkStore(cwd), proposal);
+}
+
+function initiativeTokenMarker(cwd, token) {
+	return join(
+		cwd,
+		".pi",
+		"work-store",
+		"initiative-tokens",
+		initiativeHash(token),
+	);
+}
+
+function applyInitiativeReconciliation(cwd, input, token, options = {}) {
+	if (!options.approved)
+		throw new InitiativeError(
+			"approval_failure",
+			"Explicit approval of the initiative preview is required.",
+		);
+	const proposal = normalizeInitiativeProposal(input);
+	const preview = decodeInitiativeToken(token);
+	if (preview.proposalHash !== initiativeHash(proposal))
+		throw new InitiativeError("stale_input", "Stale proposal: preview no longer matches.");
+	const lock = acquireLock(cwd);
+	try {
+		const marker = initiativeTokenMarker(cwd, token);
+		if (existsSync(marker))
+			throw new InitiativeError("approval_failure", "Initiative preview token was replayed.");
+		const store = loadNativeWorkStore(cwd);
+		if (preview.storeHash !== initiativeHash(store))
+			throw new InitiativeError("stale_input", "Stale store: preview no longer matches.");
+		const sourceHashes = verifiedInitiativeSources(cwd, proposal);
+		if (initiativeHash(preview.sourceHashes) !== initiativeHash(sourceHashes))
+			throw new InitiativeError("stale_input", "Stale source: preview no longer matches.");
+		const reconciliation = buildInitiativeReconciliation(store, proposal);
+		if (reconciliation.conflicts.length)
+			throw new InitiativeError(
+				"protected_field_conflict",
+				"Initiative preview has protected field conflicts.",
+				{ conflicts: reconciliation.conflicts },
+			);
+		if (preview.candidateHash !== initiativeHash(reconciliation.candidate))
+			throw new InitiativeError("stale_input", "Stale preview candidate.");
+		if (reconciliation.changed) {
+			reconciliation.candidate.metadata.updatedAt =
+				options.now ?? new Date().toISOString();
+			saveStore(cwd, reconciliation.candidate, {
+				...(options.interruptAt ? { interruptAt: options.interruptAt } : {}),
+			});
+		}
+		mkdirSync(dirname(marker), { recursive: true });
+		writeFileSync(marker, "consumed\n", { flag: "wx" });
+		return {
+			changed: reconciliation.changed,
+			initiativeId: proposal.initiative.id,
+			operations: reconciliation.operations,
+		};
+	} finally {
+		lock.release();
+	}
+}
+
 function currentRoadmap(cwd) {
 	const id = readWorkState(cwd).lastEpicId;
 	if (id) {
@@ -11331,8 +11429,10 @@ export {
 	captureIdeationIdeas,
 	brainstormHandoffPrompt,
 	buildWorkflowIntakeState,
+	applyInitiativeReconciliation,
 	buildWorkInitState,
 	buildInitiativeProjection,
+	previewInitiativeReconciliation,
 	buildWorkMasterState,
 	buildWorkMedState,
 	buildWorkPlanState,

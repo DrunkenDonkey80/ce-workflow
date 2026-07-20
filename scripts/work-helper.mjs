@@ -746,6 +746,37 @@ try {
 				300,
 			),
 		);
+	} else if (command === "initiative-preview") {
+		const [proposalFile] = positional();
+		if (!proposalFile)
+			throw new Error("usage: initiative-preview <proposal-json-file>");
+		const { previewInitiativeReconciliation } = await import(
+			"../extensions/work-models.js"
+		);
+		print(
+			previewInitiativeReconciliation(
+				cwd,
+				JSON.parse(readFileSync(proposalFile, "utf8")),
+			),
+		);
+	} else if (command === "initiative-apply") {
+		const [proposalFile] = positional();
+		const token = option("--token");
+		if (!proposalFile || !token || !args.includes("--approved"))
+			throw new Error(
+				"usage: initiative-apply <proposal-json-file> --token <preview-token> --approved",
+			);
+		const { applyInitiativeReconciliation } = await import(
+			"../extensions/work-models.js"
+		);
+		print(
+			applyInitiativeReconciliation(
+				cwd,
+				JSON.parse(readFileSync(proposalFile, "utf8")),
+				token,
+				{ approved: true },
+			),
+		);
 	} else if (command === "bootstrap-plan-epic") {
 		const [rel] = positional();
 		if (!rel) throw new Error("usage: bootstrap-plan-epic <plan-path>");
@@ -786,7 +817,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|bootstrap-plan-epic|json-assert> ...",
+			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-preview|initiative-apply|bootstrap-plan-epic|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}
@@ -794,6 +825,8 @@ try {
 	print({
 		status: "FAIL",
 		error: error instanceof Error ? error.message : String(error),
+		...(error?.code ? { code: error.code } : {}),
+		...(error?.conflicts ? { conflicts: error.conflicts } : {}),
 	});
 	process.exitCode = process.exitCode || 1;
 }
