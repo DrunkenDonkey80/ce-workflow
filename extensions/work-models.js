@@ -4303,6 +4303,7 @@ function issueSummary(issue) {
 		type: typeOf(issue),
 		status: statusOf(issue),
 		labels: labelsOf(issue),
+		...(parentOf(issue) ? { parentId: parentOf(issue) } : {}),
 		updated: updatedAt(issue),
 		executionMode: workflowExecutionMode(issue),
 	};
@@ -7273,7 +7274,14 @@ function openQuestionsBlockState(cwd, rel, questions, command, git, init) {
 	};
 }
 
-export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
+export function bootstrapPlanEpic(
+	cwd,
+	rel,
+	command = "/work-plan",
+	git,
+	init,
+	initiativeContext,
+) {
 	const planText = readFileSync(join(cwd, rel), "utf8");
 	const gitReport = git ?? resumeGitReport(cwd, [rel]);
 	const initReport = init ?? ensureWorkStoreInitialized(cwd);
@@ -7310,6 +7318,87 @@ export function bootstrapPlanEpic(cwd, rel, command = "/work-plan", git, init) {
 		: undefined;
 	const reuseBrainstormEpic =
 		typeOf(brainstormEpic) === "epic" && statusOf(brainstormEpic) !== "closed";
+	if (initiativeContext?.proposal) {
+		const preview = previewInitiativeReconciliation(
+			cwd,
+			initiativeContext.proposal,
+		);
+		if (!initiativeContext.token)
+			return {
+				ok: true,
+				action: "initiative-preview-required",
+				preview,
+				git: gitReport,
+				message: "Review and confirm the complete initiative hierarchy before applying it.",
+			};
+		if (!initiativeContext.approved)
+			return errorState(
+				"approval-required",
+				"Initiative bootstrap requires explicit preview approval.",
+				{ action: "approval-required", preview },
+			);
+		applyInitiativeReconciliation(
+			cwd,
+			initiativeContext.proposal,
+			initiativeContext.token,
+			{ approved: true },
+		);
+		const selected = preview.proposed.epics.find((epic) => epic.selected);
+		if (!selected)
+			throw new InitiativeError(
+				"incomplete_coverage",
+				"Initiative proposal has no selected child epic.",
+			);
+		let epic = readWorkItem(cwd, selected.id);
+		epic = updateWorkItemNative(cwd, selected.id, {
+			documentLinks: {
+				...(epic.documentLinks ?? {}),
+				design: fields.designFile,
+			},
+		});
+		if (!notesOf(epic).includes(fields.notes))
+			epic = appendWorkflowWorkItemNote(cwd, selected.id, fields.notes);
+		let planning = childrenOfRequired(cwd, selected.id).find(
+			(item) =>
+				isPlanningIssue(item) && notesOf(item).includes(`source plan: ${rel}`),
+		);
+		if (!planning)
+			planning = createWorkflowWorkItem(cwd, {
+				title: `Plan next slice for ${selected.title}`,
+				type: "task",
+				parent: selected.id,
+				notes: workflowWorkItemNotes(command, selected.title, [
+					"wo:planning",
+					`source plan: ${rel}`,
+					fields.ideaId ? `idea-id=${fields.ideaId}` : "",
+					"create one executable slice by default",
+				]),
+			});
+		if (idea) {
+			const backlink = `wo:idea status=discussed plan-path=${rel} initiative-id=${initiativeContext.proposal.initiative.id} epic-id=${selected.id} task-id=${idOf(planning)}`;
+			if (!notesOf(readWorkItem(cwd, idOf(idea))).includes(backlink))
+				appendWorkflowWorkItemNote(cwd, idOf(idea), backlink);
+			updateWorkItemNative(cwd, idOf(idea), { status: "closed" });
+		}
+		rememberWorkflowEpic(cwd, epic);
+		return withHandoffPrompt(
+			{
+				ok: true,
+				action: "run-planner",
+				initiative: issueSummary(
+					readWorkItem(cwd, initiativeContext.proposal.initiative.id),
+				),
+				epic: issueSummary(epic),
+				selectedWorkItem: issueSummary(planning),
+				git: gitReport,
+				message: `Applied initiative ${initiativeContext.proposal.initiative.id}; selected ${selected.id} for just-in-time planning.`,
+				warnings: gitReport.warnings,
+				suggestedCommands: [`/work-resume ${selected.id}`],
+				nextAction: `Next: run /work-resume ${selected.id} to plan and start its first slice.`,
+			},
+			cwd,
+		);
+	}
 	let epic;
 	if (reuseBrainstormEpic) {
 		const brainstorm = idea.description || brainstormEpic.description;

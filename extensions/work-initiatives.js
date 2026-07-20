@@ -63,12 +63,15 @@ export function normalizeInitiativeProposal(input) {
 		return fail("invalid_proposal", "Unsupported initiative proposal schema.");
 	if ("patch" in input || "operations" in input)
 		return fail("invalid_proposal", "Initiative proposals cannot contain raw patches.");
+	const mode = input.mode ?? "wrap";
 	if (
+		!["wrap", "convert"].includes(mode) ||
 		!text(input.targetId) ||
 		!object(input.initiative) ||
 		!text(input.initiative.id) ||
 		!text(input.initiative.title) ||
-		input.initiative.id === input.targetId
+		(mode === "wrap" && input.initiative.id === input.targetId) ||
+		(mode === "convert" && input.initiative.id !== input.targetId)
 	)
 		return fail("invalid_proposal", "Initiative target and identity are invalid.");
 	if (!Array.isArray(input.sources) || input.sources.length === 0)
@@ -100,6 +103,7 @@ export function normalizeInitiativeProposal(input) {
 				? { description: String(group.description) }
 				: {}),
 			...(text(group.epicId) ? { epicId: group.epicId } : {}),
+			...(group.selected === true ? { selected: true } : {}),
 		};
 	});
 	if (new Set(groups.map((group) => group.id)).size !== groups.length)
@@ -109,8 +113,13 @@ export function normalizeInitiativeProposal(input) {
 	);
 	if (new Set(explicitEpics).size !== explicitEpics.length)
 		return fail("ambiguous_lineage", "An epic cannot represent multiple delivery groups.");
-	if (!groups.some((group) => group.epicId === input.targetId))
-		return fail("incomplete_coverage", "Exactly one delivery group must retain the target epic.");
+	if (
+		(mode === "wrap" && !groups.some((group) => group.epicId === input.targetId)) ||
+		(mode === "convert" && groups.some((group) => group.epicId === input.targetId))
+	)
+		return fail("incomplete_coverage", "Delivery groups do not match the promotion mode.");
+	if (mode === "convert" && groups.filter((group) => group.selected).length !== 1)
+		return fail("incomplete_coverage", "Conversion requires exactly one selected child epic.");
 	if (!Array.isArray(input.outcomes) || input.outcomes.length === 0)
 		return fail("incomplete_coverage", "Initiative proposal requires outcomes.");
 	const groupIds = new Set(groups.map((group) => group.id));
@@ -155,6 +164,7 @@ export function normalizeInitiativeProposal(input) {
 			return fail("incomplete_coverage", `Delivery group ${group.id} has no accepted outcome.`);
 	return {
 		schemaVersion: INITIATIVE_PROPOSAL_VERSION,
+		mode,
 		targetId: input.targetId,
 		initiative: {
 			id: input.initiative.id,
@@ -211,10 +221,22 @@ export function buildInitiativeReconciliation(store, input) {
 	validateStore(store);
 	const proposal = normalizeInitiativeProposal(input);
 	const target = store.items[proposal.targetId];
-	if (!target || target.type !== "epic" || isInitiative(target))
-		return fail("invalid_proposal", "Initiative target must be a standalone or attached epic.");
-	const currentInitiative = store.items[proposal.initiative.id];
-	if (currentInitiative && !isInitiative(currentInitiative))
+	if (
+		!target ||
+		target.type !== "epic" ||
+		(proposal.mode === "wrap" && isInitiative(target)) ||
+		(proposal.mode === "convert" && isInitiative(target) && target.id !== proposal.initiative.id)
+	)
+		return fail("invalid_proposal", "Initiative target must be a compatible epic.");
+	const existingInitiative = store.items[proposal.initiative.id];
+	const currentInitiative = isInitiative(existingInitiative)
+		? existingInitiative
+		: undefined;
+	if (
+		existingInitiative &&
+		!currentInitiative &&
+		!(proposal.mode === "convert" && existingInitiative.id === target.id)
+	)
 		return fail("protected_field_conflict", "Initiative ID is already used by another record.");
 	const groups = mappedGroups(store, proposal);
 	const candidate = structuredClone(store);
@@ -222,23 +244,37 @@ export function buildInitiativeReconciliation(store, input) {
 	const conflicts = [];
 	const timestamp = store.metadata.updatedAt ?? store.metadata.createdAt;
 	if (!currentInitiative) {
-		candidate.items[proposal.initiative.id] = {
+		candidate.items[proposal.initiative.id] =
+			proposal.mode === "convert"
+				? {
+						...candidate.items[proposal.targetId],
+						labels: [
+							...new Set([
+								...(candidate.items[proposal.targetId].labels ?? []),
+								INITIATIVE_LABEL,
+							]),
+						],
+					}
+				: {
+						id: proposal.initiative.id,
+						type: "epic",
+						status: "open",
+						title: proposal.initiative.title,
+						...(proposal.initiative.description !== undefined
+							? { description: proposal.initiative.description }
+							: {}),
+						createdAt: timestamp,
+						updatedAt: timestamp,
+						dependencies: [],
+						labels: [INITIATIVE_LABEL],
+						notes: [],
+						evidence: [],
+						dependencyEdges: [],
+					};
+		operations.push({
+			kind: proposal.mode === "convert" ? "convert_to_initiative" : "create_initiative",
 			id: proposal.initiative.id,
-			type: "epic",
-			status: "open",
-			title: proposal.initiative.title,
-			...(proposal.initiative.description !== undefined
-				? { description: proposal.initiative.description }
-				: {}),
-			createdAt: timestamp,
-			updatedAt: timestamp,
-			dependencies: [],
-			labels: [INITIATIVE_LABEL],
-			notes: [],
-			evidence: [],
-			dependencyEdges: [],
-		};
-		operations.push({ kind: "create_initiative", id: proposal.initiative.id });
+		});
 	}
 	const priorCoverage = currentInitiative?.initiative?.coverage ?? [];
 	for (const group of groups) {
@@ -285,6 +321,16 @@ export function buildInitiativeReconciliation(store, input) {
 		if (existing.parentId !== proposal.initiative.id) {
 			candidate.items[group.epicId].parentId = proposal.initiative.id;
 			operations.push({ kind: "reparent_epic", id: group.epicId });
+		}
+	}
+	if (proposal.mode === "convert" && !currentInitiative) {
+		const selected = groups.find((group) => group.selected);
+		for (const child of Object.values(candidate.items).filter(
+			(item) =>
+				item.parentId === proposal.targetId && item.type !== "epic",
+		)) {
+			child.parentId = selected.epicId;
+			operations.push({ kind: "reparent_record", id: child.id });
 		}
 	}
 	const groupById = new Map(groups.map((group) => [group.id, group]));
@@ -375,10 +421,12 @@ export function previewInitiativeCandidate(store, input) {
 			initiative: structuredClone(reconciliation.proposal.initiative),
 			epics: (reconciliation.groups ?? []).map((group) => ({
 				id: group.epicId,
+				groupId: group.id,
 				title: group.title,
 				...(group.description !== undefined
 					? { description: group.description }
 					: {}),
+				...(group.selected ? { selected: true } : {}),
 			})),
 			coverage: structuredClone(reconciliation.coverage ?? []),
 		},

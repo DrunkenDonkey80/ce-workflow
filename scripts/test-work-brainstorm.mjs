@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -83,6 +84,132 @@ try {
 				"## Master plan",
 			),
 		"upgraded epic keeps brainstorm and master-plan components",
+	);
+
+	// Multi-scope plans preview and confirm an initiative with one selected child.
+	fixture.reset("no-legacy-empty");
+	const broadSource = "# Broad brainstorm\n\nR1 reader and R2 exporter\n";
+	writeFileSync(path.join(brainstormDir, "broad.md"), broadSource);
+	writeFileSync(
+		path.join(planDir, "broad-plan.md"),
+		"# Broad plan\n\n## Summary\nSource: docs/brainstorms/broad.md\n",
+	);
+	const broad = buildWorkBrainstormState(
+		cwd,
+		"Broad reader and exporter docs/brainstorms/broad.md",
+	);
+	const broadProposal = {
+		schemaVersion: 1,
+		mode: "convert",
+		targetId: broad.epic.id,
+		initiative: { id: broad.epic.id, title: "Reader initiative" },
+		sources: [
+			{
+				id: "brainstorm-broad",
+				path: "docs/brainstorms/broad.md",
+				hash: createHash("sha256").update(broadSource).digest("hex"),
+			},
+		],
+		groups: [
+			{ id: "reader", title: "Reader", selected: true },
+			{ id: "exporter", title: "Exporter" },
+		],
+		outcomes: [
+			{
+				id: "reader-outcome",
+				provenance: "brainstorm-broad:R1",
+				contentHash: "reader-hash",
+				disposition: "accepted",
+				groupId: "reader",
+			},
+			{
+				id: "exporter-outcome",
+				provenance: "brainstorm-broad:R2",
+				contentHash: "exporter-hash",
+				disposition: "accepted",
+				groupId: "exporter",
+			},
+		],
+	};
+	const broadPreview = bootstrapPlanEpic(
+		cwd,
+		"docs/plans/broad-plan.md",
+		"/work-plan",
+		undefined,
+		undefined,
+		{ proposal: broadProposal },
+	);
+	assert(
+		broadPreview.action === "initiative-preview-required" &&
+			broadPreview.preview.proposed.epics.length === 2 &&
+			!fixture.store().items[broad.epic.id].initiative,
+		"multi-scope bootstrap previews the complete hierarchy without mutation",
+	);
+	const broadApplied = bootstrapPlanEpic(
+		cwd,
+		"docs/plans/broad-plan.md",
+		"/work-plan",
+		undefined,
+		undefined,
+		{
+			proposal: broadProposal,
+			token: broadPreview.preview.token,
+			approved: true,
+		},
+	);
+	const broadStore = fixture.store();
+	const broadChildren = Object.values(broadStore.items).filter(
+		(item) => item.parentId === broad.epic.id && item.type === "epic",
+	);
+	assert(
+		broadApplied.action === "run-planner" &&
+			broadStore.items[broad.epic.id].initiative &&
+			broadChildren.length === 2,
+		"confirmed multi-scope bootstrap preserves the brainstorm epic as initiative",
+	);
+	assert(
+		broadStore.items[broadApplied.selectedWorkItem.id].parentId ===
+			broadApplied.epic.id &&
+			broadApplied.epic.parentId === broad.epic.id,
+		"only the selected child receives a planning task",
+	);
+	const successor = broadChildren.find((child) => child.id !== broadApplied.epic.id);
+	assert(
+		!Object.values(broadStore.items).some(
+			(item) => item.parentId === successor.id && item.id !== broad.idea.id,
+		),
+		"successor child remains a needs-plan stub without implementation children",
+	);
+	assert(
+		broadStore.items[broad.idea.id].status === "closed" &&
+			broadStore.items[broad.idea.id].parentId === broadApplied.epic.id,
+		"brainstorm idea backlink is retained under the selected child",
+	);
+	const broadItemCount = Object.keys(broadStore.items).length;
+	const repeatPreview = bootstrapPlanEpic(
+		cwd,
+		"docs/plans/broad-plan.md",
+		"/work-plan",
+		undefined,
+		undefined,
+		{ proposal: broadProposal },
+	);
+	const repeated = bootstrapPlanEpic(
+		cwd,
+		"docs/plans/broad-plan.md",
+		"/work-plan",
+		undefined,
+		undefined,
+		{
+			proposal: broadProposal,
+			token: repeatPreview.preview.token,
+			approved: true,
+		},
+	);
+	assert(
+		repeated.selectedWorkItem.id === broadApplied.selectedWorkItem.id &&
+			Object.keys(fixture.store().items).length === broadItemCount,
+		"rerunning initiative bootstrap reuses lineage and planning work",
 	);
 
 	fixture.reset("ideas");
