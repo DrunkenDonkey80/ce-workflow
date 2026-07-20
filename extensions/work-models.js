@@ -3963,11 +3963,10 @@ function buildWorkStatus(cwd, target) {
 	}
 
 	const epic = resolved.epic;
-	const projected = buildInitiativeProjection(cwd).nodes.find(
-		(node) => node.id === idOf(epic),
-	);
+	const projection = buildInitiativeProjection(cwd);
+	const projected = projection.nodes.find((node) => node.id === idOf(epic));
 	if (projected?.role === "initiative") {
-		const children = buildInitiativeProjection(cwd).nodes.filter(
+		const children = projection.nodes.filter(
 			(node) => node.parentId === projected.id,
 		);
 		const nextChild = children.find(
@@ -5134,17 +5133,19 @@ function resolveResumeTarget(cwd, target) {
 				message: `No WorkItem found for ${wanted}`,
 			};
 		if (typeOf(issue) === "epic") {
-			const projected = buildInitiativeProjection(cwd).nodes.find(
+			const store = loadNativeWorkStore(cwd);
+			const projection = buildInitiativeProjection(cwd, {}, store);
+			const projected = projection.nodes.find(
 				(node) => node.id === idOf(issue),
 			);
 			if (projected?.role !== "initiative")
 				return { kind: "epic", epic: issue };
-			const candidates = buildInitiativeProjection(cwd).nodes
+			const candidates = projection.nodes
 				.filter(
 					(node) =>
 						node.parentId === projected.id && node.status !== "closed",
 				)
-				.map((node) => readWorkItem(cwd, node.id));
+				.map((node) => store.items[node.id]);
 			if (candidates.length === 1)
 				return { kind: "epic", epic: candidates[0], initiative: issue };
 			return {
@@ -8937,21 +8938,6 @@ function buildWorkFinishState(cwd, args = "") {
 	}
 }
 
-function allRoadmaps(cwd) {
-	try {
-		return allWorkItems(cwd)
-			.filter((item) => item.type === "epic")
-			.filter((epic) => typeOf(epic) === "epic")
-			.sort(byUpdatedDesc);
-	} catch {
-		const byId = new Map();
-		for (const status of ["in_progress", "open", "closed"]) {
-			for (const epic of epicsByStatus(cwd, status)) byId.set(idOf(epic), epic);
-		}
-		return [...byId.values()].sort(byUpdatedDesc);
-	}
-}
-
 function initiativeReadinessFacts(cwd, store) {
 	return Object.fromEntries(
 		Object.values(store.items)
@@ -8978,8 +8964,11 @@ function initiativeReadinessFacts(cwd, store) {
 	);
 }
 
-function buildInitiativeProjection(cwd, readinessByEpic = {}) {
-	const store = loadNativeWorkStore(cwd);
+function buildInitiativeProjection(
+	cwd,
+	readinessByEpic = {},
+	store = loadNativeWorkStore(cwd),
+) {
 	return projectInitiativeHierarchy(store, {
 		...initiativeReadinessFacts(cwd, store),
 		...readinessByEpic,
@@ -9176,7 +9165,7 @@ function buildWorkRoadmapState(cwd, args = "") {
 				: rememberedId;
 		if (command === "list") {
 			const store = loadNativeWorkStore(cwd);
-			const projection = buildInitiativeProjection(cwd);
+			const projection = buildInitiativeProjection(cwd, {}, store);
 			const roadmaps = projection.nodes.map((node) =>
 				roadmapSummary(cwd, store.items[node.id], currentId, node),
 			);

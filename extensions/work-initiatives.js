@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
 	INITIATIVE_LABEL,
+	INITIATIVE_SCHEMA_VERSION,
 	validateStore,
 } from "./work-store.js";
 
@@ -382,7 +383,7 @@ export function buildInitiativeReconciliation(store, input) {
 		});
 	initiative.initiative = {
 		...(priorMetadata ?? {}),
-		schemaVersion: 1,
+		schemaVersion: INITIATIVE_SCHEMA_VERSION,
 		sources: structuredClone(proposal.sources),
 		coverage,
 		lastConfirmed: identity,
@@ -498,23 +499,25 @@ export function projectInitiativeHierarchy(store, readinessByEpic = {}) {
 		.filter((item) => !item.parentId)
 		.sort(byUpdatedThenId);
 	const childrenByParent = new Map();
-	for (const epic of epics.filter((item) => item.parentId)) {
-		const children = childrenByParent.get(epic.parentId) ?? [];
-		children.push(epic);
-		childrenByParent.set(epic.parentId, children);
+	const localItemsByParent = new Map();
+	for (const item of items.filter((entry) => entry.parentId)) {
+		const target =
+			item.type === "epic"
+				? childrenByParent
+				: item.type !== "decision" && item.type !== "idea"
+					? localItemsByParent
+					: undefined;
+		if (!target) continue;
+		const children = target.get(item.parentId) ?? [];
+		children.push(item);
+		target.set(item.parentId, children);
 	}
 	for (const children of childrenByParent.values()) children.sort(byUpdatedThenId);
 
 	const nodeFor = (epic) => {
 		const initiative = isInitiative(epic);
 		const childEpics = childrenByParent.get(epic.id) ?? [];
-		const localItems = items.filter(
-			(item) =>
-				item.parentId === epic.id &&
-				item.type !== "epic" &&
-				item.type !== "decision" &&
-				item.type !== "idea",
-		);
+		const localItems = localItemsByParent.get(epic.id) ?? [];
 		const readiness = initiative
 			? {
 					state: "aggregate",

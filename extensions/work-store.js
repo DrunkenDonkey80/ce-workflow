@@ -375,7 +375,15 @@ function validateParentGraph(items, file) {
 	}
 }
 function validateInitiativeHierarchy(items, file) {
-	for (const item of Object.values(items)) {
+	const values = Object.values(items);
+	const childrenByParent = new Map();
+	for (const item of values) {
+		if (!item.parentId) continue;
+		const children = childrenByParent.get(item.parentId) ?? [];
+		children.push(item);
+		childrenByParent.set(item.parentId, children);
+	}
+	for (const item of values) {
 		const labels = item.labels ?? [];
 		const labelCount = labels.filter((label) => label === INITIATIVE_LABEL).length;
 		const hasMetadata = item.initiative !== undefined;
@@ -387,9 +395,7 @@ function validateInitiativeHierarchy(items, file) {
 		if (item.type !== "epic" || item.parentId)
 			throw hierarchyError(`Initiative ${item.id} must be a top-level epic`, file);
 		const metadata = validateInitiativeMetadata(item, file);
-		const children = Object.values(items).filter(
-			(candidate) => candidate.parentId === item.id,
-		);
+		const children = childrenByParent.get(item.id) ?? [];
 		if (
 			children.some(
 				(child) => child.type !== "epic" || child.initiative !== undefined,
