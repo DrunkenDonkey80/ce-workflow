@@ -110,6 +110,16 @@ try {
 			notes.at(-2) === "direct note" && notes.at(-1) === "flagged note",
 			"work-note accepts direct and --append-notes forms without persisting the flag",
 		);
+		execFileSync(
+			process.execPath,
+			[helper, "work-close", "TASK-123", "--reason", "verified closure"],
+			{ cwd },
+		);
+		const closed = loadStore(cwd).items["TASK-123"];
+		assert(
+			closed.status === "closed" && closed.notes.at(-1) === "verified closure",
+			"work-close persists --reason as the closure note",
+		);
 	} finally {
 		if (oldBd === undefined) delete process.env.WORK_ORCH_BD_BIN;
 		else process.env.WORK_ORCH_BD_BIN = oldBd;

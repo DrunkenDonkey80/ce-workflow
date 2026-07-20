@@ -695,7 +695,10 @@ try {
 	} else if (command === "work-close") {
 		const id = args[0];
 		if (!id)
-			throw new Error("usage: work-close <work-item-id> [--note <text>]");
+			throw new Error(
+				"usage: work-close <work-item-id> [--reason <text>|--note <text>]",
+			);
+		const note = option("--reason") ?? option("--note");
 		const closed = mutateStore(cwd, (store) => {
 			const current = store.items[id];
 			if (!current) throw new Error(`WorkItem not found: ${id}`);
@@ -705,9 +708,7 @@ try {
 				);
 			return updateWorkItem(store, id, {
 				status: "closed",
-				notes: option("--note")
-					? [...current.notes, option("--note")]
-					: current.notes,
+				notes: note ? [...current.notes, note] : current.notes,
 			});
 		});
 		print(summary(closed, 300));

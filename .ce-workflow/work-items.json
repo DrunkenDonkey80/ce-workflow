@@ -1412,6 +1412,45 @@
       "title": "Track pi-subagents supervisor wake and async resume defects",
       "type": "bug",
       "updatedAt": "2026-07-20T09:59:01.555Z"
+    },
+    "work-2.9": {
+      "createdAt": "2026-07-20T11:50:30.982Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: `work-helper.mjs work-close work-4.2 --reason \"...\"` changed the decision status to closed but did not persist the supplied closure reason in notes, evidence, or any visible work-summary field.\nExpected: The coded work-close helper should durably record its --reason so external-prerequisite and human-decision closures remain auditable and resumable.\nImpact: The native store now shows work-4.2 closed without explaining that all live firmware components remain blocked because manifests, approvals, recovery hardware/SOP, stable power, and explicit authorization are unavailable. This can cause unsafe future assumptions or unnecessary rediscovery.\nSuggested improvement: Append the --reason to notes or evidence atomically with the status transition and include it in work-summary.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e0e726cd-7e85-4f8a-ac6b-30113e50cbb1",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 318917,
+              "file": "01-work-items.json",
+              "sha256": "de877948e1e6cabe2ab256ee3c16e1d6f8630f69ea39bc6d6cf78d1bec767697"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-20T11:50:30.978Z",
+          "workflowId": "019f7d1d-bc1c-78ad-a99d-7964c0da8fb8"
+        }
+      ],
+      "id": "work-2.9",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:triage atomic-claim=A classification=related-distinct,locally-owned canonical=work-2.9. Expected outcome: work-close --reason must persist the supplied closure rationale. Root cause: agents/work-planner.md advertises --reason while scripts/work-helper.mjs accepted only --note and silently ignored --reason. Not duplicate of work-2.7 finalization boundaries; this is a distinct helper CLI contract defect. Focused pre-fix proof failed in scripts/test-work-optimization-helpers.mjs; implementation now accepts --reason with --note compatibility.",
+        "wo:review PASS --reason is parsed with --note fallback; focused regression passed and asserts closed status plus persisted rationale.",
+        "Implementation/verification: work-close now accepts --reason with --note compatibility and persists the rationale atomically; focused regression covers closed status and note persistence. Verified node scripts/test-work-optimization-helpers.mjs, npm run verify:quiet, and git diff --check PASS. Commit reconciliation: snapshot-owned report/store import plus scripts/work-helper.mjs and scripts/test-work-optimization-helpers.mjs are the complete work-2.9 scope.",
+        "Verified implementation and regression coverage committed as work-2.9: persist work-close reasons; focused helper test, verify:quiet, and diff check passed."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: `work-helper.mjs work-close work-4.2 --reason \"...\"` changed the decision status to closed but did not persist the supplied closur",
+      "type": "task",
+      "updatedAt": "2026-07-20T14:41:04.347Z"
     }
   },
   "metadata": {
@@ -1421,7 +1460,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-20T10:05:06.986Z"
+    "updatedAt": "2026-07-20T14:41:04.348Z"
   },
   "schemaVersion": 1
 }
