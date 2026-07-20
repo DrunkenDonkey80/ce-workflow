@@ -3963,6 +3963,34 @@ function buildWorkStatus(cwd, target) {
 	}
 
 	const epic = resolved.epic;
+	const projected = buildInitiativeProjection(cwd).nodes.find(
+		(node) => node.id === idOf(epic),
+	);
+	if (projected?.role === "initiative") {
+		const children = buildInitiativeProjection(cwd).nodes.filter(
+			(node) => node.parentId === projected.id,
+		);
+		const nextChild = children.find(
+			(child) => child.status !== "closed" && child.readiness.state === "planned",
+		);
+		const needsPlan = children.find(
+			(child) => child.status !== "closed" && child.readiness.state === "needs_plan",
+		);
+		return [
+			`Initiative: ${projected.title} (${projected.id})`,
+			`Status: ${statusLabel(projected.status)}`,
+			`Progress: ${projected.aggregateProgress.closed}/${projected.aggregateProgress.total} child epics closed (${projected.aggregateProgress.percent}%)`,
+			`Coverage: ${projected.coverage.accepted} accepted • ${projected.coverage.rejected} rejected • ${projected.coverage.non_goal} non-goal`,
+			"",
+			"Child epics:",
+			...children.map(
+				(child) =>
+					`- ${child.id} [${statusLabel(child.status)}] [${child.readiness.state.replaceAll("_", " ")}] ${child.title}`,
+			),
+			"",
+			`Next: ${needsPlan ? `Run /work-plan ${needsPlan.id}.` : nextChild ? `Run /work-resume ${nextChild.id}.` : projected.closeAllowed ? `Close explicitly with /work-roadmap close ${projected.id}.` : "Resolve stale or unfinished child epics."}`,
+		].join("\n");
+	}
 	rememberWorkflowEpic(cwd, epic);
 	const epicId = idOf(epic);
 	const children = childrenOf(cwd, epicId);
@@ -5105,14 +5133,39 @@ function resolveResumeTarget(cwd, target) {
 				error: "unknown-target",
 				message: `No WorkItem found for ${wanted}`,
 			};
-		if (typeOf(issue) === "epic") return { kind: "epic", epic: issue };
+		if (typeOf(issue) === "epic") {
+			const projected = buildInitiativeProjection(cwd).nodes.find(
+				(node) => node.id === idOf(issue),
+			);
+			if (projected?.role !== "initiative")
+				return { kind: "epic", epic: issue };
+			const candidates = buildInitiativeProjection(cwd).nodes
+				.filter(
+					(node) =>
+						node.parentId === projected.id && node.status !== "closed",
+				)
+				.map((node) => readWorkItem(cwd, node.id));
+			if (candidates.length === 1)
+				return { kind: "epic", epic: candidates[0], initiative: issue };
+			return {
+				error: candidates.length
+					? "initiative-child-selection"
+					: "no-ready-child",
+				message: candidates.length
+					? `Select one child epic under initiative ${idOf(issue)}.`
+					: `Initiative ${idOf(issue)} has no open child epic.`,
+				candidates: candidates.map((epic) => candidateSummary(cwd, epic)),
+			};
+		}
 		return {
 			error: "unsupported-target",
 			message: `${wanted} is a child WorkItem; run /work-resume ${parentOf(issue) ?? "<epic-id>"} or /work-debug ${wanted}`,
 		};
 	}
 
-	const inProgress = epicsByStatus(cwd, "in_progress").sort(byUpdatedDesc);
+	const inProgress = epicsByStatus(cwd, "in_progress")
+		.filter((epic) => !epic.initiative)
+		.sort(byUpdatedDesc);
 	if (inProgress.length === 1) return { kind: "epic", epic: inProgress[0] };
 	if (inProgress.length > 1)
 		return {
@@ -5121,7 +5174,7 @@ function resolveResumeTarget(cwd, target) {
 		};
 
 	const remembered = rememberedWorkflowEpic(cwd);
-	if (remembered) {
+	if (remembered && !remembered.initiative) {
 		try {
 			if (buildEpicChildState(cwd, remembered).children.length > 0)
 				return { kind: "epic", epic: remembered };
@@ -5130,11 +5183,13 @@ function resolveResumeTarget(cwd, target) {
 		}
 	}
 
-	let candidates = epicsByStatus(cwd, "open").sort(byUpdatedDesc);
+	let candidates = epicsByStatus(cwd, "open")
+		.filter((epic) => !epic.initiative)
+		.sort(byUpdatedDesc);
 	if (candidates.length === 0) {
 		try {
 			candidates = allWorkItems(cwd)
-				.filter((item) => item.type === "epic")
+				.filter((item) => item.type === "epic" && !item.initiative)
 				.filter((epic) => statusOf(epic) !== "closed")
 				.sort(byUpdatedDesc);
 		} catch {
@@ -5921,6 +5976,9 @@ function buildWorkResumeState(cwd, args = "") {
 			blockers: resumeBlockers(childState),
 			downstreamBlocked: childState.downstreamBlocked,
 			openDecisions: childState.openDecisions.map(issueSummary),
+			...(resolved.initiative
+				? { initiative: issueSummary(resolved.initiative) }
+				: {}),
 			git,
 			planPath,
 			suggestedCommands: [`/work-resume ${childState.epicId}`],
@@ -5936,6 +5994,35 @@ function buildWorkResumeState(cwd, args = "") {
 }
 
 function buildEpicReportState(cwd, epic) {
+	const projection = buildInitiativeProjection(cwd);
+	const projected = projection.nodes.find((node) => node.id === idOf(epic));
+	if (projected?.role === "initiative") {
+		const children = projection.nodes.filter(
+			(node) => node.parentId === projected.id,
+		);
+		return {
+			ok: true,
+			initiative: true,
+			target: { requested: projected.id, kind: "initiative" },
+			epic: { ...issueSummary(epic), ...projected },
+			children,
+			aggregateProgress: projected.aggregateProgress,
+			coverage: projected.coverage,
+			blockers: projected.closeBlockers,
+			readyWork: [],
+			openDecisions: [],
+			downstreamBlocked: [],
+			git: gitReport(cwd),
+			suggestedCommands: children
+				.filter((child) => child.status !== "closed")
+				.map((child) =>
+					child.readiness.state === "needs_plan"
+						? `/work-plan ${child.id}`
+						: `/work-resume ${child.id}`,
+				),
+			warnings: [],
+		};
+	}
 	rememberWorkflowEpic(cwd, epic);
 	const childState = buildEpicChildState(cwd, epic);
 	const git = gitReport(cwd);
@@ -8742,6 +8829,18 @@ function buildWorkFinishState(cwd, args = "") {
 		const issue = readWorkItem(cwd, target);
 		if (!issue)
 			return errorState("unknown-target", `No WorkItem found for ${target}`);
+		if (issue.initiative)
+			return errorState(
+				"initiative-not-executable",
+				"Finish targets one child WorkItem or executable child epic; initiatives close explicitly through /work-roadmap.",
+				{
+					action: "finish-stop",
+					epic: issueSummary(issue),
+					candidates: buildInitiativeProjection(cwd).nodes.filter(
+						(node) => node.parentId === idOf(issue) && node.status !== "closed",
+					),
+				},
+			);
 		let workItem = issue;
 		let epic = issue;
 		if (typeOf(issue) === "epic") {
@@ -8979,9 +9078,18 @@ function currentRoadmap(cwd) {
 	const id = readWorkState(cwd).lastEpicId;
 	if (id) {
 		const epic = readWorkItem(cwd, id);
+		if (epic?.initiative) {
+			const children = Object.values(loadNativeWorkStore(cwd).items).filter(
+				(item) =>
+					item.parentId === epic.id &&
+					item.type === "epic" &&
+					item.status !== "closed",
+			);
+			return children.length === 1 ? children[0] : undefined;
+		}
 		if (epic && typeOf(epic) === "epic") return epic;
 	}
-	const active = activeEpicCandidates(cwd);
+	const active = activeEpicCandidates(cwd).filter((epic) => !epic.initiative);
 	return active.length === 1 ? active[0] : undefined;
 }
 
@@ -9059,7 +9167,13 @@ function buildWorkRoadmapState(cwd, args = "") {
 				return undefined;
 			}
 		})();
-		const currentId = current ? idOf(current) : readWorkState(cwd).lastEpicId;
+		const rememberedId = readWorkState(cwd).lastEpicId;
+		const remembered = rememberedId ? readWorkItem(cwd, rememberedId) : undefined;
+		const currentId = current
+			? idOf(current)
+			: remembered?.initiative
+				? undefined
+				: rememberedId;
 		if (command === "list") {
 			const store = loadNativeWorkStore(cwd);
 			const projection = buildInitiativeProjection(cwd);
@@ -9271,6 +9385,25 @@ function renderWorkReportText(state) {
 			`Next: ${state.suggestedCommands[0] ?? "No action suggested."}`,
 		].join("\n");
 	}
+	if (state.initiative)
+		return [
+			`Initiative: ${state.epic.title} (${state.epic.id})`,
+			`Status: ${statusLabel(state.epic.status)} • Progress: ${state.aggregateProgress.closed}/${state.aggregateProgress.total} child epics closed (${state.aggregateProgress.percent}%)`,
+			`Coverage: ${state.coverage.accepted} accepted • ${state.coverage.rejected} rejected • ${state.coverage.non_goal} non-goal`,
+			"",
+			"Child epics:",
+			...state.children.map(
+				(child) =>
+					`- ${child.id} [${statusLabel(child.status)}] [${child.readiness.state.replaceAll("_", " ")}] ${child.title}`,
+			),
+			"",
+			"Close blockers:",
+			...(state.blockers.length
+				? state.blockers.map((item) => `- ${item}`)
+				: ["- none"]),
+			"",
+			`Next: ${state.suggestedCommands[0] ?? `Use /work-roadmap close ${state.epic.id} when ready.`}`,
+		].join("\n");
 	return [
 		`Epic: ${state.epic.title} (${state.epic.id})`,
 		`Status: ${statusLabel(state.epic.status)} • Progress: ${state.counts.closed}/${state.counts.slices} slices closed`,

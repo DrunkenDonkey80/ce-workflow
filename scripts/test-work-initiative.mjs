@@ -27,6 +27,11 @@ import {
 import {
 	applyInitiativeReconciliation,
 	buildInitiativeProjection,
+	buildWorkFinishState,
+	buildWorkReportState,
+	buildWorkResumeState,
+	buildWorkRoadmapState,
+	buildWorkStatus,
 	previewInitiativeReconciliation,
 } from "../extensions/work-models.js";
 
@@ -141,6 +146,50 @@ try {
 		buildInitiativeProjection(dir, readiness),
 		projection,
 		"work-models adapter must expose the exact domain projection",
+	);
+	const status = buildWorkStatus(dir, "initiative-1");
+	assert.match(status, /Initiative: Initiative/);
+	assert.match(status, /1\/2 child epics closed \(50%\)/);
+	const report = buildWorkReportState(dir, "initiative-1");
+	assert.equal(report.initiative, true);
+	assert.deepEqual(report.aggregateProgress, { closed: 1, total: 2, percent: 50 });
+	assert.deepEqual(report.children.map((child) => child.id), [
+		"initiative-1.1",
+		"initiative-1.2",
+	]);
+	const resume = buildWorkResumeState(dir, "initiative-1");
+	assert.equal(resume.epic.id, "initiative-1.2");
+	assert.equal(resume.initiative.id, "initiative-1");
+	const finish = buildWorkFinishState(dir, "initiative-1");
+	assert.equal(finish.reason, "initiative-not-executable");
+	mkdirSync(path.join(dir, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(dir, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({ lastEpicId: "initiative-1" }),
+	);
+	const current = buildWorkRoadmapState(dir, "list");
+	assert.equal(current.currentId, "initiative-1.2");
+	assert.equal(current.roadmaps.find((item) => item.current)?.role, "child_epic");
+	const ambiguousStore = loadStore(dir);
+	ambiguousStore.items["initiative-1.3"] = record(
+		"initiative-1.3",
+		"Another child",
+		{ parentId: "initiative-1" },
+	);
+	ambiguousStore.items["initiative-1"].initiative.coverage.push({
+		id: "outcome-4",
+		provenance: "brainstorm-1:R4",
+		contentHash: "o4",
+		disposition: "accepted",
+		epicId: "initiative-1.3",
+	});
+	saveStore(dir, ambiguousStore);
+	const ambiguousCurrent = buildWorkRoadmapState(dir, "list");
+	assert.equal(ambiguousCurrent.currentId, undefined);
+	assert(!ambiguousCurrent.roadmaps.some((item) => item.current));
+	assert.equal(
+		buildWorkResumeState(dir, "initiative-1").reason,
+		"initiative-child-selection",
 	);
 
 	// Preview is pure; apply is identity-preserving, stale-safe, and idempotent.
