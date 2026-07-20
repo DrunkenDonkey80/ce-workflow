@@ -5288,6 +5288,18 @@ function resolveResumeTarget(cwd, target) {
 				.map((node) => store.items[node.id]);
 			if (candidates.length === 1)
 				return { kind: "epic", epic: candidates[0], initiative: issue };
+			const executable = candidates.map((epic) => ({
+				epic,
+				state: buildEpicChildState(cwd, epic),
+			}));
+			const next =
+				executable.find(({ state }) => state.inProgress.length)?.epic ??
+				executable.find(
+					({ epic, state }) =>
+						statusOf(epic) === "in_progress" && state.readyWork.length,
+				)?.epic ??
+				executable.find(({ state }) => state.readyWork.length)?.epic;
+			if (next) return { kind: "epic", epic: next, initiative: issue };
 			return {
 				error: candidates.length
 					? "initiative-child-selection"
@@ -12312,22 +12324,22 @@ async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 		notify(ctx, renderWorkRoadmapText(state), "info");
 		return stateTelemetry(state);
 	}
-	const task = await choose(ctx, `${state.epic.id}: tasks`, items);
-	if (!task) {
-		notify(ctx, renderWorkRoadmapText(state), "info");
-		return stateTelemetry(state);
+	while (true) {
+		const task = await choose(ctx, `${state.epic.id}: tasks`, items);
+		if (!task) return { ok: true, action: "roadmap-menu-back" };
+		const [group, workItemId] = task.split(":", 2);
+		const ops = [{ value: "summary", label: "summary" }];
+		if (group === "blocker")
+			ops.push({ value: "debug", label: "debug / full info" });
+		const op = await choose(ctx, `${workItemId}: operation`, ops);
+		if (!op) continue;
+		if (op === "debug")
+			return handleWorkflowAction(buildWorkDebugState, workItemId, ctx, pi);
+		return handleWorkReportCommand(workItemId, ctx);
 	}
-	const [group, workItemId] = task.split(":", 2);
-	const ops = [{ value: "summary", label: "summary" }];
-	if (group === "blocker")
-		ops.push({ value: "debug", label: "debug / full info" });
-	const op = await choose(ctx, `${workItemId}: operation`, ops);
-	if (op === "debug")
-		return handleWorkflowAction(buildWorkDebugState, workItemId, ctx, pi);
-	return handleWorkReportCommand(workItemId, ctx);
 }
 
-async function handleWorkRoadmapCommand(args, ctx, pi) {
+async function handleWorkRoadmapCommand(args, ctx, pi, menuSelected = "") {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const text = String(args ?? "").trim();
 	if (text) {
@@ -12348,14 +12360,16 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 		notify(ctx, renderWorkRoadmapText(list), "warning");
 		return stateTelemetry(list);
 	}
-	const selected = await choose(
-		ctx,
-		"🗺️ Work roadmaps",
-		list.roadmaps.map((epic) => ({
-			value: epic.id,
-			label: `${epic.current ? "* " : ""}${epic.parentId ? "  " : ""}${epic.id} [${statusLabel(epic.status)}] [${epic.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${epic.title}`,
-		})),
-	);
+	const selected =
+		menuSelected ||
+		(await choose(
+			ctx,
+			"🗺️ Work roadmaps",
+			list.roadmaps.map((epic) => ({
+				value: epic.id,
+				label: `${epic.current ? "* " : ""}${epic.parentId ? "  " : ""}${epic.id} [${statusLabel(epic.status)}] [${epic.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${epic.title}`,
+			})),
+		));
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
 	const selectedRoadmap = list.roadmaps.find((epic) => epic.id === selected);
 	const initiative = selectedRoadmap?.role === "initiative";
@@ -12365,6 +12379,11 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 		`${selected}: operation`,
 		initiative
 			? [
+					{
+						value: "resume",
+						label: "▶️ work-resume",
+						description: "start the next available child roadmap",
+					},
 					{ value: "report", label: "📄 inspect / report" },
 					{
 						value: "preview",
@@ -12416,14 +12435,14 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 					{ value: "report", label: "📄 full report" },
 				],
 	);
-	if (!op) return { ok: true, action: "roadmap-cancel" };
+	if (!op) return handleWorkRoadmapCommand("", ctx, pi);
 	if (op === "improve") return handleWorkImproveCommand("", pi, ctx, selected);
 	if (op === "resume") {
 		const selectedEpic = readWorkItem(ctx.cwd, selected);
 		const artifacts = epicArtifacts(ctx.cwd, selectedEpic);
 		const sources = epicPlanningSources(ctx.cwd, selectedEpic, artifacts);
 		const hasTasks = artifacts.children.some((item) => typeOf(item) !== "epic");
-		if (!hasTasks && !artifacts.plans.length && sources.length) {
+		if (!initiative && !hasTasks && !artifacts.plans.length && sources.length) {
 			const next = await choose(
 				ctx,
 				`${selected} has source intent, but no master plan or tasks`,
@@ -12438,7 +12457,7 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 				],
 			);
 			if (next !== "plan")
-				return { ok: true, action: "master-plan-resume-cancelled" };
+				return handleWorkRoadmapCommand("", ctx, pi, selected);
 			const objective = [
 				buildWorkSelfImprovingObjective(`${ctx.cwd} -- ${selected}`, {
 					project: true,
@@ -12460,7 +12479,12 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 		return handleWorkResumeGoalCommand(selected, pi, ctx);
 	}
 	if (op === "report") return handleWorkReportCommand(selected, ctx);
-	if (op === "tasks") return handleRoadmapTasksMenu(selected, ctx, pi);
+	if (op === "tasks") {
+		const taskState = await handleRoadmapTasksMenu(selected, ctx, pi);
+		return taskState.action === "roadmap-menu-back"
+			? handleWorkRoadmapCommand("", ctx, pi, selected)
+			: taskState;
+	}
 	if (op === "plan")
 		return handleWorkflowAction(buildWorkPlanState, selected, ctx, pi);
 	if (op === "convert") {
@@ -12493,7 +12517,7 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 			"Initiative proposal JSON or project path",
 			".pi/initiative-proposal.json",
 		);
-		if (!proposalInput) return { ok: true, action: "roadmap-cancel" };
+		if (!proposalInput) return handleWorkRoadmapCommand("", ctx, pi, selected);
 		let proposal;
 		let preview;
 		try {
@@ -12562,7 +12586,7 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 				label: `${epic.id} [${epic.readiness.state.replaceAll("_", " ")}] ${epic.title}`,
 			})),
 		);
-		if (!child) return { ok: true, action: "roadmap-cancel" };
+		if (!child) return handleWorkRoadmapCommand("", ctx, pi, selected);
 		if (op === "plan-child")
 			return handleWorkflowAction(buildWorkPlanState, child, ctx, pi);
 		const state = buildWorkRoadmapState(ctx.cwd, `set-current ${child}`);
@@ -12575,8 +12599,9 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 			{ value: "cancel", label: "cancel" },
 			{ value: "force", label: "close anyway" },
 		]);
-		if (confirm === "force")
-			state = buildWorkRoadmapState(ctx.cwd, `close ${selected} --force`);
+		if (confirm !== "force")
+			return handleWorkRoadmapCommand("", ctx, pi, selected);
+		state = buildWorkRoadmapState(ctx.cwd, `close ${selected} --force`);
 	}
 	notify(ctx, renderWorkRoadmapText(state), state.ok ? "info" : "warning");
 	return stateTelemetry(state);

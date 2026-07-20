@@ -161,7 +161,7 @@ try {
 		percent: 50,
 	});
 	assert.equal(initiative.readiness.state, "aggregate");
-	assert(!initiative.legalActions.includes("resume"));
+	assert.equal(initiative.legalActions[0], "resume");
 	assert(!initiative.legalActions.includes("finish"));
 	const next = projection.nodes.find((node) => node.id === "initiative-1.2");
 	assert.equal(next.role, "child_epic");
@@ -218,6 +218,13 @@ try {
 		"Another child",
 		{ parentId: "initiative-1" },
 	);
+	ambiguousStore.items["initiative-1.3.1"] = {
+		...record("initiative-1.3.1", "Competing ready task", {
+			parentId: "initiative-1.3",
+		}),
+		type: "task",
+	};
+	ambiguousStore.items["initiative-1.2.1"].status = "in_progress";
 	ambiguousStore.items["initiative-1"].initiative.coverage.push({
 		id: "outcome-4",
 		provenance: "brainstorm-1:R4",
@@ -229,10 +236,9 @@ try {
 	const ambiguousCurrent = buildWorkRoadmapState(dir, "list");
 	assert.equal(ambiguousCurrent.currentId, undefined);
 	assert(!ambiguousCurrent.roadmaps.some((item) => item.current));
-	assert.equal(
-		buildWorkResumeState(dir, "initiative-1").reason,
-		"initiative-child-selection",
-	);
+	const nextAvailable = buildWorkResumeState(dir, "initiative-1");
+	assert.equal(nextAvailable.epic.id, "initiative-1.2");
+	assert.equal(nextAvailable.initiative.id, "initiative-1");
 	const helper = path.resolve("scripts/work-helper.mjs");
 	assert.deepEqual(
 		JSON.parse(

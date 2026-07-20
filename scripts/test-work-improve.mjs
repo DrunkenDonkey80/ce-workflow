@@ -147,6 +147,7 @@ assert.equal(
 );
 
 const operationLabels = [];
+let selectedRoadmap = false;
 await handleWorkRoadmapCommand(
 	"",
 	{
@@ -157,6 +158,8 @@ await handleWorkRoadmapCommand(
 					operationLabels.push(...labels);
 					return undefined;
 				}
+				if (selectedRoadmap) return undefined;
+				selectedRoadmap = true;
 				return labels.find((label) => label.includes("SI-1 ["));
 			},
 			notify: () => {},
@@ -175,6 +178,7 @@ writeFileSync(
 	}),
 );
 const wrongSourceLabels = [];
+selectedRoadmap = false;
 await handleWorkRoadmapCommand(
 	"",
 	{
@@ -185,6 +189,8 @@ await handleWorkRoadmapCommand(
 					wrongSourceLabels.push(...labels);
 					return undefined;
 				}
+				if (selectedRoadmap) return undefined;
+				selectedRoadmap = true;
 				return labels.find((label) => label.includes("SI-1 ["));
 			},
 			notify: () => {},

@@ -583,6 +583,7 @@ function epicActions(item) {
 
 function initiativeActions(item) {
 	return [
+		"resume",
 		"inspect",
 		"report",
 		"preview",

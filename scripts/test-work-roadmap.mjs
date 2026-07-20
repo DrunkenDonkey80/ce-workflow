@@ -189,6 +189,42 @@ try {
 		"blocker task offers debug for full info",
 	);
 
+	const escapeTitles = [];
+	const escapePicks = [
+		/E-1/,
+		/list tasks/,
+		/Blocker: BUG-1/,
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+	];
+	const escaped = await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: root,
+			ui: {
+				select: async (title, labels) => {
+					escapeTitles.push(title);
+					const pick = escapePicks.shift();
+					return pick ? labels.find((label) => pick.test(label)) : undefined;
+				},
+				notify: () => {},
+			},
+		},
+		{},
+	);
+	assert.equal(escaped.action, "roadmap-cancel");
+	assert.deepEqual(escapeTitles, [
+		"🗺️ Work roadmaps",
+		"E-1: operation",
+		"E-1: tasks",
+		"BUG-1: operation",
+		"E-1: tasks",
+		"E-1: operation",
+		"🗺️ Work roadmaps",
+	]);
+
 	const rawPlan = buildWorkPlanState(
 		root,
 		"use the brainstorm and sketch docs/brainstorms/requirements.md docs/brainstorms/sketch.html",
@@ -369,6 +405,7 @@ try {
 	assert.match(treeText, / {2}I-1\.1.*planned/i);
 	assert.match(treeText, / {2}I-1\.2.*needs.plan/i);
 	const initiativeOps = [];
+	let initiativeSelected = false;
 	await handleWorkRoadmapCommand(
 		"",
 		{
@@ -379,6 +416,8 @@ try {
 						initiativeOps.push(...labels);
 						return undefined;
 					}
+					if (initiativeSelected) return undefined;
+					initiativeSelected = true;
 					return labels.find((label) => label.includes("I-1 ["));
 				},
 				notify: () => {},
@@ -386,9 +425,10 @@ try {
 		},
 		{},
 	);
+	assert.match(initiativeOps[0], /work-resume/i);
 	assert(initiativeOps.some((label) => /preview|reconcile/i.test(label)));
 	assert(initiativeOps.some((label) => /plan.*child/i.test(label)));
-	assert(!initiativeOps.some((label) => /resume|finish/i.test(label)));
+	assert(!initiativeOps.some((label) => /finish/i.test(label)));
 	const proposalPath = path.join(".pi", "initiative-proposal.json");
 	writeFileSync(
 		path.join(initiativeRoot, proposalPath),
@@ -469,6 +509,7 @@ try {
 	);
 	const captureOps = async (id) => {
 		const labelsSeen = [];
+		let selected = false;
 		await handleWorkRoadmapCommand(
 			"",
 			{
@@ -479,6 +520,8 @@ try {
 							labelsSeen.push(...labels);
 							return undefined;
 						}
+						if (selected) return undefined;
+						selected = true;
 						return labels.find((label) => label.includes(id));
 					},
 					notify: () => {},
