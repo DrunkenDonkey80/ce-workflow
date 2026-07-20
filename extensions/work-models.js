@@ -9,7 +9,9 @@ import {
 	openSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 	writeSync,
 } from "node:fs";
@@ -25,7 +27,10 @@ import {
 	resolve,
 } from "node:path";
 import { migrateLegacyBeads } from "./legacy-beads-migration.js";
-import { submitImprovementReport } from "./work-improvement-reporting.js";
+import {
+	resolveReportingSource,
+	submitImprovementReport,
+} from "./work-improvement-reporting.js";
 import {
 	buildInitiativeReconciliation,
 	decodeInitiativeToken,
@@ -73,6 +78,15 @@ const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
 const WORK_ITEM_TITLE_MAX = 180;
+const SELF_IMPROVEMENT_EPIC_TITLE = "Self-improving";
+const SELF_IMPROVEMENT_REPORT_LABEL = "self-improvement";
+const ACTIVE_SELF_IMPROVEMENT_STATUSES = new Set([
+	"open",
+	"in_progress",
+	"planned",
+	"blocked",
+]);
+const SELF_IMPROVEMENT_REPORT_ROOT = [".pi", "self-improvement-reports"];
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
 const WORKFLOW_REPO_DIR = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -10129,6 +10143,290 @@ function workResumeSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	};
 }
 
+function sameCheckout(left, right) {
+	const canonical = (value) => {
+		try {
+			return realpathSync(value);
+		} catch {
+			return resolve(value);
+		}
+	};
+	const a = canonical(left);
+	const b = canonical(right);
+	return process.platform === "win32"
+		? a.toLowerCase() === b.toLowerCase()
+		: a === b;
+}
+
+function isOpenImprovementReport(issue) {
+	return (
+		issue?.type !== "epic" &&
+		statusOf(issue) !== "closed" &&
+		statusOf(issue) !== "deferred" &&
+		labelsOf(issue).includes(SELF_IMPROVEMENT_REPORT_LABEL)
+	);
+}
+
+function selfImprovementRoadmap(cwd, target = "") {
+	if (target) {
+		const epic = readWorkItem(cwd, target);
+		return epic?.type === "epic" &&
+			epic.title === SELF_IMPROVEMENT_EPIC_TITLE &&
+			ACTIVE_SELF_IMPROVEMENT_STATUSES.has(epic.status)
+			? epic
+			: undefined;
+	}
+	const candidates = allWorkItems(cwd).filter(
+		(item) =>
+			item.type === "epic" &&
+			item.title === SELF_IMPROVEMENT_EPIC_TITLE &&
+			ACTIVE_SELF_IMPROVEMENT_STATUSES.has(item.status),
+	);
+	return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+function improvementReports(cwd, epicId) {
+	return childWorkItems(cwd, epicId)
+		.filter(isOpenImprovementReport)
+		.sort(byCreatedAsc);
+}
+
+function containedImprovementPath(root, candidate) {
+	const rel = relative(root, candidate);
+	return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+function validateImprovementEvidence(cwd, issue) {
+	const problems = [];
+	const records = asArray(issue?.evidence).filter(
+		(record) => record?.kind === "self-improvement-report",
+	);
+	if (!records.length)
+		problems.push("missing self-improvement report evidence");
+	const root = resolve(cwd, ...SELF_IMPROVEMENT_REPORT_ROOT);
+	for (const record of records) {
+		const bundle = resolve(cwd, String(record.bundle ?? ""));
+		if (!containedImprovementPath(root, bundle)) {
+			problems.push(`unsafe bundle path: ${record.bundle ?? "missing"}`);
+			continue;
+		}
+		let manifest;
+		try {
+			const manifestFile = realpathSync(resolve(bundle, "manifest.json"));
+			if (!containedImprovementPath(realpathSync(root), manifestFile))
+				throw new Error("manifest escapes report root");
+			manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+		} catch (error) {
+			problems.push(
+				`invalid manifest for ${record.bundle}: ${commandErrorText(error)}`,
+			);
+			continue;
+		}
+		const manifestFiles = new Map(
+			asArray(manifest.files).map((file) => [file?.file, file]),
+		);
+		for (const expected of asArray(record.files)) {
+			const name = String(expected?.file ?? "");
+			const listed = manifestFiles.get(name);
+			if (
+				!listed ||
+				listed.sha256 !== expected.sha256 ||
+				Number(listed.bytes) !== Number(expected.bytes)
+			) {
+				problems.push(`manifest mismatch: ${record.bundle}/${name}`);
+				continue;
+			}
+			try {
+				const file = realpathSync(resolve(bundle, name));
+				if (!containedImprovementPath(realpathSync(root), file))
+					throw new Error("evidence escapes report root");
+				const bytes = statSync(file).size;
+				const sha256 = createHash("sha256")
+					.update(readFileSync(file))
+					.digest("hex");
+				if (bytes !== Number(expected.bytes))
+					problems.push(`byte count mismatch: ${record.bundle}/${name}`);
+				if (sha256 !== expected.sha256)
+					problems.push(`sha256 mismatch: ${record.bundle}/${name}`);
+			} catch (error) {
+				problems.push(
+					`unreadable evidence ${record.bundle}/${name}: ${commandErrorText(error)}`,
+				);
+			}
+		}
+	}
+	return { valid: problems.length === 0, problems, bundles: records.length };
+}
+
+function buildWorkImproveState(cwd, target = "", options = {}) {
+	const settings = options.settings ?? readEffectiveSettings(cwd);
+	if (!workResumeSettings(cwd, settings).selfImproving)
+		return errorState(
+			"self-improving-disabled",
+			"/work-improve requires workResume.selfImproving: true.",
+		);
+	let sourceCwd = options.sourceCwd;
+	try {
+		sourceCwd ??= resolveReportingSource({
+			cwd,
+			packageRoot: WORKFLOW_REPO_DIR,
+			settings,
+		}).sourceCwd;
+	} catch (error) {
+		return errorState("source-unavailable", commandErrorText(error));
+	}
+	if (!sameCheckout(cwd, sourceCwd))
+		return errorState(
+			"wrong-source-checkout",
+			`/work-improve must run in the configured ce-workflow source checkout: ${sourceCwd}`,
+		);
+	const epic = selfImprovementRoadmap(cwd, target);
+	if (!epic)
+		return errorState(
+			"self-improvement-roadmap-missing",
+			target
+				? `${target} is not the active ${SELF_IMPROVEMENT_EPIC_TITLE} roadmap.`
+				: `No unique active ${SELF_IMPROVEMENT_EPIC_TITLE} roadmap exists.`,
+		);
+	const reports = improvementReports(cwd, epic.id).map((issue) => ({
+		...issueSummary(issue),
+		description: String(issue.description ?? ""),
+		evidence: validateImprovementEvidence(cwd, issue),
+	}));
+	if (!reports.length)
+		return errorState(
+			"no-improvement-reports",
+			`${epic.id} has no open self-improvement reports.`,
+		);
+	return {
+		ok: true,
+		action: "work-improve-ready",
+		sourceCwd,
+		epic: issueSummary(epic),
+		reports,
+		snapshotIds: reports.map((report) => report.id),
+	};
+}
+
+function renderWorkImproveText(state) {
+	if (!state.ok) return `Work improve unavailable: ${state.message}`;
+	const evidenceProblems = state.reports.filter(
+		(report) => !report.evidence.valid,
+	);
+	return [
+		`Work improve snapshot: ${state.epic.id} · ${state.reports.length} report(s)`,
+		...state.reports.map(
+			(report) =>
+				`- ${report.id}: ${report.title}${report.evidence.valid ? "" : " [evidence warning]"}`,
+		),
+		evidenceProblems.length
+			? `Evidence warnings: ${evidenceProblems
+					.map(
+						(report) => `${report.id}: ${report.evidence.problems.join("; ")}`,
+					)
+					.join(" | ")}`
+			: "Evidence manifests and hashes verified.",
+	].join("\n");
+}
+
+function buildWorkImproveObjective(state) {
+	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
+	const evidenceWarnings = state.reports
+		.filter((report) => !report.evidence.valid)
+		.map((report) => `${report.id}: ${report.evidence.problems.join("; ")}`);
+	return `Process the explicit ce-workflow self-improvement backlog snapshot end-to-end.
+
+Target checkout: ${state.sourceCwd}
+Work-improvement roadmap ID: ${state.epic.id}
+Work-improvement snapshot IDs: ${state.snapshotIds.join(", ")}
+${evidenceWarnings.length ? `Preflight evidence warnings:\n${evidenceWarnings.join("\n")}` : "Preflight evidence: manifests and hashes verified."}
+
+Execution contract:
+- The roadmap in the native work-item store is the queue; .pi/self-improvement-reports is evidence only. Process exactly the snapshot IDs above. Reports arriving later belong to the next invocation.
+- Use compact reads through node ${helper} work-summary <id> and work-children-summary ${state.epic.id}; never dump or directly edit .ce-workflow/work-items.json.
+- Atomize each report before deduplicating because one report may contain several root causes. Compare expected outcomes, current source/tests, git history, and ownership; suggested fixes alone do not define equivalence.
+- Classify every atomic claim as duplicate, related-distinct, conflicting, already-fixed, locally-owned, upstream-owned, or insufficient-evidence. Different implementation suggestions are not conflicts unless their required outcomes cannot coexist.
+- Reuse an atomic report as its execution item. When a report contains multiple claims or several reports share one claim, create or reuse one canonical bug/decision WorkItem under ${state.epic.id} with node ${helper} work-create, and link reports with node ${helper} work-block.
+- Do not close a duplicate merely because it is similar. First verify the shared fix or already-current behavior against every covered report, then note the canonical WorkItem, commit, and verification on each report before closing it.
+- Execute locally owned canonical work through the normal work-orchestrator path: smallest correct implementation, focused proof, required review, coded finish/commit, then report reconciliation. Route genuine upstream ownership durably; do not invent a local workaround unless it is the smallest verified project fix.
+- If expected outcomes conflict or evidence cannot support a safe decision, use ask_user once; if unavailable or cancelled, call work_goal_human_decision. Do not ask for routine implementation approval.
+- Leave unresolved reports open. Close each snapshot report only after verified coverage. New reports do not block this snapshot.
+- Call work_goal_complete only when every snapshot ID is closed and git/work-item state is verified.`;
+}
+
+function workImproveCompletionBlocker(goal, cwd) {
+	if (goal?.mode !== "improvement") return;
+	const ids = /^Work-improvement snapshot IDs:\s*(.+)$/m
+		.exec(String(goal.objective ?? ""))?.[1]
+		?.split(",")
+		.map((id) => id.trim())
+		.filter(Boolean);
+	if (!ids?.length) return "work-improvement snapshot IDs are missing";
+	try {
+		for (const id of ids) {
+			const issue = readWorkItem(cwd, id);
+			if (!issue) return `${id} was not found`;
+			if (statusOf(issue) !== "closed")
+				return `${id} is still ${statusOf(issue)}`;
+		}
+	} catch (error) {
+		return `work-improvement snapshot could not be verified: ${commandErrorText(error)}`;
+	}
+}
+
+async function handleWorkImproveCommand(args, pi, ctx, selected = "") {
+	const words = String(args ?? "")
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean);
+	const preview = words[0]?.toLowerCase() === "preview";
+	const target = selected || (preview ? words[1] : words[0]) || "";
+	const state = buildWorkImproveState(ctx.cwd, target);
+	notify(ctx, renderWorkImproveText(state), state.ok ? "info" : "warning");
+	if (!state.ok || preview) return stateTelemetry(state);
+	await startWorkGoal("improvement", buildWorkImproveObjective(state), pi, ctx);
+	return stateTelemetry({ ...state, action: "work-improve-started" });
+}
+
+function workImproveAvailable(cwd, target = "") {
+	try {
+		const settings = readEffectiveSettings(cwd);
+		const source = resolveReportingSource({
+			cwd,
+			packageRoot: WORKFLOW_REPO_DIR,
+			settings,
+		}).sourceCwd;
+		const epic = selfImprovementRoadmap(cwd, target);
+		return Boolean(
+			workResumeSettings(cwd, settings).selfImproving &&
+				sameCheckout(cwd, source) &&
+				epic &&
+				improvementReports(cwd, epic.id).length,
+		);
+	} catch {
+		return false;
+	}
+}
+
+function registerWorkImproveCommand(pi, ctx) {
+	if (!workImproveAvailable(ctx.cwd)) return;
+	pi.registerCommand("work-improve", {
+		description: "Triage, deduplicate, and execute self-improvement reports",
+		handler: async (args, commandCtx) => {
+			if (
+				String(args ?? "")
+					.trim()
+					.split(/\s+/, 1)[0]
+					?.toLowerCase() === "preview"
+			)
+				return handleWorkImproveCommand(args, pi, commandCtx);
+			await withCommandTelemetry("work-improve", args, commandCtx, () =>
+				handleWorkImproveCommand(args, pi, commandCtx),
+			);
+		},
+	});
+}
+
 function readWorkCatchUpBaseline() {
 	try {
 		const parsed = JSON.parse(
@@ -11157,6 +11455,8 @@ function pauseWorkGoalForDecision(decision, ctx, pi) {
 }
 
 function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
+	const improveBlocker = workImproveCompletionBlocker(goal, cwd);
+	if (improveBlocker) return improveBlocker;
 	const catchUpBlocker = catchUpCompletionBlocker(goal, cwd);
 	if (catchUpBlocker) return catchUpBlocker;
 	if (goal?.mode !== "project") return;
@@ -12058,6 +12358,7 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
 	const selectedRoadmap = list.roadmaps.find((epic) => epic.id === selected);
 	const initiative = selectedRoadmap?.role === "initiative";
+	const improvement = !initiative && workImproveAvailable(ctx.cwd, selected);
 	const op = await choose(
 		ctx,
 		`${selected}: operation`,
@@ -12076,11 +12377,17 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 						: { value: "close", label: "✅ guarded close" },
 				]
 			: [
-					{
-						value: "resume",
-						label: "▶️ work-resume",
-						description: "autonomous project loop for this roadmap",
-					},
+					improvement
+						? {
+								value: "improve",
+								label: "🛠️ work-improve",
+								description: "triage, deduplicate, and execute reports",
+							}
+						: {
+								value: "resume",
+								label: "▶️ work-resume",
+								description: "autonomous project loop for this roadmap",
+							},
 					{
 						value: "tasks",
 						label: "📋 list tasks",
@@ -12109,6 +12416,7 @@ async function handleWorkRoadmapCommand(args, ctx, pi) {
 				],
 	);
 	if (!op) return { ok: true, action: "roadmap-cancel" };
+	if (op === "improve") return handleWorkImproveCommand("", pi, ctx, selected);
 	if (op === "resume") {
 		const selectedEpic = readWorkItem(ctx.cwd, selected);
 		const artifacts = epicArtifacts(ctx.cwd, selectedEpic);
@@ -12383,6 +12691,8 @@ export {
 	applyInitiativeReconciliation,
 	approveInitiativeReconciliation,
 	buildWorkInitState,
+	buildWorkImproveObjective,
+	buildWorkImproveState,
 	buildInitiativeProjection,
 	previewInitiativeReconciliation,
 	buildWorkMasterState,
@@ -12782,6 +13092,7 @@ export default function workModelsExtension(pi) {
 		};
 		if (ctx.mode !== "print") reconcilePendingDirectRuns(ctx.cwd, runtime);
 		registerWorkCatchUpCommand(pi, ctx);
+		registerWorkImproveCommand(pi, ctx);
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
 		if (activeWorkGoal?.status === "active") {

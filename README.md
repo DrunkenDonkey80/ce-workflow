@@ -34,6 +34,7 @@ No tracker CLI is required for normal operation. In a new repository run:
 | `/work-brainstorm`, `/work-ideate`, `/work-usage`, `/work-telemetry` | Manages ideas and local reports. |
 | `/work-settings`, `/work-context`, `/work-goal` | Configures orchestration and context behavior. |
 | `/work-catch-up` | Proactively reviews every changed monitored Pi/plugin release with `ce-pov`, asks Adopt/Defer/Skip one opportunity at a time, implements adopted wins, and records every decision before advancing the baseline. |
+| `/work-improve [preview]` | In the configured ce-workflow source checkout, snapshots, validates, deduplicates, and executes open `Self-improving` reports. F7 offers this instead of resume for that roadmap. |
 | `/work-remove-beads` | One-way migration for a detected legacy workspace. |
 
 Role agents are `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, and three identical configurable advisor roles: `work-advisor`, `work-advisor-2`, and `work-advisor-3`. Configured advisors review brainstorms and plans in parallel; slice plans use the profile's `none` / `first` / `all` policy. They use `scripts/work-helper.mjs` native helpers for compact work-item summaries, initiative hierarchy, preview/apply, children, ready, claim, note, label, and blocker operations.
@@ -60,7 +61,7 @@ The migration command is idempotent, validates export parity, keeps an ignored b
 
 ## Workflow improvement reporting
 
-Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` roadmap. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout; a maintainer later resumes the roadmap through the normal workflow.
+Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` roadmap. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout. In the configured source checkout, `/work-improve preview` shows the current report snapshot and `/work-improve` processes it through the normal work-goal lifecycle; reports arriving during the run wait for the next invocation.
 
 ## Workflow evaluation harness
 
