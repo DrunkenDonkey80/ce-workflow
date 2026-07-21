@@ -32,7 +32,7 @@ No tracker CLI is required for normal operation. In a new repository run:
 | `/work-resume`, `/work-status`, `/work-report`, `/work-roadmap` | Reads native state; F7 shows roadmap trees, prepares initiative child plans without auto-starting work, and offers agent-guided conversion of standalone roadmaps into initiatives. F8 microcompacts context immediately when idle or at the next safe boundary. |
 | `/work-add`, `/work-debug`, `/work-pause`, `/work-finish` | Mutates, checkpoints, or finalizes a native work item. |
 | `/work-brainstorm`, `/work-ideate`, `/work-usage`, `/work-telemetry` | Manages ideas and local reports. |
-| `/work-settings`, `/work-context`, `/work-goal` | Configures orchestration and context behavior. |
+| `/work-settings`, `/work-context`, `/work-goal` | Configures orchestration and context behavior. Proactive compaction defaults on at 150k tokens; F8 compacts immediately or at the next safe boundary. |
 | `/work-catch-up` | Proactively reviews every changed monitored Pi/plugin release with `ce-pov`, asks Adopt/Defer/Skip one opportunity at a time, implements adopted wins, and records every decision before advancing the baseline. |
 | `/work-improve [preview]` | In the configured ce-workflow source checkout, snapshots, validates, deduplicates, and executes open `Self-improving` reports. F7 offers this instead of resume for that roadmap. |
 | `/work-remove-beads` | One-way migration for a detected legacy workspace. |

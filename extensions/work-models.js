@@ -334,7 +334,7 @@ function configuredAdvisorSlots(settings, usage = "all") {
 }
 const DEFAULT_CONTEXT = {
 	enabled: true,
-	autoCompact: false,
+	autoCompact: true,
 	compactAtTokens: 150_000,
 	keepRecentTokens: 30_000,
 	maxSummaryChars: 12_000,

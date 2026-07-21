@@ -320,10 +320,10 @@ Do not put tiny wall-clock limits on real role agents. Prefer no explicit timeou
 
 ## Context Budget Policy
 
-work items and git preserve the memory; Pi chat is disposable working context. The package extension registers `/work-context`; it does not force pre-prompt compaction in normal chats. Pi's native/ultracompact auto-compaction remains responsible unless the user explicitly enables the work guard.
+work items and git preserve the memory; Pi chat is disposable working context. The package extension registers `/work-context` and proactively compacts at safe turn boundaries by default; Pi's native/ultracompact compaction still handles hard context overflow and retry.
 
 - before any compact/restart boundary, write the current decision, changed files, verification, blockers, and next command into work item notes;
-- rely on `/work-context status` for current token/trigger state; default opt-in trigger is 150k tokens, capped by model context, and keeps at least the latest 30k tokens via Pi compaction settings;
+- rely on `/work-context status` for current token/trigger state; proactive compaction is enabled by default at 150k tokens, capped by model context, and keeps at least the latest 30k tokens via Pi compaction settings; use `/work-context off` to disable it;
 - compact only inside a single work item when context gets high or after a noisy debug/review phase;
 - `/work-resume` is an autonomous slice loop; each slice still gets a fresh-context boundary, but the loop continues to the next ready work item until a decision, blocker, completion, or `/work-stop`;
 - self-improvement reporting is off by default; opt in with `workResume.selfImproving: true` and use `work_report_improvement` only for explicit evidence intake; it never changes the ce-workflow source from a producer project;

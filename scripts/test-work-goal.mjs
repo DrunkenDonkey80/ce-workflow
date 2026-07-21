@@ -770,6 +770,20 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		path.join(cwd, ".pi", "settings.json"),
 		JSON.stringify({ workResume: { selfImproving: true } }),
 	);
+	await tempHooks.turn_end(
+		{},
+		{ ...ctx, getContextUsage: () => ({ tokens: 160_000 }) },
+	);
+	assert.equal(
+		compactions.length,
+		1,
+		"turn-end auto-compaction is enabled by default",
+	);
+	assert.match(
+		compactions[0].customInstructions,
+		/work-orchestrator proactive/,
+	);
+	compactions.length = 0;
 
 	const oldCompactions = [];
 	await tempShortcuts.f8.handler({
@@ -795,6 +809,13 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	newCompactions[0].onComplete?.();
 
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workResume: { selfImproving: true },
+			workOrchestrator: { context: { autoCompact: false } },
+		}),
+	);
 	await tempCommands["work-goal"].handler("write temp proof file", ctx);
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
