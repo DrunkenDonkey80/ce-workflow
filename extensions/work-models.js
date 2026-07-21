@@ -41,6 +41,7 @@ import {
 	previewInitiativeCandidate,
 	projectInitiativeHierarchy,
 } from "./work-initiatives.js";
+import { normalizeEffectiveProfiles } from "./background-verifiers.js";
 import {
 	acquireLock,
 	appendWorkNote,
@@ -303,6 +304,13 @@ const REVIEW_LEVEL_DESC = {
 	full: "full ce-code-review skill on the slice diff (max)",
 };
 const SUBMENU_ARROW = "›";
+const BACKGROUND_VERIFIER_OPERATIONS = [
+	"correctness",
+	"security",
+	"simplification",
+	"test-gap",
+	"performance",
+];
 
 function slotByKey(key) {
 	return SLOTS.find((slot) => slot.key === key);
@@ -2535,6 +2543,71 @@ function setWorkResumeBoolean(settings, key, value) {
 	settings.workResume[key] = Boolean(value);
 }
 
+function backgroundVerifierMap(settings) {
+	const profiles = settings.workOrchestrator?.backgroundVerifiers;
+	return profiles && typeof profiles === "object" && !Array.isArray(profiles)
+		? profiles
+		: {};
+}
+
+function backgroundVerifierProfiles(cwd, settings) {
+	const profiles = Object.entries(
+		settings === undefined
+			? effectiveBackgroundVerifierMap(cwd)
+			: backgroundVerifierMap(settings),
+	).flatMap(([model, profile]) =>
+		profile === null ? [] : [{ model, ...(profile ?? {}) }],
+	);
+	try {
+		return normalizeEffectiveProfiles(profiles);
+	} catch {
+		return [];
+	}
+}
+
+function effectiveBackgroundVerifierMap(cwd) {
+	const global = backgroundVerifierMap(readGlobalSettings());
+	const project = backgroundVerifierMap(readSettings(cwd));
+	const merged = { ...global };
+	for (const [model, profile] of Object.entries(project)) {
+		if (profile === null) delete merged[model];
+		else merged[model] = profile;
+	}
+	return merged;
+}
+
+function setBackgroundVerifierProfile(settings, profile) {
+	const normalized = normalizeEffectiveProfiles([profile])[0];
+	const block = workOrchBlock(settings);
+	block.backgroundVerifiers ??= {};
+	block.backgroundVerifiers[normalized.model] = {
+		operations: normalized.operations,
+		thinking: normalized.thinking,
+	};
+	return normalized;
+}
+
+function removeBackgroundVerifierProfile(settings, model, inherited = false) {
+	const block = settings.workOrchestrator;
+	if (!block?.backgroundVerifiers) return;
+	if (inherited) block.backgroundVerifiers[model] = null;
+	else delete block.backgroundVerifiers[model];
+	if (!Object.keys(block.backgroundVerifiers).length)
+		delete block.backgroundVerifiers;
+	if (!Object.keys(block).length) delete settings.workOrchestrator;
+}
+
+function clearBackgroundVerifierOverride(settings, model) {
+	const block = settings.workOrchestrator;
+	if (!block?.backgroundVerifiers || !owns(block.backgroundVerifiers, model))
+		return false;
+	delete block.backgroundVerifiers[model];
+	if (!Object.keys(block.backgroundVerifiers).length)
+		delete block.backgroundVerifiers;
+	if (!Object.keys(block).length) delete settings.workOrchestrator;
+	return true;
+}
+
 // ponytail: settings are prompt-live; the steps below are appended to the
 // role/plan/brainstorm handoff prompts so configured advisors actually run.
 function advisorCriticStep(cwd, target, usage = "all") {
@@ -2972,6 +3045,156 @@ async function editSlotModel(ctx, settings, slot, scope) {
 	writeScopedSettings(ctx.cwd, scope, settings);
 	ctx.ui.notify(`Saved ${slot.label}: ${slotSummary(slot, settings)}`, "info");
 	return true;
+}
+
+function backgroundVerifierSummary(profile) {
+	return `${profile.operations.join(", ")} • effort:${profile.thinking}`;
+}
+
+async function chooseBackgroundVerifierModel(ctx) {
+	const models = (await modelItems(ctx)).filter(
+		(item) => item.value !== INHERIT_MODEL && item.value !== NONE_MODEL,
+	);
+	return choose(ctx, "Add background verifier", models);
+}
+
+async function editBackgroundVerifierProfile(ctx, scope, model) {
+	for (;;) {
+		const scoped = readScopedSettings(ctx.cwd, scope);
+		const profiles = backgroundVerifierProfiles(
+			ctx.cwd,
+			scope === "global" ? scoped : undefined,
+		);
+		const profile = profiles.find((entry) => entry.model === model);
+		if (!profile) return;
+		const local = owns(backgroundVerifierMap(scoped), model);
+		const items = [
+			...BACKGROUND_VERIFIER_OPERATIONS.map((operation) => ({
+				kind: "operation",
+				value: operation,
+				...boolLabel(operation, profile.operations.includes(operation)),
+			})),
+			{
+				kind: "thinking",
+				value: "thinking",
+				label: `thinking ${SUBMENU_ARROW}`,
+				description: profile.thinking,
+			},
+			...(scope === "project" && local
+				? [
+						{
+							kind: "inherit",
+							value: "inherit",
+							label: "use global profile",
+							description: "remove this project profile override",
+						},
+					]
+				: []),
+			{
+				kind: "remove",
+				value: "remove",
+				label: "remove profile",
+				description: "disable this verifier for future checkpoints",
+			},
+			{ kind: "done", value: "done", label: "done" },
+		];
+		const choice = await choose(ctx, `Background verifier: ${model}`, items);
+		if (!choice || choice === "done") return;
+		if (choice === "thinking") {
+			const thinking = await choose(
+				ctx,
+				`${model}: thinking effort`,
+				THINKING_LEVELS.map((value) => ({
+					value,
+					label: value,
+					description: "persisted verifier thinking level",
+				})),
+				profile.thinking,
+			);
+			if (thinking === undefined) continue;
+			setBackgroundVerifierProfile(scoped, { ...profile, thinking });
+			writeScopedSettings(ctx.cwd, scope, scoped);
+			continue;
+		}
+		if (choice === "inherit") {
+			clearBackgroundVerifierOverride(scoped, model);
+			writeScopedSettings(ctx.cwd, scope, scoped);
+			return;
+		}
+		if (choice === "remove") {
+			removeBackgroundVerifierProfile(
+				scoped,
+				model,
+				scope === "project" &&
+					owns(backgroundVerifierMap(readGlobalSettings()), model),
+			);
+			writeScopedSettings(ctx.cwd, scope, scoped);
+			return;
+		}
+		const operations = profile.operations.includes(choice)
+			? profile.operations.filter((operation) => operation !== choice)
+			: [...profile.operations, choice];
+		if (operations.length === 0) {
+			removeBackgroundVerifierProfile(
+				scoped,
+				model,
+				scope === "project" &&
+					owns(backgroundVerifierMap(readGlobalSettings()), model),
+			);
+			writeScopedSettings(ctx.cwd, scope, scoped);
+			ctx.ui.notify(`Removed ${model}: no operations enabled`, "info");
+			return;
+		}
+		setBackgroundVerifierProfile(scoped, { ...profile, operations });
+		writeScopedSettings(ctx.cwd, scope, scoped);
+	}
+}
+
+async function editBackgroundVerifiers(ctx, scope) {
+	for (;;) {
+		const scoped = readScopedSettings(ctx.cwd, scope);
+		const profiles = backgroundVerifierProfiles(
+			ctx.cwd,
+			scope === "global" ? scoped : undefined,
+		);
+		const items = [
+			{
+				kind: "add",
+				value: "add",
+				label: "add background verifier",
+				description: "choose an available registry model",
+			},
+			...profiles.map((profile) => ({
+				kind: "profile",
+				value: profile.model,
+				label: `${profile.model} ${SUBMENU_ARROW}`,
+				description: backgroundVerifierSummary(profile),
+			})),
+			{ kind: "done", value: "done", label: "done" },
+		];
+		const selected = await choose(ctx, "Background verifiers", items);
+		if (!selected || selected === "done") return;
+		if (selected === "add") {
+			const model = await chooseBackgroundVerifierModel(ctx);
+			if (!model) continue;
+			if (profiles.some((profile) => profile.model === model)) {
+				ctx.ui.notify(
+					`Background verifier already configured: ${model}`,
+					"warning",
+				);
+				continue;
+			}
+			setBackgroundVerifierProfile(scoped, {
+				model,
+				operations: ["correctness"],
+				thinking: "medium",
+			});
+			writeScopedSettings(ctx.cwd, scope, scoped);
+			await editBackgroundVerifierProfile(ctx, scope, model);
+			continue;
+		}
+		await editBackgroundVerifierProfile(ctx, scope, selected);
+	}
 }
 
 function truncate(value, max = 800) {
@@ -13164,6 +13387,7 @@ export {
 	setWorkOrchAdvisorSliceUsage,
 	advisorCriticStep,
 	workOrchSettings,
+	backgroundVerifierProfiles,
 	readEffectiveSettings as effectiveSettingsForTest,
 	workResumeSettings as workResumeSettingsForTest,
 	renderWorkIdeateText,
@@ -14309,7 +14533,7 @@ export default function workModelsExtension(pi) {
 
 	pi.registerCommand("work-settings", {
 		description:
-			"Work-orchestrator settings submenu: effort profiles, three advisor model/effort slots, and review gates",
+			"Work-orchestrator settings submenu: role models, background verifiers, and review gates",
 		handler: async (args, ctx) => {
 			if (String(args).trim() === "status") return workSettingsStatus(ctx);
 			await workSettingsLoop(ctx);
@@ -14336,6 +14560,14 @@ function workSettingsStatus(ctx) {
 			(slot) =>
 				`  ${SUBMENU_ARROW} ${slot.label}: ${slotSummary(slot, settings)}`,
 		),
+		"",
+		"Background verifiers",
+		...(backgroundVerifierProfiles(ctx.cwd).length
+			? backgroundVerifierProfiles(ctx.cwd).map(
+					(profile) =>
+						`  ${SUBMENU_ARROW} ${profile.model}: ${backgroundVerifierSummary(profile)}`,
+				)
+			: ["  none configured"]),
 		"",
 		"Gates",
 		`  ${SUBMENU_ARROW} advisor usage for slice plans: ${resolved.advisorUsageForSlicePlans}`,
@@ -14388,6 +14620,8 @@ function hasProjectOverride(settings, item) {
 		);
 	}
 	if (item.kind === "profile") return owns(block, "profile");
+	if (item.kind === "backgroundVerifiers")
+		return owns(block, "backgroundVerifiers");
 	if (item.kind === "advisorSliceUsage")
 		return owns(block, "advisorUsageForSlicePlans");
 	if (item.kind === "reviewLevel") return owns(block, "codeReviewBeforeCommit");
@@ -14434,6 +14668,8 @@ function clearProjectOverride(settings, item) {
 			delete block.advisorEnabled;
 		compactOverrides(settings);
 	} else if (item.kind === "profile") clearProfileOverride(settings);
+	else if (item.kind === "backgroundVerifiers")
+		delete block.backgroundVerifiers;
 	else if (item.kind === "advisorSliceUsage")
 		delete block.advisorUsageForSlicePlans;
 	else if (item.kind === "reviewLevel") delete block.codeReviewBeforeCommit;
@@ -14598,6 +14834,22 @@ async function workSettingsLoop(ctx) {
 				description: slotSummary(slot, settings),
 			})),
 			{
+				kind: "backgroundVerifiers",
+				value: "backgroundVerifiers",
+				label: `background verifiers ${SUBMENU_ARROW}`,
+				description: backgroundVerifierProfiles(
+					ctx.cwd,
+					scope === "global" ? settings : undefined,
+				).length
+					? `${
+							backgroundVerifierProfiles(
+								ctx.cwd,
+								scope === "global" ? settings : undefined,
+							).length
+						} configured`
+					: "none configured",
+			},
+			{
 				kind: "advisorSliceUsage",
 				value: "advisorUsageForSlicePlans",
 				label: `advisor usage for slice plans ${SUBMENU_ARROW}`,
@@ -14725,6 +14977,17 @@ async function workSettingsLoop(ctx) {
 			applyProfile(settings, profileKey);
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Applied ${profileKey} ${scope} profile`, "info");
+			continue;
+		}
+		if (pick.kind === "backgroundVerifiers") {
+			try {
+				await editBackgroundVerifiers(ctx, scope);
+			} catch (error) {
+				ctx.ui.notify(
+					`Could not write background verifiers: ${error instanceof Error ? error.message : String(error)}`,
+					"error",
+				);
+			}
 			continue;
 		}
 		if (pick.kind === "advisorSliceUsage") {

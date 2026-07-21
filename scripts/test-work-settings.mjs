@@ -102,6 +102,48 @@ try {
 	writeSettings({});
 	writeFileSync(path.join(globalDir, "settings.json"), "{}\n");
 
+	// Verifier profiles merge by canonical model ID; project null tombstones win.
+	writeGlobalSettings({
+		workOrchestrator: {
+			backgroundVerifiers: {
+				"test/model-a": {
+					operations: ["correctness", "test-gap"],
+					thinking: "high",
+				},
+				"test/model-disabled": {
+					operations: ["security"],
+					thinking: "max",
+				},
+			},
+		},
+	});
+	writeSettings({
+		workOrchestrator: {
+			backgroundVerifiers: {
+				"test/model-a": { operations: ["security"], thinking: "low" },
+				"test/model-b": {
+					operations: ["performance"],
+					thinking: "medium",
+				},
+				"test/model-disabled": null,
+			},
+		},
+	});
+	assert(
+		JSON.stringify(mod.backgroundVerifierProfiles(cwd)) ===
+			JSON.stringify([
+				{ model: "test/model-a", operations: ["security"], thinking: "low" },
+				{
+					model: "test/model-b",
+					operations: ["performance"],
+					thinking: "medium",
+				},
+			]),
+		"project verifier entries override by model and tombstones disable inherited profiles",
+	);
+	writeSettings({});
+	writeGlobalSettings({});
+
 	// Default (no settings) resolves to medium profile.
 	assert(
 		mod.workOrchSettings(cwd).profile === "medium",
@@ -670,6 +712,126 @@ try {
 		settings.subagents.agentOverrides["work-reviewer"].thinking === "high",
 		"typed model flow still selects effort",
 	);
+
+	// Verifier UI adds independent profiles, rejects duplicates, and removes an
+	// empty worker rather than persisting an invocable zero-operation profile.
+	writeGlobalSettings({});
+	writeSettings({});
+	const verifierSelect = {
+		manager: ["add background verifier", "add background verifier", "done"],
+		add: ["test/model-a", "test/model-b"],
+		profile: ["security", "thinking", "done", "done"],
+	};
+	const verifierLabel = (labels, text) =>
+		labels.find((label) => label.includes(text));
+	await commands["work-settings"].handler("", {
+		...ctx,
+		modelRegistry: {
+			getAvailable: async () => [
+				{ provider: "test", id: "model-a" },
+				{ provider: "test", id: "model-b" },
+			],
+		},
+		ui: customUi(
+			[
+				{ target: "background verifiers ›", key: "enter" },
+				{ expectInitial: "background verifiers ›", key: "escape" },
+			],
+			{
+				select: async (title, labels) => {
+					if (title === "Background verifiers")
+						return verifierLabel(labels, verifierSelect.manager.shift());
+					if (title === "Add background verifier")
+						return verifierLabel(labels, verifierSelect.add.shift());
+					if (title === "Background verifier: test/model-a")
+						return verifierLabel(labels, verifierSelect.profile.shift());
+					if (title === "Background verifier: test/model-b")
+						return verifierLabel(labels, verifierSelect.profile.shift());
+					if (title === "test/model-a: thinking effort")
+						return verifierLabel(labels, "high");
+					return undefined;
+				},
+			},
+		),
+	});
+	assert(
+		JSON.stringify(mod.backgroundVerifierProfiles(cwd)) ===
+			JSON.stringify([
+				{
+					model: "test/model-a",
+					operations: ["correctness", "security"],
+					thinking: "high",
+				},
+				{
+					model: "test/model-b",
+					operations: ["correctness"],
+					thinking: "medium",
+				},
+			]),
+		"two verifier profiles round-trip with independent operations and effort",
+	);
+	const duplicateNoticeAt = notices.length;
+	verifierSelect.manager = ["add background verifier", "test/model-b", "done"];
+	verifierSelect.add = ["test/model-a"];
+	verifierSelect.profile = ["correctness"];
+	await commands["work-settings"].handler("", {
+		...ctx,
+		modelRegistry: {
+			getAvailable: async () => [
+				{ provider: "test", id: "model-a" },
+				{ provider: "test", id: "model-b" },
+			],
+		},
+		ui: customUi(
+			[
+				{ target: "background verifiers ›", key: "enter" },
+				{ expectInitial: "background verifiers ›", key: "escape" },
+			],
+			{
+				select: async (title, labels) => {
+					if (title === "Background verifiers")
+						return verifierLabel(labels, verifierSelect.manager.shift());
+					if (title === "Add background verifier")
+						return verifierLabel(labels, verifierSelect.add.shift());
+					if (title === "Background verifier: test/model-b")
+						return verifierLabel(labels, verifierSelect.profile.shift());
+					return undefined;
+				},
+			},
+		),
+	});
+	assert(
+		notices
+			.slice(duplicateNoticeAt)
+			.some((notice) => notice.message.includes("already configured")),
+		"duplicate verifier model additions are rejected",
+	);
+	assert(
+		JSON.stringify(mod.backgroundVerifierProfiles(cwd)) ===
+			JSON.stringify([
+				{
+					model: "test/model-a",
+					operations: ["correctness", "security"],
+					thinking: "high",
+				},
+			]),
+		"removing the final operation removes the verifier profile",
+	);
+	writeGlobalSettings({
+		workOrchestrator: {
+			backgroundVerifiers: {
+				"retired/model": { operations: ["performance"], thinking: "low" },
+			},
+		},
+	});
+	writeSettings({});
+	await commands["work-settings"].handler("status", ctx);
+	assert(
+		mod.backgroundVerifierProfiles(cwd)[0].model === "retired/model" &&
+			notices.at(-1).message.includes("retired/model"),
+		"an unavailable saved verifier remains visible without model remapping",
+	);
+	writeGlobalSettings({});
 
 	// Every advisor model picker supports none and inherit; none skips effort.
 	await commands["work-settings"].handler("", {
