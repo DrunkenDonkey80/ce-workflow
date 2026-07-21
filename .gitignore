@@ -1,6 +1,7 @@
 node_modules/
 .pi/
 .pi-subagents/
+.context/
 .env
 .ce-workflow/.work-items.candidate.json
 .ce-workflow/*.tmp
