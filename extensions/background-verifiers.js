@@ -631,25 +631,44 @@ function ensureVerifierWorkspace(cwd, batch) {
 	const workspace = mkdtempSync(
 		path.join(os.tmpdir(), "ce-verifier-workspace-"),
 	);
+	let refCreated = false;
 	try {
 		git(cwd, [
 			"update-ref",
 			checkpointRef(batch.id),
 			batch.checkpoint.snapshot,
 		]);
-		const archive = execFileSync(
-			"git",
-			["archive", batch.checkpoint.snapshot],
-			{
-				cwd,
-				encoding: null,
-				stdio: ["ignore", "pipe", "pipe"],
-			},
-		);
-		execFileSync("tar", ["-x", "-C", workspace], {
-			input: archive,
-			stdio: ["pipe", "pipe", "pipe"],
-		});
+		refCreated = true;
+		const archivedPaths = gitLines(cwd, [
+			"--literal-pathspecs",
+			"ls-tree",
+			"-r",
+			"--name-only",
+			batch.checkpoint.snapshot,
+			"--",
+			...batch.checkpoint.paths,
+		]);
+		if (archivedPaths.length) {
+			const archive = execFileSync(
+				"git",
+				[
+					"--literal-pathspecs",
+					"archive",
+					batch.checkpoint.snapshot,
+					"--",
+					...archivedPaths,
+				],
+				{
+					cwd,
+					encoding: null,
+					stdio: ["ignore", "pipe", "pipe"],
+				},
+			);
+			execFileSync("tar", ["-x", "-C", workspace], {
+				input: archive,
+				stdio: ["pipe", "pipe", "pipe"],
+			});
+		}
 		const marker = path.join(workspace, ".ce-verifier-workspace.json");
 		writeFileSync(
 			marker,
@@ -661,7 +680,75 @@ function ensureVerifierWorkspace(cwd, batch) {
 	} catch (cause) {
 		rmSync(workspace, { recursive: true, force: true });
 		throw error("not-scheduled", `Verifier workspace failed: ${cause.message}`);
+	} finally {
+		if (refCreated) {
+			try {
+				git(cwd, [
+					"update-ref",
+					"-d",
+					checkpointRef(batch.id),
+					batch.checkpoint.snapshot,
+				]);
+			} catch {
+				// A stale protective ref is harmless and can be pruned manually.
+			}
+		}
 	}
+}
+
+function cleanupVerifierBatchRuntime(cwd, batchId) {
+	let store;
+	try {
+		store = loadVerifierStore(cwd);
+	} catch {
+		return false;
+	}
+	const jobs = Object.values(store.jobs).filter(
+		(job) => job.batchId === batchId,
+	);
+	if (
+		!jobs.length ||
+		jobs.some((job) => ["queued", "running"].includes(job.status))
+	)
+		return false;
+	const temporaryRoot = path.resolve(os.tmpdir());
+	for (const workspace of new Set(
+		jobs.map((job) => job.launch?.request?.cwd).filter(nonempty),
+	)) {
+		const resolved = path.resolve(workspace);
+		const sameRoot =
+			process.platform === "win32"
+				? path.dirname(resolved).toLowerCase() === temporaryRoot.toLowerCase()
+				: path.dirname(resolved) === temporaryRoot;
+		if (!sameRoot || !path.basename(resolved).startsWith("ce-verifier-workspace-"))
+			continue;
+		try {
+			const marker = JSON.parse(
+				readFileSync(
+					path.join(resolved, ".ce-verifier-workspace.json"),
+					"utf8",
+				),
+			);
+			if (
+				marker.version === 1 &&
+				same(marker.paths, store.batches[batchId].checkpoint.paths)
+			)
+				rmSync(resolved, { recursive: true, force: true });
+		} catch {
+			// Never remove an unmarked temp directory.
+		}
+	}
+	try {
+		git(cwd, [
+			"update-ref",
+			"-d",
+			checkpointRef(batchId),
+			store.batches[batchId].checkpoint.snapshot,
+		]);
+	} catch {
+		// The ref normally disappears immediately after archive creation.
+	}
+	return true;
 }
 function verifierRequest(cwd, batch, job, workspace) {
 	workspace ??= ensureVerifierWorkspace(cwd, batch);
@@ -767,16 +854,20 @@ export async function launchQueuedVerifierJobs(cwd = process.cwd(), adapter) {
 	} catch {
 		return [];
 	}
-	const launched = [];
-	for (const job of Object.values(store.jobs).filter(
+	const jobs = Object.values(store.jobs).filter(
 		(item) => item.launch?.status === "queued",
-	)) {
-		let reply;
-		try {
-			reply = await adapter.spawn(structuredClone(job.launch.request));
-		} catch (cause) {
-			reply = { ok: false, ambiguous: true, failure: cause.message };
-		}
+	);
+	const replies = await Promise.all(
+		jobs.map(async (job) => {
+			try {
+				return await adapter.spawn(structuredClone(job.launch.request));
+			} catch (cause) {
+				return { ok: false, ambiguous: true, failure: cause.message };
+			}
+		}),
+	);
+	for (const [index, job] of jobs.entries()) {
+		const reply = replies[index];
 		const data = reply?.reply?.data ?? reply?.data ?? reply ?? {};
 		const result = data.result ?? {};
 		const identity = {
@@ -794,9 +885,10 @@ export async function launchQueuedVerifierJobs(cwd = process.cwd(), adapter) {
 				failure: reply?.message ?? reply?.failure,
 			}),
 		);
-		launched.push(job.id);
 	}
-	return launched;
+	for (const batchId of new Set(jobs.map((job) => job.batchId)))
+		cleanupVerifierBatchRuntime(cwd, batchId);
+	return jobs.map((job) => job.id);
 }
 function recordNotScheduledBatch(cwd, profiles, reason, input) {
 	const base = createHash("sha1").update(path.resolve(cwd)).digest("hex");
@@ -855,8 +947,9 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 		};
 	const provisional = { id: batchId, checkpoint, profiles };
 	const requests = {};
+	let workspace;
 	try {
-		const workspace = ensureVerifierWorkspace(cwd, provisional);
+		workspace = ensureVerifierWorkspace(cwd, provisional);
 		for (const profile of profiles) {
 			const job = {
 				id: expectedJobId(batchId, profile.model),
@@ -875,6 +968,7 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 			launch: launchQueuedVerifierJobs(cwd, input.adapter),
 		};
 	} catch (cause) {
+		if (workspace) rmSync(workspace, { recursive: true, force: true });
 		const batch = recordNotScheduledBatch(cwd, profiles, cause.message, input);
 		return {
 			status: "not-scheduled",
@@ -1718,6 +1812,7 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 				(state) => markVerifierOrphaned(state, job.id, input.now),
 				input,
 			);
+			cleanupVerifierBatchRuntime(cwd, job.batchId);
 			reconciled.push(job.id);
 			continue;
 		}
@@ -1790,6 +1885,7 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 				input,
 			);
 		}
+		cleanupVerifierBatchRuntime(cwd, job.batchId);
 		reconciled.push(job.id);
 	}
 	return reconciled;
@@ -1863,20 +1959,31 @@ export function renderTriageClaim(store, claimId) {
 }
 export function verifierTelemetryEvents(store) {
 	validateVerifierStore(store);
+	const findingsByReport = new Map();
+	for (const finding of Object.values(store.findings)) {
+		const findings = findingsByReport.get(finding.reportId) ?? [];
+		findings.push(finding);
+		findingsByReport.set(finding.reportId, findings);
+	}
+	const groupsByFinding = new Map();
+	for (const group of Object.values(store.groups)) {
+		for (const findingId of group.findingIds) {
+			const groups = groupsByFinding.get(findingId) ?? new Set();
+			groups.add(group.id);
+			groupsByFinding.set(findingId, groups);
+		}
+	}
 	return Object.values(store.jobs)
 		.sort((left, right) => left.id.localeCompare(right.id))
 		.flatMap((job) =>
 			job.operations.map((operation) => {
 				const report =
 					store.reports[stableId("report", { jobId: job.id, operation })];
-				const findings = Object.values(store.findings).filter(
-					(finding) => finding.reportId === report?.id,
-				);
-				const groups = Object.values(store.groups).filter((group) =>
-					group.findingIds.some((id) =>
-						findings.some((finding) => finding.id === id),
-					),
-				);
+				const findings = findingsByReport.get(report?.id) ?? [];
+				const groupIds = new Set();
+				for (const finding of findings)
+					for (const groupId of groupsByFinding.get(finding.id) ?? [])
+						groupIds.add(groupId);
 				const dispositions = findings
 					.map(
 						(finding) => store.dispositions[finding.dispositionId]?.disposition,
@@ -1906,7 +2013,7 @@ export function verifierTelemetryEvents(store) {
 							: undefined,
 					...(report?.usage === undefined ? {} : { usage: report.usage }),
 					findingCount: findings.length,
-					groupCount: groups.length,
+					groupCount: groupIds.size,
 					...(dispositions.length ? { dispositions } : {}),
 				};
 			}),

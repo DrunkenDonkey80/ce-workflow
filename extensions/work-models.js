@@ -57,6 +57,7 @@ import {
 	scheduleVerifierBatch,
 	verifierStatus,
 	verifierTelemetryEvents,
+	VERIFIER_OPERATIONS,
 } from "./background-verifiers.js";
 import {
 	acquireLock,
@@ -124,12 +125,6 @@ const NATIVE_EDIT_GUIDANCE =
 	"Use Pi's native edit tool for existing files and write tool for new files. Do not rewrite tracked files through Python, Node, or shell; if unavoidable, re-read immediately.";
 const SUBAGENT_RPC_REQUEST_EVENT = "subagents:rpc:v1:request";
 const SUBAGENT_RPC_REPLY_EVENT_PREFIX = "subagents:rpc:v1:reply:";
-const VERIFIER_TRIAGE_TOOLS = [
-	"work_verifier_inbox",
-	"work_verifier_dispose",
-	"work_verifier_complete_fix",
-	"work_verifier_reopen",
-];
 const VERIFIER_TOOL_NAMES = [
 	"work_verifier_read",
 	"work_verifier_list",
@@ -336,13 +331,7 @@ const REVIEW_LEVEL_DESC = {
 	full: "full ce-code-review skill on the slice diff (max)",
 };
 const SUBMENU_ARROW = "›";
-const BACKGROUND_VERIFIER_OPERATIONS = [
-	"correctness",
-	"security",
-	"simplification",
-	"test-gap",
-	"performance",
-];
+const BACKGROUND_VERIFIER_OPERATIONS = VERIFIER_OPERATIONS;
 
 function slotByKey(key) {
 	return SLOTS.find((slot) => slot.key === key);

@@ -720,7 +720,7 @@ try {
 	const verifierSelect = {
 		manager: ["add background verifier", "add background verifier", "done"],
 		add: ["test/model-a", "test/model-b"],
-		profile: ["security", "thinking", "done", "done"],
+		profile: ["maintainability", "security", "thinking", "done", "done"],
 	};
 	const verifierLabel = (labels, text) =>
 		labels.find((label) => label.includes(text));
@@ -759,7 +759,7 @@ try {
 			JSON.stringify([
 				{
 					model: "test/model-a",
-					operations: ["correctness", "security"],
+					operations: ["correctness", "maintainability", "security"],
 					thinking: "high",
 				},
 				{
@@ -811,7 +811,7 @@ try {
 			JSON.stringify([
 				{
 					model: "test/model-a",
-					operations: ["correctness", "security"],
+					operations: ["correctness", "maintainability", "security"],
 					thinking: "high",
 				},
 			]),

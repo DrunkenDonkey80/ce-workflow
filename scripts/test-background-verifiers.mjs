@@ -296,7 +296,8 @@ try {
 	git("config", "user.email", "test@example.test");
 	git("config", "user.name", "Test");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "base\n");
-	git("add", "tracked.txt");
+	writeFileSync(path.join(gitCwd, "other.txt"), "unrelated\n");
+	git("add", "tracked.txt", "other.txt");
 	git("commit", "-qm", "base");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "staged\n");
 	git("add", "tracked.txt");
@@ -330,6 +331,15 @@ try {
 	});
 	await scheduled.launch;
 	assert.equal(requests.length, 2);
+	assert.equal(
+		git(
+			"for-each-ref",
+			"--format=%(refname)",
+			`refs/ce-workflow/verifiers/${scheduled.batch.id}`,
+		),
+		"",
+		"checkpoint protection ref is removed after archive creation",
+	);
 	assert(
 		Object.values(loadVerifierStore(gitCwd).jobs)
 			.filter((job) => job.batchId === scheduled.batch.id)
@@ -440,6 +450,11 @@ try {
 		false,
 		"unscoped untracked bytes are excluded",
 	);
+	assert.equal(
+		existsSync(path.join(scopedRequest.cwd, "other.txt")),
+		false,
+		"unscoped committed bytes are excluded",
+	);
 	const rejected = scheduleVerifierBatch(gitCwd, {
 		profiles: [profiles[1]],
 		paths: ["tracked.txt"],
@@ -451,7 +466,15 @@ try {
 		},
 		origin: "normal",
 	});
+	const rejectedWorkspace = Object.values(loadVerifierStore(gitCwd).jobs).find(
+		(job) => job.batchId === rejected.batch.id,
+	).launch.request.cwd;
 	await rejected.launch;
+	assert.equal(
+		existsSync(rejectedWorkspace),
+		false,
+		"terminal launch failures clean their isolated workspace",
+	);
 	assert.equal(
 		Object.values(loadVerifierStore(gitCwd).jobs).find(
 			(job) => job.batchId === rejected.batch.id,
