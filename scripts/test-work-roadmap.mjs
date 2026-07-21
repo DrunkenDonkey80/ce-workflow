@@ -174,7 +174,7 @@ try {
 			this.signal = new AbortController().signal;
 		}
 	}
-	const selectRoadmap = async (id, complete) => {
+	const selectRoadmap = async (id, complete, menus = []) => {
 		const notices = [];
 		const picks = [new RegExp(id), /full report/];
 		await handleWorkRoadmapCommand(
@@ -187,7 +187,8 @@ try {
 					getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test" }),
 				},
 				ui: {
-					select: async (_title, labels) => {
+					select: async (title, labels) => {
+						menus.push({ title, labels });
 						const pick = picks.shift();
 						return pick ? labels.find((label) => pick.test(label)) : undefined;
 					},
@@ -201,15 +202,32 @@ try {
 		);
 		return notices;
 	};
-	await selectRoadmap("E-2", async () => ({
-		stopReason: "stop",
-		content: [
-			{
-				type: "text",
-				text: "Deliver the open roadmap in small verified slices. Keep its stored intent available between work sessions.",
-			},
-		],
-	}));
+	const roadmapMenus = [];
+	await selectRoadmap(
+		"E-2",
+		async () => ({
+			stopReason: "stop",
+			content: [
+				{
+					type: "text",
+					text: "Deliver the open roadmap in small verified slices. Keep its stored intent available between work sessions.",
+				},
+			],
+		}),
+		roadmapMenus,
+	);
+	assert.equal(
+		roadmapMenus[0].labels.some((label) =>
+			/Preserve visual parity|generate and save/i.test(label),
+		),
+		false,
+		"F7 base roadmap list stays title-only",
+	);
+	assert.match(
+		roadmapMenus[1].title,
+		/stored intent available/,
+		"selected roadmap summary appears above its operation menu",
+	);
 	assert.match(
 		roadmapPreviewText(
 			buildWorkRoadmapState(root, "list").roadmaps.find(
@@ -310,13 +328,15 @@ try {
 		{},
 	);
 	assert.equal(escaped.action, "roadmap-cancel");
+	const e1OperationTitle =
+		"E-1: operation\n\nPreserve visual parity while replacing the existing home-screen primitives.";
 	assert.deepEqual(escapeTitles, [
 		"🗺️ Work roadmaps",
-		"E-1: operation",
+		e1OperationTitle,
 		"E-1: tasks",
 		"BUG-1: operation",
 		"E-1: tasks",
-		"E-1: operation",
+		e1OperationTitle,
 		"🗺️ Work roadmaps",
 	]);
 

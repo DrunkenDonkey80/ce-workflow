@@ -14,6 +14,7 @@ import {
 import workModelsExtension, {
 	buildWorkImproveObjective,
 	buildWorkImproveState,
+	buildWorkResumeState,
 	handleWorkRoadmapCommand,
 	workGoalCompletionBlocker,
 } from "../extensions/work-models.js";
@@ -28,6 +29,21 @@ writeFileSync(
 	JSON.stringify({ name: "pi-work-orchestrator", version: "test" }),
 );
 writeFileSync(path.join(root, "extensions", "work-models.js"), "");
+writeFileSync(path.join(root, ".gitignore"), ".pi/\n.ce-workflow/\n");
+execFileSync("git", ["add", "."], { cwd: root, stdio: "ignore" });
+execFileSync(
+	"git",
+	[
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-m",
+		"fixture",
+	],
+	{ cwd: root, stdio: "ignore" },
+);
 const enabledSettings = {
 	workResume: { selfImproving: true },
 	workImprovement: { sourceCheckout: root },
@@ -95,6 +111,18 @@ mutateStore(root, (store) => {
 const options = { settings: enabledSettings, sourceCwd: root };
 const state = buildWorkImproveState(root, "SI-1");
 assert.equal(state.ok, true);
+for (const target of ["SI-1", ""]) {
+	const genericResume = buildWorkResumeState(root, target);
+	assert.equal(
+		genericResume.action,
+		"work-improve-required",
+		"self-improvement reports cannot bypass /work-improve through generic resume",
+	);
+	assert.deepEqual(genericResume.suggestedCommands, [
+		"/work-improve preview SI-1",
+		"/work-improve SI-1",
+	]);
+}
 assert.deepEqual(state.snapshotIds, ["SI-1.1"]);
 assert.equal(state.reports[0].evidence.valid, true);
 const objective = buildWorkImproveObjective(state);
@@ -198,8 +226,8 @@ await handleWorkRoadmapCommand(
 	},
 	{},
 );
-assert(wrongSourceLabels.some((label) => /work-resume/i.test(label)));
-assert(!wrongSourceLabels.some((label) => /work-improve/i.test(label)));
+assert(!wrongSourceLabels.some((label) => /work-resume/i.test(label)));
+assert(wrongSourceLabels.some((label) => /work-improve/i.test(label)));
 
 writeFileSync(
 	path.join(root, ".pi", "settings.json"),

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -565,6 +567,161 @@ try {
 	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
 	assert.equal(compactions.length, 1, "settling does not repeat the request");
 	compactions.length = 0;
+
+	const inlineWorkflowPrompt = `work-orchestrator inline execution
+WO_INLINE_V1: complete this medium WorkItem
+Workflow Run ID: wr-compact-resume
+Activity: work-resume
+mode: resume
+Epic: E-1 Test roadmap
+Selected WorkItem: T-1 Preserve workflow state`;
+	await tempHooks.before_agent_start(
+		{ prompt: inlineWorkflowPrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempShortcuts.f8.handler(ctx);
+	await tempHooks.turn_end(
+		{},
+		{ ...ctx, getContextUsage: () => ({ tokens: 1 }) },
+	);
+	assert.equal(compactions.length, 1, "queued F8 compacts inline work-resume");
+	assert.equal(sent.length, 1, "inline work-resume continues after compaction");
+	const resumedWorkflow = mod.parseWorkPromptMeta(sent[0].message);
+	assert.ok(
+		resumedWorkflow,
+		"compaction continuation keeps work-orchestrator metadata",
+	);
+	assert.equal(resumedWorkflow.workflowRunId, "wr-compact-resume");
+	assert.equal(resumedWorkflow.workItemId, "T-1");
+	assert.equal(resumedWorkflow.inlineWork, true);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Compaction checkpoint." }],
+				},
+			],
+		},
+		ctx,
+	);
+	sent.length = 0;
+	compactions.length = 0;
+
+	const workflowClaim = (workflowId) =>
+		path.join(
+			cwd,
+			".pi",
+			"work-runs",
+			"claims",
+			`${createHash("sha256").update(workflowId).digest("hex")}.complete`,
+		);
+	const endWithOverflow = async (workflowId) => {
+		await tempHooks.before_agent_start(
+			{
+				prompt: inlineWorkflowPrompt.replace("wr-compact-resume", workflowId),
+				systemPrompt: "base",
+			},
+			ctx,
+		);
+		await tempHooks.agent_start({}, ctx);
+		await tempHooks.agent_end(
+			{
+				messages: [
+					{
+						role: "assistant",
+						stopReason: "error",
+						errorMessage: "context_length_exceeded",
+						content: [],
+					},
+				],
+			},
+			ctx,
+		);
+		return workflowClaim(workflowId);
+	};
+
+	const overflowClaim = await endWithOverflow("wr-overflow-resume");
+	assert.equal(
+		existsSync(overflowClaim),
+		false,
+		"overflow retry does not terminally fail the work-resume run",
+	);
+	await tempHooks.session_compact(
+		{ willRetry: true, compactionEntry: { details: {} } },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Recovered after compaction." }],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(
+		JSON.parse(readFileSync(overflowClaim, "utf8")).outcome,
+		"completed",
+		"overflow retry remains the same tracked work-resume run",
+	);
+
+	const declinedRetryClaim = await endWithOverflow("wr-overflow-no-retry");
+	await tempHooks.session_compact(
+		{ willRetry: false, compactionEntry: { details: {} } },
+		ctx,
+	);
+	assert.equal(
+		JSON.parse(readFileSync(declinedRetryClaim, "utf8")).outcome,
+		"failed",
+		"overflow without retry terminally fails the work-resume run",
+	);
+
+	const failedCompactionClaim = await endWithOverflow(
+		"wr-overflow-compaction-failed",
+	);
+	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
+	assert.equal(
+		JSON.parse(readFileSync(failedCompactionClaim, "utf8")).outcome,
+		"failed",
+		"failed compaction terminally fails the work-resume run on settlement",
+	);
+
+	const contextMentionId = "wr-context-mention";
+	const contextMentionClaim = workflowClaim(contextMentionId);
+	await tempHooks.before_agent_start(
+		{
+			prompt: inlineWorkflowPrompt.replace(
+				"wr-compact-resume",
+				contextMentionId,
+			),
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [
+						{ type: "text", text: "Documented context window behavior." },
+					],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(
+		JSON.parse(readFileSync(contextMentionClaim, "utf8")).outcome,
+		"completed",
+		"ordinary context-window text is not mistaken for an overflow retry",
+	);
 
 	const unavailableNoticeCount = notices.length;
 	const unavailableCtx = { ...ctx, compact: undefined };

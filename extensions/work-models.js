@@ -346,6 +346,8 @@ const contextCompactState = {
 	requested: false,
 };
 let manualMicrocompactPending = false;
+let manualMicrocompactResumePrompt = null;
+let workAgentCompactionResume = null;
 let pendingWorkPrompt = null;
 const pendingDirtyRecoveries = new Map();
 const pendingInitiativeConversions = new Map();
@@ -3224,6 +3226,7 @@ function maybeCompact(ctx, settings, reason, forceAutoCompact = false) {
 function runManualMicrocompact(ctx) {
 	if (typeof ctx.compact !== "function") {
 		manualMicrocompactPending = false;
+		manualMicrocompactResumePrompt = null;
 		ctx.ui.notify("Microcompaction is unavailable in this mode", "warning");
 		return false;
 	}
@@ -3233,14 +3236,15 @@ function runManualMicrocompact(ctx) {
 	}
 	const resumeAfter =
 		manualMicrocompactPending && activeWorkGoal?.status !== "active";
+	const workflowPrompt = manualMicrocompactResumePrompt;
+	manualMicrocompactResumePrompt = null;
 	const generation = beginContextCompaction();
 	const resume = () => {
 		if (!resumeAfter) return;
-		void sendFollowUp(
-			ctx,
-			"Continue from the compacted context and finish the current task.",
-			workExtensionPi,
-		).catch((error) =>
+		const message = workflowPrompt
+			? `Continue the active work-orchestrator turn after compaction. Resume from current native work-item store and git state; do not repeat completed steps. The original self-contained handoff follows:\n\n${workflowPrompt}`
+			: "Continue from the compacted context and finish the current task.";
+		void sendFollowUp(ctx, message, workExtensionPi).catch((error) =>
 			ctx.ui.notify(
 				`Could not resume after microcompaction: ${formatError(error)}`,
 				"warning",
@@ -3285,6 +3289,8 @@ function requestManualMicrocompact(ctx) {
 	}
 	if (ctx.isIdle?.() !== false) return runManualMicrocompact(ctx);
 	manualMicrocompactPending = true;
+	manualMicrocompactResumePrompt =
+		activeWorkAgent?.prompt ?? pendingWorkPrompt?.prompt ?? null;
 	ctx.ui.notify("Microcompaction queued for the next idle boundary", "info");
 	return true;
 }
@@ -6146,6 +6152,18 @@ function buildWorkResumeState(cwd, args = "") {
 			});
 		if (resolved.kind === "planning_starved")
 			return initiativePlanningStarvedState(cwd, resolved, target);
+		if (selfImprovementRoadmap(cwd, idOf(resolved.epic)))
+			return errorState(
+				"work-improve-required",
+				`${idOf(resolved.epic)} contains self-improvement reports and cannot run through generic /work-resume. Use /work-improve.`,
+				{
+					action: "work-improve-required",
+					suggestedCommands: [
+						`/work-improve preview ${idOf(resolved.epic)}`,
+						`/work-improve ${idOf(resolved.epic)}`,
+					],
+				},
+			);
 		rememberWorkflowEpic(cwd, resolved.epic);
 		const childState = buildEpicChildState(cwd, resolved.epic);
 		const git = resumeGitReport(cwd, planRefsFromIssue(resolved.epic));
@@ -12479,80 +12497,14 @@ function roadmapDescriptionContext(cwd, epic) {
 }
 
 async function chooseRoadmap(ctx, title, roadmaps) {
-	const items = roadmaps.map((epic) => ({
-		value: epic.id,
-		label: `${epic.current ? "* " : ""}${epic.parentId ? "  " : ""}${epic.id} [${statusLabel(epic.status)}] [${epic.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${epic.title}`,
-		description: roadmapPreviewText(epic),
-	}));
-	const itemsByValue = new Map(items.map((item) => [item.value, item]));
-	if (ctx.mode !== "tui" || typeof ctx.ui.custom !== "function")
-		return choose(ctx, title, items);
-
-	try {
-		const [{ DynamicBorder }, { Container, SelectList, Text }] =
-			await Promise.all([
-				import("@earendil-works/pi-coding-agent"),
-				import("@earendil-works/pi-tui"),
-			]);
-		return await ctx.ui.custom((tui, theme, _keybindings, done) => {
-			const container = new Container();
-			container.addChild(new DynamicBorder((text) => theme.fg("accent", text)));
-			container.addChild(
-				new Text(
-					theme.fg("accent", theme.bold(roadmapTerminology(title))),
-					1,
-					0,
-				),
-			);
-			const selectList = new SelectList(
-				items.map(({ value, label }) => ({ value, label })),
-				Math.min(items.length, 8),
-				{
-					selectedPrefix: (text) => theme.fg("accent", text),
-					selectedText: (text) => theme.fg("accent", text),
-					description: (text) => theme.fg("muted", text),
-					scrollInfo: (text) => theme.fg("dim", text),
-					noMatch: (text) => theme.fg("warning", text),
-				},
-			);
-			container.addChild(selectList);
-			container.addChild(
-				new DynamicBorder((text) => theme.fg("borderMuted", text)),
-			);
-			const detail = new Text("", 1, 0);
-			const showDetail = (item) => {
-				const selected = itemsByValue.get(item?.value);
-				detail.setText(
-					selected
-						? `${theme.fg("accent", theme.bold(selected.label))}\n${theme.fg("muted", selected.description)}`
-						: "",
-				);
-			};
-			showDetail(selectList.getSelectedItem());
-			selectList.onSelectionChange = showDetail;
-			selectList.onSelect = (item) => done(item.value);
-			selectList.onCancel = () => done(null);
-			container.addChild(detail);
-			container.addChild(
-				new Text(
-					theme.fg("dim", "↑↓ navigate • enter select • esc cancel"),
-					1,
-					0,
-				),
-			);
-			container.addChild(new DynamicBorder((text) => theme.fg("accent", text)));
-			return {
-				render: (width) => container.render(width),
-				invalidate: () => container.invalidate(),
-				handleInput: (data) => {
-					selectList.handleInput(data);
-					tui.requestRender();
-				},
-			};
-		});
-	} catch {
-		return choose(ctx, title, items);
-	}
+	return choose(
+		ctx,
+		title,
+		roadmaps.map((epic) => ({
+			value: epic.id,
+			label: `${epic.current ? "* " : ""}${epic.parentId ? "  " : ""}${epic.id} [${statusLabel(epic.status)}] [${epic.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${epic.title}`,
+		})),
+	);
 }
 
 async function synthesizeRoadmapDescription(cwd, epic, ctx, runtime = {}) {
@@ -12698,10 +12650,10 @@ async function handleWorkRoadmapCommand(
 	const improvement =
 		!initiative &&
 		!parentPreparation &&
-		workImproveAvailable(ctx.cwd, selected);
+		Boolean(selfImprovementRoadmap(ctx.cwd, selected));
 	const op = await choose(
 		ctx,
-		`${selected}: operation`,
+		`${selected}: operation\n\n${roadmapPreviewText(selectedRoadmap)}`,
 		initiative
 			? [
 					...(preparation.legalActions.includes("start_execution")
@@ -13512,6 +13464,9 @@ export default function workModelsExtension(pi) {
 		pendingWorkGoalTurn = false;
 		workGoalContinuationPending = null;
 		manualMicrocompactPending = false;
+		manualMicrocompactResumePrompt = null;
+		workAgentCompactionResume?.finalize?.();
+		workAgentCompactionResume = null;
 		resetContextCompaction();
 		clearWorkGoalRecovery();
 		if (activeWorkGoal?.status === "waiting_usage_limit")
@@ -13527,6 +13482,9 @@ export default function workModelsExtension(pi) {
 		pendingDirtyRecoveries.clear();
 		pendingInitiativeConversions.clear();
 		manualMicrocompactPending = false;
+		manualMicrocompactResumePrompt = null;
+		workAgentCompactionResume?.finalize?.();
+		workAgentCompactionResume = null;
 		resetContextCompaction();
 		persistWorkGoal(pi);
 		clearWorkGoalUsageLimitTimer();
@@ -13575,6 +13533,7 @@ export default function workModelsExtension(pi) {
 			? {
 					id: telemetryId("agent"),
 					cwd: ctx.cwd,
+					prompt: String(event.prompt ?? ""),
 					promptChars: String(event.prompt ?? "").length,
 					meta,
 					contextBefore: usageSnapshot(ctx),
@@ -13668,6 +13627,9 @@ export default function workModelsExtension(pi) {
 		}
 		const run = activeWorkAgent;
 		activeWorkAgent = null;
+		const contextOverflow = isWorkGoalContextOverflow(
+			finalAssistantMessage(event.messages),
+		);
 		const wasWorkGoalTurn = activeWorkGoalRunning;
 		activeWorkGoalRunning = false;
 		const usage = messageUsage(event.messages);
@@ -13710,8 +13672,10 @@ export default function workModelsExtension(pi) {
 			},
 			context: { before: run.contextBefore, after: usageSnapshot(ctx) },
 		};
+		const failed = hasWorkAgentFailure(event, telemetry);
 		const evaluationIdentity = evaluationTelemetryIdentity({ role: "main" });
-		if (evaluationIdentity)
+		const recordEvaluationTerminal = (terminalReason) => {
+			if (!evaluationIdentity) return;
 			recordWorkTelemetry(run.cwd, {
 				type: "agent-terminal",
 				...evaluationIdentity,
@@ -13742,37 +13706,59 @@ export default function workModelsExtension(pi) {
 				artifactIds: [
 					...new Set(run.tools.map((tool) => tool.artifact).filter(Boolean)),
 				],
-				terminalReason: hasWorkAgentFailure(event, telemetry)
-					? "failed"
-					: "completed",
+				terminalReason,
 				costScope: "workflow-role",
 			});
+		};
 		const file = recordWorkTelemetry(run.cwd, telemetry);
-		completeWorkflowOnce(
-			run.cwd,
-			{
-				workflowRunId: run.meta.workflowRunId,
-				activity: run.meta.activity,
-				outcome: hasWorkAgentFailure(event, telemetry) ? "failed" : "completed",
-				action: run.meta.action,
-				epicId: run.meta.epicId,
-				workItemId: run.meta.workItemId,
-			},
-			{
-				pi,
-				mode: ctx.mode,
-				session: ctx.sessionManager?.getSessionId?.(),
-			},
-		);
 		appendTelemetryNote(run.cwd, run.meta.workItemId, telemetry, file);
-		appendFailureStatusNote(
-			run.cwd,
-			run.meta.workItemId,
-			run,
-			event,
-			telemetry,
-			file,
-		);
+		let attemptFinished = false;
+		const finishAttempt = (retry) => {
+			if (attemptFinished) return;
+			attemptFinished = true;
+			recordEvaluationTerminal(
+				retry ? "compaction_retry" : failed ? "failed" : "completed",
+			);
+			if (retry) return;
+			completeWorkflowOnce(
+				run.cwd,
+				{
+					workflowRunId: run.meta.workflowRunId,
+					activity: run.meta.activity,
+					outcome: failed ? "failed" : "completed",
+					action: run.meta.action,
+					epicId: run.meta.epicId,
+					workItemId: run.meta.workItemId,
+				},
+				{
+					pi,
+					mode: ctx.mode,
+					session: ctx.sessionManager?.getSessionId?.(),
+				},
+			);
+			appendFailureStatusNote(
+				run.cwd,
+				run.meta.workItemId,
+				run,
+				event,
+				telemetry,
+				file,
+			);
+		};
+		if (contextOverflow)
+			workAgentCompactionResume = {
+				prompt: {
+					id: telemetryId("agent"),
+					cwd: run.cwd,
+					prompt: run.prompt,
+					promptChars: run.promptChars,
+					meta: run.meta,
+					contextBefore: run.contextBefore,
+				},
+				retry: () => finishAttempt(true),
+				finalize: () => finishAttempt(false),
+			};
+		else finishAttempt(false);
 		cleanupBenignInstructionDirt(run.cwd);
 		finishWarpWork(
 			ctx,
@@ -13826,6 +13812,13 @@ export default function workModelsExtension(pi) {
 
 	pi.on("session_compact", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "session_compact", event);
+		if (workAgentCompactionResume) {
+			if (event.willRetry) {
+				pendingWorkPrompt = workAgentCompactionResume.prompt;
+				workAgentCompactionResume.retry();
+			} else workAgentCompactionResume.finalize();
+			workAgentCompactionResume = null;
+		}
 		const wasOurs =
 			event.compactionEntry?.details?.kind === "work-orchestrator-instant" ||
 			contextCompactState.inFlight;
@@ -13849,6 +13842,10 @@ export default function workModelsExtension(pi) {
 	pi.on("agent_settled", async (_event, ctx) => {
 		if (manualMicrocompactPending && ctx.isIdle?.() !== false)
 			runManualMicrocompact(ctx);
+		if (ctx.isIdle?.() !== false) {
+			workAgentCompactionResume?.finalize();
+			workAgentCompactionResume = null;
+		}
 	});
 
 	pi.on("turn_end", async (event, ctx) => {
