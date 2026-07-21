@@ -1181,6 +1181,99 @@
       "type": "task",
       "updatedAt": "2026-07-20T10:05:06.326Z"
     },
+    "work-2.10": {
+      "createdAt": "2026-07-21T09:26:58.860Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After successful MSVC/Ninja verification, finish-task failed because three linker-generated .ilk files under rf-lib/build-host were classified as unrecognized untracked files. The helper auto-added *.pdb to .gitignore but did not handle sibling .ilk artifacts.\nExpected: The coded finalizer should recognize MSVC .ilk files in generated build directories and either ignore/remove them consistently with .pdb artifacts, without blocking an otherwise passing task.\nImpact: Windows host-test tasks cannot finalize after linking unless the agent manually deletes generated .ilk files or changes project ignore rules, adding friction and risking accidental build-artifact commits.\nSuggested improvement: Include *.ilk in generated-artifact hygiene alongside *.pdb, preferably scoped through existing build-directory recognition.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/b19a1ebe-7a21-45ee-941d-48d2829f0eb6",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 442,
+              "file": "01-work-1.5.2-finish-ilk.log",
+              "sha256": "49fc9b710ac58016e66b7fec9ab6fbd5add9e63cd71d663872a409b0340f6af2"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-21T09:26:58.856Z",
+          "workflowId": "019f83e5-fd69-79c6-8cd2-415920491a74"
+        }
+      ],
+      "id": "work-2.10",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After successful MSVC/Ninja verification, finish-task failed because three linker-generated .ilk files under rf-lib/build-host wer",
+      "type": "task",
+      "updatedAt": "2026-07-21T09:26:58.860Z"
+    },
+    "work-2.11": {
+      "createdAt": "2026-07-21T11:19:35.070Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A paused pi-subagents writer could not be resumed: subagent resume rejected its generated recovery descriptor because `acceptance.explicit` and `acceptance.inferredReason` were unsupported. The only recovery was launching a fresh continuation writer against the current filesystem.\nExpected: A paused async subagent should resume from its generated recovery descriptor, especially after a soft interrupt used to handle a needs-attention state.\nImpact: The workflow lost in-session continuity, required a replacement agent, and increased risk when continuing a partially edited multi-file task.\nSuggested improvement: Normalize or ignore deprecated acceptance fields when reading recovery descriptors so descriptors written by the runtime are always consumable by resume.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/ff678976-4714-46ba-ad3f-692a48f6c8a5",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 415328,
+              "file": "01-session.jsonl",
+              "sha256": "d83baf5e445992d16dd6dd87f4f3c201d36204468637bb591b525d8a8ef19de9"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-21T11:19:35.067Z",
+          "workflowId": "019f83e5-fd69-79c6-8cd2-415920491a74"
+        }
+      ],
+      "id": "work-2.11",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A paused pi-subagents writer could not be resumed: subagent resume rejected its generated recovery descriptor because `acceptance.",
+      "type": "task",
+      "updatedAt": "2026-07-21T11:19:35.070Z"
+    },
+    "work-2.12": {
+      "createdAt": "2026-07-21T15:36:51.090Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.12",
+      "labels": [],
+      "notes": [
+        "created by /work-med\nwo:implementation\nwo:execution-inline\ntask: yes lets make that",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed",
+        "wo:review FAIL - medium: extensions/background-verifiers.js captureVerifierCheckpoint requires HEAD^ for clean project/custom scope, so /work-analyze whole project cannot run in a valid single-commit repository; use an empty-tree/synthetic base and add regression coverage.",
+        "wo:fix-ready-for-review - added deterministic empty-base support for clean single-commit project/custom scopes; node scripts/test-background-verifiers.mjs PASS with regression coverage",
+        "wo:review PASS - extensions/background-verifiers.js uses a deterministic synthetic empty base for clean single-commit project/custom scopes; scripts/test-background-verifiers.mjs covers both scopes and passes.",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "yes lets make that",
+      "type": "task",
+      "updatedAt": "2026-07-21T15:53:41.273Z"
+    },
     "work-2.2": {
       "createdAt": "2026-07-20T01:40:10.511Z",
       "dependencies": [
@@ -1460,7 +1553,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-20T14:41:04.348Z"
+    "updatedAt": "2026-07-21T15:53:41.273Z"
   },
   "schemaVersion": 1
 }

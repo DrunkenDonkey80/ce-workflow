@@ -155,12 +155,18 @@ function validateCheckpoint(
 		if (paths.has(entry)) fail("Duplicate checkpoint path");
 		paths.add(entry);
 	}
+	if (
+		value.scope !== undefined &&
+		!["auto", "changes", "commit", "project", "custom"].includes(value.scope)
+	)
+		fail("Invalid checkpoint scope");
 	return {
 		repository: value.repository,
 		base: value.base,
 		snapshot: value.snapshot,
 		paths: [...value.paths].sort(),
 		patchHash: value.patchHash,
+		...(value.scope === undefined ? {} : { scope: value.scope }),
 	};
 }
 function modelIds(models) {
@@ -493,6 +499,25 @@ function gitLines(cwd, args, options) {
 	const output = git(cwd, args, options);
 	return output ? output.split(/\r?\n/).filter(Boolean) : [];
 }
+
+function verifierCommitEnv(env = process.env) {
+	return {
+		...env,
+		GIT_AUTHOR_NAME: "ce-workflow verifier",
+		GIT_AUTHOR_EMAIL: "verifier@ce-workflow.invalid",
+		GIT_COMMITTER_NAME: "ce-workflow verifier",
+		GIT_COMMITTER_EMAIL: "verifier@ce-workflow.invalid",
+		GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
+		GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
+	};
+}
+
+function emptyVerifierBase(cwd) {
+	const tree = git(cwd, ["hash-object", "-t", "tree", "--stdin"]);
+	return git(cwd, ["commit-tree", tree, "-m", "ce-workflow verifier base"], {
+		env: verifierCommitEnv(),
+	});
+}
 function snapshotPaths(cwd, base, snapshot, paths, allowEmpty = false) {
 	const changed = new Set(
 		[
@@ -521,6 +546,49 @@ function snapshotPaths(cwd, base, snapshot, paths, allowEmpty = false) {
 			);
 	}
 	return scoped;
+}
+
+function projectSnapshotPaths(cwd, snapshot) {
+	return gitLines(cwd, ["ls-tree", "-r", "--name-only", snapshot]).filter(
+		(entry) => !entry.startsWith(".ce-workflow/work-runs/verifiers/"),
+	);
+}
+
+function globPattern(pattern) {
+	let source = "";
+	for (let index = 0; index < pattern.length; index += 1) {
+		const character = pattern[index];
+		if (character === "*" && pattern[index + 1] === "*") {
+			source += ".*";
+			index += 1;
+		} else if (character === "*") source += "[^/]*";
+		else if (character === "?") source += "[^/]";
+		else source += character.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+	}
+	return new RegExp(`^${source}$`);
+}
+
+function customSnapshotPaths(cwd, snapshot, patterns = []) {
+	const available = projectSnapshotPaths(cwd, snapshot);
+	const selected = new Set();
+	for (const pattern of patterns) {
+		relativePath(pattern, "checkpoint pattern");
+		const wildcard = /[*?]/.test(pattern);
+		const matches = available.filter((entry) =>
+			wildcard
+				? globPattern(pattern).test(entry)
+				: entry === pattern || entry.startsWith(`${pattern}/`),
+		);
+		if (!matches.length)
+			throw error(
+				"not-scheduled",
+				`Verifier checkpoint pattern matched no files: ${pattern}`,
+			);
+		for (const entry of matches) selected.add(entry);
+	}
+	if (!selected.size)
+		throw error("not-scheduled", "Verifier checkpoint has no custom paths");
+	return [...selected].sort();
 }
 function assertNoSnapshotSymlinks(cwd) {
 	const tracked = gitLines(cwd, ["ls-files", "-s"]);
@@ -562,58 +630,66 @@ function checkpointRef(batchId) {
 export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 	let temporaryIndex;
 	try {
-		const base = git(cwd, ["rev-parse", "HEAD"]);
+		const scope = input.scope ?? "auto";
+		if (!["auto", "changes", "commit", "project", "custom"].includes(scope))
+			throw error("invalid", `Invalid verifier scope: ${scope}`);
+		const head = git(cwd, ["rev-parse", "HEAD"]);
 		if (gitLines(cwd, ["ls-files", "-u"]).length)
 			throw error(
 				"not-scheduled",
 				"Verifier snapshot has unresolved conflicts",
 			);
 		assertNoSnapshotSymlinks(cwd);
-		const workingPaths = snapshotPaths(cwd, base, base, undefined, true);
+		const workingPaths = snapshotPaths(cwd, head, head, undefined, true);
 		const dirty = workingPaths.length > 0;
-		const changedPaths = dirty
-			? input.paths
-				? snapshotPaths(cwd, base, base, input.paths)
-				: workingPaths
-			: [];
-		let snapshot = base;
-		if (dirty) {
+		if (scope === "changes" && !dirty)
+			throw error(
+				"not-scheduled",
+				"Verifier checkpoint has no current changes",
+			);
+		let snapshot = head;
+		if (dirty && scope !== "commit") {
 			temporaryIndex = path.join(
 				mkdtempSync(path.join(os.tmpdir(), "ce-verifier-index-")),
 				"index",
 			);
 			const env = { ...process.env, GIT_INDEX_FILE: temporaryIndex };
-			git(cwd, ["read-tree", base], { env });
-			git(cwd, ["add", "-A", "--", ...changedPaths], { env });
+			git(cwd, ["read-tree", head], { env });
+			git(cwd, ["add", "-A", "--", ...workingPaths], { env });
 			const tree = git(cwd, ["write-tree"], { env });
-			const commitEnv = {
-				...env,
-				GIT_AUTHOR_NAME: "ce-workflow verifier",
-				GIT_AUTHOR_EMAIL: "verifier@ce-workflow.invalid",
-				GIT_COMMITTER_NAME: "ce-workflow verifier",
-				GIT_COMMITTER_EMAIL: "verifier@ce-workflow.invalid",
-				GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
-				GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
-			};
-			snapshot = git(cwd, ["commit-tree", tree, "-p", base], {
-				env: commitEnv,
+			snapshot = git(cwd, ["commit-tree", tree, "-p", head], {
+				env: verifierCommitEnv(env),
 			});
 		}
-		const parent = dirty
-			? base
-			: (() => {
-					try {
-						return git(cwd, ["rev-parse", "HEAD^"]);
-					} catch {
-						throw error(
-							"not-scheduled",
-							"Verifier checkpoint needs a parent commit",
-						);
-					}
-				})();
-		const paths = dirty
-			? changedPaths
-			: snapshotPaths(cwd, parent, snapshot, input.paths);
+		const parent =
+			dirty && scope !== "commit"
+				? head
+				: (() => {
+						try {
+							return git(cwd, ["rev-parse", "HEAD^"]);
+						} catch {
+							if (scope === "project" || scope === "custom")
+								return emptyVerifierBase(cwd);
+							throw error(
+								"not-scheduled",
+								"Verifier checkpoint needs a parent commit",
+							);
+						}
+					})();
+		const paths =
+			scope === "project"
+				? projectSnapshotPaths(cwd, snapshot)
+				: scope === "custom"
+					? customSnapshotPaths(cwd, snapshot, input.patterns ?? input.paths)
+					: scope === "commit"
+						? snapshotPaths(cwd, parent, snapshot, input.paths)
+						: dirty
+							? input.paths
+								? snapshotPaths(cwd, head, snapshot, input.paths)
+								: workingPaths
+							: snapshotPaths(cwd, parent, snapshot, input.paths);
+		if (!paths.length)
+			throw error("not-scheduled", "Verifier checkpoint has no project files");
 		const patchHash = createHash("sha256")
 			.update(git(cwd, ["diff", "--binary", parent, snapshot]))
 			.digest("hex");
@@ -623,6 +699,7 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 			snapshot,
 			paths,
 			patchHash,
+			scope,
 		};
 	} catch (cause) {
 		if (cause instanceof VerifierStoreError) throw cause;
@@ -646,25 +723,30 @@ function ensureVerifierWorkspace(cwd, batch) {
 			batch.checkpoint.snapshot,
 		]);
 		refCreated = true;
-		const archivedPaths = gitLines(cwd, [
-			"--literal-pathspecs",
-			"ls-tree",
-			"-r",
-			"--name-only",
-			batch.checkpoint.snapshot,
-			"--",
-			...batch.checkpoint.paths,
-		]);
+		const projectScope = batch.checkpoint.scope === "project";
+		const archivedPaths = projectScope
+			? batch.checkpoint.paths
+			: gitLines(cwd, [
+					"--literal-pathspecs",
+					"ls-tree",
+					"-r",
+					"--name-only",
+					batch.checkpoint.snapshot,
+					"--",
+					...batch.checkpoint.paths,
+				]);
 		if (archivedPaths.length) {
 			const archive = execFileSync(
 				"git",
-				[
-					"--literal-pathspecs",
-					"archive",
-					batch.checkpoint.snapshot,
-					"--",
-					...archivedPaths,
-				],
+				projectScope
+					? ["archive", batch.checkpoint.snapshot]
+					: [
+							"--literal-pathspecs",
+							"archive",
+							batch.checkpoint.snapshot,
+							"--",
+							...archivedPaths,
+						],
 				{
 					cwd,
 					encoding: null,
@@ -676,6 +758,11 @@ function ensureVerifierWorkspace(cwd, batch) {
 				stdio: ["pipe", "pipe", "pipe"],
 			});
 		}
+		if (projectScope)
+			rmSync(path.join(workspace, ".ce-workflow", "work-runs", "verifiers"), {
+				recursive: true,
+				force: true,
+			});
 		const marker = path.join(workspace, ".ce-verifier-workspace.json");
 		writeFileSync(
 			marker,
@@ -936,7 +1023,9 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 		return { status: "not-configured", launch: Promise.resolve([]) };
 	let checkpoint;
 	try {
-		checkpoint = captureVerifierCheckpoint(cwd, input);
+		checkpoint = input.checkpoint
+			? validateCheckpoint(input.checkpoint, "verifier checkpoint", "invalid")
+			: captureVerifierCheckpoint(cwd, input);
 	} catch (cause) {
 		const batch = recordNotScheduledBatch(cwd, profiles, cause.message, input);
 		return {

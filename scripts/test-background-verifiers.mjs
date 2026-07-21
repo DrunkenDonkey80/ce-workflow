@@ -40,10 +40,20 @@ import {
 	renderVerifierFinding,
 	verifierTelemetryEvents,
 } from "../extensions/background-verifiers.js";
-const { executeVerifierFind, executeVerifierGrep, executeVerifierRead } =
-	await import("../extensions/work-models.js");
+const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+const isolatedAgentDir = mkdtempSync(
+	path.join(os.tmpdir(), "ce-background-verifier-agent-"),
+);
+process.env.PI_CODING_AGENT_DIR = isolatedAgentDir;
+const workModels = await import("../extensions/work-models.js");
+const {
+	default: workModelsExtension,
+	executeVerifierFind,
+	executeVerifierGrep,
+	executeVerifierRead,
+} = workModels;
 
-const dirs = [];
+const dirs = [isolatedAgentDir];
 function repo() {
 	const dir = mkdtempSync(path.join(os.tmpdir(), "ce-background-verifiers-"));
 	dirs.push(dir);
@@ -542,6 +552,174 @@ try {
 	);
 	await committedSchedule.launch;
 	assert.deepEqual(committedRequests[0].paths, ["tracked.txt"]);
+	throwsCategory(
+		() => captureVerifierCheckpoint(committedCwd, { scope: "changes" }),
+		"not-scheduled",
+	);
+
+	// Manual scopes preserve dirty bytes, ignore them for last-commit analysis,
+	// and expand project-relative custom globs deterministically.
+	writeFileSync(path.join(committedCwd, "tracked.txt"), "working\n");
+	writeFileSync(path.join(committedCwd, "untracked.txt"), "new\n");
+	const commitCheckpoint = captureVerifierCheckpoint(committedCwd, {
+		scope: "commit",
+	});
+	assert.equal(commitCheckpoint.scope, "commit");
+	assert.equal(
+		committedGit("show", `${commitCheckpoint.snapshot}:tracked.txt`),
+		"committed",
+		"last-commit scope ignores current worktree bytes",
+	);
+	const changesCheckpoint = captureVerifierCheckpoint(committedCwd, {
+		scope: "changes",
+	});
+	assert.deepEqual(changesCheckpoint.paths, ["tracked.txt", "untracked.txt"]);
+	const projectCheckpoint = captureVerifierCheckpoint(committedCwd, {
+		scope: "project",
+	});
+	assert.deepEqual(projectCheckpoint.paths, ["tracked.txt", "untracked.txt"]);
+	const projectSchedule = scheduleVerifierBatch(committedCwd, {
+		profiles: [profiles[1]],
+		checkpoint: projectCheckpoint,
+		adapter: {
+			enforcesReadOnlyBoundary: true,
+			async spawn(request) {
+				assert.equal(
+					readFileSync(path.join(request.cwd, "tracked.txt"), "utf8"),
+					"working\n",
+				);
+				assert.equal(
+					readFileSync(path.join(request.cwd, "untracked.txt"), "utf8"),
+					"new\n",
+				);
+				return { ok: false, message: "test terminal" };
+			},
+		},
+	});
+	assert.equal(projectSchedule.status, "queued", projectSchedule.reason);
+	await projectSchedule.launch;
+	const customCheckpoint = captureVerifierCheckpoint(committedCwd, {
+		scope: "custom",
+		patterns: ["*.txt"],
+	});
+	assert.deepEqual(customCheckpoint.paths, ["tracked.txt", "untracked.txt"]);
+	throwsCategory(
+		() =>
+			captureVerifierCheckpoint(committedCwd, {
+				scope: "custom",
+				patterns: ["missing/**"],
+			}),
+		"not-scheduled",
+	);
+	const singleCommitCwd = repo();
+	const singleGit = (...args) =>
+		execFileSync("git", args, {
+			cwd: singleCommitCwd,
+			encoding: "utf8",
+		}).trim();
+	singleGit("init", "-q");
+	singleGit("config", "user.email", "test@example.test");
+	singleGit("config", "user.name", "Test");
+	writeFileSync(path.join(singleCommitCwd, "only.txt"), "only\n");
+	singleGit("add", "only.txt");
+	singleGit("commit", "-qm", "initial");
+	assert.deepEqual(
+		captureVerifierCheckpoint(singleCommitCwd, { scope: "project" }).paths,
+		["only.txt"],
+		"whole-project scope supports a single-commit repository",
+	);
+	assert.deepEqual(
+		captureVerifierCheckpoint(singleCommitCwd, {
+			scope: "custom",
+			patterns: ["*.txt"],
+		}).paths,
+		["only.txt"],
+		"custom scope supports a single-commit repository",
+	);
+
+	// /work-analyze selects all configured models, keeps the current model off
+	// until toggled, confirms the immutable file count, and queues one batch.
+	mkdirSync(path.join(committedCwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(committedCwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workOrchestrator: {
+				backgroundVerifiers: {
+					"openai/gpt-5": {
+						operations: ["correctness"],
+						thinking: "high",
+					},
+				},
+			},
+		}),
+	);
+	const commands = {};
+	const listeners = new Map();
+	const notices = [];
+	const pi = {
+		on() {},
+		registerCommand(name, command) {
+			commands[name] = command;
+		},
+		getThinkingLevel: () => "xhigh",
+		events: {
+			on(name, listener) {
+				listeners.set(name, listener);
+				return () => listeners.delete(name);
+			},
+			emit(name, payload) {
+				if (name !== "subagents:rpc:v1:request") return;
+				queueMicrotask(() =>
+					listeners.get(`subagents:rpc:v1:reply:${payload.requestId}`)?.({
+						success: true,
+						data: {
+							runId: `run-${payload.requestId}`,
+							asyncDir: committedCwd,
+						},
+					}),
+				);
+			},
+		},
+	};
+	workModelsExtension(pi);
+	let modelMenu = 0;
+	await commands["work-analyze"].handler("", {
+		cwd: committedCwd,
+		mode: "tui",
+		model: { provider: "test", id: "current" },
+		ui: {
+			notify: (message, level) => notices.push({ message, level }),
+			select: async (title, labels) => {
+				if (title === "Analysis types")
+					return labels.find((label) => label === "done");
+				if (title === "Verifier models") {
+					modelMenu += 1;
+					return modelMenu === 1
+						? labels.find((label) => label.includes("current model"))
+						: labels.find((label) => label === "done");
+				}
+				if (title === "Analysis scope")
+					return labels.find((label) => label.includes("current changes"));
+				return undefined;
+			},
+			confirm: async (_title, message) => {
+				assert.match(message, /2 model\(s\).*6 analysis type\(s\)/);
+				return true;
+			},
+		},
+	});
+	await new Promise((resolve) => setImmediate(resolve));
+	const manualBatch = Object.values(
+		loadVerifierStore(committedCwd).batches,
+	).find((batch) =>
+		batch.profiles.some((profile) => profile.model === "test/current"),
+	);
+	assert(manualBatch, "manual analyzer batch persisted");
+	assert.equal(manualBatch.profiles.length, 2);
+	assert(
+		notices.some((notice) => notice.message.includes(manualBatch.id)),
+		"manual analyzer reports its batch id",
+	);
 
 	// U4: terminal artifacts are bounded, validated, grouped, and never rendered as instructions.
 	const reconcileCwd = repo();
@@ -881,5 +1059,7 @@ try {
 
 	console.log("background verifier domain tests passed");
 } finally {
+	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 	for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 }
