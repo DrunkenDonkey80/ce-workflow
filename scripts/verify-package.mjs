@@ -57,6 +57,7 @@ check(
 );
 
 const roles = [
+	"background-verifier",
 	"advisor",
 	"advisor-2",
 	"advisor-3",
@@ -70,10 +71,25 @@ const roles = [
 ];
 const agentFiles = listed("agents");
 check(
+	"background verifier role is registered",
+	roles.includes("background-verifier"),
+);
+check(
 	"only work role agents ship",
 	roles.every((role) => agentFiles.includes(`work-${role}.md`)) &&
 		!agentFiles.includes("work-advisor-backup.md") &&
 		!agentFiles.some((name) => name.startsWith("bead-")),
+);
+const backgroundVerifierAgent = read("agents/work-background-verifier.md");
+check(
+	"background verifier agent preserves its immutable read-only contract",
+	[
+		"name: work-background-verifier",
+		"tools: work_verifier_read, work_verifier_list, work_verifier_find, work_verifier_grep",
+		"supplied immutable checkpoint",
+		"Do not write or edit files, run shell commands or processes, use the network",
+		"Write exactly one JSON object",
+	].every((marker) => backgroundVerifierAgent.includes(marker)),
 );
 const advisorFiles = [
 	"agents/work-advisor.md",
@@ -276,6 +292,26 @@ check(
 		evaluationDocs.includes("sandboxCommand"),
 );
 const models = read("extensions/work-models.js");
+const verifierStore = read("extensions/background-verifiers.js");
+check(
+	"background verifier tools are registered with the extension",
+	[
+		"work_verifier_read",
+		"work_verifier_list",
+		"work_verifier_find",
+		"work_verifier_grep",
+	].every((tool) => models.includes(`"${tool}"`)),
+);
+check(
+	"background verifier status contract is packaged",
+	[
+		"not-configured",
+		"queued/running",
+		"failed/orphaned",
+		"completed-awaiting-triage",
+		"fully-triaged",
+	].every((status) => verifierStore.includes(`"${status}"`)),
+);
 const packagedPromptCommands = pkg.pi?.prompts?.length
 	? listed("prompts").map((name) => name.replace(/\.md$/, ""))
 	: [];
@@ -362,6 +398,7 @@ check(
 );
 
 const tests = [
+	"test-background-verifiers.mjs",
 	"test-work-improvement-reporting.mjs",
 	"test-work-store.mjs",
 	"test-work-store-performance.mjs",
@@ -382,6 +419,11 @@ const tests = [
 		/^test-workflow-evaluation-.*\.mjs$/.test(name),
 	),
 ];
+check(
+	"background verifier test is discovered exactly once",
+	tests.filter((script) => script === "test-background-verifiers.mjs")
+		.length === 1,
+);
 for (const script of [...new Set(tests)]) {
 	try {
 		execFileSync(process.execPath, [path.join("scripts", script)], {
