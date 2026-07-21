@@ -770,19 +770,24 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		path.join(cwd, ".pi", "settings.json"),
 		JSON.stringify({ workResume: { selfImproving: true } }),
 	);
-	await tempHooks.turn_end(
-		{},
-		{ ...ctx, getContextUsage: () => ({ tokens: 160_000 }) },
+	const highUsageCtx = {
+		...ctx,
+		isIdle: () => true,
+		getContextUsage: () => ({ tokens: 160_000 }),
+	};
+	await tempHooks.turn_end({}, highUsageCtx);
+	assert.equal(
+		compactions.length,
+		0,
+		"turn-end auto-compaction waits until the agent is settled",
 	);
+	await tempHooks.agent_settled({}, highUsageCtx);
 	assert.equal(
 		compactions.length,
 		1,
-		"turn-end auto-compaction is enabled by default",
+		"settled auto-compaction is enabled by default",
 	);
-	assert.match(
-		compactions[0].customInstructions,
-		/work-orchestrator proactive/,
-	);
+	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
 	compactions.length = 0;
 
 	const oldCompactions = [];
@@ -830,12 +835,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	assert.equal(
 		compactions.length,
-		1,
-		"active work goals compact at turn boundaries even when opt-in auto-compaction is off",
-	);
-	assert.match(
-		compactions[0].customInstructions,
-		/work-orchestrator proactive/,
+		0,
+		"active work goals do not compact inside turn_end",
 	);
 
 	const before = await tempHooks.before_agent_start(
@@ -857,6 +858,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	assert.equal(compactions.length, 1, "work-goal compacts before continuing");
+	assert.match(compactions[0].customInstructions, /work-goal microcompact/);
 	assert.equal(sent.length, 2);
 	assert.match(sent[1].message, /Automatic continuation #1/);
 	assert.equal(statuses["work-goal"], "▶️ active #1");

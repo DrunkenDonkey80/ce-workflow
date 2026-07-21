@@ -3427,44 +3427,13 @@ function resetContextCompaction() {
 	contextCompactState.requested = false;
 }
 
-function maybeCompact(ctx, settings, reason, forceAutoCompact = false) {
+function maybeCompact(ctx, settings) {
 	const current = contextSettings(settings);
-	if (
-		current.enabled === false ||
-		(current.autoCompact !== true && !forceAutoCompact) ||
-		contextCompactState.inFlight
-	)
-		return false;
+	if (current.enabled === false || current.autoCompact !== true) return false;
 	const usage = ctx.getContextUsage?.();
-	if (!usage?.tokens) return false;
-	const trigger = compactTriggerTokens(ctx, settings);
-	if (usage.tokens < trigger) return false;
-	const generation = beginContextCompaction();
-	try {
-		ctx.compact({
-			customInstructions: `work-orchestrator proactive ${reason}: preserve goals, native work-item store/git state, file changes, blockers, and next command; omit reasoning and full tool logs.`,
-			onComplete: () => {
-				if (!finishContextCompaction(generation)) return;
-				ctx.ui.notify("Work context compacted before rot", "info");
-			},
-
-			onError: (error) => {
-				if (!finishContextCompaction(generation)) return;
-				ctx.ui.notify(
-					`Work context compaction failed: ${error.message}`,
-					"warning",
-				);
-			},
-		});
-		return true;
-	} catch (error) {
-		finishContextCompaction(generation);
-		ctx.ui.notify(
-			`Work context compaction failed: ${formatError(error)}`,
-			"warning",
-		);
+	if (!usage?.tokens || usage.tokens < compactTriggerTokens(ctx, settings))
 		return false;
-	}
+	return requestManualMicrocompact(ctx);
 }
 
 function runManualMicrocompact(ctx) {
@@ -6567,7 +6536,11 @@ function registerVerifierTriageTools(pi) {
 				);
 			run(cwd, "git", ["add", "--", ...paths]);
 			ensureOnlyStaged(cwd, paths);
-			run(cwd, "git", ["commit", "-m", "fix(verifier): apply accepted findings"]);
+			run(cwd, "git", [
+				"commit",
+				"-m",
+				"fix(verifier): apply accepted findings",
+			]);
 			const commit = run(cwd, "git", ["rev-parse", "HEAD"]);
 			const result = mutateVerifierStore(cwd, (state) =>
 				completeAcceptedFix(state, {
@@ -14780,30 +14753,25 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
-		if (manualMicrocompactPending && ctx.isIdle?.() !== false)
+		const manualMicrocompactStarted =
+			manualMicrocompactPending &&
+			ctx.isIdle?.() !== false &&
 			runManualMicrocompact(ctx);
 		if (ctx.isIdle?.() !== false) {
 			workAgentCompactionResume?.finalize();
 			workAgentCompactionResume = null;
+			if (!manualMicrocompactStarted && activeWorkGoal?.status !== "active")
+				try {
+					maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
+				} catch {
+					maybeCompact(ctx, {});
+				}
 		}
 	});
 
 	pi.on("turn_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "turn_end", event);
-		const manualMicrocompactStarted =
-			manualMicrocompactPending && runManualMicrocompact(ctx);
-		const activeGoal = activeWorkGoal?.status === "active";
-		if (!manualMicrocompactStarted)
-			try {
-				maybeCompact(
-					ctx,
-					readEffectiveSettings(ctx.cwd),
-					"turn boundary",
-					activeGoal,
-				);
-			} catch {
-				maybeCompact(ctx, {}, "turn boundary", activeGoal);
-			}
+		if (manualMicrocompactPending) runManualMicrocompact(ctx);
 		cleanupBenignInstructionDirt(ctx.cwd);
 		await flushWorkGoalContinuationRetry(ctx, pi);
 	});
