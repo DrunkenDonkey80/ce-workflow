@@ -509,6 +509,40 @@ try {
 	git("update-index", "--add", "--cacheinfo", `120000,${linkBlob},unsafe-link`);
 	throwsCategory(() => captureVerifierCheckpoint(gitCwd), "not-scheduled");
 
+	const committedCwd = repo();
+	const committedGit = (...args) =>
+		execFileSync("git", args, {
+			cwd: committedCwd,
+			encoding: "utf8",
+		}).trim();
+	committedGit("init", "-q");
+	committedGit("config", "user.email", "test@example.test");
+	committedGit("config", "user.name", "Test");
+	writeFileSync(path.join(committedCwd, "tracked.txt"), "base\n");
+	committedGit("add", "tracked.txt");
+	committedGit("commit", "-qm", "base");
+	writeFileSync(path.join(committedCwd, "tracked.txt"), "committed\n");
+	committedGit("commit", "-qam", "change");
+	const committedRequests = [];
+	const committedSchedule = scheduleVerifierBatch(committedCwd, {
+		profiles: [profiles[0]],
+		paths: ["tracked.txt"],
+		adapter: {
+			enforcesReadOnlyBoundary: true,
+			async spawn(request) {
+				committedRequests.push(request);
+				return { ok: false, message: "test terminal" };
+			},
+		},
+	});
+	assert.equal(
+		committedSchedule.status,
+		"queued",
+		`clean committed HEAD^ checkpoints schedule after finish: ${committedSchedule.reason ?? ""}`,
+	);
+	await committedSchedule.launch;
+	assert.deepEqual(committedRequests[0].paths, ["tracked.txt"]);
+
 	// U4: terminal artifacts are bounded, validated, grouped, and never rendered as instructions.
 	const reconcileCwd = repo();
 	initVerifierStore(reconcileCwd, { now: "2026-07-21T02:00:00.000Z" });
@@ -530,6 +564,18 @@ try {
 		"outputs",
 	);
 	mkdirSync(runtimeOutput, { recursive: true });
+	const reportWorkspace = mkdtempSync(
+		path.join(os.tmpdir(), "ce-verifier-workspace-"),
+	);
+	mkdirSync(path.join(reportWorkspace, "extensions"), { recursive: true });
+	writeFileSync(
+		path.join(reportWorkspace, "extensions", "work-models.js"),
+		Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join("\n"),
+	);
+	writeFileSync(
+		path.join(reportWorkspace, ".ce-verifier-workspace.json"),
+		JSON.stringify({ version: 1, paths: checkpoint.paths }),
+	);
 	const launchReport = (job, payload, state = "completed") => {
 		const output = path.join(runtimeOutput, `${job.id}.json`);
 		const asyncDir = path.join(
@@ -591,6 +637,7 @@ try {
 					{
 						logicalJobId: job.id,
 						model: job.model,
+						cwd: reportWorkspace,
 						output: path.join(runtimeOutput, `${job.id}.json`),
 					},
 				]),
@@ -606,6 +653,11 @@ try {
 	);
 	const reconciledStore = loadVerifierStore(reconcileCwd);
 	assert.equal(Object.keys(reconciledStore.findings).length, 2);
+	assert.equal(
+		existsSync(reportWorkspace),
+		false,
+		"successful terminal batches clean their isolated workspace",
+	);
 	assert.equal(
 		Object.values(reconciledStore.groups).length,
 		1,
@@ -648,6 +700,18 @@ try {
 	mkdirSync(path.dirname(malformedOutput), { recursive: true });
 	const malformedAsync = path.join(malformedCwd, "async");
 	mkdirSync(malformedAsync);
+	const malformedWorkspace = mkdtempSync(
+		path.join(os.tmpdir(), "ce-verifier-workspace-"),
+	);
+	mkdirSync(path.join(malformedWorkspace, "extensions"), { recursive: true });
+	writeFileSync(
+		path.join(malformedWorkspace, "extensions", "work-models.js"),
+		"only one line",
+	);
+	writeFileSync(
+		path.join(malformedWorkspace, ".ce-verifier-workspace.json"),
+		JSON.stringify({ version: 1, paths: checkpoint.paths }),
+	);
 	mutateVerifierStore(malformedCwd, (state) =>
 		queueVerifierJobs(state, {
 			batchId: malformedBatch.id,
@@ -655,6 +719,7 @@ try {
 				[malformedJob.id]: {
 					logicalJobId: malformedJob.id,
 					model: malformedJob.model,
+					cwd: malformedWorkspace,
 					output: malformedOutput,
 				},
 			},
@@ -671,18 +736,21 @@ try {
 		path.join(malformedAsync, "status.json"),
 		JSON.stringify({ state: "completed" }),
 	);
-	writeFileSync(malformedOutput, "{".repeat(21));
+	writeFileSync(
+		malformedOutput,
+		reportPayload(malformedJob, findingPayload(999, 999)),
+	);
 	reconcileVerifierRuns(malformedCwd);
 	const malformedStore = loadVerifierStore(malformedCwd);
 	assert.equal(
 		Object.keys(malformedStore.findings).length,
 		0,
-		"malformed output is never actionable",
+		"out-of-range output is never actionable",
 	);
 	assert.equal(
 		Object.keys(malformedStore.quarantines).length,
 		1,
-		"malformed output is quarantined",
+		"out-of-range output is quarantined",
 	);
 	assert.equal(verifierStatus(malformedStore), "failed/orphaned");
 	assert(

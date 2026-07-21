@@ -26,6 +26,21 @@ const {
 		),
 	).href
 );
+const {
+	addFinding,
+	addGroup,
+	createBatch,
+	initVerifierStore,
+	loadVerifierStore,
+	mutateVerifierStore,
+	recordOperationResult,
+} = await import(
+	pathToFileURL(
+		realpathSync(
+			path.join(import.meta.dirname, "../extensions/background-verifiers.js"),
+		),
+	).href
+);
 
 const epics = [
 	{
@@ -1053,6 +1068,69 @@ try {
 		"max still skips a planner boundary for simple slices",
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
+
+	const triageCwd = mkdtempSync(path.join(tmpdir(), "work-resume-triage-"));
+	seedNativeStore(triageCwd, sourcesForScenario("implementation"));
+	initVerifierStore(triageCwd);
+	const triageCheckpoint = {
+		repository: triageCwd,
+		base: "a".repeat(40),
+		snapshot: "b".repeat(40),
+		paths: ["extensions/work-models.js"],
+		patchHash: "c".repeat(64),
+	};
+	mutateVerifierStore(triageCwd, (store) =>
+		createBatch(store, {
+			checkpoint: triageCheckpoint,
+			profiles: [
+				{
+					model: "openai/gpt-5",
+					operations: ["correctness"],
+					thinking: "low",
+				},
+			],
+		}),
+	);
+	const triageJob = Object.values(loadVerifierStore(triageCwd).jobs)[0];
+	const triageReport = mutateVerifierStore(triageCwd, (store) =>
+		recordOperationResult(store, {
+			jobId: triageJob.id,
+			operation: "correctness",
+			outcome: "findings",
+		}),
+	);
+	const triageFinding = mutateVerifierStore(triageCwd, (store) =>
+		addFinding(store, {
+			reportId: triageReport.id,
+			operation: "correctness",
+			model: triageJob.model,
+			checkpoint: triageCheckpoint,
+			path: "extensions/work-models.js",
+			startLine: 1,
+			endLine: 1,
+			category: "correctness",
+			severity: "high",
+			rationale: "reproduced issue",
+			evidence: "line 1",
+			suggestedAction: "fix line 1",
+		}),
+	);
+	mutateVerifierStore(triageCwd, (store) =>
+		addGroup(store, { findingIds: [triageFinding.id] }),
+	);
+	const triageState = buildWorkResumeState(triageCwd, "E-1", {
+		ownerSession: "resume-test",
+	});
+	assert(
+		triageState.action === "triage-required" &&
+			triageState.handoffPrompt.includes(triageFinding.id),
+		"completed verifier findings block writer routing at resume",
+	);
+	assert(
+		buildWorkResumeState(triageCwd, "E-1").action === "run-implementation",
+		"pure resume-state reads do not steal or enforce a triage lease",
+	);
+	rmSync(triageCwd, { recursive: true, force: true });
 } finally {
 	if (oldEnv.agentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = oldEnv.agentDir;

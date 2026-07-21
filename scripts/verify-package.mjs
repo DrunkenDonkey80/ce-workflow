@@ -88,7 +88,8 @@ check(
 		"tools: work_verifier_read, work_verifier_list, work_verifier_find, work_verifier_grep",
 		"supplied immutable checkpoint",
 		"Do not write or edit files, run shell commands or processes, use the network",
-		"Write exactly one JSON object",
+		"Return exactly one JSON object",
+		"trusted runtime persists that final response",
 	].every((marker) => backgroundVerifierAgent.includes(marker)),
 );
 const advisorFiles = [

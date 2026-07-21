@@ -493,7 +493,7 @@ function gitLines(cwd, args, options) {
 	const output = git(cwd, args, options);
 	return output ? output.split(/\r?\n/).filter(Boolean) : [];
 }
-function snapshotPaths(cwd, base, snapshot, paths) {
+function snapshotPaths(cwd, base, snapshot, paths, allowEmpty = false) {
 	const changed = new Set(
 		[
 			...gitLines(
@@ -508,8 +508,10 @@ function snapshotPaths(cwd, base, snapshot, paths) {
 		].filter((entry) => !entry.startsWith(".ce-workflow/work-runs/verifiers/")),
 	);
 	const scoped = paths === undefined ? [...changed].sort() : [...paths].sort();
-	if (!scoped.length)
+	if (!scoped.length) {
+		if (allowEmpty) return [];
 		throw error("not-scheduled", "Verifier checkpoint has no changed paths");
+	}
 	for (const entry of scoped) {
 		relativePath(entry, "checkpoint path");
 		if (!changed.has(entry))
@@ -567,8 +569,13 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 				"Verifier snapshot has unresolved conflicts",
 			);
 		assertNoSnapshotSymlinks(cwd);
-		const changedPaths = snapshotPaths(cwd, base, base, input.paths);
-		const dirty = changedPaths.length > 0;
+		const workingPaths = snapshotPaths(cwd, base, base, undefined, true);
+		const dirty = workingPaths.length > 0;
+		const changedPaths = dirty
+			? input.paths
+				? snapshotPaths(cwd, base, base, input.paths)
+				: workingPaths
+			: [];
 		let snapshot = base;
 		if (dirty) {
 			temporaryIndex = path.join(
@@ -1535,6 +1542,31 @@ function artifactForJob(cwd, job) {
 		);
 	return file;
 }
+function validateFindingRange(job, batch, finding) {
+	if (!batch.checkpoint.paths.includes(finding.path))
+		throw error("invalid", "Verifier finding path is outside the checkpoint");
+	if (
+		!Number.isInteger(finding.startLine) ||
+		!Number.isInteger(finding.endLine) ||
+		finding.startLine < 1 ||
+		finding.endLine < finding.startLine
+	)
+		return;
+	const workspace = job.launch?.request?.cwd;
+	if (!nonempty(workspace)) return;
+	const relative = relativePath(finding.path);
+	let lineCount;
+	try {
+		lineCount = readFileSync(path.join(workspace, relative), "utf8").split(
+			/\r\n|[\n\r]/,
+		).length;
+	} catch {
+		throw error("invalid", "Verifier finding source path is unavailable");
+	}
+	if (finding.endLine > lineCount)
+		throw error("invalid", "Verifier finding range exceeds its source file");
+}
+
 function validateResult(job, batch, result) {
 	const required = ["jobId", "model", "checkpoint", "operation", "outcome"];
 	if (!exactKeys(result, required, ["findings", "usage", "failure"]))
@@ -1582,6 +1614,7 @@ function validateResult(job, batch, result) {
 			])
 		)
 			throw error("invalid", "Verifier finding has an invalid schema");
+		validateFindingRange(job, batch, finding);
 		return {
 			path: finding.path,
 			startLine: finding.startLine,
