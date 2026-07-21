@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -17,7 +25,12 @@ import {
 	recordOperationResult,
 	saveVerifierStore,
 	verifierStorePath,
+	captureVerifierCheckpoint,
+	scheduleVerifierBatch,
+	launchQueuedVerifierJobs,
 } from "../extensions/background-verifiers.js";
+const { executeVerifierFind, executeVerifierGrep, executeVerifierRead } =
+	await import("../extensions/work-models.js");
 
 const dirs = [];
 function repo() {
@@ -260,6 +273,204 @@ try {
 		loadVerifierStore(recoveryCwd).metadata.updatedAt,
 		"2026-07-21T00:00:00.000Z",
 	);
+
+	// U3: checkpoint capture preserves the live checkout and launches once per model.
+	const gitCwd = repo();
+	const git = (...args) =>
+		execFileSync("git", args, { cwd: gitCwd, encoding: "utf8" }).trim();
+	git("init", "-q");
+	git("config", "user.email", "test@example.test");
+	git("config", "user.name", "Test");
+	writeFileSync(path.join(gitCwd, "tracked.txt"), "base\n");
+	git("add", "tracked.txt");
+	git("commit", "-qm", "base");
+	writeFileSync(path.join(gitCwd, "tracked.txt"), "staged\n");
+	git("add", "tracked.txt");
+	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
+	writeFileSync(path.join(gitCwd, "untracked.txt"), "untracked\n");
+	const branchBefore = git("rev-parse", "--abbrev-ref", "HEAD");
+	const indexBefore = git("diff", "--cached", "--binary");
+	const worktreeBefore = git("diff", "--binary");
+	const captured = captureVerifierCheckpoint(gitCwd);
+	assert.equal(git("rev-parse", "--abbrev-ref", "HEAD"), branchBefore);
+	assert.equal(git("diff", "--cached", "--binary"), indexBefore);
+	assert.equal(git("diff", "--binary"), worktreeBefore);
+	assert.equal(git("show", `${captured.snapshot}:tracked.txt`), "unstaged");
+	assert.equal(git("show", `${captured.snapshot}:untracked.txt`), "untracked");
+	const requests = [];
+	const adapter = {
+		enforcesReadOnlyBoundary: true,
+		async spawn(request) {
+			requests.push(request);
+			return {
+				ok: true,
+				runId: `run-${requests.length}`,
+				asyncDir: `/tmp/run-${requests.length}`,
+			};
+		},
+	};
+	const scheduled = scheduleVerifierBatch(gitCwd, {
+		profiles,
+		adapter,
+		origin: "normal",
+	});
+	await scheduled.launch;
+	assert.equal(requests.length, 2);
+	assert(
+		Object.values(loadVerifierStore(gitCwd).jobs)
+			.filter((job) => job.batchId === scheduled.batch.id)
+			.every(
+				(job) => job.status === "running" && job.launch.status === "running",
+			),
+		"acknowledged launches are running",
+	);
+	assert(
+		requests.every(
+			(request) => request.context === "fresh" && request.async === true,
+		),
+	);
+	assert(
+		requests.every(
+			(request) =>
+				request.boundary.toolAllowlist.join(",") ===
+				"work_verifier_read,work_verifier_list,work_verifier_find,work_verifier_grep",
+		),
+	);
+	assert(
+		requests.every(
+			(request) => !path.resolve(request.cwd).startsWith(path.resolve(gitCwd)),
+		),
+	);
+	assert.equal(
+		readFileSync(path.join(requests[0].cwd, "tracked.txt"), "utf8").trim(),
+		"unstaged",
+	);
+	writeFileSync(path.join(gitCwd, "tracked.txt"), "after-launch\n");
+	assert.equal(
+		readFileSync(path.join(requests[0].cwd, "tracked.txt"), "utf8").trim(),
+		"unstaged",
+	);
+	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
+	assert.deepEqual(requests[0].paths.sort(), ["tracked.txt", "untracked.txt"]);
+	assert.equal(
+		executeVerifierRead(requests[0].cwd, { path: "tracked.txt" }).lines[0],
+		"unstaged",
+	);
+	assert.deepEqual(
+		executeVerifierFind(requests[0].cwd, { query: "untracked" }).matches,
+		["untracked.txt"],
+	);
+	assert.equal(
+		executeVerifierGrep(requests[0].cwd, { query: "unstaged" }).matches[0].path,
+		"tracked.txt",
+	);
+	assert.throws(() =>
+		executeVerifierRead(requests[0].cwd, { path: "/etc/passwd" }),
+	);
+	assert.throws(() =>
+		executeVerifierRead(requests[0].cwd, { path: "../tracked.txt" }),
+	);
+	symlinkSync("tracked.txt", path.join(requests[0].cwd, "escape-link"));
+	assert.throws(() =>
+		executeVerifierRead(requests[0].cwd, { path: "escape-link" }),
+	);
+	const duplicate = scheduleVerifierBatch(gitCwd, {
+		profiles,
+		adapter,
+		origin: "normal",
+	});
+	await duplicate.launch;
+	assert.equal(requests.length, 2, "equivalent checkpoints launch once");
+	const verifierFix = scheduleVerifierBatch(gitCwd, {
+		profiles,
+		adapter,
+		origin: "verifier-fix",
+	});
+	assert.equal(verifierFix.status, "suppressed");
+	assert.equal(requests.length, 2);
+	const ambiguous = scheduleVerifierBatch(gitCwd, {
+		profiles: [profiles[0]],
+		adapter: {
+			enforcesReadOnlyBoundary: true,
+			async spawn() {
+				return { ok: true };
+			},
+		},
+		origin: "normal",
+	});
+	await ambiguous.launch;
+	assert.equal(
+		Object.values(loadVerifierStore(gitCwd).jobs).find(
+			(job) => job.batchId === ambiguous.batch.id,
+		).status,
+		"orphaned",
+	);
+	assert.equal(
+		(await launchQueuedVerifierJobs(gitCwd, adapter)).length,
+		0,
+		"orphaned jobs are never relaunched",
+	);
+	writeFileSync(path.join(gitCwd, "tracked.txt"), "scoped\n");
+	const scoped = scheduleVerifierBatch(gitCwd, {
+		profiles: [profiles[0]],
+		paths: ["tracked.txt"],
+		origin: "normal",
+		adapter,
+	});
+	assert.equal(scoped.status, "queued", scoped.reason);
+	await scoped.launch;
+	const scopedRequest = requests.at(-1);
+	assert.deepEqual(scopedRequest.paths, ["tracked.txt"]);
+	assert.equal(
+		existsSync(path.join(scopedRequest.cwd, "untracked.txt")),
+		false,
+		"unscoped untracked bytes are excluded",
+	);
+	const rejected = scheduleVerifierBatch(gitCwd, {
+		profiles: [profiles[1]],
+		paths: ["tracked.txt"],
+		adapter: {
+			enforcesReadOnlyBoundary: true,
+			async spawn() {
+				return { ok: false, message: "rejected" };
+			},
+		},
+		origin: "normal",
+	});
+	await rejected.launch;
+	assert.equal(
+		Object.values(loadVerifierStore(gitCwd).jobs).find(
+			(job) => job.batchId === rejected.batch.id,
+		).status,
+		"failed",
+		"explicit launch rejection is failed, never orphaned",
+	);
+	writeFileSync(path.join(gitCwd, "tracked.txt"), "crash-boundary\n");
+	const queued = scheduleVerifierBatch(gitCwd, {
+		profiles: [profiles[0]],
+		paths: ["tracked.txt"],
+		origin: "normal",
+	});
+	assert.equal(queued.status, "queued", "jobs persist before launch");
+	assert.equal(
+		Object.values(loadVerifierStore(gitCwd).jobs).find(
+			(job) => job.batchId === queued.batch.id,
+		).launch.status,
+		"queued",
+	);
+	await launchQueuedVerifierJobs(gitCwd, adapter);
+	assert.equal(
+		requests.length,
+		4,
+		"recovery launches the durable queued job once",
+	);
+	const linkBlob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+		cwd: gitCwd,
+		input: "outside",
+		encoding: "utf8",
+	}).trim();
+	git("update-index", "--add", "--cacheinfo", `120000,${linkBlob},unsafe-link`);
+	throwsCategory(() => captureVerifierCheckpoint(gitCwd), "not-scheduled");
 
 	console.log("background verifier domain tests passed");
 } finally {

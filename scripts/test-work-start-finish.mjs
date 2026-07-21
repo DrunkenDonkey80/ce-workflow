@@ -21,6 +21,7 @@ const {
 	buildWorkMigrateState,
 	buildWorkSmallState,
 	directRoleHandoffParams,
+	createPiSubagentsVerifierAdapter,
 } = await import(
 	pathToFileURL(
 		realpathSync(
@@ -31,6 +32,56 @@ const {
 
 const fixture = installWorkflowFixture({ native: true });
 try {
+	assert(
+		createPiSubagentsVerifierAdapter({}).enforcesReadOnlyBoundary,
+		"project-owned verifier tools enforce the launch boundary without provider capabilities",
+	);
+	const listeners = new Map();
+	const verifierAdapter = createPiSubagentsVerifierAdapter({
+		events: {
+			on(name, listener) {
+				listeners.set(name, listener);
+				return () => listeners.delete(name);
+			},
+			emit(_name, request) {
+				listeners.get(`subagents:rpc:v1:reply:${request.requestId}`)?.({
+					success: true,
+					data: { runId: "verifier-run", asyncDir: "C:/tmp/verifier-run" },
+				});
+			},
+		},
+	});
+	assert(
+		(
+			await verifierAdapter.spawn({
+				version: 1,
+				agent: "work-background-verifier",
+				context: "fresh",
+				async: true,
+				cwd: fixture.cwd,
+				output: "C:/tmp/output.json",
+				outputMode: "file-only",
+				logicalJobId: "job-test",
+				model: "openai/gpt-5",
+				thinking: "low",
+				operations: ["correctness"],
+				paths: ["tracked.txt"],
+				checkpoint: { snapshot: "a".repeat(40) },
+				boundary: {
+					readOnlyWorkspace: true,
+					cwdConfinedReadTools: true,
+					credentialsIsolated: true,
+					toolAllowlist: [
+						"work_verifier_read",
+						"work_verifier_list",
+						"work_verifier_find",
+						"work_verifier_grep",
+					],
+				},
+			})
+		).ok,
+		"adapter launches without fictional provider capabilities",
+	);
 	let state = buildWorkSmallState(fixture.cwd, "Add coded start gate");
 	assert(
 		state.ok && state.action === "run-implementation",
@@ -330,6 +381,9 @@ try {
 			workOrchestrator: {
 				browserTestsOnUiDiff: false,
 				codeReviewBeforeCommit: "off",
+				backgroundVerifiers: {
+					"openai/gpt-5": { operations: ["correctness"], thinking: "low" },
+				},
 			},
 		}),
 	);
@@ -350,6 +404,10 @@ try {
 		"finish commits and closes without a committer agent",
 	);
 	assert(
+		state.verifier && state.verifier.status !== "suppressed",
+		"normal finish attempts background verification after commit",
+	);
+	assert(
 		fixture
 			.logs()
 			.some((entry) => entry.tool === "git" && entry.op === "commit") &&
@@ -359,6 +417,17 @@ try {
 			fixture.store().items["FIN-1"].status === "closed" &&
 			!fixture.logs().some((entry) => entry.op === "close"),
 		"finish stages work, closes native state, and amends one commit without bd",
+	);
+
+	fixture.reset("finishReady", "unknown");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	state = executeWorkFinishState(finishCwd, {
+		...state,
+		origin: "verifier-fix",
+	});
+	assert(
+		state.ok && state.verifier?.status === "suppressed",
+		"coded verifier-fix finish suppresses recursive background scheduling",
 	);
 
 	fixture.reset("finishReady", "unknown");

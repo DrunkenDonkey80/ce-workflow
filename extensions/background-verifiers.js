@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import {
 	chmodSync,
 	closeSync,
 	existsSync,
 	fsyncSync,
+	lstatSync,
 	mkdirSync,
+	mkdtempSync,
 	openSync,
 	readFileSync,
 	renameSync,
@@ -12,6 +15,7 @@ import {
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 export const VERIFIER_STORE_VERSION = 1;
@@ -442,7 +446,10 @@ function edit(store, change) {
 function expectedJobId(batchId, model) {
 	return stableId("job", { batchId, model });
 }
-function jobStatus(operationStatus) {
+function jobStatus(operationStatus, launch) {
+	if (launch?.status === "orphaned") return "orphaned";
+	if (launch?.status === "failed") return "failed";
+	if (launch?.status === "running") return "running";
 	const values = Object.values(operationStatus);
 	if (values.every((value) => value === "pending")) return "queued";
 	if (values.some((value) => value === "pending")) return "running";
@@ -450,6 +457,410 @@ function jobStatus(operationStatus) {
 	if (values.some((value) => value === "failed")) return "partially-failed";
 	return "completed";
 }
+function git(cwd, args, options = {}) {
+	return execFileSync("git", args, {
+		cwd,
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+		...options,
+	}).trim();
+}
+function gitLines(cwd, args, options) {
+	const output = git(cwd, args, options);
+	return output ? output.split(/\r?\n/).filter(Boolean) : [];
+}
+function snapshotPaths(cwd, base, snapshot, paths) {
+	const changed = new Set(
+		[
+			...gitLines(
+				cwd,
+				snapshot === base
+					? ["diff", "--name-only", base]
+					: ["diff", "--name-only", base, snapshot],
+			),
+			...git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"])
+				.split("\0")
+				.filter(Boolean),
+		].filter((entry) => !entry.startsWith(".ce-workflow/work-runs/verifiers/")),
+	);
+	const scoped = paths === undefined ? [...changed].sort() : [...paths].sort();
+	if (!scoped.length)
+		throw error("not-scheduled", "Verifier checkpoint has no changed paths");
+	for (const entry of scoped) {
+		relativePath(entry, "checkpoint path");
+		if (!changed.has(entry))
+			throw error(
+				"not-scheduled",
+				`Verifier checkpoint path is outside changed scope: ${entry}`,
+			);
+	}
+	return scoped;
+}
+function assertNoSnapshotSymlinks(cwd) {
+	const tracked = gitLines(cwd, ["ls-files", "-s"]);
+	if (tracked.some((line) => /^120000\s/.test(line)))
+		throw error(
+			"not-scheduled",
+			"Verifier snapshot contains a tracked symlink",
+		);
+	const untracked = git(cwd, [
+		"ls-files",
+		"--others",
+		"--exclude-standard",
+		"-z",
+	])
+		.split("\0")
+		.filter(Boolean);
+	for (const entry of untracked) {
+		try {
+			if (lstatSync(path.join(cwd, entry)).isSymbolicLink())
+				throw error(
+					"not-scheduled",
+					"Verifier snapshot contains an untracked symlink",
+				);
+		} catch (cause) {
+			if (cause instanceof VerifierStoreError) throw cause;
+			throw error("not-scheduled", `Verifier snapshot cannot read ${entry}`);
+		}
+	}
+}
+function verifierRuntimeRoot(cwd) {
+	return path.join(runtimeDir(cwd), "runtime");
+}
+function checkpointRef(batchId) {
+	return `refs/ce-workflow/verifiers/${batchId}`;
+}
+
+// Capturing through a private index is the only git mutation path here; it
+// never touches the caller's index, branch, or working tree.
+export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
+	let temporaryIndex;
+	try {
+		const base = git(cwd, ["rev-parse", "HEAD"]);
+		if (gitLines(cwd, ["ls-files", "-u"]).length)
+			throw error(
+				"not-scheduled",
+				"Verifier snapshot has unresolved conflicts",
+			);
+		assertNoSnapshotSymlinks(cwd);
+		const changedPaths = snapshotPaths(cwd, base, base, input.paths);
+		const dirty = changedPaths.length > 0;
+		let snapshot = base;
+		if (dirty) {
+			temporaryIndex = path.join(
+				mkdtempSync(path.join(os.tmpdir(), "ce-verifier-index-")),
+				"index",
+			);
+			const env = { ...process.env, GIT_INDEX_FILE: temporaryIndex };
+			git(cwd, ["read-tree", base], { env });
+			git(cwd, ["add", "-A", "--", ...changedPaths], { env });
+			const tree = git(cwd, ["write-tree"], { env });
+			const commitEnv = {
+				...env,
+				GIT_AUTHOR_NAME: "ce-workflow verifier",
+				GIT_AUTHOR_EMAIL: "verifier@ce-workflow.invalid",
+				GIT_COMMITTER_NAME: "ce-workflow verifier",
+				GIT_COMMITTER_EMAIL: "verifier@ce-workflow.invalid",
+				GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
+				GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
+			};
+			snapshot = git(cwd, ["commit-tree", tree, "-p", base], {
+				env: commitEnv,
+			});
+		}
+		const parent = dirty
+			? base
+			: (() => {
+					try {
+						return git(cwd, ["rev-parse", "HEAD^"]);
+					} catch {
+						throw error(
+							"not-scheduled",
+							"Verifier checkpoint needs a parent commit",
+						);
+					}
+				})();
+		const paths = dirty
+			? changedPaths
+			: snapshotPaths(cwd, parent, snapshot, input.paths);
+		const patchHash = createHash("sha256")
+			.update(git(cwd, ["diff", "--binary", parent, snapshot]))
+			.digest("hex");
+		return {
+			repository: path.resolve(cwd),
+			base: parent,
+			snapshot,
+			paths,
+			patchHash,
+		};
+	} catch (cause) {
+		if (cause instanceof VerifierStoreError) throw cause;
+		throw error("not-scheduled", `Verifier snapshot failed: ${cause.message}`);
+	} finally {
+		if (temporaryIndex)
+			rmSync(path.dirname(temporaryIndex), { recursive: true, force: true });
+	}
+}
+function ensureVerifierWorkspace(cwd, batch) {
+	// Keep the agent outside the repository: an archive has no .git directory,
+	// worktree links, project settings, or parent path to project credentials.
+	const workspace = mkdtempSync(
+		path.join(os.tmpdir(), "ce-verifier-workspace-"),
+	);
+	try {
+		git(cwd, [
+			"update-ref",
+			checkpointRef(batch.id),
+			batch.checkpoint.snapshot,
+		]);
+		const archive = execFileSync(
+			"git",
+			["archive", batch.checkpoint.snapshot],
+			{
+				cwd,
+				encoding: null,
+				stdio: ["ignore", "pipe", "pipe"],
+			},
+		);
+		execFileSync("tar", ["-x", "-C", workspace], {
+			input: archive,
+			stdio: ["pipe", "pipe", "pipe"],
+		});
+		const marker = path.join(workspace, ".ce-verifier-workspace.json");
+		writeFileSync(
+			marker,
+			`${JSON.stringify({ version: 1, paths: batch.checkpoint.paths })}\n`,
+			{ mode: 0o400 },
+		);
+		chmodSync(marker, 0o400);
+		return workspace;
+	} catch (cause) {
+		rmSync(workspace, { recursive: true, force: true });
+		throw error("not-scheduled", `Verifier workspace failed: ${cause.message}`);
+	}
+}
+function verifierRequest(cwd, batch, job, workspace) {
+	workspace ??= ensureVerifierWorkspace(cwd, batch);
+	const outputDir = path.join(verifierRuntimeRoot(cwd), "outputs");
+	mkdirSync(outputDir, { recursive: true, mode: 0o700 });
+	return {
+		version: 1,
+		logicalJobId: job.id,
+		agent: "work-background-verifier",
+		model: job.model,
+		thinking: job.thinking,
+		operations: job.operations,
+		context: "fresh",
+		async: true,
+		cwd: workspace,
+		output: path.join(outputDir, `${job.id}.json`),
+		outputMode: "file-only",
+		boundary: {
+			toolAllowlist: [
+				"work_verifier_read",
+				"work_verifier_list",
+				"work_verifier_find",
+				"work_verifier_grep",
+			],
+			deny: ["write", "edit", "bash", "process", "network"],
+			readOnlyWorkspace: true,
+			cwdConfinedReadTools: true,
+			credentialsIsolated: true,
+		},
+		checkpoint: structuredClone(batch.checkpoint),
+		paths: [...batch.checkpoint.paths],
+	};
+}
+export function queueVerifierJobs(store, input = {}) {
+	return edit(store, (next) => {
+		const batch = next.batches[input.batchId];
+		if (!batch)
+			throw error("missing", `Verifier batch is missing: ${input.batchId}`);
+		for (const job of Object.values(next.jobs).filter(
+			(item) => item.batchId === batch.id,
+		)) {
+			if (job.launch) continue;
+			const request = input.requests?.[job.id];
+			if (
+				!plainObject(request) ||
+				request.logicalJobId !== job.id ||
+				request.model !== job.model
+			)
+				throw error("invalid", `Invalid launch request for ${job.id}`);
+			job.launch = {
+				logicalJobId: job.id,
+				status: "queued",
+				request,
+				queuedAt: now(input.now),
+			};
+		}
+		return batch;
+	});
+}
+export function recordVerifierLaunch(store, input = {}) {
+	return edit(store, (next) => {
+		const job = next.jobs[input.jobId];
+		if (!job?.launch || job.launch.status !== "queued")
+			throw error("invalid", `Verifier job is not launchable: ${input.jobId}`);
+		const identity = input.identity ?? {};
+		if (
+			input.ambiguous ||
+			(input.ok && !identity.runId && !identity.asyncDir)
+		) {
+			job.launch = {
+				...job.launch,
+				status: "orphaned",
+				orphanedAt: now(input.now),
+			};
+			job.status = "orphaned";
+		} else if (input.ok) {
+			job.launch = {
+				...job.launch,
+				status: "running",
+				runId: identity.runId,
+				asyncDir: identity.asyncDir,
+				launchedAt: now(input.now),
+			};
+			job.status = "running";
+		} else {
+			job.launch = {
+				...job.launch,
+				status: "failed",
+				failure: String(input.failure ?? "launch failed"),
+				failedAt: now(input.now),
+			};
+			job.status = "failed";
+		}
+		return job;
+	});
+}
+export async function launchQueuedVerifierJobs(cwd = process.cwd(), adapter) {
+	if (!adapter?.enforcesReadOnlyBoundary || typeof adapter.spawn !== "function")
+		return [];
+	let store;
+	try {
+		store = loadVerifierStore(cwd);
+	} catch {
+		return [];
+	}
+	const launched = [];
+	for (const job of Object.values(store.jobs).filter(
+		(item) => item.launch?.status === "queued",
+	)) {
+		let reply;
+		try {
+			reply = await adapter.spawn(structuredClone(job.launch.request));
+		} catch (cause) {
+			reply = { ok: false, ambiguous: true, failure: cause.message };
+		}
+		const data = reply?.reply?.data ?? reply?.data ?? reply ?? {};
+		const result = data.result ?? {};
+		const identity = {
+			runId: data.runId ?? data.id ?? result.runId ?? result.id,
+			asyncDir: data.asyncDir ?? result.asyncDir,
+		};
+		mutateVerifierStore(cwd, (state) =>
+			recordVerifierLaunch(state, {
+				jobId: job.id,
+				ok: reply?.ok === true,
+				ambiguous:
+					reply?.ambiguous ||
+					(reply?.ok === true && !identity.runId && !identity.asyncDir),
+				identity,
+				failure: reply?.message ?? reply?.failure,
+			}),
+		);
+		launched.push(job.id);
+	}
+	return launched;
+}
+function recordNotScheduledBatch(cwd, profiles, reason, input) {
+	const base = createHash("sha1").update(path.resolve(cwd)).digest("hex");
+	const snapshot = createHash("sha1").update(reason).digest("hex");
+	const checkpoint = {
+		repository: path.resolve(cwd),
+		base,
+		snapshot:
+			snapshot === base
+				? `${snapshot.slice(0, -1)}${snapshot.endsWith("0") ? "1" : "0"}`
+				: snapshot,
+		paths: input.paths?.length ? [...input.paths].sort() : [".ce-workflow"],
+		patchHash: createHash("sha256").update(reason).digest("hex"),
+	};
+	initVerifierStore(cwd);
+	return mutateVerifierStore(cwd, (store) =>
+		edit(store, (next) => {
+			const id = stableId("batch", { checkpoint, profiles, reason });
+			return (next.batches[id] ??= {
+				id,
+				checkpoint,
+				profiles,
+				createdAt: now(input.now),
+				status: "not-scheduled",
+				reason,
+			});
+		}),
+	);
+}
+export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
+	if (input.origin === "verifier-fix")
+		return { status: "suppressed", launch: Promise.resolve([]) };
+	const profiles = normalizeProfiles(input.profiles ?? [], input);
+	if (!profiles.length)
+		return { status: "not-configured", launch: Promise.resolve([]) };
+	let checkpoint;
+	try {
+		checkpoint = captureVerifierCheckpoint(cwd, input);
+	} catch (cause) {
+		const batch = recordNotScheduledBatch(cwd, profiles, cause.message, input);
+		return {
+			status: "not-scheduled",
+			batch,
+			reason: cause.message,
+			launch: Promise.resolve([]),
+		};
+	}
+	const batchId = stableId("batch", { checkpoint, profiles });
+	initVerifierStore(cwd);
+	const existing = loadVerifierStore(cwd).batches[batchId];
+	if (existing)
+		return {
+			status: existing.status,
+			batch: existing,
+			launch: launchQueuedVerifierJobs(cwd, input.adapter),
+		};
+	const provisional = { id: batchId, checkpoint, profiles };
+	const requests = {};
+	try {
+		const workspace = ensureVerifierWorkspace(cwd, provisional);
+		for (const profile of profiles) {
+			const job = {
+				id: expectedJobId(batchId, profile.model),
+				model: profile.model,
+				operations: profile.operations,
+				thinking: profile.thinking,
+			};
+			requests[job.id] = verifierRequest(cwd, provisional, job, workspace);
+		}
+		const batch = mutateVerifierStore(cwd, (store) =>
+			createBatch(store, { checkpoint, profiles, requests, now: input.now }),
+		);
+		return {
+			status: "queued",
+			batch,
+			launch: launchQueuedVerifierJobs(cwd, input.adapter),
+		};
+	} catch (cause) {
+		const batch = recordNotScheduledBatch(cwd, profiles, cause.message, input);
+		return {
+			status: "not-scheduled",
+			batch,
+			reason: cause.message,
+			launch: Promise.resolve([]),
+		};
+	}
+}
+
 export function createBatch(store, input = {}) {
 	const checkpoint = validateCheckpoint(
 		input.checkpoint,
@@ -471,6 +882,14 @@ export function createBatch(store, input = {}) {
 		next.batches[id] = batch;
 		for (const profile of profiles) {
 			const jobId = expectedJobId(id, profile.model);
+			const request = input.requests?.[jobId];
+			if (
+				request !== undefined &&
+				(!plainObject(request) ||
+					request.logicalJobId !== jobId ||
+					request.model !== profile.model)
+			)
+				throw error("invalid", `Invalid launch request for ${jobId}`);
 			next.jobs[jobId] = {
 				id: jobId,
 				batchId: id,
@@ -481,6 +900,16 @@ export function createBatch(store, input = {}) {
 					profile.operations.map((operation) => [operation, "pending"]),
 				),
 				status: "queued",
+				...(request
+					? {
+							launch: {
+								logicalJobId: jobId,
+								status: "queued",
+								request,
+								queuedAt: timestamp,
+							},
+						}
+					: {}),
 				createdAt: timestamp,
 			};
 		}
@@ -580,7 +1009,7 @@ export function recordOperationResult(store, input = {}) {
 		};
 		next.reports[id] = report;
 		job.operationStatus[input.operation] = input.outcome;
-		job.status = jobStatus(job.operationStatus);
+		job.status = jobStatus(job.operationStatus, job.launch);
 		if (
 			Object.values(next.jobs)
 				.filter((candidate) => candidate.batchId === job.batchId)
@@ -782,12 +1211,24 @@ export function validateVerifierStore(store, file = "verifier store") {
 			Object.values(job.operationStatus).some(
 				(status) => !["pending", ...OUTCOMES].includes(status),
 			) ||
-			job.status !== jobStatus(job.operationStatus)
+			job.status !== jobStatus(job.operationStatus, job.launch)
 		)
 			throw error(
 				"corrupt",
 				`Invalid operation accounting for ${id} in ${file}`,
 			);
+		if (
+			job.launch !== undefined &&
+			(!plainObject(job.launch) ||
+				job.launch.logicalJobId !== job.id ||
+				!["queued", "running", "orphaned", "failed"].includes(
+					job.launch.status,
+				) ||
+				!plainObject(job.launch.request) ||
+				job.launch.request.logicalJobId !== job.id ||
+				job.launch.request.model !== job.model)
+		)
+			throw error("corrupt", `Invalid launch evidence for ${id} in ${file}`);
 	}
 	for (const [id, report] of Object.entries(store.reports)) {
 		const job = store.jobs[report?.jobId];
