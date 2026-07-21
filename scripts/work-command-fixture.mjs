@@ -212,6 +212,7 @@ export function seedNativeStore(cwd, sources) {
 			notes: source.notes ? [source.notes] : [],
 			createdAt: source.created_at ?? source.createdAt,
 			updatedAt: source.updated_at ?? source.updatedAt,
+			description: source.description,
 			acceptance: source.acceptance ?? source.acceptance_criteria,
 			documentLinks: {
 				...(source.design ? { design: source.design } : {}),
@@ -227,10 +228,10 @@ export function seedNativeStore(cwd, sources) {
 				const toId =
 					typeof edge === "string"
 						? edge
-						: record.depends_on_id ??
+						: (record.depends_on_id ??
 							record.dependsOnId ??
 							record.dependency_id ??
-							record.id;
+							record.id);
 				if (!toId) return undefined;
 				return {
 					fromId: source.id,
@@ -247,8 +248,7 @@ export function seedNativeStore(cwd, sources) {
 			...(parentId ? { parentId } : {}),
 			dependencies: edges
 				.filter(
-					(edge) =>
-						/^blocks?$/i.test(edge.type) && edge.toId !== parentId,
+					(edge) => /^blocks?$/i.test(edge.type) && edge.toId !== parentId,
 				)
 				.map((edge) => edge.toId),
 			dependencyEdges: edges,
@@ -265,7 +265,12 @@ export function installWorkflowFixture() {
 	const logPath = path.join(dir, "log.jsonl");
 	mkdirSync(path.join(cwd, "docs", "plans"), { recursive: true });
 	writeFileSync(
-		path.join(cwd, "docs", "plans", "2026-07-03-004-feat-coded-start-finish-gates-plan.md"),
+		path.join(
+			cwd,
+			"docs",
+			"plans",
+			"2026-07-03-004-feat-coded-start-finish-gates-plan.md",
+		),
 		"# Coded start/finish\n\n## Summary\nKeep workflow tests deterministic.\n\n## Acceptance\n- Native store works.\n",
 	);
 	const git = path.join(dir, "fake-git.mjs");
@@ -275,14 +280,32 @@ export function installWorkflowFixture() {
 			scenarioChildren[scenario] ?? scenarioChildren.active,
 		);
 		const scenarioEpics =
-			scenario === "empty" || scenario === "no-legacy-empty" || scenario === "no-store"
+			scenario === "empty" ||
+			scenario === "no-legacy-empty" ||
+			scenario === "no-store"
 				? []
 				: scenario === "ambiguous" || scenario === "openReadyAmbiguous"
-					? epics.map((epic) => ({ ...epic, ...(scenario === "openReadyAmbiguous" ? { status: "open" } : {}) }))
+					? epics.map((epic) => ({
+							...epic,
+							...(scenario === "openReadyAmbiguous" ? { status: "open" } : {}),
+						}))
 					: scenario === "oneOpen"
 						? [{ ...epics[0], status: "open" }]
 						: [epics[0]];
-		writeFileSync(statePath, JSON.stringify({ scenario, epics: scenarioEpics, children, gitCommitted: false, closeCommitted: false }, null, "	"));
+		writeFileSync(
+			statePath,
+			JSON.stringify(
+				{
+					scenario,
+					epics: scenarioEpics,
+					children,
+					gitCommitted: false,
+					closeCommitted: false,
+				},
+				null,
+				"	",
+			),
+		);
 		writeFileSync(logPath, "");
 		if (scenario === "no-store") {
 			rmSync(path.join(cwd, ".ce-workflow"), { recursive: true, force: true });

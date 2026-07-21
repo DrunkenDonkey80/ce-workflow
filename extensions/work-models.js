@@ -4082,6 +4082,28 @@ function lineFor(issue) {
 	return issueLine(issue);
 }
 
+function initiativePreparation(projection, initiativeId) {
+	return projection?.nodes.find((node) => node.id === initiativeId)
+		?.preparation;
+}
+
+function initiativeChildren(projection, initiative) {
+	return (initiative.children ?? [])
+		.map((id) => projection.nodes.find((node) => node.id === id))
+		.filter(Boolean);
+}
+
+function initiativeSuggestedCommands(initiative) {
+	const preparation = initiative.preparation;
+	if (preparation.legalActions.includes("plan_next"))
+		return [`/work-plan ${preparation.planningBoundary}`];
+	if (preparation.legalActions.includes("start_execution"))
+		return [`/work-resume ${initiative.id}`];
+	return initiative.closeAllowed
+		? [`/work-roadmap close ${initiative.id}`]
+		: [];
+}
+
 function buildWorkStatus(cwd, target) {
 	const gate = normalReadGate(cwd);
 	if (gate) return `${gate.reason}: ${gate.message}`;
@@ -4104,17 +4126,8 @@ function buildWorkStatus(cwd, target) {
 		: undefined;
 	const projected = projection?.nodes.find((node) => node.id === idOf(epic));
 	if (projected?.role === "initiative") {
-		const children = projection.nodes.filter(
-			(node) => node.parentId === projected.id,
-		);
-		const nextChild = children.find(
-			(child) =>
-				child.status !== "closed" && child.readiness.state === "planned",
-		);
-		const needsPlan = children.find(
-			(child) =>
-				child.status !== "closed" && child.readiness.state === "needs_plan",
-		);
+		const children = initiativeChildren(projection, projected);
+		const suggestedCommands = initiativeSuggestedCommands(projected);
 		return [
 			`Initiative: ${projected.title} (${projected.id})`,
 			`Status: ${statusLabel(projected.status)}`,
@@ -4127,7 +4140,7 @@ function buildWorkStatus(cwd, target) {
 					`- ${child.id} [${statusLabel(child.status)}] [${child.readiness.state.replaceAll("_", " ")}] ${child.title}`,
 			),
 			"",
-			`Next: ${needsPlan ? `Run /work-plan ${needsPlan.id}.` : nextChild ? `Run /work-resume ${nextChild.id}.` : projected.closeAllowed ? `Close explicitly with /work-roadmap close ${projected.id}.` : "Resolve stale or unfinished child roadmaps."}`,
+			`Next: ${suggestedCommands[0] ? `Run ${suggestedCommands[0]}.` : "Resolve stale or unfinished child roadmaps."}`,
 		].join("\n");
 	}
 	rememberWorkflowEpic(cwd, epic);
@@ -5254,6 +5267,49 @@ function candidateSummary(cwd, epic) {
 	};
 }
 
+function resolveInitiativeResumeTarget(cwd, initiative) {
+	const store = loadNativeWorkStore(cwd);
+	const projection = buildInitiativeProjection(cwd, {}, store);
+	const projected = projection.nodes.find(
+		(node) => node.id === idOf(initiative),
+	);
+	if (projected?.role !== "initiative")
+		return { kind: "epic", epic: initiative };
+	const preparation = projected.preparation;
+	const headId = preparation.openChildren[0];
+	if (!headId)
+		return {
+			error: "no-ready-child",
+			message: `Initiative ${idOf(initiative)} has no open child roadmap.`,
+		};
+	const head = store.items[headId];
+	const headProjection = projection.nodes.find((node) => node.id === headId);
+	if (!preparation.preparedPrefix.includes(headId))
+		return {
+			kind: "planning_starved",
+			initiative,
+			epic: head,
+			blockedChild: {
+				...issueSummary(head),
+				readiness: headProjection?.readiness,
+			},
+			preparation,
+		};
+	return {
+		kind: "epic",
+		epic: head,
+		initiative,
+		preparation,
+	};
+}
+
+function resolveEpicResumeTarget(cwd, epic) {
+	const parent = readWorkItem(cwd, parentOf(epic));
+	return isInitiative(parent)
+		? resolveInitiativeResumeTarget(cwd, parent)
+		: { kind: "epic", epic };
+}
+
 function resolveResumeTarget(cwd, target) {
 	let wanted = normalizePathToken(target.trim());
 	if (wanted && wanted !== "last") {
@@ -5273,42 +5329,8 @@ function resolveResumeTarget(cwd, target) {
 				message: `No WorkItem found for ${wanted}`,
 			};
 		if (typeOf(issue) === "epic") {
-			if (!issue.initiative) return { kind: "epic", epic: issue };
-			const store = loadNativeWorkStore(cwd);
-			const projection = buildInitiativeProjection(cwd, {}, store);
-			const projected = projection.nodes.find(
-				(node) => node.id === idOf(issue),
-			);
-			if (projected?.role !== "initiative")
-				return { kind: "epic", epic: issue };
-			const candidates = projection.nodes
-				.filter(
-					(node) => node.parentId === projected.id && node.status !== "closed",
-				)
-				.map((node) => store.items[node.id]);
-			if (candidates.length === 1)
-				return { kind: "epic", epic: candidates[0], initiative: issue };
-			const executable = candidates.map((epic) => ({
-				epic,
-				state: buildEpicChildState(cwd, epic),
-			}));
-			const next =
-				executable.find(({ state }) => state.inProgress.length)?.epic ??
-				executable.find(
-					({ epic, state }) =>
-						statusOf(epic) === "in_progress" && state.readyWork.length,
-				)?.epic ??
-				executable.find(({ state }) => state.readyWork.length)?.epic;
-			if (next) return { kind: "epic", epic: next, initiative: issue };
-			return {
-				error: candidates.length
-					? "initiative-child-selection"
-					: "no-ready-child",
-				message: candidates.length
-					? `Select one child roadmap under initiative ${idOf(issue)}.`
-					: `Initiative ${idOf(issue)} has no open child roadmap.`,
-				candidates: candidates.map((epic) => candidateSummary(cwd, epic)),
-			};
+			if (issue.initiative) return resolveInitiativeResumeTarget(cwd, issue);
+			return resolveEpicResumeTarget(cwd, issue);
 		}
 		return {
 			error: "unsupported-target",
@@ -5319,7 +5341,8 @@ function resolveResumeTarget(cwd, target) {
 	const inProgress = epicsByStatus(cwd, "in_progress")
 		.filter((epic) => !epic.initiative)
 		.sort(byUpdatedDesc);
-	if (inProgress.length === 1) return { kind: "epic", epic: inProgress[0] };
+	if (inProgress.length === 1)
+		return resolveEpicResumeTarget(cwd, inProgress[0]);
 	if (inProgress.length > 1)
 		return {
 			error: "ambiguous-target",
@@ -5330,7 +5353,7 @@ function resolveResumeTarget(cwd, target) {
 	if (remembered && !remembered.initiative) {
 		try {
 			if (buildEpicChildState(cwd, remembered).children.length > 0)
-				return { kind: "epic", epic: remembered };
+				return resolveEpicResumeTarget(cwd, remembered);
 		} catch {
 			// Ignore stale remembered state and fall back to native work-item store discovery.
 		}
@@ -5349,7 +5372,8 @@ function resolveResumeTarget(cwd, target) {
 			candidates = [];
 		}
 	}
-	if (candidates.length === 1) return { kind: "epic", epic: candidates[0] };
+	if (candidates.length === 1)
+		return resolveEpicResumeTarget(cwd, candidates[0]);
 	const withReady = candidates.filter((epic) => {
 		try {
 			return buildEpicChildState(cwd, epic).readyWork.length > 0;
@@ -5358,7 +5382,7 @@ function resolveResumeTarget(cwd, target) {
 		}
 	});
 	if (withReady.length > 0)
-		return { kind: "epic", epic: withReady.sort(byUpdatedDesc)[0] };
+		return resolveEpicResumeTarget(cwd, withReady.sort(byUpdatedDesc)[0]);
 	if (candidates.length > 1)
 		return {
 			error: "ambiguous-target",
@@ -6083,6 +6107,26 @@ function parseWorkResumeArgs(args = "") {
 	return parseWorkReportArgs(args);
 }
 
+function initiativePlanningStarvedState(cwd, resolved, target) {
+	const blocked = resolved.blockedChild;
+	const readiness = blocked.readiness;
+	const reason = readiness?.reason ?? "Its broad roadmap plan needs attention.";
+	return {
+		ok: true,
+		action: "planning_starved",
+		target: { requested: target || "last", kind: "initiative" },
+		epic: issueSummary(resolved.epic),
+		initiative: issueSummary(resolved.initiative),
+		blockedChild: blocked,
+		preparation: resolved.preparation,
+		git: resumeGitReport(cwd, planRefsFromIssue(resolved.epic)),
+		message: `Initiative execution is waiting for ${blocked.id}: ${reason}`,
+		suggestedCommands: [`/work-plan ${blocked.id}`],
+		nextAction: `Next: /work-plan ${blocked.id} to prepare the next roadmap.`,
+		warnings: [],
+	};
+}
+
 function buildWorkResumeState(cwd, args = "") {
 	const gate = normalReadGate(cwd);
 	if (gate)
@@ -6100,6 +6144,8 @@ function buildWorkResumeState(cwd, args = "") {
 				candidates: resolved.candidates ?? [],
 				suggestedCommands: resolved.suggestedCommands ?? [],
 			});
+		if (resolved.kind === "planning_starved")
+			return initiativePlanningStarvedState(cwd, resolved, target);
 		rememberWorkflowEpic(cwd, resolved.epic);
 		const childState = buildEpicChildState(cwd, resolved.epic);
 		const git = resumeGitReport(cwd, planRefsFromIssue(resolved.epic));
@@ -6144,7 +6190,10 @@ function buildWorkResumeState(cwd, args = "") {
 			downstreamBlocked: childState.downstreamBlocked,
 			openDecisions: childState.openDecisions.map(issueSummary),
 			...(resolved.initiative
-				? { initiative: issueSummary(resolved.initiative) }
+				? {
+						initiative: issueSummary(resolved.initiative),
+						preparation: resolved.preparation,
+					}
 				: {}),
 			git,
 			planPath,
@@ -6166,9 +6215,7 @@ function buildEpicReportState(cwd, epic) {
 		: undefined;
 	const projected = projection?.nodes.find((node) => node.id === idOf(epic));
 	if (projected?.role === "initiative") {
-		const children = projection.nodes.filter(
-			(node) => node.parentId === projected.id,
-		);
+		const children = initiativeChildren(projection, projected);
 		return {
 			ok: true,
 			initiative: true,
@@ -6177,18 +6224,13 @@ function buildEpicReportState(cwd, epic) {
 			children,
 			aggregateProgress: projected.aggregateProgress,
 			coverage: projected.coverage,
+			preparation: projected.preparation,
 			blockers: projected.closeBlockers,
 			readyWork: [],
 			openDecisions: [],
 			downstreamBlocked: [],
 			git: gitReport(cwd),
-			suggestedCommands: children
-				.filter((child) => child.status !== "closed")
-				.map((child) =>
-					child.readiness.state === "needs_plan"
-						? `/work-plan ${child.id}`
-						: `/work-resume ${child.id}`,
-				),
+			suggestedCommands: initiativeSuggestedCommands(projected),
 			warnings: [],
 		};
 	}
@@ -7501,6 +7543,38 @@ export function scanPlanOpenQuestions(text) {
 	return questions;
 }
 
+function initiativePreparationState(
+	cwd,
+	initiativeId,
+	selectedChild,
+	git,
+	message,
+) {
+	const store = loadNativeWorkStore(cwd);
+	const initiative = store.items[initiativeId];
+	const preparation = initiativePreparation(
+		buildInitiativeProjection(cwd, {}, store),
+		initiativeId,
+	);
+	return {
+		ok: true,
+		action: "initiative-preparation",
+		initiative: issueSummary(initiative),
+		epic: issueSummary(selectedChild),
+		selectedChild: issueSummary(selectedChild),
+		preparation,
+		git,
+		message,
+		warnings: git.warnings,
+		suggestedCommands: preparation.planningBoundary
+			? [`/work-plan ${preparation.planningBoundary}`]
+			: [],
+		nextAction: preparation.planningBoundary
+			? `Next: /work-plan ${preparation.planningBoundary} to prepare the next roadmap.`
+			: "Next: choose an available initiative preparation action.",
+	};
+}
+
 function openQuestionsBlockState(cwd, rel, questions, command, git, init) {
 	const listing = questions
 		.map((question, index) => {
@@ -7587,6 +7661,11 @@ export function bootstrapPlanEpic(
 			});
 			if (!notesOf(epic).includes(`source plan: ${rel}`))
 				epic = appendWorkNote(store, epic.id, fields.notes);
+			const parentInitiativeId = isInitiative(store.items[epic.parentId])
+				? epic.parentId
+				: undefined;
+			if (parentInitiativeId)
+				return { epic: nativeIssue(epic), parentInitiativeId };
 			let planning = Object.values(store.items).find(
 				(item) =>
 					item.parentId === epic.id &&
@@ -7612,6 +7691,14 @@ export function bootstrapPlanEpic(
 			return { epic: nativeIssue(epic), planning: nativeIssue(planning) };
 		});
 		rememberWorkflowEpic(cwd, attached.epic);
+		if (attached.parentInitiativeId)
+			return initiativePreparationState(
+				cwd,
+				attached.parentInitiativeId,
+				attached.epic,
+				gitReport,
+				`Attached ${rel} to initiative roadmap ${idOf(attached.epic)}.`,
+			);
 		return withHandoffPrompt(
 			{
 				ok: true,
@@ -7683,51 +7770,25 @@ export function bootstrapPlanEpic(
 		epic = updateWorkItemNative(cwd, selected.id, {
 			documentLinks: {
 				...(epic.documentLinks ?? {}),
-				master: fields.designFile,
+				design: fields.designFile,
 			},
 		});
 		const sourceNote = `initiative source plan: ${rel}`;
 		if (!notesOf(epic).includes(sourceNote))
 			epic = appendWorkflowWorkItemNote(cwd, selected.id, sourceNote);
-		let planning = childrenOfRequired(cwd, selected.id).find(
-			(item) =>
-				isPlanningIssue(item) && notesOf(item).includes(`source plan: ${rel}`),
-		);
-		if (!planning)
-			planning = createWorkflowWorkItem(cwd, {
-				title: `Plan next slice for ${selected.title}`,
-				type: "task",
-				parent: selected.id,
-				notes: workflowWorkItemNotes(command, selected.title, [
-					"wo:planning",
-					`source plan: ${rel}`,
-					fields.ideaId ? `idea-id=${fields.ideaId}` : "",
-					"create one executable slice by default",
-				]),
-			});
 		if (idea) {
-			const backlink = `wo:idea status=discussed plan-path=${rel} initiative-id=${initiativeContext.proposal.initiative.id} epic-id=${selected.id} task-id=${idOf(planning)}`;
+			const backlink = `wo:idea status=discussed plan-path=${rel} initiative-id=${initiativeContext.proposal.initiative.id} epic-id=${selected.id}`;
 			if (!notesOf(readWorkItem(cwd, idOf(idea))).includes(backlink))
 				appendWorkflowWorkItemNote(cwd, idOf(idea), backlink);
 			updateWorkItemNative(cwd, idOf(idea), { status: "closed" });
 		}
 		rememberWorkflowEpic(cwd, epic);
-		return withHandoffPrompt(
-			{
-				ok: true,
-				action: "run-planner",
-				initiative: issueSummary(
-					readWorkItem(cwd, initiativeContext.proposal.initiative.id),
-				),
-				epic: issueSummary(epic),
-				selectedWorkItem: issueSummary(planning),
-				git: gitReport,
-				message: `Applied initiative ${initiativeContext.proposal.initiative.id}; selected ${selected.id} for just-in-time planning.`,
-				warnings: gitReport.warnings,
-				suggestedCommands: [`/work-resume ${selected.id}`],
-				nextAction: `Next: run /work-resume ${selected.id} to plan and start its first slice.`,
-			},
+		return initiativePreparationState(
 			cwd,
+			initiativeContext.proposal.initiative.id,
+			epic,
+			gitReport,
+			`Applied initiative ${initiativeContext.proposal.initiative.id}; selected ${selected.id} for preparation.`,
 		);
 	}
 	let epic;
@@ -8668,34 +8729,42 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 		const init = ensureWorkStoreInitialized(cwd);
 		const masterGit = resumeGitReport(cwd);
 		const sourceArtifacts = extractRepoArtifactRefs(input);
-		const handoffPlan = (message, detail, extra = {}) => ({
-			ok: true,
-			action: "handoff-plan",
-			message: `${init.initialized ? `${init.message} ` : ""}${message}`,
-			...extra,
-			handoffPrompt: [
-				"Use ce-plan to convert this input into a detailed master roadmap plan, then create the roadmap from it in this same flow; do not stop and ask the user to re-run /work-plan.",
-				sourceArtifacts.length
-					? `Source artifacts to read and cite verbatim in the final plan: ${sourceArtifacts.join(", ")}`
-					: "",
-				"When the source is not already a plan file, write a new plan artifact; do not reuse or lightly update an older weaker plan unless the user explicitly asks.",
-				"Preserve every decided requirement, constraint, non-goal, reference, acceptance example, and open question from the source; the implementor must not need to guess.",
-				"Trace each source decision into exactly one place: plan requirement, implementation unit, verification/acceptance proof, explicit open question, or intentionally dropped-with-rationale note.",
-				"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
-				"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker WorkItem instruction, or an explicit user waiver; never leave it as passive risk prose.",
-				"Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Then create the roadmap in this same flow: run `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>`. That helper enforces the Open Question Gate; if it reports open-questions-block, resolve each open question via one ask_user (show the question and its suggested default), fold the answer into the plan, and re-run the helper until it creates the roadmap. Do NOT run /work-resume before the roadmap exists. Once the helper returns the roadmap id, end with Next: /work-resume <roadmap-id>.",
-				"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
-				detail,
-				`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
-				ROLE_TIMEOUT_GUIDANCE,
-				advisorCriticStep(cwd, "produced master plan"),
-			].join("\n"),
-			git: masterGit,
-			warnings: masterGit.warnings,
-			suggestedCommands: [],
-			nextAction:
-				"Next: after ce-plan writes the plan, bootstrap the roadmap with `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>` (runs the Open Question Gate), then resume the roadmap.",
-		});
+		const handoffPlan = (
+			message,
+			detail,
+			{ bootstrapRoadmapId, ...extra } = {},
+		) => {
+			const bootstrapCommand = `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>${bootstrapRoadmapId ? ` --roadmap ${bootstrapRoadmapId}` : ""}`;
+			return {
+				ok: true,
+				action: "handoff-plan",
+				message: `${init.initialized ? `${init.message} ` : ""}${message}`,
+				...extra,
+				handoffPrompt: [
+					"Use ce-plan to convert this input into a detailed master roadmap plan, then create the roadmap from it in this same flow; do not stop and ask the user to re-run /work-plan.",
+					sourceArtifacts.length
+						? `Source artifacts to read and cite verbatim in the final plan: ${sourceArtifacts.join(", ")}`
+						: "",
+					"When the source is not already a plan file, write a new plan artifact; do not reuse or lightly update an older weaker plan unless the user explicitly asks.",
+					"Preserve every decided requirement, constraint, non-goal, reference, acceptance example, and open question from the source; the implementor must not need to guess.",
+					"Trace each source decision into exactly one place: plan requirement, implementation unit, verification/acceptance proof, explicit open question, or intentionally dropped-with-rationale note.",
+					"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
+					"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker WorkItem instruction, or an explicit user waiver; never leave it as passive risk prose.",
+					`Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Then run \`${bootstrapCommand}\`. That helper enforces the Open Question Gate; if it reports open-questions-block, resolve each open question via one ask_user (show the question and its suggested default), fold the answer into the plan, and re-run the helper. ${bootstrapRoadmapId ? "Return the coded initiative preparation choices; plan completion is not execution approval." : "Do NOT run /work-resume before the roadmap exists. Once the helper returns the roadmap id, end with Next: /work-resume <roadmap-id>."}`,
+					"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
+					detail,
+					`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
+					ROLE_TIMEOUT_GUIDANCE,
+					advisorCriticStep(cwd, "produced master plan"),
+				].join("\n"),
+				git: masterGit,
+				warnings: masterGit.warnings,
+				suggestedCommands: [],
+				nextAction: bootstrapRoadmapId
+					? `Next: after ce-plan writes the plan, attach it with \`${bootstrapCommand}\` and return to initiative preparation.`
+					: "Next: after ce-plan writes the plan, bootstrap the roadmap with `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>` (runs the Open Question Gate), then resume the roadmap.",
+			};
+		};
 		const planTarget = splitPlanTarget(input);
 		const targetLooksEpic =
 			["current", "last"].includes(planTarget.target) ||
@@ -8709,7 +8778,13 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					candidates: resolved.candidates ?? [],
 				});
 			const artifacts = epicArtifacts(cwd, resolved.epic);
-			const brainstorm = artifacts.brainstorms[0];
+			const planningSource =
+				artifacts.brainstorms[0] ??
+				epicPlanningSources(cwd, resolved.epic, artifacts)[0];
+			const parent = readWorkItem(cwd, parentOf(resolved.epic));
+			const bootstrapRoadmapId = isInitiative(parent)
+				? idOf(resolved.epic)
+				: undefined;
 			const plan = artifacts.plans[0];
 			const mode = planTarget.mode || (plan ? "" : "new");
 			if (plan && !mode)
@@ -8720,31 +8795,33 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					message: `Roadmap already has plan ${plan}. Choose how to use it.`,
 					suggestedCommands: [
 						`${command} ${idOf(resolved.epic)} strengthen`,
-						brainstorm ? `${command} ${idOf(resolved.epic)} fork` : "",
+						planningSource ? `${command} ${idOf(resolved.epic)} fork` : "",
 						`${command} ${plan}`,
 					].filter(Boolean),
 					nextAction: `Next: ${command} ${idOf(resolved.epic)} fork to create a new roadmap from the brainstorm, or ${command} ${idOf(resolved.epic)} strengthen to harden the existing plan.`,
 				};
 			if (["fork", "new", "replace"].includes(mode)) {
-				if (!brainstorm)
+				if (!planningSource)
 					return errorState(
 						"missing-source",
-						`Roadmap ${idOf(resolved.epic)} has no linked brainstorm artifact.`,
+						`Roadmap ${idOf(resolved.epic)} has no linked planning source artifact.`,
 						{ action: "missing-source", epic: issueSummary(resolved.epic) },
 					);
 				return handoffPlan(
-					`Brainstorm from roadmap ${idOf(resolved.epic)} handed to ce-plan.`,
+					`Planning source from roadmap ${idOf(resolved.epic)} handed to ce-plan.`,
 					[
 						`Source roadmap: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
-						`Source brainstorm: ${brainstorm}`,
+						`Source artifact: ${planningSource}`,
 						plan && mode === "replace"
 							? `Ignore weaker existing plan: ${plan}`
 							: "",
-						"Create a new hardened plan artifact from the brainstorm, then run /work-plan <plan-path> to create a new active roadmap.",
+						bootstrapRoadmapId
+							? `Create a hardened broad roadmap plan, then attach it to ${bootstrapRoadmapId}; do not start implementation.`
+							: "Create a new hardened plan artifact from the source, then run /work-plan <plan-path> to create a new active roadmap.",
 					]
 						.filter(Boolean)
 						.join("\n"),
-					{ epic: issueSummary(resolved.epic) },
+					{ epic: issueSummary(resolved.epic), bootstrapRoadmapId },
 				);
 			}
 			if (mode === "strengthen") {
@@ -8758,15 +8835,15 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					`Existing plan from roadmap ${idOf(resolved.epic)} handed to ce-plan for hardening.`,
 					[
 						`Source roadmap: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
-						brainstorm
-							? `Source brainstorm: ${brainstorm}`
-							: "Source brainstorm: none linked",
+						planningSource
+							? `Source planning artifact: ${planningSource}`
+							: "Source planning artifact: none linked",
 						`Existing plan: ${plan}`,
 						"Strengthen the existing plan in place using the brainstorm when available; if the user asks for a new roadmap instead, switch to fork mode.",
 					]
 						.filter(Boolean)
 						.join("\n"),
-					{ epic: issueSummary(resolved.epic) },
+					{ epic: issueSummary(resolved.epic), bootstrapRoadmapId },
 				);
 			}
 			return errorState(
@@ -9619,10 +9696,34 @@ function resolveRoadmapTarget(cwd, target = "") {
 	return { epic };
 }
 
+function compactRoadmapDescription(value, max = 700) {
+	const text = stripFrontmatter(String(value ?? ""))
+		.replace(/<[^>]+>/g, " ")
+		.replace(/^#{1,6}\s+/gm, "")
+		.replace(/^[-*]\s+/gm, "")
+		.replace(/\s+/g, " ")
+		.trim();
+	return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+function roadmapPreviewText(epic) {
+	return (
+		compactRoadmapDescription(epic?.description) ||
+		"No saved summary yet. Select this roadmap to generate and save a 2–4 sentence summary from its linked plans, brainstorms, and tasks."
+	);
+}
+
+function persistRoadmapDescription(cwd, id, description) {
+	const summary = compactRoadmapDescription(description);
+	if (!summary) throw new Error("Roadmap summary is empty.");
+	return updateWorkItemNative(cwd, id, { description: summary }).description;
+}
+
 function roadmapSummary(_cwd, epic, currentId, projection) {
 	return {
 		...issueSummary(epic),
 		...(projection ?? {}),
+		description: field(epic, "description"),
 		current: idOf(epic) === currentId,
 	};
 }
@@ -10032,6 +10133,14 @@ function renderResumeBlockedLines(state) {
 }
 
 function renderWorkResumeText(state) {
+	if (state.ok && state.action === "planning_starved")
+		return [
+			`Initiative: ${state.initiative.title} (${state.initiative.id})`,
+			"Action: planning starved",
+			`Planning boundary: ${state.blockedChild.id} — ${state.blockedChild.title}`,
+			`Reason: ${state.message}`,
+			state.nextAction,
+		].join("\n");
 	if (!state.ok) {
 		const candidates = state.candidates?.length
 			? [
@@ -12339,7 +12448,211 @@ async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 	}
 }
 
-async function handleWorkRoadmapCommand(args, ctx, pi, menuSelected = "") {
+function roadmapDescriptionContext(cwd, epic) {
+	const artifacts = epicArtifacts(cwd, epic);
+	const sources = [...artifacts.plans, ...artifacts.brainstorms]
+		.slice(0, 4)
+		.flatMap((path) => {
+			try {
+				return [
+					`Source ${path}:\n${truncate(stripFrontmatter(readFileSync(join(cwd, path), "utf8")), 4000)}`,
+				];
+			} catch {
+				return [];
+			}
+		});
+	const children = artifacts.children.slice(0, 20).map((item) => {
+		const description = compactRoadmapDescription(
+			field(item, "description"),
+			300,
+		);
+		return `${idOf(item)} [${statusLabel(statusOf(item))}] ${titleOf(item)}${description ? ` — ${description}` : ""}`;
+	});
+	return [
+		`Roadmap: ${idOf(epic)} — ${titleOf(epic)}`,
+		`Status: ${statusLabel(statusOf(epic))}`,
+		children.length
+			? `Child work:\n${children.join("\n")}`
+			: "Child work: none recorded",
+		...sources,
+	].join("\n\n");
+}
+
+async function chooseRoadmap(ctx, title, roadmaps) {
+	const items = roadmaps.map((epic) => ({
+		value: epic.id,
+		label: `${epic.current ? "* " : ""}${epic.parentId ? "  " : ""}${epic.id} [${statusLabel(epic.status)}] [${epic.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${epic.title}`,
+		description: roadmapPreviewText(epic),
+	}));
+	const itemsByValue = new Map(items.map((item) => [item.value, item]));
+	if (ctx.mode !== "tui" || typeof ctx.ui.custom !== "function")
+		return choose(ctx, title, items);
+
+	try {
+		const [{ DynamicBorder }, { Container, SelectList, Text }] =
+			await Promise.all([
+				import("@earendil-works/pi-coding-agent"),
+				import("@earendil-works/pi-tui"),
+			]);
+		return await ctx.ui.custom((tui, theme, _keybindings, done) => {
+			const container = new Container();
+			container.addChild(new DynamicBorder((text) => theme.fg("accent", text)));
+			container.addChild(
+				new Text(
+					theme.fg("accent", theme.bold(roadmapTerminology(title))),
+					1,
+					0,
+				),
+			);
+			const selectList = new SelectList(
+				items.map(({ value, label }) => ({ value, label })),
+				Math.min(items.length, 8),
+				{
+					selectedPrefix: (text) => theme.fg("accent", text),
+					selectedText: (text) => theme.fg("accent", text),
+					description: (text) => theme.fg("muted", text),
+					scrollInfo: (text) => theme.fg("dim", text),
+					noMatch: (text) => theme.fg("warning", text),
+				},
+			);
+			container.addChild(selectList);
+			container.addChild(
+				new DynamicBorder((text) => theme.fg("borderMuted", text)),
+			);
+			const detail = new Text("", 1, 0);
+			const showDetail = (item) => {
+				const selected = itemsByValue.get(item?.value);
+				detail.setText(
+					selected
+						? `${theme.fg("accent", theme.bold(selected.label))}\n${theme.fg("muted", selected.description)}`
+						: "",
+				);
+			};
+			showDetail(selectList.getSelectedItem());
+			selectList.onSelectionChange = showDetail;
+			selectList.onSelect = (item) => done(item.value);
+			selectList.onCancel = () => done(null);
+			container.addChild(detail);
+			container.addChild(
+				new Text(
+					theme.fg("dim", "↑↓ navigate • enter select • esc cancel"),
+					1,
+					0,
+				),
+			);
+			container.addChild(new DynamicBorder((text) => theme.fg("accent", text)));
+			return {
+				render: (width) => container.render(width),
+				invalidate: () => container.invalidate(),
+				handleInput: (data) => {
+					selectList.handleInput(data);
+					tui.requestRender();
+				},
+			};
+		});
+	} catch {
+		return choose(ctx, title, items);
+	}
+}
+
+async function synthesizeRoadmapDescription(cwd, epic, ctx, runtime = {}) {
+	if (ctx.mode !== "tui") return "";
+	if (!ctx.model) {
+		notify(
+			ctx,
+			"No model is selected, so the roadmap summary was not generated.",
+			"warning",
+		);
+		return "";
+	}
+	let failure;
+	try {
+		const complete =
+			runtime.complete ??
+			(await import("@earendil-works/pi-ai/compat")).complete;
+		const BorderedLoader =
+			runtime.BorderedLoader ??
+			(await import("@earendil-works/pi-coding-agent")).BorderedLoader;
+		const result = await ctx.ui.custom((tui, theme, _keybindings, done) => {
+			const loader = new BorderedLoader(
+				tui,
+				theme,
+				`Summarizing ${idOf(epic)} using ${ctx.model.id}...`,
+			);
+			loader.onAbort = () => done(null);
+			(async () => {
+				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+				if (!auth.ok || !auth.apiKey)
+					throw new Error(
+						auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
+					);
+				const response = await complete(
+					ctx.model,
+					{
+						systemPrompt:
+							"Summarize a software roadmap for someone returning after months away. Write 2–4 concise plain-text sentences covering purpose, scope, and intended outcome. Use only the supplied context; state when intent is undocumented. No heading, bullets, markdown, or implementation advice. Maximum 700 characters.",
+						messages: [
+							{
+								role: "user",
+								content: [
+									{
+										type: "text",
+										text: roadmapDescriptionContext(cwd, epic),
+									},
+								],
+								timestamp: Date.now(),
+							},
+						],
+					},
+					{
+						apiKey: auth.apiKey,
+						headers: auth.headers,
+						env: auth.env,
+						signal: loader.signal,
+					},
+				);
+				if (response.stopReason === "aborted") return null;
+				return response.content
+					.filter((content) => content.type === "text")
+					.map((content) => content.text)
+					.join("\n");
+			})()
+				.then(done)
+				.catch((error) => {
+					failure = error;
+					done(null);
+				});
+			return loader;
+		});
+		if (!result) {
+			if (failure)
+				notify(
+					ctx,
+					`Could not generate roadmap summary: ${formatError(failure)}`,
+					"warning",
+				);
+			return "";
+		}
+		const summary = persistRoadmapDescription(cwd, idOf(epic), result);
+		notify(ctx, `Saved summary for ${idOf(epic)}.`);
+		return summary;
+	} catch (error) {
+		notify(
+			ctx,
+			`Could not generate roadmap summary: ${formatError(error)}`,
+			"warning",
+		);
+		return "";
+	}
+}
+
+async function handleWorkRoadmapCommand(
+	args,
+	ctx,
+	pi,
+	menuSelected = "",
+	roadmapRuntime = {},
+) {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const text = String(args ?? "").trim();
 	if (text) {
@@ -12362,82 +12675,139 @@ async function handleWorkRoadmapCommand(args, ctx, pi, menuSelected = "") {
 	}
 	const selected =
 		menuSelected ||
-		(await choose(
-			ctx,
-			"🗺️ Work roadmaps",
-			list.roadmaps.map((epic) => ({
-				value: epic.id,
-				label: `${epic.current ? "* " : ""}${epic.parentId ? "  " : ""}${epic.id} [${statusLabel(epic.status)}] [${epic.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${epic.title}`,
-			})),
-		));
+		(await chooseRoadmap(ctx, "🗺️ Work roadmaps", list.roadmaps));
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
 	const selectedRoadmap = list.roadmaps.find((epic) => epic.id === selected);
+	if (
+		selectedRoadmap &&
+		!compactRoadmapDescription(selectedRoadmap.description)
+	)
+		selectedRoadmap.description = await synthesizeRoadmapDescription(
+			ctx.cwd,
+			readWorkItem(ctx.cwd, selected),
+			ctx,
+			roadmapRuntime,
+		);
 	const initiative = selectedRoadmap?.role === "initiative";
-	const improvement = !initiative && workImproveAvailable(ctx.cwd, selected);
+	const preparation = initiative ? selectedRoadmap.preparation : undefined;
+	const parentPreparation = selectedRoadmap?.parentId
+		? list.roadmaps.find((epic) => epic.id === selectedRoadmap.parentId)
+				?.preparation
+		: undefined;
+	const childPrepared = parentPreparation?.preparedPrefix.includes(selected);
+	const improvement =
+		!initiative &&
+		!parentPreparation &&
+		workImproveAvailable(ctx.cwd, selected);
 	const op = await choose(
 		ctx,
 		`${selected}: operation`,
 		initiative
 			? [
-					{
-						value: "resume",
-						label: "▶️ work-resume",
-						description: "start the next available child roadmap",
-					},
+					...(preparation.legalActions.includes("start_execution")
+						? [
+								{
+									value: "resume",
+									label: "▶️ work-resume",
+									description: "start the prepared roadmap prefix",
+								},
+							]
+						: []),
 					{ value: "report", label: "📄 inspect / report" },
 					{
 						value: "preview",
 						label: "🧩 preview / reconcile",
 						description: "show hierarchy and coverage before approval",
 					},
-					{ value: "plan-child", label: "🧭 plan a child" },
-					{ value: "select-child", label: "⭐ select current child" },
+					...(preparation.legalActions.includes("plan_next")
+						? [
+								{
+									value: "plan-next",
+									label: "🧭 plan next child",
+									description: `prepare ${preparation.planningBoundary}`,
+								},
+							]
+						: []),
+					...(preparation.legalActions.includes("select_child")
+						? [{ value: "select-child", label: "⭐ choose a child" }]
+						: []),
+					{ value: "stop", label: "⏹️ stop" },
 					selectedRoadmap.status === "closed"
 						? { value: "reopen", label: "♻️ reopen" }
 						: { value: "close", label: "✅ guarded close" },
 				]
-			: [
-					improvement
-						? {
-								value: "improve",
-								label: "🛠️ work-improve",
-								description: "triage, deduplicate, and execute reports",
-							}
-						: {
-								value: "resume",
-								label: "▶️ work-resume",
-								description: "autonomous project loop for this roadmap",
-							},
-					{
-						value: "tasks",
-						label: "📋 list tasks",
-						description: "blockers, open, closed",
-					},
-					{
-						value: "plan",
-						label: "🧭 plan / strengthen",
-						description: "use linked brainstorm/plan",
-					},
-					...(selectedRoadmap?.role === "standalone_epic"
-						? [
-								{
-									value: "convert",
-									label: "🧩 convert to initiative",
-									description:
-										"scan intent, reuse roadmaps, ask only needed questions",
+			: parentPreparation
+				? [
+						...(childPrepared
+							? [
+									{
+										value: "resume",
+										label: "▶️ work-resume",
+										description: "continue this prepared child roadmap",
+									},
+								]
+							: []),
+						{ value: "tasks", label: "📋 list tasks" },
+						{ value: "plan", label: "🧭 plan / strengthen" },
+						{ value: "set-current", label: "⭐ set current" },
+						selectedRoadmap.status === "closed"
+							? { value: "reopen", label: "♻️ reopen" }
+							: { value: "close", label: "✅ close" },
+						{ value: "report", label: "📄 full report" },
+					]
+				: [
+						improvement
+							? {
+									value: "improve",
+									label: "🛠️ work-improve",
+									description: "triage, deduplicate, and execute reports",
+								}
+							: {
+									value: "resume",
+									label: "▶️ work-resume",
+									description: "autonomous project loop for this roadmap",
 								},
-							]
-						: []),
-					{ value: "set-current", label: "⭐ set current" },
-					selectedRoadmap.status === "closed"
-						? { value: "reopen", label: "♻️ reopen" }
-						: { value: "close", label: "✅ close" },
-					{ value: "report", label: "📄 full report" },
-				],
+						{
+							value: "tasks",
+							label: "📋 list tasks",
+							description: "blockers, open, closed",
+						},
+						{
+							value: "plan",
+							label: "🧭 plan / strengthen",
+							description: "use linked brainstorm/plan",
+						},
+						...(selectedRoadmap?.role === "standalone_epic"
+							? [
+									{
+										value: "convert",
+										label: "🧩 convert to initiative",
+										description:
+											"scan intent, reuse roadmaps, ask only needed questions",
+									},
+								]
+							: []),
+						{ value: "set-current", label: "⭐ set current" },
+						selectedRoadmap.status === "closed"
+							? { value: "reopen", label: "♻️ reopen" }
+							: { value: "close", label: "✅ close" },
+						{ value: "report", label: "📄 full report" },
+					],
 	);
 	if (!op) return handleWorkRoadmapCommand("", ctx, pi);
+	if (op === "stop")
+		return { ok: true, action: "initiative-preparation-stopped", preparation };
 	if (op === "improve") return handleWorkImproveCommand("", pi, ctx, selected);
 	if (op === "resume") {
+		let resumeTarget = selected;
+		if (initiative || parentPreparation) {
+			const approval = buildWorkResumeState(ctx.cwd, selected);
+			if (approval.action === "planning_starved") {
+				notify(ctx, renderWorkResumeText(approval), "info");
+				return approval;
+			}
+			resumeTarget = approval.epic.id;
+		}
 		const selectedEpic = readWorkItem(ctx.cwd, selected);
 		const artifacts = epicArtifacts(ctx.cwd, selectedEpic);
 		const sources = epicPlanningSources(ctx.cwd, selectedEpic, artifacts);
@@ -12476,7 +12846,7 @@ async function handleWorkRoadmapCommand(args, ctx, pi, menuSelected = "") {
 				sources,
 			};
 		}
-		return handleWorkResumeGoalCommand(selected, pi, ctx);
+		return handleWorkResumeGoalCommand(resumeTarget, pi, ctx);
 	}
 	if (op === "report") return handleWorkReportCommand(selected, ctx);
 	if (op === "tasks") {
@@ -12576,8 +12946,17 @@ async function handleWorkRoadmapCommand(args, ctx, pi, menuSelected = "") {
 		notify(ctx, state.message);
 		return stateTelemetry(state);
 	}
-	if (op === "plan-child" || op === "select-child") {
-		const children = list.roadmaps.filter((epic) => epic.parentId === selected);
+	if (op === "plan-next")
+		return handleWorkflowAction(
+			buildWorkPlanState,
+			preparation.planningBoundary,
+			ctx,
+			pi,
+		);
+	if (op === "select-child") {
+		const children = preparation.openChildren
+			.map((id) => list.roadmaps.find((epic) => epic.id === id))
+			.filter(Boolean);
 		const child = await choose(
 			ctx,
 			`${selected}: child roadmap`,
@@ -12587,8 +12966,6 @@ async function handleWorkRoadmapCommand(args, ctx, pi, menuSelected = "") {
 			})),
 		);
 		if (!child) return handleWorkRoadmapCommand("", ctx, pi, selected);
-		if (op === "plan-child")
-			return handleWorkflowAction(buildWorkPlanState, child, ctx, pi);
 		const state = buildWorkRoadmapState(ctx.cwd, `set-current ${child}`);
 		notify(ctx, renderWorkRoadmapText(state), state.ok ? "info" : "warning");
 		return stateTelemetry(state);
@@ -12795,6 +13172,7 @@ export {
 	renderWorkReportJson,
 	renderWorkReportText,
 	renderWorkRoadmapText,
+	roadmapPreviewText,
 	renderProjectGoalProgress,
 	renderWorkResumeJson,
 	renderWorkResumeText,

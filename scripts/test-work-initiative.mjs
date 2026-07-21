@@ -119,6 +119,7 @@ try {
 		}),
 		"initiative-1.2": record("initiative-1.2", "Next child", {
 			parentId: "initiative-1",
+			updatedAt: "2030-01-01T00:00:00.000Z",
 			documentLinks: { design: "docs/plans/draft.md" },
 		}),
 		"initiative-1.2.1": {
@@ -154,7 +155,19 @@ try {
 	);
 	const initiative = projection.nodes[0];
 	assert.equal(initiative.role, "initiative");
-	assert.deepEqual(initiative.children, ["initiative-1.1", "initiative-1.2"]);
+	assert.deepEqual(
+		initiative.children,
+		["initiative-1.1", "initiative-1.2"],
+		"legacy child order uses durable coverage, not mutable timestamps",
+	);
+	assert.deepEqual(initiative.preparation, {
+		openChildren: ["initiative-1.2"],
+		preparedPrefix: [],
+		planningBoundary: "initiative-1.2",
+		guidance: { target: 3, prepared: 0, satisfied: false },
+		startable: false,
+		legalActions: ["plan_next", "select_child", "stop"],
+	});
 	assert.deepEqual(initiative.aggregateProgress, {
 		closed: 1,
 		total: 2,
@@ -185,6 +198,7 @@ try {
 	const status = buildWorkStatus(dir, "initiative-1");
 	assert.match(status, /Initiative: Initiative/);
 	assert.match(status, /1\/2 child roadmaps closed \(50%\)/);
+	assert.match(status, /\/work-plan initiative-1\.2/);
 	const report = buildWorkReportState(dir, "initiative-1");
 	assert.equal(report.initiative, true);
 	assert.deepEqual(report.aggregateProgress, {
@@ -196,9 +210,17 @@ try {
 		report.children.map((child) => child.id),
 		["initiative-1.1", "initiative-1.2"],
 	);
+	const roadmapPreparation = buildWorkRoadmapState(dir, "list").roadmaps.find(
+		(item) => item.id === "initiative-1",
+	).preparation;
+	assert.deepEqual(report.preparation, roadmapPreparation);
 	const resume = buildWorkResumeState(dir, "initiative-1");
-	assert.equal(resume.epic.id, "initiative-1.2");
+	assert.equal(resume.ok, true);
+	assert.equal(resume.action, "planning_starved");
+	assert.equal(resume.blockedChild.id, "initiative-1.2");
+	assert.deepEqual(resume.suggestedCommands, ["/work-plan initiative-1.2"]);
 	assert.equal(resume.initiative.id, "initiative-1");
+	assert.deepEqual(resume.preparation, roadmapPreparation);
 	const finish = buildWorkFinishState(dir, "initiative-1");
 	assert.equal(finish.reason, "initiative-not-executable");
 	mkdirSync(path.join(dir, ".pi"), { recursive: true });
@@ -237,8 +259,67 @@ try {
 	assert.equal(ambiguousCurrent.currentId, undefined);
 	assert(!ambiguousCurrent.roadmaps.some((item) => item.current));
 	const nextAvailable = buildWorkResumeState(dir, "initiative-1");
-	assert.equal(nextAvailable.epic.id, "initiative-1.2");
+	assert.equal(nextAvailable.action, "planning_starved");
+	assert.equal(nextAvailable.blockedChild.id, "initiative-1.2");
 	assert.equal(nextAvailable.initiative.id, "initiative-1");
+
+	// Initiative execution consumes only the ordered prepared prefix.
+	writeFileSync(
+		path.join(dir, "docs", "plans", "ready.md"),
+		"---\nartifact_readiness: implementation-ready\n---\n# Ready\n",
+	);
+	const executionStore = loadStore(dir);
+	executionStore.items["initiative-1.1"].status = "open";
+	executionStore.items["initiative-1.1"].documentLinks = {
+		design: "docs/plans/ready.md",
+	};
+	executionStore.items["initiative-1.2"].documentLinks = {};
+	executionStore.items["initiative-1.3"].documentLinks = {
+		design: "docs/plans/ready.md",
+	};
+	saveStore(dir, executionStore);
+	const partialPrefix = buildWorkResumeState(dir, "initiative-1");
+	assert.notEqual(partialPrefix.action, "planning_starved");
+	assert.equal(partialPrefix.epic.id, "initiative-1.1");
+	assert.deepEqual(partialPrefix.preparation.preparedPrefix, [
+		"initiative-1.1",
+	]);
+	assert.equal(
+		buildWorkResumeState(dir, "initiative-1.1").epic.id,
+		"initiative-1.1",
+		"the current prepared child may resume through its initiative",
+	);
+	const exhaustedPrefixStore = loadStore(dir);
+	exhaustedPrefixStore.items["initiative-1.1"].status = "closed";
+	exhaustedPrefixStore.items["initiative-1.2"].status = "open";
+	exhaustedPrefixStore.items["initiative-1.3"].status = "in_progress";
+	saveStore(dir, exhaustedPrefixStore);
+	const rootStarved = buildWorkResumeState(dir, "initiative-1");
+	const directBypass = buildWorkResumeState(dir, "initiative-1.3");
+	const untargetedBypass = buildWorkResumeState(dir);
+	assert.equal(rootStarved.action, "planning_starved");
+	assert.equal(rootStarved.blockedChild.id, "initiative-1.2");
+	assert.equal(directBypass.action, "planning_starved");
+	assert.equal(directBypass.blockedChild.id, "initiative-1.2");
+	assert.equal(directBypass.initiative.id, "initiative-1");
+	assert.equal(untargetedBypass.action, "planning_starved");
+	assert.equal(untargetedBypass.blockedChild.id, "initiative-1.2");
+	assert.deepEqual(
+		buildWorkResumeState(dir, "initiative-1.3").preparation,
+		directBypass.preparation,
+		"restart recomputes the same durable planning boundary",
+	);
+	const staleHeadStore = loadStore(dir);
+	staleHeadStore.items["initiative-1.2"].documentLinks = {
+		design: "docs/plans/missing.md",
+	};
+	saveStore(dir, staleHeadStore);
+	const staleHead = buildWorkResumeState(dir, "initiative-1");
+	assert.equal(staleHead.action, "planning_starved");
+	assert.equal(staleHead.blockedChild.id, "initiative-1.2");
+	assert.equal(staleHead.blockedChild.readiness.state, "stale");
+	assert.equal(buildWorkResumeState(dir, "standalone-1").initiative, undefined);
+
 	const helper = path.resolve("scripts/work-helper.mjs");
 	assert.deepEqual(
 		JSON.parse(
@@ -301,8 +382,8 @@ try {
 		initiative: { id: "I-1", title: "Broad initiative" },
 		sources: [{ id: "brainstorm-1", path: sourcePath, hash: hash(sourceText) }],
 		groups: [
-			{ id: "scope-1", title: "Existing scope", epicId: "E-1" },
 			{ id: "scope-2", title: "Successor scope", description: "Later" },
+			{ id: "scope-1", title: "Existing scope", epicId: "E-1" },
 		],
 		outcomes: [
 			{
@@ -334,9 +415,20 @@ try {
 			},
 		],
 	};
+	const normalizedProposal = normalizeInitiativeProposal(proposal);
 	assert.deepEqual(
-		normalizeInitiativeProposal(proposal).groups.map((x) => x.id),
+		normalizedProposal.groups.map((x) => x.id),
 		["scope-1", "scope-2"],
+	);
+	assert.deepEqual(
+		normalizedProposal.groups.map((x) => x.deliveryOrdinal),
+		[1, 0],
+		"canonical group sorting retains semantic input delivery order",
+	);
+	assert.deepEqual(
+		normalizeInitiativeProposal(structuredClone(normalizedProposal)),
+		normalizedProposal,
+		"normalized proposals retain delivery order across JSON boundaries",
 	);
 	assert.throws(
 		() =>
@@ -367,7 +459,20 @@ try {
 	assert.deepEqual(retryPreview.proposed, preview.proposed);
 	assert.deepEqual(retryPreview.operations, preview.operations);
 	assert.notEqual(retryPreview.token, preview.token);
+	assert.notEqual(
+		previewInitiativeReconciliation(promotionDir, {
+			...proposal,
+			groups: [...proposal.groups].reverse(),
+		}).proposalHash,
+		preview.proposalHash,
+		"delivery order is part of canonical proposal and token semantics",
+	);
 	assert.equal(preview.proposed.coverage.length, proposal.outcomes.length);
+	assert.deepEqual(
+		preview.proposed.epics.map((epic) => epic.groupId),
+		["scope-2", "scope-1"],
+		"preview retains proposal delivery order despite canonical group IDs",
+	);
 	assert.deepEqual(
 		preview.operations.map((operation) => operation.kind),
 		["create_initiative", "reparent_epic", "create_epic", "set_disposition"],
@@ -407,6 +512,55 @@ try {
 	assert.equal(applied.changed, true);
 	const promoted = loadStore(promotionDir);
 	assert.equal(promoted.items["E-1"].parentId, "I-1");
+	assert.deepEqual(promoted.items["I-1"].initiative.childOrder, [
+		"I-1.1",
+		"E-1",
+	]);
+	assert.deepEqual(
+		projectInitiativeHierarchy(promoted, {
+			"I-1.1": { state: "planned", reason: "Linked plan is ready." },
+			"E-1": { state: "needs_plan", reason: "No linked plan." },
+		}).nodes.find((node) => node.id === "I-1").preparation,
+		{
+			openChildren: ["I-1.1", "E-1"],
+			preparedPrefix: ["I-1.1"],
+			planningBoundary: "E-1",
+			guidance: { target: 3, prepared: 1, satisfied: false },
+			startable: true,
+			legalActions: ["plan_next", "select_child", "start_execution", "stop"],
+		},
+		"only consecutive linked-plan readiness is prepared; child tasks do not matter",
+	);
+	const guidanceStore = structuredClone(promoted);
+	for (const id of ["I-1.2", "I-1.3"])
+		guidanceStore.items[id] = record(id, id, { parentId: "I-1" });
+	guidanceStore.items["I-1"].initiative.coverage.push(
+		...[
+			["outcome-4", "I-1.2"],
+			["outcome-5", "I-1.3"],
+		].map(([id, epicId]) => ({
+			id,
+			provenance: `brainstorm-1:${id}`,
+			contentHash: id,
+			disposition: "accepted",
+			epicId,
+		})),
+	);
+	guidanceStore.items["I-1"].initiative.childOrder.push("I-1.2", "I-1.3");
+	const guidance = projectInitiativeHierarchy(guidanceStore, {
+		"I-1.1": { state: "planned", reason: "Linked plan is ready." },
+		"E-1": { state: "planned", reason: "Linked plan is ready." },
+		"I-1.2": { state: "planned", reason: "Linked plan is ready." },
+		"I-1.3": { state: "needs_plan", reason: "No linked plan." },
+	}).nodes.find((node) => node.id === "I-1").preparation;
+	assert.deepEqual(guidance.preparedPrefix, ["I-1.1", "E-1", "I-1.2"]);
+	assert.deepEqual(guidance.guidance, {
+		target: 3,
+		prepared: 3,
+		satisfied: true,
+	});
+	assert(guidance.legalActions.includes("plan_next"));
+	assert(guidance.legalActions.includes("start_execution"));
 	assert.deepEqual(promoted.items["E-1"].documentLinks, [
 		{ path: "docs/plans/existing.md" },
 	]);
@@ -457,6 +611,10 @@ try {
 	);
 	const noopPreview = previewInitiativeReconciliation(promotionDir, proposal);
 	assert.equal(noopPreview.noop, true);
+	assert.deepEqual(
+		noopPreview.proposed.epics.map((epic) => epic.groupId),
+		["scope-2", "scope-1"],
+	);
 	const beforeNoop = readFileSync(storePath(promotionDir), "utf8");
 	assert.equal(
 		applyApproved(promotionDir, proposal, noopPreview.token).changed,

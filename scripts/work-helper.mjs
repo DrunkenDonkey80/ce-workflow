@@ -851,6 +851,10 @@ try {
 				[${JSON.stringify(roadmapIdField)}]: s.epic?.id ?? null,
 				[${JSON.stringify(roadmapTitleField)}]: s.epic?.title ?? null,
 				planning_id: s.selectedWorkItem?.id ?? null,
+				initiative: s.initiative ?? null,
+				selected_child: s.selectedChild ?? null,
+				preparation: s.preparation ?? null,
+				suggested_commands: s.suggestedCommands ?? [],
 				open_questions: s.open_questions ?? [],
 				message: s.message ?? "",
 				nextAction: s.nextAction ?? "",
@@ -866,7 +870,8 @@ try {
 		}
 		const parsed = JSON.parse(raw || "{}");
 		print(parsed);
-		if (parsed.action !== "run-planner") process.exitCode = 1;
+		if (!["run-planner", "initiative-preparation"].includes(parsed.action))
+			process.exitCode = 1;
 	} else if (command === "json-assert") {
 		const failures = jsonAssertionFailures(args[0]);
 		print({

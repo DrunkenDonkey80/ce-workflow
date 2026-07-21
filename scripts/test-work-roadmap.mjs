@@ -23,6 +23,7 @@ const {
 	buildWorkRoadmapState,
 	handleWorkRoadmapCommand,
 	renderWorkRoadmapText,
+	roadmapPreviewText,
 } = await import(
 	pathToFileURL(
 		realpathSync(
@@ -77,6 +78,8 @@ seedNativeStore(root, [
 		issue_type: "epic",
 		status: "in_progress",
 		title: "Current roadmap",
+		description:
+			"Preserve visual parity while replacing the existing home-screen primitives.",
 		notes: "brainstorm-path=docs/brainstorms/accepted.md",
 		updated_at: "2026-07-03T10:00:00Z",
 	},
@@ -139,20 +142,112 @@ execFileSync(
 	{ cwd: root, stdio: "ignore" },
 );
 try {
+	const mutableFixtureFiles = [
+		".ce-workflow/work-items.json",
+		".pi/work-store/work-items.recovery.json",
+		".pi/work-orchestrator-state.json",
+	];
+	const fixtureSnapshots = mutableFixtureFiles.map((file) => [
+		file,
+		readFileSync(path.join(root, file), "utf8"),
+	]);
 	const list = buildWorkRoadmapState(root, "list");
 	console.assert(
 		list.ok && list.roadmaps.length === 3,
 		"lists all roadmap statuses",
 	);
-	console.assert(
-		list.roadmaps.find((epic) => epic.id === "E-1")?.current,
-		"marks current roadmap",
+	const currentRoadmap = list.roadmaps.find((epic) => epic.id === "E-1");
+	console.assert(currentRoadmap?.current, "marks current roadmap");
+	assert.match(
+		roadmapPreviewText(currentRoadmap),
+		/Preserve visual parity/,
+		"F7 preview uses an existing stored roadmap description",
 	);
+	const openRoadmap = list.roadmaps.find((epic) => epic.id === "E-2");
+	assert.match(
+		roadmapPreviewText(openRoadmap),
+		/generate and save/i,
+		"F7 preview explains that a missing summary is generated on selection",
+	);
+	class TestLoader {
+		constructor() {
+			this.signal = new AbortController().signal;
+		}
+	}
+	const selectRoadmap = async (id, complete) => {
+		const notices = [];
+		const picks = [new RegExp(id), /full report/];
+		await handleWorkRoadmapCommand(
+			"",
+			{
+				cwd: root,
+				mode: "tui",
+				model: { id: "summary-model", provider: "test" },
+				modelRegistry: {
+					getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test" }),
+				},
+				ui: {
+					select: async (_title, labels) => {
+						const pick = picks.shift();
+						return pick ? labels.find((label) => pick.test(label)) : undefined;
+					},
+					custom: (factory) => new Promise((done) => factory({}, {}, {}, done)),
+					notify: (message) => notices.push(message),
+				},
+			},
+			{},
+			"",
+			{ BorderedLoader: TestLoader, complete },
+		);
+		return notices;
+	};
+	await selectRoadmap("E-2", async () => ({
+		stopReason: "stop",
+		content: [
+			{
+				type: "text",
+				text: "Deliver the open roadmap in small verified slices. Keep its stored intent available between work sessions.",
+			},
+		],
+	}));
+	assert.match(
+		roadmapPreviewText(
+			buildWorkRoadmapState(root, "list").roadmaps.find(
+				(epic) => epic.id === "E-2",
+			),
+		),
+		/stored intent available/,
+		"F7 selection generates and stores a missing roadmap summary",
+	);
+	await selectRoadmap("E-3", async () => ({
+		stopReason: "aborted",
+		content: [],
+	}));
+	assert.equal(
+		loadStore(root).items["E-3"].description,
+		undefined,
+		"cancelled summary generation does not mutate the roadmap",
+	);
+	const failureNotices = await selectRoadmap("E-3", async () => {
+		throw new Error("model unavailable");
+	});
+	assert(
+		failureNotices.some((message) => /model unavailable/.test(message)),
+		"model failures are reported before the operation menu continues",
+	);
+	assert.equal(
+		loadStore(root).items["E-3"].description,
+		undefined,
+		"failed summary generation does not mutate the roadmap",
+	);
+	for (const [file, content] of fixtureSnapshots)
+		writeFileSync(path.join(root, file), content);
 	console.assert(
 		renderWorkRoadmapText(list).includes("* E-1"),
 		"renders current marker",
 	);
 	const tasks = buildWorkRoadmapState(root, "tasks current");
+	assert.equal(tasks.epic?.id, "E-1", JSON.stringify(tasks));
 	console.assert(
 		tasks.tasks.blockers[0].id === "BUG-1",
 		"shows blockers first",
@@ -262,7 +357,7 @@ try {
 		);
 
 	const handoffs = [];
-	await handleWorkRoadmapCommand(
+	const roadmapPlanHandoff = await handleWorkRoadmapCommand(
 		"plan E-1 fork",
 		{
 			cwd: root,
@@ -271,10 +366,10 @@ try {
 		},
 		{},
 	);
-	console.assert(
-		handoffs.some((message) =>
-			message.includes("Source brainstorm: docs/brainstorms/accepted.md"),
-		),
+	assert.equal(roadmapPlanHandoff.action, "handoff-plan");
+	assert.match(
+		roadmapPlanHandoff.handoffPrompt,
+		/Source artifact: docs\/brainstorms\/accepted\.md/,
 		"roadmap plan subcommand uses epic-linked brainstorm",
 	);
 
@@ -425,9 +520,10 @@ try {
 		},
 		{},
 	);
-	assert.match(initiativeOps[0], /work-resume/i);
+	assert(!initiativeOps.some((label) => /work-resume/i.test(label)));
 	assert(initiativeOps.some((label) => /preview|reconcile/i.test(label)));
-	assert(initiativeOps.some((label) => /plan.*child/i.test(label)));
+	assert(initiativeOps.some((label) => /plan.*next child/i.test(label)));
+	assert(initiativeOps.some((label) => /stop/i.test(label)));
 	assert(!initiativeOps.some((label) => /finish/i.test(label)));
 	const proposalPath = path.join(".pi", "initiative-proposal.json");
 	writeFileSync(
@@ -490,6 +586,10 @@ try {
 		path.join(initiativeRoot, ".ce-workflow", "work-items.json"),
 		"utf8",
 	);
+	const preparationBeforeCancel = buildWorkRoadmapState(
+		initiativeRoot,
+		"list",
+	).roadmaps.find((roadmap) => roadmap.id === "I-1").preparation;
 	const cancelled = await runPreview(false);
 	assert.equal(cancelled.state.action, "initiative-preview-cancelled");
 	assert.match(cancelled.previewText, /Proposed child roadmaps:/);
@@ -500,6 +600,13 @@ try {
 			"utf8",
 		),
 		beforeCancel,
+	);
+	assert.deepEqual(
+		buildWorkRoadmapState(initiativeRoot, "list").roadmaps.find(
+			(roadmap) => roadmap.id === "I-1",
+		).preparation,
+		preparationBeforeCancel,
+		"cancelled F7 reconciliation leaves preparation unchanged",
 	);
 	const reconciled = await runPreview(true);
 	assert.equal(reconciled.state.action, "initiative-reconciled");
@@ -531,15 +638,23 @@ try {
 		);
 		return labelsSeen.join("\n");
 	};
-	for (const id of ["I-1.2", "S-1"]) {
-		const actions = await captureOps(id);
-		for (const expected of ["resume", "list tasks", "plan", "report", "close"])
-			assert.match(actions, new RegExp(expected, "i"));
-		if (id === "S-1") assert.match(actions, /convert to initiative/i);
-		else assert.doesNotMatch(actions, /convert to initiative/i);
-	}
+	const unplannedChildActions = await captureOps("I-1.2");
+	for (const expected of ["list tasks", "plan", "report", "close"])
+		assert.match(unplannedChildActions, new RegExp(expected, "i"));
+	assert.doesNotMatch(unplannedChildActions, /work-resume/i);
+	assert.doesNotMatch(unplannedChildActions, /convert to initiative/i);
+	const preparedChildStore = loadStore(initiativeRoot);
+	preparedChildStore.items["I-1.1"].status = "open";
+	saveStore(initiativeRoot, preparedChildStore);
+	assert.match(await captureOps("I-1.1"), /work-resume/i);
+	preparedChildStore.items["I-1.1"].status = "closed";
+	saveStore(initiativeRoot, preparedChildStore);
+	const standaloneActions = await captureOps("S-1");
+	for (const expected of ["resume", "list tasks", "plan", "report", "close"])
+		assert.match(standaloneActions, new RegExp(expected, "i"));
+	assert.match(standaloneActions, /convert to initiative/i);
 
-	// Resume explains the empty starting state, offers full ce-plan, then attaches its plan to this epic.
+	// A child without a broad plan offers planning instead of implementation.
 	const planningPrompts = [];
 	const planningState = await handleWorkRoadmapCommand(
 		"",
@@ -551,10 +666,8 @@ try {
 			ui: {
 				select: async (title, labels) => {
 					if (title.includes("operation"))
-						return labels.find((label) => /work-resume/i.test(label));
-					if (title.includes("master plan"))
-						return labels.find((label) => /create master plan/i.test(label));
-					return labels.find((label) => label.includes("I-1.2 ["));
+						return labels.find((label) => /plan.*next child/i.test(label));
+					return labels.find((label) => label.includes("I-1 ["));
 				},
 				confirm: async () => true,
 				notify: () => {},
@@ -564,19 +677,19 @@ try {
 		},
 		{},
 	);
-	assert.equal(planningState.action, "master-plan-resume-started");
-	assert.match(planningPrompts[0], /ce-plan/);
+	assert.equal(planningState.action, "handoff-plan");
+	assert.equal(planningPrompts.length, 1);
 	assert.match(planningPrompts[0], /docs\/plans\/child\.md/);
 	assert.match(
 		planningPrompts[0],
-		/bootstrap-plan-roadmap (?:<|&lt;)plan-path(?:>|&gt;) --roadmap I-1\.2/,
+		/bootstrap-plan-roadmap <plan-path> --roadmap I-1\.2/,
 	);
-	assert.match(planningPrompts[0], /continue.*\/work-resume I-1\.2/i);
+	assert.doesNotMatch(planningPrompts[0], /Next: \/work-resume/);
 
 	const childMasterPlan = "docs/plans/i-1-2.md";
 	writeFileSync(
 		path.join(initiativeRoot, childMasterPlan),
-		"# I-1.2 master plan\n\n## Acceptance\n\n- Focused verification passes.\n",
+		"---\nartifact_readiness: implementation-ready\n---\n\n# I-1.2 master plan\n\n## Acceptance\n\n- Focused verification passes.\n",
 	);
 	const attachedPlan = bootstrapPlanEpic(
 		initiativeRoot,
@@ -587,16 +700,37 @@ try {
 		{ targetEpicId: "I-1.2" },
 	);
 	assert.equal(attachedPlan.epic.id, "I-1.2");
-	assert.equal(attachedPlan.action, "run-planner");
+	assert.equal(attachedPlan.initiative.id, "I-1");
+	assert.equal(attachedPlan.action, "initiative-preparation");
+	assert.deepEqual(attachedPlan.preparation.legalActions, [
+		"select_child",
+		"start_execution",
+		"stop",
+	]);
+	assert.equal(attachedPlan.selectedWorkItem, undefined);
 	const plannedStore = loadStore(initiativeRoot);
 	assert.equal(
 		plannedStore.items["I-1.2"].documentLinks.design,
 		childMasterPlan,
 	);
 	assert.equal(
-		plannedStore.items[attachedPlan.selectedWorkItem.id].parentId,
-		"I-1.2",
+		Object.values(plannedStore.items).some(
+			(item) =>
+				item.parentId === "I-1.2" && item.notes?.includes("wo:planning"),
+		),
+		false,
+		"initiative broad-plan bootstrap does not create slice-planning work",
 	);
+	const strengthenChild = buildWorkPlanState(
+		initiativeRoot,
+		"I-1.2 strengthen",
+	);
+	assert.equal(strengthenChild.action, "handoff-plan");
+	assert.match(
+		strengthenChild.handoffPrompt,
+		/bootstrap-plan-roadmap <plan-path> --roadmap I-1\.2/,
+	);
+	assert.doesNotMatch(strengthenChild.handoffPrompt, /Next: \/work-resume/);
 	const plannedDescription = plannedStore.items["I-1.2"].description;
 	const plannedChildCount = Object.values(plannedStore.items).filter(
 		(item) => item.parentId === "I-1.2",
@@ -648,7 +782,15 @@ try {
 		),
 	);
 	assert.equal(helperAttach.roadmap_id, "I-1.2");
-	assert.equal(helperAttach.planning_id, attachedPlan.selectedWorkItem.id);
+	assert.equal(helperAttach.action, "initiative-preparation");
+	assert.equal(helperAttach.planning_id, null);
+	assert.equal(helperAttach.initiative.id, "I-1");
+	assert.equal(helperAttach.selected_child.id, "I-1.2");
+	assert.deepEqual(helperAttach.preparation, attachedPlan.preparation);
+	assert.deepEqual(
+		helperAttach.suggested_commands,
+		attachedPlan.suggestedCommands,
+	);
 
 	const closedConversionStore = loadStore(initiativeRoot);
 	closedConversionStore.items["S-1"].status = "closed";

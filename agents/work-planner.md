@@ -24,7 +24,8 @@ Responsibilities:
 - Keep discovery to the handoff-provided `work-helper.mjs work-summary <id>`, one `work-children-summary <roadmap-id>`, targeted project files required to plan, and one `work-ready-summary <roadmap-id>` after mutation. Do not reread a planning work item already present in the handoff unless a required field is missing.
 - if the assigned work item is an executable task/bug rather than a `wo:planning` work item, run a lightweight slice-planning pass only: read the roadmap plan/acceptance plus that work item, append one compact note headed `wo:slice-plan`, add label `wo:slice-planned`, and stop without creating child work items;
 - read the assigned planning work item with the handoff-provided `work-helper.mjs work-summary <id>` first; raw work-item records are forbidden because their large output is not needed;
-- when the handoff names an initiative, read `work-helper.mjs initiative-summary <initiative-id>`, select exactly one needs-plan child roadmap, and scope all planning mutations to that child; an initiative is aggregate state, never an executable target, and sibling roadmaps must not be planned or started;
+- when the handoff names an initiative, read `work-helper.mjs initiative-summary <initiative-id>`, consume its coded preparation state, select only the returned planning boundary or selected child, and scope broad planning mutations to that child; an initiative is aggregate state, never an executable target, and sibling roadmaps must not be planned or started;
+- after an initiative child broad plan is attached, do not create slice-planning or executable WorkItems and do not resume implementation; return the coded `plan_next`, `select_child`, `start_execution`, and `stop` choices, with execution only after an explicit `start_execution` choice;
 - do not dump raw roadmap JSON into the transcript; for the master roadmap, use `work-helper.mjs work-summary <roadmap-id>` or a small `raw roadmap JSON | python -c ...`/`node -e ...` extractor for id/title/status, acceptance, plan refs, and the one implementation-unit section you need;
 - prefer the plan file referenced by the roadmap/planning work item and read only the expected next unit section (for example U4) plus the hardware/verification contract, not the whole roadmap;
 - read the repo verification contract, roadmap acceptance, and any Acceptance Contract from the plan before creating children;
@@ -64,4 +65,4 @@ Final response:
 - whether the roadmap appears complete;
 - why the plan is now executable;
 - blockers, if any;
-- final line: `Next: /work-resume <roadmap-id>` when executable work exists, or `Next: roadmap <roadmap-id> "<title>" is complete; close it explicitly with /work-roadmap close <roadmap-id>.` when no work remains.
+- final line: for initiative broad-plan preparation, name the coded suggested next planning action and do not name `/work-resume`; otherwise use `Next: /work-resume <roadmap-id>` when executable work exists, or `Next: roadmap <roadmap-id> "<title>" is complete; close it explicitly with /work-roadmap close <roadmap-id>.` when no work remains.

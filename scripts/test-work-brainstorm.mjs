@@ -167,15 +167,20 @@ try {
 		(item) => item.parentId === broad.epic.id && item.type === "epic",
 	);
 	assert(
-		broadApplied.action === "run-planner" &&
+		broadApplied.action === "initiative-preparation" &&
 			broadStore.items[broad.epic.id].initiative &&
 			broadChildren.length === 2,
 		"confirmed multi-scope bootstrap preserves the brainstorm epic as initiative",
 	);
 	assert(
-		broadStore.items[broadApplied.selectedWorkItem.id].parentId ===
-			broadApplied.epic.id && broadApplied.epic.parentId === broad.epic.id,
-		"only the selected child receives a planning task",
+		broadApplied.selectedChild.id === broadApplied.epic.id &&
+			broadApplied.epic.parentId === broad.epic.id &&
+			!Object.values(broadStore.items).some(
+				(item) =>
+					item.parentId === broadApplied.epic.id &&
+					item.notes?.includes("wo:planning"),
+			),
+		"selected child receives its broad plan without slice-planning work",
 	);
 	const successor = broadChildren.find(
 		(child) => child.id !== broadApplied.epic.id,
@@ -217,9 +222,11 @@ try {
 		},
 	);
 	assert(
-		repeated.selectedWorkItem.id === broadApplied.selectedWorkItem.id &&
-			Object.keys(fixture.store().items).length === broadItemCount,
-		"rerunning initiative bootstrap reuses lineage and planning work",
+		repeated.selectedChild.id === broadApplied.selectedChild.id &&
+			Object.keys(fixture.store().items).length === broadItemCount &&
+			JSON.stringify(repeated.preparation) ===
+				JSON.stringify(broadApplied.preparation),
+		"rerunning initiative bootstrap reuses lineage and preparation state",
 	);
 
 	fixture.reset("ideas");
@@ -273,7 +280,7 @@ try {
 	assert(
 		planFromEpic.ok &&
 			planFromEpic.handoffPrompt.includes(
-				"Source brainstorm: docs/brainstorms/accepted.md",
+				"Source artifact: docs/brainstorms/accepted.md",
 			),
 		"work-plan can create a new roadmap from an epic-linked brainstorm",
 	);

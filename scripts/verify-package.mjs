@@ -300,7 +300,10 @@ check(
 		(command) => helper.includes(`command === "${command}"`),
 	) &&
 		read("agents/work-planner.md").includes(
-			"select exactly one needs-plan child",
+			"consume its coded preparation state",
+		) &&
+		read("agents/work-planner.md").includes(
+			"do not create slice-planning or executable WorkItems",
 		) &&
 		read("prompts/work-plan.md").includes("initiative-preview") &&
 		existsSync(path.join(root, "scripts", "test-work-initiative.mjs")),

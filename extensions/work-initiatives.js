@@ -5,7 +5,7 @@ import {
 	validateStore,
 } from "./work-store.js";
 
-export const INITIATIVE_PROJECTION_VERSION = 1;
+export const INITIATIVE_PROJECTION_VERSION = 2;
 export const INITIATIVE_PROPOSAL_VERSION = 1;
 
 export class InitiativeError extends Error {
@@ -105,12 +105,24 @@ export function normalizeInitiativeProposal(input) {
 			"incomplete_coverage",
 			"Initiative proposal requires delivery groups.",
 		);
-	const groups = input.groups.map((group) => {
+	const suppliedOrdinals = input.groups.map((group) => group?.deliveryOrdinal);
+	const hasOrdinals = suppliedOrdinals.every(Number.isInteger);
+	if (
+		suppliedOrdinals.some((value) => value !== undefined) &&
+		(!hasOrdinals ||
+			new Set(suppliedOrdinals).size !== input.groups.length ||
+			suppliedOrdinals.some(
+				(value) => value < 0 || value >= input.groups.length,
+			))
+	)
+		return fail("invalid_proposal", "Initiative delivery order is invalid.");
+	const groups = input.groups.map((group, index) => {
 		if (!object(group) || !text(group.id) || !text(group.title))
 			return fail("invalid_proposal", "Initiative delivery group is invalid.");
 		return {
 			id: group.id,
 			title: group.title,
+			deliveryOrdinal: hasOrdinals ? group.deliveryOrdinal : index,
 			...(group.description !== undefined
 				? { description: String(group.description) }
 				: {}),
@@ -201,7 +213,7 @@ export function normalizeInitiativeProposal(input) {
 				"incomplete_coverage",
 				`Delivery group ${group.id} has no accepted outcome.`,
 			);
-	return {
+	const proposal = {
 		schemaVersion: INITIATIVE_PROPOSAL_VERSION,
 		mode,
 		targetId: input.targetId,
@@ -216,6 +228,7 @@ export function normalizeInitiativeProposal(input) {
 		groups: groups.sort((left, right) => left.id.localeCompare(right.id)),
 		outcomes: outcomes.sort((left, right) => left.id.localeCompare(right.id)),
 	};
+	return proposal;
 }
 
 function mappedGroups(store, proposal) {
@@ -263,6 +276,12 @@ function generatedIdentity(item) {
 	};
 }
 
+function deliveryGroups(groups) {
+	return [...groups].sort(
+		(left, right) => left.deliveryOrdinal - right.deliveryOrdinal,
+	);
+}
+
 export function buildInitiativeReconciliation(store, input) {
 	validateStore(store);
 	const proposal = normalizeInitiativeProposal(input);
@@ -293,6 +312,12 @@ export function buildInitiativeReconciliation(store, input) {
 			"Initiative ID is already used by another record.",
 		);
 	const groups = mappedGroups(store, proposal);
+	const childOrder = deliveryGroups(groups).map((group) => group.epicId);
+	if (new Set(childOrder).size !== childOrder.length)
+		return fail(
+			"ambiguous_lineage",
+			"Delivery groups must map to unique roadmaps.",
+		);
 	const candidate = structuredClone(store);
 	const operations = [];
 	const conflicts = [];
@@ -455,7 +480,13 @@ export function buildInitiativeReconciliation(store, input) {
 		initiativeHash({
 			sources: priorMetadata.sources,
 			coverage: priorMetadata.coverage,
-		}) !== initiativeHash({ sources: proposal.sources, coverage });
+			childOrder: priorMetadata.childOrder,
+		}) !==
+			initiativeHash({
+				sources: proposal.sources,
+				coverage,
+				childOrder,
+			});
 	if (currentInitiative && metadataChanged)
 		operations.push({ kind: "update_coverage", id: proposal.initiative.id });
 	const initiative = candidate.items[proposal.initiative.id];
@@ -473,6 +504,7 @@ export function buildInitiativeReconciliation(store, input) {
 		schemaVersion: INITIATIVE_SCHEMA_VERSION,
 		sources: structuredClone(proposal.sources),
 		coverage,
+		childOrder,
 		lastConfirmed: identity,
 		evidence,
 	};
@@ -510,7 +542,7 @@ export function previewInitiativeCandidate(store, input) {
 		initiativeId: reconciliation.proposal.initiative.id,
 		proposed: {
 			initiative: structuredClone(reconciliation.proposal.initiative),
-			epics: (reconciliation.groups ?? []).map((group) => ({
+			epics: deliveryGroups(reconciliation.groups ?? []).map((group) => ({
 				id: group.epicId,
 				groupId: group.id,
 				title: group.title,
@@ -553,6 +585,47 @@ function progress(items) {
 		closed,
 		total,
 		percent: total ? Math.round((closed / total) * 100) : 0,
+	};
+}
+
+function orderedInitiativeChildren(initiative, children) {
+	const order = initiative.initiative.childOrder ?? [
+		...new Set(
+			initiative.initiative.coverage
+				.filter((outcome) => outcome.disposition === "accepted")
+				.map((outcome) => outcome.epicId),
+		),
+	];
+	const ordinal = new Map(order.map((id, index) => [id, index]));
+	return [...children].sort(
+		(left, right) => ordinal.get(left.id) - ordinal.get(right.id),
+	);
+}
+
+function preparationFor(children, readinessByEpic) {
+	const openChildren = children.filter((child) => child.status !== "closed");
+	const preparedPrefix = [];
+	for (const child of openChildren) {
+		if (!readinessFor(child, readinessByEpic).implementationReady) break;
+		preparedPrefix.push(child.id);
+	}
+	const planningBoundary = openChildren[preparedPrefix.length]?.id;
+	return {
+		openChildren: openChildren.map((child) => child.id),
+		preparedPrefix,
+		...(planningBoundary ? { planningBoundary } : {}),
+		guidance: {
+			target: 3,
+			prepared: preparedPrefix.length,
+			satisfied: preparedPrefix.length >= 3,
+		},
+		startable: preparedPrefix.length > 0,
+		legalActions: [
+			...(planningBoundary ? ["plan_next"] : []),
+			...(openChildren.length ? ["select_child"] : []),
+			...(preparedPrefix.length ? ["start_execution"] : []),
+			"stop",
+		],
 	};
 }
 
@@ -615,8 +688,15 @@ export function projectInitiativeHierarchy(
 		children.push(item);
 		target.set(item.parentId, children);
 	}
-	for (const children of childrenByParent.values())
+	for (const [parentId, children] of childrenByParent) {
 		children.sort(byUpdatedThenId);
+		const parent = store.items[parentId];
+		if (isInitiative(parent))
+			childrenByParent.set(
+				parentId,
+				orderedInitiativeChildren(parent, children),
+			);
+	}
 
 	const nodeFor = (epic) => {
 		const initiative = isInitiative(epic);
@@ -673,7 +753,13 @@ export function projectInitiativeHierarchy(
 				? progress(childEpics)
 				: progress(localItems),
 			conflicts,
-			...(initiative ? { coverage: dispositions, closeBlockers } : {}),
+			...(initiative
+				? {
+						coverage: dispositions,
+						closeBlockers,
+						preparation: preparationFor(childEpics, readinessByEpic),
+					}
+				: {}),
 			legalActions: initiative ? initiativeActions(epic) : epicActions(epic),
 			closeAllowed: !initiative || closeBlockers.length === 0,
 		};

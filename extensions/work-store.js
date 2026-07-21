@@ -359,6 +359,13 @@ function validateInitiativeMetadata(item, file) {
 		provenance.add(outcome.provenance);
 	}
 	if (
+		metadata.childOrder !== undefined &&
+		(!Array.isArray(metadata.childOrder) ||
+			metadata.childOrder.some((id) => !nonemptyString(id)) ||
+			new Set(metadata.childOrder).size !== metadata.childOrder.length)
+	)
+		throw hierarchyError(`Invalid initiative child order for ${item.id}`, file);
+	if (
 		metadata.evidence !== undefined &&
 		(!Array.isArray(metadata.evidence) ||
 			metadata.evidence.some((entry) => !plainObject(entry)))
@@ -445,6 +452,15 @@ function validateInitiativeHierarchy(items, file) {
 				.filter((outcome) => outcome.disposition === "accepted")
 				.map((outcome) => outcome.epicId),
 		);
+		if (
+			metadata.childOrder !== undefined &&
+			(metadata.childOrder.length !== acceptedEpicIds.size ||
+				metadata.childOrder.some((epicId) => !acceptedEpicIds.has(epicId)))
+		)
+			throw hierarchyError(
+				`Initiative ${item.id} child order does not cover direct children`,
+				file,
+			);
 		for (const epicId of acceptedEpicIds)
 			if (
 				!items[epicId] ||
