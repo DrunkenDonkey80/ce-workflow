@@ -437,6 +437,7 @@ export function initVerifierStore(cwd = process.cwd(), options = {}) {
 			groups: {},
 			claims: {},
 			dispositions: {},
+			fixes: {},
 		};
 		saveVerifierStore(cwd, store);
 		return store;
@@ -1136,39 +1137,109 @@ export function addGroup(store, input = {}) {
 		return group;
 	});
 }
-export function claimGroup(store, input = {}) {
-	return edit(store, (next) => {
-		if (!next.groups[input.groupId])
-			throw error("missing", `Verifier group is missing: ${input.groupId}`);
-		if (
-			!nonempty(input.ownerSession) ||
-			!nonempty(input.leaseUntil) ||
-			Number.isNaN(Date.parse(input.leaseUntil))
+const TRIAGE_LEASE_MS = 30 * 60 * 1000;
+function leaseExpiry(input) {
+	const timestamp = now(input.now);
+	const leaseUntil =
+		input.leaseUntil ??
+		new Date(Date.parse(timestamp) + TRIAGE_LEASE_MS).toISOString();
+	if (!nonempty(leaseUntil) || Number.isNaN(Date.parse(leaseUntil)))
+		throw error("invalid", "Claim needs a valid lease expiry");
+	return leaseUntil;
+}
+function groupClaim(next, group) {
+	return group.claimId ? next.claims[group.claimId] : undefined;
+}
+function remainingFindings(next, group) {
+	return group.findingIds.filter((id) => !next.findings[id].dispositionId);
+}
+function updateGroupTriage(next, group) {
+	const members = group.findingIds.map((id) => next.findings[id]);
+	if (members.some((finding) => !finding.dispositionId)) return;
+	if (
+		members.some(
+			(finding) =>
+				next.dispositions[finding.dispositionId].disposition === "accepted" &&
+				!finding.fixId,
 		)
-			throw error("invalid", "Claim needs owner session and lease expiry");
-		const id = stableId("claim", { groupId: input.groupId });
-		const existing = next.claims[id];
-		if (existing) {
-			if (
-				existing.ownerSession === input.ownerSession &&
-				existing.leaseUntil === input.leaseUntil
+	)
+		return;
+	group.status = "triaged";
+}
+function claimGroupIn(next, input = {}) {
+	const group = next.groups[input.groupId];
+	if (!group)
+		throw error("missing", `Verifier group is missing: ${input.groupId}`);
+	if (group.status === "triaged")
+		throw error(
+			"terminal",
+			`Verifier group is already triaged: ${input.groupId}`,
+		);
+	if (!nonempty(input.ownerSession))
+		throw error("invalid", "Claim needs owner session");
+	const timestamp = now(input.now);
+	const leaseUntil = leaseExpiry(input);
+	const existing = groupClaim(next, group);
+	if (
+		existing &&
+		Date.parse(existing.leaseUntil) > Date.parse(timestamp) &&
+		existing.ownerSession !== input.ownerSession
+	)
+		throw error(
+			"locked",
+			`Verifier group is already claimed: ${input.groupId}`,
+		);
+	if (existing) {
+		existing.ownerSession = input.ownerSession;
+		existing.leaseUntil = leaseUntil;
+		existing.updatedAt = timestamp;
+		if (input.resumeTarget) existing.resumeTarget = input.resumeTarget;
+		group.status = "claimed";
+		return existing;
+	}
+	const id = stableId("claim", { groupId: input.groupId });
+	const claim = {
+		id,
+		groupId: input.groupId,
+		ownerSession: input.ownerSession,
+		leaseUntil,
+		createdAt: timestamp,
+		...(input.resumeTarget ? { resumeTarget: input.resumeTarget } : {}),
+	};
+	next.claims[id] = claim;
+	group.claimId = id;
+	group.status = "claimed";
+	return claim;
+}
+export function claimGroup(store, input = {}) {
+	return edit(store, (next) => claimGroupIn(next, input));
+}
+export function claimCompletedGroups(store, input = {}) {
+	return edit(store, (next) =>
+		Object.values(next.groups)
+			.filter(
+				(group) => group.status === "completed" || group.status === "claimed",
 			)
-				return existing;
-			throw error(
-				"locked",
-				`Verifier group is already claimed: ${input.groupId}`,
-			);
-		}
-		const claim = {
-			id,
-			groupId: input.groupId,
-			ownerSession: input.ownerSession,
-			leaseUntil: input.leaseUntil,
-			createdAt: now(input.now),
-		};
-		next.claims[id] = claim;
-		return claim;
-	});
+			.filter(
+				(group) =>
+					remainingFindings(next, group).length > 0 ||
+					group.status === "claimed",
+			)
+			.sort((left, right) => left.id.localeCompare(right.id))
+			.map((group) => claimGroupIn(next, { ...input, groupId: group.id })),
+	);
+}
+function ownedClaim(next, input) {
+	const claim = next.claims[input.claimId];
+	if (!claim || claim.ownerSession !== input.ownerSession)
+		throw error("locked", "Verifier claim is not owned by this session");
+	if (Date.parse(claim.leaseUntil) <= Date.parse(now(input.now)))
+		throw error("locked", "Verifier claim lease expired");
+	return claim;
+}
+function renewClaim(claim, input) {
+	claim.leaseUntil = leaseExpiry(input);
+	claim.updatedAt = now(input.now);
 }
 export function recordDisposition(store, input = {}) {
 	return edit(store, (next) => {
@@ -1193,10 +1264,114 @@ export function recordDisposition(store, input = {}) {
 			disposition: input.disposition,
 			reason: input.reason,
 			createdAt: now(input.now),
+			...(input.claimId ? { claimId: input.claimId } : {}),
 		};
 		next.dispositions[id] = disposition;
 		finding.dispositionId = id;
 		return disposition;
+	});
+}
+export function recordTriageDisposition(store, input = {}) {
+	return edit(store, (next) => {
+		const claim = ownedClaim(next, input);
+		const group = next.groups[claim.groupId];
+		if (!group.findingIds.includes(input.findingId))
+			throw error("invalid", "Finding is outside this verifier claim");
+		if (input.changedTarget && !nonempty(input.currentCodeEvidence))
+			throw error("invalid", "Changed finding requires current-code evidence");
+		const finding = next.findings[input.findingId];
+		if (finding.dispositionId)
+			throw error("conflict", `Finding is already triaged: ${finding.id}`);
+		if (!DISPOSITIONS.has(input.disposition) || !nonempty(input.reason))
+			throw error("invalid", "Invalid verifier disposition");
+		const attempt = group.reopenCount ?? 0;
+		const id = stableId(
+			"disposition",
+			attempt ? { findingId: finding.id, attempt } : { findingId: finding.id },
+		);
+		const disposition = {
+			id,
+			findingId: finding.id,
+			disposition: input.disposition,
+			reason: input.reason,
+			createdAt: now(input.now),
+			claimId: claim.id,
+			...(attempt ? { attempt } : {}),
+			...(input.currentCodeEvidence
+				? { currentCodeEvidence: input.currentCodeEvidence }
+				: {}),
+		};
+		next.dispositions[id] = disposition;
+		finding.dispositionId = id;
+		renewClaim(claim, input);
+		updateGroupTriage(next, group);
+		return disposition;
+	});
+}
+export function completeAcceptedFix(store, input = {}) {
+	return edit(store, (next) => {
+		const claim = ownedClaim(next, input);
+		const group = next.groups[claim.groupId];
+		const findingIds = [...new Set(input.findingIds ?? [])].sort();
+		if (
+			!findingIds.length ||
+			findingIds.some((id) => !group.findingIds.includes(id))
+		)
+			throw error("invalid", "Fix must name accepted members of this claim");
+		if (
+			!nonempty(input.commit) ||
+			!/^[0-9a-f]{7,64}$/i.test(input.commit) ||
+			!Array.isArray(input.verification) ||
+			!input.verification.length ||
+			input.verification.some((entry) => !nonempty(entry))
+		)
+			throw error("invalid", "Fix needs commit and verification evidence");
+		if (
+			findingIds.some(
+				(id) =>
+					next.dispositions[next.findings[id].dispositionId]?.disposition !==
+						"accepted" || next.findings[id].fixId,
+			)
+		)
+			throw error(
+				"invalid",
+				"Fix members must be unresolved accepted findings",
+			);
+		const id = stableId("fix", {
+			claimId: claim.id,
+			findingIds,
+			commit: input.commit,
+			verification: input.verification,
+		});
+		const fix = next.fixes[id] ?? {
+			id,
+			claimId: claim.id,
+			findingIds,
+			commit: input.commit,
+			verification: [...input.verification],
+			createdAt: now(input.now),
+		};
+		next.fixes[id] = fix;
+		for (const findingId of findingIds) next.findings[findingId].fixId = id;
+		renewClaim(claim, input);
+		updateGroupTriage(next, group);
+		return fix;
+	});
+}
+export function reopenGroup(store, input = {}) {
+	return edit(store, (next) => {
+		const group = next.groups[input.groupId];
+		if (!group || group.status !== "triaged")
+			throw error("invalid", "Only triaged verifier groups can reopen");
+		for (const findingId of group.findingIds) {
+			delete next.findings[findingId].dispositionId;
+			delete next.findings[findingId].fixId;
+		}
+		delete group.claimId;
+		group.status = "completed";
+		group.reopenCount = (group.reopenCount ?? 0) + 1;
+		group.reopenedAt = now(input.now);
+		return group;
 	});
 }
 
@@ -1651,6 +1826,41 @@ export function renderVerifierFinding(finding) {
 		`suggestion (untrusted): ${quoted(finding.suggestedAction)}`,
 	].join("\n");
 }
+export function renderTriageClaim(store, claimId) {
+	validateVerifierStore(store);
+	const claim = store.claims[claimId];
+	if (!claim) throw error("missing", `Verifier claim is missing: ${claimId}`);
+	const group = store.groups[claim.groupId];
+	return {
+		claim: {
+			id: claim.id,
+			groupId: group.id,
+			leaseUntil: claim.leaseUntil,
+			resumeTarget: claim.resumeTarget,
+		},
+		findings: group.findingIds
+			.filter((id) => {
+				const finding = store.findings[id];
+				return (
+					!finding.dispositionId ||
+					(store.dispositions[finding.dispositionId]?.disposition ===
+						"accepted" &&
+						!finding.fixId)
+				);
+			})
+			.map((id) => {
+				const finding = store.findings[id];
+				return {
+					id: finding.id,
+					model: finding.model,
+					operation: finding.operation,
+					checkpoint: finding.checkpoint.snapshot,
+					disposition: store.dispositions[finding.dispositionId]?.disposition,
+					rendered: renderVerifierFinding(finding),
+				};
+			}),
+	};
+}
 export function verifierTelemetryEvents(store) {
 	validateVerifierStore(store);
 	return Object.values(store.jobs)
@@ -1729,6 +1939,7 @@ export function validateVerifierStore(store, file = "verifier store") {
 		"groups",
 		"claims",
 		"dispositions",
+		"fixes",
 	])
 		objectMap(store[field], field, file);
 	for (const [id, batch] of Object.entries(store.batches)) {
@@ -1897,13 +2108,25 @@ export function validateVerifierStore(store, file = "verifier store") {
 		if (
 			!plainObject(group) ||
 			group.id !== id ||
-			group.status !== "completed" ||
+			!["completed", "claimed", "triaged"].includes(group.status) ||
 			(group.generated !== undefined && typeof group.generated !== "boolean") ||
 			!Array.isArray(group.findingIds) ||
 			group.findingIds.length === 0 ||
 			!same(group.findingIds, [...group.findingIds].sort()) ||
 			new Set(group.findingIds).size !== group.findingIds.length ||
 			group.findingIds.some((findingId) => !store.findings[findingId]) ||
+			(group.claimId !== undefined && !store.claims[group.claimId]) ||
+			(group.status === "claimed" && !store.claims[group.claimId]) ||
+			(group.status === "triaged" &&
+				group.findingIds.some((findingId) => {
+					const finding = store.findings[findingId];
+					return (
+						!finding.dispositionId ||
+						(store.dispositions[finding.dispositionId]?.disposition ===
+							"accepted" &&
+							!finding.fixId)
+					);
+				})) ||
 			group.id !== stableId("group", { findingIds: group.findingIds })
 		)
 			throw error("corrupt", `Invalid group ${id} in ${file}`);
@@ -1916,6 +2139,8 @@ export function validateVerifierStore(store, file = "verifier store") {
 			!nonempty(claim.ownerSession) ||
 			!nonempty(claim.leaseUntil) ||
 			Number.isNaN(Date.parse(claim.leaseUntil)) ||
+			(store.groups[claim.groupId].claimId !== id &&
+				store.groups[claim.groupId].status !== "completed") ||
 			claim.id !== stableId("claim", { groupId: claim.groupId })
 		)
 			throw error("corrupt", `Invalid claim ${id} in ${file}`);
@@ -1928,10 +2153,51 @@ export function validateVerifierStore(store, file = "verifier store") {
 			!DISPOSITIONS.has(disposition.disposition) ||
 			!nonempty(disposition.reason) ||
 			disposition.id !==
-				stableId("disposition", { findingId: disposition.findingId }) ||
-			store.findings[disposition.findingId].dispositionId !== id
+				stableId(
+					"disposition",
+					disposition.attempt
+						? { findingId: disposition.findingId, attempt: disposition.attempt }
+						: { findingId: disposition.findingId },
+				) ||
+			(store.findings[disposition.findingId].dispositionId !== id &&
+				!Object.values(store.groups).some(
+					(group) =>
+						(group.status === "completed" || group.reopenCount) &&
+						group.findingIds.includes(disposition.findingId),
+				))
 		)
 			throw error("corrupt", `Invalid disposition ${id} in ${file}`);
+	}
+	for (const [id, fix] of Object.entries(store.fixes)) {
+		if (
+			!plainObject(fix) ||
+			fix.id !== id ||
+			!store.claims[fix.claimId] ||
+			!Array.isArray(fix.findingIds) ||
+			!fix.findingIds.length ||
+			fix.findingIds.some(
+				(findingId) =>
+					store.findings[findingId]?.fixId !== id &&
+					!Object.values(store.groups).some(
+						(group) =>
+							(group.status === "completed" || group.reopenCount) &&
+							group.findingIds.includes(findingId),
+					),
+			) ||
+			!nonempty(fix.commit) ||
+			!/^[0-9a-f]{7,64}$/i.test(fix.commit) ||
+			!Array.isArray(fix.verification) ||
+			!fix.verification.length ||
+			fix.verification.some((entry) => !nonempty(entry)) ||
+			id !==
+				stableId("fix", {
+					claimId: fix.claimId,
+					findingIds: fix.findingIds,
+					commit: fix.commit,
+					verification: fix.verification,
+				})
+		)
+			throw error("corrupt", `Invalid verifier fix ${id} in ${file}`);
 	}
 	return store;
 }

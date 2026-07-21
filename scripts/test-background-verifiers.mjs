@@ -16,7 +16,9 @@ import {
 	VerifierStoreError,
 	addFinding,
 	addGroup,
+	claimCompletedGroups,
 	claimGroup,
+	completeAcceptedFix,
 	createBatch,
 	initVerifierStore,
 	loadVerifierStore,
@@ -24,6 +26,8 @@ import {
 	normalizeEffectiveProfiles,
 	recordDisposition,
 	recordOperationResult,
+	recordTriageDisposition,
+	reopenGroup,
 	saveVerifierStore,
 	verifierStorePath,
 	captureVerifierCheckpoint,
@@ -663,6 +667,125 @@ try {
 			(report) => report.outcome === "failed",
 		),
 		"malformed terminal reports fail every requested operation",
+	);
+
+	// U5: completed groups claim atomically, require changed-code evidence, and stay gated through accepted fix evidence.
+	const triageGroup = Object.values(reconciledStore.groups)[0];
+	const triageClaims = mutateVerifierStore(reconcileCwd, (state) =>
+		claimCompletedGroups(state, {
+			ownerSession: "triage-a",
+			resumeTarget: "E-1",
+			now: "2026-07-21T03:00:00.000Z",
+		}),
+	);
+	assert.equal(triageClaims.length, 1, "completed group is claimed once");
+	throwsCategory(
+		() =>
+			mutateVerifierStore(reconcileCwd, (state) =>
+				claimGroup(state, {
+					groupId: triageGroup.id,
+					ownerSession: "triage-b",
+					now: "2026-07-21T03:01:00.000Z",
+				}),
+			),
+		"locked",
+	);
+	const takeover = mutateVerifierStore(reconcileCwd, (state) =>
+		claimGroup(state, {
+			groupId: triageGroup.id,
+			ownerSession: "triage-b",
+			now: "2026-07-21T03:31:00.000Z",
+		}),
+	);
+	assert.equal(
+		takeover.ownerSession,
+		"triage-b",
+		"expired triage lease can be atomically taken over",
+	);
+	const triageOwner = "triage-b";
+	const [acceptedFinding, rejectedFinding] = triageGroup.findingIds;
+	throwsCategory(
+		() =>
+			mutateVerifierStore(reconcileCwd, (state) =>
+				recordTriageDisposition(state, {
+					claimId: triageClaims[0].id,
+					ownerSession: triageOwner,
+					findingId: acceptedFinding,
+					disposition: "accepted",
+					reason: "reproduced",
+					changedTarget: true,
+					now: "2026-07-21T03:01:30.000Z",
+				}),
+			),
+		"invalid",
+	);
+	mutateVerifierStore(reconcileCwd, (state) =>
+		recordTriageDisposition(state, {
+			claimId: triageClaims[0].id,
+			ownerSession: triageOwner,
+			findingId: acceptedFinding,
+			disposition: "accepted",
+			reason: "reproduced",
+			changedTarget: true,
+			currentCodeEvidence: "extensions/work-models.js:sha",
+			now: "2026-07-21T03:02:00.000Z",
+		}),
+	);
+	mutateVerifierStore(reconcileCwd, (state) =>
+		recordTriageDisposition(state, {
+			claimId: triageClaims[0].id,
+			ownerSession: triageOwner,
+			findingId: rejectedFinding,
+			disposition: "stale",
+			reason: "already corrected",
+			now: "2026-07-21T03:03:00.000Z",
+		}),
+	);
+	assert.equal(
+		loadVerifierStore(reconcileCwd).groups[triageGroup.id].status,
+		"claimed",
+		"accepted finding blocks routing until fixed",
+	);
+	mutateVerifierStore(reconcileCwd, (state) =>
+		completeAcceptedFix(state, {
+			claimId: triageClaims[0].id,
+			ownerSession: triageOwner,
+			findingIds: [acceptedFinding],
+			commit: "a".repeat(40),
+			verification: ["node test"],
+			now: "2026-07-21T03:04:00.000Z",
+		}),
+	);
+	assert.equal(
+		loadVerifierStore(reconcileCwd).groups[triageGroup.id].status,
+		"triaged",
+		"mixed dispositions become terminal only after accepted fix evidence",
+	);
+	assert.equal(
+		mutateVerifierStore(reconcileCwd, (state) =>
+			claimCompletedGroups(state, {
+				ownerSession: "triage-c",
+				now: "2026-07-21T03:04:30.000Z",
+			}),
+		).length,
+		0,
+		"fully triaged findings stay absent from later resumes",
+	);
+	mutateVerifierStore(reconcileCwd, (state) =>
+		reopenGroup(state, {
+			groupId: triageGroup.id,
+			now: "2026-07-21T03:05:00.000Z",
+		}),
+	);
+	assert.equal(
+		mutateVerifierStore(reconcileCwd, (state) =>
+			claimCompletedGroups(state, {
+				ownerSession: "triage-b",
+				now: "2026-07-21T03:06:00.000Z",
+			}),
+		).length,
+		1,
+		"explicit reopen produces one later claim",
 	);
 
 	console.log("background verifier domain tests passed");
