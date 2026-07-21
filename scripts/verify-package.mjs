@@ -147,6 +147,18 @@ for (const rel of normalPaths) {
 	);
 }
 
+const learningPolicy = read(
+	"skills/work-orchestrator/references/full-policy.md",
+);
+check(
+	"learning capture includes operational discoveries and durable deduplication",
+	learningPolicy.includes(
+		"project-specific operational facts that took repeated attempts",
+	) &&
+		learningPolicy.includes("wo:learning:<key>=<artifact>") &&
+		read("agents/work-debugger.md").includes("canonical build/test command"),
+);
+
 const userFacingDocs = [
 	"README.md",
 	"docs/orchestrator.md",
