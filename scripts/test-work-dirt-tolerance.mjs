@@ -21,7 +21,10 @@ const cwd = process.cwd();
 const dirt = (file) => isWorkflowDirt(cwd, { path: file });
 
 // The workflow's own runtime artifacts must never block a transition.
-assert(dirt(".ce-workflow/work-items.json"), "work-store state dirt is tolerated");
+assert(
+	dirt(".ce-workflow/work-items.json"),
+	"work-store state dirt is tolerated",
+);
 assert(dirt(".ce-workflow/work-items.json"), "work-store dirt is tolerated");
 assert(
 	dirt(".pi/work-runs/2026-07-13.jsonl"),
@@ -120,6 +123,32 @@ writeFileSync(path.join(repo, "x.py"), "def f():\n    return 2\n");
 assert(
 	!isWorkflowDirt(repo, { path: "x.py", x: " ", y: "M" }),
 	"substantive source change is NOT tolerated",
+);
+
+git(repo, ["restore", "x.py"]);
+writeFileSync(
+	path.join(repo, "reflow.py"),
+	"result = call(first, second, third)\n",
+);
+git(repo, ["add", "reflow.py"]);
+git(repo, ["commit", "-q", "-m", "add reflow fixture"]);
+writeFileSync(
+	path.join(repo, "reflow.py"),
+	"result = call(\n    first,\n    second,\n    third,\n)\n",
+);
+assert(
+	isWorkflowDirt(repo, { path: "reflow.py", x: " ", y: "M" }),
+	"formatter line reflow is tolerated",
+);
+
+git(repo, ["restore", "reflow.py"]);
+writeFileSync(path.join(repo, "string.py"), 'label = "a b"\n');
+git(repo, ["add", "string.py"]);
+git(repo, ["commit", "-q", "-m", "add string fixture"]);
+writeFileSync(path.join(repo, "string.py"), 'label = "a  b"\n');
+assert(
+	!isWorkflowDirt(repo, { path: "string.py", x: " ", y: "M" }),
+	"whitespace inside a string remains substantive",
 );
 
 console.log("dirt tolerance: PASS");

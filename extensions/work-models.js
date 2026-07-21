@@ -4858,8 +4858,56 @@ export function isGeneratedBuildArtifact(path) {
 	);
 }
 
+function isPythonFormatterOnlyDirt(cwd, item) {
+	if (!/\.pyi?$/i.test(item.path)) return undefined;
+	const script = `import ast, io, json, sys, tokenize
+
+def fingerprint(source):
+    tree = ast.dump(ast.parse(source, type_comments=True), include_attributes=False)
+    comments = [token.string for token in tokenize.generate_tokens(io.StringIO(source).readline) if token.type == tokenize.COMMENT]
+    return tree, comments
+
+before, after = json.load(sys.stdin)
+print(json.dumps(fingerprint(before) == fingerprint(after)))`;
+	try {
+		const before = run(cwd, "git", ["show", `HEAD:${item.path}`]);
+		const after = readFileSync(resolve(cwd, item.path), "utf8");
+		const commands =
+			process.platform === "win32"
+				? [
+						["python", []],
+						["py", ["-3"]],
+						["python3", []],
+					]
+				: [
+						["python3", []],
+						["python", []],
+					];
+		for (const [command, prefix] of commands) {
+			try {
+				return (
+					execFileSync(command, [...prefix, "-c", script], {
+						cwd,
+						encoding: "utf8",
+						input: JSON.stringify([before, after]),
+						stdio: ["pipe", "pipe", "pipe"],
+					}).trim() === "true"
+				);
+			} catch {
+				// Try the next common Python launcher.
+			}
+		}
+	} catch {
+		// The caller fails closed when Python syntax cannot be compared.
+	}
+	return undefined;
+}
+
 function isFormatterOnlyDirt(cwd, item) {
 	if (item.x !== " " || item.y !== "M") return false;
+	const pythonResult = isPythonFormatterOnlyDirt(cwd, item);
+	if (pythonResult !== undefined || /\.pyi?$/i.test(item.path))
+		return pythonResult === true;
 	try {
 		run(cwd, "git", [
 			"diff",
