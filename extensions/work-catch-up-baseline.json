@@ -1,27 +1,40 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-19",
+  "capturedAt": "2026-07-21",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "0.80.10",
-      "reviewedAt": "2026-07-19",
-      "reviewedVersion": "0.80.10",
+      "version": "0.81.0",
+      "reviewedAt": "2026-07-21",
+      "reviewedVersion": "0.81.0",
       "decisions": [
         {
-          "version": "0.80.10",
-          "title": "Use Pi's max thinking level",
+          "version": "0.81.0",
+          "title": "Expanded RPC usage accounting and thinking introspection",
           "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "The max work profile should expose Pi's new supported ceiling instead of stopping at xhigh.",
-          "verification": "work-settings behavior and npm run verify:quiet passed"
+          "status": "no-action",
+          "rationale": "Pi now includes tool and summary usage in get_session_stats and exposes get_available_thinking_levels (upstream docs/rpc.md); ce-workflow already consumes before/after session stats and verifies the applied thinking level in scripts/workflow-evaluation-rpc.mjs, so the installed runtime provides the benefit without another compatibility layer."
         },
         {
-          "version": "0.80.10",
-          "title": "Unified model runtime and deferred Kimi tools",
-          "pov": "Not our problem",
+          "version": "0.81.0",
+          "title": "Tool and compaction usage metadata",
+          "pov": "Adopt",
           "status": "no-action",
-          "rationale": "ce-workflow does not call the replaced SDK model registry APIs and has no Kimi-specific tool surface to simplify."
+          "rationale": "The new optional usage fields are additive (upstream docs/extensions.md and docs/compaction.md). ce-workflow's instant compaction performs no nested model call, while subagent costs remain deliberately separated in work telemetry, so no usage-producing call site needs a change."
+        },
+        {
+          "version": "0.81.0",
+          "title": "Native provider registration, Qwen plans, and llama.cpp management",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "ce-workflow registers workflow tools and commands but no model provider; repository searches found no registerProvider or ModelRuntime integration point, so provider-owned authentication and local model management do not simplify this package."
+        },
+        {
+          "version": "0.81.0",
+          "title": "Additive extension lifecycle and public type exports",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "0.81.0 adds root type exports and hidden inline-extension metadata without removing the lifecycle hooks ce-workflow uses; extensions/work-models.js remains on supported agent_end, agent_settled, turn_end, and tool lifecycle contracts."
         }
       ]
     },
@@ -98,16 +111,37 @@
     },
     {
       "name": "pi-lens",
-      "version": "3.8.70",
-      "reviewedAt": "2026-07-19",
-      "reviewedVersion": "3.8.70",
+      "version": "3.8.71",
+      "reviewedAt": "2026-07-21",
+      "reviewedVersion": "3.8.71",
       "decisions": [
         {
-          "version": "3.8.70",
-          "title": "Subagent light mode and lifecycle optimizations",
+          "version": "3.8.71",
+          "title": "Diagnostic disposition tool",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "The installed pi-lens runtime applies these improvements automatically; ce-workflow has no duplicate integration to add."
+          "rationale": "pi-lens now registers lens_diagnostic_mark as a situational tool and honors its marks across diagnostics (upstream docs/dispositions.md). The host exposes it automatically through pi_lens_activate_tools, while ce-workflow's verifier triage covers a separate review-finding store, so duplicate integration would add no value."
+        },
+        {
+          "version": "3.8.71",
+          "title": "Deferred formatter and autofix bus signals",
+          "pov": "Hold",
+          "status": "no-action",
+          "rationale": "The new pilens:format:queued, pilens:format:start, and pilens:autofix:start events are useful only for an in-process immutable-snapshot listener. ce-workflow schedules background verification from an explicit settled checkpoint in extensions/work-models.js rather than snapshotting during deferred lens mutation, so there is no current race to fix."
+        },
+        {
+          "version": "3.8.71",
+          "title": "Cached workspace diagnostics and scan correctness fixes",
+          "pov": "Adopt",
+          "status": "no-action",
+          "rationale": "Persisted LSP sweep caching, tracked-file discovery, source-twin resolution, deduplication, and warm-up timeout fixes are internal pi-lens behavior (upstream CHANGELOG.md); ce-workflow already calls the public lens diagnostics tools and inherits the faster, quieter results automatically."
+        },
+        {
+          "version": "3.8.71",
+          "title": "Optional ty server and human project map",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "ty is a PATH-only fallback selected inside pi-lens and /lens-map is a human-only command with no agent tool. Neither has a ce-workflow call site or requires repository configuration."
         }
       ]
     }
