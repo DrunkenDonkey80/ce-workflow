@@ -727,7 +727,10 @@ function cleanupVerifierBatchRuntime(cwd, batchId) {
 			process.platform === "win32"
 				? path.dirname(resolved).toLowerCase() === temporaryRoot.toLowerCase()
 				: path.dirname(resolved) === temporaryRoot;
-		if (!sameRoot || !path.basename(resolved).startsWith("ce-verifier-workspace-"))
+		if (
+			!sameRoot ||
+			!path.basename(resolved).startsWith("ce-verifier-workspace-")
+		)
 			continue;
 		try {
 			const marker = JSON.parse(
