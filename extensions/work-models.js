@@ -45,8 +45,12 @@ import {
 } from "./work-initiatives.js";
 import {
 	launchQueuedVerifierJobs,
+	loadVerifierStore,
 	normalizeEffectiveProfiles,
+	reconcileVerifierRuns,
 	scheduleVerifierBatch,
+	verifierStatus,
+	verifierTelemetryEvents,
 } from "./background-verifiers.js";
 import {
 	acquireLock,
@@ -6464,6 +6468,40 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 		paths: input.paths,
 		adapter: createPiSubagentsVerifierAdapter(pi),
 	});
+}
+
+function reconcileBackgroundVerifierRuns(cwd) {
+	const reconciled = reconcileVerifierRuns(cwd);
+	let store;
+	try {
+		store = loadVerifierStore(cwd);
+	} catch {
+		return {
+			reconciled,
+			status: backgroundVerifierProfiles(cwd).length
+				? "queued/running"
+				: "not-configured",
+		};
+	}
+	for (const event of verifierTelemetryEvents(store))
+		recordWorkTelemetry(cwd, event);
+	return {
+		reconciled,
+		status: verifierStatus(store, backgroundVerifierProfiles(cwd)),
+	};
+}
+
+function backgroundVerifierRunStatus(cwd) {
+	try {
+		return verifierStatus(
+			loadVerifierStore(cwd),
+			backgroundVerifierProfiles(cwd),
+		);
+	} catch {
+		return backgroundVerifierProfiles(cwd).length
+			? "queued/running"
+			: "not-configured";
+	}
 }
 
 function workflowHelperGuidance(cwd, state) {
@@ -12982,7 +13020,10 @@ async function handleWorkflowAction(
 async function handleWorkStatusCommand(args, ctx) {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	try {
-		const output = withRecommendedActionsText(buildWorkStatus(ctx.cwd, args));
+		reconcileBackgroundVerifierRuns(ctx.cwd);
+		const output = withRecommendedActionsText(
+			`${buildWorkStatus(ctx.cwd, args)}\nVerifier review: ${backgroundVerifierRunStatus(ctx.cwd)}`,
+		);
 		rememberRecommendedActions(
 			ctx.cwd,
 			recommendedActionsFromText(output),
@@ -13704,6 +13745,8 @@ export {
 	advisorCriticStep,
 	workOrchSettings,
 	backgroundVerifierProfiles,
+	reconcileBackgroundVerifierRuns,
+	backgroundVerifierRunStatus,
 	scheduleConfiguredBackgroundVerifiers,
 	createPiSubagentsVerifierAdapter,
 	readEffectiveSettings as effectiveSettingsForTest,
@@ -14037,7 +14080,10 @@ export default function workModelsExtension(pi) {
 			mode: ctx.mode,
 			session: ctx.sessionManager?.getSessionId?.(),
 		};
-		if (ctx.mode !== "print") reconcilePendingDirectRuns(ctx.cwd, runtime);
+		if (ctx.mode !== "print") {
+			reconcilePendingDirectRuns(ctx.cwd, runtime);
+			reconcileBackgroundVerifierRuns(ctx.cwd);
+		}
 		registerWorkCatchUpCommand(pi, ctx);
 		registerWorkImproveCommand(pi, ctx);
 		activeWorkGoalCwd = ctx.cwd;

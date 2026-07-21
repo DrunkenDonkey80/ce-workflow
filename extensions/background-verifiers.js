@@ -4,12 +4,14 @@ import {
 	chmodSync,
 	closeSync,
 	existsSync,
+	fstatSync,
 	fsyncSync,
 	lstatSync,
 	mkdirSync,
 	mkdtempSync,
 	openSync,
 	readFileSync,
+	readSync,
 	renameSync,
 	rmSync,
 	unlinkSync,
@@ -42,6 +44,26 @@ const EFFORTS = new Set(THINKING_EFFORTS);
 const OUTCOMES = new Set(["findings", "no-findings", "failed"]);
 const DISPOSITIONS = new Set(["accepted", "rejected", "stale"]);
 const SEVERITIES = new Set(["critical", "high", "medium", "low", "info"]);
+const REPORT_MAX_BYTES = 1024 * 1024;
+const REPORT_MAX_DEPTH = 20;
+const REPORT_MAX_FINDINGS = 100;
+const REPORT_MAX_TEXT = 10_000;
+const REPORT_CATEGORIES = /^[a-z][a-z0-9-]{0,63}$/;
+const TERMINAL_SUCCESS_STATES = new Set([
+	"complete",
+	"completed",
+	"success",
+	"ok",
+	"passed",
+]);
+const TERMINAL_FAILURE_STATES = new Set([
+	"failed",
+	"error",
+	"cancelled",
+	"canceled",
+	"timed_out",
+	"timeout",
+]);
 
 export class VerifierStoreError extends Error {
 	constructor(category, message, details = {}) {
@@ -410,6 +432,7 @@ export function initVerifierStore(cwd = process.cwd(), options = {}) {
 			batches: {},
 			jobs: {},
 			reports: {},
+			quarantines: {},
 			findings: {},
 			groups: {},
 			claims: {},
@@ -449,9 +472,9 @@ function expectedJobId(batchId, model) {
 function jobStatus(operationStatus, launch) {
 	if (launch?.status === "orphaned") return "orphaned";
 	if (launch?.status === "failed") return "failed";
-	if (launch?.status === "running") return "running";
 	const values = Object.values(operationStatus);
-	if (values.every((value) => value === "pending")) return "queued";
+	if (values.every((value) => value === "pending"))
+		return launch?.status === "running" ? "running" : "queued";
 	if (values.some((value) => value === "pending")) return "running";
 	if (values.every((value) => value === "failed")) return "failed";
 	if (values.some((value) => value === "failed")) return "partially-failed";
@@ -971,10 +994,20 @@ export function recordOperationResult(store, input = {}) {
 			operation: input.operation,
 		});
 		const existing = next.reports[id];
+		const artifact = input.artifact;
+		if (
+			artifact !== undefined &&
+			(!plainObject(artifact) ||
+				!nonempty(artifact.path) ||
+				!Number.isInteger(artifact.bytes) ||
+				artifact.bytes < 0)
+		)
+			throw error("invalid", "Invalid verifier report artifact");
 		const comparable = {
 			outcome: input.outcome,
 			usage: input.usage,
 			failure: input.failure,
+			artifact,
 		};
 		if (existing) {
 			if (
@@ -983,6 +1016,7 @@ export function recordOperationResult(store, input = {}) {
 						outcome: existing.outcome,
 						usage: existing.usage,
 						failure: existing.failure,
+						artifact: existing.artifact,
 					},
 					comparable,
 				)
@@ -1005,6 +1039,9 @@ export function recordOperationResult(store, input = {}) {
 				? {}
 				: { usage: structuredClone(input.usage) }),
 			...(input.failure === undefined ? {} : { failure: input.failure }),
+			...(artifact === undefined
+				? {}
+				: { artifact: structuredClone(artifact) }),
 			createdAt: now(input.now),
 		};
 		next.reports[id] = report;
@@ -1033,17 +1070,28 @@ export function addFinding(store, input = {}) {
 		relativePath(input.path);
 		if (
 			!nonempty(input.category) ||
+			!REPORT_CATEGORIES.test(input.category) ||
 			!SEVERITIES.has(input.severity) ||
-			!nonempty(input.rationale) ||
-			!nonempty(input.suggestedAction)
+			!Number.isInteger(input.startLine) ||
+			!Number.isInteger(input.endLine) ||
+			input.startLine < 1 ||
+			input.endLine < input.startLine ||
+			![input.rationale, input.evidence, input.suggestedAction].every(
+				(value) => nonempty(value) && value.length <= REPORT_MAX_TEXT,
+			)
 		)
 			throw error("invalid", "Finding is missing required attribution");
+		if (!next.batches[report.batchId].checkpoint.paths.includes(input.path))
+			throw error("invalid", "Finding path is outside the reviewed checkpoint");
 		const identity = {
 			reportId: report.id,
 			path: input.path,
+			startLine: input.startLine,
+			endLine: input.endLine,
 			category: input.category,
 			severity: input.severity,
 			rationale: input.rationale,
+			evidence: input.evidence,
 			suggestedAction: input.suggestedAction,
 		};
 		const id = stableId("finding", identity);
@@ -1152,6 +1200,509 @@ export function recordDisposition(store, input = {}) {
 	});
 }
 
+function boundedArtifactRead(file, maxBytes = REPORT_MAX_BYTES) {
+	let fd;
+	try {
+		if (!file || lstatSync(file).isSymbolicLink())
+			throw error("artifact", "Verifier artifact is unavailable");
+		fd = openSync(file, "r");
+		const size = fstatSync(fd).size;
+		if (!Number.isSafeInteger(size) || size > maxBytes)
+			throw error("over-limit", "Verifier artifact exceeds the size limit", {
+				bytes: Number.isSafeInteger(size) ? size : undefined,
+			});
+		const bytes = Buffer.allocUnsafe(size);
+		const read = readSync(fd, bytes, 0, size, 0);
+		if (read !== size)
+			throw error("artifact", "Verifier artifact changed during bounded read");
+		return { bytes: size, text: bytes.toString("utf8") };
+	} catch (cause) {
+		if (cause instanceof VerifierStoreError) throw cause;
+		throw error("artifact", "Verifier artifact is unavailable");
+	} finally {
+		if (fd !== undefined) closeSync(fd);
+	}
+}
+function jsonDepth(value) {
+	let max = 0;
+	const pending = [[value, 1]];
+	while (pending.length) {
+		const [current, depth] = pending.pop();
+		max = Math.max(max, depth);
+		if (max > REPORT_MAX_DEPTH) return max;
+		if (Array.isArray(current))
+			for (const entry of current) pending.push([entry, depth + 1]);
+		else if (plainObject(current))
+			for (const entry of Object.values(current))
+				pending.push([entry, depth + 1]);
+	}
+	return max;
+}
+function exactKeys(value, required, optional = []) {
+	if (!plainObject(value)) return false;
+	const keys = Object.keys(value);
+	return (
+		required.every((key) => Object.hasOwn(value, key)) &&
+		keys.every((key) => [...required, ...optional].includes(key))
+	);
+}
+function validUsage(value) {
+	return (
+		value === undefined ||
+		(plainObject(value) &&
+			Object.values(value).every(
+				(item) =>
+					typeof item === "number" && Number.isFinite(item) && item >= 0,
+			))
+	);
+}
+function artifactForJob(cwd, job) {
+	const file = job.launch?.request?.output;
+	const root = path.resolve(verifierRuntimeRoot(cwd));
+	if (!nonempty(file) || !path.resolve(file).startsWith(`${root}${path.sep}`))
+		throw error(
+			"artifact",
+			"Verifier output is not a private runtime artifact",
+		);
+	return file;
+}
+function validateResult(job, batch, result) {
+	const required = ["jobId", "model", "checkpoint", "operation", "outcome"];
+	if (!exactKeys(result, required, ["findings", "usage", "failure"]))
+		throw error("invalid", "Verifier result has an invalid schema");
+	if (
+		result.jobId !== job.id ||
+		result.model !== job.model ||
+		!same(result.checkpoint, batch.checkpoint) ||
+		!job.operations.includes(result.operation) ||
+		!OUTCOMES.has(result.outcome) ||
+		!validUsage(result.usage)
+	)
+		throw error("invalid", "Verifier result identity is invalid");
+	if (result.outcome === "failed") {
+		if (!nonempty(result.failure) || result.failure.length > REPORT_MAX_TEXT)
+			throw error("invalid", "Verifier failure is invalid");
+		return {
+			operation: result.operation,
+			outcome: "failed",
+			usage: result.usage,
+		};
+	}
+	if (result.outcome === "no-findings") {
+		if (result.findings !== undefined || result.failure !== undefined)
+			throw error("invalid", "No-findings result has unexpected content");
+		return {
+			operation: result.operation,
+			outcome: "no-findings",
+			usage: result.usage,
+		};
+	}
+	if (!Array.isArray(result.findings) || !result.findings.length)
+		throw error("invalid", "Findings result has no findings");
+	const findings = result.findings.map((finding) => {
+		if (
+			!exactKeys(finding, [
+				"path",
+				"startLine",
+				"endLine",
+				"category",
+				"severity",
+				"rationale",
+				"evidence",
+				"suggestion",
+			])
+		)
+			throw error("invalid", "Verifier finding has an invalid schema");
+		return {
+			path: finding.path,
+			startLine: finding.startLine,
+			endLine: finding.endLine,
+			category: finding.category,
+			severity: finding.severity,
+			rationale: finding.rationale,
+			evidence: finding.evidence,
+			suggestedAction: finding.suggestion,
+		};
+	});
+	if (findings.length > REPORT_MAX_FINDINGS)
+		throw error("over-limit", "Verifier report has too many findings");
+	return {
+		operation: result.operation,
+		outcome: "findings",
+		usage: result.usage,
+		findings,
+	};
+}
+function validateTerminalReport(job, batch, text) {
+	let report;
+	try {
+		report = JSON.parse(text);
+	} catch {
+		throw error("invalid", "Verifier report is not valid JSON");
+	}
+	if (jsonDepth(report) > REPORT_MAX_DEPTH)
+		throw error("over-limit", "Verifier report exceeds the nesting limit");
+	if (
+		!exactKeys(report, [
+			"version",
+			"jobId",
+			"model",
+			"checkpoint",
+			"results",
+		]) ||
+		report.version !== 1 ||
+		report.jobId !== job.id ||
+		report.model !== job.model ||
+		!same(report.checkpoint, batch.checkpoint) ||
+		!Array.isArray(report.results)
+	)
+		throw error("invalid", "Verifier report identity is invalid");
+	if (report.results.length > job.operations.length)
+		throw error("invalid", "Verifier report has unexpected operations");
+	const results = report.results.map((result) =>
+		validateResult(job, batch, result),
+	);
+	const operations = new Set(results.map((result) => result.operation));
+	if (operations.size !== results.length)
+		throw error("invalid", "Verifier report duplicates an operation");
+	if (
+		results.reduce((sum, result) => sum + (result.findings?.length ?? 0), 0) >
+		REPORT_MAX_FINDINGS
+	)
+		throw error("over-limit", "Verifier report has too many findings");
+	return {
+		results,
+		omitted: job.operations.filter((operation) => !operations.has(operation)),
+	};
+}
+function quarantineVerifierReport(store, input = {}) {
+	return edit(store, (next) => {
+		const job = next.jobs[input.jobId];
+		if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
+		const id = stableId("quarantine", {
+			jobId: job.id,
+			artifact: input.artifact,
+			reason: input.reason,
+		});
+		return (next.quarantines[id] ??= {
+			id,
+			jobId: job.id,
+			artifact: structuredClone(input.artifact),
+			reason: input.reason,
+			createdAt: now(input.now),
+		});
+	});
+}
+function recordTerminalFailures(store, jobId, operations, artifact, nowValue) {
+	for (const operation of operations)
+		recordOperationResult(store, {
+			jobId,
+			operation,
+			outcome: "failed",
+			failure: "Verifier terminal output was unavailable or invalid",
+			artifact,
+			now: nowValue,
+		});
+}
+export function ingestVerifierReport(store, input = {}) {
+	const job = store.jobs?.[input.jobId];
+	if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
+	const batch = store.batches[job.batchId];
+	const artifact = input.artifact;
+	let validated;
+	try {
+		validated = validateTerminalReport(job, batch, input.text);
+	} catch (cause) {
+		const reason =
+			cause instanceof VerifierStoreError ? cause.category : "invalid";
+		quarantineVerifierReport(store, {
+			jobId: job.id,
+			artifact,
+			reason,
+			now: input.now,
+		});
+		recordTerminalFailures(
+			store,
+			job.id,
+			job.operations.filter(
+				(operation) => job.operationStatus[operation] === "pending",
+			),
+			artifact,
+			input.now,
+		);
+		return { quarantined: true, reason };
+	}
+	for (const result of validated.results) {
+		const report = recordOperationResult(store, {
+			jobId: job.id,
+			operation: result.operation,
+			outcome: result.outcome,
+			...(result.usage === undefined ? {} : { usage: result.usage }),
+			...(result.outcome === "failed"
+				? { failure: "Verifier reported an operation failure" }
+				: {}),
+			artifact,
+			now: input.now,
+		});
+		for (const finding of result.findings ?? [])
+			addFinding(store, {
+				reportId: report.id,
+				operation: result.operation,
+				model: job.model,
+				checkpoint: batch.checkpoint,
+				...finding,
+				now: input.now,
+			});
+	}
+	recordTerminalFailures(store, job.id, validated.omitted, artifact, input.now);
+	groupValidatedFindings(store, { now: input.now });
+	return { quarantined: false, omitted: validated.omitted };
+}
+function rangesOverlap(left, right) {
+	return left.startLine <= right.endLine && right.startLine <= left.endLine;
+}
+export function groupValidatedFindings(store, input = {}) {
+	return edit(store, (next) => {
+		for (const [id, group] of Object.entries(next.groups))
+			if (
+				group.generated &&
+				!Object.values(next.claims).some((claim) => claim.groupId === id)
+			)
+				delete next.groups[id];
+		const buckets = new Map();
+		for (const finding of Object.values(next.findings)) {
+			const key = `${finding.path}\u001f${finding.category}`;
+			(buckets.get(key) ?? buckets.set(key, []).get(key)).push(finding);
+		}
+		const groups = [];
+		for (const findings of buckets.values()) {
+			const pending = [...findings].sort(
+				(a, b) =>
+					a.startLine - b.startLine ||
+					a.endLine - b.endLine ||
+					a.id.localeCompare(b.id),
+			);
+			while (pending.length) {
+				const component = [pending.shift()];
+				for (let index = 0; index < pending.length; ) {
+					if (component.some((member) => rangesOverlap(member, pending[index])))
+						component.push(pending.splice(index, 1)[0]);
+					else index += 1;
+				}
+				const findingIds = component.map((finding) => finding.id).sort();
+				const id = stableId("group", { findingIds });
+				next.groups[id] = next.groups[id] ?? {
+					id,
+					findingIds,
+					status: "completed",
+					generated: true,
+					createdAt: now(input.now),
+				};
+				groups.push(next.groups[id]);
+			}
+		}
+		return groups.sort((left, right) => left.id.localeCompare(right.id));
+	});
+}
+function terminalState(status) {
+	return String(status?.state ?? status?.status ?? "").toLowerCase();
+}
+function markVerifierOrphaned(store, jobId, nowValue) {
+	return edit(store, (next) => {
+		const job = next.jobs[jobId];
+		if (!job || job.launch?.status !== "running") return job;
+		job.launch = {
+			...job.launch,
+			status: "orphaned",
+			orphanedAt: now(nowValue),
+		};
+		job.status = "orphaned";
+		return job;
+	});
+}
+export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
+	let store;
+	try {
+		store = loadVerifierStore(cwd);
+	} catch {
+		return [];
+	}
+	const reconciled = [];
+	for (const job of Object.values(store.jobs).filter(
+		(item) => item.launch?.status === "running",
+	)) {
+		const statusFile = job.launch.asyncDir
+			? path.join(job.launch.asyncDir, "status.json")
+			: "";
+		let status;
+		try {
+			status = JSON.parse(boundedArtifactRead(statusFile).text);
+		} catch {
+			mutateVerifierStore(
+				cwd,
+				(state) => markVerifierOrphaned(state, job.id, input.now),
+				input,
+			);
+			reconciled.push(job.id);
+			continue;
+		}
+		const state = terminalState(status);
+		if (
+			!TERMINAL_SUCCESS_STATES.has(state) &&
+			!TERMINAL_FAILURE_STATES.has(state)
+		)
+			continue;
+		let artifact;
+		try {
+			const file = artifactForJob(cwd, job);
+			artifact = { path: file, bytes: lstatSync(file).size };
+			const raw = boundedArtifactRead(file);
+			artifact.bytes = raw.bytes;
+			try {
+				chmodSync(file, 0o600);
+			} catch {
+				// Windows ACLs, when present, remain authoritative.
+			}
+			artifact = { path: file, bytes: raw.bytes };
+			mutateVerifierStore(
+				cwd,
+				(next) => {
+					if (TERMINAL_FAILURE_STATES.has(state)) {
+						recordTerminalFailures(
+							next,
+							job.id,
+							job.operations.filter(
+								(operation) =>
+									next.jobs[job.id].operationStatus[operation] === "pending",
+							),
+							artifact,
+							input.now,
+						);
+						return { failed: true };
+					}
+					return ingestVerifierReport(next, {
+						jobId: job.id,
+						artifact,
+						text: raw.text,
+						now: input.now,
+					});
+				},
+				input,
+			);
+		} catch (cause) {
+			const reason =
+				cause instanceof VerifierStoreError ? cause.category : "artifact";
+			mutateVerifierStore(
+				cwd,
+				(next) => {
+					quarantineVerifierReport(next, {
+						jobId: job.id,
+						artifact: artifact ?? { path: "private", bytes: 0 },
+						reason,
+						now: input.now,
+					});
+					recordTerminalFailures(
+						next,
+						job.id,
+						job.operations.filter(
+							(operation) =>
+								next.jobs[job.id].operationStatus[operation] === "pending",
+						),
+						artifact,
+						input.now,
+					);
+				},
+				input,
+			);
+		}
+		reconciled.push(job.id);
+	}
+	return reconciled;
+}
+export function verifierStatus(store, configured = undefined) {
+	if (!store) return configured?.length ? "queued/running" : "not-configured";
+	validateVerifierStore(store);
+	const jobs = Object.values(store.jobs);
+	if (!jobs.length)
+		return configured?.length ? "queued/running" : "not-configured";
+	if (
+		jobs.some((job) =>
+			["failed", "orphaned", "partially-failed"].includes(job.status),
+		)
+	)
+		return "failed/orphaned";
+	if (jobs.some((job) => ["queued", "running"].includes(job.status)))
+		return "queued/running";
+	if (Object.values(store.findings).some((finding) => !finding.dispositionId))
+		return "completed-awaiting-triage";
+	return "fully-triaged";
+}
+function quoted(value, limit = 500) {
+	return JSON.stringify(String(value).slice(0, limit));
+}
+export function renderVerifierFinding(finding) {
+	return [
+		`path (untrusted): ${quoted(finding.path, 500)}`,
+		`range: ${finding.startLine}-${finding.endLine}`,
+		`category (untrusted): ${quoted(finding.category, 100)}`,
+		`severity: ${quoted(finding.severity, 40)}`,
+		`rationale (untrusted): ${quoted(finding.rationale)}`,
+		`evidence (untrusted): ${quoted(finding.evidence)}`,
+		`suggestion (untrusted): ${quoted(finding.suggestedAction)}`,
+	].join("\n");
+}
+export function verifierTelemetryEvents(store) {
+	validateVerifierStore(store);
+	return Object.values(store.jobs)
+		.sort((left, right) => left.id.localeCompare(right.id))
+		.flatMap((job) =>
+			job.operations.map((operation) => {
+				const report =
+					store.reports[stableId("report", { jobId: job.id, operation })];
+				const findings = Object.values(store.findings).filter(
+					(finding) => finding.reportId === report?.id,
+				);
+				const groups = Object.values(store.groups).filter((group) =>
+					group.findingIds.some((id) =>
+						findings.some((finding) => finding.id === id),
+					),
+				);
+				const dispositions = findings
+					.map(
+						(finding) => store.dispositions[finding.dispositionId]?.disposition,
+					)
+					.filter(Boolean);
+				const started = Date.parse(
+					job.launch?.launchedAt ?? job.createdAt ?? "",
+				);
+				const ended = Date.parse(
+					report?.createdAt ??
+						job.launch?.failedAt ??
+						job.launch?.orphanedAt ??
+						"",
+				);
+				return {
+					id: `verifier-${job.id}-${operation}-${job.operationStatus[operation]}`,
+					type: "background-verifier",
+					batchId: job.batchId,
+					jobId: job.id,
+					model: job.model,
+					operation,
+					status: job.operationStatus[operation],
+					jobStatus: job.status,
+					durationMs:
+						Number.isFinite(started) && Number.isFinite(ended)
+							? Math.max(0, ended - started)
+							: undefined,
+					...(report?.usage === undefined ? {} : { usage: report.usage }),
+					findingCount: findings.length,
+					groupCount: groups.length,
+					...(dispositions.length ? { dispositions } : {}),
+				};
+			}),
+		);
+}
+
 export function validateVerifierStore(store, file = "verifier store") {
 	if (!plainObject(store))
 		throw error("corrupt", `Verifier store must be an object: ${file}`);
@@ -1173,6 +1724,7 @@ export function validateVerifierStore(store, file = "verifier store") {
 		"batches",
 		"jobs",
 		"reports",
+		"quarantines",
 		"findings",
 		"groups",
 		"claims",
@@ -1255,6 +1807,33 @@ export function validateVerifierStore(store, file = "verifier store") {
 				))
 		)
 			throw error("corrupt", `Invalid report usage ${id} in ${file}`);
+		if (
+			report.artifact !== undefined &&
+			(!plainObject(report.artifact) ||
+				!nonempty(report.artifact.path) ||
+				!Number.isInteger(report.artifact.bytes) ||
+				report.artifact.bytes < 0)
+		)
+			throw error("corrupt", `Invalid report artifact ${id} in ${file}`);
+	}
+	for (const [id, quarantine] of Object.entries(store.quarantines)) {
+		if (
+			!plainObject(quarantine) ||
+			quarantine.id !== id ||
+			!store.jobs[quarantine.jobId] ||
+			!plainObject(quarantine.artifact) ||
+			!nonempty(quarantine.artifact.path) ||
+			!Number.isInteger(quarantine.artifact.bytes) ||
+			quarantine.artifact.bytes < 0 ||
+			!nonempty(quarantine.reason) ||
+			id !==
+				stableId("quarantine", {
+					jobId: quarantine.jobId,
+					artifact: quarantine.artifact,
+					reason: quarantine.reason,
+				})
+		)
+			throw error("corrupt", `Invalid quarantine ${id} in ${file}`);
 	}
 	for (const job of Object.values(store.jobs))
 		for (const operation of job.operations) {
@@ -1273,9 +1852,12 @@ export function validateVerifierStore(store, file = "verifier store") {
 		const identity = {
 			reportId: finding?.reportId,
 			path: finding?.path,
+			startLine: finding?.startLine,
+			endLine: finding?.endLine,
 			category: finding?.category,
 			severity: finding?.severity,
 			rationale: finding?.rationale,
+			evidence: finding?.evidence,
 			suggestedAction: finding?.suggestedAction,
 		};
 		if (
@@ -1288,9 +1870,16 @@ export function validateVerifierStore(store, file = "verifier store") {
 			finding.model !== report.model ||
 			!same(finding.checkpoint, report.checkpoint) ||
 			!nonempty(finding.category) ||
+			!REPORT_CATEGORIES.test(finding.category) ||
 			!SEVERITIES.has(finding.severity) ||
-			!nonempty(finding.rationale) ||
-			!nonempty(finding.suggestedAction)
+			!Number.isInteger(finding.startLine) ||
+			!Number.isInteger(finding.endLine) ||
+			finding.startLine < 1 ||
+			finding.endLine < finding.startLine ||
+			![finding.rationale, finding.evidence, finding.suggestedAction].every(
+				(value) => nonempty(value) && value.length <= REPORT_MAX_TEXT,
+			) ||
+			!store.batches[report.batchId].checkpoint.paths.includes(finding.path)
 		)
 			throw error("corrupt", `Invalid finding ${id} in ${file}`);
 		try {
@@ -1309,6 +1898,7 @@ export function validateVerifierStore(store, file = "verifier store") {
 			!plainObject(group) ||
 			group.id !== id ||
 			group.status !== "completed" ||
+			(group.generated !== undefined && typeof group.generated !== "boolean") ||
 			!Array.isArray(group.findingIds) ||
 			group.findingIds.length === 0 ||
 			!same(group.findingIds, [...group.findingIds].sort()) ||

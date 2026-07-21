@@ -264,6 +264,31 @@ try {
 		Array.isArray(reconcilePendingDirectRuns(cwd)),
 		"malformed pending and status records do not throw",
 	);
+
+	// Verifier lifecycle telemetry is structured and leaves optional usage absent.
+	recordWorkTelemetry(cwd, {
+		id: "verifier-no-usage",
+		type: "background-verifier",
+		batchId: "batch-safe",
+		jobId: "job-safe",
+		model: "fixture-model",
+		operation: "security",
+		status: "no-findings",
+		jobStatus: "completed",
+		durationMs: 12,
+		findingCount: 0,
+		groupCount: 0,
+	});
+	const verifierEvent = telemetryEvents(cwd).find(
+		(event) => event.id === "verifier-no-usage",
+	);
+	assert(
+		verifierEvent?.operation === "security" &&
+			verifierEvent.status === "no-findings" &&
+			verifierEvent.usage === undefined &&
+			!JSON.stringify(verifierEvent).includes("sk-live"),
+		"verifier telemetry carries lifecycle fields without synthetic usage or raw output",
+	);
 	recordWorkTelemetry(cwd, {
 		id: "cmd-small",
 		timestamp: now,
