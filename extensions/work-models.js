@@ -11641,12 +11641,15 @@ function sameCheckout(left, right) {
 		: a === b;
 }
 
-function isOpenImprovementReport(issue) {
+function isImprovementReport(issue) {
+	return labelsOf(issue).includes(SELF_IMPROVEMENT_REPORT_LABEL);
+}
+
+function isOpenImprovementWork(issue) {
 	return (
 		issue?.type !== "epic" &&
 		statusOf(issue) !== "closed" &&
-		statusOf(issue) !== "deferred" &&
-		labelsOf(issue).includes(SELF_IMPROVEMENT_REPORT_LABEL)
+		statusOf(issue) !== "deferred"
 	);
 }
 
@@ -11668,9 +11671,9 @@ function selfImprovementRoadmap(cwd, target = "") {
 	return candidates.length === 1 ? candidates[0] : undefined;
 }
 
-function improvementReports(cwd, epicId) {
+function improvementWorkItems(cwd, epicId) {
 	return childWorkItems(cwd, epicId)
-		.filter(isOpenImprovementReport)
+		.filter(isOpenImprovementWork)
 		.sort(byCreatedAsc);
 }
 
@@ -11771,15 +11774,17 @@ function buildWorkImproveState(cwd, target = "", options = {}) {
 				? `${target} is not the active ${SELF_IMPROVEMENT_EPIC_TITLE} roadmap.`
 				: `No unique active ${SELF_IMPROVEMENT_EPIC_TITLE} roadmap exists.`,
 		);
-	const reports = improvementReports(cwd, epic.id).map((issue) => ({
+	const reports = improvementWorkItems(cwd, epic.id).map((issue) => ({
 		...issueSummary(issue),
 		description: String(issue.description ?? ""),
-		evidence: validateImprovementEvidence(cwd, issue),
+		evidence: isImprovementReport(issue)
+			? validateImprovementEvidence(cwd, issue)
+			: { valid: true, problems: [], bundles: 0 },
 	}));
 	if (!reports.length)
 		return errorState(
 			"no-improvement-reports",
-			`${epic.id} has no open self-improvement reports.`,
+			`${epic.id} has no open self-improvement work.`,
 		);
 	return {
 		ok: true,
@@ -11825,15 +11830,15 @@ Work-improvement snapshot IDs: ${state.snapshotIds.join(", ")}
 ${evidenceWarnings.length ? `Preflight evidence warnings:\n${evidenceWarnings.join("\n")}` : "Preflight evidence: manifests and hashes verified."}
 
 Execution contract:
-- The roadmap in the native work-item store is the queue; .pi/self-improvement-reports is evidence only. Process exactly the snapshot IDs above. Reports arriving later belong to the next invocation.
+- The roadmap in the native work-item store is the queue; .pi/self-improvement-reports is evidence only. Process exactly the snapshot IDs above. Work arriving later belongs to the next invocation.
 - Use compact reads through node ${helper} work-summary <id> and work-children-summary ${state.epic.id}; never dump or directly edit .ce-workflow/work-items.json.
-- Atomize each report before deduplicating because one report may contain several root causes. Compare expected outcomes, current source/tests, git history, and ownership; suggested fixes alone do not define equivalence.
+- Execute existing canonical work items directly. Atomize each report before deduplicating because one report may contain several root causes. Compare expected outcomes, current source/tests, git history, and ownership; suggested fixes alone do not define equivalence.
 - Classify every atomic claim as duplicate, related-distinct, conflicting, already-fixed, locally-owned, upstream-owned, or insufficient-evidence. Different implementation suggestions are not conflicts unless their required outcomes cannot coexist.
 - Reuse an atomic report as its execution item. When a report contains multiple claims or several reports share one claim, create or reuse one canonical bug/decision WorkItem under ${state.epic.id} with node ${helper} work-create, and link reports with node ${helper} work-block.
 - Do not close a duplicate merely because it is similar. First verify the shared fix or already-current behavior against every covered report, then note the canonical WorkItem, commit, and verification on each report before closing it.
 - Execute locally owned canonical work through the normal work-orchestrator path: smallest correct implementation, focused proof, required review, coded finish/commit, then report reconciliation. Route genuine upstream ownership durably; do not invent a local workaround unless it is the smallest verified project fix.
 - If expected outcomes conflict or evidence cannot support a safe decision, use ask_user once; if unavailable or cancelled, call work_goal_human_decision. Do not ask for routine implementation approval.
-- Leave unresolved reports open. Close each snapshot report only after verified coverage. New reports do not block this snapshot.
+- Leave unresolved work open. Close each snapshot item only after verified coverage. New work does not block this snapshot.
 - Call work_goal_complete only when every snapshot ID is closed and git/work-item state is verified.`;
 }
 
@@ -11884,7 +11889,7 @@ function workImproveAvailable(cwd, target = "") {
 			workResumeSettings(cwd, settings).selfImproving &&
 				sameCheckout(cwd, source) &&
 				epic &&
-				improvementReports(cwd, epic.id).length,
+				improvementWorkItems(cwd, epic.id).length,
 		);
 	} catch {
 		return false;

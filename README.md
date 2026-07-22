@@ -28,7 +28,7 @@ No tracker CLI is required for normal operation. Press **F7** to open **Orchestr
 | **Brainstorm**, **Ideas**, **Usage report**, **Telemetry** | Manages ideas and local reports. |
 | **Settings**, **Context guard**, **Autonomous goal** | Configures orchestration and context behavior. Proactive compaction defaults on at 150k tokens. |
 | **Catch up project** | Reviews changed monitored Pi/plugin releases and records Adopt/Defer/Skip decisions. |
-| **Improve orchestrator** | Validates, deduplicates, and executes open self-improvement reports in the configured source checkout. |
+| **Improve orchestrator** | Validates and deduplicates new reports, then executes all open self-improvement work in the configured source checkout. |
 | **Migrate legacy workspace** | Performs the one-way migration for a detected former workflow workspace. |
 
 Ordinary task actions use one durable `Misc` roadmap when no current roadmap is selected. When another roadmap is current, the UI asks whether new work belongs there or in `Misc`. Dedicated planning, brainstorming, and migration actions still create their own roadmaps. Untargeted **Resume work** falls back to ready `Misc` work and leaves an empty `Misc` idle.
@@ -67,7 +67,7 @@ The migration command is idempotent, validates export parity, keeps an ignored b
 
 ## Workflow improvement reporting
 
-Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` roadmap. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout. In the configured source checkout, `F7 → Improve orchestrator preview` shows the current report snapshot and `F7 → Improve orchestrator` processes it through the normal work-goal lifecycle; reports arriving during the run wait for the next invocation.
+Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` roadmap. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout. In the configured source checkout, `F7 → Improve orchestrator preview` shows the current backlog snapshot and `F7 → Improve orchestrator` processes it through the normal work-goal lifecycle; work arriving during the run waits for the next invocation.
 
 ## Workflow evaluation harness
 
