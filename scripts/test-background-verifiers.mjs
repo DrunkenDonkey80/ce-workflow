@@ -340,7 +340,7 @@ try {
 		origin: "normal",
 	});
 	await scheduled.launch;
-	assert.equal(requests.length, 2);
+	assert.equal(requests.length, 2, scheduled.reason);
 	assert.equal(
 		git(
 			"for-each-ref",
@@ -574,10 +574,32 @@ try {
 		scope: "changes",
 	});
 	assert.deepEqual(changesCheckpoint.paths, ["tracked.txt", "untracked.txt"]);
+	mkdirSync(path.join(committedCwd, "docs"));
+	mkdirSync(path.join(committedCwd, "logs"));
+	mkdirSync(path.join(committedCwd, "tests"));
+	mkdirSync(path.join(committedCwd, ".pi"));
+	writeFileSync(path.join(committedCwd, "docs", "guide.md"), "docs\n");
+	writeFileSync(path.join(committedCwd, "logs", "run.log"), "log\n");
+	writeFileSync(path.join(committedCwd, "tests", "tracked.test.js"), "test\n");
+	writeFileSync(path.join(committedCwd, "test.js"), "root test\n");
+	writeFileSync(path.join(committedCwd, "benchmark.js"), "benchmark\n");
+	writeFileSync(path.join(committedCwd, "package.json"), "{}\n");
+	writeFileSync(path.join(committedCwd, "tsconfig.json"), "{}\n");
+	writeFileSync(path.join(committedCwd, "pyproject.toml"), "[project]\n");
+	writeFileSync(path.join(committedCwd, ".npmrc"), "audit=true\n");
+	writeFileSync(path.join(committedCwd, ".pi", "settings.json"), "{}\n");
 	const projectCheckpoint = captureVerifierCheckpoint(committedCwd, {
 		scope: "project",
 	});
 	assert.deepEqual(projectCheckpoint.paths, ["tracked.txt", "untracked.txt"]);
+	assert.deepEqual(
+		captureVerifierCheckpoint(committedCwd, {
+			scope: "project",
+			operations: ["test-gap"],
+		}).paths,
+		["test.js", "tests/tracked.test.js", "tracked.txt", "untracked.txt"],
+		"whole-project analysis includes tests only for test coverage",
+	);
 	const projectSchedule = scheduleVerifierBatch(committedCwd, {
 		profiles: [profiles[1]],
 		checkpoint: projectCheckpoint,
@@ -592,6 +614,22 @@ try {
 					readFileSync(path.join(request.cwd, "untracked.txt"), "utf8"),
 					"new\n",
 				);
+				for (const excluded of [
+					"docs",
+					"logs",
+					"tests",
+					"test.js",
+					"package.json",
+					"tsconfig.json",
+					"pyproject.toml",
+					".npmrc",
+					".pi",
+				])
+					assert.equal(
+						existsSync(path.join(request.cwd, excluded)),
+						false,
+						`${excluded} is absent from the verifier workspace`,
+					);
 				return { ok: false, message: "test terminal" };
 			},
 		},
@@ -636,6 +674,34 @@ try {
 		["only.txt"],
 		"custom scope supports a single-commit repository",
 	);
+	const largeCwd = repo();
+	const largeGit = (...args) =>
+		execFileSync("git", args, { cwd: largeCwd, encoding: "utf8" }).trim();
+	largeGit("init", "-q");
+	largeGit("config", "user.email", "test@example.test");
+	largeGit("config", "user.name", "Test");
+	const largeSource = "x\n".repeat(1024 * 1024);
+	writeFileSync(path.join(largeCwd, "source.js"), largeSource);
+	largeGit("add", "source.js");
+	largeGit("commit", "-qm", "large source");
+	writeFileSync(path.join(largeCwd, "source.js"), `${largeSource}y\n`);
+	largeGit("commit", "-qam", "small change");
+	const largeSchedule = scheduleVerifierBatch(largeCwd, {
+		profiles: [profiles[0]],
+		checkpoint: captureVerifierCheckpoint(largeCwd, { scope: "project" }),
+		adapter: {
+			enforcesReadOnlyBoundary: true,
+			async spawn() {
+				return { ok: false, message: "test terminal" };
+			},
+		},
+	});
+	assert.equal(
+		largeSchedule.status,
+		"queued",
+		`large project archives without stdout buffer limits: ${largeSchedule.reason ?? ""}`,
+	);
+	await largeSchedule.launch;
 
 	// /work-analyze selects all configured models, keeps the current model off
 	// until toggled, confirms the immutable file count, and queues one batch.

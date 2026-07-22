@@ -6676,7 +6676,10 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 	const operations = await chooseAnalyzeValues(
 		ctx,
 		"Analysis types",
-		BACKGROUND_VERIFIER_OPERATIONS.map((value) => ({ value })),
+		BACKGROUND_VERIFIER_OPERATIONS.map((value) => ({
+			value,
+			label: value === "test-gap" ? "test coverage" : value,
+		})),
 		BACKGROUND_VERIFIER_OPERATIONS,
 	);
 	if (!operations) return;
@@ -6738,7 +6741,8 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 		{
 			value: "project",
 			label: "whole project",
-			description: "all tracked and untracked non-ignored files",
+			description:
+				"source files; tests included only when test coverage is selected",
 		},
 		{
 			value: "custom",
@@ -6758,7 +6762,11 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 	}
 	let checkpoint;
 	try {
-		checkpoint = captureVerifierCheckpoint(ctx.cwd, { scope, patterns });
+		checkpoint = captureVerifierCheckpoint(ctx.cwd, {
+			scope,
+			patterns,
+			operations,
+		});
 	} catch (error) {
 		ctx.ui.notify(formatError(error), "warning");
 		return;
@@ -6783,9 +6791,9 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 		adapter: createPiSubagentsVerifierAdapter(pi),
 	});
 	ctx.ui.notify(
-		scheduled.batch?.id
-			? `Analysis ${scheduled.status} as ${scheduled.batch.id}. Inspect with /work-status; triage with /work-resume.`
-			: `Analysis ${scheduled.status}: ${scheduled.reason ?? "not scheduled"}`,
+		scheduled.status === "queued"
+			? `Analysis queued as ${scheduled.batch.id}. Inspect with /work-status; triage with /work-resume.`
+			: `Analysis ${scheduled.status}: ${scheduled.reason ?? "not scheduled"}${scheduled.batch?.id ? ` (${scheduled.batch.id})` : ""}`,
 		scheduled.status === "queued" ? "info" : "warning",
 	);
 }

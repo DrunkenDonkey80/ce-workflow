@@ -11,6 +11,7 @@ import {
 	mkdtempSync,
 	openSync,
 	readFileSync,
+	readdirSync,
 	readSync,
 	renameSync,
 	rmSync,
@@ -548,9 +549,54 @@ function snapshotPaths(cwd, base, snapshot, paths, allowEmpty = false) {
 	return scoped;
 }
 
-function projectSnapshotPaths(cwd, snapshot) {
+const PROJECT_AUXILIARY_DIRS = new Set([
+	".ce-workflow",
+	".github",
+	".idea",
+	".pi",
+	".pi-subagents",
+	".vscode",
+	"benchmark",
+	"benchmarks",
+	"coverage",
+	"doc",
+	"docs",
+	"documentation",
+	"log",
+	"logs",
+]);
+const PROJECT_TEST_DIRS = new Set([
+	"__tests__",
+	"spec",
+	"specs",
+	"test",
+	"tests",
+]);
+
+function projectSourcePath(entry, includeTests) {
+	const parts = entry.toLowerCase().split("/");
+	const base = parts.at(-1);
+	if (parts.some((part) => PROJECT_AUXILIARY_DIRS.has(part))) return false;
+	if (
+		base.startsWith(".") ||
+		/^(?:agents\.md|bun\.lockb?|cargo\.(?:lock|toml)|changelog|composer\.(?:json|lock)|contributing|deno\.jsonc?|gemfile(?:\.lock)?|go\.(?:mod|sum)|gradle\.properties|jsconfig(?:\..+)?\.json|license|package(?:-lock)?\.json|pnpm-lock\.yaml|poetry\.lock|pom\.xml|pyproject\.toml|readme|requirements[^/]*\.txt|settings\.gradle(?:\.kts)?|tsconfig(?:\..+)?\.json|yarn\.lock)(?:\.|$)/i.test(
+			base,
+		)
+	)
+		return false;
+	if (/^(?:benchmark|benchmarks)(?:[._-]|$)/i.test(base)) return false;
+	const test =
+		parts.some((part) => PROJECT_TEST_DIRS.has(part)) ||
+		/^(?:test(?:[._-]|$)|.+[._-](?:spec|test)\.)/i.test(base);
+	return includeTests || !test;
+}
+
+function projectSnapshotPaths(cwd, snapshot, operations = []) {
+	const includeTests = operations.includes("test-gap");
 	return gitLines(cwd, ["ls-tree", "-r", "--name-only", snapshot]).filter(
-		(entry) => !entry.startsWith(".ce-workflow/work-runs/verifiers/"),
+		(entry) =>
+			!entry.startsWith(".ce-workflow/work-runs/verifiers/") &&
+			projectSourcePath(entry, includeTests),
 	);
 }
 
@@ -678,7 +724,7 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 					})();
 		const paths =
 			scope === "project"
-				? projectSnapshotPaths(cwd, snapshot)
+				? projectSnapshotPaths(cwd, snapshot, input.operations)
 				: scope === "custom"
 					? customSnapshotPaths(cwd, snapshot, input.patterns ?? input.paths)
 					: scope === "commit"
@@ -709,6 +755,29 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 			rmSync(path.dirname(temporaryIndex), { recursive: true, force: true });
 	}
 }
+function pruneVerifierWorkspace(root, paths) {
+	const files = new Set(paths);
+	const directories = new Set([""]);
+	for (const file of paths) {
+		const parts = file.split("/");
+		parts.pop();
+		for (let index = 1; index <= parts.length; index += 1)
+			directories.add(parts.slice(0, index).join("/"));
+	}
+	const prune = (relative = "") => {
+		for (const entry of readdirSync(path.join(root, relative), {
+			withFileTypes: true,
+		})) {
+			const file = relative ? `${relative}/${entry.name}` : entry.name;
+			if (entry.isDirectory()) {
+				if (directories.has(file)) prune(file);
+				else rmSync(path.join(root, file), { recursive: true, force: true });
+			} else if (!files.has(file)) unlinkSync(path.join(root, file));
+		}
+	};
+	prune();
+}
+
 function ensureVerifierWorkspace(cwd, batch) {
 	// Keep the agent outside the repository: an archive has no .git directory,
 	// worktree links, project settings, or parent path to project credentials.
@@ -736,33 +805,28 @@ function ensureVerifierWorkspace(cwd, batch) {
 					...batch.checkpoint.paths,
 				]);
 		if (archivedPaths.length) {
-			const archive = execFileSync(
+			const archive = path.join(workspace, ".snapshot.tar");
+			execFileSync(
 				"git",
 				projectScope
-					? ["archive", batch.checkpoint.snapshot]
+					? ["archive", `--output=${archive}`, batch.checkpoint.snapshot]
 					: [
 							"--literal-pathspecs",
 							"archive",
+							`--output=${archive}`,
 							batch.checkpoint.snapshot,
 							"--",
 							...archivedPaths,
 						],
-				{
-					cwd,
-					encoding: null,
-					stdio: ["ignore", "pipe", "pipe"],
-				},
+				{ cwd, stdio: ["ignore", "ignore", "pipe"] },
 			);
-			execFileSync("tar", ["-x", "-C", workspace], {
-				input: archive,
-				stdio: ["pipe", "pipe", "pipe"],
+			execFileSync("tar", ["-xf", ".snapshot.tar"], {
+				cwd: workspace,
+				stdio: ["ignore", "ignore", "pipe"],
 			});
+			unlinkSync(archive);
 		}
-		if (projectScope)
-			rmSync(path.join(workspace, ".ce-workflow", "work-runs", "verifiers"), {
-				recursive: true,
-				force: true,
-			});
+		if (projectScope) pruneVerifierWorkspace(workspace, archivedPaths);
 		const marker = path.join(workspace, ".ce-verifier-workspace.json");
 		writeFileSync(
 			marker,
