@@ -11721,7 +11721,8 @@ function parseWorkGoalCommand(args = "") {
 			: { kind: "status" };
 	if (command === "pause") return { kind: "pause" };
 	if (command === "resume") return { kind: "resume", answer: rest.trim() };
-	if (command === "clear" || command === "stop") return { kind: "clear" };
+	if (command === "clear") return { kind: "clear" };
+	if (command === "stop") return { kind: "stop" };
 	return attach({ kind: "start", objective: trimmed });
 }
 
@@ -13161,6 +13162,8 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		updateWorkGoalStatus(ctx);
 		return;
 	}
+	if (command.kind === "stop")
+		return handleWorkResumeStopCommand(command.reason, pi, ctx);
 	if (command.kind === "clear") {
 		const previous = activeWorkGoal?.objective;
 		activeWorkGoal = null;
@@ -13296,53 +13299,30 @@ async function handleWorkResumeGoalCommand(args, pi, ctx) {
 
 async function handleWorkResumeStopCommand(args, pi, ctx) {
 	const reason = String(args ?? "").trim() || "user requested stop";
-	const send =
-		typeof ctx.sendUserMessage === "function"
-			? ctx.sendUserMessage.bind(ctx)
-			: pi?.sendUserMessage?.bind(pi);
-	const prompt =
-		"Clean stop requested. Checkpoint current native work-item store/git state, stop at the next safe phase boundary, and do not start another WorkItem.";
+	const working = Boolean(activeWorkAgent) || !ctx.isIdle?.();
 	if (activeWorkGoal) {
-		const working = activeWorkAgent || !ctx.isIdle?.();
 		activeWorkGoal = {
 			...activeWorkGoal,
-			status: working ? "stopping" : "stopped",
+			status: working && activeWorkGoalRunning ? "stopping" : "stopped",
 			stopReason: reason,
 			updatedAt: Date.now(),
 		};
 		workGoalContinuationPending = null;
+		workGoalContinuationRetry = null;
+		clearWorkGoalRecovery();
+		clearWorkGoalUsageLimitTimer();
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
-		ctx.ui.notify(
-			working
-				? "F7 → Stop safely requested: stopping after the current clean phase."
-				: "F7 → Stop safely: work stopped. Open F7 → Resume work to continue.",
-			"info",
-		);
-		if (working && send) {
-			try {
-				if (ctx.isIdle?.()) await send(prompt);
-				else await send(prompt, { deliverAs: "steer" });
-			} catch {
-				// Stop flag is persisted; the current turn may still finish normally.
-			}
-		}
-		return;
 	}
-	const working = !ctx.isIdle?.();
+	if (working) ctx.abort();
 	ctx.ui.notify(
 		working
-			? "F7 → Stop safely requested: checkpoint and stop at the next safe phase boundary."
-			: "F7 → Stop safely: nothing active to stop.",
-		working ? "info" : "warning",
+			? "F7 → Stop safely: current turn stopped; completed changes were preserved."
+			: activeWorkGoal
+				? "F7 → Stop safely: work stopped. Open F7 → Resume work to continue."
+				: "F7 → Stop safely: nothing active to stop.",
+		working || activeWorkGoal ? "info" : "warning",
 	);
-	if (working && send) {
-		try {
-			await send(prompt, { deliverAs: "steer" });
-		} catch {
-			// Best-effort steer; the user can also just stop typing.
-		}
-	}
 }
 
 async function handleWorkMenuCommand(ctx, pi) {
@@ -13651,6 +13631,14 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	const goal = activeWorkGoal;
 	const assistant = finalAssistantMessage(event.messages);
 	const text = assistantVisibleText(assistant);
+	if (goal.status === "stopping") {
+		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		ctx.ui.notify("Resume stopped. Open F7 → Resume work to continue.", "info");
+		finishWarpWork(ctx, workWarpMode(goal.mode, goal), "stopped");
+		return;
+	}
 	const completion = parseWorkGoalCompletion(text);
 	if (completion) {
 		const result = completeActiveWorkGoal(completion, ctx, pi);
@@ -13733,14 +13721,6 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		}
 	} else {
 		clearWorkGoalRecovery();
-	}
-	if (goal.status === "stopping") {
-		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
-		persistWorkGoal(pi);
-		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("Resume stopped. Open F7 → Resume work to continue.", "info");
-		finishWarpWork(ctx, workWarpMode(goal.mode, goal), "stopped");
-		return;
 	}
 	activeWorkGoal = {
 		...goal,

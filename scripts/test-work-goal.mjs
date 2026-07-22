@@ -31,6 +31,7 @@ const mod = await import(
 
 assert.equal(mod.parseWorkGoalCommand("").kind, "status");
 assert.deepEqual(mod.parseWorkGoalCommand("pause"), { kind: "pause" });
+assert.deepEqual(mod.parseWorkGoalCommand("stop"), { kind: "stop" });
 assert.deepEqual(mod.parseWorkGoalCommand("resume use repo A"), {
 	kind: "resume",
 	answer: "use repo A",
@@ -426,6 +427,7 @@ try {
 	const notices = [];
 	const entries = [];
 	const compactions = [];
+	let aborts = 0;
 	const pi = {
 		on: (name, handler) => {
 			tempHooks[name] = handler;
@@ -508,6 +510,9 @@ try {
 	const ctx = {
 		cwd,
 		isIdle: () => false,
+		abort: () => {
+			aborts += 1;
+		},
 		hasPendingMessages: () => false,
 		sendUserMessage: async (message, options) => {
 			sent.push({ message, options });
@@ -1188,6 +1193,77 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.equal(statuses["work-goal"], undefined);
+
+	await invoke("work-goal", "halt this active turn", ctx);
+	const stopPrompt = sent.at(-1).message;
+	await tempHooks.before_agent_start(
+		{ prompt: stopPrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	const sentBeforeStop = sent.length;
+	const abortsBeforeStop = aborts;
+	const stopInputResult = await tempHooks.input?.(
+		{
+			source: "extension",
+			text: "ORCHESTRATOR_RUN_V1 work-stop remote stop",
+		},
+		ctx,
+	);
+	assert.deepEqual(stopInputResult, { action: "handled" });
+	assert.equal(
+		aborts,
+		abortsBeforeStop + 1,
+		"Stop safely aborts the active Pi turn immediately",
+	);
+	assert.equal(sent.length, sentBeforeStop, "Stop safely does not queue a steer");
+	assert.match(statuses["work-goal"], /stopping/);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					stopReason: "aborted",
+					errorMessage: "Request aborted",
+					content: [],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.match(statuses["work-goal"], /stopped/);
+	await invoke("work-goal", "clear", ctx);
+	assert.equal(statuses["work-goal"], undefined);
+
+	await invoke("work-goal", "retain a goal during ordinary chat", ctx);
+	await invoke("work-goal", "pause", ctx);
+	await tempHooks.before_agent_start(
+		{ prompt: "ordinary chat while goal is paused", systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	const abortsBeforeOrdinaryStop = aborts;
+	await invoke("work-stop", "stop ordinary turn", ctx);
+	assert.equal(aborts, abortsBeforeOrdinaryStop + 1);
+	assert.match(
+		statuses["work-goal"],
+		/stopped/,
+		"stopping a non-goal turn does not strand the persisted goal in stopping",
+	);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					stopReason: "aborted",
+					content: [],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.match(statuses["work-goal"], /stopped/);
+	await invoke("work-goal", "clear", ctx);
 
 	const beforeResumeSent = sent.length;
 	const beforeResumeNotices = notices.length;

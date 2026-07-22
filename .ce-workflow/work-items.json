@@ -1521,6 +1521,40 @@
       "type": "task",
       "updatedAt": "2026-07-22T15:43:45.681Z"
     },
+    "work-2.19": {
+      "createdAt": "2026-07-22T16:18:41.083Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Resuming completed work-planner run f813a27f failed because the generated recovery descriptor contains unsupported acceptance.explicit and acceptance.inferredReason fields; the same failure is already captured in the project workflow log.\nExpected: A completed specialist run should resume with corrected handoff context, or the recovery descriptor should contain only schema-supported acceptance fields.\nImpact: The autonomous roadmap loop could not reuse the planner session after a recoverable missing-helper-path handoff and must launch a replacement planner, wasting context and time.\nSuggested improvement: Normalize or omit unsupported acceptance metadata when writing async recovery descriptors.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/f123bab3-0e0d-4f51-aa66-15d832c290cb",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 411,
+              "file": "01-workflow-subagent-resume-error.log",
+              "sha256": "5aa46c9ca9abbc6a8188700d9d2012b44d609ea629d0e106877a9dfd40bd2340"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-22T16:18:41.079Z",
+          "workflowId": "019f8a97-0fbd-726b-a3dd-911145c60db3"
+        }
+      ],
+      "id": "work-2.19",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Resuming completed work-planner run f813a27f failed because the generated recovery descriptor contains unsupported acceptance.expl",
+      "type": "task",
+      "updatedAt": "2026-07-22T16:18:41.083Z"
+    },
     "work-2.2": {
       "createdAt": "2026-07-20T01:40:10.511Z",
       "dependencies": [
@@ -1804,7 +1838,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-22T15:56:46.391Z"
+    "updatedAt": "2026-07-22T16:18:41.083Z"
   },
   "schemaVersion": 1
 }
