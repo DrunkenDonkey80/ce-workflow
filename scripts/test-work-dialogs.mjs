@@ -33,11 +33,12 @@ function terminalWidth(value, emojiWidth = 2) {
 
 function calibratedTerminalWidth(value) {
 	const width = terminalWidth(value);
-	if (value.includes("🧭") || value.includes("🧱")) return width + 1;
+	if (value.includes("🧭") || value.includes("🧱") || value.includes("🌍"))
+		return width + 1;
 	return width;
 }
 
-async function drive(options, interact) {
+async function drive(options, interact, activeTheme = theme) {
 	let overlay;
 	const result = await showListDialog(
 		{
@@ -49,7 +50,7 @@ async function drive(options, interact) {
 					let closed = false;
 					const component = factory(
 						{ requestRender() {} },
-						theme,
+						activeTheme,
 						keybindings,
 						(next) => {
 							value = next;
@@ -191,6 +192,34 @@ await drive(
 
 await drive(
 	{
+		title: "Description color",
+		filter: false,
+		items: [
+			{
+				value: "exact",
+				label: "Exact width",
+				description: "123456789012345 1234567890123456 rest",
+			},
+		],
+	},
+	(component) => {
+		const descriptionLines = component
+			.render(36)
+			.filter((line) => /123456789|rest/.test(line));
+		assert(
+			descriptionLines.every((line) => line.includes("\x1b[90m")),
+			"every wrapped description line keeps the same muted color",
+		);
+		component.handleInput("escape");
+	},
+	{
+		...theme,
+		fg: (color, text) => (color === "muted" ? `\x1b[90m${text}\x1b[0m` : text),
+	},
+);
+
+await drive(
+	{
 		title: "Fixed",
 		fixedHeight: true,
 		descriptionMinLines: 3,
@@ -206,10 +235,15 @@ await drive(
 		component.handleInput("down");
 		assert.equal(component.render(70).length, height);
 		for (const key of "unique") component.handleInput(key);
+		const filteredLines = component.render(70);
 		assert.equal(
-			component.render(70).length,
+			filteredLines.length,
 			height,
 			"fixed dialogs do not resize when filtering to one row",
+		);
+		assert(
+			filteredLines.some((line) => line.includes("\u00a0")),
+			"empty detail rows contain a clearing cell instead of leaving stale text",
 		);
 		component.handleInput("z");
 		assert.equal(
@@ -225,9 +259,16 @@ await drive(
 colors.length = 0;
 await drive(
 	{
-		title: "Roadmaps",
+		title: "Work roadmaps",
 		purpose: "Choose a roadmap to inspect, plan, or continue.",
 		items: [
+			{
+				value: "roadmaps",
+				label: "🌍 Roadmaps",
+				description: "Calibrated globe width",
+				descriptionPrefix: "│  ",
+				inlineDescription: true,
+			},
 			{
 				value: "current",
 				label: "├* Current [in progress]",
@@ -290,5 +331,15 @@ await drive(
 		component.handleInput("escape");
 	},
 );
+
+const tabbed = await drive(
+	{
+		title: "Views",
+		items,
+		tabAction: { label: "Show all" },
+	},
+	(component) => component.handleInput("tab"),
+);
+assert.equal(tabbed.action, "tab");
 
 process.stdout.write("ok - shared work dialogs\n");

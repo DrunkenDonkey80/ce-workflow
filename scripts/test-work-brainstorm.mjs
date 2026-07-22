@@ -11,6 +11,9 @@ const { assert, installWorkflowFixture } = await import(
 );
 const {
 	brainstormHandoffPrompt,
+	linkBrainstormArtifactFromFinal,
+	menuBrainstormArgs,
+	parseWorkPromptMeta,
 	buildWorkBrainstormState,
 	buildWorkPlanState,
 	bootstrapPlanEpic,
@@ -251,6 +254,46 @@ try {
 	);
 
 	fixture.reset("ideas");
+	assert(
+		menuBrainstormArgs("Idea IDEA-2") === "Idea IDEA-2" &&
+			menuBrainstormArgs("idea for offline mode") ===
+				"new idea for offline mode",
+		"menu routing distinguishes an idea ID from a natural-language topic",
+	);
+	const standalone = buildWorkBrainstormState(
+		cwd,
+		"new Reverse the RF roles for NDEF card emulation",
+	);
+	assert(
+		standalone.action === "brainstorm-epic-created" &&
+			!standalone.epic.parentId &&
+			standalone.epic.id !== "E-1",
+		"a new menu brainstorm creates its own visible roadmap",
+	);
+	const handoffMeta = parseWorkPromptMeta(
+		brainstormHandoffPrompt(standalone, cwd),
+	);
+	assert(
+		handoffMeta.epicId === standalone.epic.id &&
+			handoffMeta.workItemId === standalone.idea.id,
+		"brainstorm handoff keeps roadmap and idea identity for automatic linking",
+	);
+	const linked = linkBrainstormArtifactFromFinal(
+		cwd,
+		{ meta: handoffMeta },
+		`Brainstorm saved: ${path.join(brainstormDir, "new.md")}`,
+	);
+	assert(
+		linked?.action === "brainstorm-linked" &&
+			fixture
+				.store()
+				.items[standalone.idea.id].notes.some((note) =>
+					note.includes("brainstorm-path=docs/brainstorms/new.md"),
+				),
+		"a completed brainstorm artifact is linked back to native work state",
+	);
+
+	fixture.reset("ideas");
 	const longPrompt = `Modernize the LPGSlim Android interface to match the Linea Pro demo look and feel with smooth transitions, graphics, animations, connected-device startup states, and updated screens while preserving the full detailed request for brainstorming. ${"Use the attached Pixel device and inspect the installed demo UI source before proposing screen-by-screen changes. ".repeat(8)}`;
 	state = buildWorkBrainstormState(cwd, longPrompt);
 	const longPromptIdea = fixture.store().items[state.idea.id];
@@ -272,7 +315,7 @@ try {
 
 	state = buildWorkBrainstormState(
 		cwd,
-		"idea IDEA-2 docs/brainstorms/accepted.md",
+		"Idea IDEA-2 docs/brainstorms/accepted.md",
 	);
 	assert(
 		state.ok && state.action === "brainstorm-linked",

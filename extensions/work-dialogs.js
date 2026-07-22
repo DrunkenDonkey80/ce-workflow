@@ -32,6 +32,7 @@ const terminalEmojiExtraCells = new Map([
 	["🧱", 1],
 	["🧭", 1],
 	["🧹", 1],
+	["🌍", 1],
 	["🟢", 1],
 	["🟡", 1],
 	["🪲", 1],
@@ -123,7 +124,7 @@ function frame(theme, title, content, width) {
 	const inner = Math.max(8, width - 4);
 	const border = (text) => theme.fg("border", text);
 	const row = (text = "") =>
-		`${border("│")}${fit(` ${text}`, inner)}${border("│")}`;
+		`${border("│")}${fit(` ${visibleWidth(text) ? text : "\u00a0"}`, inner)}${border("│")}`;
 	return [
 		border(`╭${"─".repeat(inner)}╮`),
 		row(theme.fg("accent", theme.bold(title))),
@@ -143,7 +144,7 @@ function initialIndex(items, { cursorKey, currentValue, selectedIndex }) {
 }
 
 async function nativeListDialog(ctx, options) {
-	const { title, items, currentValue, multi, cursorKey } = options;
+	const { title, items, currentValue, multi, cursorKey, tabAction } = options;
 	if (multi) {
 		const enabled = new Set(multi.selected ?? []);
 		for (;;) {
@@ -172,11 +173,21 @@ async function nativeListDialog(ctx, options) {
 	const choices = [
 		...items.filter((item) => item.value === active),
 		...items.filter((item) => item.value !== active),
+		...(tabAction
+			? [
+					{
+						value: "__dialog_tab__",
+						label: tabAction.label,
+						preserveCase: true,
+					},
+				]
+			: []),
 	];
 	const labels = choices.map(labelFor);
 	const selected = await ctx.ui.select(title, labels);
 	const index = labels.indexOf(selected);
 	if (index < 0) return;
+	if (choices[index].value === "__dialog_tab__") return { action: "tab" };
 	dialogCursors.set(cursorKey, choices[index].value);
 	return {
 		action: "select",
@@ -196,14 +207,16 @@ export async function showListDialog(ctx, options) {
 		filter = true,
 		multi,
 		subtitle,
-		purpose = multi
+		purpose: initialPurpose = multi
 			? "Choose one or more options."
 			: "Choose an option to continue.",
-		help,
+		help: initialHelp,
 		descriptionMaxLines = 3,
 		descriptionMinLines = 0,
 		fixedHeight = false,
+		fixedItemRows,
 		selectOnSpace = false,
+		tabAction,
 		onInput,
 		forceCustom = false,
 	} = options;
@@ -219,7 +232,9 @@ export async function showListDialog(ctx, options) {
 	return ctx.ui.custom(
 		(tui, theme, keybindings, done) => {
 			const enabled = new Set(multi?.selected ?? []);
-			const source = [...items];
+			let source = [...items];
+			let purpose = initialPurpose;
+			let help = initialHelp;
 			let query = "";
 			let visible = source.map((item, index) => ({ item, index }));
 			let index = initialIndex(source, {
@@ -315,7 +330,7 @@ export async function showListDialog(ctx, options) {
 						if (selected?.description && !selected.inlineDescription) {
 							const details = wrapText(
 								selected.description,
-								Math.max(8, width - 4),
+								Math.max(8, width - 5),
 								descriptionMaxLines,
 							);
 							while (details.length < descriptionMinLines) details.push("");
@@ -328,13 +343,13 @@ export async function showListDialog(ctx, options) {
 					if (fixedHeight) {
 						const inline = source.some((item) => item.inlineDescription);
 						const maxRows = inline ? 6 : 12;
-						const rowCount = Math.min(source.length, maxRows);
+						const rowCount = Math.min(fixedItemRows ?? source.length, maxRows);
 						const fixedBodyLines =
 							2 +
 							(subtitle ? 2 : 0) +
 							(filter ? 2 : 0) +
 							rowCount +
-							(source.length > maxRows ? 1 : 0) +
+							((fixedItemRows ?? source.length) > maxRows ? 1 : 0) +
 							(inline
 								? 0
 								: 1 + Math.max(descriptionMinLines, descriptionMaxLines));
@@ -357,6 +372,21 @@ export async function showListDialog(ctx, options) {
 						keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
 					) {
 						if (visible.length) index = (index + 1) % visible.length;
+					} else if (
+						tabAction &&
+						keyMatches(keybindings, data, "tui.input.tab", "tab", "\t")
+					) {
+						const next = tabAction.toggle?.();
+						if (!next) return close({ action: "tab" });
+						source = [...next.items];
+						purpose = next.purpose ?? purpose;
+						help = next.help ?? help;
+						query = "";
+						visible = source.map((item, sourceIndex) => ({
+							item,
+							index: sourceIndex,
+						}));
+						index = initialIndex(source, { cursorKey, currentValue });
 					} else if (
 						keyMatches(keybindings, data, "tui.select.cancel", "escape", "\x1b")
 					) {

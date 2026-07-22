@@ -317,7 +317,6 @@ for (const action of [
 	"Autonomous goal",
 	"Stop safely",
 	"Initialize workspace",
-	"Status",
 	"Blocker report",
 	"Ideas",
 	"Brainstorm",
@@ -346,6 +345,7 @@ for (const action of [
 		action,
 	);
 assert(orchestratorLabels.every((label) => !label.includes("/work-")));
+assert(orchestratorLabels.every((label) => !label.includes("📍 Status")));
 assert(
 	orchestratorLabels.some((label) => /\p{Emoji_Presentation}/u.test(label)),
 	"F7 labels keep their workflow icons",

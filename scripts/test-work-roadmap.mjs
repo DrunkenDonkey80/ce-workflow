@@ -81,6 +81,7 @@ seedNativeStore(root, [
 		description:
 			"Preserve visual parity while replacing the existing home-screen primitives.",
 		notes: "brainstorm-path=docs/brainstorms/accepted.md",
+		created_at: "2026-07-03T10:00:00Z",
 		updated_at: "2026-07-03T10:00:00Z",
 	},
 	{
@@ -88,6 +89,7 @@ seedNativeStore(root, [
 		issue_type: "epic",
 		status: "open",
 		title: "Open roadmap",
+		created_at: "2026-07-02T10:00:00Z",
 		updated_at: "2026-07-02T10:00:00Z",
 	},
 	{
@@ -95,7 +97,19 @@ seedNativeStore(root, [
 		issue_type: "epic",
 		status: "closed",
 		title: "Closed roadmap",
+		created_at: "2026-07-01T10:00:00Z",
 		updated_at: "2026-07-01T10:00:00Z",
+	},
+	{
+		id: "E-4",
+		issue_type: "epic",
+		status: "open",
+		title:
+			"Brainstorm: use the C:\\projects\\api\\docs\\plans\\2026-07-04-refactor.md",
+		description:
+			"Brainstorm workspace created by /work-brainstorm for: use the C:\\projects\\api\\docs\\plans\\2026-07-04-refactor.md",
+		created_at: "2026-07-04T10:00:00Z",
+		updated_at: "2026-07-04T10:00:00Z",
 	},
 	{
 		id: "BUG-1",
@@ -153,7 +167,7 @@ try {
 	]);
 	const list = buildWorkRoadmapState(root, "list");
 	console.assert(
-		list.ok && list.roadmaps.length === 3,
+		list.ok && list.roadmaps.length === 4,
 		"lists all roadmap statuses",
 	);
 	const currentRoadmap = list.roadmaps.find((epic) => epic.id === "E-1");
@@ -166,20 +180,22 @@ try {
 	const openRoadmap = list.roadmaps.find((epic) => epic.id === "E-2");
 	assert.match(
 		roadmapPreviewText(openRoadmap),
-		/generate and save/i,
-		"F7 preview explains that a missing summary is generated on selection",
+		/No saved summary yet/i,
+		"F7 preview reports a missing stored summary",
 	);
 	class TestLoader {
 		constructor() {
 			this.signal = new AbortController().signal;
 		}
 	}
-	const selectRoadmap = async (id, complete, menus = []) => {
+	const selectRoadmap = async (id, complete, menus = [], provider) => {
 		const notices = [];
-		const picks = [
-			(label) => label.includes(id),
-			(label) => /full report/.test(label),
-		];
+		const names = {
+			"E-1": "Current roadmap",
+			"E-2": "Open roadmap",
+			"E-3": "Closed roadmap",
+		};
+		let roadmapSelected = false;
 		await handleWorkRoadmapCommand(
 			"",
 			{
@@ -188,13 +204,20 @@ try {
 				model: { id: "summary-model", provider: "test" },
 				modelRegistry: {
 					getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test" }),
+					getProvider: () => provider,
 				},
 				ui: {
 					workDialogsNative: true,
 					select: async (title, labels) => {
 						menus.push({ title, labels });
-						const pick = picks.shift();
-						return pick ? labels.find(pick) : undefined;
+						if (roadmapSelected)
+							return labels.find((label) => /full report/.test(label));
+						const roadmap = labels.find((label) => label.includes(names[id]));
+						if (roadmap) {
+							roadmapSelected = true;
+							return roadmap;
+						}
+						return labels.find((label) => /Show all roadmaps/.test(label));
 					},
 					custom: (factory) => new Promise((done) => factory({}, {}, {}, done)),
 					notify: (message) => notices.push(message),
@@ -209,28 +232,80 @@ try {
 	const roadmapMenus = [];
 	await selectRoadmap(
 		"E-2",
-		async () => ({
-			stopReason: "stop",
-			content: [
-				{
-					type: "text",
-					text: "Deliver the open roadmap in small verified slices. Keep its stored intent available between work sessions.",
-				},
-			],
-		}),
+		async (_model, request) => {
+			const context = request.messages[0].content[0].text;
+			return {
+				stopReason: "stop",
+				content: [
+					{
+						type: "text",
+						text: context.includes("E-4")
+							? JSON.stringify({
+									title:
+										"E-4 Refactor the RF compatibility API C:\\projects\\api\\plan.md",
+									description:
+										"Modernize E-4 using C:\\projects\\api\\plan.md while preserving existing integrations. Keep behavior stable as the implementation moves to the new contract.",
+								})
+							: "Deliver the open roadmap in small verified slices. Keep its stored intent available between work sessions.",
+					},
+				],
+			};
+		},
 		roadmapMenus,
 	);
-	assert.equal(
+	assert(
 		roadmapMenus[0].labels.some((label) =>
-			/Preserve visual parity|No short description yet/i.test(label),
+			/Refactor the RF compatibility API/.test(label),
 		),
-		true,
-		"native fallback keeps roadmap summaries available",
+		"placeholder roadmap metadata is generated and stored",
 	);
-	assert.match(
+	assert(
+		roadmapMenus[0].labels.every(
+			(label) => !/E-[1-4]|C:\\projects|Closed roadmap/.test(label),
+		),
+		"open view hides IDs, source paths, and closed roadmaps",
+	);
+	assert(
+		roadmapMenus[0].labels.some((label) =>
+			/stored intent available/i.test(label),
+		),
+		"missing open summaries are generated before the menu is shown",
+	);
+	let sortedRoadmapDialog = "";
+	await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: root,
+			mode: "tui",
+			ui: {
+				custom: (factory) =>
+					new Promise((done) => {
+						const component = factory(
+							{ requestRender() {} },
+							{ fg: (_color, value) => value, bold: (value) => value },
+							{
+								matches: (data, id) =>
+									data === "escape" && id === "tui.select.cancel",
+							},
+							done,
+						);
+						sortedRoadmapDialog = component.render(120).join("\n");
+						component.handleInput("escape");
+					}),
+				notify: () => {},
+			},
+		},
+		{},
+	);
+	assert(
+		sortedRoadmapDialog.indexOf("Refactor the RF compatibility API") <
+			sortedRoadmapDialog.indexOf("Current roadmap"),
+		"TUI lists newest creations first",
+	);
+	assert.equal(
 		roadmapMenus[1].title,
-		/stored intent available/,
-		"selected roadmap summary appears above its operation menu",
+		"Roadmap operations",
+		"roadmap operation menu uses a single-line title",
 	);
 	assert.match(
 		roadmapPreviewText(
@@ -262,6 +337,28 @@ try {
 		undefined,
 		"failed summary generation does not mutate the roadmap",
 	);
+	await selectRoadmap("E-3", undefined, [], {
+		streamSimple: () => ({
+			result: async () => ({
+				stopReason: "stop",
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify({
+							title: "Closed roadmap",
+							description:
+								"Document the completed roadmap for future maintainers. Preserve its original outcome and historical scope.",
+						}),
+					},
+				],
+			}),
+		}),
+	});
+	assert.match(
+		loadStore(root).items["E-3"].description,
+		/future maintainers/,
+		"metadata generation uses the active provider without runtime package imports",
+	);
 	for (const [file, content] of fixtureSnapshots)
 		writeFileSync(path.join(root, file), content);
 	console.assert(
@@ -282,7 +379,7 @@ try {
 	const notices = [];
 	const opLabels = [];
 	const menuTrace = [];
-	const picks = [/E-1/, /list tasks/, /Blocker: BUG-1/, /summary/i];
+	const picks = [/Current roadmap/, /list tasks/, /Blocker: BUG-1/, /summary/i];
 	await handleWorkRoadmapCommand(
 		"",
 		{
@@ -310,7 +407,7 @@ try {
 
 	const escapeTitles = [];
 	const escapePicks = [
-		/E-1/,
+		/Current roadmap/,
 		/list tasks/,
 		/Blocker: BUG-1/,
 		undefined,
@@ -334,16 +431,15 @@ try {
 		{},
 	);
 	assert.equal(escaped.action, "roadmap-cancel");
-	const e1OperationTitle =
-		"E-1: operation\n\nPreserve visual parity while replacing the existing home-screen primitives.";
+	const e1OperationTitle = "Roadmap operations";
 	assert.deepEqual(escapeTitles, [
-		"🗺️ Work roadmaps",
+		"Work roadmaps",
 		e1OperationTitle,
 		"E-1: tasks",
 		"BUG-1: operation",
 		"E-1: tasks",
 		e1OperationTitle,
-		"🗺️ Work roadmaps",
+		"Work roadmaps",
 	]);
 
 	const rawPlan = buildWorkPlanState(
@@ -531,6 +627,8 @@ try {
 	assert.match(treeText, / {2}I-1\.1.*planned/i);
 	assert.match(treeText, / {2}I-1\.2.*needs.plan/i);
 	let roadmapDialog = "";
+	let allRoadmapDialog = "";
+	let roadmapDialogCount = 0;
 	const dialogState = await handleWorkRoadmapCommand(
 		"",
 		{
@@ -539,6 +637,7 @@ try {
 			ui: {
 				custom: (factory) =>
 					new Promise((done) => {
+						roadmapDialogCount += 1;
 						const component = factory(
 							{ requestRender() {} },
 							{
@@ -552,6 +651,8 @@ try {
 							done,
 						);
 						roadmapDialog = component.render(220).join("\n");
+						component.handleInput("tab");
+						allRoadmapDialog = component.render(220).join("\n");
 						component.handleInput("escape");
 					}),
 				notify: () => {},
@@ -560,13 +661,28 @@ try {
 		{},
 	);
 	assert.equal(dialogState.action, "roadmap-cancel");
-	assert.match(roadmapDialog, /Choose a roadmap to inspect, plan, or continue/);
-	assert.match(roadmapDialog, /I-1 .*Initiative/);
-	assert.match(roadmapDialog, /├\* I-1\.1 .*Planned child/);
-	assert.match(roadmapDialog, /└─ I-1\.2 .*Needs plan/);
+	assert.equal(
+		roadmapDialogCount,
+		1,
+		"Tab updates the existing dialog in place",
+	);
+	assert.equal(
+		roadmapDialog.split("\n").length,
+		allRoadmapDialog.split("\n").length,
+		"Tab keeps the roadmap dialog at a fixed screen position",
+	);
+	assert.match(roadmapDialog, /Showing open items, Tab to change to all/);
+	assert.match(roadmapDialog, /Initiative \[Open/);
+	assert.match(roadmapDialog, /└─ Needs plan/);
+	assert.doesNotMatch(roadmapDialog, /I-1|Planned child/);
 	assert.match(roadmapDialog, /Some cool stuff/);
 	assert.doesNotMatch(roadmapDialog, /Work completed on it|More work to plan/);
-	assert.match(roadmapDialog, /<success>.*I-1\.1/);
+	assert.match(roadmapDialog, /<success>.*Initiative/);
+	assert.match(
+		allRoadmapDialog,
+		/Showing all items, Tab to change to open only/,
+	);
+	assert.match(allRoadmapDialog, /Planned child \[Closed/);
 	const initiativeOps = [];
 	let initiativeSelected = false;
 	await handleWorkRoadmapCommand(
@@ -581,7 +697,7 @@ try {
 					}
 					if (initiativeSelected) return undefined;
 					initiativeSelected = true;
-					return labels.find((label) => label.includes("I-1 Initiative"));
+					return labels.find((label) => label.includes("Initiative ["));
 				},
 				notify: () => {},
 			},
@@ -634,7 +750,7 @@ try {
 					select: async (title, labels) =>
 						title.includes("operation")
 							? labels.find((label) => /preview|reconcile/i.test(label))
-							: labels.find((label) => label.includes("I-1 Initiative")),
+							: labels.find((label) => label.includes("Initiative [")),
 					input: async () =>
 						approved
 							? readFileSync(path.join(initiativeRoot, proposalPath), "utf8")
@@ -684,6 +800,11 @@ try {
 	);
 	const captureOps = async (id) => {
 		const labelsSeen = [];
+		const names = {
+			"I-1.1": "Planned child",
+			"I-1.2": "Needs plan",
+			"S-1": "Standalone",
+		};
 		let selected = false;
 		await handleWorkRoadmapCommand(
 			"",
@@ -697,7 +818,7 @@ try {
 						}
 						if (selected) return undefined;
 						selected = true;
-						return labels.find((label) => label.includes(id));
+						return labels.find((label) => label.includes(names[id]));
 					},
 					notify: () => {},
 				},
@@ -735,7 +856,7 @@ try {
 				select: async (title, labels) => {
 					if (title.includes("operation"))
 						return labels.find((label) => /plan.*next child/i.test(label));
-					return labels.find((label) => label.includes("I-1 Initiative"));
+					return labels.find((label) => label.includes("Initiative ["));
 				},
 				confirm: async () => true,
 				notify: () => {},
@@ -880,10 +1001,14 @@ try {
 		hasUI: true,
 		sessionManager: { getSessionId: () => "roadmap-conversion-session" },
 		ui: {
-			select: async (title, labels) =>
-				title.includes("operation")
-					? labels.find((label) => /convert to initiative/i.test(label))
-					: labels.find((label) => label.includes("S-1 Standalone")),
+			select: async (title, labels) => {
+				if (title.includes("operation"))
+					return labels.find((label) => /convert to initiative/i.test(label));
+				return (
+					labels.find((label) => label.includes("Standalone [")) ??
+					labels.find((label) => /Show all roadmaps/.test(label))
+				);
+			},
 			confirm: async () => true,
 			notify: () => {},
 		},

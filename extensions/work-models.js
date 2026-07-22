@@ -1323,8 +1323,8 @@ function parseWorkPromptMeta(prompt) {
 			.find((item) => item.startsWith(`${label}:`))
 			?.slice(label.length + 1)
 			.trim();
-	const epic = line("Epic") ?? "";
-	const selected = line("Selected WorkItem") ?? "";
+	const epic = line("Epic") ?? line("Roadmap") ?? "";
+	const selected = line("Selected WorkItem") ?? line("Idea") ?? "";
 	const target = line("Target WorkItem ID") ?? line("Target") ?? "";
 	const epicId = epic.match(/^([^\s]+)/)?.[1];
 	const selectedId = selected.match(/^([^\s]+)/)?.[1];
@@ -9565,14 +9565,31 @@ function parseWorkBrainstormArgs(args = "") {
 	if (!input) return { kind: "usage" };
 	const parts = input.split(/\s+/);
 	const action = BRAINSTORM_ACTIONS.has(parts.at(-1)) ? parts.pop() : "link";
-	if (parts[0] === "idea") {
+	if (parts[0]?.toLowerCase() === "idea") {
 		const artifact =
 			parts.length > 2 && looksLikePath(parts.at(-1)) ? parts.pop() : "";
 		return { kind: "idea", action, target: parts.slice(1).join(" "), artifact };
 	}
+	const standalone = parts[0] === "new";
+	if (standalone) parts.shift();
 	const artifact =
 		parts.length > 1 && looksLikePath(parts.at(-1)) ? parts.pop() : "";
-	return { kind: "topic", action, topic: parts.join(" "), artifact };
+	return {
+		kind: "topic",
+		action,
+		topic: parts.join(" "),
+		artifact,
+		standalone,
+	};
+}
+
+function menuBrainstormArgs(args) {
+	const text = String(args ?? "").trim();
+	if (!text) return "";
+	const target = text.match(/^idea\s+(\S+)/i)?.[1];
+	return target && (/^\d+$/.test(target) || isWorkItemId(target))
+		? text
+		: `new ${text}`;
 }
 
 function compactBrainstormTitle(topic, max = BRAINSTORM_TITLE_MAX) {
@@ -9676,14 +9693,16 @@ function buildWorkBrainstormState(cwd, args = "") {
 	if (parsed.kind === "usage")
 		return errorState(
 			"usage",
-			"Usage: /work-brainstorm [idea <target>|<topic>] [brainstorm-path]",
+			"Usage: /work-brainstorm [new <topic>|idea <target>|<topic>] [brainstorm-path]",
 			{ action: "usage" },
 		);
 	try {
 		const init = ensureWorkStoreInitialized(cwd);
-		const resolved = resolveWorkflowEpic(cwd, "");
-		let createdEpic = false;
-		let epic = resolved.epic;
+		const resolved = parsed.standalone ? {} : resolveWorkflowEpic(cwd, "");
+		let createdEpic = Boolean(parsed.standalone);
+		let epic = parsed.standalone
+			? createBrainstormEpic(cwd, parsed.topic)
+			: resolved.epic;
 		if (resolved.error) {
 			if (resolved.error !== "no-active-epic" || parsed.kind !== "topic")
 				return errorState(resolved.error, resolved.message ?? resolved.error, {
@@ -9770,6 +9789,35 @@ function buildWorkBrainstormState(cwd, args = "") {
 	}
 }
 
+function linkBrainstormArtifactFromFinal(cwd, run, text) {
+	if (run?.meta?.mode !== "brainstorm" || !run.meta.workItemId) return null;
+	const match = String(text ?? "").match(
+		/(?:^|\n)\s*Brainstorm saved:\s*`?([^\r\n`]+?\.md)`?\s*(?:\r?\n|$)/i,
+	);
+	if (!match) return null;
+	const artifact = repoRelativePath(cwd, match[1].trim());
+	if (!artifact || !existsSync(join(cwd, artifact))) return null;
+	const idea = readWorkItem(cwd, run.meta.workItemId);
+	if (
+		!idea ||
+		(run.meta.epicId && parentOf(idea) !== run.meta.epicId) ||
+		notesOf(idea).includes(`brainstorm-path=${artifact}`)
+	)
+		return null;
+	const updated = appendWorkflowWorkItemNote(
+		cwd,
+		run.meta.workItemId,
+		ideaBrainstormNote(artifact, "completed-brainstorm"),
+	);
+	return {
+		ok: true,
+		action: "brainstorm-linked",
+		artifact,
+		epic: issueSummary(readWorkItem(cwd, parentOf(idea))),
+		idea: issueSummary(updated),
+	};
+}
+
 function brainstormHandoffPrompt(state, cwd) {
 	const artifact = state.artifact;
 	const advisorStep = cwd ? advisorCriticStep(cwd, "brainstorm artifact") : "";
@@ -9781,7 +9829,7 @@ function brainstormHandoffPrompt(state, cwd) {
 		state.topic ? `Full brainstorm request:\n${state.topic}` : "",
 		artifact
 			? `Brainstorm artifact: ${artifact}\n${advisorStep ? "After the advisor gate, run" : "Run"} /work-plan ${state.epic.id} now; do not use ce-brainstorm's post-doc planning menu.`
-			: `Run ce-brainstorm interactively, ask one question at a time until the requirements are clear, write only the brainstorm artifact, skip ce-brainstorm's post-doc planning menu, then rerun /work-brainstorm idea ${state.idea.id} <path>.`,
+			: `Run ce-brainstorm interactively, ask one question at a time until the requirements are clear, write only the brainstorm artifact, and skip ce-brainstorm's post-doc planning menu. End the final response with exactly "Brainstorm saved: <absolute path>" so the extension links it to ${state.idea.id}.`,
 		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can call ce-plan with the preservation and self-audit contract.",
 		"Never silently skip ce-brainstorm questions for broad, important, or underspecified work.",
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
@@ -11042,7 +11090,7 @@ function resolveRoadmapTarget(cwd, target = "") {
 	return { epic };
 }
 
-function compactRoadmapDescription(value, max = 700) {
+function compactRoadmapDescription(value, max = 1000) {
 	const text = stripFrontmatter(String(value ?? ""))
 		.replace(/<[^>]+>/g, " ")
 		.replace(/^#{1,6}\s+/gm, "")
@@ -11052,17 +11100,88 @@ function compactRoadmapDescription(value, max = 700) {
 	return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
-function roadmapPreviewText(epic) {
+function compactRoadmapTitle(value, max = 72) {
+	const title = String(value ?? "")
+		.replace(/\s+/g, " ")
+		.trim();
+	return title.length > max ? `${title.slice(0, max - 1).trimEnd()}…` : title;
+}
+
+function roadmapDisplayTitle(epic) {
+	const id = String(epic?.id ?? "");
+	const value = String(epic?.title ?? "");
+	const title = (id ? value.replaceAll(id, " ") : value)
+		.replace(/\b[A-Za-z]:[\\/]\S+/g, "linked source")
+		.replace(/\b(?:docs|plans|brainstorms)[\\/]\S+/gi, "linked source")
+		.replace(/\s+/g, " ")
+		.trim()
+		.replace(/^[-:–—\s]+|[-:–—\s]+$/g, "");
+	return compactRoadmapTitle(title) || "Untitled roadmap";
+}
+
+function roadmapDisplayDescription(epic) {
+	const id = String(epic?.id ?? "");
+	const value = compactRoadmapDescription(epic?.description);
+	if (/^Brainstorm workspace created by \/work-brainstorm\b/i.test(value))
+		return "Summary not generated yet.";
+	return (id ? value.replaceAll(id, " ") : value)
+		.replace(/\b[A-Za-z]:[\\/]\S+/g, "linked source")
+		.replace(/\b(?:docs|plans|brainstorms)[\\/]\S+/gi, "linked source");
+}
+
+function roadmapNeedsGeneratedTitle(epic) {
 	return (
-		compactRoadmapDescription(epic?.description) ||
-		"No saved summary yet. Select this roadmap to generate and save a 2–4 sentence summary from its linked plans, brainstorms, and tasks."
+		/^Brainstorm workspace created by \/work-brainstorm\b/i.test(
+			compactRoadmapDescription(epic?.description),
+		) ||
+		/[A-Za-z]:[\\/]|(?:^|\s)(?:docs|plans|brainstorms)[\\/]/i.test(
+			String(epic?.title ?? ""),
+		)
 	);
 }
 
-function persistRoadmapDescription(cwd, id, description) {
-	const summary = compactRoadmapDescription(description);
-	if (!summary) throw new Error("Roadmap summary is empty.");
-	return updateWorkItemNative(cwd, id, { description: summary }).description;
+function roadmapNeedsGeneratedMetadata(epic) {
+	return (
+		!compactRoadmapDescription(epic?.description) ||
+		roadmapNeedsGeneratedTitle(epic)
+	);
+}
+
+function parseGeneratedRoadmapMetadata(value) {
+	const text = String(value ?? "")
+		.trim()
+		.replace(/^```(?:json)?\s*/i, "")
+		.replace(/\s*```$/, "");
+	try {
+		const parsed = JSON.parse(text);
+		return {
+			title: compactRoadmapTitle(parsed.title),
+			description: compactRoadmapDescription(parsed.description),
+		};
+	} catch {
+		return { title: "", description: compactRoadmapDescription(text) };
+	}
+}
+
+function roadmapPreviewText(epic) {
+	return roadmapDisplayDescription(epic) || "No saved summary yet.";
+}
+
+function persistRoadmapMetadata(cwd, epic, generated) {
+	const metadata = parseGeneratedRoadmapMetadata(generated);
+	const description = roadmapDisplayDescription({
+		...epic,
+		description: metadata.description,
+	});
+	if (!description) throw new Error("Roadmap summary is empty.");
+	const replaceTitle =
+		roadmapNeedsGeneratedTitle(epic) && metadata.title
+			? roadmapDisplayTitle({ ...epic, title: metadata.title })
+			: "";
+	return updateWorkItemNative(cwd, idOf(epic), {
+		...(replaceTitle ? { title: replaceTitle } : {}),
+		description,
+	});
 }
 
 function roadmapSummary(_cwd, epic, currentId, projection) {
@@ -11070,6 +11189,7 @@ function roadmapSummary(_cwd, epic, currentId, projection) {
 		...issueSummary(epic),
 		...(projection ?? {}),
 		description: field(epic, "description"),
+		created: createdAt(epic),
 		current: idOf(epic) === currentId,
 	};
 }
@@ -13263,14 +13383,6 @@ async function handleWorkMenuCommand(ctx, pi) {
 				"Initialize the native work-item store without adding AGENTS noise.\nUse once when this project has no workflow workspace.",
 		},
 		{
-			value: "work-status",
-			label: "📍 Status",
-			description:
-				"Show deterministic roadmap, work-item, and Git status.\nBlank targets the current roadmap.",
-			argumentTitle: "Status target",
-			placeholder: "Blank shows the current roadmap",
-		},
-		{
 			value: "work-report",
 			label: "📄 Blocker report",
 			description:
@@ -13292,7 +13404,8 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description:
 				"Create or link a brainstorm for an idea or freeform topic.\nThe artifact is linked back to native work state.",
 			argumentTitle: "Idea or topic",
-			placeholder: "idea <id>, a topic, or idea <id> <artifact-path>",
+			placeholder:
+				"Describe a new brainstorm, or use idea <id> [artifact-path]",
 		},
 		{
 			value: "work-plan",
@@ -13464,6 +13577,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 			args = await ctx.ui.input(item.argumentTitle, item.placeholder);
 			if (args == null) continue;
 		}
+		if (selected.value === "work-brainstorm") args = menuBrainstormArgs(args);
 		return executeOrchestratorAction(selected.value, args, ctx, pi);
 	}
 }
@@ -14077,30 +14191,86 @@ function roadmapDescriptionContext(cwd, epic) {
 	].join("\n\n");
 }
 
+function newestRoadmapsFirst(roadmaps) {
+	const ids = new Set(roadmaps.map((roadmap) => roadmap.id));
+	const children = new Map();
+	for (const roadmap of roadmaps) {
+		const parent = ids.has(roadmap.parentId) ? roadmap.parentId : "";
+		const group = children.get(parent) ?? [];
+		group.push(roadmap);
+		children.set(parent, group);
+	}
+	const newest = (a, b) =>
+		String(b.created || b.updated || "").localeCompare(
+			String(a.created || a.updated || ""),
+		);
+	for (const group of children.values()) group.sort(newest);
+	const ordered = [];
+	const append = (parent = "") => {
+		for (const roadmap of children.get(parent) ?? []) {
+			ordered.push(roadmap);
+			append(roadmap.id);
+		}
+	};
+	append();
+	return ordered;
+}
+
+function roadmapIsOpen(roadmap) {
+	return !["closed", "deferred"].includes(roadmap.status);
+}
+
+function roadmapMenuState(value) {
+	return (
+		{
+			open: "Open",
+			in_progress: "In progress",
+			blocked: "Blocked",
+			planned: "Planned",
+			deferred: "Deferred",
+			closed: "Closed",
+			needs_plan: "Needs planning",
+			stale: "Plan needs refresh",
+		}[value] ?? "Unknown"
+	);
+}
+
+function roadmapMenuNextStep(roadmap) {
+	if (roadmap.status === "closed") return "Enter to inspect or reopen.";
+	if (roadmap.role === "initiative")
+		return "Enter to inspect or plan its child roadmaps.";
+	if (["needs_plan", "stale"].includes(roadmap.readiness?.state))
+		return "Enter, then choose Plan / strengthen.";
+	return "Enter, then choose Resume work.";
+}
+
 function roadmapMenuItems(roadmaps) {
+	const visible = new Set(roadmaps.map((roadmap) => roadmap.id));
 	const siblings = new Map();
 	for (const roadmap of roadmaps) {
-		if (!roadmap.parentId) continue;
-		const group = siblings.get(roadmap.parentId) ?? [];
-		group.push(roadmap.id);
-		siblings.set(roadmap.parentId, group);
+		if (roadmap.parentId && visible.has(roadmap.parentId)) {
+			const group = siblings.get(roadmap.parentId) ?? [];
+			group.push(roadmap.id);
+			siblings.set(roadmap.parentId, group);
+		}
 	}
 	return roadmaps.map((roadmap) => {
+		const nested = roadmap.parentId && visible.has(roadmap.parentId);
 		const childIds = siblings.get(roadmap.parentId) ?? [];
 		const lastChild = childIds.at(-1) === roadmap.id;
 		const marker = roadmap.current ? "*" : "─";
 		const prefix =
 			roadmap.role === "initiative"
 				? ""
-				: roadmap.parentId
+				: nested
 					? `${lastChild ? "└" : "├"}${marker} `
 					: `${marker} `;
+		const summary =
+			roadmapDisplayDescription(roadmap) || "Summary unavailable.";
 		return {
 			value: roadmap.id,
-			label: `${prefix}${roadmap.id} ${roadmap.title} [${roadmap.status ?? "unknown"} · ${roadmap.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${SUBMENU_ARROW}`,
-			description:
-				compactRoadmapDescription(roadmap.description) ||
-				"No short description yet.",
+			label: `${prefix}${roadmapDisplayTitle(roadmap)} [${roadmapMenuState(roadmap.status)} · ${roadmapMenuState(roadmap.readiness?.state)}] ${SUBMENU_ARROW}`,
+			description: `${summary} ${roadmapMenuNextStep(roadmap)}`,
 			preserveCase: true,
 			color: roadmap.current
 				? "success"
@@ -14114,70 +14284,116 @@ function roadmapMenuItems(roadmaps) {
 }
 
 async function chooseRoadmap(ctx, title, roadmaps, selectedId) {
-	return choose(ctx, title, roadmapMenuItems(roadmaps), selectedId, {
-		purpose: "Choose a roadmap to inspect, plan, or continue.",
-		descriptionMinLines: 3,
-		fixedHeight: true,
+	let showAll = false;
+	const view = () => ({
+		items: roadmapMenuItems(
+			newestRoadmapsFirst(showAll ? roadmaps : roadmaps.filter(roadmapIsOpen)),
+		),
+		purpose: showAll
+			? "Showing all items, Tab to change to open only."
+			: "Showing open items, Tab to change to all.",
+		help: "Type to filter · Tab open/all · ↑↓ navigate · Enter select · Esc back",
 	});
+	for (;;) {
+		const current = view();
+		const selected = await showListDialog(ctx, {
+			title: roadmapTerminology(title),
+			...current,
+			currentValue: selectedId,
+			cursorKey: "roadmap-list",
+			descriptionMinLines: 6,
+			descriptionMaxLines: 6,
+			fixedHeight: true,
+			fixedItemRows: roadmaps.length,
+			tabAction: {
+				label: showAll ? "Show open roadmaps" : "Show all roadmaps",
+				toggle: () => {
+					showAll = !showAll;
+					return view();
+				},
+			},
+		});
+		if (selected?.action === "tab") {
+			showAll = !showAll;
+			continue;
+		}
+		return selected?.value;
+	}
 }
 
-async function synthesizeRoadmapDescription(cwd, epic, ctx, runtime = {}) {
-	if (ctx.mode !== "tui") return "";
+async function synthesizeRoadmapMetadata(cwd, epic, ctx, runtime = {}) {
+	if (ctx.mode !== "tui") return null;
 	if (!ctx.model) {
 		notify(
 			ctx,
 			"No model is selected, so the roadmap summary was not generated.",
 			"warning",
 		);
-		return "";
+		return null;
 	}
 	let failure;
 	try {
-		const complete =
-			runtime.complete ??
-			(await import("@earendil-works/pi-ai/compat")).complete;
-		const BorderedLoader =
-			runtime.BorderedLoader ??
-			(await import("@earendil-works/pi-coding-agent")).BorderedLoader;
-		const result = await ctx.ui.custom((tui, theme, _keybindings, done) => {
-			const loader = new BorderedLoader(
-				tui,
-				theme,
-				`Summarizing ${idOf(epic)} using ${ctx.model.id}...`,
-			);
-			loader.onAbort = () => done(null);
+		const message = `Summarizing ${roadmapDisplayTitle(epic)} using ${ctx.model.id}...`;
+		const result = await ctx.ui.custom((tui, theme, keybindings, done) => {
+			const controller = new AbortController();
+			const loader = runtime.BorderedLoader
+				? new runtime.BorderedLoader(tui, theme, message)
+				: {
+						signal: controller.signal,
+						render: (width) => [
+							theme.fg("accent", truncate(message, Math.max(8, width - 1))),
+						],
+						handleInput: (data) => {
+							if (
+								data === "\x1b" ||
+								keybindings.matches?.(data, "tui.select.cancel")
+							) {
+								controller.abort();
+								done(null);
+							}
+						},
+						invalidate() {},
+					};
+			if (runtime.BorderedLoader) loader.onAbort = () => done(null);
 			(async () => {
 				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
 				if (!auth.ok || !auth.apiKey)
 					throw new Error(
 						auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
 					);
-				const response = await complete(
-					ctx.model,
-					{
-						systemPrompt:
-							"Summarize a software roadmap for someone returning after months away. Write 2–4 concise plain-text sentences covering purpose, scope, and intended outcome. Use only the supplied context; state when intent is undocumented. No heading, bullets, markdown, or implementation advice. Maximum 700 characters.",
-						messages: [
-							{
-								role: "user",
-								content: [
-									{
-										type: "text",
-										text: roadmapDescriptionContext(cwd, epic),
-									},
-								],
-								timestamp: Date.now(),
-							},
-						],
-					},
-					{
-						apiKey: auth.apiKey,
-						headers: auth.headers,
-						env: auth.env,
-						signal: loader.signal,
-					},
-				);
+				const context = {
+					systemPrompt:
+						'Create durable display metadata for a software roadmap. Return only JSON: {"title":"...","description":"..."}. The title must be plain language, at most 72 characters, and contain no work-item IDs or file paths. The description must contain no work-item IDs or file paths and must be 3–5 concise sentences, at most 1000 characters, explaining what this roadmap is, why it exists, its scope, and intended outcome for someone returning months later. Use only supplied context; say when intent is undocumented. No markdown or implementation advice.',
+					messages: [
+						{
+							role: "user",
+							content: [
+								{
+									type: "text",
+									text: roadmapDescriptionContext(cwd, epic),
+								},
+							],
+							timestamp: Date.now(),
+						},
+					],
+				};
+				const options = {
+					apiKey: auth.apiKey,
+					headers: auth.headers,
+					env: auth.env,
+					signal: loader.signal,
+				};
+				const response = runtime.complete
+					? await runtime.complete(ctx.model, context, options)
+					: await ctx.modelRegistry
+							.getProvider(ctx.model.provider)
+							?.streamSimple(ctx.model, context, options)
+							.result();
+				if (!response)
+					throw new Error(`No provider runtime for ${ctx.model.provider}.`);
 				if (response.stopReason === "aborted") return null;
+				if (response.stopReason === "error")
+					throw new Error(response.errorMessage || "Model request failed.");
 				return response.content
 					.filter((content) => content.type === "text")
 					.map((content) => content.text)
@@ -14197,19 +14413,55 @@ async function synthesizeRoadmapDescription(cwd, epic, ctx, runtime = {}) {
 					`Could not generate roadmap summary: ${formatError(failure)}`,
 					"warning",
 				);
-			return "";
+			return null;
 		}
-		const summary = persistRoadmapDescription(cwd, idOf(epic), result);
-		notify(ctx, `Saved summary for ${idOf(epic)}.`);
-		return summary;
+		const updated = persistRoadmapMetadata(cwd, epic, result);
+		if (!runtime.quiet) notify(ctx, `Saved summary for ${titleOf(updated)}.`);
+		return {
+			title: titleOf(updated),
+			description: field(updated, "description"),
+		};
 	} catch (error) {
 		notify(
 			ctx,
 			`Could not generate roadmap summary: ${formatError(error)}`,
 			"warning",
 		);
-		return "";
+		return null;
 	}
+}
+
+async function backfillOpenRoadmapMetadata(cwd, roadmaps, ctx, runtime = {}) {
+	if (ctx.mode !== "tui") return;
+	const missing = roadmaps.filter(
+		(item) => roadmapIsOpen(item) && roadmapNeedsGeneratedMetadata(item),
+	);
+	if (!missing.length) return;
+	if (!ctx.model) {
+		notify(
+			ctx,
+			"Select a model to generate missing roadmap summaries.",
+			"warning",
+		);
+		return;
+	}
+	let generated = 0;
+	for (const roadmap of newestRoadmapsFirst(missing)) {
+		const epic = readWorkItem(cwd, roadmap.id);
+		if (!epic) continue;
+		const metadata = await synthesizeRoadmapMetadata(cwd, epic, ctx, {
+			...runtime,
+			quiet: true,
+		});
+		if (!metadata) break;
+		Object.assign(roadmap, metadata);
+		generated += 1;
+	}
+	if (generated)
+		notify(
+			ctx,
+			`Generated and saved ${generated} roadmap ${generated === 1 ? "summary" : "summaries"}.`,
+		);
 }
 
 async function handleWorkRoadmapCommand(
@@ -14239,27 +14491,27 @@ async function handleWorkRoadmapCommand(
 		notify(ctx, renderWorkRoadmapText(list), "warning");
 		return stateTelemetry(list);
 	}
+	await backfillOpenRoadmapMetadata(
+		ctx.cwd,
+		list.roadmaps,
+		ctx,
+		roadmapRuntime,
+	);
 	const selected =
 		menuSelected ||
-		(await chooseRoadmap(
-			ctx,
-			"🗺️ Work roadmaps",
-			list.roadmaps,
-			list.selectedId,
-		));
+		(await chooseRoadmap(ctx, "Work roadmaps", list.roadmaps, list.selectedId));
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
 	const selectedRoadmap = list.roadmaps.find((epic) => epic.id === selected);
 	rememberRoadmapMenuSelection(ctx.cwd, selectedRoadmap);
-	if (
-		selectedRoadmap &&
-		!compactRoadmapDescription(selectedRoadmap.description)
-	)
-		selectedRoadmap.description = await synthesizeRoadmapDescription(
+	if (selectedRoadmap && roadmapNeedsGeneratedMetadata(selectedRoadmap)) {
+		const metadata = await synthesizeRoadmapMetadata(
 			ctx.cwd,
 			readWorkItem(ctx.cwd, selected),
 			ctx,
 			roadmapRuntime,
 		);
+		if (metadata) Object.assign(selectedRoadmap, metadata);
+	}
 	const initiative = selectedRoadmap?.role === "initiative";
 	const preparation = initiative ? selectedRoadmap.preparation : undefined;
 	const parentPreparation = selectedRoadmap?.parentId
@@ -14273,7 +14525,7 @@ async function handleWorkRoadmapCommand(
 		Boolean(selfImprovementRoadmap(ctx.cwd, selected));
 	const op = await choose(
 		ctx,
-		`${selected}: operation\n\n${roadmapPreviewText(selectedRoadmap)}`,
+		"Roadmap operations",
 		initiative
 			? [
 					...(preparation.legalActions.includes("start_execution")
@@ -14365,6 +14617,10 @@ async function handleWorkRoadmapCommand(
 							: { value: "close", label: "✅ close" },
 						{ value: "report", label: "📄 full report" },
 					],
+		undefined,
+		{
+			purpose: `${roadmapDisplayTitle(selectedRoadmap ?? { id: selected, title: selected })} — ${roadmapPreviewText(selectedRoadmap)}`,
+		},
 	);
 	if (!op) return handleWorkRoadmapCommand("", ctx, pi);
 	if (op === "stop")
@@ -14705,7 +14961,20 @@ async function executeOrchestratorAction(
 	if (name === "work-brainstorm")
 		return withCommandTelemetry(name, text, ctx, async () => {
 			cleanupBenignInstructionDirt(ctx.cwd);
-			const state = buildWorkBrainstormState(ctx.cwd, text);
+			let state = buildWorkBrainstormState(ctx.cwd, text);
+			if (state.action === "brainstorm-epic-created") {
+				const epic = readWorkItem(ctx.cwd, state.epic.id);
+				if (epic) {
+					const metadata = await synthesizeRoadmapMetadata(ctx.cwd, epic, ctx, {
+						quiet: true,
+					});
+					if (metadata)
+						state = {
+							...state,
+							epic: issueSummary(readWorkItem(ctx.cwd, state.epic.id)),
+						};
+				}
+			}
 			notify(
 				ctx,
 				renderWorkBrainstormText(state),
@@ -14825,6 +15094,8 @@ export {
 	buildWorkCatchUpObjective,
 	captureIdeationIdeas,
 	brainstormHandoffPrompt,
+	linkBrainstormArtifactFromFinal,
+	menuBrainstormArgs,
 	buildWorkflowIntakeState,
 	applyInitiativeReconciliation,
 	approveInitiativeReconciliation,
@@ -15439,9 +15710,18 @@ export default function workModelsExtension(pi) {
 		}
 		const run = activeWorkAgent;
 		activeWorkAgent = null;
-		const contextOverflow = isWorkGoalContextOverflow(
-			finalAssistantMessage(event.messages),
+		const assistant = finalAssistantMessage(event.messages);
+		const linkedBrainstorm = linkBrainstormArtifactFromFinal(
+			run.cwd,
+			run,
+			assistantVisibleText(assistant),
 		);
+		if (linkedBrainstorm?.ok)
+			notify(
+				ctx,
+				`Linked ${linkedBrainstorm.artifact} to ${linkedBrainstorm.idea.id}.`,
+			);
+		const contextOverflow = isWorkGoalContextOverflow(assistant);
 		const wasWorkGoalTurn = activeWorkGoalRunning;
 		activeWorkGoalRunning = false;
 		const usage = messageUsage(event.messages);

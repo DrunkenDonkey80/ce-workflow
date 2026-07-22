@@ -1440,6 +1440,45 @@
       "type": "task",
       "updatedAt": "2026-07-22T12:20:56.571Z"
     },
+    "work-2.17": {
+      "createdAt": "2026-07-22T15:24:25.185Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: During work-5 planning, the first work-create successfully added decision work-5.2, but the immediately following work-create for work-5.3 failed with `Invalid work item work-5.3 in work store`, leaving a partially mutated dirty native store and no planning note/dependencies.\nExpected: A sequence of valid work-create calls in one planner session should durably create each child or fail atomically before partial mutation; the helper should reload/validate the newly written work store correctly and return a usable work-5.3 summary.\nImpact: Autonomous planning stopped after a partial write, requiring parent-session recovery and risking inconsistent roadmap slicing or accidental loss of the valid authority gate.\nSuggested improvement: Make work-create return only after reloading and validating the just-created item, and make multi-create planning mutations transactional or explicitly resumable from the created ID.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/0bba1b9d-cc03-4603-a76c-6569ccdf6467",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 279224,
+              "file": "01-session.jsonl",
+              "sha256": "e5db8b75f091bdfc7345dfb0d5a386ffb2b594794a5e259a1416bf6d28a9bed9"
+            },
+            {
+              "bytes": 580,
+              "file": "02-a46fc29d-d98c-4078-bf54-1b064921aa47_work-planner_output.md",
+              "sha256": "03ab8d63252796a6653bab02e4a294cf1b80b8451484a9983ef175988b78de31"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-22T15:24:25.180Z",
+          "workflowId": "019f89fa-ed23-75f5-bf6d-0aada7cc58ea"
+        }
+      ],
+      "id": "work-2.17",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: During work-5 planning, the first work-create successfully added decision work-5.2, but the immediately following work-create for ",
+      "type": "task",
+      "updatedAt": "2026-07-22T15:24:25.185Z"
+    },
     "work-2.2": {
       "createdAt": "2026-07-20T01:40:10.511Z",
       "dependencies": [
@@ -1723,7 +1762,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-22T13:08:23.531Z"
+    "updatedAt": "2026-07-22T15:24:25.186Z"
   },
   "schemaVersion": 1
 }

@@ -207,7 +207,7 @@ await handleWorkRoadmapCommand(
 				}
 				if (selectedRoadmap) return undefined;
 				selectedRoadmap = true;
-				return labels.find((label) => label.includes("SI-1 Self-improving"));
+				return labels.find((label) => label.includes("Self-improving ["));
 			},
 			notify: () => {},
 		},
@@ -238,7 +238,7 @@ await handleWorkRoadmapCommand(
 				}
 				if (selectedRoadmap) return undefined;
 				selectedRoadmap = true;
-				return labels.find((label) => label.includes("SI-1 Self-improving"));
+				return labels.find((label) => label.includes("Self-improving ["));
 			},
 			notify: () => {},
 		},
