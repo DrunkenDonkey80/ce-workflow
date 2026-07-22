@@ -1216,7 +1216,11 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		abortsBeforeStop + 1,
 		"Stop safely aborts the active Pi turn immediately",
 	);
-	assert.equal(sent.length, sentBeforeStop, "Stop safely does not queue a steer");
+	assert.equal(
+		sent.length,
+		sentBeforeStop,
+		"Stop safely does not queue a steer",
+	);
 	assert.match(statuses["work-goal"], /stopping/);
 	await tempHooks.agent_end(
 		{

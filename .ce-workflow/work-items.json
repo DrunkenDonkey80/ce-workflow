@@ -1514,16 +1514,21 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "--text Atom 1 classification: locally-owned generated-artifact classification defect; work-2.18 is the atomic canonical execution item. Root cause was prepareCommitPlan treating verifier runtime directories and bridge/subagent handoff files as implementation paths. Fixed in commit e0a5ba2 by extending isGeneratedWorkArtifact and excluding generated verification/runtime paths from commit planning while preserving real source edits. Coverage: scripts/test-work-store.mjs and scripts/test-work-planner-slicing.mjs; node scripts/test-work-store.mjs PASS, node scripts/test-work-planner-slicing.mjs PASS, npm run verify:quiet PASS, reviewer PASS. The observed artifact classes are now verified against the report; no duplicate canonical item required.",
+        "Verified local fix in e0a5ba2 prevents reported generated artifacts from being committed as implementation files."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: finish-task for work-5.3 committed and pushed generated verification/runtime artifacts as implementation files: `.ce-workflow/work",
       "type": "task",
-      "updatedAt": "2026-07-22T15:43:45.681Z"
+      "updatedAt": "2026-07-22T23:53:09.581Z"
     },
     "work-2.19": {
       "createdAt": "2026-07-22T16:18:41.083Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.8"
+      ],
       "dependencyEdges": [],
       "description": "Observed: Resuming completed work-planner run f813a27f failed because the generated recovery descriptor contains unsupported acceptance.explicit and acceptance.inferredReason fields; the same failure is already captured in the project workflow log.\nExpected: A completed specialist run should resume with corrected handoff context, or the recovery descriptor should contain only schema-supported acceptance fields.\nImpact: The autonomous roadmap loop could not reuse the planner session after a recoverable missing-helper-path handoff and must launch a replacement planner, wasting context and time.\nSuggested improvement: Normalize or omit unsupported acceptance metadata when writing async recovery descriptors.",
       "evidence": [
@@ -1548,12 +1553,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "--text Atom 1 classification: duplicate of upstream-owned canonical recovery-descriptor acceptance claim work-2.8 (also covered by work-2.11, work-2.14, and work-2.16). Verified specifically for this report: resuming a completed specialist run still rejects generated recoveryDescriptor.acceptance.explicit and acceptance.inferredReason on installed pi-subagents 0.35.1, so this is not falsely classified as already-fixed locally. Canonical work-2.8 routed the required round-trip outcome durably to https://github.com/nicobailon/pi-subagents/issues/537, fixed on upstream main by commit 318b7751f48f4e8330c23868bea6b2ea1895c3a7 with regression coverage; canonical reconciliation commit 16569ac. The current installed package predates that upstream fix. No ce-workflow workaround added because ownership is upstream and durable routing already covers the exact outcome.",
+        "Duplicate atomic claim verified and covered by canonical upstream item work-2.8 / pi-subagents #537; upstream main fix 318b7751 awaits installed release."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Resuming completed work-planner run f813a27f failed because the generated recovery descriptor contains unsupported acceptance.expl",
       "type": "task",
-      "updatedAt": "2026-07-22T16:18:41.083Z"
+      "updatedAt": "2026-07-22T23:53:19.105Z"
     },
     "work-2.2": {
       "createdAt": "2026-07-20T01:40:10.511Z",
@@ -1838,7 +1846,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-22T16:18:41.083Z"
+    "updatedAt": "2026-07-22T23:53:19.106Z"
   },
   "schemaVersion": 1
 }
