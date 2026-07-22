@@ -1667,7 +1667,8 @@
       "labels": [],
       "notes": [
         "Upstream-owned canonical claim expanded by work-2.11, work-2.14, and work-2.16. pi-subagents 0.35.1 writes resolvedAcceptance into recovery-descriptor.json in src/runs/background/async-execution.ts, then validates that output-shaped object as acceptance input in async-resume.ts. Reports reproduce rejection of explicit and inferredReason across paused writer, timed-out reviewer, and completed re-review recovery. Required upstream outcome: generated recovery descriptors must round-trip through resume for inferred and explicit acceptance.",
-        "User decision: close after durable upstream routing rather than wait for an installed release. Atom A classification: upstream-owned supervisor wake defect; reproduced again on pi-subagents 0.35.1 as async run ab3d125d-b32a-488b-b45e-0287e8214867, where subagent_wait timed out, subagent_supervisor pending was empty, and intercom pending held the live request; routed as https://github.com/nicobailon/pi-subagents/issues/581. Atom B classification: upstream-owned async recovery acceptance schema defect; routed as https://github.com/nicobailon/pi-subagents/issues/537 and fixed on upstream main by commit 318b7751f48f4e8330c23868bea6b2ea1895c3a7, with legacy and new descriptor regression coverage. Local mitigation remains commit 5899512. Snapshot coverage verified; no local dependency workaround added."
+        "User decision: close after durable upstream routing rather than wait for an installed release. Atom A classification: upstream-owned supervisor wake defect; reproduced again on pi-subagents 0.35.1 as async run ab3d125d-b32a-488b-b45e-0287e8214867, where subagent_wait timed out, subagent_supervisor pending was empty, and intercom pending held the live request; routed as https://github.com/nicobailon/pi-subagents/issues/581. Atom B classification: upstream-owned async recovery acceptance schema defect; routed as https://github.com/nicobailon/pi-subagents/issues/537 and fixed on upstream main by commit 318b7751f48f4e8330c23868bea6b2ea1895c3a7, with legacy and new descriptor regression coverage. Local mitigation remains commit 5899512. Snapshot coverage verified; no local dependency workaround added.",
+        "wo:reconciliation PASS — canonical backlog execution committed as 16569ac. Focused test node scripts/test-work-improve.mjs PASS; npm run verify:quiet PASS; reviewer PASS. Upstream routing: pi-subagents #537 (fixed on main at 318b7751) and #581 (open supervisor-wake defect). User explicitly chose close-after-durable-routing over waiting for a release."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -1722,7 +1723,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-22T13:06:10.412Z"
+    "updatedAt": "2026-07-22T13:08:23.531Z"
   },
   "schemaVersion": 1
 }
