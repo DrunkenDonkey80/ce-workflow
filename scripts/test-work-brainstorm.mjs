@@ -24,6 +24,11 @@ const {
 		),
 	).href
 );
+const { mutateStore } = await import(
+	pathToFileURL(
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-store.js")),
+	).href
+);
 
 const fixture = installWorkflowFixture({ native: true });
 const cwd = fixture.cwd;
@@ -227,6 +232,22 @@ try {
 			JSON.stringify(repeated.preparation) ===
 				JSON.stringify(broadApplied.preparation),
 		"rerunning initiative bootstrap reuses lineage and preparation state",
+	);
+
+	mutateStore(cwd, (store) => {
+		store.items[broad.epic.id].status = "open";
+		for (const child of broadChildren) store.items[child.id].status = "closed";
+	});
+	const afterInitiative = buildWorkBrainstormState(
+		cwd,
+		"Explore a separate standalone brainstorm",
+	);
+	assert(
+		afterInitiative.ok &&
+			afterInitiative.action === "brainstorm-epic-created" &&
+			!afterInitiative.epic.parentId &&
+			afterInitiative.epic.id !== broad.epic.id,
+		"a stale open initiative does not capture a new standalone brainstorm",
 	);
 
 	fixture.reset("ideas");

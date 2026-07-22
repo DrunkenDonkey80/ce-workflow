@@ -7895,7 +7895,7 @@ function resolveWorkflowEpic(cwd, target = "") {
 				error: "unknown-target",
 				message: `No WorkItem found for ${wanted}`,
 			};
-		if (typeOf(issue) !== "epic")
+		if (typeOf(issue) !== "epic" || isInitiative(issue))
 			return {
 				error: "unsupported-target",
 				message: `${wanted} is not a roadmap.`,
@@ -7905,10 +7905,12 @@ function resolveWorkflowEpic(cwd, target = "") {
 	}
 
 	const remembered = rememberedWorkflowEpic(cwd);
-	if (wanted === "last" && remembered)
+	if (wanted === "last" && remembered && !isInitiative(remembered))
 		return { kind: "epic", epic: remembered };
 
-	const active = epicsByStatus(cwd, "in_progress").sort(byUpdatedDesc);
+	const active = epicsByStatus(cwd, "in_progress")
+		.filter((epic) => !isInitiative(epic))
+		.sort(byUpdatedDesc);
 	if (active.length === 1) {
 		rememberWorkflowEpic(cwd, active[0]);
 		return { kind: "epic", epic: active[0] };
@@ -7921,7 +7923,9 @@ function resolveWorkflowEpic(cwd, target = "") {
 			candidates: active.map((epic) => candidateSummary(cwd, epic)),
 		};
 
-	const open = epicsByStatus(cwd, "open").sort(byUpdatedDesc);
+	const open = epicsByStatus(cwd, "open")
+		.filter((epic) => !isInitiative(epic))
+		.sort(byUpdatedDesc);
 	if (open.length === 1) {
 		rememberWorkflowEpic(cwd, open[0]);
 		return { kind: "epic", epic: open[0] };
