@@ -96,8 +96,10 @@ try {
 	fixture.reset("active");
 	state = buildWorkDebugState(fixture.cwd, "terminal hangs: inspect COM8");
 	assert(
-		state.ok && state.selectedWorkItem.type === "bug",
-		"symptom-only request creates native bug",
+		state.ok &&
+			state.selectedWorkItem.type === "bug" &&
+			state.epic.labels.includes("wo:misc"),
+		"symptom-only request creates a native bug under Misc",
 	);
 	assert(
 		state.selectedWorkItem.title === "terminal hangs",
@@ -108,13 +110,21 @@ try {
 		"symptom guidance is preserved",
 	);
 
-	fixture.reset("ambiguous");
+	fixture.reset("active");
+	state = buildWorkDebugState(
+		fixture.cwd,
+		"--roadmap E-1 remember current: setup",
+	);
+	const beforeChoice = Object.keys(fixture.store().items).length;
 	state = buildWorkDebugState(fixture.cwd, "ambiguous symptom");
 	assert(
-		!state.ok && state.reason === "ambiguous-target",
-		"symptom-only ambiguous epic stops",
+		!state.ok && state.reason === "task-roadmap-choice-required",
+		"symptom-only debug asks current versus Misc",
 	);
-	assert(fixture.logs().length === 0, "ambiguous debug does not create bug");
+	assert(
+		Object.keys(fixture.store().items).length === beforeChoice,
+		"debug placement choice does not create a bug",
+	);
 
 	fixture.reset("debug");
 	state = buildWorkDebugState(fixture.cwd, "NOPE-1");
@@ -124,7 +134,7 @@ try {
 	);
 
 	fixture.reset("active");
-	state = buildWorkDebugState(fixture.cwd, "broken thing");
+	state = buildWorkDebugState(fixture.cwd, "--roadmap E-1 broken thing");
 	assert(state.ok && fixture.logs().length === 0, "native debug does not require bd");
 
 	fixture.reset("active", "unknown");

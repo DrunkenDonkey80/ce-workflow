@@ -3,6 +3,7 @@ import {
 	chmodSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -1069,6 +1070,45 @@ try {
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
 
+	const miscCwd = mkdtempSync(path.join(tmpdir(), "work-resume-misc-"));
+	seedNativeStore(miscCwd, [
+		{
+			id: "MISC-1",
+			issue_type: "epic",
+			status: "open",
+			title: "Misc",
+			labels: ["wo:misc"],
+		},
+		{
+			id: "MISC-1.1",
+			parent_id: "MISC-1",
+			issue_type: "task",
+			status: "open",
+			title: "Ready miscellaneous work",
+		},
+	]);
+	let miscState = buildWorkResumeState(miscCwd);
+	assert(
+		miscState.epic.id === "MISC-1" &&
+			miscState.selectedWorkItem.id === "MISC-1.1",
+		"untargeted resume falls back to ready Misc work",
+	);
+	seedNativeStore(miscCwd, [
+		{
+			id: "MISC-1",
+			issue_type: "epic",
+			status: "open",
+			title: "Misc",
+			labels: ["wo:misc"],
+		},
+	]);
+	miscState = buildWorkResumeState(miscCwd);
+	assert(
+		miscState.action === "misc-idle",
+		"empty Misc stays idle instead of launching a planner",
+	);
+	rmSync(miscCwd, { recursive: true, force: true });
+
 	const triageCwd = mkdtempSync(path.join(tmpdir(), "work-resume-triage-"));
 	seedNativeStore(triageCwd, sourcesForScenario("implementation"));
 	initVerifierStore(triageCwd);
@@ -1131,6 +1171,77 @@ try {
 		"pure resume-state reads do not steal or enforce a triage lease",
 	);
 	rmSync(triageCwd, { recursive: true, force: true });
+
+	const orphanTriageCwd = mkdtempSync(
+		path.join(tmpdir(), "work-resume-orphan-triage-"),
+	);
+	seedNativeStore(orphanTriageCwd, []);
+	initVerifierStore(orphanTriageCwd);
+	mutateVerifierStore(orphanTriageCwd, (store) =>
+		createBatch(store, {
+			checkpoint: triageCheckpoint,
+			profiles: [
+				{
+					model: "openai/gpt-5",
+					operations: ["correctness"],
+					thinking: "low",
+				},
+			],
+		}),
+	);
+	const orphanJob = Object.values(loadVerifierStore(orphanTriageCwd).jobs)[0];
+	const orphanReport = mutateVerifierStore(orphanTriageCwd, (store) =>
+		recordOperationResult(store, {
+			jobId: orphanJob.id,
+			operation: "correctness",
+			outcome: "findings",
+		}),
+	);
+	const orphanFinding = mutateVerifierStore(orphanTriageCwd, (store) =>
+		addFinding(store, {
+			reportId: orphanReport.id,
+			operation: "correctness",
+			model: orphanJob.model,
+			checkpoint: triageCheckpoint,
+			path: "extensions/work-models.js",
+			startLine: 1,
+			endLine: 1,
+			category: "correctness",
+			severity: "high",
+			rationale: "reproduced issue",
+			evidence: "line 1",
+			suggestedAction: "fix line 1",
+		}),
+	);
+	mutateVerifierStore(orphanTriageCwd, (store) =>
+		addGroup(store, { findingIds: [orphanFinding.id] }),
+	);
+	const orphanTriageState = buildWorkResumeState(orphanTriageCwd, "", {
+		ownerSession: "orphan-resume-test",
+	});
+	const orphanTriageStore = loadVerifierStore(orphanTriageCwd);
+	const orphanClaim = Object.values(orphanTriageStore.claims)[0];
+	assert(
+		orphanTriageState.action === "triage-required" &&
+			orphanClaim.resumeTarget &&
+			orphanTriageState.handoffPrompt.includes(orphanFinding.id),
+		"verifier triage without a roadmap creates and claims Misc",
+	);
+	assert(
+		Object.values(
+			JSON.parse(
+				readFileSync(
+					path.join(orphanTriageCwd, ".ce-workflow", "work-items.json"),
+					"utf8",
+				),
+			).items,
+		).some(
+			(item) =>
+				item.id === orphanClaim.resumeTarget && item.labels?.includes("wo:misc"),
+		),
+		"orphan triage claim targets the generated Misc roadmap",
+	);
+	rmSync(orphanTriageCwd, { recursive: true, force: true });
 } finally {
 	if (oldEnv.agentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = oldEnv.agentDir;

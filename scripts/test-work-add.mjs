@@ -4,7 +4,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 
-const { buildWorkAddState } = await import(
+const { buildWorkAddState, handleWorkflowAction } = await import(
 	pathToFileURL(
 		realpathSync(
 			path.join(import.meta.dirname, "../extensions/work-models.js"),
@@ -19,11 +19,24 @@ try {
 		state.ok && state.action === "work-added",
 		"task creates child WorkItem",
 	);
-	assert(state.epic.id === "E-1", "task is created under active epic");
+	const miscId = state.epic.id;
 	assert(
-		fixture.store().items[state.selectedWorkItem.id].title ===
-			"Add coded pause tests" && fixture.logs().length === 0,
-		"creation is one native mutation without bd",
+		state.epic.title === "Misc" && state.epic.labels.includes("wo:misc"),
+		"ordinary task without a current roadmap creates Misc",
+	);
+	assert(
+		fixture.store().items[state.selectedWorkItem.id].parentId === miscId &&
+			fixture.logs().length === 0,
+		"task is created under Misc without invoking bd",
+	);
+	state = buildWorkAddState(fixture.cwd, "Reuse Misc");
+	assert(
+		state.ok &&
+			state.epic.id === miscId &&
+			Object.values(fixture.store().items).filter((item) =>
+				item.labels?.includes("wo:misc"),
+			).length === 1,
+		"ordinary tasks reuse one durable Misc roadmap",
 	);
 
 	state = buildWorkAddState(fixture.cwd, "");
@@ -32,24 +45,50 @@ try {
 		"empty task returns usage stop",
 	);
 
-	fixture.reset("ambiguous");
-	state = buildWorkAddState(fixture.cwd, "Needs explicit parent");
-	assert(
-		!state.ok && state.reason === "ambiguous-target",
-		"ambiguous active roadmap without --roadmap stops",
+	fixture.reset("active");
+	state = buildWorkAddState(
+		fixture.cwd,
+		"--roadmap E-1 Remember the current roadmap",
 	);
-	assert(fixture.logs().length === 0, "ambiguous add does not invoke bd");
+	const beforeChoice = Object.keys(fixture.store().items).length;
+	state = buildWorkAddState(fixture.cwd, "Needs placement choice");
+	assert(
+		!state.ok &&
+			state.reason === "task-roadmap-choice-required" &&
+			state.roadmapChoices.length === 2,
+		"a current roadmap asks current versus Misc",
+	);
+	assert(
+		Object.keys(fixture.store().items).length === beforeChoice,
+		"placement choice creates neither Misc nor a task",
+	);
+	const notices = [];
+	state = await handleWorkflowAction(
+		buildWorkAddState,
+		"Place through dialog",
+		{
+			cwd: fixture.cwd,
+			mode: "tui",
+			ui: {
+				notify: (message, level) => notices.push({ message, level }),
+				select: async (_title, labels) =>
+					labels.find((label) => label.startsWith("Misc")),
+			},
+		},
+		{},
+	);
+	assert(
+		state.ok && state.epic.labels.includes("wo:misc"),
+		"interactive placement can select and create Misc",
+	);
 
 	fixture.reset("openReadyAmbiguous");
 	state = buildWorkAddState(fixture.cwd, "Must not guess open ready roadmap");
 	assert(
-		!state.ok && state.reason === "no-active-epic",
-		"mutating add does not guess among open roadmaps",
+		state.ok && state.epic.labels.includes("wo:misc"),
+		"unselected open roadmaps do not override Misc",
 	);
-	assert(
-		fixture.logs().length === 0,
-		"open roadmap heuristic does not invoke bd",
-	);
+	assert(fixture.logs().length === 0, "Misc routing does not invoke bd");
 
 	fixture.reset("ambiguous");
 	state = buildWorkAddState(
@@ -62,7 +101,10 @@ try {
 	);
 
 	fixture.reset("debug");
-	state = buildWorkAddState(fixture.cwd, "--blocked-by BUG-1 Add blocked task");
+	state = buildWorkAddState(
+		fixture.cwd,
+		"--roadmap E-1 --blocked-by BUG-1 Add blocked task",
+	);
 	assert(
 		state.ok && state.blockedBy.id === "BUG-1",
 		"--blocked-by is preserved",
@@ -76,7 +118,10 @@ try {
 	);
 
 	fixture.reset("active");
-	state = buildWorkAddState(fixture.cwd, "Add independent task");
+	state = buildWorkAddState(
+		fixture.cwd,
+		"--roadmap E-1 Add independent task",
+	);
 	assert(state.ok && !state.blockedBy, "no blocker creates no dependency");
 	assert(
 		fixture.store().items[state.selectedWorkItem.id].dependencies.length === 0,
@@ -84,7 +129,7 @@ try {
 	);
 
 	fixture.reset("active", "unknown");
-	state = buildWorkAddState(fixture.cwd, "Should not create");
+	state = buildWorkAddState(fixture.cwd, "--roadmap E-1 Should not create");
 	assert(
 		!state.ok && state.reason === "dirty-stop",
 		"unsafe dirty state stops before mutation",
@@ -94,7 +139,7 @@ try {
 	fixture.reset("create-fail");
 	state = buildWorkAddState(
 		fixture.cwd,
-		"Native create succeeds without command fixture",
+		"--roadmap E-1 Native create succeeds without command fixture",
 	);
 	assert(
 		state.ok && fixture.logs().length === 0,

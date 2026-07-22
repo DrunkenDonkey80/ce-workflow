@@ -625,7 +625,13 @@ try {
 			ui: { notify: () => {} },
 		});
 		delete process.env.WORK_ORCH_ACTIVITY_MARKER;
-		const commandSummary = buildWorkTelemetryState(cwd, "workItem E-1.1");
+		const commandEvent = telemetryEvents(cwd)
+			.filter((event) => event.command === "work-small")
+			.at(-1);
+		const commandSummary = buildWorkTelemetryState(
+			cwd,
+			`workItem ${commandEvent.workItemId}`,
+		);
 		assert(
 			commandSummary.events === 1,
 			"extension command writes telemetry before inline completion",
@@ -728,7 +734,10 @@ try {
 			},
 			{ cwd, getContextUsage: () => ({ tokens: 3100 }) },
 		);
-		const reviewSummary = buildWorkTelemetryState(cwd, "workItem E-1.1");
+		const reviewSummary = buildWorkTelemetryState(
+			cwd,
+			`workItem ${commandEvent.workItemId}`,
+		);
 		const correlated = reviewSummary.slowest.filter(
 			(event) => event.workflowRunId === inlineMeta.workflowRunId,
 		);
@@ -743,7 +752,7 @@ try {
 		assert(
 			reviewSummary.slowest.some(
 				(event) =>
-					event.review?.scope === "workItem E-1.1" &&
+					event.review?.scope === `workItem ${commandEvent.workItemId}` &&
 					event.review.outcome === "PASS",
 			),
 			"review telemetry records scoped outcome fields",
@@ -800,7 +809,7 @@ try {
 			".pi",
 			"work-runs",
 			"history",
-			"E-1.1",
+			commandEvent.workItemId,
 			"sess-history.jsonl",
 		);
 		assert(existsSync(historyFile), "self-improving history writes per task");
@@ -814,7 +823,9 @@ try {
 			"self-improving history records messages and tool results",
 		);
 		assert(
-			historyLines.every((line) => line.task.workItemId === "E-1.1"),
+			historyLines.every(
+				(line) => line.task.workItemId === commandEvent.workItemId,
+			),
 			"self-improving history is grouped by WorkItem task",
 		);
 		assert(

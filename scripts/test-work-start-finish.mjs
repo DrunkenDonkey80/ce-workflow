@@ -37,6 +37,7 @@ try {
 		"project-owned verifier tools enforce the launch boundary without provider capabilities",
 	);
 	const listeners = new Map();
+	let verifierRpcParams;
 	const verifierAdapter = createPiSubagentsVerifierAdapter({
 		events: {
 			on(name, listener) {
@@ -44,6 +45,7 @@ try {
 				return () => listeners.delete(name);
 			},
 			emit(_name, request) {
+				verifierRpcParams = request.params;
 				listeners.get(`subagents:rpc:v1:reply:${request.requestId}`)?.({
 					success: true,
 					data: { runId: "verifier-run", asyncDir: "C:/tmp/verifier-run" },
@@ -51,6 +53,7 @@ try {
 			},
 		},
 	});
+	const verifierCheckpoint = { snapshot: "a".repeat(40) };
 	assert(
 		(
 			await verifierAdapter.spawn({
@@ -66,7 +69,7 @@ try {
 				thinking: "low",
 				operations: ["correctness"],
 				paths: ["tracked.txt"],
-				checkpoint: { snapshot: "a".repeat(40) },
+				checkpoint: verifierCheckpoint,
 				boundary: {
 					readOnlyWorkspace: true,
 					cwdConfinedReadTools: true,
@@ -82,15 +85,22 @@ try {
 		).ok,
 		"adapter launches without fictional provider capabilities",
 	);
+	assert(
+		verifierRpcParams.task.includes('"job-test"') &&
+			verifierRpcParams.task.includes('"openai/gpt-5"') &&
+			verifierRpcParams.task.includes(JSON.stringify(verifierCheckpoint)),
+		"verifier handoff includes the exact immutable report identity",
+	);
 	let state = buildWorkSmallState(fixture.cwd, "Add coded start gate");
 	assert(
 		state.ok && state.action === "run-implementation",
 		"small creates implementation handoff",
 	);
 	assert(
-		state.selectedWorkItem.id.startsWith("E-1.") &&
+		state.epic.title === "Misc" &&
+			state.epic.labels.includes("wo:misc") &&
 			state.selectedWorkItem.status === "in_progress",
-		"small creates and claims one native task",
+		"small creates and claims one native task under Misc",
 	);
 	assert(
 		state.inlineWork && state.handoffPrompt.includes("WO_INLINE_V1"),
@@ -156,12 +166,12 @@ try {
 	assert(!state.ok && state.reason === "usage", "small empty task stops");
 
 	fixture.reset("ambiguous");
-	state = buildWorkSmallState(fixture.cwd, "Needs explicit epic");
+	state = buildWorkSmallState(fixture.cwd, "Needs a general home");
 	assert(
-		!state.ok && state.reason === "ambiguous-target",
-		"small ambiguous epic stops",
+		state.ok && state.epic.labels.includes("wo:misc"),
+		"small without a current roadmap uses Misc",
 	);
-	assert(fixture.logs().length === 0, "small ambiguous creates nothing");
+	assert(fixture.logs().length === 0, "small Misc routing does not invoke bd");
 
 	fixture.reset("active", "unknown");
 	state = buildWorkSmallState(fixture.cwd, "Dirty should stop");

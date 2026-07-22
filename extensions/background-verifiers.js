@@ -50,6 +50,7 @@ const REPORT_MAX_DEPTH = 20;
 const REPORT_MAX_FINDINGS = 100;
 const REPORT_MAX_TEXT = 10_000;
 const REPORT_CATEGORIES = /^[a-z][a-z0-9-]{0,63}$/;
+const LAUNCH_STATUS_GRACE_MS = 30_000;
 const TERMINAL_SUCCESS_STATES = new Set([
 	"complete",
 	"completed",
@@ -478,11 +479,12 @@ function expectedJobId(batchId, model) {
 	return stableId("job", { batchId, model });
 }
 function jobStatus(operationStatus, launch) {
-	if (launch?.status === "orphaned") return "orphaned";
-	if (launch?.status === "failed") return "failed";
 	const values = Object.values(operationStatus);
-	if (values.every((value) => value === "pending"))
+	if (values.every((value) => value === "pending")) {
+		if (launch?.status === "orphaned") return "orphaned";
+		if (launch?.status === "failed") return "failed";
 		return launch?.status === "running" ? "running" : "queued";
+	}
 	if (values.some((value) => value === "pending")) return "running";
 	if (values.every((value) => value === "failed")) return "failed";
 	if (values.some((value) => value === "failed")) return "partially-failed";
@@ -880,7 +882,7 @@ function cleanupVerifierBatchRuntime(cwd, batchId) {
 	);
 	if (
 		!jobs.length ||
-		jobs.some((job) => ["queued", "running"].includes(job.status))
+		jobs.some((job) => ["queued", "running", "orphaned"].includes(job.status))
 	)
 		return false;
 	const temporaryRoot = path.resolve(os.tmpdir());
@@ -1808,7 +1810,9 @@ function validateResult(job, batch, result) {
 function validateTerminalReport(job, batch, text) {
 	let report;
 	try {
-		report = JSON.parse(text);
+		const trimmed = text.trim();
+		const fenced = trimmed.match(/^```json\s*\n([\s\S]*)\n```$/i);
+		report = JSON.parse(fenced ? fenced[1] : trimmed);
 	} catch {
 		throw error("invalid", "Verifier report is not valid JSON");
 	}
@@ -2000,35 +2004,51 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 		return [];
 	}
 	const reconciled = [];
-	for (const job of Object.values(store.jobs).filter(
-		(item) => item.launch?.status === "running",
+	const currentTime = Date.parse(now(input.now));
+	for (const job of Object.values(store.jobs).filter((item) =>
+		["running", "orphaned"].includes(item.launch?.status),
 	)) {
-		const statusFile = job.launch.asyncDir
-			? path.join(job.launch.asyncDir, "status.json")
-			: "";
-		let status;
-		try {
-			status = JSON.parse(boundedArtifactRead(statusFile).text);
-		} catch {
-			mutateVerifierStore(
-				cwd,
-				(state) => markVerifierOrphaned(state, job.id, input.now),
-				input,
-			);
-			cleanupVerifierBatchRuntime(cwd, job.batchId);
-			reconciled.push(job.id);
-			continue;
-		}
-		const state = terminalState(status);
-		if (
-			!TERMINAL_SUCCESS_STATES.has(state) &&
-			!TERMINAL_FAILURE_STATES.has(state)
-		)
-			continue;
+		let state = "";
+		if (job.launch.status === "running") {
+			const statusFile = job.launch.asyncDir
+				? path.join(job.launch.asyncDir, "status.json")
+				: "";
+			try {
+				state = terminalState(
+					JSON.parse(boundedArtifactRead(statusFile).text),
+				);
+			} catch {
+				const launchedAt = Date.parse(job.launch.launchedAt ?? "");
+				if (
+					Number.isFinite(launchedAt) &&
+					currentTime - launchedAt < LAUNCH_STATUS_GRACE_MS
+				)
+					continue;
+				mutateVerifierStore(
+					cwd,
+					(next) => markVerifierOrphaned(next, job.id, input.now),
+					input,
+				);
+				state = "orphaned";
+			}
+			if (
+				state !== "orphaned" &&
+				!TERMINAL_SUCCESS_STATES.has(state) &&
+				!TERMINAL_FAILURE_STATES.has(state)
+			)
+				continue;
+		} else state = "orphaned";
+
 		let artifact;
 		try {
 			const file = artifactForJob(cwd, job);
-			artifact = { path: file, bytes: lstatSync(file).size };
+			const fileStat = lstatSync(file);
+			if (
+				state === "orphaned" &&
+				currentTime - fileStat.mtimeMs < LAUNCH_STATUS_GRACE_MS
+			)
+				continue;
+			artifact = { path: file, bytes: fileStat.size };
 			const raw = boundedArtifactRead(file);
 			artifact.bytes = raw.bytes;
 			try {
@@ -2063,6 +2083,7 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 				input,
 			);
 		} catch (cause) {
+			if (state === "orphaned" && !artifact) continue;
 			const reason =
 				cause instanceof VerifierStoreError ? cause.category : "artifact";
 			mutateVerifierStore(

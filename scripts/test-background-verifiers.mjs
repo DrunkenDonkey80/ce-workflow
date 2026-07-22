@@ -444,6 +444,39 @@ try {
 		0,
 		"orphaned jobs are never relaunched",
 	);
+	const ambiguousStore = loadVerifierStore(gitCwd);
+	const ambiguousJob = Object.values(ambiguousStore.jobs).find(
+		(job) => job.batchId === ambiguous.batch.id,
+	);
+	const ambiguousCheckpoint = ambiguousStore.batches[ambiguous.batch.id].checkpoint;
+	writeFileSync(
+		ambiguousJob.launch.request.output,
+		`\`\`\`json\n${JSON.stringify({
+			version: 1,
+			jobId: ambiguousJob.id,
+			model: ambiguousJob.model,
+			checkpoint: ambiguousCheckpoint,
+			results: ambiguousJob.operations.map((operation) => ({
+				jobId: ambiguousJob.id,
+				model: ambiguousJob.model,
+				checkpoint: ambiguousCheckpoint,
+				operation,
+				outcome: "no-findings",
+			})),
+		})}\n\`\`\``,
+	);
+	assert.deepEqual(
+		reconcileVerifierRuns(gitCwd, {
+			now: new Date(Date.now() + 60_000).toISOString(),
+		}),
+		[ambiguousJob.id],
+		"late valid output recovers an orphaned launch",
+	);
+	assert.equal(
+		loadVerifierStore(gitCwd).jobs[ambiguousJob.id].status,
+		"completed",
+		"validated operations supersede orphaned launch status",
+	);
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "scoped\n");
 	const scoped = scheduleVerifierBatch(gitCwd, {
 		profiles: [profiles[0]],
@@ -510,6 +543,26 @@ try {
 		requests.length,
 		4,
 		"recovery launches the durable queued job once",
+	);
+	const graceJob = Object.values(loadVerifierStore(gitCwd).jobs).find(
+		(job) => job.batchId === queued.batch.id,
+	);
+	const launchedAt = Date.parse(graceJob.launch.launchedAt);
+	assert.deepEqual(
+		reconcileVerifierRuns(gitCwd, {
+			now: new Date(launchedAt + 1_000).toISOString(),
+		}),
+		[],
+		"missing runtime status stays running during launch grace",
+	);
+	assert.equal(loadVerifierStore(gitCwd).jobs[graceJob.id].status, "running");
+	reconcileVerifierRuns(gitCwd, {
+		now: new Date(launchedAt + 31_000).toISOString(),
+	});
+	assert.equal(
+		loadVerifierStore(gitCwd).jobs[graceJob.id].status,
+		"orphaned",
+		"missing runtime status becomes recoverable orphan after grace",
 	);
 	const linkBlob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
 		cwd: gitCwd,
