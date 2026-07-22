@@ -24,3 +24,12 @@ If project workflow behavior can be handled in code without losing functionality
 ## Continuous Workflow Optimization Rule
 
 Always look for ways to make ce-workflow faster, quieter, more autonomous, and cheaper in tokens/context. Use existing telemetry to spot waste in command flow, role selection, subagent handoffs, retries, output volume, and verification gates. If better telemetry would make the next improvement obvious, add the smallest structured signal needed. When you see a safe improvement to extension behavior, implement and verify it before moving on.
+
+## Dialog UX Rule
+
+Use the shared `extensions/work-dialogs.js` overlay system for every
+ce-workflow selection or checklist menu. Every dialog shows one muted purpose
+line directly below its title. Escape goes to the parent and closes only at the
+root; Enter and Space toggle checklist rows without moving the cursor; parent
+cursors survive submenu round trips; every model list supports keyboard
+filtering. Keep native UI fallbacks for non-TUI modes.

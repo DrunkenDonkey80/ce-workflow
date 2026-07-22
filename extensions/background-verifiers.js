@@ -558,12 +558,17 @@ const PROJECT_AUXILIARY_DIRS = new Set([
 	".vscode",
 	"benchmark",
 	"benchmarks",
+	"build",
 	"coverage",
+	"dist",
 	"doc",
 	"docs",
 	"documentation",
 	"log",
 	"logs",
+	"node_modules",
+	"out",
+	"target",
 ]);
 const PROJECT_TEST_DIRS = new Set([
 	"__tests__",
@@ -687,7 +692,16 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 			);
 		assertNoSnapshotSymlinks(cwd);
 		const workingPaths = snapshotPaths(cwd, head, head, undefined, true);
-		const dirty = workingPaths.length > 0;
+		const snapshotWorkingPaths =
+			scope === "project"
+				? workingPaths.filter((entry) =>
+						projectSourcePath(
+							entry,
+							input.operations?.includes("test-gap") ?? false,
+						),
+					)
+				: workingPaths;
+		const dirty = snapshotWorkingPaths.length > 0;
 		if (scope === "changes" && !dirty)
 			throw error(
 				"not-scheduled",
@@ -701,7 +715,7 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 			);
 			const env = { ...process.env, GIT_INDEX_FILE: temporaryIndex };
 			git(cwd, ["read-tree", head], { env });
-			git(cwd, ["add", "-A", "--", ...workingPaths], { env });
+			git(cwd, ["add", "-A", "--", ...snapshotWorkingPaths], { env });
 			const tree = git(cwd, ["write-tree"], { env });
 			snapshot = git(cwd, ["commit-tree", tree, "-p", head], {
 				env: verifierCommitEnv(env),
@@ -737,7 +751,7 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 		if (!paths.length)
 			throw error("not-scheduled", "Verifier checkpoint has no project files");
 		const patchHash = createHash("sha256")
-			.update(git(cwd, ["diff", "--binary", parent, snapshot]))
+			.update(`${parent}\0${snapshot}`)
 			.digest("hex");
 		return {
 			repository: path.resolve(cwd),

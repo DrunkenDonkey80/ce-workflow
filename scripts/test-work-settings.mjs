@@ -362,7 +362,7 @@ try {
 					lines.some(
 						(line) => line.includes("> ") && line.includes(action.target),
 					),
-					`missing settings choice ${action.target}`,
+					`missing settings choice ${action.target}\n${lines.join("\n")}`,
 				);
 			}
 			action.capture?.(lines);
@@ -384,8 +384,7 @@ try {
 		mode: "rpc",
 		ui: {
 			notify: ctx.ui.notify,
-			select: async (_title, labels) =>
-				labels.find((label) => label.startsWith("done")),
+			select: async () => undefined,
 		},
 	});
 	assert(notices.length === 0, "non-TUI settings fallback exits cleanly");
@@ -397,21 +396,49 @@ try {
 		"status is grouped and readable",
 	);
 	for (const phrase of [
-		"› advisor: model:inherit current",
-		"› advisor 2: model:none",
-		"› advisor 3: model:none",
+		"› Advisor 1: model:inherit current",
+		"› Advisor 2: model:none",
+		"› Advisor 3: model:none",
 		"advisor usage for slice plans: all",
-		"planner writes slice plan before work",
-		"agent slice planner for messy/large slices",
+		"Planner writes slice plan before work",
+		"Agent slice planner for messy/large slices",
 		"ce-plan slice depth: Lightweight",
 		"pre-commit review:",
-		"ce-simplify-code before review",
-		"ce-test-browser when diff touches UI",
+		"CE-simplify-code before review",
+		"CE-test-browser when diff touches UI",
 		"self-improving workflow reporting",
 		"new session between iterations",
 	])
 		assert(notices.at(-1).message.includes(phrase), `status lists ${phrase}`);
 	assert(existsSync(settingsFile()), "settings file exists");
+
+	let profileMenuVisits = 0;
+	let profileChoices = [];
+	await commands["work-settings"].handler("", {
+		...ctx,
+		mode: "rpc",
+		ui: {
+			notify: ctx.ui.notify,
+			select: async (title, labels) => {
+				if (title === "Settings: Global" && profileMenuVisits++ === 0)
+					return labels.find((label) => label.startsWith("Profile:"));
+				if (title === "Choose effort profile") profileChoices = labels;
+				return undefined;
+			},
+		},
+	});
+	assert(
+		profileChoices.every(
+			(label) =>
+				label.includes("Pros:") &&
+				label.includes("Cons:") &&
+				label.includes("Token/time consumption:") &&
+				label.includes("Active settings:") &&
+				label.includes("Work:") &&
+				label.includes("Pre-commit review:"),
+		),
+		"profiles show their full settings instead of a truncated summary",
+	);
 
 	// Global opens first; project overrides are marked and removable in-place.
 	writeGlobalSettings({ workOrchestrator: { advisorVerifyTask: true } });
@@ -423,7 +450,7 @@ try {
 		...ctx,
 		ui: customUi([
 			{
-				target: "coded task-vs-plan checklist",
+				target: "Coded task-vs-plan checklist",
 				expectText: "Settings: Global",
 				key: "\t",
 				capture: (lines) => {
@@ -431,15 +458,15 @@ try {
 				},
 			},
 			{
-				expectInitial: "coded task-vs-plan checklist",
+				expectInitial: "Coded task-vs-plan checklist",
 				expectText: "Settings: Project",
-				key: "backspace",
+				key: "delete",
 				capture: (lines) => {
 					projectScopeRender = lines.join("\n");
 				},
 			},
 			{
-				expectInitial: "coded task-vs-plan checklist",
+				expectInitial: "Coded task-vs-plan checklist",
 				key: "escape",
 				capture: (lines) => {
 					inheritedScopeRender = lines.join("\n");
@@ -448,12 +475,12 @@ try {
 		]),
 	});
 	assert(
-		globalScopeRender.includes("* ✓ on coded task-vs-plan checklist") &&
-			projectScopeRender.includes("* ○ off coded task-vs-plan checklist"),
+		globalScopeRender.includes("* ✓ on Coded task-vs-plan checklist") &&
+			projectScopeRender.includes("* ○ off Coded task-vs-plan checklist"),
 		"local override marker is visible in both scopes",
 	);
 	assert(
-		!inheritedScopeRender.includes("* ✓ on coded task-vs-plan checklist") &&
+		!inheritedScopeRender.includes("* ✓ on Coded task-vs-plan checklist") &&
 			mod.workOrchSettings(cwd).advisorVerifyTask === true &&
 			!Object.hasOwn(
 				readSettings().workOrchestrator ?? {},
@@ -478,9 +505,9 @@ try {
 		...ctx,
 		ui: customUi(
 			[
-				{ target: "advisor usage for slice plans ›", key: "enter" },
+				{ target: "Advisor usage for slice plans ›", key: "enter" },
 				{
-					expectInitial: "advisor usage for slice plans ›",
+					expectInitial: "Advisor usage for slice plans ›",
 					key: "escape",
 				},
 			],
@@ -488,7 +515,7 @@ try {
 				select: async (title, labels) => {
 					if (title === "Advisor usage for slice plans") {
 						globalUsageChoices = labels;
-						return labels.find((label) => label.startsWith("none"));
+						return labels.find((label) => label.startsWith("None"));
 					}
 					return undefined;
 				},
@@ -496,7 +523,7 @@ try {
 		),
 	});
 	assert(
-		globalUsageChoices?.[0]?.startsWith("all"),
+		globalUsageChoices?.[0]?.startsWith("All"),
 		`global enum picker opens on its persisted value: ${JSON.stringify(globalUsageChoices)}`,
 	);
 	assert(
@@ -509,9 +536,9 @@ try {
 		ui: customUi(
 			[
 				{ key: "\t" },
-				{ target: "advisor usage for slice plans ›", key: "enter" },
+				{ target: "Advisor usage for slice plans ›", key: "enter" },
 				{
-					expectInitial: "advisor usage for slice plans ›",
+					expectInitial: "Advisor usage for slice plans ›",
 					key: "escape",
 				},
 			],
@@ -519,7 +546,7 @@ try {
 				select: async (title, labels) => {
 					if (title === "Advisor usage for slice plans") {
 						projectUsageChoices = labels;
-						return labels.find((label) => label.startsWith("all"));
+						return labels.find((label) => label.startsWith("All"));
 					}
 					return undefined;
 				},
@@ -527,7 +554,7 @@ try {
 		),
 	});
 	assert(
-		projectUsageChoices?.[0]?.startsWith("first"),
+		projectUsageChoices?.[0]?.startsWith("First"),
 		"project enum picker opens on its persisted override",
 	);
 	assert(
@@ -537,8 +564,8 @@ try {
 	await commands["work-settings"].handler("", {
 		...ctx,
 		ui: customUi([
-			{ target: "coded task-vs-plan checklist", key: "enter" },
-			{ expectInitial: "coded task-vs-plan checklist", key: "escape" },
+			{ target: "Coded task-vs-plan checklist", key: "enter" },
+			{ expectInitial: "Coded task-vs-plan checklist", key: "escape" },
 		]),
 	});
 	assert(
@@ -561,8 +588,8 @@ try {
 		...ctx,
 		ui: customUi([
 			{ key: "\t" },
-			{ target: "profile ›", key: "backspace" },
-			{ expectInitial: "profile ›", key: "escape" },
+			{ target: "Profile:", key: "delete" },
+			{ expectInitial: "Profile:", key: "escape" },
 		]),
 	});
 	assert(
@@ -582,8 +609,8 @@ try {
 		...ctx,
 		ui: customUi([
 			{ key: "\t" },
-			{ target: "clear project overrides", key: "enter" },
-			{ expectInitial: "clear project overrides", key: "escape" },
+			{ target: "Clear project overrides", key: "enter" },
+			{ expectInitial: "Clear project overrides", key: "escape" },
 		]),
 	});
 	assert(
@@ -605,8 +632,8 @@ try {
 	await commands["work-settings"].handler("", {
 		...ctx,
 		ui: customUi([
-			{ target: "reset global work settings", key: "enter" },
-			{ expectInitial: "reset global work settings", key: "escape" },
+			{ target: "Reset global work settings", key: "enter" },
+			{ expectInitial: "Reset global work settings", key: "escape" },
 		]),
 	});
 	assert(
@@ -628,21 +655,21 @@ try {
 		ui: customUi([
 			{ expectText: "Settings: Global", key: "\t" },
 			{
-				target: "ce-test-browser when diff touches UI",
+				target: "CE-test-browser when diff touches UI",
 				key: " ",
 				capture: (lines) => {
 					enabledRender = lines.join("\n");
 				},
 			},
 			{
-				expectInitial: "ce-test-browser when diff touches UI",
-				target: "coded task-vs-plan checklist",
+				expectInitial: "CE-test-browser when diff touches UI",
+				target: "Coded task-vs-plan checklist",
 				key: "enter",
 				capture: (lines) => {
 					disabledRender = lines.join("\n");
 				},
 			},
-			{ expectInitial: "coded task-vs-plan checklist", key: "escape" },
+			{ expectInitial: "Coded task-vs-plan checklist", key: "escape" },
 		]),
 	});
 	assert(
@@ -676,33 +703,33 @@ try {
 		ui: customUi(
 			[
 				{ expectText: "Settings: Global", key: "\t" },
-				{ target: "review ›", key: "enter" },
+				{ target: "Model Review:", key: "enter" },
 				{
-					expectInitial: "test/gpt-5.6-high",
-					expectText: "Current: test/gpt-5.6-high",
+					expectInitial: "GPT 5.6 High",
+					expectText: "Current: GPT 5.6 High",
 					typeText: "5.6",
-					target: "test/gpt-5.6-mini",
+					target: "GPT 5.6 Mini",
 					key: "enter",
 					capture: (lines) => {
 						filteredModels = lines.join("\n");
 					},
 				},
-				{ expectInitial: "review ›", key: "escape" },
+				{ expectInitial: "Model Review:", key: "escape" },
 			],
 			{
 				select: async (_title, labels) =>
-					labels.find((label) => label.startsWith("high")),
+					labels.find((label) => label.startsWith("High")),
 			},
 		),
 	});
 	settings = readSettings();
 	assert(
-		["gpt-5.6-high", "gpt-5.6-mini", "gpt-5.6-codex"].every((id) =>
-			filteredModels.includes(id),
+		["GPT 5.6 High", "GPT 5.6 Mini", "GPT 5.6 Codex"].every((name) =>
+			filteredModels.includes(name),
 		),
 		"typing filters and keeps all matching models visible",
 	);
-	assert(!filteredModels.includes("test/other"), "filter hides non-matches");
+	assert(!filteredModels.includes("Other Model"), "filter hides non-matches");
 	assert(
 		settings.subagents.agentOverrides["work-reviewer"].model ===
 			"test/gpt-5.6-mini",
@@ -713,43 +740,42 @@ try {
 		"typed model flow still selects effort",
 	);
 
-	// Verifier UI adds independent profiles, rejects duplicates, and removes an
-	// empty worker rather than persisting an invocable zero-operation profile.
+	// Verifier UI uses the shared model/effort flow, starts with Test coverage
+	// at High, and keeps the verifier list as the main submenu.
 	writeGlobalSettings({});
 	writeSettings({});
-	const verifierSelect = {
-		manager: ["add background verifier", "add background verifier", "done"],
-		add: ["test/model-a", "test/model-b"],
-		profile: ["maintainability", "security", "thinking", "done", "done"],
+	const verifierModels = {
+		getAvailable: async () => [
+			{ provider: "test", id: "model-a" },
+			{ provider: "test", id: "model-b" },
+		],
 	};
-	const verifierLabel = (labels, text) =>
-		labels.find((label) => label.includes(text));
+	const firstVerifierChecks = [
+		"Model:",
+		"Maintainability",
+		"Security",
+		"Add background verifier",
+		"Model:",
+		undefined,
+	];
+	const verifierEfforts = ["High", "High"];
 	await commands["work-settings"].handler("", {
 		...ctx,
-		modelRegistry: {
-			getAvailable: async () => [
-				{ provider: "test", id: "model-a" },
-				{ provider: "test", id: "model-b" },
-			],
-		},
+		modelRegistry: verifierModels,
 		ui: customUi(
 			[
-				{ target: "background verifiers ›", key: "enter" },
-				{ expectInitial: "background verifiers ›", key: "escape" },
+				{ target: "Background verifiers ›", key: "enter" },
+				{ target: "test/model-a", key: "enter" },
+				{ target: "test/model-b", key: "enter" },
+				{ expectInitial: "Background verifiers ›", key: "escape" },
 			],
 			{
 				select: async (title, labels) => {
-					if (title === "Background verifiers")
-						return verifierLabel(labels, verifierSelect.manager.shift());
-					if (title === "Add background verifier")
-						return verifierLabel(labels, verifierSelect.add.shift());
-					if (title === "Background verifier: test/model-a")
-						return verifierLabel(labels, verifierSelect.profile.shift());
-					if (title === "Background verifier: test/model-b")
-						return verifierLabel(labels, verifierSelect.profile.shift());
-					if (title === "test/model-a: thinking effort")
-						return verifierLabel(labels, "high");
-					return undefined;
+					const wanted =
+						title === "Background verifier checks"
+							? firstVerifierChecks.shift()
+							: verifierEfforts.shift();
+					return labels.find((label) => label.includes(wanted));
 				},
 			},
 		),
@@ -759,43 +785,32 @@ try {
 			JSON.stringify([
 				{
 					model: "test/model-a",
-					operations: ["correctness", "maintainability", "security"],
+					operations: ["maintainability", "security", "test-gap"],
 					thinking: "high",
 				},
 				{
 					model: "test/model-b",
-					operations: ["correctness"],
-					thinking: "medium",
+					operations: ["test-gap"],
+					thinking: "high",
 				},
 			]),
-		"two verifier profiles round-trip with independent operations and effort",
+		`new verifier profiles default to Test coverage at High: ${JSON.stringify(mod.backgroundVerifierProfiles(cwd))}`,
 	);
 	const duplicateNoticeAt = notices.length;
-	verifierSelect.manager = ["add background verifier", "test/model-b", "done"];
-	verifierSelect.add = ["test/model-a"];
-	verifierSelect.profile = ["correctness"];
+	const duplicateSelections = ["test/model-b", "Model:", "High", undefined];
 	await commands["work-settings"].handler("", {
 		...ctx,
-		modelRegistry: {
-			getAvailable: async () => [
-				{ provider: "test", id: "model-a" },
-				{ provider: "test", id: "model-b" },
-			],
-		},
+		modelRegistry: verifierModels,
 		ui: customUi(
 			[
-				{ target: "background verifiers ›", key: "enter" },
-				{ expectInitial: "background verifiers ›", key: "escape" },
+				{ target: "Background verifiers ›", key: "enter" },
+				{ target: "test/model-a", key: "enter" },
+				{ expectInitial: "Background verifiers ›", key: "escape" },
 			],
 			{
-				select: async (title, labels) => {
-					if (title === "Background verifiers")
-						return verifierLabel(labels, verifierSelect.manager.shift());
-					if (title === "Add background verifier")
-						return verifierLabel(labels, verifierSelect.add.shift());
-					if (title === "Background verifier: test/model-b")
-						return verifierLabel(labels, verifierSelect.profile.shift());
-					return undefined;
+				select: async (_title, labels) => {
+					const wanted = duplicateSelections.shift();
+					return labels.find((label) => label.includes(wanted));
 				},
 			},
 		),
@@ -804,18 +819,11 @@ try {
 		notices
 			.slice(duplicateNoticeAt)
 			.some((notice) => notice.message.includes("already configured")),
-		"duplicate verifier model additions are rejected",
+		"duplicate verifier model selections are rejected",
 	);
 	assert(
-		JSON.stringify(mod.backgroundVerifierProfiles(cwd)) ===
-			JSON.stringify([
-				{
-					model: "test/model-a",
-					operations: ["correctness", "maintainability", "security"],
-					thinking: "high",
-				},
-			]),
-		"removing the final operation removes the verifier profile",
+		mod.backgroundVerifierProfiles(cwd).length === 2,
+		"duplicate selection preserves both verifier profiles",
 	);
 	writeGlobalSettings({
 		workOrchestrator: {
@@ -839,18 +847,18 @@ try {
 		ui: customUi(
 			[
 				{ expectText: "Settings: Global", key: "\t" },
-				{ target: "advisor 2 ›", key: "enter" },
+				{ target: "Model Advisor 2:", key: "enter" },
 				{
-					expectInitial: "none",
-					expectText: "Current: none",
-					target: "use global model setting",
+					expectInitial: "None",
+					expectText: "Current: None",
+					target: "Use global model setting",
 					key: "enter",
 				},
-				{ expectInitial: "advisor 2 ›", key: "escape" },
+				{ expectInitial: "Model Advisor 2:", key: "escape" },
 			],
 			{
 				select: async (_title, labels) =>
-					labels.find((label) => label.startsWith("high")),
+					labels.find((label) => label.startsWith("High")),
 			},
 		),
 	});
@@ -865,13 +873,13 @@ try {
 		...ctx,
 		ui: customUi([
 			{ expectText: "Settings: Global", key: "\t" },
-			{ target: "advisor 2 ›", key: "enter" },
+			{ target: "Model Advisor 2:", key: "enter" },
 			{
-				expectInitial: "use global model setting",
-				target: "none",
+				expectInitial: "Use global model setting",
+				target: "None",
 				key: "enter",
 			},
-			{ expectInitial: "advisor 2 ›", key: "escape" },
+			{ expectInitial: "Model Advisor 2:", key: "escape" },
 		]),
 	});
 	assert(

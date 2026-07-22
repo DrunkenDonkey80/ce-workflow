@@ -574,10 +574,15 @@ try {
 		scope: "changes",
 	});
 	assert.deepEqual(changesCheckpoint.paths, ["tracked.txt", "untracked.txt"]);
+	mkdirSync(path.join(committedCwd, "dist"));
 	mkdirSync(path.join(committedCwd, "docs"));
 	mkdirSync(path.join(committedCwd, "logs"));
 	mkdirSync(path.join(committedCwd, "tests"));
 	mkdirSync(path.join(committedCwd, ".pi"));
+	writeFileSync(
+		path.join(committedCwd, "dist", "app.apk"),
+		"x".repeat(2 * 1024 * 1024),
+	);
 	writeFileSync(path.join(committedCwd, "docs", "guide.md"), "docs\n");
 	writeFileSync(path.join(committedCwd, "logs", "run.log"), "log\n");
 	writeFileSync(path.join(committedCwd, "tests", "tracked.test.js"), "test\n");
@@ -592,6 +597,15 @@ try {
 		scope: "project",
 	});
 	assert.deepEqual(projectCheckpoint.paths, ["tracked.txt", "untracked.txt"]);
+	assert.throws(
+		() =>
+			execFileSync(
+				"git",
+				["cat-file", "-e", `${projectCheckpoint.snapshot}:dist/app.apk`],
+				{ cwd: committedCwd, stdio: "ignore" },
+			),
+		"generated output is not staged into the private project snapshot",
+	);
 	assert.deepEqual(
 		captureVerifierCheckpoint(committedCwd, {
 			scope: "project",
@@ -615,6 +629,7 @@ try {
 					"new\n",
 				);
 				for (const excluded of [
+					"dist",
 					"docs",
 					"logs",
 					"tests",
@@ -686,6 +701,7 @@ try {
 	largeGit("commit", "-qm", "large source");
 	writeFileSync(path.join(largeCwd, "source.js"), `${largeSource}y\n`);
 	largeGit("commit", "-qam", "small change");
+	writeFileSync(path.join(largeCwd, "source.js"), "y\n".repeat(1024 * 1024));
 	const largeSchedule = scheduleVerifierBatch(largeCwd, {
 		profiles: [profiles[0]],
 		checkpoint: captureVerifierCheckpoint(largeCwd, { scope: "project" }),
@@ -699,18 +715,22 @@ try {
 	assert.equal(
 		largeSchedule.status,
 		"queued",
-		`large project archives without stdout buffer limits: ${largeSchedule.reason ?? ""}`,
+		`large dirty source snapshots without stdout buffer limits: ${largeSchedule.reason ?? ""}`,
 	);
 	await largeSchedule.launch;
 
-	// /work-analyze selects all configured models, keeps the current model off
-	// until toggled, confirms the immutable file count, and queues one batch.
+	// /work-analyze resolves a persisted Inherit verifier to the current model,
+	// confirms the immutable file count, and queues one batch without sentinels.
 	mkdirSync(path.join(committedCwd, ".pi"), { recursive: true });
 	writeFileSync(
 		path.join(committedCwd, ".pi", "settings.json"),
 		JSON.stringify({
 			workOrchestrator: {
 				backgroundVerifiers: {
+					__inherit_model__: {
+						operations: ["test-gap"],
+						thinking: "high",
+					},
 					"openai/gpt-5": {
 						operations: ["correctness"],
 						thinking: "high",
@@ -748,24 +768,38 @@ try {
 		},
 	};
 	workModelsExtension(pi);
-	let modelMenu = 0;
+	assert(
+		workModels
+			.backgroundVerifierProfiles(committedCwd)
+			.some((profile) => profile.model === "__inherit_model__"),
+		"Inherit verifier persists without remapping",
+	);
+	let analyzeMenu = 0;
+	let analyzeModelLabels = [];
 	await commands["work-analyze"].handler("", {
 		cwd: committedCwd,
 		mode: "tui",
 		model: { provider: "test", id: "current" },
+		modelRegistry: {
+			getAvailable: async () => [
+				{ provider: "test", id: "current", name: "Current Friendly" },
+				{ provider: "openai", id: "gpt-5", name: "GPT Friendly" },
+			],
+		},
 		ui: {
 			notify: (message, level) => notices.push({ message, level }),
 			select: async (title, labels) => {
-				if (title === "Analysis types")
-					return labels.find((label) => label === "done");
-				if (title === "Verifier models") {
-					modelMenu += 1;
-					return modelMenu === 1
-						? labels.find((label) => label.includes("current model"))
-						: labels.find((label) => label === "done");
+				if (title === "Work analyze") {
+					analyzeMenu += 1;
+					return labels.find((label) =>
+						label.includes(
+							analyzeMenu === 1
+								? "Verifier models"
+								: "Launch background analysis",
+						),
+					);
 				}
-				if (title === "Analysis scope")
-					return labels.find((label) => label.includes("current changes"));
+				if (title === "Verifier models") analyzeModelLabels = labels;
 				return undefined;
 			},
 			confirm: async (_title, message) => {
@@ -774,14 +808,28 @@ try {
 			},
 		},
 	});
+	assert(
+		analyzeModelLabels.some((label) => label.includes("Current Friendly")) &&
+			analyzeModelLabels.some((label) => label.includes("GPT Friendly")),
+		"manual analyzer model picker uses friendly registry names",
+	);
 	await new Promise((resolve) => setImmediate(resolve));
 	const manualBatch = Object.values(
 		loadVerifierStore(committedCwd).batches,
 	).find((batch) =>
 		batch.profiles.some((profile) => profile.model === "test/current"),
 	);
-	assert(manualBatch, "manual analyzer batch persisted");
+	assert(
+		manualBatch,
+		`manual analyzer batch persisted: ${JSON.stringify({ notices, batches: Object.values(loadVerifierStore(committedCwd).batches).map((batch) => batch.profiles) })}`,
+	);
 	assert.equal(manualBatch.profiles.length, 2);
+	assert(
+		manualBatch.profiles.every(
+			(profile) => profile.model !== "__inherit_model__",
+		),
+		"runtime verifier profiles contain concrete model ids",
+	);
 	assert(
 		notices.some((notice) => notice.message.includes(manualBatch.id)),
 		"manual analyzer reports its batch id",

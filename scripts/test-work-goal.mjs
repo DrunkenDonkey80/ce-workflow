@@ -568,6 +568,14 @@ try {
 	assert.equal(compactions.length, 1, "settling does not repeat the request");
 	compactions.length = 0;
 
+	const workflowClaim = (workflowId) =>
+		path.join(
+			cwd,
+			".pi",
+			"work-runs",
+			"claims",
+			`${createHash("sha256").update(workflowId).digest("hex")}.complete`,
+		);
 	const inlineWorkflowPrompt = `work-orchestrator inline execution
 WO_INLINE_V1: complete this medium WorkItem
 Workflow Run ID: wr-compact-resume
@@ -600,23 +608,44 @@ Selected WorkItem: T-1 Preserve workflow state`;
 			messages: [
 				{
 					role: "assistant",
-					content: [{ type: "text", text: "Compaction checkpoint." }],
+					stopReason: "aborted",
+					errorMessage: "Request aborted for manual compaction",
+					content: [],
 				},
 			],
 		},
 		ctx,
 	);
+	const compactedWorkflowClaim = workflowClaim("wr-compact-resume");
+	assert.equal(
+		existsSync(compactedWorkflowClaim),
+		false,
+		"manual compaction does not fail the interrupted work-resume run",
+	);
+	await tempHooks.before_agent_start(
+		{ prompt: sent[0].message, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Finished after compaction." }],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(
+		JSON.parse(readFileSync(compactedWorkflowClaim, "utf8")).outcome,
+		"completed",
+		"resumed work-resume keeps and completes the original workflow run",
+	);
 	sent.length = 0;
 	compactions.length = 0;
 
-	const workflowClaim = (workflowId) =>
-		path.join(
-			cwd,
-			".pi",
-			"work-runs",
-			"claims",
-			`${createHash("sha256").update(workflowId).digest("hex")}.complete`,
-		);
 	const endWithOverflow = async (workflowId) => {
 		await tempHooks.before_agent_start(
 			{

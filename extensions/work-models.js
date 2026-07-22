@@ -29,6 +29,7 @@ import {
 	resolve,
 } from "node:path";
 import { migrateLegacyBeads } from "./legacy-beads-migration.js";
+import { showListDialog } from "./work-dialogs.js";
 import {
 	resolveReportingSource,
 	submitImprovementReport,
@@ -163,7 +164,7 @@ function exposeBundledSubagentAgents() {
 const SLOTS = [
 	{
 		key: "plan",
-		label: "brainstorm/plan/migration",
+		label: "Brainstorm/plan/migration",
 		agents: ["work-planner", "work-migrator"],
 		defaultThinking: "high",
 		description:
@@ -171,28 +172,28 @@ const SLOTS = [
 	},
 	{
 		key: "work",
-		label: "work",
+		label: "Work",
 		agents: ["work-worker", "work-fixer"],
 		defaultThinking: "medium",
 		description: "Implementation and reviewer-requested fixes",
 	},
 	{
 		key: "debug",
-		label: "debug",
+		label: "Debug",
 		agents: ["work-debugger"],
 		defaultThinking: "high",
 		description: "Root-cause investigation and bug fixes",
 	},
 	{
 		key: "review",
-		label: "review",
+		label: "Review",
 		agents: ["work-reviewer"],
 		defaultThinking: "medium",
 		description: "Read-only diff/acceptance/verification review",
 	},
 	{
 		key: "advisor",
-		label: "advisor",
+		label: "Advisor 1",
 		agents: ["work-advisor"],
 		defaultThinking: "high",
 		defaultEnabled: true,
@@ -201,7 +202,7 @@ const SLOTS = [
 	},
 	{
 		key: "advisor2",
-		label: "advisor 2",
+		label: "Advisor 2",
 		agents: ["work-advisor-2"],
 		defaultThinking: "high",
 		defaultEnabled: false,
@@ -209,7 +210,7 @@ const SLOTS = [
 	},
 	{
 		key: "advisor3",
-		label: "advisor 3",
+		label: "Advisor 3",
 		agents: ["work-advisor-3"],
 		defaultThinking: "high",
 		defaultEnabled: false,
@@ -300,23 +301,49 @@ const EFFORT_PROFILES = {
 	},
 };
 const DEFAULT_PROFILE = "medium";
+const PROFILE_GUIDANCE = {
+	low: {
+		summary: "Lean execution for small, familiar, low-risk changes.",
+		pros: "Fastest feedback and lowest token use.",
+		cons: "Skips review and browser/simplification gates; weaker on ambiguity.",
+		consumption: "Lowest tokens · shortest time",
+	},
+	medium: {
+		summary: "Balanced default for ordinary product and maintenance work.",
+		pros: "Good coverage with one advisor, browser checks, and light review.",
+		cons: "Uses more time and tokens than Low; skips deeper planning gates.",
+		consumption: "Moderate tokens · moderate time",
+	},
+	high: {
+		summary: "Thorough planning and review for important or complex work.",
+		pros: "All advisors, agent planning, simplification, browser checks, and review.",
+		cons: "Higher latency and token use, especially with several advisors.",
+		consumption: "High tokens · longer time",
+	},
+	max: {
+		summary: "Maximum scrutiny for risky, broad, or release-critical changes.",
+		pros: "Deep planning, maximum core effort, and full code review.",
+		cons: "Slowest and most expensive; unnecessary for routine changes.",
+		consumption: "Highest tokens · longest time",
+	},
+};
 const WORK_ORCH_BOOLEANS = [
-	{ key: "advisorVerifyTask", label: "coded task-vs-plan checklist" },
+	{ key: "advisorVerifyTask", label: "Coded task-vs-plan checklist" },
 	{
 		key: "slicePlanBeforeWork",
-		label: "planner writes slice plan before work",
+		label: "Planner writes slice plan before work",
 	},
 	{
 		key: "slicePlanWithCePlan",
-		label: "agent slice planner for messy/large slices",
+		label: "Agent slice planner for messy/large slices",
 	},
 	{
 		key: "simplifyBeforeReview",
-		label: "ce-simplify-code before review",
+		label: "CE-simplify-code before review",
 	},
 	{
 		key: "browserTestsOnUiDiff",
-		label: "ce-test-browser when diff touches UI",
+		label: "CE-test-browser when diff touches UI",
 	},
 ];
 const SLICE_PLAN_ADVISOR_USAGE = ["none", "first", "all"];
@@ -377,6 +404,7 @@ const contextCompactState = {
 };
 let manualMicrocompactPending = false;
 let manualMicrocompactResumePrompt = null;
+let manualMicrocompactWorkflowRunId = null;
 let workAgentCompactionResume = null;
 let pendingWorkPrompt = null;
 const pendingDirtyRecoveries = new Map();
@@ -2587,6 +2615,23 @@ function backgroundVerifierProfiles(cwd, settings) {
 	}
 }
 
+function runnableBackgroundVerifierProfiles(cwd, currentModel) {
+	const profiles = backgroundVerifierProfiles(cwd);
+	if (!profiles.some((profile) => profile.model === INHERIT_MODEL))
+		return profiles;
+	if (!currentModel)
+		return profiles.filter((profile) => profile.model !== INHERIT_MODEL);
+	if (profiles.some((profile) => profile.model === currentModel))
+		return profiles.filter((profile) => profile.model !== INHERIT_MODEL);
+	return normalizeEffectiveProfiles(
+		profiles.map((profile) =>
+			profile.model === INHERIT_MODEL
+				? { ...profile, model: currentModel }
+				: profile,
+		),
+	);
+}
+
 function effectiveBackgroundVerifierMap(cwd) {
 	const global = backgroundVerifierMap(readGlobalSettings());
 	const project = backgroundVerifierMap(readSettings(cwd));
@@ -2777,34 +2822,76 @@ function browserTestsOnUiDiffStep() {
 	].join("\n");
 }
 
-function slotSummary(slot, settings) {
+function titleCase(value) {
+	return String(value).replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function modelDisplayName(model, names = new Map()) {
+	if (!model || model === INHERIT_MODEL) return "Inherit";
+	if (model === NONE_MODEL) return "None";
+	return names.get(model) ?? model;
+}
+
+function modelEffortSummary(model, thinking, names) {
+	return `${modelDisplayName(model, names)}: ${titleCase(thinking)}`;
+}
+
+function slotSelection(slot, settings) {
 	if (isAdvisorSlot(slot) && !advisorEnabledForSlot(settings, slot))
-		return "model:none • effort:high";
+		return { model: NONE_MODEL, thinking: slot.defaultThinking };
 	const current = settings.subagents?.agentOverrides ?? {};
-	const model = commonValue(slot.agents.map((agent) => current[agent]?.model));
-	const thinking = commonValue(
-		slot.agents.map((agent) => current[agent]?.thinking),
-	);
-	return `model:${model ?? "inherit current"} • effort:${thinking ?? `default ${slot.defaultThinking}`}`;
+	return {
+		model: commonValue(slot.agents.map((agent) => current[agent]?.model)),
+		thinking:
+			commonValue(slot.agents.map((agent) => current[agent]?.thinking)) ??
+			slot.defaultThinking,
+	};
 }
 
-function labelFor(item) {
-	return roadmapTerminology(
-		item.description ? `${item.label} — ${item.description}` : item.label,
-	);
+function slotSummary(slot, settings) {
+	const { model, thinking } = slotSelection(slot, settings);
+	return `model:${model === NONE_MODEL ? "none" : (model ?? "inherit current")} • effort:${thinking}`;
 }
 
-async function choose(ctx, title, items, currentValue) {
-	const choices =
-		currentValue === undefined
-			? items
-			: [
-					...items.filter((item) => item.value === currentValue),
-					...items.filter((item) => item.value !== currentValue),
-				];
-	const labels = choices.map(labelFor);
-	const selected = await ctx.ui.select(roadmapTerminology(title), labels);
-	return choices[labels.indexOf(selected)]?.value;
+async function modelDisplayNames(ctx) {
+	try {
+		return new Map(
+			(await ctx.modelRegistry.getAvailable()).map((model) => [
+				`${model.provider}/${model.id}`,
+				model.name ?? `${model.provider}/${model.id}`,
+			]),
+		);
+	} catch {
+		return new Map();
+	}
+}
+
+function profileDescription(key) {
+	const profile = EFFORT_PROFILES[key];
+	const guidance = PROFILE_GUIDANCE[key];
+	return [
+		guidance.summary,
+		`Pros: ${guidance.pros}`,
+		`Cons: ${guidance.cons}`,
+		`Token/time consumption: ${guidance.consumption}`,
+		"Active settings:",
+		...SLOTS.map((slot) => `  ${slot.label}: ${titleCase(profile[slot.key])}`),
+		`  Slice-plan advisors: ${titleCase(profile.advisorUsageForSlicePlans)}`,
+		`  Agent slice planning: ${profile.slicePlanWithCePlan ? profile.slicePlanCeDepth : "Off"}`,
+		`  Simplify before review: ${profile.simplifyBeforeReview ? "On" : "Off"}`,
+		`  Browser tests on UI changes: ${profile.browserTestsOnUiDiff ? "On" : "Off"}`,
+		`  Pre-commit review: ${titleCase(profile.codeReviewBeforeCommit)}`,
+	].join("\n");
+}
+
+async function choose(ctx, title, items, currentValue, options = {}) {
+	const selected = await showListDialog(ctx, {
+		title: roadmapTerminology(title),
+		items,
+		currentValue,
+		...options,
+	});
+	return selected?.value;
 }
 
 async function modelItems(ctx, allowNone = false, projectScope = false) {
@@ -2812,26 +2899,31 @@ async function modelItems(ctx, allowNone = false, projectScope = false) {
 	if (allowNone)
 		items.push({
 			value: NONE_MODEL,
-			label: "none",
-			description: "do not run this advisor",
+			label: "None",
+			description: "Do not run this advisor",
 		});
 	items.push({
 		value: INHERIT_MODEL,
 		label: projectScope
-			? "use global model setting"
-			: "inherit current control-session model",
+			? "Use global model setting"
+			: "Inherit current control-session model",
 		description: projectScope
-			? "remove the project model override"
+			? "Remove the project model override"
 			: ctx.model
 				? `${ctx.model.provider}/${ctx.model.id}`
-				: "subagent inherits whatever /model is active",
+				: "Subagent inherits whatever /model is active",
 	});
 
 	try {
 		const models = await ctx.modelRegistry.getAvailable();
 		for (const model of models) {
 			const id = `${model.provider}/${model.id}`;
-			items.push({ value: id, label: id, description: model.name ?? "" });
+			items.push({
+				value: id,
+				label: model.name ?? id,
+				description: model.name ? id : "",
+				preserveCase: true,
+			});
 		}
 	} catch (error) {
 		ctx.ui.notify(
@@ -2893,16 +2985,6 @@ function thinkingItemsFor(slot, settings, projectScope = false) {
 	};
 }
 
-function matchesModelQuery(item, query) {
-	const needle = query.trim().toLowerCase();
-	return (
-		!needle ||
-		[item.value, item.label, item.description]
-			.filter(Boolean)
-			.some((value) => String(value).toLowerCase().includes(needle))
-	);
-}
-
 async function chooseModel(
 	ctx,
 	title,
@@ -2911,176 +2993,104 @@ async function chooseModel(
 	projectScope = false,
 ) {
 	const items = await modelItems(ctx, allowNone, projectScope);
-	const inherit = items.find((item) => item.value === INHERIT_MODEL);
-	let currentText = currentModel;
-	if (currentModel === INHERIT_MODEL)
-		currentText = `inherit (${inherit?.description ?? "control-session model"})`;
-	else if (currentModel === NONE_MODEL) currentText = "none";
-	if ((ctx.mode && ctx.mode !== "tui") || typeof ctx.ui.custom !== "function") {
-		return choose(
-			ctx,
-			title,
-			items.map((item) =>
-				item.value === currentModel
-					? { ...item, label: `${item.label} (current)` }
-					: item,
-			),
-		);
-	}
-
-	return ctx.ui.custom((tui, theme, keybindings, done) => {
-		let query = "";
-		let filtered = items;
-		let selectedIndex = Math.max(
-			0,
-			items.findIndex((item) => item.value === currentModel),
-		);
-		const applyFilter = () => {
-			filtered = items.filter((item) => matchesModelQuery(item, query));
-			selectedIndex = 0;
-		};
-
-		return {
-			render(width) {
-				const lines = [
-					theme.fg("accent", theme.bold(title)),
-					theme.fg("dim", fitUiLine(`Current: ${currentText}`, width)),
-					fitUiLine(`Search: ${query}▌`, width),
-					"",
-				];
-				if (filtered.length === 0) {
-					lines.push(theme.fg("warning", "  No matching models"));
-				} else {
-					const visible = Math.min(filtered.length, 10);
-					const start = Math.max(
-						0,
-						Math.min(
-							selectedIndex - Math.floor(visible / 2),
-							filtered.length - visible,
-						),
-					);
-					for (let index = start; index < start + visible; index += 1) {
-						const item = filtered[index];
-						const current = item.value === currentModel ? "  (current)" : "";
-						const description = item.description ? `  ${item.description}` : "";
-						const line = fitUiLine(
-							`${index === selectedIndex ? "> " : "  "}${item.label}${current}${description}`,
-							width,
-						);
-						lines.push(
-							index === selectedIndex
-								? theme.fg("accent", line)
-								: item.value === currentModel
-									? theme.fg("success", line)
-									: line,
-						);
-					}
-					if (filtered.length > visible)
-						lines.push(
-							theme.fg("dim", `  (${selectedIndex + 1}/${filtered.length})`),
-						);
-				}
-				lines.push(
-					"",
-					theme.fg(
-						"dim",
-						fitUiLine(
-							"  Type to filter · ↑↓ navigate · Enter select · Esc cancel",
-							width,
-						),
-					),
-				);
-				return lines;
-			},
-			handleInput(data) {
-				if (keybindings.matches(data, "tui.select.up")) {
-					if (filtered.length)
-						selectedIndex =
-							(selectedIndex - 1 + filtered.length) % filtered.length;
-				} else if (keybindings.matches(data, "tui.select.down")) {
-					if (filtered.length)
-						selectedIndex = (selectedIndex + 1) % filtered.length;
-				} else if (keybindings.matches(data, "tui.select.confirm")) {
-					if (filtered[selectedIndex]) done(filtered[selectedIndex].value);
-					return;
-				} else if (keybindings.matches(data, "tui.select.cancel")) {
-					done(undefined);
-					return;
-				} else if (
-					keybindings.matches(data, "tui.editor.deleteCharBackward") ||
-					data === "\b" ||
-					data === "\x7f"
-				) {
-					query = [...query].slice(0, -1).join("");
-					applyFilter();
-				} else if (keybindings.matches(data, "tui.editor.deleteToLineStart")) {
-					query = "";
-					applyFilter();
-				} else {
-					const text = data
-						.replace(/^\x1b\[200~/, "")
-						.replace(/\x1b\[201~$/, "");
-					if (!text || /[\x00-\x1f\x7f]/u.test(text)) return;
-					query += text;
-					applyFilter();
-				}
-				tui.requestRender();
-			},
-			invalidate() {},
-		};
+	const current = items.find((item) => item.value === currentModel);
+	return choose(ctx, title, items, currentModel, {
+		forceCustom: true,
+		subtitle: `Current: ${current?.label ?? modelDisplayName(currentModel)}`,
 	});
 }
 
+async function chooseModelAndEffort(
+	ctx,
+	{
+		title,
+		currentModel = INHERIT_MODEL,
+		currentThinking,
+		allowNone = false,
+		projectScope = false,
+		effortItems,
+	},
+) {
+	let model = currentModel;
+	for (;;) {
+		const selectedModel = await chooseModel(
+			ctx,
+			`${title}: choose model`,
+			model,
+			allowNone,
+			projectScope,
+		);
+		if (selectedModel === undefined) return;
+		if (selectedModel === NONE_MODEL)
+			return { model: selectedModel, thinking: currentThinking };
+		model = selectedModel;
+		const thinking = await choose(
+			ctx,
+			`${title}: choose effort`,
+			effortItems,
+			currentThinking,
+		);
+		if (thinking !== undefined) return { model, thinking };
+	}
+}
+
 async function editSlotModel(ctx, settings, slot, scope) {
-	let currentModel =
-		overrides(settings)[slot.agents[0]]?.model ?? INHERIT_MODEL;
-	if (isAdvisorSlot(slot) && !advisorEnabledForSlot(settings, slot))
-		currentModel = NONE_MODEL;
-	const model = await chooseModel(
-		ctx,
-		`${slot.label}: choose model`,
-		currentModel,
-		isAdvisorSlot(slot),
+	const current = slotSelection(slot, settings);
+	const { selectedThinking, items } = thinkingItemsFor(
+		slot,
+		settings,
 		scope === "project",
 	);
-	if (model === undefined) return false;
-	if (model === NONE_MODEL) {
+	const selected = await chooseModelAndEffort(ctx, {
+		title: `Model ${slot.label}`,
+		currentModel: current.model ?? INHERIT_MODEL,
+		currentThinking: selectedThinking ?? DEFAULT_THINKING,
+		allowNone: isAdvisorSlot(slot),
+		projectScope: scope === "project",
+		effortItems: items,
+	});
+	if (!selected) return false;
+	if (selected.model === NONE_MODEL) {
 		setAdvisorEnabled(settings, slot, false);
 		writeScopedSettings(ctx.cwd, scope, settings);
 		ctx.ui.notify(`Saved ${slot.label}: model:none`, "info");
 		return true;
 	}
 	if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
-	const { selectedThinking, items } = thinkingItemsFor(
-		slot,
-		settings,
-		scope === "project",
-	);
-	const thinking = await choose(
-		ctx,
-		`${slot.label}: choose effort${selectedThinking ? ` (current ${selectedThinking})` : ""}`,
-		items,
-		selectedThinking,
-	);
-	if (thinking === undefined) return false;
-	setSlot(settings, slot, model, thinking);
+	setSlot(settings, slot, selected.model, selected.thinking);
 	writeScopedSettings(ctx.cwd, scope, settings);
 	ctx.ui.notify(`Saved ${slot.label}: ${slotSummary(slot, settings)}`, "info");
 	return true;
 }
 
-function backgroundVerifierSummary(profile) {
-	return `${profile.operations.join(", ")} • effort:${profile.thinking}`;
+function verifierOperationLabel(operation) {
+	return operation === "test-gap"
+		? "Test coverage"
+		: operation.replaceAll("-", " ");
 }
 
-async function chooseBackgroundVerifierModel(ctx) {
-	const models = (await modelItems(ctx)).filter(
-		(item) => item.value !== INHERIT_MODEL && item.value !== NONE_MODEL,
-	);
-	return choose(ctx, "Add background verifier", models);
+function backgroundVerifierSummary(profile, names) {
+	return `${modelEffortSummary(profile.model, profile.thinking, names)} · ${profile.operations.map(verifierOperationLabel).join(", ")}`;
 }
 
-async function editBackgroundVerifierProfile(ctx, scope, model) {
+function replaceBackgroundVerifierProfile(settings, scope, oldModel, profile) {
+	if (oldModel === profile.model) {
+		setBackgroundVerifierProfile(settings, profile);
+		return;
+	}
+	if (oldModel)
+		removeBackgroundVerifierProfile(
+			settings,
+			oldModel,
+			scope === "project" &&
+				owns(backgroundVerifierMap(readGlobalSettings()), oldModel),
+		);
+	setBackgroundVerifierProfile(settings, profile);
+}
+
+async function editBackgroundVerifierProfile(ctx, scope, initialModel) {
+	let model = initialModel;
+	const names = await modelDisplayNames(ctx);
 	for (;;) {
 		const scoped = readScopedSettings(ctx.cwd, scope);
 		const profiles = backgroundVerifierProfiles(
@@ -3091,53 +3101,85 @@ async function editBackgroundVerifierProfile(ctx, scope, model) {
 		if (!profile) return;
 		const local = owns(backgroundVerifierMap(scoped), model);
 		const items = [
+			{
+				kind: "model",
+				value: "model",
+				label: `Model: [${modelEffortSummary(profile.model, profile.thinking, names)}] ${SUBMENU_ARROW}`,
+				description: "Choose the verifier model, then its thinking effort",
+			},
 			...BACKGROUND_VERIFIER_OPERATIONS.map((operation) => ({
 				kind: "operation",
 				value: operation,
-				...boolLabel(operation, profile.operations.includes(operation)),
+				...boolLabel(
+					verifierOperationLabel(operation),
+					profile.operations.includes(operation),
+				),
 			})),
 			{
-				kind: "thinking",
-				value: "thinking",
-				label: `thinking ${SUBMENU_ARROW}`,
-				description: profile.thinking,
+				kind: "add",
+				value: "add",
+				label: `Add background verifier ${SUBMENU_ARROW}`,
+				description:
+					"Start with Test coverage enabled and Model: [Inherit: High]",
 			},
 			...(scope === "project" && local
 				? [
 						{
 							kind: "inherit",
 							value: "inherit",
-							label: "use global profile",
-							description: "remove this project profile override",
+							label: "Use global profile",
+							description: "Remove this project profile override",
 						},
 					]
 				: []),
 			{
 				kind: "remove",
 				value: "remove",
-				label: "remove profile",
-				description: "disable this verifier for future checkpoints",
+				label: "Remove profile",
+				description: "Disable this verifier for future checkpoints",
 			},
-			{ kind: "done", value: "done", label: "done" },
 		];
-		const choice = await choose(ctx, `Background verifier: ${model}`, items);
-		if (!choice || choice === "done") return;
-		if (choice === "thinking") {
-			const thinking = await choose(
-				ctx,
-				`${model}: thinking effort`,
-				THINKING_LEVELS.map((value) => ({
+		const choice = await choose(
+			ctx,
+			"Background verifier checks",
+			items,
+			undefined,
+			{ cursorKey: `background-verifier:${model}` },
+		);
+		if (!choice) return;
+		if (choice === "model") {
+			const selected = await chooseModelAndEffort(ctx, {
+				title: "Background verifier model",
+				currentModel: profile.model,
+				currentThinking: profile.thinking,
+				effortItems: THINKING_LEVELS.map((value) => ({
 					value,
 					label: value,
-					description: "persisted verifier thinking level",
+					description: "Persisted verifier thinking level",
 				})),
-				profile.thinking,
-			);
-			if (thinking === undefined) continue;
-			setBackgroundVerifierProfile(scoped, { ...profile, thinking });
+			});
+			if (!selected) continue;
+			if (
+				profiles.some(
+					(entry) =>
+						entry.model === selected.model && entry.model !== profile.model,
+				)
+			) {
+				ctx.ui.notify(
+					`Background verifier already configured: ${modelDisplayName(selected.model, names)}`,
+					"warning",
+				);
+				continue;
+			}
+			replaceBackgroundVerifierProfile(scoped, scope, model, {
+				...profile,
+				...selected,
+			});
 			writeScopedSettings(ctx.cwd, scope, scoped);
+			model = selected.model;
 			continue;
 		}
+		if (choice === "add") return { action: "add" };
 		if (choice === "inherit") {
 			clearBackgroundVerifierOverride(scoped, model);
 			writeScopedSettings(ctx.cwd, scope, scoped);
@@ -3156,7 +3198,7 @@ async function editBackgroundVerifierProfile(ctx, scope, model) {
 		const operations = profile.operations.includes(choice)
 			? profile.operations.filter((operation) => operation !== choice)
 			: [...profile.operations, choice];
-		if (operations.length === 0) {
+		if (!operations.length) {
 			removeBackgroundVerifierProfile(
 				scoped,
 				model,
@@ -3164,7 +3206,10 @@ async function editBackgroundVerifierProfile(ctx, scope, model) {
 					owns(backgroundVerifierMap(readGlobalSettings()), model),
 			);
 			writeScopedSettings(ctx.cwd, scope, scoped);
-			ctx.ui.notify(`Removed ${model}: no operations enabled`, "info");
+			ctx.ui.notify(
+				`Removed ${modelDisplayName(model, names)}: no checks enabled`,
+				"info",
+			);
 			return;
 		}
 		setBackgroundVerifierProfile(scoped, { ...profile, operations });
@@ -3172,50 +3217,71 @@ async function editBackgroundVerifierProfile(ctx, scope, model) {
 	}
 }
 
+function addBackgroundVerifierProfile(ctx, scope) {
+	const scoped = readScopedSettings(ctx.cwd, scope);
+	const profiles = backgroundVerifierProfiles(
+		ctx.cwd,
+		scope === "global" ? scoped : undefined,
+	);
+	if (profiles.some((profile) => profile.model === INHERIT_MODEL)) {
+		ctx.ui.notify(
+			"Change the existing inherited verifier model before adding another profile",
+			"warning",
+		);
+		return false;
+	}
+	setBackgroundVerifierProfile(scoped, {
+		model: INHERIT_MODEL,
+		operations: ["test-gap"],
+		thinking: "high",
+	});
+	writeScopedSettings(ctx.cwd, scope, scoped);
+	return true;
+}
+
 async function editBackgroundVerifiers(ctx, scope) {
+	let openModel;
 	for (;;) {
 		const scoped = readScopedSettings(ctx.cwd, scope);
-		const profiles = backgroundVerifierProfiles(
+		let profiles = backgroundVerifierProfiles(
 			ctx.cwd,
 			scope === "global" ? scoped : undefined,
 		);
-		const items = [
-			{
-				kind: "add",
-				value: "add",
-				label: "add background verifier",
-				description: "choose an available registry model",
-			},
-			...profiles.map((profile) => ({
-				kind: "profile",
-				value: profile.model,
-				label: `${profile.model} ${SUBMENU_ARROW}`,
-				description: backgroundVerifierSummary(profile),
-			})),
-			{ kind: "done", value: "done", label: "done" },
-		];
-		const selected = await choose(ctx, "Background verifiers", items);
-		if (!selected || selected === "done") return;
-		if (selected === "add") {
-			const model = await chooseBackgroundVerifierModel(ctx);
-			if (!model) continue;
-			if (profiles.some((profile) => profile.model === model)) {
-				ctx.ui.notify(
-					`Background verifier already configured: ${model}`,
-					"warning",
-				);
-				continue;
-			}
-			setBackgroundVerifierProfile(scoped, {
-				model,
-				operations: ["correctness"],
-				thinking: "medium",
-			});
-			writeScopedSettings(ctx.cwd, scope, scoped);
-			await editBackgroundVerifierProfile(ctx, scope, model);
+		if (!profiles.length) {
+			addBackgroundVerifierProfile(ctx, scope);
+			profiles = backgroundVerifierProfiles(
+				ctx.cwd,
+				scope === "global" ? readScopedSettings(ctx.cwd, scope) : undefined,
+			);
+		}
+		if (openModel || profiles.length === 1) {
+			const model = openModel ?? profiles[0].model;
+			openModel = undefined;
+			const result = await editBackgroundVerifierProfile(ctx, scope, model);
+			if (result?.action !== "add") return;
+			if (addBackgroundVerifierProfile(ctx, scope)) openModel = INHERIT_MODEL;
 			continue;
 		}
-		await editBackgroundVerifierProfile(ctx, scope, selected);
+		const names = await modelDisplayNames(ctx);
+		const selected = await choose(ctx, "Background verifiers", [
+			...profiles.map((profile) => ({
+				value: profile.model,
+				label: `Model: [${modelEffortSummary(profile.model, profile.thinking, names)}] ${SUBMENU_ARROW}`,
+				description: profile.operations.map(verifierOperationLabel).join(", "),
+			})),
+			{
+				value: "add",
+				label: `Add background verifier ${SUBMENU_ARROW}`,
+				description:
+					"Start with Test coverage enabled and Model: [Inherit: High]",
+			},
+		]);
+		if (!selected) return;
+		if (selected === "add") {
+			if (addBackgroundVerifierProfile(ctx, scope)) openModel = INHERIT_MODEL;
+			continue;
+		}
+		openModel = selected;
 	}
 }
 
@@ -3441,6 +3507,7 @@ function runManualMicrocompact(ctx) {
 	if (typeof ctx.compact !== "function") {
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
+		manualMicrocompactWorkflowRunId = null;
 		ctx.ui.notify("Microcompaction is unavailable in this mode", "warning");
 		return false;
 	}
@@ -3503,8 +3570,9 @@ function requestManualMicrocompact(ctx) {
 	}
 	if (ctx.isIdle?.() !== false) return runManualMicrocompact(ctx);
 	manualMicrocompactPending = true;
-	manualMicrocompactResumePrompt =
-		activeWorkAgent?.prompt ?? pendingWorkPrompt?.prompt ?? null;
+	const workflow = activeWorkAgent ?? pendingWorkPrompt;
+	manualMicrocompactResumePrompt = workflow?.prompt ?? null;
+	manualMicrocompactWorkflowRunId = workflow?.meta?.workflowRunId ?? null;
 	ctx.ui.notify("Microcompaction queued for the next idle boundary", "info");
 	return true;
 }
@@ -6636,7 +6704,7 @@ function createPiSubagentsVerifierAdapter(pi) {
 }
 
 function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
-	const profiles = backgroundVerifierProfiles(cwd);
+	const profiles = runnableBackgroundVerifierProfiles(cwd, input.currentModel);
 	return scheduleVerifierBatch(cwd, {
 		profiles,
 		origin: input.origin ?? "normal",
@@ -6645,26 +6713,21 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 	});
 }
 
-async function chooseAnalyzeValues(ctx, title, values, selected) {
-	const enabled = new Set(selected);
-	for (;;) {
-		const choice = await choose(ctx, title, [
-			...values.map(({ value, label = value, description }) => ({
+async function chooseAnalyzeValues(ctx, title, values, selected, options = {}) {
+	const result = await showListDialog(ctx, {
+		title,
+		items: values.map(
+			({ value, label = value, description, preserveCase }) => ({
 				value,
+				label,
 				description,
-				...boolLabel(label, enabled.has(value)),
-			})),
-			{ value: "done", label: "done" },
-		]);
-		if (!choice) return;
-		if (choice === "done") {
-			if (enabled.size) return [...enabled];
-			ctx.ui.notify(`Select at least one ${title.toLowerCase()}`, "warning");
-			continue;
-		}
-		if (enabled.has(choice)) enabled.delete(choice);
-		else enabled.add(choice);
-	}
+				preserveCase,
+			}),
+		),
+		multi: { selected, requireOne: true },
+		...options,
+	});
+	return result?.values;
 }
 
 async function handleWorkAnalyzeCommand(_args, ctx, pi) {
@@ -6672,33 +6735,30 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 		ctx.ui.notify("/work-analyze requires an interactive UI", "warning");
 		return;
 	}
-	const configured = backgroundVerifierProfiles(ctx.cwd);
-	const operations = await chooseAnalyzeValues(
-		ctx,
-		"Analysis types",
-		BACKGROUND_VERIFIER_OPERATIONS.map((value) => ({
-			value,
-			label: value === "test-gap" ? "test coverage" : value,
-		})),
-		BACKGROUND_VERIFIER_OPERATIONS,
-	);
-	if (!operations) return;
 	const currentModel = ctx.model
 		? `${ctx.model.provider}/${ctx.model.id}`
 		: undefined;
+	const configured = runnableBackgroundVerifierProfiles(ctx.cwd, currentModel);
+	const names = await modelDisplayNames(ctx);
+	const operationOptions = BACKGROUND_VERIFIER_OPERATIONS.map((value) => ({
+		value,
+		label: verifierOperationLabel(value),
+	}));
 	const modelOptions = [
 		...configured.map((profile) => ({
 			value: profile.model,
-			label: profile.model,
-			description: `configured background verifier · ${profile.thinking}`,
+			label: modelDisplayName(profile.model, names),
+			description: `${profile.model} · Configured background verifier · ${titleCase(profile.thinking)}`,
+			preserveCase: true,
 		})),
 		...(currentModel &&
 		!configured.some((profile) => profile.model === currentModel)
 			? [
 					{
 						value: currentModel,
-						label: `${currentModel} (current model)`,
-						description: "fresh isolated verifier · off by default",
+						label: `${modelDisplayName(currentModel, names)} (current model)`,
+						description: `${currentModel} · Fresh isolated verifier · off by default`,
+						preserveCase: true,
 					},
 				]
 			: []),
@@ -6710,92 +6770,146 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 		);
 		return;
 	}
-	const models = await chooseAnalyzeValues(
-		ctx,
-		"Verifier models",
-		modelOptions,
-		configured.map((profile) => profile.model),
-	);
-	if (!models) return;
 	let hasParent = true;
 	try {
 		run(ctx.cwd, "git", ["rev-parse", "HEAD^"]);
 	} catch {
 		hasParent = false;
 	}
-	const scope = await choose(ctx, "Analysis scope", [
+	const scopeOptions = [
 		{
 			value: "changes",
-			label: "current changes",
-			description: "staged, unstaged, and untracked non-ignored files",
+			label: "Current changes",
+			description: "Staged, unstaged, and untracked non-ignored files",
 		},
 		...(hasParent
 			? [
 					{
 						value: "commit",
-						label: "last commit",
+						label: "Last commit",
 						description: "HEAD^..HEAD; ignores current working changes",
 					},
 				]
 			: []),
 		{
 			value: "project",
-			label: "whole project",
+			label: "Whole project",
 			description:
-				"source files; tests included only when test coverage is selected",
+				"Source files; tests included only when Test coverage is selected",
 		},
 		{
 			value: "custom",
-			label: "custom paths or globs",
-			description: "repository-relative, comma or newline separated",
+			label: "Custom paths or globs",
+			description: "Repository-relative, comma or newline separated",
 		},
-	]);
-	if (!scope) return;
+	];
+	let operations = [...BACKGROUND_VERIFIER_OPERATIONS];
+	let models = configured.map((profile) => profile.model);
+	let scope = "changes";
 	let patterns;
-	if (scope === "custom") {
-		const text = await ctx.ui.editor("Custom analysis paths or globs", "");
-		if (!text?.trim()) return;
-		patterns = text
-			.split(/[\n,]/)
-			.map((value) => value.trim())
-			.filter(Boolean);
-	}
-	let checkpoint;
-	try {
-		checkpoint = captureVerifierCheckpoint(ctx.cwd, {
-			scope,
-			patterns,
+	for (;;) {
+		const action = await choose(ctx, "Work analyze", [
+			{
+				value: "operations",
+				label: `Analysis checks: [${operations.length} selected] ${SUBMENU_ARROW}`,
+				description: operations.map(verifierOperationLabel).join(", "),
+			},
+			{
+				value: "models",
+				label: `Verifier models: [${models.length} selected] ${SUBMENU_ARROW}`,
+				description: models.join(", "),
+			},
+			{
+				value: "scope",
+				label: `Analysis scope: [${scopeOptions.find((item) => item.value === scope)?.label ?? scope}] ${SUBMENU_ARROW}`,
+				description:
+					scope === "custom" && patterns?.length
+						? patterns.join(", ")
+						: scopeOptions.find((item) => item.value === scope)?.description,
+			},
+			{
+				value: "launch",
+				label: "Launch background analysis",
+				description:
+					"Capture the immutable checkpoint and start selected verifiers",
+			},
+		]);
+		if (!action) return;
+		if (action === "operations") {
+			operations =
+				(await chooseAnalyzeValues(
+					ctx,
+					"Analysis checks",
+					operationOptions,
+					operations,
+				)) ?? operations;
+			continue;
+		}
+		if (action === "models") {
+			models =
+				(await chooseAnalyzeValues(
+					ctx,
+					"Verifier models",
+					modelOptions,
+					models,
+				)) ?? models;
+			continue;
+		}
+		if (action === "scope") {
+			const selected = await choose(ctx, "Analysis scope", scopeOptions, scope);
+			if (!selected) continue;
+			scope = selected;
+			if (scope === "custom") {
+				const text = await ctx.ui.editor(
+					"Custom analysis paths or globs",
+					patterns?.join("\n") ?? "",
+				);
+				if (!text?.trim()) continue;
+				patterns = text
+					.split(/[\n,]/)
+					.map((value) => value.trim())
+					.filter(Boolean);
+			}
+			continue;
+		}
+		let checkpoint;
+		try {
+			checkpoint = captureVerifierCheckpoint(ctx.cwd, {
+				scope,
+				patterns,
+				operations,
+			});
+		} catch (error) {
+			ctx.ui.notify(formatError(error), "warning");
+			continue;
+		}
+		const profiles = models.map((model) => ({
+			model,
 			operations,
+			thinking:
+				configured.find((profile) => profile.model === model)?.thinking ??
+				pi.getThinkingLevel?.() ??
+				"medium",
+		}));
+		const confirmed = await ctx.ui.confirm(
+			"Launch background analysis?",
+			`${profiles.length} model(s) · ${operations.length} analysis type(s) · ${checkpoint.paths.length} file(s) · ${scope}${checkpoint.paths.length > 1000 ? "\nWarning: whole-project analysis may be expensive." : ""}`,
+		);
+		if (!confirmed) continue;
+		const scheduled = scheduleVerifierBatch(ctx.cwd, {
+			profiles,
+			checkpoint,
+			origin: "manual-analyze",
+			adapter: createPiSubagentsVerifierAdapter(pi),
 		});
-	} catch (error) {
-		ctx.ui.notify(formatError(error), "warning");
+		ctx.ui.notify(
+			scheduled.status === "queued"
+				? `Analysis queued as ${scheduled.batch.id}. Inspect with /work-status; triage with /work-resume.`
+				: `Analysis ${scheduled.status}: ${scheduled.reason ?? "not scheduled"}${scheduled.batch?.id ? ` (${scheduled.batch.id})` : ""}`,
+			scheduled.status === "queued" ? "info" : "warning",
+		);
 		return;
 	}
-	const profiles = models.map((model) => ({
-		model,
-		operations,
-		thinking:
-			configured.find((profile) => profile.model === model)?.thinking ??
-			pi.getThinkingLevel?.() ??
-			"medium",
-	}));
-	const confirmed = await ctx.ui.confirm(
-		"Launch background analysis?",
-		`${profiles.length} model(s) · ${operations.length} analysis type(s) · ${checkpoint.paths.length} file(s) · ${scope}${checkpoint.paths.length > 1000 ? "\nWarning: whole-project analysis may be expensive." : ""}`,
-	);
-	if (!confirmed) return;
-	const scheduled = scheduleVerifierBatch(ctx.cwd, {
-		profiles,
-		checkpoint,
-		origin: "manual-analyze",
-		adapter: createPiSubagentsVerifierAdapter(pi),
-	});
-	ctx.ui.notify(
-		scheduled.status === "queued"
-			? `Analysis queued as ${scheduled.batch.id}. Inspect with /work-status; triage with /work-resume.`
-			: `Analysis ${scheduled.status}: ${scheduled.reason ?? "not scheduled"}${scheduled.batch?.id ? ` (${scheduled.batch.id})` : ""}`,
-		scheduled.status === "queued" ? "info" : "warning",
-	);
 }
 
 function reconcileBackgroundVerifierRuns(cwd) {
@@ -10152,7 +10266,7 @@ function amendIfOnly(cwd, dirty, files, message) {
 	run(cwd, "git", ["commit", "--amend", "--no-edit"]);
 }
 
-function executeWorkFinishState(cwd, state) {
+function executeWorkFinishState(cwd, state, currentModel) {
 	if (!state?.ok || state.action !== "commit-ready") return state;
 	if (state.handoffPrompt)
 		return errorState(
@@ -10182,7 +10296,7 @@ function executeWorkFinishState(cwd, state) {
 		run(cwd, "git", ["commit", "--amend", "--no-edit"]);
 		const commitHash = run(cwd, "git", ["rev-parse", "--short", "HEAD"]);
 		const verifier = scheduleVerifierBatch(cwd, {
-			profiles: backgroundVerifierProfiles(cwd),
+			profiles: runnableBackgroundVerifierProfiles(cwd, currentModel),
 			origin: state.origin ?? "normal",
 			paths: state.relatedFiles,
 		});
@@ -12943,44 +13057,51 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 }
 
 async function handleWorkMenuCommand(ctx, pi) {
-	const action = await choose(ctx, "Work menu", [
-		{
-			value: "resume",
-			label: "resume / cancel stop",
-			description: "Run /work-resume",
-		},
-		{
-			value: "stop",
-			label: "stop after current phase",
-			description: "Run /work-stop",
-		},
-		{
-			value: "roadmap",
-			label: "roadmaps",
-			description: "Open /work-roadmap",
-		},
-		{
-			value: "microcompact",
-			label: "microcompact context",
-			description: "Compact now or at the next idle boundary",
-		},
-		{
-			value: "status",
-			label: "status",
-			description: "Show /work-status",
-		},
-		{
-			value: "report",
-			label: "blocker report",
-			description: "Show /work-report",
-		},
-	]);
-	if (action === "resume") return handleWorkResumeGoalCommand("", pi, ctx);
-	if (action === "stop") return handleWorkResumeStopCommand("", pi, ctx);
-	if (action === "roadmap") return handleWorkRoadmapCommand("", ctx, pi);
-	if (action === "microcompact") return requestManualMicrocompact(ctx);
-	if (action === "status") return handleWorkStatusCommand("", ctx);
-	if (action === "report") return handleWorkReportCommand("", ctx);
+	for (;;) {
+		const action = await choose(ctx, "Work menu", [
+			{
+				value: "resume",
+				label: "resume / cancel stop",
+				description: "Run /work-resume",
+			},
+			{
+				value: "stop",
+				label: "stop after current phase",
+				description: "Run /work-stop",
+			},
+			{
+				value: "roadmap",
+				label: "roadmaps",
+				description: "Open /work-roadmap",
+			},
+			{
+				value: "microcompact",
+				label: "microcompact context",
+				description: "Compact now or at the next idle boundary",
+			},
+			{
+				value: "status",
+				label: "status",
+				description: "Show /work-status",
+			},
+			{
+				value: "report",
+				label: "blocker report",
+				description: "Show /work-report",
+			},
+		]);
+		if (!action) return;
+		if (action === "resume") return handleWorkResumeGoalCommand("", pi, ctx);
+		if (action === "stop") return handleWorkResumeStopCommand("", pi, ctx);
+		if (action === "roadmap") {
+			const result = await handleWorkRoadmapCommand("", ctx, pi);
+			if (result?.action === "roadmap-cancel") continue;
+			return result;
+		}
+		if (action === "microcompact") return requestManualMicrocompact(ctx);
+		if (action === "status") return handleWorkStatusCommand("", ctx);
+		if (action === "report") return handleWorkReportCommand("", ctx);
+	}
 }
 
 async function handleWorkGoalResetCommand(args, ctx) {
@@ -13390,6 +13511,9 @@ async function handleWorkflowAction(
 		const verifier = scheduleConfiguredBackgroundVerifiers(ctx.cwd, pi, {
 			origin: state.origin ?? "normal",
 			paths: state.git?.dirtyPaths,
+			currentModel: ctx.model
+				? `${ctx.model.provider}/${ctx.model.id}`
+				: undefined,
 		});
 		state.verifier = { status: verifier.status, batchId: verifier.batch?.id };
 	}
@@ -13553,15 +13677,48 @@ function roadmapDescriptionContext(cwd, epic) {
 	].join("\n\n");
 }
 
+function roadmapMenuItems(roadmaps) {
+	const siblings = new Map();
+	for (const roadmap of roadmaps) {
+		if (!roadmap.parentId) continue;
+		const group = siblings.get(roadmap.parentId) ?? [];
+		group.push(roadmap.id);
+		siblings.set(roadmap.parentId, group);
+	}
+	return roadmaps.map((roadmap) => {
+		const childIds = siblings.get(roadmap.parentId) ?? [];
+		const lastChild = childIds.at(-1) === roadmap.id;
+		const marker = roadmap.current ? "*" : "─";
+		const prefix =
+			roadmap.role === "initiative"
+				? ""
+				: roadmap.parentId
+					? `${lastChild ? "└" : "├"}${marker} `
+					: `${marker} `;
+		return {
+			value: roadmap.id,
+			label: `${prefix}${roadmap.id} [${statusLabel(roadmap.status)}] [${roadmap.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${roadmap.title} ${SUBMENU_ARROW}`,
+			description:
+				compactRoadmapDescription(roadmap.description, 140) ||
+				"No short description yet.",
+			descriptionPrefix: roadmap.parentId ? "│  " : "  ",
+			inlineDescription: true,
+			preserveCase: true,
+			color: roadmap.current
+				? "success"
+				: roadmap.status === "closed"
+					? "dim"
+					: roadmap.role === "initiative"
+						? "accent"
+						: "text",
+		};
+	});
+}
+
 async function chooseRoadmap(ctx, title, roadmaps) {
-	return choose(
-		ctx,
-		title,
-		roadmaps.map((epic) => ({
-			value: epic.id,
-			label: `${epic.current ? "* " : ""}${epic.parentId ? "  " : ""}${epic.id} [${statusLabel(epic.status)}] [${epic.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${epic.title}`,
-		})),
-	);
+	return choose(ctx, title, roadmapMenuItems(roadmaps), undefined, {
+		purpose: "Choose a roadmap to inspect, plan, or continue.",
+	});
 }
 
 async function synthesizeRoadmapDescription(cwd, epic, ctx, runtime = {}) {
@@ -14532,6 +14689,7 @@ export default function workModelsExtension(pi) {
 		workGoalContinuationPending = null;
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
+		manualMicrocompactWorkflowRunId = null;
 		workAgentCompactionResume?.finalize?.();
 		workAgentCompactionResume = null;
 		resetContextCompaction();
@@ -14550,6 +14708,7 @@ export default function workModelsExtension(pi) {
 		pendingInitiativeConversions.clear();
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
+		manualMicrocompactWorkflowRunId = null;
 		workAgentCompactionResume?.finalize?.();
 		workAgentCompactionResume = null;
 		resetContextCompaction();
@@ -14596,6 +14755,8 @@ export default function workModelsExtension(pi) {
 			updateWorkGoalStatus(ctx);
 		}
 		const meta = parseWorkPromptMeta(event.prompt);
+		if (meta?.workflowRunId === manualMicrocompactWorkflowRunId)
+			manualMicrocompactWorkflowRunId = null;
 		pendingWorkPrompt = meta
 			? {
 					id: telemetryId("agent"),
@@ -14812,7 +14973,9 @@ export default function workModelsExtension(pi) {
 				file,
 			);
 		};
-		if (contextOverflow)
+		if (run.meta.workflowRunId === manualMicrocompactWorkflowRunId)
+			finishAttempt(true);
+		else if (contextOverflow)
 			workAgentCompactionResume = {
 				prompt: {
 					id: telemetryId("agent"),
@@ -15211,7 +15374,11 @@ export default function workModelsExtension(pi) {
 				cleanupBenignInstructionDirt(ctx.cwd);
 				let state = buildWorkFinishState(ctx.cwd, args);
 				if (state.ok && !state.handoffPrompt)
-					state = executeWorkFinishState(ctx.cwd, state);
+					state = executeWorkFinishState(
+						ctx.cwd,
+						state,
+						ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+					);
 				if (state.verifier?.status === "queued")
 					void launchQueuedVerifierJobs(
 						ctx.cwd,
@@ -15390,21 +15557,18 @@ function workSettingsStatus(ctx) {
 	notify(ctx, lines.join("\n"), "info");
 }
 
-const SETTINGS_DONE = "__done__";
 const SETTINGS_PROFILE = "__profile__";
 const SETTINGS_RESET = "__reset__";
 
 function boolLabel(label, value) {
+	const display = String(label).replace(/^([a-z])/, (letter) =>
+		letter.toUpperCase(),
+	);
 	return {
-		label: `${onOff(value)} ${label}`,
-		settingLabel: label,
+		label: `${onOff(value)} ${display}`,
+		settingLabel: display,
 		enabled: value,
 	};
-}
-
-function fitUiLine(text, width) {
-	if (width < 2) return "";
-	return text.length <= width ? text : `${text.slice(0, width - 1)}…`;
 }
 
 function owns(object, key) {
@@ -15491,115 +15655,32 @@ function clearProjectOverride(settings, item) {
 }
 
 async function chooseWorkSetting(ctx, items, selectedIndex, scope) {
-	if ((ctx.mode && ctx.mode !== "tui") || typeof ctx.ui.custom !== "function") {
-		const labels = items.map(labelFor);
-		const selected = await ctx.ui.select(
-			`Settings: ${scope === "global" ? "Global" : "Project"}`,
-			labels,
-		);
-		const index = labels.indexOf(selected);
-		return index < 0 ? undefined : { pick: items[index], index };
-	}
-	return ctx.ui.custom((tui, theme, keybindings, done) => {
-		let index = Math.max(0, Math.min(selectedIndex, items.length - 1));
-		return {
-			render(width) {
-				const maxVisible = Math.min(items.length, 12);
-				const start = Math.max(
-					0,
-					Math.min(
-						index - Math.floor(maxVisible / 2),
-						items.length - maxVisible,
-					),
-				);
-				const end = Math.min(start + maxVisible, items.length);
-				const lines = [
-					theme.fg(
-						"accent",
-						theme.bold(
-							`Settings: ${scope === "global" ? "Global" : "Project"}`,
-						),
-					),
-					theme.fg("dim", "Tab to change scope"),
-					"",
-				];
-				for (let i = start; i < end; i += 1) {
-					const item = items[i];
-					const color =
-						item.enabled === true
-							? "success"
-							: item.enabled === false
-								? "dim"
-								: i === index
-									? "accent"
-									: "text";
-					lines.push(
-						theme.fg(
-							color,
-							fitUiLine(
-								`${i === index ? "> " : "  "}${item.local ? "* " : "  "}${item.label}`,
-								width,
-							),
-						),
-					);
-				}
-				if (start > 0 || end < items.length)
-					lines.push(
-						theme.fg(
-							"dim",
-							fitUiLine(`  (${index + 1}/${items.length})`, width),
-						),
-					);
-				if (items[index]?.description)
-					lines.push(
-						"",
-						theme.fg(
-							"muted",
-							fitUiLine(`  ${items[index].description}`, width),
-						),
-					);
-				lines.push(
-					"",
-					theme.fg(
-						"dim",
-						fitUiLine(
-							scope === "project"
-								? "  ↑↓ navigate · Enter/Space change · Backspace/Delete use global · Tab global · Esc close"
-								: "  ↑↓ navigate · Enter/Space change · * masked locally · Tab project · Esc close",
-							width,
-						),
-					),
-				);
-				return lines;
-			},
-			invalidate() {},
-			handleInput(data) {
-				if (data === "\t") return done({ action: "scope", index });
-				if (
-					scope === "project" &&
-					items[index]?.local &&
-					(keybindings.matches(data, "tui.editor.deleteCharBackward") ||
-						keybindings.matches(data, "tui.editor.deleteCharForward") ||
-						data === "\b" ||
-						data === "\x7f" ||
-						data === "\x1b[3~")
-				)
-					return done({ action: "clear", pick: items[index], index });
-				if (keybindings.matches(data, "tui.select.up"))
-					index = index === 0 ? items.length - 1 : index - 1;
-				else if (keybindings.matches(data, "tui.select.down"))
-					index = index === items.length - 1 ? 0 : index + 1;
-				else if (
-					keybindings.matches(data, "tui.select.confirm") ||
-					data === " "
-				)
-					return done({ pick: items[index], index });
-				else if (keybindings.matches(data, "tui.select.cancel"))
-					return done(undefined);
-				tui.requestRender();
-			},
-		};
+	const result = await showListDialog(ctx, {
+		title: `Settings: ${scope === "global" ? "Global" : "Project"}`,
+		items,
+		selectedIndex,
+		cursorKey: "work-settings",
+		forceCustom: true,
+		selectOnSpace: true,
+		subtitle: "Tab to change scope",
+		help:
+			scope === "project"
+				? "Type to filter · Enter/Space change · Delete uses global · Tab global · Esc/Backspace back"
+				: "Type to filter · Enter/Space change · * masked locally · Tab project · Esc/Backspace back",
+		onInput: ({ data, keybindings, item, index }) => {
+			if (data === "\t") return { action: "scope", index };
+			if (
+				scope === "project" &&
+				item?.local &&
+				(keybindings.matches(data, "tui.editor.deleteCharForward") ||
+					data === "\x1b[3~")
+			)
+				return { action: "clear", pick: item, index };
+		},
 	});
+	if (!result) return;
+	if (result.action === "scope" || result.action === "clear") return result;
+	return { pick: result.item, index: result.index };
 }
 
 async function workSettingsLoop(ctx) {
@@ -15623,24 +15704,28 @@ async function workSettingsLoop(ctx) {
 		}
 		const resolved = workOrchSettings(ctx.cwd, settings);
 		const resume = workResumeSettings(ctx.cwd, settings);
+		const names = await modelDisplayNames(ctx);
 		const items = [
 			{
 				kind: "profile",
 				value: SETTINGS_PROFILE,
-				label: `profile ${SUBMENU_ARROW} ${resolved.profile}`,
+				label: `Profile: ${titleCase(resolved.profile)} ${SUBMENU_ARROW}`,
 				description:
-					"low / medium / high / max — copy effort + gates onto current",
+					"Low / Medium / High / Max — copy effort and gates onto current settings",
 			},
-			...SLOTS.map((slot) => ({
-				kind: "slot",
-				value: slot.key,
-				label: `${slot.label} ${SUBMENU_ARROW}`,
-				description: slotSummary(slot, settings),
-			})),
+			...SLOTS.map((slot) => {
+				const selected = slotSelection(slot, settings);
+				return {
+					kind: "slot",
+					value: slot.key,
+					label: `Model ${slot.label}: [${modelEffortSummary(selected.model, selected.thinking, names)}] ${SUBMENU_ARROW}`,
+					description: slot.description,
+				};
+			}),
 			{
 				kind: "backgroundVerifiers",
 				value: "backgroundVerifiers",
-				label: `background verifiers ${SUBMENU_ARROW}`,
+				label: `Background verifiers ${SUBMENU_ARROW}`,
 				description: backgroundVerifierProfiles(
 					ctx.cwd,
 					scope === "global" ? settings : undefined,
@@ -15701,12 +15786,6 @@ async function workSettingsLoop(ctx) {
 						? "Restore built-in workflow defaults"
 						: "Use global values for every workflow setting",
 			},
-			{
-				kind: "done",
-				value: SETTINGS_DONE,
-				label: "done",
-				description: "Exit settings",
-			},
 		];
 		for (const item of items)
 			item.local = hasProjectOverride(projectSettings, item);
@@ -15728,7 +15807,6 @@ async function workSettingsLoop(ctx) {
 			}
 			continue;
 		}
-		if (pick.kind === "done") return;
 		if (pick.kind === "reset") {
 			if (
 				scope === "global" &&
@@ -15759,19 +15837,8 @@ async function workSettingsLoop(ctx) {
 				[
 					...Object.keys(EFFORT_PROFILES).map((key) => ({
 						value: key,
-						label: key,
-						description: `${SLOTS.map(
-							(slot) => `${slot.key}=${EFFORT_PROFILES[key][slot.key]}`,
-						).join(" ")} · gates:${
-							[
-								EFFORT_PROFILES[key].simplifyBeforeReview && "simplify",
-								EFFORT_PROFILES[key].browserTestsOnUiDiff && "browser",
-								EFFORT_PROFILES[key].codeReviewBeforeCommit !== "off" &&
-									`review:${EFFORT_PROFILES[key].codeReviewBeforeCommit}`,
-							]
-								.filter(Boolean)
-								.join("/") || "none"
-						}`,
+						label: titleCase(key),
+						description: profileDescription(key),
 					})),
 				],
 				resolved.profile,

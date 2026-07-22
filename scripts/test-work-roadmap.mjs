@@ -176,7 +176,10 @@ try {
 	}
 	const selectRoadmap = async (id, complete, menus = []) => {
 		const notices = [];
-		const picks = [new RegExp(id), /full report/];
+		const picks = [
+			(label) => label.includes(id),
+			(label) => /full report/.test(label),
+		];
 		await handleWorkRoadmapCommand(
 			"",
 			{
@@ -187,10 +190,11 @@ try {
 					getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test" }),
 				},
 				ui: {
+					workDialogsNative: true,
 					select: async (title, labels) => {
 						menus.push({ title, labels });
 						const pick = picks.shift();
-						return pick ? labels.find((label) => pick.test(label)) : undefined;
+						return pick ? labels.find(pick) : undefined;
 					},
 					custom: (factory) => new Promise((done) => factory({}, {}, {}, done)),
 					notify: (message) => notices.push(message),
@@ -218,10 +222,10 @@ try {
 	);
 	assert.equal(
 		roadmapMenus[0].labels.some((label) =>
-			/Preserve visual parity|generate and save/i.test(label),
+			/Preserve visual parity|No short description yet/i.test(label),
 		),
-		false,
-		"F7 base roadmap list stays title-only",
+		true,
+		"native fallback keeps roadmap summaries available",
 	);
 	assert.match(
 		roadmapMenus[1].title,
@@ -277,13 +281,15 @@ try {
 
 	const notices = [];
 	const opLabels = [];
-	const picks = [/E-1/, /list tasks/, /Blocker: BUG-1/, /summary/];
+	const menuTrace = [];
+	const picks = [/E-1/, /list tasks/, /Blocker: BUG-1/, /summary/i];
 	await handleWorkRoadmapCommand(
 		"",
 		{
 			cwd: root,
 			ui: {
 				select: async (title, labels) => {
+					menuTrace.push({ title, labels });
 					if (title.includes("BUG-1")) opLabels.push(...labels);
 					const pick = picks.shift();
 					return pick ? labels.find((label) => pick.test(label)) : undefined;
@@ -293,13 +299,13 @@ try {
 		},
 		{},
 	);
-	console.assert(
+	assert(
 		notices.some((message) => message.includes("WorkItem: Fix blocker")),
-		"interactive task menu opens task summary",
+		`interactive task menu opens task summary: ${JSON.stringify(menuTrace)}`,
 	);
-	console.assert(
-		opLabels.some((label) => label.includes("debug / full info")),
-		"blocker task offers debug for full info",
+	assert(
+		opLabels.some((label) => /debug \/ full info/i.test(label)),
+		`blocker task offers debug for full info: ${JSON.stringify(menuTrace)}`,
 	);
 
 	const escapeTitles = [];
@@ -466,6 +472,7 @@ try {
 	const initiativeStore = initStore(initiativeRoot, { now: timestamp });
 	initiativeStore.items = {
 		"I-1": item("I-1", "Initiative", {
+			description: "Some cool stuff",
 			labels: ["initiative"],
 			initiative: {
 				schemaVersion: 1,
@@ -496,11 +503,15 @@ try {
 			},
 		}),
 		"I-1.1": item("I-1.1", "Planned child", {
+			description: "Work completed on it",
 			parentId: "I-1",
 			status: "closed",
 			documentLinks: { design: "docs/plans/child.md" },
 		}),
-		"I-1.2": item("I-1.2", "Needs plan", { parentId: "I-1" }),
+		"I-1.2": item("I-1.2", "Needs plan", {
+			description: "More work to plan",
+			parentId: "I-1",
+		}),
 		"S-1": item("S-1", "Standalone", {
 			documentLinks: { brainstorm: "docs/brainstorms/standalone.md" },
 		}),
@@ -519,6 +530,44 @@ try {
 	const treeText = renderWorkRoadmapText(tree);
 	assert.match(treeText, / {2}I-1\.1.*planned/i);
 	assert.match(treeText, / {2}I-1\.2.*needs.plan/i);
+	let roadmapDialog = "";
+	const dialogState = await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: initiativeRoot,
+			mode: "tui",
+			ui: {
+				custom: (factory) =>
+					new Promise((done) => {
+						const component = factory(
+							{ requestRender() {} },
+							{
+								fg: (color, text) => `<${color}>${text}</${color}>`,
+								bold: (text) => text,
+							},
+							{
+								matches: (data, id) =>
+									data === "escape" && id === "tui.select.cancel",
+							},
+							done,
+						);
+						roadmapDialog = component.render(220).join("\n");
+						component.handleInput("escape");
+					}),
+				notify: () => {},
+			},
+		},
+		{},
+	);
+	assert.equal(dialogState.action, "roadmap-cancel");
+	assert.match(roadmapDialog, /Choose a roadmap to inspect, plan, or continue/);
+	assert.match(roadmapDialog, /I-1 .*Initiative/);
+	assert.match(roadmapDialog, /Some cool stuff/);
+	assert.match(roadmapDialog, /├\* I-1\.1 .*Planned child/);
+	assert.match(roadmapDialog, /│ {2}Work completed on it/);
+	assert.match(roadmapDialog, /└─ I-1\.2 .*Needs plan/);
+	assert.match(roadmapDialog, /│ {2}More work to plan/);
+	assert.match(roadmapDialog, /<success>.*I-1\.1/);
 	const initiativeOps = [];
 	let initiativeSelected = false;
 	await handleWorkRoadmapCommand(
