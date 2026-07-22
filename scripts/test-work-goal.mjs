@@ -210,7 +210,7 @@ assert.equal(
 		blocked: 2,
 		elapsedMs: 123_000,
 	}),
-	"Roadmap [██████░░░░░░] ✅ 3/6 units (3 left · 2 unsliced) 🔴 1 🟠 2 ⏱️ 2m 3s · F7 roadmaps · F8 microcompact",
+	"Roadmap [██████░░░░░░] ✅ 3/6 units (3 left · 2 unsliced) 🔴 1 🟠 2 ⏱️ 2m 3s · F7 Orchestrator · F8 microcompact",
 );
 assert.deepEqual(
 	mod.warpPayload(
@@ -289,18 +289,113 @@ mod.default({
 		shortcuts[key] = config;
 	},
 });
-assert.ok(commands["work-goal"]);
-assert.ok(commands["work-resume"]);
-assert.ok(commands["work-resume-stop"]);
-assert.ok(commands["work-stop"]);
-assert.ok(commands["work-menu"]);
-assert.ok(commands["work-goal-reset-continue"]);
+assert.deepEqual(
+	Object.keys(commands).filter((name) => name.startsWith("work-")),
+	[],
+	"all user-facing work slash commands are removed",
+);
+assert.ok(commands["__orchestrator-goal-continue"]);
 assert.ok(shortcuts.f7);
+assert.match(shortcuts.f7.description, /orchestrator/i);
 assert.match(shortcuts.f8.description, /microcompact/i);
-assert.ok(!commands["work-self-improving-goal"]);
-assert.ok(!commands["work-project-goal"]);
-assert.ok(!commands["work-project"]);
-assert.ok(!commands["work-catch-up"]);
+let orchestratorLabels = [];
+await shortcuts.f7.handler({
+	cwd: process.cwd(),
+	mode: "print",
+	ui: {
+		select: async (title, labels) => {
+			assert.equal(title, "Orchestrator");
+			orchestratorLabels = labels;
+			return undefined;
+		},
+	},
+});
+assert.match(orchestratorLabels[0], /Roadmaps/);
+for (const action of [
+	"Roadmaps",
+	"Resume work",
+	"Autonomous goal",
+	"Stop safely",
+	"Initialize workspace",
+	"Status",
+	"Blocker report",
+	"Ideas",
+	"Brainstorm",
+	"Plan",
+	"Migrate work",
+	"Migrate legacy workspace",
+	"Checkpoint and pause",
+	"Analyze",
+	"Small task",
+	"Medium task",
+	"Large task",
+	"Finish work item",
+	"Debug",
+	"Add work",
+	"Auto-route task",
+	"Telemetry",
+	"Usage report",
+	"Context guard",
+	"Settings",
+	"Improve orchestrator",
+	"Catch up project",
+	"Microcompact now",
+])
+	assert(
+		orchestratorLabels.some((label) => label.includes(action)),
+		action,
+	);
+assert(orchestratorLabels.every((label) => !label.includes("/work-")));
+assert(
+	orchestratorLabels.some((label) => /\p{Emoji_Presentation}/u.test(label)),
+	"F7 labels keep their workflow icons",
+);
+assert(orchestratorLabels.some((label) => label.includes("🌍 Roadmaps")));
+assert(orchestratorLabels.some((label) => label.includes("⏩ Resume work")));
+assert(orchestratorLabels.some((label) => label.includes("🧠 Context guard")));
+assert(
+	orchestratorLabels.some((label) => label.includes("🔧 Improve orchestrator")),
+);
+const orchestratorRenders = [];
+await shortcuts.f7.handler({
+	cwd: process.cwd(),
+	mode: "tui",
+	ui: {
+		custom: async (factory) => {
+			let closed = false;
+			const component = factory(
+				{ requestRender() {} },
+				{ fg: (_color, text) => text, bold: (text) => text },
+				{ matches: () => false },
+				() => {
+					closed = true;
+				},
+			);
+			orchestratorRenders.push(component.render(90));
+			component.handleInput("down");
+			orchestratorRenders.push(component.render(90));
+			for (const key of "settings") component.handleInput(key);
+			orchestratorRenders.push(component.render(90));
+			component.handleInput("escape");
+			component.handleInput("escape");
+			assert(closed);
+		},
+	},
+});
+assert(orchestratorRenders[0].some((line) => line.includes("Browse, inspect")));
+assert(
+	orchestratorRenders[0].some((line) => line.includes("last open roadmap")),
+);
+assert(orchestratorRenders[2].some((line) => line.includes("Settings")));
+assert.deepEqual(
+	orchestratorRenders.map((render) => render.length),
+	[
+		orchestratorRenders[0].length,
+		orchestratorRenders[0].length,
+		orchestratorRenders[0].length,
+	],
+	"F7 Orchestrator stays fixed while navigating and filtering",
+);
 assert.ok(tools.work_goal_complete);
 assert.ok(tools.work_goal_human_decision);
 assert.equal(tools.work_goal_human_decision.parameters.required[0], "question");
@@ -369,7 +464,10 @@ try {
 				},
 			}),
 		);
-		writeFileSync(path.join(verifierCwd, ".gitignore"), ".pi/\n.ce-workflow/\n");
+		writeFileSync(
+			path.join(verifierCwd, ".gitignore"),
+			".pi/\n.ce-workflow/\n",
+		);
 		writeFileSync(path.join(verifierCwd, "tracked.txt"), "before\n");
 		execFileSync("git", ["add", ".gitignore", "tracked.txt"], {
 			cwd: verifierCwd,
@@ -540,12 +638,22 @@ try {
 	else process.env.PI_CODING_AGENT_DIR = oldPiCodingAgentDir;
 
 	mod.default(pi);
+	const invoke = (name, args, commandCtx = ctx) =>
+		mod.executeOrchestratorAction(name, args, commandCtx, pi);
 	tempHooks.session_start?.({}, ctx);
-	assert.ok(tempCommands["work-catch-up"]);
+	const automationResult = await tempHooks.input?.(
+		{ source: "extension", text: "ORCHESTRATOR_RUN_V1 work-status" },
+		ctx,
+	);
+	assert.deepEqual(automationResult, { action: "handled" });
+	assert.deepEqual(
+		Object.keys(tempCommands).filter((name) => name.startsWith("work-")),
+		[],
+	);
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes(
-				"work-orchestrator loaded · F7 roadmaps · F8 microcompact",
+				"work-orchestrator loaded · F7 Orchestrator · F8 microcompact",
 			),
 		),
 	);
@@ -909,7 +1017,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 			workOrchestrator: { context: { autoCompact: false } },
 		}),
 	);
-	await tempCommands["work-goal"].handler("write temp proof file", ctx);
+	await invoke("work-goal", "write temp proof file", ctx);
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
 	assert.equal(statuses["work-goal"], "▶️ active #0");
@@ -931,7 +1039,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		{ prompt: sent[0].message, systemPrompt: "base" },
 		ctx,
 	);
-	assert.match(before.systemPrompt, /Active \/work-goal/);
+	assert.match(before.systemPrompt, /Active autonomous goal/);
 	assert.match(before.systemPrompt, /work_goal_human_decision/);
 	await tempHooks.agent_start({}, ctx);
 
@@ -991,7 +1099,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		{ prompt: "clarify: what screenshot is missing?", systemPrompt: "base" },
 		ctx,
 	);
-	assert.match(pausedBefore.systemPrompt, /Paused \/work-goal/);
+	assert.match(pausedBefore.systemPrompt, /Paused autonomous goal/);
 	assert.match(
 		pausedBefore.systemPrompt,
 		/Answer the user's clarification only/,
@@ -1019,7 +1127,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	assert.equal(statuses["work-goal"], "🟣❓ needs human");
 	assert.equal(sent.length, 2);
 
-	await tempCommands["work-goal"].handler(
+	await invoke(
+		"work-goal",
 		"resume 2, but use the AI-Wedge connected proof and add a connect button.",
 		ctx,
 	);
@@ -1043,7 +1152,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 
 	const beforeResumeSent = sent.length;
 	const beforeResumeNotices = notices.length;
-	await tempCommands["work-resume"].handler("one task only", ctx);
+	await invoke("work-resume", "one task only", ctx);
 	assert.equal(
 		sent.length,
 		beforeResumeSent,
@@ -1074,7 +1183,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.match(ordinaryBefore.systemPrompt, /Review cycle budget/);
-	assert.doesNotMatch(ordinaryBefore.systemPrompt, /Active \/work-goal/);
+	assert.doesNotMatch(ordinaryBefore.systemPrompt, /Active autonomous goal/);
 	await tempHooks.agent_start({}, ctx);
 	await tempHooks.agent_end(
 		{
@@ -1111,7 +1220,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	assert.equal(restartedInput, undefined);
 	assert.equal(statuses["work-goal"], "🟣❓ needs human");
-	await tempCommands["work-goal"].handler(
+	await invoke(
+		"work-goal",
 		"resume 4, waive only disconnection screenshot",
 		ctx,
 	);
@@ -1137,12 +1247,12 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		notices
 			.slice(noticeCount)
 			.some((notice) =>
-				String(notice.message).includes("Running 1. /work-status"),
+				String(notice.message).includes("Running 1. F7 → Status"),
 			),
 		"numbered choice with trailing text runs the selected action",
 	);
 
-	await tempCommands["work-goal"].handler("format decision notice", ctx);
+	await invoke("work-goal", "format decision notice", ctx);
 	await tempTools.work_goal_human_decision.execute(
 		"t2",
 		{
@@ -1164,7 +1274,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 
 	const oldUsageDelay = process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS;
 	process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = "1";
-	await tempCommands["work-goal"].handler("survive usage windows", ctx);
+	await invoke("work-goal", "survive usage windows", ctx);
 	const beforeUsageRetry = sent.length;
 	await tempHooks.before_agent_start(
 		{ prompt: sent.at(-1).message, systemPrompt: "base" },

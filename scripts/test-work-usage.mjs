@@ -13,6 +13,7 @@ import { pathToFileURL } from "node:url";
 const {
 	buildWorkUsageState,
 	default: workModelsExtension,
+	executeOrchestratorAction,
 	recordWorkTelemetry,
 	renderWorkUsageText,
 } = await import(
@@ -244,25 +245,31 @@ try {
 		);
 
 		const commands = {};
-		workModelsExtension({
+		const pi = {
 			on: () => {},
 			registerCommand: (name, config) => {
 				commands[name] = config;
 			},
-		});
+		};
+		workModelsExtension(pi);
 		const messages = [];
-		await commands["work-usage"].handler("roadmap E-1", {
-			cwd,
-			getContextUsage: () => ({ tokens: 3333 }),
-			ui: { notify: (message) => messages.push(message) },
-		});
+		await executeOrchestratorAction(
+			"work-usage",
+			"roadmap E-1",
+			{
+				cwd,
+				getContextUsage: () => ({ tokens: 3333 }),
+				ui: { notify: (message) => messages.push(message) },
+			},
+			pi,
+		);
 		assert(
 			messages.some((message) => message.includes("Work usage report:")),
-			"registered command notifies report path",
+			"Orchestrator usage action notifies report path",
 		);
 		assert(
 			messages.some((message) => message.includes("Browser not opened")),
-			"registered command does not open browser unless requested",
+			"Orchestrator usage action does not open browser unless requested",
 		);
 	} finally {
 		fixture.cleanup();

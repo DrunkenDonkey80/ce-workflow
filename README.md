@@ -1,6 +1,6 @@
 # pi-work-orchestrator
 
-Native Pi workflow package for staged software work through short `/work-*` commands.
+Native Pi workflow package for staged software work through one filterable **Orchestrator** dialog.
 
 The native work-item store at `.ce-workflow/work-items.json` is the only durable work state. Git is the only code state. Runtime logs, telemetry, locks, recovery files, exports, and backups stay ignored.
 
@@ -14,48 +14,42 @@ pi install npm:pi-ask-user
 # Optional: pi install npm:pi-intercom
 ```
 
-No tracker CLI is required for normal operation. In a new repository run:
+No tracker CLI is required for normal operation. Press **F7** to open **Orchestrator**, then type to filter its actions. **Roadmaps** is first and initially selected; its picker remembers the last open roadmap or initiative. Press **F8** to microcompact immediately when idle or at the next safe boundary.
 
-```text
-/work-init
-/work-small add focused behavior
-/work-finish <work-item-id>
-```
+## Orchestrator actions
 
-## Commands
-
-| Command | Native behavior |
+| Action | Native behavior |
 | --- | --- |
-| `/work-init` | Creates the native store when absent. |
-| `/work-plan`, `/work-master` | Creates or resumes a plan roadmap. |
-| `/work-small`, `/work-med`, `/work-big`, `/work-auto` | Classifies and creates one scoped work item. |
-| `/work-resume`, `/work-status`, `/work-report`, `/work-roadmap` | Reads native state; F7 shows roadmap trees, prepares initiative child plans without auto-starting work, and offers agent-guided conversion of standalone roadmaps into initiatives. F8 microcompacts context immediately when idle or at the next safe boundary. |
-| `/work-add`, `/work-debug`, `/work-pause`, `/work-finish` | Mutates, checkpoints, or finalizes a native work item. |
-| `/work-brainstorm`, `/work-ideate`, `/work-usage`, `/work-telemetry` | Manages ideas and local reports. |
-| `/work-settings`, `/work-context`, `/work-goal` | Configures orchestration and context behavior. Proactive compaction defaults on at 150k tokens; F8 compacts immediately or at the next safe boundary. |
-| `/work-catch-up` | Proactively reviews every changed monitored Pi/plugin release with `ce-pov`, asks Adopt/Defer/Skip one opportunity at a time, implements adopted wins, and records every decision before advancing the baseline. |
-| `/work-improve [preview]` | In the configured ce-workflow source checkout, snapshots, validates, deduplicates, and executes open `Self-improving` reports. F7 offers this instead of resume for that roadmap. |
-| `/work-remove-beads` | One-way migration for a detected legacy workspace. |
+| **Initialize workspace** | Creates the native store when absent. |
+| **Plan** | Creates or resumes a plan roadmap. |
+| **Small task**, **Medium task**, **Large task**, **Auto-route task** | Classifies and creates one scoped work item. |
+| **Resume work**, **Status**, **Blocker report**, **Roadmaps** | Reads and advances native state; Roadmaps also prepares initiative child plans and converts standalone roadmaps into initiatives. |
+| **Add work**, **Debug**, **Checkpoint and pause**, **Finish work item** | Mutates, checkpoints, or finalizes a native work item. |
+| **Brainstorm**, **Ideas**, **Usage report**, **Telemetry** | Manages ideas and local reports. |
+| **Settings**, **Context guard**, **Autonomous goal** | Configures orchestration and context behavior. Proactive compaction defaults on at 150k tokens. |
+| **Catch up project** | Reviews changed monitored Pi/plugin releases and records Adopt/Defer/Skip decisions. |
+| **Improve orchestrator** | Validates, deduplicates, and executes open self-improvement reports in the configured source checkout. |
+| **Migrate legacy workspace** | Performs the one-way migration for a detected former workflow workspace. |
 
-Ordinary task commands (`/work-add`, `/work-small`, `/work-med`, `/work-big`, ordinary `/work-auto`, and symptom-based `/work-debug`) use one durable `Misc` roadmap when no current roadmap is selected. When another roadmap is current, the UI asks whether the new task belongs there or in `Misc`. Dedicated planning, brainstorming, and migration commands still create their own roadmaps. Untargeted `/work-resume` falls back to ready `Misc` work and leaves an empty `Misc` idle.
+Ordinary task actions use one durable `Misc` roadmap when no current roadmap is selected. When another roadmap is current, the UI asks whether new work belongs there or in `Misc`. Dedicated planning, brainstorming, and migration actions still create their own roadmaps. Untargeted **Resume work** falls back to ready `Misc` work and leaves an empty `Misc` idle.
 
 Role agents are `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, and three identical configurable advisor roles: `work-advisor`, `work-advisor-2`, and `work-advisor-3`. Configured advisors review brainstorms and plans in parallel; slice plans use the profile's `none` / `first` / `all` policy. They use `scripts/work-helper.mjs` native helpers for compact work-item summaries, initiative hierarchy, preview/apply, children, ready, claim, note, label, and blocker operations.
 
 ## Background verifiers
 
-`/work-settings` → **Background verifiers** configures zero, one, or many profiles. New profiles start as **Model: [Inherit: High]** with **Test coverage** enabled; Inherit is stored as-is and resolves to the active session model only when a verifier is launched. Each profile has one unique model identity, independent checks, and a thinking effort. Global profiles apply by default; project profiles override a matching model, and a project removal is a tombstone that disables an inherited profile. Removing the last check disables that profile.
+`F7 → Settings` → **Background verifiers** configures zero, one, or many profiles. New profiles start as **Model: [Inherit: High]** with **Test coverage** enabled; Inherit is stored as-is and resolves to the active session model only when a verifier is launched. Each profile has one unique model identity, independent checks, and a thinking effort. Global profiles apply by default; project profiles override a matching model, and a project removal is a tombstone that disables an inherited profile. Removing the last check disables that profile.
 
-Every normal commit or checkpoint snapshots the selected scope and schedules each enabled profile asynchronously. `/work-analyze` uses one main menu to select checks, verifier models, and an immutable scope: current changes, last commit, whole project, or repository-relative paths/globs. Verifiers read only that immutable snapshot; they never write code or affect the active checkout. Similar completed findings are grouped for a compact inbox while retaining each model and operation attribution and its full private report. At the next `/work-resume`, triage every completed, unprocessed group before roadmap work: validate it against current code, record accepted, rejected, or stale with a reason, then fix and verify every accepted finding before continuing. Running and failed jobs never block a resume. Commits made only for accepted verifier fixes do not schedule another verifier batch.
+Every normal commit or checkpoint snapshots the selected scope and schedules each enabled profile asynchronously. `F7 → Analyze` uses one main menu to select checks, verifier models, and an immutable scope: current changes, last commit, whole project, or repository-relative paths/globs. Verifiers read only that immutable snapshot; they never write code or affect the active checkout. Similar completed findings are grouped for a compact inbox while retaining each model and operation attribution and its full private report. At the next `F7 → Resume work`, triage every completed, unprocessed group before roadmap work: validate it against current code, record accepted, rejected, or stale with a reason, then fix and verify every accepted finding before continuing. Running and failed jobs never block a resume. Commits made only for accepted verifier fixes do not schedule another verifier batch.
 
-`/work-status` exposes `not-configured`, `queued/running`, `failed/orphaned`, `completed-awaiting-triage`, or `fully-triaged`. Durable state, recovery copies, and private raw runtime reports live under `.ce-workflow/work-runs/verifiers/`; use `/work-status` to recover after interruption and `/work-resume` to triage when reports complete. Late valid reports from acknowledgement-timeout/orphaned launches remain recoverable. A triaged group stays out of later resumes unless explicitly reopened.
+`F7 → Status` exposes `not-configured`, `queued/running`, `failed/orphaned`, `completed-awaiting-triage`, or `fully-triaged`. Durable state, recovery copies, and private raw runtime reports live under `.ce-workflow/work-runs/verifiers/`; use `F7 → Status` to recover after interruption and `F7 → Resume work` to triage when reports complete. Late valid reports from acknowledgement-timeout/orphaned launches remain recoverable. A triaged group stays out of later resumes unless explicitly reopened.
 
 Verifier source text and reports are untrusted data. The `work-background-verifier` role is isolated to checkpoint read/list/find/grep tools: no writes, shell, network, credentials, commits, or agent launches. Its advice is attributable and advisory; it neither replaces nor satisfies the required foreground review and finish gates. Verification is checkpoint-scoped, not a whole-repository patrol.
 
 ## Workflow rules
 
 - One executable work item is the normal session boundary.
-- Use `/work-pause` to persist a checkpoint, then `/work-resume <roadmap-id>` in a fresh session.
-- `/work-status` and `/work-report` are deterministic local projections; do not edit the store by hand during normal use.
+- Use `F7 → Checkpoint and pause` to persist a checkpoint, then `F7 → Resume work <roadmap-id>` in a fresh session.
+- `F7 → Status` and `F7 → Blocker report` are deterministic local projections; do not edit the store by hand during normal use.
 - Initiatives aggregate child progress and route explicit execution through their durable child order. Planning a child returns to F7 instead of starting implementation; execution consumes the prepared prefix and pauses at the first child that needs planning. Initiative close cannot be forced past unresolved coverage, stale source/plan lineage, or open children. F7 previews complete hierarchy and coverage before its confirmation mints the single-use apply receipt.
 - Finish requires verification evidence and any required review before the store item closes.
 - Manual changes are classified before writer work starts. No parallel writers, automatic branch checkout, or push automation.
@@ -66,14 +60,14 @@ Verifier source text and reports are untrusted data. The `work-background-verifi
 For a repository with the former tracker workspace, use only:
 
 ```text
-/work-remove-beads
+F7 → Migrate legacy workspace
 ```
 
 The migration command is idempotent, validates export parity, keeps an ignored backup, migrates role settings, and stops safely on lock, source-change, corruption, or recovery errors. Normal commands stop and point to this command until migration completes. The migration boundary is the only packaged code that can invoke the legacy exporter.
 
 ## Workflow improvement reporting
 
-Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` roadmap. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout. In the configured source checkout, `/work-improve preview` shows the current report snapshot and `/work-improve` processes it through the normal work-goal lifecycle; reports arriving during the run wait for the next invocation.
+Set `workResume.selfImproving` to `true` only when a producer session may explicitly call `work_report_improvement`. The tool requires an observation, expected behavior, impact, and at least one approved local log. It copies complete evidence to ignored `.pi/self-improvement-reports/` storage in the configured ce-workflow checkout and creates one child task under its `Self-improving` roadmap. Reports never inspect source cleanliness, dispatch an improver, or change the source checkout. In the configured source checkout, `F7 → Improve orchestrator preview` shows the current report snapshot and `F7 → Improve orchestrator` processes it through the normal work-goal lifecycle; reports arriving during the run wait for the next invocation.
 
 ## Workflow evaluation harness
 

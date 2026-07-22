@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import workModelsExtension from "../extensions/work-models.js";
+import workModelsExtension, {
+	executeOrchestratorAction,
+} from "../extensions/work-models.js";
 import { installWorkflowFixture } from "./work-command-fixture.mjs";
 
 const fixture = installWorkflowFixture();
@@ -25,6 +27,8 @@ try {
 			sent.push({ source: "pi", message, options }),
 	};
 	workModelsExtension(pi);
+	const invoke = (name, args, ctx) =>
+		executeOrchestratorAction(name, args, ctx, pi);
 	const ctx = {
 		cwd: fixture.cwd,
 		mode: "tui",
@@ -36,7 +40,7 @@ try {
 	};
 
 	fixture.reset("active", "unknown");
-	await commands["work-small"].handler("Recover safely", ctx);
+	await invoke("work-small", "Recover safely", ctx);
 	assert.equal(fixture.logs().length, 0, "dirty preflight mutates nothing");
 	assert.equal(sent.length, 1, "dirty preflight queries the LLM once");
 	assert.match(sent[0].message, /WO_DIRTY_RECOVERY_V1/);
@@ -193,21 +197,13 @@ try {
 		true,
 		"approved cleanup ends the analysis turn",
 	);
-	assert.deepEqual(
-		sent[1],
-		{
-			source: "pi",
-			message: "/work-small Recover safely",
-			options: { deliverAs: "followUp" },
-		},
-		"approved cleanup requeues the exact blocked command",
-	);
-
-	await commands["work-small"].handler("Recover safely", ctx);
+	assert.equal(sent[1]?.source, "ctx");
+	assert.match(sent[1]?.message ?? "", /WO_INLINE_V1/);
+	assert.deepEqual(sent[1]?.options, { deliverAs: "followUp" });
 	assert.doesNotMatch(
 		notices.at(-1)?.message ?? "",
 		/Dirty files must be resolved/,
-		"clean retry passes the dirty gate",
+		"approved cleanup resumes the blocked action directly",
 	);
 	assert.ok(
 		Object.values(fixture.store().items).some(
@@ -219,9 +215,9 @@ try {
 
 	fixture.reset("active", "unknown");
 	sent.length = 0;
-	await commands["work-resume"].handler("E-1", ctx);
+	await invoke("work-resume", "E-1", ctx);
 	assert.match(sent[0]?.message ?? "", /WO_DIRTY_RECOVERY_V1/);
-	assert.ok(sent[0]?.message.includes("/work-resume E-1"));
+	assert.ok(sent[0]?.message.includes("F7 → Resume work E-1"));
 
 	process.stdout.write("dirty recovery: PASS\n");
 } finally {

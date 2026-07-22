@@ -93,7 +93,10 @@ assert(
 	isRecognizedSource("vendor-manifest.sha256", noGit),
 	"SHA-256 manifests are recognized source",
 );
-assert(isRecognizedSource("toolchain.cmake", noGit), ".cmake is recognized source");
+assert(
+	isRecognizedSource("toolchain.cmake", noGit),
+	".cmake is recognized source",
+);
 assert(!isRecognizedSource("mystery.dat", noGit), ".dat is NOT recognized");
 assert(!isRecognizedSource("dump.bin", noGit), ".bin is NOT recognized");
 

@@ -297,6 +297,8 @@ try {
 			commands[name] = config;
 		},
 	});
+	const invoke = (name, args, ctx) =>
+		mod.executeOrchestratorAction(name, args, ctx, {});
 	assert(!commands["work-models"], "redundant work-models command removed");
 
 	const notices = [];
@@ -377,9 +379,9 @@ try {
 		modelRegistry: { getAvailable: async () => [] },
 		ui: customUi([{ expectText: "Settings: Global", key: "escape" }]),
 	};
-	await commands["work-settings"].handler("", ctx);
+	await invoke("work-settings", "", ctx);
 	assert(notices.length === 0, "escape exits without notify");
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		mode: "rpc",
 		ui: {
@@ -390,7 +392,7 @@ try {
 	assert(notices.length === 0, "non-TUI settings fallback exits cleanly");
 
 	// status reports the advisor slot and gates.
-	await commands["work-settings"].handler("status", ctx);
+	await invoke("work-settings", "status", ctx);
 	assert(
 		notices.at(-1).message.includes("Work settings\n\nProfile"),
 		"status is grouped and readable",
@@ -414,7 +416,7 @@ try {
 
 	let profileMenuVisits = 0;
 	let profileChoices = [];
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		mode: "rpc",
 		ui: {
@@ -446,7 +448,7 @@ try {
 	let globalScopeRender = "";
 	let projectScopeRender = "";
 	let inheritedScopeRender = "";
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi([
 			{
@@ -501,7 +503,7 @@ try {
 		workOrchestrator: { advisorUsageForSlicePlans: "first" },
 	});
 	let globalUsageChoices;
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi(
 			[
@@ -531,7 +533,7 @@ try {
 		"global enum selection persists",
 	);
 	let projectUsageChoices;
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi(
 			[
@@ -561,7 +563,7 @@ try {
 		readSettings().workOrchestrator.advisorUsageForSlicePlans === "all",
 		"project enum selection persists",
 	);
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi([
 			{ target: "Coded task-vs-plan checklist", key: "enter" },
@@ -584,7 +586,7 @@ try {
 	mod.applyProfile(projectProfile, "low");
 	mod.setWorkOrchReviewLevel(projectProfile, "full");
 	writeSettings(projectProfile);
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi([
 			{ key: "\t" },
@@ -605,7 +607,7 @@ try {
 		workResume: { selfImproving: false },
 		subagents: { agentOverrides: { "work-worker": { thinking: "low" } } },
 	});
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi([
 			{ key: "\t" },
@@ -629,7 +631,7 @@ try {
 			},
 		},
 	});
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi([
 			{ target: "Reset global work settings", key: "enter" },
@@ -650,7 +652,7 @@ try {
 	writeSettings(settings);
 	let enabledRender = "";
 	let disabledRender = "";
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi([
 			{ expectText: "Settings: Global", key: "\t" },
@@ -690,7 +692,7 @@ try {
 	};
 	writeSettings(settings);
 	let filteredModels = "";
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		modelRegistry: {
 			getAvailable: async () => [
@@ -759,7 +761,7 @@ try {
 		undefined,
 	];
 	const verifierEfforts = ["High", "High"];
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		modelRegistry: verifierModels,
 		ui: customUi(
@@ -798,7 +800,7 @@ try {
 	);
 	const duplicateNoticeAt = notices.length;
 	const duplicateSelections = ["test/model-b", "Model:", "High", undefined];
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		modelRegistry: verifierModels,
 		ui: customUi(
@@ -833,7 +835,7 @@ try {
 		},
 	});
 	writeSettings({});
-	await commands["work-settings"].handler("status", ctx);
+	await invoke("work-settings", "status", ctx);
 	assert(
 		mod.backgroundVerifierProfiles(cwd)[0].model === "retired/model" &&
 			notices.at(-1).message.includes("retired/model"),
@@ -842,7 +844,7 @@ try {
 	writeGlobalSettings({});
 
 	// Every advisor model picker supports none and inherit; none skips effort.
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi(
 			[
@@ -869,7 +871,7 @@ try {
 			settings.subagents.agentOverrides["work-advisor-2"].thinking === "high",
 		"advisor 2 can inherit the current model at high effort",
 	);
-	await commands["work-settings"].handler("", {
+	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi([
 			{ expectText: "Settings: Global", key: "\t" },

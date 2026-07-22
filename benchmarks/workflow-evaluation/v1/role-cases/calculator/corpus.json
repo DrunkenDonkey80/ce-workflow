@@ -5,22 +5,22 @@
 	"roles": [
 		{
 			"role": "main-brainstorm",
-			"trigger": "/work-brainstorm",
+			"trigger": "ORCHESTRATOR_RUN_V1 work-brainstorm",
 			"inputKind": "request"
 		},
 		{
 			"role": "work-planner",
-			"trigger": "/work-plan",
+			"trigger": "ORCHESTRATOR_RUN_V1 work-plan",
 			"inputKind": "brainstorm"
 		},
 		{
 			"role": "work-migrator",
-			"trigger": "/work-migrate",
+			"trigger": "ORCHESTRATOR_RUN_V1 work-migrate",
 			"inputKind": "legacy-plan"
 		},
 		{
 			"role": "work-worker",
-			"trigger": "/work-resume",
+			"trigger": "ORCHESTRATOR_RUN_V1 work-resume",
 			"inputKind": "approved-plan"
 		},
 		{
@@ -30,7 +30,7 @@
 		},
 		{
 			"role": "work-debugger",
-			"trigger": "/work-debug",
+			"trigger": "ORCHESTRATOR_RUN_V1 work-debug",
 			"inputKind": "failing-project"
 		},
 		{

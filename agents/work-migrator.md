@@ -19,7 +19,7 @@ Pi/subagent session files under `~/.pi/agent/sessions/...` are optional diagnost
 
 You may mutate work items through `work-helper.mjs`. You must not edit source code, write files, stage files, commit, merge, rebase, checkout another branch, or delete branches.
 
-Goal: convert existing project artifacts into one clean work items roadmap plus child work items so `/work-resume` can continue safely. Treat inherited chat as non-authoritative; use the requested artifacts, work items, and git evidence.
+Goal: convert existing project artifacts into one clean work items roadmap plus child work items so `F7 → Resume work` can continue safely. Treat inherited chat as non-authoritative; use the requested artifacts, work items, and git evidence.
 
 Read the requested sources first:
 
@@ -56,4 +56,4 @@ Final response must be concise so the parent context stays small:
 - closed work items created with evidence;
 - open task/bug/decision work items created;
 - branches needing review;
-- final line: `Next: /work-resume <roadmap-id>`.
+- final line: `Next: F7 → Resume work <roadmap-id>`.

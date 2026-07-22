@@ -1,6 +1,6 @@
 ---
 name: work-orchestrator
-description: Drive uncomputed /work-* requests, including verified legacy work items migration. Do not load for WO_INLINE_V1 or prompts that already contain precomputed extension state; those prompts are self-contained.
+description: Execute Orchestrator workflow handoffs, including verified legacy work-item migration. Do not load for WO_INLINE_V1 or prompts that already contain precomputed extension state; those prompts are self-contained.
 ---
 
 # Work Orchestrator
@@ -51,11 +51,11 @@ If it reports independent review required, use its complete labelled reviewer ha
 - **small** — inline, two implementation files maximum.
 - **med** — inline by default, eight files maximum; escalate to big if semantic slicing is needed.
 - **big** — one `wo:planning` work item and one exact `work-planner`; propagate `wo:execution-agent` to risky executable children.
-- **resume** — autonomous slice loop. Run each ready work item inline by default (set `sliceExecutionMode=agent` in `/work-settings` to route each slice to an isolated `work-worker`); exact planner/debugger/reviewer only when policy requires it. Do NOT ask how to run each slice — apply the coded execution policy and run. After a slice closes, continue to the next ready work item automatically (re-run `/work-resume`; use `/work-goal` for automatic `/new` per slice). Stop the loop only for: an open `type=decision` work item needing human input, a blocker/debug-needed work item, roadmap completion, or `/work-stop`.
-- **goal** — autonomous current-session loop with on-demand microcompaction. Work inline; exact specialists only for the cases above. Completion requires verified evidence. Stop with `/work-stop`.
+- **resume** — autonomous slice loop. Run each ready work item inline by default (set `sliceExecutionMode=agent` in `F7 → Settings` to route each slice to an isolated `work-worker`); exact planner/debugger/reviewer only when policy requires it. Do NOT ask how to run each slice — apply the coded execution policy and run. After a slice closes, continue to the next ready work item automatically (re-run `F7 → Resume work`; use `F7 → Autonomous goal` for automatic `/new` per slice). Stop the loop only for: an open `type=decision` work item needing human input, a blocker/debug-needed work item, roadmap completion, or `F7 → Stop safely`.
+- **goal** — autonomous current-session loop with on-demand microcompaction. Work inline; exact specialists only for the cases above. Completion requires verified evidence. Stop with `F7 → Stop safely`.
 - **debug** — exact `work-debugger`, then one scoped reviewer only after a verified fix; coded finalizer commits.
 - **auto** — trust the extension's deterministic classification; do not reclassify with an LLM.
-- **plan/master** — use `ce-plan` and planner/advisor only when requirements are genuinely semantic or uncertain. master mode must clear the Open Question Gate: `/work-plan` scans the plan for unresolved open questions (including non-blocking ones with a stated default) and blocks roadmap creation until each is resolved via one `ask_user` with `allowComment=true`, then re-run. One delivery scope keeps the standalone roadmap path. Multiple independently completable scopes require a versioned semantic initiative proposal, coded preview, explicit approval, and coded apply; select one child for just-in-time planning and never plan or execute sibling stubs automatically.
+- **plan/master** — use `ce-plan` and planner/advisor only when requirements are genuinely semantic or uncertain. master mode must clear the Open Question Gate: `F7 → Plan` scans the plan for unresolved open questions (including non-blocking ones with a stated default) and blocks roadmap creation until each is resolved via one `ask_user` with `allowComment=true`, then re-run. One delivery scope keeps the standalone roadmap path. Multiple independently completable scopes require a versioned semantic initiative proposal, coded preview, explicit approval, and coded apply; select one child for just-in-time planning and never plan or execute sibling stubs automatically.
 - **remove-beads** — deterministic one-way legacy migration; it verifies export parity and backup, never commits, and stops on any mismatch.
 - **migrate** — exact `work-migrator`; source and branch inspection is read-only.
 - **init/status/report/usage/telemetry/roadmap/add/pause/finish** — deterministic extension paths; no agent.

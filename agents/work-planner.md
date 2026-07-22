@@ -56,7 +56,7 @@ Stop and contact the supervisor only when scope is ambiguous, the verification c
 
 Final response:
 
-- if this was a slice-planning pass: target work item updated, label added, risks/blockers found, and final line `Next: /work-resume <roadmap-id>`;
+- if this was a slice-planning pass: target work item updated, label added, risks/blockers found, and final line `Next: F7 → Resume work <roadmap-id>`;
 - created/updated work items;
 - planning work item closed or the exact reason it remains open;
 - dependencies added;
@@ -65,4 +65,4 @@ Final response:
 - whether the roadmap appears complete;
 - why the plan is now executable;
 - blockers, if any;
-- final line: for initiative broad-plan preparation, name the coded suggested next planning action and do not name `/work-resume`; otherwise use `Next: /work-resume <roadmap-id>` when executable work exists, or `Next: roadmap <roadmap-id> "<title>" is complete; close it explicitly with /work-roadmap close <roadmap-id>.` when no work remains.
+- final line: for initiative broad-plan preparation, name the coded suggested next planning action and do not name `F7 → Resume work`; otherwise use `Next: F7 → Resume work <roadmap-id>` when executable work exists, or `Next: roadmap <roadmap-id> "<title>" is complete; close it explicitly with F7 → Roadmaps close <roadmap-id>.` when no work remains.

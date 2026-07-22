@@ -20,6 +20,7 @@ const {
 	completeWorkflowOnce,
 	default: workModelsExtension,
 	directRoleHandoffParams,
+	executeOrchestratorAction,
 	parseWorkPromptMeta,
 	reconcilePendingDirectRuns,
 	recordPendingDirectRun,
@@ -583,14 +584,17 @@ try {
 	try {
 		const commands = {};
 		const hooks = {};
-		workModelsExtension({
+		const pi = {
 			on: (name, handler) => {
 				hooks[name] = handler;
 			},
 			registerCommand: (name, config) => {
 				commands[name] = config;
 			},
-		});
+		};
+		workModelsExtension(pi);
+		const invoke = (name, args, ctx) =>
+			executeOrchestratorAction(name, args, ctx, pi);
 		const sent = [];
 		let compactCalls = 0;
 		const hookCtx = {
@@ -611,7 +615,7 @@ try {
 			"session and input hooks tolerate malformed reconciliation data",
 		);
 		process.env.WORK_ORCH_ACTIVITY_MARKER = "validation";
-		await commands["work-small"].handler("Add tiny thing", {
+		await invoke("work-small", "Add tiny thing", {
 			cwd,
 			mode: "tui",
 			getContextUsage: () => ({ tokens: 40_000 }),
@@ -661,7 +665,7 @@ try {
 		);
 
 		fixture.reset("active");
-		await commands["work-med"].handler("Do not queue", {
+		await invoke("work-med", "Do not queue", {
 			cwd,
 			mode: "print",
 			getContextUsage: () => ({ tokens: 0 }),
@@ -677,14 +681,14 @@ try {
 
 		fixture.reset("blocked");
 		const statusNotices = [];
-		await commands["work-status"].handler("E-1", {
+		await invoke("work-status", "E-1", {
 			cwd: fixture.cwd,
 			getContextUsage: () => ({ tokens: 2222 }),
 			ui: { notify: (message) => statusNotices.push(message) },
 		});
 		assert(
 			statusNotices[0]?.includes("blockers: 1") &&
-				statusNotices[0].includes("Next: Run /work-report BLOCK-1"),
+				statusNotices[0].includes("Next: Run F7 → Blocker report BLOCK-1"),
 			"work-status reports blocked WorkItems instead of only active/ready state",
 		);
 		fixture.reset("active");

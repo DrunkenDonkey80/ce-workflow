@@ -22,12 +22,18 @@ const keybindings = {
 		(id === "tui.editor.deleteCharBackward" && data === "backspace"),
 };
 
-function terminalWidth(value) {
+function terminalWidth(value, emojiWidth = 2) {
 	let width = 0;
 	for (const char of value) {
 		if (/\p{Mark}/u.test(char) || char === "\uFE0F") continue;
-		width += /\p{Emoji_Presentation}/u.test(char) ? 2 : 1;
+		width += /\p{Emoji_Presentation}/u.test(char) ? emojiWidth : 1;
 	}
+	return width;
+}
+
+function calibratedTerminalWidth(value) {
+	const width = terminalWidth(value);
+	if (value.includes("🧭") || value.includes("🧱")) return width + 1;
 	return width;
 }
 
@@ -177,10 +183,41 @@ await drive(
 			),
 		);
 		assert(
-			detailedLines.some((line) =>
-				line.includes("with implementation constraints"),
-			),
+			detailedLines.some((line) => line.includes("implementation constraint")),
 		);
+		component.handleInput("escape");
+	},
+);
+
+await drive(
+	{
+		title: "Fixed",
+		fixedHeight: true,
+		descriptionMinLines: 3,
+		descriptionMaxLines: 3,
+		items: Array.from({ length: 13 }, (_, index) => ({
+			value: `item-${index}`,
+			label: index === 12 ? "Unique final item" : `Item ${index}`,
+			description: index % 2 ? undefined : `Description ${index}`,
+		})),
+	},
+	(component) => {
+		const height = component.render(70).length;
+		component.handleInput("down");
+		assert.equal(component.render(70).length, height);
+		for (const key of "unique") component.handleInput(key);
+		assert.equal(
+			component.render(70).length,
+			height,
+			"fixed dialogs do not resize when filtering to one row",
+		);
+		component.handleInput("z");
+		assert.equal(
+			component.render(70).length,
+			height,
+			"fixed dialogs do not resize when filtering to no rows",
+		);
+		component.handleInput("escape");
 		component.handleInput("escape");
 	},
 );
@@ -201,11 +238,26 @@ await drive(
 			},
 			{
 				value: "done",
-				label: "└─ ✅ Done [closed]",
+				label: "├─ ✅ Done [closed]",
 				description: "Finished work",
 				descriptionPrefix: "│  ",
 				inlineDescription: true,
 				color: "dim",
+			},
+
+			{
+				value: "init",
+				label: "├─ 🧱 Initialize",
+				description: "One extra terminal cell",
+				descriptionPrefix: "│  ",
+				inlineDescription: true,
+			},
+			{
+				value: "plan",
+				label: "├─ 🧭 Plan",
+				description: "One extra terminal cell",
+				descriptionPrefix: "│  ",
+				inlineDescription: true,
 			},
 		],
 	},
@@ -216,11 +268,13 @@ await drive(
 		assert(
 			lines.some((line) => line.includes("│  Work currently in progress")),
 		);
-		assert(lines.some((line) => line.includes("└─ ✅ Done [closed]")));
-		assert(
-			lines.every((line) => terminalWidth(line) === 70),
-			"emoji rows stay within the dialog width",
-		);
+		assert(lines.some((line) => line.includes("├─ ✅ Done [closed]")));
+		for (const line of lines)
+			assert.equal(
+				calibratedTerminalWidth(line),
+				68,
+				`calibrated terminal width: ${line}`,
+			);
 		assert(
 			colors.some(
 				(entry) => entry.color === "success" && entry.text.includes("Current"),

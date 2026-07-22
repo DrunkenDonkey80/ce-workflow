@@ -58,12 +58,12 @@
     "Opus-xhigh": { "provider": "anthropic", "model": "claude-opus-4-8", "effort": "xhigh" }
   },
   "lanes": [
-    { "role": "main", "trigger": "/work-brainstorm", "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"] },
-    { "role": "work-planner", "trigger": "/work-plan", "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"] },
-    { "role": "work-migrator", "trigger": "/work-migrate", "candidates": ["Luna-medium", "Terra-medium", "Sol-high"] },
-    { "role": "work-worker", "trigger": "/work-resume", "candidates": ["Terra-medium", "Terra-high", "Sol-high"] },
+    { "role": "main", "trigger": "ORCHESTRATOR_RUN_V1 work-brainstorm", "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"] },
+    { "role": "work-planner", "trigger": "ORCHESTRATOR_RUN_V1 work-plan", "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"] },
+    { "role": "work-migrator", "trigger": "ORCHESTRATOR_RUN_V1 work-migrate", "candidates": ["Luna-medium", "Terra-medium", "Sol-high"] },
+    { "role": "work-worker", "trigger": "ORCHESTRATOR_RUN_V1 work-resume", "candidates": ["Terra-medium", "Terra-high", "Sol-high"] },
     { "role": "work-fixer", "trigger": "review-failure", "candidates": ["Terra-medium", "Terra-high", "Sol-high"] },
-    { "role": "work-debugger", "trigger": "/work-debug", "candidates": ["Terra-high", "Sol-high", "Sol-xhigh"] },
+    { "role": "work-debugger", "trigger": "ORCHESTRATOR_RUN_V1 work-debug", "candidates": ["Terra-high", "Sol-high", "Sol-xhigh"] },
     { "role": "work-reviewer", "trigger": "review-gate", "candidates": ["Terra-high", "Sol-high", "Opus-high", "Opus-xhigh"] },
     { "role": "work-advisor", "trigger": "critic-gate", "candidates": ["Sol-high", "Sol-xhigh", "Opus-high", "Opus-xhigh"] },
     { "role": "work-advisor-backup", "trigger": "primary-unavailable", "candidates": ["Luna-medium", "Terra-medium", "Sol-high"] },

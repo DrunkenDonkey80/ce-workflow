@@ -90,7 +90,7 @@ const TELEMETRY_DIR_NAME = "work-runs";
 const HISTORY_DIR_NAME = "history";
 const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
-const WORK_SHORTCUT_STATUS = "F7 roadmaps · F8 microcompact";
+const WORK_SHORTCUT_STATUS = "F7 Orchestrator · F8 microcompact";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
 const DEFAULT_THINKING = "__default_thinking__";
@@ -440,7 +440,8 @@ function clearWorkGoalRecovery() {
 }
 
 const WORK_GOAL_STATE_ENTRY_TYPE = "work-goal-state";
-const WORK_GOAL_RESET_COMMAND = "work-goal-reset-continue";
+const ORCHESTRATOR_GOAL_CONTINUE_COMMAND = "__orchestrator-goal-continue";
+const ORCHESTRATOR_AUTOMATION_PREFIX = "ORCHESTRATOR_RUN_V1";
 const WORK_GOAL_STATUS_KEY = "work-goal";
 const WORK_GOAL_PROGRESS_WIDGET_KEY = "work-goal-progress";
 const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
@@ -756,6 +757,15 @@ function rememberWorkflowEpic(cwd, epic) {
 		lastEpicId: idOf(epic),
 		lastEpicTitle: titleOf(epic),
 		lastEpicStatus: statusOf(epic),
+		updatedAt: new Date().toISOString(),
+	});
+}
+
+function rememberRoadmapMenuSelection(cwd, epic) {
+	if (!epic || statusOf(epic) === "closed") return;
+	writeWorkState(cwd, {
+		...readWorkState(cwd),
+		lastRoadmapMenuId: idOf(epic),
 		updatedAt: new Date().toISOString(),
 	});
 }
@@ -1618,8 +1628,46 @@ function summarizeToolResult(event, started) {
 	};
 }
 
+const ORCHESTRATOR_ACTION_LABELS = {
+	"work-add": "Add work",
+	"work-analyze": "Analyze",
+	"work-auto": "Auto-route task",
+	"work-big": "Large task",
+	"work-brainstorm": "Brainstorm",
+	"work-catch-up": "Catch up project",
+	"work-context": "Context guard",
+	"work-debug": "Debug",
+	"work-finish": "Finish work item",
+	"work-goal": "Autonomous goal",
+	"work-ideate": "Ideas",
+	"work-improve": "Improve orchestrator",
+	"work-init": "Initialize workspace",
+	"work-master": "Plan",
+	"work-med": "Medium task",
+	"work-menu": "Orchestrator",
+	"work-migrate": "Migrate work",
+	"work-pause": "Checkpoint and pause",
+	"work-plan": "Plan",
+	"work-remove-beads": "Migrate legacy workspace",
+	"work-report": "Blocker report",
+	"work-resume": "Resume work",
+	"work-resume-stop": "Stop safely",
+	"work-roadmap": "Roadmaps",
+	"work-settings": "Settings",
+	"work-small": "Small task",
+	"work-status": "Status",
+	"work-stop": "Stop safely",
+	"work-telemetry": "Telemetry",
+	"work-usage": "Usage report",
+};
+
 function roadmapTerminology(value) {
 	return String(value ?? "")
+		.replace(
+			/(^|[\s"'`(])\/(work-[\w-]+)/gm,
+			(_match, prefix, command) =>
+				`${prefix}F7 → ${ORCHESTRATOR_ACTION_LABELS[command] ?? command}`,
+		)
 		.replace(
 			/((?:--type[=\s]+|type\s*[:=]\s*["'`]?))epic\b/gi,
 			"$1__INTERNAL_ROADMAP_TYPE__",
@@ -3473,7 +3521,7 @@ function contextStatus(ctx, settings) {
 		`Trigger: ${trigger.toLocaleString()} tokens`,
 		`Keep recent: ${Math.max(DEFAULT_CONTEXT.keepRecentTokens, Number(settings.compaction?.keepRecentTokens) || 0).toLocaleString()} tokens`,
 		`Summary budget: ${Number(current.maxSummaryChars ?? DEFAULT_CONTEXT.maxSummaryChars).toLocaleString()} chars`,
-		"Compaction style: instant, local, no LLM call; only for /work-context or opted-in work auto-compaction.",
+		"Compaction style: instant, local, no LLM call; only for context guard or opted-in work auto-compaction.",
 	].join("\n");
 }
 
@@ -6552,10 +6600,8 @@ function registerVerifierTriageTools(pi) {
 				after,
 				verifierTriageOwner(ctx),
 			);
-			if (resumeTarget && typeof pi.sendUserMessage === "function")
-				pi.sendUserMessage(`/work-resume ${resumeTarget}`, {
-					deliverAs: "followUp",
-				});
+			if (resumeTarget)
+				await executeOrchestratorAction("work-resume", resumeTarget, ctx, pi);
 			return {
 				content: [
 					{
@@ -6639,10 +6685,8 @@ function registerVerifierTriageTools(pi) {
 				loadVerifierStore(cwd),
 				verifierTriageOwner(ctx),
 			);
-			if (resumeTarget && typeof pi.sendUserMessage === "function")
-				pi.sendUserMessage(`/work-resume ${resumeTarget}`, {
-					deliverAs: "followUp",
-				});
+			if (resumeTarget)
+				await executeOrchestratorAction("work-resume", resumeTarget, ctx, pi);
 			return {
 				content: [{ type: "text", text: `Verifier fix committed ${commit}.` }],
 				details: { ...result, commit, origin: "verifier-fix" },
@@ -6733,7 +6777,8 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 }
 
 export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
-	if (!input.before || !input.after || input.before === input.after) return null;
+	if (!input.before || !input.after || input.before === input.after)
+		return null;
 	const paths = run(cwd, "git", [
 		"diff",
 		"--name-only",
@@ -6744,9 +6789,7 @@ export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
 		.map(normalizedRepoPath)
 		.filter(
 			(file) =>
-				file &&
-				!file.startsWith(".ce-workflow/") &&
-				!file.startsWith(".pi/"),
+				file && !file.startsWith(".ce-workflow/") && !file.startsWith(".pi/"),
 		);
 	if (!paths.length) return null;
 	return scheduleConfiguredBackgroundVerifiers(cwd, pi, {
@@ -6775,7 +6818,7 @@ async function chooseAnalyzeValues(ctx, title, values, selected, options = {}) {
 
 async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 	if (ctx.mode === "print" || ctx.mode === "json") {
-		ctx.ui.notify("/work-analyze requires an interactive UI", "warning");
+		ctx.ui.notify("Analyze requires an interactive UI", "warning");
 		return;
 	}
 	const currentModel = ctx.model
@@ -11070,7 +11113,8 @@ function buildWorkRoadmapState(cwd, args = "") {
 				return undefined;
 			}
 		})();
-		const rememberedId = readWorkState(cwd).lastEpicId;
+		const workState = readWorkState(cwd);
+		const rememberedId = workState.lastEpicId;
 		const remembered = rememberedId
 			? readWorkItem(cwd, rememberedId)
 			: undefined;
@@ -11085,10 +11129,24 @@ function buildWorkRoadmapState(cwd, args = "") {
 			const roadmaps = projection.nodes.map((node) =>
 				roadmapSummary(cwd, store.items[node.id], currentId, node),
 			);
+			const rememberedParentId = projection.nodes.find(
+				(node) => node.id === rememberedId,
+			)?.parentId;
 			return {
 				ok: true,
 				action: "roadmap-list",
 				currentId,
+				selectedId: [
+					workState.lastRoadmapMenuId,
+					rememberedId,
+					rememberedParentId,
+				].find(
+					(id) =>
+						id &&
+						roadmaps.some(
+							(roadmap) => roadmap.id === id && roadmap.status !== "closed",
+						),
+				),
 				projectionVersion: projection.schemaVersion,
 				roadmaps,
 			};
@@ -11513,7 +11571,7 @@ function parseWorkGoalCommand(args = "") {
 		if (!trimmed)
 			return {
 				kind: "status",
-				error: "Usage: /work-goal --tokens 100k <objective>",
+				error: "Usage: autonomous goal --tokens 100k <objective>",
 			};
 	}
 	const [command, rest] = splitFirstWord(trimmed);
@@ -11552,7 +11610,7 @@ function workGoalSelfImprovingAppendix() {
 - Use the ce-workflow/work-orchestrator process where it applies; prefer /work-init, /work-plan, /work-resume, /work-status, /work-report, and native work-item store-backed state over chat-only tracking.
 - If a live or disposable target project exposes ce-workflow friction, call work_report_improvement with the observation, expected behavior, impact, and local logs; do not modify the ce-workflow source from the producer project.
 - Prefer coded automation over prompt-only guidance when workflow behavior can be handled in this extension.
-- Use work telemetry and /work-context microcompaction to keep loops cheap, quiet, and resumable.
+- Use work telemetry and context guard microcompaction to keep loops cheap, quiet, and resumable.
 - Finish after target-project progress is verified and any discovered ce-workflow issue is reported.`;
 }
 
@@ -11833,25 +11891,6 @@ function workImproveAvailable(cwd, target = "") {
 	}
 }
 
-function registerWorkImproveCommand(pi, ctx) {
-	if (!workImproveAvailable(ctx.cwd)) return;
-	pi.registerCommand("work-improve", {
-		description: "Triage, deduplicate, and execute self-improvement reports",
-		handler: async (args, commandCtx) => {
-			if (
-				String(args ?? "")
-					.trim()
-					.split(/\s+/, 1)[0]
-					?.toLowerCase() === "preview"
-			)
-				return handleWorkImproveCommand(args, pi, commandCtx);
-			await withCommandTelemetry("work-improve", args, commandCtx, () =>
-				handleWorkImproveCommand(args, pi, commandCtx),
-			);
-		},
-	});
-}
-
 function readWorkCatchUpBaseline() {
 	try {
 		const parsed = JSON.parse(
@@ -12109,17 +12148,6 @@ async function handleWorkCatchUpCommand(args, pi, ctx) {
 	);
 }
 
-function registerWorkCatchUpCommand(pi, ctx) {
-	if (!workResumeSettings(ctx.cwd).selfImproving) return;
-	pi.registerCommand("work-catch-up", {
-		description:
-			"Proactively analyze, decide, and adopt upstream Pi/plugin capabilities",
-		handler: async (args, ctx) => {
-			await handleWorkCatchUpCommand(args, pi, ctx);
-		},
-	});
-}
-
 function workProjectAutopilotAppendix() {
 	return `Project autopilot policy:
 - Treat the target directory as the source of truth: verify git and native work-item store state there before mutating anything.
@@ -12127,7 +12155,7 @@ function workProjectAutopilotAppendix() {
 - Do not call subagent list or ask an LLM to select a role. When specialization is genuinely required, call the exact role directly: work-planner for ambiguous/large slicing, work-debugger for root-cause failures, work-worker for high-risk isolated writing, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
 - When a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child.
 - Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
-- Use /work-resume for one deterministic WorkItem boundary. Use /work-goal only when the user explicitly wants a multi-step autonomous loop.
+- Use /work-resume for one deterministic WorkItem boundary. Use autonomous goal only when the user explicitly wants a multi-step autonomous loop.
 - Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it explicitly says N tasks, stop after N executable native work-item store closes. Identifiers such as work-2 are targets, never task counts.
 - When given a target work item or roadmap ID, resolve that exact ID and continue until it is closed; an open roadmap with no ready children needs its next planned slice, not premature completion.
 - At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
@@ -12453,7 +12481,7 @@ function stopWorkGoalProgressTimer(ctx) {
 }
 
 function workGoalSummary(goal = activeWorkGoal) {
-	if (!goal) return "No active /work-goal.";
+	if (!goal) return "No active autonomous goal.";
 	const budget = formatWorkGoalBudget(goal);
 	return [
 		`Work goal: ${goal.objective}`,
@@ -12467,7 +12495,7 @@ function workGoalSummary(goal = activeWorkGoal) {
 		goal.decision
 			? `Human decision: ${formatWorkGoalDecision(goal.decision)}`
 			: "",
-		"Commands: /work-goal pause|resume|clear|status|edit <objective>; /work-goal --tokens 100k <objective>; /work-stop for a clean stop",
+		"Commands: autonomous goal pause|resume|clear|status|edit <objective>; autonomous goal --tokens 100k <objective>; F7 → Stop safely for a clean stop",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -12594,17 +12622,17 @@ function escapeXmlText(value) {
 
 function buildWorkGoalSystemPrompt(goal) {
 	const budgetLine = goal.tokenBudget
-		? `\n- Respect the /work-goal token budget (${formatWorkGoalBudget(goal)} used); the loop pauses at the limit.`
+		? `\n- Respect the autonomous goal token budget (${formatWorkGoalBudget(goal)} used); the loop pauses at the limit.`
 		: "";
-	return `Active /work-goal:
+	return `Active autonomous goal:
 <work_goal_objective>
 ${escapeXmlText(goal.objective)}
 </work_goal_objective>
 
-/work-goal management rules:
+autonomous goal management rules:
 - The user's objective above is the work prompt; these rules only manage looping, compaction, and human-decision stops.
 - Keep working autonomously until the objective is complete and verified.
-- Before each continuation, /work-goal will microcompact old reasoning and tool noise; treat native work-item store, git, files, tests, and command output as source of truth.
+- Before each continuation, autonomous goal will microcompact old reasoning and tool noise; treat native work-item store, git, files, tests, and command output as source of truth.
 - Work directly in this session by default. Do not call subagent list, delegate routine implementation/verification/commit work, or launch duplicate reviewers. Spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
 - ${ROLE_TIMEOUT_GUIDANCE}
 - Prefer coded helpers and deterministic checks over asking an LLM to classify, summarize, validate, stage, commit, close, or choose an agent.
@@ -12644,11 +12672,11 @@ function markWorkGoalContinuationDelivered(prompt) {
 }
 
 function buildWorkGoalContinuePrompt(goal, marker, note = "") {
-	return `Continue the active /work-goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. If the human answer asked you to perform an action, do that action first before unrelated work. Do not ask the same question again unless the answer is impossible to act on. Use ask_user for real human-decision blockers; use work_goal_human_decision only if ask_user is unavailable or cancelled. Otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
+	return `Continue the active autonomous goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. If the human answer asked you to perform an action, do that action first before unrelated work. Do not ask the same question again unless the answer is impossible to act on. Use ask_user for real human-decision blockers; use work_goal_human_decision only if ask_user is unavailable or cancelled. Otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
 }
 
 function buildWorkGoalCompactInstructions(goal) {
-	return `work-context work-goal microcompact: preserve the active /work-goal objective, human decisions, native work-item store/git state, files changed/read, blockers, verification evidence, and next step. Omit old reasoning and full tool logs. Objective: ${truncate(goal.objective, 1_200)}`;
+	return `work-context work-goal microcompact: preserve the active autonomous goal objective, human decisions, native work-item store/git state, files changed/read, blockers, verification evidence, and next step. Omit old reasoning and full tool logs. Objective: ${truncate(goal.objective, 1_200)}`;
 }
 
 function workGoalHasPendingMessages(ctx) {
@@ -12667,7 +12695,7 @@ async function sendWorkGoalPrompt(pi, ctx, prompt) {
 		return true;
 	} catch (error) {
 		ctx.ui.notify(
-			`Could not queue /work-goal prompt: ${formatError(error)}`,
+			`Could not queue autonomous goal prompt: ${formatError(error)}`,
 			"error",
 		);
 		return false;
@@ -12732,7 +12760,7 @@ async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
 		const queued = await sendWorkGoalPrompt(
 			pi,
 			ctx,
-			`/${WORK_GOAL_RESET_COMMAND} ${goal.id} ${marker}`,
+			`/${ORCHESTRATOR_GOAL_CONTINUE_COMMAND} ${goal.id} ${marker}`,
 		);
 		if (!queued && workGoalContinuationPending?.marker === marker)
 			workGoalContinuationPending = null;
@@ -12782,7 +12810,10 @@ function scheduleWorkGoalUsageLimitRetry(pi, ctx, goal = activeWorkGoal) {
 		};
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("/work-goal usage limit wait elapsed; retrying.", "info");
+		ctx.ui.notify(
+			"autonomous goal usage limit wait elapsed; retrying.",
+			"info",
+		);
 		const sent = await sendWorkGoalAnswerContinuation(
 			pi,
 			ctx,
@@ -12873,7 +12904,7 @@ function pauseWorkGoalForDecision(decision, ctx, pi) {
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
 	ctx.ui.notify(
-		`/work-goal needs human decision:\n${formatWorkGoalDecision(decision)}`,
+		`autonomous goal needs human decision:\n${formatWorkGoalDecision(decision)}`,
 		"warning",
 	);
 	pauseWarpForDecision(ctx, decision);
@@ -12912,7 +12943,7 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	const goal = activeWorkGoal;
 	if (!goal) {
 		return {
-			content: [{ type: "text", text: "No active /work-goal." }],
+			content: [{ type: "text", text: "No active autonomous goal." }],
 			details: {},
 			completed: false,
 		};
@@ -12926,7 +12957,10 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	if (rejection) {
 		updateWorkGoalUsage(goal, ctx);
 		persistWorkGoal(pi);
-		ctx.ui.notify(`/work-goal completion rejected: ${rejection}.`, "warning");
+		ctx.ui.notify(
+			`autonomous goal completion rejected: ${rejection}.`,
+			"warning",
+		);
 		return {
 			content: [
 				{
@@ -12949,10 +12983,10 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	persistWorkGoal(pi, null);
 	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 	ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
-	ctx.ui.notify(`/work-goal complete: ${truncate(trimmed, 240)}`, "info");
+	ctx.ui.notify(`autonomous goal complete: ${truncate(trimmed, 240)}`, "info");
 	finishWarpWork(ctx, workWarpMode(goal.mode, goal), trimmed);
 	return {
-		content: [{ type: "text", text: `/work-goal complete: ${trimmed}` }],
+		content: [{ type: "text", text: `autonomous goal complete: ${trimmed}` }],
 		details: { goal: goal.objective, summary: trimmed },
 		terminate: true,
 		completed: true,
@@ -12962,12 +12996,12 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 async function startWorkGoal(mode, objective, pi, ctx, tokenBudget) {
 	const text = String(objective ?? "").trim();
 	if (!text) {
-		ctx.ui.notify("Usage: /work-goal <objective>", "warning");
+		ctx.ui.notify("Usage: autonomous goal <objective>", "warning");
 		return;
 	}
 	if (activeWorkGoal && activeWorkGoal.status !== "complete") {
 		const replace = await ctx.ui.confirm(
-			"Replace /work-goal?",
+			"Replace autonomous goal?",
 			`Current: ${activeWorkGoal.objective}\n\nNew: ${text}`,
 		);
 		if (!replace) return;
@@ -12985,7 +13019,7 @@ async function startWorkGoal(mode, objective, pi, ctx, tokenBudget) {
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
 	ctx.ui.notify(
-		`/work-goal started: ${truncate(text, 240)}${tokenBudget ? ` (budget ${formatTokenCount(tokenBudget)})` : ""}`,
+		`autonomous goal started: ${truncate(text, 240)}${tokenBudget ? ` (budget ${formatTokenCount(tokenBudget)})` : ""}`,
 		"info",
 	);
 	await sendWorkGoalPrompt(pi, ctx, buildWorkGoalKickoffPrompt(activeWorkGoal));
@@ -13013,14 +13047,14 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
 		ctx.ui.notify(
 			previous
-				? `/work-goal cleared: ${truncate(previous, 240)}`
-				: "No active /work-goal.",
+				? `autonomous goal cleared: ${truncate(previous, 240)}`
+				: "No active autonomous goal.",
 			"info",
 		);
 		return;
 	}
 	if (!activeWorkGoal && command.kind !== "start") {
-		ctx.ui.notify("No active /work-goal.", "warning");
+		ctx.ui.notify("No active autonomous goal.", "warning");
 		return;
 	}
 	if (command.kind === "pause") {
@@ -13034,7 +13068,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		clearWorkGoalUsageLimitTimer();
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("/work-goal paused.", "info");
+		ctx.ui.notify("autonomous goal paused.", "info");
 		return;
 	}
 	if (command.kind === "resume") {
@@ -13048,7 +13082,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 				"waiting_usage_limit",
 			].includes(activeWorkGoal.status)
 		) {
-			ctx.ui.notify("No paused /work-goal to resume.", "warning");
+			ctx.ui.notify("No paused autonomous goal to resume.", "warning");
 			return;
 		}
 		clearWorkGoalRecovery();
@@ -13076,7 +13110,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 	}
 	if (command.kind === "edit") {
 		if (!command.objective) {
-			ctx.ui.notify("Usage: /work-goal edit <objective>", "warning");
+			ctx.ui.notify("Usage: autonomous goal edit <objective>", "warning");
 			return;
 		}
 		activeWorkGoal = {
@@ -13113,7 +13147,7 @@ async function handleWorkResumeGoalCommand(args, pi, ctx) {
 			};
 			persistWorkGoal(pi);
 			updateWorkGoalStatus(ctx);
-			ctx.ui.notify("/work-resume stop canceled.", "info");
+			ctx.ui.notify("Resume stop canceled.", "info");
 			return;
 		}
 		if (
@@ -13156,8 +13190,8 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 		updateWorkGoalStatus(ctx);
 		ctx.ui.notify(
 			working
-				? "/work-stop requested: stopping after the current clean phase."
-				: "/work-stop: work stopped. Run /work-resume to resume.",
+				? "F7 → Stop safely requested: stopping after the current clean phase."
+				: "F7 → Stop safely: work stopped. Open F7 → Resume work to continue.",
 			"info",
 		);
 		if (working && send) {
@@ -13173,8 +13207,8 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 	const working = !ctx.isIdle?.();
 	ctx.ui.notify(
 		working
-			? "/work-stop requested: checkpoint and stop at the next safe phase boundary."
-			: "/work-stop: nothing active to stop.",
+			? "F7 → Stop safely requested: checkpoint and stop at the next safe phase boundary."
+			: "F7 → Stop safely: nothing active to stop.",
 		working ? "info" : "warning",
 	);
 	if (working && send) {
@@ -13187,50 +13221,245 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 }
 
 async function handleWorkMenuCommand(ctx, pi) {
+	const items = [
+		{
+			value: "work-roadmap",
+			label: "🌍 Roadmaps",
+			description:
+				"Browse, inspect, plan, continue, close, or reopen roadmaps.\nThe last open roadmap or initiative is selected automatically.",
+		},
+		{
+			value: "work-resume",
+			label: "⏩ Resume work",
+			description:
+				"Run the next safe native work-item step.\nLeave the target blank to continue the current roadmap.",
+			argumentTitle: "Roadmap ID or guidance",
+			placeholder: "Blank continues the current roadmap",
+		},
+		{
+			value: "work-goal",
+			label: "🎯 Autonomous goal",
+			description:
+				"Start or manage a multi-step autonomous goal.\nGoals pause for real decisions, limits, errors, or an explicit stop.",
+			argumentTitle: "Goal objective or management action",
+			placeholder:
+				"Describe the objective, or enter status / pause / resume / clear",
+		},
+		{
+			value: "work-stop",
+			label: "⏹️ Stop safely",
+			description:
+				"Stop autonomous work at the next clean phase boundary.\nCurrent native work-item and Git state remain resumable.",
+		},
+		{
+			value: "work-init",
+			label: "🧱 Initialize workspace",
+			description:
+				"Initialize the native work-item store without adding AGENTS noise.\nUse once when this project has no workflow workspace.",
+		},
+		{
+			value: "work-status",
+			label: "📍 Status",
+			description:
+				"Show deterministic roadmap, work-item, and Git status.\nBlank targets the current roadmap.",
+			argumentTitle: "Status target",
+			placeholder: "Blank shows the current roadmap",
+		},
+		{
+			value: "work-report",
+			label: "📄 Blocker report",
+			description:
+				"Show a focused handoff report for blockers and failed evidence.\nBlank targets the current roadmap.",
+			argumentTitle: "Report target",
+			placeholder: "Blank shows the current roadmap",
+		},
+		{
+			value: "work-ideate",
+			label: "💡 Ideas",
+			description:
+				"List, capture, inspect, accept, reject, discuss, or import ideas.\nBlank opens the current roadmap's idea dashboard.",
+			argumentTitle: "Idea topic or action",
+			placeholder: "Blank lists ideas; try <id> inspect or import <path>",
+		},
+		{
+			value: "work-brainstorm",
+			label: "🧠 Brainstorm",
+			description:
+				"Create or link a brainstorm for an idea or freeform topic.\nThe artifact is linked back to native work state.",
+			argumentTitle: "Idea or topic",
+			placeholder: "idea <id>, a topic, or idea <id> <artifact-path>",
+		},
+		{
+			value: "work-plan",
+			label: "🧭 Plan",
+			description:
+				"Turn an idea, brainstorm, or plan file into a roadmap.\nPlanning preserves requirements and verification contracts.",
+			argumentTitle: "Idea, artifact, or plan path",
+			placeholder: "Describe the idea or enter a local artifact path",
+		},
+		{
+			value: "work-migrate",
+			label: "📦 Migrate work",
+			description:
+				"Normalize legacy plans, TODOs, or tracker state into native work items.\nSource artifacts remain references after migration.",
+			argumentTitle: "Migration sources",
+			placeholder: "Enter one or more source paths",
+		},
+		{
+			value: "work-remove-beads",
+			label: "🧹 Migrate legacy workspace",
+			description:
+				"Verify and migrate a former workflow workspace to native work state.\nOnly legacy workflow artifacts are removed.",
+		},
+		{
+			value: "work-pause",
+			label: "⏸️ Checkpoint and pause",
+			description:
+				"Checkpoint current work and leave a resumable handoff.\nAn optional note records why work paused.",
+			argumentTitle: "Pause note",
+			placeholder: "Optional handoff note",
+		},
+		{
+			value: "work-analyze",
+			label: "🔎 Analyze",
+			description:
+				"Choose background analyses to run on an immutable scope.\nResults are read-only and attached as evidence.",
+		},
+		{
+			value: "work-small",
+			label: "🟢 Small task",
+			description:
+				"Create one small implementation WorkItem and hand it off safely.\nUse for a narrow, already-understood change.",
+			argumentTitle: "Small task",
+			placeholder: "Describe the change",
+		},
+		{
+			value: "work-med",
+			label: "🟡 Medium task",
+			description:
+				"Create one bounded medium WorkItem and execute it inline.\nUse when implementation needs a little investigation.",
+			argumentTitle: "Medium task",
+			placeholder: "Describe the change",
+		},
+		{
+			value: "work-big",
+			label: "🔴 Large task",
+			description:
+				"Create a planning WorkItem for a large or ambiguous change.\nThe planner slices it before implementation starts.",
+			argumentTitle: "Large task",
+			placeholder: "Describe the outcome and constraints",
+		},
+		{
+			value: "work-finish",
+			label: "✅ Finish work item",
+			description:
+				"Commit reviewed work and close its WorkItem after deterministic gates pass.\nRequires a concrete work-item or roadmap target.",
+			argumentTitle: "Work item to finish",
+			placeholder: "Enter a WorkItem or roadmap ID",
+		},
+		{
+			value: "work-debug",
+			label: "🪲 Debug",
+			description:
+				"Resolve or create a debug WorkItem and run root-cause handling.\nGuidance can follow the target after a colon.",
+			argumentTitle: "Debug target and guidance",
+			placeholder: "<work-item-id>: optional guidance, or describe the bug",
+		},
+		{
+			value: "work-add",
+			label: "➕ Add work",
+			description:
+				"Create explicit work under the active roadmap.\nUse for scope discovered after the roadmap was created.",
+			argumentTitle: "Work to add",
+			placeholder: "Describe the new work",
+		},
+		{
+			value: "work-auto",
+			label: "⚡ Auto-route task",
+			description:
+				"Classify a task, apply deterministic guards, and choose the safe handoff.\nUseful when the right task size is unclear.",
+			argumentTitle: "Task to route",
+			placeholder: "Describe the task",
+		},
+		{
+			value: "work-telemetry",
+			label: "📊 Telemetry",
+			description:
+				"Summarize orchestrator timing, token, context, and review telemetry.\nBlank shows today's activity.",
+			argumentTitle: "Telemetry filter",
+			placeholder: "Blank shows today; try roadmap <id>",
+		},
+		{
+			value: "work-usage",
+			label: "📈 Usage report",
+			description:
+				"Write a local HTML usage report from existing telemetry.\nNo work items are created or changed.",
+			argumentTitle: "Usage report options",
+			placeholder:
+				"Blank uses the current roadmap; optional: roadmap <id> --open",
+		},
+		{
+			value: "work-context",
+			label: "🧠 Context guard",
+			description:
+				"Inspect or tune proactive context compaction.\nSupports status, compact, on, off, and a token threshold.",
+			argumentTitle: "Context action",
+			placeholder: "Blank shows status; compact / on / off / set <tokens>",
+		},
+		{
+			value: "work-settings",
+			label: "⚙️ Settings",
+			description:
+				"Configure effort, role models, background verifiers, and review gates.\nGlobal and project scopes are available in the submenu.",
+		},
+		{
+			value: "work-improve",
+			label: "🔧 Improve orchestrator",
+			description:
+				"Turn captured workflow evidence into a bounded self-improvement task.\nAvailable when self-improving reporting is enabled.",
+		},
+		{
+			value: "work-catch-up",
+			label: "🔄 Catch up project",
+			description:
+				"Review a project's workflow history and continue missed improvements.\nAvailable when self-improving reporting is enabled.",
+		},
+		{
+			value: "microcompact",
+			label: "🧽 Microcompact now",
+			description:
+				"Compact old reasoning and tool noise now or at the next idle boundary.\nNative work state, Git evidence, files, blockers, and next action survive.",
+		},
+	];
+	let selectedIndex = 0;
 	for (;;) {
-		const action = await choose(ctx, "Work menu", [
-			{
-				value: "resume",
-				label: "resume / cancel stop",
-				description: "Run /work-resume",
-			},
-			{
-				value: "stop",
-				label: "stop after current phase",
-				description: "Run /work-stop",
-			},
-			{
-				value: "roadmap",
-				label: "roadmaps",
-				description: "Open /work-roadmap",
-			},
-			{
-				value: "microcompact",
-				label: "microcompact context",
-				description: "Compact now or at the next idle boundary",
-			},
-			{
-				value: "status",
-				label: "status",
-				description: "Show /work-status",
-			},
-			{
-				value: "report",
-				label: "blocker report",
-				description: "Show /work-report",
-			},
-		]);
-		if (!action) return;
-		if (action === "resume") return handleWorkResumeGoalCommand("", pi, ctx);
-		if (action === "stop") return handleWorkResumeStopCommand("", pi, ctx);
-		if (action === "roadmap") {
+		const selected = await showListDialog(ctx, {
+			title: "Orchestrator",
+			purpose: "Choose any workflow action. Type to filter.",
+			items,
+			currentValue: "work-roadmap",
+			selectedIndex,
+			cursorKey: "orchestrator-menu",
+			descriptionMinLines: 3,
+			descriptionMaxLines: 3,
+			fixedHeight: true,
+		});
+		if (!selected) return;
+		selectedIndex = selected.index;
+		if (selected.value === "microcompact")
+			return requestManualMicrocompact(ctx);
+		if (selected.value === "work-roadmap") {
 			const result = await handleWorkRoadmapCommand("", ctx, pi);
 			if (result?.action === "roadmap-cancel") continue;
 			return result;
 		}
-		if (action === "microcompact") return requestManualMicrocompact(ctx);
-		if (action === "status") return handleWorkStatusCommand("", ctx);
-		if (action === "report") return handleWorkReportCommand("", ctx);
+		const item = selected.item;
+		let args = "";
+		if (item.argumentTitle) {
+			args = await ctx.ui.input(item.argumentTitle, item.placeholder);
+			if (args == null) continue;
+		}
+		return executeOrchestratorAction(selected.value, args, ctx, pi);
 	}
 }
 
@@ -13269,7 +13498,7 @@ async function handleWorkGoalResetCommand(args, ctx) {
 }
 
 function buildWorkGoalPausedPrompt(goal) {
-	return `Paused /work-goal waiting for a human decision:
+	return `Paused autonomous goal waiting for a human decision:
 <work_goal_objective>
 ${escapeXmlText(goal.objective)}
 </work_goal_objective>
@@ -13277,7 +13506,7 @@ ${escapeXmlText(goal.objective)}
 Pending decision:
 ${formatWorkGoalDecision(goal.decision)}
 
-Answer the user's clarification only. Ordinary chat never resumes this goal; only \`/work-goal resume <answer>\` does.`;
+Answer the user's clarification only. Ordinary chat never resumes this goal; only \`autonomous goal resume <answer>\` does.`;
 }
 
 async function flushWorkGoalContinuationRetry(ctx, pi) {
@@ -13338,7 +13567,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 			updateWorkGoalStatus(ctx);
 			scheduleWorkGoalUsageLimitRetry(pi, ctx, activeWorkGoal);
 			ctx.ui.notify(
-				`/work-goal hit a usage/rate limit; retrying in ${formatDuration(nextRetryAt - Date.now())}.`,
+				`autonomous goal hit a usage/rate limit; retrying in ${formatDuration(nextRetryAt - Date.now())}.`,
 				"warning",
 			);
 			return;
@@ -13356,7 +13585,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 				persistWorkGoal(pi);
 				updateWorkGoalStatus(ctx);
 				ctx.ui.notify(
-					"/work-goal paused after repeated transient errors. Run /work-goal resume to retry.",
+					"autonomous goal paused after repeated transient errors. Run autonomous goal resume to retry.",
 					"warning",
 				);
 				return;
@@ -13369,7 +13598,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 					: "provider_retry",
 			};
 			ctx.ui.notify(
-				`/work-goal hit a transient error (retry ${nextRetries}/${WORK_GOAL_MAX_RETRIES}); continuing.`,
+				`autonomous goal hit a transient error (retry ${nextRetries}/${WORK_GOAL_MAX_RETRIES}); continuing.`,
 				"info",
 			);
 		} else {
@@ -13378,7 +13607,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 			persistWorkGoal(pi);
 			updateWorkGoalStatus(ctx);
 			ctx.ui.notify(
-				"/work-goal paused after interruption. Run /work-goal resume to continue.",
+				"autonomous goal paused after interruption. Run autonomous goal resume to continue.",
 				"warning",
 			);
 			return;
@@ -13390,7 +13619,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("/work-resume stopped. Run /work-resume to resume.", "info");
+		ctx.ui.notify("Resume stopped. Open F7 → Resume work to continue.", "info");
 		finishWarpWork(ctx, workWarpMode(goal.mode, goal), "stopped");
 		return;
 	}
@@ -13416,7 +13645,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
 		ctx.ui.notify(
-			`/work-goal token budget reached: ${formatWorkGoalBudget(activeWorkGoal)}. Run /work-goal resume to continue over budget or /work-goal edit --tokens <N> <objective> to raise it.`,
+			`autonomous goal token budget reached: ${formatWorkGoalBudget(activeWorkGoal)}. Run autonomous goal resume to continue over budget or autonomous goal edit --tokens <N> <objective> to raise it.`,
 			"warning",
 		);
 		return;
@@ -13879,10 +14108,11 @@ function roadmapMenuItems(roadmaps) {
 	});
 }
 
-async function chooseRoadmap(ctx, title, roadmaps) {
-	return choose(ctx, title, roadmapMenuItems(roadmaps), undefined, {
+async function chooseRoadmap(ctx, title, roadmaps, selectedId) {
+	return choose(ctx, title, roadmapMenuItems(roadmaps), selectedId, {
 		purpose: "Choose a roadmap to inspect, plan, or continue.",
 		descriptionMinLines: 3,
+		fixedHeight: true,
 	});
 }
 
@@ -14006,9 +14236,15 @@ async function handleWorkRoadmapCommand(
 	}
 	const selected =
 		menuSelected ||
-		(await chooseRoadmap(ctx, "🗺️ Work roadmaps", list.roadmaps));
+		(await chooseRoadmap(
+			ctx,
+			"🗺️ Work roadmaps",
+			list.roadmaps,
+			list.selectedId,
+		));
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
 	const selectedRoadmap = list.roadmaps.find((epic) => epic.id === selected);
+	rememberRoadmapMenuSelection(ctx.cwd, selectedRoadmap);
 	if (
 		selectedRoadmap &&
 		!compactRoadmapDescription(selectedRoadmap.description)
@@ -14039,7 +14275,7 @@ async function handleWorkRoadmapCommand(
 						? [
 								{
 									value: "resume",
-									label: "▶️ work-resume",
+									label: "▶️ Resume work",
 									description: "start the prepared roadmap prefix",
 								},
 							]
@@ -14073,7 +14309,7 @@ async function handleWorkRoadmapCommand(
 							? [
 									{
 										value: "resume",
-										label: "▶️ work-resume",
+										label: "▶️ Resume work",
 										description: "continue this prepared child roadmap",
 									},
 								]
@@ -14090,12 +14326,12 @@ async function handleWorkRoadmapCommand(
 						improvement
 							? {
 									value: "improve",
-									label: "🛠️ work-improve",
+									label: "🔧 Improve orchestrator",
 									description: "triage, deduplicate, and execute reports",
 								}
 							: {
 									value: "resume",
-									label: "▶️ work-resume",
+									label: "▶️ Resume work",
 									description: "autonomous project loop for this roadmap",
 								},
 						{
@@ -14344,10 +14580,71 @@ function recentNumberedWorkAction(cwd, number) {
 	return last.actions[number - 1] ?? null;
 }
 
-async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
-	const match = String(action ?? "").match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
-	if (!match) return false;
-	const [, command, args = ""] = match;
+async function handleWorkContextCommand(args, ctx) {
+	let settings;
+	try {
+		settings = readEffectiveSettings(ctx.cwd);
+	} catch (error) {
+		ctx.ui.notify(
+			`Could not read settings: ${error instanceof Error ? error.message : String(error)}`,
+			"error",
+		);
+		return;
+	}
+	const [command, value] = String(args ?? "")
+		.trim()
+		.split(/\s+/, 2);
+	if (!command || command === "status")
+		return ctx.ui.notify(contextStatus(ctx, settings), "info");
+	if (command === "compact") {
+		contextCompactState.requested = true;
+		ctx.compact({
+			customInstructions:
+				"manual orchestrator context compact: preserve native work-item store/git state, files, blockers, and next action; omit reasoning and full tool logs.",
+			onComplete: () => {
+				contextCompactState.requested = false;
+				ctx.ui.notify("Work context compacted", "info");
+			},
+			onError: (error) => {
+				contextCompactState.requested = false;
+				ctx.ui.notify(
+					`Work context compaction failed: ${error.message}`,
+					"warning",
+				);
+			},
+		});
+		return;
+	}
+	if (["off", "disable"].includes(command)) {
+		settings = readSettings(ctx.cwd);
+		setContextSettings(settings, { enabled: false, autoCompact: false });
+		writeSettings(ctx.cwd, settings);
+		return ctx.ui.notify("Disabled work context guard", "info");
+	}
+	if (["on", "enable"].includes(command)) {
+		settings = readSettings(ctx.cwd);
+		setContextSettings(settings, { enabled: true, autoCompact: true });
+		writeSettings(ctx.cwd, settings);
+		return ctx.ui.notify("Enabled work context guard", "info");
+	}
+	if (command === "set") {
+		settings = readSettings(ctx.cwd);
+		setContextSettings(settings, { compactAtTokens: clampCompactAt(value) });
+		writeSettings(ctx.cwd, settings);
+		return ctx.ui.notify(contextStatus(ctx, settings), "info");
+	}
+	ctx.ui.notify("Use: status, compact, on, off, or set <tokens>", "warning");
+}
+
+async function executeOrchestratorAction(
+	command,
+	args,
+	ctx,
+	pi,
+	selectionNote = "",
+) {
+	const name = String(command ?? "").replace(/^\//, "");
+	const text = String(args ?? "");
 	const builders = {
 		"work-init": buildWorkInitState,
 		"work-pause": buildWorkPauseState,
@@ -14358,39 +14655,141 @@ async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
 		"work-master": buildWorkMasterState,
 		"work-migrate": buildWorkMigrateState,
 		"work-remove-beads": buildWorkRemoveBeadsState,
-		"work-finish": buildWorkFinishState,
 		"work-debug": buildWorkDebugState,
 		"work-add": buildWorkAddState,
 		"work-auto": buildWorkAutoState,
-		"work-roadmap": buildWorkRoadmapState,
 	};
-	if (command === "work-status")
-		await withCommandTelemetry(command, args, ctx, () =>
-			handleWorkStatusCommand(args, ctx),
+	if (name === "work-goal")
+		return handleWorkGoalCommand(text, "generic", pi, ctx);
+	if (["work-stop", "work-resume-stop"].includes(name))
+		return handleWorkResumeStopCommand(text, pi, ctx);
+	if (name === "work-menu") return handleWorkMenuCommand(ctx, pi);
+	if (name === "work-settings")
+		return text.trim() === "status"
+			? workSettingsStatus(ctx)
+			: workSettingsLoop(ctx);
+	if (name === "work-context") return handleWorkContextCommand(text, ctx);
+	if (name === "work-improve")
+		return text.trim().split(/\s+/, 1)[0]?.toLowerCase() === "preview"
+			? handleWorkImproveCommand(text, pi, ctx)
+			: withCommandTelemetry(name, text, ctx, () =>
+					handleWorkImproveCommand(text, pi, ctx),
+				);
+	if (name === "work-catch-up") return handleWorkCatchUpCommand(text, pi, ctx);
+	if (name === "work-telemetry") {
+		cleanupBenignInstructionDirt(ctx.cwd);
+		return notify(ctx, buildWorkTelemetry(ctx.cwd, text), "info");
+	}
+	if (name === "work-usage")
+		return withCommandTelemetry(name, text, ctx, async () => {
+			cleanupBenignInstructionDirt(ctx.cwd);
+			const state = buildWorkUsageState(ctx.cwd, text);
+			if (state.ok && state.open)
+				state.browserOpened = openUsageReport(state.path);
+			notify(ctx, renderWorkUsageText(state), state.ok ? "info" : "warning");
+			return stateTelemetry(state);
+		});
+	if (name === "work-ideate")
+		return withCommandTelemetry(name, text, ctx, async () => {
+			cleanupBenignInstructionDirt(ctx.cwd);
+			const state = buildWorkIdeateState(ctx.cwd, text);
+			notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
+			if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
+			return stateTelemetry(state);
+		});
+	if (name === "work-brainstorm")
+		return withCommandTelemetry(name, text, ctx, async () => {
+			cleanupBenignInstructionDirt(ctx.cwd);
+			const state = buildWorkBrainstormState(ctx.cwd, text);
+			notify(
+				ctx,
+				renderWorkBrainstormText(state),
+				state.ok ? "info" : "warning",
+			);
+			if (state.ok)
+				await sendFollowUp(ctx, brainstormHandoffPrompt(state, ctx.cwd), pi);
+			return stateTelemetry(state);
+		});
+	if (name === "work-finish")
+		return withCommandTelemetry(name, text, ctx, async () => {
+			cleanupBenignInstructionDirt(ctx.cwd);
+			let state = buildWorkFinishState(ctx.cwd, text);
+			if (state.ok && !state.handoffPrompt)
+				state = executeWorkFinishState(
+					ctx.cwd,
+					state,
+					ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+				);
+			if (state.verifier?.status === "queued")
+				void launchQueuedVerifierJobs(
+					ctx.cwd,
+					createPiSubagentsVerifierAdapter(pi),
+				);
+			rememberRecommendedActions(
+				ctx.cwd,
+				recommendedActions(state),
+				"work-finish",
+			);
+			notify(
+				ctx,
+				renderWorkflowActionText(state),
+				state.ok ? "info" : "warning",
+			);
+			if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
+			return stateTelemetry(state);
+		});
+	if (name === "work-status")
+		return withCommandTelemetry(name, text, ctx, () =>
+			handleWorkStatusCommand(text, ctx),
 		);
-	else if (command === "work-report")
-		await withCommandTelemetry(command, args, ctx, () =>
-			handleWorkReportCommand(args, ctx),
+	if (name === "work-report")
+		return withCommandTelemetry(name, text, ctx, () =>
+			handleWorkReportCommand(text, ctx),
 		);
-	else if (command === "work-resume")
-		await withCommandTelemetry(
-			command,
-			args,
+	if (name === "work-roadmap")
+		return withCommandTelemetry(name, text, ctx, () =>
+			handleWorkRoadmapCommand(text, ctx, pi),
+		);
+	if (name === "work-analyze")
+		return withCommandTelemetry(name, text, ctx, () =>
+			handleWorkAnalyzeCommand(text, ctx, pi),
+		);
+	if (name === "work-resume")
+		return withCommandTelemetry(
+			name,
+			text,
 			ctx,
-			() => handleWorkResumeCommand(args, ctx, pi, selectionNote),
+			() => handleWorkResumeCommand(text, ctx, pi, selectionNote),
 			true,
 		);
-	else if (builders[command])
-		await withCommandTelemetry(
-			command,
-			args,
-			ctx,
-			() =>
-				handleWorkflowAction(builders[command], args, ctx, pi, selectionNote),
-			true,
-		);
-	else return false;
-	return true;
+	if (!builders[name]) return false;
+	return withCommandTelemetry(
+		name,
+		text,
+		ctx,
+		() => handleWorkflowAction(builders[name], text, ctx, pi, selectionNote),
+		[
+			"work-small",
+			"work-med",
+			"work-big",
+			"work-plan",
+			"work-master",
+			"work-migrate",
+			"work-debug",
+		].includes(name),
+	);
+}
+
+async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
+	const match = String(action ?? "").match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
+	if (!match) return false;
+	return executeOrchestratorAction(
+		match[1],
+		match[2] ?? "",
+		ctx,
+		pi,
+		selectionNote,
+	);
 }
 
 async function maybeRunNumberedWorkAction(event, ctx, pi) {
@@ -14464,6 +14863,7 @@ export {
 	writeEvidenceSummary,
 	directRoleHandoffParams,
 	executeNumberedWorkAction,
+	executeOrchestratorAction,
 	completeWorkflowOnce,
 	withCommandTelemetry,
 	parseWorkPromptMeta,
@@ -14563,18 +14963,19 @@ export default function workModelsExtension(pi) {
 					throw new Error(
 						`Blocking files remain dirty: ${compactList(remaining)}. Apply the approved cleanup or cancel for manual repair.`,
 					);
-				if (typeof pi.sendUserMessage !== "function")
-					throw new Error("Could not queue the blocked work command.");
+				const parsed = recovery.command.match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
+				if (!parsed)
+					throw new Error("Blocked orchestrator action is malformed.");
 				pendingDirtyRecoveries.delete(token);
-				pi.sendUserMessage(recovery.command, { deliverAs: "followUp" });
+				await executeOrchestratorAction(parsed[1], parsed[2] ?? "", ctx, pi);
 				return {
 					content: [
 						{
 							type: "text",
-							text: `Approved cleanup is clear; queued ${recovery.command}.`,
+							text: `Approved cleanup is clear; resumed ${ORCHESTRATOR_ACTION_LABELS[parsed[1]] ?? "work"}.`,
 						},
 					],
-					details: { command: recovery.command },
+					details: { action: parsed[1] },
 					terminate: true,
 				};
 			},
@@ -14758,11 +15159,11 @@ export default function workModelsExtension(pi) {
 			name: "work_goal_complete",
 			label: "Work Goal Complete",
 			description:
-				"Mark the active /work-goal complete after the objective is fully done and verified.",
+				"Mark the active autonomous goal complete after the objective is fully done and verified.",
 			promptSnippet:
-				"Mark the active /work-goal complete after verified completion",
+				"Mark the active autonomous goal complete after verified completion",
 			promptGuidelines: [
-				"Use work_goal_complete only when the active /work-goal is fully complete and verified.",
+				"Use work_goal_complete only when the active autonomous goal is fully complete and verified.",
 			],
 			parameters: { ...WORK_GOAL_TOOL_SCHEMA, required: ["summary"] },
 			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -14778,7 +15179,7 @@ export default function workModelsExtension(pi) {
 			name: "work_goal_human_decision",
 			label: "Work Goal Human Decision",
 			description:
-				"Durably pause the active /work-goal only when ask_user is unavailable or cancelled. Never use this as the first prompt path.",
+				"Durably pause the active autonomous goal only when ask_user is unavailable or cancelled. Never use this as the first prompt path.",
 			promptSnippet:
 				"Persist a human-decision blocker only after ask_user is unavailable or cancelled",
 			promptGuidelines: [
@@ -14802,7 +15203,7 @@ export default function workModelsExtension(pi) {
 					content: [
 						{
 							type: "text",
-							text: `/work-goal paused for human decision.\n${formatWorkGoalDecision(decision)}`,
+							text: `autonomous goal paused for human decision.\n${formatWorkGoalDecision(decision)}`,
 						},
 					],
 					details: decision,
@@ -14837,8 +15238,6 @@ export default function workModelsExtension(pi) {
 			reconcilePendingDirectRuns(ctx.cwd, runtime);
 			reconcileBackgroundVerifierRuns(ctx.cwd);
 		}
-		registerWorkCatchUpCommand(pi, ctx);
-		registerWorkImproveCommand(pi, ctx);
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
 		if (activeWorkGoal?.status === "active") {
@@ -14892,6 +15291,20 @@ export default function workModelsExtension(pi) {
 		});
 		recordSelfImprovementHistory(ctx, "input", event);
 		if (!extractWorkGoalContinuationMarker(event.text)) clearWorkGoalRecovery();
+		const automated = String(event.text ?? "").match(
+			new RegExp(
+				`^${ORCHESTRATOR_AUTOMATION_PREFIX}\\s+(work-[\\w-]+)(?:\\s+([\\s\\S]*))?$`,
+			),
+		);
+		if (automated) {
+			await executeOrchestratorAction(
+				automated[1],
+				automated[2] ?? "",
+				ctx,
+				pi,
+			);
+			return { action: "handled" };
+		}
 		const parsed = parseNumberedWorkActionInput(event.text);
 		if (parsed && recentNumberedWorkAction(ctx.cwd, parsed.number)) {
 			if (await maybeRunNumberedWorkAction(event, ctx, pi))
@@ -15281,413 +15694,23 @@ export default function workModelsExtension(pi) {
 		recordSelfImprovementHistory(ctx, "turn_start", event);
 	});
 
-	pi.registerCommand("work-goal", {
-		description:
-			"Run an autonomous goal with microcompact loops and human-decision stops",
-		handler: async (args, ctx) => {
-			await handleWorkGoalCommand(args, "generic", pi, ctx);
-		},
-	});
-
-	pi.registerCommand("work-resume", {
-		description: "Run the next coded native work-item store/git work step",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-resume",
-				args,
-				ctx,
-				() => handleWorkResumeCommand(args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-stop", {
-		description: "Cleanly stop autonomous work at the next safe boundary",
-		handler: async (args, ctx) => {
-			await handleWorkResumeStopCommand(args, pi, ctx);
-		},
-	});
-
-	pi.registerCommand("work-resume-stop", {
-		description: "Alias for /work-stop",
-		handler: async (args, ctx) => {
-			await handleWorkResumeStopCommand(args, pi, ctx);
-		},
-	});
-
-	pi.registerCommand("work-menu", {
-		description: "Open a small work-orchestrator menu",
-		handler: async (_args, ctx) => {
-			await handleWorkMenuCommand(ctx, pi);
-		},
-	});
-
-	pi.registerCommand(WORK_GOAL_RESET_COMMAND, {
-		description: "Internal: continue a work goal in a fresh session",
+	pi.registerCommand(ORCHESTRATOR_GOAL_CONTINUE_COMMAND, {
+		description: "Internal orchestrator goal continuation",
 		handler: async (args, ctx) => {
 			await handleWorkGoalResetCommand(args, ctx);
 		},
 	});
 
 	pi.registerShortcut?.("f7", {
-		description: "Open work roadmaps",
+		description: "Open Orchestrator",
 		handler: async (ctx) => {
-			await handleWorkRoadmapCommand("", ctx, pi);
+			await handleWorkMenuCommand(ctx, pi);
 		},
 	});
 	pi.registerShortcut?.("f8", {
 		description: "Microcompact work context",
 		handler: async (ctx) => {
 			requestManualMicrocompact(ctx);
-		},
-	});
-
-	pi.registerCommand("work-init", {
-		description:
-			"Initialize native work-item store for work-orchestrator without AGENTS noise",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-init", args, ctx, () =>
-				handleWorkflowAction(buildWorkInitState, args, ctx, pi),
-			);
-		},
-	});
-
-	pi.registerCommand("work-status", {
-		description:
-			"Show deterministic native work-item store/git work-orchestrator status",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-status", args, ctx, () =>
-				handleWorkStatusCommand(args, ctx),
-			);
-		},
-	});
-
-	pi.registerCommand("work-report", {
-		description:
-			"Show deterministic native work-item store/git blocker handoff report",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-report", args, ctx, () =>
-				handleWorkReportCommand(args, ctx),
-			);
-		},
-	});
-
-	pi.registerCommand("work-roadmap", {
-		description:
-			"List, select, close, reopen, and inspect native work-item store roadmaps",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-roadmap", args, ctx, () =>
-				handleWorkRoadmapCommand(args, ctx, pi),
-			);
-		},
-	});
-
-	pi.registerCommand("work-telemetry", {
-		description:
-			"Summarize work-orchestrator timing, token, and context telemetry",
-		handler: async (args, ctx) => {
-			cleanupBenignInstructionDirt(ctx.cwd);
-			const output = buildWorkTelemetry(ctx.cwd, args);
-			notify(ctx, output, "info");
-		},
-	});
-
-	pi.registerCommand("work-usage", {
-		description: "Write a local HTML work usage report from telemetry",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-usage", args, ctx, async () => {
-				cleanupBenignInstructionDirt(ctx.cwd);
-				const state = buildWorkUsageState(ctx.cwd, args);
-				if (state.ok && state.open)
-					state.browserOpened = openUsageReport(state.path);
-				notify(ctx, renderWorkUsageText(state), state.ok ? "info" : "warning");
-				return stateTelemetry(state);
-			});
-		},
-	});
-
-	pi.registerCommand("work-ideate", {
-		description: "Show and mutate native work-item store-backed idea state",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-ideate", args, ctx, async () => {
-				cleanupBenignInstructionDirt(ctx.cwd);
-				const state = buildWorkIdeateState(ctx.cwd, args);
-				notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
-				if (state.handoffPrompt)
-					await sendFollowUp(ctx, state.handoffPrompt, pi);
-				return stateTelemetry(state);
-			});
-		},
-	});
-
-	pi.registerCommand("work-brainstorm", {
-		description: "Link brainstorms back to native work-item store-backed ideas",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-brainstorm", args, ctx, async () => {
-				cleanupBenignInstructionDirt(ctx.cwd);
-				const state = buildWorkBrainstormState(ctx.cwd, args);
-				notify(
-					ctx,
-					renderWorkBrainstormText(state),
-					state.ok ? "info" : "warning",
-				);
-				if (state.ok)
-					await sendFollowUp(ctx, brainstormHandoffPrompt(state, ctx.cwd), pi);
-				return stateTelemetry(state);
-			});
-		},
-	});
-
-	pi.registerCommand("work-pause", {
-		description:
-			"Checkpoint current native work-item store-backed work and stop",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-pause", args, ctx, () =>
-				handleWorkflowAction(buildWorkPauseState, args, ctx, pi),
-			);
-		},
-	});
-
-	pi.registerCommand("work-analyze", {
-		description: "Run selected background analyses on an immutable scope",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-analyze", args, ctx, () =>
-				handleWorkAnalyzeCommand(args, ctx, pi),
-			);
-		},
-	});
-
-	pi.registerCommand("work-small", {
-		description: "Create one implementation WorkItem and hand off safely",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-small",
-				args,
-				ctx,
-				() => handleWorkflowAction(buildWorkSmallState, args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-med", {
-		description: "Create one bounded medium WorkItem and execute it inline",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-med",
-				args,
-				ctx,
-				() => handleWorkflowAction(buildWorkMedState, args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-big", {
-		description: "Create one large-slice planning WorkItem and hand off safely",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-big",
-				args,
-				ctx,
-				() => handleWorkflowAction(buildWorkBigState, args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-plan", {
-		description:
-			"Plan an idea and bootstrap the native work-item store roadmap",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-plan",
-				args,
-				ctx,
-				() => handleWorkflowAction(buildWorkPlanState, args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-master", {
-		description: "Alias for /work-plan master roadmap bootstrap",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-master",
-				args,
-				ctx,
-				() => handleWorkflowAction(buildWorkMasterState, args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-remove-beads", {
-		description: "Verify and migrate a legacy workspace to native work state",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-remove-beads", args, ctx, () =>
-				handleWorkflowAction(buildWorkRemoveBeadsState, args, ctx, pi),
-			);
-		},
-	});
-
-	pi.registerCommand("work-migrate", {
-		description: "Normalize migration sources and hand off safely",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-migrate",
-				args,
-				ctx,
-				() => handleWorkflowAction(buildWorkMigrateState, args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-finish", {
-		description:
-			"Commit reviewed work and close the WorkItem when deterministic gates pass",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-finish", args, ctx, async () => {
-				cleanupBenignInstructionDirt(ctx.cwd);
-				let state = buildWorkFinishState(ctx.cwd, args);
-				if (state.ok && !state.handoffPrompt)
-					state = executeWorkFinishState(
-						ctx.cwd,
-						state,
-						ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
-					);
-				if (state.verifier?.status === "queued")
-					void launchQueuedVerifierJobs(
-						ctx.cwd,
-						createPiSubagentsVerifierAdapter(pi),
-					);
-				rememberRecommendedActions(
-					ctx.cwd,
-					recommendedActions(state),
-					"work-finish",
-				);
-				notify(
-					ctx,
-					renderWorkflowActionText(state),
-					state.ok ? "info" : "warning",
-				);
-				if (state.handoffPrompt)
-					await sendFollowUp(ctx, state.handoffPrompt, pi);
-				return stateTelemetry(state);
-			});
-		},
-	});
-
-	pi.registerCommand("work-debug", {
-		description: "Resolve or create a debug WorkItem and hand off safely",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry(
-				"work-debug",
-				args,
-				ctx,
-				() => handleWorkflowAction(buildWorkDebugState, args, ctx, pi),
-				true,
-			);
-		},
-	});
-
-	pi.registerCommand("work-add", {
-		description:
-			"Create explicit work under the active native work-item store roadmap",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-add", args, ctx, () =>
-				handleWorkflowAction(buildWorkAddState, args, ctx, pi),
-			);
-		},
-	});
-
-	pi.registerCommand("work-auto", {
-		description: "Run deterministic /work-auto guards and hand off",
-		handler: async (args, ctx) => {
-			await withCommandTelemetry("work-auto", args, ctx, () =>
-				handleWorkflowAction(buildWorkAutoState, args, ctx, pi),
-			);
-		},
-	});
-
-	pi.registerCommand("work-context", {
-		description: "Inspect or tune proactive instant context compaction",
-		handler: async (args, ctx) => {
-			let settings;
-			try {
-				settings = readEffectiveSettings(ctx.cwd);
-			} catch (error) {
-				ctx.ui.notify(
-					`Could not read settings: ${error instanceof Error ? error.message : String(error)}`,
-					"error",
-				);
-				return;
-			}
-
-			const [command, value] = args.trim().split(/\s+/, 2);
-			if (!command || command === "status") {
-				ctx.ui.notify(contextStatus(ctx, settings), "info");
-				return;
-			}
-			if (command === "compact") {
-				contextCompactState.requested = true;
-				ctx.compact({
-					customInstructions:
-						"manual work-context compact: preserve native work-item store/git state, files, blockers, and next command; omit reasoning and full tool logs.",
-					onComplete: () => {
-						contextCompactState.requested = false;
-						ctx.ui.notify("Work context compacted", "info");
-					},
-					onError: (error) => {
-						contextCompactState.requested = false;
-						ctx.ui.notify(
-							`Work context compaction failed: ${error.message}`,
-							"warning",
-						);
-					},
-				});
-				return;
-			}
-			if (command === "off" || command === "disable") {
-				settings = readSettings(ctx.cwd);
-				setContextSettings(settings, { enabled: false, autoCompact: false });
-				writeSettings(ctx.cwd, settings);
-				ctx.ui.notify("Disabled work context guard", "info");
-				return;
-			}
-			if (command === "on" || command === "enable") {
-				settings = readSettings(ctx.cwd);
-				setContextSettings(settings, { enabled: true, autoCompact: true });
-				writeSettings(ctx.cwd, settings);
-				ctx.ui.notify("Enabled work context guard", "info");
-				return;
-			}
-			if (command === "set") {
-				settings = readSettings(ctx.cwd);
-				setContextSettings(settings, {
-					compactAtTokens: clampCompactAt(value),
-				});
-				writeSettings(ctx.cwd, settings);
-				ctx.ui.notify(contextStatus(ctx, settings), "info");
-				return;
-			}
-
-			ctx.ui.notify(
-				"Usage: /work-context [status|compact|on|off|set <tokens>]",
-				"warning",
-			);
-		},
-	});
-
-	pi.registerCommand("work-settings", {
-		description:
-			"Work-orchestrator settings submenu: role models, background verifiers, and review gates",
-		handler: async (args, ctx) => {
-			if (String(args).trim() === "status") return workSettingsStatus(ctx);
-			await workSettingsLoop(ctx);
 		},
 	});
 }

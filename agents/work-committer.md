@@ -43,4 +43,4 @@ Final response must be concise so the parent context stays small:
 - work item closed or updated;
 - verification evidence;
 - uncommitted unrelated files, if any;
-- final line: `Next: /work-resume <roadmap-id>` when more roadmap work remains or when remaining scope is unknown. Only say `Next: roadmap <roadmap-id> "<title>" is complete; close it explicitly with /work-roadmap close <roadmap-id>.` when the parent task explicitly says this is the final slice or you verified the roadmap/master plan has no remaining unsliced/open units; never infer roadmap completion just because `work-ready-summary` is empty after closing one work item.
+- final line: `Next: F7 → Resume work <roadmap-id>` when more roadmap work remains or when remaining scope is unknown. Only say `Next: roadmap <roadmap-id> "<title>" is complete; close it explicitly with F7 → Roadmaps close <roadmap-id>.` when the parent task explicitly says this is the final slice or you verified the roadmap/master plan has no remaining unsliced/open units; never infer roadmap completion just because `work-ready-summary` is empty after closing one work item.

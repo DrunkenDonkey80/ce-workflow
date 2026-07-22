@@ -27,6 +27,24 @@ function stripAnsi(value) {
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
+// ponytail: calibrated for packaged icons on Windows Terminal; update with icons.
+const terminalEmojiExtraCells = new Map([
+	["🧱", 1],
+	["🧭", 1],
+	["🧹", 1],
+	["🟢", 1],
+	["🟡", 1],
+	["🪲", 1],
+	["🧽", 1],
+]);
+
+function emojiExtraCells(value) {
+	const text = stripAnsi(value);
+	for (const [emoji, cells] of terminalEmojiExtraCells)
+		if (text.includes(emoji)) return cells;
+	return 0;
+}
+
 function cellWidth(segment) {
 	if (
 		/\p{Emoji_Presentation}/u.test(segment) ||
@@ -62,18 +80,19 @@ function visibleWidth(value) {
 
 function fit(value, width) {
 	const text = String(value);
+	const safeWidth = Math.max(1, width - emojiExtraCells(text));
 	const visible = visibleWidth(text);
-	if (visible <= width) return `${text}${" ".repeat(width - visible)}`;
+	if (visible <= safeWidth) return `${text}${" ".repeat(safeWidth - visible)}`;
 	let result = "";
 	let used = 0;
 	for (const { segment } of graphemes.segment(stripAnsi(text))) {
 		const next = cellWidth(segment);
-		if (used + next > width - 1) break;
+		if (used + next > safeWidth - 1) break;
 		result += segment;
 		used += next;
 	}
 	result += "…";
-	return `${result}${" ".repeat(Math.max(0, width - used - 1))}`;
+	return `${result}${" ".repeat(Math.max(0, safeWidth - used - 1))}`;
 }
 
 function wrapText(value, width, maxLines) {
@@ -100,7 +119,8 @@ function wrapText(value, width, maxLines) {
 }
 
 function frame(theme, title, content, width) {
-	const inner = Math.max(8, width - 2);
+	// Overlay rendering reserves a cursor cell; keep two more clear of autowrap.
+	const inner = Math.max(8, width - 4);
 	const border = (text) => theme.fg("border", text);
 	const row = (text = "") =>
 		`${border("│")}${fit(` ${text}`, inner)}${border("│")}`;
@@ -182,6 +202,7 @@ export async function showListDialog(ctx, options) {
 		help,
 		descriptionMaxLines = 3,
 		descriptionMinLines = 0,
+		fixedHeight = false,
 		selectOnSpace = false,
 		onInput,
 		forceCustom = false,
@@ -303,6 +324,21 @@ export async function showListDialog(ctx, options) {
 								...details.map((line) => theme.fg("muted", line)),
 							);
 						}
+					}
+					if (fixedHeight) {
+						const inline = source.some((item) => item.inlineDescription);
+						const maxRows = inline ? 6 : 12;
+						const rowCount = Math.min(source.length, maxRows);
+						const fixedBodyLines =
+							2 +
+							(subtitle ? 2 : 0) +
+							(filter ? 2 : 0) +
+							rowCount +
+							(source.length > maxRows ? 1 : 0) +
+							(inline
+								? 0
+								: 1 + Math.max(descriptionMinLines, descriptionMaxLines));
+						while (content.length < fixedBodyLines) content.push("");
 					}
 					let defaultHelp = "↑↓ navigate · Enter select · Esc/Backspace back";
 					if (multi)

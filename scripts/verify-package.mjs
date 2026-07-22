@@ -144,9 +144,6 @@ const normalPaths = [
 	...agentFiles
 		.filter((name) => name.startsWith("work-"))
 		.map((name) => `agents/${name}`),
-	...listed("prompts")
-		.filter((name) => name !== "work-remove-beads.md")
-		.map((name) => `prompts/${name}`),
 ];
 for (const rel of normalPaths) {
 	const text = read(rel)
@@ -183,7 +180,6 @@ const userFacingDocs = [
 	"skills/work-orchestrator/SKILL.md",
 	"skills/work-orchestrator/references/full-policy.md",
 	...agentFiles.map((name) => `agents/${name}`),
-	...listed("prompts").map((name) => `prompts/${name}`),
 ];
 const staleRoadmapTerms = userFacingDocs.flatMap((rel) =>
 	[...read(rel).matchAll(/\bepics?\b/gi)].map((match) => `${rel}:${match[0]}`),
@@ -313,16 +309,12 @@ check(
 		"fully-triaged",
 	].every((status) => verifierStore.includes(`"${status}"`)),
 );
-const packagedPromptCommands = pkg.pi?.prompts?.length
-	? listed("prompts").map((name) => name.replace(/\.md$/, ""))
-	: [];
-const duplicateCommands = packagedPromptCommands.filter((name) =>
-	models.includes(`registerCommand("${name}"`),
-);
 check(
-	"commands have one packaged owner",
-	duplicateCommands.length === 0,
-	duplicateCommands.join(", "),
+	"orchestrator has one F7 entrypoint and no work slash commands",
+	!existsSync(path.join(root, "prompts")) &&
+		!models.match(/registerCommand\(["'`]work-/) &&
+		models.includes('registerShortcut?.("f7"') &&
+		models.includes('title: "Orchestrator"'),
 );
 const helper = read("scripts/work-helper.mjs");
 check(
@@ -354,7 +346,7 @@ check(
 		read("agents/work-planner.md").includes(
 			"do not create slice-planning or executable WorkItems",
 		) &&
-		read("prompts/work-plan.md").includes("initiative-preview") &&
+		models.includes("initiative-preview") &&
 		existsSync(path.join(root, "scripts", "test-work-initiative.mjs")),
 );
 const plannerAgent = read("agents/work-planner.md");
@@ -376,9 +368,9 @@ check(
 		),
 );
 check(
-	"migration command remains explicit",
-	models.includes('registerCommand("work-remove-beads"') &&
-		read("prompts/work-remove-beads.md").includes("/work-remove-beads"),
+	"legacy migration remains available from Orchestrator",
+	models.includes('value: "work-remove-beads"') &&
+		models.includes("buildWorkRemoveBeadsState"),
 );
 
 const runtimeTracked = execFileSync("git", ["ls-files"], {

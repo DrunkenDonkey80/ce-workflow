@@ -448,7 +448,8 @@ try {
 	const ambiguousJob = Object.values(ambiguousStore.jobs).find(
 		(job) => job.batchId === ambiguous.batch.id,
 	);
-	const ambiguousCheckpoint = ambiguousStore.batches[ambiguous.batch.id].checkpoint;
+	const ambiguousCheckpoint =
+		ambiguousStore.batches[ambiguous.batch.id].checkpoint;
 	writeFileSync(
 		ambiguousJob.launch.request.output,
 		`\`\`\`json\n${JSON.stringify({
@@ -821,6 +822,8 @@ try {
 		},
 	};
 	workModelsExtension(pi);
+	const invoke = (name, args, ctx) =>
+		workModels.executeOrchestratorAction(name, args, ctx, pi);
 	assert(
 		workModels
 			.backgroundVerifierProfiles(committedCwd)
@@ -829,7 +832,7 @@ try {
 	);
 	let analyzeMenu = 0;
 	let analyzeModelLabels = [];
-	await commands["work-analyze"].handler("", {
+	await invoke("work-analyze", "", {
 		cwd: committedCwd,
 		mode: "tui",
 		model: { provider: "test", id: "current" },

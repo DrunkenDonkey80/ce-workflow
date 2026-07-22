@@ -773,8 +773,8 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 	}
 	if (sample.stage === "work" && !customPrompt) {
 		prompts = [
-			`/work-migrate ${sample.stageInputPath}`,
-			"/work-goal Resume the active migrated plan through every executable WorkItem, verification, review, commit, and finalization.",
+			`ORCHESTRATOR_RUN_V1 work-migrate ${sample.stageInputPath}`,
+			"ORCHESTRATOR_RUN_V1 work-goal Resume the active migrated plan through every executable WorkItem, verification, review, commit, and finalization.",
 		];
 		requiredCommands = ["work-migrate", "work-goal"];
 	}
@@ -1742,7 +1742,7 @@ export function requiresSentinel(changedPaths, declaredChangeType = "") {
 		/^(README\.md|docs\/|scripts\/test-|benchmarks\/workflow-evaluation\/)/;
 	return changedPaths.some(
 		(file) =>
-			/^(extensions\/work-models\.js|skills\/ce-(brainstorm|plan|work)\/|prompts\/work-|agents\/workItem-)/.test(
+			/^(extensions\/work-models\.js|skills\/ce-(brainstorm|plan|work)\/|agents\/workItem-)/.test(
 				file.replaceAll("\\", "/"),
 			) || !knownNarrow.test(file.replaceAll("\\", "/")),
 	);

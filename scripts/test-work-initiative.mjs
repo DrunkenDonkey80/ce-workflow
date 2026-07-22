@@ -231,6 +231,11 @@ try {
 	const current = buildWorkRoadmapState(dir, "list");
 	assert.equal(current.currentId, "initiative-1.2");
 	assert.equal(
+		current.selectedId,
+		"initiative-1",
+		"roadmap menu remembers the last open initiative without changing execution",
+	);
+	assert.equal(
 		current.roadmaps.find((item) => item.current)?.role,
 		"child_epic",
 	);
@@ -257,6 +262,7 @@ try {
 	saveStore(dir, ambiguousStore);
 	const ambiguousCurrent = buildWorkRoadmapState(dir, "list");
 	assert.equal(ambiguousCurrent.currentId, undefined);
+	assert.equal(ambiguousCurrent.selectedId, "initiative-1");
 	assert(!ambiguousCurrent.roadmaps.some((item) => item.current));
 	const nextAvailable = buildWorkResumeState(dir, "initiative-1");
 	assert.equal(nextAvailable.action, "planning_starved");

@@ -15,6 +15,7 @@ import workModelsExtension, {
 	buildWorkImproveObjective,
 	buildWorkImproveState,
 	buildWorkResumeState,
+	executeOrchestratorAction,
 	handleWorkRoadmapCommand,
 	workGoalCompletionBlocker,
 } from "../extensions/work-models.js";
@@ -188,15 +189,15 @@ await handleWorkRoadmapCommand(
 				}
 				if (selectedRoadmap) return undefined;
 				selectedRoadmap = true;
-				return labels.find((label) => label.includes("SI-1 ["));
+				return labels.find((label) => label.includes("SI-1 Self-improving"));
 			},
 			notify: () => {},
 		},
 	},
 	{},
 );
-assert(operationLabels.some((label) => /work-improve/i.test(label)));
-assert(!operationLabels.some((label) => /work-resume/i.test(label)));
+assert(operationLabels.some((label) => /improve/i.test(label)));
+assert(!operationLabels.some((label) => /resume/i.test(label)));
 
 writeFileSync(
 	path.join(root, ".pi", "settings.json"),
@@ -219,15 +220,15 @@ await handleWorkRoadmapCommand(
 				}
 				if (selectedRoadmap) return undefined;
 				selectedRoadmap = true;
-				return labels.find((label) => label.includes("SI-1 ["));
+				return labels.find((label) => label.includes("SI-1 Self-improving"));
 			},
 			notify: () => {},
 		},
 	},
 	{},
 );
-assert(!wrongSourceLabels.some((label) => /work-resume/i.test(label)));
-assert(wrongSourceLabels.some((label) => /work-improve/i.test(label)));
+assert(!wrongSourceLabels.some((label) => /resume/i.test(label)));
+assert(wrongSourceLabels.some((label) => /improve/i.test(label)));
 
 writeFileSync(
 	path.join(root, ".pi", "settings.json"),
@@ -236,7 +237,7 @@ writeFileSync(
 const commands = {};
 const hooks = {};
 let activeTools = [];
-workModelsExtension({
+const pi = {
 	on: (name, handler) => {
 		hooks[name] = handler;
 	},
@@ -248,7 +249,8 @@ workModelsExtension({
 	setActiveTools: (tools) => {
 		activeTools = tools;
 	},
-});
+};
+workModelsExtension(pi);
 const hookCtx = {
 	cwd: root,
 	mode: "interactive",
@@ -261,12 +263,13 @@ const hookCtx = {
 	},
 };
 await hooks.session_start({}, hookCtx);
-assert(
-	commands["work-improve"],
-	"registers only when improvement work is ready",
+assert.equal(
+	Object.keys(commands).filter((name) => name.startsWith("work-")).length,
+	0,
+	"self-improvement remains menu-only",
 );
 assert(!existsSync(path.join(root, ".pi", "work-runs")));
-await commands["work-improve"].handler("preview SI-1", hookCtx);
+await executeOrchestratorAction("work-improve", "preview SI-1", hookCtx, pi);
 assert(
 	!existsSync(path.join(root, ".pi", "work-runs")),
 	"preview does not emit telemetry or mutate workflow state",

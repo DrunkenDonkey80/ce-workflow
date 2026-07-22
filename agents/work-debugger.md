@@ -45,4 +45,4 @@ Final response must be concise so the parent context stays small:
 - verification run and result;
 - work items updated;
 - whether durable learning capture is warranted, with the proposed learning key and preferred destination (`AGENTS.md`/executable configuration for direct procedures, `ce-compound mode:headless` for non-obvious rationale or troubleshooting);
-- final line: `Next: /work-resume <roadmap-id>` or the exact blocker command.
+- final line: `Next: F7 → Resume work <roadmap-id>` or the exact blocker command.

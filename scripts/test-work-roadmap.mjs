@@ -588,7 +588,7 @@ try {
 		},
 		{},
 	);
-	assert(!initiativeOps.some((label) => /work-resume/i.test(label)));
+	assert(!initiativeOps.some((label) => /resume work/i.test(label)));
 	assert(initiativeOps.some((label) => /preview|reconcile/i.test(label)));
 	assert(initiativeOps.some((label) => /plan.*next child/i.test(label)));
 	assert(initiativeOps.some((label) => /stop/i.test(label)));
@@ -709,12 +709,12 @@ try {
 	const unplannedChildActions = await captureOps("I-1.2");
 	for (const expected of ["list tasks", "plan", "report", "close"])
 		assert.match(unplannedChildActions, new RegExp(expected, "i"));
-	assert.doesNotMatch(unplannedChildActions, /work-resume/i);
+	assert.doesNotMatch(unplannedChildActions, /resume work/i);
 	assert.doesNotMatch(unplannedChildActions, /convert to initiative/i);
 	const preparedChildStore = loadStore(initiativeRoot);
 	preparedChildStore.items["I-1.1"].status = "open";
 	saveStore(initiativeRoot, preparedChildStore);
-	assert.match(await captureOps("I-1.1"), /work-resume/i);
+	assert.match(await captureOps("I-1.1"), /resume work/i);
 	preparedChildStore.items["I-1.1"].status = "closed";
 	saveStore(initiativeRoot, preparedChildStore);
 	const standaloneActions = await captureOps("S-1");

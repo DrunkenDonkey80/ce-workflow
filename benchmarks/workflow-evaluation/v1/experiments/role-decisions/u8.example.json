@@ -16,19 +16,19 @@
   "lanes": [
     {
       "role": "main",
-      "trigger": "/work-brainstorm",
+      "trigger": "ORCHESTRATOR_RUN_V1 work-brainstorm",
       "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"],
       "dimensions": ["question-quality", "requirements", "scope", "unexpected-questions", "downstream-plan-readiness", "cost"]
     },
     {
       "role": "work-planner",
-      "trigger": "/work-plan",
+      "trigger": "ORCHESTRATOR_RUN_V1 work-plan",
       "candidates": ["Sol-high", "Sol-xhigh", "Terra-high"],
       "dimensions": ["preservation", "traceability", "slicing", "verification", "downstream-success", "cost"]
     },
     {
       "role": "work-migrator",
-      "trigger": "/work-migrate",
+      "trigger": "ORCHESTRATOR_RUN_V1 work-migrate",
       "candidates": ["Luna-medium", "Terra-medium", "Sol-high"],
       "dimensions": ["artifact-preservation", "relationship-preservation", "decision-preservation", "no-source-edits", "no-invented-work", "cost"]
     },
