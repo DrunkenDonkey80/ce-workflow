@@ -22,6 +22,15 @@ const keybindings = {
 		(id === "tui.editor.deleteCharBackward" && data === "backspace"),
 };
 
+function terminalWidth(value) {
+	let width = 0;
+	for (const char of value) {
+		if (/\p{Mark}/u.test(char) || char === "\uFE0F") continue;
+		width += /\p{Emoji_Presentation}/u.test(char) ? 2 : 1;
+	}
+	return width;
+}
+
 async function drive(options, interact) {
 	let overlay;
 	const result = await showListDialog(
@@ -135,6 +144,47 @@ assert.equal(
 	"filtered model can be selected",
 );
 
+await drive(
+	{
+		title: "Details",
+		filter: false,
+		descriptionMinLines: 3,
+		items: [
+			{ value: "short", label: "Short", description: "Short context." },
+			{
+				value: "roadmap",
+				label: "Roadmap",
+				description:
+					"First description line has useful context and continues with implementation constraints.",
+			},
+		],
+	},
+	(component) => {
+		const shortLines = component.render(36);
+		component.handleInput("down");
+		const detailedLines = component.render(36);
+		assert.equal(
+			detailedLines.length,
+			shortLines.length,
+			"fixed detail rows keep the overlay in place",
+		);
+		assert(
+			detailedLines.some((line) => line.includes("First description line has")),
+		);
+		assert(
+			detailedLines.some((line) =>
+				line.includes("useful context and continues"),
+			),
+		);
+		assert(
+			detailedLines.some((line) =>
+				line.includes("with implementation constraints"),
+			),
+		);
+		component.handleInput("escape");
+	},
+);
+
 colors.length = 0;
 await drive(
 	{
@@ -151,7 +201,7 @@ await drive(
 			},
 			{
 				value: "done",
-				label: "└─ Done [closed]",
+				label: "└─ ✅ Done [closed]",
 				description: "Finished work",
 				descriptionPrefix: "│  ",
 				inlineDescription: true,
@@ -166,7 +216,11 @@ await drive(
 		assert(
 			lines.some((line) => line.includes("│  Work currently in progress")),
 		);
-		assert(lines.some((line) => line.includes("└─ Done [closed]")));
+		assert(lines.some((line) => line.includes("└─ ✅ Done [closed]")));
+		assert(
+			lines.every((line) => terminalWidth(line) === 70),
+			"emoji rows stay within the dialog width",
+		);
 		assert(
 			colors.some(
 				(entry) => entry.color === "success" && entry.text.includes("Current"),

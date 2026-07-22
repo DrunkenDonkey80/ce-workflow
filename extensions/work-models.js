@@ -7300,7 +7300,9 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 			options.ownerSession
 		) {
 			try {
-				if (verifierStatus(loadVerifierStore(cwd)) === "completed-awaiting-triage") {
+				if (
+					verifierStatus(loadVerifierStore(cwd)) === "completed-awaiting-triage"
+				) {
 					ensureMiscRoadmap(cwd);
 					resolved = resolveResumeTarget(cwd, target);
 				}
@@ -7781,7 +7783,9 @@ function miscRoadmapIn(store) {
 			labelsOf(item).includes(MISC_ROADMAP_LABEL),
 	);
 	if (matches.length > 1) {
-		const error = new Error("Multiple roadmaps are marked wo:misc; keep exactly one.");
+		const error = new Error(
+			"Multiple roadmaps are marked wo:misc; keep exactly one.",
+		);
 		error.reason = "misc-roadmap-conflict";
 		throw error;
 	}
@@ -7831,7 +7835,8 @@ function resolveOrdinaryTaskEpic(cwd, parsed) {
 		const existingMisc = miscRoadmap(cwd);
 		return {
 			error: "task-roadmap-choice-required",
-			message: "Choose whether this task belongs to the current roadmap or Misc.",
+			message:
+				"Choose whether this task belongs to the current roadmap or Misc.",
 			candidates: [candidateSummary(cwd, current)],
 			roadmapChoices: [
 				{
@@ -13830,12 +13835,10 @@ function roadmapMenuItems(roadmaps) {
 					: `${marker} `;
 		return {
 			value: roadmap.id,
-			label: `${prefix}${roadmap.id} [${statusLabel(roadmap.status)}] [${roadmap.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${roadmap.title} ${SUBMENU_ARROW}`,
+			label: `${prefix}${roadmap.id} ${roadmap.title} [${roadmap.status ?? "unknown"} · ${roadmap.readiness?.state?.replaceAll("_", " ") ?? "unknown"}] ${SUBMENU_ARROW}`,
 			description:
-				compactRoadmapDescription(roadmap.description, 140) ||
+				compactRoadmapDescription(roadmap.description) ||
 				"No short description yet.",
-			descriptionPrefix: roadmap.parentId ? "│  " : "  ",
-			inlineDescription: true,
 			preserveCase: true,
 			color: roadmap.current
 				? "success"
@@ -13851,6 +13854,7 @@ function roadmapMenuItems(roadmaps) {
 async function chooseRoadmap(ctx, title, roadmaps) {
 	return choose(ctx, title, roadmapMenuItems(roadmaps), undefined, {
 		purpose: "Choose a roadmap to inspect, plan, or continue.",
+		descriptionMinLines: 3,
 	});
 }
 

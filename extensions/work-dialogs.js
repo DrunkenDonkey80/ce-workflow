@@ -25,12 +25,78 @@ function stripAnsi(value) {
 	return String(value).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
 }
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+function cellWidth(segment) {
+	if (
+		/\p{Emoji_Presentation}/u.test(segment) ||
+		/[\uFE0F\u200D]/u.test(segment)
+	)
+		return 2;
+	const code = segment.codePointAt(0) ?? 0;
+	if (
+		/^\p{Mark}+$/u.test(segment) ||
+		code < 32 ||
+		(code >= 0x7f && code < 0xa0)
+	)
+		return 0;
+	return (code >= 0x1100 && code <= 0x115f) ||
+		(code >= 0x2e80 && code <= 0xa4cf) ||
+		(code >= 0xac00 && code <= 0xd7a3) ||
+		(code >= 0xf900 && code <= 0xfaff) ||
+		(code >= 0xfe10 && code <= 0xfe6f) ||
+		(code >= 0xff00 && code <= 0xff60) ||
+		(code >= 0xffe0 && code <= 0xffe6) ||
+		(code >= 0x1b000 && code <= 0x1b2ff) ||
+		(code >= 0x20000 && code <= 0x3fffd)
+		? 2
+		: 1;
+}
+
+function visibleWidth(value) {
+	let width = 0;
+	for (const { segment } of graphemes.segment(stripAnsi(value)))
+		width += cellWidth(segment);
+	return width;
+}
+
 function fit(value, width) {
 	const text = String(value);
-	const visible = stripAnsi(text).length;
+	const visible = visibleWidth(text);
 	if (visible <= width) return `${text}${" ".repeat(width - visible)}`;
-	const plain = stripAnsi(text);
-	return width > 1 ? `${plain.slice(0, width - 1)}…` : plain.slice(0, width);
+	let result = "";
+	let used = 0;
+	for (const { segment } of graphemes.segment(stripAnsi(text))) {
+		const next = cellWidth(segment);
+		if (used + next > width - 1) break;
+		result += segment;
+		used += next;
+	}
+	result += "…";
+	return `${result}${" ".repeat(Math.max(0, width - used - 1))}`;
+}
+
+function wrapText(value, width, maxLines) {
+	const words = stripAnsi(value).trim().split(/\s+/).filter(Boolean);
+	const lines = [];
+	let line = "";
+	for (let index = 0; index < words.length; index += 1) {
+		const candidate = line ? `${line} ${words[index]}` : words[index];
+		if (visibleWidth(candidate) <= width) {
+			line = candidate;
+			continue;
+		}
+		if (line) lines.push(fit(line, width).trimEnd());
+		line = words[index];
+		if (lines.length === maxLines - 1) {
+			lines.push(
+				fit([line, ...words.slice(index + 1)].join(" "), width).trimEnd(),
+			);
+			return lines;
+		}
+	}
+	if (line) lines.push(fit(line, width).trimEnd());
+	return lines;
 }
 
 function frame(theme, title, content, width) {
@@ -114,6 +180,8 @@ export async function showListDialog(ctx, options) {
 			? "Choose one or more options."
 			: "Choose an option to continue.",
 		help,
+		descriptionMaxLines = 3,
+		descriptionMinLines = 0,
 		selectOnSpace = false,
 		onInput,
 		forceCustom = false,
@@ -223,13 +291,18 @@ export async function showListDialog(ctx, options) {
 						if (visible.length > count)
 							content.push(theme.fg("dim", `${index + 1}/${visible.length}`));
 						const selected = visible[index]?.item;
-						if (selected?.description && !selected.inlineDescription)
+						if (selected?.description && !selected.inlineDescription) {
+							const details = wrapText(
+								selected.description,
+								Math.max(8, width - 4),
+								descriptionMaxLines,
+							);
+							while (details.length < descriptionMinLines) details.push("");
 							content.push(
 								"",
-								...String(selected.description)
-									.split("\n")
-									.map((line) => theme.fg("muted", line)),
+								...details.map((line) => theme.fg("muted", line)),
 							);
+						}
 					}
 					let defaultHelp = "↑↓ navigate · Enter select · Esc/Backspace back";
 					if (multi)
@@ -336,7 +409,7 @@ export async function showListDialog(ctx, options) {
 				anchor: "center",
 				width: "70%",
 				minWidth: 54,
-				maxHeight: "85%",
+				maxHeight: "95%",
 				margin: 1,
 			},
 		},

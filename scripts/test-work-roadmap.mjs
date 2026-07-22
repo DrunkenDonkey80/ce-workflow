@@ -562,11 +562,10 @@ try {
 	assert.equal(dialogState.action, "roadmap-cancel");
 	assert.match(roadmapDialog, /Choose a roadmap to inspect, plan, or continue/);
 	assert.match(roadmapDialog, /I-1 .*Initiative/);
-	assert.match(roadmapDialog, /Some cool stuff/);
 	assert.match(roadmapDialog, /├\* I-1\.1 .*Planned child/);
-	assert.match(roadmapDialog, /│ {2}Work completed on it/);
 	assert.match(roadmapDialog, /└─ I-1\.2 .*Needs plan/);
-	assert.match(roadmapDialog, /│ {2}More work to plan/);
+	assert.match(roadmapDialog, /Some cool stuff/);
+	assert.doesNotMatch(roadmapDialog, /Work completed on it|More work to plan/);
 	assert.match(roadmapDialog, /<success>.*I-1\.1/);
 	const initiativeOps = [];
 	let initiativeSelected = false;
@@ -582,7 +581,7 @@ try {
 					}
 					if (initiativeSelected) return undefined;
 					initiativeSelected = true;
-					return labels.find((label) => label.includes("I-1 ["));
+					return labels.find((label) => label.includes("I-1 Initiative"));
 				},
 				notify: () => {},
 			},
@@ -635,7 +634,7 @@ try {
 					select: async (title, labels) =>
 						title.includes("operation")
 							? labels.find((label) => /preview|reconcile/i.test(label))
-							: labels.find((label) => label.includes("I-1 [")),
+							: labels.find((label) => label.includes("I-1 Initiative")),
 					input: async () =>
 						approved
 							? readFileSync(path.join(initiativeRoot, proposalPath), "utf8")
@@ -736,7 +735,7 @@ try {
 				select: async (title, labels) => {
 					if (title.includes("operation"))
 						return labels.find((label) => /plan.*next child/i.test(label));
-					return labels.find((label) => label.includes("I-1 ["));
+					return labels.find((label) => label.includes("I-1 Initiative"));
 				},
 				confirm: async () => true,
 				notify: () => {},
@@ -884,7 +883,7 @@ try {
 			select: async (title, labels) =>
 				title.includes("operation")
 					? labels.find((label) => /convert to initiative/i.test(label))
-					: labels.find((label) => label.includes("S-1 [")),
+					: labels.find((label) => label.includes("S-1 Standalone")),
 			confirm: async () => true,
 			notify: () => {},
 		},
