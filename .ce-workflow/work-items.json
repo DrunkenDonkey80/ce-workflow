@@ -1208,12 +1208,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned atomic claim. Root cause verified in scripts/work-hygiene.mjs: .pdb was recognized but sibling MSVC .ilk artifacts were not. Implemented *.ilk generated-artifact handling with focused test; covered by the scoped work-2.15 reviewer PASS and untracked hygiene: PASS.",
+        "Verified coverage: *.ilk recognition implemented and focused untracked-hygiene test passes; review PASS recorded on work-2.15 for the shared scoped diff."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After successful MSVC/Ninja verification, finish-task failed because three linker-generated .ilk files under rf-lib/build-host wer",
       "type": "task",
-      "updatedAt": "2026-07-21T09:26:58.860Z"
+      "updatedAt": "2026-07-22T12:20:19.491Z"
     },
     "work-2.11": {
       "createdAt": "2026-07-21T11:19:35.070Z",
@@ -1369,7 +1372,9 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:review PASS — scoped diffs recognize *.ilk; agent_end schedules configured committed non-workflow verifier batches via Pi adapter and records status/batch telemetry; no-change/workflow-only paths return null; focused three-test gate passed."
+      ],
       "parentId": "work-2",
       "status": "open",
       "title": "Self-improvement report: Configured ce-workflow background verifiers did not run after routine inline tasks work-1.5.22 and work-1.5.23 were finalized thro",
@@ -1694,7 +1699,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-22T04:15:47.864Z"
+    "updatedAt": "2026-07-22T12:20:19.492Z"
   },
   "schemaVersion": 1
 }

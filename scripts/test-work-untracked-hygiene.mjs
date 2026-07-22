@@ -52,6 +52,11 @@ assert(
 	"MSVC debug symbols map to *.pdb",
 );
 assert(
+	ignorePatternForBuildArtifact("rf-lib/build-host/rf_session_tests.ilk") ===
+		"*.ilk",
+	"MSVC incremental linker files map to *.ilk",
+);
+assert(
 	ignorePatternForBuildArtifact("a/b/node_modules/lib/index.js") ===
 		"node_modules/",
 	"node_modules maps to node_modules/",
