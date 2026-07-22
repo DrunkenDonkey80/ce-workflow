@@ -348,6 +348,65 @@ try {
 			entries.push({ type: "custom", customType, data });
 		},
 	};
+	const verifierCwd = mkdtempSync(path.join(tmpdir(), "ce-work-verifier-"));
+	try {
+		execFileSync("git", ["init"], { cwd: verifierCwd, stdio: "ignore" });
+		execFileSync("git", ["config", "user.name", "Test"], { cwd: verifierCwd });
+		execFileSync("git", ["config", "user.email", "test@example.com"], {
+			cwd: verifierCwd,
+		});
+		mkdirSync(path.join(verifierCwd, ".pi"), { recursive: true });
+		writeFileSync(
+			path.join(verifierCwd, ".pi", "settings.json"),
+			JSON.stringify({
+				workOrchestrator: {
+					backgroundVerifiers: {
+						"test/verifier": {
+							operations: ["correctness"],
+							thinking: "low",
+						},
+					},
+				},
+			}),
+		);
+		writeFileSync(path.join(verifierCwd, ".gitignore"), ".pi/\n.ce-workflow/\n");
+		writeFileSync(path.join(verifierCwd, "tracked.txt"), "before\n");
+		execFileSync("git", ["add", ".gitignore", "tracked.txt"], {
+			cwd: verifierCwd,
+		});
+		execFileSync("git", ["commit", "-m", "before"], { cwd: verifierCwd });
+		const before = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: verifierCwd,
+			encoding: "utf8",
+		}).trim();
+		writeFileSync(path.join(verifierCwd, "tracked.txt"), "after\n");
+		execFileSync("git", ["add", "tracked.txt"], { cwd: verifierCwd });
+		execFileSync("git", ["commit", "-m", "after"], { cwd: verifierCwd });
+		const after = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: verifierCwd,
+			encoding: "utf8",
+		}).trim();
+		const scheduled = mod.scheduleCommittedRunVerifiers(verifierCwd, pi, {
+			before,
+			after,
+		});
+		assert.equal(scheduled.status, "queued", scheduled.reason);
+		await scheduled.launch;
+		assert(
+			existsSync(
+				path.join(
+					verifierCwd,
+					".ce-workflow",
+					"work-runs",
+					"verifiers",
+					"state.json",
+				),
+			),
+			"normal committed agent runs schedule configured background verifiers",
+		);
+	} finally {
+		rmSync(verifierCwd, { recursive: true, force: true });
+	}
 	const ctx = {
 		cwd,
 		isIdle: () => false,

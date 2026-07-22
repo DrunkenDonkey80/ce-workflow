@@ -6732,6 +6732,30 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 	});
 }
 
+export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
+	if (!input.before || !input.after || input.before === input.after) return null;
+	const paths = run(cwd, "git", [
+		"diff",
+		"--name-only",
+		`${input.before}..${input.after}`,
+		"--",
+	])
+		.split(/\r?\n/)
+		.map(normalizedRepoPath)
+		.filter(
+			(file) =>
+				file &&
+				!file.startsWith(".ce-workflow/") &&
+				!file.startsWith(".pi/"),
+		);
+	if (!paths.length) return null;
+	return scheduleConfiguredBackgroundVerifiers(cwd, pi, {
+		origin: input.origin,
+		currentModel: input.currentModel,
+		paths,
+	});
+}
+
 async function chooseAnalyzeValues(ctx, title, values, selected, options = {}) {
 	const result = await showListDialog(ctx, {
 		title,
@@ -15002,6 +15026,21 @@ export default function workModelsExtension(pi) {
 		const durationMs = Math.max(0, Date.now() - run.startedAt);
 		const review = reviewTelemetry(run.meta, event);
 		const gitAfter = gitSnapshot(run.cwd);
+		const commitCreated = Boolean(
+			run.gitBefore?.head &&
+				gitAfter.head &&
+				run.gitBefore.head !== gitAfter.head,
+		);
+		const verifier = commitCreated
+			? scheduleCommittedRunVerifiers(run.cwd, pi, {
+					before: run.gitBefore.head,
+					after: gitAfter.head,
+					origin: run.meta.origin ?? "normal",
+					currentModel: ctx.model
+						? `${ctx.model.provider}/${ctx.model.id}`
+						: undefined,
+				})
+			: null;
 		const testsRun = run.tools.filter((tool) => tool.kind === "test").length;
 		const role = run.meta.inlineWork
 			? `inline-${run.meta.inlineLevel ?? "medium"}`
@@ -15028,11 +15067,10 @@ export default function workModelsExtension(pi) {
 				durationMs,
 				tokens: usage.totalTokens || undefined,
 				filesChanged: gitAfter.dirtyFiles,
-				commitCreated: Boolean(
-					run.gitBefore?.head &&
-						gitAfter.head &&
-						run.gitBefore.head !== gitAfter.head,
-				),
+				commitCreated,
+				backgroundVerifier: verifier
+					? { status: verifier.status, batchId: verifier.batch?.id }
+					: undefined,
 				testsRun,
 				reviewOutcome: review?.outcome,
 			},
