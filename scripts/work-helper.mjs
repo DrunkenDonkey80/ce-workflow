@@ -123,8 +123,10 @@ function reviewerHandoff(id, implementationFiles, reviewReasons) {
 		`Review only: ${reviewOnly}`,
 		`Review reasons: ${reviewReasons.join("; ")}`,
 		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${id}.`,
+		"Reviewer coordination: this handoff is complete. Do not contact the supervisor; return BLOCKED immediately if any supplied path or command is unusable.",
 		"Finish retry: rerun the same finish-task command with --reviewed only after durable PASS evidence.",
-		"Reviewer liveness: use the coded async handoff; needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. Prefer no explicit timeout; otherwise use at least 10 minutes. A reviewer waiting on contact_supervisor is not an implementation or review failure.",
+		"FAIL recovery: after fixes and verification, rerun the same finish-task command without --reviewed to regenerate this complete handoff; never handcraft a targeted re-review task.",
+		"Reviewer liveness: use the coded async handoff; needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. Prefer no explicit timeout; otherwise use at least 10 minutes.",
 	].join("\n");
 }
 

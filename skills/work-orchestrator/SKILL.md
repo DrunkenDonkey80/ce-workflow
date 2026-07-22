@@ -44,7 +44,7 @@ node <work-helper.mjs> finish-task <work-item-id> --max-files <2|8> --message "<
 
 For JSON use `--json <file> --equals <path=value>`. The helper enforces file scope and sensitive-path review, records `wo:verify-check`, commits, closes, amends work items close state, pushes only with an upstream, and checks cleanliness.
 
-If it reports independent review required, use its complete labelled reviewer handoff verbatim; do not handcraft or broaden the reviewer task. Launch exactly one `work-reviewer`, require one durable `wo:review PASS|FAIL` note, and rerun the same finish command with `--reviewed` only after PASS. If scope or verification fails, do not commit/close.
+If it reports independent review required, use its complete labelled reviewer handoff verbatim; do not handcraft or broaden the reviewer task. Launch exactly one `work-reviewer`, require one durable `wo:review PASS|FAIL` note, and rerun the same finish command with `--reviewed` only after PASS. After FAIL and substantive fixes, rerun that finish command without `--reviewed` to regenerate the complete targeted re-review handoff; never handcraft the re-review or omit its helper/path fields. If scope or verification fails, do not commit/close.
 
 ## Modes
 

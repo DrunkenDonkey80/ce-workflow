@@ -563,7 +563,11 @@ process.exit(result.status ?? 1);
 			reviewMessage.includes('Review only: "auth/policy file.js"') &&
 			reviewMessage.includes("Review reasons: sensitive paths") &&
 			reviewMessage.includes("durable `wo:review PASS|FAIL` note") &&
+			reviewMessage.includes("Do not contact the supervisor") &&
+			reviewMessage.includes("return BLOCKED immediately") &&
 			reviewMessage.includes("same finish-task command with --reviewed") &&
+			reviewMessage.includes("without --reviewed to regenerate this complete handoff") &&
+			reviewMessage.includes("never handcraft a targeted re-review task") &&
 			!reviewMessage
 				.split("Review only:")[1]
 				.split("\n")[0]
