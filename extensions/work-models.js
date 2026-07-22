@@ -454,7 +454,7 @@ const WORK_GOAL_USAGE_LIMIT_RE =
 const WORK_GOAL_NON_RETRYABLE_RE =
 	/multi-auth rotation failed|credentials tried|unauthori[sz]ed|invalid api key/i;
 const WORK_GOAL_RETRYABLE_RE =
-	/websocket closed|sse response headers timed out|headers timed out|context[_\s-]*length[_\s-]*exceeded|input exceeds the context window|context window|provider returned error|overloaded|529|503|connection reset|fetch failed|etimedout|socket hang up/i;
+	/websocket(?: closed| error)|sse response headers timed out|headers timed out|context[_\s-]*length[_\s-]*exceeded|input exceeds the context window|context window|provider returned error|overloaded|529|503|connection reset|fetch failed|etimedout|socket hang up/i;
 const WORK_GOAL_CONTEXT_OVERFLOW_RE =
 	/context[_\s-]*length|context window|input exceeds|prompt is too long|maximum context length/i;
 const WORK_GOAL_CONTRADICTORY_COMPLETION_RE =
@@ -14589,7 +14589,7 @@ async function handleWorkRoadmapCommand(
 							: {
 									value: "resume",
 									label: "▶️ Resume work",
-									description: "autonomous project loop for this roadmap",
+									description: "start the autonomous implementation loop",
 								},
 						{
 							value: "tasks",
@@ -14647,9 +14647,9 @@ async function handleWorkRoadmapCommand(
 				[
 					{
 						value: "plan",
-						label: "🧭 create master plan and resume",
+						label: "🧭 create master plan, then implement",
 						description:
-							"run the normal ce-plan questions, attach the plan, then continue",
+							"answer ce-plan questions, attach the plan, then start implementation",
 					},
 					{ value: "cancel", label: "cancel" },
 				],

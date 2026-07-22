@@ -22,6 +22,8 @@ for (const requirement of [
 	"reject and re-cut the proposed decomposition",
 	"horizontal plan units map one-to-one to children",
 	"prove an end-to-end behavior on its own",
+	"--type <task|bug|decision>",
+	"`feature` is not a native work-item type",
 ])
 	assert.ok(
 		prompt.includes(requirement),

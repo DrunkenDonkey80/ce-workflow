@@ -1150,6 +1150,45 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	assert.equal(statuses["work-goal"], undefined);
 
+	await invoke("work-goal", "survive a WebSocket retry", ctx);
+	const retryPrompt = sent.at(-1).message;
+	await tempHooks.before_agent_start(
+		{ prompt: retryPrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					stopReason: "error",
+					errorMessage: "WebSocket error",
+					content: [],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.match(
+		statuses["work-goal"],
+		/active/,
+		"provider WebSocket retries keep the autonomous-goal indicator active",
+	);
+	assert.ok(
+		notices.some((notice) =>
+			String(notice.message).includes("transient error"),
+		),
+	);
+	await tempTools.work_goal_complete.execute(
+		"t-websocket",
+		{ summary: "retry state verified" },
+		null,
+		null,
+		ctx,
+	);
+	assert.equal(statuses["work-goal"], undefined);
+
 	const beforeResumeSent = sent.length;
 	const beforeResumeNotices = notices.length;
 	await invoke("work-resume", "one task only", ctx);

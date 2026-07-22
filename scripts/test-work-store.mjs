@@ -168,6 +168,13 @@ try {
 		change(candidate);
 		throwsCategory(() => validateStore(candidate), "corrupt");
 	};
+	const invalidType = structuredClone(hierarchy);
+	invalidType.items["initiative-1.1"].type = "feature";
+	assert.throws(
+		() => validateStore(invalidType),
+		/Invalid work item type "feature" for initiative-1\.1/,
+		"invalid helper types report the actual bad field",
+	);
 	invalidHierarchy((store) => {
 		store.items["initiative-1.1"].type = "task";
 	});

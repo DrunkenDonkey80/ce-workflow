@@ -517,11 +517,12 @@ export function validateStore(store, file = "work store") {
 		)
 			throw error("corrupt", `Duplicate or invalid work item ID in ${file}`);
 		ids.add(item.id);
-		if (
-			!TYPES.has(item.type) ||
-			!STATUSES.has(item.status) ||
-			typeof item.title !== "string"
-		)
+		if (!TYPES.has(item.type))
+			throw error(
+				"corrupt",
+				`Invalid work item type ${JSON.stringify(item.type)} for ${key} in ${file}`,
+			);
+		if (!STATUSES.has(item.status) || typeof item.title !== "string")
 			throw error("corrupt", `Invalid work item ${key} in ${file}`);
 		if (item.parentId !== undefined && typeof item.parentId !== "string")
 			throw error("corrupt", `Invalid parent for ${key} in ${file}`);

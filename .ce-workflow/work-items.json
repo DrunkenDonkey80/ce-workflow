@@ -1472,12 +1472,54 @@
         "report",
         "self-improvement"
       ],
+      "notes": [
+        "Root cause corrected: work-planner advertised unsupported --type feature. The second create was rejected before insertion; it was not a recordCount mismatch or partial work-5.3 mutation. Planner now uses task|bug|decision and validation names the invalid type.",
+        "Fixed planner type contract and invalid-type diagnostics; package verification passes."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: During work-5 planning, the first work-create successfully added decision work-5.2, but the immediately following work-create for ",
+      "type": "task",
+      "updatedAt": "2026-07-22T15:56:46.390Z"
+    },
+    "work-2.18": {
+      "createdAt": "2026-07-22T15:43:45.681Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task for work-5.3 committed and pushed generated verification/runtime artifacts as implementation files: `.ce-workflow/work-runs/verifiers/state.json`, `.ce-workflow/work-runs/verifiers/.state.recovery.json`, and ignored build helper `rf-lib/build-host/verify-type4.ps1`. The helper's own review handoff also counted the ignored build script toward the large-diff scope.\nExpected: finish-task should exclude ignored build-directory files and ce-workflow runtime/verifier state from review, max-file counting, staging, commits, and pushes; only durable `.ce-workflow/work-items.json` state and actual project sources/tests should be committed.\nImpact: Generated local runtime state and a machine-specific absolute toolchain path were pushed to the project branch, polluting history and making the commit non-portable.\nSuggested improvement: Apply project ignore matching before scope/review/stage collection and hard-exclude `.ce-workflow/work-runs/**`; reject machine-specific scripts under ignored build directories.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/8b4042a0-b05d-46b0-8e9a-1cd84665a7ad",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 44670,
+              "file": "01-HEAD",
+              "sha256": "6ab4fc9e17de2cd91a9cff66949f194874def19d91a35c921aee1ad05f1b1215"
+            },
+            {
+              "bytes": 52214,
+              "file": "02-session.jsonl",
+              "sha256": "4373c33885055cb327b6e39d6b66226b6d21eaaa07139e2ba86ada15cf3292fd"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-22T15:43:45.676Z",
+          "workflowId": "019f89fa-ed23-75f5-bf6d-0aada7cc58ea"
+        }
+      ],
+      "id": "work-2.18",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
       "notes": [],
       "parentId": "work-2",
       "status": "open",
-      "title": "Self-improvement report: During work-5 planning, the first work-create successfully added decision work-5.2, but the immediately following work-create for ",
+      "title": "Self-improvement report: finish-task for work-5.3 committed and pushed generated verification/runtime artifacts as implementation files: `.ce-workflow/work",
       "type": "task",
-      "updatedAt": "2026-07-22T15:24:25.185Z"
+      "updatedAt": "2026-07-22T15:43:45.681Z"
     },
     "work-2.2": {
       "createdAt": "2026-07-20T01:40:10.511Z",
@@ -1762,7 +1804,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-22T15:24:25.186Z"
+    "updatedAt": "2026-07-22T15:56:46.391Z"
   },
   "schemaVersion": 1
 }
