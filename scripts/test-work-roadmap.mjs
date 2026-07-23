@@ -125,6 +125,7 @@ seedNativeStore(root, [
 		issue_type: "task",
 		status: "open",
 		title: "Build feature",
+		acceptance: "Focused implementation proof passes.",
 	},
 	{
 		id: "DONE-1",
@@ -172,6 +173,11 @@ try {
 	);
 	const currentRoadmap = list.roadmaps.find((epic) => epic.id === "E-1");
 	console.assert(currentRoadmap?.current, "marks current roadmap");
+	assert.equal(
+		currentRoadmap?.readiness?.state,
+		"planned",
+		"an implementation-ready child makes its roadmap planned without a plan file",
+	);
 	assert.match(
 		roadmapPreviewText(currentRoadmap),
 		/Preserve visual parity/,

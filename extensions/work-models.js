@@ -10715,14 +10715,37 @@ function initiativeReadinessFacts(cwd, store) {
 			.filter((item) => item.type === "epic" && !item.initiative)
 			.map((item) => {
 				const plan = item.documentLinks?.design;
+				const plannedChild = Object.values(store.items).find(
+					(child) =>
+						parentOf(child) === item.id &&
+						["open", "in_progress"].includes(statusOf(child)) &&
+						isWorkSlice(child) &&
+						!isPlanningIssue(child) &&
+						Boolean(
+							field(
+								child,
+								"acceptance",
+								"acceptance_criteria",
+								"acceptanceCriteria",
+							) || hasSlicePlan(child),
+						),
+				);
 				if (!plan)
-					return [
-						item.id,
-						{
-							state: "needs_plan",
-							reason: "No implementation-ready plan is linked.",
-						},
-					];
+					return plannedChild
+						? [
+								item.id,
+								{
+									state: "planned",
+									reason: `Executable child ${idOf(plannedChild)} is implementation-ready.`,
+								},
+							]
+						: [
+								item.id,
+								{
+									state: "needs_plan",
+									reason: "No implementation-ready plan is linked.",
+								},
+							];
 				const file = join(cwd, plan);
 				if (!existsSync(file))
 					return [
