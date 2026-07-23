@@ -6346,9 +6346,7 @@ function* verifierLines(file) {
 		for (let bytes; (bytes = readSync(descriptor, chunk, 0, chunk.length)); ) {
 			pending += decoder.write(chunk.subarray(0, bytes));
 			for (let newline; (newline = pending.indexOf("\n")) !== -1; ) {
-				const line = pending
-					.slice(0, newline)
-					.replace(/\r$/, "");
+				const line = pending.slice(0, newline).replace(/\r$/, "");
 				if (Buffer.byteLength(line) > VERIFIER_MAX_BYTES)
 					throw new Error("Verifier line exceeds the read limit.");
 				yield line;
@@ -13368,8 +13366,111 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 	);
 }
 
+const CSWAP_EXE_EXTENSIONS =
+	process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
+
+// Fast PATH scan (no process spawn) so the menu stays cheap to render.
+function resolveCswap() {
+	const override = process.env.WORK_ORCH_CSWAP_BIN;
+	if (override) return existsSync(override) ? override : null;
+	for (const dir of (process.env.PATH ?? "").split(delimiter).filter(Boolean))
+		for (const ext of CSWAP_EXE_EXTENSIONS) {
+			const candidate = join(dir, `cswap${ext}`);
+			if (existsSync(candidate)) return candidate;
+		}
+	return null;
+}
+
+function cswapUsageLines(account) {
+	const windows = [
+		["5h", account?.usage?.fiveHour],
+		["Week", account?.usage?.sevenDay],
+	];
+	const lines = [];
+	for (const [label, window] of windows) {
+		if (!window || window.pct == null) continue;
+		const reset = window.countdown
+			? ` · resets in ${window.countdown}${window.clock ? ` (${window.clock})` : ""}`
+			: "";
+		lines.push(`${label}: ${Math.round(window.pct)}% used${reset}`);
+	}
+	return lines.length ? lines.join("\n") : "Usage info unavailable";
+}
+
+function cswapMenuItems(data) {
+	const accounts = Array.isArray(data?.accounts) ? data.accounts : [];
+	const activeNumber = data?.activeAccountNumber;
+	const items = accounts.map((account) => {
+		const active = account.active || account.number === activeNumber;
+		const name = account.alias || account.email || `Account-${account.number}`;
+		return {
+			value: String(account.number),
+			label: `${active ? "● " : ""}${account.number}. ${name}${active ? " (active)" : ""}`,
+			description: cswapUsageLines(account),
+		};
+	});
+	return { items, activeNumber };
+}
+
+function runCswap(bin, args, cwd) {
+	return JSON.parse(
+		execFileSync(bin, [...args, "--json"], {
+			cwd,
+			encoding: "utf8",
+			timeout: 20000,
+			stdio: ["ignore", "pipe", "pipe"],
+		}),
+	);
+}
+
+async function handleCswapMenu(ctx, bin) {
+	let data;
+	try {
+		data = runCswap(bin, ["list"], ctx.cwd);
+	} catch (error) {
+		notify(
+			ctx,
+			`cswap list failed: ${error instanceof Error ? error.message : String(error)}`,
+			"warning",
+		);
+		return;
+	}
+	const { items, activeNumber } = cswapMenuItems(data);
+	if (!items.length) {
+		notify(ctx, "cswap has no managed accounts.", "warning");
+		return;
+	}
+	const choice = await choose(
+		ctx,
+		"Claude account switcher",
+		items,
+		activeNumber == null ? undefined : String(activeNumber),
+		{
+			purpose: "Switch the active Claude account. Type to filter.",
+			descriptionMinLines: 2,
+			descriptionMaxLines: 2,
+		},
+	);
+	if (!choice) return;
+	if (choice === String(activeNumber)) {
+		notify(ctx, `Account-${choice} is already active.`, "info");
+		return;
+	}
+	try {
+		const result = runCswap(bin, ["switch", choice], ctx.cwd);
+		notify(ctx, result.message || `Switched to account ${choice}.`, "info");
+	} catch (error) {
+		notify(
+			ctx,
+			`cswap switch failed: ${error instanceof Error ? error.message : String(error)}`,
+			"warning",
+		);
+	}
+}
+
 async function handleWorkMenuCommand(ctx, pi) {
 	const improvementCount = workImproveCount(ctx.cwd);
+	const cswapBin = resolveCswap();
 	const items = [
 		{
 			value: "work-roadmap",
@@ -13377,6 +13478,16 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description:
 				"Browse, inspect, plan, continue, close, or reopen roadmaps.\nThe last open roadmap or initiative is selected automatically.",
 		},
+		...(cswapBin
+			? [
+					{
+						value: "cswap",
+						label: "🔀 Claude account switcher",
+						description:
+							"Switch the active Claude account via cswap.\nShows 5h and weekly usage and reset times per account.",
+					},
+				]
+			: []),
 		...(improvementCount
 			? [
 					{
@@ -13594,6 +13705,10 @@ async function handleWorkMenuCommand(ctx, pi) {
 		selectedIndex = selected.index;
 		if (selected.value === "microcompact")
 			return requestManualMicrocompact(ctx);
+		if (selected.value === "cswap") {
+			await handleCswapMenu(ctx, cswapBin);
+			continue;
+		}
 		if (selected.value === "work-roadmap") {
 			const result = await handleWorkRoadmapCommand("", ctx, pi);
 			if (result?.action === "roadmap-cancel") continue;
@@ -15117,6 +15232,8 @@ export {
 	applyInitiativeReconciliation,
 	approveInitiativeReconciliation,
 	buildWorkInitState,
+	resolveCswap,
+	cswapMenuItems,
 	buildWorkImproveObjective,
 	buildWorkImproveState,
 	buildInitiativeProjection,
