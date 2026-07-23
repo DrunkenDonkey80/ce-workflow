@@ -13382,7 +13382,7 @@ function resolveCswap() {
 }
 
 function cswapUsage(account) {
-	const parts = [];
+	const segments = [];
 	for (const [label, window] of [
 		["5h", account?.usage?.fiveHour],
 		["week", account?.usage?.sevenDay],
@@ -13390,11 +13390,17 @@ function cswapUsage(account) {
 		if (window?.pct == null) continue;
 		const pct = Math.max(0, Math.min(100, Math.round(window.pct)));
 		const filled = Math.round((pct / 100) * 6);
-		parts.push(
-			`${label} [${"#".repeat(filled)}${" ".repeat(6 - filled)}] ${pct}%${window.countdown ? `, in ${window.countdown}` : ""}`,
+		if (segments.length) segments.push({ text: ", " });
+		segments.push(
+			{ text: `${label} ` },
+			{
+				text: `[${"█".repeat(filled)}${"░".repeat(6 - filled)}] ${pct}%`,
+				color: pct > 80 ? "error" : pct > 50 ? "warning" : "success",
+			},
+			...(window.countdown ? [{ text: `, in ${window.countdown}` }] : []),
 		);
 	}
-	return parts.join(", ");
+	return segments;
 }
 
 function cswapMenuItems(data) {
@@ -13412,14 +13418,24 @@ function cswapMenuItems(data) {
 			};
 			const [leftRank, leftReset] = rank(left);
 			const [rightRank, rightReset] = rank(right);
-			return leftRank - rightRank || leftReset - rightReset || left.index - right.index;
+			return (
+				leftRank - rightRank ||
+				leftReset - rightReset ||
+				left.index - right.index
+			);
 		})
 		.map(({ account }) => {
-			const name = account.email || account.alias || `Account-${account.number}`;
+			const name =
+				account.email || account.alias || `Account-${account.number}`;
 			const usage = cswapUsage(account);
+			const labelSegments = [
+				{ text: name },
+				...(usage.length ? [{ text: ", " }, ...usage] : []),
+			];
 			return {
 				value: String(account.number),
-				label: `${name}${usage ? `, ${usage}` : ""}`,
+				label: labelSegments.map((segment) => segment.text).join(""),
+				labelSegments,
 				preserveCase: true,
 			};
 		});

@@ -13,18 +13,27 @@ function labelFor(item) {
 	return item.description ? `${label} — ${item.description}` : label;
 }
 
-function itemIndicator(item, { checked, currentValue, multi, selected } = {}) {
+function itemIndicator(item, { checked, currentValue, multi } = {}) {
 	if (multi) return checked ? "✓" : "○";
 	if (item.value === currentValue) return "●";
 	if (item.local) return "*";
-	return selected ? ">" : " ";
+	return " ";
+}
+
+function indicatedPrefix(item, options, align = true) {
+	const indicator = itemIndicator(item, options);
+	if (!align) return indicator === " " ? "" : `${indicator} `;
+	return `${options?.selected ? ">" : " "}${indicator} `;
 }
 
 function indicatedLabel(item, options, align = true) {
-	const indicator = itemIndicator(item, options);
-	return indicator === " " && !align
-		? itemLabel(item)
-		: `${indicator} ${itemLabel(item)}`;
+	return `${indicatedPrefix(item, options, align)}${itemLabel(item)}`;
+}
+
+function styledLabel(theme, item, options, color) {
+	return `${theme.fg(color, indicatedPrefix(item, options))}${item.labelSegments
+		.map((segment) => theme.fg(segment.color ?? color, segment.text))
+		.join("")}`;
 }
 
 function keyMatches(keybindings, data, id, ...fallbacks) {
@@ -333,7 +342,21 @@ export async function showListDialog(ctx, options) {
 							else if (item.enabled === true) color = "success";
 							else if (item.enabled === false) color = "dim";
 							else if (item.value === currentValue) color = "success";
-							content.push(theme.fg(color, text));
+							content.push(
+								item.labelSegments
+									? styledLabel(
+											theme,
+											item,
+											{
+												checked: enabled.has(item.value),
+												currentValue,
+												multi: Boolean(multi),
+												selected: row === index,
+											},
+											color,
+										)
+									: theme.fg(color, text),
+							);
 							if (item.inlineDescription)
 								content.push(
 									theme.fg(

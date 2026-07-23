@@ -90,19 +90,50 @@ await drive({ title: "Root", items, cursorKey: "root" }, (component) => {
 		"every dialog shows its purpose below the title",
 	);
 	assert(
-		lines.some((line) => line.includes("> Beta")),
+		lines.some((line) => line.includes(">  Beta")),
 		"returning from a submenu restores its parent cursor",
 	);
 	component.handleInput("escape");
 });
 
 await drive(
-	{ title: "Indicators", items, currentValue: "beta", selectedIndex: 0 },
+	{
+		title: "Indicators",
+		items: [{ ...items[0], local: true }, ...items.slice(1)],
+		currentValue: "beta",
+		selectedIndex: 0,
+	},
 	(component) => {
 		const lines = component.render(70);
-		assert(lines.some((line) => line.includes("> Alpha")));
-		assert(lines.some((line) => line.includes("● Beta")));
+		assert(lines.some((line) => line.includes(">* Alpha")));
+		assert(lines.some((line) => line.includes(" ● Beta")));
 		assert(!lines.some((line) => line.includes("(current)")));
+		component.handleInput("escape");
+	},
+);
+
+colors.length = 0;
+await drive(
+	{
+		title: "Colored segments",
+		items: [
+			{
+				value: "usage",
+				label: "Usage [████░░] 60%",
+				labelSegments: [
+					{ text: "Usage " },
+					{ text: "[████░░] 60%", color: "warning" },
+				],
+			},
+		],
+	},
+	(component) => {
+		assert(component.render(70).some((line) => line.includes("[████░░] 60%")));
+		assert(
+			colors.some(
+				({ color, text }) => color === "warning" && text.includes("████"),
+			),
+		);
 		component.handleInput("escape");
 	},
 );
@@ -118,13 +149,13 @@ const checklist = await drive(
 		component.handleInput("down");
 		component.handleInput("enter");
 		assert(
-			component.render(70).some((line) => line.includes("✓ Beta")),
-			"Enter toggles without duplicating the selected indicator",
+			component.render(70).some((line) => line.includes(">✓ Beta")),
+			"selection and checked indicators use separate columns",
 		);
 		component.handleInput(" ");
 		assert(
-			component.render(70).some((line) => line.includes("○ Beta")),
-			"Space toggles without duplicating the selected indicator",
+			component.render(70).some((line) => line.includes(">○ Beta")),
+			"selection and unchecked indicators use separate columns",
 		);
 		component.handleInput(" ");
 		component.handleInput("escape");
