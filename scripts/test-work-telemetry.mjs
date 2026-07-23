@@ -738,6 +738,10 @@ try {
 			},
 			{ cwd, getContextUsage: () => ({ tokens: 3100 }) },
 		);
+		await hooks.agent_settled(
+			{},
+			{ cwd, isIdle: () => true, getContextUsage: () => ({ tokens: 3100 }) },
+		);
 		const reviewSummary = buildWorkTelemetryState(
 			cwd,
 			`workItem ${commandEvent.workItemId}`,
@@ -808,6 +812,7 @@ try {
 			historyCtx,
 		);
 		await hooks.agent_end({ messages: [] }, historyCtx);
+		await hooks.agent_settled({}, { ...historyCtx, isIdle: () => true });
 		const historyFile = path.join(
 			cwd,
 			".pi",

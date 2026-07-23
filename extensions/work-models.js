@@ -411,8 +411,8 @@ const contextCompactState = {
 let manualMicrocompactPending = false;
 let manualMicrocompactResumePrompt = null;
 let manualMicrocompactWorkflowRunId = null;
-let workAgentCompactionResume = null;
 let pendingWorkPrompt = null;
+let pendingSettledAgentEnd = null;
 const pendingDirtyRecoveries = new Map();
 const pendingInitiativeConversions = new Map();
 const commandWorkflowStorage = new AsyncLocalStorage();
@@ -15549,8 +15549,8 @@ export default function workModelsExtension(pi) {
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
 		manualMicrocompactWorkflowRunId = null;
-		workAgentCompactionResume?.finalize?.();
-		workAgentCompactionResume = null;
+		pendingSettledAgentEnd = null;
+		activeWorkAgent = null;
 		resetContextCompaction();
 		clearWorkGoalRecovery();
 		if (activeWorkGoal?.status === "waiting_usage_limit")
@@ -15568,8 +15568,8 @@ export default function workModelsExtension(pi) {
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
 		manualMicrocompactWorkflowRunId = null;
-		workAgentCompactionResume?.finalize?.();
-		workAgentCompactionResume = null;
+		pendingSettledAgentEnd = null;
+		activeWorkAgent = null;
 		resetContextCompaction();
 		persistWorkGoal(pi);
 		clearWorkGoalUsageLimitTimer();
@@ -15661,7 +15661,7 @@ export default function workModelsExtension(pi) {
 			ctx.abort();
 			return;
 		}
-		activeWorkGoalRunning = pendingWorkGoalTurn;
+		if (pendingWorkGoalTurn) activeWorkGoalRunning = true;
 		pendingWorkGoalTurn = false;
 		if (!pendingWorkPrompt) {
 			if (
@@ -15720,8 +15720,7 @@ export default function workModelsExtension(pi) {
 		activeWorkAgent.toolStarts.delete(event.toolCallId);
 	});
 
-	pi.on("agent_end", async (event, ctx) => {
-		recordSelfImprovementHistory(ctx, "agent_end", event);
+	const finalizeSettledAgent = async (event, ctx) => {
 		if (!activeWorkAgent) {
 			const wasWorkGoalTurn = activeWorkGoalRunning;
 			activeWorkGoalRunning = false;
@@ -15744,7 +15743,6 @@ export default function workModelsExtension(pi) {
 				ctx,
 				`Linked ${linkedBrainstorm.artifact} to ${linkedBrainstorm.idea.id}.`,
 			);
-		const contextOverflow = isWorkGoalContextOverflow(assistant);
 		const wasWorkGoalTurn = activeWorkGoalRunning;
 		activeWorkGoalRunning = false;
 		const usage = messageUsage(event.messages);
@@ -15874,22 +15872,7 @@ export default function workModelsExtension(pi) {
 				file,
 			);
 		};
-		if (run.meta.workflowRunId === manualMicrocompactWorkflowRunId)
-			finishAttempt(true);
-		else if (contextOverflow)
-			workAgentCompactionResume = {
-				prompt: {
-					id: telemetryId("agent"),
-					cwd: run.cwd,
-					prompt: run.prompt,
-					promptChars: run.promptChars,
-					meta: run.meta,
-					contextBefore: run.contextBefore,
-				},
-				retry: () => finishAttempt(true),
-				finalize: () => finishAttempt(false),
-			};
-		else finishAttempt(false);
+		finishAttempt(false);
 		cleanupBenignInstructionDirt(run.cwd);
 		finishWarpWork(
 			ctx,
@@ -15898,6 +15881,11 @@ export default function workModelsExtension(pi) {
 		);
 		if (wasWorkGoalTurn) await handleWorkGoalAgentEnd(event, ctx, pi);
 		activeHistoryTask = null;
+	};
+
+	pi.on("agent_end", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "agent_end", event);
+		pendingSettledAgentEnd = event;
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
@@ -15943,13 +15931,6 @@ export default function workModelsExtension(pi) {
 
 	pi.on("session_compact", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "session_compact", event);
-		if (workAgentCompactionResume) {
-			if (event.willRetry) {
-				pendingWorkPrompt = workAgentCompactionResume.prompt;
-				workAgentCompactionResume.retry();
-			} else workAgentCompactionResume.finalize();
-			workAgentCompactionResume = null;
-		}
 		const wasOurs =
 			event.compactionEntry?.details?.kind === "work-orchestrator-instant" ||
 			contextCompactState.inFlight;
@@ -15971,13 +15952,16 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
+		if (pendingSettledAgentEnd) {
+			const event = pendingSettledAgentEnd;
+			pendingSettledAgentEnd = null;
+			await finalizeSettledAgent(event, ctx);
+		}
 		const manualMicrocompactStarted =
 			manualMicrocompactPending &&
 			ctx.isIdle?.() !== false &&
 			runManualMicrocompact(ctx);
 		if (ctx.isIdle?.() !== false) {
-			workAgentCompactionResume?.finalize();
-			workAgentCompactionResume = null;
 			if (!manualMicrocompactStarted && activeWorkGoal?.status !== "active")
 				try {
 					maybeCompact(ctx, readEffectiveSettings(ctx.cwd));

@@ -537,6 +537,8 @@ try {
 			confirm: async () => true,
 		},
 	};
+	const settle = (target = ctx) =>
+		tempHooks.agent_settled({}, { ...target, isIdle: () => true });
 
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
@@ -814,6 +816,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.equal(
 		JSON.parse(readFileSync(compactedWorkflowClaim, "utf8")).outcome,
 		"completed",
@@ -821,6 +824,58 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	sent.length = 0;
 	compactions.length = 0;
+
+	const nativeRetryId = "wr-native-provider-retry";
+	const nativeRetryClaim = workflowClaim(nativeRetryId);
+	await tempHooks.before_agent_start(
+		{
+			prompt: inlineWorkflowPrompt.replace("wr-compact-resume", nativeRetryId),
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					stopReason: "error",
+					errorMessage: "Our servers are currently overloaded. Please try again later.",
+					content: [],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(
+		existsSync(nativeRetryClaim),
+		false,
+		"agent_end cannot fail work while Pi may still retry",
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Recovered on Pi's native retry." }],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(
+		existsSync(nativeRetryClaim),
+		false,
+		"workflow completion waits for agent_settled",
+	);
+	await settle();
+	assert.equal(
+		JSON.parse(readFileSync(nativeRetryClaim, "utf8")).outcome,
+		"completed",
+		"native provider retries remain one successful work-resume run",
+	);
 
 	const endWithOverflow = async (workflowId) => {
 		await tempHooks.before_agent_start(
@@ -869,6 +924,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.equal(
 		JSON.parse(readFileSync(overflowClaim, "utf8")).outcome,
 		"completed",
@@ -880,6 +936,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		{ willRetry: false, compactionEntry: { details: {} } },
 		ctx,
 	);
+	await settle();
 	assert.equal(
 		JSON.parse(readFileSync(declinedRetryClaim, "utf8")).outcome,
 		"failed",
@@ -922,6 +979,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.equal(
 		JSON.parse(readFileSync(contextMentionClaim, "utf8")).outcome,
 		"completed",
@@ -1063,6 +1121,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.equal(compactions.length, 1, "work-goal compacts before continuing");
 	assert.match(compactions[0].customInstructions, /work-goal microcompact/);
 	assert.equal(sent.length, 2);
@@ -1090,6 +1149,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.equal(statuses["work-goal"], "🟣❓ needs human");
 	assert.ok(
 		notices.some((notice) =>
@@ -1166,6 +1226,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	await tempHooks.agent_start({}, ctx);
+	const retryNotices = notices.length;
 	await tempHooks.agent_end(
 		{
 			messages: [
@@ -1179,15 +1240,36 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	assert.equal(
+		statuses["work-goal"],
+		"🔵 working #0",
+		"agent_end does not consume a goal iteration before Pi settles",
+	);
+	assert.equal(notices.length, retryNotices);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Recovered on Pi's native retry." }],
+				},
+			],
+		},
+		ctx,
+	);
+	await settle();
 	assert.match(
 		statuses["work-goal"],
 		/active/,
-		"provider WebSocket retries keep the autonomous-goal indicator active",
+		"native provider retries keep the autonomous-goal indicator active",
 	);
-	assert.ok(
-		notices.some((notice) =>
-			String(notice.message).includes("transient error"),
-		),
+	assert.equal(
+		notices
+			.slice(retryNotices)
+			.some((notice) => String(notice.message).includes("transient error")),
+		false,
+		"successful native retries do not trigger a duplicate workflow retry",
 	);
 	await tempTools.work_goal_complete.execute(
 		"t-websocket",
@@ -1239,6 +1321,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.match(statuses["work-goal"], /stopped/);
 	await invoke("work-goal", "clear", ctx);
 	assert.equal(statuses["work-goal"], undefined);
@@ -1270,6 +1353,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.match(statuses["work-goal"], /stopped/);
 	await invoke("work-goal", "clear", ctx);
 
@@ -1328,6 +1412,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.equal(statuses["work-goal"], "⏸️ paused");
 	assert.ok(
 		notices.some((notice) =>
@@ -1353,6 +1438,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.equal(sent.length, beforeOrdinaryChat);
 
 	entries.length = 0;
@@ -1454,6 +1540,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		},
 		ctx,
 	);
+	await settle();
 	assert.equal(statuses["work-goal"], "⏸️ usage wait #0");
 	await new Promise((resolve) => setTimeout(resolve, 20));
 	assert.equal(sent.length, beforeUsageRetry + 1);
