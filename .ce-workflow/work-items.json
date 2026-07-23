@@ -1629,6 +1629,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-07-22T23:56:01.026Z",
           "workflowId": "019f89df-ae26-749f-8a9b-232dc865d077"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.20",
@@ -1637,13 +1640,15 @@
         "self-improvement"
       ],
       "notes": [
-        "Independent reproduction: background verifier job-455cc42b298b1850ea0c2b21 using zai/glm-5.2 also found scripts/test-work-goal.mjs present but unreadable at every bounded window and unsearchable by work_verifier_grep; all six configured operations failed without assessment. Evidence: .ce-workflow/work-runs/verifiers/runtime/outputs/job-455cc42b298b1850ea0c2b21.json."
+        "Independent reproduction: background verifier job-455cc42b298b1850ea0c2b21 using zai/glm-5.2 also found scripts/test-work-goal.mjs present but unreadable at every bounded window and unsearchable by work_verifier_grep; all six configured operations failed without assessment. Evidence: .ce-workflow/work-runs/verifiers/runtime/outputs/job-455cc42b298b1850ea0c2b21.json.",
+        "Classified as two related-distinct, locally-owned claims executed by canonical work-2.21. Commit f1d5fbb streams bounded verifier line windows and fixes exact-file grep; node scripts/test-background-verifiers.mjs passed with a >32 KB checkpoint fixture covering read line 700 and exact-path grep.",
+        "wo:verify-check PASS\nCommand: node scripts/work-helper.mjs work-summary work-2.21\nOutput: rFiles excludes an exact requested file. No duplicate/conflicting/upstream/already-fixed/insufficient-evidence claim applies.\\nwo:verify-check PASS\\nCommand: node scripts/test-background-verifiers.mjs\\nOutput: background verifier domain tests passed\\nwo:verify-check PASS\\nCommand: node scripts/test-background-verifiers.mjs\\nOutput: background verifier domain tests passed\\nwo:verify-check PASS\\nCommand: node scripts/test-background-verifiers.mjs\\nOutput: background verifier domain tests passed\"\n}"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The background verifier checkpoint exposed scripts/test-work-goal.mjs as in-scope, but every work_verifier_read window (even maxLi",
       "type": "task",
-      "updatedAt": "2026-07-23T02:03:37.102Z"
+      "updatedAt": "2026-07-23T02:06:04.938Z"
     },
     "work-2.21": {
       "acceptance": "Bounded read windows and grep matches work for a checkpoint file larger than 32 KB; exact file-path grep remains checkpoint scoped and bounded.",
@@ -1914,7 +1919,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-23T02:05:28.072Z"
+    "updatedAt": "2026-07-23T02:06:04.938Z"
   },
   "schemaVersion": 1
 }
