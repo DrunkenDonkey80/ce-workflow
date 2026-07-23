@@ -14,9 +14,9 @@ import {
 import workModelsExtension, {
 	buildWorkImproveObjective,
 	buildWorkImproveState,
+	buildWorkRoadmapState,
 	buildWorkResumeState,
 	executeOrchestratorAction,
-	handleWorkRoadmapCommand,
 	workGoalCompletionBlocker,
 } from "../extensions/work-models.js";
 
@@ -134,6 +134,7 @@ assert.match(
 	objective,
 	/Do not close a duplicate merely because it is similar/,
 );
+assert.match(objective, /Summarize what was done in 1-3 short sentences/);
 for (const id of ["SI-CLOSED", "SI-DEFERRED"])
 	assert.equal(
 		buildWorkImproveState(root, id).reason,
@@ -193,88 +194,45 @@ assert.equal(
 	"wrong-source-checkout",
 );
 
-const operationLabels = [];
-let selectedRoadmap = false;
-await handleWorkRoadmapCommand(
-	"",
-	{
-		cwd: root,
-		ui: {
-			select: async (title, labels) => {
-				if (title.includes("operation")) {
-					operationLabels.push(...labels);
-					return undefined;
-				}
-				if (selectedRoadmap) return undefined;
-				selectedRoadmap = true;
-				return labels.find((label) => label.includes("Self-improving ["));
-			},
-			notify: () => {},
-		},
-	},
-	{},
+assert(
+	!buildWorkRoadmapState(root, "list").roadmaps.some(
+		(roadmap) => roadmap.id === "SI-1",
+	),
+	"the dedicated improvement roadmap stays out of Roadmaps",
 );
-assert(operationLabels.some((label) => /improve/i.test(label)));
-assert(!operationLabels.some((label) => /resume/i.test(label)));
 
-writeFileSync(
-	path.join(root, ".pi", "settings.json"),
-	JSON.stringify({
-		...enabledSettings,
-		workImprovement: { sourceCheckout: tmpdir() },
-	}),
-);
-const wrongSourceLabels = [];
-selectedRoadmap = false;
-await handleWorkRoadmapCommand(
-	"",
-	{
-		cwd: root,
-		ui: {
-			select: async (title, labels) => {
-				if (title.includes("operation")) {
-					wrongSourceLabels.push(...labels);
-					return undefined;
-				}
-				if (selectedRoadmap) return undefined;
-				selectedRoadmap = true;
-				return labels.find((label) => label.includes("Self-improving ["));
-			},
-			notify: () => {},
-		},
-	},
-	{},
-);
-assert(!wrongSourceLabels.some((label) => /resume/i.test(label)));
-assert(wrongSourceLabels.some((label) => /improve/i.test(label)));
-
-writeFileSync(
-	path.join(root, ".pi", "settings.json"),
-	JSON.stringify(enabledSettings),
-);
 const commands = {};
 const hooks = {};
+const shortcuts = {};
+const tools = {};
 let activeTools = [];
 const pi = {
 	on: (name, handler) => {
 		hooks[name] = handler;
 	},
-	registerTool: () => {},
+	registerTool: (tool) => {
+		tools[tool.name] = tool;
+	},
 	registerCommand: (name, config) => {
 		commands[name] = config;
+	},
+	registerShortcut: (name, config) => {
+		shortcuts[name] = config;
 	},
 	getActiveTools: () => activeTools,
 	setActiveTools: (tools) => {
 		activeTools = tools;
 	},
+	sendUserMessage: async () => {},
 };
 workModelsExtension(pi);
+const notices = [];
 const hookCtx = {
 	cwd: root,
 	mode: "interactive",
 	sessionManager: { getSessionId: () => "work-improve-test" },
 	ui: {
-		notify: () => {},
+		notify: (message) => notices.push(message),
 		setStatus: () => {},
 		setWidget: () => {},
 		setTitle: () => {},
@@ -291,5 +249,50 @@ await executeOrchestratorAction("work-improve", "preview SI-1", hookCtx, pi);
 assert(
 	!existsSync(path.join(root, ".pi", "work-runs")),
 	"preview does not emit telemetry or mutate workflow state",
+);
+const menuLabels = [];
+await shortcuts.f7.handler({
+	cwd: root,
+	mode: "print",
+	ui: {
+		select: async (_title, labels) => {
+			menuLabels.push(...labels);
+			return undefined;
+		},
+	},
+});
+assert.match(menuLabels[0], /Roadmaps/);
+assert.match(menuLabels[1], /Improve project \(1\)/);
+await executeOrchestratorAction("work-improve", "SI-1", hookCtx, pi);
+mutateStore(root, (store) =>
+	updateWorkItem(store, "SI-1.1", { status: "closed" }),
+);
+await tools.work_goal_complete.execute(
+	"improvement-complete",
+	{ summary: "Fixed report ingestion and verified the focused regression test." },
+	null,
+	null,
+	hookCtx,
+);
+assert(
+	notices.some((message) =>
+		String(message).includes("Project improvement complete: Fixed report ingestion"),
+	),
+	"completed improvements show a short result summary",
+);
+const emptyMenuLabels = [];
+await shortcuts.f7.handler({
+	cwd: root,
+	mode: "print",
+	ui: {
+		select: async (_title, labels) => {
+			emptyMenuLabels.push(...labels);
+			return undefined;
+		},
+	},
+});
+assert(
+	emptyMenuLabels.every((label) => !label.includes("Improve project")),
+	"Improve project is hidden when no tasks are available",
 );
 await hooks.session_shutdown({}, hookCtx);

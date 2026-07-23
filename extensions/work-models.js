@@ -1641,7 +1641,7 @@ const ORCHESTRATOR_ACTION_LABELS = {
 	"work-finish": "Finish work item",
 	"work-goal": "Autonomous goal",
 	"work-ideate": "Ideas",
-	"work-improve": "Improve orchestrator",
+	"work-improve": "Improve project",
 	"work-init": "Initialize workspace",
 	"work-master": "Plan",
 	"work-med": "Medium task",
@@ -11247,9 +11247,13 @@ function buildWorkRoadmapState(cwd, args = "") {
 		if (command === "list") {
 			const store = loadNativeWorkStore(cwd);
 			const projection = buildInitiativeProjection(cwd, {}, store);
-			const roadmaps = projection.nodes.map((node) =>
-				roadmapSummary(cwd, store.items[node.id], currentId, node),
-			);
+			const roadmaps = projection.nodes
+				.filter(
+					(node) => store.items[node.id]?.title !== SELF_IMPROVEMENT_EPIC_TITLE,
+				)
+				.map((node) =>
+					roadmapSummary(cwd, store.items[node.id], currentId, node),
+				);
 			const rememberedParentId = projection.nodes.find(
 				(node) => node.id === rememberedId,
 			)?.parentId;
@@ -11961,7 +11965,7 @@ Execution contract:
 - Execute locally owned canonical work through the normal work-orchestrator path: smallest correct implementation, focused proof, required review, coded finish/commit, then report reconciliation. Route genuine upstream ownership durably; do not invent a local workaround unless it is the smallest verified project fix.
 - If expected outcomes conflict or evidence cannot support a safe decision, use ask_user once; if unavailable or cancelled, call work_goal_human_decision. Do not ask for routine implementation approval.
 - Leave unresolved work open. Close each snapshot item only after verified coverage. New work does not block this snapshot.
-- Call work_goal_complete only when every snapshot ID is closed and git/work-item state is verified.`;
+- Call work_goal_complete only when every snapshot ID is closed and git/work-item state is verified. Summarize what was done in 1-3 short sentences, naming the fixes and verification.`;
 }
 
 function workImproveCompletionBlocker(goal, cwd) {
@@ -11998,7 +12002,7 @@ async function handleWorkImproveCommand(args, pi, ctx, selected = "") {
 	return stateTelemetry({ ...state, action: "work-improve-started" });
 }
 
-function workImproveAvailable(cwd, target = "") {
+function workImproveCount(cwd, target = "") {
 	try {
 		const settings = readEffectiveSettings(cwd);
 		const source = resolveReportingSource({
@@ -12007,14 +12011,13 @@ function workImproveAvailable(cwd, target = "") {
 			settings,
 		}).sourceCwd;
 		const epic = selfImprovementRoadmap(cwd, target);
-		return Boolean(
-			workResumeSettings(cwd, settings).selfImproving &&
-				sameCheckout(cwd, source) &&
-				epic &&
-				improvementWorkItems(cwd, epic.id).length,
-		);
+		return workResumeSettings(cwd, settings).selfImproving &&
+			sameCheckout(cwd, source) &&
+			epic
+			? improvementWorkItems(cwd, epic.id).length
+			: 0;
 	} catch {
-		return false;
+		return 0;
 	}
 }
 
@@ -13110,10 +13113,14 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	persistWorkGoal(pi, null);
 	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
 	ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
-	ctx.ui.notify(`autonomous goal complete: ${truncate(trimmed, 240)}`, "info");
+	const completionLabel =
+		goal.mode === "improvement"
+			? "Project improvement complete"
+			: "autonomous goal complete";
+	ctx.ui.notify(`${completionLabel}: ${truncate(trimmed, 240)}`, "info");
 	finishWarpWork(ctx, workWarpMode(goal.mode, goal), trimmed);
 	return {
-		content: [{ type: "text", text: `autonomous goal complete: ${trimmed}` }],
+		content: [{ type: "text", text: `${completionLabel}: ${trimmed}` }],
 		details: { goal: goal.objective, summary: trimmed },
 		terminate: true,
 		completed: true,
@@ -13327,6 +13334,7 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 }
 
 async function handleWorkMenuCommand(ctx, pi) {
+	const improvementCount = workImproveCount(ctx.cwd);
 	const items = [
 		{
 			value: "work-roadmap",
@@ -13334,6 +13342,16 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description:
 				"Browse, inspect, plan, continue, close, or reopen roadmaps.\nThe last open roadmap or initiative is selected automatically.",
 		},
+		...(improvementCount
+			? [
+					{
+						value: "work-improve",
+						label: `🔧 Improve project (${improvementCount})`,
+						description:
+							"Process captured workflow improvements.\nOnly the currently available backlog snapshot is included.",
+					},
+				]
+			: []),
 		{
 			value: "work-resume",
 			label: "⏩ Resume work",
@@ -13510,12 +13528,6 @@ async function handleWorkMenuCommand(ctx, pi) {
 			label: "⚙️ Settings",
 			description:
 				"Configure effort, role models, background verifiers, and review gates.\nGlobal and project scopes are available in the submenu.",
-		},
-		{
-			value: "work-improve",
-			label: "🔧 Improve orchestrator",
-			description:
-				"Turn captured workflow evidence into a bounded self-improvement task.\nAvailable when self-improving reporting is enabled.",
 		},
 		{
 			value: "work-catch-up",
@@ -14500,10 +14512,6 @@ async function handleWorkRoadmapCommand(
 				?.preparation
 		: undefined;
 	const childPrepared = parentPreparation?.preparedPrefix.includes(selected);
-	const improvement =
-		!initiative &&
-		!parentPreparation &&
-		Boolean(selfImprovementRoadmap(ctx.cwd, selected));
 	const op = await choose(
 		ctx,
 		"Roadmap operations",
@@ -14561,17 +14569,11 @@ async function handleWorkRoadmapCommand(
 						{ value: "report", label: "📄 full report" },
 					]
 				: [
-						improvement
-							? {
-									value: "improve",
-									label: "🔧 Improve orchestrator",
-									description: "triage, deduplicate, and execute reports",
-								}
-							: {
-									value: "resume",
-									label: "▶️ Resume work",
-									description: "start the autonomous implementation loop",
-								},
+						{
+							value: "resume",
+							label: "▶️ Resume work",
+							description: "start the autonomous implementation loop",
+						},
 						{
 							value: "tasks",
 							label: "📋 list tasks",
@@ -14606,7 +14608,6 @@ async function handleWorkRoadmapCommand(
 	if (!op) return handleWorkRoadmapCommand("", ctx, pi);
 	if (op === "stop")
 		return { ok: true, action: "initiative-preparation-stopped", preparation };
-	if (op === "improve") return handleWorkImproveCommand("", pi, ctx, selected);
 	if (op === "resume") {
 		let resumeTarget = selected;
 		if (initiative || parentPreparation) {

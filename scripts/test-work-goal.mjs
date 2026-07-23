@@ -345,7 +345,6 @@ for (const action of [
 	"Usage report",
 	"Context guard",
 	"Settings",
-	"Improve orchestrator",
 	"Catch up project",
 	"Microcompact now",
 ])
@@ -362,9 +361,6 @@ assert(
 assert(orchestratorLabels.some((label) => label.includes("🌍 Roadmaps")));
 assert(orchestratorLabels.some((label) => label.includes("⏩ Resume work")));
 assert(orchestratorLabels.some((label) => label.includes("🧠 Context guard")));
-assert(
-	orchestratorLabels.some((label) => label.includes("🔧 Improve orchestrator")),
-);
 const orchestratorRenders = [];
 await shortcuts.f7.handler({
 	cwd: process.cwd(),
