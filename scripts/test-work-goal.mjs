@@ -68,6 +68,14 @@ assert.equal(
 	true,
 );
 assert.equal(
+	mod.isRetryableWorkGoalInterruption({
+		stopReason: "error",
+		errorMessage:
+			"Codex error: An error occurred while processing your request. You can retry your request.",
+	}),
+	true,
+);
+assert.equal(
 	mod.isWorkGoalContextOverflow({
 		errorMessage: "input exceeds the context window",
 	}),
@@ -1296,6 +1304,40 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	tempHooks.session_start?.({}, ctx);
 	assert.equal(statuses["work-goal"], "⏸️ paused");
+	const abortsBeforeStaleContinuation = aborts;
+	const staleBefore = await tempHooks.before_agent_start(
+		{
+			prompt:
+				"Continue the active autonomous goal.\n\n<!-- work-goal-continuation:wg-inert-restart:1:stale -->",
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	assert.doesNotMatch(staleBefore.systemPrompt, /Active autonomous goal/);
+	await tempHooks.agent_start({}, ctx);
+	assert.equal(
+		aborts,
+		abortsBeforeStaleContinuation + 1,
+		"a queued continuation cannot reactivate a paused goal",
+	);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					stopReason: "aborted",
+					content: [],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(statuses["work-goal"], "⏸️ paused");
+	assert.ok(
+		notices.some((notice) =>
+			String(notice.message).includes("stale autonomous-goal continuation"),
+		),
+	);
 	const beforeOrdinaryChat = sent.length;
 	const ordinaryBefore = await tempHooks.before_agent_start(
 		{ prompt: "regarding com7, is it fixed right", systemPrompt: "base" },

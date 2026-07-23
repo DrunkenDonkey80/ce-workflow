@@ -420,6 +420,7 @@ let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
 let activeWorkGoalRunning = false;
 let pendingWorkGoalTurn = false;
+let blockedWorkGoalTurn = false;
 let workGoalContinuationPending = null;
 let workGoalContinuationRetry = null;
 let workGoalRecovery = null;
@@ -454,7 +455,7 @@ const WORK_GOAL_USAGE_LIMIT_RE =
 const WORK_GOAL_NON_RETRYABLE_RE =
 	/multi-auth rotation failed|credentials tried|unauthori[sz]ed|invalid api key/i;
 const WORK_GOAL_RETRYABLE_RE =
-	/websocket(?: closed| error)|sse response headers timed out|headers timed out|context[_\s-]*length[_\s-]*exceeded|input exceeds the context window|context window|provider returned error|overloaded|529|503|connection reset|fetch failed|etimedout|socket hang up/i;
+	/websocket(?: closed| error)|sse response headers timed out|headers timed out|context[_\s-]*length[_\s-]*exceeded|input exceeds the context window|context window|provider returned error|you can retry your request|overloaded|529|503|connection reset|fetch failed|etimedout|socket hang up/i;
 const WORK_GOAL_CONTEXT_OVERFLOW_RE =
 	/context[_\s-]*length|context window|input exceeds|prompt is too long|maximum context length/i;
 const WORK_GOAL_CONTRADICTORY_COMPLETION_RE =
@@ -15507,6 +15508,7 @@ export default function workModelsExtension(pi) {
 		pendingInitiativeConversions.clear();
 		activeWorkGoalRunning = false;
 		pendingWorkGoalTurn = false;
+		blockedWorkGoalTurn = false;
 		workGoalContinuationPending = null;
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
@@ -15577,18 +15579,12 @@ export default function workModelsExtension(pi) {
 			: `${baseSystemPrompt}\n\n${REVIEW_CYCLE_BUDGET_PROMPT}`.trim();
 		markWorkGoalContinuationDelivered(event.prompt);
 		const marker = extractWorkGoalContinuationMarker(event.prompt);
-		pendingWorkGoalTurn = Boolean(
+		const matchingWorkGoalTurn = Boolean(
 			activeWorkGoal && marker?.startsWith(`${activeWorkGoal.id}:`),
 		);
-		if (pendingWorkGoalTurn && activeWorkGoal?.status === "paused") {
-			activeWorkGoal = {
-				...activeWorkGoal,
-				status: "active",
-				updatedAt: Date.now(),
-			};
-			persistWorkGoal(pi);
-			updateWorkGoalStatus(ctx);
-		}
+		pendingWorkGoalTurn =
+			matchingWorkGoalTurn && activeWorkGoal?.status === "active";
+		blockedWorkGoalTurn = matchingWorkGoalTurn && !pendingWorkGoalTurn;
 		const meta = parseWorkPromptMeta(event.prompt);
 		if (meta?.workflowRunId === manualMicrocompactWorkflowRunId)
 			manualMicrocompactWorkflowRunId = null;
@@ -15618,6 +15614,17 @@ export default function workModelsExtension(pi) {
 
 	pi.on("agent_start", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "agent_start", event);
+		if (blockedWorkGoalTurn) {
+			blockedWorkGoalTurn = false;
+			pendingWorkGoalTurn = false;
+			pendingWorkPrompt = null;
+			ctx.ui.notify(
+				"Ignored a stale autonomous-goal continuation. Resume the goal explicitly to continue.",
+				"warning",
+			);
+			ctx.abort();
+			return;
+		}
 		activeWorkGoalRunning = pendingWorkGoalTurn;
 		pendingWorkGoalTurn = false;
 		if (!pendingWorkPrompt) {
