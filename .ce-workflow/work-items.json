@@ -1604,7 +1604,9 @@
     },
     "work-2.20": {
       "createdAt": "2026-07-22T23:56:01.030Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.21"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The background verifier checkpoint exposed scripts/test-work-goal.mjs as in-scope, but every work_verifier_read window (even maxLines=1) reported 'Verifier file exceeds the read limit' and work_verifier_grep returned no matches, so all correctness/maintainability/simplification operations failed without inspecting source.\nExpected: Checkpoint-scoped verifier tools should allow bounded reads and text search of a valid in-scope source file, including large files, so configured background verification can assess the committed checkpoint.\nImpact: Background verification silently produced no findings or assessment for a committed change, wasting a high-cost verifier run and weakening the post-commit verification gate.\nSuggested improvement: Fix checkpoint file materialization/indexing so work_verifier_read honors bounded startLine/maxLines windows and work_verifier_grep searches the checkpoint copy regardless of total file size.",
       "evidence": [
@@ -1641,7 +1643,32 @@
       "status": "open",
       "title": "Self-improvement report: The background verifier checkpoint exposed scripts/test-work-goal.mjs as in-scope, but every work_verifier_read window (even maxLi",
       "type": "task",
-      "updatedAt": "2026-07-22T23:56:01.030Z"
+      "updatedAt": "2026-07-23T02:03:37.102Z"
+    },
+    "work-2.21": {
+      "acceptance": "Bounded read windows and grep matches work for a checkpoint file larger than 32 KB; exact file-path grep remains checkpoint scoped and bounded.",
+      "createdAt": "2026-07-23T02:03:30.091Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Checkpoint-scoped reads reject every window when the whole file exceeds 32 KB, while grep treats an exact file path only as a directory prefix and returns no matches.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.21",
+      "labels": [],
+      "notes": [
+        "Atomized work-2.20 into two related-distinct, locally-owned root causes in extensions/work-models.js: whole-file size validation occurs before read pagination, and verifierFiles excludes an exact requested file. No duplicate/conflicting/upstream/already-fixed/insufficient-evidence claim applies.",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Make checkpoint verifier tools inspect large files and exact paths",
+      "type": "bug",
+      "updatedAt": "2026-07-23T02:05:28.072Z"
     },
     "work-2.3": {
       "createdAt": "2026-07-20T02:00:16.639Z",
@@ -1887,7 +1914,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-22T23:58:03.902Z"
+    "updatedAt": "2026-07-23T02:05:28.072Z"
   },
   "schemaVersion": 1
 }

@@ -313,6 +313,12 @@ try {
 	git("add", "tracked.txt");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
 	writeFileSync(path.join(gitCwd, "untracked.txt"), "untracked\n");
+	writeFileSync(
+		path.join(gitCwd, "large.txt"),
+		Array.from({ length: 1_000 }, (_, index) =>
+			`${String(index + 1).padStart(4, "0")}:${"x".repeat(40)}${index === 699 ? ":needle" : ""}`,
+		).join("\n"),
+	);
 	const branchBefore = git("rev-parse", "--abbrev-ref", "HEAD");
 	const indexBefore = git("diff", "--cached", "--binary");
 	const worktreeBefore = git("diff", "--binary");
@@ -385,10 +391,29 @@ try {
 		"unstaged",
 	);
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
-	assert.deepEqual(requests[0].paths.sort(), ["tracked.txt", "untracked.txt"]);
+	assert.deepEqual(requests[0].paths.sort(), [
+		"large.txt",
+		"tracked.txt",
+		"untracked.txt",
+	]);
 	assert.equal(
 		executeVerifierRead(requests[0].cwd, { path: "tracked.txt" }).lines[0],
 		"unstaged",
+	);
+	assert.match(
+		executeVerifierRead(requests[0].cwd, {
+			path: "large.txt",
+			startLine: 700,
+			maxLines: 1,
+		}).lines[0],
+		/needle/,
+	);
+	assert.equal(
+		executeVerifierGrep(requests[0].cwd, {
+			path: "large.txt",
+			query: "needle",
+		}).matches[0].line,
+		700,
 	);
 	assert.deepEqual(
 		executeVerifierFind(requests[0].cwd, { query: "untracked" }).matches,

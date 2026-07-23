@@ -10,6 +10,7 @@ import {
 	openSync,
 	readdirSync,
 	readFileSync,
+	readSync,
 	realpathSync,
 	rmSync,
 	statSync,
@@ -17,6 +18,7 @@ import {
 	writeSync,
 } from "node:fs";
 import { homedir } from "node:os";
+import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import {
 	basename,
@@ -6335,11 +6337,33 @@ function verifierPath(cwd, requested, { directory = false } = {}) {
 		throw new Error("Verifier path is outside the checkpoint scope.");
 	return { ...workspace, target, relative: normalized };
 }
-function verifierText(file) {
-	const text = readFileSync(file, "utf8");
-	if (Buffer.byteLength(text) > VERIFIER_MAX_BYTES)
-		throw new Error("Verifier file exceeds the read limit.");
-	return text;
+function* verifierLines(file) {
+	const descriptor = openSync(file, "r");
+	const chunk = Buffer.allocUnsafe(VERIFIER_MAX_BYTES);
+	const decoder = new StringDecoder("utf8");
+	let pending = "";
+	try {
+		for (let bytes; (bytes = readSync(descriptor, chunk, 0, chunk.length)); ) {
+			pending += decoder.write(chunk.subarray(0, bytes));
+			for (let newline; (newline = pending.indexOf("\n")) !== -1; ) {
+				const line = pending
+					.slice(0, newline)
+					.replace(/\r$/, "");
+				if (Buffer.byteLength(line) > VERIFIER_MAX_BYTES)
+					throw new Error("Verifier line exceeds the read limit.");
+				yield line;
+				pending = pending.slice(newline + 1);
+			}
+			if (Buffer.byteLength(pending) > VERIFIER_MAX_BYTES)
+				throw new Error("Verifier line exceeds the read limit.");
+		}
+		pending += decoder.end();
+		if (Buffer.byteLength(pending) > VERIFIER_MAX_BYTES)
+			throw new Error("Verifier line exceeds the read limit.");
+		yield pending;
+	} finally {
+		closeSync(descriptor);
+	}
 }
 export function executeVerifierRead(cwd, params = {}) {
 	const { target, relative: file } = verifierPath(cwd, params.path);
@@ -6353,12 +6377,21 @@ export function executeVerifierRead(cwd, params = {}) {
 		maxLines > VERIFIER_MAX_LINES
 	)
 		throw new Error("Invalid verifier line range.");
-	const lines = verifierText(target).split(/\r?\n/);
-	return {
-		path: file,
-		startLine,
-		lines: lines.slice(startLine - 1, startLine - 1 + maxLines),
-	};
+	const lines = [];
+	let outputBytes = 0;
+	let lineNumber = 0;
+	for (const line of verifierLines(target)) {
+		lineNumber += 1;
+		if (lineNumber < startLine) continue;
+		outputBytes += Buffer.byteLength(line);
+		if (outputBytes > VERIFIER_MAX_BYTES)
+			throw new Error(
+				"Verifier read window exceeds the output limit; request fewer lines.",
+			);
+		lines.push(line);
+		if (lines.length === maxLines) break;
+	}
+	return { path: file, startLine, lines };
 }
 export function executeVerifierList(cwd, params = {}) {
 	const {
@@ -6388,6 +6421,8 @@ export function executeVerifierList(cwd, params = {}) {
 }
 function verifierFiles(cwd, requested) {
 	const { root, paths } = verifierPath(cwd, requested, { directory: true });
+	if (requested && requested !== "." && paths.has(requested))
+		return [verifierPath(root, requested)];
 	const prefix = requested && requested !== "." ? `${requested}/` : "";
 	return [...paths]
 		.filter((entry) => entry.startsWith(prefix))
@@ -6424,13 +6459,13 @@ export function executeVerifierGrep(cwd, params = {}) {
 		throw new Error("Invalid verifier result limit.");
 	const matches = [];
 	for (const entry of verifierFiles(cwd, params.path)) {
-		for (const [index, line] of verifierText(entry.target)
-			.split(/\r?\n/)
-			.entries()) {
+		let lineNumber = 0;
+		for (const line of verifierLines(entry.target)) {
+			lineNumber += 1;
 			if (line.includes(query))
 				matches.push({
 					path: entry.relative,
-					line: index + 1,
+					line: lineNumber,
 					text: line.slice(0, 500),
 				});
 			if (matches.length >= maxResults) return { matches };
