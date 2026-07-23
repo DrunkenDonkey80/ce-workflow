@@ -13,8 +13,18 @@ function labelFor(item) {
 	return item.description ? `${label} — ${item.description}` : label;
 }
 
-function checkLabel(item, enabled) {
-	return `${enabled ? "✓ on" : "○ off"} ${itemLabel(item)}`;
+function itemIndicator(item, { checked, currentValue, multi, selected } = {}) {
+	if (multi) return checked ? "✓" : "○";
+	if (item.value === currentValue) return "●";
+	if (item.local) return "*";
+	return selected ? ">" : " ";
+}
+
+function indicatedLabel(item, options, align = true) {
+	const indicator = itemIndicator(item, options);
+	return indicator === " " && !align
+		? itemLabel(item)
+		: `${indicator} ${itemLabel(item)}`;
 }
 
 function keyMatches(keybindings, data, id, ...fallbacks) {
@@ -150,7 +160,10 @@ async function nativeListDialog(ctx, options) {
 		for (;;) {
 			const choices = items.map((item) => ({
 				...item,
-				label: checkLabel(item, enabled.has(item.value)),
+				label: indicatedLabel(item, {
+					checked: enabled.has(item.value),
+					multi: true,
+				}),
 				preserveCase: true,
 			}));
 			const labels = choices.map(labelFor);
@@ -183,7 +196,13 @@ async function nativeListDialog(ctx, options) {
 				]
 			: []),
 	];
-	const labels = choices.map(labelFor);
+	const labels = choices.map((item) =>
+		labelFor({
+			...item,
+			label: indicatedLabel(item, { currentValue: active }, false),
+			preserveCase: true,
+		}),
+	);
 	const selected = await ctx.ui.select(title, labels);
 	const index = labels.indexOf(selected);
 	if (index < 0) return;
@@ -301,13 +320,12 @@ export async function showListDialog(ctx, options) {
 						);
 						for (let row = start; row < start + count; row += 1) {
 							const item = visible[row].item;
-							const marker = row === index ? "> " : "  ";
-							const current = item.value === currentValue ? " (current)" : "";
-							const local = item.local ? "* " : "  ";
-							const label = multi
-								? checkLabel(item, enabled.has(item.value))
-								: itemLabel(item);
-							const text = `${marker}${local}${label}${current}`;
+							const text = indicatedLabel(item, {
+								checked: enabled.has(item.value),
+								currentValue,
+								multi: Boolean(multi),
+								selected: row === index,
+							});
 							let color = item.color ?? "text";
 							if (row === index && !item.color) color = "accent";
 							else if (multi)

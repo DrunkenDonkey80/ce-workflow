@@ -13381,34 +13381,48 @@ function resolveCswap() {
 	return null;
 }
 
-function cswapUsageLines(account) {
-	const windows = [
+function cswapUsage(account) {
+	const parts = [];
+	for (const [label, window] of [
 		["5h", account?.usage?.fiveHour],
-		["Week", account?.usage?.sevenDay],
-	];
-	const lines = [];
-	for (const [label, window] of windows) {
-		if (!window || window.pct == null) continue;
-		const reset = window.countdown
-			? ` · resets in ${window.countdown}${window.clock ? ` (${window.clock})` : ""}`
-			: "";
-		lines.push(`${label}: ${Math.round(window.pct)}% used${reset}`);
+		["week", account?.usage?.sevenDay],
+	]) {
+		if (window?.pct == null) continue;
+		const pct = Math.max(0, Math.min(100, Math.round(window.pct)));
+		const filled = Math.round((pct / 100) * 6);
+		parts.push(
+			`${label} [${"#".repeat(filled)}${" ".repeat(6 - filled)}] ${pct}%${window.countdown ? `, in ${window.countdown}` : ""}`,
+		);
 	}
-	return lines.length ? lines.join("\n") : "Usage info unavailable";
+	return parts.join(", ");
 }
 
 function cswapMenuItems(data) {
 	const accounts = Array.isArray(data?.accounts) ? data.accounts : [];
 	const activeNumber = data?.activeAccountNumber;
-	const items = accounts.map((account) => {
-		const active = account.active || account.number === activeNumber;
-		const name = account.alias || account.email || `Account-${account.number}`;
-		return {
-			value: String(account.number),
-			label: `${active ? "● " : ""}${account.number}. ${name}${active ? " (active)" : ""}`,
-			description: cswapUsageLines(account),
-		};
-	});
+	const items = accounts
+		.map((account, index) => ({ account, index }))
+		.sort((left, right) => {
+			const rank = ({ account }) => {
+				const fiveHour = account?.usage?.fiveHour;
+				const reset = Date.parse(fiveHour?.resetsAt ?? "");
+				return fiveHour?.pct < 50 && Number.isFinite(reset)
+					? [0, reset]
+					: [1, 0];
+			};
+			const [leftRank, leftReset] = rank(left);
+			const [rightRank, rightReset] = rank(right);
+			return leftRank - rightRank || leftReset - rightReset || left.index - right.index;
+		})
+		.map(({ account }) => {
+			const name = account.email || account.alias || `Account-${account.number}`;
+			const usage = cswapUsage(account);
+			return {
+				value: String(account.number),
+				label: `${name}${usage ? `, ${usage}` : ""}`,
+				preserveCase: true,
+			};
+		});
 	return { items, activeNumber };
 }
 
@@ -13445,11 +13459,7 @@ async function handleCswapMenu(ctx, bin) {
 		"Claude account switcher",
 		items,
 		activeNumber == null ? undefined : String(activeNumber),
-		{
-			purpose: "Switch the active Claude account. Type to filter.",
-			descriptionMinLines: 2,
-			descriptionMaxLines: 2,
-		},
+		{ purpose: "Switch the active Claude account. Type to filter." },
 	);
 	if (!choice) return;
 	if (choice === String(activeNumber)) {

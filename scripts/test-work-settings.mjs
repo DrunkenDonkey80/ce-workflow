@@ -337,7 +337,7 @@ try {
 				assert(
 					lines.some(
 						(line) =>
-							line.includes("> ") && line.includes(action.expectInitial),
+							line.includes("[accent]") && line.includes(action.expectInitial),
 					),
 					`cursor did not stay on ${action.expectInitial}`,
 				);
@@ -353,7 +353,8 @@ try {
 					lines = component.render(140);
 					if (
 						lines.some(
-							(line) => line.includes("> ") && line.includes(action.target),
+							(line) =>
+								line.includes("[accent]") && line.includes(action.target),
 						)
 					)
 						break;
@@ -362,7 +363,8 @@ try {
 				lines = component.render(140);
 				assert(
 					lines.some(
-						(line) => line.includes("> ") && line.includes(action.target),
+						(line) =>
+							line.includes("[accent]") && line.includes(action.target),
 					),
 					`missing settings choice ${action.target}\n${lines.join("\n")}`,
 				);
@@ -525,7 +527,7 @@ try {
 		),
 	});
 	assert(
-		globalUsageChoices?.[0]?.startsWith("All"),
+		globalUsageChoices?.[0]?.startsWith("● All"),
 		`global enum picker opens on its persisted value: ${JSON.stringify(globalUsageChoices)}`,
 	);
 	assert(
@@ -556,7 +558,7 @@ try {
 		),
 	});
 	assert(
-		projectUsageChoices?.[0]?.startsWith("First"),
+		projectUsageChoices?.[0]?.startsWith("● First"),
 		"project enum picker opens on its persisted override",
 	);
 	assert(

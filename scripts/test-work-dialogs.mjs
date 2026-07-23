@@ -90,11 +90,22 @@ await drive({ title: "Root", items, cursorKey: "root" }, (component) => {
 		"every dialog shows its purpose below the title",
 	);
 	assert(
-		lines.some((line) => line.includes(">   Beta")),
+		lines.some((line) => line.includes("> Beta")),
 		"returning from a submenu restores its parent cursor",
 	);
 	component.handleInput("escape");
 });
+
+await drive(
+	{ title: "Indicators", items, currentValue: "beta", selectedIndex: 0 },
+	(component) => {
+		const lines = component.render(70);
+		assert(lines.some((line) => line.includes("> Alpha")));
+		assert(lines.some((line) => line.includes("● Beta")));
+		assert(!lines.some((line) => line.includes("(current)")));
+		component.handleInput("escape");
+	},
+);
 
 const checklist = await drive(
 	{
@@ -107,13 +118,13 @@ const checklist = await drive(
 		component.handleInput("down");
 		component.handleInput("enter");
 		assert(
-			component.render(70).some((line) => line.includes(">   ✓ on Beta")),
-			"Enter toggles without moving the selected line",
+			component.render(70).some((line) => line.includes("✓ Beta")),
+			"Enter toggles without duplicating the selected indicator",
 		);
 		component.handleInput(" ");
 		assert(
-			component.render(70).some((line) => line.includes(">   ○ off Beta")),
-			"Space toggles without moving the selected line",
+			component.render(70).some((line) => line.includes("○ Beta")),
+			"Space toggles without duplicating the selected indicator",
 		);
 		component.handleInput(" ");
 		component.handleInput("escape");
