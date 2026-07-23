@@ -105,8 +105,8 @@ await drive(
 	},
 	(component) => {
 		const lines = component.render(70);
-		assert(lines.some((line) => line.includes(">* Alpha")));
-		assert(lines.some((line) => line.includes(" ● Beta")));
+		assert(lines.some((line) => line.includes("> *Alpha")));
+		assert(lines.some((line) => line.includes("●Beta")));
 		assert(!lines.some((line) => line.includes("(current)")));
 		component.handleInput("escape");
 	},
@@ -149,12 +149,12 @@ const checklist = await drive(
 		component.handleInput("down");
 		component.handleInput("enter");
 		assert(
-			component.render(70).some((line) => line.includes(">✓ Beta")),
+			component.render(70).some((line) => line.includes("> ✓Beta")),
 			"selection and checked indicators use separate columns",
 		);
 		component.handleInput(" ");
 		assert(
-			component.render(70).some((line) => line.includes(">○ Beta")),
+			component.render(70).some((line) => line.includes("> ○Beta")),
 			"selection and unchecked indicators use separate columns",
 		);
 		component.handleInput(" ");

@@ -363,8 +363,7 @@ try {
 				lines = component.render(140);
 				assert(
 					lines.some(
-						(line) =>
-							line.includes("[accent]") && line.includes(action.target),
+						(line) => line.includes("[accent]") && line.includes(action.target),
 					),
 					`missing settings choice ${action.target}\n${lines.join("\n")}`,
 				);
@@ -479,12 +478,12 @@ try {
 		]),
 	});
 	assert(
-		globalScopeRender.includes("* ✓ on Coded task-vs-plan checklist") &&
-			projectScopeRender.includes("* ○ off Coded task-vs-plan checklist"),
+		globalScopeRender.includes("*✓ on Coded task-vs-plan checklist") &&
+			projectScopeRender.includes("*○ off Coded task-vs-plan checklist"),
 		"local override marker is visible in both scopes",
 	);
 	assert(
-		!inheritedScopeRender.includes("* ✓ on Coded task-vs-plan checklist") &&
+		!inheritedScopeRender.includes("*✓ on Coded task-vs-plan checklist") &&
 			mod.workOrchSettings(cwd).advisorVerifyTask === true &&
 			!Object.hasOwn(
 				readSettings().workOrchestrator ?? {},
@@ -527,7 +526,7 @@ try {
 		),
 	});
 	assert(
-		globalUsageChoices?.[0]?.startsWith("● All"),
+		globalUsageChoices?.[0]?.startsWith("●All"),
 		`global enum picker opens on its persisted value: ${JSON.stringify(globalUsageChoices)}`,
 	);
 	assert(
@@ -558,7 +557,7 @@ try {
 		),
 	});
 	assert(
-		projectUsageChoices?.[0]?.startsWith("● First"),
+		projectUsageChoices?.[0]?.startsWith("●First"),
 		"project enum picker opens on its persisted override",
 	);
 	assert(

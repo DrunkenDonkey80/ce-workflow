@@ -22,8 +22,8 @@ function itemIndicator(item, { checked, currentValue, multi } = {}) {
 
 function indicatedPrefix(item, options, align = true) {
 	const indicator = itemIndicator(item, options);
-	if (!align) return indicator === " " ? "" : `${indicator} `;
-	return `${options?.selected ? ">" : " "}${indicator} `;
+	if (!align) return indicator === " " ? "" : indicator;
+	return `${options?.selected ? ">" : " "} ${indicator}`;
 }
 
 function indicatedLabel(item, options, align = true) {
