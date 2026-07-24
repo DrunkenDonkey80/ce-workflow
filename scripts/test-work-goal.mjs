@@ -841,7 +841,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 				{
 					role: "assistant",
 					stopReason: "error",
-					errorMessage: "Our servers are currently overloaded. Please try again later.",
+					errorMessage:
+						"Our servers are currently overloaded. Please try again later.",
 					content: [],
 				},
 			],

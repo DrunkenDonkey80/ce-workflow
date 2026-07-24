@@ -33,7 +33,29 @@ No tracker CLI is required for normal operation. Press **F7** to open **Orchestr
 
 Ordinary task actions use one durable `Misc` roadmap when no current roadmap is selected. When another roadmap is current, the UI asks whether new work belongs there or in `Misc`. Dedicated planning, brainstorming, and migration actions still create their own roadmaps. Untargeted **Resume work** falls back to ready `Misc` work and leaves an empty `Misc` idle.
 
-Role agents are `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, and three identical configurable advisor roles: `work-advisor`, `work-advisor-2`, and `work-advisor-3`. Configured advisors review brainstorms and plans in parallel; slice plans use the profile's `none` / `first` / `all` policy. They use `scripts/work-helper.mjs` native helpers for compact work-item summaries, initiative hierarchy, preview/apply, children, ready, claim, note, label, and blocker operations.
+Role agents are `work-planner`, `work-worker`, `work-reviewer`,
+`work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, the
+tool-free `work-divergent` generator, and three configurable advisor roles:
+`work-advisor`, `work-advisor-2`, and `work-advisor-3`. Configured advisors
+review brainstorms and plans in parallel; slice plans use the profile's
+`none` / `first` / `all` policy. Every implementation runs in the isolated
+`work-worker` selected by the Work model setting; Small and Medium only bound
+scope. They use `scripts/work-helper.mjs` native helpers for compact work-item
+summaries, initiative hierarchy, preview/apply,
+children, ready, claim, note, label, and blocker operations.
+
+## Creative sidecar
+
+`F7 → Settings` → **Creative sidecar** supports **Off**, **Ask** (default), and
+**Auto**. Ask offers Quick or Wide for direct brainstorms, large tasks, and new
+master plans; Auto chooses Wide without another prompt. Wide runs three fresh,
+mutually isolated `work-divergent` branches under fixed cognitive frames, forms
+the ordinary baseline independently, then merges only constraint-compatible
+candidates before the configured advisors critique the result. Generator
+branches reuse the enabled Advisor 1–3 model selections round-robin; with only
+Inherit configured, all three still run as separate contexts on the current
+model. Existing `wo:divergent-analysis` provenance is reused instead of
+regenerating it.
 
 ## Background verifiers
 

@@ -101,6 +101,18 @@ try {
 	);
 	writeSettings({});
 	writeFileSync(path.join(globalDir, "settings.json"), "{}\n");
+	assert(
+		mod.workOrchSettings(cwd).creativeMode === "ask",
+		"creative sidecar defaults to one Quick/Wide question",
+	);
+	const creativeSettings = {};
+	mod.setWorkOrchCreativeMode(creativeSettings, "auto");
+	writeSettings(creativeSettings);
+	assert(
+		mod.workOrchSettings(cwd).creativeMode === "auto",
+		"creative sidecar mode persists",
+	);
+	writeSettings({});
 
 	// Verifier profiles merge by canonical model ID; project null tombstones win.
 	writeGlobalSettings({
@@ -179,9 +191,10 @@ try {
 		mod.workOrchSettings(cwd).codeReviewBeforeCommit === "light",
 		"medium light review",
 	);
+	writeSettings({ workOrchestrator: { sliceExecutionMode: "inline" } });
 	assert(
-		mod.workOrchSettings(cwd).sliceExecutionMode === "inline",
-		"medium inline slice execution",
+		!("sliceExecutionMode" in mod.workOrchSettings(cwd)),
+		"legacy inline setting is ignored",
 	);
 	assert(
 		mod.workOrchSettings(cwd).simplifyBeforeReview === false,
@@ -224,7 +237,6 @@ try {
 	mod.setWorkOrchBoolean(settings, "slicePlanBeforeWork", false);
 	mod.setWorkOrchBoolean(settings, "slicePlanWithCePlan", false);
 	mod.setWorkOrchReviewLevel(settings, "off");
-	mod.setWorkOrchSliceExecution(settings, "agent");
 	writeSettings(settings);
 	assert(
 		mod.workOrchSettings(cwd).advisorVerifyTask === false,
@@ -241,10 +253,6 @@ try {
 	assert(
 		mod.workOrchSettings(cwd).codeReviewBeforeCommit === "off",
 		"flipped review off",
-	);
-	assert(
-		mod.workOrchSettings(cwd).sliceExecutionMode === "agent",
-		"flipped slice execution to agent",
 	);
 	assert(
 		mod.workOrchSettings(cwd).profile === "max",
@@ -402,17 +410,23 @@ try {
 		"› Advisor 1: model:inherit current",
 		"› Advisor 2: model:none",
 		"› Advisor 3: model:none",
+		"creative sidecar: ask",
 		"advisor usage for slice plans: all",
 		"Planner writes slice plan before work",
 		"Agent slice planner for messy/large slices",
 		"ce-plan slice depth: Lightweight",
 		"pre-commit review:",
+		"implementation: configured Work model (isolated work-worker)",
 		"CE-simplify-code before review",
 		"CE-test-browser when diff touches UI",
 		"self-improving workflow reporting",
 		"new session between iterations",
 	])
 		assert(notices.at(-1).message.includes(phrase), `status lists ${phrase}`);
+	assert(
+		!notices.at(-1).message.includes("slice execution"),
+		"status removes the retired inline/agent option",
+	);
 	assert(existsSync(settingsFile()), "settings file exists");
 
 	let profileMenuVisits = 0;
@@ -441,6 +455,25 @@ try {
 				label.includes("Pre-commit review:"),
 		),
 		"profiles show their full settings instead of a truncated summary",
+	);
+	let creativeMenuVisits = 0;
+	await invoke("work-settings", "", {
+		...ctx,
+		mode: "rpc",
+		ui: {
+			notify: ctx.ui.notify,
+			select: async (title, labels) => {
+				if (title === "Settings: Global" && creativeMenuVisits++ === 0)
+					return labels.find((label) => label.startsWith("Creative sidecar:"));
+				if (title === "Creative sidecar mode")
+					return labels.find((label) => label.startsWith("Auto"));
+				return undefined;
+			},
+		},
+	});
+	assert(
+		readGlobalSettings().workOrchestrator.creativeMode === "auto",
+		"settings UI persists automatic creative sidecars",
 	);
 
 	// Global opens first; project overrides are marked and removable in-place.
@@ -896,12 +929,40 @@ try {
 		advisor2: true,
 		advisor3: true,
 	};
+	settings.subagents = {
+		agentOverrides: {
+			"work-advisor": { model: "test/generator-a" },
+			"work-advisor-2": { model: "test/generator-b" },
+			"work-advisor-3": { model: "test/generator-c" },
+		},
+	};
 	writeSettings(settings);
+	assert(
+		JSON.stringify(mod.divergentTaskModels(cwd)) ===
+			JSON.stringify([
+				"test/generator-a",
+				"test/generator-b",
+				"test/generator-c",
+			]),
+		"divergent branches reuse the configured advisor models",
+	);
+	const creativeStep = mod.creativeSidecarStep(cwd, "brainstorm artifact");
+	assert(
+		(creativeStep.match(/work-divergent/g) ?? []).length === 3 &&
+			creativeStep.includes("async:true") &&
+			creativeStep.includes("subagent_wait with all:true") &&
+			creativeStep.includes("wo:divergent-analysis") &&
+			creativeStep.includes("test/generator-c"),
+		"creative sidecar launches three isolated model-assigned branches and preserves provenance",
+	);
 	const allAdvisors = mod.advisorCriticStep(cwd, "master plan", "all");
 	for (const agent of ["work-advisor", "work-advisor-2", "work-advisor-3"])
 		assert(allAdvisors.includes(agent), `parallel gate includes ${agent}`);
 	assert(
 		allAdvisors.includes("exactly one parallel subagent call") &&
+			allAdvisors.includes("requirements/evidence auditor") &&
+			allAdvisors.includes("builder/on-call critic") &&
+			allAdvisors.includes("adversarial simplifier") &&
 			allAdvisors.includes("never invoke ce-doc-review") &&
 			allAdvisors.includes("one focused re-review by work-advisor") &&
 			allAdvisors.includes("Never start a recursive review loop"),
@@ -926,6 +987,12 @@ try {
 	assert(
 		mod.advisorCriticStep(cwd, "master plan") === "",
 		"all advisor slots set to none skip artifact review",
+	);
+	assert(
+		mod
+			.divergentTaskModels(cwd)
+			.every((model) => model === "__inherit_model__"),
+		"same-model fallback still produces all three isolated branches",
 	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

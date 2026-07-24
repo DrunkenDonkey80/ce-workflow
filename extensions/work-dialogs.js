@@ -256,6 +256,9 @@ export async function showListDialog(ctx, options) {
 		return nativeListDialog(ctx, { ...options, cursorKey });
 	if (typeof ctx.ui.custom !== "function")
 		return nativeListDialog(ctx, { ...options, cursorKey });
+	const subtitleLines = (
+		Array.isArray(subtitle) ? subtitle : [subtitle]
+	).filter(Boolean);
 
 	return ctx.ui.custom(
 		(tui, theme, keybindings, done) => {
@@ -309,7 +312,11 @@ export async function showListDialog(ctx, options) {
 				focused: false,
 				render(width) {
 					const content = [theme.fg("muted", purpose), ""];
-					if (subtitle) content.push(theme.fg("dim", subtitle), "");
+					if (subtitleLines.length)
+						content.push(
+							...subtitleLines.map((line) => theme.fg("dim", line)),
+							"",
+						);
 					if (filter) {
 						const cursor = component.focused ? "▌" : "";
 						content.push(
@@ -387,7 +394,7 @@ export async function showListDialog(ctx, options) {
 						const rowCount = Math.min(fixedItemRows ?? source.length, maxRows);
 						const fixedBodyLines =
 							2 +
-							(subtitle ? 2 : 0) +
+							(subtitleLines.length ? subtitleLines.length + 1 : 0) +
 							(filter ? 2 : 0) +
 							rowCount +
 							((fixedItemRows ?? source.length) > maxRows ? 1 : 0) +

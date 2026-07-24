@@ -40,10 +40,7 @@ try {
 	);
 
 	fixture.reset("active");
-	state = buildWorkAutoState(
-		fixture.cwd,
-		"test failure: expected 200 got 500",
-	);
+	state = buildWorkAutoState(fixture.cwd, "test failure: expected 200 got 500");
 	assert(
 		state.ok &&
 			state.action === "debug-ready" &&
@@ -64,8 +61,9 @@ try {
 		state.ok &&
 			state.action === "run-implementation" &&
 			state.autoClassification === "small" &&
-			state.inlineWork,
-		"ordinary tiny feature routes directly to inline small work",
+			state.executionPolicy.level === "small" &&
+			!state.inlineWork,
+		"ordinary tiny feature routes to a small scoped worker",
 	);
 
 	fixture.reset("active", "unknown");

@@ -546,23 +546,24 @@ try {
 	setScenario("implementation");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
-		state.action === "run-implementation" && state.inlineWork,
-		"unplanned implementation gets a coded slice plan and continues inline",
+		state.action === "run-implementation" &&
+			!state.inlineWork &&
+			directRoleHandoffParams(state, cwd)?.agent === "work-worker",
+		"unplanned implementation gets a coded slice plan and continues in the worker",
 	);
 	assert(
 		state.selectedWorkItem.id === "IMP-1",
 		"implementation workItem selected",
 	);
 	assert(
-		state.handoffPrompt?.includes("WO_INLINE_V1"),
-		"inline slice planning avoids a separate planner boundary",
+		state.handoffPrompt?.includes("Implementation scope: medium"),
+		"coded slice planning avoids a separate planner boundary",
 	);
 	assert(
-		state.handoffPrompt.includes("Target: IMP-1") &&
-			state.handoffPrompt.includes('"title":"Implement feature slice"') &&
-			state.handoffPrompt.includes('"acceptance":"npm run verify passes"') &&
+		state.handoffPrompt.includes("Selected work item: IMP-1") &&
+			state.handoffPrompt.includes("Implement feature slice") &&
 			!state.handoffPrompt.includes("[object Object]"),
-		"coded slice-plan target stays compact and readable",
+		"worker slice-plan target stays compact and readable",
 	);
 
 	setScenario("implementationAgent");
@@ -589,8 +590,9 @@ try {
 	setScenario("plannedIdea");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
-		state.action === "run-implementation" && state.inlineWork,
-		"planned idea selects linked executable child inline",
+		state.action === "run-implementation" &&
+			directRoleHandoffParams(state, cwd)?.agent === "work-worker",
+		"planned idea selects its linked executable child worker",
 	);
 	assert(
 		state.selectedWorkItem.id === "IMP-1",
@@ -630,8 +632,9 @@ try {
 	setScenario("stalePlanningReady");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
-		state.action === "run-implementation" && state.inlineWork,
-		"ready executable work proceeds inline despite stale planning cleanup",
+		state.action === "run-implementation" &&
+			directRoleHandoffParams(state, cwd)?.agent === "work-worker",
+		"ready executable work proceeds in the worker despite stale planning cleanup",
 	);
 	assert(state.selectedWorkItem.id === "IMP-1", "ready implementation wins");
 
@@ -924,10 +927,10 @@ try {
 		sendUserMessage: async (message, options) =>
 			sent.push({ message, options }),
 	});
-	assert(sent.length === 1, "safe handler injects one follow-up");
 	assert(
-		sent[0].options.deliverAs === "followUp",
-		"handler uses followUp delivery",
+		sent.length === 0 &&
+			notices.at(-1)?.message.includes("Required work-worker could not start"),
+		"implementation stops without an inline fallback when worker RPC is unavailable",
 	);
 
 	const piSent = [];
@@ -942,8 +945,8 @@ try {
 		},
 	);
 	assert(
-		piSent.length === 1 && piSent[0].options.deliverAs === "followUp",
-		"inline handler falls back to pi.sendUserMessage when ctx helper is absent",
+		piSent.length === 0,
+		"implementation never falls back to the current session sender",
 	);
 
 	setScenario();
@@ -1036,24 +1039,26 @@ try {
 		"blocked resume output includes blocker next action",
 	);
 
-	// normal profiles add the slice-plan note inline; max can still launch a planner for messy/large slices.
+	// Every profile keeps coded slice planning but routes implementation to work-worker.
 	setScenario("implementation");
 	for (const profile of ["low", "medium", "high"]) {
-		const inlineCwd = mkdtempSync(path.join(tmpdir(), "work-resume-inline-"));
-		mkdirSync(path.join(inlineCwd, ".pi"), { recursive: true });
+		const profileCwd = mkdtempSync(path.join(tmpdir(), "work-resume-agent-"));
+		mkdirSync(path.join(profileCwd, ".pi"), { recursive: true });
 		writeFileSync(
-			path.join(inlineCwd, ".pi", "settings.json"),
-			JSON.stringify({ workOrchestrator: { profile } }),
+			path.join(profileCwd, ".pi", "settings.json"),
+			JSON.stringify({
+				workOrchestrator: { profile, sliceExecutionMode: "inline" },
+			}),
 		);
-		seedNativeStore(inlineCwd, sourcesForScenario("implementation"));
-		const inlineState = buildWorkResumeState(inlineCwd, "E-1");
+		seedNativeStore(profileCwd, sourcesForScenario("implementation"));
+		const profileState = buildWorkResumeState(profileCwd, "E-1");
 		assert(
-			inlineState.action === "run-implementation" &&
-				inlineState.inlineWork &&
-				inlineState.handoffPrompt,
-			`${profile} slice planning continues inline`,
+			profileState.action === "run-implementation" &&
+				directRoleHandoffParams(profileState, profileCwd)?.agent ===
+					"work-worker",
+			`${profile} routes implementation to work-worker despite legacy inline config`,
 		);
-		rmSync(inlineCwd, { recursive: true, force: true });
+		rmSync(profileCwd, { recursive: true, force: true });
 	}
 
 	const maxCwd = mkdtempSync(path.join(tmpdir(), "work-resume-ce-"));
@@ -1065,8 +1070,9 @@ try {
 	seedNativeStore(maxCwd, sourcesForScenario("implementation"));
 	const maxState = buildWorkResumeState(maxCwd, "E-1");
 	assert(
-		maxState.action === "run-implementation" && maxState.inlineWork,
-		"max still skips a planner boundary for simple slices",
+		maxState.action === "run-implementation" &&
+			directRoleHandoffParams(maxState, maxCwd)?.agent === "work-worker",
+		"max skips a planner boundary but still uses work-worker",
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
 
@@ -1237,7 +1243,8 @@ try {
 			).items,
 		).some(
 			(item) =>
-				item.id === orphanClaim.resumeTarget && item.labels?.includes("wo:misc"),
+				item.id === orphanClaim.resumeTarget &&
+				item.labels?.includes("wo:misc"),
 		),
 		"orphan triage claim targets the generated Misc roadmap",
 	);

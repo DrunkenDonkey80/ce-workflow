@@ -13,7 +13,22 @@ try {
 	const notices = [];
 	const branch = [];
 	const hooks = {};
+	const rpcListeners = new Map();
+	let rpcRequest;
 	const pi = {
+		events: {
+			on: (name, listener) => {
+				rpcListeners.set(name, listener);
+				return () => rpcListeners.delete(name);
+			},
+			emit: (_name, request) => {
+				rpcRequest = request;
+				rpcListeners.get(`subagents:rpc:v1:reply:${request.requestId}`)?.({
+					success: true,
+					data: { runId: "worker-run", asyncDir: "C:/tmp/worker-run" },
+				});
+			},
+		},
 		on: (name, handler) => {
 			hooks[name] = handler;
 		},
@@ -185,21 +200,45 @@ try {
 	assert.equal(sent.length, 1, "failed cleanup does not requeue work");
 
 	process.env.WORK_FLOW_GIT_DIRTY = "clean";
-	const result = await tools.work_dirty_continue.execute(
-		"approved",
-		{ token },
-		undefined,
-		undefined,
-		ctx,
+	ctx.getContextUsage = () => ({ tokens: 40_000 });
+	ctx.isIdle = () => false;
+	let compactCalls = 0;
+	ctx.compact = () => {
+		compactCalls += 1;
+	};
+	let timeout;
+	const result = await Promise.race([
+		tools.work_dirty_continue.execute(
+			"approved",
+			{ token },
+			undefined,
+			undefined,
+			ctx,
+		),
+		new Promise((_, reject) => {
+			timeout = setTimeout(
+				() => reject(new Error("dirty continuation deadlocked")),
+				1_000,
+			);
+		}),
+	]).finally(() => clearTimeout(timeout));
+	assert.equal(
+		compactCalls,
+		0,
+		"active tool continuation queues its follow-up without waiting on compaction",
 	);
 	assert.equal(
 		result.terminate,
 		true,
 		"approved cleanup ends the analysis turn",
 	);
-	assert.equal(sent[1]?.source, "ctx");
-	assert.match(sent[1]?.message ?? "", /WO_INLINE_V1/);
-	assert.deepEqual(sent[1]?.options, { deliverAs: "followUp" });
+	assert.equal(rpcRequest?.params?.agent, "work-worker");
+	assert.match(rpcRequest?.params?.task ?? "", /Implementation scope: small/);
+	assert.equal(
+		sent.length,
+		1,
+		"worker launch does not fall back to inline follow-up",
+	);
 	assert.doesNotMatch(
 		notices.at(-1)?.message ?? "",
 		/Dirty files must be resolved/,

@@ -359,6 +359,29 @@ const SLICE_PLAN_ADVISOR_USAGE_DESC = {
 	all: "run all configured advisors in parallel",
 };
 const REVIEW_LEVELS = ["off", "light", "full"];
+const CREATIVE_MODES = ["off", "ask", "auto"];
+const CREATIVE_MODE_DESC = {
+	off: "use the normal brainstorm or planning flow",
+	ask: "offer Quick or Wide before broad brainstorms and plans",
+	auto: "run three isolated divergent branches without prompting",
+};
+const DIVERGENT_FRAMES = [
+	{
+		label: "Inversion and adversary",
+		prompt:
+			"Ask how the obvious solution fails or can be abused, then invert those failures into alternatives.",
+	},
+	{
+		label: "3am operator",
+		prompt:
+			"Optimize for diagnosis, reversibility, graceful failure, and the person operating this under pressure.",
+	},
+	{
+		label: "Remove the load-bearing assumption",
+		prompt:
+			"Identify the convention everyone treats as fixed, remove it, and explore what becomes possible.",
+	},
+];
 const REVIEW_LEVEL_DESC = {
 	off: "no pre-commit review (low profile)",
 	light: "one work-reviewer pass on the scoped diff (medium/high)",
@@ -416,8 +439,10 @@ let pendingSettledAgentEnd = null;
 const pendingDirtyRecoveries = new Map();
 const pendingInitiativeConversions = new Map();
 const commandWorkflowStorage = new AsyncLocalStorage();
+const activeRoadmapMenuSessions = new WeakMap();
 let activeHistoryTask = null;
 let activeWorkAgent = null;
+const finishHelperStarts = new Map();
 let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
 let activeWorkGoalRunning = false;
@@ -894,6 +919,7 @@ function stateTelemetry(state) {
 		},
 		outputChars: state?.outputChars,
 		counts: state?.counts,
+		creativeDepth: state?.creativeDepth,
 		warnings: state?.warnings?.length
 			? { count: state.warnings.length }
 			: undefined,
@@ -954,6 +980,8 @@ function isDuplicateTelemetry(file, record) {
 	return false;
 }
 
+const telemetryEventsCache = new Map();
+
 function recordWorkTelemetry(cwd, event) {
 	if (!cwd || process.env.WORK_ORCH_TELEMETRY_OFF === "1") return "";
 	const enriched = telemetryWithTranscript(event);
@@ -970,6 +998,7 @@ function recordWorkTelemetry(cwd, event) {
 	mkdirSync(telemetryDir(cwd), { recursive: true });
 	if (isDuplicateTelemetry(file, record)) return file;
 	appendFileSync(file, `${JSON.stringify(record)}\n`);
+	telemetryEventsCache.delete(resolve(cwd));
 	return file;
 }
 
@@ -1328,11 +1357,16 @@ function parseWorkPromptMeta(prompt) {
 			.trim();
 	const epic = line("Epic") ?? line("Roadmap") ?? "";
 	const selected = line("Selected WorkItem") ?? line("Idea") ?? "";
-	const target = line("Target WorkItem ID") ?? line("Target") ?? "";
+	const target =
+		line("Target WorkItem ID") ??
+		line("Target work item") ??
+		line("Target") ??
+		"";
 	const epicId = epic.match(/^([^\s]+)/)?.[1];
 	const selectedId = selected.match(/^([^\s]+)/)?.[1];
+	const targetId = target.match(/^([^\s]+)/)?.[1];
 	let workItemId;
-	if (target && target !== "none") workItemId = target;
+	if (targetId && targetId !== "none") workItemId = targetId;
 	else if (selectedId && !selectedId.startsWith("none"))
 		workItemId = selectedId;
 	const inlineLevel = text.match(
@@ -1557,6 +1591,7 @@ function summarizeSubagentResult(result) {
 			result.toolCount ??
 			result.progressSummary?.toolCount,
 		model: result.model,
+		modelName: result.modelName ?? result.model?.name,
 		tokens: subagentUsageTotal(usage),
 		input: usage?.input ?? result.tokens?.input,
 		output: usage?.output ?? result.tokens?.output,
@@ -1774,31 +1809,67 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 }
 
 function readTelemetryEvents(cwd) {
-	const dir = telemetryDir(cwd);
-	if (!existsSync(dir)) return [];
-	const files = readdirSync(dir)
-		.filter((file) => file.endsWith(".jsonl"))
-		.map((file) => join(dir, file));
-	const claims = join(dir, "claims");
-	if (existsSync(claims))
-		files.push(
-			...readdirSync(claims)
-				.filter((file) => file.endsWith(".complete"))
-				.map((file) => join(claims, file)),
-		);
-	return files.flatMap((file) =>
-		readFileSync(file, "utf8")
-			.split(/\r?\n/)
-			.filter(Boolean)
-			.map((line) => {
-				try {
-					return { ...JSON.parse(line), file };
-				} catch {
-					return undefined;
-				}
-			})
-			.filter(Boolean),
+	const dirs = [
+		...new Set([telemetryDir(cwd), join(cwd, ".ce-workflow", "work-runs")]),
+	].filter(existsSync);
+	if (!dirs.length) return [];
+	const files = dirs.flatMap((dir) => {
+		const found = readdirSync(dir)
+			.filter((file) => file.endsWith(".jsonl"))
+			.sort()
+			.map((file) => join(dir, file));
+		const claims = join(dir, "claims");
+		if (existsSync(claims))
+			found.push(
+				...readdirSync(claims)
+					.filter((file) => file.endsWith(".complete"))
+					.sort()
+					.map((file) => join(claims, file)),
+			);
+		return found;
+	});
+	const cacheKey = resolve(cwd);
+	const signature = files
+		.map((file) => {
+			const stat = statSync(file);
+			return `${file}:${stat.size}:${stat.mtimeMs}`;
+		})
+		.join("\n");
+	const cached = telemetryEventsCache.get(cacheKey);
+	if (cached?.signature === signature) return cached.events;
+	const events = [
+		...new Map(
+			files
+				.flatMap((file) =>
+					readFileSync(file, "utf8")
+						.split(/\r?\n/)
+						.filter(Boolean)
+						.map((line, index) => {
+							try {
+								return { ...JSON.parse(line), file, index };
+							} catch {
+								return undefined;
+							}
+						})
+						.filter(Boolean),
+				)
+				.map((event) => [event.id ?? `${event.file}:${event.index}`, event]),
+		).values(),
+	].map(({ index: _index, ...event }) => event);
+	const verifierScopes = new Map(
+		events
+			.filter((event) => event.payoff?.backgroundVerifier?.batchId)
+			.map((event) => [
+				event.payoff.backgroundVerifier.batchId,
+				{ epicId: event.epicId, workItemId: event.workItemId },
+			]),
 	);
+	const scopedEvents = events.map((event) => ({
+		...verifierScopes.get(event.batchId),
+		...event,
+	}));
+	telemetryEventsCache.set(cacheKey, { signature, events: scopedEvents });
+	return scopedEvents;
 }
 
 function parseTelemetryArgs(args = "") {
@@ -1835,6 +1906,507 @@ function addMetric(map, key, event) {
 	item.durationMs += Number(event.durationMs ?? 0);
 	item.tokens += Number(event.usage?.totalTokens ?? 0);
 	map.set(key, item);
+}
+
+const WORK_STATS_PHASES = [
+	"Plan",
+	"Divergence",
+	"Plan review",
+	"Work",
+	"Work review",
+	"Fix",
+	"Debug",
+	"Migration",
+	"Finish",
+	"Background verification",
+	"Orchestration",
+	"Other",
+];
+
+function workStatsPhase(value) {
+	const role = String(value ?? "").toLowerCase();
+	if (role.includes("background-verifier")) return "Background verification";
+	if (role.includes("divergent")) return "Divergence";
+	if (role.includes("advisor")) return "Plan review";
+	if (role.includes("planner")) return "Plan";
+	if (role.includes("reviewer")) return "Work review";
+	if (role.includes("committer")) return "Finish";
+	if (role.includes("debugger")) return "Debug";
+	if (role.includes("migrator")) return "Migration";
+	if (role.includes("fixer")) return "Fix";
+	if (role.includes("worker")) return "Work";
+	return "Other";
+}
+
+function workStatsModel(value, provider) {
+	const raw =
+		typeof value === "string"
+			? value
+			: (value?.id ?? value?.model ?? value?.name);
+	if (!raw) return "unknown";
+	return provider && !String(raw).includes("/") ? `${provider}/${raw}` : raw;
+}
+
+function workStatsUsage(value = {}) {
+	const input = Number(value.input ?? value.inputTokens ?? 0);
+	const output = Number(value.output ?? value.outputTokens ?? 0);
+	const cacheRead = Number(value.cacheRead ?? 0);
+	const cacheWrite = Number(value.cacheWrite ?? 0);
+	return {
+		tokens: Number(
+			value.totalTokens ??
+				value.total ??
+				value.tokens ??
+				input + output + cacheRead + cacheWrite,
+		),
+		input,
+		output,
+	};
+}
+
+function workStatsScope(cwd, targetId) {
+	const items = allWorkItems(cwd);
+	const target = items.find((item) => idOf(item) === targetId);
+	const ids = new Set([targetId]);
+	if (typeOf(target) === "epic") {
+		let changed = true;
+		while (changed) {
+			changed = false;
+			for (const item of items) {
+				if (ids.has(idOf(item)) || !ids.has(parentOf(item))) continue;
+				ids.add(idOf(item));
+				changed = true;
+			}
+		}
+	}
+	return { id: targetId, type: typeOf(target) ?? "unknown", ids };
+}
+
+function workStatsEvents(cwd, scope) {
+	const events = [
+		...new Map(
+			readTelemetryEvents(cwd).map((event, index) => [
+				event.id ?? `anonymous-${index}`,
+				event,
+			]),
+		).values(),
+	];
+	return events.filter((event) => {
+		const epicId = event.epicId ?? event.meta?.epicId;
+		const workItemId = event.workItemId ?? event.meta?.workItemId;
+		return scope.type === "epic"
+			? scope.ids.has(epicId) || scope.ids.has(workItemId)
+			: workItemId === scope.id;
+	});
+}
+
+function addWorkStatsRun(map, input) {
+	const phase = input.phase;
+	const model = workStatsModel(input.model, input.provider);
+	const key = `${phase}\u001f${model}`;
+	const row = map.get(key) ?? {
+		phase,
+		model,
+		modelName: input.modelName,
+		runs: 0,
+		durationMs: 0,
+		tokens: 0,
+		input: 0,
+		output: 0,
+	};
+	const usage = workStatsUsage(input.usage);
+	row.runs += 1;
+	row.durationMs += Number(input.durationMs ?? 0);
+	row.tokens += usage.tokens;
+	row.input += usage.input;
+	row.output += usage.output;
+	row.modelName ??= input.modelName;
+	map.set(key, row);
+}
+
+function legacyStatsRole(name = "") {
+	const value = String(name).toLowerCase();
+	for (const role of [
+		"planner",
+		"advisor",
+		"reviewer",
+		"committer",
+		"debugger",
+		"migrator",
+		"fixer",
+		"worker",
+	])
+		if (value.includes(role)) return role;
+	return "worker";
+}
+
+function legacyStatsItemPhase(item) {
+	return /^plan\b/i.test(titleOf(item)) || typeOf(item) === "epic"
+		? "Plan"
+		: "Work";
+}
+
+function legacyStatsTimestamp(value) {
+	const parsed = new Date(value).getTime();
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function addLegacyStatsAggregate(aggregates, run) {
+	if (!run.model || !run.workItemId) return;
+	const key = [run.source, run.workItemId, run.phase, run.model].join("\0");
+	const current = aggregates.get(key) ?? {
+		...run,
+		firstAt: run.firstAt,
+		lastAt: run.lastAt,
+		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 },
+	};
+	const usage = workStatsUsage(run.usage);
+	current.firstAt = Math.min(current.firstAt, run.firstAt);
+	current.lastAt = Math.max(current.lastAt, run.lastAt);
+	current.usage.input += usage.input;
+	current.usage.output += usage.output;
+	current.usage.cacheRead += Number(run.usage?.cacheRead ?? 0);
+	current.usage.cacheWrite += Number(run.usage?.cacheWrite ?? 0);
+	current.usage.totalTokens += usage.tokens;
+	aggregates.set(key, current);
+}
+
+function legacyStatsTargetAt(items, activityStartedAt) {
+	return [...items]
+		.filter(
+			(item) =>
+				legacyStatsTimestamp(item.createdAt) <= activityStartedAt &&
+				activityStartedAt <=
+					legacyStatsTimestamp(item.updatedAt ?? item.closedAt),
+		)
+		.sort(
+			(a, b) =>
+				Number(typeOf(b) !== "epic") - Number(typeOf(a) !== "epic") ||
+				legacyStatsTimestamp(b.createdAt) - legacyStatsTimestamp(a.createdAt),
+		)[0];
+}
+
+function legacyStatsChildSessions(rootSessionFile) {
+	const root = String(rootSessionFile ?? "").replace(/\.jsonl$/i, "");
+	if (!root || !existsSync(root)) return [];
+	return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+		if (!entry.isDirectory()) return [];
+		const file = join(root, entry.name, "run-0", "session.jsonl");
+		return existsSync(file) ? [file] : [];
+	});
+}
+
+function legacyStatsEventHasUsage(event) {
+	return Boolean(
+		event.usage ||
+			event.messages ||
+			(event.tools ?? []).some((tool) => tool.subagentDetails?.length),
+	);
+}
+
+function legacyStatsUserText(text) {
+	for (const line of text.split(/\r?\n/)) {
+		if (!line) continue;
+		try {
+			const event = JSON.parse(line);
+			if (event.type !== "message" || event.message?.role !== "user") continue;
+			const content = event.message.content;
+			return typeof content === "string"
+				? content
+				: (content ?? [])
+						.map((part) => part?.text ?? "")
+						.filter(Boolean)
+						.join("\n");
+		} catch {}
+	}
+	return "";
+}
+
+function legacyStatsChildWorkItem(text, scopedIds) {
+	const intro = legacyStatsUserText(text).slice(0, 2_000);
+	return scopedIds.find((id) => {
+		const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const boundary = `${escaped}(?=$|[^A-Za-z0-9_.-])`;
+		return (
+			new RegExp(
+				`(?:work item|work-item|task|target(?: work item)?)\\s+(?:ID:\\s*)?${boundary}`,
+				"i",
+			).test(intro) ||
+			new RegExp(
+				`(?:review|implement|fix|plan|debug|migrate)\\s+(?:(?:the|this)\\s+)?(?:(?:work item|task)\\s+)?${boundary}`,
+				"i",
+			).test(intro)
+		);
+	});
+}
+
+function importLegacyStats(cwd, targetId, existingEvents = []) {
+	const target = readWorkItem(cwd, targetId);
+	if (!target || statusOf(target) !== "closed") return false;
+	const cache = join(telemetryDir(cwd), "legacy-stats.jsonl");
+	if (existsSync(cache)) {
+		const marker = `"legacyStatsTarget":"${targetId}"`;
+		if (readFileSync(cache, "utf8").includes(marker)) return false;
+	}
+	const historyDir = join(cwd, ".pi", "work-runs", "history", "session");
+	if (!existsSync(historyDir)) return false;
+	const allItems = allWorkItems(cwd);
+	const scope = workStatsScope(cwd, targetId);
+	const allScopeItems = allItems.filter((item) => scope.ids.has(idOf(item)));
+	const coveredIds = new Set(
+		existingEvents
+			.filter(legacyStatsEventHasUsage)
+			.flatMap((event) => [
+				event.workItemId,
+				event.meta?.workItemId,
+				event.epicId,
+				event.meta?.epicId,
+			])
+			.filter(Boolean),
+	);
+	const missingIds = new Set(
+		allScopeItems.map(idOf).filter((id) => !coveredIds.has(id)),
+	);
+	const ancestors = new Set([targetId]);
+	for (let current = target; parentOf(current); ) {
+		ancestors.add(parentOf(current));
+		current = allItems.find((item) => idOf(item) === parentOf(current));
+		if (!current) break;
+	}
+	const aggregates = new Map();
+	const childSessionFiles = new Set();
+	const scannedRootSessions = new Set();
+	for (const entry of readdirSync(historyDir, { withFileTypes: true })) {
+		if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+		const file = join(historyDir, entry.name);
+		const text = readFileSync(file, "utf8");
+		const objectiveTarget = text.match(
+			/Target work item or roadmap ID:\s*([^\\\s"<]+)/,
+		)?.[1];
+		if (!ancestors.has(objectiveTarget)) continue;
+		let turnStartedAt = 0;
+		for (const line of text.split(/\r?\n/)) {
+			if (!line) continue;
+			let event;
+			try {
+				event = JSON.parse(line);
+			} catch {
+				continue;
+			}
+			if (event.sessionFile && !scannedRootSessions.has(event.sessionFile)) {
+				scannedRootSessions.add(event.sessionFile);
+				for (const child of legacyStatsChildSessions(event.sessionFile))
+					childSessionFiles.add(child);
+			}
+			if (event.type === "turn_start") {
+				turnStartedAt = legacyStatsTimestamp(event.timestamp);
+				continue;
+			}
+			const message = event.event?.message;
+			if (event.type !== "message_end" || message?.role !== "assistant")
+				continue;
+			const timestamp = legacyStatsTimestamp(event.timestamp);
+			const item = legacyStatsTargetAt(
+				allScopeItems,
+				turnStartedAt || timestamp,
+			);
+			if (!item || !missingIds.has(idOf(item))) continue;
+			addLegacyStatsAggregate(aggregates, {
+				source: `root:${event.sessionId}`,
+				workItemId: idOf(item),
+				phase: legacyStatsItemPhase(item),
+				model: [message.provider, message.model].filter(Boolean).join("/"),
+				usage: message.usage,
+				firstAt: turnStartedAt || timestamp,
+				lastAt: timestamp,
+			});
+		}
+	}
+	const scopedIds = [...missingIds].sort((a, b) => b.length - a.length);
+	for (const file of childSessionFiles) {
+		const text = readFileSync(file, "utf8");
+		const workItemId = legacyStatsChildWorkItem(text, scopedIds);
+		if (!workItemId) continue;
+		let model = "";
+		let role = "worker";
+		let firstAt = Number.POSITIVE_INFINITY;
+		let lastAt = 0;
+		for (const line of text.split(/\r?\n/)) {
+			if (!line) continue;
+			let event;
+			try {
+				event = JSON.parse(line);
+			} catch {
+				continue;
+			}
+			const timestamp = legacyStatsTimestamp(event.timestamp);
+			if (timestamp) firstAt = Math.min(firstAt, timestamp);
+			if (event.type === "model_change")
+				model = [event.provider, event.modelId].filter(Boolean).join("/");
+			if (event.type === "session_info") role = legacyStatsRole(event.name);
+			if (event.type !== "message" || event.message?.role !== "assistant")
+				continue;
+			lastAt = Math.max(lastAt, timestamp);
+			addLegacyStatsAggregate(aggregates, {
+				source: `child:${file}`,
+				workItemId,
+				phase: workStatsPhase(role),
+				model:
+					[event.message.provider, event.message.model]
+						.filter(Boolean)
+						.join("/") || model,
+				usage: event.message.usage,
+				firstAt: Number.isFinite(firstAt) ? firstAt : timestamp,
+				lastAt: timestamp,
+			});
+		}
+	}
+	mkdirSync(dirname(cache), { recursive: true });
+	const imported = [...aggregates.values()].map((run) => ({
+		version: 1,
+		id: `legacy-stats-${createHash("sha256").update([run.source, run.workItemId, run.phase, run.model].join("\0")).digest("hex")}`,
+		type: "agent",
+		legacyStatsImported: true,
+		statsPhase: run.phase,
+		workItemId: run.workItemId,
+		model: run.model,
+		durationMs: Math.max(0, run.lastAt - run.firstAt),
+		usage: run.usage,
+		timestamp: new Date(run.lastAt).toISOString(),
+	}));
+	appendFileSync(
+		cache,
+		[
+			...imported,
+			{
+				version: 1,
+				id: `legacy-stats-marker-${createHash("sha256").update(targetId).digest("hex")}`,
+				type: "legacy-stats-import",
+				legacyStatsTarget: targetId,
+				timestamp: new Date().toISOString(),
+			},
+		]
+			.map((event) => JSON.stringify(event))
+			.join("\n") + "\n",
+	);
+	telemetryEventsCache.delete(resolve(cwd));
+	return imported.length > 0;
+}
+
+function buildWorkStats(cwd, targetId, options = {}) {
+	const scope = workStatsScope(cwd, targetId);
+	let scopedEvents = workStatsEvents(cwd, scope);
+	if (
+		options.importLegacy !== false &&
+		importLegacyStats(cwd, targetId, scopedEvents)
+	)
+		scopedEvents = workStatsEvents(cwd, scope);
+	const rows = new Map();
+	const detailRuns = new Set();
+	for (const event of scopedEvents) {
+		if (event.type === "background-verifier") {
+			if (event.usage === undefined && event.durationMs === undefined) continue;
+			addWorkStatsRun(rows, {
+				phase: "Background verification",
+				model: event.model,
+				durationMs: event.durationMs,
+				usage: event.usage,
+			});
+			continue;
+		}
+		if (event.type === "agent" && (event.usage || event.messages))
+			addWorkStatsRun(rows, {
+				phase: event.statsPhase ?? "Orchestration",
+				model: event.model,
+				modelName: event.modelName,
+				provider: event.provider,
+				durationMs: event.durationMs,
+				usage: event.telemetry?.reconciled?.usage ?? event.usage,
+			});
+		for (const [toolIndex, tool] of (event.tools ?? []).entries()) {
+			for (const [detailIndex, detail] of (
+				tool.subagentDetails ?? []
+			).entries()) {
+				const runKey =
+					detail.transcriptPath ??
+					detail.sessionFile ??
+					`${event.id ?? event.timestamp}:${toolIndex}:${detailIndex}`;
+				if (detailRuns.has(runKey)) continue;
+				detailRuns.add(runKey);
+				addWorkStatsRun(rows, {
+					phase: workStatsPhase(detail.agent ?? detail.role),
+					model: detail.model,
+					modelName: detail.modelName,
+					durationMs: detail.durationMs,
+					usage: {
+						totalTokens: detail.tokens,
+						input: detail.input,
+						output: detail.output,
+						cacheRead: detail.cacheRead,
+						cacheWrite: detail.cacheWrite,
+					},
+				});
+			}
+		}
+	}
+	const phaseOrder = new Map(
+		WORK_STATS_PHASES.map((phase, index) => [phase, index]),
+	);
+	const models = [...rows.values()].sort(
+		(a, b) =>
+			(phaseOrder.get(a.phase) ?? 999) - (phaseOrder.get(b.phase) ?? 999) ||
+			b.durationMs - a.durationMs ||
+			a.model.localeCompare(b.model),
+	);
+	const phases = WORK_STATS_PHASES.map((phase) => {
+		const phaseModels = models.filter((row) => row.phase === phase);
+		return {
+			phase,
+			models: phaseModels,
+			runs: phaseModels.reduce((sum, row) => sum + row.runs, 0),
+			durationMs: phaseModels.reduce((sum, row) => sum + row.durationMs, 0),
+			tokens: phaseModels.reduce((sum, row) => sum + row.tokens, 0),
+		};
+	}).filter((phase) => phase.runs > 0);
+	return {
+		scope: { id: scope.id, type: scope.type },
+		phases,
+		totals: {
+			runs: models.reduce((sum, row) => sum + row.runs, 0),
+			durationMs: models.reduce((sum, row) => sum + row.durationMs, 0),
+			tokens: models.reduce((sum, row) => sum + row.tokens, 0),
+			input: models.reduce((sum, row) => sum + row.input, 0),
+			output: models.reduce((sum, row) => sum + row.output, 0),
+		},
+	};
+}
+
+function workStatsDisplayModel(model) {
+	const raw = String(model ?? "unknown");
+	const id = raw.split("/").at(-1)?.split(":")[0] ?? raw;
+	const sol = id.match(/^gpt-(\d+(?:\.\d+)?)-sol$/i);
+	if (sol) return `${sol[1]} sol`;
+	const glm = id.match(/^glm-(\d+(?:\.\d+)?)$/i);
+	if (glm) return `GLM ${glm[1]}`;
+	const claude = id.match(/^claude-(opus|sonnet)-(\d+)-(\d+)$/i);
+	if (claude)
+		return `Claude ${claude[1][0].toUpperCase()}${claude[1].slice(1)} ${claude[2]}.${claude[3]}`;
+	return raw;
+}
+
+function renderWorkStats(stats) {
+	if (!stats?.phases?.length) return ["Stats:", "- no recorded model usage"];
+	return [
+		"Stats:",
+		...stats.phases.flatMap((phase) => [
+			`${phase.phase}:`,
+			...phase.models.map(
+				(model) =>
+					`- ${workStatsDisplayModel(model.modelName ?? model.model)}: ${formatDuration(model.durationMs)}, ${formatTokenCount(model.tokens)} tokens`,
+			),
+		]),
+		`Total: ${formatDuration(stats.totals.durationMs)}, ${formatTokenCount(stats.totals.tokens)} tokens`,
+	];
 }
 
 function summarizeTelemetryTools(tools = []) {
@@ -2585,15 +3157,16 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
 	const codeReviewBeforeCommit =
 		raw.codeReviewBeforeCommit ?? base.codeReviewBeforeCommit;
-	const sliceExecutionMode =
-		raw.sliceExecutionMode === "agent" ? "agent" : "inline";
+	const creativeMode = CREATIVE_MODES.includes(raw.creativeMode)
+		? raw.creativeMode
+		: "ask";
 	return {
 		profile,
+		creativeMode,
 		advisorEnabled,
 		advisorUsageForSlicePlans,
 		slicePlanCeDepth,
 		codeReviewBeforeCommit,
-		sliceExecutionMode,
 		...flags,
 	};
 }
@@ -2631,9 +3204,9 @@ function setWorkOrchReviewLevel(settings, value) {
 	block.codeReviewBeforeCommit = REVIEW_LEVELS.includes(value) ? value : "off";
 }
 
-function setWorkOrchSliceExecution(settings, value) {
+function setWorkOrchCreativeMode(settings, value) {
 	const block = workOrchBlock(settings);
-	block.sliceExecutionMode = value === "agent" ? "agent" : "inline";
+	block.creativeMode = CREATIVE_MODES.includes(value) ? value : "ask";
 }
 
 function setWorkOrchAdvisorSliceUsage(settings, value) {
@@ -2737,12 +3310,112 @@ function advisorCriticStep(cwd, target, usage = "all") {
 	if (!slots.length) return "";
 	const agents = slots.map((slot) => slot.agents[0]);
 	const first = agents[0];
+	const charters = [
+		"requirements/evidence auditor: challenge missing constraints, unsupported claims, and weak proof",
+		"builder/on-call critic: challenge feasibility, sequencing, operability, and recovery traps",
+		"adversarial simplifier: challenge unnecessary complexity, hidden assumptions, and cheaper alternatives",
+	];
 	return [
 		`Advisor critic gate (read-only): after the exact ${target} path or WorkItem note is known, launch exactly one parallel subagent call in tasks mode with context:fresh, one task for each configured agent: ${agents.join(", ")}. Use only these packaged work-advisor roles; never invoke ce-doc-review.`,
-		`Give every advisor the same exact ${target}, its authoritative source artifacts, and the same review question. Require independent findings with concrete locations and smallest fixes. Advisors must not edit files, mutate WorkItems, or launch subagents.`,
+		`Give every advisor the same exact ${target}, authoritative sources, and review contract, plus its independent charter: ${agents.map((agent, index) => `${agent} = ${charters[index]}`).join("; ")}. Require concrete locations and smallest fixes. Advisors must not edit files, mutate WorkItems, or launch subagents.`,
 		"Wait for all configured advisors, deduplicate their findings, and apply only authority-grounded fixes. Complete this gate before any plan bootstrap, slicing, or implementation. Convert any unresolved blocking gap into a decision/blocker WorkItem before proceeding; an unavailable advisor is recorded and not replaced or retried.",
 		`If fixes changed the artifact, decide whether one focused re-review by ${first} is warranted. Re-run it once only for substantive cross-section changes, ambiguity resolution, or a fix that could create a new inconsistency; skip re-review for mechanical wording/traceability fixes. Never start a recursive review loop.`,
 	].join("\n");
+}
+
+function divergentTaskModels(cwd) {
+	const settings = readEffectiveSettings(cwd);
+	const configured = configuredAdvisorSlots(settings).map(
+		(slot) => slotSelection(slot, settings).model,
+	);
+	const models = configured.length ? configured : [INHERIT_MODEL];
+	return DIVERGENT_FRAMES.map((_, index) => models[index % models.length]);
+}
+
+function creativeSidecarStep(cwd, target) {
+	const models = divergentTaskModels(cwd);
+	const tasks = DIVERGENT_FRAMES.map((frame, index) => ({
+		agent: "work-divergent",
+		...(models[index] && models[index] !== INHERIT_MODEL
+			? { model: models[index] }
+			: {}),
+		task: [
+			"Use only the normalized problem and real constraints supplied by the parent.",
+			`FRAME — ${frame.label}: ${frame.prompt}`,
+			"Generate four non-obvious candidates as the agent contract requires.",
+		].join("\n"),
+	}));
+	return [
+		`Creative sidecar gate for ${target}: finish required clarification and source reading first, then launch exactly one PARALLEL subagent call with async:true, context:fresh, concurrency:3, and these task templates: ${JSON.stringify(tasks)}. Prepend the same normalized problem and real constraints to every task; never include sibling output.`,
+		"While those branches run, form the normal baseline independently. Then call subagent_wait with all:true, cluster duplicates, reject constraint violations, and merge only useful non-obvious candidates into the artifact or planning note. Preserve provenance as a compact `wo:divergent-analysis` section naming each frame and model. A failed branch is recorded and not retried.",
+		"If an authoritative source already contains a current `wo:divergent-analysis` section for this problem, reuse it and skip generation. This is one bounded divergence pass: no branch deepening and no second generation round. Configured work-advisor critics challenge the merged artifact afterward.",
+	].join("\n");
+}
+
+async function chooseCreativeDepth(ctx) {
+	const mode = workOrchSettings(ctx.cwd).creativeMode;
+	if (mode === "off") return "quick";
+	if (mode === "auto") return "wide";
+	if (ctx.mode !== "tui") return "quick";
+	return (
+		(await choose(
+			ctx,
+			"Creative sidecar",
+			[
+				{
+					value: "quick",
+					label: "Quick",
+					description: "Use the normal brainstorm or planning flow",
+				},
+				{
+					value: "wide",
+					label: "Wide — 3 isolated perspectives",
+					description:
+						"Run parallel divergent branches, merge them, then use configured advisors as critics",
+				},
+			],
+			"wide",
+			{
+				purpose:
+					"Choose whether this broad task needs an isolated creative pass.",
+			},
+		)) ?? "quick"
+	);
+}
+
+async function withCreativeSidecar(builder, args, state, ctx) {
+	const isBig = builder === buildWorkBigState && state.action === "run-planner";
+	const isPlan =
+		builder === buildWorkPlanState && state.action === "handoff-plan";
+	if (!state.ok || (!isBig && !isPlan)) return state;
+	const depth = await chooseCreativeDepth(ctx);
+	if (depth !== "wide") return { ...state, creativeDepth: depth };
+	const target = isBig
+		? `planning WorkItem ${state.selectedWorkItem.id}`
+		: `master plan input ${String(args).trim()}`;
+	const step = creativeSidecarStep(ctx.cwd, target);
+	if (isBig)
+		return withHandoffPrompt(
+			{
+				...state,
+				creativeDepth: depth,
+				controlSessionHandoff: true,
+				handoffExtra: [
+					...(state.handoffExtra ?? []),
+					step,
+					advisorCriticStep(
+						ctx.cwd,
+						`merged planning brief on WorkItem ${state.selectedWorkItem.id}`,
+					),
+				].filter(Boolean),
+			},
+			ctx.cwd,
+		);
+	return {
+		...state,
+		creativeDepth: depth,
+		handoffPrompt: [step, state.handoffPrompt].filter(Boolean).join("\n"),
+	};
 }
 
 function advisorVerifyStep() {
@@ -4789,14 +5462,32 @@ function depsOf(issue) {
 function workflowExecutionMode(issue) {
 	const explicit = field(issue, "executionMode", "execution_mode");
 	if (["agent", "inline-medium", "inline-small"].includes(explicit))
-		return explicit;
-	const text = `${labelsOf(issue).join(" ")}\n${notesOf(issue)}`;
-	if (/wo:execution-agent|created by \/work-big|big slice/i.test(text))
 		return "agent";
-	if (/wo:execution-inline|created by \/work-med/i.test(text))
-		return "inline-medium";
-	if (/created by \/work-small/i.test(text)) return "inline-small";
-	return "auto";
+	const text = `${labelsOf(issue).join(" ")}\n${notesOf(issue)}`;
+	return /wo:implementation|wo:execution-(?:agent|inline)|created by \/work-(?:small|med|big)|big slice/i.test(
+		text,
+	)
+		? "agent"
+		: "auto";
+}
+
+function workflowImplementationScope(issue) {
+	const explicit = field(
+		issue,
+		"implementationScope",
+		"executionMode",
+		"execution_mode",
+	);
+	if (explicit === "small" || explicit === "inline-small") return "small";
+	return /created by \/work-small/i.test(notesOf(issue)) ? "small" : "medium";
+}
+
+function workflowImplementationRisk(issue) {
+	return /wo:execution-agent|created by \/work-big|big slice/i.test(
+		`${labelsOf(issue).join(" ")}\n${notesOf(issue)}`,
+	)
+		? "high"
+		: "normal";
 }
 
 function implementationPathsFromNotes(issue) {
@@ -4832,6 +5523,8 @@ function issueSummary(issue) {
 	};
 	if (isIdeaIssue(issue)) summary.ideaStatus = deriveIdeaStatus(issue);
 	if (typeOf(issue) !== "epic") {
+		summary.implementationScope = workflowImplementationScope(issue);
+		summary.implementationRisk = workflowImplementationRisk(issue);
 		const acceptance = field(
 			issue,
 			"acceptance",
@@ -5533,47 +6226,59 @@ function isDebugIssue(issue) {
 
 function highRiskImplementation(issue) {
 	if (!issue) return false;
-	if (issue.executionMode === "agent" || isDebugIssue(issue)) return true;
+	if (issue.implementationRisk === "high" || isDebugIssue(issue)) return true;
 	const text = `${issue.title ?? titleOf(issue)} ${labelsOf(issue).join(" ")}`;
 	return /\b(?:auth(?:entication|orization)?|permission|credential|secret|payment|billing|migration|schema|database|destructive|production|deploy|release|breaking|architecture|cross[- ]cutting|concurren(?:cy|t)|race condition|thread safety|crypt|security|firmware flash)\b/i.test(
 		text,
 	);
 }
 
-function implementationExecutionPolicy(state, cwd) {
+function implementationExecutionPolicy(state) {
 	const issue = state?.selectedWorkItem;
-	if (cwd && workOrchSettings(cwd).sliceExecutionMode === "agent")
-		return {
-			kind: "agent",
-			level: "isolated",
-			reason:
-				"sliceExecutionMode=agent routes each slice to an isolated work-worker",
-		};
-	if (highRiskImplementation(issue))
-		return {
-			kind: "agent",
-			level: "high-risk",
-			reason: "risk markers require an isolated writer and independent review",
-		};
-	if (state?.fastSmall || issue?.executionMode === "inline-small")
-		return { kind: "inline", level: "small", maxFiles: 2 };
-	if (issue?.executionMode === "inline-medium")
-		return { kind: "inline", level: "medium", maxFiles: 8 };
-	return { kind: "inline", level: "medium", maxFiles: 8 };
+	const level =
+		state?.fastSmall ||
+		issue?.implementationScope === "small" ||
+		issue?.executionMode === "inline-small"
+			? "small"
+			: "medium";
+	return {
+		kind: "agent",
+		level,
+		maxFiles: level === "small" ? 2 : 8,
+		reason: highRiskImplementation(issue)
+			? "risk markers require an isolated writer and independent review"
+			: `configured work-worker handles ${level} implementation scope`,
+	};
 }
 
-function withImplementationPolicy(state, cwd) {
-	const policy = implementationExecutionPolicy(state, cwd);
+function withImplementationPolicy(state) {
+	const policy = implementationExecutionPolicy(state);
 	return {
 		...state,
 		executionPolicy: policy,
-		inlineWork: policy.kind === "inline",
-		inlineLevel: policy.level,
-		handoffReason:
-			policy.kind === "inline"
-				? `coded ${policy.level} policy keeps work in the current session`
-				: policy.reason,
+		inlineWork: false,
+		inlineLevel: undefined,
+		handoffReason: policy.reason,
 	};
+}
+
+function implementationScopeLine(state) {
+	if (state?.action !== "run-implementation") return "";
+	const level = state.executionPolicy?.level ?? "medium";
+	const maxFiles =
+		state.executionPolicy?.maxFiles ?? (level === "small" ? 2 : 8);
+	return `Implementation scope: ${level}; change at most ${maxFiles} implementation files unless the acceptance contract explicitly requires more.`;
+}
+
+function evidenceOnlyImplementationLine(state) {
+	if (state?.action !== "run-implementation") return "";
+	const task = state.smallTask ?? state.selectedWorkItem ?? {};
+	const text = Object.values(task).filter(Boolean).join("\n");
+	return /evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
+		text,
+	)
+		? "Evidence-only task: prove the exact requested condition; do not substitute a broader suite or edit product/workflow source. Run the narrowest existing probe and record its exact evidence."
+		: "";
 }
 
 function byCreatedAsc(a, b) {
@@ -5811,8 +6516,7 @@ function planResumeAction(state, cwd) {
 			? state.git.blockedPaths
 			: state.git.dirtyPaths;
 		const expectedAgentDiff =
-			activeImplementation?.executionMode === "agent" &&
-			activeImplementation.verificationReady &&
+			activeImplementation?.verificationReady &&
 			blockers.length > 0 &&
 			blockers.every((file) =>
 				activeImplementation.changedPaths?.includes(normalizedRepoPath(file)),
@@ -5917,30 +6621,38 @@ function planResumeAction(state, cwd) {
 				},
 				cwd,
 			);
-		if (!routed.inlineWork) {
+		if (
+			activeImplementation.verificationReady &&
+			!activeImplementation.changedPaths?.length
+		)
+			return missingReviewScope();
+		if (activeImplementation.verificationReady) {
 			if (
-				activeImplementation.verificationReady &&
-				!activeImplementation.changedPaths?.length
+				highRiskImplementation(activeImplementation) ||
+				!isSmallDiff(cwd, activeImplementation.changedPaths)
 			)
-				return missingReviewScope();
-			if (activeImplementation.verificationReady)
 				return withHandoffPrompt(
 					{
 						...routed,
 						action: "run-review",
 						handoffReason:
-							"verified high-risk implementation requires one independent review",
+							"verified sensitive/broad implementation requires one independent review",
 					},
 					cwd,
 				);
 			return {
 				...routed,
-				action: "in-progress-agent",
-				message:
-					"High-risk WorkItem is already in progress; not launching a duplicate writer. Check the active-run widget or record a blocker before retrying.",
+				action: "finish-ready",
+				message: "Small implementation is verified; use the coded finish gate.",
+				suggestedCommands: [`/work-finish ${activeImplementation.id}`],
 			};
 		}
-		return withHandoffPrompt(routed, cwd);
+		return {
+			...routed,
+			action: "in-progress-agent",
+			message:
+				"WorkItem is already in progress; not launching a duplicate writer. Check the active-run widget or record a blocker before retrying.",
+		};
 	}
 	const debug = state.readyExecutable.find(isDebugIssue);
 	if (debug)
@@ -6065,7 +6777,6 @@ function safeArtifactPart(value) {
 }
 
 function directRoleAgent(state) {
-	if (state?.inlineWork) return undefined;
 	const action = String(state?.action ?? "");
 	if (action === "run-planner") return "work-planner";
 	if (action === "handoff-migrate") return "work-migrator";
@@ -6135,6 +6846,8 @@ function directRoleTask(state, cwd) {
 		state.action === "run-planner"
 			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop.`
 			: "",
+		implementationScopeLine(state),
+		evidenceOnlyImplementationLine(state),
 		state.action === "run-implementation" || state.action === "run-debug"
 			? planReference(state, cwd)
 			: "",
@@ -6806,6 +7519,7 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 		profiles,
 		origin: input.origin ?? "normal",
 		paths: input.paths,
+		scope: input.scope,
 		adapter: createPiSubagentsVerifierAdapter(pi),
 	});
 }
@@ -6830,7 +7544,65 @@ export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
 		origin: input.origin,
 		currentModel: input.currentModel,
 		paths,
+		scope: "commit",
 	});
+}
+
+function finishHelperRequest(toolName, args) {
+	if (toolName && toolName !== "bash") return undefined;
+	const command = typeof args === "string" ? args : args?.command;
+	const match = String(command ?? "").match(
+		/\bwork-helper\.mjs["']?\s+finish-(?:task|small)\s+([A-Za-z0-9_.-]+)/,
+	);
+	return match ? { workItemId: match[1] } : undefined;
+}
+
+function finishHelperSucceeded(event, workItemId) {
+	if (event.isError) return false;
+	const text =
+		typeof event.result === "string"
+			? event.result
+			: JSON.stringify(event.result ?? "");
+	const escaped = workItemId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return (
+		/["']?status["']?\s*:\s*["']PASS["']/i.test(text) &&
+		new RegExp(`["']?work_item_id["']?\\s*:\\s*["']${escaped}["']`, "i").test(
+			text,
+		)
+	);
+}
+
+function scheduleFinishedHelperVerifiers(cwd, pi, ctx, started, event) {
+	if (!started || !finishHelperSucceeded(event, started.workItemId)) return;
+	const after = run(cwd, "git", ["rev-parse", "HEAD"]);
+	const verifier = scheduleCommittedRunVerifiers(cwd, pi, {
+		before: started.before,
+		after,
+		origin: "normal",
+		currentModel: ctx.model
+			? `${ctx.model.provider}/${ctx.model.id}`
+			: undefined,
+	});
+	if (!verifier) return;
+	if (verifier.batch?.id)
+		recordWorkTelemetry(cwd, {
+			id: `verifier-scope-${verifier.batch.id}`,
+			type: "verifier-scope",
+			workItemId: started.workItemId,
+			payoff: { backgroundVerifier: { batchId: verifier.batch.id } },
+		});
+	if (verifier.status === "queued") {
+		const models = (verifier.batch?.profiles ?? [])
+			.map((profile) => workStatsDisplayModel(profile.model))
+			.join(", ");
+		ctx.ui?.notify?.(`Background verification queued: ${models}`, "info");
+		void verifier.launch?.catch(() => {});
+	} else if (verifier.status === "not-scheduled") {
+		ctx.ui?.notify?.(
+			`Background verification was not scheduled: ${verifier.reason}`,
+			"warning",
+		);
+	}
 }
 
 async function chooseAnalyzeValues(ctx, title, values, selected, options = {}) {
@@ -7213,51 +7985,7 @@ function blockerPreflightLines(cwd, state) {
 	}
 }
 
-function inlineWorkHandoffPrompt(state, extraLines = [], cwd) {
-	const selected = state.selectedWorkItem;
-	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
-	const level = state.inlineLevel ?? state.executionPolicy?.level ?? "medium";
-	const maxFiles =
-		state.executionPolicy?.maxFiles ?? (level === "small" ? 2 : 8);
-	const task = state.smallTask ?? selected ?? {};
-	const contract = {
-		id: task.id,
-		title: task.title,
-		notes: task.notes_tail,
-		acceptance: task.acceptance_criteria_tail ?? task.acceptance,
-	};
-	const taskText = Object.values(contract).filter(Boolean).join("\n");
-	const evidenceOnly =
-		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
-			taskText,
-		);
-	return [
-		`work-orchestrator WO_INLINE_V1: complete this ${level} task directly in the current session. Do not call subagent list and do not launch a worker, planner, or committer.`,
-		...workflowPromptMetadata(),
-		state.epic
-			? `Roadmap: ${state.epic.id} — ${state.epic.title}`
-			: "Roadmap: none",
-		`Target: ${selected?.id ?? "none"}`,
-		`Task: ${JSON.stringify(contract)}`,
-		`Git intake: ${state.git?.status ?? "unknown"}; later runtime/native work-item store dirt is expected.`,
-		`Helper: node ${helper}`,
-		NATIVE_EDIT_GUIDANCE,
-		evidenceOnly
-			? "Evidence-only task: prove the exact requested condition; do not substitute a broader suite or edit product/workflow source. Read project instructions, search once for the narrowest existing probe, then run it. Evidence plus native work-item store changes may be the only commit."
-			: `Implement with targeted reads only and keep the change within ${maxFiles} implementation files. Greenfield tasks naming output files should create them immediately.`,
-		`Finish once: finish-task ${selected?.id ?? "<id>"} --max-files ${maxFiles} --message "<summary>" --verify "<smallest real check>" [--expect "<exact stdout>"] --immediate-format --push. Pass the check directly; use --json <file> --equals <path=value> for JSON. For a multiline check, write one runtime script under .pi first instead of retrying shell quoting. The helper settles Pi's managed formatter before verification and commit.`,
-		"When the task names files, read those files directly: no pwd/list/find. Do not reread successful edits, run verification separately, or inspect diff/status; finish-task performs those checks. Do not rediscover/claim, dump raw native work-item store JSON, run broad scans/help, or modify the work-orchestrator package/helper as a workaround. Use one stdlib transform for deterministic text/JSON work.",
-		"If finish-task requires independent review, launch exactly work-reviewer once, persist PASS, then rerun with --reviewed. On scope conflict, failed verification, or a real decision, persist the blocker and stop open/uncommitted.",
-		planReference(state, cwd),
-		...extraLines.filter(Boolean),
-		"After finish-task succeeds, return its compact result and stop.",
-	]
-		.filter(Boolean)
-		.join("\n");
-}
-
 function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
-	if (state.inlineWork) return inlineWorkHandoffPrompt(state, extraLines, cwd);
 	const selected = state.selectedWorkItem;
 	const selectedLine = selected
 		? `${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
@@ -7300,6 +8028,8 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 		...plannerLines,
 		...simplifyLines,
 		...advisorLines,
+		implementationScopeLine(state),
+		evidenceOnlyImplementationLine(state),
 		state.action === "run-implementation" || state.action === "run-debug"
 			? planReference(state, cwd)
 			: "",
@@ -7536,6 +8266,7 @@ function buildEpicReportState(cwd, epic) {
 			git: gitReport(cwd),
 			suggestedCommands: initiativeSuggestedCommands(projected),
 			warnings: [],
+			stats: buildWorkStats(cwd, idOf(epic)),
 		};
 	}
 	rememberWorkflowEpic(cwd, epic);
@@ -7585,6 +8316,7 @@ function buildEpicReportState(cwd, epic) {
 			.map((issue) => ({ id: idOf(issue), text: noteExcerpt(issue) }))
 			.filter((item) => item.text),
 		warnings: git.warnings,
+		stats: buildWorkStats(cwd, idOf(epic)),
 	};
 }
 
@@ -7635,6 +8367,7 @@ function buildWorkItemReportState(cwd, workItem) {
 			? [{ id: idOf(workItem), text: noteExcerpt(workItem, 800) }]
 			: [],
 		warnings: git.warnings,
+		stats: buildWorkStats(cwd, idOf(workItem)),
 	};
 }
 
@@ -8506,8 +9239,6 @@ function buildWorkSmallState(cwd, args = "") {
 						ok: true,
 						action: "run-implementation",
 						fastSmall: true,
-						inlineWork: true,
-						inlineLevel: "small",
 						smallTask: compactTaskSummary(claimed, { notesTail: 800 }),
 						epic: issueSummary(epic),
 						selectedWorkItem: issueSummary(claimed),
@@ -8545,8 +9276,6 @@ function buildWorkSmallState(cwd, args = "") {
 					ok: true,
 					action: "run-implementation",
 					fastSmall: true,
-					inlineWork: true,
-					inlineLevel: "small",
 					smallTask: compactTaskSummary(workItem, { notesTail: 800 }),
 					epic: issueSummary(issue),
 					selectedWorkItem: issueSummary(workItem),
@@ -8579,8 +9308,6 @@ function buildWorkSmallState(cwd, args = "") {
 				ok: true,
 				action: "run-implementation",
 				fastSmall: true,
-				inlineWork: true,
-				inlineLevel: "small",
 				smallTask: compactTaskSummary(workItem, { notesTail: 800 }),
 				epic: issueSummary(resolved.epic),
 				selectedWorkItem: issueSummary(workItem),
@@ -8672,7 +9399,7 @@ function buildWorkMedState(cwd, args = "") {
 				notes: workflowWorkItemNotes(
 					"/work-med",
 					parsed.task,
-					["wo:implementation", "wo:execution-inline"],
+					["wo:implementation", "wo:execution-agent"],
 					false,
 				),
 			}),
@@ -8682,13 +9409,11 @@ function buildWorkMedState(cwd, args = "") {
 				{
 					ok: true,
 					action: "run-implementation",
-					inlineWork: true,
-					inlineLevel: "medium",
 					smallTask: compactTaskSummary(workItem, { notesTail: 1200 }),
 					epic: issueSummary(resolved.epic),
 					selectedWorkItem: issueSummary(workItem),
 					git,
-					message: `Created ${idOf(workItem)} under ${idOf(resolved.epic)} for inline medium work.`,
+					message: `Created ${idOf(workItem)} under ${idOf(resolved.epic)} for medium scoped work.`,
 					warnings: git.warnings,
 				},
 				cwd,
@@ -9852,8 +10577,12 @@ function linkBrainstormArtifactFromFinal(cwd, run, text) {
 	};
 }
 
-function brainstormHandoffPrompt(state, cwd) {
+function brainstormHandoffPrompt(state, cwd, creativeDepth = "quick") {
 	const artifact = state.artifact;
+	const creativeStep =
+		cwd && creativeDepth === "wide" && !artifact
+			? creativeSidecarStep(cwd, `brainstorm for ${state.idea.id}`)
+			: "";
 	const advisorStep = cwd ? advisorCriticStep(cwd, "brainstorm artifact") : "";
 	const criticLines = advisorStep ? [advisorStep] : [];
 	return [
@@ -9866,6 +10595,7 @@ function brainstormHandoffPrompt(state, cwd) {
 			: `Run ce-brainstorm interactively, ask one question at a time until the requirements are clear, write only the brainstorm artifact, and skip ce-brainstorm's post-doc planning menu. End the final response with exactly "Brainstorm saved: <absolute path>" so the extension links it to ${state.idea.id}.`,
 		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can call ce-plan with the preservation and self-audit contract.",
 		"Never silently skip ce-brainstorm questions for broad, important, or underspecified work.",
+		creativeStep,
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
 		ROLE_TIMEOUT_GUIDANCE,
 		...criticLines,
@@ -10554,7 +11284,16 @@ function executeWorkFinishState(cwd, state, currentModel) {
 			profiles: runnableBackgroundVerifierProfiles(cwd, currentModel),
 			origin: state.origin ?? "normal",
 			paths: state.relatedFiles,
+			scope: "commit",
 		});
+		if (verifier.batch?.id)
+			recordWorkTelemetry(cwd, {
+				id: `verifier-scope-${verifier.batch.id}`,
+				type: "verifier-scope",
+				epicId: state.epic?.id,
+				workItemId: state.selectedWorkItem?.id ?? state.workItem?.id,
+				payoff: { backgroundVerifier: { batchId: verifier.batch.id } },
+			});
 		return {
 			...state,
 			verifier,
@@ -12337,8 +13076,8 @@ async function handleWorkCatchUpCommand(args, pi, ctx) {
 function workProjectAutopilotAppendix() {
 	return `Project autopilot policy:
 - Treat the target directory as the source of truth: verify git and native work-item store state there before mutating anything.
-- Work directly in the current session by default. Intake, target selection, bounded implementation, verification, commit, close, and push are inline/coded work, not separate agents.
-- Do not call subagent list or ask an LLM to select a role. When specialization is genuinely required, call the exact role directly: work-planner for ambiguous/large slicing, work-debugger for root-cause failures, work-worker for high-risk isolated writing, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
+- Keep intake, target selection, finish gates, commit, close, and push coded in the current session. Route every bounded implementation through the configured work-worker model.
+- Do not call subagent list or ask an LLM to select a role. Call the exact role directly: work-worker for implementation, work-planner for ambiguous/large slicing, work-debugger for root-cause failures, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
 - When a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child.
 - Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
 - Use /work-resume for one deterministic WorkItem boundary. Use autonomous goal only when the user explicitly wants a multi-step autonomous loop.
@@ -13737,6 +14476,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 				"Compact old reasoning and tool noise now or at the next idle boundary.\nNative work state, Git evidence, files, blockers, and next action survive.",
 		},
 	];
+	const roadmapRuntime = { showAllRoadmaps: false };
 	let selectedIndex = 0;
 	for (;;) {
 		const selected = await showListDialog(ctx, {
@@ -13759,9 +14499,20 @@ async function handleWorkMenuCommand(ctx, pi) {
 			continue;
 		}
 		if (selected.value === "work-roadmap") {
-			const result = await handleWorkRoadmapCommand("", ctx, pi);
-			if (result?.action === "roadmap-cancel") continue;
-			return result;
+			activeRoadmapMenuSessions.set(ctx, roadmapRuntime);
+			try {
+				const result = await handleWorkRoadmapCommand(
+					"",
+					ctx,
+					pi,
+					"",
+					roadmapRuntime,
+				);
+				if (result?.action === "roadmap-cancel") continue;
+				return result;
+			} finally {
+				activeRoadmapMenuSessions.delete(ctx);
+			}
 		}
 		const item = selected.item;
 		let args = "";
@@ -14021,6 +14772,7 @@ async function sendWorkflowFollowUp(ctx, message, pi, state) {
 		// Keep the safe default when project settings are unreadable.
 	}
 	if (
+		ctx.isIdle?.() === false ||
 		!compactEnabled ||
 		!state.inlineWork ||
 		tokens < 32_000 ||
@@ -14209,6 +14961,7 @@ async function handleWorkflowAction(
 			}
 		}
 	}
+	state = await withCreativeSidecar(builder, args, state, ctx);
 	if (
 		builder === buildWorkPauseState &&
 		state.ok &&
@@ -14224,9 +14977,10 @@ async function handleWorkflowAction(
 		state.verifier = { status: verifier.status, batchId: verifier.batch?.id };
 	}
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-action");
-	const direct = state.ok
-		? directRoleHandoffParams(state, ctx.cwd, selectionNote)
-		: null;
+	const direct =
+		state.ok && !state.controlSessionHandoff
+			? directRoleHandoffParams(state, ctx.cwd, selectionNote)
+			: null;
 	notify(
 		ctx,
 		renderWorkflowActionText(
@@ -14345,7 +15099,9 @@ async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 		const ops = [{ value: "summary", label: "summary" }];
 		if (group === "blocker")
 			ops.push({ value: "debug", label: "debug / full info" });
-		const op = await choose(ctx, `${workItemId}: operation`, ops);
+		const op = await choose(ctx, `${workItemId}: operation`, ops, undefined, {
+			subtitle: renderWorkStats(buildWorkStats(ctx.cwd, workItemId)),
+		});
 		if (!op) continue;
 		if (op === "debug")
 			return handleWorkflowAction(buildWorkDebugState, workItemId, ctx, pi);
@@ -14436,7 +15192,7 @@ function roadmapMenuNextStep(roadmap) {
 	return "Enter, then choose Resume work.";
 }
 
-function roadmapMenuItems(roadmaps) {
+export function roadmapMenuItems(_cwd, roadmaps) {
 	const visible = new Set(roadmaps.map((roadmap) => roadmap.id));
 	const siblings = new Map();
 	for (const roadmap of roadmaps) {
@@ -14475,13 +15231,16 @@ function roadmapMenuItems(roadmaps) {
 	});
 }
 
-async function chooseRoadmap(ctx, title, roadmaps, selectedId) {
-	let showAll = false;
+async function chooseRoadmap(ctx, title, roadmaps, selectedId, runtime = {}) {
+	runtime.showAllRoadmaps ??= false;
 	const view = () => ({
 		items: roadmapMenuItems(
-			newestRoadmapsFirst(showAll ? roadmaps : roadmaps.filter(roadmapIsOpen)),
+			ctx.cwd,
+			newestRoadmapsFirst(
+				runtime.showAllRoadmaps ? roadmaps : roadmaps.filter(roadmapIsOpen),
+			),
 		),
-		purpose: showAll
+		purpose: runtime.showAllRoadmaps
 			? "Showing all items, Tab to change to open only."
 			: "Showing open items, Tab to change to all.",
 		help: "Type to filter · Tab open/all · ↑↓ navigate · Enter select · Esc back",
@@ -14498,15 +15257,17 @@ async function chooseRoadmap(ctx, title, roadmaps, selectedId) {
 			fixedHeight: true,
 			fixedItemRows: roadmaps.length,
 			tabAction: {
-				label: showAll ? "Show open roadmaps" : "Show all roadmaps",
+				label: runtime.showAllRoadmaps
+					? "Show open roadmaps"
+					: "Show all roadmaps",
 				toggle: () => {
-					showAll = !showAll;
+					runtime.showAllRoadmaps = !runtime.showAllRoadmaps;
 					return view();
 				},
 			},
 		});
 		if (selected?.action === "tab") {
-			showAll = !showAll;
+			runtime.showAllRoadmaps = !runtime.showAllRoadmaps;
 			continue;
 		}
 		return selected?.value;
@@ -14664,6 +15425,7 @@ async function handleWorkRoadmapCommand(
 	roadmapRuntime = {},
 ) {
 	cleanupBenignInstructionDirt(ctx.cwd);
+	const sessionRuntime = activeRoadmapMenuSessions.get(ctx) ?? roadmapRuntime;
 	const text = String(args ?? "").trim();
 	if (text) {
 		const parsed = splitRoadmapArgs(text);
@@ -14687,11 +15449,17 @@ async function handleWorkRoadmapCommand(
 		ctx.cwd,
 		list.roadmaps,
 		ctx,
-		roadmapRuntime,
+		sessionRuntime,
 	);
 	const selected =
 		menuSelected ||
-		(await chooseRoadmap(ctx, "Work roadmaps", list.roadmaps, list.selectedId));
+		(await chooseRoadmap(
+			ctx,
+			"Work roadmaps",
+			list.roadmaps,
+			list.selectedId,
+			sessionRuntime,
+		));
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
 	const selectedRoadmap = list.roadmaps.find((epic) => epic.id === selected);
 	rememberRoadmapMenuSelection(ctx.cwd, selectedRoadmap);
@@ -14700,7 +15468,7 @@ async function handleWorkRoadmapCommand(
 			ctx.cwd,
 			readWorkItem(ctx.cwd, selected),
 			ctx,
-			roadmapRuntime,
+			sessionRuntime,
 		);
 		if (metadata) Object.assign(selectedRoadmap, metadata);
 	}
@@ -14802,6 +15570,7 @@ async function handleWorkRoadmapCommand(
 		undefined,
 		{
 			purpose: `${roadmapDisplayTitle(selectedRoadmap ?? { id: selected, title: selected })} — ${roadmapPreviewText(selectedRoadmap)}`,
+			subtitle: renderWorkStats(buildWorkStats(ctx.cwd, selected)),
 		},
 	);
 	if (!op) return handleWorkRoadmapCommand("", ctx, pi);
@@ -15156,13 +15925,20 @@ async function executeOrchestratorAction(
 						};
 				}
 			}
+			const creativeDepth =
+				state.ok && !state.artifact ? await chooseCreativeDepth(ctx) : "quick";
+			state = { ...state, creativeDepth };
 			notify(
 				ctx,
 				renderWorkBrainstormText(state),
 				state.ok ? "info" : "warning",
 			);
 			if (state.ok)
-				await sendFollowUp(ctx, brainstormHandoffPrompt(state, ctx.cwd), pi);
+				await sendFollowUp(
+					ctx,
+					brainstormHandoffPrompt(state, ctx.cwd, creativeDepth),
+					pi,
+				);
 			return stateTelemetry(state);
 		});
 	if (name === "work-finish")
@@ -15300,6 +16076,7 @@ export {
 	buildWorkResumeState,
 	buildWorkSmallState,
 	buildWorkStatus,
+	buildWorkStats,
 	buildWorkTelemetry,
 	buildWorkTelemetryState,
 	buildWorkUsageState,
@@ -15351,8 +16128,10 @@ export {
 	applyProfile,
 	setWorkOrchBoolean,
 	setWorkOrchReviewLevel,
-	setWorkOrchSliceExecution,
+	setWorkOrchCreativeMode,
 	setWorkOrchAdvisorSliceUsage,
+	creativeSidecarStep,
+	divergentTaskModels,
 	advisorCriticStep,
 	workOrchSettings,
 	backgroundVerifierProfiles,
@@ -15729,6 +16508,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
+		finishHelperStarts.clear();
 		pendingDirtyRecoveries.clear();
 		pendingInitiativeConversions.clear();
 		manualMicrocompactPending = false;
@@ -15870,6 +16650,16 @@ export default function workModelsExtension(pi) {
 
 	pi.on("tool_execution_start", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "tool_execution_start", event);
+		const helper = finishHelperRequest(event.toolName, event.args);
+		if (helper)
+			try {
+				finishHelperStarts.set(event.toolCallId, {
+					...helper,
+					before: run(ctx.cwd, "git", ["rev-parse", "HEAD"]),
+				});
+			} catch {
+				// The helper reports Git failures itself; do not mask its result.
+			}
 		if (!activeWorkAgent) return;
 		activeWorkAgent.toolStarts.set(event.toolCallId, {
 			startedAt: Date.now(),
@@ -15880,6 +16670,16 @@ export default function workModelsExtension(pi) {
 	pi.on("tool_execution_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "tool_execution_end", event);
 		updateWorkGoalProgress(ctx);
+		const helper = finishHelperStarts.get(event.toolCallId);
+		finishHelperStarts.delete(event.toolCallId);
+		try {
+			scheduleFinishedHelperVerifiers(ctx.cwd, pi, ctx, helper, event);
+		} catch (error) {
+			ctx.ui?.notify?.(
+				`Background verification failed to queue: ${error instanceof Error ? error.message : String(error)}`,
+				"warning",
+			);
+		}
 		if (!activeWorkAgent) return;
 		const started = activeWorkAgent.toolStarts.get(event.toolCallId);
 		activeWorkAgent.tools.push(summarizeToolResult(event, started));
@@ -15937,6 +16737,9 @@ export default function workModelsExtension(pi) {
 		const telemetry = {
 			id: run.id,
 			type: "agent",
+			provider: ctx.model?.provider,
+			model: workStatsModel(ctx.model, ctx.model?.provider),
+			modelName: ctx.model?.name,
 			workflowRunId: run.meta.workflowRunId,
 			activity: run.meta.activity,
 			mode: run.meta.mode,
@@ -16193,6 +16996,10 @@ function workSettingsStatus(ctx) {
 				`  ${SUBMENU_ARROW} ${slot.label}: ${slotSummary(slot, settings)}`,
 		),
 		"",
+		"Creative analysis",
+		`  ${SUBMENU_ARROW} creative sidecar: ${resolved.creativeMode}`,
+		"  generators reuse Advisor 1–3 models; configured advisors critique the merged result",
+		"",
 		"Background verifiers",
 		...(backgroundVerifierProfiles(ctx.cwd).length
 			? backgroundVerifierProfiles(ctx.cwd).map(
@@ -16208,7 +17015,7 @@ function workSettingsStatus(ctx) {
 		),
 		`  ${SUBMENU_ARROW} ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
 		`  ${SUBMENU_ARROW} pre-commit review: ${resolved.codeReviewBeforeCommit}`,
-		`  ${SUBMENU_ARROW} slice execution: ${resolved.sliceExecutionMode}`,
+		"  implementation: configured Work model (isolated work-worker)",
 		"",
 		"Resume automation",
 		`  ${onOff(resume.selfImproving)} self-improving workflow reporting (explicit evidence intake)`,
@@ -16251,10 +17058,10 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "profile") return owns(block, "profile");
 	if (item.kind === "backgroundVerifiers")
 		return owns(block, "backgroundVerifiers");
+	if (item.kind === "creativeMode") return owns(block, "creativeMode");
 	if (item.kind === "advisorSliceUsage")
 		return owns(block, "advisorUsageForSlicePlans");
 	if (item.kind === "reviewLevel") return owns(block, "codeReviewBeforeCommit");
-	if (item.kind === "sliceExec") return owns(block, "sliceExecutionMode");
 	if (item.kind === "bool") return owns(block, item.value);
 	if (item.kind === "resumeBool") return owns(settings.workResume, item.value);
 	return false;
@@ -16299,10 +17106,10 @@ function clearProjectOverride(settings, item) {
 	} else if (item.kind === "profile") clearProfileOverride(settings);
 	else if (item.kind === "backgroundVerifiers")
 		delete block.backgroundVerifiers;
+	else if (item.kind === "creativeMode") delete block.creativeMode;
 	else if (item.kind === "advisorSliceUsage")
 		delete block.advisorUsageForSlicePlans;
 	else if (item.kind === "reviewLevel") delete block.codeReviewBeforeCommit;
-	else if (item.kind === "sliceExec") delete block.sliceExecutionMode;
 	else if (item.kind === "bool") delete block[item.value];
 	else if (item.kind === "resumeBool") delete settings.workResume[item.value];
 	if (
@@ -16400,6 +17207,13 @@ async function workSettingsLoop(ctx) {
 					: "none configured",
 			},
 			{
+				kind: "creativeMode",
+				value: "creativeMode",
+				label: `Creative sidecar: ${titleCase(resolved.creativeMode)} ${SUBMENU_ARROW}`,
+				description:
+					"3 isolated generators reuse Advisor 1–3 models; advisors critique the merged result",
+			},
+			{
 				kind: "advisorSliceUsage",
 				value: "advisorUsageForSlicePlans",
 				label: `advisor usage for slice plans ${SUBMENU_ARROW}`,
@@ -16415,12 +17229,6 @@ async function workSettingsLoop(ctx) {
 				value: "codeReviewBeforeCommit",
 				label: `pre-commit review ${SUBMENU_ARROW}`,
 				description: resolved.codeReviewBeforeCommit,
-			},
-			{
-				kind: "sliceExec",
-				value: "sliceExecutionMode",
-				label: `slice execution ${SUBMENU_ARROW}`,
-				description: resolved.sliceExecutionMode,
 			},
 			{
 				kind: "resumeBool",
@@ -16522,6 +17330,24 @@ async function workSettingsLoop(ctx) {
 			}
 			continue;
 		}
+		if (pick.kind === "creativeMode") {
+			const mode = await choose(
+				ctx,
+				"Creative sidecar mode",
+				CREATIVE_MODES.map((value) => ({
+					value,
+					label: value,
+					description: CREATIVE_MODE_DESC[value],
+				})),
+				resolved.creativeMode,
+			);
+			if (!mode) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			setWorkOrchCreativeMode(settings, mode);
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Creative sidecar: ${mode}`, "info");
+			continue;
+		}
 		if (pick.kind === "advisorSliceUsage") {
 			const usage = await choose(
 				ctx,
@@ -16556,31 +17382,6 @@ async function workSettingsLoop(ctx) {
 			setWorkOrchReviewLevel(settings, level);
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Pre-commit review: ${level}`, "info");
-			continue;
-		}
-		if (pick.kind === "sliceExec") {
-			const mode = await choose(
-				ctx,
-				"Slice execution",
-				[
-					{
-						value: "inline",
-						label: "inline",
-						description: "run each slice in the current session (default)",
-					},
-					{
-						value: "agent",
-						label: "agent",
-						description: "route each slice to an isolated work-worker subagent",
-					},
-				],
-				resolved.sliceExecutionMode,
-			);
-			if (!mode) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setWorkOrchSliceExecution(settings, mode);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Slice execution: ${mode}`, "info");
 			continue;
 		}
 		if (pick.kind === "slot") {

@@ -56,7 +56,11 @@ assert.equal(
 	"a@x.io, 5h [████░░] 60%, in 1h 32m, week [█░░░░░] 10%, in 3d 12h 5m",
 );
 assert.deepEqual(
-	new Set(items.flatMap((item) => item.labelSegments.map(({ color }) => color)).filter(Boolean)),
+	new Set(
+		items
+			.flatMap((item) => item.labelSegments.map(({ color }) => color))
+			.filter(Boolean),
+	),
 	new Set(["success", "warning", "error"]),
 );
 assert.equal(items[3].label, "b@x.io");

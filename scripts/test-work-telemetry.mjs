@@ -584,7 +584,22 @@ try {
 	try {
 		const commands = {};
 		const hooks = {};
+		const rpcListeners = new Map();
+		let rpcRequest;
 		const pi = {
+			events: {
+				on: (name, listener) => {
+					rpcListeners.set(name, listener);
+					return () => rpcListeners.delete(name);
+				},
+				emit: (_name, request) => {
+					rpcRequest = request;
+					rpcListeners.get(`subagents:rpc:v1:reply:${request.requestId}`)?.({
+						success: true,
+						data: { runId: "worker-run", asyncDir: "C:/tmp/worker-run" },
+					});
+				},
+			},
 			on: (name, handler) => {
 				hooks[name] = handler;
 			},
@@ -638,7 +653,7 @@ try {
 		);
 		assert(
 			commandSummary.events === 1,
-			"extension command writes telemetry before inline completion",
+			"extension command writes telemetry before worker completion",
 		);
 		assert(
 			commandSummary.byPhase[0].key === "command/work-small/run-implementation",
@@ -646,22 +661,22 @@ try {
 		);
 		assert(
 			commandSummary.slowest[0].handoff?.queued &&
-				commandSummary.slowest[0].handoff.role === "inline-small",
-			"extension command records inline-small handoff role",
+				commandSummary.slowest[0].handoff.role === "worker",
+			"extension command records worker handoff role",
 		);
 		assert(
-			compactCalls === 1 && sent.length === 1,
-			"context-heavy inline commands microcompact before triggering the handoff",
+			compactCalls === 0 && sent.length === 0,
+			"worker handoff bypasses inline compaction and follow-up delivery",
 		);
 		assert(
-			sent[0].message.includes("WO_INLINE_V1") &&
-				sent[0].message.includes("Do not call subagent list"),
-			"small handoff stays inline and discovery-free",
+			rpcRequest?.params?.agent === "work-worker" &&
+				rpcRequest.params.task.includes("Implementation scope: small"),
+			"small handoff launches the configured worker with bounded scope",
 		);
-		const inlineMeta = parseWorkPromptMeta(sent[0].message);
+		const workerMeta = parseWorkPromptMeta(rpcRequest.params.task);
 		assert(
-			inlineMeta.workflowRunId && inlineMeta.activity === "validation",
-			"inline handoff carries command workflow identity and activity",
+			workerMeta.workflowRunId && workerMeta.activity === "validation",
+			"worker handoff carries command workflow identity and activity",
 		);
 
 		fixture.reset("active");
@@ -675,7 +690,7 @@ try {
 		});
 		assert(
 			fixture.logs().every((entry) => entry.op !== "create") &&
-				sent.length === 1,
+				sent.length === 0,
 			"print mode fails safely before creating a queued or duplicate WorkItem",
 		);
 
@@ -694,7 +709,7 @@ try {
 		fixture.reset("active");
 
 		await hooks.before_agent_start(
-			{ prompt: sent[0].message },
+			{ prompt: rpcRequest.params.task },
 			{
 				cwd,
 				getContextUsage: () => ({ tokens: 3000 }),
@@ -747,7 +762,7 @@ try {
 			`workItem ${commandEvent.workItemId}`,
 		);
 		const correlated = reviewSummary.slowest.filter(
-			(event) => event.workflowRunId === inlineMeta.workflowRunId,
+			(event) => event.workflowRunId === workerMeta.workflowRunId,
 		);
 		assert(
 			correlated.some((event) => event.type === "command") &&
@@ -755,7 +770,7 @@ try {
 				correlated.filter((event) => event.type === "workflow-complete")
 					.length === 1 &&
 				correlated.every((event) => event.activity === "validation"),
-			"inline command and agent share one workflow identity, marker, and terminal event",
+			"worker command and agent share one workflow identity, marker, and terminal event",
 		);
 		assert(
 			reviewSummary.slowest.some(
@@ -788,7 +803,7 @@ try {
 			},
 		};
 		await hooks.before_agent_start(
-			{ prompt: sent[0].message, systemPrompt: "system" },
+			{ prompt: rpcRequest.params.task, systemPrompt: "system" },
 			historyCtx,
 		);
 		await hooks.agent_start({}, historyCtx);

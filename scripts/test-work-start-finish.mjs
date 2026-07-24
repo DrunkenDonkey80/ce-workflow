@@ -20,6 +20,7 @@ const {
 	buildWorkPlanState,
 	buildWorkMigrateState,
 	buildWorkSmallState,
+	buildWorkTelemetryState,
 	directRoleHandoffParams,
 	createPiSubagentsVerifierAdapter,
 } = await import(
@@ -102,22 +103,20 @@ try {
 			state.selectedWorkItem.status === "in_progress",
 		"small creates and claims one native task under Misc",
 	);
+	const smallDirect = directRoleHandoffParams(state, fixture.cwd);
 	assert(
-		state.inlineWork && state.handoffPrompt.includes("WO_INLINE_V1"),
-		"small uses concise inline fast path",
+		!state.inlineWork &&
+			state.executionPolicy.level === "small" &&
+			state.executionPolicy.maxFiles === 2,
+		"small preserves its scope while using an isolated worker",
 	);
 	assert(
-		directRoleHandoffParams(state, fixture.cwd) === null,
-		"small does not launch a subagent",
-	);
-	assert(
-		state.handoffPrompt.includes("Do not call subagent list") &&
-			state.handoffPrompt.includes("finish-task") &&
-			state.handoffPrompt.includes("native edit tool") &&
-			state.handoffPrompt.includes("Do not rewrite tracked files") &&
-			state.handoffPrompt.includes("--immediate-format") &&
-			state.handoffPrompt.length < 2400,
-		"small handoff is compact, coded, and discovery-free",
+		smallDirect?.agent === "work-worker" &&
+			smallDirect.params.task.includes("Implementation scope: small") &&
+			smallDirect.params.task.includes("at most 2 implementation files") &&
+			smallDirect.params.task.includes("native edit tool") &&
+			smallDirect.params.task.includes("Do not rewrite tracked files"),
+		"small launches the configured worker with bounded scope",
 	);
 	assert(
 		fixture.store().items[state.selectedWorkItem.id].type === "task" &&
@@ -131,14 +130,13 @@ try {
 		"try the hardware probe to verify the device without changing source",
 	);
 	assert(
-		state.handoffPrompt.includes("Evidence-only task:") &&
-			state.handoffPrompt.includes("search once") &&
-			state.handoffPrompt.includes("runtime script under .pi") &&
-			/modify the work-orchestrator package\/helper as a workaround/i.test(
-				state.handoffPrompt,
-			) &&
-			state.handoffPrompt.length < 2400,
-		"evidence-only small work gets a bounded probe path without workflow self-modification",
+		directRoleHandoffParams(state, fixture.cwd)?.params.task.includes(
+			"Evidence-only task:",
+		) &&
+			directRoleHandoffParams(state, fixture.cwd)?.params.task.includes(
+				"do not substitute a broader suite or edit product/workflow source",
+			),
+		"evidence-only small work keeps its narrow probe contract",
 	);
 
 	fixture.reset("active");
@@ -190,22 +188,27 @@ try {
 
 	fixture.reset("active");
 	state = buildWorkMedState(fixture.cwd, "Split a bounded feature");
+	const medDirect = directRoleHandoffParams(state, fixture.cwd);
 	assert(
-		state.ok && state.action === "run-implementation" && state.inlineWork,
-		"med creates one inline executable handoff",
+		state.ok &&
+			state.action === "run-implementation" &&
+			!state.inlineWork &&
+			state.executionPolicy.level === "medium",
+		"med creates one medium scoped worker handoff",
 	);
 	assert(
 		state.selectedWorkItem.status === "in_progress" &&
-			fixture
+			!fixture
 				.store()
 				.items[state.selectedWorkItem.id].notes.join("\n")
 				.includes("wo:execution-inline"),
-		"med creates and claims an inline-marked task",
+		"med creates and claims a task without the retired inline marker",
 	);
 	assert(
-		directRoleHandoffParams(state, fixture.cwd) === null &&
-			state.handoffPrompt.includes("--max-files 8"),
-		"med skips planner/worker agents and uses bounded coded finalization",
+		medDirect?.agent === "work-worker" &&
+			medDirect.params.task.includes("Implementation scope: medium") &&
+			medDirect.params.task.includes("at most 8 implementation files"),
+		"med launches the configured worker with bounded scope",
 	);
 
 	fixture.reset("active");
@@ -219,14 +222,15 @@ try {
 			riskyDirect?.agent === "work-worker" &&
 			riskyDirect.params.task.includes("native edit tool") &&
 			riskyDirect.params.task.includes("Do not rewrite tracked files"),
-		"sensitive small requests escalate to a native-tool isolated writer",
+		"sensitive small requests use the native-tool isolated writer",
 	);
 
 	fixture.reset("active");
 	state = buildWorkAutoState(fixture.cwd, "Add docs note");
 	assert(
-		state.autoClassification === "small" && state.inlineWork,
-		"auto classifies obvious small work in code",
+		state.autoClassification === "small" &&
+			directRoleHandoffParams(state, fixture.cwd)?.agent === "work-worker",
+		"auto classifies obvious small work and routes it to the worker",
 	);
 
 	fixture.reset("active");
@@ -416,6 +420,14 @@ try {
 	assert(
 		state.verifier && state.verifier.status !== "suppressed",
 		"normal finish attempts background verification after commit",
+	);
+	assert(
+		buildWorkTelemetryState(finishCwd, "workItem FIN-1").slowest.some(
+			(event) =>
+				event.type === "verifier-scope" &&
+				event.payoff?.backgroundVerifier?.batchId === state.verifier.batch?.id,
+		),
+		"finish persists the verifier batch-to-task stats scope",
 	);
 	assert(
 		fixture

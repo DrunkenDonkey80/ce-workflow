@@ -63,6 +63,7 @@ const roles = [
 	"advisor-3",
 	"committer",
 	"debugger",
+	"divergent",
 	"fixer",
 	"migrator",
 	"planner",
@@ -79,6 +80,17 @@ check(
 	roles.every((role) => agentFiles.includes(`work-${role}.md`)) &&
 		!agentFiles.includes("work-advisor-backup.md") &&
 		!agentFiles.some((name) => name.startsWith("bead-")),
+);
+const divergentAgent = read("agents/work-divergent.md");
+check(
+	"divergent role is isolated and tool-free",
+	[
+		"name: work-divergent",
+		"tools:\nthinking: high",
+		"inheritProjectContext: false",
+		"Never see or request sibling output",
+		"Return only this compact JSON array",
+	].every((marker) => divergentAgent.includes(marker)),
 );
 const backgroundVerifierAgent = read("agents/work-background-verifier.md");
 check(

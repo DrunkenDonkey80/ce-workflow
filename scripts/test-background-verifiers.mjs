@@ -315,8 +315,10 @@ try {
 	writeFileSync(path.join(gitCwd, "untracked.txt"), "untracked\n");
 	writeFileSync(
 		path.join(gitCwd, "large.txt"),
-		Array.from({ length: 1_000 }, (_, index) =>
-			`${String(index + 1).padStart(4, "0")}:${"x".repeat(40)}${index === 699 ? ":needle" : ""}`,
+		Array.from(
+			{ length: 1_000 },
+			(_, index) =>
+				`${String(index + 1).padStart(4, "0")}:${"x".repeat(40)}${index === 699 ? ":needle" : ""}`,
 		).join("\n"),
 	);
 	const branchBefore = git("rev-parse", "--abbrev-ref", "HEAD");
@@ -819,10 +821,13 @@ try {
 		}),
 	);
 	const commands = {};
+	const hooks = {};
 	const listeners = new Map();
 	const notices = [];
 	const pi = {
-		on() {},
+		on(name, handler) {
+			hooks[name] = handler;
+		},
 		registerCommand(name, command) {
 			commands[name] = command;
 		},
@@ -914,6 +919,84 @@ try {
 	assert(
 		notices.some((notice) => notice.message.includes(manualBatch.id)),
 		"manual analyzer reports its batch id",
+	);
+
+	// The coded inline finish helper is observed by the extension and launches
+	// configured verifier models for the commit it just created.
+	const helperCwd = repo();
+	const helperGit = (...args) =>
+		execFileSync("git", args, {
+			cwd: helperCwd,
+			encoding: "utf8",
+		}).trim();
+	helperGit("init", "-q");
+	helperGit("config", "user.email", "test@example.test");
+	helperGit("config", "user.name", "Test");
+	writeFileSync(path.join(helperCwd, "tracked.txt"), "before\n");
+	helperGit("add", "tracked.txt");
+	helperGit("commit", "-qm", "base");
+	mkdirSync(path.join(helperCwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(helperCwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workOrchestrator: {
+				backgroundVerifiers: {
+					"zai/glm-5.2": {
+						operations: ["correctness"],
+						thinking: "high",
+					},
+					"anthropic/claude-opus-4-8": {
+						operations: ["maintainability"],
+						thinking: "medium",
+					},
+				},
+			},
+		}),
+	);
+	const helperNotices = [];
+	const helperCtx = {
+		cwd: helperCwd,
+		model: { provider: "openai-codex", id: "gpt-5.6-sol" },
+		ui: {
+			notify: (message, level) => helperNotices.push({ message, level }),
+		},
+	};
+	await hooks.tool_execution_start(
+		{
+			toolCallId: "finish-helper",
+			toolName: "bash",
+			args: {
+				command:
+					"node scripts/work-helper.mjs finish-task TASK-HOOK --max-files 1 --message done --verify true",
+			},
+		},
+		helperCtx,
+	);
+	writeFileSync(path.join(helperCwd, "tracked.txt"), "after\n");
+	helperGit("commit", "-qam", "TASK-HOOK: done");
+	await hooks.tool_execution_end(
+		{
+			toolCallId: "finish-helper",
+			toolName: "bash",
+			isError: false,
+			result: '{"status":"PASS","work_item_id":"TASK-HOOK"}',
+		},
+		helperCtx,
+	);
+	await new Promise((resolve) => setImmediate(resolve));
+	const helperStore = loadVerifierStore(helperCwd);
+	assert.deepEqual(
+		Object.values(helperStore.jobs)
+			.map((job) => job.model)
+			.sort(),
+		["anthropic/claude-opus-4-8", "zai/glm-5.2"],
+		"inline finish helper launches every configured non-Sol verifier model",
+	);
+	assert(
+		helperNotices.some((notice) =>
+			notice.message.includes("Background verification queued"),
+		),
+		"inline finish helper reports the queued verifier models",
 	);
 
 	// U4: terminal artifacts are bounded, validated, grouped, and never rendered as instructions.

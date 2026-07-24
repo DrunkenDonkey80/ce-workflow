@@ -19,6 +19,7 @@ const {
 	bootstrapPlanEpic,
 	approveInitiativeReconciliation,
 	deriveIdeaStatus,
+	executeOrchestratorAction,
 	renderWorkBrainstormText,
 } = await import(
 	pathToFileURL(
@@ -278,6 +279,40 @@ try {
 			handoffMeta.workItemId === standalone.idea.id,
 		"brainstorm handoff keeps roadmap and idea identity for automatic linking",
 	);
+	const wideHandoff = brainstormHandoffPrompt(standalone, cwd, "wide");
+	assert(
+		wideHandoff.includes("Creative sidecar gate") &&
+			(wideHandoff.match(/work-divergent/g) ?? []).length === 3 &&
+			wideHandoff.indexOf("Creative sidecar gate") <
+				wideHandoff.indexOf("Advisor critic gate") &&
+			!brainstormHandoffPrompt(standalone, cwd).includes(
+				"Creative sidecar gate",
+			),
+		"wide brainstorm merges three isolated branches before configured critics",
+	);
+	const followUps = [];
+	const interactive = await executeOrchestratorAction(
+		"work-brainstorm",
+		"Try an offline-first reader",
+		{
+			cwd,
+			mode: "tui",
+			ui: {
+				notify() {},
+				select: async (title, labels) =>
+					title === "Creative sidecar"
+						? labels.find((label) => label.includes("Wide"))
+						: undefined,
+			},
+			sendUserMessage: async (message) => followUps.push(message),
+		},
+		{},
+	);
+	assert(
+		interactive.creativeDepth === "wide" &&
+			followUps[0]?.includes("Creative sidecar gate"),
+		"Ask mode offers Wide and feeds the creative gate into the live brainstorm handoff",
+	);
 	const linked = linkBrainstormArtifactFromFinal(
 		cwd,
 		{ meta: handoffMeta },
@@ -292,6 +327,33 @@ try {
 				),
 		"a completed brainstorm artifact is linked back to native work state",
 	);
+
+	fixture.reset("ideas");
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({ workOrchestrator: { creativeMode: "auto" } }),
+	);
+	const planningFollowUps = [];
+	const broadTask = await executeOrchestratorAction(
+		"work-big",
+		"--roadmap E-1 Design a resilient offline synchronization system",
+		{
+			cwd,
+			mode: "rpc",
+			ui: { notify() {} },
+			sendUserMessage: async (message) => planningFollowUps.push(message),
+		},
+		{},
+	);
+	assert(
+		broadTask.creativeDepth === "wide" &&
+			broadTask.controlSessionHandoff === true &&
+			planningFollowUps[0]?.includes("Creative sidecar gate") &&
+			planningFollowUps[0]?.includes("work-divergent") &&
+			planningFollowUps[0]?.includes("Advisor critic gate"),
+		"Auto mode runs the wide sidecar in the control session before work-big planning",
+	);
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), "{}\n");
 
 	fixture.reset("ideas");
 	const longPrompt = `Modernize the LPGSlim Android interface to match the Linea Pro demo look and feel with smooth transitions, graphics, animations, connected-device startup states, and updated screens while preserving the full detailed request for brainstorming. ${"Use the attached Pixel device and inspect the installed demo UI source before proposing screen-by-screen changes. ".repeat(8)}`;

@@ -83,18 +83,30 @@ const picked = await drive(
 	},
 );
 assert.equal(picked.value, "beta");
-await drive({ title: "Root", items, cursorKey: "root" }, (component) => {
-	const lines = component.render(70);
-	assert(
-		lines.some((line) => line.includes("Choose an option to continue.")),
-		"every dialog shows its purpose below the title",
-	);
-	assert(
-		lines.some((line) => line.includes(">  Beta")),
-		"returning from a submenu restores its parent cursor",
-	);
-	component.handleInput("escape");
-});
+await drive(
+	{
+		title: "Root",
+		items,
+		cursorKey: "root",
+		subtitle: ["Stats:", "Plan:", "- model: 1m 0s, 1k tokens"],
+	},
+	(component) => {
+		const lines = component.render(70);
+		assert(
+			lines.some((line) => line.includes("Choose an option to continue.")),
+			"every dialog shows its purpose below the title",
+		);
+		assert(
+			lines.some((line) => line.includes(">  Beta")),
+			"returning from a submenu restores its parent cursor",
+		);
+		assert(
+			lines.some((line) => line.includes("- model: 1m 0s, 1k tokens")),
+			"dialogs render multi-line stats subtitles",
+		);
+		component.handleInput("escape");
+	},
+);
 
 await drive(
 	{

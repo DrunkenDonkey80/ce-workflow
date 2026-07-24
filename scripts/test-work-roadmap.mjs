@@ -689,6 +689,61 @@ try {
 		/Showing all items, Tab to change to open only/,
 	);
 	assert.match(allRoadmapDialog, /Planned child \[Closed/);
+
+	const shortcuts = {};
+	workModelsExtension({
+		on: () => {},
+		registerCommand: () => {},
+		registerShortcut: (key, shortcut) => {
+			shortcuts[key] = shortcut;
+		},
+		registerTool: () => {},
+	});
+	let roadmapVisits = 0;
+	let orchestratorVisits = 0;
+	let returnedRoadmapDialog = "";
+	let reenteredRoadmapDialog = "";
+	await shortcuts.f7.handler({
+		cwd: initiativeRoot,
+		mode: "tui",
+		ui: {
+			custom: (factory) =>
+				new Promise((done) => {
+					const component = factory(
+						{ requestRender() {} },
+						{
+							fg: (_color, text) => text,
+							bold: (text) => text,
+						},
+						{ matches: () => false },
+						done,
+					);
+					const rendered = component.render(220).join("\n");
+					if (rendered.includes("Orchestrator")) {
+						orchestratorVisits += 1;
+						component.handleInput(orchestratorVisits <= 2 ? "enter" : "escape");
+					} else if (rendered.includes("Work roadmaps")) {
+						roadmapVisits += 1;
+						if (roadmapVisits === 1) {
+							component.handleInput("tab");
+							component.handleInput("enter");
+						} else {
+							if (roadmapVisits === 2) returnedRoadmapDialog = rendered;
+							else reenteredRoadmapDialog = rendered;
+							component.handleInput("escape");
+						}
+					} else component.handleInput("escape");
+				}),
+			notify: () => {},
+		},
+	});
+	for (const rendered of [returnedRoadmapDialog, reenteredRoadmapDialog])
+		assert.match(
+			rendered,
+			/Showing all items, Tab to change to open only/,
+			"F7 remembers closed-item visibility for its full menu session",
+		);
+
 	const initiativeOps = [];
 	let initiativeSelected = false;
 	await handleWorkRoadmapCommand(
