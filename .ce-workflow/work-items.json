@@ -1707,7 +1707,8 @@
       ],
       "notes": [
         "Classification: one atomic locally-owned claim, related-distinct from work-2.13. Root cause is finishTask persisting wo:verify-check PASS before untracked-file and max-file gates; no duplicate, conflict, upstream ownership, already-fixed behavior, or insufficient evidence applies. Fix defers durable PASS until every pre-commit scope/review gate passes. Focused regression covers repeated untracked and scope failures without PASS-note growth.",
-        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers",
+        "Reconciliation evidence: implementation/closure commit cfa524e; focused node scripts/test-work-optimization-helpers.mjs PASS; final npm run verify:quiet PASS."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -1749,7 +1750,8 @@
       ],
       "notes": [
         "Classification: one atomic upstream-owned claim, related-distinct from work-2.13. Captured planner evidence contains 30 bash/grep/read/find calls and zero write/edit calls; neither formatting-only changed Python file was read. Current ce-workflow work-close only mutates native work state and formatPendingFiles is exclusive to finish-task, so no local formatting path owns this mutation. No duplicate, conflict, locally-owned fix, already-fixed guarantee, or insufficient evidence applies. Routed durably to pi-lens issue https://github.com/apmantza/pi-lens/issues/791; no local workaround added because masking or restoring externally mutated source could overwrite legitimate concurrent edits.",
-        "Reconciled as upstream-owned and routed to pi-lens issue #791 with captured no-write/no-edit planner evidence; local masking/restoration would risk overwriting legitimate concurrent source changes."
+        "Reconciled as upstream-owned and routed to pi-lens issue #791 with captured no-write/no-edit planner evidence; local masking/restoration would risk overwriting legitimate concurrent source changes.",
+        "Reconciliation evidence: upstream route https://github.com/apmantza/pi-lens/issues/791 verified OPEN; closure commit c2ead95; final npm run verify:quiet PASS."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -2001,7 +2003,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-24T07:54:10.651Z"
+    "updatedAt": "2026-07-24T07:56:43.463Z"
   },
   "schemaVersion": 1
 }
