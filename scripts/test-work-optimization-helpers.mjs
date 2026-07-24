@@ -487,6 +487,33 @@ process.exit(result.status ?? 1);
 	);
 	rmSync(path.join(finishCwd, "rollback.js"));
 
+	writeFileSync(path.join(finishCwd, "undecided.asset"), "unknown");
+	let untrackedError = "";
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-3",
+				"--max-files",
+				"8",
+				"--message",
+				"untracked gate",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		);
+	} catch (error) {
+		untrackedError = String(error.stdout ?? "");
+	}
+	assert(
+		untrackedError.includes("untracked files need a decision"),
+		"finish-task checks untracked files before persisting PASS evidence",
+	);
+	rmSync(path.join(finishCwd, "undecided.asset"));
+
 	for (const file of ["one.txt", "two.txt", "three.txt"])
 		writeFileSync(path.join(finishCwd, file), file);
 	let scopeError = "";
@@ -516,6 +543,12 @@ process.exit(result.status ?? 1);
 	assert(
 		scopeError.includes("scope exceeds 2 implementation files"),
 		"finish-task enforces the coded file boundary before commit",
+	);
+	assert(
+		!loadStore(finishCwd).items["TASK-3"].notes.some((note) =>
+			note.includes("wo:verify-check PASS"),
+		),
+		"failed pre-commit retries do not persist duplicate PASS evidence",
 	);
 	for (const file of ["one.txt", "two.txt", "three.txt"])
 		rmSync(path.join(finishCwd, file));

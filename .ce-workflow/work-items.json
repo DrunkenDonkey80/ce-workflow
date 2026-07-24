@@ -1675,6 +1675,85 @@
       "type": "bug",
       "updatedAt": "2026-07-23T02:05:28.072Z"
     },
+    "work-2.22": {
+      "createdAt": "2026-07-23T02:06:41.788Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task appended a wo:verify-check PASS note before checking untracked files and implementation-file scope. Two pre-commit failures followed by a successful retry therefore recorded the same passing verification three times on work-2.21.\nExpected: Run cleanliness/scope gates before persisting PASS evidence, or make the PASS note idempotent across retries so failed finalization attempts do not bloat durable work-item history.\nImpact: Retries after recoverable pre-commit failures add misleading duplicate verification evidence and unnecessary native work-store churn.\nSuggested improvement: Move the PASS-note mutation after scope/untracked validation or deduplicate by work item, command, and output.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/99125036-7c2f-4c7e-8f3a-846de3bdfb29",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 166083,
+              "file": "01-work-items.json",
+              "sha256": "38d59f1d21371703f905f906f7e6118b8e9863eefc362b559e36b3d65e217d99"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-07-23T02:06:41.785Z",
+          "workflowId": "workflow-mrwv5wmj-exuyx4"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.22",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned claim, related-distinct from work-2.13. Root cause is finishTask persisting wo:verify-check PASS before untracked-file and max-file gates; no duplicate, conflict, upstream ownership, already-fixed behavior, or insufficient evidence applies. Fix defers durable PASS until every pre-commit scope/review gate passes. Focused regression covers repeated untracked and scope failures without PASS-note growth.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: finish-task appended a wo:verify-check PASS note before checking untracked files and implementation-file scope. Two pre-commit fai",
+      "type": "task",
+      "updatedAt": "2026-07-24T07:52:46.347Z"
+    },
+    "work-2.23": {
+      "createdAt": "2026-07-23T07:31:56.093Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After /work-big created and planned work-6, the previously clean producer repository acquired unrelated formatting-only edits in python-test-app/src/rflab_pinpad/proxmark_machine.py and proxmark_ndef_url.py. The planning task only needed native work-store mutations; production files should not have been formatted or touched.\nExpected: Planning/decision work-item creation and closure should restrict formatting/staging to files owned by that planning boundary (normally only .ce-workflow/work-items.json), leaving unrelated production files byte-identical.\nImpact: The target repo is now dirty before reverse-role implementation starts, obscuring ownership and risking accidental inclusion of unrelated formatting in later task commits.\nSuggested improvement: Make coded planning finalization skip formatPendingFiles entirely or pass an explicit allowlist containing only the native work-store path.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/1e318eea-0942-4d92-a5eb-c8bcbb0ea04e",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 288575,
+              "file": "01-session.jsonl",
+              "sha256": "accc11ddc0c1605b01f2d7ebe12e17afe068044dca0d4dcee23cff912763bf32"
+            },
+            {
+              "bytes": 731,
+              "file": "02-work-work-6.1-work-planner.md",
+              "sha256": "7fd19eb9053da420edd3766ee1640b4176245c694e823ee03d6e1722fdf67108"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-23T07:31:56.089Z",
+          "workflowId": "019f8d9b-667d-7b3e-b2d0-8472774d61be"
+        }
+      ],
+      "id": "work-2.23",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After /work-big created and planned work-6, the previously clean producer repository acquired unrelated formatting-only edits in p",
+      "type": "task",
+      "updatedAt": "2026-07-23T07:31:56.093Z"
+    },
     "work-2.3": {
       "createdAt": "2026-07-20T02:00:16.639Z",
       "dependencies": [
@@ -1919,7 +1998,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-23T02:06:04.938Z"
+    "updatedAt": "2026-07-24T07:52:46.347Z"
   },
   "schemaVersion": 1
 }

@@ -238,20 +238,12 @@ function finishTask() {
 		);
 		throw new Error(`verification failed: ${verificationCommand}`);
 	}
-	if (verificationCommand) {
+	if (verificationCommand)
 		verificationResult = {
 			command: verificationCommand,
 			status: "PASS",
 			output: output.slice(-500),
 		};
-		mutateStore(cwd, (store) =>
-			appendWorkNote(
-				store,
-				id,
-				`wo:verify-check PASS\nCommand: ${verificationCommand}\nOutput: ${output.slice(-500)}`,
-			),
-		);
-	}
 	const tidy = tidyUntrackedFiles({ cwd, gitBin });
 	if (tidy.unrecognized.length)
 		throw new Error(
@@ -333,6 +325,14 @@ function finishTask() {
 		if (!/(?:wo:review|review(?: result)?):?\s*PASS\b/i.test(notesOf(task)))
 			throw new Error("--reviewed requires durable wo:review PASS evidence");
 	}
+	if (verificationCommand)
+		mutateStore(cwd, (store) =>
+			appendWorkNote(
+				store,
+				id,
+				`wo:verify-check PASS\nCommand: ${verificationCommand}\nOutput: ${output.slice(-500)}`,
+			),
+		);
 	git(["add", "-A", "--", ...changed]);
 	const staged = git(["diff", "--cached", "--name-only"])
 		.split(/\r?\n/)
