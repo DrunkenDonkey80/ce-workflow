@@ -1747,12 +1747,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: one atomic upstream-owned claim, related-distinct from work-2.13. Captured planner evidence contains 30 bash/grep/read/find calls and zero write/edit calls; neither formatting-only changed Python file was read. Current ce-workflow work-close only mutates native work state and formatPendingFiles is exclusive to finish-task, so no local formatting path owns this mutation. No duplicate, conflict, locally-owned fix, already-fixed guarantee, or insufficient evidence applies. Routed durably to pi-lens issue https://github.com/apmantza/pi-lens/issues/791; no local workaround added because masking or restoring externally mutated source could overwrite legitimate concurrent edits.",
+        "Reconciled as upstream-owned and routed to pi-lens issue #791 with captured no-write/no-edit planner evidence; local masking/restoration would risk overwriting legitimate concurrent source changes."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After /work-big created and planned work-6, the previously clean producer repository acquired unrelated formatting-only edits in p",
       "type": "task",
-      "updatedAt": "2026-07-23T07:31:56.093Z"
+      "updatedAt": "2026-07-24T07:54:10.650Z"
     },
     "work-2.3": {
       "createdAt": "2026-07-20T02:00:16.639Z",
@@ -1998,7 +2001,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-24T07:52:46.347Z"
+    "updatedAt": "2026-07-24T07:54:10.651Z"
   },
   "schemaVersion": 1
 }
