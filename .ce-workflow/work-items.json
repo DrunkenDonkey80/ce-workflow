@@ -2511,17 +2511,25 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Add one dumb specialized tree-workspace overlay in extensions/work-dialogs.js, reusing the shared overlay/native fallback contract. It receives projected frames, owns session-local expansion overrides and cursor rendering/key handling, and exposes close/back/done callbacks for timer cleanup. Add focused coverage in scripts/test-work-dialogs.mjs. Do not own extensions/work-models.js.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.3",
       "labels": [],
       "notes": [
-        "wo:execution-agent. Covers brief A2 and dialog portions of A4/A8. Independently ready and exclusive owner of extensions/work-dialogs.js; consume projected frames without importing work-models.js."
+        "wo:execution-agent. Covers brief A2 and dialog portions of A4/A8. Independently ready and exclusive owner of extensions/work-dialogs.js; consume projected frames without importing work-models.js.",
+        "wo:review-scope [\"extensions/work-dialogs.js\",\"scripts/test-work-dialogs.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"scripts/test-work-dialogs.mjs:618 - After the projection-error tick, rerender the component and assert the last good refreshed frame; the current assertion reuses lines captured before the error and therefore cannot prove error retention.\"]}",
+        "wo:review PASS - targeted re-review confirms the projection-error test rerenders after the failed tick and proves the last good refreshed frame remains; focused dialog test passes.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-dialogs.mjs\nOutput: ok - shared work dialogs"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Render the stable-ID tree workspace dialog",
       "type": "task",
-      "updatedAt": "2026-07-25T08:05:09.658Z"
+      "updatedAt": "2026-07-25T11:48:02.440Z"
     },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
@@ -2572,7 +2580,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T11:25:43.216Z"
+    "updatedAt": "2026-07-25T11:48:02.440Z"
   },
   "schemaVersion": 1
 }

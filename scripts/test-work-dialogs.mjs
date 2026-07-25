@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
 	resetDialogStateForTest,
 	showListDialog,
+	showTreeWorkspaceDialog,
 } from "../extensions/work-dialogs.js";
 
 const colors = [];
@@ -446,5 +447,211 @@ const tabbed = await drive(
 	(component) => component.handleInput("tab"),
 );
 assert.equal(tabbed.action, "tab");
+
+const treeFrames = [
+	{
+		ok: true,
+		signature: "one",
+		selectedId: "roadmap-open",
+		roadmaps: [
+			{
+				id: "roadmap-open",
+				title: "Open roadmap",
+				status: "open",
+				tasks: [
+					{ id: "task-a", title: "Task A", status: "open", children: [] },
+					{ id: "task-b", title: "Task B", status: "open", children: [] },
+				],
+			},
+			{
+				id: "roadmap-closed",
+				title: "Closed roadmap",
+				status: "closed",
+				tasks: [
+					{
+						id: "task-closed",
+						title: "Hidden task",
+						status: "closed",
+						children: [],
+					},
+				],
+			},
+		],
+	},
+	{
+		ok: true,
+		signature: "two",
+		roadmaps: [
+			{
+				id: "roadmap-open",
+				title: "Open roadmap refreshed",
+				status: "open",
+				tasks: [
+					{ id: "task-b", title: "Task B", status: "open", children: [] },
+					{ id: "task-a", title: "Task A", status: "open", children: [] },
+				],
+			},
+		],
+	},
+];
+
+async function driveTree(options, interact, mode = "tui") {
+	let tick;
+	let renders = 0;
+	let cleanups = 0;
+	let cleared = 0;
+	const result = await showTreeWorkspaceDialog(
+		{
+			mode,
+			ui: {
+				async custom(factory) {
+					let value;
+					let closed = false;
+					const component = factory(
+						{
+							terminal: { rows: 24 },
+							requestRender() {
+								renders += 1;
+							},
+						},
+						theme,
+						keybindings,
+						(next) => {
+							value = next;
+							closed = true;
+						},
+					);
+					await interact(component, {
+						get tick() {
+							return tick;
+						},
+						get renders() {
+							return renders;
+						},
+					});
+					assert(closed, "tree workspace closes");
+					return value;
+				},
+				async select(_title, labels) {
+					return labels[0];
+				},
+			},
+		},
+		{
+			title: "Tree workspace",
+			purpose: "Inspect projected work without mutating it.",
+			frame: treeFrames[0],
+			setIntervalFn(callback) {
+				tick = callback;
+				return 7;
+			},
+			clearIntervalFn(value) {
+				assert.equal(value, 7);
+				cleared += 1;
+			},
+			cleanup() {
+				cleanups += 1;
+			},
+			...options,
+		},
+	);
+	return { result, renders, cleanups, cleared };
+}
+
+let refreshStep = 0;
+const treeRun = await driveTree(
+	{
+		async refresh() {
+			refreshStep += 1;
+			if (refreshStep === 1) return treeFrames[0];
+			if (refreshStep === 2) return treeFrames[1];
+			throw new Error("projection unavailable");
+		},
+	},
+	async (component, state) => {
+		let lines = component.render(70);
+		assert(
+			lines.some((line) => line.includes("Inspect projected work")),
+			"tree workspace has one purpose line",
+		);
+		assert(
+			lines.some((line) => line.includes("Task A")),
+			"open containers default expanded",
+		);
+		assert(
+			!lines.some((line) => line.includes("Hidden task")),
+			"closed containers default collapsed",
+		);
+		for (const key of "hidden") component.handleInput(key);
+		assert(
+			component.render(70).some((line) => line.includes("Hidden task")),
+			"filter searches descendants of collapsed containers",
+		);
+		component.handleInput("escape");
+		component.handleInput(" ");
+		lines = component.render(70);
+		assert(
+			!lines.some((line) => line.includes("Task A")),
+			"Space collapses before filtering",
+		);
+		assert(
+			lines.some((line) => line.includes("Filter: ")),
+			"Space is not appended to the filter",
+		);
+		component.handleInput("right");
+		component.handleInput("down");
+		assert(component.render(70).some((line) => /❯\s+Task A/.test(line)));
+		const before = state.renders;
+		await state.tick();
+		assert.equal(state.renders, before, "unchanged signatures do not render");
+		await state.tick();
+		assert.equal(
+			state.renders,
+			before + 1,
+			"changed signatures render exactly once",
+		);
+		lines = component.render(70);
+		assert(
+			lines.some((line) => /❯\s+Task A/.test(line)),
+			"cursor follows stable ID across reorder",
+		);
+		await state.tick();
+		lines = component.render(70);
+		assert(
+			lines.some((line) => line.includes("Task B")),
+			"projection errors retain the last good frame",
+		);
+		component.handleInput("escape");
+	},
+);
+assert.equal(treeRun.result.action, "back");
+assert.equal(treeRun.cleanups, 1, "Escape invokes explicit cleanup once");
+assert.equal(treeRun.cleared, 1, "Escape clears refresh timer");
+
+const selectedTree = await driveTree({}, async (component) =>
+	component.handleInput("enter"),
+);
+assert.equal(selectedTree.result.value, "roadmap-open");
+assert.equal(selectedTree.cleanups, 1, "done/select invokes cleanup");
+
+const backedTree = await driveTree({}, async (component) =>
+	component.handleInput("backspace"),
+);
+assert.equal(backedTree.result.action, "back");
+assert.equal(backedTree.cleanups, 1, "back invokes cleanup");
+
+let nativeCleanup = 0;
+const nativeTree = await showTreeWorkspaceDialog(
+	{ mode: "rpc", ui: { select: async (_title, labels) => labels[0] } },
+	{
+		title: "Native tree",
+		frame: treeFrames[0],
+		cleanup() {
+			nativeCleanup += 1;
+		},
+	},
+);
+assert.equal(nativeTree.value, "roadmap-open");
+assert.equal(nativeCleanup, 1, "native fallback invokes cleanup");
 
 process.stdout.write("ok - shared work dialogs\n");

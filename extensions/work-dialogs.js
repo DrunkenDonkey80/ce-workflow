@@ -536,6 +536,289 @@ export async function showListDialog(ctx, options) {
 	);
 }
 
+export async function showTreeWorkspaceDialog(ctx, options) {
+	const {
+		title,
+		purpose = "Choose a work item to continue.",
+		frame: initialFrame,
+		refresh,
+		refreshIntervalMs = 1000,
+		setIntervalFn = setInterval,
+		clearIntervalFn = clearInterval,
+		cleanup,
+		cursorKey = title,
+		filter = true,
+	} = options;
+	const rootsFor = (frame) => {
+		const roadmaps = frame?.roadmaps ?? [];
+		const byParent = new Map();
+		for (const row of roadmaps) {
+			const parent = row.parentId ?? "";
+			if (!byParent.has(parent)) byParent.set(parent, []);
+			byParent.get(parent).push(row);
+		}
+		const appendTasks = (rows, task, depth) => {
+			rows.push({ ...task, depth, container: Boolean(task.children?.length) });
+			for (const child of task.children ?? [])
+				appendTasks(rows, child, depth + 1);
+		};
+		const appendRoadmaps = (rows, parent = "", depth = 0) => {
+			for (const roadmap of byParent.get(parent) ?? []) {
+				rows.push({
+					...roadmap,
+					depth,
+					container: Boolean(
+						roadmap.tasks?.length || byParent.get(roadmap.id)?.length,
+					),
+				});
+				for (const task of roadmap.tasks ?? [])
+					appendTasks(rows, task, depth + 1);
+				appendRoadmaps(rows, roadmap.id, depth + 1);
+			}
+		};
+		const rows = [];
+		appendRoadmaps(rows);
+		return rows;
+	};
+	const nativeRows = rootsFor(initialFrame).map((row) => ({
+		value: row.id,
+		label: `${"  ".repeat(row.depth)}${row.title ?? row.label ?? row.id}`,
+		description: row.description,
+		preserveCase: true,
+	}));
+	if (
+		ctx.ui.workDialogsNative === true ||
+		ctx.mode !== "tui" ||
+		typeof ctx.ui.custom !== "function"
+	) {
+		try {
+			return await nativeListDialog(ctx, {
+				...options,
+				items: nativeRows,
+				cursorKey,
+			});
+		} finally {
+			cleanup?.();
+		}
+	}
+
+	return ctx.ui.custom(
+		(tui, theme, keybindings, done) => {
+			let frame = initialFrame;
+			let rows = rootsFor(frame);
+			let query = "";
+			let visible = [];
+			const expansion = new Map();
+			let selectedId =
+				frame?.selectedId ?? dialogCursors.get(cursorKey) ?? rows[0]?.id;
+			let closed = false;
+			let timer;
+			let cachedKey;
+			let cachedLines;
+
+			const expanded = (row) =>
+				expansion.has(row.id) ? expansion.get(row.id) : row.status !== "closed";
+			const rebuild = () => {
+				const hiddenDepths = [];
+				const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+				visible = rows.filter((row) => {
+					while (
+						hiddenDepths.length &&
+						hiddenDepths[hiddenDepths.length - 1] >= row.depth
+					)
+						hiddenDepths.pop();
+					const hidden = hiddenDepths.length > 0;
+					if (row.container && !expanded(row)) hiddenDepths.push(row.depth);
+					const haystack =
+						`${row.title ?? row.label ?? ""} ${row.id} ${row.description ?? ""}`.toLowerCase();
+					return (
+						(!hidden || terms.length > 0) &&
+						terms.every((term) => haystack.includes(term))
+					);
+				});
+				if (!visible.some((row) => row.id === selectedId))
+					selectedId = visible[0]?.id;
+				cachedKey = undefined;
+			};
+			const finish = (result) => {
+				if (closed) return;
+				closed = true;
+				if (timer !== undefined) clearIntervalFn(timer);
+				cleanup?.();
+				if (selectedId) dialogCursors.set(cursorKey, selectedId);
+				done(result);
+			};
+			const poll = async () => {
+				try {
+					const next = await refresh?.();
+					if (!next?.ok || next.signature === frame?.signature) return;
+					frame = next;
+					rows = rootsFor(frame);
+					rebuild();
+					tui.requestRender();
+				} catch {
+					// Projection errors deliberately retain the last good frame.
+				}
+			};
+			rebuild();
+			if (refresh) timer = setIntervalFn(poll, refreshIntervalMs);
+
+			const component = {
+				focused: false,
+				render(width) {
+					const height = workspaceHeight(tui);
+					const renderWidth = Math.max(1, width - 2);
+					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}`;
+					if (cache === cachedKey) return cachedLines;
+					const lines = [];
+					const add = (line = "") =>
+						lines.push(fit(line || "\u00a0", renderWidth));
+					add(
+						`${theme.fg("accent", theme.bold(title))}  ${theme.fg("dim", `${visible.length}/${rows.length}`)}`,
+					);
+					add(theme.fg("muted", purpose));
+					if (filter)
+						add(
+							`${theme.fg("muted", "Filter:")} ${theme.fg("text", `${query}${component.focused ? "▌" : ""}`)}`,
+						);
+					add(sectionLine(theme, "Work items", renderWidth));
+					const bodyRows = Math.max(1, height - lines.length - 2);
+					const index = Math.max(
+						0,
+						visible.findIndex((row) => row.id === selectedId),
+					);
+					const start = Math.max(
+						0,
+						Math.min(
+							index - Math.floor(bodyRows / 2),
+							visible.length - bodyRows,
+						),
+					);
+					for (let at = start; at < start + bodyRows; at += 1) {
+						const row = visible[at];
+						if (!row) add();
+						else {
+							const marker = row.container ? (expanded(row) ? "▾" : "▸") : " ";
+							const prefix = `${row.id === selectedId ? "❯" : " "} ${"  ".repeat(row.depth)}${marker} `;
+							add(
+								theme.fg(
+									row.id === selectedId
+										? "accent"
+										: row.status === "closed"
+											? "dim"
+											: "text",
+									`${prefix}${row.title ?? row.label ?? row.id}`,
+								),
+							);
+						}
+					}
+					add(sectionLine(theme, "Keys", renderWidth));
+					add(
+						theme.fg(
+							"dim",
+							`${filter ? "Type to filter · " : ""}↑↓ navigate · Space/←/→ expand · Enter select · Esc back`,
+						),
+					);
+					while (lines.length < height) add();
+					cachedKey = cache;
+					cachedLines = lines.slice(0, height);
+					return cachedLines;
+				},
+				handleInput(data) {
+					const index = Math.max(
+						0,
+						visible.findIndex((row) => row.id === selectedId),
+					);
+					const row = visible[index];
+					if (
+						data === " " ||
+						data === "left" ||
+						data === "\x1b[D" ||
+						data === "right" ||
+						data === "\x1b[C"
+					) {
+						if (row?.container) {
+							const next =
+								data === "left" || data === "\x1b[D"
+									? false
+									: data === "right" || data === "\x1b[C"
+										? true
+										: !expanded(row);
+							expansion.set(row.id, next);
+							rebuild();
+						}
+					} else if (
+						keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A")
+					) {
+						if (visible.length)
+							selectedId =
+								visible[(index - 1 + visible.length) % visible.length].id;
+					} else if (
+						keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
+					) {
+						if (visible.length)
+							selectedId = visible[(index + 1) % visible.length].id;
+					} else if (
+						keyMatches(
+							keybindings,
+							data,
+							"tui.select.confirm",
+							"enter",
+							"return",
+							"\r",
+							"\n",
+						)
+					) {
+						if (row)
+							return finish({ action: "select", value: row.id, item: row });
+					} else if (
+						keyMatches(keybindings, data, "tui.select.cancel", "escape", "\x1b")
+					) {
+						if (filter && query) {
+							query = "";
+							rebuild();
+						} else return finish({ action: "back" });
+					} else if (
+						filter &&
+						keyMatches(
+							keybindings,
+							data,
+							"tui.editor.deleteCharBackward",
+							"backspace",
+							"\b",
+							"\x7f",
+						)
+					) {
+						if (query) {
+							query = [...query].slice(0, -1).join("");
+							rebuild();
+						} else return finish({ action: "back" });
+					} else if (filter) {
+						const text = data
+							.replace(/^\x1b\[200~/, "")
+							.replace(/\x1b\[201~$/, "");
+						if (text && !/[\x00-\x1f\x7f]/u.test(text)) {
+							query += text;
+							rebuild();
+						}
+					}
+					if (selectedId) dialogCursors.set(cursorKey, selectedId);
+					cachedKey = undefined;
+					tui.requestRender();
+				},
+				invalidate() {
+					cachedKey = undefined;
+				},
+			};
+			return component;
+		},
+		{
+			overlay: true,
+			overlayOptions: { anchor: "center", width: "100%", maxHeight: "100%" },
+		},
+	);
+}
+
 export function resetDialogStateForTest() {
 	dialogCursors.clear();
 }
