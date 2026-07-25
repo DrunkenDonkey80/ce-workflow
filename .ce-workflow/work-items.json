@@ -2540,17 +2540,26 @@
       ],
       "dependencyEdges": [],
       "description": "Integrate the projection and tree dialog in extensions/work-models.js by replacing chooseRoadmap/roadmapMenuItems/handleRoadmapTasksMenu nesting with the always-all workspace and one-shot context action popup. Own the 750ms refresh/signature loop and cleanup callbacks, stable-ID mutation revalidation, reports-return flow, and Add task composer/fallback around createWorkflowWorkItem without routing fallback through buildWorkAddState. Update scripts/test-work-roadmap.mjs and scripts/test-work-add.mjs; consume the dialog API without changing extensions/work-dialogs.js.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.4",
       "labels": [],
       "notes": [
-        "wo:execution-agent. Covers brief A6, A7, A8 and final A1/A2/A4 integration. Production ownership is extensions/work-models.js only and begins after projection plus dialog slices; no persistent expansion store, event bus, delta telemetry, reset key, or dashboard framework."
+        "wo:execution-agent. Covers brief A6, A7, A8 and final A1/A2/A4 integration. Production ownership is extensions/work-models.js only and begins after projection plus dialog slices; no persistent expansion store, event bus, delta telemetry, reset key, or dashboard framework.",
+        "wo:verify-check FAIL\nCommand: npm run verify:quiet\ntest-work-improve.mjs passes: Command failed: C:\\Program Files\\nodejs\\node.exe scripts\\test-work-improve.mjs\nnode:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: the dedicated improvement roadmap stays out of Roadmaps\r\n    at file:///C:/soft/ce-workflow/scripts/test-work-improve.mjs:197:1 {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: false,\r\n  expected: true,\r\n  operator: '==',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.14.0\r\n\n",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-add.mjs\",\"scripts/test-work-improve.mjs\",\"scripts/test-work-roadmap.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:16384 - Remove the workspace roadmap popup’s list-tasks action (also extensions/work-models.js:16402), or guard it to legacy/non-workspace routes; tasks are already inline and this action re-enters handleRoadmapTasksMenu, violating the required one-shot context popup. Add a TUI regression asserting roadmap Enter cannot open the nested task-report menu.\"]}",
+        "wo:review PASS Targeted re-review confirms workspace roadmap actions no longer expose list tasks; focused A8 tests and npm run verify:quiet pass.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Wire workspace actions, refresh, and rich task composer",
       "type": "task",
-      "updatedAt": "2026-07-25T08:05:58.646Z"
+      "updatedAt": "2026-07-25T12:16:56.253Z"
     },
     "work-3.5": {
       "acceptance": "In a real Pi TUI, select Add task from the new workspace for a known roadmap or task parent; enter multiline text; paste an image; submit through Pi's normal composer; verify the resulting task context preserves the selected roadmap/parent, multiline request, and image context. Record project-owner identity, date, selected parent ID, resulting task/work context ID, and explicit approve/reject result in this WorkItem. Approval is complete only with project-owner evidence; text-only fallback is not sufficient for this rich-composer smoke.",
@@ -2580,7 +2589,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T11:48:02.440Z"
+    "updatedAt": "2026-07-25T12:16:56.253Z"
   },
   "schemaVersion": 1
 }

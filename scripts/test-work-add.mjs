@@ -4,7 +4,12 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 
-const { buildWorkAddState, handleWorkflowAction } = await import(
+const {
+	buildWorkAddState,
+	createWorkspaceTaskFromText,
+	handleWorkflowAction,
+	prepareWorkspaceTaskComposer,
+} = await import(
 	pathToFileURL(
 		realpathSync(
 			path.join(import.meta.dirname, "../extensions/work-models.js"),
@@ -118,10 +123,7 @@ try {
 	);
 
 	fixture.reset("active");
-	state = buildWorkAddState(
-		fixture.cwd,
-		"--roadmap E-1 Add independent task",
-	);
+	state = buildWorkAddState(fixture.cwd, "--roadmap E-1 Add independent task");
 	assert(state.ok && !state.blockedBy, "no blocker creates no dependency");
 	assert(
 		fixture.store().items[state.selectedWorkItem.id].dependencies.length === 0,
@@ -144,6 +146,123 @@ try {
 	assert(
 		state.ok && fixture.logs().length === 0,
 		"native create never invokes bd",
+	);
+
+	fixture.reset("active");
+	const roadmap = fixture.store().items["E-1"];
+	let draft = "";
+	state = await prepareWorkspaceTaskComposer(
+		{
+			cwd: fixture.cwd,
+			ui: {
+				getEditorText: () => draft,
+				setEditorText: (text) => (draft = text),
+			},
+		},
+		roadmap,
+	);
+	assert(
+		state.richComposer && /roadmap.*E-1/is.test(draft),
+		"empty rich composer receives a natural-language roadmap envelope",
+	);
+	assert(!draft.includes("/work-add"), "composer envelope excludes /work-add");
+
+	const originalDraft = "first byte\nlast byte";
+	draft = originalDraft;
+	state = await prepareWorkspaceTaskComposer(
+		{
+			cwd: fixture.cwd,
+			ui: {
+				getEditorText: () => draft,
+				setEditorText: (text) => (draft = text),
+				select: async (_title, labels) =>
+					labels.find((label) => label === "Cancel"),
+			},
+		},
+		roadmap,
+	);
+	assert(
+		state.action === "task-composer-cancelled" && draft === originalDraft,
+		"cancel preserves existing draft bytes",
+	);
+	draft = originalDraft;
+	await prepareWorkspaceTaskComposer(
+		{
+			cwd: fixture.cwd,
+			ui: {
+				getEditorText: () => draft,
+				setEditorText: (text) => (draft = text),
+				select: async (_title, labels) =>
+					labels.find((label) => label === "Append to draft"),
+			},
+		},
+		roadmap,
+	);
+	assert(
+		draft.startsWith(`${originalDraft}\n\nAdd a task`),
+		"approved append adds exactly two newlines",
+	);
+
+	const parentState = buildWorkAddState(
+		fixture.cwd,
+		"--roadmap E-1 Parent task",
+	);
+	const parent = fixture.store().items[parentState.selectedWorkItem.id];
+	draft = "";
+	await prepareWorkspaceTaskComposer(
+		{
+			cwd: fixture.cwd,
+			ui: {
+				getEditorText: () => draft,
+				setEditorText: (text) => (draft = text),
+			},
+		},
+		roadmap,
+		parent,
+	);
+	assert(
+		draft.includes(parent.id),
+		"rich composer envelope names the selected parent task",
+	);
+	const warnings = [];
+	state = await prepareWorkspaceTaskComposer(
+		{
+			cwd: fixture.cwd,
+			ui: {
+				notify: (message) => warnings.push(message),
+				editor: async () => "  Compact   title  \nsecond line\nthird line",
+			},
+		},
+		roadmap,
+		parent,
+	);
+	const created = fixture.store().items[state.selectedWorkItem.id];
+	assert(
+		/Image attachment is unavailable/.test(warnings[0]),
+		"fallback warns that image attachment is unavailable",
+	);
+	assert(
+		created.parentId === parent.id,
+		"fallback preserves the selected task parent",
+	);
+	assert(
+		created.title === "Compact title",
+		"fallback title uses compact first nonempty line",
+	);
+	assert(
+		created.description === "  Compact   title  \nsecond line\nthird line",
+		"fallback preserves full multiline description",
+	);
+
+	const raced = createWorkspaceTaskFromText(
+		fixture.cwd,
+		"E-1",
+		"REMOVED-1",
+		"Must not create",
+	);
+	assert(
+		!raced.ok && raced.reason === "parent-ineligible",
+		"fallback rereads and rejects a removed parent",
 	);
 } finally {
 	fixture.cleanup();

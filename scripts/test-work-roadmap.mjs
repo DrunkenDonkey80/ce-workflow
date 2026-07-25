@@ -269,16 +269,12 @@ try {
 		"placeholder roadmap metadata is generated and stored",
 	);
 	assert(
-		roadmapMenus[0].labels.every(
-			(label) => !/E-[1-4]|C:\\projects|Closed roadmap/.test(label),
-		),
-		"open view hides IDs, source paths, and closed roadmaps",
+		roadmapMenus[0].labels.some((label) => /Closed roadmap/.test(label)),
+		"workspace always includes closed roadmaps",
 	);
 	assert(
-		roadmapMenus[0].labels.some((label) =>
-			/stored intent available/i.test(label),
-		),
-		"missing open summaries are generated before the menu is shown",
+		roadmapMenus[0].labels.every((label) => !/\[(?:Open|Closed)\]/.test(label)),
+		"workspace omits visible open/closed labels",
 	);
 	let sortedRoadmapDialog = "";
 	await handleWorkRoadmapCommand(
@@ -314,7 +310,17 @@ try {
 	assert.equal(
 		roadmapMenus[1].title,
 		"Roadmap operations",
-		"roadmap operation menu uses a single-line title",
+		"roadmap action popup uses a single-line title",
+	);
+	assert(
+		roadmapMenus[1].labels.every((label) => !/list tasks/.test(label)) &&
+			roadmapMenus.every((menu) => menu.title !== "E-2: tasks"),
+		"TUI roadmap Enter cannot open the nested task-report menu",
+	);
+	assert.equal(
+		roadmapMenus[2].title,
+		"Work roadmaps",
+		"report action returns to the workspace",
 	);
 	assert.match(
 		roadmapPreviewText(
@@ -636,8 +642,10 @@ try {
 	assert.match(treeText, / {2}I-1\.1.*planned/i);
 	assert.match(treeText, / {2}I-1\.2.*needs.plan/i);
 	let roadmapDialog = "";
-	let allRoadmapDialog = "";
-	let roadmapDialogCount = 0;
+	let intervalMs;
+	let poll;
+	let cleared;
+	let renders = 0;
 	const dialogState = await handleWorkRoadmapCommand(
 		"",
 		{
@@ -646,13 +654,9 @@ try {
 			ui: {
 				custom: (factory) =>
 					new Promise((done) => {
-						roadmapDialogCount += 1;
 						const component = factory(
-							{ requestRender() {} },
-							{
-								fg: (color, text) => `<${color}>${text}</${color}>`,
-								bold: (text) => text,
-							},
+							{ requestRender: () => renders++ },
+							{ fg: (_color, text) => text, bold: (text) => text },
 							{
 								matches: (data, id) =>
 									data === "escape" && id === "tui.select.cancel",
@@ -660,92 +664,35 @@ try {
 							done,
 						);
 						roadmapDialog = component.render(220).join("\n");
-						component.handleInput("tab");
-						allRoadmapDialog = component.render(220).join("\n");
-						component.handleInput("escape");
+						(async () => {
+							await poll();
+							assert.equal(renders, 0, "unchanged signature does not render");
+							const changed = loadStore(initiativeRoot);
+							changed.items["I-1.2"].title = "Fresh task title";
+							saveStore(initiativeRoot, changed);
+							await poll();
+							assert.equal(renders, 1, "changed signature requests one render");
+							component.handleInput("escape");
+						})();
 					}),
 				notify: () => {},
 			},
 		},
 		{},
+		"",
+		{
+			setIntervalFn: (callback, ms) => (
+				(poll = callback), (intervalMs = ms), 41
+			),
+			clearIntervalFn: (timer) => (cleared = timer),
+		},
 	);
 	assert.equal(dialogState.action, "roadmap-cancel");
-	assert.equal(
-		roadmapDialogCount,
-		1,
-		"Tab updates the existing dialog in place",
-	);
-	assert.equal(
-		roadmapDialog.split("\n").length,
-		allRoadmapDialog.split("\n").length,
-		"Tab keeps the roadmap dialog at a fixed screen position",
-	);
-	assert.match(roadmapDialog, /Showing open items, Tab to change to all/);
-	assert.match(roadmapDialog, /Initiative \[Open/);
-	assert.match(roadmapDialog, /└─ Needs plan/);
-	assert.doesNotMatch(roadmapDialog, /I-1|Planned child/);
-	assert.match(roadmapDialog, /Some cool stuff/);
-	assert.doesNotMatch(roadmapDialog, /Work completed on it|More work to plan/);
-	assert.match(roadmapDialog, /<success>.*Initiative/);
-	assert.match(
-		allRoadmapDialog,
-		/Showing all items, Tab to change to open only/,
-	);
-	assert.match(allRoadmapDialog, /Planned child \[Closed/);
-
-	const shortcuts = {};
-	workModelsExtension({
-		on: () => {},
-		registerCommand: () => {},
-		registerShortcut: (key, shortcut) => {
-			shortcuts[key] = shortcut;
-		},
-		registerTool: () => {},
-	});
-	let roadmapVisits = 0;
-	let orchestratorVisits = 0;
-	let returnedRoadmapDialog = "";
-	let reenteredRoadmapDialog = "";
-	await shortcuts.f7.handler({
-		cwd: initiativeRoot,
-		mode: "tui",
-		ui: {
-			custom: (factory) =>
-				new Promise((done) => {
-					const component = factory(
-						{ requestRender() {} },
-						{
-							fg: (_color, text) => text,
-							bold: (text) => text,
-						},
-						{ matches: () => false },
-						done,
-					);
-					const rendered = component.render(220).join("\n");
-					if (rendered.includes("Orchestrator")) {
-						orchestratorVisits += 1;
-						component.handleInput(orchestratorVisits <= 2 ? "enter" : "escape");
-					} else if (rendered.includes("Work roadmaps")) {
-						roadmapVisits += 1;
-						if (roadmapVisits === 1) {
-							component.handleInput("tab");
-							component.handleInput("enter");
-						} else {
-							if (roadmapVisits === 2) returnedRoadmapDialog = rendered;
-							else reenteredRoadmapDialog = rendered;
-							component.handleInput("escape");
-						}
-					} else component.handleInput("escape");
-				}),
-			notify: () => {},
-		},
-	});
-	for (const rendered of [returnedRoadmapDialog, reenteredRoadmapDialog])
-		assert.match(
-			rendered,
-			/Showing all items, Tab to change to open only/,
-			"F7 remembers closed-item visibility for its full menu session",
-		);
+	assert.equal(intervalMs, 750, "work workspace refreshes every 750ms");
+	assert.equal(cleared, 41, "workspace clears its timer on back");
+	assert.match(roadmapDialog, /Initiative/);
+	assert.match(roadmapDialog, /Planned child/);
+	assert.doesNotMatch(roadmapDialog, /Tab open\/all|\[(?:Open|Closed)\]/);
 
 	const initiativeOps = [];
 	let initiativeSelected = false;

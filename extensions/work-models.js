@@ -31,7 +31,7 @@ import {
 	resolve,
 } from "node:path";
 import { migrateLegacyBeads } from "./legacy-beads-migration.js";
-import { showListDialog } from "./work-dialogs.js";
+import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.js";
 import {
 	resolveReportingSource,
 	submitImprovementReport,
@@ -12606,59 +12606,59 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 			const liveFacts = workRoadmapLiveFacts(cwd, runtime);
 			const workflowActivity = workflowActivityByItem(cwd);
 			const rows = projection.nodes.map((node) => {
-					const epic = store.items[node.id];
-					const tasks = groupedRoadmapTasks(cwd, epic, liveFacts);
-					const exact = liveFacts.get(node.id) ?? {};
-					const descendants = tasks.tree.flatMap(function flatten(task) {
-						return [task, ...task.children.flatMap(flatten)];
-					});
-					const liveDescendants = descendants.filter((task) => task.live);
-					const activityAt = Math.max(
-						Date.parse(updatedAt(epic)) || 0,
-						workflowActivity.get(node.id) ?? 0,
-						liveFacts.get(node.id)?.activityAt ?? 0,
-						...descendants.map((task) =>
-							Math.max(
-								Date.parse(updatedAt(store.items[task.id])) || 0,
-								workflowActivity.get(task.id) ?? 0,
-								liveFacts.get(task.id)?.activityAt ?? 0,
-							),
-						),
-					);
-					const live = Boolean(exact.live || liveDescendants.length);
-					const engaged = Boolean(
-						statusOf(epic) === "in_progress" ||
-							tasks.tree.some((task) => task.engaged),
-					);
-					const attention = Boolean(
-						["paused", "needs_attention"].includes(statusOf(epic)) ||
-							exact.attention ||
-							tasks.tree.some((task) => task.attention),
-					);
-					return roadmapSummary(cwd, epic, currentId, {
-						...node,
-						rowId: `roadmap:${node.id}`,
-						tasks: tasks.tree,
-						progress: tasks.progress,
-						activityAt: activityAt ? new Date(activityAt).toISOString() : "",
-						live,
-						exactLive: Boolean(exact.live),
-						emphasized: Boolean(exact.emphasized),
-						engaged,
-						attention,
-						liveStartedAt: Math.max(
-							exact.startedAt ?? 0,
-							...liveDescendants.map(
-								(task) => liveFacts.get(task.id)?.startedAt ?? 0,
-							),
-						),
-						planningEligible: ownBrainstormEligibility(
-							cwd,
-							epic,
-							node.readiness?.state,
-						),
-					});
+				const epic = store.items[node.id];
+				const tasks = groupedRoadmapTasks(cwd, epic, liveFacts);
+				const exact = liveFacts.get(node.id) ?? {};
+				const descendants = tasks.tree.flatMap(function flatten(task) {
+					return [task, ...task.children.flatMap(flatten)];
 				});
+				const liveDescendants = descendants.filter((task) => task.live);
+				const activityAt = Math.max(
+					Date.parse(updatedAt(epic)) || 0,
+					workflowActivity.get(node.id) ?? 0,
+					liveFacts.get(node.id)?.activityAt ?? 0,
+					...descendants.map((task) =>
+						Math.max(
+							Date.parse(updatedAt(store.items[task.id])) || 0,
+							workflowActivity.get(task.id) ?? 0,
+							liveFacts.get(task.id)?.activityAt ?? 0,
+						),
+					),
+				);
+				const live = Boolean(exact.live || liveDescendants.length);
+				const engaged = Boolean(
+					statusOf(epic) === "in_progress" ||
+						tasks.tree.some((task) => task.engaged),
+				);
+				const attention = Boolean(
+					["paused", "needs_attention"].includes(statusOf(epic)) ||
+						exact.attention ||
+						tasks.tree.some((task) => task.attention),
+				);
+				return roadmapSummary(cwd, epic, currentId, {
+					...node,
+					rowId: `roadmap:${node.id}`,
+					tasks: tasks.tree,
+					progress: tasks.progress,
+					activityAt: activityAt ? new Date(activityAt).toISOString() : "",
+					live,
+					exactLive: Boolean(exact.live),
+					emphasized: Boolean(exact.emphasized),
+					engaged,
+					attention,
+					liveStartedAt: Math.max(
+						exact.startedAt ?? 0,
+						...liveDescendants.map(
+							(task) => liveFacts.get(task.id)?.startedAt ?? 0,
+						),
+					),
+					planningEligible: ownBrainstormEligibility(
+						cwd,
+						epic,
+						node.readiness?.state,
+					),
+				});
+			});
 			const childrenByParent = new Map();
 			for (const row of rows) {
 				const parent = row.parentId ?? "";
@@ -16071,6 +16071,201 @@ async function backfillOpenRoadmapMetadata(cwd, roadmaps, ctx, runtime = {}) {
 		);
 }
 
+function findWorkspaceTask(roadmaps, id) {
+	const visit = (tasks = []) => {
+		for (const task of tasks) {
+			if (task.id === id) return task;
+			const found = visit(task.children);
+			if (found) return found;
+		}
+	};
+	for (const roadmap of roadmaps) {
+		const task = visit(roadmap.tasks);
+		if (task) return { roadmap, task };
+	}
+}
+
+function taskComposerEnvelope(roadmap, parent) {
+	const destination = parent
+		? ` under the parent task “${parent.title}” (${parent.id})`
+		: "";
+	return `Add a task to the roadmap “${roadmap.title}” (${roadmap.id})${destination}.\n\nDescribe the task, its intended outcome, and any constraints.`;
+}
+
+export function createWorkspaceTaskFromText(cwd, roadmapId, parentId, text) {
+	const store = loadNativeWorkStore(cwd);
+	const roadmap = store.items[roadmapId];
+	const parent = parentId ? store.items[parentId] : roadmap;
+	if (!roadmap || typeOf(roadmap) !== "epic" || statusOf(roadmap) === "closed")
+		return errorState(
+			"roadmap-removed",
+			`Roadmap ${roadmapId} is no longer available.`,
+		);
+	let ancestor = parent;
+	while (ancestor && idOf(ancestor) !== roadmapId)
+		ancestor = store.items[parentOf(ancestor)];
+	if (!parent || statusOf(parent) === "closed" || !ancestor)
+		return errorState(
+			"parent-ineligible",
+			`Parent ${parentId} is no longer eligible.`,
+		);
+	const title = String(text ?? "")
+		.split(/\r?\n/)
+		.find((line) => line.trim())
+		?.trim()
+		.replace(/\s+/g, " ");
+	if (!title) return errorState("empty-task", "Task text cannot be empty.");
+	const workItem = createWorkflowWorkItem(cwd, {
+		title,
+		type: "task",
+		parent: idOf(parent),
+		description: String(text),
+		notes: "created from Work roadmaps text-only editor",
+	});
+	return {
+		ok: true,
+		action: "work-added",
+		epic: issueSummary(roadmap),
+		selectedWorkItem: issueSummary(workItem),
+	};
+}
+
+export async function prepareWorkspaceTaskComposer(ctx, roadmap, parent) {
+	const envelope = taskComposerEnvelope(roadmap, parent);
+	if (
+		typeof ctx.ui.getEditorText === "function" &&
+		typeof ctx.ui.setEditorText === "function"
+	) {
+		const draft = ctx.ui.getEditorText();
+		if (draft) {
+			const append = await choose(ctx, "Existing draft", [
+				{ value: "append", label: "Append to draft" },
+				{ value: "cancel", label: "Cancel" },
+			]);
+			if (append !== "append")
+				return { ok: true, action: "task-composer-cancelled" };
+			ctx.ui.setEditorText(`${draft}\n\n${envelope}`);
+		} else ctx.ui.setEditorText(envelope);
+		return { ok: true, action: "task-composer-prepared", richComposer: true };
+	}
+	ctx.ui.notify(
+		"Image attachment is unavailable; using the text-only multiline editor.",
+		"warning",
+	);
+	const text = await ctx.ui.editor("Add task (text only)", "");
+	if (text === undefined)
+		return { ok: true, action: "task-composer-cancelled" };
+	return createWorkspaceTaskFromText(ctx.cwd, roadmap.id, parent?.id, text);
+}
+
+async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
+	for (;;) {
+		const frame = buildWorkRoadmapState(ctx.cwd, "list");
+		if (!frame.ok) {
+			notify(ctx, renderWorkRoadmapText(frame), "warning");
+			return stateTelemetry(frame);
+		}
+		await backfillOpenRoadmapMetadata(ctx.cwd, frame.roadmaps, ctx, runtime);
+		const currentFrame = buildWorkRoadmapState(ctx.cwd, "list");
+		const selected = await showTreeWorkspaceDialog(ctx, {
+			title: "Work roadmaps",
+			purpose: "All roadmap and task work, ordered by current activity.",
+			frame: currentFrame,
+			refreshIntervalMs: 750,
+			refresh: () => buildWorkRoadmapState(ctx.cwd, "list"),
+			setIntervalFn: runtime.setIntervalFn,
+			clearIntervalFn: runtime.clearIntervalFn,
+			cursorKey: "roadmap-workspace",
+		});
+		if (!selected || selected.action === "back")
+			return { ok: true, action: "roadmap-cancel" };
+		const fresh = buildWorkRoadmapState(ctx.cwd, "list");
+		const roadmap = fresh.roadmaps?.find((item) => item.id === selected.value);
+		const taskSelection = roadmap
+			? undefined
+			: findWorkspaceTask(fresh.roadmaps ?? [], selected.value);
+		if (!fresh.ok || (!roadmap && !taskSelection)) {
+			notify(
+				ctx,
+				`Work item ${selected.value} is no longer available.`,
+				"warning",
+			);
+			continue;
+		}
+		if (taskSelection) {
+			const { roadmap: taskRoadmap, task } = taskSelection;
+			const taskState = buildWorkRoadmapState(
+				ctx.cwd,
+				`tasks ${taskRoadmap.id}`,
+			);
+			const blocker = taskState.tasks?.blockers?.some(
+				(item) => item.id === task.id,
+			);
+			const actions = [
+				{ value: "report", label: "📄 inspect / report" },
+				...(blocker ? [{ value: "debug", label: "🐛 debug / full info" }] : []),
+				...(task.status === "closed"
+					? []
+					: [{ value: "add", label: "➕ Add child task" }]),
+			];
+			const action = await choose(ctx, "Task actions", actions);
+			if (!action) continue;
+			const currentFrame = buildWorkRoadmapState(ctx.cwd, "list");
+			const current = findWorkspaceTask(currentFrame.roadmaps ?? [], task.id);
+			const stillBlocker =
+				current &&
+				buildWorkRoadmapState(
+					ctx.cwd,
+					`tasks ${current.roadmap.id}`,
+				).tasks?.blockers?.some((item) => item.id === task.id);
+			if (
+				!current ||
+				!actions.some((item) => item.value === action) ||
+				(action === "add" && current.task.status === "closed") ||
+				(action === "debug" && !stillBlocker)
+			) {
+				notify(
+					ctx,
+					`Task ${task.id} changed and is no longer eligible for that action.`,
+					"warning",
+				);
+				continue;
+			}
+			if (action === "report") await handleWorkReportCommand(task.id, ctx);
+			else if (action === "debug")
+				await handleWorkflowAction(buildWorkDebugState, task.id, ctx, pi);
+			else return prepareWorkspaceTaskComposer(ctx, taskRoadmap, task);
+			continue;
+		}
+		runtime.inWorkspace = true;
+		try {
+			const result = await handleWorkRoadmapCommand(
+				"",
+				ctx,
+				pi,
+				roadmap.id,
+				runtime,
+			);
+			if (
+				result?.action === "task-composer-prepared" ||
+				result?.action === "work-added"
+			)
+				return result;
+			if (
+				[
+					"resume-started",
+					"master-plan-resume-started",
+					"handoff-plan",
+					"initiative-conversion-started",
+				].includes(result?.action)
+			)
+				return result;
+		} finally {
+			delete runtime.inWorkspace;
+		}
+	}
+}
+
 async function handleWorkRoadmapCommand(
 	args,
 	ctx,
@@ -16081,6 +16276,8 @@ async function handleWorkRoadmapCommand(
 	cleanupBenignInstructionDirt(ctx.cwd);
 	const sessionRuntime = activeRoadmapMenuSessions.get(ctx) ?? roadmapRuntime;
 	const text = String(args ?? "").trim();
+	if (!text && !menuSelected && ctx.mode === "tui")
+		return handleWorkRoadmapWorkspace(ctx, pi, sessionRuntime);
 	if (text) {
 		const parsed = splitRoadmapArgs(text);
 		if (parsed.command === "plan")
@@ -16148,6 +16345,9 @@ async function handleWorkRoadmapCommand(
 							]
 						: []),
 					{ value: "report", label: "📄 inspect / report" },
+					...(selectedRoadmap.status === "closed"
+						? []
+						: [{ value: "add", label: "➕ Add task" }]),
 					{
 						value: "preview",
 						label: "🧩 preview / reconcile",
@@ -16181,7 +16381,12 @@ async function handleWorkRoadmapCommand(
 									},
 								]
 							: []),
-						{ value: "tasks", label: "📋 list tasks" },
+						...(!sessionRuntime.inWorkspace
+							? [{ value: "tasks", label: "📋 list tasks" }]
+							: []),
+						...(selectedRoadmap.status === "closed"
+							? []
+							: [{ value: "add", label: "➕ Add task" }]),
 						{ value: "plan", label: "🧭 plan / strengthen" },
 						{ value: "set-current", label: "⭐ set current" },
 						selectedRoadmap.status === "closed"
@@ -16195,11 +16400,18 @@ async function handleWorkRoadmapCommand(
 							label: "▶️ Resume work",
 							description: "start the autonomous implementation loop",
 						},
-						{
-							value: "tasks",
-							label: "📋 list tasks",
-							description: "blockers, open, closed",
-						},
+						...(!sessionRuntime.inWorkspace
+							? [
+									{
+										value: "tasks",
+										label: "📋 list tasks",
+										description: "blockers, open, closed",
+									},
+								]
+							: []),
+						...(selectedRoadmap.status === "closed"
+							? []
+							: [{ value: "add", label: "➕ Add task" }]),
 						{
 							value: "plan",
 							label: "🧭 plan / strengthen",
@@ -16227,7 +16439,30 @@ async function handleWorkRoadmapCommand(
 			subtitle: renderWorkStats(buildWorkStats(ctx.cwd, selected)),
 		},
 	);
-	if (!op) return handleWorkRoadmapCommand("", ctx, pi);
+	if (!op)
+		return sessionRuntime.inWorkspace
+			? { ok: true, action: "roadmap-workspace-return" }
+			: handleWorkRoadmapCommand("", ctx, pi);
+	const revalidatedRoadmap = buildWorkRoadmapState(
+		ctx.cwd,
+		"list",
+	).roadmaps?.find((roadmap) => roadmap.id === selected);
+	const changedEligibility =
+		!revalidatedRoadmap ||
+		revalidatedRoadmap.status !== selectedRoadmap?.status ||
+		revalidatedRoadmap.parentId !== selectedRoadmap?.parentId ||
+		JSON.stringify(revalidatedRoadmap.readiness) !==
+			JSON.stringify(selectedRoadmap?.readiness) ||
+		JSON.stringify(revalidatedRoadmap.preparation) !==
+			JSON.stringify(selectedRoadmap?.preparation);
+	if (changedEligibility) {
+		notify(
+			ctx,
+			`Roadmap ${selected} changed and must be selected again.`,
+			"warning",
+		);
+		return { ok: true, action: "roadmap-workspace-return" };
+	}
 	if (op === "stop")
 		return { ok: true, action: "initiative-preparation-stopped", preparation };
 	if (op === "resume") {
@@ -16280,7 +16515,26 @@ async function handleWorkRoadmapCommand(
 		}
 		return handleWorkResumeGoalCommand(resumeTarget, pi, ctx);
 	}
-	if (op === "report") return handleWorkReportCommand(selected, ctx);
+	if (op === "add") {
+		const fresh = buildWorkRoadmapState(ctx.cwd, "list").roadmaps.find(
+			(roadmap) => roadmap.id === selected,
+		);
+		if (!fresh || fresh.status === "closed") {
+			notify(
+				ctx,
+				`Roadmap ${selected} is no longer eligible for new tasks.`,
+				"warning",
+			);
+			return { ok: true, action: "roadmap-workspace-return" };
+		}
+		return prepareWorkspaceTaskComposer(ctx, fresh);
+	}
+	if (op === "report") {
+		const result = await handleWorkReportCommand(selected, ctx);
+		return sessionRuntime.inWorkspace
+			? { ok: true, action: "roadmap-workspace-return" }
+			: result;
+	}
 	if (op === "tasks") {
 		const taskState = await handleRoadmapTasksMenu(selected, ctx, pi);
 		return taskState.action === "roadmap-menu-back"

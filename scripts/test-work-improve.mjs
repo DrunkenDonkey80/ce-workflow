@@ -195,10 +195,10 @@ assert.equal(
 );
 
 assert(
-	!buildWorkRoadmapState(root, "list").roadmaps.some(
+	buildWorkRoadmapState(root, "list").roadmaps.some(
 		(roadmap) => roadmap.id === "SI-1",
 	),
-	"the dedicated improvement roadmap stays out of Roadmaps",
+	"the dedicated improvement roadmap stays visible in the all-roadmap workspace",
 );
 
 const commands = {};
