@@ -21,6 +21,7 @@ const workModelsPath = realpathSync(
 );
 const {
 	default: workModelsExtension,
+	backfillVisibleDisplayMetadata,
 	bootstrapPlanEpic,
 	buildWorkPlanState,
 	buildWorkRoadmapState,
@@ -195,9 +196,11 @@ try {
 		/No saved summary yet/i,
 		"F7 preview reports a missing stored summary",
 	);
+	const loaderMessages = [];
 	class TestLoader {
-		constructor() {
+		constructor(_tui, _theme, message) {
 			this.signal = new AbortController().signal;
+			loaderMessages.push(message);
 		}
 	}
 	const selectRoadmap = async (id, complete, menus = [], provider) => {
@@ -242,23 +245,30 @@ try {
 		return notices;
 	};
 	const roadmapMenus = [];
-	await selectRoadmap(
+	const generatedNotices = await selectRoadmap(
 		"E-2",
 		async (_model, request) => {
-			const context = request.messages[0].content[0].text;
+			const context = JSON.parse(request.messages[0].content[0].text);
 			return {
 				stopReason: "stop",
 				content: [
 					{
 						type: "text",
-						text: context.includes("E-4")
-							? JSON.stringify({
-									title:
-										"E-4 Refactor the RF compatibility API C:\\projects\\api\\plan.md",
-									description:
-										"Modernize E-4 using C:\\projects\\api\\plan.md while preserving existing integrations. Keep behavior stable as the implementation moves to the new contract.",
-								})
-							: "Deliver the open roadmap in small verified slices. Keep its stored intent available between work sessions.",
+						text: JSON.stringify({
+							items: context.map((item) => ({
+								id: item.id,
+								title:
+									item.id === "E-4"
+										? "Refactor the RF compatibility API"
+										: `Concise ${item.type} ${context.indexOf(item) + 1}`,
+								...(item.type === "epic" && !item.description
+									? {
+											description:
+												"This durable roadmap captures the intended software outcome. It preserves scope for future work sessions. Delivery remains bounded by the stored acceptance criteria.",
+										}
+									: {}),
+							})),
+						}),
 					},
 				],
 			};
@@ -266,10 +276,14 @@ try {
 		roadmapMenus,
 	);
 	assert(
-		roadmapMenus[0].labels.some((label) =>
-			/Refactor the RF compatibility API/.test(label),
-		),
-		"placeholder roadmap metadata is generated and stored",
+		loadStore(root).items["E-4"].displayMetadata?.title ===
+			"Refactor the RF compatibility API",
+		`placeholder roadmap display metadata is generated and stored: ${JSON.stringify(generatedNotices)}`,
+	);
+	assert.deepEqual(
+		loaderMessages,
+		["Processing descriptions…"],
+		"one correctly labelled loader covers the whole visible batch",
 	);
 	assert(
 		roadmapMenus[0].labels.some((label) => /Closed roadmap/.test(label)),
@@ -305,10 +319,10 @@ try {
 		},
 		{},
 	);
-	assert(
-		sortedRoadmapDialog.indexOf("Refactor the RF compatibility API") <
-			sortedRoadmapDialog.indexOf("Current roadmap"),
-		"TUI lists newest creations first",
+	assert.match(
+		sortedRoadmapDialog,
+		/Refactor the RF compatibility API/,
+		"TUI renders persisted display titles",
 	);
 	assert.equal(
 		roadmapMenus[1].title,
@@ -331,51 +345,100 @@ try {
 				(epic) => epic.id === "E-2",
 			),
 		),
-		/stored intent available/,
-		"F7 selection generates and stores a missing roadmap summary",
+		/durable roadmap/,
+		"workspace batch generates and stores a missing roadmap summary",
 	);
-	await selectRoadmap("E-3", async () => ({
-		stopReason: "aborted",
-		content: [],
-	}));
+	const afterBatch = loadStore(root);
 	assert.equal(
-		loadStore(root).items["E-3"].description,
-		undefined,
-		"cancelled summary generation does not mutate the roadmap",
+		afterBatch.items["E-4"].title,
+		"Brainstorm: use the C:\\projects\\api\\docs\\plans\\2026-07-04-refactor.md",
+		"display synthesis never overwrites the authoritative title",
 	);
-	const failureNotices = await selectRoadmap("E-3", async () => {
-		throw new Error("model unavailable");
+	assert.equal(
+		afterBatch.items["E-4"].displayMetadata.title,
+		"Refactor the RF compatibility API",
+		"valid synthesized display metadata is persisted per item",
+	);
+	assert.equal(
+		buildWorkRoadmapState(root, "list").roadmaps.find(
+			(item) => item.id === "E-4",
+		).shortTitle,
+		"Refactor the RF compatibility API",
+		"projection immediately prefers valid persisted display metadata",
+	);
+
+	let repeatCalls = 0;
+	await backfillVisibleDisplayMetadata(
+		root,
+		buildWorkRoadmapState(root, "list"),
+		{
+			cwd: root,
+			mode: "tui",
+			model: { id: "summary-model", provider: "test" },
+			modelRegistry: {
+				getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test" }),
+			},
+			ui: {
+				custom: () => {
+					repeatCalls += 1;
+				},
+				notify() {},
+			},
+		},
+	);
+	assert.equal(
+		repeatCalls,
+		0,
+		"valid persisted metadata causes zero model or loader calls",
+	);
+
+	const invalidBefore = JSON.stringify(loadStore(root));
+	const invalidItem = loadStore(root).items["E-4"];
+	delete invalidItem.displayMetadata;
+	saveStore(root, {
+		...loadStore(root),
+		items: { ...loadStore(root).items, "E-4": invalidItem },
 	});
-	assert(
-		failureNotices.some((message) => /model unavailable/.test(message)),
-		"model failures are reported before the operation menu continues",
-	);
-	assert.equal(
-		loadStore(root).items["E-3"].description,
-		undefined,
-		"failed summary generation does not mutate the roadmap",
-	);
-	await selectRoadmap("E-3", undefined, [], {
-		streamSimple: () => ({
-			result: async () => ({
+	const invalidNotices = [];
+	await backfillVisibleDisplayMetadata(
+		root,
+		buildWorkRoadmapState(root, "list"),
+		{
+			cwd: root,
+			mode: "tui",
+			model: { id: "summary-model", provider: "test" },
+			modelRegistry: {
+				getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test" }),
+			},
+			ui: {
+				custom: (factory) => new Promise((done) => factory({}, {}, {}, done)),
+				notify: (message) => invalidNotices.push(message),
+			},
+		},
+		{
+			BorderedLoader: TestLoader,
+			complete: async () => ({
 				stopReason: "stop",
 				content: [
 					{
 						type: "text",
 						text: JSON.stringify({
-							title: "Closed roadmap",
-							description:
-								"Document the completed roadmap for future maintainers. Preserve its original outcome and historical scope.",
+							items: [{ id: "E-4", title: "# invalid" }],
 						}),
 					},
 				],
 			}),
-		}),
-	});
-	assert.match(
-		loadStore(root).items["E-3"].description,
-		/future maintainers/,
-		"metadata generation uses the active provider without runtime package imports",
+		},
+	);
+	assert(
+		invalidNotices.some((message) => /Invalid display title/.test(message)) &&
+			!loadStore(root).items["E-4"].displayMetadata,
+		"malformed batch output is rejected without partial mutation",
+	);
+	assert.notEqual(
+		invalidBefore,
+		JSON.stringify(loadStore(root)),
+		"invalid fixture changed only to remove metadata before validation",
 	);
 	for (const [file, content] of fixtureSnapshots)
 		writeFileSync(path.join(root, file), content);

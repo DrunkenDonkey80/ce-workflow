@@ -100,6 +100,16 @@ const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 1;
 const BRAINSTORM_TITLE_MAX = 180;
 const WORK_ITEM_TITLE_MAX = 180;
+const DISPLAY_METADATA_SCHEMA_VERSION = 1;
+const DISPLAY_TITLE_MAX = 72;
+const DISPLAY_METADATA_BATCH_SIZE = 40;
+const TASK_IMAGE_MIME_EXTENSIONS = new Map([
+	["image/png", ".png"],
+	["image/jpeg", ".jpg"],
+	["image/gif", ".gif"],
+	["image/webp", ".webp"],
+]);
+const RICH_TASK_PENDING_MAX_AGE_MS = 30 * 60 * 1000;
 const SELF_IMPROVEMENT_EPIC_TITLE = "Self-improving";
 const SELF_IMPROVEMENT_REPORT_LABEL = "self-improvement";
 const MISC_ROADMAP_TITLE = "Misc";
@@ -439,6 +449,7 @@ let pendingWorkPrompt = null;
 let pendingSettledAgentEnd = null;
 const pendingDirtyRecoveries = new Map();
 const pendingInitiativeConversions = new Map();
+const pendingRichTaskComposers = new Map();
 const commandWorkflowStorage = new AsyncLocalStorage();
 const activeRoadmapMenuSessions = new WeakMap();
 let activeHistoryTask = null;
@@ -12261,7 +12272,34 @@ function compactRoadmapTitle(value, max = 72) {
 	return title.length > max ? `${title.slice(0, max - 1).trimEnd()}…` : title;
 }
 
+function validDisplayTitle(value, knownIds = []) {
+	const title = typeof value === "string" ? value : "";
+	return Boolean(
+		title &&
+			title === title.trim() &&
+			title.length <= DISPLAY_TITLE_MAX &&
+			!/[\r\n]/.test(title) &&
+			!/[`*_#>|[\]]/.test(title) &&
+			!/^\s*(?:[-+]\s|\d+\.\s)/.test(title) &&
+			!/[A-Za-z]:[\\/]|(?:^|\s)\/(?:[^\s/]+\/)+|(?:^|\s)(?:docs|plans|brainstorms)[\\/]/i.test(
+				title,
+			) &&
+			!knownIds.some((id) =>
+				title.toLowerCase().includes(String(id).toLowerCase()),
+			),
+	);
+}
+
+function validDisplayMetadata(item) {
+	return Boolean(
+		item?.displayMetadata?.schemaVersion === DISPLAY_METADATA_SCHEMA_VERSION &&
+			validDisplayTitle(item.displayMetadata.title, [idOf(item)]),
+	);
+}
+
 function roadmapDisplayTitle(epic) {
+	if (validDisplayMetadata(epic)) return epic.displayMetadata.title;
+	if (validDisplayTitle(epic?.shortTitle, [idOf(epic)])) return epic.shortTitle;
 	const id = String(epic?.id ?? "");
 	const value = String(epic?.title ?? "");
 	const title = (id ? value.replaceAll(id, " ") : value)
@@ -16098,6 +16136,220 @@ async function synthesizeRoadmapMetadata(cwd, epic, ctx, runtime = {}) {
 	}
 }
 
+function visibleRoadmapItems(cwd, frame) {
+	const store = loadNativeWorkStore(cwd);
+	const ids = [];
+	const addTasks = (tasks = []) => {
+		for (const task of tasks) {
+			ids.push(task.id);
+			addTasks(task.children);
+		}
+	};
+	for (const roadmap of frame.roadmaps ?? []) {
+		ids.push(roadmap.id);
+		addTasks(roadmap.tasks);
+	}
+	return [...new Set(ids)].map((id) => store.items[id]).filter(Boolean);
+}
+
+function batchDisplayMetadataContext(items) {
+	return JSON.stringify(
+		items.map((item) => ({
+			id: idOf(item),
+			type: typeOf(item),
+			title: compactRoadmapTitle(titleOf(item), 300),
+			description: compactRoadmapDescription(field(item, "description"), 1200),
+			acceptance: compactRoadmapDescription(field(item, "acceptance"), 800),
+			context: compactRoadmapDescription(
+				(item.notes ?? []).slice(-3).join("\n"),
+				800,
+			),
+		})),
+	);
+}
+
+function parseDisplayMetadataBatch(value, items) {
+	const text = String(value ?? "")
+		.trim()
+		.replace(/^```(?:json)?\s*/i, "")
+		.replace(/\s*```$/, "");
+	const parsed = JSON.parse(text);
+	const entries = Array.isArray(parsed) ? parsed : parsed?.items;
+	if (!Array.isArray(entries))
+		throw new Error("Display metadata must be a JSON array.");
+	const expected = new Map(items.map((item) => [idOf(item), item]));
+	const seen = new Set();
+	const knownIds = [...expected.keys()];
+	const validated = entries.map((entry) => {
+		const id = typeof entry?.id === "string" ? entry.id : "";
+		if (!expected.has(id) || seen.has(id))
+			throw new Error(
+				`Unexpected or duplicate display metadata ID: ${id || "<missing>"}.`,
+			);
+		seen.add(id);
+		if (!validDisplayTitle(entry.title, knownIds))
+			throw new Error(`Invalid display title for ${id}.`);
+		const item = expected.get(id);
+		let description;
+		if (
+			typeOf(item) === "epic" &&
+			!compactRoadmapDescription(item.description)
+		) {
+			description = parseGeneratedRoadmapMetadata(
+				JSON.stringify({ title: entry.title, description: entry.description }),
+			).description;
+			if (!description) throw new Error(`Roadmap summary is empty for ${id}.`);
+			const safe = roadmapDisplayDescription({ ...item, description });
+			if (!safe) throw new Error(`Roadmap summary is invalid for ${id}.`);
+			description = safe;
+		}
+		return { id, title: entry.title, description };
+	});
+	if (seen.size !== expected.size)
+		throw new Error(
+			"Display metadata response omitted one or more work items.",
+		);
+	return validated;
+}
+
+export async function backfillVisibleDisplayMetadata(
+	cwd,
+	frame,
+	ctx,
+	runtime = {},
+) {
+	if (ctx.mode !== "tui") return;
+	const missing = visibleRoadmapItems(cwd, frame).filter(
+		(item) => !validDisplayMetadata(item),
+	);
+	if (!missing.length) return;
+	if (!ctx.model) {
+		notify(ctx, "Select a model to process missing display titles.", "warning");
+		return;
+	}
+	let failure;
+	const message = "Processing descriptions…";
+	try {
+		const result = await ctx.ui.custom((tui, theme, keybindings, done) => {
+			const controller = new AbortController();
+			const loader = runtime.BorderedLoader
+				? new runtime.BorderedLoader(tui, theme, message)
+				: {
+						signal: controller.signal,
+						render: (width) => [
+							theme.fg("accent", truncate(message, Math.max(8, width - 1))),
+						],
+						handleInput: (data) => {
+							if (
+								data === "\x1b" ||
+								keybindings.matches?.(data, "tui.select.cancel")
+							) {
+								controller.abort();
+								done(null);
+							}
+						},
+						invalidate() {},
+					};
+			if (runtime.BorderedLoader) loader.onAbort = () => done(null);
+			(async () => {
+				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+				if (!auth.ok || !auth.apiKey)
+					throw new Error(
+						auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
+					);
+				const options = {
+					apiKey: auth.apiKey,
+					headers: auth.headers,
+					env: auth.env,
+					signal: loader.signal,
+				};
+				const results = [];
+				for (
+					let offset = 0;
+					offset < missing.length;
+					offset += DISPLAY_METADATA_BATCH_SIZE
+				) {
+					const items = missing.slice(
+						offset,
+						offset + DISPLAY_METADATA_BATCH_SIZE,
+					);
+					const request = {
+						systemPrompt:
+							'Return only JSON: {"items":[{"id":"known ID","title":"plain title","description":"only when requested"}]}. Return every supplied ID exactly once and no others. Titles are single-line plain language, at most 72 characters, with no markdown, IDs, or file paths. For epics whose description is empty, add a concise 3–5 sentence description of scope and outcome. Use only supplied context.',
+						messages: [
+							{
+								role: "user",
+								content: [
+									{ type: "text", text: batchDisplayMetadataContext(items) },
+								],
+								timestamp: Date.now(),
+							},
+						],
+					};
+					const response = runtime.complete
+						? await runtime.complete(ctx.model, request, options)
+						: await ctx.modelRegistry
+								.getProvider(ctx.model.provider)
+								?.streamSimple(ctx.model, request, options)
+								.result();
+					if (!response)
+						throw new Error(`No provider runtime for ${ctx.model.provider}.`);
+					if (response.stopReason === "aborted") return null;
+					if (response.stopReason === "error")
+						throw new Error(response.errorMessage || "Model request failed.");
+					results.push({
+						items,
+						text: response.content
+							.filter((part) => part.type === "text")
+							.map((part) => part.text)
+							.join("\n"),
+					});
+				}
+				return results;
+			})()
+				.then(done)
+				.catch((error) => {
+					failure = error;
+					done(null);
+				});
+			return loader;
+		});
+		if (!result) {
+			notify(
+				ctx,
+				failure
+					? `Could not process descriptions: ${formatError(failure)}`
+					: "Description processing was cancelled; using stored fallback titles.",
+				"warning",
+			);
+			return;
+		}
+		const entries = result.flatMap((chunk) =>
+			parseDisplayMetadataBatch(chunk.text, chunk.items),
+		);
+		mutateStore(cwd, (store) => {
+			for (const entry of entries) {
+				const previous = store.items[entry.id];
+				updateWorkItem(store, entry.id, {
+					displayMetadata: {
+						schemaVersion: DISPLAY_METADATA_SCHEMA_VERSION,
+						title: entry.title,
+					},
+					...(entry.description
+						? { description: entry.description }
+						: { updatedAt: previous.updatedAt }),
+				});
+			}
+		});
+	} catch (error) {
+		notify(
+			ctx,
+			`Could not process descriptions: ${formatError(error)}`,
+			"warning",
+		);
+	}
+}
+
 async function backfillOpenRoadmapMetadata(cwd, roadmaps, ctx, runtime = {}) {
 	if (ctx.mode !== "tui") return;
 	const missing = roadmaps.filter(
@@ -16190,6 +16442,92 @@ export function createWorkspaceTaskFromText(cwd, roadmapId, parentId, text) {
 	};
 }
 
+function richTaskComposerKey(ctx) {
+	return `${resolve(ctx?.cwd ?? process.cwd())}\u0000${ctx?.sessionManager?.getSessionId?.() ?? `process-${process.pid}`}`;
+}
+
+export function materializeTaskImages(cwd, images) {
+	if (!Array.isArray(images) || !images.length) return [];
+	const directory = join(resolve(cwd), ".pi", "work-artifacts", "task-images");
+	const written = [];
+	try {
+		const decoded = images.map((image) => {
+			const extension = TASK_IMAGE_MIME_EXTENSIONS.get(image?.mimeType);
+			const data = image?.data;
+			if (
+				image?.type !== "image" ||
+				!extension ||
+				typeof data !== "string" ||
+				!data ||
+				data.startsWith("data:") ||
+				!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+					data,
+				)
+			)
+				throw new Error("Invalid or unsupported image attachment.");
+			const bytes = Buffer.from(data, "base64");
+			if (!bytes.length || bytes.toString("base64") !== data)
+				throw new Error("Malformed base64 image attachment.");
+			return { bytes, extension, mimeType: image.mimeType };
+		});
+		mkdirSync(directory, { recursive: true });
+		return decoded.map(({ bytes, extension, mimeType }) => {
+			const absolute = join(directory, `${randomUUID()}${extension}`);
+			const descriptor = openSync(absolute, "wx");
+			written.push(absolute);
+			try {
+				writeFileSync(descriptor, bytes);
+			} finally {
+				closeSync(descriptor);
+			}
+			return {
+				path: relative(resolve(cwd), absolute).replaceAll("\\", "/"),
+				mimeType,
+				bytes: bytes.length,
+			};
+		});
+	} catch (error) {
+		for (const file of written) rmSync(file, { force: true });
+		throw error;
+	}
+}
+
+export function transformPendingRichTaskInput(event, ctx, runtime = {}) {
+	const key = richTaskComposerKey(ctx);
+	const pending = pendingRichTaskComposers.get(key);
+	if (!pending) return;
+	if (Date.now() - pending.createdAt > RICH_TASK_PENDING_MAX_AGE_MS) {
+		pendingRichTaskComposers.delete(key);
+		return;
+	}
+	if (event?.source !== "interactive") return;
+	if (!String(event.text ?? "").includes(pending.envelope)) {
+		pendingRichTaskComposers.delete(key);
+		return;
+	}
+	if (!event.images?.length) {
+		pendingRichTaskComposers.delete(key);
+		return;
+	}
+	try {
+		const attachments = (
+			runtime.materializeTaskImages ?? materializeTaskImages
+		)(ctx.cwd, event.images);
+		pendingRichTaskComposers.delete(key);
+		return {
+			action: "transform",
+			text: `${event.text}\n\nAttachments:\n${attachments.map((attachment) => `- ${attachment.path} (${attachment.mimeType}, ${attachment.bytes} bytes)`).join("\n")}`,
+			images: [],
+		};
+	} catch (error) {
+		ctx.ui?.notify?.(
+			`Could not save task image: ${formatError(error)} Retry the submission.`,
+			"warning",
+		);
+		return { action: "handled" };
+	}
+}
+
 export async function prepareWorkspaceTaskComposer(ctx, roadmap, parent) {
 	const envelope = taskComposerEnvelope(roadmap, parent);
 	if (
@@ -16206,6 +16544,13 @@ export async function prepareWorkspaceTaskComposer(ctx, roadmap, parent) {
 				return { ok: true, action: "task-composer-cancelled" };
 			ctx.ui.setEditorText(`${draft}\n\n${envelope}`);
 		} else ctx.ui.setEditorText(envelope);
+		pendingRichTaskComposers.set(richTaskComposerKey(ctx), {
+			cwd: resolve(ctx.cwd),
+			envelope,
+			roadmapId: roadmap.id,
+			parentId: parent?.id,
+			createdAt: Date.now(),
+		});
 		return { ok: true, action: "task-composer-prepared", richComposer: true };
 	}
 	ctx.ui.notify(
@@ -16241,7 +16586,7 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 			notify(ctx, renderWorkRoadmapText(frame), "warning");
 			return stateTelemetry(frame);
 		}
-		await backfillOpenRoadmapMetadata(ctx.cwd, frame.roadmaps, ctx, runtime);
+		await backfillVisibleDisplayMetadata(ctx.cwd, frame, ctx, runtime);
 		const currentFrame = buildWorkRoadmapState(ctx.cwd, "list");
 		const selected = await showTreeWorkspaceDialog(ctx, {
 			title: "Work roadmaps",
@@ -16373,12 +16718,13 @@ async function handleWorkRoadmapCommand(
 		notify(ctx, renderWorkRoadmapText(list), "warning");
 		return stateTelemetry(list);
 	}
-	await backfillOpenRoadmapMetadata(
-		ctx.cwd,
-		list.roadmaps,
-		ctx,
-		sessionRuntime,
-	);
+	if (!sessionRuntime.inWorkspace)
+		await backfillOpenRoadmapMetadata(
+			ctx.cwd,
+			list.roadmaps,
+			ctx,
+			sessionRuntime,
+		);
 	const selected =
 		menuSelected ||
 		(await chooseRoadmap(
@@ -16391,7 +16737,11 @@ async function handleWorkRoadmapCommand(
 	if (!selected) return { ok: true, action: "roadmap-cancel" };
 	const selectedRoadmap = list.roadmaps.find((epic) => epic.id === selected);
 	rememberRoadmapMenuSelection(ctx.cwd, selectedRoadmap);
-	if (selectedRoadmap && roadmapNeedsGeneratedMetadata(selectedRoadmap)) {
+	if (
+		!sessionRuntime.inWorkspace &&
+		selectedRoadmap &&
+		roadmapNeedsGeneratedMetadata(selectedRoadmap)
+	) {
 		const metadata = await synthesizeRoadmapMetadata(
 			ctx.cwd,
 			readWorkItem(ctx.cwd, selected),
@@ -17499,6 +17849,7 @@ export default function workModelsExtension(pi) {
 			persistWorkGoal(pi);
 		}
 		pendingInitiativeConversions.clear();
+		pendingRichTaskComposers.clear();
 		activeWorkGoalRunning = false;
 		pendingWorkGoalTurn = false;
 		blockedWorkGoalTurn = false;
@@ -17523,6 +17874,7 @@ export default function workModelsExtension(pi) {
 		finishHelperStarts.clear();
 		pendingDirtyRecoveries.clear();
 		pendingInitiativeConversions.clear();
+		pendingRichTaskComposers.clear();
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
 		manualMicrocompactWorkflowRunId = null;
@@ -17536,14 +17888,20 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", async (event, ctx) => {
+		const richTaskTransform = transformPendingRichTaskInput(event, ctx);
+		if (richTaskTransform?.action === "handled") return richTaskTransform;
+		const sanitizedEvent = richTaskTransform
+			? { ...event, text: richTaskTransform.text, images: [] }
+			: event;
 		reconcilePendingDirectRuns(ctx.cwd, {
 			pi,
 			mode: ctx.mode,
 			session: ctx.sessionManager?.getSessionId?.(),
 		});
-		recordSelfImprovementHistory(ctx, "input", event);
-		if (!extractWorkGoalContinuationMarker(event.text)) clearWorkGoalRecovery();
-		const automated = String(event.text ?? "").match(
+		recordSelfImprovementHistory(ctx, "input", sanitizedEvent);
+		if (!extractWorkGoalContinuationMarker(sanitizedEvent.text))
+			clearWorkGoalRecovery();
+		const automated = String(sanitizedEvent.text ?? "").match(
 			new RegExp(
 				`^${ORCHESTRATOR_AUTOMATION_PREFIX}\\s+(work-[\\w-]+)(?:\\s+([\\s\\S]*))?$`,
 			),
@@ -17557,11 +17915,12 @@ export default function workModelsExtension(pi) {
 			);
 			return { action: "handled" };
 		}
-		const parsed = parseNumberedWorkActionInput(event.text);
+		const parsed = parseNumberedWorkActionInput(sanitizedEvent.text);
 		if (parsed && recentNumberedWorkAction(ctx.cwd, parsed.number)) {
-			if (await maybeRunNumberedWorkAction(event, ctx, pi))
+			if (await maybeRunNumberedWorkAction(sanitizedEvent, ctx, pi))
 				return { action: "handled" };
 		}
+		return richTaskTransform;
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {

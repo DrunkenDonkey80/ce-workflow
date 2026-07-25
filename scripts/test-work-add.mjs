@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { realpathSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
@@ -8,7 +8,9 @@ const {
 	buildWorkAddState,
 	createWorkspaceTaskFromText,
 	handleWorkflowAction,
+	materializeTaskImages,
 	prepareWorkspaceTaskComposer,
+	transformPendingRichTaskInput,
 } = await import(
 	pathToFileURL(
 		realpathSync(
@@ -224,12 +226,178 @@ try {
 		draft.includes(parent.id),
 		"rich composer envelope names the selected parent task",
 	);
+	const submission = `${draft}\n\nFirst request line\nSecond request line`;
+	const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+	const gifBytes = Buffer.from("GIF89a", "ascii");
+	const transformed = transformPendingRichTaskInput(
+		{
+			source: "interactive",
+			text: submission,
+			images: [
+				{
+					type: "image",
+					mimeType: "image/png",
+					data: pngBytes.toString("base64"),
+				},
+				{
+					type: "image",
+					mimeType: "image/gif",
+					data: gifBytes.toString("base64"),
+				},
+			],
+		},
+		{ cwd: fixture.cwd, ui: { notify() {} } },
+	);
+	assert(
+		transformed.action === "transform" &&
+			transformed.images.length === 0 &&
+			transformed.text.startsWith(`${submission}\n\nAttachments:\n`),
+		"matching rich input preserves the multiline envelope and removes image payloads",
+	);
+	assert(
+		!transformed.text.includes(pngBytes.toString("base64")) &&
+			!transformed.text.includes("data:") &&
+			/image\/png, 4 bytes/.test(transformed.text) &&
+			/image\/gif, 6 bytes/.test(transformed.text),
+		"transformed input contains only path, MIME, and byte metadata",
+	);
+	const imageDirectory = path.join(
+		fixture.cwd,
+		".pi/work-artifacts/task-images",
+	);
+	const imageFiles = readdirSync(imageDirectory).sort();
+	assert(
+		imageFiles.length === 2 &&
+			imageFiles.some((file) => file.endsWith(".png")) &&
+			imageFiles.some((file) => file.endsWith(".gif")),
+		"two unique MIME-derived image files are materialized",
+	);
+	assert(
+		imageFiles.some((file) =>
+			readFileSync(path.join(imageDirectory, file)).equals(pngBytes),
+		) &&
+			imageFiles.some((file) =>
+				readFileSync(path.join(imageDirectory, file)).equals(gifBytes),
+			),
+		"materialized files preserve exact decoded bytes",
+	);
+	const imageTask = createWorkspaceTaskFromText(
+		fixture.cwd,
+		roadmap.id,
+		parent.id,
+		transformed.text,
+	);
+	assert(
+		imageTask.ok && !/data:|iVBOR/i.test(JSON.stringify(fixture.store())),
+		"serialized native work state contains no data URL or source base64",
+	);
+
+	draft = "";
+	await prepareWorkspaceTaskComposer(
+		{
+			cwd: fixture.cwd,
+			ui: {
+				getEditorText: () => draft,
+				setEditorText: (text) => (draft = text),
+			},
+		},
+		roadmap,
+		parent,
+	);
+	assert(
+		transformPendingRichTaskInput(
+			{ source: "interactive", text: draft, images: [] },
+			{ cwd: fixture.cwd },
+		) === undefined,
+		"matching text-only submission is unchanged and clears pending state",
+	);
+	assert(
+		transformPendingRichTaskInput(
+			{
+				source: "interactive",
+				text: draft,
+				images: [
+					{
+						type: "image",
+						mimeType: "image/png",
+						data: pngBytes.toString("base64"),
+					},
+				],
+			},
+			{ cwd: fixture.cwd },
+		) === undefined,
+		"cleared pending state does not intercept later input",
+	);
+
+	draft = "";
+	await prepareWorkspaceTaskComposer(
+		{
+			cwd: fixture.cwd,
+			ui: {
+				getEditorText: () => draft,
+				setEditorText: (text) => (draft = text),
+			},
+		},
+		roadmap,
+		parent,
+	);
+	assert(
+		transformPendingRichTaskInput(
+			{
+				source: "rpc",
+				text: draft,
+				images: [
+					{
+						type: "image",
+						mimeType: "image/png",
+						data: pngBytes.toString("base64"),
+					},
+				],
+			},
+			{ cwd: fixture.cwd },
+		) === undefined,
+		"RPC rich input is unaffected",
+	);
 	const warnings = [];
+	const failed = transformPendingRichTaskInput(
+		{
+			source: "interactive",
+			text: draft,
+			images: [
+				{
+					type: "image",
+					mimeType: "image/png",
+					data: "data:image/png;base64,AAAA",
+				},
+			],
+		},
+		{ cwd: fixture.cwd, ui: { notify: (message) => warnings.push(message) } },
+	);
+	assert(
+		failed.action === "handled" &&
+			warnings.some((message) => /Retry/.test(message)),
+		"malformed image input fails closed and retains retry guidance",
+	);
+	let unsupportedRejected = false;
+	try {
+		materializeTaskImages(fixture.cwd, [
+			{ type: "image", mimeType: "image/svg+xml", data: "AAAA" },
+		]);
+	} catch (error) {
+		unsupportedRejected = /unsupported/.test(String(error));
+	}
+	assert(unsupportedRejected, "unsupported image MIME types are rejected");
+	assert(
+		existsSync(imageDirectory),
+		"failed image input does not remove prior valid artifacts",
+	);
+
+	const warningsFallback = [];
 	state = await prepareWorkspaceTaskComposer(
 		{
 			cwd: fixture.cwd,
 			ui: {
-				notify: (message) => warnings.push(message),
+				notify: (message) => warningsFallback.push(message),
 				editor: async () => "  Compact   title  \nsecond line\nthird line",
 			},
 		},
@@ -238,7 +406,7 @@ try {
 	);
 	const created = fixture.store().items[state.selectedWorkItem.id];
 	assert(
-		/Image attachment is unavailable/.test(warnings[0]),
+		/Image attachment is unavailable/.test(warningsFallback[0]),
 		"fallback warns that image attachment is unavailable",
 	);
 	assert(
