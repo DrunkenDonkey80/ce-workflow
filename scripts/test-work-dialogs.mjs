@@ -62,10 +62,16 @@ async function drive(
 							closed = true;
 						},
 					);
+					const initialRender = component.render(70);
 					assert.equal(
-						component.render(70).length,
+						initialRender.length,
 						Math.max(1, terminalRows - 1),
 						"workspace occupies a stable terminal viewport",
+					);
+					assert.strictEqual(
+						component.render(70),
+						initialRender,
+						"unchanged workspaces reuse their rendered viewport",
 					);
 					await interact(component, () => closed);
 					assert(closed, "dialog interaction closes");
@@ -377,7 +383,7 @@ await drive(
 		for (const line of lines)
 			assert.equal(
 				calibratedTerminalWidth(line),
-				70,
+				68,
 				`calibrated terminal width: ${line}`,
 			);
 		assert(
@@ -414,7 +420,7 @@ await drive(
 		for (const line of lines)
 			assert.equal(
 				calibratedTerminalWidth(line),
-				70,
+				68,
 				`multiple-icon terminal width: ${line}`,
 			);
 		component.handleInput("escape");

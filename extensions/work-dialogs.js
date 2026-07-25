@@ -297,12 +297,18 @@ export async function showListDialog(ctx, options) {
 				);
 			};
 
+			let cachedKey;
+			let cachedLines;
 			const component = {
 				focused: false,
 				render(width) {
 					const height = workspaceHeight(tui);
+					const renderWidth = Math.max(1, width - 2);
+					const cacheKey = `${renderWidth}:${height}:${component.focused}`;
+					if (cacheKey === cachedKey) return cachedLines;
 					const lines = [];
-					const add = (line = "") => lines.push(fit(line || "\u00a0", width));
+					const add = (line = "") =>
+						lines.push(fit(line || "\u00a0", renderWidth));
 					const inline = source.some((item) => item.inlineDescription);
 					const detailRows = inline
 						? 0
@@ -349,7 +355,7 @@ export async function showListDialog(ctx, options) {
 						sectionLine(
 							theme,
 							multi ? `Checklist · ${position}` : `Options · ${position}`,
-							width,
+							renderWidth,
 						),
 					);
 
@@ -390,7 +396,7 @@ export async function showListDialog(ctx, options) {
 						const selected = visible[index]?.item;
 						const details = wrapText(
 							selected?.description ?? "No description.",
-							Math.max(8, width - 2),
+							Math.max(8, renderWidth - 2),
 							detailRows,
 						);
 						while (details.length < detailRows) details.push("");
@@ -403,10 +409,12 @@ export async function showListDialog(ctx, options) {
 						defaultHelp =
 							"↑↓ navigate · Enter/Space toggle · Esc/Backspace save and go back";
 					if (filter) defaultHelp = `Type to filter · ${defaultHelp}`;
-					add(sectionLine(theme, "Keys", width));
+					add(sectionLine(theme, "Keys", renderWidth));
 					add(theme.fg("dim", help ?? defaultHelp));
 					while (lines.length < height) add();
-					return lines.slice(0, height);
+					cachedKey = cacheKey;
+					cachedLines = lines.slice(0, height);
+					return cachedLines;
 				},
 				handleInput(data) {
 					const selected = visible[index];
@@ -508,9 +516,12 @@ export async function showListDialog(ctx, options) {
 						applyFilter();
 					}
 					remember();
+					cachedKey = undefined;
 					tui.requestRender();
 				},
-				invalidate() {},
+				invalidate() {
+					cachedKey = undefined;
+				},
 			};
 			return component;
 		},
