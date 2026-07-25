@@ -2122,6 +2122,128 @@
       "type": "task",
       "updatedAt": "2026-07-25T07:02:13.981Z"
     },
+    "work-2.31": {
+      "createdAt": "2026-07-25T08:09:13.614Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The exact work-planner run for work-3.1 transiently deleted the project policy sections from C:\\soft\\ce-workflow\\AGENTS.md even though the planner contract prohibited source edits and its result attested that only native work state changed. The parent had verified AGENTS.md clean immediately before launch and restored the planner-introduced deletion after detecting it.\nExpected: A read-only/native-store planner must be technically prevented from mutating repository source or instruction files, and its no-source-change attestation must be checked against the pre-launch Git snapshot before accepting the handoff.\nImpact: A planning-only boundary could silently remove workflow safety and Dialog UX rules, contaminate the next implementation slice, and falsely report a clean source scope.\nSuggested improvement: Enforce a planner write allowlist limited to the native work-item store and declared plan artifact, then compare post-run Git paths to the launch snapshot and fail the handoff on any undeclared mutation.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/3f0be225-aa17-4799-8c05-8d906dcb051a",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 111427,
+              "file": "01-session.jsonl",
+              "sha256": "8e09c626a870a0cd18e43c1f3c92dd9286af03f7e77c2853ae013d9832cca224"
+            },
+            {
+              "bytes": 6687,
+              "file": "02-work-3.1-planner-result.md",
+              "sha256": "77d383e2700f039bc79e169b6161d8604f2b17687cb9354f0ddc35eb1808be41"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-07-25T08:09:13.609Z",
+          "workflowId": "workflow-ms026e3o-7wuj1p"
+        }
+      ],
+      "id": "work-2.31",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The exact work-planner run for work-3.1 transiently deleted the project policy sections from C:\\soft\\ce-workflow\\AGENTS.md even th",
+      "type": "task",
+      "updatedAt": "2026-07-25T08:09:13.614Z"
+    },
+    "work-2.32": {
+      "createdAt": "2026-07-25T11:02:47.828Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After work-goal continuation/compaction, three async work-reviewer launches failed before producing a review with `No API key found for openai-codex`; an explicit `zai/glm-5.2` attempt failed similarly. Prior reviewers in the same goal had succeeded, and an explicit sessionDir/fork context did not restore credentials.\nExpected: Coded async review handoffs should inherit or resolve the authenticated parent provider across work-goal continuation/compaction, and provider-auth failures should terminate immediately with a concrete infrastructure status.\nImpact: The verified work-7.2.5 documentation cannot receive its mandatory durable verdict, blocking coded finish and work-7 closure despite passing all available software gates.\nSuggested improvement: Preserve provider authentication for child Pi processes across goal continuation/compaction and classify child auth failures as terminal infrastructure failures rather than no-activity alerts.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/890b2832-4e0f-4f27-8657-67757e8926b6",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 8144,
+              "file": "01-7b1820f6-578e-4cad-beef-657692610c72_work-reviewer_transcript.jsonl",
+              "sha256": "8e684dee03da61efc761ee3e324c33f3650a1f4e20c7beb399770f189e646fc1"
+            },
+            {
+              "bytes": 8176,
+              "file": "02-0b79f795-cacf-4db2-afee-0fcffceb5360_work-reviewer_transcript.jsonl",
+              "sha256": "68466d558c67ac64b6fec1ec4b2b157490f1e35f4379a68a871f30d2d7c4ede2"
+            },
+            {
+              "bytes": 7646,
+              "file": "03-9047f45f-3716-43ab-ad51-7265cb03f22f_work-reviewer_transcript.jsonl",
+              "sha256": "17687587558a62ca004a013ba9bad5b11d4e0f47289897fb2473ba5ad4482b21"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-25T11:02:47.824Z",
+          "workflowId": "019f9733-76e4-76a3-8e52-9f0f1ece5c6b"
+        }
+      ],
+      "id": "work-2.32",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After work-goal continuation/compaction, three async work-reviewer launches failed before producing a review with `No API key foun",
+      "type": "task",
+      "updatedAt": "2026-07-25T11:02:47.828Z"
+    },
+    "work-2.33": {
+      "createdAt": "2026-07-25T11:09:52.181Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The configured work-worker for work-3.2 aborted before implementation because its role contract invoked unsupported `work-helper.mjs claim work-3.2`; the helper exposes `work-claim`. The worker then correctly refused to retry after the helper syntax failure.\nExpected: Generated worker instructions and role defaults must use the supported `work-claim` command, or the coded parent must claim before dispatch so workers never guess helper syntax.\nImpact: Every bounded implementation routed through work-worker can fail immediately without editing or verification, wasting a specialist launch and stalling autonomous resume.\nSuggested improvement: Replace the stale `claim` token in work-worker role/runtime instructions with `work-claim`, and add a command-contract test generated from the helper's registered subcommands.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/12b07580-e823-47f6-b8e9-c6e77d403085",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 27039,
+              "file": "01-session.jsonl",
+              "sha256": "81fde1643cc94668d2060e0c6f5a7e1a5835176b7a11b01aeaca88d600b7a62e"
+            },
+            {
+              "bytes": 1841,
+              "file": "02-work-3.2-worker-result.md",
+              "sha256": "4654763383bea83f50eebc8e6d8e1dfabd850449a9d1d49f5d437b83238d5823"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-07-25T11:09:52.176Z",
+          "workflowId": "019f97f7-4cee-7c46-a743-9b072cd3d74f"
+        }
+      ],
+      "id": "work-2.33",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The configured work-worker for work-3.2 aborted before implementation because its role contract invoked unsupported `work-helper.m",
+      "type": "task",
+      "updatedAt": "2026-07-25T11:09:52.181Z"
+    },
     "work-2.4": {
       "createdAt": "2026-07-20T02:33:35.267Z",
       "dependencies": [
@@ -2319,6 +2441,128 @@
       "title": "Self-improvement report: `work-helper.mjs work-close work-4.2 --reason \"...\"` changed the decision status to closed but did not persist the supplied closur",
       "type": "task",
       "updatedAt": "2026-07-20T14:41:04.347Z"
+    },
+    "work-3": {
+      "createdAt": "2026-07-25T07:42:39.407Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Durable container for ordinary tasks that do not belong to a dedicated roadmap.",
+      "evidence": [],
+      "id": "work-3",
+      "labels": [
+        "wo:misc"
+      ],
+      "notes": [],
+      "status": "open",
+      "title": "Misc",
+      "type": "epic",
+      "updatedAt": "2026-07-25T07:42:39.407Z"
+    },
+    "work-3.1": {
+      "createdAt": "2026-07-25T07:42:39.536Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "evidence": [],
+      "id": "work-3.1",
+      "labels": [],
+      "notes": [
+        "created by /work-big\nwo:planning\nbig slice: split into executable native work-item store and decision native work-item store before implementation\ntask: lets modernize the plan/task display a bit using our brand new interface. first lets always show all and remove tab support, but on top is always the last we are working on followed by the open ones, the closed are last. no need of open/closed display, remove, needs plan can show only on open items. remove needs plan from misc as it is a trash dump of various tasks and dont need a plan. also dont show needs a plan if there is no brainstorm attached to the said idea, it can't plan without anyway. also tasks needs a normal typing interface, not one im typing it now because it is limited to one line, does not allow pasting images, etc. so back to the tasks menu show a progressbar and completed/total in the title in front of every task that is open with a status indiator we are currently working on it or not, I'd like it to be a realtime display. keep closed tasks collapsed, open - expanded, allow with space to change collapse state, left arrow collapses, right expands. sub-tasks also open on top closed below and color coded if one is being worked on right now. basically im trying to move away from \"entering\" anything - this base display should be enough for everything - stats, description, visual display. when you enter on something that is actionable just present a small popup with possible actions and thats all, the view should be one. later we will make that menu very dynamic in displayying realtime stuff.\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name.",
+        "Merged planning brief — work-3.1\n\nObjective\nReplace the roadmap selector plus nested task menus with one always-all, hierarchy-first live workspace. The initial delivery is a stable, readable operating surface, not a general dashboard framework.\n\nAuthoritative current sources\n- C:\\soft\\ce-workflow\\extensions\\work-models.js: chooseRoadmap, roadmapMenuItems, handleRoadmapTasksMenu, buildWorkRoadmapState, groupedRoadmapTasks, buildEpicChildState, epicArtifacts/epicPlanningSources, activeWorkAgent/activeWorkGoal/pending direct-run state.\n- C:\\soft\\ce-workflow\\extensions\\work-dialogs.js: shared overlay contract, parent cursor preservation, keyboard filtering, Escape behavior.\n- C:\\soft\\ce-workflow\\scripts\\test-work-roadmap.mjs and scripts\\test-work-dialogs.mjs.\n- Pi docs: C:\\Users\\Flex\\AppData\\Roaming\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\extensions.md and docs\\tui.md. Custom components support render/handleInput/invalidate/dispose, timers plus tui.requestRender(), Space/Left/Right, overlays, and ctx.ui.setEditorText; the normal composer supports multiline and image paste, while extension command handlers do not receive images and ctx.ui.editor is text-only.\n\nRequired behavior\n1. Always render all roadmap rows; remove the open/all Tab mode and Open/Closed words. Sort the active/current or most-recently-worked roadmap first, remaining open roadmaps next by recent activity, and closed roadmaps last.\n2. Open roadmaps/tasks are expanded by default; closed ones are collapsed. Session-local overrides survive refresh. Space toggles, Left collapses, Right expands. Cursor and actions bind to stable item IDs so live reordering cannot target the wrong row.\n3. Expanded rows expose description/stats and a recursive task tree. Siblings order non-closed before closed. Open container rows show a compact progress bar plus completed/total. Active execution is distinctly color-coded; durable in_progress is a fallback status, not proof that a process is live.\n4. Resolve current execution in one read-only presentation reducer from activeWorkAgent/current-command metadata, active work-goal state, pending direct runs, and item ancestry. Never write presentation state into native WorkItems. Refresh with a bounded timer (about 0.5–1s), invalidate only on changed projection, keep selection by ID, clear timers on dispose, and preserve the last good frame or static fallback if refresh fails.\n5. Show Needs plan only when the roadmap is open, is not the Misc roadmap, has a directly attached brainstorm source, and readiness is needs_plan/stale. Apply the same eligibility to Plan/strengthen actions; no planning label/action appears for Misc or source-less ideas.\n6. Enter on a roadmap or task opens one small context-sensitive action popup, then returns to the same workspace. Remove the separate roadmap-operations and task-report navigation as the primary path; reports remain actions in the popup.\n7. Add task closes/unfocuses the workspace and prefills Pi’s normal composer with a human-readable roadmap/parent-scoped task request. Do not route creation through /work-add or a custom one-line/editor dialog, because those lose image attachments. The normal agent path interprets submitted text/images. If the rich composer is unavailable, show an explicit capability warning and use the existing native/non-TUI fallback rather than silently claiming image support.\n8. Keep native non-TUI command behavior and the existing shared dialog UX rules. Rendering is read-only. Revalidate selected ID/status before mutating actions.\n\nMinimal implementation shape\n- Add a headless workspace projection function in work-models.js for deterministic ordering, hierarchy, progress, planning eligibility, and live markers.\n- Add one specialized tree-workspace dialog to work-dialogs.js rather than turning the generic list into a speculative framework.\n- Replace chooseRoadmap/handleRoadmapTasksMenu nesting with the live workspace plus one-shot action popup; retain text/RPC fallbacks.\n- Focus tests on projection ordering/eligibility/progress, collapse and stable-ID keys, refresh/dispose/fallback, action revalidation, and composer handoff.\n\nwo:divergent-analysis\n- Inversion/adversary — gpt-5.6-sol: accepted stable-ID action revalidation, read-only activity reduction, and main-composer intent envelope; rejected frozen ordering because current-first must remain live.\n- 3am operator — claude-opus-4-8: accepted last-good/static degradation and explicit composer-capability fallback; rejected extra delta telemetry and reset key as unrequested scope.\n- Remove load-bearing assumption — glm-5.2: accepted a testable headless projection and session-local lifecycle-derived expansion overrides; rejected event-only subscription because current activity sources do not share a reliable event stream, and rejected non-actionable roadmap headers because roadmap actions remain required.\n\nNo unresolved human decision is required for planning. The least-surprising image-capable task-entry default is a prefilled natural-language request in Pi’s normal composer, with final creation performed by the normal agent path.",
+        "Merged planning brief v2 — work-3.1\n\nObjective\nReplace the roadmap selector plus nested task menus with one always-all, hierarchy-first live workspace. The initial delivery is a stable, readable operating surface, not a general dashboard framework.\n\nAuthoritative current sources\n- C:\\soft\\ce-workflow\\extensions\\work-models.js: chooseRoadmap, roadmapMenuItems, handleRoadmapTasksMenu, buildWorkRoadmapState, groupedRoadmapTasks, buildEpicChildState, epicArtifacts, activeWorkAgent/currentCommandWorkflow, reconcilePendingDirectRuns, pending direct-run records.\n- C:\\soft\\ce-workflow\\extensions\\work-dialogs.js: shared overlay contract, parent cursor preservation, keyboard filtering, Escape behavior.\n- C:\\soft\\ce-workflow\\scripts\\test-work-roadmap.mjs, scripts\\test-work-dialogs.mjs, and scripts\\test-work-add.mjs.\n- Pi docs: C:\\Users\\Flex\\AppData\\Roaming\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\extensions.md and docs\\tui.md. Custom components support render/handleInput/invalidate and timers plus tui.requestRender(); ctx.ui.custom does not invoke a component dispose hook. The normal composer supports multiline and image paste; extension command handlers do not receive images and ctx.ui.editor is text-only.\n\nRequired behavior\n1. Always render all roadmaps; remove open/all Tab mode and visible Open/Closed words. Preserve initiative hierarchy: child roadmaps remain grouped under their initiative and sort only among siblings. Within each sibling group sort: live roadmap first by live startedAt descending, remembered current roadmap next, remaining open roadmaps by activityAt descending, then closed roadmaps by activityAt descending; tie-break by stable ID. activityAt is max(roadmap updatedAt, all descendant updatedAt, latest non-live workflow timestamp). A live child propagates live state to ancestor task/roadmap rows, while the exact live task gets the strongest marker.\n2. Open roadmap/task containers are expanded by default; closed containers are collapsed. Session-local override sets survive refresh and reset only when the workspace closes. Space toggles, Left collapses, Right expands; consume these keys before filter handling. Keep cursor and pending actions bound to stable IDs so live reordering cannot target another row.\n3. Expanded rows expose description/stats and a recursive task tree. Siblings order non-closed before closed. Open container rows show a compact progress bar plus completed/total; progress counts executable descendant slices, while an open leaf is 0/1. Active execution is color-coded distinctly from durable in_progress, which means engaged but does not prove a process is live.\n4. Build one read-only live presentation reducer with this truth table:\n   - activeWorkAgent for the same cwd with meta.workItemId is live from its startedAt until settled; exact item and ancestors are live.\n   - pending direct-run record is live only when its status file exists, is non-terminal, state is running/active, and its declared deadline has not expired (30-second grace). paused/needs_attention is an attention marker and recent activity, not live. Missing, malformed, completed/failed/stopped, or expired status is not live.\n   - activeWorkGoalRunning alone never marks a WorkItem because a goal has no authoritative target ID; it contributes only when represented by activeWorkAgent metadata.\n   - durable in_progress contributes engaged state and updatedAt, never live coloring.\n   - if live signals conflict, newest startedAt wins exact emphasis; all valid ancestors remain marked.\n   Rendering never writes to native WorkItems. work-models.js owns reducer/timer to avoid a work-dialogs→work-models import cycle; work-dialogs.js receives projected frames. Refresh every 750ms, compare a compact row signature before requesting render, and retain the previous cached frame on read/project failure. Clear the timer through every overlay close/back/done path because ctx.ui.custom has no dispose callback. Add a `ponytail:` note that full projection is acceptable for small/medium native stores; add indexed/event-driven refresh only after measured latency.\n5. The direct-brainstorm predicate is: an existing path listed in the selected roadmap's own `epicArtifacts(...).brainstorms`, excluding brainstorms discovered only on child items and excluding sources inherited from an initiative. Show Needs plan and Plan/strengthen only when status is open, title is not the Misc roadmap, readiness is needs_plan or stale, and that direct predicate is true. Missing files are false. Planned/ready roadmaps do not show Needs plan.\n6. Enter on a roadmap or task opens one small context-sensitive action popup and then returns to the same workspace. Remove separate roadmap-operations and task-report navigation as the primary path; reports remain popup actions. Before any mutation, reread by stable ID and revalidate status/action eligibility; stale actions warn and return without mutation.\n7. Add task from TUI closes the workspace and prepares Pi's normal composer with a human-readable roadmap/parent-scoped natural-language request, not `/work-add`, so the submitted prompt can retain multiline text and images for the normal agent path. If `getEditorText()` is empty, set the envelope. If non-empty, use the shared small popup to ask Append to draft or Cancel; append with two newlines only on approval and never overwrite existing text. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable, use ctx.ui.editor as an explicit text-only multiline fallback, and create deterministically through existing buildWorkAddState. RPC/print/json retain existing command/text behavior and never claim image support.\n8. Keep native non-TUI command behavior and existing shared dialog UX: one muted purpose line, Escape to parent/root close, parent cursor preservation, keyboard filtering, native fallback. Rendering is read-only.\n\nMinimal implementation shape\n- Add pure workspace projection/helpers in work-models.js for hierarchy, deterministic ordering, progress, direct planning eligibility, live/attention markers, and stable row signatures.\n- Add one dumb specialized tree-workspace dialog to work-dialogs.js. It owns expansion/cursor rendering and key handling; work-models.js supplies refreshed projected frames and owns timer cleanup through close callbacks.\n- Replace chooseRoadmap/handleRoadmapTasksMenu nesting with the live workspace plus one-shot action popup; retain build/render command functions for text/RPC fallback.\n- Do not add persistent expansion storage, an event bus, delta telemetry, a reset key, or a general dashboard framework.\n\nAcceptance matrix\nA1 Always-all/order/hierarchy: scripts/test-work-roadmap.mjs asserts no Tab action/help, no Open/Closed labels, initiatives retain child grouping, live/current/open/closed ordering follows the exact key and ID tie-break.\nA2 Expansion/keys: scripts/test-work-dialogs.mjs asserts open/closed defaults, session-local override survival across refresh, Space/Left/Right consumption before filter, stable cursor ID after reorder, and all close paths clear the interval.\nA3 Progress/tree: scripts/test-work-roadmap.mjs asserts recursive sibling ordering, leaf/container completed/total, bars only on open rows, engaged versus live colors/markers.\nA4 Liveness/failure/read-only: scripts/test-work-roadmap.mjs fixtures cover activeWorkAgent, running direct status, expired/terminal/malformed/missing direct status, needs_attention, active goal without target, ancestor propagation, and conflicting timestamps. The fixture hashes `.ce-workflow/work-items.json` bytes before/after projection plus two refresh ticks and asserts equality. Dialog tests use injected timer callbacks and assert unchanged signatures cause no requestRender, changed signatures cause one, projection errors retain the last frame, and every exit clears the timer.\nA5 Planning eligibility: scripts/test-work-roadmap.mjs fixtures cover Misc, missing direct file, inherited-only source, child-only brainstorm, direct brainstorm, planned, needs_plan, stale, open and closed states; only open non-Misc needs_plan/stale with an existing direct brainstorm gets the label/action.\nA6 Actions/races: scripts/test-work-roadmap.mjs asserts Enter yields one small popup, report returns to the workspace, and removed/closed/ineligible IDs between selection and execution cannot mutate state.\nA7 Composer/fallback: scripts/test-work-roadmap.mjs or test-work-add.mjs asserts empty-editor prefill, append-confirm preserving existing text, cancel preserving bytes, natural-language envelope contains roadmap/parent ID and excludes `/work-add`, text-only fallback warning plus deterministic add, and non-TUI fallback. A manual real Pi TUI smoke must verify selecting Add task, multiline entry, image paste, submission, and resulting task context; named approver is the project owner who requested work-3.1. Create a dependent decision/evidence WorkItem for that approval rather than silently waiving it.\nA8 Regression: `node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs`; final package gate `npm run verify:quiet`.\n\nwo:divergent-analysis\n- Inversion/adversary — gpt-5.6-sol: accepted stable-ID action revalidation, read-only activity reduction, and main-composer intent envelope; rejected frozen ordering because current-first must remain live.\n- 3am operator — claude-opus-4-8: accepted last-good/static degradation and explicit composer-capability fallback; rejected extra delta telemetry and reset key as unrequested scope.\n- Remove load-bearing assumption — glm-5.2: accepted a testable headless projection and session-local lifecycle-derived expansion overrides; rejected event-only subscription because current activity sources do not share a reliable event stream, and rejected non-actionable roadmap headers because roadmap actions remain required.\n\nAdvisor fixes applied\n- Defined liveness/activity precedence, terminal/stale handling, ancestor propagation, ordering key, hierarchy grouping, and tie-breaks.\n- Defined direct brainstorm and missing/inherited/child-source exclusions.\n- Corrected nonexistent dispose assumption; pinned timer ownership/cleanup and Space/filter precedence.\n- Defined composer draft preservation and explicit text-only fallback.\n- Added exact automated and manual acceptance evidence, including store-byte read-only proof and project-owner image-paste approval.\n\nNo unresolved product decision remains. The implementation plan must create the dependent manual evidence/approval WorkItem required by A7.",
+        "Merged planning brief v2 — work-3.1\n\nObjective\nReplace the roadmap selector plus nested task menus with one always-all, hierarchy-first live workspace. The initial delivery is a stable, readable operating surface, not a general dashboard framework.\n\nAuthoritative current sources\n- C:\\soft\\ce-workflow\\extensions\\work-models.js: chooseRoadmap, roadmapMenuItems, handleRoadmapTasksMenu, buildWorkRoadmapState, groupedRoadmapTasks, buildEpicChildState, epicArtifacts, activeWorkAgent/currentCommandWorkflow, reconcilePendingDirectRuns, pending direct-run records.\n- C:\\soft\\ce-workflow\\extensions\\work-dialogs.js: shared overlay contract, parent cursor preservation, keyboard filtering, Escape behavior.\n- C:\\soft\\ce-workflow\\scripts\\test-work-roadmap.mjs, scripts\\test-work-dialogs.mjs, and scripts\\test-work-add.mjs.\n- Pi docs: C:\\Users\\Flex\\AppData\\Roaming\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\extensions.md and docs\\tui.md. Custom components support render/handleInput/invalidate and timers plus tui.requestRender(); ctx.ui.custom does not invoke a component dispose hook. The normal composer supports multiline and image paste; extension command handlers do not receive images and ctx.ui.editor is text-only.\n\nRequired behavior\n1. Always render all roadmaps; remove open/all Tab mode and visible Open/Closed words. Preserve initiative hierarchy: child roadmaps remain grouped under their initiative and sort only among siblings. Within each sibling group sort: live roadmap first by live startedAt descending, remembered current roadmap next, remaining open roadmaps by activityAt descending, then closed roadmaps by activityAt descending; tie-break by stable ID. activityAt is max(roadmap updatedAt, all descendant updatedAt, latest non-live workflow timestamp). A live child propagates live state to ancestor task/roadmap rows, while the exact live task gets the strongest marker.\n2. Open roadmap/task containers are expanded by default; closed containers are collapsed. Session-local override sets survive refresh and reset only when the workspace closes. Space toggles, Left collapses, Right expands; consume these keys before filter handling. Keep cursor and pending actions bound to stable IDs so live reordering cannot target another row.\n3. Expanded rows expose description/stats and a recursive task tree. Siblings order non-closed before closed. Open container rows show a compact progress bar plus completed/total; progress counts executable descendant slices, while an open leaf is 0/1. Active execution is color-coded distinctly from durable in_progress, which means engaged but does not prove a process is live.\n4. Build one read-only live presentation reducer with this truth table:\n   - activeWorkAgent for the same cwd with meta.workItemId is live from its startedAt until settled; exact item and ancestors are live.\n   - pending direct-run record is live only when its status file exists, is non-terminal, and state is running/active. With deadlineAt, it must not be expired (30-second grace). Without deadlineAt, its positive pid must still be alive (`process.kill(pid, 0)` succeeds); absent/dead pid is stale. paused/needs_attention is an attention marker and recent activity, not live. Missing, malformed, completed/failed/stopped, expired, or dead-process status is not live.\n   - activeWorkGoalRunning alone never marks a WorkItem because a goal has no authoritative target ID; it contributes only when represented by activeWorkAgent metadata.\n   - durable in_progress contributes engaged state and updatedAt, never live coloring.\n   - if live signals conflict, newest startedAt wins exact emphasis; all valid ancestors remain marked.\n   Rendering never writes to native WorkItems. work-models.js owns reducer/timer to avoid a work-dialogs→work-models import cycle; work-dialogs.js receives projected frames. Refresh every 750ms, compare a compact row signature before requesting render, and retain the previous cached frame on read/project failure. Clear the timer through every overlay close/back/done path because ctx.ui.custom has no dispose callback. Add a `ponytail:` note that full projection is acceptable for small/medium native stores; add indexed/event-driven refresh only after measured latency.\n5. The direct-brainstorm predicate is: an existing path listed in the selected roadmap's own `epicArtifacts(...).brainstorms`, excluding brainstorms discovered only on child items and excluding sources inherited from an initiative. Show Needs plan and Plan/strengthen only when status is open, title is not the Misc roadmap, readiness is needs_plan or stale, and that direct predicate is true. Missing files are false. Planned/ready roadmaps do not show Needs plan.\n6. Enter on a roadmap or task opens one small context-sensitive action popup and then returns to the same workspace. Remove separate roadmap-operations and task-report navigation as the primary path; reports remain popup actions. Before any mutation, reread by stable ID and revalidate status/action eligibility; stale actions warn and return without mutation.\n7. Add task from TUI closes the workspace and prepares Pi's normal composer with a human-readable roadmap/parent-scoped natural-language request, not `/work-add`, so the submitted prompt can retain multiline text and images for the normal agent path. If `getEditorText()` is empty, set the envelope. If non-empty, use the shared small popup to ask Append to draft or Cancel; append with two newlines only on approval and never overwrite existing text. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as an explicit text-only multiline fallback. Add one deterministic fallback helper that calls createWorkflowWorkItem with the selected task parent (or roadmap), derives a compact title from the first non-empty line, and preserves the full multiline text in description; do not route this fallback through buildWorkAddState. RPC/print/json retain existing command/text behavior and never claim image support.\n8. Keep native non-TUI command behavior and existing shared dialog UX: one muted purpose line, Escape to parent/root close, parent cursor preservation, keyboard filtering, native fallback. Rendering is read-only.\n\nMinimal implementation shape\n- Add pure workspace projection/helpers in work-models.js for hierarchy, deterministic ordering, progress, direct planning eligibility, live/attention markers, and stable row signatures.\n- Add one dumb specialized tree-workspace dialog to work-dialogs.js. It owns expansion/cursor rendering and key handling; work-models.js supplies refreshed projected frames and owns timer cleanup through close callbacks.\n- Replace chooseRoadmap/handleRoadmapTasksMenu nesting with the live workspace plus one-shot action popup; retain build/render command functions for text/RPC fallback.\n- Do not add persistent expansion storage, an event bus, delta telemetry, a reset key, or a general dashboard framework.\n\nAcceptance matrix\nA1 Always-all/order/hierarchy: scripts/test-work-roadmap.mjs asserts no Tab action/help, no Open/Closed labels, initiatives retain child grouping, live/current/open/closed ordering follows the exact key and ID tie-break.\nA2 Expansion/keys: scripts/test-work-dialogs.mjs asserts open/closed defaults, session-local override survival across refresh, Space/Left/Right consumption before filter, stable cursor ID after reorder, and all close paths clear the interval.\nA3 Progress/tree: scripts/test-work-roadmap.mjs asserts recursive sibling ordering, leaf/container completed/total, bars only on open rows, engaged versus live colors/markers.\nA4 Liveness/failure/read-only: scripts/test-work-roadmap.mjs fixtures cover activeWorkAgent; running direct status with deadline; expired/terminal/malformed/missing status; no-deadline status with mocked live and dead pid; needs_attention; active goal without target; ancestor propagation; and conflicting timestamps. The fixture hashes `.ce-workflow/work-items.json` bytes before/after projection plus two refresh ticks and asserts equality. Dialog tests use injected timer callbacks and assert unchanged signatures cause no requestRender, changed signatures cause one, projection errors retain the last frame, and every exit clears the timer.\nA5 Planning eligibility: scripts/test-work-roadmap.mjs fixtures cover Misc, missing direct file, inherited-only source, child-only brainstorm, direct brainstorm, planned, needs_plan, stale, open and closed states; only open non-Misc needs_plan/stale with an existing direct brainstorm gets the label/action.\nA6 Actions/races: scripts/test-work-roadmap.mjs asserts Enter yields one small popup, report returns to the workspace, and removed/closed/ineligible IDs between selection and execution cannot mutate state.\nA7 Composer/fallback: scripts/test-work-roadmap.mjs or test-work-add.mjs asserts empty-editor prefill, append-confirm preserving existing text, cancel preserving bytes, natural-language envelope contains roadmap/parent ID and excludes `/work-add`, and non-TUI behavior. Text-only fallback fixtures assert the explicit no-image warning, selected parent preservation, compact first-line title, full multiline description, and no buildWorkAddState path. A manual real Pi TUI smoke must verify selecting Add task, multiline entry, image paste, submission, and resulting task context; named approver is the project owner who requested work-3.1. Create a dependent decision/evidence WorkItem for that approval rather than silently waiving it.\nA8 Regression: `node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs`; final package gate `npm run verify:quiet`.\n\nwo:divergent-analysis\n- Inversion/adversary — gpt-5.6-sol: accepted stable-ID action revalidation, read-only activity reduction, and main-composer intent envelope; rejected frozen ordering because current-first must remain live.\n- 3am operator — claude-opus-4-8: accepted last-good/static degradation and explicit composer-capability fallback; rejected extra delta telemetry and reset key as unrequested scope.\n- Remove load-bearing assumption — glm-5.2: accepted a testable headless projection and session-local lifecycle-derived expansion overrides; rejected event-only subscription because current activity sources do not share a reliable event stream, and rejected non-actionable roadmap headers because roadmap actions remain required.\n\nAdvisor fixes applied\n- Defined liveness/activity precedence, terminal/stale handling, ancestor propagation, ordering key, hierarchy grouping, and tie-breaks.\n- Defined direct brainstorm and missing/inherited/child-source exclusions.\n- Corrected nonexistent dispose assumption; pinned timer ownership/cleanup and Space/filter precedence.\n- Defined composer draft preservation and explicit text-only fallback.\n- Added exact automated and manual acceptance evidence, including store-byte read-only proof and project-owner image-paste approval.\n\nFocused re-review residuals applied without a recursive review loop: no-deadline direct runs require a live pid, and text-only fallback preserves parent plus multiline description through a dedicated deterministic helper.\n\nNo unresolved product decision remains. The implementation plan must create the dependent manual evidence/approval WorkItem required by A7.",
+        "wo:planning-result — Atomized into independently ready work-3.2 projection (A1/A3/A4/A5) and work-3.3 dialog (A2), followed by work-3.4 integration/actions/composer (A6/A7/A8), with dependent work-3.5 project-owner real Pi TUI multiline/image-paste approval. Dependencies: work-3.4 waits for work-3.2 and work-3.3; work-3.5 waits for work-3.4. Ready check exposed work-3.2 and work-3.3 as intended; work-3.1 remained visible only because this note/close follows that single check. No requirement is unsliced.",
+        "Planning complete: durable executable slices work-3.2 through work-3.4 and dependent A7 evidence decision work-3.5 created with verified dependency direction."
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "lets modernize the plan/task display a bit using our brand new interface. first lets always show all and remove tab support, but on top is always the last we are working on followe…",
+      "type": "task",
+      "updatedAt": "2026-07-25T08:06:14.837Z"
+    },
+    "work-3.2": {
+      "acceptance": "A1: projection always includes all roadmaps with no Tab mode or visible Open/Closed words; initiative children stay grouped and only sort among siblings by live startedAt desc, remembered current, open activityAt desc, closed activityAt desc, then stable ID. activityAt is max of roadmap/descendant updatedAt and latest non-live workflow timestamp. A3: recursive tasks order non-closed before closed; open containers show progress bars and executable-descendant completed/total, open leaves are 0/1; live is distinct from durable in_progress engaged state; exact live item is strongest and ancestors propagate. A4: reducer implements activeWorkAgent same-cwd/meta.workItemId truth; direct status must exist, parse, be running/active and nonterminal; deadline uses 30s grace; no-deadline requires positive live pid via process.kill(pid,0); absent/dead pid, missing/malformed/terminal/expired are stale; paused/needs_attention is attention/recent activity not live; activeWorkGoalRunning alone is never targeted; newest startedAt wins exact emphasis while valid ancestors stay marked. Projection and two refresh reads leave .ce-workflow/work-items.json byte-identical; failure retains a usable cached frame contract. A5: Needs plan and Plan/strengthen eligibility is only open, non-Misc, needs_plan/stale roadmaps with an existing path in that roadmap's own epicArtifacts(...).brainstorms; missing, initiative-inherited, and child-only brainstorms are false; planned/ready and closed are false. Include the ponytail note limiting full projection to small/medium stores. Focused verification: node scripts/test-work-roadmap.mjs",
+      "createdAt": "2026-07-25T08:04:58.365Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Implement the pure, read-only live workspace projection in extensions/work-models.js around buildWorkRoadmapState, groupedRoadmapTasks, buildEpicChildState, epicArtifacts, reconcilePendingDirectRuns, activeWorkAgent, currentCommandWorkflow, and activeWorkGoalRunning. Produce hierarchy-first projected frames, stable row IDs/signatures, ordering, recursive progress, planning eligibility, and live/engaged/attention state. Scope production changes to work-models.js; add focused fixtures in scripts/test-work-roadmap.mjs.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.2",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Covers brief A1, A3, A4, A5 and projection portions of A2. Traceability: always-all hierarchy/order; recursive progress; direct-brainstorm exclusions; exact liveness truth table including no-deadline pid; stable IDs/signatures; read-only store-byte proof. Do not own extensions/work-dialogs.js or integration/composer routing.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-roadmap.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:12513 - Replace the undefined telemetryEvents call with the existing readTelemetryEvents source and filter to non-live workflow events so activityAt includes the required latest workflow timestamp; the catch currently hides the ReferenceError and returns no workflow activity.\",\"extensions/work-models.js:12608 - Remove the Self-improving title exclusion (or encode an explicit accepted exception) because A1 requires every roadmap in the projection.\",\"extensions/work-models.js:12695 - Build the frame signature from all projected render state, including roadmap titles/readiness/planning eligibility and recursive task rows; the current subset leaves the signature unchanged for task/title/readiness changes.\"]}",
+        "wo:review PASS - targeted re-review confirms all three prior findings fixed; node scripts/test-work-roadmap.mjs passes",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs\nOutput: "
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Project read-only all-roadmap workspace frames",
+      "type": "task",
+      "updatedAt": "2026-07-25T11:25:43.216Z"
+    },
+    "work-3.3": {
+      "acceptance": "A2: open roadmap/task containers default expanded and closed containers default collapsed; session-local override sets survive frame refresh and reset only when the workspace closes. Space toggles, Left collapses, Right expands, and all three are consumed before filter handling. Cursor and pending selection remain bound to stable IDs across reorder. One muted purpose line, Escape to parent/root close, parent cursor preservation, keyboard filtering, and native fallback remain intact. Injected refresh/timer tests prove unchanged compact signatures cause no requestRender, changed signatures cause exactly one, projection errors retain the last good frame, and every overlay close/back/done/escape path invokes cleanup because ctx.ui.custom has no dispose hook. Focused verification: node scripts/test-work-dialogs.mjs",
+      "createdAt": "2026-07-25T08:05:09.658Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Add one dumb specialized tree-workspace overlay in extensions/work-dialogs.js, reusing the shared overlay/native fallback contract. It receives projected frames, owns session-local expansion overrides and cursor rendering/key handling, and exposes close/back/done callbacks for timer cleanup. Add focused coverage in scripts/test-work-dialogs.mjs. Do not own extensions/work-models.js.",
+      "evidence": [],
+      "id": "work-3.3",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Covers brief A2 and dialog portions of A4/A8. Independently ready and exclusive owner of extensions/work-dialogs.js; consume projected frames without importing work-models.js."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Render the stable-ID tree workspace dialog",
+      "type": "task",
+      "updatedAt": "2026-07-25T08:05:09.658Z"
+    },
+    "work-3.4": {
+      "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
+      "createdAt": "2026-07-25T08:05:28.786Z",
+      "dependencies": [
+        "work-3.2",
+        "work-3.3"
+      ],
+      "dependencyEdges": [],
+      "description": "Integrate the projection and tree dialog in extensions/work-models.js by replacing chooseRoadmap/roadmapMenuItems/handleRoadmapTasksMenu nesting with the always-all workspace and one-shot context action popup. Own the 750ms refresh/signature loop and cleanup callbacks, stable-ID mutation revalidation, reports-return flow, and Add task composer/fallback around createWorkflowWorkItem without routing fallback through buildWorkAddState. Update scripts/test-work-roadmap.mjs and scripts/test-work-add.mjs; consume the dialog API without changing extensions/work-dialogs.js.",
+      "evidence": [],
+      "id": "work-3.4",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Covers brief A6, A7, A8 and final A1/A2/A4 integration. Production ownership is extensions/work-models.js only and begins after projection plus dialog slices; no persistent expansion store, event bus, delta telemetry, reset key, or dashboard framework."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Wire workspace actions, refresh, and rich task composer",
+      "type": "task",
+      "updatedAt": "2026-07-25T08:05:58.646Z"
+    },
+    "work-3.5": {
+      "acceptance": "In a real Pi TUI, select Add task from the new workspace for a known roadmap or task parent; enter multiline text; paste an image; submit through Pi's normal composer; verify the resulting task context preserves the selected roadmap/parent, multiline request, and image context. Record project-owner identity, date, selected parent ID, resulting task/work context ID, and explicit approve/reject result in this WorkItem. Approval is complete only with project-owner evidence; text-only fallback is not sufficient for this rich-composer smoke.",
+      "createdAt": "2026-07-25T08:05:42.979Z",
+      "dependencies": [
+        "work-3.4"
+      ],
+      "dependencyEdges": [],
+      "description": "After the workspace/composer implementation passes automation, the project owner who requested work-3.1 must perform and approve the A7 real Pi TUI smoke. This is the durable manual evidence gate; it does not waive or replace automated composer/fallback coverage.",
+      "evidence": [],
+      "id": "work-3.5",
+      "labels": [],
+      "notes": [
+        "Dependent A7 manual decision/evidence gate. Must remain blocked until work-3.4 implementation and automated regression/final gate complete. No source ownership."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Approve real Pi TUI multiline and image-paste task flow",
+      "type": "decision",
+      "updatedAt": "2026-07-25T08:05:58.794Z"
     }
   },
   "metadata": {
@@ -2328,7 +2572,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T07:02:13.983Z"
+    "updatedAt": "2026-07-25T11:25:43.216Z"
   },
   "schemaVersion": 1
 }

@@ -36,6 +36,9 @@ const root = mkdtempSync(path.join(tmpdir(), "work-roadmap-"));
 const initiativeRoot = mkdtempSync(
 	path.join(tmpdir(), "work-initiative-roadmap-"),
 );
+const projectionRoot = mkdtempSync(
+	path.join(tmpdir(), "work-roadmap-projection-"),
+);
 execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
 mkdirSync(path.join(root, ".pi"));
 mkdirSync(path.join(root, "docs", "plans"), { recursive: true });
@@ -1151,7 +1154,397 @@ try {
 	);
 	assert.equal(blockedInitiativeClose.action, "initiative-close-blocked");
 	assert.equal(loadStore(initiativeRoot).items["I-1"].status, "open");
+
+	mkdirSync(path.join(projectionRoot, ".pi", "work-runs", "direct"), {
+		recursive: true,
+	});
+	mkdirSync(path.join(projectionRoot, "docs", "brainstorms"), {
+		recursive: true,
+	});
+	writeFileSync(
+		path.join(projectionRoot, "docs", "brainstorms", "own.md"),
+		"# Direct roadmap intent\n",
+	);
+	writeFileSync(
+		path.join(projectionRoot, "docs", "brainstorms", "child.md"),
+		"# Child-only intent\n",
+	);
+	writeFileSync(
+		path.join(projectionRoot, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({ lastEpicId: "R-current" }),
+	);
+	const projectionStore = initStore(projectionRoot, {
+		now: "2026-07-01T00:00:00Z",
+	});
+	projectionStore.items = {
+		"I-live": item("I-live", "Initiative projection", {
+			labels: ["initiative"],
+			initiative: {
+				schemaVersion: 1,
+				sources: [
+					{
+						id: "projection",
+						path: "docs/brainstorms/own.md",
+						hash: createHash("sha256")
+							.update("# Direct roadmap intent\n")
+							.digest("hex"),
+					},
+				],
+				coverage: ["R-live", "R-current", "R-open", "R-closed"].map(
+					(epicId) => ({
+						id: `outcome-${epicId}`,
+						provenance: `projection:${epicId}`,
+						contentHash: epicId,
+						disposition: "accepted",
+						epicId,
+					}),
+				),
+				evidence: [],
+			},
+		}),
+		"R-live": item("R-live", "Live child", {
+			parentId: "I-live",
+			updatedAt: "2026-07-02T00:00:00Z",
+		}),
+		"R-current": item("R-current", "Remembered current", {
+			parentId: "I-live",
+			updatedAt: "2026-07-05T00:00:00Z",
+		}),
+		"R-open": item("R-open", "Open child", {
+			parentId: "I-live",
+			updatedAt: "2026-07-04T00:00:00Z",
+		}),
+		"R-closed": item("R-closed", "Closed child", {
+			parentId: "I-live",
+			status: "closed",
+			updatedAt: "2026-07-06T00:00:00Z",
+		}),
+		"T-container": item("T-container", "Container", {
+			type: "task",
+			parentId: "R-live",
+			status: "open",
+		}),
+		"T-agent": item("T-agent", "Agent leaf", {
+			type: "task",
+			parentId: "T-container",
+			status: "closed",
+		}),
+		"T-direct": item("T-direct", "Direct leaf", {
+			type: "task",
+			parentId: "T-container",
+			status: "open",
+		}),
+		"T-grace": item("T-grace", "Deadline grace leaf", {
+			type: "task",
+			parentId: "T-container",
+			status: "open",
+		}),
+		"T-stale": item("T-stale", "Stale runtime leaf", {
+			type: "task",
+			parentId: "R-current",
+			status: "open",
+		}),
+		"T-engaged": item("T-engaged", "Durably engaged", {
+			type: "task",
+			parentId: "R-open",
+			status: "in_progress",
+		}),
+		"T-attention": item("T-attention", "Needs attention", {
+			type: "task",
+			parentId: "R-open",
+			status: "open",
+		}),
+		"R-plan": item("R-plan", "Plan me", {
+			documentLinks: { brainstorm: "docs/brainstorms/own.md" },
+		}),
+		"R-child-only": item("R-child-only", "Child source only"),
+		"T-source": item("T-source", "Source holder", {
+			type: "task",
+			parentId: "R-child-only",
+			documentLinks: { brainstorm: "docs/brainstorms/child.md" },
+		}),
+		"R-misc": item("R-misc", "Misc", {
+			documentLinks: { brainstorm: "docs/brainstorms/own.md" },
+		}),
+		"R-self": item("R-self", "Self-improving"),
+	};
+	saveStore(projectionRoot, projectionStore);
+	writeFileSync(
+		path.join(projectionRoot, ".pi", "work-runs", "roadmap-events.jsonl"),
+		[
+			JSON.stringify({
+				id: "completed-roadmap-workflow",
+				type: "workflow-complete",
+				terminal: true,
+				workItemId: "R-open",
+				timestamp: "2026-07-20T00:00:00Z",
+			}),
+			JSON.stringify({
+				id: "live-roadmap-workflow",
+				type: "command-start",
+				workItemId: "R-open",
+				timestamp: "2026-07-21T00:00:00Z",
+			}),
+		].join("\n"),
+	);
+	const directDir = path.join(projectionRoot, ".pi", "direct-live");
+	const graceDir = path.join(projectionRoot, ".pi", "direct-grace");
+	const attentionDir = path.join(projectionRoot, ".pi", "direct-attention");
+	const malformedDir = path.join(projectionRoot, ".pi", "direct-malformed");
+	const terminalDir = path.join(projectionRoot, ".pi", "direct-terminal");
+	const expiredDir = path.join(projectionRoot, ".pi", "direct-expired");
+	for (const dir of [
+		directDir,
+		graceDir,
+		attentionDir,
+		malformedDir,
+		terminalDir,
+		expiredDir,
+	])
+		mkdirSync(dir, { recursive: true });
+	writeFileSync(
+		path.join(directDir, "status.json"),
+		JSON.stringify({
+			state: "running",
+			pid: 4242,
+			startedAt: "2026-07-10T00:00:02Z",
+		}),
+	);
+	writeFileSync(
+		path.join(graceDir, "status.json"),
+		JSON.stringify({
+			state: "active",
+			deadline: "2026-07-10T00:00:45Z",
+			startedAt: "2026-07-10T00:00:00Z",
+		}),
+	);
+	writeFileSync(
+		path.join(attentionDir, "status.json"),
+		JSON.stringify({
+			state: "needs_attention",
+			updatedAt: "2026-07-10T00:00:03Z",
+		}),
+	);
+	writeFileSync(path.join(malformedDir, "status.json"), "{bad", "utf8");
+	writeFileSync(
+		path.join(terminalDir, "status.json"),
+		JSON.stringify({ state: "completed" }),
+	);
+	writeFileSync(
+		path.join(expiredDir, "status.json"),
+		JSON.stringify({ state: "running", deadline: "2026-07-10T00:00:00Z" }),
+	);
+	writeFileSync(
+		path.join(
+			projectionRoot,
+			".pi",
+			"work-runs",
+			"direct",
+			"pending-direct.jsonl",
+		),
+		[
+			JSON.stringify({
+				type: "pending",
+				workflowRunId: "live",
+				workItemId: "T-direct",
+				asyncDir: directDir,
+			}),
+			JSON.stringify({
+				type: "pending",
+				workflowRunId: "grace",
+				workItemId: "T-grace",
+				asyncDir: graceDir,
+			}),
+			JSON.stringify({
+				type: "pending",
+				workflowRunId: "attention",
+				workItemId: "T-attention",
+				asyncDir: attentionDir,
+			}),
+			JSON.stringify({
+				type: "pending",
+				workflowRunId: "missing",
+				workItemId: "T-stale",
+				asyncDir: path.join(projectionRoot, ".pi", "missing"),
+			}),
+			JSON.stringify({
+				type: "pending",
+				workflowRunId: "malformed",
+				workItemId: "T-stale",
+				asyncDir: malformedDir,
+			}),
+			JSON.stringify({
+				type: "pending",
+				workflowRunId: "terminal",
+				workItemId: "T-stale",
+				asyncDir: terminalDir,
+			}),
+			JSON.stringify({
+				type: "pending",
+				workflowRunId: "expired",
+				workItemId: "T-stale",
+				asyncDir: expiredDir,
+			}),
+		].join("\n"),
+	);
+	const storePath = path.join(
+		projectionRoot,
+		".ce-workflow",
+		"work-items.json",
+	);
+	const storeBytes = readFileSync(storePath);
+	const projectionRuntime = {
+		now: Date.parse("2026-07-10T00:01:00Z"),
+		processExists: (pid) => pid === 4242,
+		activeWorkAgent: {
+			cwd: projectionRoot,
+			startedAt: Date.parse("2026-07-10T00:00:01Z"),
+			meta: { workItemId: "T-agent" },
+		},
+		activeWorkGoalRunning: true,
+	};
+	const projected = buildWorkRoadmapState(
+		projectionRoot,
+		"list",
+		projectionRuntime,
+	);
+	const refreshed = buildWorkRoadmapState(
+		projectionRoot,
+		"list",
+		projectionRuntime,
+	);
+	assert.equal(
+		projected.signature,
+		refreshed.signature,
+		"frame signature is stable",
+	);
+	assert.deepEqual(
+		readFileSync(storePath),
+		storeBytes,
+		"two refreshes are byte-read-only",
+	);
+	assert.deepEqual(
+		projected.roadmaps
+			.filter((roadmap) => roadmap.parentId === "I-live")
+			.map((roadmap) => roadmap.id),
+		["R-live", "R-current", "R-open", "R-closed"],
+		"initiative siblings order live, current, open, then closed",
+	);
+	const liveRoadmap = projected.roadmaps.find(
+		(roadmap) => roadmap.id === "R-live",
+	);
+	const liveContainer = liveRoadmap.tasks.find(
+		(task) => task.id === "T-container",
+	);
+	assert.deepEqual(liveRoadmap.progress, { completed: 1, total: 3 });
+	assert.equal(
+		liveContainer.live,
+		true,
+		"exact live state propagates to ancestors",
+	);
+	assert.equal(
+		liveContainer.children.find((task) => task.id === "T-direct").emphasized,
+		true,
+	);
+	assert.equal(
+		liveContainer.children.find((task) => task.id === "T-agent").exactLive,
+		true,
+	);
+	assert.equal(
+		liveContainer.children.find((task) => task.id === "T-grace").exactLive,
+		true,
+	);
+	assert.equal(
+		projected.roadmaps.find((roadmap) => roadmap.id === "R-current").live,
+		false,
+		"missing, malformed, terminal, and expired direct states are stale",
+	);
+	const openProjected = projected.roadmaps.find(
+		(roadmap) => roadmap.id === "R-open",
+	);
+	assert.equal(openProjected.live, false, "durable in_progress is not live");
+	assert.equal(openProjected.engaged, true);
+	assert.equal(openProjected.attention, true);
+	assert.equal(
+		openProjected.activityAt,
+		"2026-07-20T00:00:00.000Z",
+		"completed workflow telemetry contributes activity without treating live starts as durable activity",
+	);
+	assert(
+		projected.roadmaps.some((roadmap) => roadmap.id === "R-self"),
+		"all-roadmap projection includes the Self-improving roadmap",
+	);
+	assert.equal(
+		projected.roadmaps.find((roadmap) => roadmap.id === "R-plan")
+			.planningEligible,
+		true,
+	);
+	assert.equal(
+		projected.roadmaps.find((roadmap) => roadmap.id === "R-child-only")
+			.planningEligible,
+		false,
+	);
+	assert.equal(
+		projected.roadmaps.find((roadmap) => roadmap.id === "R-misc")
+			.planningEligible,
+		false,
+	);
+	const titleChangedStore = loadStore(projectionRoot);
+	titleChangedStore.items["R-plan"].title = "Plan me renamed";
+	saveStore(projectionRoot, titleChangedStore);
+	const titleChanged = buildWorkRoadmapState(
+		projectionRoot,
+		"list",
+		projectionRuntime,
+	);
+	assert.notEqual(
+		titleChanged.signature,
+		projected.signature,
+		"roadmap title changes invalidate the frame signature",
+	);
+	const readinessChangedStore = loadStore(projectionRoot);
+	readinessChangedStore.items["R-plan"].documentLinks.design =
+		"docs/plans/missing.md";
+	saveStore(projectionRoot, readinessChangedStore);
+	const readinessChanged = buildWorkRoadmapState(
+		projectionRoot,
+		"list",
+		projectionRuntime,
+	);
+	assert.notEqual(
+		readinessChanged.signature,
+		titleChanged.signature,
+		"readiness changes invalidate the frame signature",
+	);
+	const taskChangedStore = loadStore(projectionRoot);
+	taskChangedStore.items["T-direct"].title = "Direct leaf renamed";
+	saveStore(projectionRoot, taskChangedStore);
+	const taskChanged = buildWorkRoadmapState(
+		projectionRoot,
+		"list",
+		projectionRuntime,
+	);
+	assert.notEqual(
+		taskChanged.signature,
+		readinessChanged.signature,
+		"recursive task render changes invalidate the frame signature",
+	);
+	writeFileSync(storePath, "{broken", "utf8");
+	writeFileSync(
+		path.join(projectionRoot, ".pi", "work-store", "work-items.recovery.json"),
+		"{broken",
+		"utf8",
+	);
+	const cached = buildWorkRoadmapState(
+		projectionRoot,
+		"list",
+		projectionRuntime,
+	);
+	assert.equal(cached.ok, true, "failed refresh retains a usable frame");
+	assert.equal(cached.cached, true);
+	assert.equal(cached.signature, taskChanged.signature);
+	writeFileSync(storePath, storeBytes);
 } finally {
-	for (const target of [root, initiativeRoot])
+	for (const target of [root, initiativeRoot, projectionRoot])
 		rmSync(target, { recursive: true, force: true });
 }

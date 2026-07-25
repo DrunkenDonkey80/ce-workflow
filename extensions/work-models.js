@@ -12356,24 +12356,227 @@ function splitRoadmapArgs(args = "") {
 	return { command, target, flags };
 }
 
-function groupedRoadmapTasks(cwd, epic) {
+function executableProgress(issue, children) {
+	if (!children.length)
+		return isWorkSlice(issue) && !isPlanningIssue(issue)
+			? { completed: statusOf(issue) === "closed" ? 1 : 0, total: 1 }
+			: { completed: 0, total: 0 };
+	return children.reduce(
+		(progress, child) => ({
+			completed: progress.completed + child.progress.completed,
+			total: progress.total + child.progress.total,
+		}),
+		{ completed: 0, total: 0 },
+	);
+}
+
+function projectedTaskTree(cwd, epic, liveFacts = new Map()) {
+	const descendants = buildEpicChildState(cwd, epic).children;
+	const byParent = new Map();
+	for (const issue of descendants) {
+		const parentId = parentOf(issue) || idOf(epic);
+		if (!byParent.has(parentId)) byParent.set(parentId, []);
+		byParent.get(parentId).push(issue);
+	}
+	const project = (issue) => {
+		const children = (byParent.get(idOf(issue)) ?? [])
+			.map(project)
+			.sort(
+				(a, b) =>
+					Number(a.status === "closed") - Number(b.status === "closed") ||
+					a.id.localeCompare(b.id),
+			);
+		const fact = liveFacts.get(idOf(issue)) ?? {};
+		return {
+			...issueSummary(issue),
+			rowId: `work-item:${idOf(issue)}`,
+			children,
+			progress: executableProgress(issue, children),
+			live: Boolean(fact.live || children.some((child) => child.live)),
+			exactLive: Boolean(fact.live),
+			emphasized: Boolean(fact.emphasized),
+			engaged: Boolean(
+				statusOf(issue) === "in_progress" ||
+					fact.engaged ||
+					children.some((child) => child.engaged),
+			),
+			attention: Boolean(
+				["paused", "needs_attention"].includes(statusOf(issue)) ||
+					fact.attention ||
+					children.some((child) => child.attention),
+			),
+		};
+	};
+	return (byParent.get(idOf(epic)) ?? [])
+		.map(project)
+		.sort(
+			(a, b) =>
+				Number(a.status === "closed") - Number(b.status === "closed") ||
+				a.id.localeCompare(b.id),
+		);
+}
+
+function directRunFacts(cwd, runtime = {}) {
+	const now = Number(runtime.now ?? Date.now());
+	const processExists =
+		runtime.processExists ??
+		((pid) => {
+			try {
+				process.kill(pid, 0);
+				return true;
+			} catch {
+				return false;
+			}
+		});
+	const events = readPendingDirectEvents(cwd);
+	const completed = new Set(
+		events
+			.filter((event) => event.type === "completed")
+			.map((event) => event.workflowRunId),
+	);
+	const pending = new Map();
+	for (const event of events)
+		if (event.type === "pending" && event.workflowRunId)
+			pending.set(event.workflowRunId, event);
+	const facts = [];
+	for (const run of pending.values()) {
+		if (completed.has(run.workflowRunId) || !run.workItemId || !run.asyncDir)
+			continue;
+		let status;
+		try {
+			status = JSON.parse(
+				readFileSync(join(run.asyncDir, "status.json"), "utf8"),
+			);
+		} catch {
+			continue;
+		}
+		const state = directStatusState(status);
+		if (DIRECT_TERMINAL_STATES.has(state)) continue;
+		const startedAt =
+			Date.parse(status.startedAt ?? run.startedAt ?? run.timestamp) || 0;
+		if (["paused", "needs_attention"].includes(state)) {
+			facts.push({
+				id: run.workItemId,
+				attention: true,
+				startedAt,
+				activityAt:
+					Date.parse(status.updatedAt ?? status.timestamp ?? run.timestamp) ||
+					startedAt,
+			});
+			continue;
+		}
+		if (!["running", "active"].includes(state)) continue;
+		const deadlineValue = status.deadline ?? status.expiresAt ?? run.deadline;
+		const deadline =
+			deadlineValue == null ? undefined : Date.parse(deadlineValue);
+		const pid = Number(status.pid ?? run.pid);
+		const live =
+			deadlineValue == null
+				? Number.isInteger(pid) && pid > 0 && processExists(pid)
+				: Number.isFinite(deadline) && now <= deadline + 30_000;
+		if (live) facts.push({ id: run.workItemId, live: true, startedAt });
+	}
+	return facts;
+}
+
+function workRoadmapLiveFacts(cwd, runtime = {}) {
+	const facts = directRunFacts(cwd, runtime);
+	const agent = runtime.activeWorkAgent ?? activeWorkAgent;
+	const agentCwd = agent?.cwd ? resolve(agent.cwd) : "";
+	if (agent?.meta?.workItemId && agentCwd === resolve(cwd))
+		facts.push({
+			id: agent.meta.workItemId,
+			live: true,
+			startedAt: Number(agent.startedAt) || 0,
+		});
+	const newest = facts
+		.filter((fact) => fact.live)
+		.sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id))[0];
+	const byId = new Map();
+	for (const fact of facts) {
+		const current = byId.get(fact.id) ?? {};
+		byId.set(fact.id, {
+			live: Boolean(current.live || fact.live),
+			engaged: Boolean(current.engaged || fact.engaged),
+			attention: Boolean(current.attention || fact.attention),
+			startedAt: Math.max(current.startedAt ?? 0, fact.startedAt ?? 0),
+			activityAt: Math.max(current.activityAt ?? 0, fact.activityAt ?? 0),
+			emphasized: Boolean(current.emphasized || fact.id === newest?.id),
+		});
+	}
+	return byId;
+}
+
+function workflowActivityByItem(cwd) {
+	const activity = new Map();
+	try {
+		for (const event of readTelemetryEvents(cwd).filter(
+			(event) => event.type === "workflow-complete" && event.terminal === true,
+		)) {
+			const id = event.workItemId ?? event.epicId;
+			const timestamp = Date.parse(
+				event.completedAt ??
+					event.timestamp ??
+					event.updatedAt ??
+					event.startedAt,
+			);
+			if (id && Number.isFinite(timestamp))
+				activity.set(id, Math.max(activity.get(id) ?? 0, timestamp));
+		}
+	} catch {
+		// A projection remains usable when optional workflow history is unavailable.
+	}
+	return activity;
+}
+
+function ownBrainstormEligibility(cwd, epic, readiness) {
+	if (
+		statusOf(epic) === "closed" ||
+		!["needs_plan", "stale"].includes(readiness) ||
+		/^misc(?:ellaneous)?$/i.test(titleOf(epic).trim())
+	)
+		return false;
+	const own = new Set(issueArtifactPaths(cwd, epic, "brainstorm"));
+	return epicArtifacts(cwd, epic).brainstorms.some(
+		(path) => own.has(path) && existsSync(join(cwd, path)),
+	);
+}
+
+function groupedRoadmapTasks(cwd, epic, liveFacts = new Map()) {
 	const state = buildEpicChildState(cwd, epic);
 	const blocked = new Set(state.blockers.map(idOf));
 	const open = state.children.filter(
 		(issue) => statusOf(issue) !== "closed" && !blocked.has(idOf(issue)),
 	);
 	const closed = state.children.filter((issue) => statusOf(issue) === "closed");
+	const tree = projectedTaskTree(cwd, epic, liveFacts);
 	return {
 		blockers: state.blockers.map(issueSummary),
 		open: open.map(issueSummary),
 		closed: closed.map(issueSummary),
+		tree,
+		progress: executableProgress(epic, tree),
 	};
 }
 
-function buildWorkRoadmapState(cwd, args = "") {
+const workRoadmapFrameCache = new Map();
+
+function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
+	const cacheKey = resolve(cwd);
+	const cachedFailure = (reason, message, extra = {}) => {
+		const cached = workRoadmapFrameCache.get(cacheKey);
+		return cached
+			? {
+					...cached,
+					cached: true,
+					stale: true,
+					refreshError: { reason, message },
+				}
+			: errorState(reason, message, extra);
+	};
 	const gate = normalReadGate(cwd);
 	if (gate)
-		return errorState(gate.reason, gate.message, {
+		return cachedFailure(gate.reason, gate.message, {
 			action: gate.reason,
 			suggestedCommands:
 				gate.reason === "migration-required" ? ["/work-remove-beads"] : [],
@@ -12400,17 +12603,97 @@ function buildWorkRoadmapState(cwd, args = "") {
 		if (command === "list") {
 			const store = loadNativeWorkStore(cwd);
 			const projection = buildInitiativeProjection(cwd, {}, store);
-			const roadmaps = projection.nodes
-				.filter(
-					(node) => store.items[node.id]?.title !== SELF_IMPROVEMENT_EPIC_TITLE,
-				)
-				.map((node) =>
-					roadmapSummary(cwd, store.items[node.id], currentId, node),
+			const liveFacts = workRoadmapLiveFacts(cwd, runtime);
+			const workflowActivity = workflowActivityByItem(cwd);
+			const rows = projection.nodes.map((node) => {
+					const epic = store.items[node.id];
+					const tasks = groupedRoadmapTasks(cwd, epic, liveFacts);
+					const exact = liveFacts.get(node.id) ?? {};
+					const descendants = tasks.tree.flatMap(function flatten(task) {
+						return [task, ...task.children.flatMap(flatten)];
+					});
+					const liveDescendants = descendants.filter((task) => task.live);
+					const activityAt = Math.max(
+						Date.parse(updatedAt(epic)) || 0,
+						workflowActivity.get(node.id) ?? 0,
+						liveFacts.get(node.id)?.activityAt ?? 0,
+						...descendants.map((task) =>
+							Math.max(
+								Date.parse(updatedAt(store.items[task.id])) || 0,
+								workflowActivity.get(task.id) ?? 0,
+								liveFacts.get(task.id)?.activityAt ?? 0,
+							),
+						),
+					);
+					const live = Boolean(exact.live || liveDescendants.length);
+					const engaged = Boolean(
+						statusOf(epic) === "in_progress" ||
+							tasks.tree.some((task) => task.engaged),
+					);
+					const attention = Boolean(
+						["paused", "needs_attention"].includes(statusOf(epic)) ||
+							exact.attention ||
+							tasks.tree.some((task) => task.attention),
+					);
+					return roadmapSummary(cwd, epic, currentId, {
+						...node,
+						rowId: `roadmap:${node.id}`,
+						tasks: tasks.tree,
+						progress: tasks.progress,
+						activityAt: activityAt ? new Date(activityAt).toISOString() : "",
+						live,
+						exactLive: Boolean(exact.live),
+						emphasized: Boolean(exact.emphasized),
+						engaged,
+						attention,
+						liveStartedAt: Math.max(
+							exact.startedAt ?? 0,
+							...liveDescendants.map(
+								(task) => liveFacts.get(task.id)?.startedAt ?? 0,
+							),
+						),
+						planningEligible: ownBrainstormEligibility(
+							cwd,
+							epic,
+							node.readiness?.state,
+						),
+					});
+				});
+			const childrenByParent = new Map();
+			for (const row of rows) {
+				const parent = row.parentId ?? "";
+				if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
+				childrenByParent.get(parent).push(row);
+			}
+			const compare = (a, b) => {
+				const rank = (row) =>
+					row.live ? 0 : row.current ? 1 : row.status === "closed" ? 3 : 2;
+				return (
+					rank(a) - rank(b) ||
+					(a.live
+						? b.liveStartedAt - a.liveStartedAt
+						: String(b.activityAt).localeCompare(String(a.activityAt))) ||
+					a.id.localeCompare(b.id)
 				);
+			};
+			const ordered = [];
+			const append = (parentId = "") => {
+				for (const row of (childrenByParent.get(parentId) ?? []).sort(
+					compare,
+				)) {
+					ordered.push(row);
+					append(row.id);
+				}
+			};
+			append();
+			// ponytail: full in-memory projection is for small/medium stores; add pagination if store size becomes measurable UI latency.
+			const signature = createHash("sha256")
+				.update(JSON.stringify(ordered))
+				.digest("hex");
 			const rememberedParentId = projection.nodes.find(
 				(node) => node.id === rememberedId,
 			)?.parentId;
-			return {
+			const frame = {
 				ok: true,
 				action: "roadmap-list",
 				currentId,
@@ -12421,13 +12704,16 @@ function buildWorkRoadmapState(cwd, args = "") {
 				].find(
 					(id) =>
 						id &&
-						roadmaps.some(
+						ordered.some(
 							(roadmap) => roadmap.id === id && roadmap.status !== "closed",
 						),
 				),
 				projectionVersion: projection.schemaVersion,
-				roadmaps,
+				signature,
+				roadmaps: ordered,
 			};
+			workRoadmapFrameCache.set(cacheKey, frame);
+			return frame;
 		}
 		if (command === "tasks") {
 			const resolved = resolveRoadmapTarget(cwd, target);
@@ -12530,7 +12816,7 @@ function buildWorkRoadmapState(cwd, args = "") {
 			{ action: "usage" },
 		);
 	} catch (error) {
-		return errorState(error.reason ?? "work-store-error", error.message, {
+		return cachedFailure(error.reason ?? "work-store-error", error.message, {
 			action: error.reason ?? "work-store-error",
 		});
 	}
