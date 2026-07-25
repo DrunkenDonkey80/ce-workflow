@@ -480,6 +480,22 @@ const treeFrames = [
 				],
 			},
 			{
+				id: "roadmap-aggregate-open",
+				title: "Native closed, aggregate open",
+				status: "closed",
+				aggregateStatus: "open",
+				role: "standalone_epic",
+				progress: { completed: 0, total: 1 },
+				tasks: [
+					{
+						id: "task-aggregate-open",
+						title: "Aggregate-open child",
+						status: "open",
+						children: [],
+					},
+				],
+			},
+			{
 				id: "roadmap-closed",
 				title: "Closed roadmap",
 				status: "closed",
@@ -518,12 +534,16 @@ async function driveTree(options, interact, mode = "tui") {
 	let renders = 0;
 	let cleanups = 0;
 	let cleared = 0;
+	let contextUsageCalls = 0;
 	const result = await showTreeWorkspaceDialog(
 		{
 			mode,
 			model: { provider: "test-provider", id: "test-model" },
 			sessionManager: { getSessionId: () => "session-42" },
-			getContextUsage: () => ({ tokens: 1234, maxTokens: 8192 }),
+			getContextUsage: () => {
+				contextUsageCalls += 1;
+				return { tokens: 1234, maxTokens: 8192 };
+			},
 			ui: {
 				async custom(factory) {
 					let value;
@@ -576,17 +596,28 @@ async function driveTree(options, interact, mode = "tui") {
 			...options,
 		},
 	);
-	return { result, renders, cleanups, cleared };
+	return { result, renders, cleanups, cleared, contextUsageCalls };
 }
 
 let refreshStep = 0;
+const statsCalls = [];
 colors.length = 0;
 const treeRun = await driveTree(
 	{
+		resolveStats(id) {
+			statsCalls.push(id);
+			return ["Stats:", `- selected ${id}`];
+		},
 		async refresh() {
 			refreshStep += 1;
 			if (refreshStep === 1) return treeFrames[0];
 			if (refreshStep === 2) return treeFrames[1];
+			if (refreshStep === 3)
+				return {
+					...treeFrames[1],
+					signature: "duplicate",
+					roadmaps: [...treeFrames[1].roadmaps, ...treeFrames[1].roadmaps],
+				};
 			throw new Error("projection unavailable");
 		},
 	},
@@ -604,8 +635,18 @@ const treeRun = await driveTree(
 		assert(lines.some((line) => line.includes("[+] ● 1/1 Closed roadmap")));
 		assert(lines.some((line) => /\s{2}\s{3} ● Task A/.test(line)));
 		assert(lines.some((line) => line.includes("complete selected roadmap description")));
-		assert(lines.some((line) => line.includes("Model: test-provider/test-model")));
-		assert(lines.some((line) => line.includes("Tokens: 1234/8192")));
+		assert(lines.some((line) => line.includes("- selected roadmap-open")));
+		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
+		assert(
+			lines.some((line) => line.includes("Aggregate-open child")),
+			"aggregate-open native closed parents default expanded",
+		);
+		assert(
+			!colors.some(
+				(call) => call.color === "dim" && call.text.includes("Native closed, aggregate open"),
+			),
+			"aggregate-open titles are not dimmed",
+		);
 		for (const color of ["warning", "success", "muted", "dim"])
 			assert(
 				colors.some((call) => call.color === color && call.text === "●"),
@@ -633,12 +674,24 @@ const treeRun = await driveTree(
 		);
 		component.handleInput("right");
 		component.handleInput("down");
-		assert(component.render(70).some((line) => /❯\s+● Task A/.test(line)));
+		lines = component.render(70);
+		assert(lines.some((line) => /❯\s+● Task A/.test(line)));
+		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
+		assert(lines.some((line) => line.includes("- selected task-a")));
 		assert(
-			component
-				.render(70)
-				.some((line) => line.includes("Task A full stored description.")),
-			"detail pane follows stable selection",
+			lines.some((line) => line.includes("Task A full stored description.")),
+			"description and telemetry follow stable selection",
+		);
+		component.handleInput("up");
+		assert(component.render(70).some((line) => /❯.*Open roadmap/.test(line)));
+		component.handleInput("down");
+		assert(component.render(70).some((line) => /❯\s+● Task A/.test(line)));
+		assert.equal(statsCalls.filter((id) => id === "roadmap-open").length, 1);
+		assert.equal(statsCalls.filter((id) => id === "task-a").length, 1);
+		assert.equal(
+			new Set(statsCalls).size,
+			statsCalls.length,
+			"stats resolve once per selected ID",
 		);
 		const before = state.renders;
 		await state.tick();
@@ -654,18 +707,34 @@ const treeRun = await driveTree(
 			lines.some((line) => /❯\s+● Task A/.test(line)),
 			"cursor follows stable ID across reorder",
 		);
+		const beforeMalformed = state.renders;
+		await state.tick();
+		assert.equal(state.renders, beforeMalformed, "duplicate refresh is rejected");
 		await state.tick();
 		lines = component.render(70);
 		assert(
 			lines.some((line) => line.includes("Task B")),
 			"projection errors retain the last good frame",
 		);
+		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
 		component.handleInput("escape");
 	},
 );
 assert.equal(treeRun.result.action, "back");
 assert.equal(treeRun.cleanups, 1, "Escape invokes explicit cleanup once");
 assert.equal(treeRun.cleared, 1, "Escape clears refresh timer");
+assert.equal(treeRun.contextUsageCalls, 0, "render never reads current context usage");
+
+const failedStatsTree = await driveTree(
+	{ resolveStats: () => { throw new Error("stats unavailable"); } },
+	async (component) => {
+		assert(component.render(70).some((line) => line.includes("- unknown")));
+		component.handleInput("down");
+		assert(component.render(70).some((line) => line.includes("- unknown")));
+		component.handleInput("escape");
+	},
+);
+assert.equal(failedStatsTree.result.action, "back", "stats failure does not break navigation");
 
 const selectedTree = await driveTree({}, async (component) =>
 	component.handleInput("enter"),

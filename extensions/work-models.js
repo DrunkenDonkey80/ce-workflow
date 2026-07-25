@@ -12370,8 +12370,30 @@ function executableProgress(issue, children) {
 	);
 }
 
+function roadmapProgressContribution(roadmap) {
+	return roadmap.progress.total > 0
+		? roadmap.progress
+		: { completed: roadmap.status === "closed" ? 1 : 0, total: 1 };
+}
+
+function projectedAggregateStatus(row, descendants = []) {
+	if (row.attention) return "needs_attention";
+	if (row.live || row.engaged) return "in_progress";
+	if (
+		row.status === "closed" &&
+		(row.progress.completed < row.progress.total ||
+			descendants.some(
+				(child) => (child.aggregateStatus ?? child.status) !== "closed",
+			))
+	)
+		return "open";
+	return row.status;
+}
+
 function projectedTaskTree(cwd, epic, liveFacts = new Map()) {
-	const descendants = buildEpicChildState(cwd, epic).children;
+	const descendants = buildEpicChildState(cwd, epic).children.filter(
+		(issue) => typeOf(issue) !== "epic",
+	);
 	const byParent = new Map();
 	for (const issue of descendants) {
 		const parentId = parentOf(issue) || idOf(epic);
@@ -12379,19 +12401,12 @@ function projectedTaskTree(cwd, epic, liveFacts = new Map()) {
 		byParent.get(parentId).push(issue);
 	}
 	const project = (issue) => {
-		const children = (byParent.get(idOf(issue)) ?? [])
-			.map(project)
-			.sort(
-				(a, b) =>
-					Number(a.status === "closed") - Number(b.status === "closed") ||
-					a.id.localeCompare(b.id),
-			);
+		const children = (byParent.get(idOf(issue)) ?? []).map(project);
 		const fact = liveFacts.get(idOf(issue)) ?? {};
-		return {
+		const row = {
 			...issueSummary(issue),
 			description: field(issue, "description"),
 			shortTitle: roadmapDisplayTitle(issue),
-			rowId: `work-item:${idOf(issue)}`,
 			children,
 			progress: executableProgress(issue, children),
 			live: Boolean(fact.live || children.some((child) => child.live)),
@@ -12408,14 +12423,13 @@ function projectedTaskTree(cwd, epic, liveFacts = new Map()) {
 					children.some((child) => child.attention),
 			),
 		};
+		row.aggregateStatus = projectedAggregateStatus(row, children);
+		return row;
 	};
-	return (byParent.get(idOf(epic)) ?? [])
-		.map(project)
-		.sort(
-			(a, b) =>
-				Number(a.status === "closed") - Number(b.status === "closed") ||
-				a.id.localeCompare(b.id),
-		);
+	const compare = (a, b) =>
+		Number(a.aggregateStatus === "closed") -
+			Number(b.aggregateStatus === "closed") || a.id.localeCompare(b.id);
+	return (byParent.get(idOf(epic)) ?? []).map(project).sort(compare);
 }
 
 function directRunFacts(cwd, runtime = {}) {
@@ -12638,10 +12652,9 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 						exact.attention ||
 						tasks.tree.some((task) => task.attention),
 				);
-				return roadmapSummary(cwd, epic, currentId, {
+				const row = roadmapSummary(cwd, epic, currentId, {
 					...node,
 					shortTitle: roadmapDisplayTitle(epic),
-					rowId: `roadmap:${node.id}`,
 					tasks: tasks.tree,
 					progress: tasks.progress,
 					activityAt: activityAt ? new Date(activityAt).toISOString() : "",
@@ -12662,6 +12675,8 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 						node.readiness?.state,
 					),
 				});
+				row.aggregateStatus = projectedAggregateStatus(row, tasks.tree);
+				return row;
 			});
 			const childrenByParent = new Map();
 			for (const row of rows) {
@@ -12672,14 +12687,30 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 			for (const row of rows) {
 				if (row.role !== "initiative") continue;
 				const children = childrenByParent.get(row.id) ?? [];
-				row.progress = {
-					completed: children.filter((child) => child.status === "closed").length,
-					total: children.length,
-				};
+				row.progress = [
+					row.progress,
+					...children.map(roadmapProgressContribution),
+				].reduce(
+					(progress, child) => ({
+						completed: progress.completed + child.completed,
+						total: progress.total + child.total,
+					}),
+					{ completed: 0, total: 0 },
+				);
+				row.aggregateStatus = projectedAggregateStatus(row, [
+					...row.tasks,
+					...children,
+				]);
 			}
 			const compare = (a, b) => {
 				const rank = (row) =>
-					row.live ? 0 : row.current ? 1 : row.status === "closed" ? 3 : 2;
+					row.live
+						? 0
+						: row.current
+							? 1
+							: row.aggregateStatus === "closed"
+								? 3
+								: 2;
 				return (
 					rank(a) - rank(b) ||
 					(a.live
@@ -12698,6 +12729,14 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 				}
 			};
 			append();
+			const entityIds = ordered.flatMap((roadmap) => [
+				roadmap.id,
+				...roadmap.tasks.flatMap(function flatten(task) {
+					return [task.id, ...task.children.flatMap(flatten)];
+				}),
+			]);
+			if (new Set(entityIds).size !== entityIds.length)
+				throw new Error("Roadmap projection contains duplicate entity IDs.");
 			// ponytail: full in-memory projection is for small/medium stores; add pagination if store size becomes measurable UI latency.
 			const signature = createHash("sha256")
 				.update(JSON.stringify(ordered))
@@ -16180,6 +16219,22 @@ export async function prepareWorkspaceTaskComposer(ctx, roadmap, parent) {
 }
 
 async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
+	const statsByWorkItem = new Map();
+	const resolveStats = (workItemId) => {
+		if (!statsByWorkItem.has(workItemId)) {
+			try {
+				statsByWorkItem.set(
+					workItemId,
+					renderWorkStats(
+						buildWorkStats(ctx.cwd, workItemId, { importLegacy: false }),
+					),
+				);
+			} catch {
+				statsByWorkItem.set(workItemId, ["Stats:", "- unknown"]);
+			}
+		}
+		return statsByWorkItem.get(workItemId);
+	};
 	for (;;) {
 		const frame = buildWorkRoadmapState(ctx.cwd, "list");
 		if (!frame.ok) {
@@ -16197,6 +16252,7 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 			setIntervalFn: runtime.setIntervalFn,
 			clearIntervalFn: runtime.clearIntervalFn,
 			cursorKey: "roadmap-workspace",
+			resolveStats,
 		});
 		if (!selected || selected.action === "back")
 			return { ok: true, action: "roadmap-cancel" };

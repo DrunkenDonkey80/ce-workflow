@@ -16,6 +16,9 @@ import { pathToFileURL } from "node:url";
 import { initStore, loadStore, saveStore } from "../extensions/work-store.js";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
+const workModelsPath = realpathSync(
+	path.join(import.meta.dirname, "../extensions/work-models.js"),
+);
 const {
 	default: workModelsExtension,
 	bootstrapPlanEpic,
@@ -25,12 +28,11 @@ const {
 	renderWorkRoadmapText,
 	roadmapMenuItems,
 	roadmapPreviewText,
-} = await import(
-	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
-		),
-	).href
+} = await import(pathToFileURL(workModelsPath).href);
+assert.match(
+	readFileSync(workModelsPath, "utf8"),
+	/buildWorkStats\(ctx\.cwd, workItemId, \{ importLegacy: false \}\)/,
+	"workspace selection stats never import legacy session history",
 );
 
 const root = mkdtempSync(path.join(tmpdir(), "work-roadmap-"));
@@ -1142,29 +1144,35 @@ try {
 			"I-live",
 			"I-live Initiative projection with a deliberately long deterministic display title from C:\\projects\\source\\plan.md that remains stored intact",
 			{
-				description: "Full initiative description remains available to the detail pane.",
+				status: "closed",
+				description:
+					"Full initiative description remains available to the detail pane.",
 				labels: ["initiative"],
-			initiative: {
-				schemaVersion: 1,
-				sources: [
-					{
-						id: "projection",
-						path: "docs/brainstorms/own.md",
-						hash: createHash("sha256")
-							.update("# Direct roadmap intent\n")
-							.digest("hex"),
-					},
-				],
-				coverage: ["R-live", "R-current", "R-open", "R-closed"].map(
-					(epicId) => ({
+				initiative: {
+					schemaVersion: 1,
+					sources: [
+						{
+							id: "projection",
+							path: "docs/brainstorms/own.md",
+							hash: createHash("sha256")
+								.update("# Direct roadmap intent\n")
+								.digest("hex"),
+						},
+					],
+					coverage: [
+						"R-live",
+						"R-current",
+						"R-open",
+						"R-closed",
+						"R-empty",
+					].map((epicId) => ({
 						id: `outcome-${epicId}`,
 						provenance: `projection:${epicId}`,
 						contentHash: epicId,
 						disposition: "accepted",
 						epicId,
-					}),
-				),
-				evidence: [],
+					})),
+					evidence: [],
 				},
 			},
 		),
@@ -1184,6 +1192,14 @@ try {
 			parentId: "I-live",
 			status: "closed",
 			updatedAt: "2026-07-06T00:00:00Z",
+		}),
+		"R-empty": item("R-empty", "Visible empty child", {
+			parentId: "I-live",
+		}),
+		"T-under-closed": item("T-under-closed", "Open descendant", {
+			type: "task",
+			parentId: "R-closed",
+			status: "open",
 		}),
 		"T-container": item("T-container", "Container", {
 			type: "task",
@@ -1396,17 +1412,68 @@ try {
 		projected.roadmaps
 			.filter((roadmap) => roadmap.parentId === "I-live")
 			.map((roadmap) => roadmap.id),
-		["R-live", "R-current", "R-open", "R-closed"],
-		"initiative siblings order live, current, open, then closed",
+		["R-live", "R-current", "R-open", "R-closed", "R-empty"],
+		"initiative siblings use aggregate visual status ordering",
 	);
 	const projectedInitiative = projected.roadmaps.find(
 		(roadmap) => roadmap.id === "I-live",
 	);
 	assert.deepEqual(
 		projectedInitiative.progress,
-		{ completed: 1, total: 4 },
-		"initiative progress counts only direct child roadmaps",
+		{ completed: 1, total: 8 },
+		"initiative progress combines child executable progress",
 	);
+	assert.equal(
+		projectedInitiative.status,
+		"closed",
+		"native status is retained",
+	);
+	assert.notEqual(
+		projectedInitiative.aggregateStatus,
+		"closed",
+		"open descendants prevent a closed-looking initiative",
+	);
+	assert.deepEqual(
+		projectedInitiative.tasks,
+		[],
+		"child roadmap entities and their tasks are not duplicated under the initiative",
+	);
+	const flattenedIds = projected.roadmaps.flatMap((roadmap) => [
+		roadmap.id,
+		...roadmap.tasks.flatMap(function flatten(task) {
+			return [task.id, ...task.children.flatMap(flatten)];
+		}),
+	]);
+	assert.equal(
+		new Set(flattenedIds).size,
+		flattenedIds.length,
+		"projected IDs are unique",
+	);
+	assert.equal(flattenedIds.filter((id) => id === "R-live").length, 1);
+	assert.equal(flattenedIds.filter((id) => id === "T-direct").length, 1);
+	const emptyRoadmap = projected.roadmaps.find(
+		(roadmap) => roadmap.id === "R-empty",
+	);
+	assert.deepEqual(emptyRoadmap.progress, { completed: 0, total: 0 });
+	assert.equal(
+		projectedInitiative.progress.total -
+			projected.roadmaps
+				.filter(
+					(roadmap) =>
+						roadmap.parentId === "I-live" && roadmap.id !== "R-empty",
+				)
+				.reduce(
+					(total, roadmap) => total + Math.max(1, roadmap.progress.total),
+					0,
+				),
+		1,
+		"a visible empty child roadmap contributes one open target",
+	);
+	const closedWithOpenChild = projected.roadmaps.find(
+		(roadmap) => roadmap.id === "R-closed",
+	);
+	assert.equal(closedWithOpenChild.status, "closed");
+	assert.notEqual(closedWithOpenChild.aggregateStatus, "closed");
 	assert.equal(
 		projectedInitiative.title,
 		"I-live Initiative projection with a deliberately long deterministic display title from C:\\projects\\source\\plan.md that remains stored intact",

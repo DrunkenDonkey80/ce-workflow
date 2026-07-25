@@ -2567,7 +2567,9 @@
       "dependencies": [
         "work-3.4",
         "work-3.6",
-        "work-3.7"
+        "work-3.7",
+        "work-3.8",
+        "work-3.9"
       ],
       "dependencyEdges": [],
       "description": "After the workspace/composer implementation passes automation, the project owner who requested work-3.1 must perform and approve the A7 real Pi TUI smoke. This is the durable manual evidence gate; it does not waive or replace automated composer/fallback coverage.",
@@ -2577,13 +2579,14 @@
       "notes": [
         "Dependent A7 manual decision/evidence gate. Must remain blocked until work-3.4 implementation and automated regression/final gate complete. No source ownership.",
         "wo:manual-evidence FAIL — 2026-07-25\nProject owner reported the real Pi TUI multiline/image-paste smoke failed: \"lot of stuff failed will respond with a followup prompt\".\nDetailed reproduction and observed failures are pending the project owner's follow-up. Keep work-3.5 and roadmap work-3 open; do not waive the manual gate.",
-        "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\n- Misc still exposes `Needs planning` although it has no brainstorm; hide planning readiness/actions when no brainstorm exists.\n- Tree containers need `+` when collapsed and `-` when expanded.\n- Plan, Brainstorm, Work small/medium/big, and related execution actions must start a normal visible Pi chat turn and route that turn to the appropriate skill/code path; they must not open the current weird prompt/direct-flow UX. A previous pre-goal implementation had the desired normal-chat behavior.\n- Current workspace screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f827069d-5af7-48e2-9b7a-c2ec350922fa.png\n- Visual target screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-2c7030b1-1c05-4449-adc0-ac60e84cb10d.png\n- Desired rows: initiative/idea `[-] [colored status dot] completed/total child roadmaps synthesized short title`; roadmap/brainstorm `[-] [colored status dot] completed/total tasks synthesized short title`; task `[colored status dot] synthesized short title`, preserving tree indentation.\n- Reserve the lower detail area for the selected item's full description and model/token statistics.\nResult: rejected. Keep work-3.5 open until repairs land and a new real Pi TUI smoke passes with parent, multiline, and image evidence."
+        "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\n- Misc still exposes `Needs planning` although it has no brainstorm; hide planning readiness/actions when no brainstorm exists.\n- Tree containers need `+` when collapsed and `-` when expanded.\n- Plan, Brainstorm, Work small/medium/big, and related execution actions must start a normal visible Pi chat turn and route that turn to the appropriate skill/code path; they must not open the current weird prompt/direct-flow UX. A previous pre-goal implementation had the desired normal-chat behavior.\n- Current workspace screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f827069d-5af7-48e2-9b7a-c2ec350922fa.png\n- Visual target screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-2c7030b1-1c05-4449-adc0-ac60e84cb10d.png\n- Desired rows: initiative/idea `[-] [colored status dot] completed/total child roadmaps synthesized short title`; roadmap/brainstorm `[-] [colored status dot] completed/total tasks synthesized short title`; task `[colored status dot] synthesized short title`, preserving tree indentation.\n- Reserve the lower detail area for the selected item's full description and model/token statistics.\nResult: rejected. Keep work-3.5 open until repairs land and a new real Pi TUI smoke passes with parent, multiline, and image evidence.",
+        "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\nProject owner: Flex\nScreenshots:\n- C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-962ed028-6bab-47ae-9f03-dc87d4ce6001.png\n- C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f205de2b-58bd-471c-a0db-07e9203fa2fc.png\nObserved failures after repairs d3744c3:\n- Cursor movement is very slow (~1/3 second per row).\n- On Hardware-Validated RFLib, two items appear selected; down-arrow cycles between two rows and navigation gets stuck/reversed.\n- Flexible, Low-Footprint shows 0/0 despite having a subtarget.\n- Parent Hardware-Validated RFLib appears closed/gray while children are open, so status semantics are contradictory.\n- Details header repeats fixed current model/session stats for every item; the stats do not follow the selected item's execution/model metadata.\n- Truncated raw chat/request text is not an intelligible synthesized title.\nRequested repair:\n- Generate real LLM-synthesized concise titles for items lacking them when entering the menu, show a Processing descriptions progress overlay, and persist titles per item.\n- Correct navigation, speed, progress, status, and selected-item details.\nResult: rejected. Keep work-3.5 and work-3 open until repairs land and a new real Pi TUI smoke passes, including the original parent/multiline/image Add-task evidence.\n"
       ],
       "parentId": "work-3",
       "status": "open",
       "title": "Approve real Pi TUI multiline and image-paste task flow",
       "type": "decision",
-      "updatedAt": "2026-07-25T13:38:40.861Z"
+      "updatedAt": "2026-07-25T14:41:43.550Z"
     },
     "work-3.6": {
       "acceptance": "Misc or any roadmap without its own brainstorm shows no Needs planning text and offers no Plan/Brainstorm action. Each named TUI launch calls pi.sendUserMessage exactly once with existing routed instructions and emits no subagents RPC request. RPC still uses direct role launch; print/json remain unchanged. Focused roadmap, brainstorm, start-finish, resume, telemetry, and add tests pass.",
@@ -2657,6 +2660,53 @@
       "title": "Fix stale dirty-recovery TUI routing expectation",
       "type": "bug",
       "updatedAt": "2026-07-25T14:06:25.298Z"
+    },
+    "work-3.8": {
+      "acceptance": "Every projected item ID appears once; arrow navigation moves one row promptly in both directions with one selection; filter/expansion/cursor/refresh remain stable. Initiative and roadmap progress/status truthfully aggregate actionable descendants so open children cannot render under a closed-looking parent and visible subtargets do not yield 0/0. Details follow selection and show the selected item's full description plus cached work telemetry/model/token stats, degrading to unknown. Focused roadmap/dialog/stats/add tests and npm run verify:quiet pass.",
+      "createdAt": "2026-07-25T14:41:08.822Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Fix the second owner-smoke failures in the roadmap tree: duplicate stable IDs causing two selected rows/stuck navigation, slow per-row movement, misleading 0/0 initiative progress, contradictory closed parent/open descendant status, and fixed current-session details that do not follow the selected item.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.8",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Owner screenshots: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-962ed028-6bab-47ae-9f03-dc87d4ce6001.png and C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f205de2b-58bd-471c-a0db-07e9203fa2fc.png",
+        "Implemented Phase 1 only.\nFiles changed: extensions/work-models.js, extensions/work-dialogs.js, scripts/test-work-roadmap.mjs, scripts/test-work-dialogs.mjs.\nProjection now excludes descendant epics from task trees, removes rowId aliases, rejects duplicate entity IDs before frame caching/publication, retains root-level non-epic tasks, aggregates initiative executable progress with visible empty-roadmap fallback targets, and supplies projection-only aggregateStatus while preserving native status.\nTree rendering now uses aggregateStatus for expansion/color/dimming, performs its render-cache check before resolving selection-scoped stats, never calls ctx.getContextUsage, caches resolver results by selected ID, and retains the last good frame on malformed duplicate refreshes. Workspace stats reuse renderWorkStats(buildWorkStats(...)) and degrade to unknown.\nVerification passed: node scripts/test-work-roadmap.mjs; node scripts/test-work-dialogs.mjs; node scripts/test-work-stats.mjs; node scripts/test-work-add.mjs. Package-wide gate intentionally not run per handoff.\nRemaining risk: real Pi TUI perceived key latency and owner smoke remain for parent/reviewer; native initiative hierarchy currently disallows direct task children, though projection preserves any root-level non-epic descendants it receives.\n",
+        "wo:review-scope [\"extensions/work-dialogs.js\",\"extensions/work-models.js\",\"scripts/test-work-dialogs.mjs\",\"scripts/test-work-roadmap.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:16227 - High: workspace resolveStats calls buildWorkStats with legacy import enabled from the synchronous render path; selecting an unimported closed row can scan every .pi/work-runs/history/session file and write telemetry, preserving the per-row latency this task must remove. Call buildWorkStats with { importLegacy: false } (or otherwise keep legacy scanning off the render path) and add a focused regression check.\"]}",
+        "wo:review PASS Targeted latency fix disables legacy stats import; roadmap/dialog focused tests and npm run verify:quiet passed.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Repair roadmap workspace navigation and truthful aggregates",
+      "type": "task",
+      "updatedAt": "2026-07-25T15:17:45.725Z"
+    },
+    "work-3.9": {
+      "acceptance": "Items with a valid persisted synthesized title reuse it without a model call. Missing initiative/roadmap/task titles are batch-synthesized from stored context before the workspace opens, visibly report Processing descriptions progress, validate concise plain-language output, persist per item, and safely fall back on generation failure/cancel. Rich Add-task image attachments are decoded to unique files under an ignored durable project artifact directory, transformed to path references with media metadata, and no base64/data URL enters the user text or WorkItem store; multiline text and selected parent remain intact. RPC/print/native fallback and text-only Add-task remain unchanged. Focused roadmap/add/dialog tests and npm run verify:quiet pass.",
+      "createdAt": "2026-07-25T14:41:18.248Z",
+      "dependencies": [
+        "work-3.8"
+      ],
+      "dependencyEdges": [],
+      "description": "Replace truncated raw request/chat display text with real model-synthesized concise titles. On roadmap workspace entry, generate missing titles with an explicit Processing descriptions loader/progress experience and persist them per item. In the rich Add-task composer, materialize pasted image data to durable project files and pass/store only file references instead of base64/data URLs.",
+      "evidence": [],
+      "id": "work-3.9",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Project owner explicitly requested file references instead of base64 for pasted images."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Persist model-synthesized titles and file-backed task images",
+      "type": "task",
+      "updatedAt": "2026-07-25T14:41:43.235Z"
     }
   },
   "metadata": {
@@ -2666,7 +2716,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T14:22:28.222Z"
+    "updatedAt": "2026-07-25T15:17:45.726Z"
   },
   "schemaVersion": 1
 }

@@ -536,36 +536,17 @@ export async function showListDialog(ctx, options) {
 	);
 }
 
-function treeStatusColor(row) {
-	if (
-		row.attention ||
-		["blocked", "paused", "needs_attention"].includes(row.status)
-	)
-		return "warning";
-	if (row.live || row.engaged || row.status === "in_progress") return "success";
-	if (row.status === "closed") return "dim";
-	return "muted";
+function treeVisualStatus(row) {
+	return row.aggregateStatus ?? row.status;
 }
 
-function treeContextStats(ctx) {
-	let session = "unknown";
-	let usage;
-	try {
-		session = ctx?.sessionManager?.getSessionId?.() || "unknown";
-		usage = ctx?.getContextUsage?.();
-	} catch {
-		// Optional Pi context APIs vary by host version.
-	}
-	const model =
-		[ctx?.model?.provider, ctx?.model?.id ?? ctx?.model?.name]
-			.filter(Boolean)
-			.join("/") || "unknown";
-	const tokens = usage?.tokens ?? "unknown";
-	const limit = usage?.maxTokens ?? usage?.contextWindow;
-	return [
-		`Model: ${model} · Session: ${session}`,
-		`Tokens: ${tokens}${limit == null ? "" : `/${limit}`}`,
-	];
+function treeStatusColor(row) {
+	const status = treeVisualStatus(row);
+	if (row.attention || ["blocked", "paused", "needs_attention"].includes(status))
+		return "warning";
+	if (row.live || row.engaged || status === "in_progress") return "success";
+	if (status === "closed") return "dim";
+	return "muted";
 }
 
 export async function showTreeWorkspaceDialog(ctx, options) {
@@ -580,9 +561,15 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		cleanup,
 		cursorKey = title,
 		filter = true,
+		resolveStats,
 	} = options;
 	const rootsFor = (frame) => {
 		const roadmaps = frame?.roadmaps ?? [];
+		const seen = new Set();
+		const remember = (row) => {
+			if (seen.has(row.id)) throw new Error(`Duplicate work item ID: ${row.id}`);
+			seen.add(row.id);
+		};
 		const byParent = new Map();
 		for (const row of roadmaps) {
 			const parent = row.parentId ?? "";
@@ -590,12 +577,14 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 			byParent.get(parent).push(row);
 		}
 		const appendTasks = (rows, task, depth) => {
+			remember(task);
 			rows.push({ ...task, depth, container: Boolean(task.children?.length) });
 			for (const child of task.children ?? [])
 				appendTasks(rows, child, depth + 1);
 		};
 		const appendRoadmaps = (rows, parent = "", depth = 0) => {
 			for (const roadmap of byParent.get(parent) ?? []) {
+				remember(roadmap);
 				rows.push({
 					...roadmap,
 					depth,
@@ -647,9 +636,12 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 			let timer;
 			let cachedKey;
 			let cachedLines;
+			const statsById = new Map();
 
 			const expanded = (row) =>
-				expansion.has(row.id) ? expansion.get(row.id) : row.status !== "closed";
+				expansion.has(row.id)
+					? expansion.get(row.id)
+					: treeVisualStatus(row) !== "closed";
 			const rebuild = () => {
 				const hiddenDepths = [];
 				const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -684,8 +676,9 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 				try {
 					const next = await refresh?.();
 					if (!next?.ok || next.signature === frame?.signature) return;
+					const nextRows = rootsFor(next);
 					frame = next;
-					rows = rootsFor(frame);
+					rows = nextRows;
 					rebuild();
 					tui.requestRender();
 				} catch {
@@ -700,9 +693,17 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 				render(width) {
 					const height = workspaceHeight(tui);
 					const renderWidth = Math.max(1, width - 2);
-					const stats = treeContextStats(ctx);
-					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}:${stats.join("|")}`;
+					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}`;
 					if (cache === cachedKey) return cachedLines;
+					const selected = visible.find((row) => row.id === selectedId);
+					if (selected && !statsById.has(selected.id)) {
+						try {
+							statsById.set(selected.id, resolveStats?.(selected.id) ?? ["Stats:", "- unknown"]);
+						} catch {
+							statsById.set(selected.id, ["Stats:", "- unknown"]);
+						}
+					}
+					const stats = statsById.get(selected?.id) ?? ["Stats:", "- unknown"];
 					const lines = [];
 					const add = (line = "") =>
 						lines.push(fit(line || "\u00a0", renderWidth));
@@ -744,7 +745,11 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 							const prefix = `${theme.fg(selected ? "accent" : "text", selected ? "❯" : " ")} ${"  ".repeat(row.depth)}${marker} `;
 							const dot = theme.fg(treeStatusColor(row), "●");
 							const title = theme.fg(
-								selected ? "accent" : row.status === "closed" ? "dim" : "text",
+								selected
+									? "accent"
+									: treeVisualStatus(row) === "closed"
+										? "dim"
+										: "text",
 								`${progress}${row.shortTitle ?? row.title ?? row.label ?? row.id}`,
 							);
 							add(`${prefix}${dot} ${title}`);
@@ -753,7 +758,6 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					add(sectionLine(theme, "Details", renderWidth));
 					const statLines = stats.map((line) => fit(line, renderWidth).trimEnd());
 					for (const line of statLines) add(theme.fg("muted", line));
-					const selected = visible.find((row) => row.id === selectedId);
 					const details = wrapText(
 						selected?.description || "No description.",
 						renderWidth,
