@@ -242,8 +242,9 @@ try {
 	const bigDirect = directRoleHandoffParams(state, fixture.cwd);
 	assert(
 		state.handoffPrompt.includes("big slice") &&
-			bigDirect?.agent === "work-planner",
-		"big handoff carries big posture and directly selects the planner",
+			bigDirect?.agent === "work-planner" &&
+			state.selectedWorkItem.labels.includes("wo:planning"),
+		"big creates a labelled planning intake and directly selects the planner",
 	);
 	assert(
 		bigDirect.params.task.length < 1800 &&

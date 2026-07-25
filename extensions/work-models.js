@@ -5331,6 +5331,24 @@ function childrenOf(cwd, epicId) {
 	}
 }
 
+function descendantsOf(cwd, parentId) {
+	const byParent = new Map();
+	for (const item of allWorkItems(cwd)) {
+		const children = byParent.get(parentOf(item)) ?? [];
+		children.push(item);
+		byParent.set(parentOf(item), children);
+	}
+	const descendants = [];
+	const pending = [parentId];
+	while (pending.length) {
+		for (const item of byParent.get(pending.pop()) ?? []) {
+			descendants.push(item);
+			pending.push(idOf(item));
+		}
+	}
+	return descendants;
+}
+
 function readyIds(cwd, epicId) {
 	try {
 		return new Set(
@@ -5797,6 +5815,7 @@ function issueSummary(issue) {
 		summary.reviewRounds = reviewEvents(issue).length;
 		summary.reviewFailures = reviewFailureCount(issue);
 		summary.fixReadyForReview = fixReadyForReview(issue);
+		summary.residualFixAccepted = residualFixAccepted(issue);
 	}
 	return summary;
 }
@@ -6540,7 +6559,7 @@ function byCreatedAsc(a, b) {
 
 function buildEpicChildState(cwd, epic) {
 	const epicId = idOf(epic);
-	const children = childrenOfRequired(cwd, epicId);
+	const children = descendantsOf(cwd, epicId);
 	const byId = new Map(children.map((issue) => [idOf(issue), issue]));
 	const workItems = children.filter(isWorkSlice);
 	const planning = workItems.filter(
@@ -6833,12 +6852,16 @@ function planResumeAction(state, cwd) {
 				`/work-report ${activeImplementation.id}`,
 			],
 		});
-		if (activeImplementation.reviewPassed)
+		if (
+			activeImplementation.reviewPassed ||
+			activeImplementation.residualFixAccepted
+		)
 			return {
 				...routed,
 				action: "finish-ready",
-				message:
-					"Implementation is verified and reviewed; use the coded finish gate.",
+				message: activeImplementation.reviewPassed
+					? "Implementation is verified and reviewed; use the coded finish gate."
+					: "Targeted re-review residuals are fixed and verified; finish without a third reviewer.",
 				suggestedCommands: [`/work-finish ${activeImplementation.id}`],
 			};
 		if ((activeImplementation.reviewFailures ?? 0) >= 2)
@@ -9600,6 +9623,7 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 			title: parsed.task,
 			type: "task",
 			parent: idOf(resolved.epic),
+			labels: ["wo:planning"],
 			notes: workflowWorkItemNotes(`/work-${size}`, parsed.task, [
 				"wo:planning",
 				posture,
@@ -11449,6 +11473,69 @@ function fixReadyForReview(issue) {
 	return (
 		notes.toLowerCase().lastIndexOf("wo:fix pass") >
 		notes.toLowerCase().lastIndexOf("wo:review fail")
+	);
+}
+
+function targetedReviewFindings(issue) {
+	const matches = [
+		...notesOf(issue).matchAll(/^wo:review FAIL(?:\s*-\s*|\s+)(.+)$/gim),
+	];
+	const match = matches.at(-1);
+	if (!match) return undefined;
+	const payload = match[1].trim();
+	try {
+		const value = JSON.parse(payload);
+		if (Array.isArray(value.findings)) {
+			const findings = value.findings.filter(
+				(item) => typeof item === "string" && item.trim(),
+			);
+			if (findings.length === value.findings.length && findings.length)
+				return { index: match.index, findings };
+		}
+	} catch {
+		// Legacy compact reviewer notes carry one finding after the FAIL marker.
+	}
+	return payload ? { index: match.index, findings: [payload] } : undefined;
+}
+
+function residualDisposition(issue) {
+	const matches = [
+		...notesOf(issue).matchAll(/^wo:residual-fix PASS (\{.*\})$/gim),
+	];
+	for (const match of matches.reverse()) {
+		try {
+			const value = JSON.parse(match[1]);
+			if (
+				Array.isArray(value.dispositions) &&
+				value.dispositions.length > 0 &&
+				value.dispositions.every((item) =>
+					["finding", "fix", "evidence"].every(
+						(key) => typeof item?.[key] === "string" && item[key].trim(),
+					),
+				)
+			)
+				return { index: match.index, dispositions: value.dispositions };
+		} catch {
+			// Ignore malformed disposition notes and require a valid one.
+		}
+	}
+	return undefined;
+}
+
+function residualFixAccepted(issue) {
+	const target = targetedReviewFindings(issue);
+	const disposition = residualDisposition(issue);
+	return (
+		reviewFailureCount(issue) >= 2 &&
+		target &&
+		disposition?.index > target.index &&
+		disposition.dispositions.length === target.findings.length &&
+		target.findings.every(
+			(finding) =>
+				disposition.dispositions.filter((item) => item.finding === finding)
+					.length === 1,
+		) &&
+		hasVerificationEvidence(issue)
 	);
 }
 

@@ -10,6 +10,10 @@ const prompt = readFileSync(
 
 for (const requirement of [
 	"completionGuard: false",
+	"bash, write, contact_supervisor",
+	"labels, notes, or authoritative handoff as a planning intake",
+	"requested date-prefixed `docs/plans/*-plan.md` file",
+	"intended-but-missing plan path",
 	"implementation units as traceability boundaries, never as the default child shape",
 	"A child may cover parts of several units",
 	"do not mirror them as sequential work items",

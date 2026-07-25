@@ -59,6 +59,24 @@ function childWorkItems(parentId) {
 	);
 }
 
+function descendantIds(parentId) {
+	const byParent = new Map();
+	for (const item of Object.values(loadStore(cwd).items)) {
+		const children = byParent.get(item.parentId) ?? [];
+		children.push(item);
+		byParent.set(item.parentId, children);
+	}
+	const ids = new Set();
+	const pending = [parentId];
+	while (pending.length) {
+		for (const item of byParent.get(pending.pop()) ?? []) {
+			ids.add(item.id);
+			pending.push(item.id);
+		}
+	}
+	return ids;
+}
+
 function readyNativeWorkItems() {
 	return readyWorkItems(loadStore(cwd));
 }
@@ -124,10 +142,92 @@ function reviewerHandoff(id, implementationFiles, reviewReasons) {
 		`Review reasons: ${reviewReasons.join("; ")}`,
 		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${id}.`,
 		"Reviewer coordination: this handoff is complete. Do not contact the supervisor; return BLOCKED immediately if any supplied path or command is unusable.",
-		"Finish retry: rerun the same finish-task command with --reviewed only after durable PASS evidence.",
-		"FAIL recovery: after fixes and verification, rerun the same finish-task command without --reviewed to regenerate this complete handoff; never handcraft a targeted re-review task.",
+		"Finish retry: rerun the same finish-task command with --reviewed after durable PASS evidence, or after fixing and verifying residual findings from the targeted re-review.",
+		"FAIL recovery: after the initial review, fix and verify findings, then rerun the same finish-task command without --reviewed to regenerate this complete handoff; never handcraft a targeted re-review task. After that targeted re-review, fix and verify residuals and use --reviewed without launching a third reviewer.",
 		"Reviewer liveness: use the coded async handoff; needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. Prefer no explicit timeout; otherwise use at least 10 minutes.",
 	].join("\n");
+}
+
+function sameFiles(left = [], right = []) {
+	return (
+		JSON.stringify([...left].sort()) === JSON.stringify([...right].sort())
+	);
+}
+
+function reviewScope(task) {
+	const matches = [...notesOf(task).matchAll(/^wo:review-scope (.+)$/gim)];
+	try {
+		return matches.length ? JSON.parse(matches.at(-1)[1]) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function targetedReviewFindings(task) {
+	const matches = [
+		...notesOf(task).matchAll(/^wo:review FAIL(?:\s*-\s*|\s+)(.+)$/gim),
+	];
+	const match = matches.at(-1);
+	if (!match) return undefined;
+	const payload = match[1].trim();
+	try {
+		const value = JSON.parse(payload);
+		if (Array.isArray(value.findings)) {
+			const findings = value.findings.filter(
+				(item) => typeof item === "string" && item.trim(),
+			);
+			if (findings.length === value.findings.length && findings.length)
+				return { index: match.index, findings };
+		}
+	} catch {
+		// Legacy compact reviewer notes carry one finding after the FAIL marker.
+	}
+	return payload ? { index: match.index, findings: [payload] } : undefined;
+}
+
+function residualDisposition(task) {
+	const matches = [
+		...notesOf(task).matchAll(/^wo:residual-fix PASS (\{.*\})$/gim),
+	];
+	for (const match of matches.reverse()) {
+		try {
+			const value = JSON.parse(match[1]);
+			if (
+				Array.isArray(value.dispositions) &&
+				value.dispositions.length > 0 &&
+				value.dispositions.every((item) =>
+					["finding", "fix", "evidence"].every(
+						(key) => typeof item?.[key] === "string" && item[key].trim(),
+					),
+				)
+			)
+				return { index: match.index, dispositions: value.dispositions };
+		} catch {
+			// Ignore malformed disposition notes and require a valid one.
+		}
+	}
+	return undefined;
+}
+
+function reviewDispositionSatisfied(task) {
+	const notes = notesOf(task);
+	const reviews = [
+		...notes.matchAll(/(?:wo:review|review(?: result)?):?\s*(PASS|FAIL)\b/gi),
+	];
+	if (reviews.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
+	const target = targetedReviewFindings(task);
+	const disposition = residualDisposition(task);
+	return (
+		reviews.filter((event) => event[1]?.toUpperCase() === "FAIL").length >= 2 &&
+		target &&
+		disposition?.index > target.index &&
+		disposition.dispositions.length === target.findings.length &&
+		target.findings.every(
+			(finding) =>
+				disposition.dispositions.filter((item) => item.finding === finding)
+					.length === 1,
+		)
+	);
 }
 
 function formatPendingFiles() {
@@ -259,8 +359,7 @@ function finishTask() {
 		const normalized = file.replaceAll("\\", "/");
 		return (
 			!normalized.startsWith(".ce-workflow/") &&
-			normalized !== ".ce-workflow/work-items.json" &&
-			normalized !== ".gitignore"
+			normalized !== ".ce-workflow/work-items.json"
 		);
 	});
 	if (implementationFiles.length > maxFiles)
@@ -320,10 +419,31 @@ function finishTask() {
 	)
 		reviewReasons.push("hardware/live-evidence contract");
 	if (reviewReasons.length) {
-		if (!args.includes("--reviewed"))
+		const reviewed = args.includes("--reviewed");
+		const priorScope = reviewScope(task);
+		if (!reviewed) {
+			if (!sameFiles(priorScope, implementationFiles))
+				mutateStore(cwd, (store) =>
+					appendWorkNote(
+						store,
+						id,
+						`wo:review-scope ${JSON.stringify(implementationFiles)}`,
+					),
+				);
 			throw new Error(reviewerHandoff(id, implementationFiles, reviewReasons));
-		if (!/(?:wo:review|review(?: result)?):?\s*PASS\b/i.test(notesOf(task)))
-			throw new Error("--reviewed requires durable wo:review PASS evidence");
+		}
+		if (!priorScope)
+			throw new Error(
+				"--reviewed requires a persisted wo:review-scope; rerun finish-task without --reviewed to generate the coded handoff",
+			);
+		if (!sameFiles(priorScope, implementationFiles))
+			throw new Error(
+				"review scope changed; rerun finish-task without --reviewed to regenerate the coded handoff",
+			);
+		if (!reviewDispositionSatisfied(task))
+			throw new Error(
+				"--reviewed requires durable wo:review PASS evidence or a verified residual fix after the targeted re-review",
+			);
 	}
 	if (verificationCommand)
 		mutateStore(cwd, (store) =>
@@ -447,11 +567,8 @@ function parentOf(issue) {
 
 function notesOf(issue) {
 	const notes = field(issue, "notes", "description", "body") ?? "";
-	return Array.isArray(notes)
-		? notes.join("\n")
-		: typeof notes === "string"
-			? notes
-			: JSON.stringify(notes ?? "");
+	if (Array.isArray(notes)) return notes.join("\n");
+	return typeof notes === "string" ? notes : JSON.stringify(notes ?? "");
 }
 
 function depsOf(issue) {
@@ -475,6 +592,10 @@ function summary(issue, notesTail = 2000) {
 		parentId: parentOf(issue),
 		dependencies: depsOf(issue),
 		updatedAt: field(issue, "updatedAt", "updated_at"),
+		description: String(issue?.description ?? "").slice(0, 4000),
+		design: String(issue?.design ?? "").slice(0, 4000),
+		acceptance: String(field(issue, "acceptance", "acceptance_criteria") ?? "").slice(0, 4000),
+		evidence_tail: arr(issue?.evidence).slice(-3),
 		notes_tail: notesOf(issue).slice(-notesTail),
 	};
 }
@@ -573,7 +694,7 @@ try {
 		const epic = args[0];
 		print(
 			readyNativeWorkItems()
-				.filter((issue) => !epic || parentOf(issue) === epic)
+				.filter((issue) => !epic || descendantIds(epic).has(idOf(issue)))
 				.map((issue) => ({
 					id: idOf(issue),
 					title: titleOf(issue),
@@ -635,12 +756,11 @@ try {
 			byFile[file] = (byFile[file] ?? 0) + 1;
 		}
 		const capped = capText(raw, bytes);
+		let status = "PASS";
+		if (lines.length) status = "found";
+		else if (command === "scan-capability") status = "missing";
 		print({
-			status: lines.length
-				? "found"
-				: command === "scan-capability"
-					? "missing"
-					: "PASS",
+			status,
 			exit_code: exitCode,
 			query,
 			match_count: lines.length,
@@ -779,8 +899,7 @@ try {
 			"../extensions/work-models.js"
 		);
 		const projection = buildInitiativeProjection(cwd);
-		if (!target) print(projection);
-		else {
+		if (target) {
 			const root = projection.nodes.find((node) => node.id === target);
 			if (!root) throw new Error(`Initiative or roadmap not found: ${target}`);
 			print({
@@ -791,7 +910,7 @@ try {
 					...projection.nodes.filter((node) => node.parentId === root.id),
 				],
 			});
-		}
+		} else print(projection);
 	} else if (command === "initiative-preview") {
 		const [proposalFile] = positional();
 		const proposalJson = option("--proposal-json");

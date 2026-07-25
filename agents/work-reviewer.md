@@ -34,7 +34,7 @@ Review the assigned work item by inspecting:
 Report exactly one outcome and persist the same verdict before returning:
 
 - `PASS` when the diff satisfies the work item and verification/Acceptance Contract evidence is adequate; append `wo:review PASS` plus one-line evidence.
-- `FAIL` when fixes are required, required verification/Acceptance Contract evidence is missing, or failed product evidence lacks a linked debug/blocked work item unless the work item acceptance is explicitly evidence-capture only; append `wo:review FAIL` plus the smallest required fix.
+- `FAIL` when fixes are required, required verification/Acceptance Contract evidence is missing, or failed product evidence lacks a linked debug/blocked work item unless the work item acceptance is explicitly evidence-capture only; append one single-line `wo:review FAIL {"findings":["file:line - exact required fix"]}` note with one distinct string per finding. This structured list is the coded contract for targeted residual disposition.
 
 If the scoped code satisfies acceptance but an out-of-scope tracked instruction file such as `AGENTS.md` has only whitespace-only dirt, do not fail the implementation for that alone. Report it as a parent cleanup note unless it conflicts with the work item or appears staged for commit.
 

@@ -249,6 +249,24 @@ const childrenByScenario = {
 			labels: ["wo:slice-planned"],
 		},
 	],
+	nestedPlanningReady: [
+		{
+			id: "PLAN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "closed",
+			title: "Closed planning container",
+			labels: ["wo:planning"],
+		},
+		{
+			id: "IMP-NESTED",
+			parent_id: "PLAN-1",
+			issue_type: "task",
+			status: "open",
+			title: "Ready executable grandchild",
+			labels: ["wo:slice-planned"],
+		},
+	],
 	inProgressVerifiedAgent: [
 		{
 			id: "IMP-BIG",
@@ -324,7 +342,18 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL - two",
+				'wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL {"findings":["residual A","residual B"]}\nwo:fix PASS - generic residual summary\nwo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"only one fix","evidence":"one test"}]}',
+		},
+	],
+	inProgressResidualFix: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL {"findings":["residual A","residual B"]}\nwo:fix PASS - both residuals fixed; tests passed\nwo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"bounded guard","evidence":"focused test A passed"},{"finding":"residual B","fix":"scope guard","evidence":"focused test B passed"}]}',
 		},
 	],
 	blocked: [
@@ -638,6 +667,14 @@ try {
 	);
 	assert(state.selectedWorkItem.id === "IMP-1", "ready implementation wins");
 
+	setScenario("nestedPlanningReady");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-implementation" &&
+			state.selectedWorkItem.id === "IMP-NESTED",
+		"resume discovers executable grandchildren below closed planning containers",
+	);
+
 	setScenario("inProgressSensitiveContract");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
@@ -711,7 +748,16 @@ try {
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "review-blocked" && !state.handoffPrompt,
-		"one initial review plus one re-review is the hard coded limit",
+		"the review cap rejects incomplete residual-finding disposition",
+	);
+
+	setScenario("inProgressResidualFix");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "finish-ready" &&
+			state.selectedWorkItem.residualFixAccepted &&
+			!state.handoffPrompt,
+		"verified residual fixes after targeted re-review finish without a third reviewer",
 	);
 
 	setScenario("blocked");

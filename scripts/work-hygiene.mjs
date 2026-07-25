@@ -9,6 +9,7 @@ import path from "node:path";
 
 const RUNTIME_PREFIXES = [
 	/^\.pi(?:-subagents)?\//,
+	/^\.ce-workflow\/work-runs\//,
 	/^work-[^/]+-(?:workItem-small|workItem-worker)\.md$/,
 ];
 
