@@ -23,7 +23,7 @@ function itemIndicator(item, { checked, currentValue, multi } = {}) {
 function indicatedPrefix(item, options, align = true) {
 	const indicator = itemIndicator(item, options);
 	if (!align) return indicator === " " ? "" : indicator;
-	return `${options?.selected ? ">" : " "} ${indicator}`;
+	return `${options?.selected ? "❯" : " "} ${indicator}`;
 }
 
 function indicatedLabel(item, options, align = true) {
@@ -58,19 +58,12 @@ const terminalEmojiExtraCells = new Map([
 	["🧽", 1],
 ]);
 
-function emojiExtraCells(value) {
-	const text = stripAnsi(value);
-	for (const [emoji, cells] of terminalEmojiExtraCells)
-		if (text.includes(emoji)) return cells;
-	return 0;
-}
-
 function cellWidth(segment) {
 	if (
 		/\p{Emoji_Presentation}/u.test(segment) ||
 		/[\uFE0F\u200D]/u.test(segment)
 	)
-		return 2;
+		return 2 + (terminalEmojiExtraCells.get(segment) ?? 0);
 	const code = segment.codePointAt(0) ?? 0;
 	if (
 		/^\p{Mark}+$/u.test(segment) ||
@@ -100,7 +93,7 @@ function visibleWidth(value) {
 
 function fit(value, width) {
 	const text = String(value);
-	const safeWidth = Math.max(1, width - emojiExtraCells(text));
+	const safeWidth = Math.max(1, width);
 	const visible = visibleWidth(text);
 	if (visible <= safeWidth) return `${text}${" ".repeat(safeWidth - visible)}`;
 	let result = "";
@@ -138,18 +131,16 @@ function wrapText(value, width, maxLines) {
 	return lines;
 }
 
-function frame(theme, title, content, width) {
-	// Overlay rendering reserves a cursor cell; keep two more clear of autowrap.
-	const inner = Math.max(8, width - 4);
-	const border = (text) => theme.fg("border", text);
-	const row = (text = "") =>
-		`${border("│")}${fit(` ${visibleWidth(text) ? text : "\u00a0"}`, inner)}${border("│")}`;
-	return [
-		border(`╭${"─".repeat(inner)}╮`),
-		row(theme.fg("accent", theme.bold(title))),
-		...content.map(row),
-		border(`╰${"─".repeat(inner)}╯`),
-	];
+function sectionLine(theme, title, width) {
+	const label = ` ${title} `;
+	return theme.fg(
+		"border",
+		`${label}${"─".repeat(Math.max(0, width - visibleWidth(label)))}`,
+	);
+}
+
+function workspaceHeight(tui) {
+	return Math.max(1, (tui.terminal?.rows ?? 24) - 1);
 }
 
 function initialIndex(items, { cursorKey, currentValue, selectedIndex }) {
@@ -241,8 +232,6 @@ export async function showListDialog(ctx, options) {
 		help: initialHelp,
 		descriptionMaxLines = 3,
 		descriptionMinLines = 0,
-		fixedHeight = false,
-		fixedItemRows,
 		selectOnSpace = false,
 		tabAction,
 		onInput,
@@ -311,105 +300,113 @@ export async function showListDialog(ctx, options) {
 			const component = {
 				focused: false,
 				render(width) {
-					const content = [theme.fg("muted", purpose), ""];
-					if (subtitleLines.length)
-						content.push(
-							...subtitleLines.map((line) => theme.fg("dim", line)),
-							"",
-						);
+					const height = workspaceHeight(tui);
+					const lines = [];
+					const add = (line = "") => lines.push(fit(line || "\u00a0", width));
+					const inline = source.some((item) => item.inlineDescription);
+					const detailRows = inline
+						? 0
+						: Math.max(descriptionMinLines, descriptionMaxLines);
+					const shownSubtitles = subtitleLines.slice(
+						0,
+						Math.max(0, height - detailRows - 8),
+					);
+
+					add(
+						`${theme.fg("accent", theme.bold(title))}  ${theme.fg(
+							"dim",
+							`${visible.length}/${source.length}${multi ? ` · ${enabled.size} selected` : ""}`,
+						)}`,
+					);
+					add(theme.fg("muted", purpose));
+					for (const line of shownSubtitles) add(theme.fg("dim", line));
 					if (filter) {
 						const cursor = component.focused ? "▌" : "";
-						content.push(
-							fit(`Filter: ${query}${cursor}`, Math.max(1, width - 4)),
-							"",
+						add(
+							`${theme.fg("muted", "Filter:")} ${theme.fg("text", `${query}${cursor}`)}`,
 						);
 					}
-					if (!visible.length) content.push(theme.fg("warning", "No matches"));
-					else {
-						const count = Math.min(
-							visible.length,
-							source.some((item) => item.inlineDescription) ? 6 : 12,
+
+					const detailBlockRows = detailRows ? detailRows + 1 : 0;
+					const footerRows = 2;
+					const listRows = Math.max(
+						1,
+						height - lines.length - detailBlockRows - footerRows - 1,
+					);
+					const itemRows = inline ? 2 : 1;
+					const count = Math.max(
+						1,
+						Math.min(visible.length, Math.floor(listRows / itemRows)),
+					);
+					const start = Math.max(
+						0,
+						Math.min(index - Math.floor(count / 2), visible.length - count),
+					);
+					const position = visible.length
+						? `${index + 1}/${visible.length}`
+						: "0/0";
+					add(
+						sectionLine(
+							theme,
+							multi ? `Checklist · ${position}` : `Options · ${position}`,
+							width,
+						),
+					);
+
+					const body = [];
+					if (!visible.length) body.push(theme.fg("warning", " No matches"));
+					for (let row = start; row < start + count && visible[row]; row += 1) {
+						const item = visible[row].item;
+						const state = {
+							checked: enabled.has(item.value),
+							currentValue,
+							multi: Boolean(multi),
+							selected: row === index,
+						};
+						let color = item.color ?? "text";
+						if (row === index && !item.color) color = "accent";
+						else if (multi) color = enabled.has(item.value) ? "success" : "dim";
+						else if (item.enabled === true) color = "success";
+						else if (item.enabled === false) color = "dim";
+						else if (item.value === currentValue) color = "success";
+						body.push(
+							item.labelSegments
+								? styledLabel(theme, item, state, color)
+								: theme.fg(color, indicatedLabel(item, state)),
 						);
-						const start = Math.max(
-							0,
-							Math.min(index - Math.floor(count / 2), visible.length - count),
-						);
-						for (let row = start; row < start + count; row += 1) {
-							const item = visible[row].item;
-							const text = indicatedLabel(item, {
-								checked: enabled.has(item.value),
-								currentValue,
-								multi: Boolean(multi),
-								selected: row === index,
-							});
-							let color = item.color ?? "text";
-							if (row === index && !item.color) color = "accent";
-							else if (multi)
-								color = enabled.has(item.value) ? "success" : "dim";
-							else if (item.enabled === true) color = "success";
-							else if (item.enabled === false) color = "dim";
-							else if (item.value === currentValue) color = "success";
-							content.push(
-								item.labelSegments
-									? styledLabel(
-											theme,
-											item,
-											{
-												checked: enabled.has(item.value),
-												currentValue,
-												multi: Boolean(multi),
-												selected: row === index,
-											},
-											color,
-										)
-									: theme.fg(color, text),
+						if (item.inlineDescription)
+							body.push(
+								theme.fg(
+									"muted",
+									`${item.descriptionPrefix ?? "   "}${item.description ?? "No short description yet."}`,
+								),
 							);
-							if (item.inlineDescription)
-								content.push(
-									theme.fg(
-										"muted",
-										`${item.descriptionPrefix ?? "   "}${item.description ?? "No short description yet."}`,
-									),
-								);
-						}
-						if (visible.length > count)
-							content.push(theme.fg("dim", `${index + 1}/${visible.length}`));
+					}
+					while (body.length < listRows) body.push("\u00a0");
+					for (const line of body.slice(0, listRows)) add(line);
+
+					if (detailRows) {
+						add(sectionLine(theme, "Details", width));
 						const selected = visible[index]?.item;
-						if (selected?.description && !selected.inlineDescription) {
-							const details = wrapText(
-								selected.description,
-								Math.max(8, width - 5),
-								descriptionMaxLines,
-							);
-							while (details.length < descriptionMinLines) details.push("");
-							content.push(
-								"",
-								...details.map((line) => theme.fg("muted", line)),
-							);
-						}
+						const details = wrapText(
+							selected?.description ?? "No description.",
+							Math.max(8, width - 2),
+							detailRows,
+						);
+						while (details.length < detailRows) details.push("");
+						for (const line of details.slice(0, detailRows))
+							add(theme.fg("muted", line));
 					}
-					if (fixedHeight) {
-						const inline = source.some((item) => item.inlineDescription);
-						const maxRows = inline ? 6 : 12;
-						const rowCount = Math.min(fixedItemRows ?? source.length, maxRows);
-						const fixedBodyLines =
-							2 +
-							(subtitleLines.length ? subtitleLines.length + 1 : 0) +
-							(filter ? 2 : 0) +
-							rowCount +
-							((fixedItemRows ?? source.length) > maxRows ? 1 : 0) +
-							(inline
-								? 0
-								: 1 + Math.max(descriptionMinLines, descriptionMaxLines));
-						while (content.length < fixedBodyLines) content.push("");
-					}
+
 					let defaultHelp = "↑↓ navigate · Enter select · Esc/Backspace back";
 					if (multi)
 						defaultHelp =
 							"↑↓ navigate · Enter/Space toggle · Esc/Backspace save and go back";
 					if (filter) defaultHelp = `Type to filter · ${defaultHelp}`;
-					content.push("", theme.fg("dim", help ?? defaultHelp));
-					return frame(theme, title, content, width);
+					add(sectionLine(theme, "Keys", width));
+					add(theme.fg("dim", help ?? defaultHelp));
+					while (lines.length < height) add();
+					return lines.slice(0, height);
 				},
 				handleInput(data) {
 					const selected = visible[index];
@@ -521,10 +518,8 @@ export async function showListDialog(ctx, options) {
 			overlay: true,
 			overlayOptions: {
 				anchor: "center",
-				width: "70%",
-				minWidth: 54,
-				maxHeight: "95%",
-				margin: 1,
+				width: "100%",
+				maxHeight: "100%",
 			},
 		},
 	);
