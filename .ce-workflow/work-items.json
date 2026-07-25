@@ -2479,6 +2479,34 @@
       "type": "task",
       "updatedAt": "2026-07-25T08:06:14.837Z"
     },
+    "work-3.10": {
+      "acceptance": "F7 Roadmaps processes missing initiative/roadmap/task display titles with at most 8 concurrent model requests, updates one visible  loader as items finish, persists each valid item safely, and handles/retries or reports invalid per-item outputs without aborting or discarding successful titles. Existing persisted titles cause zero calls; cancellation stops new work cleanly; no store corruption/duplicate requests; focused roadmap tests and npm run verify:quiet pass; real owner TUI smoke no longer emits the work-1.5.8 warning and visibly advances.",
+      "createdAt": "2026-07-25T15:54:33.612Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Real Pi TUI title backfill after 28ed6df aborts with , runs too slowly, and gives no useful progress. Diagnose the exact invalid output/validation path, then make missing-title generation visibly progressive and bounded-concurrent (target 8 model requests) so one invalid item does not discard valid generated titles.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.10",
+      "labels": [],
+      "notes": [
+        "wo:debug-needed. Exact live failure: Could not process descriptions: Invalid display title for work-1.5.8. Owner requests about 8 concurrent agents/model calls and visible progress.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-roadmap.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:16173 - Include type and the last-three-notes context in displayMetadataFingerprint (or fingerprint the exact serialized request context) so a concurrent type/notes change cannot persist stale generated metadata; add the corresponding overlap regression.\",\"work-3.10:acceptance - Attach the required real owner TUI smoke evidence showing visible progress and no work-1.5.8 warning; focused and verify:quiet harness passes do not satisfy this live-product requirement.\"]}",
+        "wo:review FAIL {\"findings\":[\"work-3.10:acceptance - Attach the required real owner TUI smoke evidence showing visible progress and no work-1.5.8 warning; focused roadmap and verify:quiet passes do not satisfy this live-product requirement.\"]}",
+        "wo:manual-evidence PASS — real owner TUI smoke, 2026-07-25\nProject owner: Flex\nTarget project: C:\\soft\\PinpadAPP\\rflib\nBuild under test: dirty work-3.10 candidate after 28ed6df, package/focused gates passing\nOwner verdict: \"llmifing works perfectly\"\nVerified outcome:\n- concurrent title processing completes in the real Pi TUI;\n- live processing progress is visible;\n- the prior `Could not process descriptions: Invalid display title for work-1.5.8` failure no longer blocks the workspace.\nFollow-up UX requests are tracked separately and do not invalidate this targeted concurrency/recovery smoke: move stats, closed checkmarks, parent-collapse left arrow, and recursive delete with warning.\n",
+        "wo:residual-fix PASS {\"dispositions\":[{\"finding\":\"work-3.10:acceptance - Attach the required real owner TUI smoke evidence showing visible progress and no work-1.5.8 warning; focused roadmap and verify:quiet passes do not satisfy this live-product requirement.\",\"fix\":\"Ran the required real owner TUI smoke after the targeted re-review.\",\"evidence\":\"Flex tested C:\\\\soft\\\\PinpadAPP\\\\rflib and reported 'llmifing works perfectly'; visible progress completed and the work-1.5.8 warning did not recur.\"}]}\nwo:verify-check PASS — npm run verify:quiet passed and project-owner real Pi TUI smoke passed after the targeted re-review.\n",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Recover invalid title generation with concurrent progress",
+      "type": "bug",
+      "updatedAt": "2026-07-25T23:43:08.321Z"
+    },
     "work-3.2": {
       "acceptance": "A1: projection always includes all roadmaps with no Tab mode or visible Open/Closed words; initiative children stay grouped and only sort among siblings by live startedAt desc, remembered current, open activityAt desc, closed activityAt desc, then stable ID. activityAt is max of roadmap/descendant updatedAt and latest non-live workflow timestamp. A3: recursive tasks order non-closed before closed; open containers show progress bars and executable-descendant completed/total, open leaves are 0/1; live is distinct from durable in_progress engaged state; exact live item is strongest and ancestors propagate. A4: reducer implements activeWorkAgent same-cwd/meta.workItemId truth; direct status must exist, parse, be running/active and nonterminal; deadline uses 30s grace; no-deadline requires positive live pid via process.kill(pid,0); absent/dead pid, missing/malformed/terminal/expired are stale; paused/needs_attention is attention/recent activity not live; activeWorkGoalRunning alone is never targeted; newest startedAt wins exact emphasis while valid ancestors stay marked. Projection and two refresh reads leave .ce-workflow/work-items.json byte-identical; failure retains a usable cached frame contract. A5: Needs plan and Plan/strengthen eligibility is only open, non-Misc, needs_plan/stale roadmaps with an existing path in that roadmap's own epicArtifacts(...).brainstorms; missing, initiative-inherited, and child-only brainstorms are false; planned/ready and closed are false. Include the ponytail note limiting full projection to small/medium stores. Focused verification: node scripts/test-work-roadmap.mjs",
       "createdAt": "2026-07-25T08:04:58.365Z",
@@ -2565,6 +2593,7 @@
       "acceptance": "In a real Pi TUI, select Add task from the new workspace for a known roadmap or task parent; enter multiline text; paste an image; submit through Pi's normal composer; verify the resulting task context preserves the selected roadmap/parent, multiline request, and image context. Record project-owner identity, date, selected parent ID, resulting task/work context ID, and explicit approve/reject result in this WorkItem. Approval is complete only with project-owner evidence; text-only fallback is not sufficient for this rich-composer smoke.",
       "createdAt": "2026-07-25T08:05:42.979Z",
       "dependencies": [
+        "work-3.10",
         "work-3.4",
         "work-3.6",
         "work-3.7",
@@ -2580,13 +2609,14 @@
         "Dependent A7 manual decision/evidence gate. Must remain blocked until work-3.4 implementation and automated regression/final gate complete. No source ownership.",
         "wo:manual-evidence FAIL — 2026-07-25\nProject owner reported the real Pi TUI multiline/image-paste smoke failed: \"lot of stuff failed will respond with a followup prompt\".\nDetailed reproduction and observed failures are pending the project owner's follow-up. Keep work-3.5 and roadmap work-3 open; do not waive the manual gate.",
         "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\n- Misc still exposes `Needs planning` although it has no brainstorm; hide planning readiness/actions when no brainstorm exists.\n- Tree containers need `+` when collapsed and `-` when expanded.\n- Plan, Brainstorm, Work small/medium/big, and related execution actions must start a normal visible Pi chat turn and route that turn to the appropriate skill/code path; they must not open the current weird prompt/direct-flow UX. A previous pre-goal implementation had the desired normal-chat behavior.\n- Current workspace screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f827069d-5af7-48e2-9b7a-c2ec350922fa.png\n- Visual target screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-2c7030b1-1c05-4449-adc0-ac60e84cb10d.png\n- Desired rows: initiative/idea `[-] [colored status dot] completed/total child roadmaps synthesized short title`; roadmap/brainstorm `[-] [colored status dot] completed/total tasks synthesized short title`; task `[colored status dot] synthesized short title`, preserving tree indentation.\n- Reserve the lower detail area for the selected item's full description and model/token statistics.\nResult: rejected. Keep work-3.5 open until repairs land and a new real Pi TUI smoke passes with parent, multiline, and image evidence.",
-        "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\nProject owner: Flex\nScreenshots:\n- C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-962ed028-6bab-47ae-9f03-dc87d4ce6001.png\n- C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f205de2b-58bd-471c-a0db-07e9203fa2fc.png\nObserved failures after repairs d3744c3:\n- Cursor movement is very slow (~1/3 second per row).\n- On Hardware-Validated RFLib, two items appear selected; down-arrow cycles between two rows and navigation gets stuck/reversed.\n- Flexible, Low-Footprint shows 0/0 despite having a subtarget.\n- Parent Hardware-Validated RFLib appears closed/gray while children are open, so status semantics are contradictory.\n- Details header repeats fixed current model/session stats for every item; the stats do not follow the selected item's execution/model metadata.\n- Truncated raw chat/request text is not an intelligible synthesized title.\nRequested repair:\n- Generate real LLM-synthesized concise titles for items lacking them when entering the menu, show a Processing descriptions progress overlay, and persist titles per item.\n- Correct navigation, speed, progress, status, and selected-item details.\nResult: rejected. Keep work-3.5 and work-3 open until repairs land and a new real Pi TUI smoke passes, including the original parent/multiline/image Add-task evidence.\n"
+        "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\nProject owner: Flex\nScreenshots:\n- C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-962ed028-6bab-47ae-9f03-dc87d4ce6001.png\n- C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f205de2b-58bd-471c-a0db-07e9203fa2fc.png\nObserved failures after repairs d3744c3:\n- Cursor movement is very slow (~1/3 second per row).\n- On Hardware-Validated RFLib, two items appear selected; down-arrow cycles between two rows and navigation gets stuck/reversed.\n- Flexible, Low-Footprint shows 0/0 despite having a subtarget.\n- Parent Hardware-Validated RFLib appears closed/gray while children are open, so status semantics are contradictory.\n- Details header repeats fixed current model/session stats for every item; the stats do not follow the selected item's execution/model metadata.\n- Truncated raw chat/request text is not an intelligible synthesized title.\nRequested repair:\n- Generate real LLM-synthesized concise titles for items lacking them when entering the menu, show a Processing descriptions progress overlay, and persist titles per item.\n- Correct navigation, speed, progress, status, and selected-item details.\nResult: rejected. Keep work-3.5 and work-3 open until repairs land and a new real Pi TUI smoke passes, including the original parent/multiline/image Add-task evidence.\n",
+        "wo:manual-evidence FAIL — owner smoke after 28ed6df, 2026-07-25\nProject owner: Flex\nObserved warning on F7 → Roadmaps title backfill:\n`Could not process descriptions: Invalid display title for work-1.5.8.`\nThe current operation is too slow and provides insufficient visible progress.\nOwner request: process missing descriptions concurrently (about 8 model/agent requests at a time) and show live visible progress so it is obvious that work is advancing.\nResult: rejected. Keep work-3.5 and work-3 open; create a linked debug bug, diagnose the invalid-title failure, make per-item/chunk failures recoverable without discarding valid work, add bounded concurrency and progress, then repeat the real TUI smoke.\n"
       ],
       "parentId": "work-3",
       "status": "open",
       "title": "Approve real Pi TUI multiline and image-paste task flow",
       "type": "decision",
-      "updatedAt": "2026-07-25T14:41:43.550Z"
+      "updatedAt": "2026-07-25T15:54:44.188Z"
     },
     "work-3.6": {
       "acceptance": "Misc or any roadmap without its own brainstorm shows no Needs planning text and offers no Plan/Brainstorm action. Each named TUI launch calls pi.sendUserMessage exactly once with existing routed instructions and emits no subagents RPC request. RPC still uses direct role launch; print/json remain unchanged. Focused roadmap, brainstorm, start-finish, resume, telemetry, and add tests pass.",
@@ -2723,7 +2753,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T15:39:12.961Z"
+    "updatedAt": "2026-07-25T23:43:08.322Z"
   },
   "schemaVersion": 1
 }

@@ -197,12 +197,6 @@ try {
 		"F7 preview reports a missing stored summary",
 	);
 	const loaderMessages = [];
-	class TestLoader {
-		constructor(_tui, _theme, message) {
-			this.signal = new AbortController().signal;
-			loaderMessages.push(message);
-		}
-	}
 	const selectRoadmap = async (id, complete, menus = [], provider) => {
 		const notices = [];
 		const names = {
@@ -234,13 +228,27 @@ try {
 						}
 						return labels.find((label) => /Show all roadmaps/.test(label));
 					},
-					custom: (factory) => new Promise((done) => factory({}, {}, {}, done)),
+					custom: (factory) =>
+						new Promise((done) => {
+							let component;
+							const tui = {
+								requestRender: () =>
+									loaderMessages.push(component.render(120)[0]),
+							};
+							component = factory(
+								tui,
+								{ fg: (_color, value) => value },
+								{},
+								done,
+							);
+							loaderMessages.push(component.render(120)[0]);
+						}),
 					notify: (message) => notices.push(message),
 				},
 			},
 			{},
 			"",
-			{ BorderedLoader: TestLoader, complete },
+			{ complete },
 		);
 		return notices;
 	};
@@ -280,10 +288,15 @@ try {
 			"Refactor the RF compatibility API",
 		`placeholder roadmap display metadata is generated and stored: ${JSON.stringify(generatedNotices)}`,
 	);
-	assert.deepEqual(
-		loaderMessages,
-		["Processing descriptions…"],
-		"one correctly labelled loader covers the whole visible batch",
+	const progressTotal = loaderMessages[0].match(/0\/(\d+)/)?.[1];
+	assert(progressTotal, "production progress starts at zero with a total");
+	assert.equal(
+		loaderMessages.at(-1),
+		`Processing descriptions… ${progressTotal}/${progressTotal}`,
+	);
+	assert(
+		loaderMessages.length > 2,
+		"production custom progress renders initial, intermediate, and total states",
 	);
 	assert(
 		roadmapMenus[0].labels.some((label) => /Closed roadmap/.test(label)),
@@ -416,7 +429,6 @@ try {
 			},
 		},
 		{
-			BorderedLoader: TestLoader,
 			complete: async () => ({
 				stopReason: "stop",
 				content: [
@@ -431,15 +443,371 @@ try {
 		},
 	);
 	assert(
-		invalidNotices.some((message) => /Invalid display title/.test(message)) &&
-			!loadStore(root).items["E-4"].displayMetadata,
-		"malformed batch output is rejected without partial mutation",
+		invalidNotices.some((message) =>
+			/1 work item\(s\): invalid title/.test(message),
+		) && !loadStore(root).items["E-4"].displayMetadata,
+		"invalid output is retried once and reported without mutation",
 	);
 	assert.notEqual(
 		invalidBefore,
 		JSON.stringify(loadStore(root)),
 		"invalid fixture changed only to remove metadata before validation",
 	);
+
+	const responseFor = (request) => {
+		const context = JSON.parse(request.messages[0].content[0].text);
+		return {
+			stopReason: "stop",
+			content: [
+				{
+					type: "text",
+					text: JSON.stringify({
+						items: context.map((_entry, index) => ({
+							id: _entry.id,
+							title: `Generated title ${index + 1}`,
+						})),
+					}),
+				},
+			],
+		};
+	};
+	const testBackfillRoot = mkdtempSync(path.join(tmpdir(), "work-backfill-"));
+	try {
+		execFileSync("git", ["init"], { cwd: testBackfillRoot, stdio: "ignore" });
+		const many = Array.from({ length: 321 }, (_, index) => ({
+			id: `R-${index + 1}`,
+			issue_type: "epic",
+			status: "open",
+			title: `Stored roadmap ${index + 1}`,
+			description: "Existing safe roadmap summary.",
+		}));
+		seedNativeStore(testBackfillRoot, many);
+		const frame = {
+			roadmaps: many.map((entry) => ({ id: entry.id, tasks: [] })),
+		};
+		const pending = [];
+		let active = 0;
+		let maxActive = 0;
+		const starts = [];
+		const ctx = {
+			cwd: testBackfillRoot,
+			mode: "tui",
+			model: { id: "summary-model", provider: "test" },
+			modelRegistry: {
+				getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test" }),
+			},
+			ui: {
+				custom: (factory) =>
+					new Promise((done) =>
+						factory(
+							{ requestRender() {} },
+							{ fg: (_color, value) => value },
+							{},
+							done,
+						),
+					),
+				notify() {},
+			},
+		};
+		const concurrencyRun = backfillVisibleDisplayMetadata(
+			testBackfillRoot,
+			frame,
+			ctx,
+			{
+				complete: (_model, request) => {
+					starts.push(JSON.parse(request.messages[0].content[0].text));
+					active += 1;
+					maxActive = Math.max(maxActive, active);
+					return new Promise((resolve) =>
+						pending.push(() => {
+							active -= 1;
+							resolve(responseFor(request));
+						}),
+					);
+				},
+			},
+		);
+		await new Promise((resolve) => setImmediate(resolve));
+		assert.equal(
+			starts.length,
+			8,
+			"only eight chunks start before one settles",
+		);
+		pending.shift()();
+		await new Promise((resolve) => setImmediate(resolve));
+		assert.equal(starts.length, 9, "the ninth chunk starts after a slot opens");
+		while (pending.length) pending.shift()();
+		await concurrencyRun;
+		assert.equal(
+			maxActive,
+			8,
+			"display generation has a hard concurrency cap of eight",
+		);
+		assert.equal(
+			starts.flat().length,
+			321,
+			"every item is included in exactly one initial chunk",
+		);
+
+		const partial = ["P-1", "P-2", "P-3", "P-4"].map((id) => ({
+			id,
+			issue_type: "epic",
+			status: "open",
+			title: `Stored ${id}`,
+			description: "Existing safe roadmap summary.",
+		}));
+		seedNativeStore(testBackfillRoot, partial);
+		const partialCalls = [];
+		const partialNotices = [];
+		await backfillVisibleDisplayMetadata(
+			testBackfillRoot,
+			{ roadmaps: partial.map((entry) => ({ id: entry.id, tasks: [] })) },
+			{
+				...ctx,
+				ui: { ...ctx.ui, notify: (message) => partialNotices.push(message) },
+			},
+			{
+				complete: async (_model, request) => {
+					const context = JSON.parse(request.messages[0].content[0].text);
+					partialCalls.push(context.map((entry) => entry.id));
+					if (context.length > 1)
+						return {
+							stopReason: "stop",
+							content: [
+								{
+									type: "text",
+									text: JSON.stringify({
+										items: [
+											{ id: "P-1", title: "First valid title" },
+											{ id: "P-2", title: "Duplicate candidate" },
+											{ id: "P-2", title: "Another duplicate" },
+											{ id: "P-4", title: "# invalid" },
+											{ id: "unknown", title: "Ignored unknown title" },
+										],
+									}),
+								},
+							],
+						};
+					const id = context[0].id;
+					return {
+						stopReason: "stop",
+						content: [
+							{
+								type: "text",
+								text: JSON.stringify({
+									items: [
+										{
+											id,
+											title:
+												id === "P-4" ? "# still invalid" : "Recovered title",
+										},
+									],
+								}),
+							},
+						],
+					};
+				},
+			},
+		);
+		const partialStore = loadStore(testBackfillRoot);
+		assert.equal(
+			partialStore.items["P-1"].displayMetadata.title,
+			"First valid title",
+		);
+		assert.equal(
+			partialStore.items["P-2"].displayMetadata.title,
+			"Recovered title",
+		);
+		assert.equal(
+			partialStore.items["P-3"].displayMetadata.title,
+			"Recovered title",
+		);
+		assert.equal(partialStore.items["P-4"].displayMetadata, undefined);
+		assert.deepEqual(
+			partialCalls
+				.slice(1)
+				.map((ids) => ids[0])
+				.sort(),
+			["P-2", "P-3", "P-4"],
+			"only duplicate, omitted, and malformed candidates retry as singletons",
+		);
+		assert(partialNotices.some((message) => /1 work item/.test(message)));
+		const malformed = [
+			{
+				id: "M-1",
+				issue_type: "epic",
+				status: "open",
+				title: "Stored malformed candidate",
+				description: "Existing safe roadmap summary.",
+			},
+		];
+		seedNativeStore(testBackfillRoot, malformed);
+		let malformedCalls = 0;
+		await backfillVisibleDisplayMetadata(
+			testBackfillRoot,
+			{ roadmaps: [{ id: "M-1", tasks: [] }] },
+			ctx,
+			{
+				complete: async (_model, request) => {
+					malformedCalls += 1;
+					return malformedCalls === 1
+						? { stopReason: "stop", content: [{ type: "text", text: "{" }] }
+						: responseFor(request);
+				},
+			},
+		);
+		assert.equal(
+			malformedCalls,
+			2,
+			"malformed JSON receives one singleton retry",
+		);
+		assert(loadStore(testBackfillRoot).items["M-1"].displayMetadata);
+
+		const overlap = ["O-1", "O-2", "O-3", "O-4", "O-5", "O-6"].map((id) => ({
+			id,
+			issue_type: "epic",
+			status: "open",
+			title: `Stored ${id}`,
+			description: "Existing safe roadmap summary.",
+			notes: "Existing request context",
+		}));
+		seedNativeStore(testBackfillRoot, overlap);
+		let overlapResolve;
+		let overlapCalls = 0;
+		const overlapRuntime = {
+			complete: (_model, request) => {
+				overlapCalls += 1;
+				return new Promise((resolve) => {
+					overlapResolve = () => resolve(responseFor(request));
+				});
+			},
+		};
+		const overlapFrame = {
+			roadmaps: overlap.map((entry) => ({ id: entry.id, tasks: [] })),
+		};
+		const firstOverlap = backfillVisibleDisplayMetadata(
+			testBackfillRoot,
+			overlapFrame,
+			ctx,
+			overlapRuntime,
+		);
+		const secondOverlap = backfillVisibleDisplayMetadata(
+			testBackfillRoot,
+			overlapFrame,
+			ctx,
+			overlapRuntime,
+		);
+		await new Promise((resolve) => setImmediate(resolve));
+		assert.equal(
+			overlapCalls,
+			1,
+			"same-path overlapping backfills share one run",
+		);
+		const concurrentStore = loadStore(testBackfillRoot);
+		concurrentStore.items["O-1"].displayMetadata = {
+			schemaVersion: 1,
+			title: "Concurrent persisted title",
+		};
+		concurrentStore.items["O-2"].title = "Changed source title";
+		concurrentStore.items["O-3"].type = "task";
+		concurrentStore.items["O-4"].notes.push("Concurrent note context");
+		delete concurrentStore.items["O-6"];
+		saveStore(testBackfillRoot, concurrentStore);
+		overlapResolve();
+		await Promise.all([firstOverlap, secondOverlap]);
+		const overlapStore = loadStore(testBackfillRoot);
+		assert.equal(
+			overlapStore.items["O-1"].displayMetadata.title,
+			"Concurrent persisted title",
+			"concurrently persisted valid metadata is not overwritten",
+		);
+		assert.equal(
+			overlapStore.items["O-2"].displayMetadata,
+			undefined,
+			"changed source context rejects stale generated metadata",
+		);
+		assert.equal(
+			overlapStore.items["O-3"].displayMetadata,
+			undefined,
+			"changed item type rejects stale generated metadata",
+		);
+		assert.equal(
+			overlapStore.items["O-4"].displayMetadata,
+			undefined,
+			"changed bounded notes context rejects stale generated metadata",
+		);
+		assert.equal(
+			overlapStore.items["O-5"].displayMetadata.title,
+			"Generated title 5",
+		);
+		assert.equal(
+			overlapStore.items["O-6"],
+			undefined,
+			"deleted items are skipped safely",
+		);
+
+		seedNativeStore(testBackfillRoot, many);
+		const cancelPending = [];
+		const cancelSignals = [];
+		let cancelComponent;
+		let cancelStarts = 0;
+		const cancelCtx = {
+			...ctx,
+			ui: {
+				custom: (factory) =>
+					new Promise((done) => {
+						cancelComponent = factory(
+							{
+								requestRender() {
+									cancelComponent.handleInput("\x1b");
+								},
+							},
+							{ fg: (_color, value) => value },
+							{},
+							done,
+						);
+					}),
+				notify() {},
+			},
+		};
+		const cancelRun = backfillVisibleDisplayMetadata(
+			testBackfillRoot,
+			frame,
+			cancelCtx,
+			{
+				complete: (_model, request, options) => {
+					cancelStarts += 1;
+					cancelSignals.push(options.signal);
+					return new Promise((resolve) =>
+						cancelPending.push(() => resolve(responseFor(request))),
+					);
+				},
+			},
+		);
+		await new Promise((resolve) => setImmediate(resolve));
+		assert.equal(cancelStarts, 8);
+		cancelPending.shift()();
+		await new Promise((resolve) => setImmediate(resolve));
+		assert(loadStore(testBackfillRoot).items["R-1"].displayMetadata);
+		assert(
+			cancelSignals.every((signal) => signal.aborted),
+			"abort reaches in-flight requests",
+		);
+		while (cancelPending.length) cancelPending.shift()();
+		await cancelRun;
+		assert.equal(
+			cancelStarts,
+			8,
+			"cancellation prevents the ninth chunk from starting",
+		);
+		assert.equal(
+			loadStore(testBackfillRoot).items["R-41"].displayMetadata,
+			undefined,
+			"late post-abort results are not persisted",
+		);
+	} finally {
+		rmSync(testBackfillRoot, { recursive: true, force: true });
+	}
 	for (const [file, content] of fixtureSnapshots)
 		writeFileSync(path.join(root, file), content);
 	console.assert(

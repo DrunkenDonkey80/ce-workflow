@@ -103,6 +103,8 @@ const WORK_ITEM_TITLE_MAX = 180;
 const DISPLAY_METADATA_SCHEMA_VERSION = 1;
 const DISPLAY_TITLE_MAX = 72;
 const DISPLAY_METADATA_BATCH_SIZE = 40;
+const DISPLAY_METADATA_CONCURRENCY = 8;
+const displayMetadataRuns = new Map();
 const TASK_IMAGE_MIME_EXTENSIONS = new Map([
 	["image/png", ".png"],
 	["image/jpeg", ".jpg"],
@@ -16152,44 +16154,61 @@ function visibleRoadmapItems(cwd, frame) {
 	return [...new Set(ids)].map((id) => store.items[id]).filter(Boolean);
 }
 
+function displayMetadataItemContext(item) {
+	return {
+		id: idOf(item),
+		type: typeOf(item),
+		title: compactRoadmapTitle(titleOf(item), 300),
+		description: compactRoadmapDescription(field(item, "description"), 1200),
+		acceptance: compactRoadmapDescription(field(item, "acceptance"), 800),
+		context: compactRoadmapDescription(
+			(item.notes ?? []).slice(-3).join("\n"),
+			800,
+		),
+	};
+}
+
 function batchDisplayMetadataContext(items) {
-	return JSON.stringify(
-		items.map((item) => ({
-			id: idOf(item),
-			type: typeOf(item),
-			title: compactRoadmapTitle(titleOf(item), 300),
-			description: compactRoadmapDescription(field(item, "description"), 1200),
-			acceptance: compactRoadmapDescription(field(item, "acceptance"), 800),
-			context: compactRoadmapDescription(
-				(item.notes ?? []).slice(-3).join("\n"),
-				800,
-			),
-		})),
-	);
+	return JSON.stringify(items.map(displayMetadataItemContext));
+}
+
+function displayMetadataFingerprint(item) {
+	return JSON.stringify(displayMetadataItemContext(item));
 }
 
 function parseDisplayMetadataBatch(value, items) {
-	const text = String(value ?? "")
-		.trim()
-		.replace(/^```(?:json)?\s*/i, "")
-		.replace(/\s*```$/, "");
-	const parsed = JSON.parse(text);
-	const entries = Array.isArray(parsed) ? parsed : parsed?.items;
-	if (!Array.isArray(entries))
-		throw new Error("Display metadata must be a JSON array.");
+	const retry = new Map(items.map((item) => [idOf(item), "omitted"]));
+	const valid = [];
+	let entries;
+	try {
+		const text = String(value ?? "")
+			.trim()
+			.replace(/^```(?:json)?\s*/i, "")
+			.replace(/\s*```$/, "");
+		const parsed = JSON.parse(text);
+		entries = Array.isArray(parsed) ? parsed : parsed?.items;
+		if (!Array.isArray(entries)) throw new Error("not an array");
+	} catch {
+		return { valid, retry };
+	}
 	const expected = new Map(items.map((item) => [idOf(item), item]));
-	const seen = new Set();
-	const knownIds = [...expected.keys()];
-	const validated = entries.map((entry) => {
+	const grouped = new Map();
+	for (const entry of entries) {
 		const id = typeof entry?.id === "string" ? entry.id : "";
-		if (!expected.has(id) || seen.has(id))
-			throw new Error(
-				`Unexpected or duplicate display metadata ID: ${id || "<missing>"}.`,
-			);
-		seen.add(id);
-		if (!validDisplayTitle(entry.title, knownIds))
-			throw new Error(`Invalid display title for ${id}.`);
-		const item = expected.get(id);
+		if (expected.has(id)) grouped.set(id, [...(grouped.get(id) ?? []), entry]);
+	}
+	const knownIds = [...expected.keys()];
+	for (const [id, item] of expected) {
+		const candidates = grouped.get(id) ?? [];
+		if (candidates.length !== 1) {
+			retry.set(id, candidates.length ? "duplicate" : "omitted");
+			continue;
+		}
+		const entry = candidates[0];
+		if (!validDisplayTitle(entry.title, knownIds)) {
+			retry.set(id, "invalid title");
+			continue;
+		}
 		let description;
 		if (
 			typeOf(item) === "epic" &&
@@ -16198,18 +16217,82 @@ function parseDisplayMetadataBatch(value, items) {
 			description = parseGeneratedRoadmapMetadata(
 				JSON.stringify({ title: entry.title, description: entry.description }),
 			).description;
-			if (!description) throw new Error(`Roadmap summary is empty for ${id}.`);
-			const safe = roadmapDisplayDescription({ ...item, description });
-			if (!safe) throw new Error(`Roadmap summary is invalid for ${id}.`);
+			const safe = description
+				? roadmapDisplayDescription({ ...item, description })
+				: "";
+			if (!safe) {
+				retry.set(id, "invalid summary");
+				continue;
+			}
 			description = safe;
 		}
-		return { id, title: entry.title, description };
-	});
-	if (seen.size !== expected.size)
-		throw new Error(
-			"Display metadata response omitted one or more work items.",
-		);
-	return validated;
+		retry.delete(id);
+		valid.push({ id, title: entry.title, description });
+	}
+	return { valid, retry };
+}
+
+// BorderedLoader has no public message setter, so live progress uses this cancellable component.
+function displayMetadataProgress(tui, theme, keybindings, total, done) {
+	const controller = new AbortController();
+	let completed = 0;
+	let finished = false;
+	return {
+		signal: controller.signal,
+		advance(count = 1) {
+			completed = Math.min(total, completed + count);
+			tui.requestRender?.();
+		},
+		finish(value) {
+			if (finished) return;
+			finished = true;
+			done(value);
+		},
+		render(width) {
+			const message = `Processing descriptions… ${completed}/${total}`;
+			const line = truncate(message, Math.max(8, width - 1));
+			return [theme.fg?.("accent", line) ?? line];
+		},
+		handleInput(data) {
+			if (data === "\x1b" || keybindings.matches?.(data, "tui.select.cancel")) {
+				controller.abort();
+				this.finish(null);
+			}
+		},
+		invalidate() {},
+	};
+}
+
+function displayMetadataRequest(items) {
+	return {
+		systemPrompt:
+			'Return only JSON: {"items":[{"id":"known ID","title":"plain title","description":"only when requested"}]}. Return every supplied ID exactly once and no others. Titles are single-line plain language, at most 72 characters, with no markdown, IDs, or file paths. For epics whose description is empty, add a concise 3–5 sentence description of scope and outcome. Use only supplied context.',
+		messages: [
+			{
+				role: "user",
+				content: [{ type: "text", text: batchDisplayMetadataContext(items) }],
+				timestamp: Date.now(),
+			},
+		],
+	};
+}
+
+async function runDisplayMetadataJobs(jobs, signal, run) {
+	let next = 0;
+	const worker = async () => {
+		for (;;) {
+			if (signal.aborted) return;
+			const index = next++;
+			if (index >= jobs.length) return;
+			await run(jobs[index], index);
+		}
+	};
+	await Promise.all(
+		Array.from(
+			{ length: Math.min(DISPLAY_METADATA_CONCURRENCY, jobs.length) },
+			worker,
+		),
+	);
 }
 
 export async function backfillVisibleDisplayMetadata(
@@ -16227,126 +16310,177 @@ export async function backfillVisibleDisplayMetadata(
 		notify(ctx, "Select a model to process missing display titles.", "warning");
 		return;
 	}
-	let failure;
-	const message = "Processing descriptions…";
-	try {
-		const result = await ctx.ui.custom((tui, theme, keybindings, done) => {
-			const controller = new AbortController();
-			const loader = runtime.BorderedLoader
-				? new runtime.BorderedLoader(tui, theme, message)
-				: {
-						signal: controller.signal,
-						render: (width) => [
-							theme.fg("accent", truncate(message, Math.max(8, width - 1))),
-						],
-						handleInput: (data) => {
+	const runKey = resolve(storePath(cwd));
+	if (displayMetadataRuns.has(runKey)) return displayMetadataRuns.get(runKey);
+	let background;
+	const uiRun = ctx.ui.custom((tui, theme, keybindings, done) => {
+		const progress = displayMetadataProgress(
+			tui,
+			theme,
+			keybindings,
+			missing.length,
+			done,
+		);
+		background = (async () => {
+			if (progress.signal.aborted) return;
+			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+			if (progress.signal.aborted) return;
+			if (!auth.ok || !auth.apiKey)
+				throw new Error(
+					auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
+				);
+			const options = {
+				apiKey: auth.apiKey,
+				headers: auth.headers,
+				env: auth.env,
+				signal: progress.signal,
+			};
+			const fingerprints = new Map(
+				missing.map((item) => [idOf(item), displayMetadataFingerprint(item)]),
+			);
+			const failures = new Map();
+			const persist = async (entries) => {
+				if (progress.signal.aborted || !entries.length) return;
+				await withFileMutationQueue(storePath(cwd), async () => {
+					if (progress.signal.aborted) return;
+					mutateStore(cwd, (store) => {
+						for (const entry of entries) {
+							if (progress.signal.aborted) return;
+							const previous = store.items[entry.id];
 							if (
-								data === "\x1b" ||
-								keybindings.matches?.(data, "tui.select.cancel")
-							) {
-								controller.abort();
-								done(null);
-							}
-						},
-						invalidate() {},
-					};
-			if (runtime.BorderedLoader) loader.onAbort = () => done(null);
-			(async () => {
-				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
-				if (!auth.ok || !auth.apiKey)
-					throw new Error(
-						auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
-					);
-				const options = {
-					apiKey: auth.apiKey,
-					headers: auth.headers,
-					env: auth.env,
-					signal: loader.signal,
-				};
-				const results = [];
-				for (
-					let offset = 0;
-					offset < missing.length;
-					offset += DISPLAY_METADATA_BATCH_SIZE
-				) {
-					const items = missing.slice(
-						offset,
-						offset + DISPLAY_METADATA_BATCH_SIZE,
-					);
-					const request = {
-						systemPrompt:
-							'Return only JSON: {"items":[{"id":"known ID","title":"plain title","description":"only when requested"}]}. Return every supplied ID exactly once and no others. Titles are single-line plain language, at most 72 characters, with no markdown, IDs, or file paths. For epics whose description is empty, add a concise 3–5 sentence description of scope and outcome. Use only supplied context.',
-						messages: [
-							{
-								role: "user",
-								content: [
-									{ type: "text", text: batchDisplayMetadataContext(items) },
-								],
-								timestamp: Date.now(),
-							},
-						],
-					};
-					const response = runtime.complete
-						? await runtime.complete(ctx.model, request, options)
+								!previous ||
+								validDisplayMetadata(previous) ||
+								displayMetadataFingerprint(previous) !==
+									fingerprints.get(entry.id)
+							)
+								continue;
+							updateWorkItem(store, entry.id, {
+								displayMetadata: {
+									schemaVersion: DISPLAY_METADATA_SCHEMA_VERSION,
+									title: entry.title,
+								},
+								...(entry.description
+									? { description: entry.description }
+									: { updatedAt: previous.updatedAt }),
+							});
+						}
+					});
+				});
+			};
+			const complete = async (items) => {
+				if (progress.signal.aborted) return;
+				let response;
+				try {
+					response = runtime.complete
+						? await runtime.complete(
+								ctx.model,
+								displayMetadataRequest(items),
+								options,
+							)
 						: await ctx.modelRegistry
 								.getProvider(ctx.model.provider)
-								?.streamSimple(ctx.model, request, options)
+								?.streamSimple(
+									ctx.model,
+									displayMetadataRequest(items),
+									options,
+								)
 								.result();
-					if (!response)
-						throw new Error(`No provider runtime for ${ctx.model.provider}.`);
-					if (response.stopReason === "aborted") return null;
-					if (response.stopReason === "error")
-						throw new Error(response.errorMessage || "Model request failed.");
-					results.push({
-						items,
-						text: response.content
-							.filter((part) => part.type === "text")
-							.map((part) => part.text)
-							.join("\n"),
-					});
+				} catch {
+					if (progress.signal.aborted) return;
+					return {
+						valid: [],
+						retry: new Map(items.map((item) => [idOf(item), "request failed"])),
+					};
 				}
-				return results;
-			})()
-				.then(done)
-				.catch((error) => {
-					failure = error;
-					done(null);
-				});
-			return loader;
+				if (progress.signal.aborted) return;
+				if (!response || response.stopReason === "error")
+					return {
+						valid: [],
+						retry: new Map(items.map((item) => [idOf(item), "request failed"])),
+					};
+				if (response.stopReason === "aborted") return;
+				const text = (response.content ?? [])
+					.filter((part) => part.type === "text")
+					.map((part) => part.text)
+					.join("\n");
+				if (progress.signal.aborted) return;
+				return parseDisplayMetadataBatch(text, items);
+			};
+			const retryItems = [];
+			const chunks = [];
+			for (
+				let offset = 0;
+				offset < missing.length;
+				offset += DISPLAY_METADATA_BATCH_SIZE
+			)
+				chunks.push(
+					missing.slice(offset, offset + DISPLAY_METADATA_BATCH_SIZE),
+				);
+			await runDisplayMetadataJobs(chunks, progress.signal, async (items) => {
+				const parsed = await complete(items);
+				if (progress.signal.aborted || !parsed) return;
+				await persist(parsed.valid);
+				if (progress.signal.aborted) return;
+				for (const _entry of parsed.valid) progress.advance();
+				for (const item of items) {
+					const reason = parsed.retry.get(idOf(item));
+					if (reason) retryItems.push(item);
+				}
+			});
+			if (progress.signal.aborted) return;
+			await runDisplayMetadataJobs(
+				retryItems,
+				progress.signal,
+				async (item) => {
+					const parsed = await complete([item]);
+					if (progress.signal.aborted || !parsed) return;
+					await persist(parsed.valid);
+					if (progress.signal.aborted) return;
+					const id = idOf(item);
+					if (parsed.retry.has(id)) failures.set(id, parsed.retry.get(id));
+					progress.advance();
+				},
+			);
+			if (progress.signal.aborted) return;
+			const result = { failures };
+			progress.finish(result);
+			return result;
+		})().catch((error) => {
+			const result = { error };
+			progress.finish(result);
+			return result;
 		});
+		return progress;
+	});
+	const run = Promise.resolve(uiRun).then(async (result) => {
+		await background;
+		return result;
+	});
+	displayMetadataRuns.set(runKey, run);
+	try {
+		const result = await run;
 		if (!result) {
 			notify(
 				ctx,
-				failure
-					? `Could not process descriptions: ${formatError(failure)}`
-					: "Description processing was cancelled; using stored fallback titles.",
+				"Description processing was cancelled; using stored fallback titles.",
 				"warning",
 			);
-			return;
+		} else if (result.error) {
+			notify(
+				ctx,
+				`Could not process descriptions: ${formatError(result.error)}`,
+				"warning",
+			);
+		} else if (result.failures.size) {
+			const reasons = [...new Set(result.failures.values())].join(", ");
+			notify(
+				ctx,
+				`Could not process descriptions for ${result.failures.size} work item(s): ${reasons}.`,
+				"warning",
+			);
 		}
-		const entries = result.flatMap((chunk) =>
-			parseDisplayMetadataBatch(chunk.text, chunk.items),
-		);
-		mutateStore(cwd, (store) => {
-			for (const entry of entries) {
-				const previous = store.items[entry.id];
-				updateWorkItem(store, entry.id, {
-					displayMetadata: {
-						schemaVersion: DISPLAY_METADATA_SCHEMA_VERSION,
-						title: entry.title,
-					},
-					...(entry.description
-						? { description: entry.description }
-						: { updatedAt: previous.updatedAt }),
-				});
-			}
-		});
-	} catch (error) {
-		notify(
-			ctx,
-			`Could not process descriptions: ${formatError(error)}`,
-			"warning",
-		);
+	} finally {
+		displayMetadataRuns.delete(runKey);
 	}
 }
 
@@ -16580,13 +16714,13 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 		}
 		return statsByWorkItem.get(workItemId);
 	};
+	const initialFrame = buildWorkRoadmapState(ctx.cwd, "list");
+	if (!initialFrame.ok) {
+		notify(ctx, renderWorkRoadmapText(initialFrame), "warning");
+		return stateTelemetry(initialFrame);
+	}
+	await backfillVisibleDisplayMetadata(ctx.cwd, initialFrame, ctx, runtime);
 	for (;;) {
-		const frame = buildWorkRoadmapState(ctx.cwd, "list");
-		if (!frame.ok) {
-			notify(ctx, renderWorkRoadmapText(frame), "warning");
-			return stateTelemetry(frame);
-		}
-		await backfillVisibleDisplayMetadata(ctx.cwd, frame, ctx, runtime);
 		const currentFrame = buildWorkRoadmapState(ctx.cwd, "list");
 		const selected = await showTreeWorkspaceDialog(ctx, {
 			title: "Work roadmaps",
