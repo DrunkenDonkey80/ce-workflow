@@ -101,7 +101,10 @@ try {
 		"scope finalization",
 		...verifyArgs,
 	);
-	assert.match(handoff, /Review only: "\.gitignore", "source\.js"|Review only: "source\.js", "\.gitignore"/);
+	assert.match(
+		handoff,
+		/Review only: "\.gitignore", "source\.js"|Review only: "source\.js", "\.gitignore"/,
+	);
 	assert.doesNotMatch(handoff, /work-runs/);
 	assert.match(
 		loadStore(cwd).items["TASK-1"].notes.join("\n"),

@@ -599,7 +599,9 @@ process.exit(result.status ?? 1);
 			reviewMessage.includes("Do not contact the supervisor") &&
 			reviewMessage.includes("return BLOCKED immediately") &&
 			reviewMessage.includes("same finish-task command with --reviewed") &&
-			reviewMessage.includes("without --reviewed to regenerate this complete handoff") &&
+			reviewMessage.includes(
+				"without --reviewed to regenerate this complete handoff",
+			) &&
 			reviewMessage.includes("never handcraft a targeted re-review task") &&
 			!reviewMessage
 				.split("Review only:")[1]

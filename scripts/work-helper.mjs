@@ -149,9 +149,7 @@ function reviewerHandoff(id, implementationFiles, reviewReasons) {
 }
 
 function sameFiles(left = [], right = []) {
-	return (
-		JSON.stringify([...left].sort()) === JSON.stringify([...right].sort())
-	);
+	return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
 
 function reviewScope(task) {
@@ -594,7 +592,9 @@ function summary(issue, notesTail = 2000) {
 		updatedAt: field(issue, "updatedAt", "updated_at"),
 		description: String(issue?.description ?? "").slice(0, 4000),
 		design: String(issue?.design ?? "").slice(0, 4000),
-		acceptance: String(field(issue, "acceptance", "acceptance_criteria") ?? "").slice(0, 4000),
+		acceptance: String(
+			field(issue, "acceptance", "acceptance_criteria") ?? "",
+		).slice(0, 4000),
 		evidence_tail: arr(issue?.evidence).slice(-3),
 		notes_tail: notesOf(issue).slice(-notesTail),
 	};
