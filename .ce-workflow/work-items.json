@@ -2507,6 +2507,52 @@
       "type": "bug",
       "updatedAt": "2026-07-25T23:43:08.321Z"
     },
+    "work-3.11": {
+      "acceptance": "Stats render in a stable top-right region without overlapping rows/details and follow selection; the lower description gets six wrapped lines when viewport permits. Closed aggregate-complete rows use a gray checkmark while non-closed stages keep semantic colored circles. Left on an expanded container collapses it; Left on a descendant collapses the nearest expanded ancestor and selects that parent; repeated navigation has one cursor and preserves filter/refresh/cache/cleanup/native fallback. Focused dialog/roadmap/add tests and npm run verify:quiet pass.",
+      "createdAt": "2026-07-25T23:45:21.538Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Apply the remaining roadmap workspace presentation/navigation polish from the owner smoke: move selected-item stats into unused top-right space, reserve six detail-description lines below, render completed rows with a gray checkmark instead of the work-stage circle, and make Left on a child row collapse its nearest expanded parent container.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.11",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Owner accepted concurrent title generation and requested this final workspace polish.",
+        "Implemented roadmap workspace polish in extensions/work-dialogs.js with focused coverage in scripts/test-work-dialogs.mjs.\n\nFiles changed:\n- extensions/work-dialogs.js\n- scripts/test-work-dialogs.mjs\n\nVerification:\n- node scripts/test-work-dialogs.mjs — PASS (ok - shared work dialogs)\n- node scripts/test-work-roadmap.mjs — PASS (exit 0)\n- node scripts/test-work-add.mjs — PASS (ok - coded work-add behavior)\n\nResult: selection stats render in a width-aware right-aligned header column and no longer consume Details rows; up to six wrapped description lines are reserved when space permits; aggregate-closed rows use dim checkmarks while open stages retain semantic dots; Left collapses the selected expanded container or nearest expanded visible ancestor and selects it. Refresh/cache/filter/cleanup/native behavior remains covered by the existing regression test.\nRemaining work: reviewer gate and parent package verification.\n",
+        "wo:review-scope [\"extensions/work-dialogs.js\",\"scripts/test-work-dialogs.mjs\"]",
+        "wo:review PASS Scoped diff satisfies stats placement, six-line details, closed checkmarks, and ancestor collapse; focused/regression verification evidence is sufficient.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Polish roadmap stats, completion markers, and parent collapse",
+      "type": "task",
+      "updatedAt": "2026-07-25T23:58:18.800Z"
+    },
+    "work-3.12": {
+      "acceptance": "TUI action menus expose Delete for eligible initiative/roadmap/task selections. Confirmation lists the selected item and exact descendant count and proceeds only when the user types uppercase DELETE exactly; cancel/mismatch changes nothing. One atomic native-store mutation deletes the full descendant subtree, rejects Misc/protected roots, revalidates selection at commit time, and refuses with a clear message if any surviving outside item depends on a deleted ID. Success invalidates projection/cache and returns to a stable workspace selection. RPC/print/native fallback are unchanged. Focused store/roadmap/dialog tests and npm run verify:quiet pass.",
+      "createdAt": "2026-07-25T23:45:21.682Z",
+      "dependencies": [
+        "work-3.11"
+      ],
+      "dependencyEdges": [],
+      "description": "Add a Delete action for mistaken roadmap/task/initiative items that permanently removes the selected item and all descendants. Before deletion, show a prominent destructive warning with selected title/ID and descendant count, then require typing the exact word DELETE; the owner explicitly chose DELETE without the hard-to-type ID.",
+      "evidence": [],
+      "id": "work-3.12",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Irreversible UX decision approved by Flex: require typing DELETE, but not the item ID; use a huge warning."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Add guarded recursive subtree deletion",
+      "type": "task",
+      "updatedAt": "2026-07-25T23:45:28.797Z"
+    },
     "work-3.2": {
       "acceptance": "A1: projection always includes all roadmaps with no Tab mode or visible Open/Closed words; initiative children stay grouped and only sort among siblings by live startedAt desc, remembered current, open activityAt desc, closed activityAt desc, then stable ID. activityAt is max of roadmap/descendant updatedAt and latest non-live workflow timestamp. A3: recursive tasks order non-closed before closed; open containers show progress bars and executable-descendant completed/total, open leaves are 0/1; live is distinct from durable in_progress engaged state; exact live item is strongest and ancestors propagate. A4: reducer implements activeWorkAgent same-cwd/meta.workItemId truth; direct status must exist, parse, be running/active and nonterminal; deadline uses 30s grace; no-deadline requires positive live pid via process.kill(pid,0); absent/dead pid, missing/malformed/terminal/expired are stale; paused/needs_attention is attention/recent activity not live; activeWorkGoalRunning alone is never targeted; newest startedAt wins exact emphasis while valid ancestors stay marked. Projection and two refresh reads leave .ce-workflow/work-items.json byte-identical; failure retains a usable cached frame contract. A5: Needs plan and Plan/strengthen eligibility is only open, non-Misc, needs_plan/stale roadmaps with an existing path in that roadmap's own epicArtifacts(...).brainstorms; missing, initiative-inherited, and child-only brainstorms are false; planned/ready and closed are false. Include the ponytail note limiting full projection to small/medium stores. Focused verification: node scripts/test-work-roadmap.mjs",
       "createdAt": "2026-07-25T08:04:58.365Z",
@@ -2594,6 +2640,8 @@
       "createdAt": "2026-07-25T08:05:42.979Z",
       "dependencies": [
         "work-3.10",
+        "work-3.11",
+        "work-3.12",
         "work-3.4",
         "work-3.6",
         "work-3.7",
@@ -2616,7 +2664,7 @@
       "status": "open",
       "title": "Approve real Pi TUI multiline and image-paste task flow",
       "type": "decision",
-      "updatedAt": "2026-07-25T15:54:44.188Z"
+      "updatedAt": "2026-07-25T23:45:29.136Z"
     },
     "work-3.6": {
       "acceptance": "Misc or any roadmap without its own brainstorm shows no Needs planning text and offers no Plan/Brainstorm action. Each named TUI launch calls pi.sendUserMessage exactly once with existing routed instructions and emits no subagents RPC request. RPC still uses direct role launch; print/json remain unchanged. Focused roadmap, brainstorm, start-finish, resume, telemetry, and add tests pass.",
@@ -2753,7 +2801,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T23:43:08.322Z"
+    "updatedAt": "2026-07-25T23:58:18.801Z"
   },
   "schemaVersion": 1
 }

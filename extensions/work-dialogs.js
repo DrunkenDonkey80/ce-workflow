@@ -707,16 +707,31 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					const lines = [];
 					const add = (line = "") =>
 						lines.push(fit(line || "\u00a0", renderWidth));
-					add(
+					const header = [
 						`${theme.fg("accent", theme.bold(title))}  ${theme.fg("dim", `${visible.length}/${rows.length}`)}`,
-					);
-					add(theme.fg("muted", purpose));
+						theme.fg("muted", purpose),
+					];
 					if (filter)
-						add(
+						header.push(
 							`${theme.fg("muted", "Filter:")} ${theme.fg("text", `${query}${component.focused ? "▌" : ""}`)}`,
 						);
+					const statsWidth = Math.min(
+						Math.max(1, Math.floor((renderWidth - 2) / 2)),
+						Math.max(1, ...stats.map((line) => visibleWidth(line))),
+					);
+					const headerWidth = Math.max(1, renderWidth - statsWidth - 2);
+					for (let at = 0; at < Math.max(header.length, stats.length); at += 1) {
+						const left = fit(header[at] ?? "", headerWidth);
+						const right = fit(stats[at] ?? "", statsWidth).trimEnd();
+						add(
+							`${left}  ${" ".repeat(Math.max(0, statsWidth - visibleWidth(right)))}${theme.fg("muted", right)}`,
+						);
+					}
 					add(sectionLine(theme, "Work items", renderWidth));
-					const detailRows = Math.max(2, Math.min(6, Math.floor(height / 3)));
+					const detailRows = Math.max(
+						1,
+						Math.min(6, height - lines.length - 4),
+					);
 					const bodyRows = Math.max(1, height - lines.length - detailRows - 3);
 					const index = Math.max(
 						0,
@@ -743,7 +758,10 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 								? `${row.progress?.completed ?? 0}/${row.progress?.total ?? 0} `
 								: "";
 							const prefix = `${theme.fg(selected ? "accent" : "text", selected ? "❯" : " ")} ${"  ".repeat(row.depth)}${marker} `;
-							const dot = theme.fg(treeStatusColor(row), "●");
+							const dot = theme.fg(
+								treeStatusColor(row),
+								treeVisualStatus(row) === "closed" ? "✓" : "●",
+							);
 							const title = theme.fg(
 								selected
 									? "accent"
@@ -756,12 +774,10 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						}
 					}
 					add(sectionLine(theme, "Details", renderWidth));
-					const statLines = stats.map((line) => fit(line, renderWidth).trimEnd());
-					for (const line of statLines) add(theme.fg("muted", line));
 					const details = wrapText(
 						selected?.description || "No description.",
 						renderWidth,
-						Math.max(1, detailRows - statLines.length),
+						detailRows,
 					);
 					for (const line of details) add(theme.fg("text", line));
 					while (lines.length < height - 2) add();
@@ -783,21 +799,30 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						visible.findIndex((row) => row.id === selectedId),
 					);
 					const row = visible[index];
-					if (
-						data === " " ||
-						data === "left" ||
-						data === "\x1b[D" ||
-						data === "right" ||
-						data === "\x1b[C"
-					) {
+					if (data === "left" || data === "\x1b[D") {
+						let parent = row?.container && expanded(row) ? row : undefined;
+						for (let at = index - 1; !parent && at >= 0; at -= 1) {
+							const candidate = visible[at];
+							if (
+								candidate.depth < (row?.depth ?? 0) &&
+								candidate.container &&
+								expanded(candidate)
+							)
+								parent = candidate;
+						}
+						if (parent) {
+							selectedId = parent.id;
+							expansion.set(parent.id, false);
+							rebuild();
+						}
+					} else if (data === "right" || data === "\x1b[C") {
 						if (row?.container) {
-							const next =
-								data === "left" || data === "\x1b[D"
-									? false
-									: data === "right" || data === "\x1b[C"
-										? true
-										: !expanded(row);
-							expansion.set(row.id, next);
+							expansion.set(row.id, true);
+							rebuild();
+						}
+					} else if (data === " ") {
+						if (row?.container) {
+							expansion.set(row.id, !expanded(row));
 							rebuild();
 						}
 					} else if (

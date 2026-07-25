@@ -458,7 +458,7 @@ const treeFrames = [
 				id: "roadmap-open",
 				title: "Open roadmap stored title",
 				shortTitle: "Open roadmap",
-				description: "The complete selected roadmap description wraps in the lower detail pane.",
+				description: "The complete selected roadmap description wraps in the lower detail pane with enough additional stored context to occupy six lines in a narrow viewport without telemetry displacing any selected-item description text from the reserved detail area.",
 				status: "open",
 				role: "standalone_epic",
 				progress: { completed: 0, total: 2 },
@@ -469,7 +469,14 @@ const treeFrames = [
 						title: "Task A",
 						description: "Task A full stored description.",
 						status: "open",
-						children: [],
+						children: [
+							{
+								id: "task-a-child",
+								title: "Task A child",
+								status: "open",
+								children: [],
+							},
+						],
 					},
 					{
 						id: "task-b",
@@ -632,10 +639,26 @@ const treeRun = await driveTree(
 			"open containers default expanded",
 		);
 		assert(lines.some((line) => line.includes("[-] ● 0/2 Open roadmap")));
-		assert(lines.some((line) => line.includes("[+] ● 1/1 Closed roadmap")));
-		assert(lines.some((line) => /\s{2}\s{3} ● Task A/.test(line)));
+		assert(lines.some((line) => line.includes("[+] ✓ 1/1 Closed roadmap")));
+		assert(lines.some((line) => /\s{2}\[-\] ● Task A/.test(line)));
 		assert(lines.some((line) => line.includes("complete selected roadmap description")));
-		assert(lines.some((line) => line.includes("- selected roadmap-open")));
+		assert(lines[0].trimEnd().endsWith("Stats:"), "stats start in the top-right column");
+		assert(
+			lines[1].trimEnd().endsWith("- selected roadmap-open"),
+			"selection stats share the header without overlap",
+		);
+		const narrowLines = component.render(42);
+		const detailsAt = narrowLines.findIndex((line) => line.includes(" Details "));
+		const keysAt = narrowLines.findIndex((line) => line.includes(" Keys "));
+		assert.equal(keysAt - detailsAt - 1, 6, "six description rows are reserved");
+		assert(
+			narrowLines.slice(detailsAt + 1, keysAt).every((line) => line.trim()),
+			"all six reserved rows render wrapped selected description",
+		);
+		assert(
+			!lines.slice(lines.findIndex((line) => line.includes(" Details "))).some((line) => line.includes("- selected roadmap-open")),
+			"stats are removed from Details",
+		);
 		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
 		assert(
 			lines.some((line) => line.includes("Aggregate-open child")),
@@ -647,11 +670,15 @@ const treeRun = await driveTree(
 			),
 			"aggregate-open titles are not dimmed",
 		);
-		for (const color of ["warning", "success", "muted", "dim"])
+		for (const color of ["warning", "success", "muted"])
 			assert(
 				colors.some((call) => call.color === color && call.text === "●"),
 				`${color} status dot is colored independently`,
 			);
+		assert(
+			colors.some((call) => call.color === "dim" && call.text === "✓"),
+			"aggregate-complete rows use a dim checkmark",
+		);
 		assert(
 			!lines.some((line) => line.includes("Hidden task")),
 			"closed containers default collapsed",
@@ -674,10 +701,23 @@ const treeRun = await driveTree(
 		);
 		component.handleInput("right");
 		component.handleInput("down");
+		component.handleInput("down");
+		assert(component.render(70).some((line) => /❯\s+● Task A child/.test(line)));
+		component.handleInput("left");
 		lines = component.render(70);
-		assert(lines.some((line) => /❯\s+● Task A/.test(line)));
+		assert(lines.some((line) => /❯.*\[\+\] ● Task A/.test(line)));
+		assert(!lines.some((line) => line.includes("Task A child")));
+		component.handleInput("left");
+		lines = component.render(70);
+		assert(lines.some((line) => /❯.*\[\+\] ● 0\/2 Open roadmap/.test(line)));
+		assert(!lines.some((line) => line.includes("Task A")));
+		component.handleInput("right");
+		component.handleInput("down");
+		component.handleInput("right");
+		lines = component.render(70);
+		assert(lines.some((line) => /❯.*\[-\] ● Task A/.test(line)));
 		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
-		assert(lines.some((line) => line.includes("- selected task-a")));
+		assert(lines[1].trimEnd().endsWith("- selected task-a"));
 		assert(
 			lines.some((line) => line.includes("Task A full stored description.")),
 			"description and telemetry follow stable selection",
@@ -685,7 +725,7 @@ const treeRun = await driveTree(
 		component.handleInput("up");
 		assert(component.render(70).some((line) => /❯.*Open roadmap/.test(line)));
 		component.handleInput("down");
-		assert(component.render(70).some((line) => /❯\s+● Task A/.test(line)));
+		assert(component.render(70).some((line) => /❯.*\[-\] ● Task A/.test(line)));
 		assert.equal(statsCalls.filter((id) => id === "roadmap-open").length, 1);
 		assert.equal(statsCalls.filter((id) => id === "task-a").length, 1);
 		assert.equal(
