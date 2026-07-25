@@ -14580,7 +14580,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		},
 		{
 			value: "work-stop",
-			label: "⏹️ Stop safely",
+			label: "🛑 Stop safely",
 			description:
 				"Stop autonomous work at the next clean phase boundary.\nCurrent native work-item and Git state remain resumable.",
 		},
@@ -14639,7 +14639,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		},
 		{
 			value: "work-pause",
-			label: "⏸️ Checkpoint and pause",
+			label: "💾 Checkpoint and pause",
 			description:
 				"Checkpoint current work and leave a resumable handoff.\nAn optional note records why work paused.",
 			argumentTitle: "Pause note",
@@ -14740,7 +14740,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		},
 		{
 			value: "work-settings",
-			label: "⚙️ Settings",
+			label: "🔧 Settings",
 			description:
 				"Configure effort, role models, background verifiers, and review gates.\nGlobal and project scopes are available in the submenu.",
 		},

@@ -32,13 +32,18 @@ function terminalWidth(value, emojiWidth = 2) {
 }
 
 function calibratedTerminalWidth(value) {
-	const width = terminalWidth(value);
-	if (value.includes("🧭") || value.includes("🧱") || value.includes("🌍"))
-		return width + 1;
+	let width = terminalWidth(value);
+	for (const emoji of ["🧭", "🧱", "🌍"])
+		width += value.split(emoji).length - 1;
 	return width;
 }
 
-async function drive(options, interact, activeTheme = theme) {
+async function drive(
+	options,
+	interact,
+	activeTheme = theme,
+	terminalRows = 24,
+) {
 	let overlay;
 	const result = await showListDialog(
 		{
@@ -49,13 +54,18 @@ async function drive(options, interact, activeTheme = theme) {
 					let value;
 					let closed = false;
 					const component = factory(
-						{ requestRender() {} },
+						{ terminal: { rows: terminalRows }, requestRender() {} },
 						activeTheme,
 						keybindings,
 						(next) => {
 							value = next;
 							closed = true;
 						},
+					);
+					assert.equal(
+						component.render(70).length,
+						Math.max(1, terminalRows - 1),
+						"workspace occupies a stable terminal viewport",
 					);
 					await interact(component, () => closed);
 					assert(closed, "dialog interaction closes");
@@ -65,7 +75,9 @@ async function drive(options, interact, activeTheme = theme) {
 		},
 		options,
 	);
-	assert.equal(overlay.overlay, true, "menus use an overlay dialog");
+	assert.equal(overlay.overlay, true, "menus use an overlay workspace");
+	assert.equal(overlay.overlayOptions.width, "100%");
+	assert.equal(overlay.overlayOptions.maxHeight, "100%");
 	return result;
 }
 
@@ -97,7 +109,7 @@ await drive(
 			"every dialog shows its purpose below the title",
 		);
 		assert(
-			lines.some((line) => line.includes(">  Beta")),
+			lines.some((line) => line.includes("❯  Beta")),
 			"returning from a submenu restores its parent cursor",
 		);
 		assert(
@@ -117,7 +129,7 @@ await drive(
 	},
 	(component) => {
 		const lines = component.render(70);
-		assert(lines.some((line) => line.includes("> *Alpha")));
+		assert(lines.some((line) => line.includes("❯ *Alpha")));
 		assert(lines.some((line) => line.includes("●Beta")));
 		assert(!lines.some((line) => line.includes("(current)")));
 		component.handleInput("escape");
@@ -161,12 +173,12 @@ const checklist = await drive(
 		component.handleInput("down");
 		component.handleInput("enter");
 		assert(
-			component.render(70).some((line) => line.includes("> ✓Beta")),
+			component.render(70).some((line) => line.includes("❯ ✓Beta")),
 			"selection and checked indicators use separate columns",
 		);
 		component.handleInput(" ");
 		assert(
-			component.render(70).some((line) => line.includes("> ○Beta")),
+			component.render(70).some((line) => line.includes("❯ ○Beta")),
 			"selection and unchecked indicators use separate columns",
 		);
 		component.handleInput(" ");
@@ -230,15 +242,13 @@ await drive(
 			"fixed detail rows keep the overlay in place",
 		);
 		assert(
-			detailedLines.some((line) => line.includes("First description line has")),
-		);
-		assert(
-			detailedLines.some((line) =>
-				line.includes("useful context and continues"),
-			),
-		);
-		assert(
-			detailedLines.some((line) => line.includes("implementation constraint")),
+			detailedLines
+				.join(" ")
+				.replace(/\s+/g, " ")
+				.includes(
+					"First description line has useful context and continues with implementation constraints.",
+				),
+			"details remain readable across terminal-width wrapping",
 		);
 		component.handleInput("escape");
 	},
@@ -367,7 +377,7 @@ await drive(
 		for (const line of lines)
 			assert.equal(
 				calibratedTerminalWidth(line),
-				68,
+				70,
 				`calibrated terminal width: ${line}`,
 			);
 		assert(
@@ -384,6 +394,41 @@ await drive(
 		);
 		component.handleInput("escape");
 	},
+);
+
+await drive(
+	{
+		title: "Multiple calibrated icons",
+		items: [
+			{ value: "stages", label: "🧭 Plan → 🧱 Build" },
+			{
+				value: "truncated",
+				label: `${"Long stage ".repeat(9)}🧭 🧱`,
+			},
+		],
+	},
+	(component) => {
+		const lines = component.render(70);
+		assert(lines.some((line) => line.includes("🧭 Plan → 🧱 Build")));
+		assert(lines.some((line) => line.includes("…")));
+		for (const line of lines)
+			assert.equal(
+				calibratedTerminalWidth(line),
+				70,
+				`multiple-icon terminal width: ${line}`,
+			);
+		component.handleInput("escape");
+	},
+);
+
+await drive(
+	{ title: "Tiny terminal", items },
+	(component) => {
+		assert.equal(component.render(70).length, 4);
+		component.handleInput("escape");
+	},
+	theme,
+	5,
 );
 
 const tabbed = await drive(
