@@ -9,3 +9,6 @@ node_modules/
 .ce-workflow/*.bak
 *.log
 .DS_Store
+.tmp/adhd-architecture.md
+.tmp/adhd-research.md
+tmp/pi-key-latency.py
