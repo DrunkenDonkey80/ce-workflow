@@ -606,6 +606,8 @@ try {
 			registerCommand: (name, config) => {
 				commands[name] = config;
 			},
+			sendUserMessage: async (message, options) =>
+				sent.push({ message, options }),
 		};
 		workModelsExtension(pi);
 		const invoke = (name, args, ctx) =>
@@ -665,21 +667,22 @@ try {
 			"extension command records worker handoff role",
 		);
 		assert(
-			compactCalls === 0 && sent.length === 0,
-			"worker handoff bypasses inline compaction and follow-up delivery",
+			compactCalls === 0 && sent.length === 1 && rpcRequest === undefined,
+			"TUI worker handoff emits one visible Pi turn without compaction or RPC",
 		);
+		const routedPrompt = sent[0].message;
 		assert(
-			rpcRequest?.params?.agent === "work-worker" &&
-				rpcRequest.params.task.includes("Implementation scope: small"),
-			"small handoff launches the configured worker with bounded scope",
+			routedPrompt.includes("Implementation scope: small"),
+			"small handoff keeps the configured worker's bounded instructions",
 		);
-		const workerMeta = parseWorkPromptMeta(rpcRequest.params.task);
+		const workerMeta = parseWorkPromptMeta(routedPrompt);
 		assert(
 			workerMeta.workflowRunId && workerMeta.activity === "validation",
 			"worker handoff carries command workflow identity and activity",
 		);
 
 		fixture.reset("active");
+		sent.length = 0;
 		await invoke("work-med", "Do not queue", {
 			cwd,
 			mode: "print",
@@ -709,7 +712,7 @@ try {
 		fixture.reset("active");
 
 		await hooks.before_agent_start(
-			{ prompt: rpcRequest.params.task },
+			{ prompt: routedPrompt },
 			{
 				cwd,
 				getContextUsage: () => ({ tokens: 3000 }),
@@ -803,7 +806,7 @@ try {
 			},
 		};
 		await hooks.before_agent_start(
-			{ prompt: rpcRequest.params.task, systemPrompt: "system" },
+			{ prompt: routedPrompt, systemPrompt: "system" },
 			historyCtx,
 		);
 		await hooks.agent_start({}, historyCtx);

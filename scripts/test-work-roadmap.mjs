@@ -23,6 +23,7 @@ const {
 	buildWorkRoadmapState,
 	handleWorkRoadmapCommand,
 	renderWorkRoadmapText,
+	roadmapMenuItems,
 	roadmapPreviewText,
 } = await import(
 	pathToFileURL(
@@ -494,16 +495,29 @@ try {
 		);
 
 	const handoffs = [];
+	let roadmapPlanRpc = 0;
 	const roadmapPlanHandoff = await handleWorkRoadmapCommand(
 		"plan E-1 fork",
 		{
 			cwd: root,
-			ui: { notify: (message) => notices.push(message) },
-			sendUserMessage: async (message) => handoffs.push(message),
+			mode: "tui",
+			ui: {
+				notify: (message) => notices.push(message),
+				select: async (_title, labels) => labels[0],
+			},
+			sendUserMessage: async () => {
+				throw new Error("TUI roadmap plan must inject through Pi");
+			},
 		},
-		{},
+		{
+			sendUserMessage: async (message) => handoffs.push(message),
+			events: { emit: () => roadmapPlanRpc++ },
+		},
 	);
 	assert.equal(roadmapPlanHandoff.action, "handoff-plan");
+	assert.equal(handoffs.length, 1);
+	assert.equal(roadmapPlanRpc, 0);
+	assert.match(handoffs[0], /Source roadmap: E-1/);
 	assert.match(
 		roadmapPlanHandoff.handoffPrompt,
 		/Source artifact: docs\/brainstorms\/accepted\.md/,
@@ -813,7 +827,7 @@ try {
 		const labelsSeen = [];
 		const names = {
 			"I-1.1": "Planned child",
-			"I-1.2": "Needs plan",
+			"I-1.2": "Fresh task title",
 			"S-1": "Standalone",
 		};
 		let selected = false;
@@ -839,9 +853,9 @@ try {
 		return labelsSeen.join("\n");
 	};
 	const unplannedChildActions = await captureOps("I-1.2");
-	for (const expected of ["list tasks", "plan", "report", "close"])
+	for (const expected of ["list tasks", "report", "close"])
 		assert.match(unplannedChildActions, new RegExp(expected, "i"));
-	assert.doesNotMatch(unplannedChildActions, /resume work/i);
+	assert.doesNotMatch(unplannedChildActions, /resume work|plan|brainstorm/i);
 	assert.doesNotMatch(unplannedChildActions, /convert to initiative/i);
 	const preparedChildStore = loadStore(initiativeRoot);
 	preparedChildStore.items["I-1.1"].status = "open";
@@ -860,14 +874,14 @@ try {
 		"",
 		{
 			cwd: initiativeRoot,
+			mode: "tui",
 			isIdle: () => false,
 			sessionManager: { getSessionId: () => "roadmap-planning-session" },
-			sendUserMessage: async (message) => planningPrompts.push(message),
 			ui: {
 				select: async (title, labels) => {
 					if (title.includes("operation"))
 						return labels.find((label) => /plan.*next child/i.test(label));
-					return labels.find((label) => label.includes("Initiative ["));
+					return labels.find((label) => /Initiative/i.test(label));
 				},
 				confirm: async () => true,
 				notify: () => {},
@@ -875,7 +889,7 @@ try {
 				setWidget: () => {},
 			},
 		},
-		{},
+		{ sendUserMessage: async (message) => planningPrompts.push(message) },
 	);
 	assert.equal(planningState.action, "handoff-plan");
 	assert.equal(planningPrompts.length, 1);
@@ -1210,7 +1224,8 @@ try {
 			parentId: "R-child-only",
 			documentLinks: { brainstorm: "docs/brainstorms/child.md" },
 		}),
-		"R-misc": item("R-misc", "Misc", {
+		"R-misc": item("R-misc", "Compatibility bucket", {
+			labels: ["wo:misc"],
 			documentLinks: { brainstorm: "docs/brainstorms/own.md" },
 		}),
 		"R-self": item("R-self", "Self-improving"),
@@ -1431,10 +1446,42 @@ try {
 			.planningEligible,
 		false,
 	);
-	assert.equal(
-		projected.roadmaps.find((roadmap) => roadmap.id === "R-misc")
-			.planningEligible,
-		false,
+	const miscRoadmap = projected.roadmaps.find(
+		(roadmap) => roadmap.id === "R-misc",
+	);
+	assert.equal(miscRoadmap.planningEligible, false);
+	const miscMenu = roadmapMenuItems(projectionRoot, [miscRoadmap])[0];
+	assert.doesNotMatch(
+		`${miscMenu.label} ${miscMenu.description}`,
+		/Needs planning|Plan \/ strengthen/i,
+		"canonical wo:misc suppresses planning readiness and next-step text",
+	);
+	const miscOps = [];
+	let miscSelected = false;
+	await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: projectionRoot,
+			mode: "tui",
+			ui: {
+				select: async (title, labels) => {
+					if (title.includes("operation")) {
+						miscOps.push(...labels);
+						return undefined;
+					}
+					if (miscSelected) return undefined;
+					miscSelected = true;
+					return labels.find((label) => label.includes("Compatibility bucket"));
+				},
+				notify: () => {},
+			},
+		},
+		{ sendUserMessage: async () => {} },
+	);
+	assert.doesNotMatch(
+		miscOps.join("\n"),
+		/plan|brainstorm/i,
+		"canonical wo:misc offers no planning action",
 	);
 	const titleChangedStore = loadStore(projectionRoot);
 	titleChangedStore.items["R-plan"].title = "Plan me renamed";

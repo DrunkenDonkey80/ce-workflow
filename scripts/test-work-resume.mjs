@@ -967,32 +967,28 @@ try {
 	const sent = [];
 	const notices = [];
 	setScenario("plannedIdea");
-	await handleWorkResumeCommand("E-1", {
-		cwd: cwd,
-		ui: { notify: (message, level) => notices.push({ message, level }) },
-		sendUserMessage: async (message, options) =>
-			sent.push({ message, options }),
-	});
-	assert(
-		sent.length === 0 &&
-			notices.at(-1)?.message.includes("Required work-worker could not start"),
-		"implementation stops without an inline fallback when worker RPC is unavailable",
-	);
-
-	const piSent = [];
+	let tuiRpcRequests = 0;
 	await handleWorkResumeCommand(
 		"E-1",
 		{
 			cwd: cwd,
+			mode: "tui",
 			ui: { notify: (message, level) => notices.push({ message, level }) },
+			sendUserMessage: async () => {
+				throw new Error("TUI must inject through Pi");
+			},
 		},
 		{
-			sendUserMessage: (message, options) => piSent.push({ message, options }),
+			sendUserMessage: async (message, options) =>
+				sent.push({ message, options }),
+			events: { emit: () => tuiRpcRequests++ },
 		},
 	);
 	assert(
-		piSent.length === 0,
-		"implementation never falls back to the current session sender",
+		sent.length === 1 &&
+			sent[0].message.includes("WorkItem") &&
+			tuiRpcRequests === 0,
+		"TUI resume injects one visible Pi user turn without direct RPC",
 	);
 
 	setScenario();
@@ -1014,6 +1010,7 @@ try {
 		"E-1",
 		{
 			cwd: cwd,
+			mode: "rpc",
 			ui: { notify: (message, level) => notices.push({ message, level }) },
 			sendUserMessage: async (message, options) =>
 				sent.push({ message, options }),
@@ -1039,22 +1036,21 @@ try {
 			"/work-resume E-1",
 			{
 				cwd: cwd,
+				mode: "tui",
 				ui: { notify: (message, level) => notices.push({ message, level }) },
+			},
+			{
 				sendUserMessage: async (message, options) =>
 					sent.push({ message, options }),
 			},
-			rpcPi,
 			"the terminal is next to the probe",
 		),
 		"numbered /work-resume action executes",
 	);
 	assert(
-		rpcRequest?.params?.task?.includes("the terminal is next to the probe"),
-		"numbered /work-resume keeps the note on the coded direct handoff",
-	);
-	assert(
-		sent.length === sentBeforeNumberedResume,
-		"numbered /work-resume does not start an autonomous work-goal prompt",
+		sent.length === sentBeforeNumberedResume + 1 &&
+			sent.at(-1).message.includes("the terminal is next to the probe"),
+		"numbered TUI /work-resume keeps the note in one visible Pi turn",
 	);
 
 	setScenario("blocked");

@@ -2565,7 +2565,9 @@
       "acceptance": "In a real Pi TUI, select Add task from the new workspace for a known roadmap or task parent; enter multiline text; paste an image; submit through Pi's normal composer; verify the resulting task context preserves the selected roadmap/parent, multiline request, and image context. Record project-owner identity, date, selected parent ID, resulting task/work context ID, and explicit approve/reject result in this WorkItem. Approval is complete only with project-owner evidence; text-only fallback is not sufficient for this rich-composer smoke.",
       "createdAt": "2026-07-25T08:05:42.979Z",
       "dependencies": [
-        "work-3.4"
+        "work-3.4",
+        "work-3.6",
+        "work-3.7"
       ],
       "dependencyEdges": [],
       "description": "After the workspace/composer implementation passes automation, the project owner who requested work-3.1 must perform and approve the A7 real Pi TUI smoke. This is the durable manual evidence gate; it does not waive or replace automated composer/fallback coverage.",
@@ -2573,13 +2575,60 @@
       "id": "work-3.5",
       "labels": [],
       "notes": [
-        "Dependent A7 manual decision/evidence gate. Must remain blocked until work-3.4 implementation and automated regression/final gate complete. No source ownership."
+        "Dependent A7 manual decision/evidence gate. Must remain blocked until work-3.4 implementation and automated regression/final gate complete. No source ownership.",
+        "wo:manual-evidence FAIL — 2026-07-25\nProject owner reported the real Pi TUI multiline/image-paste smoke failed: \"lot of stuff failed will respond with a followup prompt\".\nDetailed reproduction and observed failures are pending the project owner's follow-up. Keep work-3.5 and roadmap work-3 open; do not waive the manual gate.",
+        "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\n- Misc still exposes `Needs planning` although it has no brainstorm; hide planning readiness/actions when no brainstorm exists.\n- Tree containers need `+` when collapsed and `-` when expanded.\n- Plan, Brainstorm, Work small/medium/big, and related execution actions must start a normal visible Pi chat turn and route that turn to the appropriate skill/code path; they must not open the current weird prompt/direct-flow UX. A previous pre-goal implementation had the desired normal-chat behavior.\n- Current workspace screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f827069d-5af7-48e2-9b7a-c2ec350922fa.png\n- Visual target screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-2c7030b1-1c05-4449-adc0-ac60e84cb10d.png\n- Desired rows: initiative/idea `[-] [colored status dot] completed/total child roadmaps synthesized short title`; roadmap/brainstorm `[-] [colored status dot] completed/total tasks synthesized short title`; task `[colored status dot] synthesized short title`, preserving tree indentation.\n- Reserve the lower detail area for the selected item's full description and model/token statistics.\nResult: rejected. Keep work-3.5 open until repairs land and a new real Pi TUI smoke passes with parent, multiline, and image evidence."
       ],
       "parentId": "work-3",
       "status": "open",
       "title": "Approve real Pi TUI multiline and image-paste task flow",
       "type": "decision",
-      "updatedAt": "2026-07-25T08:05:58.794Z"
+      "updatedAt": "2026-07-25T13:38:40.861Z"
+    },
+    "work-3.6": {
+      "acceptance": "Misc or any roadmap without its own brainstorm shows no Needs planning text and offers no Plan/Brainstorm action. Each named TUI launch calls pi.sendUserMessage exactly once with existing routed instructions and emits no subagents RPC request. RPC still uses direct role launch; print/json remain unchanged. Focused roadmap, brainstorm, start-finish, resume, telemetry, and add tests pass.",
+      "createdAt": "2026-07-25T13:38:14.482Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Repair the rejected work-3.5 smoke: make planningEligible the presentation/action gate (including canonical wo:misc) and make Brainstorm, Plan, Work small/medium/big, Resume, roadmap Plan/plan-next, and related TUI launches create one normal visible Pi user chat turn using existing handoff/skill instructions instead of direct subagent RPC. Preserve RPC direct execution, print/json behavior, and the rich Add-task composer.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.6",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Repair slice 1 from the failed work-3.5 project-owner smoke and work-planner diagnosis. Production owner: extensions/work-models.js.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-brainstorm.mjs\",\"scripts/test-work-resume.mjs\",\"scripts/test-work-roadmap.mjs\",\"scripts/test-work-telemetry.mjs\"]",
+        "wo:review PASS - scoped diff routes TUI handoffs through pi.sendUserMessage, preserves RPC direct launch/print-json gates, gates planning UI by planningEligible; roadmap/brainstorm/start-finish/resume/telemetry/add tests and scoped diff-check passed.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs && node scripts/test-work-brainstorm.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-telemetry.mjs && node scripts/test-work-add.mjs\nOutput: ok - work-brainstorm behavior\nok - coded work start/finish behavior\nok - coded work-resume behavior\nWork commands that launch implementation turns require TUI or RPC mode. Print/JSON mode stopped before creating or claiming a WorkItem.\nok - work telemetry behavior\nok - coded work-add behavior"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Restore truthful planning eligibility and normal TUI chat routing",
+      "type": "task",
+      "updatedAt": "2026-07-25T13:53:38.623Z"
+    },
+    "work-3.7": {
+      "acceptance": "Initiative rows show [+/-] status dot closed/total direct child roadmaps and short title; roadmap rows show [+/-] status dot closed/total recursive executable tasks and short title; task rows show status dot and short title. Lower pane wraps the selected full description and model/token stats, degrading to unknown safely. Stable cursor/expansion/filter/750ms refresh/cache/cleanup and Add-task behavior remain intact. Focused roadmap/dialog/add tests and npm run verify:quiet pass.",
+      "createdAt": "2026-07-25T13:38:25.018Z",
+      "dependencies": [
+        "work-3.6"
+      ],
+      "dependencyEdges": [],
+      "description": "Repair the rejected work-3.5 roadmap screen. Extend the existing stable-ID projection and shared tree dialog only: container markers are [+]/[-]; rows render a theme-colored semantic status dot, hierarchy-specific completed/total progress, deterministic short display title, and indentation; the lower pane follows selection with the full stored description plus current model/session token stats. Keep Add-task composer and native fallback behavior.",
+      "evidence": [],
+      "id": "work-3.7",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Repair slice 2 from the failed work-3.5 project-owner smoke and work-planner diagnosis. Production owners: extensions/work-models.js and extensions/work-dialogs.js. Depends on work-3.6."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Redesign roadmap tree rows and detail pane",
+      "type": "task",
+      "updatedAt": "2026-07-25T13:38:33.488Z"
     }
   },
   "metadata": {
@@ -2589,7 +2638,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T12:16:56.253Z"
+    "updatedAt": "2026-07-25T13:53:38.623Z"
   },
   "schemaVersion": 1
 }

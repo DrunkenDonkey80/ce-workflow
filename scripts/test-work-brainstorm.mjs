@@ -291,6 +291,7 @@ try {
 		"wide brainstorm merges three isolated branches before configured critics",
 	);
 	const followUps = [];
+	let brainstormRpc = 0;
 	const interactive = await executeOrchestratorAction(
 		"work-brainstorm",
 		"Try an offline-first reader",
@@ -304,14 +305,18 @@ try {
 						? labels.find((label) => label.includes("Wide"))
 						: undefined,
 			},
-			sendUserMessage: async (message) => followUps.push(message),
 		},
-		{},
+		{
+			sendUserMessage: async (message) => followUps.push(message),
+			events: { emit: () => brainstormRpc++ },
+		},
 	);
 	assert(
 		interactive.creativeDepth === "wide" &&
-			followUps[0]?.includes("Creative sidecar gate"),
-		"Ask mode offers Wide and feeds the creative gate into the live brainstorm handoff",
+			followUps.length === 1 &&
+			followUps[0]?.includes("Creative sidecar gate") &&
+			brainstormRpc === 0,
+		"TUI Brainstorm emits one visible Pi turn with its creative handoff and no RPC",
 	);
 
 	const linked = linkBrainstormArtifactFromFinal(
@@ -363,23 +368,28 @@ try {
 		JSON.stringify({ workOrchestrator: { creativeMode: "auto" } }),
 	);
 	const planningFollowUps = [];
+	let bigTaskRpc = 0;
 	const broadTask = await executeOrchestratorAction(
 		"work-big",
 		"--roadmap E-1 Design a resilient offline synchronization system",
 		{
 			cwd,
-			mode: "rpc",
+			mode: "tui",
 			ui: { notify() {} },
-			sendUserMessage: async (message) => planningFollowUps.push(message),
 		},
-		{},
+		{
+			sendUserMessage: async (message) => planningFollowUps.push(message),
+			events: { emit: () => bigTaskRpc++ },
+		},
 	);
 	assert(
 		broadTask.creativeDepth === "wide" &&
 			broadTask.controlSessionHandoff === true &&
+			planningFollowUps.length === 1 &&
 			planningFollowUps[0]?.includes("Creative sidecar gate") &&
 			planningFollowUps[0]?.includes("work-divergent") &&
-			planningFollowUps[0]?.includes("Advisor critic gate"),
+			planningFollowUps[0]?.includes("Advisor critic gate") &&
+			bigTaskRpc === 0,
 		"Auto mode runs the wide sidecar in the control session before work-big planning",
 	);
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), "{}\n");

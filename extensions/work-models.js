@@ -12533,6 +12533,7 @@ function ownBrainstormEligibility(cwd, epic, readiness) {
 	if (
 		statusOf(epic) === "closed" ||
 		!["needs_plan", "stale"].includes(readiness) ||
+		labelsOf(epic).includes(MISC_ROADMAP_LABEL) ||
 		/^misc(?:ellaneous)?$/i.test(titleOf(epic).trim())
 	)
 		return false;
@@ -14255,9 +14256,11 @@ function workGoalHasPendingMessages(ctx) {
 async function sendWorkGoalPrompt(pi, ctx, prompt) {
 	try {
 		const send =
-			typeof ctx.sendUserMessage === "function"
-				? ctx.sendUserMessage.bind(ctx)
-				: pi?.sendUserMessage?.bind(pi);
+			ctx.mode === "tui" && typeof pi?.sendUserMessage === "function"
+				? pi.sendUserMessage.bind(pi)
+				: typeof ctx.sendUserMessage === "function"
+					? ctx.sendUserMessage.bind(ctx)
+					: pi?.sendUserMessage?.bind(pi);
 		if (!send) return false;
 		if (ctx.isIdle?.()) await send(roadmapTerminology(prompt));
 		else await send(roadmapTerminology(prompt), { deliverAs: "followUp" });
@@ -15387,12 +15390,16 @@ function formatError(error) {
 async function sendFollowUp(ctx, message, pi) {
 	if (!message) return;
 	const text = roadmapTerminology(message);
+	if (ctx.mode === "tui" && typeof pi?.sendUserMessage === "function") {
+		await pi.sendUserMessage(text, { deliverAs: "followUp" });
+		return;
+	}
 	if (typeof ctx.sendUserMessage === "function") {
 		await ctx.sendUserMessage(text, { deliverAs: "followUp" });
 		return;
 	}
 	if (typeof pi?.sendUserMessage === "function") {
-		pi.sendUserMessage(text, { deliverAs: "followUp" });
+		await pi.sendUserMessage(text, { deliverAs: "followUp" });
 		return;
 	}
 	ctx.ui.notify(
@@ -15466,9 +15473,10 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		ownerSession: verifierTriageOwner(ctx),
 	});
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-resume");
-	const direct = state.ok
-		? directRoleHandoffParams(state, ctx.cwd, selectionNote)
-		: null;
+	const direct =
+		state.ok && ctx.mode === "rpc"
+			? directRoleHandoffParams(state, ctx.cwd, selectionNote)
+			: null;
 	notify(
 		ctx,
 		renderWorkResumeText(
@@ -15632,7 +15640,7 @@ async function handleWorkflowAction(
 	}
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-action");
 	const direct =
-		state.ok && !state.controlSessionHandoff
+		state.ok && ctx.mode === "rpc" && !state.controlSessionHandoff
 			? directRoleHandoffParams(state, ctx.cwd, selectionNote)
 			: null;
 	notify(
@@ -15841,8 +15849,7 @@ function roadmapMenuNextStep(roadmap) {
 	if (roadmap.status === "closed") return "Enter to inspect or reopen.";
 	if (roadmap.role === "initiative")
 		return "Enter to inspect or plan its child roadmaps.";
-	if (["needs_plan", "stale"].includes(roadmap.readiness?.state))
-		return "Enter, then choose Plan / strengthen.";
+	if (roadmap.planningEligible) return "Enter, then choose Plan / strengthen.";
 	return "Enter, then choose Resume work.";
 }
 
@@ -15869,9 +15876,12 @@ export function roadmapMenuItems(_cwd, roadmaps) {
 					: `${marker} `;
 		const summary =
 			roadmapDisplayDescription(roadmap) || "Summary unavailable.";
+		const readiness = roadmap.planningEligible
+			? ` · ${roadmapMenuState(roadmap.readiness?.state)}`
+			: "";
 		return {
 			value: roadmap.id,
-			label: `${prefix}${roadmapDisplayTitle(roadmap)} [${roadmapMenuState(roadmap.status)} · ${roadmapMenuState(roadmap.readiness?.state)}] ${SUBMENU_ARROW}`,
+			label: `${prefix}${roadmapDisplayTitle(roadmap)} [${roadmapMenuState(roadmap.status)}${readiness}] ${SUBMENU_ARROW}`,
 			description: `${summary} ${roadmapMenuNextStep(roadmap)}`,
 			preserveCase: true,
 			color: roadmap.current
@@ -16387,7 +16397,9 @@ async function handleWorkRoadmapCommand(
 						...(selectedRoadmap.status === "closed"
 							? []
 							: [{ value: "add", label: "➕ Add task" }]),
-						{ value: "plan", label: "🧭 plan / strengthen" },
+						...(selectedRoadmap.planningEligible
+							? [{ value: "plan", label: "🧭 plan / strengthen" }]
+							: []),
 						{ value: "set-current", label: "⭐ set current" },
 						selectedRoadmap.status === "closed"
 							? { value: "reopen", label: "♻️ reopen" }
@@ -16412,11 +16424,15 @@ async function handleWorkRoadmapCommand(
 						...(selectedRoadmap.status === "closed"
 							? []
 							: [{ value: "add", label: "➕ Add task" }]),
-						{
-							value: "plan",
-							label: "🧭 plan / strengthen",
-							description: "use linked brainstorm/plan",
-						},
+						...(selectedRoadmap.planningEligible
+							? [
+									{
+										value: "plan",
+										label: "🧭 plan / strengthen",
+										description: "use linked brainstorm/plan",
+									},
+								]
+							: []),
 						...(selectedRoadmap?.role === "standalone_epic"
 							? [
 									{
