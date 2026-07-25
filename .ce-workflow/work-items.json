@@ -2614,21 +2614,49 @@
       "acceptance": "Initiative rows show [+/-] status dot closed/total direct child roadmaps and short title; roadmap rows show [+/-] status dot closed/total recursive executable tasks and short title; task rows show status dot and short title. Lower pane wraps the selected full description and model/token stats, degrading to unknown safely. Stable cursor/expansion/filter/750ms refresh/cache/cleanup and Add-task behavior remain intact. Focused roadmap/dialog/add tests and npm run verify:quiet pass.",
       "createdAt": "2026-07-25T13:38:25.018Z",
       "dependencies": [
-        "work-3.6"
+        "work-3.6",
+        "work-3.7.1"
       ],
       "dependencyEdges": [],
       "description": "Repair the rejected work-3.5 roadmap screen. Extend the existing stable-ID projection and shared tree dialog only: container markers are [+]/[-]; rows render a theme-colored semantic status dot, hierarchy-specific completed/total progress, deterministic short display title, and indentation; the lower pane follows selection with the full stored description plus current model/session token stats. Keep Add-task composer and native fallback behavior.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.7",
       "labels": [],
       "notes": [
-        "wo:execution-agent. Repair slice 2 from the failed work-3.5 project-owner smoke and work-planner diagnosis. Production owners: extensions/work-models.js and extensions/work-dialogs.js. Depends on work-3.6."
+        "wo:execution-agent. Repair slice 2 from the failed work-3.5 project-owner smoke and work-planner diagnosis. Production owners: extensions/work-models.js and extensions/work-dialogs.js. Depends on work-3.6.",
+        "wo:review-scope [\"extensions/work-dialogs.js\",\"extensions/work-models.js\",\"scripts/test-work-dialogs.mjs\",\"scripts/test-work-dirty-recovery.mjs\",\"scripts/test-work-roadmap.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:12388 - projectedTaskTree omits each task description, so selecting a real task renders No description. instead of the required full stored description; project description: field(issue, description) and assert it in scripts/test-work-roadmap.mjs.\"]}",
+        "wo:review PASS targeted re-review confirms task description projection at extensions/work-models.js:12392-12393; focused dialog/roadmap/dirty-recovery tests and npm run verify:quiet pass.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Redesign roadmap tree rows and detail pane",
       "type": "task",
-      "updatedAt": "2026-07-25T13:38:33.488Z"
+      "updatedAt": "2026-07-25T14:22:28.222Z"
+    },
+    "work-3.7.1": {
+      "acceptance": "node scripts/test-work-dirty-recovery.mjs passes while preserving approved dirty cleanup, terminate behavior, no deadlock/compaction wait, no duplicate follow-up, and the accepted work-3.6 TUI normal-chat/no-RPC contract. Then npm run verify:quiet passes with the work-3.7 changes.",
+      "createdAt": "2026-07-25T14:02:59.999Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "The work-3.7 final package gate fails at scripts/test-work-dirty-recovery.mjs:235 because the test still expects a work-worker subagent RPC launch after work-3.6 intentionally changed TUI workflow continuations to one normal visible Pi user chat turn. Diagnose whether this is stale test drift or a routing regression and apply the minimum fix.",
+      "evidence": [],
+      "id": "work-3.7.1",
+      "labels": [],
+      "notes": [
+        "wo:debug-needed. Exact failure: scripts/test-work-dirty-recovery.mjs:235 selectedAgent observed undefined, expected work-worker after work-3.6 TUI route changed to pi.sendUserMessage.",
+        "# work-3.7.1 debug result\n\n- **Reproduced:** `node scripts/test-work-dirty-recovery.mjs` failed at `C:\\soft\\ce-workflow\\scripts\\test-work-dirty-recovery.mjs:235`; `rpcRequest?.params?.agent` was `undefined`, not `work-worker`.\n- **Root cause:** stale test drift, not a product regression. Work-3.6 intentionally gated direct role RPC in `C:\\soft\\ce-workflow\\extensions\\work-models.js` to `ctx.mode === \"rpc\"`. The dirty continuation re-enters `executeOrchestratorAction` with the original TUI context, so the accepted path is `sendWorkflowFollowUp` → `sendFollowUp` → `pi.sendUserMessage`, not subagent RPC. Work-3.6 updated equivalent routing tests but missed this older dirty-recovery assertion.\n- **Finding (medium):** `C:\\soft\\ce-workflow\\scripts\\test-work-dirty-recovery.mjs:235` asserted the retired TUI RPC contract and blocked the final gate.\n- **Fix:** test-only update in `C:\\soft\\ce-workflow\\scripts\\test-work-dirty-recovery.mjs`. It now proves no RPC request, exactly one additional follow-up (two total including the recovery prompt), Pi-origin delivery, retained bounded worker instructions, and `deliverAs: \"followUp\"`.\n- **Preserved:** existing assertions still prove cleanup approval enforcement, termination, no deadlock/compaction, no dirty-warning replay, and normal startup. Production/dialog files were not changed by this debug task. RPC direct behavior remains unchanged; its dedicated coverage is at `C:\\soft\\ce-workflow\\scripts\\test-work-resume.mjs:994-1028`.\n- **Verification:** `node scripts/test-work-dirty-recovery.mjs` → `dirty recovery: PASS`.\n- **Work state:** `work-3.7.1` was read but not mutated, as explicitly requested. No files are staged. Pre-existing work-3.7 changes in `C:\\soft\\ce-workflow\\.ce-workflow\\work-items.json`, `C:\\soft\\ce-workflow\\extensions\\work-dialogs.js`, `C:\\soft\\ce-workflow\\extensions\\work-models.js`, `C:\\soft\\ce-workflow\\scripts\\test-work-dialogs.mjs`, and `C:\\soft\\ce-workflow\\scripts\\test-work-roadmap.mjs` were avoided.\n- **Learning capture:** not warranted; this is localized stale-test drift and the TUI/RPC contract already has dedicated regression coverage.\n- **Residual risk:** the dedicated RPC-direct test was inspected but not rerun because the task explicitly limited verification to the dirty-recovery script; production routing was untouched.\n\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"Concrete root cause and medium-severity stale assertion identified at C:\\\\soft\\\\ce-workflow\\\\scripts\\\\test-work-dirty-recovery.mjs:235; minimum test-only correction verified passing.\"\n    }\n  ],\n  \"changedFiles\": [\n    \"C:\\\\soft\\\\ce-workflow\\\\scripts\\\\test-work-dirty-recovery.mjs\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"C:\\\\soft\\\\ce-workflow\\\\scripts\\\\test-work-dirty-recovery.mjs\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"node scripts/test-work-dirty-recovery.mjs\",\n      \"result\": \"failed\",\n      \"summary\": \"Reproduced selectedAgent/RPC agent undefined versus expected work-worker at line 235.\"\n    },\n    {\n      \"command\": \"node scripts/test-work-dirty-recovery.mjs\",\n      \"result\": \"passed\",\n      \"summary\": \"Printed dirty recovery: PASS after the test-only correction.\"\n    },\n    {\n      \"command\": \"git diff --cached --name-only\",\n      \"result\": \"passed\",\n      \"summary\": \"No staged files.\"\n    }\n  ],\n  \"validationOutput\": [\n    \"dirty recovery: PASS\",\n    \"TUI continuation asserted to emit no RPC, one Pi follow-up, bounded small-scope prompt, and deliverAs=followUp.\"\n  ],\n  \"residualRisks\": [\n    \"Dedicated RPC-direct coverage at C:\\\\soft\\\\ce-workflow\\\\scripts\\\\test-work-resume.mjs:994-1028 was inspected but not rerun under the explicit one-command verification constraint; production code was unchanged.\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"Replaced stale TUI subagent-RPC expectations with the accepted visible Pi follow-up/no-RPC contract; no production changes.\",\n  \"reviewFindings\": [\n    \"medium: C:\\\\soft\\\\ce-workflow\\\\scripts\\\\test-work-dirty-recovery.mjs:235 - stale pre-work-3.6 TUI RPC expectation caused the final gate failure.\",\n    \"no blockers\"\n  ],\n  \"manualNotes\": \"Work item/native state and in-progress work-3.7 production/dialog files were not modified.\"\n}\n```\n\nNext: F7 → Resume work work-3.7\n"
+      ],
+      "parentId": "work-3.7",
+      "status": "closed",
+      "title": "Fix stale dirty-recovery TUI routing expectation",
+      "type": "bug",
+      "updatedAt": "2026-07-25T14:06:25.298Z"
     }
   },
   "metadata": {
@@ -2638,7 +2666,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T13:53:38.623Z"
+    "updatedAt": "2026-07-25T14:22:28.222Z"
   },
   "schemaVersion": 1
 }

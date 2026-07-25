@@ -456,17 +456,35 @@ const treeFrames = [
 		roadmaps: [
 			{
 				id: "roadmap-open",
-				title: "Open roadmap",
+				title: "Open roadmap stored title",
+				shortTitle: "Open roadmap",
+				description: "The complete selected roadmap description wraps in the lower detail pane.",
 				status: "open",
+				role: "standalone_epic",
+				progress: { completed: 0, total: 2 },
+				attention: true,
 				tasks: [
-					{ id: "task-a", title: "Task A", status: "open", children: [] },
-					{ id: "task-b", title: "Task B", status: "open", children: [] },
+					{
+						id: "task-a",
+						title: "Task A",
+						description: "Task A full stored description.",
+						status: "open",
+						children: [],
+					},
+					{
+						id: "task-b",
+						title: "Task B",
+						status: "in_progress",
+						children: [],
+					},
 				],
 			},
 			{
 				id: "roadmap-closed",
 				title: "Closed roadmap",
 				status: "closed",
+				role: "standalone_epic",
+				progress: { completed: 1, total: 1 },
 				tasks: [
 					{
 						id: "task-closed",
@@ -503,6 +521,9 @@ async function driveTree(options, interact, mode = "tui") {
 	const result = await showTreeWorkspaceDialog(
 		{
 			mode,
+			model: { provider: "test-provider", id: "test-model" },
+			sessionManager: { getSessionId: () => "session-42" },
+			getContextUsage: () => ({ tokens: 1234, maxTokens: 8192 }),
 			ui: {
 				async custom(factory) {
 					let value;
@@ -559,6 +580,7 @@ async function driveTree(options, interact, mode = "tui") {
 }
 
 let refreshStep = 0;
+colors.length = 0;
 const treeRun = await driveTree(
 	{
 		async refresh() {
@@ -578,6 +600,17 @@ const treeRun = await driveTree(
 			lines.some((line) => line.includes("Task A")),
 			"open containers default expanded",
 		);
+		assert(lines.some((line) => line.includes("[-] ● 0/2 Open roadmap")));
+		assert(lines.some((line) => line.includes("[+] ● 1/1 Closed roadmap")));
+		assert(lines.some((line) => /\s{2}\s{3} ● Task A/.test(line)));
+		assert(lines.some((line) => line.includes("complete selected roadmap description")));
+		assert(lines.some((line) => line.includes("Model: test-provider/test-model")));
+		assert(lines.some((line) => line.includes("Tokens: 1234/8192")));
+		for (const color of ["warning", "success", "muted", "dim"])
+			assert(
+				colors.some((call) => call.color === color && call.text === "●"),
+				`${color} status dot is colored independently`,
+			);
 		assert(
 			!lines.some((line) => line.includes("Hidden task")),
 			"closed containers default collapsed",
@@ -600,7 +633,13 @@ const treeRun = await driveTree(
 		);
 		component.handleInput("right");
 		component.handleInput("down");
-		assert(component.render(70).some((line) => /❯\s+Task A/.test(line)));
+		assert(component.render(70).some((line) => /❯\s+● Task A/.test(line)));
+		assert(
+			component
+				.render(70)
+				.some((line) => line.includes("Task A full stored description.")),
+			"detail pane follows stable selection",
+		);
 		const before = state.renders;
 		await state.tick();
 		assert.equal(state.renders, before, "unchanged signatures do not render");
@@ -612,7 +651,7 @@ const treeRun = await driveTree(
 		);
 		lines = component.render(70);
 		assert(
-			lines.some((line) => /❯\s+Task A/.test(line)),
+			lines.some((line) => /❯\s+● Task A/.test(line)),
 			"cursor follows stable ID across reorder",
 		);
 		await state.tick();

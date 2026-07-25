@@ -232,13 +232,15 @@ try {
 		true,
 		"approved cleanup ends the analysis turn",
 	);
-	assert.equal(rpcRequest?.params?.agent, "work-worker");
-	assert.match(rpcRequest?.params?.task ?? "", /Implementation scope: small/);
 	assert.equal(
-		sent.length,
-		1,
-		"worker launch does not fall back to inline follow-up",
+		rpcRequest,
+		undefined,
+		"TUI continuation does not launch a worker through RPC",
 	);
+	assert.equal(sent.length, 2, "TUI continuation queues exactly one follow-up");
+	assert.equal(sent.at(-1)?.source, "pi");
+	assert.match(sent.at(-1)?.message ?? "", /Implementation scope: small/);
+	assert.equal(sent.at(-1)?.options?.deliverAs, "followUp");
 	assert.doesNotMatch(
 		notices.at(-1)?.message ?? "",
 		/Dirty files must be resolved/,

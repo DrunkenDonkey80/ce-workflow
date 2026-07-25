@@ -536,6 +536,38 @@ export async function showListDialog(ctx, options) {
 	);
 }
 
+function treeStatusColor(row) {
+	if (
+		row.attention ||
+		["blocked", "paused", "needs_attention"].includes(row.status)
+	)
+		return "warning";
+	if (row.live || row.engaged || row.status === "in_progress") return "success";
+	if (row.status === "closed") return "dim";
+	return "muted";
+}
+
+function treeContextStats(ctx) {
+	let session = "unknown";
+	let usage;
+	try {
+		session = ctx?.sessionManager?.getSessionId?.() || "unknown";
+		usage = ctx?.getContextUsage?.();
+	} catch {
+		// Optional Pi context APIs vary by host version.
+	}
+	const model =
+		[ctx?.model?.provider, ctx?.model?.id ?? ctx?.model?.name]
+			.filter(Boolean)
+			.join("/") || "unknown";
+	const tokens = usage?.tokens ?? "unknown";
+	const limit = usage?.maxTokens ?? usage?.contextWindow;
+	return [
+		`Model: ${model} · Session: ${session}`,
+		`Tokens: ${tokens}${limit == null ? "" : `/${limit}`}`,
+	];
+}
+
 export async function showTreeWorkspaceDialog(ctx, options) {
 	const {
 		title,
@@ -668,7 +700,8 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 				render(width) {
 					const height = workspaceHeight(tui);
 					const renderWidth = Math.max(1, width - 2);
-					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}`;
+					const stats = treeContextStats(ctx);
+					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}:${stats.join("|")}`;
 					if (cache === cachedKey) return cachedLines;
 					const lines = [];
 					const add = (line = "") =>
@@ -682,7 +715,8 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 							`${theme.fg("muted", "Filter:")} ${theme.fg("text", `${query}${component.focused ? "▌" : ""}`)}`,
 						);
 					add(sectionLine(theme, "Work items", renderWidth));
-					const bodyRows = Math.max(1, height - lines.length - 2);
+					const detailRows = Math.max(2, Math.min(6, Math.floor(height / 3)));
+					const bodyRows = Math.max(1, height - lines.length - detailRows - 3);
 					const index = Math.max(
 						0,
 						visible.findIndex((row) => row.id === selectedId),
@@ -698,20 +732,35 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						const row = visible[at];
 						if (!row) add();
 						else {
-							const marker = row.container ? (expanded(row) ? "▾" : "▸") : " ";
-							const prefix = `${row.id === selectedId ? "❯" : " "} ${"  ".repeat(row.depth)}${marker} `;
-							add(
-								theme.fg(
-									row.id === selectedId
-										? "accent"
-										: row.status === "closed"
-											? "dim"
-											: "text",
-									`${prefix}${row.title ?? row.label ?? row.id}`,
-								),
+							const selected = row.id === selectedId;
+							const marker = row.container
+								? expanded(row)
+									? "[-]"
+									: "[+]"
+								: "   ";
+							const progress = row.role || row.tasks
+								? `${row.progress?.completed ?? 0}/${row.progress?.total ?? 0} `
+								: "";
+							const prefix = `${theme.fg(selected ? "accent" : "text", selected ? "❯" : " ")} ${"  ".repeat(row.depth)}${marker} `;
+							const dot = theme.fg(treeStatusColor(row), "●");
+							const title = theme.fg(
+								selected ? "accent" : row.status === "closed" ? "dim" : "text",
+								`${progress}${row.shortTitle ?? row.title ?? row.label ?? row.id}`,
 							);
+							add(`${prefix}${dot} ${title}`);
 						}
 					}
+					add(sectionLine(theme, "Details", renderWidth));
+					const statLines = stats.map((line) => fit(line, renderWidth).trimEnd());
+					for (const line of statLines) add(theme.fg("muted", line));
+					const selected = visible.find((row) => row.id === selectedId);
+					const details = wrapText(
+						selected?.description || "No description.",
+						renderWidth,
+						Math.max(1, detailRows - statLines.length),
+					);
+					for (const line of details) add(theme.fg("text", line));
+					while (lines.length < height - 2) add();
 					add(sectionLine(theme, "Keys", renderWidth));
 					add(
 						theme.fg(

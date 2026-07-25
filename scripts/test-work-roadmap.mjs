@@ -1138,8 +1138,12 @@ try {
 		now: "2026-07-01T00:00:00Z",
 	});
 	projectionStore.items = {
-		"I-live": item("I-live", "Initiative projection", {
-			labels: ["initiative"],
+		"I-live": item(
+			"I-live",
+			"I-live Initiative projection with a deliberately long deterministic display title from C:\\projects\\source\\plan.md that remains stored intact",
+			{
+				description: "Full initiative description remains available to the detail pane.",
+				labels: ["initiative"],
 			initiative: {
 				schemaVersion: 1,
 				sources: [
@@ -1161,8 +1165,9 @@ try {
 					}),
 				),
 				evidence: [],
+				},
 			},
-		}),
+		),
 		"R-live": item("R-live", "Live child", {
 			parentId: "I-live",
 			updatedAt: "2026-07-02T00:00:00Z",
@@ -1189,6 +1194,8 @@ try {
 			type: "task",
 			parentId: "T-container",
 			status: "closed",
+			description:
+				"The agent leaf keeps this complete stored task description intact for the lower detail pane.",
 		}),
 		"T-direct": item("T-direct", "Direct leaf", {
 			type: "task",
@@ -1392,6 +1399,25 @@ try {
 		["R-live", "R-current", "R-open", "R-closed"],
 		"initiative siblings order live, current, open, then closed",
 	);
+	const projectedInitiative = projected.roadmaps.find(
+		(roadmap) => roadmap.id === "I-live",
+	);
+	assert.deepEqual(
+		projectedInitiative.progress,
+		{ completed: 1, total: 4 },
+		"initiative progress counts only direct child roadmaps",
+	);
+	assert.equal(
+		projectedInitiative.title,
+		"I-live Initiative projection with a deliberately long deterministic display title from C:\\projects\\source\\plan.md that remains stored intact",
+		"projection preserves the full stored title",
+	);
+	assert.equal(
+		projectedInitiative.description,
+		"Full initiative description remains available to the detail pane.",
+	);
+	assert(projectedInitiative.shortTitle.length <= 72);
+	assert.doesNotMatch(projectedInitiative.shortTitle, /I-live|C:\\projects/);
 	const liveRoadmap = projected.roadmaps.find(
 		(roadmap) => roadmap.id === "R-live",
 	);
@@ -1399,6 +1425,16 @@ try {
 		(task) => task.id === "T-container",
 	);
 	assert.deepEqual(liveRoadmap.progress, { completed: 1, total: 3 });
+	assert.equal(liveRoadmap.shortTitle, "Live child");
+	const projectedAgent = liveContainer.children.find(
+		(task) => task.id === "T-agent",
+	);
+	assert.equal(projectedAgent.shortTitle, "Agent leaf");
+	assert.equal(
+		projectedAgent.description,
+		"The agent leaf keeps this complete stored task description intact for the lower detail pane.",
+		"task projection preserves the full stored description",
+	);
 	assert.equal(
 		liveContainer.live,
 		true,

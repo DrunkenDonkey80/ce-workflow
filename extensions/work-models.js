@@ -12389,6 +12389,8 @@ function projectedTaskTree(cwd, epic, liveFacts = new Map()) {
 		const fact = liveFacts.get(idOf(issue)) ?? {};
 		return {
 			...issueSummary(issue),
+			description: field(issue, "description"),
+			shortTitle: roadmapDisplayTitle(issue),
 			rowId: `work-item:${idOf(issue)}`,
 			children,
 			progress: executableProgress(issue, children),
@@ -12638,6 +12640,7 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 				);
 				return roadmapSummary(cwd, epic, currentId, {
 					...node,
+					shortTitle: roadmapDisplayTitle(epic),
 					rowId: `roadmap:${node.id}`,
 					tasks: tasks.tree,
 					progress: tasks.progress,
@@ -12665,6 +12668,14 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 				const parent = row.parentId ?? "";
 				if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
 				childrenByParent.get(parent).push(row);
+			}
+			for (const row of rows) {
+				if (row.role !== "initiative") continue;
+				const children = childrenByParent.get(row.id) ?? [];
+				row.progress = {
+					completed: children.filter((child) => child.status === "closed").length,
+					total: children.length,
+				};
 			}
 			const compare = (a, b) => {
 				const rank = (row) =>
