@@ -1759,6 +1759,282 @@
       "type": "task",
       "updatedAt": "2026-07-24T07:54:10.650Z"
     },
+    "work-2.24": {
+      "createdAt": "2026-07-25T03:31:37.223Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The precomputed resume state selected Action `run-planner` for open WorkItem `work-7.2` and explicitly required a big-slice native child/decision split, but the selected item remained type=task with no `wo:planning` label. The exact work-planner therefore refused to write the durable plan or create child/decision WorkItems and only appended a slice-plan note.\nExpected: Before dispatching `run-planner`, the workflow should create/reclassify a valid `wo:planning` intake (or supply an authoritative helper mutation command) so the selected planner can create the required plan and native child/decision split in one boundary.\nImpact: Planning cannot complete and implementation cannot safely proceed under the required big-slice policy; rerunning without metadata repair risks executing the unsliced parent task.\nSuggested improvement: Have the extension atomically mark/create the planning intake before emitting `Action: run-planner`, and validate that its type/labels satisfy the packaged work-planner contract.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/b0d86ec1-5309-403a-a386-2cce01467b7f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3220,
+              "file": "01-work-7.2-planner-result.md",
+              "sha256": "6501cdd9db17dc8264df7763d40f9cb26c92d26ff93a02011c903fc36df9229f"
+            },
+            {
+              "bytes": 293082,
+              "file": "02-session.jsonl",
+              "sha256": "395b07c737587f38ecb2b8f45d1c7fba19112c4616eee4898ff035d0aa081c3b"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-25T03:31:37.217Z",
+          "workflowId": "workflow-mrzsh5ir-zktohy"
+        }
+      ],
+      "id": "work-2.24",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned planning-intake metadata defect, related-distinct from work-2.27's plan-artifact permission defect. Current /work-big created a native task whose notes said wo:planning but omitted the canonical label, while the packaged planner treated native task type as executable. Fix labels the intake and makes the role honor authoritative planning markers.",
+        "wo:review PASS - /work-big now creates labels:[wo:planning], planner honors authoritative planning markers, and focused slicing/start-finish tests passed.",
+        "Reconciliation PASS: implementation commit 49a14f7 labels /work-big planning intake and aligns planner marker handling. Focused start/finish and planner-contract tests PASS; npm run verify:quiet PASS; independent reviewer PASS.",
+        "Fixed in 49a14f7 and verified."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The precomputed resume state selected Action `run-planner` for open WorkItem `work-7.2` and explicitly required a big-slice native",
+      "type": "task",
+      "updatedAt": "2026-07-25T07:02:12.566Z"
+    },
+    "work-2.25": {
+      "createdAt": "2026-07-25T04:34:27.305Z",
+      "dependencies": [
+        "work-2.8"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: A timed-out async work-planner run could not be resumed because pi-subagents rejected its generated recovery descriptor: acceptance.explicit and acceptance.inferredReason unsupported, and acceptance.level requested an independent reviewer result for a planner run.\nExpected: Timed-out exact-role planner runs should produce a valid recovery descriptor and accept `subagent resume`, preserving session work and avoiding a duplicate planner launch.\nImpact: The planner's in-session progress cannot be recovered; autonomous execution must either relaunch the exact planner from scratch or remain blocked.\nSuggested improvement: Sanitize acceptance fields when generating recovery descriptors and omit reviewer-only acceptance levels for planner sessions.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/37b25733-1746-49ad-a028-a5632006969f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 34,
+              "file": "01-08258cca-3f5e-444e-8492-cfa320ae69c0_work-planner_output.md",
+              "sha256": "d2932fce96d255aa4b500233c1d5c46bb1b80d48a5f815d75983fcfe9ac4da6f"
+            },
+            {
+              "bytes": 28295,
+              "file": "02-2026-07-25.jsonl",
+              "sha256": "0778a0e2d79c601eea0c6b925451fcd106d0df9f54076b14174b1c5cf3398b31"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-25T04:34:27.302Z",
+          "workflowId": "019f9733-76e4-76a3-8e52-9f0f1ece5c6b"
+        }
+      ],
+      "id": "work-2.25",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic duplicate/upstream-owned claim of canonical work-2.8's async recovery acceptance-schema defect. Current pi-subagents 0.36.0 writes input-shaped acceptance to recovery-descriptor.json and normalizes legacy explicit/inferredReason descriptors on resume; upstream fix 318b7751 and canonical reconciliation commit 16569ac cover this planner case. Verified against installed async-execution.ts and async-resume.ts; no local workaround required.",
+        "Duplicate of canonical work-2.8; fixed upstream and verified in installed pi-subagents 0.36.0.",
+        "Runtime verification caveat: resuming reviewer run c917959c failed in this already-loaded Pi process with the legacy explicit/inferredReason descriptor rejection. Filesystem package 0.36.0 contains the upstream normalizer, but the active extension instance is stale until Pi restart; durable upstream routing under canonical work-2.8 remains the closure basis."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: A timed-out async work-planner run could not be resumed because pi-subagents rejected its generated recovery descriptor: acceptanc",
+      "type": "task",
+      "updatedAt": "2026-07-25T06:47:03.828Z"
+    },
+    "work-2.26": {
+      "createdAt": "2026-07-25T04:39:58.920Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After the planner closed planning parent work-7.2 and created open executable grandchildren work-7.2.2 through work-7.2.5, `work-ready-summary work-7` returned only direct child work-7.1 and omitted ready grandchild work-7.2.2. Closing the planning parent therefore hides its executable descendants from roadmap resume selection.\nExpected: Roadmap readiness traversal should include ready open descendants beneath closed planning containers, or planning children should be attached where deterministic resume can discover them.\nImpact: Autonomous resume can falsely conclude there is no ready voice slice and skip or strand planned implementation work.\nSuggested improvement: Make work-ready-summary recursively traverse closed planning nodes while respecting dependencies, and add a regression test for a roadmap -> closed wo:planning task -> ready executable grandchild.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/15e84882-c8f3-4f66-aee2-429bd778cdf3",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1013,
+              "file": "01-work-7.2-plan-final.md",
+              "sha256": "2072e1694ceab25590559e230986a205ad9bf4195362824b523464d6596336e7"
+            },
+            {
+              "bytes": 33506,
+              "file": "02-2026-07-25.jsonl",
+              "sha256": "fe79683038cadb638f545074e88fb2059d6bece09183b3b0ae3a0ff4f5df96de"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-25T04:39:58.916Z",
+          "workflowId": "019f9733-76e4-76a3-8e52-9f0f1ece5c6b"
+        }
+      ],
+      "id": "work-2.26",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned recursive-readiness defect. Both work-ready-summary and roadmap resume filtered only direct children, so closed planning containers stranded executable grandchildren. Fix traverses all roadmap descendants while preserving dependency checks; regression covers roadmap -> closed planning task -> ready grandchild.",
+        "wo:review PASS - readiness and resume now traverse roadmap descendants; nested closed-planning-container regression passed.",
+        "Reconciliation PASS: implementation commit 49a14f7 makes helper and resume readiness traverse descendants. Nested planning regression, helper contract, and npm run verify:quiet PASS; independent reviewer PASS.",
+        "Fixed in 49a14f7 and verified."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: After the planner closed planning parent work-7.2 and created open executable grandchildren work-7.2.2 through work-7.2.5, `work-r",
+      "type": "task",
+      "updatedAt": "2026-07-25T07:02:12.859Z"
+    },
+    "work-2.27": {
+      "createdAt": "2026-07-25T04:40:06.642Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The exact work-planner was required to create a durable date-prefixed implementation plan under docs/plans, but its packaged role policy prohibited writing repository files. It closed work-7.2 and recorded only an intended path plus a compact note; `C:\\soft\\LPG\\docs\\plans\\2026-07-25-001-feat-lpgdemo-voice-intent-nano-plan.md` does not exist.\nExpected: For big-mode planning, the planner contract and orchestration requirement should agree: either permit the planner to write the plan artifact, or have coded orchestration materialize a validated plan before closing the planning item.\nImpact: The planning WorkItem is closed while a required durable artifact is missing, reducing traceability and leaving implementation workers with only notes/temp input.\nSuggested improvement: Align work-planner write permissions with big-plan acceptance and prevent close when the declared docs/plans path is absent.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/91fcd6e4-8461-437c-a210-f64a2754b19d",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1013,
+              "file": "01-work-7.2-plan-final.md",
+              "sha256": "2072e1694ceab25590559e230986a205ad9bf4195362824b523464d6596336e7"
+            },
+            {
+              "bytes": 33506,
+              "file": "02-2026-07-25.jsonl",
+              "sha256": "fe79683038cadb638f545074e88fb2059d6bece09183b3b0ae3a0ff4f5df96de"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-25T04:40:06.638Z",
+          "workflowId": "019f9733-76e4-76a3-8e52-9f0f1ece5c6b"
+        }
+      ],
+      "id": "work-2.27",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned planner-contract conflict, related-distinct from work-2.24. The handoff required a dated docs/plans artifact while the exact role omitted write and prohibited all repository files. Fix permits only explicitly requested dated plan files and forbids closing against an intended-but-missing artifact.",
+        "wo:review PASS - planner write boundary is limited to explicitly requested dated docs/plans plan files and closure requires the artifact to exist.",
+        "Reconciliation PASS: implementation commit 49a14f7 permits only handoff-required dated plan artifacts and prevents close against a missing declared plan. Planner contract test and npm run verify:quiet PASS; independent reviewer PASS.",
+        "Fixed in 49a14f7 and verified."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The exact work-planner was required to create a durable date-prefixed implementation plan under docs/plans, but its packaged role ",
+      "type": "task",
+      "updatedAt": "2026-07-25T07:02:13.135Z"
+    },
+    "work-2.28": {
+      "createdAt": "2026-07-25T05:11:27.623Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The allowed targeted re-review for work-7.2.2 returned two residual findings. After the exact work-fixer fixed both and focused tests/LSP passed, policy forbids a third reviewer, but `finish-task --reviewed` rejects closure because the latest durable review remains FAIL and requires a literal `wo:review PASS`.\nExpected: After the one targeted re-review, coded orchestration should support dispositioning verified residual findings and finishing without launching a prohibited third review, while preserving evidence of each fix.\nImpact: The task cannot be committed/closed without either violating the review-cycle budget or manually fabricating reviewer PASS evidence.\nSuggested improvement: Add a coded residual-finding disposition state accepted by finish-task after the targeted re-review, requiring exact finding-to-fix evidence and passing verification but no third reviewer.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/f71d3345-7d56-4796-8925-af3838d9a4e1",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 639,
+              "file": "01-work-7.2.2-rereview.md",
+              "sha256": "18cbbb6be54f2c345d702130e5043844067c2771df0500c6cb8a5e58578544af"
+            },
+            {
+              "bytes": 3067,
+              "file": "02-work-7.2.2-final-fix.md",
+              "sha256": "7eb31336c7317a57456fd3b286e167fb4514785305c5fd51d1f4cf1a4ed6fe8c"
+            },
+            {
+              "bytes": 33506,
+              "file": "03-2026-07-25.jsonl",
+              "sha256": "fe79683038cadb638f545074e88fb2059d6bece09183b3b0ae3a0ff4f5df96de"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-25T05:11:27.619Z",
+          "workflowId": "019f9733-76e4-76a3-8e52-9f0f1ece5c6b"
+        }
+      ],
+      "id": "work-2.28",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned review-cap/finalizer conflict. The coded resume path stopped after two FAIL verdicts even when a later exact fixer PASS and verification resolved every residual, while finish-task accepted only reviewer PASS. Fix recognizes verified post-targeted-review residual disposition in resume and finalization without launching a third reviewer.",
+        "wo:review FAIL - scripts/work-helper.mjs:171-178 accepts any post-second-FAIL wo:fix PASS without exact finding-to-fix evidence; require structured residual disposition covering every latest finding before --reviewed closure.",
+        "wo:fix PASS - replaced generic post-review fixer acceptance with a validated single-line wo:residual-fix disposition containing one finding/fix/evidence mapping per residual; malformed or generic notes remain blocked. Focused helper and resume tests pass.",
+        "wo:review FAIL - scripts/work-helper.mjs:166-204 and extensions/work-models.js:11479-11512 accept any single nonempty disposition after two FAILs; parse the latest targeted-review findings and require one matching finding/fix/evidence disposition for every residual.",
+        "wo:fix PASS - targeted-review findings are now parsed from structured JSON (legacy compact FAIL is one exact finding), and closure requires exactly one matching disposition per finding; helper/resume tests cover two findings with incomplete and complete mappings.",
+        "wo:residual-fix PASS {\"dispositions\":[{\"finding\":\"scripts/work-helper.mjs:166-204 and extensions/work-models.js:11479-11512 accept any single nonempty disposition after two FAILs; parse the latest targeted-review findings and require one matching finding/fix/evidence disposition for every residual.\",\"fix\":\"Parse the latest FAIL findings and require exact one-to-one finding matches in both helper finalization and resume routing.\",\"evidence\":\"node scripts/test-work-helper-contract.mjs and node scripts/test-work-resume.mjs passed with incomplete and complete two-finding mappings.\"}]}",
+        "Reconciliation PASS: implementation commit 49a14f7 adds exact one-to-one targeted-review finding disposition in resume and finish paths. Focused helper/resume tests and npm run verify:quiet PASS. Initial and targeted reviews identified residuals; both were fixed and durably dispositioned without a prohibited third review.",
+        "Fixed and dispositioned after the allowed targeted re-review in 49a14f7."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The allowed targeted re-review for work-7.2.2 returned two residual findings. After the exact work-fixer fixed both and focused te",
+      "type": "task",
+      "updatedAt": "2026-07-25T07:02:13.431Z"
+    },
+    "work-2.29": {
+      "createdAt": "2026-07-25T05:12:19.809Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: `finish-task work-7.2.2` committed paths outside the reviewed implementation handoff and requested slice: verifier recovery state/output files and `.gitignore`, even though these were pre-existing workflow-owned/known dirty paths and the reviewer reviewed only five voice/plan files.\nExpected: The coded finalizer should commit only the task-owned reviewed allowlist plus the native WorkItem state required to close it; pre-existing known dirt must remain untouched unless explicitly assigned to the task.\nImpact: Commit 2065c1a mixes unrelated verifier recovery state and repository ignore changes into the voice parser slice, weakening auditability and violating scoped-dirt guarantees.\nSuggested improvement: Snapshot pre-task dirty paths and exclude them from staging/commit unless they are explicit task-owned files; require independent review if final commit scope grows beyond the reviewer handoff.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/cfb5bad9-ac2b-4fe0-b0aa-5fae1c2a587e",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 33506,
+              "file": "01-2026-07-25.jsonl",
+              "sha256": "fe79683038cadb638f545074e88fb2059d6bece09183b3b0ae3a0ff4f5df96de"
+            },
+            {
+              "bytes": 860,
+              "file": "02-work-7.2.2-review.md",
+              "sha256": "39bfa2c21af9ef0690f4e42f5027bc4e3c9a0ec2fca43d23560c9d1b62b116ae"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-25T05:12:19.806Z",
+          "workflowId": "019f9733-76e4-76a3-8e52-9f0f1ece5c6b"
+        }
+      ],
+      "id": "work-2.29",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned final commit scope defect, related-distinct from work-2.18. The earlier fix did not cover scripts/work-helper.mjs: verifier runtime paths remained in changed/staged scope and .gitignore was excluded from review but included in commit. Fix excludes .ce-workflow/work-runs and persists/compares the exact review scope, with .gitignore included whenever it will be committed.",
+        "wo:review FAIL - scripts/work-helper.mjs:383 permits --reviewed when no wo:review-scope exists; require a persisted array scope and exact equality before staging/commit.",
+        "wo:fix PASS - --reviewed now requires an existing valid persisted wo:review-scope exactly matching current implementation files; absent or changed scope fails closed. Focused helper contract covers both cases and passes.",
+        "wo:review PASS - scripts/work-helper.mjs:393-419 fails --reviewed closed when wo:review-scope is absent or differs, covered by scripts/test-work-helper-contract.mjs:112-150.",
+        "Reconciliation PASS: implementation commit 49a14f7 excludes verifier runtime paths, includes committed .gitignore in review scope, and requires persisted exact scope equality. Helper contract and npm run verify:quiet PASS; targeted re-review PASS.",
+        "Fixed in 49a14f7 and verified by targeted re-review."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: `finish-task work-7.2.2` committed paths outside the reviewed implementation handoff and requested slice: verifier recovery state/",
+      "type": "task",
+      "updatedAt": "2026-07-25T07:02:13.710Z"
+    },
     "work-2.3": {
       "createdAt": "2026-07-20T02:00:16.639Z",
       "dependencies": [
@@ -1796,6 +2072,55 @@
       "title": "Self-improvement report: `finish-task --verify` executes through Windows cmd.exe even when the active Pi shell is Git Bash. A verification command that had",
       "type": "task",
       "updatedAt": "2026-07-20T10:05:06.585Z"
+    },
+    "work-2.30": {
+      "createdAt": "2026-07-25T06:17:35.018Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The coded finish-task handoff for work-7.2.4 directed the reviewer to `work-summary`, but that helper returned only identity/status/dependencies and an empty notes_tail, omitting the WorkItem acceptance plus available worker verification. The reviewer correctly returned BLOCKED without inspecting the diff.\nExpected: The generated review handoff must provide usable acceptance/verification context, either by making work-summary include description/acceptance and latest implementation evidence or by embedding those fields in the coded handoff.\nImpact: A sensitive implementation cannot receive its required independent verdict despite passing focused tests; reviewer capacity is spent on intake plumbing rather than code review.\nSuggested improvement: Include WorkItem description, acceptance criteria, verification command/result, and latest worker evidence in compact summaries used by coded reviewer handoffs.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/91f2a114-a782-4bdd-b568-19daad2e679b",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1828,
+              "file": "01-work-7.2.4-review.md",
+              "sha256": "74b2c6a5cfecec9c2d0b24bcbce1049203763cf2ac42c5f0239fb45c520102f1"
+            },
+            {
+              "bytes": 6790,
+              "file": "02-work-7.2.4-recovery.md",
+              "sha256": "855b2a3e2d9a0f7aa661ef504f80fb9598f56f38a0dfd21fb3f88bb18f47a7b9"
+            },
+            {
+              "bytes": 33506,
+              "file": "03-2026-07-25.jsonl",
+              "sha256": "fe79683038cadb638f545074e88fb2059d6bece09183b3b0ae3a0ff4f5df96de"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-07-25T06:17:35.014Z",
+          "workflowId": "019f9733-76e4-76a3-8e52-9f0f1ece5c6b"
+        }
+      ],
+      "id": "work-2.30",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned compact-review-intake defect. work-summary omitted description, design, acceptance, and evidence even though coded reviewer handoffs declared it authoritative. Fix adds bounded contract fields and latest evidence while retaining compact notes.",
+        "wo:review PASS - compact summary now includes bounded description/design/acceptance, latest three evidence records, and compact notes; helper contract test passed.",
+        "Reconciliation PASS: implementation commit 49a14f7 adds bounded description/design/acceptance/latest-evidence fields to work-summary. Helper contract and npm run verify:quiet PASS; independent reviewer PASS.",
+        "Fixed in 49a14f7 and verified."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The coded finish-task handoff for work-7.2.4 directed the reviewer to `work-summary`, but that helper returned only identity/statu",
+      "type": "task",
+      "updatedAt": "2026-07-25T07:02:13.981Z"
     },
     "work-2.4": {
       "createdAt": "2026-07-20T02:33:35.267Z",
@@ -2003,7 +2328,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-24T07:56:43.463Z"
+    "updatedAt": "2026-07-25T07:02:13.983Z"
   },
   "schemaVersion": 1
 }
