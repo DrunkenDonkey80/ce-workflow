@@ -255,6 +255,7 @@ assert.match(
 assert.match(prompt, /work_goal_human_decision is only a durable fallback/);
 assert.match(prompt, /WORK_GOAL_NEEDS_HUMAN_DECISION/);
 assert.match(prompt, /work_goal_complete/);
+assert.match(prompt, /After it succeeds, send one concise final response/);
 assert.match(prompt, /launch it async/);
 assert.match(
 	prompt,
@@ -334,6 +335,7 @@ for (const action of [
 	"Migrate legacy workspace",
 	"Checkpoint and pause",
 	"Analyze",
+	"Agent health",
 	"Small task",
 	"Medium task",
 	"Large task",
@@ -1211,12 +1213,17 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		{ prompt: sent[2].message, systemPrompt: "base" },
 		ctx,
 	);
-	await tempTools.work_goal_complete.execute(
+	const completionResult = await tempTools.work_goal_complete.execute(
 		"t1",
 		{ summary: "verified in temp harness" },
 		null,
 		null,
 		ctx,
+	);
+	assert.equal(completionResult.terminate, undefined);
+	assert.match(
+		completionResult.content[0].text,
+		/Now give the user a concise final summary/,
 	);
 	assert.equal(statuses["work-goal"], undefined);
 

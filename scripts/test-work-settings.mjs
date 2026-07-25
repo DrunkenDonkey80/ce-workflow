@@ -955,6 +955,126 @@ try {
 			creativeStep.includes("test/generator-c"),
 		"creative sidecar launches three isolated model-assigned branches and preserves provenance",
 	);
+	const healthTargets = mod.selectedAgentHealthTargets(
+		cwd,
+		"test/control",
+		"brainstorm",
+	);
+	assert(
+		JSON.stringify(healthTargets.map((target) => target.model)) ===
+			JSON.stringify([
+				"test/generator-a",
+				"test/generator-b",
+				"test/generator-c",
+			]),
+		"brainstorm health checks each configured advisor model once",
+	);
+	const healthNotices = [];
+	const healthCtx = {
+		cwd,
+		hasUI: true,
+		mode: "rpc",
+		model: { provider: "test", id: "control" },
+		modelRegistry: {
+			find: (provider, id) => ({ provider, id }),
+			getApiKeyAndHeaders: async (model) =>
+				model.id === "generator-b"
+					? { ok: true }
+					: { ok: true, apiKey: "test-key" },
+			getProvider: () => ({
+				streamSimple: () => ({
+					result: async () => ({
+						stopReason: "stop",
+						content: [{ type: "text", text: "HI" }],
+					}),
+				}),
+			}),
+		},
+		ui: {
+			notify: (message, level) => healthNotices.push({ message, level }),
+			select: async (_title, labels) =>
+				labels.find((label) => label.includes("Continue without")),
+		},
+	};
+	const health = await mod.brainstormAgentHealthPreflight(healthCtx);
+	assert(
+		health.proceed &&
+			JSON.stringify(health.offlineModels) ===
+				JSON.stringify(["test/generator-b"]) &&
+			healthNotices.some(
+				(notice) =>
+					notice.level === "warning" &&
+					notice.message.includes("No API key or login is available"),
+			),
+		"brainstorm preflight reports login failures and can continue without them",
+	);
+	const secretResult = await mod.probeAgentModel(
+		{
+			...healthCtx,
+			modelRegistry: {
+				...healthCtx.modelRegistry,
+				getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test-key" }),
+				getProvider: () => ({
+					streamSimple: () => ({
+						result: async () => ({
+							stopReason: "error",
+							errorMessage: "gateway token=secret-value-123456 failed",
+						}),
+					}),
+				}),
+			},
+		},
+		{ model: "test/generator-a", roles: ["Advisor 1"] },
+		20,
+	);
+	assert(
+		!secretResult.ok &&
+			secretResult.reason.includes("[redacted]") &&
+			!secretResult.reason.includes("secret-value"),
+		"provider errors are redacted before the health report",
+	);
+	let timeoutSignal;
+	const timeoutResult = await mod.probeAgentModel(
+		{
+			...healthCtx,
+			modelRegistry: {
+				...healthCtx.modelRegistry,
+				getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test-key" }),
+				getProvider: () => ({
+					streamSimple: (_model, _context, options) => {
+						timeoutSignal = options.signal;
+						return { result: async () => new Promise(() => {}) };
+					},
+				}),
+			},
+		},
+		{ model: "test/generator-a", roles: ["Advisor 1"] },
+		5,
+	);
+	assert(
+		!timeoutResult.ok &&
+			timeoutResult.reason.includes("timed out") &&
+			timeoutSignal.aborted,
+		"health probes abort and report a bounded timeout",
+	);
+	const offlineHandoff = mod.brainstormHandoffPrompt(
+		{
+			artifact: "",
+			idea: { id: "I-1", title: "Idea" },
+			epic: { id: "E-1", title: "Epic" },
+		},
+		cwd,
+		"wide",
+		{
+			offlineModels: health.offlineModels,
+			currentModel: "test/control",
+		},
+	);
+	assert(
+		(offlineHandoff.match(/work-divergent/g) ?? []).length === 2 &&
+			!offlineHandoff.includes("work-advisor-2"),
+		"continuing excludes failed models from divergent and advisor launches",
+	);
 	const allAdvisors = mod.advisorCriticStep(cwd, "master plan", "all");
 	for (const agent of ["work-advisor", "work-advisor-2", "work-advisor-3"])
 		assert(allAdvisors.includes(agent), `parallel gate includes ${agent}`);
@@ -993,6 +1113,36 @@ try {
 			.divergentTaskModels(cwd)
 			.every((model) => model === "__inherit_model__"),
 		"same-model fallback still produces all three isolated branches",
+	);
+	assert(
+		JSON.stringify(
+			mod
+				.selectedAgentHealthTargets(cwd, "test/control", "brainstorm")
+				.map((target) => target.model),
+		) === JSON.stringify(["test/control"]),
+		"disabled advisors still probe inherited creative divergence",
+	);
+	settings.workOrchestrator.backgroundVerifiers = {
+		__inherit_model__: {
+			operations: ["correctness"],
+			thinking: "low",
+		},
+	};
+	writeSettings(settings);
+	const inheritedVerifierTargets = mod.selectedAgentHealthTargets(
+		cwd,
+		"test/control",
+	);
+	assert(
+		!inheritedVerifierTargets.some(
+			(target) => target.model === "__inherit_model__",
+		) &&
+			inheritedVerifierTargets.some(
+				(target) =>
+					target.model === "test/control" &&
+					target.roles.includes("Background verifier"),
+			),
+		"inherited background verifiers resolve to the current model",
 	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

@@ -313,6 +313,7 @@ try {
 			followUps[0]?.includes("Creative sidecar gate"),
 		"Ask mode offers Wide and feeds the creative gate into the live brainstorm handoff",
 	);
+
 	const linked = linkBrainstormArtifactFromFinal(
 		cwd,
 		{ meta: handoffMeta },
@@ -326,6 +327,34 @@ try {
 					note.includes("brainstorm-path=docs/brainstorms/new.md"),
 				),
 		"a completed brainstorm artifact is linked back to native work state",
+	);
+
+	fixture.reset("no-legacy-empty");
+	const beforeBlockedHealth = Object.keys(fixture.store().items).length;
+	const blockedHealth = await executeOrchestratorAction(
+		"work-brainstorm",
+		"This must not create work state",
+		{
+			cwd,
+			hasUI: true,
+			mode: "rpc",
+			model: { provider: "test", id: "offline" },
+			modelRegistry: {
+				find: (provider, id) => ({ provider, id }),
+				getApiKeyAndHeaders: async () => ({ ok: true }),
+			},
+			ui: {
+				notify() {},
+				select: async (_title, labels) =>
+					labels.find((label) => label.includes("Stop and fix")),
+			},
+		},
+		{},
+	);
+	assert(
+		blockedHealth.action === "brainstorm-agent-health-blocked" &&
+			Object.keys(fixture.store().items).length === beforeBlockedHealth,
+		"brainstorm health failure can stop before native work state is created",
 	);
 
 	fixture.reset("ideas");

@@ -106,6 +106,7 @@ const MISC_ROADMAP_TITLE = "Misc";
 const MISC_ROADMAP_LABEL = "wo:misc";
 const MISC_ROADMAP_CHOICE = "__misc_roadmap__";
 const VERIFIER_RPC_TIMEOUT_MS = 30_000;
+const AGENT_HEALTH_TIMEOUT_MS = 30_000;
 const ACTIVE_SELF_IMPROVEMENT_STATUSES = new Set([
 	"open",
 	"in_progress",
@@ -3305,8 +3306,21 @@ function clearBackgroundVerifierOverride(settings, model) {
 
 // ponytail: settings are prompt-live; the steps below are appended to the
 // role/plan/brainstorm handoff prompts so configured advisors actually run.
-function advisorCriticStep(cwd, target, usage = "all") {
-	const slots = configuredAdvisorSlots(readEffectiveSettings(cwd), usage);
+function advisorCriticStep(
+	cwd,
+	target,
+	usage = "all",
+	offlineModels = [],
+	currentModel = "",
+) {
+	const settings = readEffectiveSettings(cwd);
+	const offline = new Set(offlineModels);
+	const slots = configuredAdvisorSlots(settings, usage).filter(
+		(slot) =>
+			!offline.has(
+				configuredModelId(slotSelection(slot, settings).model, currentModel),
+			),
+	);
 	if (!slots.length) return "";
 	const agents = slots.map((slot) => slot.agents[0]);
 	const first = agents[0];
@@ -3332,21 +3346,31 @@ function divergentTaskModels(cwd) {
 	return DIVERGENT_FRAMES.map((_, index) => models[index % models.length]);
 }
 
-function creativeSidecarStep(cwd, target) {
+function creativeSidecarStep(
+	cwd,
+	target,
+	offlineModels = [],
+	currentModel = "",
+) {
 	const models = divergentTaskModels(cwd);
+	const offline = new Set(offlineModels);
 	const tasks = DIVERGENT_FRAMES.map((frame, index) => ({
-		agent: "work-divergent",
-		...(models[index] && models[index] !== INHERIT_MODEL
-			? { model: models[index] }
-			: {}),
-		task: [
-			"Use only the normalized problem and real constraints supplied by the parent.",
-			`FRAME — ${frame.label}: ${frame.prompt}`,
-			"Generate four non-obvious candidates as the agent contract requires.",
-		].join("\n"),
-	}));
+		frame,
+		model: models[index],
+	}))
+		.filter(({ model }) => !offline.has(configuredModelId(model, currentModel)))
+		.map(({ frame, model }) => ({
+			agent: "work-divergent",
+			...(model && model !== INHERIT_MODEL ? { model } : {}),
+			task: [
+				"Use only the normalized problem and real constraints supplied by the parent.",
+				`FRAME — ${frame.label}: ${frame.prompt}`,
+				"Generate four non-obvious candidates as the agent contract requires.",
+			].join("\n"),
+		}));
+	if (!tasks.length) return "";
 	return [
-		`Creative sidecar gate for ${target}: finish required clarification and source reading first, then launch exactly one PARALLEL subagent call with async:true, context:fresh, concurrency:3, and these task templates: ${JSON.stringify(tasks)}. Prepend the same normalized problem and real constraints to every task; never include sibling output.`,
+		`Creative sidecar gate for ${target}: finish required clarification and source reading first, then launch exactly one PARALLEL subagent call with async:true, context:fresh, concurrency:${tasks.length}, and these task templates: ${JSON.stringify(tasks)}. Prepend the same normalized problem and real constraints to every task; never include sibling output.`,
 		"While those branches run, form the normal baseline independently. Then call subagent_wait with all:true, cluster duplicates, reject constraint violations, and merge only useful non-obvious candidates into the artifact or planning note. Preserve provenance as a compact `wo:divergent-analysis` section naming each frame and model. A failed branch is recorded and not retried.",
 		"If an authoritative source already contains a current `wo:divergent-analysis` section for this problem, reuse it and skip generation. This is one bounded divergence pass: no branch deepening and no second generation round. Configured work-advisor critics challenge the merged artifact afterward.",
 	].join("\n");
@@ -3592,6 +3616,235 @@ async function modelDisplayNames(ctx) {
 	} catch {
 		return new Map();
 	}
+}
+
+function currentModelId(ctx) {
+	return ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "";
+}
+
+function configuredModelId(model, currentModel) {
+	return !model || model === INHERIT_MODEL ? currentModel : model;
+}
+
+function selectedAgentHealthTargets(cwd, currentModel, scope = "all") {
+	const settings = readEffectiveSettings(cwd);
+	const slots =
+		scope === "brainstorm"
+			? configuredAdvisorSlots(settings)
+			: SLOTS.filter(
+					(slot) =>
+						!isAdvisorSlot(slot) || advisorEnabledForSlot(settings, slot),
+				);
+	const selected = slots.map((slot) => ({
+		model: configuredModelId(slotSelection(slot, settings).model, currentModel),
+		role: slot.label,
+	}));
+	if (scope === "brainstorm" && !selected.length)
+		selected.push({ model: currentModel, role: "Creative divergence" });
+	if (scope === "all")
+		for (const profile of backgroundVerifierProfiles(cwd))
+			selected.push({
+				model: configuredModelId(profile.model, currentModel),
+				role: "Background verifier",
+			});
+	const targets = new Map();
+	for (const entry of selected) {
+		const key = entry.model || "__missing_current_model__";
+		const target = targets.get(key) ?? {
+			model: entry.model,
+			roles: [],
+		};
+		if (!target.roles.includes(entry.role)) target.roles.push(entry.role);
+		targets.set(key, target);
+	}
+	return [...targets.values()];
+}
+
+function splitModelId(model) {
+	const slash = String(model).indexOf("/");
+	return slash > 0
+		? { provider: model.slice(0, slash), id: model.slice(slash + 1) }
+		: null;
+}
+
+function agentHealthError(error) {
+	const message = truncate(formatError(error), 240)
+		.replace(
+			/(["']?(?:api[-_ ]?key|authorization|token|secret)["']?\s*[:=]\s*)(["'])[^"']*\2/gi,
+			"$1[redacted]",
+		)
+		.replace(
+			/((?:api[-_ ]?key|authorization|token|secret)\s*[:=]\s*)(?:bearer\s+)?[^\s,;]+/gi,
+			"$1[redacted]",
+		)
+		.replace(/\b(?:sk|key|token)-[A-Za-z0-9_-]{8,}\b/gi, "[redacted]");
+	if (/no api key|missing api key|not logged in/i.test(message))
+		return "No API key or login is available.";
+	if (/unauthori[sz]ed|invalid api.?key|\b401\b|\b403\b/i.test(message))
+		return "Authentication was rejected; sign in again.";
+	if (/\b429\b|usage.?credits?|rate.?limit|quota/i.test(message))
+		return `Provider limit: ${message}`;
+	return message;
+}
+
+async function probeAgentModel(
+	ctx,
+	target,
+	timeoutMs = AGENT_HEALTH_TIMEOUT_MS,
+) {
+	const startedAt = Date.now();
+	const fail = (reason) => ({
+		...target,
+		ok: false,
+		reason,
+		durationMs: Date.now() - startedAt,
+	});
+	if (!target.model)
+		return fail("No control-session model is selected for inherited roles.");
+	const parsed = splitModelId(target.model);
+	if (!parsed) return fail("Model ID must be provider/model.");
+	if (!ctx.modelRegistry) return fail("Pi model registry is unavailable.");
+	try {
+		const model =
+			ctx.modelRegistry.find?.(parsed.provider, parsed.id) ??
+			(ctx.model?.provider === parsed.provider && ctx.model?.id === parsed.id
+				? ctx.model
+				: null);
+		if (!model) return fail("Model is not registered in Pi.");
+		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+		if (!auth?.ok || !auth.apiKey)
+			return fail(
+				agentHealthError(
+					auth?.ok
+						? `No API key for ${parsed.provider}`
+						: auth?.error || `Authentication failed for ${parsed.provider}`,
+				),
+			);
+		const provider = ctx.modelRegistry.getProvider(parsed.provider);
+		if (!provider?.streamSimple)
+			return fail(`No provider runtime for ${parsed.provider}.`);
+		const controller = new AbortController();
+		let timer;
+		try {
+			const response = await Promise.race([
+				provider
+					.streamSimple(
+						model,
+						{
+							systemPrompt:
+								"This is an agent health probe. Reply with exactly HI.",
+							messages: [
+								{
+									role: "user",
+									content: [{ type: "text", text: "HI" }],
+									timestamp: Date.now(),
+								},
+							],
+						},
+						{
+							apiKey: auth.apiKey,
+							headers: auth.headers,
+							env: auth.env,
+							signal: controller.signal,
+						},
+					)
+					.result(),
+				new Promise((_, reject) => {
+					timer = setTimeout(() => {
+						controller.abort();
+						reject(new Error(`Health probe timed out after ${timeoutMs}ms.`));
+					}, timeoutMs);
+				}),
+			]);
+			if (response?.stopReason === "error")
+				return fail(
+					agentHealthError(response.errorMessage || "Model request failed."),
+				);
+			if (response?.stopReason === "aborted")
+				return fail("Health probe was aborted.");
+			return {
+				...target,
+				ok: true,
+				durationMs: Date.now() - startedAt,
+			};
+		} finally {
+			clearTimeout(timer);
+		}
+	} catch (error) {
+		return fail(agentHealthError(error));
+	}
+}
+
+async function checkAgentHealth(ctx, scope = "all", timeoutMs) {
+	const targets = selectedAgentHealthTargets(
+		ctx.cwd,
+		currentModelId(ctx),
+		scope,
+	);
+	return Promise.all(
+		targets.map((target) => probeAgentModel(ctx, target, timeoutMs)),
+	);
+}
+
+function renderAgentHealth(results) {
+	return [
+		"Agent health",
+		"",
+		...results.map(
+			(result) =>
+				`${result.ok ? "✓" : "✗"} ${result.model || "Inherited model"} · ${result.roles.join(", ")} · ${result.ok ? `${formatDuration(result.durationMs)} response` : result.reason}`,
+		),
+	].join("\n");
+}
+
+async function runAgentHealthMenu(ctx) {
+	ctx.ui.notify("Checking selected agent models...", "info");
+	const results = await checkAgentHealth(ctx);
+	ctx.ui.notify(
+		renderAgentHealth(results),
+		results.every((result) => result.ok) ? "info" : "warning",
+	);
+	return results;
+}
+
+async function brainstormAgentHealthPreflight(ctx) {
+	if (!ctx.modelRegistry?.getApiKeyAndHeaders)
+		return { proceed: true, offlineModels: [] };
+	ctx.ui.notify("Checking brainstorm agent models...", "info");
+	const results = await checkAgentHealth(ctx, "brainstorm");
+	const offline = results.filter((result) => !result.ok);
+	if (!offline.length) return { proceed: true, offlineModels: [] };
+	ctx.ui.notify(renderAgentHealth(results), "warning");
+	if (!ctx.hasUI && ctx.mode !== "tui")
+		return { proceed: false, offlineModels: offline.map((item) => item.model) };
+	const selected = await showListDialog(ctx, {
+		title: "Brainstorm agent health",
+		purpose:
+			"Some configured agents are offline. Continue without them or stop to repair access.",
+		subtitle: offline.map(
+			(item) => `${item.model || "Inherited model"}: ${item.reason}`,
+		),
+		items: [
+			{
+				value: "continue",
+				label: "Continue without offline agents",
+				description:
+					"Run the brainstorm with only the models that passed this probe.",
+			},
+			{
+				value: "stop",
+				label: "Stop and fix model access",
+				description:
+					"Cancel before creating work state; sign in or repair provider credentials.",
+			},
+		],
+		currentValue: "stop",
+		cursorKey: "brainstorm-agent-health",
+	});
+	return {
+		proceed: selected?.value === "continue",
+		offlineModels: offline.map((item) => item.model),
+	};
 }
 
 function profileDescription(key) {
@@ -10577,13 +10830,31 @@ function linkBrainstormArtifactFromFinal(cwd, run, text) {
 	};
 }
 
-function brainstormHandoffPrompt(state, cwd, creativeDepth = "quick") {
+function brainstormHandoffPrompt(
+	state,
+	cwd,
+	creativeDepth = "quick",
+	{ offlineModels = [], currentModel = "" } = {},
+) {
 	const artifact = state.artifact;
 	const creativeStep =
 		cwd && creativeDepth === "wide" && !artifact
-			? creativeSidecarStep(cwd, `brainstorm for ${state.idea.id}`)
+			? creativeSidecarStep(
+					cwd,
+					`brainstorm for ${state.idea.id}`,
+					offlineModels,
+					currentModel,
+				)
 			: "";
-	const advisorStep = cwd ? advisorCriticStep(cwd, "brainstorm artifact") : "";
+	const advisorStep = cwd
+		? advisorCriticStep(
+				cwd,
+				"brainstorm artifact",
+				"all",
+				offlineModels,
+				currentModel,
+			)
+		: "";
 	const criticLines = advisorStep ? [advisorStep] : [];
 	return [
 		`Use the work-orchestrator skill in mode: ${artifact ? "master" : "brainstorm"} with this precomputed extension state.`,
@@ -13567,7 +13838,7 @@ autonomous goal management rules:
 - Set allowComment=true for planning, product, and adoption choices where a selected option may need a caveat. Set allowComment=false for destructive actions and coded binary approvals. Do not enable comments globally as a substitute for choosing per-call semantics.
 - If evidence depends on external hardware/account/environment state, use ask_user to ask the user to make that state available. Once they answer that it is available or tell you to proceed, capture/inspect the artifact yourself immediately instead of asking again.
 - work_goal_human_decision is only a durable fallback after ask_user is unavailable or cancelled; never use it as the first prompt path. If both tools are unavailable, end with ${WORK_GOAL_DECISION_MARKER}: and the question instead of asking a plain-text question.
-- When complete, call work_goal_complete with verification evidence. If the tool is unavailable, end with ${WORK_GOAL_COMPLETE_MARKER}: and the evidence.
+- When complete, call work_goal_complete with verification evidence. After it succeeds, send one concise final response summarizing what was completed (and, for improvement goals, what improved) plus verification; do not call more tools. If the tool is unavailable, end with ${WORK_GOAL_COMPLETE_MARKER}: and the evidence.
 - Do not call completion for partial progress, blockers, failing tests, or unverified work. Summaries that say the work is incomplete or tests still fail are rejected.${budgetLine}`;
 }
 
@@ -13915,9 +14186,13 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	ctx.ui.notify(`${completionLabel}: ${truncate(trimmed, 240)}`, "info");
 	finishWarpWork(ctx, workWarpMode(goal.mode, goal), trimmed);
 	return {
-		content: [{ type: "text", text: `${completionLabel}: ${trimmed}` }],
+		content: [
+			{
+				type: "text",
+				text: `${completionLabel}: ${trimmed}\nNow give the user a concise final summary of what was completed and how it was verified.`,
+			},
+		],
 		details: { goal: goal.objective, summary: trimmed },
-		terminate: true,
 		completed: true,
 	};
 }
@@ -14375,6 +14650,12 @@ async function handleWorkMenuCommand(ctx, pi) {
 			label: "🔎 Analyze",
 			description:
 				"Choose background analyses to run on an immutable scope.\nResults are read-only and attached as evidence.",
+		},
+		{
+			value: "work-agent-health",
+			label: "🩺 Agent health",
+			description:
+				"Send a tiny live probe to every selected model.\nReports missing login, provider, model, quota, and request failures.",
 		},
 		{
 			value: "work-small",
@@ -15879,6 +16160,7 @@ async function executeOrchestratorAction(
 		return text.trim() === "status"
 			? workSettingsStatus(ctx)
 			: workSettingsLoop(ctx);
+	if (name === "work-agent-health") return runAgentHealthMenu(ctx);
 	if (name === "work-context") return handleWorkContextCommand(text, ctx);
 	if (name === "work-improve")
 		return text.trim().split(/\s+/, 1)[0]?.toLowerCase() === "preview"
@@ -15911,6 +16193,17 @@ async function executeOrchestratorAction(
 	if (name === "work-brainstorm")
 		return withCommandTelemetry(name, text, ctx, async () => {
 			cleanupBenignInstructionDirt(ctx.cwd);
+			const health = await brainstormAgentHealthPreflight(ctx);
+			if (!health.proceed) {
+				const state = {
+					ok: false,
+					action: "brainstorm-agent-health-blocked",
+					message:
+						"Brainstorm cancelled before creating work state. Repair model access, then try again.",
+				};
+				notify(ctx, state.message, "warning");
+				return stateTelemetry(state);
+			}
 			let state = buildWorkBrainstormState(ctx.cwd, text);
 			if (state.action === "brainstorm-epic-created") {
 				const epic = readWorkItem(ctx.cwd, state.epic.id);
@@ -15936,7 +16229,10 @@ async function executeOrchestratorAction(
 			if (state.ok)
 				await sendFollowUp(
 					ctx,
-					brainstormHandoffPrompt(state, ctx.cwd, creativeDepth),
+					brainstormHandoffPrompt(state, ctx.cwd, creativeDepth, {
+						offlineModels: health.offlineModels,
+						currentModel: currentModelId(ctx),
+					}),
 					pi,
 				);
 			return stateTelemetry(state);
@@ -16133,6 +16429,11 @@ export {
 	creativeSidecarStep,
 	divergentTaskModels,
 	advisorCriticStep,
+	selectedAgentHealthTargets,
+	probeAgentModel,
+	checkAgentHealth,
+	renderAgentHealth,
+	brainstormAgentHealthPreflight,
 	workOrchSettings,
 	backgroundVerifierProfiles,
 	reconcileBackgroundVerifierRuns,
@@ -16402,6 +16703,7 @@ export default function workModelsExtension(pi) {
 				"Mark the active autonomous goal complete after verified completion",
 			promptGuidelines: [
 				"Use work_goal_complete only when the active autonomous goal is fully complete and verified.",
+				"After work_goal_complete succeeds, respond to the user with one concise final summary and do not call more tools.",
 			],
 			parameters: { ...WORK_GOAL_TOOL_SCHEMA, required: ["summary"] },
 			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
