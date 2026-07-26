@@ -1764,6 +1764,64 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		"work-resume reports coded WorkItems target resolution without a goal kickoff",
 	);
 
+	entries.length = 0;
+	writeFileSync(
+		path.join(cwd, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({
+			workGoal: {
+				id: "wg-reset",
+				mode: "project",
+				objective: "continue across sessions",
+				status: "active",
+				iteration: 2,
+				resumeOnSessionStart: true,
+			},
+		}),
+	);
+	tempHooks.session_start?.({}, ctx);
+	assert.match(statuses["work-goal"], /active #2/);
+	const beforeFallbackCompactions = compactions.length;
+	const beforeFallbackSent = sent.length;
+	await tempCommands["__orchestrator-goal-continue"].handler(
+		"wg-reset wg-reset:2:fallback",
+		{
+			...ctx,
+			newSession: async () => ({ cancelled: true }),
+		},
+	);
+	assert.equal(compactions.length, beforeFallbackCompactions + 1);
+	assert.equal(sent.length, beforeFallbackSent + 1);
+	assert.match(sent.at(-1).message, /microcompact/);
+
+	let handoffEntry;
+	let freshPrompt;
+	await tempCommands["__orchestrator-goal-continue"].handler(
+		"wg-reset wg-reset:2:fresh",
+		{
+			...ctx,
+			newSession: async (options) => {
+				options.setup({
+					appendCustomEntry: (customType, data) => {
+						handoffEntry = { type: "custom", customType, data };
+					},
+				});
+				await options.withSession({
+					sendUserMessage: async (message) => {
+						freshPrompt = message;
+					},
+				});
+				return { cancelled: false };
+			},
+		},
+	);
+	assert.equal(handoffEntry.data.goal.resumeOnSessionStart, true);
+	assert.match(freshPrompt, /Started in a fresh session/);
+	entries.length = 0;
+	entries.push(handoffEntry);
+	tempHooks.session_start?.({}, ctx);
+	assert.match(statuses["work-goal"], /active #2/);
+	await invoke("work-goal", "clear", ctx);
+
 	writeFileSync(
 		path.join(cwd, ".pi", "work-orchestrator-state.json"),
 		JSON.stringify({

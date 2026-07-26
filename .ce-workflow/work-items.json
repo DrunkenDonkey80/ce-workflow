@@ -2807,6 +2807,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-07-26T06:44:21.481Z",
           "workflowId": "019f9cf6-fc42-7406-b8ae-16049b88dd6f"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.42",
@@ -2814,12 +2817,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: RFLib autonomous project goal iteration 1 requested the internal new-session continuation, but execution remained in the original ",
       "type": "task",
-      "updatedAt": "2026-07-26T06:44:21.486Z"
+      "updatedAt": "2026-07-26T10:33:30.712Z"
     },
     "work-2.43": {
       "acceptance": "Pi setThinkingLevel is used safely; replacement sessions reapply the configured effort; every terminal/paused path restores the prior level; focused goal tests pass.",
@@ -3532,7 +3537,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T10:30:14.211Z"
+    "updatedAt": "2026-07-26T10:33:30.712Z"
   },
   "schemaVersion": 1
 }

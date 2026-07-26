@@ -15719,37 +15719,63 @@ async function handleWorkMenuCommand(ctx, pi) {
 	}
 }
 
-async function handleWorkGoalResetCommand(args, ctx) {
+async function handleWorkGoalResetCommand(args, ctx, pi) {
 	const [goalId, marker] = String(args ?? "")
 		.trim()
 		.split(/\s+/, 2);
 	const goal = activeWorkGoal;
 	if (!goal || goal.status !== "active" || goal.id !== goalId) return;
-	if (typeof ctx.newSession !== "function") {
-		await ctx.sendUserMessage(
+	const cwd = activeWorkGoalCwd ?? ctx.cwd;
+	const fallback = async (reason) => {
+		recordWorkTelemetry(cwd, {
+			type: "goal-continuation-reset",
+			goalId: goal.id,
+			path: "microcompact-fallback",
+			reason,
+		});
+		ctx.ui.notify(
+			`Fresh-session continuation unavailable (${reason}); microcompacting instead.`,
+			"warning",
+		);
+		return microCompactThenSendWorkGoalPrompt(
+			pi,
+			ctx,
+			goal,
 			buildWorkGoalContinuePrompt(
 				goal,
-				marker,
-				"Session reset unavailable; continuing in-place.",
+				marker || workGoalContinuationMarker(goal),
+				"Fresh-session reset was unavailable; continued after a work-context microcompact.",
 			),
 		);
-		return;
-	}
+	};
+	if (typeof ctx.newSession !== "function") return fallback("API unavailable");
 	const prompt = buildWorkGoalContinuePrompt(
 		goal,
 		marker || workGoalContinuationMarker(goal),
 		"Started in a fresh session; resume from native work-item store/git and avoid relying on prior chat.",
 	);
 	const parentSession = ctx.sessionManager?.getSessionFile?.();
-	const result = await ctx.newSession({
-		parentSession,
-		withSession: async (nextCtx) => {
-			await nextCtx.sendUserMessage(prompt);
-		},
-	});
-	if (result?.cancelled) {
-		workGoalContinuationPending = null;
-		ctx.ui.notify("Work-goal session reset cancelled", "warning");
+	try {
+		const result = await ctx.newSession({
+			parentSession,
+			setup: (sessionManager) => {
+				sessionManager.appendCustomEntry(WORK_GOAL_STATE_ENTRY_TYPE, {
+					goal: { ...goal, resumeOnSessionStart: true },
+				});
+			},
+			withSession: async (nextCtx) => {
+				await nextCtx.sendUserMessage(prompt);
+			},
+		});
+		if (result?.cancelled) return fallback("reset cancelled");
+		recordWorkTelemetry(cwd, {
+			type: "goal-continuation-reset",
+			goalId: goal.id,
+			path: "new-session",
+		});
+		return true;
+	} catch (error) {
+		return fallback(`reset failed: ${formatError(error)}`);
 	}
 }
 
@@ -18629,11 +18655,19 @@ export default function workModelsExtension(pi) {
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
 		if (activeWorkGoal?.status === "active") {
-			activeWorkGoal = {
-				...activeWorkGoal,
-				status: "paused",
-				updatedAt: Date.now(),
-			};
+			if (activeWorkGoal.resumeOnSessionStart) {
+				activeWorkGoal = {
+					...activeWorkGoal,
+					resumeOnSessionStart: undefined,
+					updatedAt: Date.now(),
+				};
+			} else {
+				activeWorkGoal = {
+					...activeWorkGoal,
+					status: "paused",
+					updatedAt: Date.now(),
+				};
+			}
 			persistWorkGoal(pi);
 		}
 		pendingInitiativeConversions.clear();
@@ -19124,7 +19158,7 @@ export default function workModelsExtension(pi) {
 	pi.registerCommand(ORCHESTRATOR_GOAL_CONTINUE_COMMAND, {
 		description: "Internal orchestrator goal continuation",
 		handler: async (args, ctx) => {
-			await handleWorkGoalResetCommand(args, ctx);
+			await handleWorkGoalResetCommand(args, ctx, pi);
 		},
 	});
 
