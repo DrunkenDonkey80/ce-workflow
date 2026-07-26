@@ -207,16 +207,32 @@ function residualDisposition(task) {
 	return undefined;
 }
 
-function reviewDispositionSatisfied(task) {
-	const notes = notesOf(task);
-	const reviews = [
-		...notes.matchAll(/(?:wo:review|review(?: result)?):?\s*(PASS|FAIL)\b/gi),
+function mechanicalDisposition(task) {
+	const matches = [
+		...notesOf(task).matchAll(/^wo:mechanical-fix PASS (\{.*\})$/gim),
 	];
-	if (reviews.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
-	const target = targetedReviewFindings(task);
-	const disposition = residualDisposition(task);
+	for (const match of matches.reverse()) {
+		try {
+			const value = JSON.parse(match[1]);
+			if (
+				Array.isArray(value.dispositions) &&
+				value.dispositions.length > 0 &&
+				value.dispositions.every((item) =>
+					["finding", "fix", "evidence"].every(
+						(key) => typeof item?.[key] === "string" && item[key].trim(),
+					),
+				)
+			)
+				return { index: match.index, dispositions: value.dispositions };
+		} catch {
+			// Ignore malformed mechanical dispositions and require a valid one.
+		}
+	}
+	return undefined;
+}
+
+function dispositionCovers(target, disposition) {
 	return (
-		reviews.filter((event) => event[1]?.toUpperCase() === "FAIL").length >= 2 &&
 		target &&
 		disposition?.index > target.index &&
 		disposition.dispositions.length === target.findings.length &&
@@ -226,6 +242,21 @@ function reviewDispositionSatisfied(task) {
 					.length === 1,
 		)
 	);
+}
+
+function reviewDispositionSatisfied(task) {
+	const notes = notesOf(task);
+	const reviews = [
+		...notes.matchAll(/(?:wo:review|review(?: result)?):?\s*(PASS|FAIL)\b/gi),
+	];
+	if (reviews.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
+	const failures = reviews.filter(
+		(event) => event[1]?.toUpperCase() === "FAIL",
+	).length;
+	const target = targetedReviewFindings(task);
+	return failures === 1
+		? dispositionCovers(target, mechanicalDisposition(task))
+		: failures >= 2 && dispositionCovers(target, residualDisposition(task));
 }
 
 function formatPendingFiles() {

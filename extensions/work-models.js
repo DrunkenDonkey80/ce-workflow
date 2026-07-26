@@ -5839,6 +5839,7 @@ function issueSummary(issue) {
 		summary.reviewRounds = reviewEvents(issue).length;
 		summary.reviewFailures = reviewFailureCount(issue);
 		summary.fixReadyForReview = fixReadyForReview(issue);
+		summary.mechanicalFixAccepted = mechanicalFixAccepted(issue);
 		summary.residualFixAccepted = residualFixAccepted(issue);
 	}
 	return summary;
@@ -6878,6 +6879,7 @@ function planResumeAction(state, cwd) {
 		});
 		if (
 			activeImplementation.reviewPassed ||
+			activeImplementation.mechanicalFixAccepted ||
 			activeImplementation.residualFixAccepted
 		)
 			return {
@@ -6885,7 +6887,9 @@ function planResumeAction(state, cwd) {
 				action: "finish-ready",
 				message: activeImplementation.reviewPassed
 					? "Implementation is verified and reviewed; use the coded finish gate."
-					: "Targeted re-review residuals are fixed and verified; finish without a third reviewer.",
+					: activeImplementation.mechanicalFixAccepted
+						? "Initial-review findings were mechanically fixed and verified; finish without a redundant re-review."
+						: "Targeted re-review residuals are fixed and verified; finish without a third reviewer.",
 				suggestedCommands: [`/work-finish ${activeImplementation.id}`],
 			};
 		if ((activeImplementation.reviewFailures ?? 0) >= 2)
@@ -7144,7 +7148,10 @@ function directRoleTask(state, cwd) {
 			? `For child state use: node ${helper} work-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
-			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop.`
+			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop. Planner launch baseline paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}; fail BLOCKED if final Git status adds any undeclared repository path outside the native store, workflow runtime, or requested dated plan.`
+			: "",
+		state.action === "run-implementation" && selected?.id
+			? `Claim exactly with: node ${helper} work-claim ${selected.id}`
 			: "",
 		implementationScopeLine(state),
 		evidenceOnlyImplementationLine(state),
@@ -11554,11 +11561,32 @@ function residualDisposition(issue) {
 	return undefined;
 }
 
-function residualFixAccepted(issue) {
-	const target = targetedReviewFindings(issue);
-	const disposition = residualDisposition(issue);
+function mechanicalDisposition(issue) {
+	const matches = [
+		...notesOf(issue).matchAll(/^wo:mechanical-fix PASS (\{.*\})$/gim),
+	];
+	for (const match of matches.reverse()) {
+		try {
+			const value = JSON.parse(match[1]);
+			if (
+				Array.isArray(value.dispositions) &&
+				value.dispositions.length > 0 &&
+				value.dispositions.every((item) =>
+					["finding", "fix", "evidence"].every(
+						(key) => typeof item?.[key] === "string" && item[key].trim(),
+					),
+				)
+			)
+				return { index: match.index, dispositions: value.dispositions };
+		} catch {
+			// Ignore malformed mechanical dispositions and require a valid one.
+		}
+	}
+	return undefined;
+}
+
+function dispositionCovers(target, disposition) {
 	return (
-		reviewFailureCount(issue) >= 2 &&
 		target &&
 		disposition?.index > target.index &&
 		disposition.dispositions.length === target.findings.length &&
@@ -11566,6 +11594,27 @@ function residualFixAccepted(issue) {
 			(finding) =>
 				disposition.dispositions.filter((item) => item.finding === finding)
 					.length === 1,
+		)
+	);
+}
+
+function residualFixAccepted(issue) {
+	return (
+		reviewFailureCount(issue) >= 2 &&
+		dispositionCovers(
+			targetedReviewFindings(issue),
+			residualDisposition(issue),
+		) &&
+		hasVerificationEvidence(issue)
+	);
+}
+
+function mechanicalFixAccepted(issue) {
+	return (
+		reviewFailureCount(issue) === 1 &&
+		dispositionCovers(
+			targetedReviewFindings(issue),
+			mechanicalDisposition(issue),
 		) &&
 		hasVerificationEvidence(issue)
 	);
