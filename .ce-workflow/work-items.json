@@ -7,6 +7,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Execute docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md to Definition of Done.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement the CE workflow evaluation harness"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -63,6 +67,10 @@
         }
       ],
       "description": "Implement and verify U1 from the authoritative plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement evaluation harness unit one"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -131,6 +139,10 @@
         }
       ],
       "description": "Implement and verify U2 from the authoritative plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement evaluation harness unit two"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -199,6 +211,10 @@
         }
       ],
       "description": "Implement and verify U3 from the authoritative plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement evaluation harness unit three"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -267,6 +283,10 @@
         }
       ],
       "description": "Implement and verify U4 from the authoritative plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement evaluation harness unit four"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -333,6 +353,10 @@
         }
       ],
       "description": "Implement and verify U5 from the authoritative plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement evaluation harness unit five"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -401,6 +425,10 @@
         }
       ],
       "description": "Implement and verify U6 from the authoritative plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement evaluation harness unit six"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -469,6 +497,10 @@
         }
       ],
       "description": "Implement and verify U7 from the authoritative plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement evaluation harness unit seven"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -537,6 +569,10 @@
         }
       ],
       "description": "Implement and verify U8 from the authoritative plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement evaluation harness unit eight"
+      },
       "documentLinks": {
         "spec": "docs/plans/2026-07-15-001-feat-ce-workflow-evaluation-harness-plan.md"
       },
@@ -621,6 +657,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Brainstorm workspace created by /work-brainstorm for: look at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance, accuracy and token usage. different modes, different agents we use (like own reviewer vs ce-code review agents, different thinking levels, etc).that system should be both simple enough to be fast to test ce-workflow and complex enough to actually test the full suite. the goal is to further optimize ce-workflow while ensuring it is still working great",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Design a stable CE workflow evaluation setup"
+      },
       "evidence": [
         {
           "closeEvidence": "All brainstorm deliverables completed and verified"
@@ -673,6 +713,10 @@
         }
       ],
       "description": "Idea created by /work-brainstorm.\n\nFull brainstorm request:\nlook at this repo, clone it to temp and analyze + the description. the idea here is for we to have a stable test setup where we can evaluate our changes - for performance, accuracy and token usage. different modes, different agents we use (like own reviewer vs ce-code review agents, different thinking levels, etc).that system should be both simple enough to be fast to test ce-workflow and complex enough to actually test the full suite. the goal is to further optimize ce-workflow while ensuring it is still working great",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Analyze requirements for a CE workflow evaluation setup"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -739,6 +783,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Master roadmap plan from docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md.\n\n## Goal Capsule\n\n- **Objective:** Extend the workflow evaluation harness, then use it to produce evidence-backed model and effort recommendations for each ce-workflow role and for same-family versus cross-family critique.\n- **Authority hierarchy:** This plan governs the roadmap; the existing V1 benchmark contract and approved project bundles govern unchanged harness behavior; retained experiment evidence governs recommendations; current code patterns govern implementation details when they do not conflict.\n- **Execution profile:** Deep, dependency-ordered work. Implement deterministic contracts before paid runs, then progress through smoke, calibration, decision, and sentinel evidence.\n- **Stop conditions:** Stop rather than accept undeclared configuration drift, incomplete role telemetry, hidden-resource leakage, silent model fallback, evaluator disagreement, failed hard gates, stale calibration, or missing provider capability as evidence of a winner.\n- **Tail ownership:** The executor owns code, fixtures, descriptors, experiment runs, evidence, and documentation. A maintainer owns provider access, benchmark-contract approval, rubric correction followed by fresh blinded reruns, and adoption of a provider-specific recommendation; maintainers cannot adjudicate a winner in place.\n\n---",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Model role evaluation roadmap"
+      },
       "documentLinks": {
         "design": "docs/plans/2026-07-16-001-feat-model-role-evaluation-roadmap-plan.md"
       },
@@ -758,6 +806,10 @@
       "createdAt": "2026-07-16T19:18:17.405Z",
       "dependencies": [],
       "dependencyEdges": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Plan the next model role evaluation slice"
+      },
       "evidence": [],
       "id": "work-1.1",
       "labels": [],
@@ -778,6 +830,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "npm run verify:quiet intermittently fails with EPERM when a just-used Git fixture root is removed on Windows.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Retry Windows fixture cleanup"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -803,6 +859,10 @@
       ],
       "dependencyEdges": [],
       "description": "Implement U8 of the model-role evaluation roadmap: produce confirmatory model/effort evidence for the main brainstorm session, work-planner, work-migrator, and work-advisor-backup while keeping work-committer as a deterministic finalization control. Run the predeclared matrix only: Sol-high, Sol-xhigh, and Terra-high for brainstorm/planner; Luna-medium, Terra-medium, and Sol-high for migrator/advisor-backup. Exercise calculator and CSV projects where the role applies and targeted role-case sentinels for conditional roles. Preserve provider/model/effort provenance, calibration binding, complete telemetry, blinded dual-evaluator judgments, three alternating pairs, project/class scope, uncertainty, failures, and valid no-winner or needs-more-evidence outcomes. Do not change package defaults or compare committer models.\n\nRequirements: R20-R25 and R27-R36; acceptance examples AE1, AE7, AE11, and AE12. Depends on completed U6 and U7. Primary source paths: benchmarks/workflow-evaluation/v1/experiments/role-decisions/, retained authority-only evidence outside the source tree, and README.md.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Evaluate brainstorm, planner, migrator, and support roles"
+      },
       "evidence": [],
       "id": "work-1.11",
       "labels": [],
@@ -830,6 +890,10 @@
       ],
       "dependencyEdges": [],
       "description": "Execute only roadmap unit U9: produce confirmatory role-decision evidence for worker, fixer, debugger, and reviewer across the applicable calculator/CSV and holdout lanes. Add or update bounded U9 descriptors/evidence documentation under benchmarks/workflow-evaluation/v1/experiments/role-decisions/ and README.md; retained live evidence stays outside the source tree. Do not implement U10 critic-topology work, U11 adoption/sentinel changes, model-default changes, or unrelated workflow changes.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Evaluate worker, fixer, debugger, and reviewer roles"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -860,6 +924,10 @@
       ],
       "dependencyEdges": [],
       "description": "Execute only roadmap unit U10: freeze the critic-topology decision descriptors, run the predeclared revision-loop contrasts, retain decision evidence outside the tracked source tree, and document a conditional same-family/cross-family conclusion or explicit no-winner. Cover Sol-high and Opus-high generators with empty, Sol-high, and Opus-high critique; add the declared Sol-xhigh/Opus-xhigh effort contrasts. Permit a balanced randomized dual-critic interaction only after both single critics pass. Excludes U11 integrated sentinels/adoption, settings/default changes, unrelated scripts/test-work-resume.mjs, and any generated raw evidence in tracked source.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Evaluate critic topology and revision loops"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -889,6 +957,10 @@
       ],
       "dependencyEdges": [],
       "description": "Finalize U11 without manufacturing evidence. Consume the closed U8-U10 outcomes, which authorize no model/role or critic-topology recommendation. Keep provider-neutral defaults unchanged; produce only the bounded deterministic adoption/sentinel behavior and documentation needed to record why no mapping was adopted. Do not create integrated handoffs, live samples, or recommendation presets unless an actual qualified mapping already exists in retained evidence.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Finalize integrated sentinels and adoption"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -913,6 +985,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "First executable slice of the Model Role Evaluation Roadmap (epic work-1), Phase 1 Measurement contracts. PROBLEM: the V1 harness factor allowlist cannot validly compare top-level models or nested role overrides. SCOPE: extend the factor allowlist and resolved-pair schema with a complete canonical role map, compound modelAssignment values (provider + exact model bound as one factor), role-scoped factor paths, and independently testable effort factors for every ce-workflow role under test. APPROACH: reuse recursive changed-path validation and canonical fingerprints already in scripts/workflow-evaluation-contract.mjs; mirror the existing subagents.agentOverrides shape from extensions/work-models.js. Fail preflight on partial provider/model deltas, aliases resolving differently, ambient overrides, unsupported role keys, fallback-policy drift, no-op changes, or more than the declared delta; require an explicit interaction declaration for effort+assignment. Preserve existing workflowRevision/effort/prompt/mode/reviewer descriptor compatibility and key-order-independent fingerprints. Add failing contract fixtures BEFORE changing live descriptor handling. Requirements R1-R6, R20-R22; AE1-AE2. Depends on: none. Files: scripts/workflow-evaluation-contract.mjs, scripts/workflow-evaluation.mjs, benchmarks/workflow-evaluation/v1/experiments/smoke.example.json, benchmarks/workflow-evaluation/v1/experiments/decision.example.json, scripts/test-workflow-evaluation-contract.mjs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Define the model and role factor contract"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -943,6 +1019,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Apply each evaluation side's complete canonical role map through the existing Pi settings path and prove the requested provider/model/effort identity was observed at every main-session and nested-role dispatch. Extend the V1 harness only; do not introduce a second runtime settings format. Preserve source, bundle, sibling-workspace, credential-root, and evidence-root isolation.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Capture effective role configuration and provenance"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -972,6 +1052,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Implement only roadmap unit U3: extend existing work-run/subagent reconciliation with stable sample, pair, attempt, agent, parent, role, treatment, and artifact identities; observed configuration; per-agent metrics; and an append-only artifact visibility/consumption ledger. Preserve ordinary work telemetry compatibility and separate workflow-role, critic, reviser, harness, and evaluator accounting. Exclude U4-U11 corpus, scoring, campaign, live-run, recommendation, and adoption work.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Add per-agent telemetry and an artifact ledger"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -999,6 +1083,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Add versioned leakage-safe clean, seeded, and holdout role/critique replay cases for both benchmark projects.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Build a frozen role and critique replay corpus"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -1024,6 +1112,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Add independent pinned GPT/Claude judgments, role-specific scoring, Pareto reporting, and no-winner decisions.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Add dual-evaluator Pareto scoring"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -1050,6 +1142,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Freeze the model-role campaign and prove every selected lane is safely wired with non-decision-grade smoke evidence.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Run deterministic gates and the smoke campaign"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -1076,6 +1172,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Establish approved baseline noise, budgets, and conservative thresholds for every contrast that may support a model-role recommendation.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Calibrate baselines and finalists"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -1112,6 +1212,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "The documented planner/helper syntax uses work-note <id> --append-notes <text>, but work-helper currently appends the flag itself to notes.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Support documented append-notes syntax"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -1132,6 +1236,11 @@
       "createdAt": "2026-07-19T08:21:38.875Z",
       "dependencies": [],
       "dependencyEdges": [],
+      "description": "Improve the reliability and safety of planning, execution, review, and finalization workflows. Address recurring failures in recovery, authentication, generated-artifact handling, verification, and work-item mutation. Produce durable fixes or route upstream-owned defects with clear evidence and outcomes.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Self-improving workflow"
+      },
       "evidence": [],
       "id": "work-2",
       "labels": [
@@ -1141,7 +1250,7 @@
       "status": "open",
       "title": "Self-improving",
       "type": "epic",
-      "updatedAt": "2026-07-19T08:21:38.875Z"
+      "updatedAt": "2026-07-26T01:57:42.572Z"
     },
     "work-2.1": {
       "createdAt": "2026-07-19T08:21:38.875Z",
@@ -1150,6 +1259,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: finish-task --immediate-format attempted to run Biome on the 1.3 MiB native runtime store .ce-workflow/work-items.json and failed before review/finalization because Biome's configured maximum is 1.0 MiB.\nExpected: The coded finalizer should treat .ce-workflow/work-items.json as runtime state and exclude it from immediate formatting, while still staging and committing it.\nImpact: A fully verified work item cannot reach the review/commit/close boundary when immediate formatting is requested, even though production files and the runtime store are valid.\nSuggested improvement: Filter isRuntimePath files before formatPendingFiles invokes Biome, or explicitly skip .ce-workflow/work-items.json.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Exclude the native work store from immediate formatting"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/1a49241c-e58e-434f-a9fc-355f7fe83284",
@@ -1186,6 +1299,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: After successful MSVC/Ninja verification, finish-task failed because three linker-generated .ilk files under rf-lib/build-host were classified as unrecognized untracked files. The helper auto-added *.pdb to .gitignore but did not handle sibling .ilk artifacts.\nExpected: The coded finalizer should recognize MSVC .ilk files in generated build directories and either ignore/remove them consistently with .pdb artifacts, without blocking an otherwise passing task.\nImpact: Windows host-test tasks cannot finalize after linking unless the agent manually deletes generated .ilk files or changes project ignore rules, adding friction and risking accidental build-artifact commits.\nSuggested improvement: Include *.ilk in generated-artifact hygiene alongside *.pdb, preferably scoped through existing build-directory recognition.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Recognize generated MSVC ILK files"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/b19a1ebe-7a21-45ee-941d-48d2829f0eb6",
@@ -1225,6 +1342,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: A paused pi-subagents writer could not be resumed: subagent resume rejected its generated recovery descriptor because `acceptance.explicit` and `acceptance.inferredReason` were unsupported. The only recovery was launching a fresh continuation writer against the current filesystem.\nExpected: A paused async subagent should resume from its generated recovery descriptor, especially after a soft interrupt used to handle a needs-attention state.\nImpact: The workflow lost in-session continuity, required a replacement agent, and increased risk when continuing a partially edited multi-file task.\nSuggested improvement: Normalize or ignore deprecated acceptance fields when reading recovery descriptors so descriptors written by the runtime are always consumable by resume.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resume paused subagents from generated recovery descriptors"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/ff678976-4714-46ba-ad3f-692a48f6c8a5",
@@ -1261,6 +1382,10 @@
       "createdAt": "2026-07-21T15:36:51.090Z",
       "dependencies": [],
       "dependencyEdges": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Support empty-base background verification"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -1287,6 +1412,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: finish-task for work-1.5.18 reported clean=true, but the next work-goal continuation found scripts/verify-rf-key-hygiene.py dirtied by a delayed formatter with a formatting-only diff unrelated to the completed task.\nExpected: --immediate-format should wait for or settle managed formatting before committing and before its final clean check, so a PASS/clean result remains clean at the next deterministic WorkItem boundary.\nImpact: The next task starts with unrelated dirt, forcing manual attribution/restoration and risking scope-check failures or accidental inclusion in a later commit.\nSuggested improvement: After the commit, wait for the managed formatter generation to quiesce and rerun status; if formatting arrives, amend or restore deterministically before returning clean=true.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Wait for formatting before reporting a clean finish"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/13d1a1cf-e54b-4693-8df6-ed18c9eeced7",
@@ -1326,6 +1455,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: A timed-out async work-reviewer run could not be resumed because pi-subagents rejected its own recovery descriptor fields acceptance.explicit and acceptance.inferredReason.\nExpected: action=resume should accept recovery descriptors generated by the same runtime, or migrate/drop unsupported acceptance metadata automatically.\nImpact: The required targeted review cannot be recovered from its existing context, wasting a 10-minute run and forcing a fresh reviewer solely because runtime-generated state is unreadable.\nSuggested improvement: Normalize recoveryDescriptor.acceptance through the current schema before validation and ignore deprecated explicit/inferredReason fields.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resume timed-out reviewers from generated recovery state"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/a9342194-07f7-43bd-8e0d-50cd6d2dab67",
@@ -1363,6 +1496,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: Configured ce-workflow background verifiers did not run after routine inline tasks work-1.5.22 and work-1.5.23 were finalized through the documented `work-helper.mjs finish-task` path. The verifier state file was never created, work_verifier_inbox reports the store missing, and the helper contains no verifier scheduling call.\nExpected: Every normal commit/close performed through the documented routine inline finalizer should capture a checkpoint and asynchronously schedule all effective background verifier profiles, matching README behavior and the extension's executeWorkFinishState path. The coded helper and extension finalizer must share one scheduling primitive or otherwise guarantee identical post-commit behavior.\nImpact: Configured correctness/security/maintainability/simplification/test-gap/performance analyzers are silently skipped for the default inline/autopilot workflow. Users see successful closed/pushed tasks but receive no durable verifier batches or next-resume triage, weakening the promised review loop without an error.\nSuggested improvement: Route `finish-task` through the same post-commit scheduling code as executeWorkFinishState, or add an explicit helper-to-extension callback/event that schedules using effective scoped profiles and reports queued/not-scheduled status in finish-task JSON.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Schedule verifiers after routine task finalization"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/261db86a-ab6c-48ee-986a-dce8193886b7",
@@ -1403,6 +1540,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: A completed work-reviewer re-review could not be resumed for the requested one-finding verification because pi-subagents rejected its generated recovery descriptor: recoveryDescriptor.acceptance.explicit and inferredReason are unsupported. This blocks preserving the mandated two-cycle review cap while obtaining the required durable PASS after fixing the reviewer's sole finding.\nExpected: Resuming the completed reviewer should restore the same reviewer session so it can verify its sole requested fix and record durable PASS without launching a third review cycle.\nImpact: The targeted task cannot pass finish-task's mandatory durable review gate without either violating the explicit two-cycle review cap or fabricating review evidence.\nSuggested improvement: Normalize or ignore obsolete acceptance fields when loading recovery descriptors, or generate descriptors compatible with the current subagent schema.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resume completed reviewers for targeted re-review"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/8c8bff8b-8f58-4ade-92b4-50b85e66c39f",
@@ -1445,6 +1586,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: During work-5 planning, the first work-create successfully added decision work-5.2, but the immediately following work-create for work-5.3 failed with `Invalid work item work-5.3 in work store`, leaving a partially mutated dirty native store and no planning note/dependencies.\nExpected: A sequence of valid work-create calls in one planner session should durably create each child or fail atomically before partial mutation; the helper should reload/validate the newly written work store correctly and return a usable work-5.3 summary.\nImpact: Autonomous planning stopped after a partial write, requiring parent-session recovery and risking inconsistent roadmap slicing or accidental loss of the valid authority gate.\nSuggested improvement: Make work-create return only after reloading and validating the just-created item, and make multi-create planning mutations transactional or explicitly resumable from the created ID.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Fix planner work-item type creation"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/0bba1b9d-cc03-4603-a76c-6569ccdf6467",
@@ -1487,6 +1632,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: finish-task for work-5.3 committed and pushed generated verification/runtime artifacts as implementation files: `.ce-workflow/work-runs/verifiers/state.json`, `.ce-workflow/work-runs/verifiers/.state.recovery.json`, and ignored build helper `rf-lib/build-host/verify-type4.ps1`. The helper's own review handoff also counted the ignored build script toward the large-diff scope.\nExpected: finish-task should exclude ignored build-directory files and ce-workflow runtime/verifier state from review, max-file counting, staging, commits, and pushes; only durable `.ce-workflow/work-items.json` state and actual project sources/tests should be committed.\nImpact: Generated local runtime state and a machine-specific absolute toolchain path were pushed to the project branch, polluting history and making the commit non-portable.\nSuggested improvement: Apply project ignore matching before scope/review/stage collection and hard-exclude `.ce-workflow/work-runs/**`; reject machine-specific scripts under ignored build directories.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Exclude generated runtime artifacts from task commits"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/8b4042a0-b05d-46b0-8e9a-1cd84665a7ad",
@@ -1531,6 +1680,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: Resuming completed work-planner run f813a27f failed because the generated recovery descriptor contains unsupported acceptance.explicit and acceptance.inferredReason fields; the same failure is already captured in the project workflow log.\nExpected: A completed specialist run should resume with corrected handoff context, or the recovery descriptor should contain only schema-supported acceptance fields.\nImpact: The autonomous roadmap loop could not reuse the planner session after a recoverable missing-helper-path handoff and must launch a replacement planner, wasting context and time.\nSuggested improvement: Normalize or omit unsupported acceptance metadata when writing async recovery descriptors.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resume completed planners from generated recovery state"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/f123bab3-0e0d-4f51-aa66-15d832c290cb",
@@ -1571,6 +1724,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The work-planner bundled/default instructions attempted C:\\Users\\Flex\\.pi\\agent\\skills\\work-items\\scripts\\work-helper.mjs and C:\\Users\\Flex\\.pi\\agent\\skills\\work-items\\work-helper.mjs, neither of which exists. It then blocked for 10 minutes on supervisor contact and hit the 15-minute run timeout, even though the active workflow checkout exposes C:\\soft\\ce-workflow\\scripts\\work-helper.mjs. Attempting to resume also failed because the recovery descriptor persisted unsupported acceptance fields.\nExpected: Planner runs should receive the resolved work-helper.mjs absolute path in their coded handoff and asynchronous recovery descriptors should be valid for resume after timeout.\nImpact: Automatic epic slicing stopped before creating any WorkItem, consumed 15 minutes, and could not be resumed; unattended /work-goal execution can stall without durable progress.\nSuggested improvement: Include the resolved helper path in planner handoffs and sanitize persisted acceptance descriptors to fields accepted by resume.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resolve planner helper paths and recovery state"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/68e28993-dd76-49a3-bb51-a2dbd3f981af",
@@ -1609,6 +1766,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The background verifier checkpoint exposed scripts/test-work-goal.mjs as in-scope, but every work_verifier_read window (even maxLines=1) reported 'Verifier file exceeds the read limit' and work_verifier_grep returned no matches, so all correctness/maintainability/simplification operations failed without inspecting source.\nExpected: Checkpoint-scoped verifier tools should allow bounded reads and text search of a valid in-scope source file, including large files, so configured background verification can assess the committed checkpoint.\nImpact: Background verification silently produced no findings or assessment for a committed change, wasting a high-cost verifier run and weakening the post-commit verification gate.\nSuggested improvement: Fix checkpoint file materialization/indexing so work_verifier_read honors bounded startLine/maxLines windows and work_verifier_grep searches the checkpoint copy regardless of total file size.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Allow verifier tools to inspect large checkpoint files"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/8eea20d8-1190-4763-92ca-5a2e10862a46",
@@ -1656,6 +1817,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Checkpoint-scoped reads reject every window when the whole file exceeds 32 KB, while grep treats an exact file path only as a directory prefix and returns no matches.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Inspect large files and exact paths in checkpoint verifiers"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -1680,6 +1845,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: finish-task appended a wo:verify-check PASS note before checking untracked files and implementation-file scope. Two pre-commit failures followed by a successful retry therefore recorded the same passing verification three times on work-2.21.\nExpected: Run cleanliness/scope gates before persisting PASS evidence, or make the PASS note idempotent across retries so failed finalization attempts do not bloat durable work-item history.\nImpact: Retries after recoverable pre-commit failures add misleading duplicate verification evidence and unnecessary native work-store churn.\nSuggested improvement: Move the PASS-note mutation after scope/untracked validation or deduplicate by work item, command, and output.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Avoid duplicate verification notes after finalization retries"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/99125036-7c2f-4c7e-8f3a-846de3bdfb29",
@@ -1721,6 +1890,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: After /work-big created and planned work-6, the previously clean producer repository acquired unrelated formatting-only edits in python-test-app/src/rflab_pinpad/proxmark_machine.py and proxmark_ndef_url.py. The planning task only needed native work-store mutations; production files should not have been formatted or touched.\nExpected: Planning/decision work-item creation and closure should restrict formatting/staging to files owned by that planning boundary (normally only .ce-workflow/work-items.json), leaving unrelated production files byte-identical.\nImpact: The target repo is now dirty before reverse-role implementation starts, obscuring ownership and risking accidental inclusion of unrelated formatting in later task commits.\nSuggested improvement: Make coded planning finalization skip formatPendingFiles entirely or pass an explicit allowlist containing only the native work-store path.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prevent planning from formatting unrelated source files"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/1e318eea-0942-4d92-a5eb-c8bcbb0ea04e",
@@ -1764,6 +1937,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The precomputed resume state selected Action `run-planner` for open WorkItem `work-7.2` and explicitly required a big-slice native child/decision split, but the selected item remained type=task with no `wo:planning` label. The exact work-planner therefore refused to write the durable plan or create child/decision WorkItems and only appended a slice-plan note.\nExpected: Before dispatching `run-planner`, the workflow should create/reclassify a valid `wo:planning` intake (or supply an authoritative helper mutation command) so the selected planner can create the required plan and native child/decision split in one boundary.\nImpact: Planning cannot complete and implementation cannot safely proceed under the required big-slice policy; rerunning without metadata repair risks executing the unsliced parent task.\nSuggested improvement: Have the extension atomically mark/create the planning intake before emitting `Action: run-planner`, and validate that its type/labels satisfy the packaged work-planner contract.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Mark large-work intake before planner dispatch"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/b0d86ec1-5309-403a-a386-2cce01467b7f",
@@ -1810,6 +1987,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: A timed-out async work-planner run could not be resumed because pi-subagents rejected its generated recovery descriptor: acceptance.explicit and acceptance.inferredReason unsupported, and acceptance.level requested an independent reviewer result for a planner run.\nExpected: Timed-out exact-role planner runs should produce a valid recovery descriptor and accept `subagent resume`, preserving session work and avoiding a duplicate planner launch.\nImpact: The planner's in-session progress cannot be recovered; autonomous execution must either relaunch the exact planner from scratch or remain blocked.\nSuggested improvement: Sanitize acceptance fields when generating recovery descriptors and omit reviewer-only acceptance levels for planner sessions.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resume timed-out planners from valid recovery descriptors"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/37b25733-1746-49ad-a028-a5632006969f",
@@ -1853,6 +2034,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: After the planner closed planning parent work-7.2 and created open executable grandchildren work-7.2.2 through work-7.2.5, `work-ready-summary work-7` returned only direct child work-7.1 and omitted ready grandchild work-7.2.2. Closing the planning parent therefore hides its executable descendants from roadmap resume selection.\nExpected: Roadmap readiness traversal should include ready open descendants beneath closed planning containers, or planning children should be attached where deterministic resume can discover them.\nImpact: Autonomous resume can falsely conclude there is no ready voice slice and skip or strand planned implementation work.\nSuggested improvement: Make work-ready-summary recursively traverse closed planning nodes while respecting dependencies, and add a regression test for a roadmap -> closed wo:planning task -> ready executable grandchild.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Traverse ready work beneath closed planning containers"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/15e84882-c8f3-4f66-aee2-429bd778cdf3",
@@ -1897,6 +2082,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The exact work-planner was required to create a durable date-prefixed implementation plan under docs/plans, but its packaged role policy prohibited writing repository files. It closed work-7.2 and recorded only an intended path plus a compact note; `C:\\soft\\LPG\\docs\\plans\\2026-07-25-001-feat-lpgdemo-voice-intent-nano-plan.md` does not exist.\nExpected: For big-mode planning, the planner contract and orchestration requirement should agree: either permit the planner to write the plan artifact, or have coded orchestration materialize a validated plan before closing the planning item.\nImpact: The planning WorkItem is closed while a required durable artifact is missing, reducing traceability and leaving implementation workers with only notes/temp input.\nSuggested improvement: Align work-planner write permissions with big-plan acceptance and prevent close when the declared docs/plans path is absent.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Require durable plan artifacts before closing planning work"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/91fcd6e4-8461-437c-a210-f64a2754b19d",
@@ -1941,6 +2130,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The allowed targeted re-review for work-7.2.2 returned two residual findings. After the exact work-fixer fixed both and focused tests/LSP passed, policy forbids a third reviewer, but `finish-task --reviewed` rejects closure because the latest durable review remains FAIL and requires a literal `wo:review PASS`.\nExpected: After the one targeted re-review, coded orchestration should support dispositioning verified residual findings and finishing without launching a prohibited third review, while preserving evidence of each fix.\nImpact: The task cannot be committed/closed without either violating the review-cycle budget or manually fabricating reviewer PASS evidence.\nSuggested improvement: Add a coded residual-finding disposition state accepted by finish-task after the targeted re-review, requiring exact finding-to-fix evidence and passing verification but no third reviewer.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Support verified residual-finding disposition after re-review"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/f71d3345-7d56-4796-8925-af3838d9a4e1",
@@ -1994,6 +2187,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: `finish-task work-7.2.2` committed paths outside the reviewed implementation handoff and requested slice: verifier recovery state/output files and `.gitignore`, even though these were pre-existing workflow-owned/known dirty paths and the reviewer reviewed only five voice/plan files.\nExpected: The coded finalizer should commit only the task-owned reviewed allowlist plus the native WorkItem state required to close it; pre-existing known dirt must remain untouched unless explicitly assigned to the task.\nImpact: Commit 2065c1a mixes unrelated verifier recovery state and repository ignore changes into the voice parser slice, weakening auditability and violating scoped-dirt guarantees.\nSuggested improvement: Snapshot pre-task dirty paths and exclude them from staging/commit unless they are explicit task-owned files; require independent review if final commit scope grows beyond the reviewer handoff.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Restrict final commits to reviewed task-owned files"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/cfb5bad9-ac2b-4fe0-b0aa-5fae1c2a587e",
@@ -2042,6 +2239,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: `finish-task --verify` executes through Windows cmd.exe even when the active Pi shell is Git Bash. A verification command that had just passed interactively with POSIX inline environment syntax (`ANDROID_HOME='...' ./gradlew.bat ...`) failed in the coded finalizer as an unrecognized command and recorded a misleading failed verification note before the cmd syntax retry passed.\nExpected: The coded finalizer should either execute verification using the active project shell, provide/accept an explicit shell mode, or normalize/document environment-prefix commands so a previously passing verification command remains portable into finish-task.\nImpact: A valid build was recorded as a failed verification on the work item, requiring a second expensive gate and platform-specific command rewriting; unattended finishing can stall on Windows.\nSuggested improvement: Add a platform-neutral `--env NAME=value` option or execute `--verify` with the detected active shell, while recording the actual shell in verification evidence.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Run final verification in the active shell"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/1d8e9e0e-5b65-45ec-aa02-a41c395631a6",
@@ -2078,6 +2279,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The coded finish-task handoff for work-7.2.4 directed the reviewer to `work-summary`, but that helper returned only identity/status/dependencies and an empty notes_tail, omitting the WorkItem acceptance plus available worker verification. The reviewer correctly returned BLOCKED without inspecting the diff.\nExpected: The generated review handoff must provide usable acceptance/verification context, either by making work-summary include description/acceptance and latest implementation evidence or by embedding those fields in the coded handoff.\nImpact: A sensitive implementation cannot receive its required independent verdict despite passing focused tests; reviewer capacity is spent on intake plumbing rather than code review.\nSuggested improvement: Include WorkItem description, acceptance criteria, verification command/result, and latest worker evidence in compact summaries used by coded reviewer handoffs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Include acceptance and evidence in reviewer handoffs"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/91f2a114-a782-4bdd-b568-19daad2e679b",
@@ -2127,6 +2332,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The exact work-planner run for work-3.1 transiently deleted the project policy sections from C:\\soft\\ce-workflow\\AGENTS.md even though the planner contract prohibited source edits and its result attested that only native work state changed. The parent had verified AGENTS.md clean immediately before launch and restored the planner-introduced deletion after detecting it.\nExpected: A read-only/native-store planner must be technically prevented from mutating repository source or instruction files, and its no-source-change attestation must be checked against the pre-launch Git snapshot before accepting the handoff.\nImpact: A planning-only boundary could silently remove workflow safety and Dialog UX rules, contaminate the next implementation slice, and falsely report a clean source scope.\nSuggested improvement: Enforce a planner write allowlist limited to the native work-item store and declared plan artifact, then compare post-run Git paths to the launch snapshot and fail the handoff on any undeclared mutation.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prevent planner source edits and verify clean handoffs"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/3f0be225-aa17-4799-8c05-8d906dcb051a",
@@ -2154,18 +2363,25 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomization: (A) locally-owned planner launch/final Git attestation, fixed by 46ff9e0 + 9894473 with exact baseline paths in coded handoffs and fail-closed final status checks; (B) upstream-owned undeclared child mutation/isolation, routed durably to open canonical work-2.38 because the captured child transcript contains no AGENTS.md write call. Focused start/finish test PASS; npm run verify:quiet PASS.",
+        "Snapshot report reconciled: local audit fixed and unresolved upstream isolation retained open as work-2.38."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The exact work-planner run for work-3.1 transiently deleted the project policy sections from C:\\soft\\ce-workflow\\AGENTS.md even th",
       "type": "task",
-      "updatedAt": "2026-07-25T08:09:13.614Z"
+      "updatedAt": "2026-07-26T05:37:23.666Z"
     },
     "work-2.32": {
       "createdAt": "2026-07-25T11:02:47.828Z",
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: After work-goal continuation/compaction, three async work-reviewer launches failed before producing a review with `No API key found for openai-codex`; an explicit `zai/glm-5.2` attempt failed similarly. Prior reviewers in the same goal had succeeded, and an explicit sessionDir/fork context did not restore credentials.\nExpected: Coded async review handoffs should inherit or resolve the authenticated parent provider across work-goal continuation/compaction, and provider-auth failures should terminate immediately with a concrete infrastructure status.\nImpact: The verified work-7.2.5 documentation cannot receive its mandatory durable verdict, blocking coded finish and work-7 closure despite passing all available software gates.\nSuggested improvement: Preserve provider authentication for child Pi processes across goal continuation/compaction and classify child auth failures as terminal infrastructure failures rather than no-activity alerts.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Preserve provider authentication for async reviewers"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/890b2832-4e0f-4f27-8657-67757e8926b6",
@@ -2198,18 +2414,25 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomization: provider-auth inheritance and immediate auth-failure termination are related upstream-owned pi-subagents lifecycle claims, routed durably to open canonical work-2.39. ce-workflow already treats startup/auth failures as infrastructure evidence and terminal direct states as failed; installed pi-subagents 0.37.0 supports auth/model fallback and current launchContractDigest schema, but continuation-specific live proof remains open.",
+        "Snapshot evidence routed to open upstream canonical work-2.39; no speculative local credential workaround added."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After work-goal continuation/compaction, three async work-reviewer launches failed before producing a review with `No API key foun",
       "type": "task",
-      "updatedAt": "2026-07-25T11:02:47.828Z"
+      "updatedAt": "2026-07-26T05:37:23.999Z"
     },
     "work-2.33": {
       "createdAt": "2026-07-25T11:09:52.181Z",
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The configured work-worker for work-3.2 aborted before implementation because its role contract invoked unsupported `work-helper.mjs claim work-3.2`; the helper exposes `work-claim`. The worker then correctly refused to retry after the helper syntax failure.\nExpected: Generated worker instructions and role defaults must use the supported `work-claim` command, or the coded parent must claim before dispatch so workers never guess helper syntax.\nImpact: Every bounded implementation routed through work-worker can fail immediately without editing or verification, wasting a specialist launch and stalling autonomous resume.\nSuggested improvement: Replace the stale `claim` token in work-worker role/runtime instructions with `work-claim`, and add a command-contract test generated from the helper's registered subcommands.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Fix the worker claim command contract"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/12b07580-e823-47f6-b8e9-c6e77d403085",
@@ -2237,18 +2460,25 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: one atomic locally-owned stale worker command contract. Fixed in 46ff9e0 + 9894473: worker role and generated direct handoff now provide exact absolute-helper work-claim invocation; start/finish regression and npm run verify:quiet PASS.",
+        "Fixed exact work-claim handoff contract and verified."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The configured work-worker for work-3.2 aborted before implementation because its role contract invoked unsupported `work-helper.m",
       "type": "task",
-      "updatedAt": "2026-07-25T11:09:52.181Z"
+      "updatedAt": "2026-07-26T05:37:24.301Z"
     },
     "work-2.34": {
       "createdAt": "2026-07-26T01:02:44.236Z",
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The coded finish-task gate requires a new durable wo:review PASS after an initial FAIL even when the only fixes are mechanical comment/documentation corrections and a work-fixer recorded wo:fix PASS. For work-7.3 the initial review requested only a dated source comment and two corresponding-source list entries; after those exact fixes, finish-task --reviewed would still reject because the gate accepts only a final review PASS (or a second FAIL plus structured residual disposition).\nExpected: The coded gate should honor the workflow review budget: skip targeted re-review for test-only, documentation, formatting, traceability, and other mechanical fixes when a concrete initial finding has a verified one-to-one fix disposition.\nImpact: The current gate forces redundant reviewer runs, adds latency/cost, and conflicts with the documented one-review-cycle policy even though production behavior did not change.\nSuggested improvement: Allow a structured finding-to-fix wo:fix PASS after one FAIL to satisfy finish-task for mechanical-only changes; retain targeted re-review for production behavior changes.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Accept verified mechanical fixes after review failures"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/d8b7242d-c0e1-48ae-9dea-9a8046b1aff9",
@@ -2276,12 +2506,166 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: one atomic locally-owned review-budget/finalizer mismatch, related-distinct from work-2.28 targeted-re-review residual handling. Fixed in 46ff9e0 + 9894473: one initial FAIL may finish only with exact one-to-one wo:mechanical-fix dispositions plus passing verification; generic wo:fix remains rejected. Helper/resume regressions and npm run verify:quiet PASS.",
+        "Fixed structured mechanical-only finish path and verified."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The coded finish-task gate requires a new durable wo:review PASS after an initial FAIL even when the only fixes are mechanical com",
       "type": "task",
-      "updatedAt": "2026-07-26T01:02:44.236Z"
+      "updatedAt": "2026-07-26T05:37:24.618Z"
+    },
+    "work-2.35": {
+      "createdAt": "2026-07-26T02:31:57.694Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A completed work-planner run requested the absolute work-helper path, but attempting to resume the run failed because pi-subagents rejected ce-workflow's recovery descriptor field `launchContractDigest`.\nExpected: The coded planning handoff should always include the absolute work-helper path; if clarification is needed, a completed specialist run should resume without recovery-descriptor schema incompatibility.\nImpact: Autonomous roadmap planning stalled and required a replacement planner launch despite a recoverable missing-path clarification.\nSuggested improvement: Include C:\\soft\\ce-workflow\\scripts\\work-helper.mjs in all planner handoffs and keep recovery descriptor schema compatible with the installed pi-subagents version.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/2215a6a3-9c38-4e40-b0f5-9242dba503e4",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 283,
+              "file": "01-049a187a-5e38-4877-b129-b37537bf3f0d_work-planner_output.md",
+              "sha256": "58b56a2cbc4ab7b14bcbc6caef23ee8dbd96fca583609327ac9d30800652e360"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-26T02:31:57.688Z",
+          "workflowId": "019f9c22-df3a-7f7c-ba07-85d3a83e43e5"
+        }
+      ],
+      "id": "work-2.35",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomization: (A) exact helper path is an already-fixed duplicate of canonical work-2.7/49a14f7 and remains covered by generated handoff regression; (B) recovery descriptor compatibility is an upstream duplicate of canonical work-2.8. Installed pi-subagents 0.37.0 async-resume explicitly validates and propagates optional launchContractDigest. start/finish and package verification PASS.",
+        "Verified duplicate coverage by work-2.7/work-2.8 and installed pi-subagents 0.37.0."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: A completed work-planner run requested the absolute work-helper path, but attempting to resume the run failed because pi-subagents",
+      "type": "task",
+      "updatedAt": "2026-07-26T05:37:24.940Z"
+    },
+    "work-2.36": {
+      "createdAt": "2026-07-26T04:46:57.931Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: work-worker verified work-9.4 in `rf-lib/build-work-9-4`, but coded finish-task rejected hundreds of generated Visual Studio/CMake files as unrecognized untracked files.\nExpected: Specialists should remove their temporary build directories after verification, or finish-task should recognize bounded CMake build-* directories as generated when they are clearly build outputs.\nImpact: A passing implementation could not finalize until manual generated-output cleanup, adding noise and risk to autonomous slices.\nSuggested improvement: Require work-worker cleanup of task-specific build directories after tests, and/or extend generated-build detection to `**/build-work-*` CMake trees.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/2cf1adb9-634a-43df-877f-49d186af5ae4",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3214,
+              "file": "01-4f6f5407-fa57-41e9-8059-b14990845f47_work-worker_output.md",
+              "sha256": "0f8150c4214804dae6cfbbe27c949ae36d34eefb19b2551baf1b4f78eaaa9d75"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-26T04:46:57.925Z",
+          "workflowId": "019f9c22-df3a-7f7c-ba07-85d3a83e43e5"
+        }
+      ],
+      "id": "work-2.36",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned generated-output hygiene defect. Fixed in 46ff9e0: workers must clean task build directories and finalizer hygiene recognizes any bounded build-work-* directory as build-work-*/. Focused untracked-hygiene regression and npm run verify:quiet PASS.",
+        "Fixed bounded build-work-* cleanup/recognition and verified."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: work-worker verified work-9.4 in `rf-lib/build-work-9-4`, but coded finish-task rejected hundreds of generated Visual Studio/CMake",
+      "type": "task",
+      "updatedAt": "2026-07-26T05:37:25.279Z"
+    },
+    "work-2.37": {
+      "createdAt": "2026-07-26T05:04:34.704Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task rejected standard files in the new minimal Android Gradle project (`*.gradle`, Gradle wrapper properties/JAR, `gradlew`, and `settings.gradle`) as unrecognized untracked files, while recognizing Java/XML sources.\nExpected: The coded finalizer should recognize standard Gradle build scripts and wrapper files as source/project infrastructure eligible for task commit, while still rejecting arbitrary binaries.\nImpact: A valid Android bootstrap cannot finalize without manual intent-to-add workarounds for routine Gradle files.\nSuggested improvement: Extend recognized-source rules for `*.gradle`, `settings.gradle`, `gradle-wrapper.properties`, executable `gradlew`, and a narrowly-scoped standard `gradle/wrapper/gradle-wrapper.jar`.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/5daf7cd6-c5bd-41ec-98c2-a1b0d9cedb93",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 375,
+              "file": "01-6067fa38-1b32-46d0-babb-47465977ffe3_work-worker_output.md",
+              "sha256": "4d9125dada920da95c1df29261d202fd20b3e03dab10604f19474b291338f4a6"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-26T05:04:34.698Z",
+          "workflowId": "019f9c22-df3a-7f7c-ba07-85d3a83e43e5"
+        }
+      ],
+      "id": "work-2.37",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: one atomic locally-owned Gradle project infrastructure recognition defect, related-distinct from generated build output. Fixed in 46ff9e0: .gradle scripts, gradlew, wrapper properties, and only gradle/wrapper/gradle-wrapper.jar are recognized; arbitrary JARs remain rejected. Focused regression and npm run verify:quiet PASS.",
+        "Fixed narrow standard Gradle infrastructure recognition and verified."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: finish-task rejected standard files in the new minimal Android Gradle project (`*.gradle`, Gradle wrapper properties/JAR, `gradlew",
+      "type": "task",
+      "updatedAt": "2026-07-26T05:37:25.645Z"
+    },
+    "work-2.38": {
+      "acceptance": "Local planner handoffs name the launch baseline and require a final fail-closed Git check; keep the upstream isolation claim open until the child runtime technically prevents undeclared repository writes or provides authoritative mutation attribution.",
+      "createdAt": "2026-07-26T05:31:03.589Z",
+      "dependencies": [
+        "work-2.31"
+      ],
+      "dependencyEdges": [],
+      "description": "Canonical claim for work-2.31 atoms: ce-workflow must compare a planner's final Git paths with its launch baseline, while pi-subagents must prevent undeclared source mutations by a role whose transcript contains no source-writing call.",
+      "evidence": [],
+      "id": "work-2.38",
+      "labels": [],
+      "notes": [
+        "Classification: work-2.31 atom A is locally-owned launch-baseline attestation; atom B is upstream-owned with insufficient mechanism evidence because the captured planner transcript writes only its runtime output artifact and invokes helper mutations, with no AGENTS.md write call."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Enforce and audit planner repository write boundaries",
+      "type": "bug",
+      "updatedAt": "2026-07-26T05:31:32.514Z"
+    },
+    "work-2.39": {
+      "acceptance": "An installed pi-subagents runtime must launch an async exact role after goal continuation using authenticated parent provider resolution and expose an auth failure as terminal status without waiting for a no-activity alert.",
+      "createdAt": "2026-07-26T05:31:03.726Z",
+      "dependencies": [
+        "work-2.32"
+      ],
+      "dependencyEdges": [],
+      "description": "Canonical upstream claim for work-2.32 atoms: pi-subagents child launches after continuation/compaction must resolve authenticated parent providers, and startup/auth failures must become immediate terminal infrastructure status rather than idle alerts.",
+      "evidence": [],
+      "id": "work-2.39",
+      "labels": [],
+      "notes": [
+        "Classification: both work-2.32 atoms are upstream-owned pi-subagents process/auth lifecycle behavior; ce-workflow already treats startup/auth failure as infrastructure evidence and direct terminal states as failed. Leave this canonical bug open pending continuation-specific runtime proof."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Track async child authentication across goal continuation",
+      "type": "bug",
+      "updatedAt": "2026-07-26T05:31:32.915Z"
     },
     "work-2.4": {
       "createdAt": "2026-07-20T02:33:35.267Z",
@@ -2291,6 +2675,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The work-reviewer for work-4.7 invoked contact_supervisor after receiving live parent steering, but the ask did not wake or reach the active parent before the child's 10-minute wait expired. The parent was blocked in subagent_wait and only received the stale pending ask after the entire 15-minute reviewer run timed out. The reviewer therefore produced no verdict despite having the correct helper path after one shell-path retry.\nExpected: Live child supervisor asks should wake subagent_wait immediately and be surfaced to the parent while the child remains live, so the parent can reply before the child timeout. Mid-run steering should not strand the child in an unobservable contact_supervisor wait.\nImpact: The mandatory independent public-API review consumed 15 minutes and failed without a verdict, forcing another reviewer cycle for infrastructure rather than code reasons.\nSuggested improvement: Bridge contact_supervisor pending events into subagent_wait wakeups and preserve enough run time after steering/ask delivery for the child to continue.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Surface child supervisor requests during waits"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/b23dcbc1-2140-4957-83fe-454cf4a9db1a",
@@ -2329,6 +2717,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The exact work-worker for work-4.11 directly edited `.ce-workflow/work-items.json`, omitted the comma after the notes array, and wrote noncanonical status `in-progress`. The coded finalizer then failed with `Work store is not valid JSON` until the parent manually repaired both fields.\nExpected: Specialist agents must mutate native work state only through resolved work-helper commands (`work-note`, `work-claim`, etc.), and the store layer should atomically validate serialization/status values before replacing the canonical file.\nImpact: The native source of truth became unreadable mid-goal, blocking all status, finalization, and recovery automation and risking loss of durable work state.\nSuggested improvement: Inject the resolved helper path and prohibit direct store writes in worker prompts; add atomic write-plus-schema validation and canonical status enforcement in the store mutation layer.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prevent agents from directly editing the work store"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/7b926774-9d3f-4e45-b7ff-d80a0bd6b5c4",
@@ -2368,6 +2760,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: An exact work-planner run timed out after a malformed bare helper invocation, and the supported async resume path then rejected its own generated recovery descriptor because it persisted unsupported acceptance fields (`explicit`, `inferredReason`) and `level=reviewed`.\nExpected: The planner should receive the fully qualified helper invocation or recover after supervisor guidance; generated recovery descriptors must contain only resume-supported acceptance fields/levels so `subagent resume` can revive a failed run.\nImpact: The required planning specialist could not persist child work items, and the same specialist cannot be resumed through the documented recovery action, forcing parent-side replanning or a duplicate run.\nSuggested improvement: Sanitize persisted acceptance metadata to the resume schema and validate recovery descriptors when they are written; normalize helper references in work-planner prompts to `node <absolute>/work-helper.mjs`.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make planner recovery descriptors resumable"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/d61c78c1-5e40-41b7-be97-0eeabd888fc1",
@@ -2405,6 +2801,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local fix for work-2.1, work-2.2, work-2.3, work-2.4, work-2.5, and work-2.6 atoms: exclude managed work state from immediate formatting; run verification in the active Git Bash shell on Windows; require exact helper paths; forbid direct store edits; and make reviewers/helper failures return BLOCKED instead of waiting on supervisor coordination.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Harden finalization and role-agent failure boundaries"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2428,6 +2828,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Upstream-owned residual from work-2.2/work-2.4/work-2.6: pi-subagents 0.35.1 contact_supervisor requests can remain invisible to the parent after live steering, and async recovery descriptors persist resolved acceptance fields that resume validation rejects.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Track supervisor wake and async resume defects"
+      },
       "evidence": [],
       "id": "work-2.8",
       "labels": [],
@@ -2447,6 +2851,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: `work-helper.mjs work-close work-4.2 --reason \"...\"` changed the decision status to closed but did not persist the supplied closure reason in notes, evidence, or any visible work-summary field.\nExpected: The coded work-close helper should durably record its --reason so external-prerequisite and human-decision closures remain auditable and resumable.\nImpact: The native store now shows work-4.2 closed without explaining that all live firmware components remain blocked because manifests, approvals, recovery hardware/SOP, stable power, and explicit authorization are unavailable. This can cause unsafe future assumptions or unnecessary rediscovery.\nSuggested improvement: Append the --reason to notes or evidence atomically with the status transition and include it in work-summary.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Persist closure reasons in work item history"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/e0e726cd-7e85-4f8a-ac6b-30113e50cbb1",
@@ -2486,6 +2894,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Durable container for ordinary tasks that do not belong to a dedicated roadmap.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Miscellaneous work"
+      },
       "evidence": [],
       "id": "work-3",
       "labels": [
@@ -2501,6 +2913,10 @@
       "createdAt": "2026-07-25T07:42:39.536Z",
       "dependencies": [],
       "dependencyEdges": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Modernize the roadmap and task workspace"
+      },
       "evidence": [],
       "id": "work-3.1",
       "labels": [],
@@ -2524,6 +2940,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Real Pi TUI title backfill after 28ed6df aborts with , runs too slowly, and gives no useful progress. Diagnose the exact invalid output/validation path, then make missing-title generation visibly progressive and bounded-concurrent (target 8 model requests) so one invalid item does not discard valid generated titles.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Recover invalid title generation with concurrent progress"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2552,6 +2972,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Apply the remaining roadmap workspace presentation/navigation polish from the owner smoke: move selected-item stats into unused top-right space, reserve six detail-description lines below, render completed rows with a gray checkmark instead of the work-stage circle, and make Left on a child row collapse its nearest expanded parent container.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Polish roadmap stats, completion markers, and parent collapse"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2580,6 +3004,10 @@
       ],
       "dependencyEdges": [],
       "description": "Add a Delete action for mistaken roadmap/task/initiative items that permanently removes the selected item and all descendants. Before deletion, show a prominent destructive warning with selected title/ID and descendant count, then require typing the exact word DELETE; the owner explicitly chose DELETE without the hard-to-type ID.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Add guarded recursive subtree deletion"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2606,6 +3034,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Repair the latest owner-smoke layout issues: variable stats height makes the Work items list jump, and the description-processing progress is too easy to miss inline. Reserve a fixed stats region on the right so the Work items separator/list origin stays stable across selection changes, keep six detail-description lines, and present description processing as a centered live-progress dialog.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Stabilize the stats panel and center description progress"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2632,6 +3064,10 @@
       ],
       "dependencyEdges": [],
       "description": "Remove modal argument prompts for F7 Brainstorm, Plan, and Work small/medium/big. Selecting one must fully close the menu, prefill only  in Pi's normal editor, and register a session/cwd-scoped pending action that consumes the next matching interactive chat submission and routes its freeform body to the existing workflow procedure/skill code.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Route freeform workflow actions through the main editor"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2657,6 +3093,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "The real main-editor Brainstorm image smoke routes a pasted Pi clipboard image path as a repository brainstorm artifact and fails with . Diagnose and fix the parser/routing boundary so pasted image paths remain freeform prompt context while explicit artifact-link syntax still works.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Keep pasted images in freeform Brainstorm context"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2680,6 +3120,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Implement the pure, read-only live workspace projection in extensions/work-models.js around buildWorkRoadmapState, groupedRoadmapTasks, buildEpicChildState, epicArtifacts, reconcilePendingDirectRuns, activeWorkAgent, currentCommandWorkflow, and activeWorkGoalRunning. Produce hierarchy-first projected frames, stable row IDs/signatures, ordering, recursive progress, planning eligibility, and live/engaged/attention state. Scope production changes to work-models.js; add focused fixtures in scripts/test-work-roadmap.mjs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Project read-only workspace frames for all roadmaps"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2706,6 +3150,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Add one dumb specialized tree-workspace overlay in extensions/work-dialogs.js, reusing the shared overlay/native fallback contract. It receives projected frames, owns session-local expansion overrides and cursor rendering/key handling, and exposes close/back/done callbacks for timer cleanup. Add focused coverage in scripts/test-work-dialogs.mjs. Do not own extensions/work-models.js.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Render the stable-ID tree workspace dialog"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2735,6 +3183,10 @@
       ],
       "dependencyEdges": [],
       "description": "Integrate the projection and tree dialog in extensions/work-models.js by replacing chooseRoadmap/roadmapMenuItems/handleRoadmapTasksMenu nesting with the always-all workspace and one-shot context action popup. Own the 750ms refresh/signature loop and cleanup callbacks, stable-ID mutation revalidation, reports-return flow, and Add task composer/fallback around createWorkflowWorkItem without routing fallback through buildWorkAddState. Update scripts/test-work-roadmap.mjs and scripts/test-work-add.mjs; consume the dialog API without changing extensions/work-dialogs.js.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Wire workspace actions, refresh, and the rich task composer"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2774,6 +3226,10 @@
       ],
       "dependencyEdges": [],
       "description": "After the workspace/composer implementation passes automation, the project owner who requested work-3.1 must perform and approve the A7 real Pi TUI smoke. This is the durable manual evidence gate; it does not waive or replace automated composer/fallback coverage.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Approve the real Pi TUI multiline and image-paste flow"
+      },
       "evidence": [],
       "id": "work-3.5",
       "labels": [],
@@ -2798,6 +3254,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Repair the rejected work-3.5 smoke: make planningEligible the presentation/action gate (including canonical wo:misc) and make Brainstorm, Plan, Work small/medium/big, Resume, roadmap Plan/plan-next, and related TUI launches create one normal visible Pi user chat turn using existing handoff/skill instructions instead of direct subagent RPC. Preserve RPC direct execution, print/json behavior, and the rich Add-task composer.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Restore planning eligibility and normal TUI chat routing"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2826,6 +3286,10 @@
       ],
       "dependencyEdges": [],
       "description": "Repair the rejected work-3.5 roadmap screen. Extend the existing stable-ID projection and shared tree dialog only: container markers are [+]/[-]; rows render a theme-colored semantic status dot, hierarchy-specific completed/total progress, deterministic short display title, and indentation; the lower pane follows selection with the full stored description plus current model/session token stats. Keep Add-task composer and native fallback behavior.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Redesign roadmap tree rows and the detail pane"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2852,6 +3316,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "The work-3.7 final package gate fails at scripts/test-work-dirty-recovery.mjs:235 because the test still expects a work-worker subagent RPC launch after work-3.6 intentionally changed TUI workflow continuations to one normal visible Pi user chat turn. Diagnose whether this is stale test drift or a routing regression and apply the minimum fix.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Fix the stale dirty-recovery TUI routing expectation"
+      },
       "evidence": [],
       "id": "work-3.7.1",
       "labels": [],
@@ -2871,6 +3339,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Fix the second owner-smoke failures in the roadmap tree: duplicate stable IDs causing two selected rows/stuck navigation, slow per-row movement, misleading 0/0 initiative progress, contradictory closed parent/open descendant status, and fixed current-session details that do not follow the selected item.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Repair workspace navigation and truthful aggregates"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2900,6 +3372,10 @@
       ],
       "dependencyEdges": [],
       "description": "Replace truncated raw request/chat display text with real model-synthesized concise titles. On roadmap workspace entry, generate missing titles with an explicit Processing descriptions loader/progress experience and persist them per item. In the rich Add-task composer, materialize pasted image data to durable project files and pass/store only file references instead of base64/data URLs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Persist synthesized titles and file-backed task images"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -2927,7 +3403,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T01:37:10.522Z"
+    "updatedAt": "2026-07-26T05:37:25.646Z"
   },
   "schemaVersion": 1
 }
