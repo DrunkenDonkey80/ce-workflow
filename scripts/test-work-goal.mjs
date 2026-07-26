@@ -329,6 +329,7 @@ for (const action of [
 	"Initialize workspace",
 	"Blocker report",
 	"Ideas",
+	"Research",
 	"Brainstorm",
 	"Plan",
 	"Migrate work",
@@ -435,6 +436,7 @@ const editorCtx = (session, draft = "") => {
 };
 const routedEditorActions = [];
 for (const [selection, action] of [
+	["Research", "work-research"],
 	["Brainstorm", "work-brainstorm"],
 	["Plan", "work-plan"],
 	["Small task", "work-small"],
@@ -462,6 +464,7 @@ for (const [selection, action] of [
 assert.deepEqual(
 	routedEditorActions,
 	[
+		{ command: "work-research", args: "Build useful thing" },
 		{
 			command: "work-brainstorm",
 			args: "Build useful thing",
@@ -472,7 +475,7 @@ assert.deepEqual(
 		{ command: "work-med", args: "Build useful thing" },
 		{ command: "work-big", args: "Build useful thing" },
 	],
-	"all five main-editor actions route freeform input and only Brainstorm carries private freeform provenance",
+	"all six main-editor actions route freeform input and only Brainstorm carries private freeform provenance",
 );
 
 const clipboardPath =
@@ -781,7 +784,10 @@ assert.deepEqual(
 	tools.work_verifier_read.parameters.properties.startLine.type,
 	["integer", "null"],
 );
-assert.equal(tools.work_verifier_read.parameters.properties.path.type, "string");
+assert.equal(
+	tools.work_verifier_read.parameters.properties.path.type,
+	"string",
+);
 assert.ok(tools.work_goal_complete);
 assert.ok(tools.work_goal_human_decision);
 assert.deepEqual(tools.work_goal_complete.parameters.properties.question.type, [

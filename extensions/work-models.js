@@ -117,6 +117,7 @@ const RICH_TASK_PENDING_MAX_AGE_MS = 30 * 60 * 1000;
 const MAIN_EDITOR_ACTION_MARKER = "Idea or prompt:\n";
 const MAIN_EDITOR_ACTION_MAX_AGE_MS = 30 * 60 * 1000;
 const MAIN_EDITOR_ACTIONS = new Set([
+	"work-research",
 	"work-brainstorm",
 	"work-plan",
 	"work-small",
@@ -1807,7 +1808,9 @@ function subagentDetailsForTool(cwd, tool, cache) {
 	];
 	const artifacts = subagentArtifactDetails(cwd, tool.runId, cache);
 	if (!artifacts.length) return recorded;
-	const merged = new Map(artifacts.map((item) => [item.agent ?? item.model, item]));
+	const merged = new Map(
+		artifacts.map((item) => [item.agent ?? item.model, item]),
+	);
 	for (const item of recorded) {
 		const key = item.agent ?? item.model;
 		merged.set(key, { ...(merged.get(key) ?? {}), ...item });
@@ -1835,13 +1838,19 @@ function telemetryWaitTimes(event) {
 		wallMs,
 		(event.tools ?? [])
 			.filter((tool) => tool.name === "ask_user")
-			.reduce((sum, tool) => sum + Math.max(0, Number(tool.durationMs ?? 0)), 0),
+			.reduce(
+				(sum, tool) => sum + Math.max(0, Number(tool.durationMs ?? 0)),
+				0,
+			),
 	);
 	const delegatedWaitMs = Math.min(
 		Math.max(0, wallMs - humanWaitMs),
 		(event.tools ?? [])
 			.filter((tool) => tool.name === "subagent_wait")
-			.reduce((sum, tool) => sum + Math.max(0, Number(tool.durationMs ?? 0)), 0),
+			.reduce(
+				(sum, tool) => sum + Math.max(0, Number(tool.durationMs ?? 0)),
+				0,
+			),
 	);
 	return {
 		wallMs,
@@ -1897,6 +1906,7 @@ const ORCHESTRATOR_ACTION_LABELS = {
 	"work-auto": "Auto-route task",
 	"work-big": "Large task",
 	"work-brainstorm": "Brainstorm",
+	"work-research": "Research",
 	"work-catch-up": "Catch up project",
 	"work-context": "Context guard",
 	"work-debug": "Debug",
@@ -2664,7 +2674,10 @@ function renderWorkStats(stats) {
 		"",
 		...(stats.totals.parentWallDurationMs
 			? [
-					`Parent wall: ${formatDuration(stats.totals.parentWallDurationMs)} · active orchestration ${formatDuration(stats.totals.orchestrationActiveMs)} · user wait ${formatDuration(stats.totals.humanWaitMs)} · delegated wait ${formatDuration(stats.totals.delegatedWaitMs)}`,
+					`Parent wall: ${formatDuration(stats.totals.parentWallDurationMs)}`,
+					`Active orchestration: ${formatDuration(stats.totals.orchestrationActiveMs)}`,
+					`User wait: ${formatDuration(stats.totals.humanWaitMs)}`,
+					`Delegated wait: ${formatDuration(stats.totals.delegatedWaitMs)}`,
 				]
 			: []),
 		`Total: ${formatDuration(stats.totals.durationMs)}, ${formatTokenCount(stats.totals.tokens)} tokens`,
@@ -3272,9 +3285,8 @@ function buildWorkUsageState(cwd, args = "") {
 	let itemScope;
 	try {
 		if (
-			["roadmap", "epic", "workItem", "task"].includes(
-				scoped.filter.scope,
-			) || scoped.filter.scope?.includes("-")
+			["roadmap", "epic", "workItem", "task"].includes(scoped.filter.scope) ||
+			scoped.filter.scope?.includes("-")
 		)
 			itemScope = workStatsScope(
 				cwd,
@@ -3679,6 +3691,41 @@ function creativeSidecarStep(
 		`Creative sidecar gate for ${target}: finish required clarification and source reading first, then launch exactly one PARALLEL subagent call with async:true, context:fresh, concurrency:${tasks.length}, and these task templates: ${JSON.stringify(tasks)}. Prepend the same normalized problem and real constraints to every task; never include sibling output.`,
 		"While those branches run, form the normal baseline independently. Then call subagent_wait with all:true, cluster duplicates, reject constraint violations, and merge only useful non-obvious candidates into the artifact or planning note. Preserve provenance as a compact `wo:divergent-analysis` section naming each frame and model. A failed branch is recorded and not retried.",
 		"If an authoritative source already contains a current `wo:divergent-analysis` section for this problem, reuse it and skip generation. This is one bounded divergence pass: no branch deepening and no second generation round. Configured work-advisor critics challenge the merged artifact afterward.",
+	].join("\n");
+}
+
+function researchHandoffPrompt(cwd, question) {
+	const models = divergentTaskModels(cwd);
+	const branches = DIVERGENT_FRAMES.map((frame, index) => ({
+		agent: "work-divergent",
+		...(models[index] && models[index] !== INHERIT_MODEL
+			? { model: models[index] }
+			: {}),
+		task: [
+			`Research question:\n${question}`,
+			`FRAME — ${frame.label}: ${frame.prompt}`,
+			"Generate four non-obvious candidates as the agent contract requires. Do not use sibling output.",
+		].join("\n"),
+	}));
+	const advisors = configuredAdvisorSlots(
+		readEffectiveSettings(cwd),
+		"all",
+	).map((slot) => slot.agents[0]);
+	return [
+		"Use the work-orchestrator in mode: research. This is answer-only exploratory research, not brainstorm, planning, or implementation.",
+		...workflowPromptMetadata(),
+		"Action: run-research",
+		`Research question:\n${question}`,
+		"Ask at most one focused clarification only when different answers would materially change the investigation; otherwise state reasonable assumptions and proceed.",
+		`Call subagent with action:list once, then immediately launch exactly one PARALLEL tasks call with async:true, context:fresh, concurrency:${branches.length}, and these independent branches: ${JSON.stringify(branches)}. A failed branch is recorded and not retried.`,
+		"While those branches run, independently form the ordinary baseline. If current external facts could affect the answer, call web_search once with 2-4 varied queries; use source_check for load-bearing claims and prefer primary sources. Inspect local code only when the question needs project-specific implications.",
+		"Then call subagent_wait with all:true, cluster duplicate ideas, compare them with the evidence, and draft one coherent answer.",
+		advisors.length
+			? `Challenge that draft with one parallel fresh-context advisor pass using ${advisors.join(", ")}. Give every advisor the same draft, evidence, and source URLs; assign distinct charters in order: evidence/assumption auditor, feasibility/operator critic, adversarial simplifier. Advisors are read-only, must not launch subagents, and unavailable advisors are recorded without retry.`
+			: "No advisors are configured; perform one concise evidence, feasibility, and simplicity self-critique instead.",
+		"Return a concise but complete answer with: direct answer; evidence and citations; materially different options and trade-offs; advisor disagreements/challenges; confidence and unknowns; and one refined prompt suitable for F7 → Brainstorm or F7 → Large task.",
+		"Do not create project or research artifacts, work items, roadmaps, commits, or settings. Do not automatically start Brainstorm or Large task.",
+		ROLE_TIMEOUT_GUIDANCE,
 	].join("\n");
 }
 
@@ -13673,7 +13720,10 @@ function applyWorkGoalThinking(pi, goal, ctx) {
 }
 
 function restoreWorkGoalThinking(pi, goal) {
-	if (!goal?.previousThinkingLevel || typeof pi?.setThinkingLevel !== "function")
+	if (
+		!goal?.previousThinkingLevel ||
+		typeof pi?.setThinkingLevel !== "function"
+	)
 		return;
 	if (pi.getThinkingLevel?.() !== goal.previousThinkingLevel)
 		pi.setThinkingLevel(goal.previousThinkingLevel);
@@ -15553,6 +15603,14 @@ async function handleWorkMenuCommand(ctx, pi) {
 				"List, capture, inspect, accept, reject, discuss, or import ideas.\nBlank opens the current roadmap's idea dashboard.",
 			argumentTitle: "Idea topic or action",
 			placeholder: "Blank lists ideas; try <id> inspect or import <path>",
+		},
+		{
+			value: "work-research",
+			label: "🔬 Research",
+			description:
+				"Investigate a complex question with parallel models, web evidence, and adversarial critique.\nReturns an answer only; no work items or research artifacts are created.",
+			argumentTitle: "Research question",
+			placeholder: "Ask a complex question or explore an early idea",
 		},
 		{
 			value: "work-brainstorm",
@@ -18108,6 +18166,28 @@ async function executeOrchestratorAction(
 			if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
 			return stateTelemetry(state);
 		});
+	if (name === "work-research")
+		return withCommandTelemetry(name, text, ctx, async () => {
+			const question = text.trim();
+			if (!question) {
+				const state = {
+					ok: false,
+					action: "research-usage",
+					message: "Research needs a question.",
+				};
+				notify(ctx, state.message, "warning");
+				return state;
+			}
+			const state = {
+				ok: true,
+				action: "run-research",
+				message: "Research queued without creating work state or artifacts.",
+				handoffPrompt: researchHandoffPrompt(ctx.cwd, question),
+			};
+			notify(ctx, state.message, "info");
+			await sendFollowUp(ctx, state.handoffPrompt, pi);
+			return state;
+		});
 	if (name === "work-brainstorm")
 		return withCommandTelemetry(name, text, ctx, async () => {
 			cleanupBenignInstructionDirt(ctx.cwd);
@@ -18265,6 +18345,7 @@ export {
 	buildWorkCatchUpObjective,
 	captureIdeationIdeas,
 	brainstormHandoffPrompt,
+	researchHandoffPrompt,
 	linkBrainstormArtifactFromFinal,
 	menuBrainstormArgs,
 	buildWorkflowIntakeState,
@@ -19497,7 +19578,8 @@ async function workSettingsLoop(ctx) {
 				kind: "resumeThinking",
 				value: "goalThinkingLevel",
 				label: `autonomous-goal main effort: ${resume.goalThinkingLevel} ${SUBMENU_ARROW}`,
-				description: "Temporarily override this session while autonomous work runs",
+				description:
+					"Temporarily override this session while autonomous work runs",
 			},
 			{
 				kind: "reset",

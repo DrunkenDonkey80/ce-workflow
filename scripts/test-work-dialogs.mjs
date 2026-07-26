@@ -481,6 +481,8 @@ const treeFrames = [
 								id: "task-a-child",
 								title: "Task A child",
 								status: "open",
+								exactLive: true,
+								live: true,
 								children: [],
 							},
 						],
@@ -663,6 +665,11 @@ const treeRun = await driveTree(
 		assert(lines.some((line) => line.includes("[-] ● 0/2 Open roadmap")));
 		assert(lines.some((line) => line.includes("[+] ✓ 1/1 Closed roadmap")));
 		assert(lines.some((line) => /\s{2}\[-\] ● Task A/.test(line)));
+		assert(
+			lines.some((line) => line.includes("Task A child [running]")) &&
+				lines.some((line) => line.includes("Task B [active]")),
+			"live and durable active tasks show distinct status labels",
+		);
 		assert(
 			lines.some((line) =>
 				line.includes("complete selected roadmap description"),

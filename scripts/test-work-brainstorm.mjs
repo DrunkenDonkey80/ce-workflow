@@ -17,6 +17,7 @@ const { assert, installWorkflowFixture } = await import(
 );
 const {
 	brainstormHandoffPrompt,
+	researchHandoffPrompt,
 	linkBrainstormArtifactFromFinal,
 	menuBrainstormArgs,
 	parseWorkPromptMeta,
@@ -323,7 +324,9 @@ try {
 	);
 	const telemetryText = readdirSync(path.join(cwd, ".pi", "work-runs"))
 		.filter((file) => file.endsWith(".jsonl"))
-		.map((file) => readFileSync(path.join(cwd, ".pi", "work-runs", file), "utf8"))
+		.map((file) =>
+			readFileSync(path.join(cwd, ".pi", "work-runs", file), "utf8"),
+		)
 		.join("\n");
 	const telemetryEvents = telemetryText
 		.split(/\r?\n/)
@@ -428,6 +431,31 @@ try {
 		"Auto mode runs the wide sidecar in the control session before work-big planning",
 	);
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), "{}\n");
+
+	fixture.reset("ideas");
+	const researchItemsBefore = Object.keys(fixture.store().items);
+	const researchFollowUps = [];
+	const researchQuestion =
+		"Compare practical approaches to a fast, multi-model research workflow";
+	const researchState = await executeOrchestratorAction(
+		"work-research",
+		researchQuestion,
+		{ cwd, mode: "tui", ui: { notify() {} } },
+		{ sendUserMessage: async (message) => researchFollowUps.push(message) },
+	);
+	const researchPrompt = researchHandoffPrompt(cwd, researchQuestion);
+	assert(
+		researchState.ok &&
+			researchState.action === "run-research" &&
+			researchFollowUps.length === 1 &&
+			researchPrompt.includes("work-divergent") &&
+			researchPrompt.includes("web_search") &&
+			researchPrompt.includes("source_check") &&
+			researchPrompt.includes("answer-only") &&
+			Object.keys(fixture.store().items).join("\n") ===
+				researchItemsBefore.join("\n"),
+		"Research runs parallel evidence and critique without creating work state",
+	);
 
 	fixture.reset("ideas");
 	const clipboardBody = [

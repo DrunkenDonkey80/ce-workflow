@@ -568,6 +568,16 @@ function treeStatusColor(row) {
 	return "muted";
 }
 
+function treeActivityLabel(row) {
+	const status = treeVisualStatus(row);
+	if (row.attention) return "attention";
+	if (row.exactLive) return "running";
+	if (row.live) return "running child";
+	if (status === "in_progress") return "active";
+	if (row.engaged) return "active child";
+	return "";
+}
+
 export async function showTreeWorkspaceDialog(ctx, options) {
 	const {
 		title,
@@ -816,7 +826,8 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 										: "text",
 								`${progress}${row.shortTitle ?? row.title ?? row.label ?? row.id}`,
 							);
-							tree = `${prefix}${dot} ${title}`;
+							const activity = treeActivityLabel(row);
+							tree = `${prefix}${dot} ${title}${activity ? theme.fg("muted", ` [${activity}]`) : ""}`;
 						}
 						if (!statsWidth) add(tree);
 						else {

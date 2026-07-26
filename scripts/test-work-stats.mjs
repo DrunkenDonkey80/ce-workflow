@@ -340,7 +340,10 @@ try {
 	});
 	const artifactDir = path.join(cwd, ".pi-subagents", "artifacts");
 	mkdirSync(artifactDir, { recursive: true });
-	const transcriptPath = path.join(artifactDir, "artifact-run_work-worker.jsonl");
+	const transcriptPath = path.join(
+		artifactDir,
+		"artifact-run_work-worker.jsonl",
+	);
 	writeFileSync(
 		transcriptPath,
 		[
@@ -427,6 +430,16 @@ try {
 			artifactRoadmap.totals.humanWaitMs >= 20_000 &&
 			artifactRoadmap.totals.delegatedWaitMs >= 30_000,
 		"roadmap stats split parent wall time from user and delegated waits",
+	);
+	const timingLines = renderWorkStats(artifactRoadmap);
+	assert(
+		[
+			"Parent wall:",
+			"Active orchestration:",
+			"User wait:",
+			"Delegated wait:",
+		].every((label) => timingLines.some((line) => line.startsWith(label))),
+		"long wall-time stats render one metric per line",
 	);
 
 	const task = buildWorkStats(cwd, "TASK-1");
