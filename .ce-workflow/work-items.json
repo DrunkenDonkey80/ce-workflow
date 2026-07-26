@@ -3393,17 +3393,26 @@
         "schemaVersion": 1,
         "title": "Promote one-slot successor prefetch exactly once"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.18",
       "labels": [],
       "notes": [
-        "wo:execution-agent\nDesign/files: add the packaged work-prefetch role prompt in agents/work-prefetch.md; use the lane launcher/envelope in extensions/read-only-lanes.js; integrate candidate derivation around planResumeAction/buildWorkResumeState and the pendingSettledAgentEnd/agent_settled hook, exact coded promotion, status, and telemetry in extensions/work-models.js; document one-slot semantics and discard reasons in README.md; add scripts/test-work-prefetch.mjs and extend scripts/test-work-resume.mjs plus scripts/test-work-background-verifier-flow.mjs. Reuse recordPendingDirectRun/recordSpawnedDirectRun and advisorCriticStep prompt composition; do not add an advisor scheduler or cancellation RPC. Covered brief parts: one-slot prefetch, exact promotion/discard, immutable provenance, safe known-wait filling, and read-only context preparation. Branch: feat/workflow-parallelism."
+        "wo:execution-agent\nDesign/files: add the packaged work-prefetch role prompt in agents/work-prefetch.md; use the lane launcher/envelope in extensions/read-only-lanes.js; integrate candidate derivation around planResumeAction/buildWorkResumeState and the pendingSettledAgentEnd/agent_settled hook, exact coded promotion, status, and telemetry in extensions/work-models.js; document one-slot semantics and discard reasons in README.md; add scripts/test-work-prefetch.mjs and extend scripts/test-work-resume.mjs plus scripts/test-work-background-verifier-flow.mjs. Reuse recordPendingDirectRun/recordSpawnedDirectRun and advisorCriticStep prompt composition; do not add an advisor scheduler or cancellation RPC. Covered brief parts: one-slot prefetch, exact promotion/discard, immutable provenance, safe known-wait filling, and read-only context preparation. Branch: feat/workflow-parallelism.",
+        "Files changed: `agents/work-prefetch.md`, `extensions/read-only-lanes.js`, `extensions/work-models.js`, `README.md`, `scripts/test-work-prefetch.mjs`\nImplemented one-slot depth-one successor prefetch on the read-only lane substrate, immutable resume/provenance checkpointing, deferred exact promotion/discard, pending direct-run and agent-settle reconciliation, packaged non-orchestrating read-only role, status/telemetry, and documented serial semantics.\nVerification: `node scripts/test-work-prefetch.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-background-verifier-flow.mjs` — PASS (all three ok). Syntax: `node --check extensions/work-models.js && node --check extensions/read-only-lanes.js && node --check scripts/test-work-prefetch.mjs` — PASS. Diff: `git diff --check` — PASS (only Windows line-ending warnings). Focused prefetch test rerun after test-only telemetry/ambiguous-ack assertions — PASS.\nRemaining work: independent review and parent finalization/commit. No implementation blocker known.\n",
+        "Final verification update: ambiguous prefetch acknowledgement now remains running/slot-occupying and can recover a late valid deterministic output artifact; packaged runtime tool allowlist is read/grep/find/ls only. Re-ran `node scripts/test-work-prefetch.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-background-verifier-flow.mjs` — PASS. Re-ran syntax checks and `git diff --check` — PASS (line-ending warnings only).",
+        "wo:review-scope [\"README.md\",\"extensions/read-only-lanes.js\",\"extensions/work-models.js\",\"agents/work-prefetch.md\",\"scripts/test-work-prefetch.mjs\"]",
+        "wo:review PASS one-slot prefetch: derive/promote gates match acceptance (serial, slot-occupied, triage, unstable-selection; re-derived resume + HEAD/task/deps/epic-children/verifier/settings/path hashes; single wo:prefetch note, all 9 discard reasons tested byte-safe); reviewer re-ran test-work-prefetch.mjs, test-work-resume.mjs, test-work-background-verifier-flow.mjs - all ok; nothing staged",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-prefetch.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-background-verifier-flow.mjs\nOutput: ok - one-slot successor prefetch promotion and discard behavior\nok - coded work-resume behavior\nok - completed task commit fires a background verifier in a disposable repository"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Promote one-slot successor prefetch exactly once",
       "type": "task",
-      "updatedAt": "2026-07-26T14:18:11.838Z"
+      "updatedAt": "2026-07-26T15:35:01.935Z"
     },
     "work-3.19": {
       "acceptance": "Deterministic fake-runner tests prove bounded shard concurrency, colliding resource/output serialization, noncolliding overlap, fail-fast suppression of queued starts while running siblings settle, stable ordered evidence, and criticalPathMs equal to the longest declared dependency chain with sumShardMs greater than criticalPathMs without a wall-clock threshold. Every shard records command, exit status, bounded output hash/tail, virtual/real timing, resource keys, base HEAD, source fingerprint, and gate/schema version. A shard that changes source or WorkItem bytes fails admission and leaves commit/store unchanged. Forged, stale, late, wrong-schema, wrong-gate, wrong-HEAD, wrong-fingerprint, command-mismatched, missing, duplicate, and non-PASS manifests fail closed; exact fresh evidence produces one compact ordered wo:verify-check PASS note and finish commits/closes once. WORK_ORCH_SERIAL=1 and the F7 setting execute the identical required command/review set in order and yield the same gate decision and store outcome as parallel scheduling. Read-only lane completion never receives writer commit attribution or schedules a committed verifier batch; normal finish schedules exactly one batch for the real commit. Existing post-commit dedup, late-report recovery, all-findings resume triage, foreground review, dirty recovery, and finish rollback/commit/close remain passing. Verification: node scripts/test-work-verification-shards.mjs && node scripts/test-work-helper-contract.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-background-verifiers.mjs && node scripts/test-work-background-verifier-flow.mjs; final gate: npm run verify:quiet.",
@@ -3718,7 +3727,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T15:08:02.032Z"
+    "updatedAt": "2026-07-26T15:35:01.935Z"
   },
   "schemaVersion": 1
 }

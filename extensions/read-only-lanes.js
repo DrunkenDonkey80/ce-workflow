@@ -700,8 +700,9 @@ export async function runReadOnlyLaneBatch(
 							artifact,
 							metrics: { durationMs: durations[index] },
 						});
-						const settled =
-							output.promote === false
+						const settled = options.deferPromotion
+							? loadLaneStore(cwd).lanes[lane.id]
+							: output.promote === false
 								? transitionLane(cwd, lane.id, "discarded", {
 										reason: "producer-declined-promotion",
 									})

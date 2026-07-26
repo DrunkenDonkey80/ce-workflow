@@ -72,6 +72,7 @@ import {
 	laneTelemetryEvents,
 	loadLaneStore,
 	promoteLane,
+	queueLane,
 	reconcileReadOnlyLanes,
 	runReadOnlyLaneBatch,
 	transitionLane,
@@ -143,6 +144,10 @@ const MISC_ROADMAP_TITLE = "Misc";
 const MISC_ROADMAP_LABEL = "wo:misc";
 const MISC_ROADMAP_CHOICE = "__misc_roadmap__";
 const VERIFIER_RPC_TIMEOUT_MS = 30_000;
+const PREFETCH_RPC_TIMEOUT_MS = 2_000;
+const PREFETCH_ARTIFACT_MAX_BYTES = 128 * 1024;
+const PREFETCH_OUTPUT_VERSION = 1;
+const PREFETCH_TOOL_NAMES = ["read", "grep", "find", "ls"];
 const AGENT_HEALTH_TIMEOUT_MS = 30_000;
 const ACTIVE_SELF_IMPROVEMENT_STATUSES = new Set([
 	"open",
@@ -7163,7 +7168,7 @@ function resumeBlockers(childState) {
 		);
 }
 
-function planResumeAction(state, cwd) {
+function planResumeAction(state, cwd, options = {}) {
 	if (!state.ok) return state;
 	const activeImplementation = state.inProgressExecutable?.[0];
 	if (state.git && !state.git.safeForHandoff) {
@@ -7353,7 +7358,8 @@ function planResumeAction(state, cwd) {
 					},
 					cwd,
 				);
-			return applyInlineSlicePlan(cwd, state, implementation);
+			if (!options.readOnlyPlanning)
+				return applyInlineSlicePlan(cwd, state, implementation);
 		}
 		return withHandoffPrompt(
 			withImplementationPolicy(
@@ -8480,9 +8486,9 @@ function readOnlyLaneEnvelope(
 	request,
 	settings = readEffectiveSettings(cwd),
 ) {
-	if (!["discovery", "debug"].includes(request?.laneKind))
+	if (!["discovery", "debug", "prefetch"].includes(request?.laneKind))
 		throw new Error(
-			"Read-only lanes support only current-task discovery/debug",
+			"Read-only lanes support only current-task discovery/debug or successor prefetch",
 		);
 	const workItem = readWorkItem(cwd, request.workItemId);
 	if (!workItem) throw new Error(`No WorkItem found for ${request.workItemId}`);
@@ -8580,10 +8586,622 @@ async function launchCurrentTaskReadOnlyLanes(
 	return result;
 }
 
+function prefetchVerifierStatus(cwd) {
+	try {
+		return verifierStatus(loadVerifierStore(cwd));
+	} catch {
+		return "not-configured";
+	}
+}
+
+function prefetchRelevantPaths(candidate, supplied = []) {
+	return [...new Set([...(supplied ?? []), ...(candidate?.changedPaths ?? [])])]
+		.map(normalizedRepoPath)
+		.filter(
+			(file) =>
+				file &&
+				!isWorkStorePath(file) &&
+				!isPiRuntimeArtifact(file) &&
+				!isAbsolute(file) &&
+				!file.startsWith("../"),
+		)
+		.sort();
+}
+
+function prefetchPathHashes(cwd, paths) {
+	return Object.fromEntries(
+		paths.map((file) => {
+			const target = join(cwd, file);
+			try {
+				const info = lstatSync(target);
+				return [
+					file,
+					info.isFile() && !info.isSymbolicLink()
+						? laneDigest(readFileSync(target))
+						: "non-file",
+				];
+			} catch {
+				return [file, "missing"];
+			}
+		}),
+	);
+}
+
+function prefetchTaskRevision(issue) {
+	return laneDigest({
+		title: titleOf(issue),
+		type: typeOf(issue),
+		description: field(issue, "description"),
+		design: field(issue, "design", "documentLinks"),
+		notes: notesOf(issue),
+		labels: labelsOf(issue).sort(),
+	});
+}
+
+function prefetchEpicChildren(cwd, epicId) {
+	return laneDigest(
+		descendantsOf(cwd, epicId)
+			.map((issue) => ({
+				id: idOf(issue),
+				parentId: parentOf(issue),
+				status: statusOf(issue),
+				type: typeOf(issue),
+				dependencies: depsOf(issue).sort(),
+				updated: updatedAt(issue),
+			}))
+			.sort((left, right) => left.id.localeCompare(right.id)),
+	);
+}
+
+function prefetchCheckpoint(
+	cwd,
+	state,
+	current,
+	candidate,
+	relevantPaths,
+	advisorChallenge,
+) {
+	const issue = readWorkItem(cwd, candidate.id);
+	const settings = readEffectiveSettings(cwd);
+	const verifier = prefetchVerifierStatus(cwd);
+	const checkpoint = {
+		version: 1,
+		epicId: state.epic.id,
+		currentWorkItemId: idOf(current),
+		selectedWorkItemId: candidate.id,
+		action: state.action,
+		head: run(cwd, "git", ["rev-parse", "HEAD"]),
+		acceptanceHash: laneDigest(
+			field(issue, "acceptance", "acceptance_criteria", "acceptanceCriteria") ??
+				"",
+		),
+		taskRevisionHash: prefetchTaskRevision(issue),
+		dependenciesHash: laneDigest(depsOf(issue).sort()),
+		epicChildrenHash: prefetchEpicChildren(cwd, state.epic.id),
+		verifierStatus: verifier,
+		settingsHash: laneDigest(settings),
+		advisorChallengeHash: laneDigest(advisorChallenge),
+		relevantPathHashes: prefetchPathHashes(cwd, relevantPaths),
+		createdAt: new Date().toISOString(),
+	};
+	checkpoint.id = laneDigest({ ...checkpoint, createdAt: undefined });
+	return checkpoint;
+}
+
+function pendingPrefetchSlot(cwd) {
+	try {
+		return Object.values(loadLaneStore(cwd).lanes).find(
+			(lane) =>
+				lane.laneKind === "prefetch" &&
+				(["queued", "running", "completed"].includes(lane.state) ||
+					lane.launch?.acknowledgement === "ambiguous"),
+		);
+	} catch {
+		return undefined;
+	}
+}
+
+function nextPrefetchGeneration(cwd, workItemId) {
+	try {
+		return (
+			Math.max(
+				0,
+				...Object.values(loadLaneStore(cwd).lanes)
+					.filter(
+						(lane) =>
+							lane.laneKind === "prefetch" && lane.workItemId === workItemId,
+					)
+					.map((lane) => lane.generation),
+			) + 1
+		);
+	} catch {
+		return 1;
+	}
+}
+
+function configuredPrefetchAdvisorChallenge(cwd, candidate) {
+	const step = advisorCriticStep(
+		cwd,
+		`prefetched slice plan for WorkItem ${candidate.id}`,
+		workOrchSettings(cwd).advisorUsageForSlicePlans,
+	);
+	return step
+		? `Future orchestrator gate only; the prefetch role must not launch it:\n${step}`
+		: "No advisor challenge is configured for slice plans.";
+}
+
+function prefetchOutputPath(cwd, laneId) {
+	return join(
+		cwd,
+		".ce-workflow",
+		"work-runs",
+		"read-only-lanes",
+		"outputs",
+		`${laneId}.json`,
+	);
+}
+
+function prefetchRoleTask(candidate, checkpoint, advisorChallenge) {
+	return [
+		`Prepare only depth-one successor WorkItem ${candidate.id}; do not implement or mutate anything.`,
+		`Successor summary: ${JSON.stringify(candidate)}`,
+		`Immutable checkpoint: ${JSON.stringify(checkpoint)}`,
+		"Return exactly one JSON object with version:1, the exact workItemId and checkpoint id, provisionalContext and slicePlan strings, focusedVerification and unresolvedDecisions string arrays, the supplied advisorChallenge string, and preparationOnly:true.",
+		"Live/device/evidence-dependent work receives preparation only. Never infer foreground success. Do not write source, Git, WorkItems, or runtime state, and do not launch subagents.",
+		`Configured advisor challenge to preserve verbatim as advisorChallenge (do not execute it): ${advisorChallenge}`,
+	].join("\n");
+}
+
+function prefetchRequest(cwd, candidate, checkpoint, lane, advisorChallenge) {
+	const output = prefetchOutputPath(cwd, lane.id);
+	return {
+		version: 1,
+		agent: "work-prefetch",
+		workItemId: candidate.id,
+		checkpoint,
+		lane,
+		context: "fresh",
+		async: true,
+		cwd,
+		output,
+		outputMode: "file-only",
+		task: prefetchRoleTask(candidate, checkpoint, advisorChallenge),
+		boundary: {
+			readOnly: true,
+			depth: 1,
+			deny: ["write", "edit", "bash", "process", "network", "subagent"],
+		},
+	};
+}
+
+function deriveSuccessorPrefetch(cwd, input = {}) {
+	const settings = input.settings ?? readEffectiveSettings(cwd);
+	if (
+		process.env.WORK_ORCH_SERIAL === "1" ||
+		workOrchSettings(cwd, settings).serialReadOnlyLanes
+	)
+		return { eligible: false, reason: "serial-mode" };
+	const occupied = pendingPrefetchSlot(cwd);
+	if (occupied)
+		return { eligible: false, reason: "slot-occupied", laneId: occupied.id };
+	if (prefetchVerifierStatus(cwd) === "completed-awaiting-triage")
+		return { eligible: false, reason: "triage-required" };
+	const current = readWorkItem(cwd, input.currentWorkItemId);
+	if (!current) return { eligible: false, reason: "current-task-missing" };
+	const epicId = input.epicId ?? parentOf(current);
+	if (!epicId) return { eligible: false, reason: "unstable-selection" };
+	const state = buildWorkResumeState(cwd, epicId, {
+		readOnlyPlanning: true,
+	});
+	const candidate = state.selectedWorkItem;
+	if (
+		!state.ok ||
+		!["run-implementation", "run-debug", "run-planner"].includes(
+			state.action,
+		) ||
+		!candidate?.id ||
+		candidate.id === idOf(current)
+	)
+		return { eligible: false, reason: "unstable-selection", state };
+	const ready = (state.readyWork ?? []).filter((item) => {
+		const issue = readWorkItem(cwd, item.id);
+		if (!issue || item.id === idOf(current)) return false;
+		if (
+			parentOf(issue) === parentOf(current) &&
+			!depsOf(issue).includes(idOf(current))
+		)
+			return true;
+		if (!depsOf(issue).includes(idOf(current))) return false;
+		return depsOf(issue)
+			.filter((id) => id !== idOf(current))
+			.every((id) => statusOf(readWorkItem(cwd, id)) === "closed");
+	});
+	if (ready.length !== 1 || ready[0].id !== candidate.id)
+		return { eligible: false, reason: "unstable-selection", state };
+	const relevantPaths = prefetchRelevantPaths(candidate, input.relevantPaths);
+	const advisorChallenge = configuredPrefetchAdvisorChallenge(cwd, candidate);
+	const checkpoint = prefetchCheckpoint(
+		cwd,
+		state,
+		current,
+		candidate,
+		relevantPaths,
+		advisorChallenge,
+	);
+	const generation = nextPrefetchGeneration(cwd, candidate.id);
+	const lane = readOnlyLaneEnvelope(
+		cwd,
+		{
+			laneKind: "prefetch",
+			producer: "work-orchestrator",
+			workItemId: candidate.id,
+			generation,
+			checkpoint: JSON.stringify(checkpoint),
+			selection: {
+				action: state.action,
+				selectedWorkItemId: candidate.id,
+			},
+			relevantPaths,
+			resourceKeys: ["repo:read", "successor-prefetch"],
+			gateVersion: "successor-prefetch-v1",
+			promotionOwner: "work-orchestrator",
+		},
+		settings,
+	);
+	return {
+		eligible: true,
+		state,
+		candidate,
+		checkpoint,
+		advisorChallenge,
+		lane,
+		request: prefetchRequest(
+			cwd,
+			candidate,
+			checkpoint,
+			lane,
+			advisorChallenge,
+		),
+	};
+}
+
+function validPrefetchArtifact(artifact, lane, checkpoint) {
+	return (
+		artifact?.version === PREFETCH_OUTPUT_VERSION &&
+		artifact.workItemId === lane.workItemId &&
+		artifact.checkpoint === checkpoint.id &&
+		typeof artifact.provisionalContext === "string" &&
+		Boolean(artifact.provisionalContext.trim()) &&
+		typeof artifact.slicePlan === "string" &&
+		Boolean(artifact.slicePlan.trim()) &&
+		Array.isArray(artifact.focusedVerification) &&
+		artifact.focusedVerification.every((value) => typeof value === "string") &&
+		Array.isArray(artifact.unresolvedDecisions) &&
+		artifact.unresolvedDecisions.every((value) => typeof value === "string") &&
+		typeof artifact.advisorChallenge === "string" &&
+		laneDigest(artifact.advisorChallenge) === checkpoint.advisorChallengeHash &&
+		artifact.preparationOnly === true
+	);
+}
+
+function prefetchDurationMetrics(lane, discarded) {
+	const started = Date.parse(
+		lane.timestamps.runningAt ?? lane.timestamps.queuedAt,
+	);
+	const durationMs = Math.max(0, Date.now() - started);
+	return {
+		...(lane.metrics ?? {}),
+		durationMs,
+		wastedDurationMs: discarded ? durationMs : 0,
+	};
+}
+
+function discardSuccessorPrefetch(cwd, lane, reason) {
+	const discarded = transitionLane(cwd, lane.id, "discarded", {
+		reason,
+		metrics: prefetchDurationMetrics(lane, true),
+	});
+	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
+	return { state: "discarded", reason, lane: discarded };
+}
+
+function prefetchPromotionNote(lane, artifact) {
+	return [
+		`wo:prefetch ${lane.id}`,
+		"Preparation only; authoritative state was re-derived before promotion.",
+		`Provisional context: ${artifact.provisionalContext.trim()}`,
+		`Compact slice plan: ${artifact.slicePlan.trim()}`,
+		`Focused verification: ${artifact.focusedVerification.join("; ") || "none proposed"}`,
+		`Unresolved decisions: ${artifact.unresolvedDecisions.join("; ") || "none"}`,
+		`Configured advisor challenge: ${artifact.advisorChallenge.trim() || "none"}`,
+	].join("\n");
+}
+
+function promoteSuccessorPrefetch(cwd, laneId, options = {}) {
+	const lane = loadLaneStore(cwd).lanes[laneId];
+	if (!lane || lane.laneKind !== "prefetch")
+		return { state: "missing", reason: "invalid-output" };
+	if (["promoted", "discarded"].includes(lane.state))
+		return {
+			state: lane.state,
+			reason: lane.discardReason ?? lane.reason,
+			lane,
+		};
+	if (lane.state !== "completed")
+		return { state: lane.state, reason: "not-completed", lane };
+	let checkpoint;
+	try {
+		checkpoint = JSON.parse(lane.checkpoint);
+	} catch {
+		return discardSuccessorPrefetch(cwd, lane, "invalid-output");
+	}
+	const issue = readWorkItem(cwd, lane.workItemId);
+	const marker = `wo:prefetch ${lane.id}`;
+	if (issue && notesOf(issue).includes(marker)) {
+		const promoted = promoteLane(cwd, lane.id, lane.promotionOwner, {
+			metrics: prefetchDurationMetrics(lane, false),
+		});
+		return { state: promoted.state, lane: promoted, alreadyApplied: true };
+	}
+	const state = buildWorkResumeState(cwd, checkpoint.epicId, {
+		readOnlyPlanning: true,
+	});
+	if (
+		!state.ok ||
+		state.action !== checkpoint.action ||
+		state.selectedWorkItem?.id !== checkpoint.selectedWorkItemId
+	)
+		return discardSuccessorPrefetch(cwd, lane, "selection-changed");
+	if (run(cwd, "git", ["rev-parse", "HEAD"]) !== checkpoint.head)
+		return discardSuccessorPrefetch(cwd, lane, "head-changed");
+	if (
+		!issue ||
+		prefetchTaskRevision(issue) !== checkpoint.taskRevisionHash ||
+		laneDigest(
+			field(issue, "acceptance", "acceptance_criteria", "acceptanceCriteria") ??
+				"",
+		) !== checkpoint.acceptanceHash
+	)
+		return discardSuccessorPrefetch(cwd, lane, "task-revised");
+	if (laneDigest(depsOf(issue).sort()) !== checkpoint.dependenciesHash)
+		return discardSuccessorPrefetch(cwd, lane, "dependencies-changed");
+	const verifier = prefetchVerifierStatus(cwd);
+	if (verifier === "completed-awaiting-triage")
+		return discardSuccessorPrefetch(cwd, lane, "triage-required");
+	if (
+		laneDigest(prefetchPathHashes(cwd, lane.relevantPaths)) !==
+		laneDigest(checkpoint.relevantPathHashes)
+	)
+		return discardSuccessorPrefetch(cwd, lane, "paths-changed");
+	if (
+		verifier !== checkpoint.verifierStatus ||
+		prefetchEpicChildren(cwd, checkpoint.epicId) !==
+			checkpoint.epicChildrenHash ||
+		laneDigest(readEffectiveSettings(cwd)) !== checkpoint.settingsHash
+	)
+		return discardSuccessorPrefetch(cwd, lane, "selection-changed");
+	if (options.cancelled === true)
+		return discardSuccessorPrefetch(cwd, lane, "cancelled");
+	const newest = Math.max(
+		...Object.values(loadLaneStore(cwd).lanes)
+			.filter(
+				(other) =>
+					other.laneKind === "prefetch" && other.workItemId === lane.workItemId,
+			)
+			.map((other) => other.generation),
+	);
+	if (lane.generation !== newest)
+		return discardSuccessorPrefetch(cwd, lane, "late-generation");
+	if (!validPrefetchArtifact(lane.artifact, lane, checkpoint))
+		return discardSuccessorPrefetch(cwd, lane, "invalid-output");
+	appendWorkflowWorkItemNote(
+		cwd,
+		lane.workItemId,
+		prefetchPromotionNote(lane, lane.artifact),
+	);
+	const promoted = promoteLane(cwd, lane.id, lane.promotionOwner, {
+		metrics: prefetchDurationMetrics(lane, false),
+	});
+	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
+	return { state: promoted.state, lane: promoted };
+}
+
+async function launchSuccessorPrefetch(cwd, input, adapter, options = {}) {
+	const derived = input?.lane ? input : deriveSuccessorPrefetch(cwd, input);
+	if (!derived.eligible) return derived;
+	if (typeof adapter?.spawn !== "function")
+		return { eligible: false, reason: "adapter-unavailable" };
+	if (options.cancelled === true || options.signal?.aborted) {
+		queueLane(cwd, derived.lane);
+		return discardSuccessorPrefetch(cwd, derived.lane, "cancelled");
+	}
+	const result = await runReadOnlyLaneBatch(
+		cwd,
+		[derived.lane],
+		async (lane) => {
+			if (options.signal?.aborted)
+				return { status: "cancelled", promote: false };
+			const spawned = await adapter.spawn({ ...derived.request, lane });
+			const identity = directRunIdentity(derived.request, spawned);
+			acknowledgeLaneLaunch(cwd, lane.id, {
+				ambiguous: spawned?.ambiguous === true,
+				...identity,
+			});
+			if (!spawned?.ok && spawned?.ambiguous) return { status: "running" };
+			if (!spawned?.ok)
+				throw new Error(spawned?.message ?? "successor prefetch launch failed");
+			if (options.signal?.aborted)
+				return { status: "cancelled", promote: false };
+			const settled =
+				typeof adapter.wait === "function"
+					? await adapter.wait(identity, lane)
+					: spawned;
+			return {
+				artifact: settled.artifact,
+				durationMs: settled.durationMs,
+				status:
+					settled.completed === true
+						? "completed"
+						: (settled.status ?? "running"),
+			};
+		},
+		{
+			maxConcurrency: 1,
+			deferPromotion: true,
+			failFast: true,
+		},
+	);
+	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
+	const lane = loadLaneStore(cwd).lanes[derived.lane.id];
+	const promotion =
+		lane?.state === "completed"
+			? promoteSuccessorPrefetch(cwd, lane.id, options)
+			: undefined;
+	return { ...derived, result, promotion };
+}
+
+function createSuccessorPrefetchAdapter(pi) {
+	return {
+		async spawn(request) {
+			if (
+				request?.version !== 1 ||
+				request.agent !== "work-prefetch" ||
+				request.context !== "fresh" ||
+				request.async !== true ||
+				request.boundary?.readOnly !== true ||
+				request.boundary?.depth !== 1 ||
+				request.boundary.deny?.includes("subagent") !== true
+			)
+				return {
+					ok: false,
+					message: "Successor prefetch read-only boundary cannot be enforced",
+				};
+			mkdirSync(dirname(request.output), { recursive: true, mode: 0o700 });
+			return spawnSubagentRpc(
+				pi,
+				{
+					agent: request.agent,
+					task: request.task,
+					context: request.context,
+					cwd: request.cwd,
+					async: request.async,
+					clarify: false,
+					output: request.output,
+					outputMode: request.outputMode,
+					tools: PREFETCH_TOOL_NAMES,
+					boundary: request.boundary,
+					inheritProjectContext: true,
+					inheritSkills: false,
+				},
+				PREFETCH_RPC_TIMEOUT_MS,
+			);
+		},
+	};
+}
+
+async function maybeLaunchSuccessorPrefetch(
+	cwd,
+	currentWorkItemId,
+	epicId,
+	pi,
+) {
+	if (!currentWorkItemId || !pi)
+		return { eligible: false, reason: "no-current-task" };
+	try {
+		return await launchSuccessorPrefetch(
+			cwd,
+			{ currentWorkItemId, epicId },
+			createSuccessorPrefetchAdapter(pi),
+		);
+	} catch (error) {
+		return {
+			eligible: false,
+			reason: "launch-failed",
+			message: error instanceof Error ? error.message : String(error),
+		};
+	}
+}
+
+function readPrefetchArtifact(file) {
+	const info = lstatSync(file);
+	if (
+		!info.isFile() ||
+		info.isSymbolicLink() ||
+		info.size > PREFETCH_ARTIFACT_MAX_BYTES
+	)
+		throw new Error("invalid prefetch artifact");
+	return JSON.parse(readFileSync(file, "utf8"));
+}
+
+function reconcileSuccessorPrefetches(cwd, options = {}) {
+	const reconciled = [];
+	reconcileReadOnlyLanes(cwd);
+	for (const lane of Object.values(loadLaneStore(cwd).lanes)) {
+		if (lane.laneKind !== "prefetch") continue;
+		if (lane.state === "running") {
+			const output = prefetchOutputPath(cwd, lane.id);
+			let terminal = false;
+			let succeeded = false;
+			let statusState = "";
+			if (lane.launch?.asyncDir) {
+				const statusFile = join(lane.launch.asyncDir, "status.json");
+				if (existsSync(statusFile)) {
+					try {
+						const status = JSON.parse(readFileSync(statusFile, "utf8"));
+						terminal = directStatusComplete(status);
+						statusState = directStatusState(status);
+						succeeded = statusState
+							? DIRECT_SUCCESS_STATES.has(statusState)
+							: status.steps.every((step) =>
+									DIRECT_SUCCESS_STATES.has(
+										String(step?.status ?? "").toLowerCase(),
+									),
+								);
+					} catch {
+						continue;
+					}
+				}
+			}
+			if (terminal && !succeeded) {
+				transitionLane(cwd, lane.id, "failed", {
+					reason: statusState || "prefetch runner failed",
+				});
+				reconciled.push(lane.id);
+				continue;
+			}
+			if (!terminal && !existsSync(output)) continue;
+			let artifact;
+			try {
+				artifact = readPrefetchArtifact(output);
+			} catch {
+				if (!terminal) continue;
+				artifact = { invalid: true };
+			}
+			transitionLane(cwd, lane.id, "completed", {
+				artifact,
+				metrics: prefetchDurationMetrics(lane, false),
+			});
+			reconciled.push(lane.id);
+		}
+		const current = loadLaneStore(cwd).lanes[lane.id];
+		if (current?.state === "completed") {
+			promoteSuccessorPrefetch(cwd, lane.id, options);
+			reconciled.push(lane.id);
+		}
+	}
+	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
+	return { reconciled: [...new Set(reconciled)], lanes: laneStatus(cwd) };
+}
+
 function reconcileReadOnlyLaneRuns(cwd) {
 	const reconciled = reconcileReadOnlyLanes(cwd);
 	for (const lane of Object.values(loadLaneStore(cwd).lanes)) {
-		if (lane.state !== "running" || !lane.launch?.asyncDir) continue;
+		if (
+			lane.laneKind === "prefetch" ||
+			lane.state !== "running" ||
+			!lane.launch?.asyncDir
+		)
+			continue;
 		const statusFile = join(lane.launch.asyncDir, "status.json");
 		if (!existsSync(statusFile)) continue;
 		let status;
@@ -9078,7 +9696,7 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 			suggestedCommands: [`/work-resume ${childState.epicId}`],
 			warnings: git.warnings,
 		};
-		return planResumeAction(base, cwd);
+		return planResumeAction(base, cwd, options);
 	} catch (error) {
 		return errorState(error.reason ?? "work-store-error", error.message, {
 			action: "work-store-error",
@@ -18650,6 +19268,11 @@ export {
 	workOrchSettings,
 	backgroundVerifierProfiles,
 	launchCurrentTaskReadOnlyLanes,
+	deriveSuccessorPrefetch,
+	launchSuccessorPrefetch,
+	promoteSuccessorPrefetch,
+	reconcileSuccessorPrefetches,
+	createSuccessorPrefetchAdapter,
 	reconcileReadOnlyLaneRuns,
 	readOnlyLaneRuntimeStatus,
 	readOnlyLaneEnvelope,
@@ -18995,6 +19618,7 @@ export default function workModelsExtension(pi) {
 		if (ctx.mode !== "print") {
 			reconcilePendingDirectRuns(ctx.cwd, runtime);
 			try {
+				reconcileSuccessorPrefetches(ctx.cwd);
 				reconcileReadOnlyLaneRuns(ctx.cwd);
 			} catch {
 				// Lane state must not prevent the rest of session startup.
@@ -19073,11 +19697,29 @@ export default function workModelsExtension(pi) {
 		const sanitizedEvent = richTaskTransform
 			? { ...event, text: richTaskTransform.text, images: [] }
 			: event;
-		reconcilePendingDirectRuns(ctx.cwd, {
+		const pendingRuns = readPendingDirectEvents(ctx.cwd).filter(
+			(item) => item.type === "pending",
+		);
+		const reconciledRuns = reconcilePendingDirectRuns(ctx.cwd, {
 			pi,
 			mode: ctx.mode,
 			session: ctx.sessionManager?.getSessionId?.(),
 		});
+		try {
+			reconcileSuccessorPrefetches(ctx.cwd);
+			const settled = pendingRuns
+				.filter((item) => reconciledRuns.includes(item.workflowRunId))
+				.at(-1);
+			if (settled?.workItemId)
+				await maybeLaunchSuccessorPrefetch(
+					ctx.cwd,
+					settled.workItemId,
+					settled.epicId,
+					pi,
+				);
+		} catch {
+			// Prefetch is opportunistic and must not block normal input handling.
+		}
 		recordSelfImprovementHistory(ctx, "input", sanitizedEvent);
 		if (!extractWorkGoalContinuationMarker(sanitizedEvent.text))
 			clearWorkGoalRecovery();
@@ -19406,6 +20048,14 @@ export default function workModelsExtension(pi) {
 	pi.on("agent_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "agent_end", event);
 		pendingSettledAgentEnd = event;
+		const settling = activeWorkAgent?.meta;
+		if (settling?.workItemId)
+			await maybeLaunchSuccessorPrefetch(
+				ctx.cwd,
+				settling.workItemId,
+				settling.epicId,
+				pi,
+			);
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
@@ -19476,6 +20126,11 @@ export default function workModelsExtension(pi) {
 			const event = pendingSettledAgentEnd;
 			pendingSettledAgentEnd = null;
 			await finalizeSettledAgent(event, ctx);
+		}
+		try {
+			reconcileSuccessorPrefetches(ctx.cwd);
+		} catch {
+			// Prefetch settlement is recoverable on the next safe hook.
 		}
 		const manualMicrocompactStarted =
 			manualMicrocompactPending &&
