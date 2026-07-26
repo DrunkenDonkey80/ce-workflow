@@ -403,6 +403,214 @@ assert.deepEqual(
 	],
 	"F7 Orchestrator stays fixed while navigating and filtering",
 );
+
+const editorMarker = "Idea or prompt:\n";
+const editorNotices = [];
+const editorCtx = (session, draft = "") => {
+	let editorText = draft;
+	return {
+		cwd: process.cwd(),
+		mode: "tui",
+		sessionManager: { getSessionId: () => session },
+		ui: {
+			workDialogsNative: true,
+			select: async (_title, labels) =>
+				labels.find((label) => label.includes(editorCtx.selection)),
+			input: async () => {
+				throw new Error("main-editor actions must not open input");
+			},
+			editor: async () => {
+				throw new Error("main-editor actions must not open editor");
+			},
+			getEditorText: () => editorText,
+			setEditorText: (text) => {
+				editorText = text;
+			},
+			notify: (message, level) => editorNotices.push({ message, level }),
+		},
+		get editorText() {
+			return editorText;
+		},
+	};
+};
+const routedEditorActions = [];
+for (const [selection, action] of [
+	["Brainstorm", "work-brainstorm"],
+	["Plan", "work-plan"],
+	["Small task", "work-small"],
+	["Medium task", "work-med"],
+	["Large task", "work-big"],
+]) {
+	editorCtx.selection = selection;
+	const actionCtx = editorCtx(`editor-${action}`);
+	await shortcuts.f7.handler(actionCtx);
+	assert.equal(actionCtx.editorText, editorMarker, `${action} exact marker`);
+	const handled = await mod.consumePendingMainEditorAction(
+		{ source: "interactive", text: `${editorMarker}  Build useful thing  ` },
+		actionCtx,
+		{
+			execute: async (command, args) =>
+				routedEditorActions.push({ command, args }),
+		},
+	);
+	assert.equal(handled?.action, "handled", `${action} consumes once`);
+}
+assert.deepEqual(
+	routedEditorActions,
+	[
+		{ command: "work-brainstorm", args: "new Build useful thing" },
+		{ command: "work-plan", args: "Build useful thing" },
+		{ command: "work-small", args: "Build useful thing" },
+		{ command: "work-med", args: "Build useful thing" },
+		{ command: "work-big", args: "Build useful thing" },
+	],
+	"all five main-editor actions route freeform input and only Brainstorm applies menu semantics",
+);
+
+editorCtx.selection = "Plan";
+const blankCtx = editorCtx("editor-blank");
+await shortcuts.f7.handler(blankCtx);
+assert.equal(
+	(
+		await mod.consumePendingMainEditorAction(
+			{ source: "interactive", text: editorMarker },
+			blankCtx,
+			{ execute: async () => assert.fail("blank must not route") },
+		)
+	)?.action,
+	"handled",
+);
+assert.equal(blankCtx.editorText, editorMarker, "blank input restores marker");
+assert.match(editorNotices.at(-1).message, /Add an idea or prompt/);
+let blankRoutes = 0;
+await mod.consumePendingMainEditorAction(
+	{ source: "interactive", text: `${editorMarker}Now route` },
+	blankCtx,
+	{ execute: async () => blankRoutes++ },
+);
+assert.equal(blankRoutes, 1, "blank submission keeps pending action armed");
+
+const mismatchCtx = editorCtx("editor-mismatch");
+await shortcuts.f7.handler(mismatchCtx);
+assert.equal(
+	await mod.consumePendingMainEditorAction(
+		{ source: "interactive", text: "ordinary chat" },
+		mismatchCtx,
+		{ execute: async () => assert.fail("mismatch must not route") },
+	),
+	undefined,
+);
+assert.equal(
+	await mod.consumePendingMainEditorAction(
+		{ source: "interactive", text: `${editorMarker}late"` },
+		mismatchCtx,
+		{ execute: async () => assert.fail("mismatch must clear pending") },
+	),
+	undefined,
+);
+
+const staleCtx = editorCtx("editor-stale");
+await shortcuts.f7.handler(staleCtx);
+assert.equal(
+	await mod.consumePendingMainEditorAction(
+		{ source: "interactive", text: `${editorMarker}stale` },
+		staleCtx,
+		{
+			now: () => Date.now() + 31 * 60 * 1000,
+			execute: async () => assert.fail("stale must not route"),
+		},
+	),
+	undefined,
+);
+
+const sourceCtx = editorCtx("editor-sources");
+await shortcuts.f7.handler(sourceCtx);
+for (const source of ["rpc", "extension"])
+	assert.equal(
+		await mod.consumePendingMainEditorAction(
+			{ source, text: `${editorMarker}${source}` },
+			sourceCtx,
+			{ execute: async () => assert.fail(`${source} must not route`) },
+		),
+		undefined,
+	);
+let sourceRoutes = 0;
+await mod.consumePendingMainEditorAction(
+	{ source: "interactive", text: `${editorMarker}interactive` },
+	sourceCtx,
+	{ execute: async () => sourceRoutes++ },
+);
+assert.equal(sourceRoutes, 1, "RPC and extension inputs do not clear pending");
+
+const draftCtx = editorCtx("editor-draft", "unrelated draft");
+await shortcuts.f7.handler(draftCtx);
+assert.equal(draftCtx.editorText, "unrelated draft", "existing draft is preserved");
+assert.match(editorNotices.at(-1).message, /already has a draft/);
+assert.equal(
+	await mod.consumePendingMainEditorAction(
+		{ source: "interactive", text: `${editorMarker}must remain ordinary` },
+		draftCtx,
+		{ execute: async () => assert.fail("draft case must not arm") },
+	),
+	undefined,
+);
+
+const sessionCtx = editorCtx("editor-session-clear");
+await shortcuts.f7.handler(sessionCtx);
+hooks.session_start({}, {
+	...sessionCtx,
+	mode: "print",
+	sessionManager: {
+		getSessionId: () => "editor-session-clear",
+		getBranch: () => [],
+	},
+	ui: {
+		...sessionCtx.ui,
+		setStatus() {},
+		setWidget() {},
+	},
+});
+assert.equal(
+	await mod.consumePendingMainEditorAction(
+		{ source: "interactive", text: `${editorMarker}after start` },
+		sessionCtx,
+		{ execute: async () => assert.fail("session start must clear pending") },
+	),
+	undefined,
+);
+sessionCtx.ui.setEditorText("");
+await shortcuts.f7.handler(sessionCtx);
+await hooks.session_shutdown({}, {
+	...sessionCtx,
+	ui: { ...sessionCtx.ui, setStatus() {} },
+});
+assert.equal(
+	await mod.consumePendingMainEditorAction(
+		{ source: "interactive", text: `${editorMarker}after shutdown` },
+		sessionCtx,
+		{ execute: async () => assert.fail("session shutdown must clear pending") },
+	),
+	undefined,
+);
+
+let resumePrompted = 0;
+let resumeSelections = 0;
+await shortcuts.f7.handler({
+	cwd: process.cwd(),
+	mode: "tui",
+	ui: {
+		workDialogsNative: true,
+		select: async (_title, labels) =>
+			resumeSelections++ === 0
+				? labels.find((label) => label.includes("Resume work"))
+				: undefined,
+		input: async () => {
+			resumePrompted++;
+			return null;
+		},
+	},
+});
+assert.equal(resumePrompted, 1, "unrelated menu actions retain argument dialogs");
 assert.ok(tools.work_goal_complete);
 assert.ok(tools.work_goal_human_decision);
 assert.equal(tools.work_goal_human_decision.parameters.required[0], "question");

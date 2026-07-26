@@ -113,6 +113,15 @@ const TASK_IMAGE_MIME_EXTENSIONS = new Map([
 	["image/webp", ".webp"],
 ]);
 const RICH_TASK_PENDING_MAX_AGE_MS = 30 * 60 * 1000;
+const MAIN_EDITOR_ACTION_MARKER = "Idea or prompt:\n";
+const MAIN_EDITOR_ACTION_MAX_AGE_MS = 30 * 60 * 1000;
+const MAIN_EDITOR_ACTIONS = new Set([
+	"work-brainstorm",
+	"work-plan",
+	"work-small",
+	"work-med",
+	"work-big",
+]);
 const SELF_IMPROVEMENT_EPIC_TITLE = "Self-improving";
 const SELF_IMPROVEMENT_REPORT_LABEL = "self-improvement";
 const MISC_ROADMAP_TITLE = "Misc";
@@ -453,6 +462,7 @@ let pendingSettledAgentEnd = null;
 const pendingDirtyRecoveries = new Map();
 const pendingInitiativeConversions = new Map();
 const pendingRichTaskComposers = new Map();
+const pendingMainEditorActions = new Map();
 const commandWorkflowStorage = new AsyncLocalStorage();
 const activeRoadmapMenuSessions = new WeakMap();
 let activeHistoryTask = null;
@@ -14998,6 +15008,67 @@ async function handleCswapMenu(ctx, bin) {
 	}
 }
 
+function mainEditorActionKey(ctx) {
+	return `${resolve(ctx?.cwd ?? process.cwd())}\u0000${ctx?.sessionManager?.getSessionId?.() ?? `process-${process.pid}`}`;
+}
+
+function prepareMainEditorAction(command, ctx) {
+	if (
+		ctx.mode !== "tui" ||
+		typeof ctx.ui?.getEditorText !== "function" ||
+		typeof ctx.ui?.setEditorText !== "function"
+	)
+		return false;
+	if (ctx.ui.getEditorText()) {
+		pendingMainEditorActions.delete(mainEditorActionKey(ctx));
+		ctx.ui.notify?.(
+			"The editor already has a draft. Send or clear it before choosing this action.",
+			"warning",
+		);
+		return true;
+	}
+	ctx.ui.setEditorText(MAIN_EDITOR_ACTION_MARKER);
+	pendingMainEditorActions.set(mainEditorActionKey(ctx), {
+		action: command,
+		marker: MAIN_EDITOR_ACTION_MARKER,
+		createdAt: Date.now(),
+	});
+	return true;
+}
+
+export async function consumePendingMainEditorAction(
+	event,
+	ctx,
+	runtime = {},
+) {
+	const pending = pendingMainEditorActions.get(mainEditorActionKey(ctx));
+	if (!pending || event?.source !== "interactive") return;
+	const now = runtime.now?.() ?? Date.now();
+	if (now - pending.createdAt > MAIN_EDITOR_ACTION_MAX_AGE_MS) {
+		pendingMainEditorActions.delete(mainEditorActionKey(ctx));
+		return;
+	}
+	const text = String(event.text ?? "");
+	if (!text.startsWith(pending.marker)) {
+		pendingMainEditorActions.delete(mainEditorActionKey(ctx));
+		return;
+	}
+	const body = text.slice(pending.marker.length).trim();
+	if (!body) {
+		pending.createdAt = now;
+		ctx.ui?.setEditorText?.(pending.marker);
+		ctx.ui?.notify?.("Add an idea or prompt before sending.", "warning");
+		return { action: "handled" };
+	}
+	pendingMainEditorActions.delete(mainEditorActionKey(ctx));
+	await runtime.execute(
+		pending.action,
+		pending.action === "work-brainstorm" ? menuBrainstormArgs(body) : body,
+		ctx,
+	);
+	return { action: "handled" };
+}
+
 async function handleWorkMenuCommand(ctx, pi) {
 	const improvementCount = workImproveCount(ctx.cwd);
 	const cswapBin = resolveCswap();
@@ -15263,6 +15334,11 @@ async function handleWorkMenuCommand(ctx, pi) {
 			}
 		}
 		const item = selected.item;
+		if (
+			MAIN_EDITOR_ACTIONS.has(selected.value) &&
+			prepareMainEditorAction(selected.value, ctx)
+		)
+			return;
 		let args = "";
 		if (item.argumentTitle) {
 			args = await ctx.ui.input(item.argumentTitle, item.placeholder);
@@ -18101,6 +18177,7 @@ export default function workModelsExtension(pi) {
 		}
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
+		pendingMainEditorActions.clear();
 		activeWorkGoalRunning = false;
 		pendingWorkGoalTurn = false;
 		blockedWorkGoalTurn = false;
@@ -18126,6 +18203,7 @@ export default function workModelsExtension(pi) {
 		pendingDirtyRecoveries.clear();
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
+		pendingMainEditorActions.clear();
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
 		manualMicrocompactWorkflowRunId = null;
@@ -18139,6 +18217,11 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", async (event, ctx) => {
+		const mainEditorAction = await consumePendingMainEditorAction(event, ctx, {
+			execute: (command, args, actionCtx) =>
+				executeOrchestratorAction(command, args, actionCtx, pi),
+		});
+		if (mainEditorAction?.action === "handled") return mainEditorAction;
 		const richTaskTransform = transformPendingRichTaskInput(event, ctx);
 		if (richTaskTransform?.action === "handled") return richTaskTransform;
 		const sanitizedEvent = richTaskTransform

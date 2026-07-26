@@ -2244,6 +2244,45 @@
       "type": "task",
       "updatedAt": "2026-07-25T11:09:52.181Z"
     },
+    "work-2.34": {
+      "createdAt": "2026-07-26T01:02:44.236Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The coded finish-task gate requires a new durable wo:review PASS after an initial FAIL even when the only fixes are mechanical comment/documentation corrections and a work-fixer recorded wo:fix PASS. For work-7.3 the initial review requested only a dated source comment and two corresponding-source list entries; after those exact fixes, finish-task --reviewed would still reject because the gate accepts only a final review PASS (or a second FAIL plus structured residual disposition).\nExpected: The coded gate should honor the workflow review budget: skip targeted re-review for test-only, documentation, formatting, traceability, and other mechanical fixes when a concrete initial finding has a verified one-to-one fix disposition.\nImpact: The current gate forces redundant reviewer runs, adds latency/cost, and conflicts with the documented one-review-cycle policy even though production behavior did not change.\nSuggested improvement: Allow a structured finding-to-fix wo:fix PASS after one FAIL to satisfy finish-task for mechanical-only changes; retain targeted re-review for production behavior changes.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/d8b7242d-c0e1-48ae-9dea-9a8046b1aff9",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2550,
+              "file": "01-work-7.3-review-output.md",
+              "sha256": "6056ea1fc839da3497363ccc9fb57432d01e27483de1df0a723a0014bb04adc4"
+            },
+            {
+              "bytes": 2470,
+              "file": "02-work-7.3-fixer-output.md",
+              "sha256": "9df88e50df9ed70b6bf20ab86722f09b250ea55728ae5de42bdd67067e804767"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-26T01:02:44.227Z",
+          "workflowId": "019f9b96-d415-731a-be53-c0bda95ed40e"
+        }
+      ],
+      "id": "work-2.34",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The coded finish-task gate requires a new durable wo:review PASS after an initial FAIL even when the only fixes are mechanical com",
+      "type": "task",
+      "updatedAt": "2026-07-26T01:02:44.236Z"
+    },
     "work-2.4": {
       "createdAt": "2026-07-20T02:33:35.267Z",
       "dependencies": [
@@ -2593,18 +2632,24 @@
       ],
       "dependencyEdges": [],
       "description": "Remove modal argument prompts for F7 Brainstorm, Plan, and Work small/medium/big. Selecting one must fully close the menu, prefill only  in Pi's normal editor, and register a session/cwd-scoped pending action that consumes the next matching interactive chat submission and routes its freeform body to the existing workflow procedure/skill code.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.14",
       "labels": [],
       "notes": [
         "wo:execution-agent. Restore the pre-goal normal-editor pending-action UX requested repeatedly by the project owner; no prompt files or new dispatcher.",
-        "wo:contract-correction — shell quoting removed the literal marker from create output. The exact required main-editor prefill is:\nIdea or prompt:\nfollowed by one newline. The modal prompts must not be invoked for the five scoped actions.\n"
+        "wo:contract-correction — shell quoting removed the literal marker from create output. The exact required main-editor prefill is:\nIdea or prompt:\nfollowed by one newline. The modal prompts must not be invoked for the five scoped actions.\n",
+        "Implemented modal-free main-editor routing for F7 Brainstorm, Plan, Small, Medium, and Large actions.\nFiles changed: extensions/work-models.js; scripts/test-work-goal.mjs.\nVerification passed: node scripts/test-work-goal.mjs; node scripts/test-work-brainstorm.mjs; node scripts/test-work-start-finish.mjs; node scripts/test-work-resume.mjs; node scripts/test-work-add.mjs.\nCoverage: exact marker/menu return/no modal for all five; one-shot routing and Brainstorm new-topic semantics; blank re-arm; mismatch/stale/RPC/extension/existing-draft/session lifecycle; unrelated menu argument prompt. Existing handler tests retain single visible Pi turn/no RPC evidence for Brainstorm and Work, with Plan routing covered by existing owning integration.\nRemaining work: reviewer gate and parent package verification. Work item remains in progress.\n",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Route freeform workflow actions through the main editor",
       "type": "task",
-      "updatedAt": "2026-07-26T00:42:36.486Z"
+      "updatedAt": "2026-07-26T01:04:04.439Z"
     },
     "work-3.2": {
       "acceptance": "A1: projection always includes all roadmaps with no Tab mode or visible Open/Closed words; initiative children stay grouped and only sort among siblings by live startedAt desc, remembered current, open activityAt desc, closed activityAt desc, then stable ID. activityAt is max of roadmap/descendant updatedAt and latest non-live workflow timestamp. A3: recursive tasks order non-closed before closed; open containers show progress bars and executable-descendant completed/total, open leaves are 0/1; live is distinct from durable in_progress engaged state; exact live item is strongest and ancestors propagate. A4: reducer implements activeWorkAgent same-cwd/meta.workItemId truth; direct status must exist, parse, be running/active and nonterminal; deadline uses 30s grace; no-deadline requires positive live pid via process.kill(pid,0); absent/dead pid, missing/malformed/terminal/expired are stale; paused/needs_attention is attention/recent activity not live; activeWorkGoalRunning alone is never targeted; newest startedAt wins exact emphasis while valid ancestors stay marked. Projection and two refresh reads leave .ce-workflow/work-items.json byte-identical; failure retains a usable cached frame contract. A5: Needs plan and Plan/strengthen eligibility is only open, non-Misc, needs_plan/stale roadmaps with an existing path in that roadmap's own epicArtifacts(...).brainstorms; missing, initiative-inherited, and child-only brainstorms are false; planned/ready and closed are false. Include the ponytail note limiting full projection to small/medium stores. Focused verification: node scripts/test-work-roadmap.mjs",
@@ -2857,7 +2902,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T00:53:59.642Z"
+    "updatedAt": "2026-07-26T01:04:04.439Z"
   },
   "schemaVersion": 1
 }
