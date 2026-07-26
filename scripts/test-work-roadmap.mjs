@@ -43,6 +43,7 @@ const initiativeRoot = mkdtempSync(
 const projectionRoot = mkdtempSync(
 	path.join(tmpdir(), "work-roadmap-projection-"),
 );
+const deletionRoot = mkdtempSync(path.join(tmpdir(), "work-roadmap-deletion-"));
 execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
 mkdirSync(path.join(root, ".pi"));
 mkdirSync(path.join(root, "docs", "plans"), { recursive: true });
@@ -341,6 +342,11 @@ try {
 		roadmapMenus[1].title,
 		"Roadmap operations",
 		"roadmap action popup uses a single-line title",
+	);
+	assert.match(
+		roadmapMenus[1].labels.join("\n"),
+		/Delete permanently/,
+		"roadmap operations expose destructive deletion",
 	);
 	assert(
 		roadmapMenus[1].labels.every((label) => !/list tasks/.test(label)) &&
@@ -853,6 +859,11 @@ try {
 		opLabels.some((label) => /debug \/ full info/i.test(label)),
 		`blocker task offers debug for full info: ${JSON.stringify(menuTrace)}`,
 	);
+	assert.match(
+		opLabels.join("\n"),
+		/Delete permanently/,
+		"task operations expose destructive deletion",
+	);
 
 	const escapeTitles = [];
 	const escapePicks = [
@@ -1164,6 +1175,7 @@ try {
 	);
 	assert(!initiativeOps.some((label) => /resume work/i.test(label)));
 	assert(initiativeOps.some((label) => /preview|reconcile/i.test(label)));
+	assert(initiativeOps.some((label) => /Delete permanently/i.test(label)));
 	assert(initiativeOps.some((label) => /plan.*next child/i.test(label)));
 	assert(initiativeOps.some((label) => /stop/i.test(label)));
 	assert(!initiativeOps.some((label) => /finish/i.test(label)));
@@ -2017,6 +2029,165 @@ try {
 		/plan|brainstorm/i,
 		"canonical wo:misc offers no planning action",
 	);
+	assert.doesNotMatch(
+		miscOps.join("\n"),
+		/Delete/i,
+		"canonical wo:misc cannot be deleted",
+	);
+
+	// Destructive deletion requires exact confirmation and revalidates atomically.
+	execFileSync("git", ["init"], { cwd: deletionRoot, stdio: "ignore" });
+	mkdirSync(path.join(deletionRoot, ".pi"), { recursive: true });
+	const deletionStore = initStore(deletionRoot, { now: timestamp });
+	deletionStore.items = {
+		"R-delete": item("R-delete", "Delete roadmap"),
+		"T-delete": item("T-delete", "Child task", {
+			type: "task",
+			parentId: "R-delete",
+		}),
+		"T-deep": item("T-deep", "Deep task", {
+			type: "task",
+			parentId: "T-delete",
+			dependencies: ["T-delete"],
+		}),
+		"R-outside": item("R-outside", "Outside"),
+		"R-legacy-misc": item("R-legacy-misc", "Misc"),
+	};
+	const resetDeletionStore = () => saveStore(deletionRoot, structuredClone(deletionStore));
+	resetDeletionStore();
+	const legacyMiscOps = [];
+	await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: deletionRoot,
+			mode: "tui",
+			ui: {
+				select: async (title, labels) => {
+					if (title.includes("operation")) legacyMiscOps.push(...labels);
+					return undefined;
+				},
+				notify: () => {},
+			},
+		},
+		{},
+		"R-legacy-misc",
+	);
+	assert.doesNotMatch(legacyMiscOps.join("\n"), /Delete/i);
+	const runDeletion = async (confirmation, onInput) => {
+		const notices = [];
+		const state = await handleWorkRoadmapCommand(
+			"",
+			{
+				cwd: deletionRoot,
+				mode: "tui",
+				ui: {
+					select: async (_title, labels) =>
+						labels.find((label) => /Delete permanently/.test(label)),
+					input: async () => {
+						onInput?.();
+						return confirmation;
+					},
+					notify: (message) => notices.push(message),
+				},
+			},
+			{ sendUserMessage: async () => {} },
+			"R-delete",
+		);
+		return { notices, state };
+	};
+	for (const confirmation of [undefined, "delete", " DELETE", "DELETE "]) {
+		resetDeletionStore();
+		const before = readFileSync(
+			path.join(deletionRoot, ".ce-workflow", "work-items.json"),
+			"utf8",
+		);
+		await runDeletion(confirmation);
+		assert.equal(
+			readFileSync(
+				path.join(deletionRoot, ".ce-workflow", "work-items.json"),
+				"utf8",
+			),
+			before,
+			"cancel and non-exact confirmation leave the store byte-identical",
+		);
+	}
+	resetDeletionStore();
+	const warned = await runDeletion("delete");
+	assert.match(warned.notices.join("\n"), /DESTRUCTIVE DELETE/);
+	assert.match(warned.notices.join("\n"), /Delete roadmap \(R-delete\)/);
+	assert.match(warned.notices.join("\n"), /2 descendants \(3 total items\)/);
+
+	resetDeletionStore();
+	const staleCount = await runDeletion("DELETE", () => {
+		const store = loadStore(deletionRoot);
+		store.items["T-new"] = item("T-new", "New child", {
+			type: "task",
+			parentId: "R-delete",
+		});
+		saveStore(deletionRoot, store);
+	});
+	assert(loadStore(deletionRoot).items["R-delete"]);
+	assert.match(staleCount.notices.join("\n"), /changed from 3 to 4/);
+
+	resetDeletionStore();
+	const staleProtection = await runDeletion("DELETE", () => {
+		const store = loadStore(deletionRoot);
+		store.items["R-delete"].labels.push("wo:protected-root");
+		saveStore(deletionRoot, store);
+	});
+	assert(loadStore(deletionRoot).items["R-delete"]);
+	assert.match(staleProtection.notices.join("\n"), /protected/);
+
+	resetDeletionStore();
+	const dependencyRefusal = await runDeletion("DELETE", () => {
+		const store = loadStore(deletionRoot);
+		store.items["R-outside"].dependencies = ["T-deep"];
+		saveStore(deletionRoot, store);
+	});
+	assert(loadStore(deletionRoot).items["R-delete"]);
+	assert.match(dependencyRefusal.notices.join("\n"), /depends on it/);
+
+	resetDeletionStore();
+	const successfulDelete = await runDeletion("DELETE");
+	assert.equal(successfulDelete.state.action, "roadmap-workspace-return");
+	assert.deepEqual(Object.keys(loadStore(deletionRoot).items), [
+		"R-legacy-misc",
+		"R-outside",
+	]);
+	assert.match(successfulDelete.notices.join("\n"), /Deleted 3 work items/);
+
+	// Deletion drops the pre-delete frame before workspace fallback can reuse it.
+	const deletionStorePath = path.join(
+		deletionRoot,
+		".ce-workflow",
+		"work-items.json",
+	);
+	const deletionRecoveryPath = path.join(
+		deletionRoot,
+		".pi",
+		"work-store",
+		"work-items.recovery.json",
+	);
+	const deletedStoreBytes = readFileSync(deletionStorePath, "utf8");
+	writeFileSync(deletionStorePath, "{broken", "utf8");
+	writeFileSync(deletionRecoveryPath, "{broken", "utf8");
+	const noStaleFallback = buildWorkRoadmapState(deletionRoot, "list");
+	assert.equal(
+		noStaleFallback.ok,
+		false,
+		"invalidated cache cannot serve the previously selected/deleted roadmap",
+	);
+	writeFileSync(deletionStorePath, deletedStoreBytes, "utf8");
+	const freshAfterDelete = buildWorkRoadmapState(deletionRoot, "list");
+	assert.equal(freshAfterDelete.ok, true);
+	assert(!freshAfterDelete.roadmaps.some((roadmap) => roadmap.id === "R-delete"));
+	writeFileSync(deletionStorePath, "{broken", "utf8");
+	const freshFallback = buildWorkRoadmapState(deletionRoot, "list");
+	assert.equal(freshFallback.cached, true);
+	assert.equal(freshFallback.signature, freshAfterDelete.signature);
+	assert(!freshFallback.roadmaps.some((roadmap) => roadmap.id === "R-delete"));
+	writeFileSync(deletionStorePath, deletedStoreBytes, "utf8");
+
 	const titleChangedStore = loadStore(projectionRoot);
 	titleChangedStore.items["R-plan"].title = "Plan me renamed";
 	saveStore(projectionRoot, titleChangedStore);
@@ -2073,6 +2244,6 @@ try {
 	assert.equal(cached.signature, taskChanged.signature);
 	writeFileSync(storePath, storeBytes);
 } finally {
-	for (const target of [root, initiativeRoot, projectionRoot])
+	for (const target of [root, initiativeRoot, projectionRoot, deletionRoot])
 		rmSync(target, { recursive: true, force: true });
 }

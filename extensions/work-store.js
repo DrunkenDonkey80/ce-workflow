@@ -706,6 +706,50 @@ export function deleteWorkItem(store, id) {
 	return store;
 }
 
+export function deleteWorkItemSubtree(store, id) {
+	validateStore(store);
+	const selected = store.items[id];
+	if (!selected) throw error("missing", `Work item is missing: ${id}`);
+	const labels = selected.labels ?? [];
+	if (
+		selected.protected === true ||
+		labels.includes("wo:protected") ||
+		labels.includes("wo:protected-root") ||
+		labels.includes("wo:misc") ||
+		(selected.type === "epic" && selected.title === "Misc")
+	)
+		throw error(
+			"conflict",
+			`Work item ${id} is a protected root and cannot be deleted`,
+		);
+	const deletedIds = new Set([id]);
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const item of Object.values(store.items))
+			if (!deletedIds.has(item.id) && deletedIds.has(item.parentId)) {
+				deletedIds.add(item.id);
+				changed = true;
+			}
+	}
+	const external = Object.values(store.items).find(
+		(item) =>
+			!deletedIds.has(item.id) &&
+			item.dependencies?.some((dependency) => deletedIds.has(dependency)),
+	);
+	if (external)
+		throw error(
+			"corrupt",
+			`Cannot delete work subtree ${id}: surviving work item ${external.id} depends on it`,
+		);
+	const items = Object.fromEntries(
+		Object.entries(store.items).filter(([itemId]) => !deletedIds.has(itemId)),
+	);
+	validateStore({ ...store, items });
+	store.items = items;
+	return [...deletedIds];
+}
+
 export function getWorkItem(store, id) {
 	validateStore(store);
 	return store.items[id];

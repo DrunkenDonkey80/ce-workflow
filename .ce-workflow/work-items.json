@@ -2541,17 +2541,25 @@
       ],
       "dependencyEdges": [],
       "description": "Add a Delete action for mistaken roadmap/task/initiative items that permanently removes the selected item and all descendants. Before deletion, show a prominent destructive warning with selected title/ID and descendant count, then require typing the exact word DELETE; the owner explicitly chose DELETE without the hard-to-type ID.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.12",
       "labels": [],
       "notes": [
-        "wo:execution-agent. Irreversible UX decision approved by Flex: require typing DELETE, but not the item ID; use a huge warning."
+        "wo:execution-agent. Irreversible UX decision approved by Flex: require typing DELETE, but not the item ID; use a huge warning.",
+        "wo:review-scope [\"extensions/work-models.js\",\"extensions/work-store.js\",\"scripts/test-work-roadmap.mjs\",\"scripts/test-work-store.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-store.js:709 - deleteWorkItemSubtree does not reject a selected Misc/protected root; enforce the protection rule inside the native mutation and add direct store tests proving refusal is non-mutating.\",\"extensions/work-models.js:15897 - successful deletion leaves workRoadmapFrameCache holding the pre-delete projection; invalidate the cwd cache after the atomic mutation and add a regression proving stale fallback cannot surface deleted IDs.\"]}",
+        "wo:review PASS protected-root refusal and cache invalidation are implemented with direct regressions; focused tests and npm run verify:quiet pass.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Add guarded recursive subtree deletion",
       "type": "task",
-      "updatedAt": "2026-07-25T23:45:28.797Z"
+      "updatedAt": "2026-07-26T00:28:12.701Z"
     },
     "work-3.2": {
       "acceptance": "A1: projection always includes all roadmaps with no Tab mode or visible Open/Closed words; initiative children stay grouped and only sort among siblings by live startedAt desc, remembered current, open activityAt desc, closed activityAt desc, then stable ID. activityAt is max of roadmap/descendant updatedAt and latest non-live workflow timestamp. A3: recursive tasks order non-closed before closed; open containers show progress bars and executable-descendant completed/total, open leaves are 0/1; live is distinct from durable in_progress engaged state; exact live item is strongest and ancestors propagate. A4: reducer implements activeWorkAgent same-cwd/meta.workItemId truth; direct status must exist, parse, be running/active and nonterminal; deadline uses 30s grace; no-deadline requires positive live pid via process.kill(pid,0); absent/dead pid, missing/malformed/terminal/expired are stale; paused/needs_attention is attention/recent activity not live; activeWorkGoalRunning alone is never targeted; newest startedAt wins exact emphasis while valid ancestors stay marked. Projection and two refresh reads leave .ce-workflow/work-items.json byte-identical; failure retains a usable cached frame contract. A5: Needs plan and Plan/strengthen eligibility is only open, non-Misc, needs_plan/stale roadmaps with an existing path in that roadmap's own epicArtifacts(...).brainstorms; missing, initiative-inherited, and child-only brainstorms are false; planned/ready and closed are false. Include the ponytail note limiting full projection to small/medium stores. Focused verification: node scripts/test-work-roadmap.mjs",
@@ -2801,7 +2809,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-25T23:58:18.801Z"
+    "updatedAt": "2026-07-26T00:28:12.701Z"
   },
   "schemaVersion": 1
 }

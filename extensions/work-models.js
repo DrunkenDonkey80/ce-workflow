@@ -67,6 +67,7 @@ import {
 	acquireLock,
 	appendWorkNote,
 	createWorkItem,
+	deleteWorkItemSubtree,
 	initStore,
 	loadStore,
 	mutateStore,
@@ -15829,6 +15830,85 @@ function roadmapTaskItems(tasks = {}) {
 	);
 }
 
+function deletionProtected(item) {
+	const labels = item?.labels ?? [];
+	return (
+		!item ||
+		item.protected === true ||
+		labels.includes("wo:protected") ||
+		labels.includes("wo:protected-root") ||
+		labels.includes(MISC_ROADMAP_LABEL) ||
+		(item.type === "epic" && item.title === MISC_ROADMAP_TITLE)
+	);
+}
+
+function subtreeIds(store, id) {
+	const ids = new Set([id]);
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const item of Object.values(store.items))
+			if (!ids.has(item.id) && ids.has(item.parentId)) {
+				ids.add(item.id);
+				changed = true;
+			}
+	}
+	return ids;
+}
+
+async function confirmSubtreeDeletion(ctx, selectedItem) {
+	if (deletionProtected(selectedItem)) return false;
+	const snapshot = loadStore(ctx.cwd);
+	const current = snapshot.items[selectedItem.id];
+	if (deletionProtected(current)) {
+		notify(ctx, `Work item ${selectedItem.id} is protected and cannot be deleted.`, "warning");
+		return false;
+	}
+	const expectedCount = subtreeIds(snapshot, current.id).size;
+	const descendants = expectedCount - 1;
+	notify(
+		ctx,
+		`⚠️ DESTRUCTIVE DELETE ⚠️\n${current.title} (${current.id})\nThis permanently deletes ${descendants} descendant${descendants === 1 ? "" : "s"} (${expectedCount} total items). This cannot be undone.`,
+		"warning",
+	);
+	const confirmation = await ctx.ui.input(
+		`Type DELETE to permanently delete ${current.id}`,
+		"DELETE",
+	);
+	if (confirmation !== "DELETE") {
+		if (confirmation != null)
+			notify(ctx, "Deletion cancelled: confirmation must be exactly DELETE.", "warning");
+		return false;
+	}
+	try {
+		const deletedIds = mutateStore(ctx.cwd, (store) => {
+			const fresh = store.items[current.id];
+			if (deletionProtected(fresh))
+				throw new WorkStoreError(
+					"conflict",
+					`Work item ${current.id} is now protected or missing; deletion cancelled.`,
+				);
+			const freshCount = subtreeIds(store, fresh.id).size;
+			if (freshCount !== expectedCount)
+				throw new WorkStoreError(
+					"conflict",
+					`Work subtree ${fresh.id} changed from ${expectedCount} to ${freshCount} items; deletion cancelled. Select it again to retry.`,
+				);
+			return deleteWorkItemSubtree(store, fresh.id);
+		});
+		workRoadmapFrameCache.delete(resolve(ctx.cwd));
+		notify(ctx, `Deleted ${deletedIds.length} work item${deletedIds.length === 1 ? "" : "s"}.`, "info");
+		return true;
+	} catch (error) {
+		notify(
+			ctx,
+			`Deletion cancelled: ${error.message} Select the item again to retry.`,
+			"warning",
+		);
+		return false;
+	}
+}
+
 async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 	const state = buildWorkRoadmapState(ctx.cwd, `tasks ${epicId}`);
 	if (!state.ok) {
@@ -15851,12 +15931,20 @@ async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 		const ops = [{ value: "summary", label: "summary" }];
 		if (group === "blocker")
 			ops.push({ value: "debug", label: "debug / full info" });
+		const selectedItem = readWorkItem(ctx.cwd, workItemId);
+		if (!deletionProtected(selectedItem))
+			ops.push({ value: "delete", label: "🗑️ Delete permanently" });
 		const op = await choose(ctx, `${workItemId}: operation`, ops, undefined, {
 			subtitle: renderWorkStats(buildWorkStats(ctx.cwd, workItemId)),
 		});
 		if (!op) continue;
 		if (op === "debug")
 			return handleWorkflowAction(buildWorkDebugState, workItemId, ctx, pi);
+		if (op === "delete") {
+			if (await confirmSubtreeDeletion(ctx, selectedItem))
+				return { ok: true, action: "roadmap-menu-back" };
+			continue;
+		}
 		return handleWorkReportCommand(workItemId, ctx);
 	}
 }
@@ -16757,12 +16845,16 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 			const blocker = taskState.tasks?.blockers?.some(
 				(item) => item.id === task.id,
 			);
+			const selectedItem = readWorkItem(ctx.cwd, task.id);
 			const actions = [
 				{ value: "report", label: "📄 inspect / report" },
 				...(blocker ? [{ value: "debug", label: "🐛 debug / full info" }] : []),
 				...(task.status === "closed"
 					? []
 					: [{ value: "add", label: "➕ Add child task" }]),
+				...(!deletionProtected(selectedItem)
+					? [{ value: "delete", label: "🗑️ Delete permanently" }]
+					: []),
 			];
 			const action = await choose(ctx, "Task actions", actions);
 			if (!action) continue;
@@ -16790,6 +16882,8 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 			if (action === "report") await handleWorkReportCommand(task.id, ctx);
 			else if (action === "debug")
 				await handleWorkflowAction(buildWorkDebugState, task.id, ctx, pi);
+			else if (action === "delete")
+				await confirmSubtreeDeletion(ctx, selectedItem);
 			else return prepareWorkspaceTaskComposer(ctx, taskRoadmap, task);
 			continue;
 		}
@@ -16891,6 +16985,10 @@ async function handleWorkRoadmapCommand(
 				?.preparation
 		: undefined;
 	const childPrepared = parentPreparation?.preparedPrefix.includes(selected);
+	const selectedItem = readWorkItem(ctx.cwd, selected);
+	const deleteAction = deletionProtected(selectedItem)
+		? []
+		: [{ value: "delete", label: "🗑️ Delete permanently" }];
 	const op = await choose(
 		ctx,
 		"Roadmap operations",
@@ -16930,6 +17028,7 @@ async function handleWorkRoadmapCommand(
 					selectedRoadmap.status === "closed"
 						? { value: "reopen", label: "♻️ reopen" }
 						: { value: "close", label: "✅ guarded close" },
+					...deleteAction,
 				]
 			: parentPreparation
 				? [
@@ -16956,6 +17055,7 @@ async function handleWorkRoadmapCommand(
 							? { value: "reopen", label: "♻️ reopen" }
 							: { value: "close", label: "✅ close" },
 						{ value: "report", label: "📄 full report" },
+						...deleteAction,
 					]
 				: [
 						{
@@ -16999,6 +17099,7 @@ async function handleWorkRoadmapCommand(
 							? { value: "reopen", label: "♻️ reopen" }
 							: { value: "close", label: "✅ close" },
 						{ value: "report", label: "📄 full report" },
+						...deleteAction,
 					],
 		undefined,
 		{
@@ -17032,6 +17133,10 @@ async function handleWorkRoadmapCommand(
 	}
 	if (op === "stop")
 		return { ok: true, action: "initiative-preparation-stopped", preparation };
+	if (op === "delete") {
+		await confirmSubtreeDeletion(ctx, selectedItem);
+		return { ok: true, action: "roadmap-workspace-return" };
+	}
 	if (op === "resume") {
 		let resumeTarget = selected;
 		if (initiative || parentPreparation) {

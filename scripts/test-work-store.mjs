@@ -11,6 +11,7 @@ import {
 	appendWorkNote,
 	createWorkItem,
 	deleteWorkItem,
+	deleteWorkItemSubtree,
 	initStore,
 	loadStore,
 	mutateStore,
@@ -226,6 +227,94 @@ try {
 		() => deleteWorkItem(hierarchy, "initiative-1.1"),
 		(error) => error.category === "corrupt",
 	);
+
+	// Recursive deletion validates first, permits internal dependencies, and publishes once.
+	const subtreeDir = repo();
+	const subtree = initStore(subtreeDir, { now: "2026-07-15T00:00:00.000Z" });
+	item(subtree, { id: "root", type: "epic", title: "Root" });
+	item(subtree, {
+		id: "child",
+		type: "task",
+		title: "Child",
+		parentId: "root",
+	});
+	item(subtree, {
+		id: "deep",
+		type: "task",
+		title: "Deep",
+		parentId: "child",
+		dependencies: ["child"],
+	});
+	item(subtree, { id: "outside", type: "epic", title: "Outside" });
+	saveStore(subtreeDir, subtree);
+	const deleted = mutateStore(subtreeDir, (store) =>
+		deleteWorkItemSubtree(store, "root"),
+	);
+	assert.deepEqual(new Set(deleted), new Set(["root", "child", "deep"]));
+	assert.deepEqual(Object.keys(loadStore(subtreeDir).items), ["outside"]);
+	validateStore(loadStore(subtreeDir));
+	assert.throws(
+		() => deleteWorkItemSubtree(loadStore(subtreeDir), "missing"),
+		(error) => error.category === "missing",
+	);
+
+	const blockedSubtree = loadStore(subtreeDir);
+	item(blockedSubtree, { id: "blocked", type: "epic", title: "Blocked" });
+	item(blockedSubtree, {
+		id: "blocked-child",
+		type: "task",
+		title: "Blocked child",
+		parentId: "blocked",
+	});
+	updateWorkItem(blockedSubtree, "outside", { dependencies: ["blocked-child"] });
+	saveStore(subtreeDir, blockedSubtree);
+	const blockedBytes = readFileSync(storePath(subtreeDir), "utf8");
+	assert.throws(
+		() =>
+			mutateStore(subtreeDir, (store) =>
+				deleteWorkItemSubtree(store, "blocked"),
+			),
+		/depend/i,
+	);
+	assert.equal(readFileSync(storePath(subtreeDir), "utf8"), blockedBytes);
+	const invalidSubtree = structuredClone(blockedSubtree);
+	invalidSubtree.items["blocked-child"].parentId = "missing";
+	assert.throws(() => deleteWorkItemSubtree(invalidSubtree, "blocked"), /parent/i);
+
+	// Direct mutation calls enforce every TUI-compatible protected-root form.
+	const protectedDir = repo();
+	const protectedBase = initStore(protectedDir, {
+		now: "2026-07-15T00:00:00.000Z",
+	});
+	item(protectedBase, { id: "protected", type: "epic", title: "Protected" });
+	for (const protect of [
+		(workItem) => (workItem.protected = true),
+		(workItem) => workItem.labels.push("wo:protected"),
+		(workItem) => workItem.labels.push("wo:protected-root"),
+		(workItem) => workItem.labels.push("wo:misc"),
+		(workItem) => (workItem.title = "Misc"),
+	]) {
+		const snapshot = structuredClone(protectedBase);
+		protect(snapshot.items.protected);
+		saveStore(protectedDir, snapshot);
+		const before = readFileSync(storePath(protectedDir), "utf8");
+		assert.throws(
+			() =>
+				mutateStore(protectedDir, (store) =>
+					deleteWorkItemSubtree(store, "protected"),
+				),
+			(error) =>
+				error instanceof WorkStoreError &&
+				error.category === "conflict" &&
+				/protected root.*cannot be deleted/i.test(error.message),
+		);
+		assert.equal(
+			readFileSync(storePath(protectedDir), "utf8"),
+			before,
+			"protected-root refusal leaves the native store byte-identical",
+		);
+	}
+
 	const promoted = initiativeStore();
 	const protectedChild = structuredClone(promoted.items["initiative-1.1"]);
 	assert.equal(protectedChild.id, "initiative-1.1");
