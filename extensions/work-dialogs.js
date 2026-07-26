@@ -720,19 +720,29 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						Math.max(1, ...stats.map((line) => visibleWidth(line))),
 					);
 					const headerWidth = Math.max(1, renderWidth - statsWidth - 2);
-					for (let at = 0; at < Math.max(header.length, stats.length); at += 1) {
+					const statsRows = Math.min(
+						9,
+						Math.max(header.length, height - 5),
+					);
+					const shownStats = stats.length > statsRows
+						? [
+								...stats.slice(0, Math.max(0, statsRows - 1)),
+								`… ${stats.length - statsRows + 1} more`,
+							]
+						: stats;
+					for (let at = 0; at < statsRows; at += 1) {
 						const left = fit(header[at] ?? "", headerWidth);
-						const right = fit(stats[at] ?? "", statsWidth).trimEnd();
+						const right = fit(shownStats[at] ?? "", statsWidth).trimEnd();
 						add(
 							`${left}  ${" ".repeat(Math.max(0, statsWidth - visibleWidth(right)))}${theme.fg("muted", right)}`,
 						);
 					}
 					add(sectionLine(theme, "Work items", renderWidth));
 					const detailRows = Math.max(
-						1,
+						0,
 						Math.min(6, height - lines.length - 4),
 					);
-					const bodyRows = Math.max(1, height - lines.length - detailRows - 3);
+					const bodyRows = Math.max(0, height - lines.length - detailRows - 3);
 					const index = Math.max(
 						0,
 						visible.findIndex((row) => row.id === selectedId),
@@ -774,11 +784,13 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						}
 					}
 					add(sectionLine(theme, "Details", renderWidth));
-					const details = wrapText(
-						selected?.description || "No description.",
-						renderWidth,
-						detailRows,
-					);
+					const details = detailRows
+						? wrapText(
+								selected?.description || "No description.",
+								renderWidth,
+								detailRows,
+							)
+						: [];
 					for (const line of details) add(theme.fg("text", line));
 					while (lines.length < height - 2) add();
 					add(sectionLine(theme, "Keys", renderWidth));

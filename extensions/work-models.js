@@ -16320,7 +16320,6 @@ function parseDisplayMetadataBatch(value, items) {
 	return { valid, retry };
 }
 
-// BorderedLoader has no public message setter, so live progress uses this cancellable component.
 function displayMetadataProgress(tui, theme, keybindings, total, done) {
 	const controller = new AbortController();
 	let completed = 0;
@@ -16337,9 +16336,19 @@ function displayMetadataProgress(tui, theme, keybindings, total, done) {
 			done(value);
 		},
 		render(width) {
-			const message = `Processing descriptions… ${completed}/${total}`;
-			const line = truncate(message, Math.max(8, width - 1));
-			return [theme.fg?.("accent", line) ?? line];
+			const boxWidth = Math.min(54, Math.max(12, width));
+			const innerWidth = boxWidth - 2;
+			const message = truncate(
+				`Processing descriptions… ${completed}/${total}`,
+				Math.max(1, innerWidth - 1),
+			);
+			const content = `${message}${" ".repeat(Math.max(0, innerWidth - message.length))}`;
+			const border = theme.fg?.("border", `─`.repeat(innerWidth)) ?? `─`.repeat(innerWidth);
+			return [
+				`╭${border}╮`,
+				`│${theme.fg?.("accent", content) ?? content}│`,
+				`╰${border}╯`,
+			];
 		},
 		handleInput(data) {
 			if (data === "\x1b" || keybindings.matches?.(data, "tui.select.cancel")) {
@@ -16539,6 +16548,9 @@ export async function backfillVisibleDisplayMetadata(
 			return result;
 		});
 		return progress;
+	}, {
+		overlay: true,
+		overlayOptions: { anchor: "center", width: 56, maxHeight: 3 },
 	});
 	const run = Promise.resolve(uiRun).then(async (result) => {
 		await background;

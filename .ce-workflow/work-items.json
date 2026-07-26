@@ -2561,6 +2561,51 @@
       "type": "task",
       "updatedAt": "2026-07-26T00:28:12.701Z"
     },
+    "work-3.13": {
+      "acceptance": "The roadmap workspace reserves a deterministic-height top-right/right-side stats panel matching the owner screenshot; Work items separator and first list row keep the same screen rows when selecting items with different stats lengths. Stats remain selection-specific, width-aware, and non-overlapping; six wrapped detail lines remain when viewport permits. Processing descriptions renders one centered cancellable overlay with visible completed/total progress and clean teardown. Narrow/short terminals degrade safely. Focused dialog/roadmap tests and npm run verify:quiet pass.",
+      "createdAt": "2026-07-26T00:42:12.393Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Repair the latest owner-smoke layout issues: variable stats height makes the Work items list jump, and the description-processing progress is too easy to miss inline. Reserve a fixed stats region on the right so the Work items separator/list origin stays stable across selection changes, keep six detail-description lines, and present description processing as a centered live-progress dialog.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.13",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-ebb44e66-1f7b-49a8-90fb-cc1d6342b8f7.png",
+        "--note Implemented deterministic 9-row upper stats region with explicit overflow, stable Work items/list origin, six-row details at normal viewport heights, and narrow/short fallback. Replaced inline description progress with a centered bordered cancellable overlay using public custom UI APIs.\nFiles changed: extensions/work-dialogs.js; extensions/work-models.js; scripts/test-work-dialogs.mjs; scripts/test-work-roadmap.mjs.\nVerification: node scripts/test-work-dialogs.mjs (pass: ok - shared work dialogs); node scripts/test-work-roadmap.mjs (pass, exit 0); node scripts/test-work-add.mjs (pass: ok - coded work-add behavior).\nRemaining: independent review and parent package gate.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Stabilize stats panel and center description progress",
+      "type": "task",
+      "updatedAt": "2026-07-26T00:53:59.642Z"
+    },
+    "work-3.14": {
+      "acceptance": "Selecting Brainstorm, Plan, Small task, Medium task, or Large task invokes no ctx.ui.input/editor modal, closes the menu, and prepares the normal main editor with exactly  plus a newline. The next matching interactive submission with nonblank body is consumed once and routed to the selected existing handler, including existing Brainstorm menu semantics; the procedure emits its normal single visible routed chat turn. Empty, mismatched, stale, session-change, RPC, extension, cancel, and ordinary chat inputs are not misrouted; pending state clears deterministically. Existing draft handling is safe. Other F7 actions keep current argument dialogs. Focused menu/input/brainstorm/start tests and npm run verify:quiet pass.",
+      "createdAt": "2026-07-26T00:42:12.709Z",
+      "dependencies": [
+        "work-3.13"
+      ],
+      "dependencyEdges": [],
+      "description": "Remove modal argument prompts for F7 Brainstorm, Plan, and Work small/medium/big. Selecting one must fully close the menu, prefill only  in Pi's normal editor, and register a session/cwd-scoped pending action that consumes the next matching interactive chat submission and routes its freeform body to the existing workflow procedure/skill code.",
+      "evidence": [],
+      "id": "work-3.14",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Restore the pre-goal normal-editor pending-action UX requested repeatedly by the project owner; no prompt files or new dispatcher.",
+        "wo:contract-correction — shell quoting removed the literal marker from create output. The exact required main-editor prefill is:\nIdea or prompt:\nfollowed by one newline. The modal prompts must not be invoked for the five scoped actions.\n"
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Route freeform workflow actions through the main editor",
+      "type": "task",
+      "updatedAt": "2026-07-26T00:42:36.486Z"
+    },
     "work-3.2": {
       "acceptance": "A1: projection always includes all roadmaps with no Tab mode or visible Open/Closed words; initiative children stay grouped and only sort among siblings by live startedAt desc, remembered current, open activityAt desc, closed activityAt desc, then stable ID. activityAt is max of roadmap/descendant updatedAt and latest non-live workflow timestamp. A3: recursive tasks order non-closed before closed; open containers show progress bars and executable-descendant completed/total, open leaves are 0/1; live is distinct from durable in_progress engaged state; exact live item is strongest and ancestors propagate. A4: reducer implements activeWorkAgent same-cwd/meta.workItemId truth; direct status must exist, parse, be running/active and nonterminal; deadline uses 30s grace; no-deadline requires positive live pid via process.kill(pid,0); absent/dead pid, missing/malformed/terminal/expired are stale; paused/needs_attention is attention/recent activity not live; activeWorkGoalRunning alone is never targeted; newest startedAt wins exact emphasis while valid ancestors stay marked. Projection and two refresh reads leave .ce-workflow/work-items.json byte-identical; failure retains a usable cached frame contract. A5: Needs plan and Plan/strengthen eligibility is only open, non-Misc, needs_plan/stale roadmaps with an existing path in that roadmap's own epicArtifacts(...).brainstorms; missing, initiative-inherited, and child-only brainstorms are false; planned/ready and closed are false. Include the ponytail note limiting full projection to small/medium stores. Focused verification: node scripts/test-work-roadmap.mjs",
       "createdAt": "2026-07-25T08:04:58.365Z",
@@ -2650,6 +2695,8 @@
         "work-3.10",
         "work-3.11",
         "work-3.12",
+        "work-3.13",
+        "work-3.14",
         "work-3.4",
         "work-3.6",
         "work-3.7",
@@ -2666,13 +2713,14 @@
         "wo:manual-evidence FAIL — 2026-07-25\nProject owner reported the real Pi TUI multiline/image-paste smoke failed: \"lot of stuff failed will respond with a followup prompt\".\nDetailed reproduction and observed failures are pending the project owner's follow-up. Keep work-3.5 and roadmap work-3 open; do not waive the manual gate.",
         "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\n- Misc still exposes `Needs planning` although it has no brainstorm; hide planning readiness/actions when no brainstorm exists.\n- Tree containers need `+` when collapsed and `-` when expanded.\n- Plan, Brainstorm, Work small/medium/big, and related execution actions must start a normal visible Pi chat turn and route that turn to the appropriate skill/code path; they must not open the current weird prompt/direct-flow UX. A previous pre-goal implementation had the desired normal-chat behavior.\n- Current workspace screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f827069d-5af7-48e2-9b7a-c2ec350922fa.png\n- Visual target screenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-2c7030b1-1c05-4449-adc0-ac60e84cb10d.png\n- Desired rows: initiative/idea `[-] [colored status dot] completed/total child roadmaps synthesized short title`; roadmap/brainstorm `[-] [colored status dot] completed/total tasks synthesized short title`; task `[colored status dot] synthesized short title`, preserving tree indentation.\n- Reserve the lower detail area for the selected item's full description and model/token statistics.\nResult: rejected. Keep work-3.5 open until repairs land and a new real Pi TUI smoke passes with parent, multiline, and image evidence.",
         "wo:manual-evidence FAIL — detailed owner feedback, 2026-07-25\nProject owner: Flex\nScreenshots:\n- C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-962ed028-6bab-47ae-9f03-dc87d4ce6001.png\n- C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-f205de2b-58bd-471c-a0db-07e9203fa2fc.png\nObserved failures after repairs d3744c3:\n- Cursor movement is very slow (~1/3 second per row).\n- On Hardware-Validated RFLib, two items appear selected; down-arrow cycles between two rows and navigation gets stuck/reversed.\n- Flexible, Low-Footprint shows 0/0 despite having a subtarget.\n- Parent Hardware-Validated RFLib appears closed/gray while children are open, so status semantics are contradictory.\n- Details header repeats fixed current model/session stats for every item; the stats do not follow the selected item's execution/model metadata.\n- Truncated raw chat/request text is not an intelligible synthesized title.\nRequested repair:\n- Generate real LLM-synthesized concise titles for items lacking them when entering the menu, show a Processing descriptions progress overlay, and persist titles per item.\n- Correct navigation, speed, progress, status, and selected-item details.\nResult: rejected. Keep work-3.5 and work-3 open until repairs land and a new real Pi TUI smoke passes, including the original parent/multiline/image Add-task evidence.\n",
-        "wo:manual-evidence FAIL — owner smoke after 28ed6df, 2026-07-25\nProject owner: Flex\nObserved warning on F7 → Roadmaps title backfill:\n`Could not process descriptions: Invalid display title for work-1.5.8.`\nThe current operation is too slow and provides insufficient visible progress.\nOwner request: process missing descriptions concurrently (about 8 model/agent requests at a time) and show live visible progress so it is obvious that work is advancing.\nResult: rejected. Keep work-3.5 and work-3 open; create a linked debug bug, diagnose the invalid-title failure, make per-item/chunk failures recoverable without discarding valid work, add bounded concurrency and progress, then repeat the real TUI smoke.\n"
+        "wo:manual-evidence FAIL — owner smoke after 28ed6df, 2026-07-25\nProject owner: Flex\nObserved warning on F7 → Roadmaps title backfill:\n`Could not process descriptions: Invalid display title for work-1.5.8.`\nThe current operation is too slow and provides insufficient visible progress.\nOwner request: process missing descriptions concurrently (about 8 model/agent requests at a time) and show live visible progress so it is obvious that work is advancing.\nResult: rejected. Keep work-3.5 and work-3 open; create a linked debug bug, diagnose the invalid-title failure, make per-item/chunk failures recoverable without discarding valid work, add bounded concurrency and progress, then repeat the real TUI smoke.\n",
+        "wo:manual-evidence FAIL — final owner smoke after 3c11509, 2026-07-26\nProject owner: Flex\nScreenshot: C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-ebb44e66-1f7b-49a8-90fb-cc1d6342b8f7.png\nObserved/requested repairs:\n- Selection-specific stats in the current variable-height header make the work list jump. Reserve a stable right-side stats area above/beside the Work items separator like the screenshot so the Work items/list origin does not move between selections; retain six description lines.\n- Processing descriptions progress is too easy to miss inline. Show it as a centered dialog with live completed/total progress.\n- F7 Work small/medium/big, Brainstorm, and Plan still open a modal text input such as `Idea or topic`. They must instead close/release the menu, prefill only `Idea or prompt:` in Pi's normal main editor, let the owner type freely, and have a registered pending procedure consume that next chat submission and route it to the selected workflow/skill code. No modal input prompt.\nResult: rejected. Keep work-3.5 and work-3 open until repairs and a new real Pi TUI smoke pass, including the original rich Add-task evidence.\n"
       ],
       "parentId": "work-3",
       "status": "open",
       "title": "Approve real Pi TUI multiline and image-paste task flow",
       "type": "decision",
-      "updatedAt": "2026-07-25T23:45:29.136Z"
+      "updatedAt": "2026-07-26T00:42:36.907Z"
     },
     "work-3.6": {
       "acceptance": "Misc or any roadmap without its own brainstorm shows no Needs planning text and offers no Plan/Brainstorm action. Each named TUI launch calls pi.sendUserMessage exactly once with existing routed instructions and emits no subagents RPC request. RPC still uses direct role launch; print/json remain unchanged. Focused roadmap, brainstorm, start-finish, resume, telemetry, and add tests pass.",
@@ -2809,7 +2857,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T00:28:12.701Z"
+    "updatedAt": "2026-07-26T00:53:59.642Z"
   },
   "schemaVersion": 1
 }

@@ -557,7 +557,7 @@ async function driveTree(options, interact, mode = "tui") {
 					let closed = false;
 					const component = factory(
 						{
-							terminal: { rows: 24 },
+							terminal: { rows: options.testRows ?? 30 },
 							requestRender() {
 								renders += 1;
 							},
@@ -613,7 +613,9 @@ const treeRun = await driveTree(
 	{
 		resolveStats(id) {
 			statsCalls.push(id);
-			return ["Stats:", `- selected ${id}`];
+			return id === "roadmap-open"
+				? ["Stats:", `- selected ${id}`, ...Array.from({ length: 9 }, (_, at) => `- metric ${at + 1}`)]
+				: ["Stats:", `- selected ${id}`];
 		},
 		async refresh() {
 			refreshStep += 1;
@@ -647,6 +649,10 @@ const treeRun = await driveTree(
 			lines[1].trimEnd().endsWith("- selected roadmap-open"),
 			"selection stats share the header without overlap",
 		);
+		assert(lines[8].includes("… 3 more"), "stats overflow is explicit within its fixed capacity");
+		const initialSeparatorAt = lines.findIndex((line) => line.includes(" Work items "));
+		const initialFirstRowAt = lines.findIndex((line) => line.includes("Open roadmap"));
+		assert.equal(initialFirstRowAt, initialSeparatorAt + 1);
 		const narrowLines = component.render(42);
 		const detailsAt = narrowLines.findIndex((line) => line.includes(" Details "));
 		const keysAt = narrowLines.findIndex((line) => line.includes(" Keys "));
@@ -718,6 +724,16 @@ const treeRun = await driveTree(
 		assert(lines.some((line) => /❯.*\[-\] ● Task A/.test(line)));
 		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
 		assert(lines[1].trimEnd().endsWith("- selected task-a"));
+		assert.equal(
+			lines.findIndex((line) => line.includes(" Work items ")),
+			initialSeparatorAt,
+			"Work items separator does not move when selected stats shrink",
+		);
+		assert.equal(
+			lines.findIndex((line) => line.includes("Open roadmap")),
+			initialFirstRowAt,
+			"first tree row stays fixed when selected stats shrink",
+		);
 		assert(
 			lines.some((line) => line.includes("Task A full stored description.")),
 			"description and telemetry follow stable selection",
@@ -775,6 +791,20 @@ const failedStatsTree = await driveTree(
 	},
 );
 assert.equal(failedStatsTree.result.action, "back", "stats failure does not break navigation");
+
+const shortTree = await driveTree(
+	{ testRows: 8 },
+	async (component) => {
+		const lines = component.render(18);
+		assert.equal(lines.length, 7, "short workspace stays within terminal height");
+		assert(lines.some((line) => line.includes(" Work items ")));
+		assert(lines.some((line) => line.includes(" Details ")));
+		assert(lines.some((line) => line.includes(" Keys ")));
+		assert(lines.every((line) => terminalWidth(line) <= 16), "narrow workspace stays within width");
+		component.handleInput("escape");
+	},
+);
+assert.equal(shortTree.result.action, "back", "narrow/short fallback remains cancellable");
 
 const selectedTree = await driveTree({}, async (component) =>
 	component.handleInput("enter"),

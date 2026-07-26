@@ -198,6 +198,8 @@ try {
 		"F7 preview reports a missing stored summary",
 	);
 	const loaderMessages = [];
+	let progressOverlayOptions;
+	let progressTeardowns = 0;
 	const selectRoadmap = async (id, complete, menus = [], provider) => {
 		const notices = [];
 		const names = {
@@ -229,20 +231,24 @@ try {
 						}
 						return labels.find((label) => /Show all roadmaps/.test(label));
 					},
-					custom: (factory) =>
+					custom: (factory, customOptions) =>
 						new Promise((done) => {
+							progressOverlayOptions = customOptions;
 							let component;
 							const tui = {
 								requestRender: () =>
-									loaderMessages.push(component.render(120)[0]),
+									loaderMessages.push(component.render(120).join("\n")),
 							};
 							component = factory(
 								tui,
 								{ fg: (_color, value) => value },
 								{},
-								done,
+								(value) => {
+									progressTeardowns += 1;
+									done(value);
+								},
 							);
-							loaderMessages.push(component.render(120)[0]);
+							loaderMessages.push(component.render(120).join("\n"));
 						}),
 					notify: (message) => notices.push(message),
 				},
@@ -291,14 +297,20 @@ try {
 	);
 	const progressTotal = loaderMessages[0].match(/0\/(\d+)/)?.[1];
 	assert(progressTotal, "production progress starts at zero with a total");
-	assert.equal(
+	assert.match(loaderMessages[0], /╭─+╮\n│.*Processing descriptions… 0\/\d+/);
+	assert.match(
 		loaderMessages.at(-1),
-		`Processing descriptions… ${progressTotal}/${progressTotal}`,
+		new RegExp(`Processing descriptions… ${progressTotal}/${progressTotal}`),
 	);
 	assert(
 		loaderMessages.length > 2,
 		"production custom progress renders initial, intermediate, and total states",
 	);
+	assert.deepEqual(progressOverlayOptions, {
+		overlay: true,
+		overlayOptions: { anchor: "center", width: 56, maxHeight: 3 },
+	});
+	assert.equal(progressTeardowns, 1, "completed progress overlay tears down once");
 	assert(
 		roadmapMenus[0].labels.some((label) => /Closed roadmap/.test(label)),
 		"workspace always includes closed roadmaps",
@@ -317,7 +329,7 @@ try {
 				custom: (factory) =>
 					new Promise((done) => {
 						const component = factory(
-							{ requestRender() {} },
+							{ terminal: { rows: 30 }, requestRender() {} },
 							{ fg: (_color, value) => value, bold: (value) => value },
 							{
 								matches: (data, id) =>
@@ -757,11 +769,14 @@ try {
 		const cancelSignals = [];
 		let cancelComponent;
 		let cancelStarts = 0;
+		let cancelTeardowns = 0;
+		let cancelOverlayOptions;
 		const cancelCtx = {
 			...ctx,
 			ui: {
-				custom: (factory) =>
+				custom: (factory, customOptions) =>
 					new Promise((done) => {
+						cancelOverlayOptions = customOptions;
 						cancelComponent = factory(
 							{
 								requestRender() {
@@ -770,7 +785,10 @@ try {
 							},
 							{ fg: (_color, value) => value },
 							{},
-							done,
+							(value) => {
+								cancelTeardowns += 1;
+								done(value);
+							},
 						);
 					}),
 				notify() {},
@@ -801,6 +819,8 @@ try {
 		);
 		while (cancelPending.length) cancelPending.shift()();
 		await cancelRun;
+		assert.equal(cancelTeardowns, 1, "cancelled progress overlay tears down once");
+		assert.equal(cancelOverlayOptions?.overlayOptions?.anchor, "center");
 		assert.equal(
 			cancelStarts,
 			8,
