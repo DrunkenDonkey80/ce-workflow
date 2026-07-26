@@ -35,8 +35,8 @@ const SOURCE_EXTS = new Set(
 		"py js mjs cjs ts jsx tsx go rs java kt scala rb php swift " +
 		"c h cpp hpp cc hh cs fs vb clj cljs ex exs erl elm hs jl lua pl pm " +
 		"r dart vue svelte astro md mdx html htm xml svg rst adoc tex " +
-		"css scss sass less styl toml yaml yml json json5 jsonc ini cfg conf " +
-		"sh bash zsh fish ps1 psm1 bat cmd sql graphql gql proto txt lock csv tsv sha256 cmake"
+		"css scss sass less styl toml yaml yml json json5 jsonc ini cfg conf properties " +
+		"gradle sh bash zsh fish ps1 psm1 bat cmd sql graphql gql proto txt lock csv tsv sha256 cmake"
 	).split(" "),
 );
 
@@ -48,6 +48,7 @@ const SOURCE_BASENAMES = new Set([
 	"Gemfile",
 	"Vagrantfile",
 	"CMakeLists.txt",
+	"gradlew",
 	"requirements.txt",
 	"package.json",
 	"tsconfig.json",
@@ -79,6 +80,7 @@ export function ignorePatternForBuildArtifact(file) {
 	for (const dir of Object.keys(DIR_PATTERNS))
 		if (dirs.has(dir)) return DIR_PATTERNS[dir];
 	for (const dir of dirs) {
+		if (/^build-work-[^/]+$/i.test(dir)) return "build-work-*/";
 		if (/\.egg-info$/i.test(dir)) return "*.egg-info/";
 		if (/\.dist-info$/i.test(dir)) return "*.dist-info/";
 	}
@@ -98,6 +100,7 @@ export function isRecognizedSource(file, runGit) {
 	const norm = file.replaceAll("\\", "/");
 	const base = norm.split("/").pop();
 	if (SOURCE_BASENAMES.has(base)) return true;
+	if (/(?:^|\/)gradle\/wrapper\/gradle-wrapper\.jar$/i.test(norm)) return true;
 	const dot = base.lastIndexOf(".");
 	const ext = dot >= 0 ? base.slice(dot + 1).toLowerCase() : "";
 	if (ext && SOURCE_EXTS.has(ext)) return true;

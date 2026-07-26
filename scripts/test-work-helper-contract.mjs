@@ -231,6 +231,61 @@ try {
 	);
 	assert.equal(residualFinished.status, "PASS");
 
+	writeFileSync(path.join(cwd, "mechanical.md"), "old wording\n");
+	const mechanicalStore = loadStore(cwd);
+	createWorkItem(mechanicalStore, {
+		id: "TASK-3",
+		type: "task",
+		status: "open",
+		title: "Update authentication documentation",
+		notes: [
+			"wo:review FAIL - source comment date is missing",
+			"wo:fix PASS - comment corrected and docs check passed",
+			'wo:review-scope ["mechanical.md"]',
+		],
+	});
+	saveStore(cwd, mechanicalStore);
+	execFileSync("git", ["add", "mechanical.md", ".ce-workflow/work-items.json"], {
+		cwd,
+	});
+	execFileSync("git", ["commit", "-m", "mechanical baseline"], {
+		cwd,
+		stdio: "ignore",
+	});
+	writeFileSync(path.join(cwd, "mechanical.md"), "dated wording\n");
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-3",
+			"--max-files",
+			"1",
+			"--message",
+			"finish mechanical fix",
+			...verifyArgs,
+			"--reviewed",
+		),
+		/durable wo:review PASS evidence/,
+		"generic fixer PASS cannot bypass the initial review",
+	);
+	const mechanicalDispositionStore = loadStore(cwd);
+	mechanicalDispositionStore.items["TASK-3"].notes.push(
+		'wo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added the required date","evidence":"documentation check passed"}]}',
+	);
+	saveStore(cwd, mechanicalDispositionStore);
+	const mechanicalFinished = JSON.parse(
+		run(
+			"finish-task",
+			"TASK-3",
+			"--max-files",
+			"1",
+			"--message",
+			"finish mechanical fix",
+			...verifyArgs,
+			"--reviewed",
+		),
+	);
+	assert.equal(mechanicalFinished.status, "PASS");
+
 	console.log("ok - work helper contract");
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

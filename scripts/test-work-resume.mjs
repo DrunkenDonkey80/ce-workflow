@@ -334,6 +334,17 @@ const childrenByScenario = {
 				"wo:execution-agent\nwo:verify-check PASS\nwo:review PASS - no blockers",
 		},
 	],
+	inProgressMechanicalFix: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				'wo:execution-agent\nFiles changed: docs/auth.md.\nwo:verify-check PASS\nwo:review FAIL - source comment date is missing\nwo:fix PASS - comment fixed\nwo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added source date","evidence":"documentation check passed"}]}',
+		},
+	],
 	inProgressReviewCap: [
 		{
 			id: "AUTH-1",
@@ -742,6 +753,15 @@ try {
 	assert(
 		state.action === "finish-ready" && !state.handoffPrompt,
 		"durable review PASS skips duplicate reviewer and writer agents",
+	);
+
+	setScenario("inProgressMechanicalFix");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "finish-ready" &&
+			state.selectedWorkItem.mechanicalFixAccepted &&
+			!state.handoffPrompt,
+		"verified mechanical fixes finish after one review without a redundant re-review",
 	);
 
 	setScenario("inProgressReviewCap");

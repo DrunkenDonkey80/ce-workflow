@@ -112,6 +112,9 @@ try {
 	);
 	assert(
 		smallDirect?.agent === "work-worker" &&
+			smallDirect.params.task.includes(
+				`work-claim ${state.selectedWorkItem.id}`,
+			) &&
 			smallDirect.params.task.includes("Implementation scope: small") &&
 			smallDirect.params.task.includes("at most 2 implementation files") &&
 			smallDirect.params.task.includes("native edit tool") &&
@@ -252,6 +255,8 @@ try {
 				`Target work item: ${state.selectedWorkItem.id}`,
 			) &&
 			bigDirect.params.task.includes("work-ready-summary") &&
+			bigDirect.params.task.includes("Planner launch baseline paths:") &&
+			bigDirect.params.task.includes("fail BLOCKED if final Git status adds") &&
 			!bigDirect.params.task.includes("raw store readiness") &&
 			!bigDirect.params.task.includes("Subagent output guidance") &&
 			bigDirect.params.acceptance.level === "none" &&

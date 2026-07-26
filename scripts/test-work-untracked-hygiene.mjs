@@ -57,6 +57,11 @@ assert(
 	"MSVC incremental linker files map to *.ilk",
 );
 assert(
+	ignorePatternForBuildArtifact("rf-lib/build-work-9-4/CMakeCache.txt") ===
+		"build-work-*/",
+	"task-specific CMake trees map to one bounded ignore pattern",
+);
+assert(
 	ignorePatternForBuildArtifact("a/b/node_modules/lib/index.js") ===
 		"node_modules/",
 	"node_modules maps to node_modules/",
@@ -97,7 +102,18 @@ assert(
 	isRecognizedSource("toolchain.cmake", noGit),
 	".cmake is recognized source",
 );
+assert(isRecognizedSource("settings.gradle", noGit), ".gradle is recognized");
+assert(isRecognizedSource("gradlew", noGit), "gradlew is recognized");
+assert(
+	isRecognizedSource("gradle/wrapper/gradle-wrapper.properties", noGit),
+	"Gradle wrapper properties are recognized",
+);
+assert(
+	isRecognizedSource("gradle/wrapper/gradle-wrapper.jar", noGit),
+	"only the standard Gradle wrapper JAR path is recognized",
+);
 assert(!isRecognizedSource("mystery.dat", noGit), ".dat is NOT recognized");
+assert(!isRecognizedSource("random.jar", noGit), "arbitrary JARs are NOT recognized");
 assert(!isRecognizedSource("dump.bin", noGit), ".bin is NOT recognized");
 
 // --- .gitignore writer dedups and does not rewrite when nothing new ---
@@ -155,6 +171,19 @@ writeFileSync(path.join(repo, "mystery.dat"), "x");
 writeFileSync(path.join(repo, "data.bin"), "x");
 mkdirSync(path.join(repo, "node_modules", "lib"), { recursive: true });
 writeFileSync(path.join(repo, "node_modules", "lib", "index.js"), "x");
+mkdirSync(path.join(repo, "rf-lib", "build-work-9-4"), { recursive: true });
+writeFileSync(path.join(repo, "rf-lib", "build-work-9-4", "CMakeCache.txt"), "x");
+mkdirSync(path.join(repo, "android", "gradle", "wrapper"), { recursive: true });
+writeFileSync(path.join(repo, "android", "settings.gradle"), "rootProject.name = 'x'\n");
+writeFileSync(path.join(repo, "android", "gradlew"), "#!/bin/sh\n");
+writeFileSync(
+	path.join(repo, "android", "gradle", "wrapper", "gradle-wrapper.properties"),
+	"distributionUrl=x\n",
+);
+writeFileSync(
+	path.join(repo, "android", "gradle", "wrapper", "gradle-wrapper.jar"),
+	"jar",
+);
 mkdirSync(path.join(repo, ".ce-workflow"), { recursive: true });
 writeFileSync(path.join(repo, ".ce-workflow", "work-items.json"), "{}");
 
@@ -162,7 +191,13 @@ const tidy = tidyUntrackedFiles({ cwd: repo });
 const sorted = (arr) => [...arr].sort();
 assert(
 	sorted(tidy.ignored).join(",") ===
-		sorted(["build/", "__pycache__/", "*.py[cod]", "node_modules/"]).join(","),
+		sorted([
+		"build/",
+		"build-work-*/",
+		"__pycache__/",
+		"*.py[cod]",
+		"node_modules/",
+	]).join(","),
 	"build/cache artifacts collected as canonical patterns",
 );
 assert(
@@ -171,8 +206,9 @@ assert(
 	"only the unknown extensions are escalated",
 );
 assert(
-	!tidy.unrecognized.includes("src/new.py"),
-	"new source is not escalated",
+	!tidy.unrecognized.includes("src/new.py") &&
+		!tidy.unrecognized.some((file) => file.startsWith("android/")),
+	"new source and standard Gradle infrastructure are not escalated",
 );
 assert(
 	!tidy.unrecognized.includes(".ce-workflow/work-items.json"),
