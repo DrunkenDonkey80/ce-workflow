@@ -2744,6 +2744,101 @@
       "type": "task",
       "updatedAt": "2026-07-26T05:51:55.731Z"
     },
+    "work-2.41": {
+      "createdAt": "2026-07-26T06:44:00.093Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: RFLib usage/stats label full parent wall time as Orchestration and omit available child usage. The audit found 33.13 recorded wall-hours split into 18.21h ask_user wait, 5.67h subagent_wait, and 9.24h residual time. The current long parent event reports 210.6m as orchestration although 103.7m is human wait and 76.2m delegated wait. Its 21 unique child runIds have matching artifact metadata totaling 13.40m tokens/$22.23, but the report says no per-subagent usage.\nExpected: Usage/stats should split active orchestration, human wait, and delegated wait; hydrate child model/effort/tokens/cost from runId artifacts when live subagentDetails are absent; and avoid presenting idle/delegated wall time as high-effort orchestrator work.\nImpact: The UI materially overstates orchestrator time, hides worker/reviewer cost, and makes speed/cost optimization decisions unreliable.\nSuggested improvement: Add wait buckets to telemetry/report rows and reconcile unique subagent runIds against project .pi-subagents/artifacts/*_meta.json at report time.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/8e2bfa56-41af-4c3b-b213-521d2af4d276",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1457,
+              "file": "01-rflib-usage-audit-2026-07-26.json",
+              "sha256": "ee885d8300ebccaf94ce72050d128185c178bd24861ba30b60f6f193a68b6fb1"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-07-26T06:44:00.087Z",
+          "workflowId": "019f9cf6-fc42-7406-b8ae-16049b88dd6f"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.41",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-stats.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:1721 - workItemIdFromSubagentTask regex requires whitespace after the label, so the standard handoff headers `Work item: <id>` (emitted at extensions/work-models.js:7371) and `Target WorkItem ID: <id>` never parse and child-to-work-item attribution/wait split silently degrades in production; reuse historyTaskFromText(task).workItemId (extensions/work-models.js:1344) or allow `\\s*:?\\s*` before the id\",\"scripts/test-work-stats.mjs:369 - artifact meta task only uses the matching form \\\"Implement WorkItem TASK-ARTIFACT\\\"; add a case using the real handoff form \\\"Work item: TASK-ARTIFACT\\\" so the attribution regex regression is caught\"]}",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:2531 - buildWorkStats iterates raw readTelemetryEvents(cwd) instead of the id-deduped list workStatsEvents builds at extensions/work-models.js:2212; readTelemetryEvents concatenates .ce-workflow/telemetry, .ce-workflow/work-runs and claims/*.complete, so an event id present in two sources is counted twice in phase rows, totals and the new wait buckets - the exact overstatement this item removes. Dedupe by id before hydrateTelemetrySubagents, same Map pattern as line 2212.\"]}",
+        "wo:residual-fix PASS {\"dispositions\":[{\"finding\":\"extensions/work-models.js:2531 - buildWorkStats iterates raw readTelemetryEvents(cwd) instead of the id-deduped list workStatsEvents builds at extensions/work-models.js:2212; readTelemetryEvents concatenates .ce-workflow/telemetry, .ce-workflow/work-runs and claims/*.complete, so an event id present in two sources is counted twice in phase rows, totals and the new wait buckets - the exact overstatement this item removes. Dedupe by id before hydrateTelemetrySubagents, same Map pattern as line 2212.\",\"fix\":\"Deduplicated raw telemetry events by stable event id before artifact hydration and stats aggregation.\",\"evidence\":\"node scripts/test-work-stats.mjs and node scripts/test-work-usage.mjs pass; TypeScript LSP reports zero errors.\"}]}",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-stats.mjs\nOutput: ok - work stats roll up by task, roadmap, initiative, idea, phase, and model"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: RFLib usage/stats label full parent wall time as Orchestration and omit available child usage. The audit found 33.13 recorded wall",
+      "type": "task",
+      "updatedAt": "2026-07-26T10:30:14.211Z"
+    },
+    "work-2.42": {
+      "createdAt": "2026-07-26T06:44:21.486Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: RFLib autonomous project goal iteration 1 requested the internal new-session continuation, but execution remained in the original 182k-token session and no new root session file appeared. Because active goals suppress ordinary maybeCompact, the next 43 model turns replayed 8.06m cached tokens and cost $9.33 after the supposed reset; the first post-boundary request alone sent 170,780 uncached input tokens.\nExpected: newSessionBetweenIterations should either start a demonstrably fresh session or fall back to work-goal microcompaction before sending the continuation. An active goal must not continue with neither reset nor compaction.\nImpact: Long autonomous roadmaps repeatedly replay a near-full high-effort orchestrator context, dominating tokens/cost and making later slices progressively slower and more expensive.\nSuggested improvement: After ctx.newSession, verify a session transition/result; on unavailable, cancelled, undefined, or unchanged-session outcomes, call microCompactThenSendWorkGoalPrompt. Also emit reset/compaction telemetry so reports can prove which path ran.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e3d81b88-f78e-4407-99cf-735fcb932929",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1295,
+              "file": "01-rflib-goal-session-reset-audit-2026-07-26.json",
+              "sha256": "44ccc9fbfc2bdd9910fe14445738dd1d4fd02f8195e15f22090962610ae2afe0"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-07-26T06:44:21.481Z",
+          "workflowId": "019f9cf6-fc42-7406-b8ae-16049b88dd6f"
+        }
+      ],
+      "id": "work-2.42",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: RFLib autonomous project goal iteration 1 requested the internal new-session continuation, but execution remained in the original ",
+      "type": "task",
+      "updatedAt": "2026-07-26T06:44:21.486Z"
+    },
+    "work-2.43": {
+      "acceptance": "Pi setThinkingLevel is used safely; replacement sessions reapply the configured effort; every terminal/paused path restores the prior level; focused goal tests pass.",
+      "createdAt": "2026-07-26T10:10:46.806Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Add configurable autonomous-goal main-session thinking effort (default inherit), apply it while a goal is active including replacement sessions, and restore the user's previous effort on pause, stop, clear, budget/rate wait, or completion. Enable medium in the user's global workflow settings.",
+      "evidence": [],
+      "id": "work-2.43",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Lower autonomous goal main effort temporarily and restore it",
+      "type": "task",
+      "updatedAt": "2026-07-26T10:10:46.806Z"
+    },
     "work-2.5": {
       "createdAt": "2026-07-20T03:29:59.300Z",
       "dependencies": [
@@ -3437,7 +3532,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T05:51:55.732Z"
+    "updatedAt": "2026-07-26T10:30:14.211Z"
   },
   "schemaVersion": 1
 }

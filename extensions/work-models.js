@@ -1344,7 +1344,7 @@ function selfImprovementHistoryEnabled(ctx) {
 function historyTaskFromText(value) {
 	const text = String(value ?? "");
 	const labeled = text.match(
-		/(?:Target WorkItem ID|Selected WorkItem|Target|WorkItem ID|workItem)\s*:\s*([^\s]+)/i,
+		/(?:Target WorkItem ID|Selected WorkItem|Target|Work\s*Item(?: ID)?)\s*:\s*([^\s]+)/i,
 	)?.[1];
 	const workItemId = labeled && labeled !== "none" ? labeled : undefined;
 	return {
@@ -1714,6 +1714,141 @@ function subagentDetailsFromResult(result) {
 		...(details?.results ?? []).map(summarizeSubagentResult),
 		...statusSubagentResults(details?.asyncDir),
 	];
+}
+
+function workItemIdFromSubagentTask(task) {
+	return (
+		historyTaskFromText(task).workItemId ??
+		String(task ?? "").match(
+			/\bWork\s*Item\s+([A-Za-z]+-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)\b/i,
+		)?.[1]
+	);
+}
+
+function subagentArtifactDetails(cwd, runId, cache = new Map()) {
+	if (!runId) return [];
+	if (cache.has(runId)) return cache.get(runId);
+	const artifactDir = join(cwd, ".pi-subagents", "artifacts");
+	let files = [];
+	try {
+		files = readdirSync(artifactDir).filter(
+			(file) => file.startsWith(`${runId}_`) && file.endsWith("_meta.json"),
+		);
+	} catch {
+		cache.set(runId, []);
+		return [];
+	}
+	const details = [];
+	for (const file of files) {
+		try {
+			const meta = JSON.parse(readFileSync(join(artifactDir, file), "utf8"));
+			const transcriptPath = meta.transcriptPath
+				? isAbsolute(meta.transcriptPath)
+					? meta.transcriptPath
+					: resolve(cwd, meta.transcriptPath)
+				: undefined;
+			const transcript =
+				transcriptPath && existsSync(transcriptPath)
+					? reconcileTranscriptTelemetry(transcriptPath)
+					: undefined;
+			const attempts = Array.isArray(meta.modelAttempts)
+				? meta.modelAttempts
+				: [];
+			const attemptUsage = attempts.reduce(
+				(sum, attempt) => {
+					const usage = attempt?.usage ?? {};
+					sum.input += Number(usage.input ?? 0);
+					sum.output += Number(usage.output ?? 0);
+					sum.cacheRead += Number(usage.cacheRead ?? 0);
+					sum.cacheWrite += Number(usage.cacheWrite ?? 0);
+					sum.cost += Number(usage.cost ?? 0);
+					return sum;
+				},
+				{ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 },
+			);
+			const usage = transcript?.usage?.totalTokens
+				? transcript.usage
+				: {
+						...attemptUsage,
+						totalTokens:
+							attemptUsage.input +
+							attemptUsage.output +
+							attemptUsage.cacheRead +
+							attemptUsage.cacheWrite,
+					};
+			details.push({
+				runId,
+				agent: meta.agent,
+				role: handoffRole(meta.agent),
+				model: meta.model,
+				status: Number(meta.exitCode ?? 1) === 0 ? "completed" : "failed",
+				durationMs: transcript?.durationMs,
+				tokens: usage.totalTokens,
+				input: usage.input,
+				output: usage.output,
+				cacheRead: usage.cacheRead,
+				cacheWrite: usage.cacheWrite,
+				cost: attemptUsage.cost || usage.cost,
+				transcriptPath,
+				workItemId: workItemIdFromSubagentTask(meta.task),
+			});
+		} catch {
+			// Ignore malformed or concurrently-written artifacts.
+		}
+	}
+	cache.set(runId, details);
+	return details;
+}
+
+function subagentDetailsForTool(cwd, tool, cache) {
+	const recorded = [
+		...(tool.subagentDetails ?? []),
+		...subagentDetailsFromResult(tool.result),
+	];
+	const artifacts = subagentArtifactDetails(cwd, tool.runId, cache);
+	if (!artifacts.length) return recorded;
+	const merged = new Map(artifacts.map((item) => [item.agent ?? item.model, item]));
+	for (const item of recorded) {
+		const key = item.agent ?? item.model;
+		merged.set(key, { ...(merged.get(key) ?? {}), ...item });
+	}
+	return [...merged.values()];
+}
+
+function hydrateTelemetrySubagents(cwd, event, cache = new Map()) {
+	return {
+		...event,
+		tools: (event.tools ?? []).map((tool) =>
+			tool.name === "subagent"
+				? {
+						...tool,
+						subagentDetails: subagentDetailsForTool(cwd, tool, cache),
+					}
+				: tool,
+		),
+	};
+}
+
+function telemetryWaitTimes(event) {
+	const wallMs = Math.max(0, Number(event.durationMs ?? 0));
+	const humanWaitMs = Math.min(
+		wallMs,
+		(event.tools ?? [])
+			.filter((tool) => tool.name === "ask_user")
+			.reduce((sum, tool) => sum + Math.max(0, Number(tool.durationMs ?? 0)), 0),
+	);
+	const delegatedWaitMs = Math.min(
+		Math.max(0, wallMs - humanWaitMs),
+		(event.tools ?? [])
+			.filter((tool) => tool.name === "subagent_wait")
+			.reduce((sum, tool) => sum + Math.max(0, Number(tool.durationMs ?? 0)), 0),
+	);
+	return {
+		wallMs,
+		humanWaitMs,
+		delegatedWaitMs,
+		activeMs: Math.max(0, wallMs - humanWaitMs - delegatedWaitMs),
+	};
 }
 
 function toolKind(name, args) {
@@ -2391,9 +2526,35 @@ function buildWorkStats(cwd, targetId, options = {}) {
 		importLegacyStats(cwd, targetId, scopedEvents)
 	)
 		scopedEvents = workStatsEvents(cwd, scope);
+	const directIds = new Set(scopedEvents.map((event) => event.id));
+	const artifactCache = new Map();
+	const events = [
+		...new Map(
+			readTelemetryEvents(cwd).map((event, index) => [
+				event.id ?? `anonymous-${index}`,
+				event,
+			]),
+		).values(),
+	].map((event) => hydrateTelemetrySubagents(cwd, event, artifactCache));
+	const detailMatchesScope = (detail) =>
+		detail.workItemId &&
+		(scope.type === "epic"
+			? scope.ids.has(detail.workItemId)
+			: detail.workItemId === scope.id);
 	const rows = new Map();
 	const detailRuns = new Set();
-	for (const event of scopedEvents) {
+	const waits = {
+		parentWallDurationMs: 0,
+		orchestrationActiveMs: 0,
+		humanWaitMs: 0,
+		delegatedWaitMs: 0,
+	};
+	for (const event of events) {
+		const directMatch = directIds.has(event.id);
+		const matchingDetails = (event.tools ?? [])
+			.flatMap((tool) => tool.subagentDetails ?? [])
+			.filter(detailMatchesScope);
+		if (!directMatch && !matchingDetails.length) continue;
 		if (event.type === "background-verifier") {
 			if (event.usage === undefined && event.durationMs === undefined) continue;
 			addWorkStatsRun(rows, {
@@ -2404,19 +2565,31 @@ function buildWorkStats(cwd, targetId, options = {}) {
 			});
 			continue;
 		}
-		if (event.type === "agent" && (event.usage || event.messages))
+		if (
+			(directMatch || (scope.type === "epic" && matchingDetails.length)) &&
+			event.type === "agent" &&
+			(event.usage || event.messages)
+		) {
+			const eventWaits = telemetryWaitTimes(event);
+			waits.parentWallDurationMs += eventWaits.wallMs;
+			waits.orchestrationActiveMs += eventWaits.activeMs;
+			waits.humanWaitMs += eventWaits.humanWaitMs;
+			waits.delegatedWaitMs += eventWaits.delegatedWaitMs;
 			addWorkStatsRun(rows, {
 				phase: event.statsPhase ?? "Orchestration",
 				model: event.model,
 				modelName: event.modelName,
 				provider: event.provider,
-				durationMs: event.durationMs,
+				durationMs: eventWaits.activeMs,
 				usage: event.telemetry?.reconciled?.usage ?? event.usage,
 			});
+		}
 		for (const [toolIndex, tool] of (event.tools ?? []).entries()) {
 			for (const [detailIndex, detail] of (
 				tool.subagentDetails ?? []
 			).entries()) {
+				if (detail.workItemId && !detailMatchesScope(detail)) continue;
+				if (!directMatch && !detailMatchesScope(detail)) continue;
 				const runKey =
 					detail.transcriptPath ??
 					detail.sessionFile ??
@@ -2467,6 +2640,7 @@ function buildWorkStats(cwd, targetId, options = {}) {
 			tokens: models.reduce((sum, row) => sum + row.tokens, 0),
 			input: models.reduce((sum, row) => sum + row.input, 0),
 			output: models.reduce((sum, row) => sum + row.output, 0),
+			...waits,
 		},
 	};
 }
@@ -2488,6 +2662,11 @@ function renderWorkStats(stats) {
 			),
 		]),
 		"",
+		...(stats.totals.parentWallDurationMs
+			? [
+					`Parent wall: ${formatDuration(stats.totals.parentWallDurationMs)} · active orchestration ${formatDuration(stats.totals.orchestrationActiveMs)} · user wait ${formatDuration(stats.totals.humanWaitMs)} · delegated wait ${formatDuration(stats.totals.delegatedWaitMs)}`,
+				]
+			: []),
 		`Total: ${formatDuration(stats.totals.durationMs)}, ${formatTokenCount(stats.totals.tokens)} tokens`,
 	];
 }
@@ -2892,6 +3071,7 @@ function usageEventRows(events) {
 		.sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0))
 		.map((event) => {
 			const tools = event.tools ?? [];
+			const waits = telemetryWaitTimes(event);
 			return {
 				id: event.id ?? "unknown",
 				timestamp: event.timestamp ?? "unknown",
@@ -2904,6 +3084,9 @@ function usageEventRows(events) {
 				kind: operationKind(event),
 				phase: event.action ?? event.phase ?? "unknown",
 				duration: event.durationMs,
+				activeDuration: waits.activeMs,
+				humanWait: waits.humanWaitMs,
+				delegatedWait: waits.delegatedWaitMs,
 				tokens: event.usage?.totalTokens,
 				context: event.context?.after?.tokens ?? event.context?.before?.tokens,
 				contextBefore: event.context?.before?.tokens,
@@ -2962,6 +3145,15 @@ function usageSummary(events, rows) {
 		tokens: rows.reduce((sum, row) => sum + Number(row.tokens ?? 0), 0),
 		unknownTokens: rows.filter((row) => row.tokens === undefined).length,
 		unknownContext: rows.filter((row) => row.context === undefined).length,
+		activeDurationMs: rows.reduce(
+			(sum, row) => sum + Number(row.activeDuration ?? 0),
+			0,
+		),
+		humanWaitMs: rows.reduce((sum, row) => sum + Number(row.humanWait ?? 0), 0),
+		delegatedWaitMs: rows.reduce(
+			(sum, row) => sum + Number(row.delegatedWait ?? 0),
+			0,
+		),
 		toolEvents: events.filter((event) => (event.tools ?? []).length).length,
 		tools: toolCounts(tools),
 		subagents: subagentCounts(tools),
@@ -3013,7 +3205,7 @@ function usageSubagentDetailHtml(row) {
 }
 
 function usageDetailHtml(row) {
-	return `<div class="detail-box"><div class="detail-grid"><div><b>Event</b><br>${escapeHtml(row.id)} · ${escapeHtml(row.eventType)} · ${escapeHtml(row.kind)} · ${escapeHtml(row.ok === false ? "failed" : "ok/unknown")}</div><div><b>Usage</b><br>tokens ${escapeHtml(unknown(row.tokens))}; in ${escapeHtml(unknown(row.usage?.input))}; out ${escapeHtml(unknown(row.usage?.output))}; cost ${escapeHtml(unknown(row.usage?.cost))}</div><div><b>Context</b><br>before ${escapeHtml(unknown(row.contextBefore))}; after ${escapeHtml(unknown(row.contextAfter))}</div><div><b>Messages</b><br>${escapeHtml(row.messages ? `${row.messages.count} total, ${row.messages.assistant} assistant, ${row.messages.tools} tool results` : "unknown")}</div></div>${row.error ? `<p class="error">${escapeHtml(row.error)}</p>` : ""}<p class="muted">Rows are event totals. Tool calls record wall time and I/O chars. New subagent runs also record child tokens/cost/model when pi-subagents returns them.</p>${usageSubagentDetailHtml(row)}${usageToolDetailHtml(row)}</div>`;
+	return `<div class="detail-box"><div class="detail-grid"><div><b>Event</b><br>${escapeHtml(row.id)} · ${escapeHtml(row.eventType)} · ${escapeHtml(row.kind)} · ${escapeHtml(row.ok === false ? "failed" : "ok/unknown")}</div><div><b>Time</b><br>wall ${escapeHtml(formatDuration(row.duration))}; active ${escapeHtml(formatDuration(row.activeDuration))}; user wait ${escapeHtml(formatDuration(row.humanWait))}; delegated wait ${escapeHtml(formatDuration(row.delegatedWait))}</div><div><b>Usage</b><br>tokens ${escapeHtml(unknown(row.tokens))}; in ${escapeHtml(unknown(row.usage?.input))}; out ${escapeHtml(unknown(row.usage?.output))}; cost ${escapeHtml(unknown(row.usage?.cost))}</div><div><b>Context</b><br>before ${escapeHtml(unknown(row.contextBefore))}; after ${escapeHtml(unknown(row.contextAfter))}</div><div><b>Messages</b><br>${escapeHtml(row.messages ? `${row.messages.count} total, ${row.messages.assistant} assistant, ${row.messages.tools} tool results` : "unknown")}</div></div>${row.error ? `<p class="error">${escapeHtml(row.error)}</p>` : ""}<p class="muted">Rows split parent wall time into active orchestration, user decision wait, and delegated subagent wait. New subagent runs also record child tokens/cost/model; missing detail is recovered from pi-subagents artifacts.</p>${usageSubagentDetailHtml(row)}${usageToolDetailHtml(row)}</div>`;
 }
 
 function usageHtml(state) {
@@ -3039,7 +3231,7 @@ body{font-family:ui-sans-serif,system-ui,sans-serif;margin:2rem;color:#111827;ba
 </style>
 <h1>Work usage</h1>
 <p class="muted">Scope: <strong>${escapeHtml(roadmapTerminology(state.filter.scope))} ${escapeHtml(state.filter.value)}</strong></p>
-<div class="cards"><div class="card"><b>${state.summary.events}</b><span>events</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.durationMs))}</b><span>time</span></div><div class="card"><b>${escapeHtml(state.summary.tokens || "unknown")}</b><span>tokens</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.subagents))}</b><span>subagents</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.tools))}</b><span>tools</span></div><div class="card"><b>${escapeHtml(state.summary.improvement.state)}</b><span>self-improvement${state.summary.improvement.enabled ? " · explicit reporting available" : ""}</span></div></div>
+<div class="cards"><div class="card"><b>${state.summary.events}</b><span>events</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.durationMs))}</b><span>wall time</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.activeDurationMs))}</b><span>active orchestration</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.humanWaitMs))}</b><span>user wait</span></div><div class="card"><b>${escapeHtml(formatDuration(state.summary.delegatedWaitMs))}</b><span>delegated wait</span></div><div class="card"><b>${escapeHtml(state.summary.tokens || "unknown")}</b><span>tokens</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.subagents))}</b><span>subagents</span></div><div class="card"><b>${escapeHtml(formatCounts(state.summary.tools))}</b><span>tools</span></div><div class="card"><b>${escapeHtml(state.summary.improvement.state)}</b><span>self-improvement${state.summary.improvement.enabled ? " · explicit reporting available" : ""}</span></div></div>
 <p class="muted">Missing data: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}. Generated from ${state.files.length ? state.files.map(escapeHtml).join(", ") : escapeHtml(state.dir)}.</p>
 ${usageSubagentSummaryHtml(state.summary)}
 <input id="filter" placeholder="filter rows" aria-label="filter rows">
@@ -3077,9 +3269,36 @@ function buildWorkUsageState(cwd, args = "") {
 			action: "choose-scope",
 			candidates: scoped.candidates,
 		});
-	const events = readTelemetryEvents(cwd).filter((event) =>
-		matchesTelemetryScope(event, scoped.filter),
-	);
+	let itemScope;
+	try {
+		if (
+			["roadmap", "epic", "workItem", "task"].includes(
+				scoped.filter.scope,
+			) || scoped.filter.scope?.includes("-")
+		)
+			itemScope = workStatsScope(
+				cwd,
+				scoped.filter.value ?? scoped.filter.scope,
+			);
+	} catch {
+		// Date and ad-hoc telemetry filters have no work-item scope.
+	}
+	const artifactCache = new Map();
+	const detailMatches = (detail) =>
+		detail.workItemId &&
+		itemScope &&
+		(itemScope.type === "epic"
+			? itemScope.ids.has(detail.workItemId)
+			: detail.workItemId === itemScope.id);
+	const events = readTelemetryEvents(cwd)
+		.map((event) => hydrateTelemetrySubagents(cwd, event, artifactCache))
+		.filter(
+			(event) =>
+				matchesTelemetryScope(event, scoped.filter) ||
+				(event.tools ?? []).some((tool) =>
+					(tool.subagentDetails ?? []).some(detailMatches),
+				),
+		);
 	const rows = usageEventRows(events);
 	const state = {
 		ok: true,
@@ -3128,7 +3347,7 @@ function renderWorkUsageText(state) {
 		state.open
 			? "Browser open requested."
 			: "Browser not opened; pass --open to launch it.",
-		`Scope: ${state.filter.scope}${state.filter.value ? ` ${state.filter.value}` : ""} · events: ${state.summary.events} · time: ${formatDuration(state.summary.durationMs)} · tokens: ${state.summary.tokens || "unknown"}`,
+		`Scope: ${state.filter.scope}${state.filter.value ? ` ${state.filter.value}` : ""} · events: ${state.summary.events} · wall: ${formatDuration(state.summary.durationMs)} · active: ${formatDuration(state.summary.activeDurationMs)} · user wait: ${formatDuration(state.summary.humanWaitMs)} · delegated wait: ${formatDuration(state.summary.delegatedWaitMs)} · tokens: ${state.summary.tokens || "unknown"}`,
 		state.summary.unknownTokens || state.summary.unknownContext
 			? `Missing data shown as unknown: tokens ${state.summary.unknownTokens}, context ${state.summary.unknownContext}`
 			: "",

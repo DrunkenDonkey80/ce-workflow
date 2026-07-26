@@ -60,6 +60,13 @@ try {
 			parentId: "EPIC-1",
 		},
 		{
+			id: "TASK-ARTIFACT",
+			type: "task",
+			status: "closed",
+			title: "Artifact-backed telemetry task",
+			parentId: "EPIC-1",
+		},
+		{
 			id: "EPIC-ARCHIVE",
 			type: "epic",
 			status: "closed",
@@ -331,6 +338,54 @@ try {
 		durationMs: 10_000,
 		usage: { totalTokens: 100 },
 	});
+	const artifactDir = path.join(cwd, ".pi-subagents", "artifacts");
+	mkdirSync(artifactDir, { recursive: true });
+	const transcriptPath = path.join(artifactDir, "artifact-run_work-worker.jsonl");
+	writeFileSync(
+		transcriptPath,
+		[
+			{
+				type: "message",
+				timestamp: new Date(now).toISOString(),
+				message: { role: "user", content: "implement" },
+			},
+			{
+				type: "message",
+				timestamp: new Date(now + 5_000).toISOString(),
+				message: {
+					role: "assistant",
+					usage: { input: 700, output: 300, totalTokens: 1_000 },
+				},
+			},
+		]
+			.map((line) => JSON.stringify(line))
+			.join("\n") + "\n",
+	);
+	writeFileSync(
+		path.join(artifactDir, "artifact-run_work-worker_meta.json"),
+		JSON.stringify({
+			runId: "artifact-run",
+			agent: "work-worker",
+			model: "openai-codex/gpt-5.6-codex:medium",
+			task: "Work item: TASK-ARTIFACT\nImplement and verify it.",
+			transcriptPath,
+			exitCode: 0,
+			modelAttempts: [{ usage: { input: 700, output: 300, cost: 0.02 } }],
+		}),
+	);
+	recordWorkTelemetry(cwd, {
+		id: "artifact-parent",
+		timestamp: now + 4,
+		type: "agent",
+		model: "openai-codex/gpt-5.6-codex",
+		durationMs: 90_000,
+		usage: { totalTokens: 100 },
+		tools: [
+			{ name: "ask_user", durationMs: 20_000 },
+			{ name: "subagent_wait", durationMs: 30_000 },
+			{ name: "subagent", runId: "artifact-run" },
+		],
+	});
 
 	const exactModelStats = renderWorkStats({
 		phases: [
@@ -355,6 +410,25 @@ try {
 		"stats use exact provider-free model IDs and separate the total row",
 	);
 
+	const artifactTask = buildWorkStats(cwd, "TASK-ARTIFACT");
+	assert(
+		artifactTask.phases.some(
+			(phase) => phase.phase === "Work" && phase.tokens === 1_000,
+		),
+		"stats recover child model usage from pi-subagents artifacts",
+	);
+	assert(
+		artifactTask.totals.parentWallDurationMs === 0,
+		"child-attributed parent events do not charge their whole wall time to one task",
+	);
+	const artifactRoadmap = buildWorkStats(cwd, "EPIC-1");
+	assert(
+		artifactRoadmap.totals.parentWallDurationMs >= 90_000 &&
+			artifactRoadmap.totals.humanWaitMs >= 20_000 &&
+			artifactRoadmap.totals.delegatedWaitMs >= 30_000,
+		"roadmap stats split parent wall time from user and delegated waits",
+	);
+
 	const task = buildWorkStats(cwd, "TASK-1");
 	assert(
 		task.phases.some((phase) => phase.phase === "Plan"),
@@ -377,11 +451,11 @@ try {
 		`task totals sum each model run once (${JSON.stringify(task)})`,
 	);
 	assert(
-		buildWorkStats(cwd, "EPIC-1").totals.tokens === 5_000,
-		"roadmap totals include child task usage",
+		buildWorkStats(cwd, "EPIC-1").totals.tokens === 6_100,
+		"roadmap totals include child task and artifact-recovered usage",
 	);
 	assert(
-		buildWorkStats(cwd, "INIT-1").totals.tokens === 5_000,
+		buildWorkStats(cwd, "INIT-1").totals.tokens === 6_100,
 		"initiative totals recursively include child roadmaps",
 	);
 	assert(
