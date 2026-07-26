@@ -449,8 +449,12 @@ for (const [selection, action] of [
 		{ source: "interactive", text: `${editorMarker}  Build useful thing  ` },
 		actionCtx,
 		{
-			execute: async (command, args) =>
-				routedEditorActions.push({ command, args }),
+			execute: async (command, args, _ctx, options) =>
+				routedEditorActions.push({
+					command,
+					args,
+					...(options ? { options } : {}),
+				}),
 		},
 	);
 	assert.equal(handled?.action, "handled", `${action} consumes once`);
@@ -458,14 +462,136 @@ for (const [selection, action] of [
 assert.deepEqual(
 	routedEditorActions,
 	[
-		{ command: "work-brainstorm", args: "new Build useful thing" },
+		{
+			command: "work-brainstorm",
+			args: "Build useful thing",
+			options: { explicitFreeform: true },
+		},
 		{ command: "work-plan", args: "Build useful thing" },
 		{ command: "work-small", args: "Build useful thing" },
 		{ command: "work-med", args: "Build useful thing" },
 		{ command: "work-big", args: "Build useful thing" },
 	],
-	"all five main-editor actions route freeform input and only Brainstorm applies menu semantics",
+	"all five main-editor actions route freeform input and only Brainstorm carries private freeform provenance",
 );
+
+const clipboardPath =
+	"C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-68605870-29c4-41f9-a1e9-5878ea4f214a.png";
+const clipboardBody = `First line\nSecond line\n${clipboardPath}`;
+editorCtx.selection = "Brainstorm";
+const clipboardCtx = editorCtx("editor-brainstorm-clipboard");
+await shortcuts.f7.handler(clipboardCtx);
+const clipboardRoutes = [];
+await mod.consumePendingMainEditorAction(
+	{ source: "interactive", text: `${editorMarker}${clipboardBody}` },
+	clipboardCtx,
+	{
+		execute: async (command, args, _ctx, options) =>
+			clipboardRoutes.push({ command, args, options }),
+	},
+);
+assert.deepEqual(
+	clipboardRoutes,
+	[
+		{
+			command: "work-brainstorm",
+			args: clipboardBody,
+			options: { explicitFreeform: true },
+		},
+	],
+	"Windows clipboard path routes once as private explicit freeform text",
+);
+
+const sourceImage = { type: "image", mimeType: "image/png", data: "cG5n" };
+const imageCtx = editorCtx("editor-brainstorm-image");
+await shortcuts.f7.handler(imageCtx);
+let materializedImages;
+let imageRoute;
+await mod.consumePendingMainEditorAction(
+	{
+		source: "interactive",
+		text: `${editorMarker}${clipboardBody}`,
+		images: [sourceImage],
+	},
+	imageCtx,
+	{
+		materializeTaskImages: (_cwd, images) => {
+			materializedImages = images;
+			return [
+				{
+					path: ".pi/work-artifacts/task-images/image.png",
+					mimeType: "image/png",
+					bytes: 3,
+				},
+			];
+		},
+		execute: async (command, args, _ctx, options) => {
+			imageRoute = { command, args, options };
+		},
+	},
+);
+assert.equal(materializedImages[0], sourceImage);
+assert.match(imageRoute.args, /C:\\Users\\Flex\\AppData/);
+assert.match(
+	imageRoute.args,
+	/- \.pi\/work-artifacts\/task-images\/image\.png \(image\/png, 3 bytes\)/,
+);
+assert(!imageRoute.args.includes(sourceImage.data) && !imageRoute.args.includes("data:"));
+assert.deepEqual(imageRoute.options, { explicitFreeform: true });
+
+const emptyImagesCtx = editorCtx("editor-brainstorm-empty-images");
+await shortcuts.f7.handler(emptyImagesCtx);
+let emptyMaterializerCalls = 0;
+let emptyRoutes = 0;
+await mod.consumePendingMainEditorAction(
+	{ source: "interactive", text: `${editorMarker}No image`, images: [] },
+	emptyImagesCtx,
+	{
+		materializeTaskImages: () => emptyMaterializerCalls++,
+		execute: async () => emptyRoutes++,
+	},
+);
+assert.equal(emptyMaterializerCalls, 0, "empty images skip materialization");
+assert.equal(emptyRoutes, 1, "empty images still route once");
+
+const failedImageCtx = editorCtx("editor-brainstorm-failed-image");
+await shortcuts.f7.handler(failedImageCtx);
+const failedSubmission = `${editorMarker}${clipboardBody}`;
+let materializeAttempts = 0;
+let failedImageRoutes = 0;
+const retryRuntime = {
+	materializeTaskImages: () => {
+		if (++materializeAttempts === 1) throw new Error("disk full");
+		return [
+			{
+				path: ".pi/work-artifacts/task-images/retry.png",
+				mimeType: "image/png",
+				bytes: 3,
+			},
+		];
+	},
+	execute: async () => failedImageRoutes++,
+};
+assert.equal(
+	(
+		await mod.consumePendingMainEditorAction(
+			{ source: "interactive", text: failedSubmission, images: [sourceImage] },
+			failedImageCtx,
+			retryRuntime,
+		)
+	)?.action,
+	"handled",
+);
+assert.equal(failedImageRoutes, 0, "materialization failure does not execute");
+assert.equal(failedImageCtx.editorText, failedSubmission, "failure restores submission");
+assert.match(editorNotices.at(-1).message, /Reattach the image and retry/);
+await mod.consumePendingMainEditorAction(
+	{ source: "interactive", text: failedSubmission, images: [sourceImage] },
+	failedImageCtx,
+	retryRuntime,
+);
+assert.equal(materializeAttempts, 2, "failed image submission remains armed");
+assert.equal(failedImageRoutes, 1, "reattached image retries exactly once");
 
 editorCtx.selection = "Plan";
 const blankCtx = editorCtx("editor-blank");

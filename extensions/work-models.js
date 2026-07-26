@@ -10620,9 +10620,17 @@ function ideationHandoffPrompt(epic, topic, runId) {
 	].join("\n");
 }
 
-function parseWorkBrainstormArgs(args = "") {
+function parseWorkBrainstormArgs(args = "", options = {}) {
 	const input = String(args).trim();
 	if (!input) return { kind: "usage" };
+	if (options.explicitFreeform)
+		return {
+			kind: "topic",
+			action: "link",
+			topic: input,
+			artifact: "",
+			standalone: true,
+		};
 	const parts = input.split(/\s+/);
 	const action = BRAINSTORM_ACTIONS.has(parts.at(-1)) ? parts.pop() : "link";
 	if (parts[0]?.toLowerCase() === "idea") {
@@ -10748,8 +10756,8 @@ function resolveFreeformIdea(cwd, epic, topic) {
 	};
 }
 
-function buildWorkBrainstormState(cwd, args = "") {
-	const parsed = parseWorkBrainstormArgs(args);
+function buildWorkBrainstormState(cwd, args = "", options = {}) {
+	const parsed = parseWorkBrainstormArgs(args, options);
 	if (parsed.kind === "usage")
 		return errorState(
 			"usage",
@@ -15053,19 +15061,34 @@ export async function consumePendingMainEditorAction(
 		pendingMainEditorActions.delete(mainEditorActionKey(ctx));
 		return;
 	}
-	const body = text.slice(pending.marker.length).trim();
+	let body = text.slice(pending.marker.length).trim();
 	if (!body) {
 		pending.createdAt = now;
 		ctx.ui?.setEditorText?.(pending.marker);
 		ctx.ui?.notify?.("Add an idea or prompt before sending.", "warning");
 		return { action: "handled" };
 	}
+	const explicitFreeform = pending.action === "work-brainstorm";
+	if (explicitFreeform && event.images?.length) {
+		try {
+			const attachments = (
+				runtime.materializeTaskImages ?? materializeTaskImages
+			)(ctx.cwd, event.images);
+			body += `\n\nAttachments:\n${attachments.map((attachment) => `- ${attachment.path} (${attachment.mimeType}, ${attachment.bytes} bytes)`).join("\n")}`;
+		} catch (error) {
+			pending.createdAt = now;
+			ctx.ui?.setEditorText?.(text);
+			ctx.ui?.notify?.(
+				`Could not save Brainstorm image: ${formatError(error)} Reattach the image and retry.`,
+				"warning",
+			);
+			return { action: "handled" };
+		}
+	}
 	pendingMainEditorActions.delete(mainEditorActionKey(ctx));
-	await runtime.execute(
-		pending.action,
-		pending.action === "work-brainstorm" ? menuBrainstormArgs(body) : body,
-		ctx,
-	);
+	if (explicitFreeform)
+		await runtime.execute(pending.action, body, ctx, { explicitFreeform: true });
+	else await runtime.execute(pending.action, body, ctx);
 	return { action: "handled" };
 }
 
@@ -17521,6 +17544,7 @@ async function executeOrchestratorAction(
 	ctx,
 	pi,
 	selectionNote = "",
+	options = {},
 ) {
 	const name = String(command ?? "").replace(/^\//, "");
 	const text = String(args ?? "");
@@ -17591,7 +17615,7 @@ async function executeOrchestratorAction(
 				notify(ctx, state.message, "warning");
 				return stateTelemetry(state);
 			}
-			let state = buildWorkBrainstormState(ctx.cwd, text);
+			let state = buildWorkBrainstormState(ctx.cwd, text, options);
 			if (state.action === "brainstorm-epic-created") {
 				const epic = readWorkItem(ctx.cwd, state.epic.id);
 				if (epic) {
@@ -18218,8 +18242,8 @@ export default function workModelsExtension(pi) {
 
 	pi.on("input", async (event, ctx) => {
 		const mainEditorAction = await consumePendingMainEditorAction(event, ctx, {
-			execute: (command, args, actionCtx) =>
-				executeOrchestratorAction(command, args, actionCtx, pi),
+			execute: (command, args, actionCtx, options) =>
+				executeOrchestratorAction(command, args, actionCtx, pi, "", options),
 		});
 		if (mainEditorAction?.action === "handled") return mainEditorAction;
 		const richTaskTransform = transformPendingRichTaskInput(event, ctx);

@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -292,9 +298,11 @@ try {
 	);
 	const followUps = [];
 	let brainstormRpc = 0;
+	const routedClipboardBody =
+		"Try an offline-first reader\nC:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-68605870-29c4-41f9-a1e9-5878ea4f214a.png";
 	const interactive = await executeOrchestratorAction(
 		"work-brainstorm",
-		"Try an offline-first reader",
+		routedClipboardBody,
 		{
 			cwd,
 			mode: "tui",
@@ -310,13 +318,40 @@ try {
 			sendUserMessage: async (message) => followUps.push(message),
 			events: { emit: () => brainstormRpc++ },
 		},
+		"",
+		{ explicitFreeform: true },
 	);
+	const telemetryText = readdirSync(path.join(cwd, ".pi", "work-runs"))
+		.filter((file) => file.endsWith(".jsonl"))
+		.map((file) => readFileSync(path.join(cwd, ".pi", "work-runs", file), "utf8"))
+		.join("\n");
+	const telemetryEvents = telemetryText
+		.split(/\r?\n/)
+		.filter(Boolean)
+		.map((line) => JSON.parse(line));
 	assert(
 		interactive.creativeDepth === "wide" &&
 			followUps.length === 1 &&
 			followUps[0]?.includes("Creative sidecar gate") &&
 			brainstormRpc === 0,
 		"TUI Brainstorm emits one visible Pi turn with its creative handoff and no RPC",
+	);
+	assert(
+		followUps[0]?.includes(routedClipboardBody),
+		"explicit freeform body reaches the TUI handoff unchanged",
+	);
+	assert(
+		telemetryEvents.some(
+			(event) =>
+				event.command === "work-brainstorm" &&
+				event.args === routedClipboardBody.replace("\n", " "),
+		),
+		"explicit freeform body remains the command telemetry args",
+	);
+	assert(
+		!followUps[0]?.includes("explicitFreeform") &&
+			!telemetryText.includes("explicitFreeform"),
+		"private freeform option does not leak into handoff or telemetry",
 	);
 
 	const linked = linkBrainstormArtifactFromFinal(
@@ -395,6 +430,31 @@ try {
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), "{}\n");
 
 	fixture.reset("ideas");
+	const clipboardBody = [
+		"Keep both lines of this request",
+		"and inspect the pasted screenshot",
+		"C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-68605870-29c4-41f9-a1e9-5878ea4f214a.png",
+	].join("\n");
+	state = buildWorkBrainstormState(cwd, clipboardBody, {
+		explicitFreeform: true,
+	});
+	const explicitIdea = fixture.store().items[state.idea.id];
+	const explicitHandoff = brainstormHandoffPrompt(state, cwd);
+	assert(
+		state.ok &&
+			state.artifact === "" &&
+			state.topic === clipboardBody &&
+			explicitIdea.description.includes(clipboardBody),
+		"explicit freeform preserves a multiline Windows clipboard path as topic text",
+	);
+	assert(
+		![state.topic, explicitIdea.description, explicitHandoff].some((value) =>
+			String(value).includes("explicitFreeform"),
+		),
+		"private freeform provenance never leaks into topic, description, or handoff",
+	);
+
+	fixture.reset("ideas");
 	const longPrompt = `Modernize the LPGSlim Android interface to match the Linea Pro demo look and feel with smooth transitions, graphics, animations, connected-device startup states, and updated screens while preserving the full detailed request for brainstorming. ${"Use the attached Pixel device and inspect the installed demo UI source before proposing screen-by-screen changes. ".repeat(8)}`;
 	state = buildWorkBrainstormState(cwd, longPrompt);
 	const longPromptIdea = fixture.store().items[state.idea.id];
@@ -459,8 +519,18 @@ try {
 		"freeform creates new idea when no exact match exists",
 	);
 	assert(
-		state.idea.ideaStatus === "brainstormed",
-		"new freeform idea is brainstormed when artifact exists",
+		state.idea.ideaStatus === "brainstormed" &&
+			state.artifact === "docs/brainstorms/new.md",
+		"new positional topic artifact remains compatible",
+	);
+
+	state = buildWorkBrainstormState(
+		cwd,
+		"Missing artifact docs/brainstorms/missing.md",
+	);
+	assert(
+		!state.ok && state.action === "missing-source",
+		"missing direct positional artifact still fails",
 	);
 
 	state = buildWorkBrainstormState(
