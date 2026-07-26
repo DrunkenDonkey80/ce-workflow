@@ -17,6 +17,8 @@ import os from "node:os";
 import path from "node:path";
 
 export const READ_ONLY_LANE_VERSION = 1;
+export const VERIFICATION_MANIFEST_VERSION = 1;
+export const VERIFICATION_GATE_VERSION = "finish-verification-v1";
 const STORE_VERSION = 1;
 const STATES = new Set([
 	"queued",
@@ -449,8 +451,12 @@ function runtimePath(entry) {
 		entry.startsWith(".pi/work-runs/")
 	);
 }
-export function captureRepositoryFingerprint(cwd = process.cwd()) {
+export function captureRepositoryFingerprint(
+	cwd = process.cwd(),
+	options = {},
+) {
 	const head = git(cwd, ["rev-parse", "HEAD"]);
+	const excludedOutputs = (options.excludeOutputs ?? []).map(relativePath);
 	const records = git(cwd, [
 		"status",
 		"--porcelain=v1",
@@ -466,6 +472,13 @@ export function captureRepositoryFingerprint(cwd = process.cwd()) {
 		const entry = record.slice(3).replaceAll("\\", "/");
 		if (/[RC]/.test(status) && records[index + 1]) index += 1;
 		if (runtimePath(entry)) continue;
+		if (
+			status === "??" &&
+			excludedOutputs.some(
+				(output) => entry === output || entry.startsWith(`${output}/`),
+			)
+		)
+			continue;
 		const file = path.join(cwd, entry);
 		let content = "missing";
 		try {
@@ -796,4 +809,470 @@ export function laneTelemetryEvents(cwd = process.cwd()) {
 		type: "read-only-lane",
 		...lane,
 	}));
+}
+
+function exactKeys(value, keys) {
+	return (
+		plain(value) &&
+		JSON.stringify(Object.keys(value).sort()) ===
+			JSON.stringify([...keys].sort())
+	);
+}
+function verificationOutputPath(value) {
+	const output = relativePath(value);
+	if (/^(?:\.git|\.ce-workflow|\.pi)(?:\/|$)/.test(output))
+		fail(
+			"invalid",
+			`Verification output cannot contain workflow or Git state: ${output}`,
+		);
+	return output.replace(/\/$/, "");
+}
+function outputClaimsConflict(left, right) {
+	return left.some((a) =>
+		right.some(
+			(b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`),
+		),
+	);
+}
+function shardClaimsConflict(left, right) {
+	return (
+		left.resourceKeys.some((key) => right.resourceKeys.includes(key)) ||
+		outputClaimsConflict(left.outputs, right.outputs)
+	);
+}
+function normalizedShard(input, index) {
+	if (!plain(input))
+		fail("invalid", `Verification shard ${index + 1} is invalid`);
+	const id = input.id;
+	if (!text(id) || !/^[A-Za-z0-9_.-]+$/.test(id))
+		fail("invalid", `Verification shard ${index + 1} has an invalid id`);
+	if (!text(input.command))
+		fail("invalid", `Verification shard ${id} needs a command`);
+	return {
+		id,
+		command: input.command,
+		dependsOn: sortedStrings(input.dependsOn ?? [], "dependsOn"),
+		resourceKeys: sortedStrings(input.resourceKeys ?? [], "resourceKeys"),
+		outputs: sortedStrings(input.outputs ?? [], "outputs").map(
+			verificationOutputPath,
+		),
+		required: input.required !== false,
+	};
+}
+export function normalizeVerificationShards(shards) {
+	if (!Array.isArray(shards) || !shards.length)
+		fail("invalid", "At least one verification shard is required");
+	const normalized = shards.map(normalizedShard);
+	const ids = new Set(normalized.map(({ id }) => id));
+	if (ids.size !== normalized.length)
+		fail("invalid", "Verification shard ids must be unique");
+	for (const shard of normalized) {
+		if (shard.dependsOn.includes(shard.id))
+			fail("invalid", `Verification shard ${shard.id} depends on itself`);
+		if (shard.dependsOn.some((id) => !ids.has(id)))
+			fail(
+				"invalid",
+				`Verification shard ${shard.id} has a missing dependency`,
+			);
+	}
+	const pending = new Set(ids);
+	const complete = new Set();
+	while (pending.size) {
+		const ready = normalized.filter(
+			(shard) =>
+				pending.has(shard.id) &&
+				shard.dependsOn.every((id) => complete.has(id)),
+		);
+		if (!ready.length)
+			fail("invalid", "Verification shard dependencies contain a cycle");
+		for (const shard of ready) {
+			pending.delete(shard.id);
+			complete.add(shard.id);
+		}
+	}
+	return normalized;
+}
+function verificationOutput(value) {
+	const output = String(value ?? "");
+	return {
+		outputHash: hash(output, 64),
+		outputTail: output.slice(-500),
+	};
+}
+function verificationMetrics(shards, durations, limit) {
+	const remaining = new Set(shards.map(({ id }) => id));
+	const ends = new Map();
+	const slots = Array.from({ length: limit }, () => 0);
+	const claims = new Map();
+	let maxConcurrency = 0;
+	const intervals = [];
+	while (remaining.size) {
+		const shard = shards.find(
+			(item) =>
+				remaining.has(item.id) && item.dependsOn.every((id) => ends.has(id)),
+		);
+		const dependencyReady = Math.max(
+			0,
+			...shard.dependsOn.map((id) => ends.get(id) ?? 0),
+		);
+		const claimReady = Math.max(
+			0,
+			...shards
+				.filter(
+					(other) => ends.has(other.id) && shardClaimsConflict(shard, other),
+				)
+				.map((other) => claims.get(other.id) ?? 0),
+		);
+		let slot = 0;
+		for (let index = 1; index < slots.length; index += 1)
+			if (
+				Math.max(slots[index], dependencyReady, claimReady) <
+				Math.max(slots[slot], dependencyReady, claimReady)
+			)
+				slot = index;
+		const start = Math.max(slots[slot], dependencyReady, claimReady);
+		const end = start + (durations.get(shard.id) ?? 0);
+		slots[slot] = end;
+		ends.set(shard.id, end);
+		claims.set(shard.id, end);
+		intervals.push({ start, end });
+		remaining.delete(shard.id);
+	}
+	for (const point of new Set(
+		intervals.flatMap(({ start, end }) => [start, end]),
+	))
+		maxConcurrency = Math.max(
+			maxConcurrency,
+			intervals.filter(({ start, end }) => start <= point && point < end)
+				.length,
+		);
+	return {
+		criticalPathMs: Math.max(0, ...ends.values()),
+		sumShardMs: [...durations.values()].reduce((sum, value) => sum + value, 0),
+		maxConcurrency,
+	};
+}
+
+export async function runVerificationShardBatch(
+	cwd,
+	input,
+	runner,
+	options = {},
+) {
+	if (typeof runner !== "function")
+		fail("invalid", "Verification runner is required");
+	if (!repositoryMutationLocked(cwd) || options.mutationOwner !== true)
+		fail(
+			"locked",
+			"Verification shards require the repository mutation-lock owner",
+		);
+	const shards = normalizeVerificationShards(input?.shards);
+	const serial =
+		options.serial === true || process.env.WORK_ORCH_SERIAL === "1";
+	const limit = serial ? 1 : Math.max(1, Number(options.maxConcurrency) || 2);
+	const baseHead = input.baseHead ?? git(cwd, ["rev-parse", "HEAD"]);
+	const outputs = [...new Set(shards.flatMap((shard) => shard.outputs))].sort();
+	const sourceFingerprint =
+		input.sourceFingerprint ??
+		captureRepositoryFingerprint(cwd, { excludeOutputs: outputs });
+	if (sourceFingerprint.head !== baseHead)
+		fail("invalid", "Verification candidate HEAD and fingerprint differ");
+	const invocationId =
+		input.invocationId ??
+		`verify-${hash(`${Date.now()}-${process.pid}-${Math.random()}`, 32)}`;
+	const startedAt = timestamp(options.now?.());
+	const results = new Map();
+	const running = new Map();
+	const active = new Set();
+	let stopped = false;
+	await new Promise((resolveBatch) => {
+		const pump = () => {
+			while (!stopped && running.size < limit) {
+				const shard = shards.find(
+					(item) =>
+						!results.has(item.id) &&
+						!running.has(item.id) &&
+						item.dependsOn.every((id) => results.get(id)?.status === "PASS") &&
+						[...active].every(
+							(id) =>
+								!shardClaimsConflict(
+									item,
+									shards.find((entry) => entry.id === id),
+								),
+						),
+				);
+				if (!shard) break;
+				running.set(shard.id, true);
+				active.add(shard.id);
+				void (async () => {
+					const realStarted = Date.now();
+					const shardStartedAt = timestamp(options.now?.());
+					let output;
+					try {
+						output = (await runner(shard)) ?? {};
+					} catch (error) {
+						output = {
+							exitStatus: Number.isInteger(error?.status)
+								? error.status
+								: Number.isInteger(error?.code)
+									? error.code
+									: 1,
+							stdout: error?.stdout,
+							stderr: error?.stderr ?? error?.message ?? error,
+						};
+					}
+					const exitStatus = Number.isInteger(output.exitStatus)
+						? output.exitStatus
+						: Number.isInteger(output.status)
+							? output.status
+							: 0;
+					const durationMs = Math.max(0, Date.now() - realStarted);
+					const virtualDurationMs = Math.max(
+						0,
+						Number(output.virtualDurationMs ?? output.durationMs) || durationMs,
+					);
+					const bounded = verificationOutput(
+						`${String(output.stdout ?? "")}${String(output.stderr ?? "")}`,
+					);
+					results.set(shard.id, {
+						schemaVersion: VERIFICATION_MANIFEST_VERSION,
+						gateVersion: input.gateVersion ?? VERIFICATION_GATE_VERSION,
+						id: shard.id,
+						command: shard.command,
+						status: exitStatus === 0 ? "PASS" : "FAIL",
+						exitStatus,
+						...bounded,
+						durationMs,
+						virtualDurationMs,
+						startedAt: shardStartedAt,
+						finishedAt: timestamp(options.now?.()),
+						dependsOn: shard.dependsOn,
+						resourceKeys: shard.resourceKeys,
+						outputs: shard.outputs,
+						baseHead,
+						sourceFingerprint: sourceFingerprint.digest,
+						required: shard.required,
+					});
+					if (exitStatus !== 0 && options.failFast !== false) stopped = true;
+					active.delete(shard.id);
+					running.delete(shard.id);
+					pump();
+				})();
+			}
+			if (running.size) return;
+			const unsettled = shards.filter((shard) => !results.has(shard.id));
+			if (
+				stopped ||
+				unsettled.every((shard) =>
+					shard.dependsOn.some((id) => results.get(id)?.status !== "PASS"),
+				)
+			) {
+				for (const shard of unsettled) {
+					const bounded = verificationOutput("");
+					results.set(shard.id, {
+						schemaVersion: VERIFICATION_MANIFEST_VERSION,
+						gateVersion: input.gateVersion ?? VERIFICATION_GATE_VERSION,
+						id: shard.id,
+						command: shard.command,
+						status: "SKIPPED",
+						exitStatus: null,
+						...bounded,
+						durationMs: 0,
+						virtualDurationMs: 0,
+						startedAt: timestamp(options.now?.()),
+						finishedAt: timestamp(options.now?.()),
+						dependsOn: shard.dependsOn,
+						resourceKeys: shard.resourceKeys,
+						outputs: shard.outputs,
+						baseHead,
+						sourceFingerprint: sourceFingerprint.digest,
+						required: shard.required,
+					});
+				}
+				resolveBatch();
+				return;
+			}
+			if (results.size === shards.length) resolveBatch();
+		};
+		pump();
+	});
+	const ordered = shards.map((shard) => results.get(shard.id));
+	const durations = new Map(
+		ordered.map((result) => [result.id, result.virtualDurationMs]),
+	);
+	const metrics = verificationMetrics(shards, durations, limit);
+	const currentFingerprint = captureRepositoryFingerprint(cwd, {
+		excludeOutputs: outputs,
+	});
+	const manifest = {
+		schemaVersion: VERIFICATION_MANIFEST_VERSION,
+		gateVersion: input.gateVersion ?? VERIFICATION_GATE_VERSION,
+		invocationId,
+		authoritativeCommand: input.authoritativeCommand,
+		baseHead,
+		sourceFingerprint,
+		declarationsHash: hash(shards, 64),
+		startedAt,
+		finishedAt: timestamp(options.now?.()),
+		shards: ordered,
+		reviews: Array.isArray(input.reviews) ? structuredClone(input.reviews) : [],
+		metrics,
+		status:
+			fingerprintsEqual(sourceFingerprint, currentFingerprint) &&
+			ordered.every((result) => !result.required || result.status === "PASS")
+				? "PASS"
+				: "FAIL",
+	};
+	return {
+		manifest,
+		declarations: shards,
+		currentFingerprint,
+		serial,
+		outputs,
+	};
+}
+
+const MANIFEST_KEYS = [
+	"schemaVersion",
+	"gateVersion",
+	"invocationId",
+	"authoritativeCommand",
+	"baseHead",
+	"sourceFingerprint",
+	"declarationsHash",
+	"startedAt",
+	"finishedAt",
+	"shards",
+	"reviews",
+	"metrics",
+	"status",
+];
+const SHARD_RESULT_KEYS = [
+	"schemaVersion",
+	"gateVersion",
+	"id",
+	"command",
+	"status",
+	"exitStatus",
+	"outputHash",
+	"outputTail",
+	"durationMs",
+	"virtualDurationMs",
+	"startedAt",
+	"finishedAt",
+	"dependsOn",
+	"resourceKeys",
+	"outputs",
+	"baseHead",
+	"sourceFingerprint",
+	"required",
+];
+export function admitVerificationManifest(manifest, expected = {}) {
+	const shards = normalizeVerificationShards(expected.shards);
+	const gateVersion = expected.gateVersion ?? VERIFICATION_GATE_VERSION;
+	const reject = (message) => fail("admission", message);
+	if (!exactKeys(manifest, MANIFEST_KEYS))
+		reject("Verification manifest schema is not exact");
+	if (manifest.schemaVersion !== VERIFICATION_MANIFEST_VERSION)
+		reject("Verification manifest schema version is wrong");
+	if (manifest.gateVersion !== gateVersion)
+		reject("Verification manifest gate is wrong");
+	if (
+		!text(expected.invocationId) ||
+		manifest.invocationId !== expected.invocationId
+	)
+		reject("Verification manifest invocation is stale or forged");
+	if (
+		manifest.authoritativeCommand !== expected.authoritativeCommand ||
+		manifest.baseHead !== expected.baseHead ||
+		JSON.stringify(manifest.sourceFingerprint) !==
+			JSON.stringify(expected.sourceFingerprint) ||
+		manifest.declarationsHash !== hash(shards, 64)
+	)
+		reject("Verification manifest candidate does not match");
+	if (
+		!text(manifest.startedAt) ||
+		!text(manifest.finishedAt) ||
+		!Number.isFinite(Date.parse(manifest.startedAt)) ||
+		!Number.isFinite(Date.parse(manifest.finishedAt)) ||
+		Date.parse(manifest.finishedAt) < Date.parse(manifest.startedAt) ||
+		!exactKeys(manifest.metrics, [
+			"criticalPathMs",
+			"sumShardMs",
+			"maxConcurrency",
+		]) ||
+		["criticalPathMs", "sumShardMs", "maxConcurrency"].some(
+			(key) =>
+				!Number.isFinite(manifest.metrics[key]) || manifest.metrics[key] < 0,
+		)
+	)
+		reject("Verification manifest timing evidence is invalid");
+	if (
+		expected.currentFingerprint &&
+		!fingerprintsEqual(manifest.sourceFingerprint, expected.currentFingerprint)
+	)
+		reject("Verification candidate changed after shards ran");
+	if (
+		expected.notAfter &&
+		Date.parse(manifest.finishedAt) > Date.parse(expected.notAfter)
+	)
+		reject("Verification manifest arrived late");
+	if (
+		!Array.isArray(manifest.shards) ||
+		manifest.shards.length !== shards.length
+	)
+		reject("Verification manifest is missing shard evidence");
+	const ids = new Set(manifest.shards.map((result) => result?.id));
+	if (ids.size !== manifest.shards.length)
+		reject("Verification manifest has duplicate shards");
+	for (let index = 0; index < shards.length; index += 1) {
+		const declaration = shards[index];
+		const result = manifest.shards[index];
+		if (!exactKeys(result, SHARD_RESULT_KEYS))
+			reject(`Verification shard ${declaration.id} schema is not exact`);
+		if (
+			result.schemaVersion !== VERIFICATION_MANIFEST_VERSION ||
+			result.gateVersion !== gateVersion ||
+			result.id !== declaration.id ||
+			result.command !== declaration.command ||
+			result.baseHead !== expected.baseHead ||
+			result.sourceFingerprint !== expected.sourceFingerprint.digest ||
+			JSON.stringify(result.dependsOn) !==
+				JSON.stringify(declaration.dependsOn) ||
+			JSON.stringify(result.resourceKeys) !==
+				JSON.stringify(declaration.resourceKeys) ||
+			JSON.stringify(result.outputs) !== JSON.stringify(declaration.outputs) ||
+			result.required !== declaration.required
+		)
+			reject(
+				`Verification shard ${declaration.id} does not match its declaration`,
+			);
+		if (
+			declaration.required &&
+			(result.status !== "PASS" || result.exitStatus !== 0)
+		)
+			reject(`Required verification shard ${declaration.id} did not pass`);
+		if (
+			!/^[0-9a-f]{64}$/.test(result.outputHash) ||
+			typeof result.outputTail !== "string" ||
+			result.outputTail.length > 500 ||
+			!Number.isFinite(result.durationMs) ||
+			result.durationMs < 0 ||
+			!Number.isFinite(result.virtualDurationMs) ||
+			result.virtualDurationMs < 0 ||
+			!Number.isFinite(Date.parse(result.startedAt)) ||
+			!Number.isFinite(Date.parse(result.finishedAt)) ||
+			Date.parse(result.finishedAt) < Date.parse(result.startedAt)
+		)
+			reject(
+				`Verification shard ${declaration.id} output or timing evidence is invalid`,
+			);
+	}
+	if (
+		JSON.stringify(manifest.reviews) !== JSON.stringify(expected.reviews ?? [])
+	)
+		reject("Verification review evidence does not match");
+	if (manifest.status !== "PASS")
+		reject("Verification manifest gate did not pass");
+	return manifest;
 }

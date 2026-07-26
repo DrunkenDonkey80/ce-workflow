@@ -65,6 +65,8 @@ import {
 } from "./background-verifiers.js";
 import {
 	acknowledgeLaneLaunch,
+	acquireRepositoryMutationLock,
+	admitVerificationManifest,
 	captureRepositoryFingerprint,
 	createLaneEnvelope,
 	fingerprintsEqual,
@@ -75,6 +77,7 @@ import {
 	queueLane,
 	reconcileReadOnlyLanes,
 	runReadOnlyLaneBatch,
+	runVerificationShardBatch,
 	transitionLane,
 } from "./read-only-lanes.js";
 import {
@@ -8195,6 +8198,61 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 	});
 }
 
+export async function runFrozenCandidateVerification(
+	cwd,
+	input,
+	runner,
+	options = {},
+) {
+	const mutation = acquireRepositoryMutationLock(cwd);
+	try {
+		const checkpoint = captureVerifierCheckpoint(cwd, {
+			scope: input.scope ?? "changes",
+			paths: input.paths,
+		});
+		const verifier = scheduleVerifierBatch(cwd, {
+			profiles: input.profiles ?? [],
+			checkpoint,
+			origin: input.origin ?? "normal",
+			adapter: input.adapter,
+		});
+		const reviews = verifier.batch
+			? (verifier.batch.profiles ?? []).map((profile) => ({
+					batchId: verifier.batch.id,
+					checkpoint: checkpoint.snapshot,
+					model: profile.model,
+					status: verifier.status,
+				}))
+			: [];
+		const batch = await runVerificationShardBatch(
+			cwd,
+			{ ...input, reviews },
+			runner,
+			{
+				...options,
+				mutationOwner: true,
+				serial:
+					options.serial === true ||
+					process.env.WORK_ORCH_SERIAL === "1" ||
+					workOrchSettings(cwd).serialReadOnlyLanes,
+			},
+		);
+		admitVerificationManifest(batch.manifest, {
+			shards: batch.declarations,
+			invocationId: batch.manifest.invocationId,
+			authoritativeCommand: input.authoritativeCommand,
+			baseHead: batch.manifest.baseHead,
+			sourceFingerprint: batch.manifest.sourceFingerprint,
+			currentFingerprint: batch.currentFingerprint,
+			gateVersion: input.gateVersion,
+			reviews,
+		});
+		return { ...batch, checkpoint, verifier };
+	} finally {
+		mutation.release();
+	}
+}
+
 export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
 	if (!input.before || !input.after || input.before === input.after)
 		return null;
@@ -12868,7 +12926,7 @@ function amendIfOnly(cwd, dirty, files, message) {
 	run(cwd, "git", ["commit", "--amend", "--no-edit"]);
 }
 
-function executeWorkFinishState(cwd, state, currentModel) {
+function executeWorkFinishStateUnlocked(cwd, state, currentModel) {
 	if (!state?.ok || state.action !== "commit-ready") return state;
 	if (state.handoffPrompt)
 		return errorState(
@@ -12936,6 +12994,15 @@ function executeWorkFinishState(cwd, state, currentModel) {
 			commandErrorText(error) || error.message,
 			{ ...state, action: "finish-stop" },
 		);
+	}
+}
+
+function executeWorkFinishState(cwd, state, currentModel) {
+	const mutation = acquireRepositoryMutationLock(cwd);
+	try {
+		return executeWorkFinishStateUnlocked(cwd, state, currentModel);
+	} finally {
+		mutation.release();
 	}
 }
 
@@ -19069,31 +19136,37 @@ async function executeOrchestratorAction(
 		});
 	if (name === "work-finish")
 		return withCommandTelemetry(name, text, ctx, async () => {
-			cleanupBenignInstructionDirt(ctx.cwd);
-			let state = buildWorkFinishState(ctx.cwd, text);
-			if (state.ok && !state.handoffPrompt)
-				state = executeWorkFinishState(
+			const mutation = acquireRepositoryMutationLock(ctx.cwd);
+			try {
+				cleanupBenignInstructionDirt(ctx.cwd);
+				let state = buildWorkFinishState(ctx.cwd, text);
+				if (state.ok && !state.handoffPrompt)
+					state = executeWorkFinishStateUnlocked(
+						ctx.cwd,
+						state,
+						ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+					);
+				if (state.verifier?.status === "queued")
+					void launchQueuedVerifierJobs(
+						ctx.cwd,
+						createPiSubagentsVerifierAdapter(pi),
+					);
+				rememberRecommendedActions(
 					ctx.cwd,
-					state,
-					ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+					recommendedActions(state),
+					"work-finish",
 				);
-			if (state.verifier?.status === "queued")
-				void launchQueuedVerifierJobs(
-					ctx.cwd,
-					createPiSubagentsVerifierAdapter(pi),
+				notify(
+					ctx,
+					renderWorkflowActionText(state),
+					state.ok ? "info" : "warning",
 				);
-			rememberRecommendedActions(
-				ctx.cwd,
-				recommendedActions(state),
-				"work-finish",
-			);
-			notify(
-				ctx,
-				renderWorkflowActionText(state),
-				state.ok ? "info" : "warning",
-			);
-			if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
-			return stateTelemetry(state);
+				if (state.handoffPrompt)
+					await sendFollowUp(ctx, state.handoffPrompt, pi);
+				return stateTelemetry(state);
+			} finally {
+				mutation.release();
+			}
 		});
 	if (name === "work-status")
 		return withCommandTelemetry(name, text, ctx, () =>

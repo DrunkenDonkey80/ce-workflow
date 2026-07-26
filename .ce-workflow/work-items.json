@@ -3426,17 +3426,26 @@
         "schemaVersion": 1,
         "title": "Join frozen verification shards into coded finish"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.19",
       "labels": [],
       "notes": [
-        "wo:execution-agent\nDesign/files: implement the declared shard scheduler, resource/output validation, frozen fingerprints, manifest schema/join, and telemetry by extending extensions/read-only-lanes.js; integrate frozen-candidate orchestration, immutable review fanout through captureVerifierCheckpoint/scheduleVerifierBatch, serial setting, and correct pipeline attribution in extensions/work-models.js; add repeated declared shard/manifest admission to finishTask/runVerification in scripts/work-helper.mjs while retaining serial fallback and full-invocation MUTATE_REPO ownership; leave extensions/background-verifiers.js review/report authority intact except the smallest export or attribution hook genuinely required; document declarations, exclusivity, manifest admission, serial parity, and current resume-triage semantics in README.md. Add scripts/test-work-verification-shards.mjs and extend scripts/test-work-helper-contract.mjs, scripts/test-work-start-finish.mjs, scripts/test-background-verifiers.mjs, and scripts/test-work-background-verifier-flow.mjs. Covered brief parts: frozen candidate sharding, immutable review fanout, joined evidence admission, deterministic overlap, pipeline attribution/regression, serial parity, and full regression. Branch: feat/workflow-parallelism."
+        "wo:execution-agent\nDesign/files: implement the declared shard scheduler, resource/output validation, frozen fingerprints, manifest schema/join, and telemetry by extending extensions/read-only-lanes.js; integrate frozen-candidate orchestration, immutable review fanout through captureVerifierCheckpoint/scheduleVerifierBatch, serial setting, and correct pipeline attribution in extensions/work-models.js; add repeated declared shard/manifest admission to finishTask/runVerification in scripts/work-helper.mjs while retaining serial fallback and full-invocation MUTATE_REPO ownership; leave extensions/background-verifiers.js review/report authority intact except the smallest export or attribution hook genuinely required; document declarations, exclusivity, manifest admission, serial parity, and current resume-triage semantics in README.md. Add scripts/test-work-verification-shards.mjs and extend scripts/test-work-helper-contract.mjs, scripts/test-work-start-finish.mjs, scripts/test-background-verifiers.mjs, and scripts/test-work-background-verifier-flow.mjs. Covered brief parts: frozen candidate sharding, immutable review fanout, joined evidence admission, deterministic overlap, pipeline attribution/regression, serial parity, and full regression. Branch: feat/workflow-parallelism.",
+        "Implementation complete; item remains in progress for review/commit.\nFiles changed: README.md; extensions/read-only-lanes.js; extensions/work-models.js; scripts/work-helper.mjs; scripts/test-work-verification-shards.mjs; scripts/test-work-helper-contract.mjs.\nVerification: node scripts/test-work-verification-shards.mjs && node scripts/test-work-helper-contract.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-background-verifiers.mjs && node scripts/test-work-background-verifier-flow.mjs — PASS. npm run verify:quiet — PASS. node --check on all changed JS/MJS — PASS. git diff --check — PASS.\nResult: frozen shard scheduling/admission, mutation-lock ownership, serial parity, immutable review checkpoint join, compact finish evidence, cleanup, and attribution/dedup regressions pass. Failures: none. Remaining: independent review and parent commit/finalization.\n",
+        "wo:review-scope [\"README.md\",\"extensions/read-only-lanes.js\",\"extensions/work-models.js\",\"scripts/test-work-helper-contract.mjs\",\"scripts/work-helper.mjs\",\"scripts/test-work-verification-shards.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"scripts/work-helper.mjs:764 - restore prior option() semantics by guarding index + 1 < args.length instead of truthiness, so --expect \\\"\\\" still asserts empty verification output instead of silently skipping the gate (verified: old returns empty string, new returns undefined)\",\"extensions/read-only-lanes.js:1015 - map real child exit code with Number.isInteger(error?.status) ? error.status : Number.isInteger(error?.code) ? error.code : 1 because promisified exec/execFile reject with code (verified code=7, status=undefined), so failed shards currently record exitStatus 1 instead of the declared exit status; add one fake-runner assertion in scripts/test-work-verification-shards.mjs\"]}",
+        "wo:review PASS targeted re-review: empty --expect remains enforced, child-process exit code 7 is preserved, and focused shard/helper contract tests plus syntax/diff checks pass.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Join frozen verification shards into coded finish",
       "type": "task",
-      "updatedAt": "2026-07-26T14:18:12.008Z"
+      "updatedAt": "2026-07-26T16:22:57.145Z"
     },
     "work-3.2": {
       "acceptance": "A1: projection always includes all roadmaps with no Tab mode or visible Open/Closed words; initiative children stay grouped and only sort among siblings by live startedAt desc, remembered current, open activityAt desc, closed activityAt desc, then stable ID. activityAt is max of roadmap/descendant updatedAt and latest non-live workflow timestamp. A3: recursive tasks order non-closed before closed; open containers show progress bars and executable-descendant completed/total, open leaves are 0/1; live is distinct from durable in_progress engaged state; exact live item is strongest and ancestors propagate. A4: reducer implements activeWorkAgent same-cwd/meta.workItemId truth; direct status must exist, parse, be running/active and nonterminal; deadline uses 30s grace; no-deadline requires positive live pid via process.kill(pid,0); absent/dead pid, missing/malformed/terminal/expired are stale; paused/needs_attention is attention/recent activity not live; activeWorkGoalRunning alone is never targeted; newest startedAt wins exact emphasis while valid ancestors stay marked. Projection and two refresh reads leave .ce-workflow/work-items.json byte-identical; failure retains a usable cached frame contract. A5: Needs plan and Plan/strengthen eligibility is only open, non-Misc, needs_plan/stale roadmaps with an existing path in that roadmap's own epicArtifacts(...).brainstorms; missing, initiative-inherited, and child-only brainstorms are false; planned/ready and closed are false. Include the ponytail note limiting full projection to small/medium stores. Focused verification: node scripts/test-work-roadmap.mjs",
@@ -3727,7 +3736,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T15:35:01.935Z"
+    "updatedAt": "2026-07-26T16:22:57.145Z"
   },
   "schemaVersion": 1
 }

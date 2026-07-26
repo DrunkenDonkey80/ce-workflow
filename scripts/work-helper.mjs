@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync, execSync } from "node:child_process";
+import { exec, execFile, execFileSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -10,7 +10,13 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { acquireRepositoryMutationLock } from "../extensions/read-only-lanes.js";
+import { promisify } from "node:util";
+import {
+	acquireRepositoryMutationLock,
+	admitVerificationManifest,
+	runVerificationShardBatch,
+	VERIFICATION_GATE_VERSION,
+} from "../extensions/read-only-lanes.js";
 import {
 	appendWorkNote,
 	closeWorkItem,
@@ -31,6 +37,8 @@ import {
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
 const gitBin = process.env.WORK_ORCH_GIT_BIN || "git";
+const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 function run(bin, argv, options = {}) {
 	let executable = bin;
@@ -289,26 +297,69 @@ function formatPendingFiles() {
 	return files;
 }
 
-function runVerification(command) {
-	const options = {
-		cwd,
-		encoding: "utf8",
-		stdio: ["ignore", "pipe", "pipe"],
-	};
+async function runVerificationCommand(command) {
+	const options = { cwd, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 };
 	const shell =
 		process.env.WORK_ORCH_VERIFY_SHELL ||
 		(process.platform === "win32" && process.env.MSYSTEM ? "bash" : "");
 	try {
-		return shell
-			? execFileSync(shell, ["-lc", command], options)
-			: execSync(command, options);
+		const result = shell
+			? await execFileAsync(shell, ["-lc", command], options)
+			: await execAsync(command, options);
+		return { exitStatus: 0, stdout: result.stdout, stderr: result.stderr };
 	} catch (error) {
 		if (error instanceof Error) throw error;
 		throw new Error(String(error));
 	}
 }
 
-function finishTaskUnlocked() {
+async function runVerification(command, shards = []) {
+	if (!shards.length) {
+		const result = await runVerificationCommand(command);
+		return { output: String(result.stdout ?? ""), manifest: null };
+	}
+	const authoritativeCommand = shards.map((shard) => shard.command).join(" && ");
+	if (command !== authoritativeCommand)
+		throw new Error(
+			"declared verification shards must exactly compose the authoritative --verify command in order",
+		);
+	let serialSetting = false;
+	try {
+		const settings = JSON.parse(
+			readFileSync(path.join(cwd, ".pi", "settings.json"), "utf8"),
+		);
+		serialSetting = settings?.workOrchestrator?.serialReadOnlyLanes === true;
+	} catch {
+		// Missing or malformed settings keep the bounded default.
+	}
+	const batch = await runVerificationShardBatch(
+		cwd,
+		{ shards, authoritativeCommand, gateVersion: VERIFICATION_GATE_VERSION },
+		async (shard) => runVerificationCommand(shard.command),
+		{ serial: serialSetting, failFast: true, mutationOwner: true },
+	);
+	admitVerificationManifest(batch.manifest, {
+		shards: batch.declarations,
+		invocationId: batch.manifest.invocationId,
+		authoritativeCommand,
+		baseHead: batch.manifest.baseHead,
+		sourceFingerprint: batch.manifest.sourceFingerprint,
+		currentFingerprint: batch.currentFingerprint,
+		gateVersion: VERIFICATION_GATE_VERSION,
+		reviews: batch.manifest.reviews,
+	});
+	return {
+		output: batch.manifest.shards
+			.map(
+				(shard) =>
+					`${shard.id}:${shard.status}:${shard.outputHash.slice(0, 12)}`,
+			)
+			.join(", "),
+		manifest: batch.manifest,
+	};
+}
+
+async function finishTaskUnlocked() {
 	const id = args[0];
 	const message = option("--message");
 	const maxFiles = Number(
@@ -316,7 +367,7 @@ function finishTaskUnlocked() {
 	);
 	if (!id || !message || !Number.isInteger(maxFiles) || maxFiles < 1)
 		throw new Error(
-			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> --expect <stdout> | --json <file> --equals <path=value>] [--immediate-format] [--reviewed] [--push]",
+			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--immediate-format] [--reviewed] [--push]",
 		);
 	const task = readWorkItem(id);
 	if (task?.initiative)
@@ -337,12 +388,34 @@ function finishTaskUnlocked() {
 		);
 	if (stagedBefore.length) git(["restore", "--staged", "--", ...stagedBefore]);
 
+	const canonicalBeforeVerificationPath = storePath(cwd);
+	const canonicalBeforeVerification = existsSync(canonicalBeforeVerificationPath)
+		? readFileSync(canonicalBeforeVerificationPath, "utf8")
+		: null;
 	const verify = option("--verify");
+	const shardDeclarations = options("--verify-shard").map((value, index) => {
+		try {
+			return JSON.parse(value);
+		} catch {
+			throw new Error(`--verify-shard ${index + 1} must be valid JSON`);
+		}
+	});
+	const absentShardOutputs = new Set(
+		shardDeclarations
+			.flatMap((shard) => (Array.isArray(shard.outputs) ? shard.outputs : []))
+			.filter(
+				(output) =>
+					typeof output === "string" &&
+					!path.isAbsolute(output) &&
+					!existsSync(path.join(cwd, output)),
+			),
+	);
 	const jsonFile = option("--json");
 	if (!verify && !jsonFile)
 		throw new Error("finish-task requires --verify or --json");
 	let verificationResult;
 	let verificationCommand;
+	let verificationManifest;
 	let output;
 	try {
 		if (jsonFile) {
@@ -352,7 +425,9 @@ function finishTaskUnlocked() {
 			output = "all JSON assertions passed";
 		} else if (verify) {
 			verificationCommand = verify;
-			output = runVerification(verify).trim();
+			const verification = await runVerification(verify, shardDeclarations);
+			output = verification.output.trim();
+			verificationManifest = verification.manifest;
 			const expected = option("--expect");
 			if (expected !== undefined && output !== expected)
 				throw new Error(
@@ -360,20 +435,41 @@ function finishTaskUnlocked() {
 				);
 		}
 	} catch (error) {
-		mutateStore(cwd, (store) =>
-			appendWorkNote(
-				store,
-				id,
-				`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${String(error.stderr ?? error.message ?? error).slice(-500)}`,
-			),
-		);
+		if (shardDeclarations.length) {
+			if (canonicalBeforeVerification === null)
+				rmSync(canonicalBeforeVerificationPath, { force: true });
+			else
+				writeFileSync(
+					canonicalBeforeVerificationPath,
+					canonicalBeforeVerification,
+				);
+		} else {
+			mutateStore(cwd, (store) =>
+				appendWorkNote(
+					store,
+					id,
+					`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${String(error.stderr ?? error.message ?? error).slice(-500)}`,
+				),
+			);
+		}
 		throw new Error(`verification failed: ${verificationCommand}`);
 	}
+	for (const output of absentShardOutputs)
+		if (verificationManifest?.shards.some((shard) => shard.outputs.includes(output)))
+			rmSync(path.join(cwd, output), { recursive: true, force: true });
 	if (verificationCommand)
 		verificationResult = {
 			command: verificationCommand,
 			status: "PASS",
 			output: output.slice(-500),
+			...(verificationManifest
+				? {
+						gateVersion: verificationManifest.gateVersion,
+						shards: verificationManifest.shards.map(
+							({ id, status, outputHash }) => ({ id, status, outputHash }),
+						),
+					}
+				: {}),
 		};
 	const tidy = tidyUntrackedFiles({ cwd, gitBin });
 	if (tidy.unrecognized.length)
@@ -561,10 +657,10 @@ function finishTaskUnlocked() {
 	};
 }
 
-function finishTask() {
+async function finishTask() {
 	const mutation = acquireRepositoryMutationLock(cwd);
 	try {
-		return finishTaskUnlocked();
+		return await finishTaskUnlocked();
 	} finally {
 		mutation.release();
 	}
@@ -663,9 +759,13 @@ function capText(text, bytes = 10000) {
 	};
 }
 
+function options(name) {
+	return args.flatMap((arg, index) =>
+		arg === name && index + 1 < args.length ? [args[index + 1]] : [],
+	);
+}
 function option(name, fallback = undefined) {
-	const index = args.indexOf(name);
-	return index >= 0 ? args[index + 1] : fallback;
+	return options(name)[0] ?? fallback;
 }
 
 function positional() {
@@ -813,7 +913,7 @@ try {
 			full_log_path: fullLogPath,
 		});
 	} else if (command === "finish-small" || command === "finish-task") {
-		print(finishTask());
+		print(await finishTask());
 	} else if (command === "ensure-no-staged") {
 		const allowWorkStore = args.includes("--allow-work-store");
 		const staged = git(["diff", "--cached", "--name-only"])

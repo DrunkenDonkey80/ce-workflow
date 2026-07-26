@@ -92,6 +92,22 @@ try {
 		path.join(cwd, ".ce-workflow", "work-runs", "verifiers", "state.json"),
 		"{}\n",
 	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-1",
+			"--max-files",
+			"2",
+			"--message",
+			"reject nonempty verification output",
+			"--verify",
+			`"${process.execPath}" -e "process.stdout.write('not-empty')"`,
+			"--expect",
+			"",
+		),
+		/verification failed/,
+		"an empty --expect still asserts empty verification output",
+	);
 	const handoff = failure(
 		"finish-task",
 		"TASK-1",
@@ -289,6 +305,76 @@ try {
 		),
 	);
 	assert.equal(mechanicalFinished.status, "PASS");
+
+	writeFileSync(path.join(cwd, "sharded.js"), "export default false;\n");
+	const shardStore = loadStore(cwd);
+	createWorkItem(shardStore, {
+		id: "TASK-4",
+		type: "task",
+		status: "open",
+		title: "Run declared finish shards",
+		acceptance: "The exact declared verification command set passes.",
+	});
+	saveStore(cwd, shardStore);
+	execFileSync(
+		"git",
+		["add", "sharded.js", ".ce-workflow/work-items.json"],
+		{ cwd },
+	);
+	execFileSync("git", ["commit", "-m", "shard baseline"], {
+		cwd,
+		stdio: "ignore",
+	});
+	writeFileSync(path.join(cwd, "sharded.js"), "export default true;\n");
+	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		`${JSON.stringify({ workOrchestrator: { serialReadOnlyLanes: true } })}\n`,
+	);
+	const shardA = `${JSON.stringify(process.execPath)} -e "require('fs').mkdirSync('build-shard',{recursive:true});require('fs').appendFileSync('build-shard/order.txt','a\\n')"`;
+	const shardB = `${JSON.stringify(process.execPath)} -e "require('fs').appendFileSync('build-shard/order.txt','b\\n')"`;
+	const shardedFinished = JSON.parse(
+		run(
+			"finish-task",
+			"TASK-4",
+			"--max-files",
+			"1",
+			"--message",
+			"finish declared shards",
+			"--verify",
+			`${shardA} && ${shardB}`,
+			"--verify-shard",
+			JSON.stringify({
+				id: "a",
+				command: shardA,
+				outputs: ["build-shard/order.txt"],
+			}),
+			"--verify-shard",
+			JSON.stringify({
+				id: "b",
+				command: shardB,
+				dependsOn: ["a"],
+				outputs: ["build-shard/order.txt"],
+			}),
+		),
+	);
+	assert.equal(shardedFinished.status, "PASS");
+	assert.deepEqual(
+		shardedFinished.verification.shards.map(({ id, status }) => ({ id, status })),
+		[
+			{ id: "a", status: "PASS" },
+			{ id: "b", status: "PASS" },
+		],
+		"finish admits one fresh ordered shard manifest",
+	);
+	assert.equal(
+		loadStore(cwd).items["TASK-4"].notes.filter((note) =>
+			note.startsWith("wo:verify-check PASS"),
+		).length,
+		1,
+		"finish writes one compact verification PASS note",
+	);
+	assert.equal(loadStore(cwd).items["TASK-4"].status, "closed");
 
 	console.log("ok - work helper contract");
 } finally {
