@@ -66,6 +66,7 @@ import {
 import {
 	acquireLock,
 	appendWorkNote,
+	closeWorkItem,
 	createWorkItem,
 	deleteWorkItemSubtree,
 	initStore,
@@ -166,6 +167,70 @@ const VERIFIER_WORKSPACE_MARKER = ".ce-verifier-workspace.json";
 const VERIFIER_MAX_BYTES = 32_000;
 const VERIFIER_MAX_LINES = 200;
 const VERIFIER_MAX_RESULTS = 100;
+const PREFERRED_JSON_SCHEMA_SAMPLING = Object.freeze({
+	type: "json_schema",
+	strict: "prefer",
+});
+
+function nullableJsonSchema(schema) {
+	if (typeof schema.type === "string")
+		return {
+			...schema,
+			type: [schema.type, "null"],
+			...(schema.enum ? { enum: [...schema.enum, null] } : {}),
+		};
+	return { anyOf: [schema, { type: "null" }] };
+}
+
+function strictJsonSchema(schema) {
+	if (!schema || typeof schema !== "object" || Array.isArray(schema))
+		return schema;
+	const next = { ...schema };
+	if (schema.items) next.items = strictJsonSchema(schema.items);
+	if (schema.properties) {
+		const originallyRequired = new Set(schema.required ?? []);
+		next.properties = Object.fromEntries(
+			Object.entries(schema.properties).map(([key, property]) => {
+				const strict = strictJsonSchema(property);
+				return [
+					key,
+					originallyRequired.has(key) ? strict : nullableJsonSchema(strict),
+				];
+			}),
+		);
+		next.required = Object.keys(schema.properties);
+		next.additionalProperties = false;
+	}
+	return next;
+}
+
+function omitNullToolArguments(value) {
+	if (Array.isArray(value)) return value.map(omitNullToolArguments);
+	if (!value || typeof value !== "object") return value;
+	return Object.fromEntries(
+		Object.entries(value)
+			.filter(([, item]) => item !== null)
+			.map(([key, item]) => [key, omitNullToolArguments(item)]),
+	);
+}
+
+function registerConstrainedTool(pi, tool) {
+	const execute = tool.execute;
+	pi.registerTool({
+		...tool,
+		parameters: strictJsonSchema(tool.parameters),
+		constrainedSampling: PREFERRED_JSON_SCHEMA_SAMPLING,
+		execute(toolCallId, params, signal, onUpdate, ctx) {
+			return execute(
+				toolCallId,
+				omitNullToolArguments(params),
+				signal,
+				onUpdate,
+				ctx,
+			);
+		},
+	});
+}
 
 function exposeBundledSubagentAgents() {
 	if (!existsSync(WORK_ORCH_AGENT_DIR)) return;
@@ -2408,15 +2473,7 @@ function buildWorkStats(cwd, targetId, options = {}) {
 
 function workStatsDisplayModel(model) {
 	const raw = String(model ?? "unknown");
-	const id = raw.split("/").at(-1)?.split(":")[0] ?? raw;
-	const sol = id.match(/^gpt-(\d+(?:\.\d+)?)-sol$/i);
-	if (sol) return `${sol[1]} sol`;
-	const glm = id.match(/^glm-(\d+(?:\.\d+)?)$/i);
-	if (glm) return `GLM ${glm[1]}`;
-	const claude = id.match(/^claude-(opus|sonnet)-(\d+)-(\d+)$/i);
-	if (claude)
-		return `Claude ${claude[1][0].toUpperCase()}${claude[1].slice(1)} ${claude[2]}.${claude[3]}`;
-	return raw;
+	return raw.split("/").at(-1) ?? raw;
 }
 
 function renderWorkStats(stats) {
@@ -2427,9 +2484,10 @@ function renderWorkStats(stats) {
 			`${phase.phase}:`,
 			...phase.models.map(
 				(model) =>
-					`- ${workStatsDisplayModel(model.modelName ?? model.model)}: ${formatDuration(model.durationMs)}, ${formatTokenCount(model.tokens)} tokens`,
+					`- ${workStatsDisplayModel(model.model)}: ${formatDuration(model.durationMs)}, ${formatTokenCount(model.tokens)} tokens`,
 			),
 		]),
+		"",
 		`Total: ${formatDuration(stats.totals.durationMs)}, ${formatTokenCount(stats.totals.tokens)} tokens`,
 	];
 }
@@ -7556,7 +7614,7 @@ function registerVerifierTools(pi) {
 		],
 	];
 	for (const [name, description, properties, required, execute] of tools)
-		pi.registerTool({
+		registerConstrainedTool(pi, {
 			name,
 			description,
 			parameters: {
@@ -7573,7 +7631,7 @@ function registerVerifierTools(pi) {
 		});
 }
 function registerVerifierTriageTools(pi) {
-	pi.registerTool({
+	registerConstrainedTool(pi, {
 		name: "work_verifier_inbox",
 		label: "Verifier triage inbox",
 		description:
@@ -7595,7 +7653,7 @@ function registerVerifierTriageTools(pi) {
 			};
 		},
 	});
-	pi.registerTool({
+	registerConstrainedTool(pi, {
 		name: "work_verifier_dispose",
 		label: "Record verifier disposition",
 		description:
@@ -7668,7 +7726,7 @@ function registerVerifierTriageTools(pi) {
 			};
 		},
 	});
-	pi.registerTool({
+	registerConstrainedTool(pi, {
 		name: "work_verifier_complete_fix",
 		label: "Complete accepted verifier fix",
 		description:
@@ -7748,7 +7806,7 @@ function registerVerifierTriageTools(pi) {
 			};
 		},
 	});
-	pi.registerTool({
+	registerConstrainedTool(pi, {
 		name: "work_verifier_reopen",
 		label: "Reopen verifier finding group",
 		description:
@@ -8966,25 +9024,37 @@ function ordinaryTaskEpicError(resolved) {
 
 function resolveOrdinaryTaskEpic(cwd, parsed) {
 	if (parsed.epic) return resolveParsedEpic(cwd, parsed);
-	const current = rememberedWorkflowEpic(cwd);
+	const currentId = readWorkState(cwd).lastEpicId;
+	const current = currentId ? readWorkItem(cwd, currentId) : undefined;
+	const roadmaps = allWorkItems(cwd)
+		.filter(
+			(item) =>
+				typeOf(item) === "epic" &&
+				!item.initiative &&
+				!labelsOf(item).includes(MISC_ROADMAP_LABEL),
+		)
+		.sort(byUpdatedDesc);
 	if (
-		current &&
-		["open", "in_progress"].includes(statusOf(current)) &&
-		!current.initiative &&
-		!labelsOf(current).includes(MISC_ROADMAP_LABEL)
+		roadmaps.length &&
+		(parsed.chooseRoadmap ||
+			(current &&
+				!current.initiative &&
+				!labelsOf(current).includes(MISC_ROADMAP_LABEL)))
 	) {
 		const existingMisc = miscRoadmap(cwd);
 		return {
 			error: "task-roadmap-choice-required",
-			message:
-				"Choose whether this task belongs to the current roadmap or Misc.",
-			candidates: [candidateSummary(cwd, current)],
+			message: "Choose the roadmap for this task.",
+			candidates: roadmaps.map((epic) => candidateSummary(cwd, epic)),
 			roadmapChoices: [
-				{
-					value: idOf(current),
-					label: `Current: ${idOf(current)} — ${titleOf(current)}`,
-					description: "add to the current roadmap",
-				},
+				...roadmaps.map((epic) => ({
+					value: idOf(epic),
+					label: `${idOf(epic) === currentId ? "Current: " : ""}${idOf(epic)} — ${titleOf(epic)} [${statusLabel(statusOf(epic))}]`,
+					description:
+						statusOf(epic) === "closed"
+							? "reopen this roadmap and add the task"
+							: "add to this roadmap",
+				})),
 				{
 					value: existingMisc ? idOf(existingMisc) : MISC_ROADMAP_CHOICE,
 					label: MISC_ROADMAP_TITLE,
@@ -9322,13 +9392,15 @@ function parseWorkAddArgs(args = "") {
 	const task = [];
 	let epic = "";
 	let blockedBy = "";
+	let chooseRoadmap = false;
 	for (let index = 0; index < tokens.length; index += 1) {
 		const token = tokens[index];
 		if (["--roadmap", "--epic"].includes(token)) epic = tokens[++index] ?? "";
 		else if (token === "--blocked-by") blockedBy = tokens[++index] ?? "";
+		else if (token === "--choose-roadmap") chooseRoadmap = true;
 		else task.push(token);
 	}
-	return { epic, blockedBy, task: task.join(" ") };
+	return { epic, blockedBy, chooseRoadmap, task: task.join(" ") };
 }
 
 function buildWorkAddState(cwd, args = "") {
@@ -9480,6 +9552,15 @@ function workflowWorkItemNotes(command, task, extra = [], roleAgent = true) {
 		.join("\n");
 }
 
+function reopenTaskRoadmap(cwd, epic) {
+	const reopened =
+		statusOf(epic) === "closed"
+			? updateWorkItemNative(cwd, idOf(epic), { status: "open" })
+			: epic;
+	rememberWorkflowEpic(cwd, reopened);
+	return reopened;
+}
+
 function resolveParsedEpic(cwd, parsed) {
 	if (!parsed.epic) return resolveWorkflowEpic(cwd, "");
 	const expanded = expandNumericWorkItemShorthand(cwd, parsed.epic, "epic");
@@ -9490,8 +9571,7 @@ function resolveParsedEpic(cwd, parsed) {
 			error: "unsupported-target",
 			message: `${parsed.epic} is not a roadmap.`,
 		};
-	rememberWorkflowEpic(cwd, epic);
-	return { kind: "epic", epic };
+	return { kind: "epic", epic: reopenTaskRoadmap(cwd, epic) };
 }
 
 function claimWorkflowWorkItem(cwd, issue) {
@@ -9564,12 +9644,13 @@ function buildWorkSmallState(cwd, args = "") {
 				return errorState("usage", "Usage: /work-small <roadmap-id> <task>", {
 					action: "usage",
 				});
+			const epic = reopenTaskRoadmap(cwd, issue);
 			const workItem = claimWorkflowWorkItem(
 				cwd,
 				createWorkflowWorkItem(cwd, {
 					title: task,
 					type: "task",
-					parent: idOf(issue),
+					parent: idOf(epic),
 					notes: workflowWorkItemNotes(
 						"/work-small",
 						task,
@@ -9584,10 +9665,10 @@ function buildWorkSmallState(cwd, args = "") {
 					action: "run-implementation",
 					fastSmall: true,
 					smallTask: compactTaskSummary(workItem, { notesTail: 800 }),
-					epic: issueSummary(issue),
+					epic: issueSummary(epic),
 					selectedWorkItem: issueSummary(workItem),
 					git,
-					message: `Created ${idOf(workItem)} under ${idOf(issue)}.`,
+					message: `Created ${idOf(workItem)} under ${idOf(epic)}.`,
 					warnings: git.warnings,
 				},
 				cwd,
@@ -12931,8 +13012,8 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 						"Initiative close is blocked until coverage, plans, and child roadmaps are resolved.",
 					suggestedCommands: [`/work-roadmap tasks ${idOf(resolved.epic)}`],
 				};
-			const unresolved = childrenOfRequired(cwd, idOf(resolved.epic)).filter(
-				(issue) => statusOf(issue) !== "closed",
+			const unresolved = descendantsOf(cwd, idOf(resolved.epic)).filter(
+				(issue) => typeOf(issue) !== "idea" && statusOf(issue) !== "closed",
 			);
 			if (unresolved.length && !force)
 				return {
@@ -15093,11 +15174,7 @@ function prepareMainEditorAction(command, ctx) {
 	return true;
 }
 
-export async function consumePendingMainEditorAction(
-	event,
-	ctx,
-	runtime = {},
-) {
+export async function consumePendingMainEditorAction(event, ctx, runtime = {}) {
 	const pending = pendingMainEditorActions.get(mainEditorActionKey(ctx));
 	if (!pending || event?.source !== "interactive") return;
 	const now = runtime.now?.() ?? Date.now();
@@ -15136,7 +15213,9 @@ export async function consumePendingMainEditorAction(
 	}
 	pendingMainEditorActions.delete(mainEditorActionKey(ctx));
 	if (explicitFreeform)
-		await runtime.execute(pending.action, body, ctx, { explicitFreeform: true });
+		await runtime.execute(pending.action, body, ctx, {
+			explicitFreeform: true,
+		});
 	else await runtime.execute(pending.action, body, ctx);
 	return { action: "handled" };
 }
@@ -15825,7 +15904,28 @@ async function handleWorkflowAction(
 	const unsupported = unsupportedPrintWorkflow(ctx);
 	if (unsupported) return unsupported;
 	cleanupBenignInstructionDirt(ctx.cwd);
-	let state = builder(ctx.cwd, args);
+	const parsedPlacement = parseWorkAddArgs(args);
+	const firstArg = String(args ?? "")
+		.trim()
+		.split(/\s+/, 1)[0];
+	const chooseRoadmap =
+		[
+			buildWorkAddState,
+			buildWorkSmallState,
+			buildWorkMedState,
+			buildWorkBigState,
+		].includes(builder) &&
+		ctx.mode === "tui" &&
+		ctx.ui?.select &&
+		!parsedPlacement.epic &&
+		!(
+			builder === buildWorkSmallState &&
+			(isWorkItemId(firstArg) || isNumericWorkItemShorthand(firstArg))
+		);
+	let state = builder(
+		ctx.cwd,
+		chooseRoadmap ? `--choose-roadmap ${String(args).trim()}` : args,
+	);
 	if (
 		state.reason === "task-roadmap-choice-required" &&
 		state.roadmapChoices?.length &&
@@ -15990,6 +16090,21 @@ function deletionProtected(item) {
 	);
 }
 
+function closeTaskByRequest(cwd, id) {
+	const closed = nativeIssue(
+		mutateStore(cwd, (store) => {
+			const current = store.items[id];
+			if (!current)
+				throw new WorkStoreError("missing", `Work item ${id} is missing.`);
+			if (typeOf(current) === "epic")
+				throw new WorkStoreError("conflict", `${id} is a roadmap, not a task.`);
+			return closeWorkItem(store, id);
+		}),
+	);
+	workRoadmapFrameCache.delete(resolve(cwd));
+	return closed;
+}
+
 function subtreeIds(store, id) {
 	const ids = new Set([id]);
 	let changed = true;
@@ -16009,7 +16124,11 @@ async function confirmSubtreeDeletion(ctx, selectedItem) {
 	const snapshot = loadStore(ctx.cwd);
 	const current = snapshot.items[selectedItem.id];
 	if (deletionProtected(current)) {
-		notify(ctx, `Work item ${selectedItem.id} is protected and cannot be deleted.`, "warning");
+		notify(
+			ctx,
+			`Work item ${selectedItem.id} is protected and cannot be deleted.`,
+			"warning",
+		);
 		return false;
 	}
 	const expectedCount = subtreeIds(snapshot, current.id).size;
@@ -16025,7 +16144,11 @@ async function confirmSubtreeDeletion(ctx, selectedItem) {
 	);
 	if (confirmation !== "DELETE") {
 		if (confirmation != null)
-			notify(ctx, "Deletion cancelled: confirmation must be exactly DELETE.", "warning");
+			notify(
+				ctx,
+				"Deletion cancelled: confirmation must be exactly DELETE.",
+				"warning",
+			);
 		return false;
 	}
 	try {
@@ -16045,7 +16168,11 @@ async function confirmSubtreeDeletion(ctx, selectedItem) {
 			return deleteWorkItemSubtree(store, fresh.id);
 		});
 		workRoadmapFrameCache.delete(resolve(ctx.cwd));
-		notify(ctx, `Deleted ${deletedIds.length} work item${deletedIds.length === 1 ? "" : "s"}.`, "info");
+		notify(
+			ctx,
+			`Deleted ${deletedIds.length} work item${deletedIds.length === 1 ? "" : "s"}.`,
+			"info",
+		);
 		return true;
 	} catch (error) {
 		notify(
@@ -16079,6 +16206,8 @@ async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 		const ops = [{ value: "summary", label: "summary" }];
 		if (group === "blocker")
 			ops.push({ value: "debug", label: "debug / full info" });
+		if (group !== "closed")
+			ops.push({ value: "close", label: "✅ Close task" });
 		const selectedItem = readWorkItem(ctx.cwd, workItemId);
 		if (!deletionProtected(selectedItem))
 			ops.push({ value: "delete", label: "🗑️ Delete permanently" });
@@ -16092,6 +16221,11 @@ async function handleRoadmapTasksMenu(epicId, ctx, pi) {
 			if (await confirmSubtreeDeletion(ctx, selectedItem))
 				return { ok: true, action: "roadmap-menu-back" };
 			continue;
+		}
+		if (op === "close") {
+			closeTaskByRequest(ctx.cwd, workItemId);
+			notify(ctx, `Closed task ${workItemId}.`, "info");
+			return { ok: true, action: "roadmap-menu-back" };
 		}
 		return handleWorkReportCommand(workItemId, ctx);
 	}
@@ -16486,12 +16620,21 @@ function displayMetadataProgress(tui, theme, keybindings, total, done) {
 		render(width) {
 			const boxWidth = Math.min(54, Math.max(12, width));
 			const innerWidth = boxWidth - 2;
+			const status = `Processing descriptions… ${completed}/${total}`;
+			const bar = progressBar(
+				completed,
+				total,
+				Math.min(12, Math.max(1, innerWidth - 2)),
+			);
 			const message = truncate(
-				`Processing descriptions… ${completed}/${total}`,
+				status.length + bar.length < innerWidth
+					? `${status} ${bar}`
+					: `${bar} ${status}`,
 				Math.max(1, innerWidth - 1),
 			);
 			const content = `${message}${" ".repeat(Math.max(0, innerWidth - message.length))}`;
-			const border = theme.fg?.("border", `─`.repeat(innerWidth)) ?? `─`.repeat(innerWidth);
+			const border =
+				theme.fg?.("border", `─`.repeat(innerWidth)) ?? `─`.repeat(innerWidth);
 			return [
 				`╭${border}╮`,
 				`│${theme.fg?.("accent", content) ?? content}│`,
@@ -16558,148 +16701,155 @@ export async function backfillVisibleDisplayMetadata(
 	const runKey = resolve(storePath(cwd));
 	if (displayMetadataRuns.has(runKey)) return displayMetadataRuns.get(runKey);
 	let background;
-	const uiRun = ctx.ui.custom((tui, theme, keybindings, done) => {
-		const progress = displayMetadataProgress(
-			tui,
-			theme,
-			keybindings,
-			missing.length,
-			done,
-		);
-		background = (async () => {
-			if (progress.signal.aborted) return;
-			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
-			if (progress.signal.aborted) return;
-			if (!auth.ok || !auth.apiKey)
-				throw new Error(
-					auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
-				);
-			const options = {
-				apiKey: auth.apiKey,
-				headers: auth.headers,
-				env: auth.env,
-				signal: progress.signal,
-			};
-			const fingerprints = new Map(
-				missing.map((item) => [idOf(item), displayMetadataFingerprint(item)]),
+	const uiRun = ctx.ui.custom(
+		(tui, theme, keybindings, done) => {
+			const progress = displayMetadataProgress(
+				tui,
+				theme,
+				keybindings,
+				missing.length,
+				done,
 			);
-			const failures = new Map();
-			const persist = async (entries) => {
-				if (progress.signal.aborted || !entries.length) return;
-				await withFileMutationQueue(storePath(cwd), async () => {
-					if (progress.signal.aborted) return;
-					mutateStore(cwd, (store) => {
-						for (const entry of entries) {
-							if (progress.signal.aborted) return;
-							const previous = store.items[entry.id];
-							if (
-								!previous ||
-								validDisplayMetadata(previous) ||
-								displayMetadataFingerprint(previous) !==
-									fingerprints.get(entry.id)
-							)
-								continue;
-							updateWorkItem(store, entry.id, {
-								displayMetadata: {
-									schemaVersion: DISPLAY_METADATA_SCHEMA_VERSION,
-									title: entry.title,
-								},
-								...(entry.description
-									? { description: entry.description }
-									: { updatedAt: previous.updatedAt }),
-							});
-						}
-					});
-				});
-			};
-			const complete = async (items) => {
+			background = (async () => {
 				if (progress.signal.aborted) return;
-				let response;
-				try {
-					response = runtime.complete
-						? await runtime.complete(
-								ctx.model,
-								displayMetadataRequest(items),
-								options,
-							)
-						: await ctx.modelRegistry
-								.getProvider(ctx.model.provider)
-								?.streamSimple(
+				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+				if (progress.signal.aborted) return;
+				if (!auth.ok || !auth.apiKey)
+					throw new Error(
+						auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
+					);
+				const options = {
+					apiKey: auth.apiKey,
+					headers: auth.headers,
+					env: auth.env,
+					signal: progress.signal,
+				};
+				const fingerprints = new Map(
+					missing.map((item) => [idOf(item), displayMetadataFingerprint(item)]),
+				);
+				const failures = new Map();
+				const persist = async (entries) => {
+					if (progress.signal.aborted || !entries.length) return;
+					await withFileMutationQueue(storePath(cwd), async () => {
+						if (progress.signal.aborted) return;
+						mutateStore(cwd, (store) => {
+							for (const entry of entries) {
+								if (progress.signal.aborted) return;
+								const previous = store.items[entry.id];
+								if (
+									!previous ||
+									validDisplayMetadata(previous) ||
+									displayMetadataFingerprint(previous) !==
+										fingerprints.get(entry.id)
+								)
+									continue;
+								updateWorkItem(store, entry.id, {
+									displayMetadata: {
+										schemaVersion: DISPLAY_METADATA_SCHEMA_VERSION,
+										title: entry.title,
+									},
+									...(entry.description
+										? { description: entry.description }
+										: { updatedAt: previous.updatedAt }),
+								});
+							}
+						});
+					});
+				};
+				const complete = async (items) => {
+					if (progress.signal.aborted) return;
+					let response;
+					try {
+						response = runtime.complete
+							? await runtime.complete(
 									ctx.model,
 									displayMetadataRequest(items),
 									options,
 								)
-								.result();
-				} catch {
+							: await ctx.modelRegistry
+									.getProvider(ctx.model.provider)
+									?.streamSimple(
+										ctx.model,
+										displayMetadataRequest(items),
+										options,
+									)
+									.result();
+					} catch {
+						if (progress.signal.aborted) return;
+						return {
+							valid: [],
+							retry: new Map(
+								items.map((item) => [idOf(item), "request failed"]),
+							),
+						};
+					}
 					if (progress.signal.aborted) return;
-					return {
-						valid: [],
-						retry: new Map(items.map((item) => [idOf(item), "request failed"])),
-					};
-				}
-				if (progress.signal.aborted) return;
-				if (!response || response.stopReason === "error")
-					return {
-						valid: [],
-						retry: new Map(items.map((item) => [idOf(item), "request failed"])),
-					};
-				if (response.stopReason === "aborted") return;
-				const text = (response.content ?? [])
-					.filter((part) => part.type === "text")
-					.map((part) => part.text)
-					.join("\n");
-				if (progress.signal.aborted) return;
-				return parseDisplayMetadataBatch(text, items);
-			};
-			const retryItems = [];
-			const chunks = [];
-			for (
-				let offset = 0;
-				offset < missing.length;
-				offset += DISPLAY_METADATA_BATCH_SIZE
-			)
-				chunks.push(
-					missing.slice(offset, offset + DISPLAY_METADATA_BATCH_SIZE),
-				);
-			await runDisplayMetadataJobs(chunks, progress.signal, async (items) => {
-				const parsed = await complete(items);
-				if (progress.signal.aborted || !parsed) return;
-				await persist(parsed.valid);
-				if (progress.signal.aborted) return;
-				for (const _entry of parsed.valid) progress.advance();
-				for (const item of items) {
-					const reason = parsed.retry.get(idOf(item));
-					if (reason) retryItems.push(item);
-				}
-			});
-			if (progress.signal.aborted) return;
-			await runDisplayMetadataJobs(
-				retryItems,
-				progress.signal,
-				async (item) => {
-					const parsed = await complete([item]);
+					if (!response || response.stopReason === "error")
+						return {
+							valid: [],
+							retry: new Map(
+								items.map((item) => [idOf(item), "request failed"]),
+							),
+						};
+					if (response.stopReason === "aborted") return;
+					const text = (response.content ?? [])
+						.filter((part) => part.type === "text")
+						.map((part) => part.text)
+						.join("\n");
+					if (progress.signal.aborted) return;
+					return parseDisplayMetadataBatch(text, items);
+				};
+				const retryItems = [];
+				const chunks = [];
+				for (
+					let offset = 0;
+					offset < missing.length;
+					offset += DISPLAY_METADATA_BATCH_SIZE
+				)
+					chunks.push(
+						missing.slice(offset, offset + DISPLAY_METADATA_BATCH_SIZE),
+					);
+				await runDisplayMetadataJobs(chunks, progress.signal, async (items) => {
+					const parsed = await complete(items);
 					if (progress.signal.aborted || !parsed) return;
 					await persist(parsed.valid);
 					if (progress.signal.aborted) return;
-					const id = idOf(item);
-					if (parsed.retry.has(id)) failures.set(id, parsed.retry.get(id));
-					progress.advance();
-				},
-			);
-			if (progress.signal.aborted) return;
-			const result = { failures };
-			progress.finish(result);
-			return result;
-		})().catch((error) => {
-			const result = { error };
-			progress.finish(result);
-			return result;
-		});
-		return progress;
-	}, {
-		overlay: true,
-		overlayOptions: { anchor: "center", width: 56, maxHeight: 3 },
-	});
+					for (const _entry of parsed.valid) progress.advance();
+					for (const item of items) {
+						const reason = parsed.retry.get(idOf(item));
+						if (reason) retryItems.push(item);
+					}
+				});
+				if (progress.signal.aborted) return;
+				await runDisplayMetadataJobs(
+					retryItems,
+					progress.signal,
+					async (item) => {
+						const parsed = await complete([item]);
+						if (progress.signal.aborted || !parsed) return;
+						await persist(parsed.valid);
+						if (progress.signal.aborted) return;
+						const id = idOf(item);
+						if (parsed.retry.has(id)) failures.set(id, parsed.retry.get(id));
+						progress.advance();
+					},
+				);
+				if (progress.signal.aborted) return;
+				const result = { failures };
+				progress.finish(result);
+				return result;
+			})().catch((error) => {
+				const result = { error };
+				progress.finish(result);
+				return result;
+			});
+			return progress;
+		},
+		{
+			overlay: true,
+			overlayOptions: { anchor: "center", width: 56, maxHeight: 3 },
+		},
+	);
 	const run = Promise.resolve(uiRun).then(async (result) => {
 		await background;
 		return result;
@@ -16787,14 +16937,19 @@ function taskComposerEnvelope(roadmap, parent) {
 }
 
 export function createWorkspaceTaskFromText(cwd, roadmapId, parentId, text) {
-	const store = loadNativeWorkStore(cwd);
-	const roadmap = store.items[roadmapId];
-	const parent = parentId ? store.items[parentId] : roadmap;
-	if (!roadmap || typeOf(roadmap) !== "epic" || statusOf(roadmap) === "closed")
+	let store = loadNativeWorkStore(cwd);
+	let roadmap = store.items[roadmapId];
+	if (!roadmap || typeOf(roadmap) !== "epic")
 		return errorState(
 			"roadmap-removed",
 			`Roadmap ${roadmapId} is no longer available.`,
 		);
+	if (statusOf(roadmap) === "closed") {
+		reopenTaskRoadmap(cwd, roadmap);
+		store = loadNativeWorkStore(cwd);
+		roadmap = store.items[roadmapId];
+	}
+	const parent = parentId ? store.items[parentId] : roadmap;
 	let ancestor = parent;
 	while (ancestor && idOf(ancestor) !== roadmapId)
 		ancestor = store.items[parentOf(ancestor)];
@@ -16978,6 +17133,8 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 			refresh: () => buildWorkRoadmapState(ctx.cwd, "list"),
 			setIntervalFn: runtime.setIntervalFn,
 			clearIntervalFn: runtime.clearIntervalFn,
+			setTimeoutFn: runtime.setTimeoutFn,
+			clearTimeoutFn: runtime.clearTimeoutFn,
 			cursorKey: "roadmap-workspace",
 			resolveStats,
 		});
@@ -17011,7 +17168,10 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 				...(blocker ? [{ value: "debug", label: "🐛 debug / full info" }] : []),
 				...(task.status === "closed"
 					? []
-					: [{ value: "add", label: "➕ Add child task" }]),
+					: [
+							{ value: "close", label: "✅ Close task" },
+							{ value: "add", label: "➕ Add child task" },
+						]),
 				...(!deletionProtected(selectedItem)
 					? [{ value: "delete", label: "🗑️ Delete permanently" }]
 					: []),
@@ -17029,7 +17189,8 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 			if (
 				!current ||
 				!actions.some((item) => item.value === action) ||
-				(action === "add" && current.task.status === "closed") ||
+				(["add", "close"].includes(action) &&
+					current.task.status === "closed") ||
 				(action === "debug" && !stillBlocker)
 			) {
 				notify(
@@ -17042,7 +17203,10 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 			if (action === "report") await handleWorkReportCommand(task.id, ctx);
 			else if (action === "debug")
 				await handleWorkflowAction(buildWorkDebugState, task.id, ctx, pi);
-			else if (action === "delete")
+			else if (action === "close") {
+				closeTaskByRequest(ctx.cwd, task.id);
+				notify(ctx, `Closed task ${task.id}.`, "info");
+			} else if (action === "delete")
 				await confirmSubtreeDeletion(ctx, selectedItem);
 			else return prepareWorkspaceTaskComposer(ctx, taskRoadmap, task);
 			continue;
@@ -17164,9 +17328,7 @@ async function handleWorkRoadmapCommand(
 							]
 						: []),
 					{ value: "report", label: "📄 inspect / report" },
-					...(selectedRoadmap.status === "closed"
-						? []
-						: [{ value: "add", label: "➕ Add task" }]),
+					{ value: "add", label: "➕ Add task" },
 					{
 						value: "preview",
 						label: "🧩 preview / reconcile",
@@ -17204,9 +17366,7 @@ async function handleWorkRoadmapCommand(
 						...(!sessionRuntime.inWorkspace
 							? [{ value: "tasks", label: "📋 list tasks" }]
 							: []),
-						...(selectedRoadmap.status === "closed"
-							? []
-							: [{ value: "add", label: "➕ Add task" }]),
+						{ value: "add", label: "➕ Add task" },
 						...(selectedRoadmap.planningEligible
 							? [{ value: "plan", label: "🧭 plan / strengthen" }]
 							: []),
@@ -17232,9 +17392,7 @@ async function handleWorkRoadmapCommand(
 									},
 								]
 							: []),
-						...(selectedRoadmap.status === "closed"
-							? []
-							: [{ value: "add", label: "➕ Add task" }]),
+						{ value: "add", label: "➕ Add task" },
 						...(selectedRoadmap.planningEligible
 							? [
 									{
@@ -17264,7 +17422,6 @@ async function handleWorkRoadmapCommand(
 		undefined,
 		{
 			purpose: `${roadmapDisplayTitle(selectedRoadmap ?? { id: selected, title: selected })} — ${roadmapPreviewText(selectedRoadmap)}`,
-			subtitle: renderWorkStats(buildWorkStats(ctx.cwd, selected)),
 		},
 	);
 	if (!op)
@@ -17345,19 +17502,30 @@ async function handleWorkRoadmapCommand(
 				sources,
 			};
 		}
-		return handleWorkResumeGoalCommand(resumeTarget, pi, ctx);
+		await handleWorkResumeGoalCommand(resumeTarget, pi, ctx);
+		return {
+			ok: true,
+			action: "resume-started",
+			epic: issueSummary(readWorkItem(ctx.cwd, resumeTarget)),
+		};
 	}
 	if (op === "add") {
-		const fresh = buildWorkRoadmapState(ctx.cwd, "list").roadmaps.find(
+		let fresh = buildWorkRoadmapState(ctx.cwd, "list").roadmaps.find(
 			(roadmap) => roadmap.id === selected,
 		);
-		if (!fresh || fresh.status === "closed") {
+		if (!fresh) {
 			notify(
 				ctx,
 				`Roadmap ${selected} is no longer eligible for new tasks.`,
 				"warning",
 			);
 			return { ok: true, action: "roadmap-workspace-return" };
+		}
+		if (fresh.status === "closed") {
+			reopenTaskRoadmap(ctx.cwd, readWorkItem(ctx.cwd, selected));
+			fresh = buildWorkRoadmapState(ctx.cwd, "list").roadmaps.find(
+				(roadmap) => roadmap.id === selected,
+			);
 		}
 		return prepareWorkspaceTaskComposer(ctx, fresh);
 	}
@@ -17908,6 +18076,7 @@ export {
 	renderWorkReportJson,
 	renderWorkReportText,
 	renderWorkRoadmapText,
+	renderWorkStats,
 	roadmapPreviewText,
 	renderProjectGoalProgress,
 	renderWorkResumeJson,
@@ -17925,7 +18094,7 @@ export default function workModelsExtension(pi) {
 	if (typeof pi.registerTool === "function") {
 		registerVerifierTools(pi);
 		registerVerifierTriageTools(pi);
-		pi.registerTool({
+		registerConstrainedTool(pi, {
 			name: DIRTY_CONTINUE_TOOL,
 			label: "Continue after dirty cleanup",
 			description:
@@ -17980,7 +18149,7 @@ export default function workModelsExtension(pi) {
 			},
 		});
 
-		pi.registerTool({
+		registerConstrainedTool(pi, {
 			name: INITIATIVE_RECONCILE_TOOL,
 			label: "Convert roadmap to initiative",
 			description:
@@ -18097,7 +18266,7 @@ export default function workModelsExtension(pi) {
 			},
 		});
 
-		pi.registerTool({
+		registerConstrainedTool(pi, {
 			name: IMPROVEMENT_REPORT_TOOL,
 			label: "Report workflow improvement",
 			description:
@@ -18154,7 +18323,7 @@ export default function workModelsExtension(pi) {
 			},
 		});
 
-		pi.registerTool({
+		registerConstrainedTool(pi, {
 			name: "work_goal_complete",
 			label: "Work Goal Complete",
 			description:
@@ -18175,7 +18344,7 @@ export default function workModelsExtension(pi) {
 			},
 		});
 
-		pi.registerTool({
+		registerConstrainedTool(pi, {
 			name: "work_goal_human_decision",
 			label: "Work Goal Human Decision",
 			description:

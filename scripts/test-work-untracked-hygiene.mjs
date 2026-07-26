@@ -113,7 +113,10 @@ assert(
 	"only the standard Gradle wrapper JAR path is recognized",
 );
 assert(!isRecognizedSource("mystery.dat", noGit), ".dat is NOT recognized");
-assert(!isRecognizedSource("random.jar", noGit), "arbitrary JARs are NOT recognized");
+assert(
+	!isRecognizedSource("random.jar", noGit),
+	"arbitrary JARs are NOT recognized",
+);
 assert(!isRecognizedSource("dump.bin", noGit), ".bin is NOT recognized");
 
 // --- .gitignore writer dedups and does not rewrite when nothing new ---
@@ -172,9 +175,15 @@ writeFileSync(path.join(repo, "data.bin"), "x");
 mkdirSync(path.join(repo, "node_modules", "lib"), { recursive: true });
 writeFileSync(path.join(repo, "node_modules", "lib", "index.js"), "x");
 mkdirSync(path.join(repo, "rf-lib", "build-work-9-4"), { recursive: true });
-writeFileSync(path.join(repo, "rf-lib", "build-work-9-4", "CMakeCache.txt"), "x");
+writeFileSync(
+	path.join(repo, "rf-lib", "build-work-9-4", "CMakeCache.txt"),
+	"x",
+);
 mkdirSync(path.join(repo, "android", "gradle", "wrapper"), { recursive: true });
-writeFileSync(path.join(repo, "android", "settings.gradle"), "rootProject.name = 'x'\n");
+writeFileSync(
+	path.join(repo, "android", "settings.gradle"),
+	"rootProject.name = 'x'\n",
+);
 writeFileSync(path.join(repo, "android", "gradlew"), "#!/bin/sh\n");
 writeFileSync(
 	path.join(repo, "android", "gradle", "wrapper", "gradle-wrapper.properties"),
@@ -192,12 +201,12 @@ const sorted = (arr) => [...arr].sort();
 assert(
 	sorted(tidy.ignored).join(",") ===
 		sorted([
-		"build/",
-		"build-work-*/",
-		"__pycache__/",
-		"*.py[cod]",
-		"node_modules/",
-	]).join(","),
+			"build/",
+			"build-work-*/",
+			"__pycache__/",
+			"*.py[cod]",
+			"node_modules/",
+		]).join(","),
 	"build/cache artifacts collected as canonical patterns",
 );
 assert(

@@ -15,6 +15,7 @@ const {
 	buildWorkReport,
 	buildWorkStats,
 	recordWorkTelemetry,
+	renderWorkStats,
 	roadmapMenuItems,
 } = await import(
 	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
@@ -330,6 +331,29 @@ try {
 		durationMs: 10_000,
 		usage: { totalTokens: 100 },
 	});
+
+	const exactModelStats = renderWorkStats({
+		phases: [
+			{
+				phase: "Other",
+				models: [
+					{
+						model: "openai-codex/gpt-5.6-luna:low",
+						modelName: "5.6 sol",
+						durationMs: 1_000,
+						tokens: 2_000,
+					},
+				],
+			},
+		],
+		totals: { durationMs: 1_000, tokens: 2_000 },
+	});
+	assert(
+		exactModelStats.includes("- gpt-5.6-luna:low: 1s, 2k tokens") &&
+			exactModelStats.at(-2) === "" &&
+			exactModelStats.at(-1) === "Total: 1s, 2k tokens",
+		"stats use exact provider-free model IDs and separate the total row",
+	);
 
 	const task = buildWorkStats(cwd, "TASK-1");
 	assert(

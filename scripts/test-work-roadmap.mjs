@@ -198,6 +198,7 @@ try {
 		"F7 preview reports a missing stored summary",
 	);
 	const loaderMessages = [];
+	const narrowLoaderMessages = [];
 	let progressOverlayOptions;
 	let progressTeardowns = 0;
 	const selectRoadmap = async (id, complete, menus = [], provider) => {
@@ -236,8 +237,10 @@ try {
 							progressOverlayOptions = customOptions;
 							let component;
 							const tui = {
-								requestRender: () =>
-									loaderMessages.push(component.render(120).join("\n")),
+								requestRender: () => {
+									loaderMessages.push(component.render(120).join("\n"));
+									narrowLoaderMessages.push(component.render(30).join("\n"));
+								},
 							};
 							component = factory(
 								tui,
@@ -249,6 +252,7 @@ try {
 								},
 							);
 							loaderMessages.push(component.render(120).join("\n"));
+							narrowLoaderMessages.push(component.render(30).join("\n"));
 						}),
 					notify: (message) => notices.push(message),
 				},
@@ -297,10 +301,20 @@ try {
 	);
 	const progressTotal = loaderMessages[0].match(/0\/(\d+)/)?.[1];
 	assert(progressTotal, "production progress starts at zero with a total");
-	assert.match(loaderMessages[0], /╭─+╮\n│.*Processing descriptions… 0\/\d+/);
+	assert.match(
+		loaderMessages[0],
+		/╭─+╮\n│.*Processing descriptions… 0\/\d+ \[░{12}\]/,
+	);
+	assert.match(
+		narrowLoaderMessages[0],
+		/│\[░{12}\] Processing/,
+		"narrow progress keeps the bar visible by truncating the label instead",
+	);
 	assert.match(
 		loaderMessages.at(-1),
-		new RegExp(`Processing descriptions… ${progressTotal}/${progressTotal}`),
+		new RegExp(
+			`Processing descriptions… ${progressTotal}/${progressTotal} \\[█{12}\\]`,
+		),
 	);
 	assert(
 		loaderMessages.length > 2,
@@ -310,7 +324,11 @@ try {
 		overlay: true,
 		overlayOptions: { anchor: "center", width: 56, maxHeight: 3 },
 	});
-	assert.equal(progressTeardowns, 1, "completed progress overlay tears down once");
+	assert.equal(
+		progressTeardowns,
+		1,
+		"completed progress overlay tears down once",
+	);
 	assert(
 		roadmapMenus[0].labels.some((label) => /Closed roadmap/.test(label)),
 		"workspace always includes closed roadmaps",
@@ -359,6 +377,39 @@ try {
 		roadmapMenus[1].labels.join("\n"),
 		/Delete permanently/,
 		"roadmap operations expose destructive deletion",
+	);
+	let roadmapOperationsDialog = "";
+	await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: root,
+			mode: "tui",
+			ui: {
+				custom: (factory) =>
+					new Promise((done) => {
+						const component = factory(
+							{ terminal: { rows: 30 }, requestRender() {} },
+							{ fg: (_color, value) => value, bold: (value) => value },
+							{
+								matches: (data, id) =>
+									data === "escape" && id === "tui.select.cancel",
+							},
+							done,
+						);
+						roadmapOperationsDialog = component.render(120).join("\n");
+						component.handleInput("escape");
+					}),
+				notify: () => {},
+			},
+		},
+		{},
+		"E-2",
+		{ inWorkspace: true },
+	);
+	assert.doesNotMatch(
+		roadmapOperationsDialog,
+		/^Stats:|^Work:|^Orchestration:|^Total:/m,
+		"roadmap operations omit duplicated usage stats",
 	);
 	assert(
 		roadmapMenus[1].labels.every((label) => !/list tasks/.test(label)) &&
@@ -819,7 +870,11 @@ try {
 		);
 		while (cancelPending.length) cancelPending.shift()();
 		await cancelRun;
-		assert.equal(cancelTeardowns, 1, "cancelled progress overlay tears down once");
+		assert.equal(
+			cancelTeardowns,
+			1,
+			"cancelled progress overlay tears down once",
+		);
 		assert.equal(cancelOverlayOptions?.overlayOptions?.anchor, "center");
 		assert.equal(
 			cancelStarts,
@@ -2073,7 +2128,8 @@ try {
 		"R-outside": item("R-outside", "Outside"),
 		"R-legacy-misc": item("R-legacy-misc", "Misc"),
 	};
-	const resetDeletionStore = () => saveStore(deletionRoot, structuredClone(deletionStore));
+	const resetDeletionStore = () =>
+		saveStore(deletionRoot, structuredClone(deletionStore));
 	resetDeletionStore();
 	const legacyMiscOps = [];
 	await handleWorkRoadmapCommand(
@@ -2200,7 +2256,9 @@ try {
 	writeFileSync(deletionStorePath, deletedStoreBytes, "utf8");
 	const freshAfterDelete = buildWorkRoadmapState(deletionRoot, "list");
 	assert.equal(freshAfterDelete.ok, true);
-	assert(!freshAfterDelete.roadmaps.some((roadmap) => roadmap.id === "R-delete"));
+	assert(
+		!freshAfterDelete.roadmaps.some((roadmap) => roadmap.id === "R-delete"),
+	);
 	writeFileSync(deletionStorePath, "{broken", "utf8");
 	const freshFallback = buildWorkRoadmapState(deletionRoot, "list");
 	assert.equal(freshFallback.cached, true);
@@ -2263,6 +2321,57 @@ try {
 	assert.equal(cached.cached, true);
 	assert.equal(cached.signature, taskChanged.signature);
 	writeFileSync(storePath, storeBytes);
+
+	const closeableBrainstorm = loadStore(root);
+	closeableBrainstorm.items["E-4"].status = "open";
+	closeableBrainstorm.items["IDEA-E4"] = item("IDEA-E4", "Source idea", {
+		type: "idea",
+		parentId: "E-4",
+	});
+	closeableBrainstorm.items["DONE-E4"] = item("DONE-E4", "Completed task", {
+		type: "task",
+		status: "closed",
+		parentId: "E-4",
+	});
+	saveStore(root, closeableBrainstorm);
+	const closedBrainstorm = buildWorkRoadmapState(root, "close E-4");
+	assert.equal(
+		closedBrainstorm.action,
+		"roadmap-closed",
+		"brainstorms with no incomplete tasks close despite retained source ideas",
+	);
+
+	let resumePrompts = 0;
+	const resumedFromWorkspace = await handleWorkRoadmapCommand(
+		"",
+		{
+			cwd: root,
+			mode: "tui",
+			isIdle: () => true,
+			getContextUsage: () => ({ tokens: 0, maxTokens: 100_000 }),
+			ui: {
+				select: async (_title, labels) =>
+					labels.find((label) => /Resume work/.test(label)),
+				confirm: async () => true,
+				notify: () => {},
+				setStatus: () => {},
+			},
+		},
+		{
+			appendEntry: () => {},
+			sendUserMessage: async () => {
+				resumePrompts += 1;
+			},
+		},
+		"E-1",
+		{ inWorkspace: true },
+	);
+	assert.equal(resumedFromWorkspace.action, "resume-started");
+	assert.equal(
+		resumePrompts,
+		1,
+		"F7 resume starts work before closing the menu",
+	);
 } finally {
 	for (const target of [root, initiativeRoot, projectionRoot, deletionRoot])
 		rmSync(target, { recursive: true, force: true });

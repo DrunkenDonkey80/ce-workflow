@@ -2,10 +2,14 @@
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { saveStore } from "../extensions/work-store.js";
 import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 
 const {
 	buildWorkAddState,
+	buildWorkBigState,
+	buildWorkMedState,
+	buildWorkSmallState,
 	createWorkspaceTaskFromText,
 	handleWorkflowAction,
 	materializeTaskImages,
@@ -90,12 +94,86 @@ try {
 	);
 
 	fixture.reset("openReadyAmbiguous");
-	state = buildWorkAddState(fixture.cwd, "Must not guess open ready roadmap");
-	assert(
-		state.ok && state.epic.labels.includes("wo:misc"),
-		"unselected open roadmaps do not override Misc",
+	let placementLabels = [];
+	state = await handleWorkflowAction(
+		buildWorkAddState,
+		"Must not guess open ready roadmap",
+		{
+			cwd: fixture.cwd,
+			mode: "tui",
+			ui: {
+				notify: () => {},
+				select: async (_title, labels) => {
+					placementLabels = labels;
+					return undefined;
+				},
+			},
+		},
+		{},
 	);
-	assert(fixture.logs().length === 0, "Misc routing does not invoke bd");
+	assert(
+		!state.ok && placementLabels.some((label) => label.includes("E-2")),
+		"placement offers every roadmap instead of guessing between active ones",
+	);
+	assert(fixture.logs().length === 0, "roadmap choice does not invoke bd");
+
+	const closedStore = fixture.store();
+	closedStore.items["E-2"].status = "closed";
+	saveStore(fixture.cwd, closedStore);
+	state = await handleWorkflowAction(
+		buildWorkAddState,
+		"Reopen chosen brainstorm",
+		{
+			cwd: fixture.cwd,
+			mode: "tui",
+			ui: {
+				notify: () => {},
+				select: async (_title, labels) =>
+					labels.find((label) => label.includes("E-2")),
+			},
+		},
+		{},
+	);
+	assert(
+		state.ok &&
+			state.epic.id === "E-2" &&
+			fixture.store().items["E-2"].status === "open",
+		"closed brainstorms appear in placement and reopen when selected",
+	);
+	for (const builder of [
+		buildWorkSmallState,
+		buildWorkMedState,
+		buildWorkBigState,
+	]) {
+		const store = fixture.store();
+		store.items["E-2"].status = "closed";
+		saveStore(fixture.cwd, store);
+		let sawClosedRoadmap = false;
+		state = await handleWorkflowAction(
+			builder,
+			"Sized task",
+			{
+				cwd: fixture.cwd,
+				mode: "tui",
+				ui: {
+					notify: () => {},
+					select: async (_title, labels) => {
+						sawClosedRoadmap ||= labels.some(
+							(label) => label.includes("E-2") && /closed/i.test(label),
+						);
+						return labels.find((label) => label.includes("E-2"));
+					},
+				},
+			},
+			{ sendUserMessage: async () => {} },
+		);
+		assert(
+			state.ok &&
+				sawClosedRoadmap &&
+				fixture.store().items["E-2"].status === "open",
+			"small/medium/big placement shows and reopens closed brainstorms",
+		);
+	}
 
 	fixture.reset("ambiguous");
 	state = buildWorkAddState(
@@ -431,6 +509,19 @@ try {
 	assert(
 		!raced.ok && raced.reason === "parent-ineligible",
 		"fallback rereads and rejects a removed parent",
+	);
+	const closedComposerStore = fixture.store();
+	closedComposerStore.items["E-1"].status = "closed";
+	saveStore(fixture.cwd, closedComposerStore);
+	const reopenedComposer = createWorkspaceTaskFromText(
+		fixture.cwd,
+		"E-1",
+		undefined,
+		"Reopen from composer",
+	);
+	assert(
+		reopenedComposer.ok && fixture.store().items["E-1"].status === "open",
+		"adding from the roadmap composer reopens a closed brainstorm",
 	);
 } finally {
 	fixture.cleanup();

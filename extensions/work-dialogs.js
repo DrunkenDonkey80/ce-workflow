@@ -139,9 +139,32 @@ function sectionLine(theme, title, width) {
 	);
 }
 
+function statsLine(theme, lines, index) {
+	const line = lines[index] ?? "";
+	if (!line) return "";
+	if (line === "Stats:" || line.startsWith("Total:"))
+		return theme.fg("accent", theme.bold(line));
+	let block = -1;
+	for (let at = 1; at <= index; at += 1)
+		if (lines[at] && !lines[at].startsWith("-") && lines[at].endsWith(":"))
+			block += 1;
+	const color = ["success", "warning", "text", "accent"][
+		Math.max(0, block) % 4
+	];
+	return theme.fg(color, line.endsWith(":") ? theme.bold(line) : line);
+}
+
 function workspaceHeight(tui) {
 	return Math.max(1, (tui.terminal?.rows ?? 24) - 1);
 }
+
+// Keep the final column unused: exact-width redraws wrap in Windows terminals.
+const workspaceOverlayOptions = {
+	anchor: "top-left",
+	width: "100%",
+	maxHeight: "100%",
+	margin: { right: 1 },
+};
 
 function initialIndex(items, { cursorKey, currentValue, selectedIndex }) {
 	if (Number.isInteger(selectedIndex))
@@ -525,14 +548,7 @@ export async function showListDialog(ctx, options) {
 			};
 			return component;
 		},
-		{
-			overlay: true,
-			overlayOptions: {
-				anchor: "center",
-				width: "100%",
-				maxHeight: "100%",
-			},
-		},
+		{ overlay: true, overlayOptions: workspaceOverlayOptions },
 	);
 }
 
@@ -542,7 +558,10 @@ function treeVisualStatus(row) {
 
 function treeStatusColor(row) {
 	const status = treeVisualStatus(row);
-	if (row.attention || ["blocked", "paused", "needs_attention"].includes(status))
+	if (
+		row.attention ||
+		["blocked", "paused", "needs_attention"].includes(status)
+	)
 		return "warning";
 	if (row.live || row.engaged || status === "in_progress") return "success";
 	if (status === "closed") return "dim";
@@ -558,6 +577,9 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		refreshIntervalMs = 1000,
 		setIntervalFn = setInterval,
 		clearIntervalFn = clearInterval,
+		setTimeoutFn = setTimeout,
+		clearTimeoutFn = clearTimeout,
+		statsDelayMs = 100,
 		cleanup,
 		cursorKey = title,
 		filter = true,
@@ -567,7 +589,8 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		const roadmaps = frame?.roadmaps ?? [];
 		const seen = new Set();
 		const remember = (row) => {
-			if (seen.has(row.id)) throw new Error(`Duplicate work item ID: ${row.id}`);
+			if (seen.has(row.id))
+				throw new Error(`Duplicate work item ID: ${row.id}`);
 			seen.add(row.id);
 		};
 		const byParent = new Map();
@@ -634,6 +657,8 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 				frame?.selectedId ?? dialogCursors.get(cursorKey) ?? rows[0]?.id;
 			let closed = false;
 			let timer;
+			let statsTimer;
+			let statsPendingId;
 			let cachedKey;
 			let cachedLines;
 			const statsById = new Map();
@@ -668,6 +693,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 				if (closed) return;
 				closed = true;
 				if (timer !== undefined) clearIntervalFn(timer);
+				if (statsTimer !== undefined) clearTimeoutFn(statsTimer);
 				cleanup?.();
 				if (selectedId) dialogCursors.set(cursorKey, selectedId);
 				done(result);
@@ -687,6 +713,27 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 			};
 			rebuild();
 			if (refresh) timer = setIntervalFn(poll, refreshIntervalMs);
+			const queueStats = (id) => {
+				if (statsPendingId !== id && statsTimer !== undefined) {
+					clearTimeoutFn(statsTimer);
+					statsTimer = undefined;
+					statsPendingId = undefined;
+				}
+				if (!id || statsById.has(id) || statsPendingId === id) return;
+				statsPendingId = id;
+				statsTimer = setTimeoutFn(() => {
+					statsTimer = undefined;
+					if (closed || statsPendingId !== id) return;
+					statsPendingId = undefined;
+					try {
+						statsById.set(id, resolveStats?.(id) ?? ["Stats:", "- unknown"]);
+					} catch {
+						statsById.set(id, ["Stats:", "- unknown"]);
+					}
+					cachedKey = undefined;
+					tui.requestRender();
+				}, statsDelayMs);
+			};
 
 			const component = {
 				focused: false,
@@ -696,14 +743,8 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}`;
 					if (cache === cachedKey) return cachedLines;
 					const selected = visible.find((row) => row.id === selectedId);
-					if (selected && !statsById.has(selected.id)) {
-						try {
-							statsById.set(selected.id, resolveStats?.(selected.id) ?? ["Stats:", "- unknown"]);
-						} catch {
-							statsById.set(selected.id, ["Stats:", "- unknown"]);
-						}
-					}
-					const stats = statsById.get(selected?.id) ?? ["Stats:", "- unknown"];
+					queueStats(selected?.id);
+					const stats = statsById.get(selected?.id) ?? ["Stats:", "- loading…"];
 					const lines = [];
 					const add = (line = "") =>
 						lines.push(fit(line || "\u00a0", renderWidth));
@@ -715,34 +756,28 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						header.push(
 							`${theme.fg("muted", "Filter:")} ${theme.fg("text", `${query}${component.focused ? "▌" : ""}`)}`,
 						);
-					const statsWidth = Math.min(
-						Math.max(1, Math.floor((renderWidth - 2) / 2)),
-						Math.max(1, ...stats.map((line) => visibleWidth(line))),
-					);
-					const headerWidth = Math.max(1, renderWidth - statsWidth - 2);
-					const statsRows = Math.min(
-						9,
-						Math.max(header.length, height - 5),
-					);
-					const shownStats = stats.length > statsRows
-						? [
-								...stats.slice(0, Math.max(0, statsRows - 1)),
-								`… ${stats.length - statsRows + 1} more`,
-							]
-						: stats;
-					for (let at = 0; at < statsRows; at += 1) {
-						const left = fit(header[at] ?? "", headerWidth);
-						const right = fit(shownStats[at] ?? "", statsWidth).trimEnd();
-						add(
-							`${left}  ${" ".repeat(Math.max(0, statsWidth - visibleWidth(right)))}${theme.fg("muted", right)}`,
-						);
-					}
+					for (const line of header) add(line);
 					add(sectionLine(theme, "Work items", renderWidth));
 					const detailRows = Math.max(
 						0,
 						Math.min(6, height - lines.length - 4),
 					);
 					const bodyRows = Math.max(0, height - lines.length - detailRows - 3);
+					const statsWidth =
+						renderWidth >= 24
+							? Math.min(
+									Math.floor((renderWidth - 2) / 2),
+									Math.max(1, ...stats.map((line) => visibleWidth(line))),
+								)
+							: 0;
+					const treeWidth = renderWidth - (statsWidth ? statsWidth + 2 : 0);
+					const shownStats =
+						stats.length > bodyRows
+							? [
+									...stats.slice(0, Math.max(0, bodyRows - 1)),
+									`… ${stats.length - bodyRows + 1} more`,
+								]
+							: stats;
 					const index = Math.max(
 						0,
 						visible.findIndex((row) => row.id === selectedId),
@@ -754,19 +789,20 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 							visible.length - bodyRows,
 						),
 					);
-					for (let at = start; at < start + bodyRows; at += 1) {
-						const row = visible[at];
-						if (!row) add();
-						else {
+					for (let offset = 0; offset < bodyRows; offset += 1) {
+						const row = visible[start + offset];
+						let tree = "";
+						if (row) {
 							const selected = row.id === selectedId;
 							const marker = row.container
 								? expanded(row)
 									? "[-]"
 									: "[+]"
 								: "   ";
-							const progress = row.role || row.tasks
-								? `${row.progress?.completed ?? 0}/${row.progress?.total ?? 0} `
-								: "";
+							const progress =
+								row.role || row.tasks
+									? `${row.progress?.completed ?? 0}/${row.progress?.total ?? 0} `
+									: "";
 							const prefix = `${theme.fg(selected ? "accent" : "text", selected ? "❯" : " ")} ${"  ".repeat(row.depth)}${marker} `;
 							const dot = theme.fg(
 								treeStatusColor(row),
@@ -780,7 +816,18 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 										: "text",
 								`${progress}${row.shortTitle ?? row.title ?? row.label ?? row.id}`,
 							);
-							add(`${prefix}${dot} ${title}`);
+							tree = `${prefix}${dot} ${title}`;
+						}
+						if (!statsWidth) add(tree);
+						else {
+							const left = fit(tree, treeWidth);
+							const right = fit(
+								statsLine(theme, shownStats, offset),
+								statsWidth,
+							).trimEnd();
+							add(
+								`${left}  ${" ".repeat(Math.max(0, statsWidth - visibleWidth(right)))}${right}`,
+							);
 						}
 					}
 					add(sectionLine(theme, "Details", renderWidth));
@@ -902,10 +949,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 			};
 			return component;
 		},
-		{
-			overlay: true,
-			overlayOptions: { anchor: "center", width: "100%", maxHeight: "100%" },
-		},
+		{ overlay: true, overlayOptions: workspaceOverlayOptions },
 	);
 }
 

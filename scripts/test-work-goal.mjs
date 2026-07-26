@@ -536,7 +536,10 @@ assert.match(
 	imageRoute.args,
 	/- \.pi\/work-artifacts\/task-images\/image\.png \(image\/png, 3 bytes\)/,
 );
-assert(!imageRoute.args.includes(sourceImage.data) && !imageRoute.args.includes("data:"));
+assert(
+	!imageRoute.args.includes(sourceImage.data) &&
+		!imageRoute.args.includes("data:"),
+);
 assert.deepEqual(imageRoute.options, { explicitFreeform: true });
 
 const emptyImagesCtx = editorCtx("editor-brainstorm-empty-images");
@@ -583,7 +586,11 @@ assert.equal(
 	"handled",
 );
 assert.equal(failedImageRoutes, 0, "materialization failure does not execute");
-assert.equal(failedImageCtx.editorText, failedSubmission, "failure restores submission");
+assert.equal(
+	failedImageCtx.editorText,
+	failedSubmission,
+	"failure restores submission",
+);
 assert.match(editorNotices.at(-1).message, /Reattach the image and retry/);
 await mod.consumePendingMainEditorAction(
 	{ source: "interactive", text: failedSubmission, images: [sourceImage] },
@@ -670,7 +677,11 @@ assert.equal(sourceRoutes, 1, "RPC and extension inputs do not clear pending");
 
 const draftCtx = editorCtx("editor-draft", "unrelated draft");
 await shortcuts.f7.handler(draftCtx);
-assert.equal(draftCtx.editorText, "unrelated draft", "existing draft is preserved");
+assert.equal(
+	draftCtx.editorText,
+	"unrelated draft",
+	"existing draft is preserved",
+);
 assert.match(editorNotices.at(-1).message, /already has a draft/);
 assert.equal(
 	await mod.consumePendingMainEditorAction(
@@ -683,19 +694,22 @@ assert.equal(
 
 const sessionCtx = editorCtx("editor-session-clear");
 await shortcuts.f7.handler(sessionCtx);
-hooks.session_start({}, {
-	...sessionCtx,
-	mode: "print",
-	sessionManager: {
-		getSessionId: () => "editor-session-clear",
-		getBranch: () => [],
+hooks.session_start(
+	{},
+	{
+		...sessionCtx,
+		mode: "print",
+		sessionManager: {
+			getSessionId: () => "editor-session-clear",
+			getBranch: () => [],
+		},
+		ui: {
+			...sessionCtx.ui,
+			setStatus() {},
+			setWidget() {},
+		},
 	},
-	ui: {
-		...sessionCtx.ui,
-		setStatus() {},
-		setWidget() {},
-	},
-});
+);
 assert.equal(
 	await mod.consumePendingMainEditorAction(
 		{ source: "interactive", text: `${editorMarker}after start` },
@@ -706,10 +720,13 @@ assert.equal(
 );
 sessionCtx.ui.setEditorText("");
 await shortcuts.f7.handler(sessionCtx);
-await hooks.session_shutdown({}, {
-	...sessionCtx,
-	ui: { ...sessionCtx.ui, setStatus() {} },
-});
+await hooks.session_shutdown(
+	{},
+	{
+		...sessionCtx,
+		ui: { ...sessionCtx.ui, setStatus() {} },
+	},
+);
 assert.equal(
 	await mod.consumePendingMainEditorAction(
 		{ source: "interactive", text: `${editorMarker}after shutdown` },
@@ -736,10 +753,45 @@ await shortcuts.f7.handler({
 		},
 	},
 });
-assert.equal(resumePrompted, 1, "unrelated menu actions retain argument dialogs");
+assert.equal(
+	resumePrompted,
+	1,
+	"unrelated menu actions retain argument dialogs",
+);
+assert.equal(Object.keys(tools).length, 13);
+const assertStrictSchema = (schema) => {
+	if (!schema || typeof schema !== "object") return;
+	if (schema.properties) {
+		assert.deepEqual(schema.required, Object.keys(schema.properties));
+		assert.equal(schema.additionalProperties, false);
+		for (const property of Object.values(schema.properties))
+			assertStrictSchema(property);
+	}
+	if (schema.items) assertStrictSchema(schema.items);
+	for (const option of schema.anyOf ?? []) assertStrictSchema(option);
+};
+for (const tool of Object.values(tools)) {
+	assert.deepEqual(tool.constrainedSampling, {
+		type: "json_schema",
+		strict: "prefer",
+	});
+	assertStrictSchema(tool.parameters);
+}
+assert.deepEqual(
+	tools.work_verifier_read.parameters.properties.startLine.type,
+	["integer", "null"],
+);
+assert.equal(tools.work_verifier_read.parameters.properties.path.type, "string");
 assert.ok(tools.work_goal_complete);
 assert.ok(tools.work_goal_human_decision);
-assert.equal(tools.work_goal_human_decision.parameters.required[0], "question");
+assert.deepEqual(tools.work_goal_complete.parameters.properties.question.type, [
+	"string",
+	"null",
+]);
+assert.equal(
+	tools.work_goal_human_decision.parameters.properties.question.type,
+	"string",
+);
 assert.ok(hooks.before_agent_start);
 assert.ok(hooks.agent_end);
 assert.deepEqual(

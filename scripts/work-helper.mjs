@@ -12,6 +12,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
 	appendWorkNote,
+	closeWorkItem,
 	createWorkItem,
 	loadStore,
 	mutateStore,
@@ -859,8 +860,7 @@ try {
 				throw new Error(
 					`Initiative ${id} must be closed through /work-roadmap guarded close.`,
 				);
-			return updateWorkItem(store, id, {
-				status: "closed",
+			return closeWorkItem(store, id, {
 				notes: note ? [...current.notes, note] : current.notes,
 			});
 		});

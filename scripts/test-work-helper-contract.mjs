@@ -245,9 +245,13 @@ try {
 		],
 	});
 	saveStore(cwd, mechanicalStore);
-	execFileSync("git", ["add", "mechanical.md", ".ce-workflow/work-items.json"], {
-		cwd,
-	});
+	execFileSync(
+		"git",
+		["add", "mechanical.md", ".ce-workflow/work-items.json"],
+		{
+			cwd,
+		},
+	);
 	execFileSync("git", ["commit", "-m", "mechanical baseline"], {
 		cwd,
 		stdio: "ignore",

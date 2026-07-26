@@ -85,6 +85,12 @@ async function drive(
 	assert.equal(overlay.overlay, true, "menus use an overlay workspace");
 	assert.equal(overlay.overlayOptions.width, "100%");
 	assert.equal(overlay.overlayOptions.maxHeight, "100%");
+	assert.equal(overlay.overlayOptions.anchor, "top-left");
+	assert.equal(
+		overlay.overlayOptions.margin.right,
+		1,
+		"workspace leaves the terminal wrap column unused",
+	);
 	return result;
 }
 
@@ -458,7 +464,8 @@ const treeFrames = [
 				id: "roadmap-open",
 				title: "Open roadmap stored title",
 				shortTitle: "Open roadmap",
-				description: "The complete selected roadmap description wraps in the lower detail pane with enough additional stored context to occupy six lines in a narrow viewport without telemetry displacing any selected-item description text from the reserved detail area.",
+				description:
+					"The complete selected roadmap description wraps in the lower detail pane with enough additional stored context to occupy six lines in a narrow viewport without telemetry displacing any selected-item description text from the reserved detail area.",
 				status: "open",
 				role: "standalone_epic",
 				progress: { completed: 0, total: 2 },
@@ -538,6 +545,7 @@ const treeFrames = [
 
 async function driveTree(options, interact, mode = "tui") {
 	let tick;
+	let overlay;
 	let renders = 0;
 	let cleanups = 0;
 	let cleared = 0;
@@ -552,7 +560,8 @@ async function driveTree(options, interact, mode = "tui") {
 				return { tokens: 1234, maxTokens: 8192 };
 			},
 			ui: {
-				async custom(factory) {
+				async custom(factory, customOptions) {
+					overlay = customOptions;
 					let value;
 					let closed = false;
 					const component = factory(
@@ -597,13 +606,18 @@ async function driveTree(options, interact, mode = "tui") {
 				assert.equal(value, 7);
 				cleared += 1;
 			},
+			setTimeoutFn(callback) {
+				callback();
+				return 8;
+			},
+			clearTimeoutFn() {},
 			cleanup() {
 				cleanups += 1;
 			},
 			...options,
 		},
 	);
-	return { result, renders, cleanups, cleared, contextUsageCalls };
+	return { result, renders, cleanups, cleared, contextUsageCalls, overlay };
 }
 
 let refreshStep = 0;
@@ -614,7 +628,13 @@ const treeRun = await driveTree(
 		resolveStats(id) {
 			statsCalls.push(id);
 			return id === "roadmap-open"
-				? ["Stats:", `- selected ${id}`, ...Array.from({ length: 9 }, (_, at) => `- metric ${at + 1}`)]
+				? [
+						"Stats:",
+						"Plan:",
+						`- selected ${id}`,
+						"Work:",
+						...Array.from({ length: 9 }, (_, at) => `- metric ${at + 1}`),
+					]
 				: ["Stats:", `- selected ${id}`];
 		},
 		async refresh() {
@@ -643,26 +663,62 @@ const treeRun = await driveTree(
 		assert(lines.some((line) => line.includes("[-] ● 0/2 Open roadmap")));
 		assert(lines.some((line) => line.includes("[+] ✓ 1/1 Closed roadmap")));
 		assert(lines.some((line) => /\s{2}\[-\] ● Task A/.test(line)));
-		assert(lines.some((line) => line.includes("complete selected roadmap description")));
-		assert(lines[0].trimEnd().endsWith("Stats:"), "stats start in the top-right column");
 		assert(
-			lines[1].trimEnd().endsWith("- selected roadmap-open"),
-			"selection stats share the header without overlap",
+			lines.some((line) =>
+				line.includes("complete selected roadmap description"),
+			),
 		);
-		assert(lines[8].includes("… 3 more"), "stats overflow is explicit within its fixed capacity");
-		const initialSeparatorAt = lines.findIndex((line) => line.includes(" Work items "));
-		const initialFirstRowAt = lines.findIndex((line) => line.includes("Open roadmap"));
+		const initialSeparatorAt = lines.findIndex((line) =>
+			line.includes(" Work items "),
+		);
+		const initialFirstRowAt = lines.findIndex((line) =>
+			line.includes("Open roadmap"),
+		);
+		assert.equal(
+			initialSeparatorAt,
+			3,
+			"header collapses to its three content rows",
+		);
 		assert.equal(initialFirstRowAt, initialSeparatorAt + 1);
+		assert(
+			lines[initialSeparatorAt + 1].trimEnd().endsWith("Stats:"),
+			"stats start below the Work items line in the right column",
+		);
+		assert(
+			lines[initialSeparatorAt + 3]
+				.trimEnd()
+				.endsWith("- selected roadmap-open"),
+			"selection stats share the work-item body without overlap",
+		);
+		assert(
+			lines.some((line) => line.includes("- metric 9")),
+			"available body height shows all stats",
+		);
 		const narrowLines = component.render(42);
-		const detailsAt = narrowLines.findIndex((line) => line.includes(" Details "));
+		const narrowSeparatorAt = narrowLines.findIndex((line) =>
+			line.includes(" Work items "),
+		);
+		assert(
+			narrowLines[narrowSeparatorAt + 1].trimEnd().endsWith("Stats:"),
+			"narrow workspaces retain stats below the separator",
+		);
+		const detailsAt = narrowLines.findIndex((line) =>
+			line.includes(" Details "),
+		);
 		const keysAt = narrowLines.findIndex((line) => line.includes(" Keys "));
-		assert.equal(keysAt - detailsAt - 1, 6, "six description rows are reserved");
+		assert.equal(
+			keysAt - detailsAt - 1,
+			6,
+			"six description rows are reserved",
+		);
 		assert(
 			narrowLines.slice(detailsAt + 1, keysAt).every((line) => line.trim()),
 			"all six reserved rows render wrapped selected description",
 		);
 		assert(
-			!lines.slice(lines.findIndex((line) => line.includes(" Details "))).some((line) => line.includes("- selected roadmap-open")),
+			!lines
+				.slice(lines.findIndex((line) => line.includes(" Details ")))
+				.some((line) => line.includes("- selected roadmap-open")),
 			"stats are removed from Details",
 		);
 		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
@@ -672,7 +728,9 @@ const treeRun = await driveTree(
 		);
 		assert(
 			!colors.some(
-				(call) => call.color === "dim" && call.text.includes("Native closed, aggregate open"),
+				(call) =>
+					call.color === "dim" &&
+					call.text.includes("Native closed, aggregate open"),
 			),
 			"aggregate-open titles are not dimmed",
 		);
@@ -681,6 +739,15 @@ const treeRun = await driveTree(
 				colors.some((call) => call.color === color && call.text === "●"),
 				`${color} status dot is colored independently`,
 			);
+		assert(
+			colors.some(
+				(call) => call.color === "success" && call.text === "Plan:",
+			) &&
+				colors.some(
+					(call) => call.color === "warning" && call.text === "Work:",
+				),
+			"adjacent stats blocks use distinct colors",
+		);
 		assert(
 			colors.some((call) => call.color === "dim" && call.text === "✓"),
 			"aggregate-complete rows use a dim checkmark",
@@ -708,7 +775,9 @@ const treeRun = await driveTree(
 		component.handleInput("right");
 		component.handleInput("down");
 		component.handleInput("down");
-		assert(component.render(70).some((line) => /❯\s+● Task A child/.test(line)));
+		assert(
+			component.render(70).some((line) => /❯\s+● Task A child/.test(line)),
+		);
 		component.handleInput("left");
 		lines = component.render(70);
 		assert(lines.some((line) => /❯.*\[\+\] ● Task A/.test(line)));
@@ -723,7 +792,10 @@ const treeRun = await driveTree(
 		lines = component.render(70);
 		assert(lines.some((line) => /❯.*\[-\] ● Task A/.test(line)));
 		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
-		assert(lines[1].trimEnd().endsWith("- selected task-a"));
+		assert(
+			lines[initialSeparatorAt + 2].trimEnd().endsWith("- selected task-a"),
+			"stats remain below the separator when selection changes",
+		);
 		assert.equal(
 			lines.findIndex((line) => line.includes(" Work items ")),
 			initialSeparatorAt,
@@ -765,7 +837,11 @@ const treeRun = await driveTree(
 		);
 		const beforeMalformed = state.renders;
 		await state.tick();
-		assert.equal(state.renders, beforeMalformed, "duplicate refresh is rejected");
+		assert.equal(
+			state.renders,
+			beforeMalformed,
+			"duplicate refresh is rejected",
+		);
 		await state.tick();
 		lines = component.render(70);
 		assert(
@@ -777,12 +853,28 @@ const treeRun = await driveTree(
 	},
 );
 assert.equal(treeRun.result.action, "back");
+assert.equal(treeRun.overlay.overlayOptions.anchor, "top-left");
+assert.equal(treeRun.overlay.overlayOptions.width, "100%");
+assert.equal(treeRun.overlay.overlayOptions.maxHeight, "100%");
+assert.equal(
+	treeRun.overlay.overlayOptions.margin.right,
+	1,
+	"tree workspace leaves the terminal wrap column unused",
+);
 assert.equal(treeRun.cleanups, 1, "Escape invokes explicit cleanup once");
 assert.equal(treeRun.cleared, 1, "Escape clears refresh timer");
-assert.equal(treeRun.contextUsageCalls, 0, "render never reads current context usage");
+assert.equal(
+	treeRun.contextUsageCalls,
+	0,
+	"render never reads current context usage",
+);
 
 const failedStatsTree = await driveTree(
-	{ resolveStats: () => { throw new Error("stats unavailable"); } },
+	{
+		resolveStats: () => {
+			throw new Error("stats unavailable");
+		},
+	},
 	async (component) => {
 		assert(component.render(70).some((line) => line.includes("- unknown")));
 		component.handleInput("down");
@@ -790,21 +882,71 @@ const failedStatsTree = await driveTree(
 		component.handleInput("escape");
 	},
 );
-assert.equal(failedStatsTree.result.action, "back", "stats failure does not break navigation");
+assert.equal(
+	failedStatsTree.result.action,
+	"back",
+	"stats failure does not break navigation",
+);
 
-const shortTree = await driveTree(
-	{ testRows: 8 },
+let deferredStats;
+let cancelledStats = 0;
+const deferredStatsCalls = [];
+await driveTree(
+	{
+		setTimeoutFn(callback) {
+			deferredStats = callback;
+			return 91;
+		},
+		clearTimeoutFn(value) {
+			assert.equal(value, 91);
+			cancelledStats += 1;
+		},
+		resolveStats(id) {
+			deferredStatsCalls.push(id);
+			return ["Stats:", `- selected ${id}`];
+		},
+	},
 	async (component) => {
-		const lines = component.render(18);
-		assert.equal(lines.length, 7, "short workspace stays within terminal height");
-		assert(lines.some((line) => line.includes(" Work items ")));
-		assert(lines.some((line) => line.includes(" Details ")));
-		assert(lines.some((line) => line.includes(" Keys ")));
-		assert(lines.every((line) => terminalWidth(line) <= 16), "narrow workspace stays within width");
+		assert(component.render(70).some((line) => line.includes("- loading…")));
+		assert.equal(
+			deferredStatsCalls.length,
+			0,
+			"render never resolves stats inline",
+		);
+		component.handleInput("down");
+		assert(component.render(70).some((line) => line.includes("- loading…")));
+		assert.equal(
+			deferredStatsCalls.length,
+			0,
+			"arrow navigation stays filesystem-free",
+		);
+		deferredStats();
+		assert.deepEqual(deferredStatsCalls, ["task-a"]);
+		assert(
+			component.render(70).some((line) => line.includes("- selected task-a")),
+		);
 		component.handleInput("escape");
 	},
 );
-assert.equal(shortTree.result.action, "back", "narrow/short fallback remains cancellable");
+assert.equal(cancelledStats, 1, "moving selection cancels stale stats work");
+
+const shortTree = await driveTree({ testRows: 8 }, async (component) => {
+	const lines = component.render(18);
+	assert.equal(lines.length, 7, "short workspace stays within terminal height");
+	assert(lines.some((line) => line.includes(" Work items ")));
+	assert(lines.some((line) => line.includes(" Details ")));
+	assert(lines.some((line) => line.includes(" Keys ")));
+	assert(
+		lines.every((line) => terminalWidth(line) <= 16),
+		"narrow workspace stays within width",
+	);
+	component.handleInput("escape");
+});
+assert.equal(
+	shortTree.result.action,
+	"back",
+	"narrow/short fallback remains cancellable",
+);
 
 const selectedTree = await driveTree({}, async (component) =>
 	component.handleInput("enter"),

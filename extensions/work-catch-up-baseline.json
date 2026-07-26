@@ -1,40 +1,41 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-21",
+  "capturedAt": "2026-07-26",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "0.81.0",
-      "reviewedAt": "2026-07-21",
-      "reviewedVersion": "0.81.0",
+      "version": "0.82.1",
+      "reviewedAt": "2026-07-26",
+      "reviewedVersion": "0.82.1",
       "decisions": [
         {
-          "version": "0.81.0",
-          "title": "Expanded RPC usage accounting and thinking introspection",
+          "version": "0.82.1",
+          "title": "Preferred strict JSON Schema sampling for workflow tools",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Pi 0.82 adds capability-gated constrained JSON Schema sampling, and ce-workflow registers thirteen nested workflow tools in extensions/work-models.js. Using strict=prefer improves argument reliability on supporting models while preserving fallback behavior everywhere else.",
+          "verification": "node scripts/test-work-goal.mjs passed and asserts all 13 registered tools use constrainedSampling { type: json_schema, strict: prefer }; primary LSP diagnostics reported no errors; npm run verify:quiet passed"
+        },
+        {
+          "version": "0.82.1",
+          "title": "Session-aware and streaming bash runtime metadata",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "Pi now includes tool and summary usage in get_session_stats and exposes get_available_thinking_levels (upstream docs/rpc.md); ce-workflow already consumes before/after session stats and verifies the applied thinking level in scripts/workflow-evaluation-rpc.mjs, so the installed runtime provides the benefit without another compatibility layer."
+          "rationale": "Pi now supplies session/model environment variables to built-in and factory bash tools and streams direct RPC bash updates. ce-workflow uses Pi's built-in bash/tool lifecycle and its evaluation RPC client already consumes correlated RPC events, so it inherits the capability without a repository adapter."
         },
         {
-          "version": "0.81.0",
-          "title": "Tool and compaction usage metadata",
+          "version": "0.82.1",
+          "title": "Provider, model catalog, thinking, authentication, and renderer additions",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "OpenRouter/Kimi login, Claude Opus 5 and xhigh metadata, Anthropic gateway auth, model-catalog refreshes, and outputPad affect host/provider or custom-renderer surfaces. ce-workflow registers no provider or custom message renderer and already queries the host model registry and applied thinking level."
+        },
+        {
+          "version": "0.82.1",
+          "title": "Inherited runtime and lifecycle fixes",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "The new optional usage fields are additive (upstream docs/extensions.md and docs/compaction.md). ce-workflow's instant compaction performs no nested model call, while subagent costs remain deliberately separated in work telemetry, so no usage-producing call site needs a change."
-        },
-        {
-          "version": "0.81.0",
-          "title": "Native provider registration, Qwen plans, and llama.cpp management",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "ce-workflow registers workflow tools and commands but no model provider; repository searches found no registerProvider or ModelRuntime integration point, so provider-owned authentication and local model management do not simplify this package."
-        },
-        {
-          "version": "0.81.0",
-          "title": "Additive extension lifecycle and public type exports",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "0.81.0 adds root type exports and hidden inline-extension metadata without removing the lifecycle hooks ce-workflow uses; extensions/work-models.js remains on supported agent_end, agent_settled, turn_end, and tool lifecycle contracts."
+          "rationale": "Retry, compaction routing, context discovery, editor, scoped-model, startup-resource, and TUI fixes are internal Pi behavior. The extension hooks used by ce-workflow remain additive and supported, so the installed host supplies these fixes without compatibility code."
         }
       ]
     },
@@ -71,17 +72,44 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.35.1",
-      "reviewedAt": "2026-07-19",
-      "reviewedVersion": "0.35.1",
+      "version": "0.37.0",
+      "reviewedAt": "2026-07-26",
+      "reviewedVersion": "0.37.0",
       "decisions": [
         {
-          "version": "0.35.1",
-          "title": "Current wait and acceptance contracts",
+          "version": "0.37.0",
+          "title": "Versioned agent contracts and side-effect-free launch preflight",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "ce-workflow's extension-owned RPC handoff already validates through the same spawn resolver, records a task only after acknowledged launch, disables plugin acceptance with a reason, and applies native work-item gates. Adding a second preflight or agentContract v1 projection would duplicate controls without changing a current decision or failure path."
+        },
+        {
+          "version": "0.37.0",
+          "title": "Capability ceilings and shared child extension defaults",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Every packaged ce-workflow role already declares an explicit strict tool allowlist, context mode, skill inheritance, and thinking level in agents/*.md. A global capability ceiling or defaultExtensions/defaultThinking layer would duplicate those fail-closed role contracts rather than simplify them."
+        },
+        {
+          "version": "0.37.0",
+          "title": "Evidence and independent-review semantics",
           "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Direct handoffs should use subagent_wait guidance and reason-bearing acceptance instead of deprecated shorthand.",
-          "verification": "coded work start/finish behavior and npm run verify:quiet passed"
+          "status": "no-action",
+          "rationale": "0.37 separates verified evidence from achieved independent review. ce-workflow already sends reason-bearing acceptance level none for direct role handoffs, orchestrates work-reviewer separately, and its active guidance says evidence ends at verified and review is orthogonal, so no compatibility edit is needed."
+        },
+        {
+          "version": "0.37.0",
+          "title": "Fleet, async terminal proof, steering, and worktree handoff manifests",
+          "pov": "Adopt",
+          "status": "no-action",
+          "rationale": "The persistent FleetView, exact wait/steer wakeups, durable process-terminal state, Windows resilience, and status projections are supplied by pi-subagents itself and directly improve ce-workflow's existing async RPC handoffs. Aggregate worktree manifests do not apply because ce-workflow deliberately keeps one writer and does not launch parallel worktree writers."
+        },
+        {
+          "version": "0.37.0",
+          "title": "Delegation v2 and structured foreground leaves",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "ce-workflow needs durable async specialist runs with supervisor coordination and native work-item state, while delegation v2 is an extension-owned concurrent foreground leaf contract. Replacing the existing async spawn RPC would lose the lifecycle shape this repository relies on."
         }
       ]
     },

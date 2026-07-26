@@ -9,6 +9,7 @@ import {
 	acquireLock,
 	addWorkEvidence,
 	appendWorkNote,
+	closeWorkItem,
 	createWorkItem,
 	deleteWorkItem,
 	deleteWorkItemSubtree,
@@ -228,6 +229,91 @@ try {
 		(error) => error.category === "corrupt",
 	);
 
+	// Closing or deleting the final active task closes ordinary roadmap containers only.
+	const lifecycle = initStore(repo(), { now: "2026-07-15T00:00:00.000Z" });
+	item(lifecycle, { id: "roadmap", type: "epic", title: "Roadmap" });
+	item(lifecycle, {
+		id: "idea",
+		type: "idea",
+		title: "Source idea",
+		parentId: "roadmap",
+	});
+	item(lifecycle, {
+		id: "task-a",
+		type: "task",
+		title: "A",
+		parentId: "roadmap",
+	});
+	item(lifecycle, {
+		id: "task-b",
+		type: "task",
+		title: "B",
+		parentId: "roadmap",
+	});
+	closeWorkItem(lifecycle, "task-a");
+	assert.equal(lifecycle.items.roadmap.status, "open");
+	closeWorkItem(lifecycle, "task-b");
+	assert.equal(
+		lifecycle.items.roadmap.status,
+		"closed",
+		"open source ideas do not keep a completed brainstorm open",
+	);
+	for (const [id, title, protect] of [
+		["misc", "Misc", (root) => root.labels.push("wo:misc")],
+		["improvement", "Self-improving", () => {}],
+		["protected", "Protected", (root) => (root.protected = true)],
+		[
+			"protected-label",
+			"Protected label",
+			(root) => root.labels.push("wo:protected"),
+		],
+		[
+			"protected-root",
+			"Protected root",
+			(root) => root.labels.push("wo:protected-root"),
+		],
+	]) {
+		const root = item(lifecycle, { id, type: "epic", title });
+		protect(root);
+		item(lifecycle, {
+			id: `${id}-task`,
+			type: "task",
+			title: "Persistent task",
+			parentId: id,
+		});
+		closeWorkItem(lifecycle, `${id}-task`);
+		assert.equal(lifecycle.items[id].status, "open");
+		item(lifecycle, {
+			id: `${id}-delete`,
+			type: "task",
+			title: "Persistent delete",
+			parentId: id,
+		});
+		deleteWorkItemSubtree(lifecycle, `${id}-delete`);
+		assert.equal(lifecycle.items[id].status, "open");
+	}
+	for (const mutation of [
+		(store) => closeWorkItem(store, "initiative-1.1.1"),
+		(store) => deleteWorkItemSubtree(store, "initiative-1.1.1"),
+	]) {
+		const initiativeLifecycle = initiativeStore();
+		mutation(initiativeLifecycle);
+		assert.equal(initiativeLifecycle.items["initiative-1"].status, "open");
+	}
+	item(lifecycle, {
+		id: "delete-parent",
+		type: "epic",
+		title: "Delete parent",
+	});
+	item(lifecycle, {
+		id: "delete-last",
+		type: "task",
+		title: "Delete last",
+		parentId: "delete-parent",
+	});
+	deleteWorkItemSubtree(lifecycle, "delete-last");
+	assert.equal(lifecycle.items["delete-parent"].status, "closed");
+
 	// Recursive deletion validates first, permits internal dependencies, and publishes once.
 	const subtreeDir = repo();
 	const subtree = initStore(subtreeDir, { now: "2026-07-15T00:00:00.000Z" });
@@ -266,7 +352,9 @@ try {
 		title: "Blocked child",
 		parentId: "blocked",
 	});
-	updateWorkItem(blockedSubtree, "outside", { dependencies: ["blocked-child"] });
+	updateWorkItem(blockedSubtree, "outside", {
+		dependencies: ["blocked-child"],
+	});
 	saveStore(subtreeDir, blockedSubtree);
 	const blockedBytes = readFileSync(storePath(subtreeDir), "utf8");
 	assert.throws(
@@ -279,7 +367,10 @@ try {
 	assert.equal(readFileSync(storePath(subtreeDir), "utf8"), blockedBytes);
 	const invalidSubtree = structuredClone(blockedSubtree);
 	invalidSubtree.items["blocked-child"].parentId = "missing";
-	assert.throws(() => deleteWorkItemSubtree(invalidSubtree, "blocked"), /parent/i);
+	assert.throws(
+		() => deleteWorkItemSubtree(invalidSubtree, "blocked"),
+		/parent/i,
+	);
 
 	// Direct mutation calls enforce every TUI-compatible protected-root form.
 	const protectedDir = repo();

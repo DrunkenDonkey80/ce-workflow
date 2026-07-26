@@ -2710,6 +2710,40 @@
       "type": "task",
       "updatedAt": "2026-07-20T10:05:06.729Z"
     },
+    "work-2.40": {
+      "createdAt": "2026-07-26T05:51:55.731Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The work-worker for work-9.8 appended native WorkItem notes even though its handoff explicitly said not to mutate WorkItems; coded orchestration owns claims/evidence/close state.\nExpected: Implementation specialists should modify only task-owned source/test files and return evidence; only coded helpers/reviewers should mutate native WorkItem state.\nImpact: Uncoordinated worker notes add store churn and can interfere with deterministic finish/close evidence ownership.\nSuggested improvement: Enforce a worker-side guard that rejects work-helper mutation commands when the handoff says WorkItems are read-only.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/50bacd40-a21d-412a-8233-8bb356c23427",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2495,
+              "file": "01-25c813a0-7131-4370-9ae1-adfef6211325_work-worker_output.md",
+              "sha256": "5ca333cfc663ddf6ea8f9647da0a80bb92dfe401ed0e7f8711f0754ab4c14878"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-26T05:51:55.726Z",
+          "workflowId": "019f9c22-df3a-7f7c-ba07-85d3a83e43e5"
+        }
+      ],
+      "id": "work-2.40",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The work-worker for work-9.8 appended native WorkItem notes even though its handoff explicitly said not to mutate WorkItems; coded",
+      "type": "task",
+      "updatedAt": "2026-07-26T05:51:55.731Z"
+    },
     "work-2.5": {
       "createdAt": "2026-07-20T03:29:59.300Z",
       "dependencies": [
@@ -3403,7 +3437,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T05:37:25.646Z"
+    "updatedAt": "2026-07-26T05:51:55.732Z"
   },
   "schemaVersion": 1
 }
