@@ -64,6 +64,19 @@ import {
 	VERIFIER_OPERATIONS,
 } from "./background-verifiers.js";
 import {
+	acknowledgeLaneLaunch,
+	captureRepositoryFingerprint,
+	createLaneEnvelope,
+	fingerprintsEqual,
+	laneStatus,
+	laneTelemetryEvents,
+	loadLaneStore,
+	promoteLane,
+	reconcileReadOnlyLanes,
+	runReadOnlyLaneBatch,
+	transitionLane,
+} from "./read-only-lanes.js";
+import {
 	acquireLock,
 	appendWorkNote,
 	closeWorkItem,
@@ -439,6 +452,10 @@ const WORK_ORCH_BOOLEANS = [
 	{
 		key: "browserTestsOnUiDiff",
 		label: "CE-test-browser when diff touches UI",
+	},
+	{
+		key: "serialReadOnlyLanes",
+		label: "Serial read-only lanes",
 	},
 ];
 const SLICE_PLAN_ADVISOR_USAGE = ["none", "first", "all"];
@@ -3467,7 +3484,9 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 		? raw.advisorUsageForSlicePlans
 		: base.advisorUsageForSlicePlans;
 	const flags = {};
-	for (const { key } of WORK_ORCH_BOOLEANS) flags[key] = raw[key] ?? base[key];
+	for (const { key } of WORK_ORCH_BOOLEANS)
+		flags[key] = raw[key] ?? base[key] ?? false;
+	if (process.env.WORK_ORCH_SERIAL === "1") flags.serialReadOnlyLanes = true;
 	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
 	const codeReviewBeforeCommit =
 		raw.codeReviewBeforeCommit ?? base.codeReviewBeforeCommit;
@@ -3501,7 +3520,8 @@ function applyProfile(settings, profileKey) {
 	compactOverrides(settings);
 	const block = workOrchBlock(settings);
 	block.profile = profileKey;
-	for (const { key } of WORK_ORCH_BOOLEANS) block[key] = profile[key];
+	for (const { key } of WORK_ORCH_BOOLEANS)
+		if (profile[key] !== undefined) block[key] = profile[key];
 	block.advisorUsageForSlicePlans = profile.advisorUsageForSlicePlans;
 	block.slicePlanCeDepth = profile.slicePlanCeDepth;
 	block.codeReviewBeforeCommit = profile.codeReviewBeforeCommit;
@@ -5744,7 +5764,7 @@ function initiativeSuggestedCommands(initiative) {
 		: [];
 }
 
-function buildWorkStatus(cwd, target) {
+function buildWorkStatus(cwd, target, readOnlyOverride) {
 	const gate = normalReadGate(cwd);
 	if (gate) return `${gate.reason}: ${gate.message}`;
 	const resolved = resolveEpic(cwd, target);
@@ -5819,6 +5839,7 @@ function buildWorkStatus(cwd, target) {
 			return "git status unavailable";
 		}
 	})();
+	const readOnly = readOnlyOverride ?? readOnlyLaneRuntimeStatus(cwd);
 
 	const next = (() => {
 		if (decisions.length) return "Resolve decision WorkItems first.";
@@ -5869,6 +5890,14 @@ function buildWorkStatus(cwd, target) {
 		"",
 		"Git:",
 		gitStatus || "clean",
+		"",
+		`Read-only lanes: ${readOnly.mode}`,
+		...(readOnly.lanes.length
+			? readOnly.lanes.map(
+					(lane) =>
+						`- ${lane.laneKind} ${lane.workItemId} g${lane.generation} ${lane.state} head=${lane.head} claims=${lane.claims.join(",") || "none"} age=${lane.ageMs}ms${lane.reason ? ` reason=${lane.reason}` : ""}`,
+				)
+			: ["- none"]),
 		"",
 		`Next: ${next}`,
 	].join("\n");
@@ -8437,6 +8466,185 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 			scheduled.status === "queued" ? "info" : "warning",
 		);
 		return;
+	}
+}
+
+function laneDigest(value) {
+	return createHash("sha256")
+		.update(typeof value === "string" ? value : JSON.stringify(value ?? null))
+		.digest("hex");
+}
+
+function readOnlyLaneEnvelope(
+	cwd,
+	request,
+	settings = readEffectiveSettings(cwd),
+) {
+	if (!["discovery", "debug"].includes(request?.laneKind))
+		throw new Error(
+			"Read-only lanes support only current-task discovery/debug",
+		);
+	const workItem = readWorkItem(cwd, request.workItemId);
+	if (!workItem) throw new Error(`No WorkItem found for ${request.workItemId}`);
+	const head = run(cwd, "git", ["rev-parse", "HEAD"]);
+	return createLaneEnvelope({
+		repository: realpathSync(cwd),
+		laneKind: request.laneKind,
+		producer: request.producer ?? "work-orchestrator",
+		workItemId: request.workItemId,
+		generation: request.generation ?? 1,
+		baseHead: head,
+		checkpoint: request.checkpoint ?? head,
+		workItemHash: laneDigest(workItem),
+		selectionHash: laneDigest(request.selection ?? request.relevantPaths ?? []),
+		relevantPaths: request.relevantPaths ?? [],
+		resourceKeys: request.resourceKeys ?? [],
+		gateVersion: request.gateVersion ?? "work-gates-v1",
+		settingsVersion: laneDigest(settings),
+		promotionOwner: request.promotionOwner ?? "work-orchestrator",
+	});
+}
+
+async function launchCurrentTaskReadOnlyLanes(
+	cwd,
+	requests,
+	adapter,
+	options = {},
+) {
+	const maxLanes = Math.max(1, Number(options.maxLanes) || 3);
+	if (!Array.isArray(requests) || requests.length > maxLanes)
+		throw new Error(
+			`Read-only lane launch is bounded to ${maxLanes} current-task lanes`,
+		);
+	if (typeof adapter?.spawn !== "function")
+		throw new Error("Read-only lane adapter is unavailable");
+	const settings = options.settings ?? readEffectiveSettings(cwd);
+	const envelopes = requests.map((request) =>
+		readOnlyLaneEnvelope(cwd, request, settings),
+	);
+	const byId = new Map(
+		envelopes.map((lane, index) => [lane.id, requests[index]]),
+	);
+	const result = await runReadOnlyLaneBatch(
+		cwd,
+		envelopes,
+		async (lane) => {
+			const request = byId.get(lane.id);
+			const spawned = await adapter.spawn({ ...request, lane });
+			const identity = directRunIdentity(request, spawned);
+			acknowledgeLaneLaunch(cwd, lane.id, {
+				ambiguous: spawned?.ambiguous === true,
+				...identity,
+			});
+			if (!spawned?.ok)
+				throw new Error(
+					spawned?.ambiguous
+						? "ambiguous launch acknowledgement"
+						: (spawned?.message ?? "read-only lane launch failed"),
+				);
+			if (request?.workflowRunId && (identity.runId || identity.asyncDir))
+				recordPendingDirectRun(cwd, {
+					workflowRunId: request.workflowRunId,
+					activity: request.activity ?? "read-only-lane",
+					action: `read-only-${request.laneKind}`,
+					agent: request.agent,
+					workItemId: request.workItemId,
+					...identity,
+				});
+			const settled =
+				typeof adapter.wait === "function"
+					? await adapter.wait(identity, lane)
+					: spawned;
+			return {
+				artifact: settled.artifact ?? {
+					...identity,
+					laneKind: lane.laneKind,
+				},
+				durationMs: settled.durationMs,
+				promote: settled.promote !== false,
+				status:
+					settled.completed === true
+						? "completed"
+						: (settled.status ?? "running"),
+			};
+		},
+		{
+			maxConcurrency: Math.min(maxLanes, Number(options.maxConcurrency) || 2),
+			failFast: options.failFast,
+			serial:
+				process.env.WORK_ORCH_SERIAL === "1" ||
+				workOrchSettings(cwd, settings).serialReadOnlyLanes,
+		},
+	);
+	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
+	return result;
+}
+
+function reconcileReadOnlyLaneRuns(cwd) {
+	const reconciled = reconcileReadOnlyLanes(cwd);
+	for (const lane of Object.values(loadLaneStore(cwd).lanes)) {
+		if (lane.state !== "running" || !lane.launch?.asyncDir) continue;
+		const statusFile = join(lane.launch.asyncDir, "status.json");
+		if (!existsSync(statusFile)) continue;
+		let status;
+		try {
+			status = JSON.parse(readFileSync(statusFile, "utf8"));
+		} catch {
+			continue;
+		}
+		if (!directStatusComplete(status)) continue;
+		const state = directStatusState(status);
+		const succeeded = state
+			? DIRECT_SUCCESS_STATES.has(state)
+			: status.steps.every((step) =>
+					DIRECT_SUCCESS_STATES.has(String(step?.status ?? "").toLowerCase()),
+				);
+		if (!succeeded) {
+			transitionLane(cwd, lane.id, "failed", {
+				reason: state || "read-only runner failed",
+			});
+			reconciled.push(lane.id);
+			continue;
+		}
+		if (
+			!lane.launch.fingerprint ||
+			!fingerprintsEqual(
+				lane.launch.fingerprint,
+				captureRepositoryFingerprint(cwd),
+			)
+		) {
+			transitionLane(cwd, lane.id, "failed", {
+				reason: "mutation: repository fingerprint changed before settlement",
+			});
+			reconciled.push(lane.id);
+			continue;
+		}
+		transitionLane(cwd, lane.id, "completed", {
+			artifact: {
+				statusFile,
+				runId: lane.launch.runId,
+				asyncDir: lane.launch.asyncDir,
+			},
+		});
+		promoteLane(cwd, lane.id, lane.promotionOwner);
+		reconciled.push(lane.id);
+	}
+	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
+	return { reconciled, lanes: laneStatus(cwd) };
+}
+
+function readOnlyLaneRuntimeStatus(cwd) {
+	try {
+		return {
+			mode:
+				process.env.WORK_ORCH_SERIAL === "1" ||
+				workOrchSettings(cwd).serialReadOnlyLanes
+					? "serial"
+					: "parallel",
+			lanes: laneStatus(cwd),
+		};
+	} catch {
+		return { mode: "unavailable", lanes: [] };
 	}
 }
 
@@ -16382,9 +16590,15 @@ async function handleWorkflowAction(
 async function handleWorkStatusCommand(args, ctx) {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	try {
+		let readOnly;
+		try {
+			reconcileReadOnlyLaneRuns(ctx.cwd);
+		} catch {
+			readOnly = { mode: "unavailable", lanes: [] };
+		}
 		reconcileBackgroundVerifierRuns(ctx.cwd);
 		const output = withRecommendedActionsText(
-			`${buildWorkStatus(ctx.cwd, args)}\nVerifier review: ${backgroundVerifierRunStatus(ctx.cwd)}`,
+			`${buildWorkStatus(ctx.cwd, args, readOnly)}\nVerifier review: ${backgroundVerifierRunStatus(ctx.cwd)}`,
 		);
 		rememberRecommendedActions(
 			ctx.cwd,
@@ -18435,6 +18649,10 @@ export {
 	brainstormAgentHealthPreflight,
 	workOrchSettings,
 	backgroundVerifierProfiles,
+	launchCurrentTaskReadOnlyLanes,
+	reconcileReadOnlyLaneRuns,
+	readOnlyLaneRuntimeStatus,
+	readOnlyLaneEnvelope,
 	reconcileBackgroundVerifierRuns,
 	backgroundVerifierRunStatus,
 	scheduleConfiguredBackgroundVerifiers,
@@ -18776,6 +18994,11 @@ export default function workModelsExtension(pi) {
 		};
 		if (ctx.mode !== "print") {
 			reconcilePendingDirectRuns(ctx.cwd, runtime);
+			try {
+				reconcileReadOnlyLaneRuns(ctx.cwd);
+			} catch {
+				// Lane state must not prevent the rest of session startup.
+			}
 			reconcileBackgroundVerifierRuns(ctx.cwd);
 		}
 		activeWorkGoalCwd = ctx.cwd;

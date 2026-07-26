@@ -41,6 +41,7 @@ import {
 	verifierTelemetryEvents,
 } from "../extensions/background-verifiers.js";
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+const previousSerial = process.env.WORK_ORCH_SERIAL;
 const isolatedAgentDir = mkdtempSync(
 	path.join(os.tmpdir(), "ce-background-verifier-agent-"),
 );
@@ -49,6 +50,7 @@ const workModels = await import("../extensions/work-models.js");
 const {
 	default: workModelsExtension,
 	executeVerifierFind,
+	reconcileBackgroundVerifierRuns,
 	executeVerifierGrep,
 	executeVerifierRead,
 } = workModels;
@@ -1334,10 +1336,18 @@ try {
 		1,
 		"explicit reopen produces one later claim",
 	);
+	process.env.WORK_ORCH_SERIAL = "1";
+	assert.equal(
+		typeof reconcileBackgroundVerifierRuns(reconcileCwd).status,
+		"string",
+		"serial read-only mode leaves background verifier recovery and triage active",
+	);
 
 	console.log("background verifier domain tests passed");
 } finally {
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+	if (previousSerial === undefined) delete process.env.WORK_ORCH_SERIAL;
+	else process.env.WORK_ORCH_SERIAL = previousSerial;
 	for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 }

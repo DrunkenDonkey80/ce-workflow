@@ -67,6 +67,12 @@ Every normal commit or checkpoint snapshots the selected scope and schedules eac
 
 Verifier source text and reports are untrusted data. The `work-background-verifier` role is isolated to checkpoint read/list/find/grep tools: no writes, shell, network, credentials, commits, or agent launches. Its advice is attributable and advisory; it neither replaces nor satisfies the required foreground review and finish gates. Verification is checkpoint-scoped, not a whole-repository patrol.
 
+## Read-only lanes
+
+Current-task discovery and debug can use bounded read-only lanes. Their versioned envelopes and recovery state live under `.ce-workflow/work-runs/read-only-lanes/`; `F7 → Status` reports lane kind, WorkItem, generation, checkpoint/HEAD, lifecycle, resource claims, age, reason, and concurrency/waste metrics. Same-key lanes serialize locally, while independent keys may overlap up to the configured bound. Results promote only when their generation and before/after HEAD, source, untracked-file, and WorkItem-store fingerprints still match. Cancelled, stale, late, mutation-producing, or dead-local-runner results are discarded, failed, or orphaned and never attributed as a writer commit or used to queue committed-scope verifiers.
+
+`WORK_ORCH_SERIAL=1` or `F7 → Settings → Serial read-only lanes` preserves lane selection and provenance but runs read-only lanes one at a time. It does not disable background-verifier recovery or triage. `finish-task` and `finish-small` hold the repository mutation boundary for their complete invocation, including verification; competing lanes cannot enter the primary checkout. These PID/resource locks are intentionally single-host. Do not share one checkout between hosts without an external lock service.
+
 ## Workflow rules
 
 - One executable work item is the normal session boundary.

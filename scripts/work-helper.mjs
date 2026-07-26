@@ -10,6 +10,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { acquireRepositoryMutationLock } from "../extensions/read-only-lanes.js";
 import {
 	appendWorkNote,
 	closeWorkItem,
@@ -307,7 +308,7 @@ function runVerification(command) {
 	}
 }
 
-function finishTask() {
+function finishTaskUnlocked() {
 	const id = args[0];
 	const message = option("--message");
 	const maxFiles = Number(
@@ -558,6 +559,15 @@ function finishTask() {
 		push,
 		clean: true,
 	};
+}
+
+function finishTask() {
+	const mutation = acquireRepositoryMutationLock(cwd);
+	try {
+		return finishTaskUnlocked();
+	} finally {
+		mutation.release();
+	}
 }
 
 function arr(value) {

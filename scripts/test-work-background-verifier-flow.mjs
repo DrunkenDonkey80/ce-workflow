@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const { buildWorkStats, default: workModelsExtension } = await import(
+const {
+	buildWorkStats,
+	default: workModelsExtension,
+	launchCurrentTaskReadOnlyLanes,
+} = await import(
 	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
 		.href
 );
@@ -147,6 +151,31 @@ try {
 			phase.models.some((model) => model.model === "fixture/main"),
 		),
 		"completed task telemetry persists the orchestration model",
+	);
+	const batchCount = Object.keys(store.batches).length;
+	await launchCurrentTaskReadOnlyLanes(
+		cwd,
+		[
+			{
+				laneKind: "discovery",
+				workItemId: "TASK-1",
+				generation: 1,
+				relevantPaths: ["feature.js"],
+				resourceKeys: ["repo:read"],
+				workflowRunId: "read-only-attribution",
+			},
+		],
+		{
+			spawn: async () => ({
+				ok: true,
+				completed: true,
+				data: { runId: "read-only-1" },
+			}),
+		},
+	);
+	assert(
+		Object.keys(loadVerifierStore(cwd).batches).length === batchCount,
+		"read-only lane settlement is separate from activeWorkAgent commit attribution",
 	);
 	process.stdout.write(
 		"ok - completed task commit fires a background verifier in a disposable repository\n",

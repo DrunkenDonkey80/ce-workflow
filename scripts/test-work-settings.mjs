@@ -21,8 +21,10 @@ function assert(ok, message) {
 }
 
 const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
+const previousSerial = process.env.WORK_ORCH_SERIAL;
 const globalDir = mkdtempSync(path.join(tmpdir(), "work-global-settings-"));
 process.env.PI_CODING_AGENT_DIR = globalDir;
+delete process.env.WORK_ORCH_SERIAL;
 const cwd = mkdtempSync(path.join(tmpdir(), "work-settings-"));
 try {
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
@@ -49,7 +51,23 @@ try {
 		mod.workResumeSettingsForTest(cwd).goalThinkingLevel === "inherit",
 		"autonomous goals inherit the current effort by default",
 	);
+	assert(
+		mod.workOrchSettings(cwd).serialReadOnlyLanes === false,
+		"read-only lanes default to bounded parallel mode",
+	);
 	assert(!existsSync(settingsFile()), "no default source mutation");
+	process.env.WORK_ORCH_SERIAL = "1";
+	assert(
+		mod.workOrchSettings(cwd).serialReadOnlyLanes === true,
+		"WORK_ORCH_SERIAL forces serial read-only lane mode",
+	);
+	delete process.env.WORK_ORCH_SERIAL;
+	writeSettings({ workOrchestrator: { serialReadOnlyLanes: true } });
+	assert(
+		mod.workOrchSettings(cwd).serialReadOnlyLanes === true,
+		"F7 project setting enables matching serial lane mode",
+	);
+	writeSettings({});
 	writeFileSync(
 		path.join(globalDir, "settings.json"),
 		JSON.stringify({
@@ -1160,6 +1178,8 @@ try {
 	rmSync(globalDir, { recursive: true, force: true });
 	if (previousConfigDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousConfigDir;
+	if (previousSerial === undefined) delete process.env.WORK_ORCH_SERIAL;
+	else process.env.WORK_ORCH_SERIAL = previousSerial;
 }
 
 process.stdout.write("ok - work-settings behavior\n");
