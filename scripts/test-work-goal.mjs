@@ -819,8 +819,15 @@ try {
 	const notices = [];
 	const entries = [];
 	const compactions = [];
+	const thinkingChanges = [];
+	let thinkingLevel = "high";
 	let aborts = 0;
 	const pi = {
+		getThinkingLevel: () => thinkingLevel,
+		setThinkingLevel: (level) => {
+			thinkingLevel = level;
+			thinkingChanges.push(level);
+		},
 		on: (name, handler) => {
 			tempHooks[name] = handler;
 		},
@@ -1469,11 +1476,15 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	writeFileSync(
 		path.join(cwd, ".pi", "settings.json"),
 		JSON.stringify({
-			workResume: { selfImproving: true },
+			workResume: {
+				selfImproving: true,
+				goalThinkingLevel: "medium",
+			},
 			workOrchestrator: { context: { autoCompact: false } },
 		}),
 	);
 	await invoke("work-goal", "write temp proof file", ctx);
+	assert.equal(thinkingLevel, "medium");
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
 	assert.equal(statuses["work-goal"], "▶️ active #0");
@@ -1540,6 +1551,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	await settle();
 	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	assert.equal(thinkingLevel, "high");
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes("needs human decision"),
@@ -1591,6 +1603,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.equal(statuses["work-goal"], "▶️ active #1");
+	assert.equal(thinkingLevel, "medium");
 	assert.equal(sent.length, 3);
 	assert.match(sent[2].message, /User resumed the goal with this answer/);
 	assert.match(sent[2].message, /add a connect button/);
@@ -1612,6 +1625,13 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		/Now give the user a concise final summary/,
 	);
 	assert.equal(statuses["work-goal"], undefined);
+	assert.equal(thinkingLevel, "high");
+	assert.deepEqual(thinkingChanges.slice(0, 4), [
+		"medium",
+		"high",
+		"medium",
+		"high",
+	]);
 
 	await invoke("work-goal", "survive a WebSocket retry", ctx);
 	const retryPrompt = sent.at(-1).message;

@@ -2832,17 +2832,23 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Add configurable autonomous-goal main-session thinking effort (default inherit), apply it while a goal is active including replacement sessions, and restore the user's previous effort on pause, stop, clear, budget/rate wait, or completion. Enable medium in the user's global workflow settings.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.43",
       "labels": [
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Lower autonomous goal main effort temporarily and restore it",
       "type": "task",
-      "updatedAt": "2026-07-26T10:10:46.806Z"
+      "updatedAt": "2026-07-26T10:40:49.952Z"
     },
     "work-2.5": {
       "createdAt": "2026-07-20T03:29:59.300Z",
@@ -3537,7 +3543,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T10:33:30.712Z"
+    "updatedAt": "2026-07-26T10:40:49.952Z"
   },
   "schemaVersion": 1
 }

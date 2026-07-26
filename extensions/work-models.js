@@ -3523,6 +3523,11 @@ function setWorkResumeBoolean(settings, key, value) {
 	settings.workResume[key] = Boolean(value);
 }
 
+function setWorkResumeThinkingLevel(settings, value) {
+	settings.workResume ??= {};
+	settings.workResume.goalThinkingLevel = value;
+}
+
 function backgroundVerifierMap(settings) {
 	const profiles = settings.workOrchestrator?.backgroundVerifiers;
 	return profiles && typeof profiles === "object" && !Array.isArray(profiles)
@@ -13647,7 +13652,31 @@ function workResumeSettings(cwd, settings = readEffectiveSettings(cwd)) {
 			project.selfImproving === true ||
 			(project.selfImproving !== false && globalDefault),
 		newSessionBetweenIterations: project.newSessionBetweenIterations !== false,
+		goalThinkingLevel: ["inherit", ...THINKING_LEVELS].includes(
+			project.goalThinkingLevel,
+		)
+			? project.goalThinkingLevel
+			: "inherit",
 	};
+}
+
+function applyWorkGoalThinking(pi, goal, ctx) {
+	if (!goal) return;
+	goal.goalThinkingLevel ??= workResumeSettings(
+		activeWorkGoalCwd ?? ctx?.cwd,
+	).goalThinkingLevel;
+	if (goal.goalThinkingLevel === "inherit") return;
+	goal.previousThinkingLevel ??=
+		pi?.getThinkingLevel?.() ?? ctx?.getThinkingLevel?.() ?? ctx?.thinkingLevel;
+	if (pi?.getThinkingLevel?.() !== goal.goalThinkingLevel)
+		pi?.setThinkingLevel?.(goal.goalThinkingLevel);
+}
+
+function restoreWorkGoalThinking(pi, goal) {
+	if (!goal?.previousThinkingLevel || typeof pi?.setThinkingLevel !== "function")
+		return;
+	if (pi.getThinkingLevel?.() !== goal.previousThinkingLevel)
+		pi.setThinkingLevel(goal.previousThinkingLevel);
 }
 
 function sameCheckout(left, right) {
@@ -14775,6 +14804,7 @@ async function microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt) {
 
 async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
 	if (workGoalContinuationPending?.goalId === goal.id) return false;
+	applyWorkGoalThinking(pi, goal, ctx);
 	if (workGoalHasPendingMessages(ctx)) return false;
 	const marker = workGoalContinuationMarker(goal);
 	const prompt = buildWorkGoalContinuePrompt(goal, marker, note);
@@ -14804,6 +14834,7 @@ async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
 
 async function sendWorkGoalAnswerContinuation(pi, ctx, goal, note = "") {
 	if (workGoalContinuationPending?.goalId === goal.id) return false;
+	applyWorkGoalThinking(pi, goal, ctx);
 	const marker = workGoalContinuationMarker(goal);
 	const prompt = buildWorkGoalContinuePrompt(goal, marker, note);
 	workGoalContinuationPending = {
@@ -14924,6 +14955,7 @@ function formatWorkGoalDecision(decision = {}) {
 
 function pauseWorkGoalForDecision(decision, ctx, pi) {
 	if (!activeWorkGoal) return;
+	restoreWorkGoalThinking(pi, activeWorkGoal);
 	workGoalContinuationPending = null;
 	activeWorkGoal = {
 		...activeWorkGoal,
@@ -15003,6 +15035,7 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 			completed: false,
 		};
 	}
+	restoreWorkGoalThinking(pi, goal);
 	activeWorkGoal = { ...goal, status: "complete", updatedAt: Date.now() };
 	persistWorkGoal(pi, activeWorkGoal);
 	activeWorkGoal = null;
@@ -15043,6 +15076,7 @@ async function startWorkGoal(mode, objective, pi, ctx, tokenBudget) {
 			`Current: ${activeWorkGoal.objective}\n\nNew: ${text}`,
 		);
 		if (!replace) return;
+		restoreWorkGoalThinking(pi, activeWorkGoal);
 	}
 	workGoalContinuationPending = null;
 	clearWorkGoalRecovery();
@@ -15054,6 +15088,7 @@ async function startWorkGoal(mode, objective, pi, ctx, tokenBudget) {
 		workGoalTokenTotal(ctx),
 	);
 	activeWorkGoalCwd = ctx.cwd;
+	applyWorkGoalThinking(pi, activeWorkGoal, ctx);
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
 	ctx.ui.notify(
@@ -15078,6 +15113,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		return handleWorkResumeStopCommand(command.reason, pi, ctx);
 	if (command.kind === "clear") {
 		const previous = activeWorkGoal?.objective;
+		restoreWorkGoalThinking(pi, activeWorkGoal);
 		activeWorkGoal = null;
 		workGoalContinuationPending = null;
 		clearWorkGoalRecovery();
@@ -15098,6 +15134,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		return;
 	}
 	if (command.kind === "pause") {
+		restoreWorkGoalThinking(pi, activeWorkGoal);
 		activeWorkGoal = {
 			...activeWorkGoal,
 			status: "paused",
@@ -15133,6 +15170,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 			decision: undefined,
 			updatedAt: Date.now(),
 		};
+		applyWorkGoalThinking(pi, activeWorkGoal, ctx);
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
 		await sendWorkGoalPrompt(
@@ -15161,6 +15199,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 			decision: undefined,
 			updatedAt: Date.now(),
 		};
+		applyWorkGoalThinking(pi, activeWorkGoal, ctx);
 		clearWorkGoalRecovery();
 		clearWorkGoalUsageLimitTimer();
 		persistWorkGoal(pi);
@@ -15213,6 +15252,7 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 	const reason = String(args ?? "").trim() || "user requested stop";
 	const working = Boolean(activeWorkAgent) || !ctx.isIdle?.();
 	if (activeWorkGoal) {
+		restoreWorkGoalThinking(pi, activeWorkGoal);
 		activeWorkGoal = {
 			...activeWorkGoal,
 			status: working && activeWorkGoalRunning ? "stopping" : "stopped",
@@ -15815,6 +15855,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	const assistant = finalAssistantMessage(event.messages);
 	const text = assistantVisibleText(assistant);
 	if (goal.status === "stopping") {
+		restoreWorkGoalThinking(pi, goal);
 		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
@@ -15843,6 +15884,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		isWorkGoalUsageLimit(assistant)
 	) {
 		if (isWorkGoalUsageLimit(assistant)) {
+			restoreWorkGoalThinking(pi, goal);
 			const nextRetryAt = Date.now() + workGoalUsageLimitRetryDelayMs();
 			activeWorkGoal = {
 				...goal,
@@ -15865,6 +15907,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		if (isRetryableWorkGoalInterruption(assistant)) {
 			const nextRetries = (goal.retries ?? 0) + 1;
 			if (nextRetries > WORK_GOAL_MAX_RETRIES) {
+				restoreWorkGoalThinking(pi, goal);
 				activeWorkGoal = {
 					...goal,
 					status: "paused",
@@ -15892,6 +15935,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 				"info",
 			);
 		} else {
+			restoreWorkGoalThinking(pi, goal);
 			activeWorkGoal = { ...goal, status: "paused", updatedAt: Date.now() };
 			clearWorkGoalRecovery();
 			persistWorkGoal(pi);
@@ -15918,6 +15962,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		activeWorkGoal.tokenBudget !== undefined &&
 		activeWorkGoal.tokensUsed >= activeWorkGoal.tokenBudget
 	) {
+		restoreWorkGoalThinking(pi, activeWorkGoal);
 		workGoalContinuationPending = null;
 		activeWorkGoal = {
 			...activeWorkGoal,
@@ -18661,7 +18706,9 @@ export default function workModelsExtension(pi) {
 					resumeOnSessionStart: undefined,
 					updatedAt: Date.now(),
 				};
+				applyWorkGoalThinking(pi, activeWorkGoal, ctx);
 			} else {
+				restoreWorkGoalThinking(pi, activeWorkGoal);
 				activeWorkGoal = {
 					...activeWorkGoal,
 					status: "paused",
@@ -18669,7 +18716,7 @@ export default function workModelsExtension(pi) {
 				};
 			}
 			persistWorkGoal(pi);
-		}
+		} else restoreWorkGoalThinking(pi, activeWorkGoal);
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
 		pendingMainEditorActions.clear();
@@ -19221,6 +19268,7 @@ function workSettingsStatus(ctx) {
 		`  ${onOff(resume.selfImproving)} self-improving workflow reporting (explicit evidence intake)`,
 		`  source: ${settings.workImprovement?.sourceCheckout ?? process.env.CE_WORKFLOW_SOURCE_DIR ?? "package checkout fallback"}`,
 		`  ${onOff(resume.newSessionBetweenIterations)} new session between iterations`,
+		`  ${SUBMENU_ARROW} autonomous-goal main effort: ${resume.goalThinkingLevel}`,
 	];
 	notify(ctx, lines.join("\n"), "info");
 }
@@ -19263,7 +19311,8 @@ function hasProjectOverride(settings, item) {
 		return owns(block, "advisorUsageForSlicePlans");
 	if (item.kind === "reviewLevel") return owns(block, "codeReviewBeforeCommit");
 	if (item.kind === "bool") return owns(block, item.value);
-	if (item.kind === "resumeBool") return owns(settings.workResume, item.value);
+	if (item.kind === "resumeBool" || item.kind === "resumeThinking")
+		return owns(settings.workResume, item.value);
 	return false;
 }
 
@@ -19311,7 +19360,8 @@ function clearProjectOverride(settings, item) {
 		delete block.advisorUsageForSlicePlans;
 	else if (item.kind === "reviewLevel") delete block.codeReviewBeforeCommit;
 	else if (item.kind === "bool") delete block[item.value];
-	else if (item.kind === "resumeBool") delete settings.workResume[item.value];
+	else if (item.kind === "resumeBool" || item.kind === "resumeThinking")
+		delete settings.workResume[item.value];
 	if (
 		settings.workOrchestrator &&
 		!Object.keys(settings.workOrchestrator).length
@@ -19442,6 +19492,12 @@ async function workSettingsLoop(ctx) {
 					"new session between iterations",
 					resume.newSessionBetweenIterations,
 				),
+			},
+			{
+				kind: "resumeThinking",
+				value: "goalThinkingLevel",
+				label: `autonomous-goal main effort: ${resume.goalThinkingLevel} ${SUBMENU_ARROW}`,
+				description: "Temporarily override this session while autonomous work runs",
 			},
 			{
 				kind: "reset",
@@ -19582,6 +19638,27 @@ async function workSettingsLoop(ctx) {
 			setWorkOrchReviewLevel(settings, level);
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Pre-commit review: ${level}`, "info");
+			continue;
+		}
+		if (pick.kind === "resumeThinking") {
+			const level = await choose(
+				ctx,
+				"Autonomous-goal main effort",
+				["inherit", ...THINKING_LEVELS].map((value) => ({
+					value,
+					label: value,
+					description:
+						value === "inherit"
+							? "Keep the current session effort"
+							: "Restore the prior effort when work pauses or finishes",
+				})),
+				resume.goalThinkingLevel,
+			);
+			if (!level) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			setWorkResumeThinkingLevel(settings, level);
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Autonomous-goal main effort: ${level}`, "info");
 			continue;
 		}
 		if (pick.kind === "slot") {

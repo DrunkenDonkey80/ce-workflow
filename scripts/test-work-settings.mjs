@@ -45,11 +45,18 @@ try {
 		mod.workResumeSettingsForTest(cwd).selfImproving === false,
 		"self improvement defaults off",
 	);
+	assert(
+		mod.workResumeSettingsForTest(cwd).goalThinkingLevel === "inherit",
+		"autonomous goals inherit the current effort by default",
+	);
 	assert(!existsSync(settingsFile()), "no default source mutation");
 	writeFileSync(
 		path.join(globalDir, "settings.json"),
 		JSON.stringify({
-			workResume: { selfImprovingDefault: true },
+			workResume: {
+				selfImprovingDefault: true,
+				goalThinkingLevel: "medium",
+			},
 			workOrchestrator: {
 				profile: "high",
 				advisorEnabled: {
@@ -71,6 +78,10 @@ try {
 	assert(
 		mod.workResumeSettingsForTest(cwd).selfImproving === true,
 		"global hidden default enables self improvement",
+	);
+	assert(
+		mod.workResumeSettingsForTest(cwd).goalThinkingLevel === "medium",
+		"global settings can lower autonomous-goal main effort",
 	);
 	writeSettings({
 		workResume: { selfImproving: false },
