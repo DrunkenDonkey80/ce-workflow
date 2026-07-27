@@ -2993,6 +2993,10 @@
       ],
       "dependencyEdges": [],
       "description": "Upstream-owned residual from work-2.38/work-2.31: pi-subagents must technically prevent undeclared source mutations by read-only planner roles or emit authoritative per-process mutation attribution so ce-workflow can distinguish child writes from concurrent repository changes.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Track upstream planner repository mutation isolation"
+      },
       "evidence": [],
       "id": "work-2.46",
       "labels": [],
@@ -3013,6 +3017,10 @@
       ],
       "dependencyEdges": [],
       "description": "Upstream-owned residual from work-2.39/work-2.32: pi-subagents child launches after continuation/compaction must resolve authenticated parent providers and classify startup/auth failures as immediate terminal infrastructure states.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Track upstream authentication after goal continuation"
+      },
       "evidence": [],
       "id": "work-2.47",
       "labels": [],
@@ -3034,6 +3042,10 @@
       ],
       "dependencyEdges": [],
       "description": "Canonical upstream claim for work-2.44 and work-2.45 recovery atoms: pi-subagents 0.37.0 writes launchContractDigest into recovery-descriptor.json but readAsyncRecoveryDescriptor omits it from allowedFields, so resume rejects the runtime's own descriptor.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Accept generated launch digests in recovery descriptors"
+      },
       "evidence": [],
       "id": "work-2.48",
       "labels": [],
@@ -4257,7 +4269,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T16:40:05.078Z"
+    "updatedAt": "2026-07-27T16:43:13.725Z"
   },
   "schemaVersion": 1
 }

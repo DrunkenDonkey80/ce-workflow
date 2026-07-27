@@ -25,8 +25,9 @@ const keybindings = {
 
 function terminalWidth(value, emojiWidth = 2) {
 	let width = 0;
-	for (const char of value) {
-		if (/\p{Mark}/u.test(char) || char === "\uFE0F") continue;
+	const plain = value.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+	for (const char of plain) {
+		if (/\p{Mark}|\p{Control}/u.test(char) || char === "\uFE0F") continue;
 		width += /\p{Emoji_Presentation}/u.test(char) ? emojiWidth : 1;
 	}
 	return width;
@@ -37,6 +38,51 @@ function calibratedTerminalWidth(value) {
 	for (const emoji of ["🧭", "🧱", "🌍"])
 		width += value.split(emoji).length - 1;
 	return width;
+}
+
+function terminalWriteState(value, width) {
+	let row = 0;
+	let column = 0;
+	let wrapPending = false;
+	const plain = value.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+	for (const char of plain) {
+		if (char === "\r") {
+			column = 0;
+			wrapPending = false;
+			continue;
+		}
+		const cells = calibratedTerminalWidth(char);
+		if (!cells) continue;
+		if (wrapPending) {
+			row += 1;
+			column = 0;
+			wrapPending = false;
+		}
+		if (column + cells > width) {
+			row += 1;
+			column = 0;
+		}
+		column += cells;
+		wrapPending = column === width;
+	}
+	return { row, wrapPending };
+}
+
+function assertAutowrapSafeOverlayLines(lines, width) {
+	for (const line of lines) {
+		assert.equal(line[0], " ", "overlay reserves its first terminal cell");
+		assert.equal(line.at(-1), "\r", "overlay resets the terminal column");
+		assert.equal(
+			calibratedTerminalWidth(line),
+			width - 1,
+			"overlay leaves one compositor padding cell",
+		);
+		assert.deepEqual(
+			terminalWriteState(`${line} `, width),
+			{ row: 0, wrapPending: false },
+			"composited redraw avoids the terminal autowrap boundary",
+		);
+	}
 }
 
 async function drive(
@@ -64,6 +110,7 @@ async function drive(
 						},
 					);
 					const initialRender = component.render(70);
+					assertAutowrapSafeOverlayLines(initialRender, 70);
 					assert.equal(
 						initialRender.length,
 						Math.max(1, terminalRows - 2),
@@ -88,8 +135,8 @@ async function drive(
 	assert.equal(overlay.overlayOptions.anchor, "top-left");
 	assert.deepEqual(
 		overlay.overlayOptions.margin,
-		{ top: 1, right: 1, bottom: 1 },
-		"workspace avoids terminal-edge redraws",
+		{ top: 1, bottom: 1 },
+		"workspace avoids vertical terminal-edge redraws",
 	);
 	return result;
 }
@@ -104,6 +151,7 @@ const picked = await drive(
 	{ title: "Root", items, cursorKey: "root" },
 	(component) => {
 		component.handleInput("down");
+		assertAutowrapSafeOverlayLines(component.render(70), 70);
 		component.handleInput("enter");
 	},
 );
@@ -390,7 +438,7 @@ await drive(
 		for (const line of lines)
 			assert.equal(
 				calibratedTerminalWidth(line),
-				68,
+				69,
 				`calibrated terminal width: ${line}`,
 			);
 		assert(
@@ -427,7 +475,7 @@ await drive(
 		for (const line of lines)
 			assert.equal(
 				calibratedTerminalWidth(line),
-				68,
+				69,
 				`multiple-icon terminal width: ${line}`,
 			);
 		component.handleInput("escape");
@@ -654,6 +702,7 @@ const treeRun = await driveTree(
 	},
 	async (component, state) => {
 		let lines = component.render(70);
+		assertAutowrapSafeOverlayLines(lines, 70);
 		assert(
 			lines.some((line) => line.includes("Inspect projected work")),
 			"tree workspace has one purpose line",
@@ -782,9 +831,9 @@ const treeRun = await driveTree(
 		component.handleInput("right");
 		component.handleInput("down");
 		component.handleInput("down");
-		assert(
-			component.render(70).some((line) => /❯\s+● Task A child/.test(line)),
-		);
+		const movedLines = component.render(70);
+		assertAutowrapSafeOverlayLines(movedLines, 70);
+		assert(movedLines.some((line) => /❯\s+● Task A child/.test(line)));
 		component.handleInput("left");
 		lines = component.render(70);
 		assert(lines.some((line) => /❯.*\[\+\] ● Task A/.test(line)));
@@ -865,8 +914,8 @@ assert.equal(treeRun.overlay.overlayOptions.width, "100%");
 assert.equal(treeRun.overlay.overlayOptions.maxHeight, "100%");
 assert.deepEqual(
 	treeRun.overlay.overlayOptions.margin,
-	{ top: 1, right: 1, bottom: 1 },
-	"tree workspace avoids terminal-edge redraws",
+	{ top: 1, bottom: 1 },
+	"tree workspace avoids vertical terminal-edge redraws",
 );
 assert.equal(treeRun.cleanups, 1, "Escape invokes explicit cleanup once");
 assert.equal(treeRun.cleared, 1, "Escape clears refresh timer");
@@ -944,7 +993,7 @@ const shortTree = await driveTree({ testRows: 8 }, async (component) => {
 	assert(lines.some((line) => line.includes(" Details ")));
 	assert(lines.some((line) => line.includes(" Keys ")));
 	assert(
-		lines.every((line) => terminalWidth(line) <= 16),
+		lines.every((line) => terminalWidth(line) <= 17),
 		"narrow workspace stays within width",
 	);
 	component.handleInput("escape");

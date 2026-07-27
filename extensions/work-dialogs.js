@@ -158,12 +158,18 @@ function workspaceHeight(tui) {
 	return Math.max(1, (tui.terminal?.rows ?? 24) - 2);
 }
 
-// Keep the terminal edges unused: exact-size redraws wrap or scroll on Windows.
+function fitOverlayLine(value, width) {
+	if (width <= 1) return "";
+	return ` ${width > 2 ? fit(value || "\u00a0", width - 2) : ""}\r`;
+}
+
+// Vertical margins prevent scrolling; the leading cell + CR prevent exact-width
+// compositor padding from leaving Windows terminals at the autowrap boundary.
 const workspaceOverlayOptions = {
 	anchor: "top-left",
 	width: "100%",
 	maxHeight: "100%",
-	margin: { top: 1, right: 1, bottom: 1 },
+	margin: { top: 1, bottom: 1 },
 };
 
 function initialIndex(items, { cursorKey, currentValue, selectedIndex }) {
@@ -330,8 +336,7 @@ export async function showListDialog(ctx, options) {
 					const cacheKey = `${renderWidth}:${height}:${component.focused}`;
 					if (cacheKey === cachedKey) return cachedLines;
 					const lines = [];
-					const add = (line = "") =>
-						lines.push(fit(line || "\u00a0", renderWidth));
+					const add = (line = "") => lines.push(fitOverlayLine(line, width));
 					const inline = source.some((item) => item.inlineDescription);
 					const detailRows = inline
 						? 0
@@ -756,8 +761,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					queueStats(selected?.id);
 					const stats = statsById.get(selected?.id) ?? ["Stats:", "- loading…"];
 					const lines = [];
-					const add = (line = "") =>
-						lines.push(fit(line || "\u00a0", renderWidth));
+					const add = (line = "") => lines.push(fitOverlayLine(line, width));
 					const header = [
 						`${theme.fg("accent", theme.bold(title))}  ${theme.fg("dim", `${visible.length}/${rows.length}`)}`,
 						theme.fg("muted", purpose),
