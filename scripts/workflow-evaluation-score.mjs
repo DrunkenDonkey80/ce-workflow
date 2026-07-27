@@ -295,6 +295,102 @@ function improvement(baseline, candidate) {
 	return candidate === 0 ? 0 : -Infinity;
 }
 
+export const ROUTING_OUTCOMES = Object.freeze({
+	primary: Object.freeze({
+		parentTurnsPerClosedItem: "lower",
+		parentContextTokensPerClosedItem: "lower",
+	}),
+	quality: Object.freeze({
+		firstPassVerificationRate: "higher",
+		reviewFindingRate: "lower",
+		acceptedPostCloseFindingRate: "lower",
+		reopenOrDebugRate: "lower",
+		escalationRate: "lower",
+		manualInterventionRate: "lower",
+	}),
+	operational: Object.freeze({
+		latencyMs: "lower",
+		staleOrDiscardedBackgroundMs: "lower",
+		duplicateOrAmbiguousRecoveryRate: "lower",
+		infrastructureFailureRate: "lower",
+	}),
+	cost: Object.freeze({ totalCostUsd: "lower" }),
+});
+
+function routingImprovement(baseline, candidate, direction) {
+	const better =
+		direction === "higher" ? candidate - baseline : baseline - candidate;
+	return baseline === 0 ? (better >= 0 ? 0 : -Infinity) : better / baseline;
+}
+
+export function evaluateRoutingDecision(inputPairs, options = {}) {
+	if (!Array.isArray(inputPairs) || inputPairs.length < 3)
+		return invalid("no-qualified-evidence");
+	const metrics = Object.values(ROUTING_OUTCOMES).flatMap(Object.keys);
+	if (
+		inputPairs.some(
+			(pair) =>
+				!pair?.baseline ||
+				!pair?.candidate ||
+				metrics.some(
+					(metric) =>
+						!Number.isFinite(pair.baseline[metric]) ||
+						!Number.isFinite(pair.candidate[metric]),
+				),
+		)
+	)
+		return invalid("incomplete-routing-outcomes");
+	const summary = Object.fromEntries(
+		metrics.map((metric) => {
+			const direction = Object.values(ROUTING_OUTCOMES).find(
+				(group) => metric in group,
+			)[metric];
+			const baseline = median(inputPairs.map((pair) => pair.baseline[metric]));
+			const candidate = median(
+				inputPairs.map((pair) => pair.candidate[metric]),
+			);
+			return [
+				metric,
+				{
+					baseline,
+					candidate,
+					improvement: routingImprovement(baseline, candidate, direction),
+				},
+			];
+		}),
+	);
+	const minimumImprovement = Math.max(
+		MINIMUM_IMPROVEMENT,
+		options.minimumImprovement ?? 0,
+	);
+	const maximumRegression = Math.max(
+		MAXIMUM_DIMENSION_REGRESSION,
+		options.maximumDimensionRegression ?? 0,
+	);
+	const primary = Object.keys(ROUTING_OUTCOMES.primary);
+	const guardrails = Object.values(ROUTING_OUTCOMES)
+		.slice(1)
+		.flatMap(Object.keys);
+	const primaryWin = primary.some(
+		(metric) => summary[metric].improvement >= minimumImprovement,
+	);
+	const regression = [...primary, ...guardrails].find(
+		(metric) => summary[metric].improvement < -maximumRegression,
+	);
+	const accepted = primaryWin && !regression;
+	return {
+		status: accepted ? "candidate-accepted" : "candidate-rejected",
+		reason: regression
+			? `guardrail-regression:${regression}`
+			: primaryWin
+				? "material-savings-without-regression"
+				: "material-savings-threshold-not-met",
+		pairs: inputPairs,
+		summary,
+		thresholds: { minimumImprovement, maximumRegression },
+	};
+}
+
 export function evaluateDecision(inputPairs, rubric, options = {}) {
 	if (!Array.isArray(inputPairs) || inputPairs.length !== 3)
 		return invalid("decision-requires-three-pairs");

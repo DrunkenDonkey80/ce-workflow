@@ -3851,17 +3851,28 @@
         "schemaVersion": 1,
         "title": "Evaluate cohorts and remove ineffective routing paths"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.30",
       "labels": [],
       "notes": [
-        "wo:execution-agent. Continuation stage 6; reuse scripts/workflow-evaluation*.mjs and existing campaign, sentinel, calibration, and paired-identity assets. Prefer deletion over preserving a path that does not clear the established quality and improvement thresholds."
+        "wo:execution-agent. Continuation stage 6; reuse scripts/workflow-evaluation*.mjs and existing campaign, sentinel, calibration, and paired-identity assets. Prefer deletion over preserving a path that does not clear the established quality and improvement thresholds.",
+        "Files: scripts/workflow-evaluation-routing-cohorts.mjs; scripts/workflow-evaluation-score.mjs; scripts/test-workflow-evaluation-routing-cohorts.mjs.\nImplemented bounded live TUI/RPC/autonomous telemetry adaptation with isolated legacy identity, full build/behavior/routing/role-map/project/assurance/mode strata, paired primary/quality/operational/total-cost outcomes, and deterministic optional Sentinel/prefetch simplification using authoritative calibrated thresholds.\nVerification: node scripts/test-workflow-evaluation-routing-cohorts.mjs && node scripts/test-workflow-evaluation-contract.mjs && node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-sentinel.mjs — PASS. npm run verify:quiet — PASS. git diff --check — PASS (line-ending warnings only).\nDecision/report fixtures: material savings with no regression retain Sentinel and prefetch opt-in; quality regression, sub-threshold savings, stricter calibration, and no qualified evidence keep defaults unchanged and report the optional path plus dead adapter/config for disable/removal; provider fallback remains neutral. Residual risk: real simplification remains fail-closed until at least three complete paired closed-item samples include a completed post-close evidence window; no production path was deleted from absent real-world evidence.\n",
+        "wo:review-scope [\"scripts/workflow-evaluation-score.mjs\",\"scripts/test-workflow-evaluation-routing-cohorts.mjs\",\"scripts/workflow-evaluation-routing-cohorts.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"scripts/workflow-evaluation-routing-cohorts.mjs:236 - add \\\"identityKind\\\" to the comparable() field list (or require both arms non-legacy before pushing a pair) so legacy baselines cannot pair with versioned candidates; reproduced: 3 legacy baselines + 3 versioned sentinel candidates yield retainedPaths [sentinel] with reason material-savings-without-regression\",\"scripts/test-workflow-evaluation-routing-cohorts.mjs:205 - add one assertion that a mixed legacy-baseline/versioned-candidate fixture yields score.reason no-qualified-evidence and leaves removedPaths unchanged\"]}",
+        "wo:fix PASS — Fixed decision-time identityKind comparability; added mixed legacy/versioned no-qualified-evidence/defaults/removal regression fixture; added both routing-cohort files to evaluation inventory. Files: scripts/workflow-evaluation-routing-cohorts.mjs, scripts/test-workflow-evaluation-routing-cohorts.mjs, scripts/verify-package.mjs. Verification PASS: node scripts/test-workflow-evaluation-routing-cohorts.mjs && node scripts/test-workflow-evaluation-contract.mjs && node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-sentinel.mjs; npm pack --dry-run; npm run verify:quiet.",
+        "wo:review-scope [\"scripts/verify-package.mjs\",\"scripts/workflow-evaluation-score.mjs\",\"scripts/test-workflow-evaluation-routing-cohorts.mjs\",\"scripts/workflow-evaluation-routing-cohorts.mjs\"]",
+        "wo:review PASS — identityKind now in comparable() (workflow-evaluation-routing-cohorts.mjs:230-238); mixed legacy-baseline/versioned-candidate fixture asserts no-qualified-evidence with removedPaths [sentinel,prefetch] and defaultsChanged false; both routing-cohort files in verify-package evaluation inventory; threshold Math.max semantics unchanged. Evidence: node scripts/test-workflow-evaluation-routing-cohorts.mjs, test-workflow-evaluation-score.mjs, verify-package.mjs --quiet all ok.",
+        "wo:verify-check PASS\nCommand: node scripts/test-workflow-evaluation-routing-cohorts.mjs && node scripts/test-workflow-evaluation-contract.mjs && node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-sentinel.mjs\nOutput: ok - live routing cohorts and deterministic simplification decisions\nok - workflow evaluation contract fixtures\nok - workflow evaluation decision scoring fixtures\nok - workflow evaluation calibration, approval, and sentinel fixtures"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Evaluate cohorts and remove ineffective routing paths",
       "type": "task",
-      "updatedAt": "2026-07-27T06:24:01.011Z"
+      "updatedAt": "2026-07-27T15:09:25.903Z"
     },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
@@ -4094,7 +4105,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T14:35:31.008Z"
+    "updatedAt": "2026-07-27T15:09:25.903Z"
   },
   "schemaVersion": 1
 }
