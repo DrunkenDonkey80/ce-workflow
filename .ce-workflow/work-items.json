@@ -3920,6 +3920,9 @@
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-3.32",
@@ -3927,13 +3930,15 @@
       "notes": [
         "wo:execution-agent Observed live on the second work-3 roadmap-close attempt after work-3.31 shipped.",
         "Implemented missing-scope admission guard before durable review PASS acceptance.\nFiles: scripts/work-helper.mjs; scripts/test-work-helper-contract.mjs\nVerification PASS: pre-fix HEAD helper + new regression fails at coded empty-scope handoff; node scripts/test-work-helper-contract.mjs && node scripts/test-work-start-finish.mjs; npm run verify:quiet; git diff --check.\nResult: preexisting PASS cannot bypass first unreviewed coded handoff; --reviewed without scope remains rejected; explicit [] succeeds on reviewed retry.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs && node scripts/test-work-start-finish.mjs\nOutput: ok - work helper contract\nok - coded work start/finish behavior",
+        "wo:review PASS - ecf35f1 one-line priorScope!==undefined guard satisfies all 5 acceptance clauses; pre-fix helper control fails new regression (store-only handoff despite PASS), post-fix contract+start-finish suites pass, non-empty mismatch/disposition gates retained",
         "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs && node scripts/test-work-start-finish.mjs\nOutput: ok - work helper contract\nok - coded work start/finish behavior"
       ],
       "parentId": "work-3",
       "status": "closed",
       "title": "Require empty review handoff before accepting prior PASS",
       "type": "bug",
-      "updatedAt": "2026-07-27T15:41:23.457Z"
+      "updatedAt": "2026-07-27T15:44:57.592Z"
     },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
@@ -4166,7 +4171,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T15:41:23.457Z"
+    "updatedAt": "2026-07-27T15:44:57.593Z"
   },
   "schemaVersion": 1
 }
