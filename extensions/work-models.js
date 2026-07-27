@@ -7897,7 +7897,7 @@ function directRoleTask(state, cwd) {
 			? `For child state use: node ${helper} work-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
-			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop. Planner launch baseline paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. Tolerate a new unstaged tracked instruction-file path only when git diff --quiet --ignore-all-space --ignore-blank-lines -- <path> passes; never stage it. Block staged, untracked, substantive, or other added paths. Final Git status must add no undeclared repository path outside the native store, workflow runtime, or requested dated plan.`
+			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence). Open decision WorkItems are only for unresolved human, product, or architectural authority; record a clear technical winner in the slice note and do not block executable work. Verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop. Planner launch baseline paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. Tolerate a new unstaged tracked instruction-file path only when git diff --quiet --ignore-all-space --ignore-blank-lines -- <path> passes; never stage it. Block staged, untracked, substantive, or other added paths. Final Git status must add no undeclared repository path outside the native store, workflow runtime, or requested dated plan.`
 			: "",
 		state.action === "run-implementation" && selected?.id
 			? `Claim exactly with: node ${helper} work-claim ${selected.id}`
@@ -11884,7 +11884,7 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 		if (resolved.error) return ordinaryTaskEpicError(resolved);
 		const posture =
 			size === "big"
-				? "big slice: split into executable native work-item store and decision native work-item store before implementation"
+				? "big slice: create the minimum executable native WorkItems; create an open decision only for unresolved human, product, or architectural authority, and record a clear technical default in the slice note without blocking execution"
 				: "medium slice: create one executable child WorkItem by default before implementation; create up to three only for obvious low-risk sequences";
 		const workItem = createWorkflowWorkItem(cwd, {
 			title: parsed.task,

@@ -245,16 +245,22 @@ try {
 	const bigDirect = directRoleHandoffParams(state, fixture.cwd);
 	assert(
 		state.handoffPrompt.includes("big slice") &&
+			state.handoffPrompt.includes(
+				"create an open decision only for unresolved human, product, or architectural authority",
+			) &&
 			bigDirect?.agent === "work-planner" &&
 			state.selectedWorkItem.labels.includes("wo:planning"),
-		"big creates a labelled planning intake and directly selects the planner",
+		"big creates a labelled planning intake without forcing a technical decision blocker",
 	);
 	assert(
-		bigDirect.params.task.length < 2200 &&
+		bigDirect.params.task.length < 2500 &&
 			bigDirect.params.task.includes(
 				`Target work item: ${state.selectedWorkItem.id}`,
 			) &&
 			bigDirect.params.task.includes("work-ready-summary") &&
+			bigDirect.params.task.includes(
+				"record a clear technical winner in the slice note and do not block executable work",
+			) &&
 			bigDirect.params.task.includes("Planner launch baseline paths:") &&
 			bigDirect.params.task.includes(
 				"git diff --quiet --ignore-all-space --ignore-blank-lines",

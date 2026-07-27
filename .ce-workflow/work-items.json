@@ -3236,15 +3236,21 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim from work-2.50: planner choices with a clear technical winner and no user/product authority should be durably recorded without leaving an open decision that blocks executable work. Open decision WorkItems remain mandatory for genuine human/product/architectural authority.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.52",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-start-finish.mjs && node scripts/test-work-resume.mjs\nOutput: ok - coded work start/finish behavior\nok - coded work-resume behavior"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Do not block execution on clear technical planner defaults",
       "type": "task",
-      "updatedAt": "2026-07-27T18:45:55.944Z"
+      "updatedAt": "2026-07-27T18:55:59.829Z"
     },
     "work-2.53": {
       "acceptance": "work-children-summary has a deterministic bounded default with explicit truncation metadata and a targeted/full opt-in when needed. A large synthetic roadmap test proves bounded output while existing small-roadmap summaries remain compatible.",
@@ -4506,7 +4512,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T18:54:15.442Z"
+    "updatedAt": "2026-07-27T18:55:59.829Z"
   },
   "schemaVersion": 1
 }
