@@ -2655,7 +2655,8 @@
       "id": "work-2.38",
       "labels": [],
       "notes": [
-        "Classification: work-2.31 atom A is locally-owned launch-baseline attestation; atom B is upstream-owned with insufficient mechanism evidence because the captured planner transcript writes only its runtime output artifact and invokes helper mutations, with no AGENTS.md write call."
+        "Classification: work-2.31 atom A is locally-owned launch-baseline attestation; atom B is upstream-owned with insufficient mechanism evidence because the captured planner transcript writes only its runtime output artifact and invokes helper mutations, with no AGENTS.md write call.",
+        "Atom A classified already-fixed/local: commit 9894473 added planner launch baseline paths and a fail-BLOCKED final Git-status contract; node scripts/test-work-start-finish.mjs passes. Atom B classified upstream-owned and routed durably to work-2.46."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -2679,7 +2680,8 @@
       "id": "work-2.39",
       "labels": [],
       "notes": [
-        "Classification: both work-2.32 atoms are upstream-owned pi-subagents process/auth lifecycle behavior; ce-workflow already treats startup/auth failure as infrastructure evidence and direct terminal states as failed. Leave this canonical bug open pending continuation-specific runtime proof."
+        "Classification: both work-2.32 atoms are upstream-owned pi-subagents process/auth lifecycle behavior; ce-workflow already treats startup/auth failure as infrastructure evidence and direct terminal states as failed. Leave this canonical bug open pending continuation-specific runtime proof.",
+        "Both atoms classified upstream-owned and routed durably to work-2.47; current ce-workflow already classifies startup/auth failure as infrastructure evidence, but continuation-specific credential inheritance requires pi-subagents runtime proof."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -2761,7 +2763,9 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Single atom classified conflicting with current ownership: work-worker is intentionally permitted to claim and append implementation evidence through the exact helper while coded orchestration exclusively owns commit/close. Rejecting all worker helper mutations would break the current evidence contract; direct store edits remain forbidden. Verified by agents/work-worker.md and passing node scripts/test-work-start-finish.mjs."
+      ],
       "parentId": "work-2",
       "status": "open",
       "title": "Self-improvement report: The work-worker for work-9.8 appended native WorkItem notes even though its handoff explicitly said not to mutate WorkItems; coded",
@@ -2917,7 +2921,9 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Single recovery atom classified duplicate of canonical work-2.48 (related-distinct from closed work-2.8's older acceptance-metadata defect). Installed pi-subagents 0.37.0 source reproduces the generator/parser launchContractDigest schema mismatch."
+      ],
       "parentId": "work-2",
       "status": "open",
       "title": "Self-improvement report: A paused async work-fixer could not be resumed because pi-subagents rejected its own generated recovery descriptor with `unknown f",
@@ -2960,12 +2966,75 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atom A classified already-fixed/local: direct role handoffs inject the absolute WORK_HELPER_SCRIPT and work-worker requires that exact path (commits 5899512/46ff9e0); node scripts/test-work-start-finish.mjs passes. Atom B is duplicate of canonical upstream work-2.48 and its pi-subagents 0.37.0 schema mismatch is reproduced."
+      ],
       "parentId": "work-2",
       "status": "open",
       "title": "Self-improvement report: A work-worker stopped because the coded handoff omitted the required absolute work-helper.mjs path. The documented async resume th",
       "type": "task",
       "updatedAt": "2026-07-27T05:06:39.328Z"
+    },
+    "work-2.46": {
+      "acceptance": "Close only after an installed pi-subagents runtime proves a planner cannot mutate undeclared repository source, or reports authoritative mutation attribution that identifies the writer; ce-workflow's launch-baseline/final-status contract remains covered locally.",
+      "createdAt": "2026-07-27T16:38:50.205Z",
+      "dependencies": [
+        "work-2.38"
+      ],
+      "dependencyEdges": [],
+      "description": "Upstream-owned residual from work-2.38/work-2.31: pi-subagents must technically prevent undeclared source mutations by read-only planner roles or emit authoritative per-process mutation attribution so ce-workflow can distinguish child writes from concurrent repository changes.",
+      "evidence": [],
+      "id": "work-2.46",
+      "labels": [],
+      "notes": [
+        "Classification: upstream-owned runtime isolation/attribution atom split from work-2.38; current ce-workflow local baseline guard is already fixed and tested."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Track upstream planner repository mutation isolation",
+      "type": "bug",
+      "updatedAt": "2026-07-27T16:39:43.671Z"
+    },
+    "work-2.47": {
+      "acceptance": "Close only after an installed pi-subagents runtime proves an async exact-role launch after goal continuation uses authenticated parent provider resolution and an auth failure becomes terminal without an idle alert.",
+      "createdAt": "2026-07-27T16:38:50.351Z",
+      "dependencies": [
+        "work-2.39"
+      ],
+      "dependencyEdges": [],
+      "description": "Upstream-owned residual from work-2.39/work-2.32: pi-subagents child launches after continuation/compaction must resolve authenticated parent providers and classify startup/auth failures as immediate terminal infrastructure states.",
+      "evidence": [],
+      "id": "work-2.47",
+      "labels": [],
+      "notes": [
+        "Classification: upstream-owned provider/process lifecycle behavior; no safe ce-workflow workaround replaces child runtime credential resolution."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Track upstream async authentication after goal continuation",
+      "type": "bug",
+      "updatedAt": "2026-07-27T16:39:43.819Z"
+    },
+    "work-2.48": {
+      "acceptance": "A generated async recovery descriptor containing launchContractDigest round-trips through readAsyncRecoveryDescriptor and resume for paused/failed runs; an automated regression test covers the generated descriptor schema.",
+      "createdAt": "2026-07-27T16:38:50.507Z",
+      "dependencies": [
+        "work-2.44",
+        "work-2.45"
+      ],
+      "dependencyEdges": [],
+      "description": "Canonical upstream claim for work-2.44 and work-2.45 recovery atoms: pi-subagents 0.37.0 writes launchContractDigest into recovery-descriptor.json but readAsyncRecoveryDescriptor omits it from allowedFields, so resume rejects the runtime's own descriptor.",
+      "evidence": [],
+      "id": "work-2.48",
+      "labels": [],
+      "notes": [
+        "Classification: work-2.44 and work-2.45 are duplicates for this root cause; source inspection of installed pi-subagents 0.37.0 proves generator/parser schema mismatch."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Accept generated launch digests in async recovery descriptors",
+      "type": "bug",
+      "updatedAt": "2026-07-27T16:39:44.136Z"
     },
     "work-2.5": {
       "createdAt": "2026-07-20T03:29:59.300Z",
@@ -4178,7 +4247,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T15:51:31.296Z"
+    "updatedAt": "2026-07-27T16:39:44.911Z"
   },
   "schemaVersion": 1
 }
