@@ -349,21 +349,24 @@ for (const fence of ["stopping", "waiting_decision", "session-switch"]) {
 		const launched = await launchDirectAction(
 			cwd,
 			{
-				action: "run-fix",
+				action: "run-review",
 				epic: { id: "E-1" },
 				selectedWorkItem: { id: "W-1", status: "open" },
 			},
-			{ agent: "work-fixer", params: { agent: "work-fixer", task: "fixture" } },
+			{
+				agent: "work-reviewer",
+				params: { agent: "work-reviewer", task: "fixture" },
+			},
 			{},
 			{ workflowRunId: "launch-rejected" },
 		);
 		assert(
 			!launched.spawned.ok && loadStore(cwd).items["W-1"].status === "open",
-			"launch rejection returns the claimed WorkItem to open",
+			"reviewer launch rejection returns the claimed WorkItem to open",
 		);
 		assert(
 			currentWorkActionLeases(cwd).at(-1).state === "fenced",
-			"launch rejection fences its action lease",
+			"reviewer launch rejection fences retryably instead of parking",
 		);
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });

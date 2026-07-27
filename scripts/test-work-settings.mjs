@@ -218,6 +218,10 @@ try {
 		"default profile medium",
 	);
 	assert(
+		mod.workOrchSettings(cwd).modelStrategy === "main-first",
+		"model strategy defaults compatibly to main-first",
+	);
+	assert(
 		mod.workOrchSettings(cwd).advisorEnabled.advisor === true &&
 			mod.workOrchSettings(cwd).advisorEnabled.advisor2 === false &&
 			mod.workOrchSettings(cwd).advisorEnabled.advisor3 === false,
@@ -261,6 +265,16 @@ try {
 		"medium browser tests on ui diff",
 	);
 
+	// Every shipped profile keeps the mutable Lead at high effort.
+	for (const profile of ["low", "medium", "high", "max"]) {
+		const profileSettings = {};
+		mod.applyProfile(profileSettings, profile);
+		assert(
+			profileSettings.subagents.agentOverrides["work-lead"].thinking === "high",
+			`${profile} profile keeps Lead effort high`,
+		);
+	}
+
 	// Apply max profile: effort + gates copied onto current, models preserved.
 	let settings = {};
 	mod.applyProfile(settings, "max");
@@ -285,6 +299,10 @@ try {
 	assert(
 		readSettings().subagents.agentOverrides["work-worker"].thinking === "max",
 		"worker effort max",
+	);
+	assert(
+		readSettings().subagents.agentOverrides["work-lead"].thinking === "high",
+		"every effort profile pins Lead to high effort",
 	);
 
 	// Flip a boolean live; profile label is preserved.
@@ -463,9 +481,11 @@ try {
 		"status is grouped and readable",
 	);
 	for (const phrase of [
-		"› Advisor 1: model:inherit current",
-		"› Advisor 2: model:none",
-		"› Advisor 3: model:none",
+		"model strategy: main-first",
+		"› Lead / Resolution: Main model:inherit current • effort:high • Backup:none",
+		"› Advisor 1: Main model:inherit current",
+		"› Advisor 2: Main model:none",
+		"› Advisor 3: Main model:none",
 		"creative sidecar: ask",
 		"advisor usage for slice plans: all",
 		"Planner writes slice plan before work",

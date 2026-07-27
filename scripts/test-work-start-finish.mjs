@@ -222,10 +222,10 @@ try {
 	const riskyDirect = directRoleHandoffParams(state, fixture.cwd);
 	assert(
 		!state.inlineWork &&
-			riskyDirect?.agent === "work-worker" &&
+			riskyDirect?.agent === "work-lead" &&
 			riskyDirect.params.task.includes("native edit tool") &&
 			riskyDirect.params.task.includes("Do not rewrite tracked files"),
-		"sensitive small requests use the native-tool isolated writer",
+		"sensitive small requests use the native-tool high-assurance Lead",
 	);
 
 	fixture.reset("active");

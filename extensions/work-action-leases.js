@@ -25,10 +25,12 @@ const OCCUPIED = new Set([
 	"ambiguous",
 	"live",
 	"orphaned",
+	"parked",
 ]);
 const ROLE_EVIDENCE = Object.freeze({
 	planner: ["closed-planning-item", "ready-child"],
 	builder: ["files-changed", "verification"],
+	lead: ["files-changed", "verification"],
 	debugger: ["files-changed", "verification"],
 	reviewer: ["review-verdict"],
 	fixer: ["files-changed", "verification"],
@@ -59,6 +61,14 @@ function gitHead(cwd) {
 		script ? [script, "rev-parse", "HEAD"] : ["rev-parse", "HEAD"],
 		{ cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
 	).trim();
+}
+function itemSuperseded(item) {
+	return (
+		String(item?.notes ?? "")
+			.toLowerCase()
+			.includes("superseded") ||
+		(item?.labels ?? []).some((label) => /superseded/i.test(label))
+	);
 }
 function itemContract(item) {
 	return {
@@ -172,7 +182,10 @@ export function currentWorkActionLeases(cwd = process.cwd()) {
 	for (const event of readWorkActionLeaseEvents(cwd)) {
 		if (event.type === "lease" && validLease(event))
 			leases.set(event.leaseId, { ...event });
-		else if (leases.has(event.leaseId) && typeof event.state === "string")
+		else if (
+			leases.has(event.leaseId) &&
+			(typeof event.state === "string" || event.type === "candidate")
+		)
 			Object.assign(leases.get(event.leaseId), event, { type: "lease" });
 	}
 	return [...leases.values()];
@@ -196,13 +209,19 @@ function nextGeneration(cwd, workItemId) {
 }
 function semanticRole(input) {
 	const value = String(input ?? "").toLowerCase();
-	if (value.includes("planner")) return "planner";
-	if (value.includes("review")) return "reviewer";
-	if (value.includes("fix")) return "fixer";
-	if (value.includes("debug")) return "debugger";
-	if (value.includes("migrat")) return "migrator";
-	return "builder";
+	return ROLE_EVIDENCE[value] ? value : "builder";
 }
+export function recoverParkedWorkActionLease(cwd, workItemId) {
+	const item = loadStore(cwd).items[workItemId];
+	if (!item || (item.labels ?? []).includes("wo:blocked")) return [];
+	const recovered = currentWorkActionLeases(cwd).filter(
+		(lease) => lease.workItemId === workItemId && lease.state === "parked",
+	);
+	for (const lease of recovered)
+		fenceWorkActionLease(cwd, lease.leaseId, "operator-blocker-cleared");
+	return recovered.map((lease) => lease.leaseId);
+}
+
 export function acquireWorkActionLease(cwd, input = {}) {
 	if (
 		!input.workflowRunId ||
@@ -217,7 +236,19 @@ export function acquireWorkActionLease(cwd, input = {}) {
 	try {
 		if (actionLeaseLogMalformed(cwd))
 			throw new Error("Mutable action lease log requires recovery");
-		const occupied = occupiedWorkActionLease(cwd);
+		const store = loadStore(cwd);
+		const item = store.items[input.workItemId];
+		if (!item) throw new Error(`WorkItem is missing: ${input.workItemId}`);
+		if (item.status === "closed")
+			throw new Error(`WorkItem is closed: ${input.workItemId}`);
+		if (itemSuperseded(item))
+			throw new Error(`WorkItem is superseded: ${input.workItemId}`);
+		recoverParkedWorkActionLease(cwd, input.workItemId);
+		const occupied = currentWorkActionLeases(cwd).find(
+			(lease) =>
+				OCCUPIED.has(lease.state) &&
+				(lease.state !== "parked" || lease.workItemId === input.workItemId),
+		);
 		if (occupied)
 			throw new Error(
 				`Mutable action lease is occupied by ${occupied.leaseId}`,
@@ -230,9 +261,6 @@ export function acquireWorkActionLease(cwd, input = {}) {
 		);
 		if (primaryLane)
 			throw new Error(`Primary checkout lane is active: ${primaryLane.id}`);
-		const store = loadStore(cwd);
-		const item = store.items[input.workItemId];
-		if (!item) throw new Error(`WorkItem is missing: ${input.workItemId}`);
 		const role = semanticRole(
 			input.semanticRole ?? input.agent ?? input.action,
 		);
@@ -249,6 +277,13 @@ export function acquireWorkActionLease(cwd, input = {}) {
 			action: input.action,
 			semanticRole: role,
 			requestedAssurance: input.requestedAssurance ?? "normal",
+			achievedAssurance:
+				input.achievedAssurance ?? input.requestedAssurance ?? "normal",
+			candidateKey: input.candidateKey ?? null,
+			selectedCandidate: input.selectedCandidate ?? null,
+			fallback: Boolean(input.fallback),
+			degradedIndependence: Boolean(input.degradedIndependence),
+			modelStrategy: input.modelStrategy ?? "main-first",
 			baseHead: gitHead(cwd),
 			baseStoreHash: storeHash(cwd),
 			baseWorkItemHash: digest(itemContract(item)),
@@ -266,6 +301,21 @@ export function acquireWorkActionLease(cwd, input = {}) {
 		admission.release();
 	}
 }
+export function recordWorkActionLeaseCandidate(cwd, leaseId, candidate = {}) {
+	return appendEvent(cwd, {
+		version: WORK_ACTION_LEASE_VERSION,
+		type: "candidate",
+		leaseId,
+		timestamp: new Date().toISOString(),
+		selectedCandidate: candidate.id ?? null,
+		candidateModel: candidate.model ?? null,
+		candidateThinking: candidate.thinking ?? null,
+		fallback: Boolean(candidate.fallback),
+		degradedIndependence: Boolean(candidate.degradedIndependence),
+		achievedAssurance: candidate.achievedAssurance ?? "normal",
+	});
+}
+
 export function acknowledgeWorkActionLease(cwd, leaseId, acknowledgement = {}) {
 	const lease = currentWorkActionLeases(cwd).find(
 		(item) => item.leaseId === leaseId,
@@ -307,10 +357,7 @@ export function orphanWorkActionLease(
 }
 function roleEvidence(store, lease, item) {
 	const notes = String(item.notes ?? "").replaceAll("\\n", "\n");
-	if (
-		/superseded/i.test(notes) ||
-		(item.labels ?? []).some((label) => /superseded/i.test(label))
-	)
+	if (itemSuperseded(item))
 		return { ok: false, reason: "work-item-superseded" };
 	if (lease.semanticRole === "planner") {
 		const children = readyWorkItems(store).filter(
@@ -414,5 +461,8 @@ export function reconcileWorkActionLeaseLiveness(cwd, options = {}) {
 export function workActionLeaseState(cwd, workItemId) {
 	const lease = occupiedWorkActionLease(cwd, workItemId);
 	if (!lease) return null;
-	return { state: lease.state === "orphaned" ? "orphaned" : "live", lease };
+	return {
+		state: ["orphaned", "parked"].includes(lease.state) ? lease.state : "live",
+		lease,
+	};
 }

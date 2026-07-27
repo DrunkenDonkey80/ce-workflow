@@ -104,6 +104,7 @@ import {
 	acquireWorkActionLease,
 	currentWorkActionLeases,
 	fenceWorkActionLease,
+	recordWorkActionLeaseCandidate,
 	reconcileWorkActionLeaseLiveness,
 	settleWorkActionLease,
 	workActionLeaseState,
@@ -293,6 +294,7 @@ function exposeBundledSubagentAgents() {
 const SLOTS = [
 	{
 		key: "plan",
+		kind: "role",
 		label: "Brainstorm/plan/migration",
 		agents: ["work-planner", "work-migrator"],
 		defaultThinking: "high",
@@ -301,6 +303,7 @@ const SLOTS = [
 	},
 	{
 		key: "work",
+		kind: "role",
 		label: "Work",
 		agents: ["work-worker", "work-fixer"],
 		defaultThinking: "medium",
@@ -308,6 +311,7 @@ const SLOTS = [
 	},
 	{
 		key: "debug",
+		kind: "role",
 		label: "Debug",
 		agents: ["work-debugger"],
 		defaultThinking: "high",
@@ -315,13 +319,24 @@ const SLOTS = [
 	},
 	{
 		key: "review",
+		kind: "role",
 		label: "Review",
 		agents: ["work-reviewer"],
 		defaultThinking: "medium",
 		description: "Read-only diff/acceptance/verification review",
 	},
 	{
+		key: "lead",
+		kind: "role",
+		label: "Lead / Resolution",
+		agents: ["work-lead"],
+		defaultThinking: "high",
+		description:
+			"High-assurance implementation and bounded failure resolution; defaults to the effective Work model",
+	},
+	{
 		key: "advisor",
+		kind: "advisor",
 		label: "Advisor 1",
 		agents: ["work-advisor"],
 		defaultThinking: "high",
@@ -331,6 +346,7 @@ const SLOTS = [
 	},
 	{
 		key: "advisor2",
+		kind: "advisor",
 		label: "Advisor 2",
 		agents: ["work-advisor-2"],
 		defaultThinking: "high",
@@ -339,6 +355,7 @@ const SLOTS = [
 	},
 	{
 		key: "advisor3",
+		kind: "advisor",
 		label: "Advisor 3",
 		agents: ["work-advisor-3"],
 		defaultThinking: "high",
@@ -363,6 +380,7 @@ const EFFORT_PROFILES = {
 	low: {
 		plan: "low",
 		work: "low",
+		lead: "high",
 		debug: "medium",
 		review: "low",
 		advisor: "high",
@@ -380,6 +398,7 @@ const EFFORT_PROFILES = {
 	medium: {
 		plan: "medium",
 		work: "medium",
+		lead: "high",
 		debug: "high",
 		review: "medium",
 		advisor: "high",
@@ -397,6 +416,7 @@ const EFFORT_PROFILES = {
 	high: {
 		plan: "high",
 		work: "high",
+		lead: "high",
 		debug: "high",
 		review: "high",
 		advisor: "high",
@@ -414,6 +434,7 @@ const EFFORT_PROFILES = {
 	max: {
 		plan: "max",
 		work: "max",
+		lead: "high",
 		debug: "max",
 		review: "high",
 		advisor: "high",
@@ -430,6 +451,7 @@ const EFFORT_PROFILES = {
 	},
 };
 const DEFAULT_PROFILE = "medium";
+const MODEL_STRATEGIES = ["main-first", "round-robin"];
 const PROFILE_GUIDANCE = {
 	low: {
 		summary: "Lean execution for small, familiar, low-risk changes.",
@@ -545,7 +567,7 @@ function slotByKey(key) {
 }
 
 function isAdvisorSlot(slot) {
-	return slot?.defaultEnabled !== undefined;
+	return slot?.kind === "advisor";
 }
 
 function advisorEnabledForSlot(settings, slot) {
@@ -1024,6 +1046,18 @@ function textChars(value) {
 
 function handoffRole(action) {
 	const text = String(action ?? "");
+	const semantic = {
+		"work-planner": "planner",
+		"work-migrator": "migrator",
+		"work-worker": "builder",
+		"work-lead": "lead",
+		"work-reviewer": "reviewer",
+		"work-fixer": "fixer",
+		"work-debugger": "debugger",
+		"run-resolution": "lead",
+		"run-repair": "builder",
+	}[text];
+	if (semantic) return semantic;
 	if (text.includes("debug")) return "debugger";
 	if (text.includes("review")) return "reviewer";
 	if (text.includes("commit") || text.includes("finish")) return "committer";
@@ -1344,6 +1378,7 @@ function reconcilePendingDirectRuns(cwd, runtime = {}) {
 						"ambiguous",
 						"live",
 						"orphaned",
+						"parked",
 					].includes(actionLease?.state)
 				)
 					continue;
@@ -3626,6 +3661,9 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 		: "ask";
 	return {
 		profile,
+		modelStrategy: MODEL_STRATEGIES.includes(raw.modelStrategy)
+			? raw.modelStrategy
+			: "main-first",
 		creativeMode,
 		advisorEnabled,
 		advisorUsageForSlicePlans,
@@ -4101,17 +4139,28 @@ function slotSelection(slot, settings) {
 	if (isAdvisorSlot(slot) && !advisorEnabledForSlot(settings, slot))
 		return { model: NONE_MODEL, thinking: slot.defaultThinking };
 	const current = settings.subagents?.agentOverrides ?? {};
-	return {
+	const selected = {
 		model: commonValue(slot.agents.map((agent) => current[agent]?.model)),
 		thinking:
 			commonValue(slot.agents.map((agent) => current[agent]?.thinking)) ??
 			slot.defaultThinking,
 	};
+	if (slot.key !== "lead" || selected.model !== undefined) return selected;
+	const builder = slotByKey("work");
+	return { ...selected, model: slotSelection(builder, settings).model };
+}
+
+function backupSlotSelection(slot, settings) {
+	const selected = settings.workOrchestrator?.roleBackups?.[slot.key];
+	return selected?.model
+		? { model: selected.model, thinking: selected.thinking ?? slot.defaultThinking }
+		: null;
 }
 
 function slotSummary(slot, settings) {
 	const { model, thinking } = slotSelection(slot, settings);
-	return `model:${model === NONE_MODEL ? "none" : (model ?? "inherit current")} • effort:${thinking}`;
+	const backup = backupSlotSelection(slot, settings);
+	return `Main model:${model === NONE_MODEL ? "none" : (model ?? "inherit current")} • effort:${thinking} • Backup:${backup ? `${backup.model}/${backup.thinking}` : "none"}`;
 }
 
 async function modelDisplayNames(ctx) {
@@ -4144,10 +4193,23 @@ function selectedAgentHealthTargets(cwd, currentModel, scope = "all") {
 					(slot) =>
 						!isAdvisorSlot(slot) || advisorEnabledForSlot(settings, slot),
 				);
-	const selected = slots.map((slot) => ({
-		model: configuredModelId(slotSelection(slot, settings).model, currentModel),
-		role: slot.label,
-	}));
+	const selected = slots.flatMap((slot) => {
+		const backup = backupSlotSelection(slot, settings);
+		return [
+			{
+				model: configuredModelId(slotSelection(slot, settings).model, currentModel),
+				role: slot.label,
+			},
+			...(backup
+				? [
+						{
+							model: configuredModelId(backup.model, currentModel),
+							role: `${slot.label} Backup`,
+						},
+					]
+				: []),
+		];
+	});
 	if (scope === "brainstorm" && !selected.length)
 		selected.push({ model: currentModel, role: "Creative divergence" });
 	if (scope === "all")
@@ -4440,12 +4502,36 @@ function setSlot(settings, slot, model, thinking) {
 	compactOverrides(settings);
 }
 
+function setBackupSlot(settings, slot, model, thinking, tombstone = false) {
+	const block = workOrchBlock(settings);
+	block.roleBackups ??= {};
+	if (model === NONE_MODEL) {
+		if (tombstone) block.roleBackups[slot.key] = null;
+		else delete block.roleBackups[slot.key];
+	}
+	else
+		block.roleBackups[slot.key] = {
+			model,
+			thinking:
+				thinking === DEFAULT_THINKING ? slot.defaultThinking : thinking,
+		};
+	if (!Object.keys(block.roleBackups).length) delete block.roleBackups;
+}
+
+function setModelStrategy(settings, strategy) {
+	workOrchBlock(settings).modelStrategy = MODEL_STRATEGIES.includes(strategy)
+		? strategy
+		: "main-first";
+}
+
 function resetAll(settings) {
 	for (const slot of SLOTS) {
 		for (const agent of slot.agents)
 			delete settings.subagents?.agentOverrides?.[agent];
 	}
 	delete settings.subagents?.agentOverrides?.["work-advisor-backup"];
+	delete settings.workOrchestrator?.roleBackups;
+	delete settings.workOrchestrator?.modelStrategy;
 	compactOverrides(settings);
 }
 
@@ -4524,30 +4610,49 @@ async function chooseModelAndEffort(
 	}
 }
 
-async function editSlotModel(ctx, settings, slot, scope) {
-	const current = slotSelection(slot, settings);
+async function editSlotModel(ctx, settings, slot, scope, backup = false) {
+	const current = backup
+		? (backupSlotSelection(slot, settings) ?? {
+				model: NONE_MODEL,
+				thinking: slot.defaultThinking,
+			})
+		: slotSelection(slot, settings);
 	const { selectedThinking, items } = thinkingItemsFor(
 		slot,
 		settings,
 		scope === "project",
 	);
 	const selected = await chooseModelAndEffort(ctx, {
-		title: `Model ${slot.label}`,
+		title: `${backup ? "Backup" : "Model"} ${slot.label}`,
 		currentModel: current.model ?? INHERIT_MODEL,
-		currentThinking: selectedThinking ?? DEFAULT_THINKING,
-		allowNone: isAdvisorSlot(slot),
+		currentThinking: backup
+			? current.thinking
+			: (selectedThinking ?? DEFAULT_THINKING),
+		allowNone: backup || isAdvisorSlot(slot),
 		projectScope: scope === "project",
 		effortItems: items,
 	});
 	if (!selected) return false;
 	if (selected.model === NONE_MODEL) {
-		setAdvisorEnabled(settings, slot, false);
+		if (backup)
+			setBackupSlot(
+				settings,
+				slot,
+				NONE_MODEL,
+				selected.thinking,
+				scope === "project" &&
+					Boolean(backupSlotSelection(slot, readGlobalSettings())),
+			);
+		else setAdvisorEnabled(settings, slot, false);
 		writeScopedSettings(ctx.cwd, scope, settings);
-		ctx.ui.notify(`Saved ${slot.label}: model:none`, "info");
+		ctx.ui.notify(`Saved ${backup ? `${slot.label} Backup` : slot.label}: model:none`, "info");
 		return true;
 	}
-	if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
-	setSlot(settings, slot, selected.model, selected.thinking);
+	if (backup) setBackupSlot(settings, slot, selected.model, selected.thinking);
+	else {
+		if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
+		setSlot(settings, slot, selected.model, selected.thinking);
+	}
 	writeScopedSettings(ctx.cwd, scope, settings);
 	ctx.ui.notify(`Saved ${slot.label}: ${slotSummary(slot, settings)}`, "info");
 	return true;
@@ -7024,8 +7129,17 @@ function highRiskImplementation(issue) {
 	);
 }
 
-function implementationExecutionPolicy(state) {
+function implementationExecutionPolicy(state, cwd) {
 	const issue = state?.selectedWorkItem;
+	let assurance;
+	try {
+		assurance = classifyShadowAssurance(
+			cwd && issue?.id ? (readWorkItem(cwd, issue.id) ?? issue) : issue,
+		);
+	} catch {
+		assurance = { suggestedAssurance: "normal", reasons: [] };
+	}
+	const lead = assurance.suggestedAssurance === "high";
 	const level =
 		state?.fastSmall ||
 		issue?.implementationScope === "small" ||
@@ -7034,16 +7148,22 @@ function implementationExecutionPolicy(state) {
 			: "medium";
 	return {
 		kind: "agent",
+		agent: lead ? "work-lead" : "work-worker",
+		semanticRole: lead ? "lead" : "builder",
+		requestedAssurance: lead ? "high" : "normal",
+		assuranceReasons: assurance.reasons ?? [],
 		level,
 		maxFiles: level === "small" ? 2 : 8,
-		reason: highRiskImplementation(issue)
-			? "risk markers require an isolated writer and independent review"
-			: `configured work-worker handles ${level} implementation scope`,
+		reason: lead
+			? "canonical high-assurance floor requires Lead ownership"
+			: highRiskImplementation(issue)
+				? "risk markers require an isolated writer and independent review"
+				: `configured work-worker handles ${level} implementation scope`,
 	};
 }
 
-function withImplementationPolicy(state) {
-	const policy = implementationExecutionPolicy(state);
+function withImplementationPolicy(state, cwd) {
+	const policy = implementationExecutionPolicy(state, cwd);
 	return {
 		...state,
 		executionPolicy: policy,
@@ -7448,13 +7568,18 @@ function planResumeAction(state, cwd, options = {}) {
 		const leaseStatus = workActionLeaseState(cwd, activeImplementation.id);
 		return {
 			...routed,
-			action: "in-progress-agent",
+			action:
+				leaseStatus?.state === "parked"
+					? "operator-decision-parked"
+					: "in-progress-agent",
 			agentState: leaseStatus?.state ?? "untracked",
 			actionLease: leaseStatus?.lease,
 			message:
-				leaseStatus?.state === "orphaned"
-					? "WorkItem has an orphaned mutable action lease; recovery must reconcile or explicitly fence it before relaunch."
-					: "WorkItem is already in progress; not launching a duplicate writer. Check the active-run widget or record a blocker before retrying.",
+				leaseStatus?.state === "parked"
+					? "Mutable work is parked after routing or escalation exhaustion; operator action is required and no writer will relaunch."
+					: leaseStatus?.state === "orphaned"
+						? "WorkItem has an orphaned mutable action lease; recovery must reconcile or explicitly fence it before relaunch."
+						: "WorkItem is already in progress; not launching a duplicate writer. Check the active-run widget or record a blocker before retrying.",
 		};
 	}
 	const debug = state.readyExecutable.find(isDebugIssue);
@@ -7580,15 +7705,53 @@ function safeArtifactPart(value) {
 	);
 }
 
+const DIRECT_ROLE_BY_ACTION = Object.freeze({
+	"run-planner": ["work-planner", "planner", "plan"],
+	"handoff-migrate": ["work-migrator", "migrator", "plan"],
+	"run-implementation": ["work-worker", "builder", "work"],
+	"run-repair": ["work-worker", "builder", "work"],
+	"run-resolution": ["work-lead", "lead", "lead"],
+	"run-review": ["work-reviewer", "reviewer", "review"],
+	"run-fix": ["work-fixer", "fixer", "work"],
+	"run-debug": ["work-debugger", "debugger", "debug"],
+});
+
 function directRoleAgent(state) {
-	const action = String(state?.action ?? "");
-	if (action === "run-planner") return "work-planner";
-	if (action === "handoff-migrate") return "work-migrator";
-	if (action === "run-implementation") return "work-worker";
-	if (action === "run-review") return "work-reviewer";
-	if (action === "run-fix") return "work-fixer";
-	if (/debug/.test(action)) return "work-debugger";
-	return undefined;
+	if (state?.action === "run-implementation" && state.executionPolicy?.agent)
+		return state.executionPolicy.agent;
+	return DIRECT_ROLE_BY_ACTION[state?.action]?.[0];
+}
+
+function directSemanticRole(agent) {
+	return Object.values(DIRECT_ROLE_BY_ACTION).find(
+		([candidate]) => candidate === agent,
+	)?.[1];
+}
+
+function directRoleSlot(agent) {
+	return Object.values(DIRECT_ROLE_BY_ACTION).find(
+		([candidate]) => candidate === agent,
+	)?.[2];
+}
+
+function roleModelRouting(cwd, agent) {
+	const settings = readEffectiveSettings(cwd);
+	const slot = slotByKey(directRoleSlot(agent));
+	if (!slot) return { strategy: "main-first", candidates: [] };
+	const main = slotSelection(slot, settings);
+	const backup = backupSlotSelection(slot, settings);
+	const candidates = [
+		{ id: "main", model: main.model, thinking: main.thinking },
+		...(backup ? [{ id: "backup", ...backup }] : []),
+	];
+	const strategy = workOrchSettings(cwd, settings).modelStrategy;
+	if (strategy === "round-robin" && candidates.length > 1) {
+		const previous = currentWorkActionLeases(cwd)
+			.filter((lease) => lease.candidateKey === slot.key && lease.selectedCandidate)
+			.at(-1)?.selectedCandidate;
+		if (previous === "main") candidates.reverse();
+	}
+	return { strategy, candidateKey: slot.key, candidates };
 }
 
 function reviewerHandoffLines(state) {
@@ -7655,10 +7818,14 @@ function directRoleTask(state, cwd) {
 			: "",
 		implementationScopeLine(state),
 		evidenceOnlyImplementationLine(state),
-		state.action === "run-implementation" || state.action === "run-debug"
+		["run-implementation", "run-repair", "run-resolution", "run-debug"].includes(
+			state.action,
+		)
 			? planReference(state, cwd)
 			: "",
-		["run-implementation", "run-debug", "run-fix"].includes(state.action)
+		["run-implementation", "run-repair", "run-resolution", "run-debug", "run-fix"].includes(
+			state.action,
+		)
 			? NATIVE_EDIT_GUIDANCE
 			: "",
 		...(state.handoffExtra ?? []).filter(Boolean),
@@ -7679,10 +7846,19 @@ function directRoleHandoffParams(state, cwd, selectionNote = "") {
 	const target = safeArtifactPart(
 		state.selectedWorkItem?.id ?? state.epic?.id ?? state.action ?? agent,
 	);
+	const routing = roleModelRouting(cwd, agent);
+	const selected = routing.candidates[0];
+	const explicitModel =
+		selected?.model && ![INHERIT_MODEL, "mixed"].includes(selected.model)
+			? selected.model
+			: undefined;
 	return {
 		agent,
+		routing,
 		params: {
 			agent,
+			...(explicitModel ? { model: explicitModel } : {}),
+			...(selected?.thinking ? { thinking: selected.thinking } : {}),
 			task: withSelectionNote(directRoleTask(state, cwd), selectionNote),
 			workflowRunId: currentCommandWorkflow()?.workflowRunId,
 			activity: workflowActivityMarker(),
@@ -7725,10 +7901,6 @@ function directRunIdentity(direct, spawned) {
 	};
 }
 
-function directSemanticRole(agent) {
-	return String(agent ?? "").replace(/^work-/, "");
-}
-
 function acquireDirectActionLease(cwd, state, direct, runtime = {}) {
 	let shadowAssurance;
 	try {
@@ -7738,6 +7910,16 @@ function acquireDirectActionLease(cwd, state, direct, runtime = {}) {
 	} catch {
 		// Missing assurance input preserves the one-model normal compatibility floor.
 	}
+	const selected = direct.routing?.candidates?.[0];
+	const main = direct.routing?.candidates?.find((candidate) => candidate.id === "main");
+	const fallback = selected?.id === "backup";
+	const selectedProvider = String(selected?.model ?? "").split("/")[0];
+	const mainProvider = String(main?.model ?? "").split("/")[0];
+	const requestedAssurance =
+		state.executionPolicy?.requestedAssurance ??
+		shadowAssurance?.requestedAssurance ??
+		shadowAssurance?.suggestedAssurance ??
+		"normal";
 	return acquireWorkActionLease(cwd, {
 		workflowRunId:
 			runtime.workflowRunId ??
@@ -7747,10 +7929,15 @@ function acquireDirectActionLease(cwd, state, direct, runtime = {}) {
 		workItemId: state.selectedWorkItem?.id,
 		action: state.action,
 		semanticRole: directSemanticRole(direct.agent),
-		requestedAssurance:
-			shadowAssurance?.requestedAssurance ??
-			shadowAssurance?.suggestedAssurance ??
-			"normal",
+		requestedAssurance,
+		achievedAssurance: requestedAssurance,
+		candidateKey: direct.routing?.candidateKey,
+		selectedCandidate: selected?.id,
+		fallback,
+		degradedIndependence:
+			fallback &&
+			(!selectedProvider || !mainProvider || selectedProvider === mainProvider),
+		modelStrategy: direct.routing?.strategy,
 		mode: runtime.mode ?? currentCommandWorkflow()?.mode,
 		session: runtime.session ?? null,
 		activity: runtime.activity ?? workflowActivityMarker(),
@@ -7859,14 +8046,48 @@ export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
 			spawned: { ok: false, message: "WorkItem claim was rejected" },
 		};
 	}
-	const spawned = await spawnSubagentRpc(pi, direct.params);
-	if (spawned.ok || spawned.ambiguous) {
-		acknowledgeDirectActionLease(cwd, lease, direct, spawned);
-		watchDirectActionLease(cwd, lease.leaseId, { ...runtime, pi });
-		return { state: claimedState, spawned, lease };
+	const candidates = direct.routing?.candidates?.length
+		? direct.routing.candidates
+		: [{ id: "main" }];
+	let spawned = { ok: false, message: "No configured model candidate launched" };
+	for (const candidate of candidates) {
+		const main = candidates.find((item) => item.id === "main");
+		const candidateProvider = String(candidate.model ?? "").split("/")[0];
+		const mainProvider = String(main?.model ?? "").split("/")[0];
+		const fallback = candidate.id === "backup";
+		recordWorkActionLeaseCandidate(cwd, lease.leaseId, {
+			...candidate,
+			fallback,
+			degradedIndependence:
+				fallback &&
+				(!candidateProvider || !mainProvider || candidateProvider === mainProvider),
+			achievedAssurance: lease.requestedAssurance,
+		});
+		const explicitModel =
+			candidate.model && ![INHERIT_MODEL, "mixed"].includes(candidate.model)
+				? candidate.model
+				: undefined;
+		spawned = await spawnSubagentRpc(pi, {
+			...direct.params,
+			...(explicitModel ? { model: explicitModel } : { model: undefined }),
+			...(candidate.thinking ? { thinking: candidate.thinking } : {}),
+		});
+		if (spawned.ok || spawned.ambiguous) {
+			direct = {
+				...direct,
+				params: {
+					...direct.params,
+					...(explicitModel ? { model: explicitModel } : {}),
+					thinking: candidate.thinking,
+				},
+			};
+			acknowledgeDirectActionLease(cwd, lease, direct, spawned);
+			watchDirectActionLease(cwd, lease.leaseId, { ...runtime, pi });
+			return { state: claimedState, spawned, lease };
+		}
 	}
-	let retryableState = claimedState;
-	try {
+	if (candidates.length === 1 && lease.semanticRole !== "lead") {
+		let retryableState = claimedState;
 		if (claimedState.handoffClaimed) {
 			const reopened = updateWorkItemNative(cwd, state.selectedWorkItem.id, {
 				status: "open",
@@ -7877,10 +8098,20 @@ export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
 				handoffClaimed: false,
 			};
 		}
-	} finally {
 		fenceWorkActionLease(cwd, lease.leaseId, "launch-rejected");
+		return { state: retryableState, spawned, lease };
 	}
-	return { state: retryableState, spawned, lease };
+	parkWorkActionLease(cwd, lease, "model-candidates-exhausted");
+	return {
+		state: {
+			...claimedState,
+			action: "model-routing-parked",
+			message:
+				"Every configured model candidate failed to launch; mutable work is parked for operator action.",
+		},
+		spawned,
+		lease,
+	};
 }
 
 function directTerminalResult(status) {
@@ -7895,6 +8126,134 @@ function directTerminalResult(status) {
 				DIRECT_SUCCESS_STATES.has(String(item.status).toLowerCase()),
 			);
 	return { ok, state, details };
+}
+
+function latestFailurePacket(issue) {
+	const matches = [
+		...notesOf(issue).replaceAll("\\n", "\n").matchAll(/(?:^|\n)\s*wo:failure\s+([^\r\n]+)/g),
+	];
+	if (!matches.length) return null;
+	try {
+		const packet = JSON.parse(matches.at(-1)[1]);
+		return packet?.version === 1 ? packet : null;
+	} catch {
+		return null;
+	}
+}
+
+export function leadEscalationDecision(issue, history = []) {
+	const packet = latestFailurePacket(issue);
+	const repairs = history.filter((lease) => lease.action === "run-repair").length;
+	const classification = String(
+		packet?.classification ?? packet?.kind ?? "ambiguous",
+	).toLowerCase();
+	const localized =
+		packet?.understood === true &&
+		["localized", "localized-understood", "implementation-error"].includes(
+			classification,
+		);
+	return localized && repairs === 0
+		? { action: "repair", classification, repairs }
+		: { action: "lead", classification, repairs };
+}
+
+function appendEscalationEvidence(cwd, lease, decision) {
+	const item = loadStore(cwd).items[lease.workItemId];
+	if (!item) return null;
+	const evidence = {
+		version: 1,
+		classification: decision.classification,
+		sourceLeaseId: lease.leaseId,
+		builderRepairs: decision.repairs,
+		owner: "lead",
+	};
+	const line = `wo:escalation ${JSON.stringify(evidence)}`;
+	if (!notesOf(item).includes(`"sourceLeaseId":"${lease.leaseId}"`))
+		return updateWorkItemNative(cwd, lease.workItemId, {
+			notes: [...(item.notes ?? []), line],
+			labels: [...new Set([...(item.labels ?? []), "wo:escalation"])],
+		});
+	return readWorkItem(cwd, lease.workItemId);
+}
+
+function workItemClosedOrSuperseded(item) {
+	return (
+		statusOf(item) === "closed" ||
+		/superseded/i.test(notesOf(item)) ||
+		labelsOf(item).some((label) => /superseded/i.test(label))
+	);
+}
+
+function parkWorkActionLease(cwd, lease, reason) {
+	const item = readWorkItem(cwd, lease.workItemId);
+	if (item) {
+		const evidence = {
+			version: 1,
+			reason,
+			leaseId: lease.leaseId,
+			operatorAction: "clear the blocker label after resolving model availability or the recorded decision",
+			recoveryCommand: `node scripts/work-helper.mjs work-label ${lease.workItemId} --remove wo:blocked`,
+			resumeCommand: `/work-resume ${lease.roadmapId}`,
+		};
+		const line = `wo:operator-blocker ${JSON.stringify(evidence)}`;
+		updateWorkItemNative(cwd, lease.workItemId, {
+			notes: notesOf(item).includes(`"leaseId":"${lease.leaseId}"`)
+				? item.notes
+				: [...(item.notes ?? []), line],
+			labels: [...new Set([...(item.labels ?? []), "wo:blocked"])],
+		});
+	}
+	fenceWorkActionLease(cwd, lease.leaseId, reason, "parked");
+}
+
+async function recoverBuilderFailure(cwd, lease, terminal, runtime) {
+	if (
+		terminal?.ok !== false ||
+		!runtime.pi ||
+		!["builder", "lead"].includes(lease.semanticRole)
+	)
+		return null;
+	const item = readWorkItem(cwd, lease.workItemId);
+	if (!item || workItemClosedOrSuperseded(item)) return null;
+	if (lease.semanticRole === "lead") {
+		parkWorkActionLease(cwd, lease, "lead-resolution-exhausted");
+		return { action: "operator-decision-parked", launched: false };
+	}
+	const history = currentWorkActionLeases(cwd).filter(
+		(candidate) => candidate.workItemId === lease.workItemId,
+	);
+	const decision = leadEscalationDecision(item, history);
+	const selected =
+		decision.action === "lead"
+			? appendEscalationEvidence(cwd, lease, decision)
+			: item;
+	const next = {
+		ok: true,
+		epic: issueSummary(readWorkItem(cwd, lease.roadmapId)),
+		selectedWorkItem: issueSummary(selected),
+		action: decision.action === "repair" ? "run-repair" : "run-resolution",
+		handoffPrompt: "coded bounded failure recovery",
+		handoffReason:
+			decision.action === "repair"
+				? "one localized understood Builder repair"
+				: "versioned failure escalation requires one Lead owner",
+		executionPolicy: {
+			agent: decision.action === "repair" ? "work-worker" : "work-lead",
+			semanticRole: decision.action === "repair" ? "builder" : "lead",
+			requestedAssurance:
+				decision.action === "repair" ? lease.requestedAssurance : "high",
+		},
+	};
+	const direct = directRoleHandoffParams(next, cwd);
+	if (!direct) return null;
+	const launched = await launchDirectAction(cwd, next, direct, runtime.pi, {
+		...runtime,
+		workflowRunId: `${lease.workflowRunId}-g${lease.generation + 1}`,
+	});
+	return {
+		action: next.action,
+		launched: Boolean(launched.spawned.ok || launched.spawned.ambiguous),
+	};
 }
 
 export async function driveWorkActionLeases(cwd, runtime = {}) {
@@ -7931,6 +8290,13 @@ export async function driveWorkActionLeases(cwd, runtime = {}) {
 				mode: lease.mode ?? runtime.mode,
 				action: lease.action,
 				role: lease.semanticRole,
+				routing: {
+					candidate: lease.selectedCandidate,
+					fallback: lease.fallback,
+					requiredAssurance: lease.requestedAssurance,
+					achievedAssurance: lease.achievedAssurance,
+					degradedIndependence: lease.degradedIndependence,
+				},
 				epicId: lease.roadmapId,
 				workItemId: lease.workItemId,
 				ok: false,
@@ -7944,6 +8310,22 @@ export async function driveWorkActionLeases(cwd, runtime = {}) {
 				],
 				reason: settled.reason,
 			});
+			const recovery = await recoverBuilderFailure(cwd, lease, terminal, runtime);
+			if (recovery) {
+				runtime.notify?.({
+					ok: recovery.launched,
+					action: recovery.action,
+					message: recovery.launched
+						? `Bounded failure recovery launched ${recovery.action}.`
+						: "Failure recovery is parked for operator action.",
+				});
+				results.push({
+					leaseId: lease.leaseId,
+					state: recovery.launched ? "escalated" : "parked",
+					...recovery,
+				});
+				break;
+			}
 			completeWorkflowOnce(cwd, {
 				workflowRunId: lease.workflowRunId,
 				activity: lease.activity,
@@ -7974,6 +8356,13 @@ export async function driveWorkActionLeases(cwd, runtime = {}) {
 			mode: lease.mode ?? runtime.mode,
 			action: lease.action,
 			role: lease.semanticRole,
+			routing: {
+				candidate: lease.selectedCandidate,
+				fallback: lease.fallback,
+				requiredAssurance: lease.requestedAssurance,
+				achievedAssurance: lease.achievedAssurance,
+				degradedIndependence: lease.degradedIndependence,
+			},
 			epicId: lease.roadmapId,
 			workItemId: lease.workItemId,
 			ok: true,
@@ -17744,10 +18133,11 @@ async function handleWorkStatusCommand(args, ctx, pi) {
 				"ambiguous",
 				"live",
 				"orphaned",
+				"parked",
 			].includes(lease.state),
 		);
 		const leaseStatus = activeLease
-			? `${activeLease.state === "orphaned" ? "orphaned" : "live"} ${activeLease.semanticRole} ${activeLease.workItemId} generation ${activeLease.generation}`
+			? `${["orphaned", "parked"].includes(activeLease.state) ? activeLease.state : "live"} ${activeLease.semanticRole} ${activeLease.workItemId} generation ${activeLease.generation}`
 			: "none";
 		const output = withRecommendedActionsText(
 			`${buildWorkStatus(ctx.cwd, args, readOnly)}\nAction lease: ${leaseStatus}\nVerifier review: ${backgroundVerifierRunStatus(ctx.cwd)}`,
@@ -20779,6 +21169,7 @@ function workSettingsStatus(ctx) {
 		`  ${SUBMENU_ARROW} profile: ${resolved.profile}`,
 		"",
 		"Role models / effort",
+		`  ${SUBMENU_ARROW} model strategy: ${resolved.modelStrategy}`,
 		...SLOTS.map(
 			(slot) =>
 				`  ${SUBMENU_ARROW} ${slot.label}: ${slotSummary(slot, settings)}`,
@@ -20889,6 +21280,9 @@ function hasProjectOverride(settings, item) {
 				(isAdvisorSlot(slot) && owns(block?.advisorEnabled, slot.key)),
 		);
 	}
+	if (item.kind === "backupSlot")
+		return owns(block?.roleBackups, item.value);
+	if (item.kind === "modelStrategy") return owns(block, "modelStrategy");
 	if (item.kind === "profile") return owns(block, "profile");
 	if (item.kind === "backgroundVerifiers")
 		return owns(block, "backgroundVerifiers");
@@ -20938,7 +21332,12 @@ function clearProjectOverride(settings, item) {
 		if (block?.advisorEnabled && !Object.keys(block.advisorEnabled).length)
 			delete block.advisorEnabled;
 		compactOverrides(settings);
-	} else if (item.kind === "profile") clearProfileOverride(settings);
+	} else if (item.kind === "backupSlot") {
+		delete block.roleBackups?.[item.value];
+		if (block.roleBackups && !Object.keys(block.roleBackups).length)
+			delete block.roleBackups;
+	} else if (item.kind === "modelStrategy") delete block.modelStrategy;
+	else if (item.kind === "profile") clearProfileOverride(settings);
 	else if (item.kind === "backgroundVerifiers")
 		delete block.backgroundVerifiers;
 	else if (item.kind === "creativeMode") delete block.creativeMode;
@@ -21018,14 +21417,29 @@ async function workSettingsLoop(ctx) {
 				description:
 					"Low / Medium / High / Max — copy effort and gates onto current settings",
 			},
-			...SLOTS.map((slot) => {
+			{
+				kind: "modelStrategy",
+				value: "modelStrategy",
+				label: `Model strategy: ${resolved.modelStrategy} ${SUBMENU_ARROW}`,
+				description: "Main first, or durable alternation across configured role candidates",
+			},
+			...SLOTS.flatMap((slot) => {
 				const selected = slotSelection(slot, settings);
-				return {
-					kind: "slot",
-					value: slot.key,
-					label: `Model ${slot.label}: [${modelEffortSummary(selected.model, selected.thinking, names)}] ${SUBMENU_ARROW}`,
-					description: slot.description,
-				};
+				const backup = backupSlotSelection(slot, settings);
+				return [
+					{
+						kind: "slot",
+						value: slot.key,
+						label: `Model ${slot.label}: [${modelEffortSummary(selected.model, selected.thinking, names)}] ${SUBMENU_ARROW}`,
+						description: `Main · ${slot.description}`,
+					},
+					{
+						kind: "backupSlot",
+						value: slot.key,
+						label: `Backup ${slot.label}: [${backup ? modelEffortSummary(backup.model, backup.thinking, names) : "None"}] ${SUBMENU_ARROW}`,
+						description: "Optional fallback; absent preserves Main-only behavior",
+					},
+				];
 			}),
 			{
 				kind: "backgroundVerifiers",
@@ -21174,6 +21588,26 @@ async function workSettingsLoop(ctx) {
 			ctx.ui.notify(`Applied ${profileKey} ${scope} profile`, "info");
 			continue;
 		}
+		if (pick.kind === "modelStrategy") {
+			const strategy = await choose(
+				ctx,
+				"Model strategy",
+				MODEL_STRATEGIES.map((value) => ({
+					value,
+					label: value,
+					description:
+						value === "main-first"
+							? "Try Main, then configured Backup"
+							: "Alternate eligible Main and Backup choices durably",
+				})),
+				resolved.modelStrategy,
+			);
+			if (!strategy) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			setModelStrategy(settings, strategy);
+			writeScopedSettings(ctx.cwd, scope, settings);
+			continue;
+		}
 		if (pick.kind === "backgroundVerifiers") {
 			try {
 				await editBackgroundVerifiers(ctx, scope);
@@ -21260,7 +21694,7 @@ async function workSettingsLoop(ctx) {
 			ctx.ui.notify(`Autonomous-goal main effort: ${level}`, "info");
 			continue;
 		}
-		if (pick.kind === "slot") {
+		if (pick.kind === "slot" || pick.kind === "backupSlot") {
 			const slot = slotByKey(pick.value);
 			if (slot)
 				try {
@@ -21269,6 +21703,7 @@ async function workSettingsLoop(ctx) {
 						readScopedSettings(ctx.cwd, scope),
 						slot,
 						scope,
+						pick.kind === "backupSlot",
 					);
 				} catch (error) {
 					const target =

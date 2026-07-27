@@ -65,6 +65,7 @@ const roles = [
 	"debugger",
 	"divergent",
 	"fixer",
+	"lead",
 	"migrator",
 	"planner",
 	"reviewer",
@@ -363,14 +364,19 @@ check(
 );
 const plannerAgent = read("agents/work-planner.md");
 const workerAgent = read("agents/work-worker.md");
+const leadAgent = read("agents/work-lead.md");
 const reviewerAgent = read("agents/work-reviewer.md");
 check(
 	"role agents fail closed on missing native helper paths",
-	[plannerAgent, workerAgent, reviewerAgent].every(
+	[plannerAgent, workerAgent, leadAgent, reviewerAgent].every(
 		(text) =>
 			text.includes("exact absolute `work-helper.mjs` path") &&
 			text.includes("directly edit `.ce-workflow/work-items.json`"),
-	) && models.includes("Never guess another helper path"),
+	) &&
+		models.includes("Never guess another helper path") &&
+		models.includes('kind: "role"') &&
+		models.includes('agents: ["work-lead"]') &&
+		leadAgent.includes("diagnose architecture and plan constraints"),
 );
 check(
 	"reviewers never block on supervisor coordination",

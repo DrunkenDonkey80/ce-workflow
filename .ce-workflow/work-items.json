@@ -2924,6 +2924,45 @@
       "type": "task",
       "updatedAt": "2026-07-26T14:45:37.999Z"
     },
+    "work-2.45": {
+      "createdAt": "2026-07-27T05:06:39.328Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A work-worker stopped because the coded handoff omitted the required absolute work-helper.mjs path. The documented async resume then failed with an invalid recovery descriptor error for field launchContractDigest.\nExpected: Coded work-worker handoffs should include the resolved absolute helper path, and recovery descriptors emitted by the current runtime should be accepted by resume.\nImpact: Implementation never started and a replacement worker launch is required despite no product failure.\nSuggested improvement: Inject the helper path into worker contracts and maintain recovery descriptor schema compatibility.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/cfaff58d-36d0-4fd5-beb2-8f779175973b",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 197,
+              "file": "01-41d780e9-a05f-4fdd-b949-12a291ace3c8_work-worker_output.md",
+              "sha256": "47be7609e5ae62a7c3afa69e334a2c5e27474c26ef3a2a064ac6cf285f109f48"
+            },
+            {
+              "bytes": 431,
+              "file": "02-work-7.5-worker-output.md",
+              "sha256": "3c8f77ec2e36be135dd9850bcadabe04530834d25ee3c9141ef95c24c22787dc"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "rflib",
+          "submittedAt": "2026-07-27T05:06:39.323Z",
+          "workflowId": "019fa1d9-9d64-73ad-b496-43ccfda086a4"
+        }
+      ],
+      "id": "work-2.45",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A work-worker stopped because the coded handoff omitted the required absolute work-helper.mjs path. The documented async resume th",
+      "type": "task",
+      "updatedAt": "2026-07-27T05:06:39.328Z"
+    },
     "work-2.5": {
       "createdAt": "2026-07-20T03:29:59.300Z",
       "dependencies": [
@@ -3563,12 +3602,14 @@
       "evidence": [],
       "id": "work-3.23",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "wo:decision B — Explicit fallback with per-role Main and Backup models.\nOwner decision:\n- Every semantic role exposes two model selectors: Main and Backup. Backup may inherit/use the same model when explicitly configured.\n- One global Model strategy controls selection: `main-first` tries Main and uses Backup only when Main is unavailable/fails launch; `round-robin` alternates eligible Main/Backup choices across launches.\n- Required Lead/Reviewer roles may use the configured Backup while recording required versus achieved assurance and degraded independence/provider separation.\n- If all configured choices fail or are unavailable, pause visibly; never silently lower a mandatory gate.\n- Background verifier/Sentinel profiles remain optional: individual failures are recorded and reconciled but do not halt foreground work unless a separately approved policy makes that evidence mandatory.\n- Existing one-model settings migrate compatibly by treating the current model as Main, no Backup, with `main-first` default."
+      ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Decide mandatory-role unavailability fallback",
       "type": "decision",
-      "updatedAt": "2026-07-27T03:11:15.376Z"
+      "updatedAt": "2026-07-27T05:16:14.598Z"
     },
     "work-3.24": {
       "acceptance": "The owner records A or B; defines acceptable evidence freshness and fallback behavior; and states whether Sentinel is advisory, required, or mode-specific. The choice must reuse immutable read-only lane/verifier artifacts rather than authorize live primary-checkout watching or a third runtime.",
@@ -3669,17 +3710,29 @@
         "schemaVersion": 1,
         "title": "Add Lead routing with one bounded escalation"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.27",
       "labels": [],
       "notes": [
-        "wo:execution-agent\nHigh-assurance isolated writer boundary inherited from planning work-3.20."
+        "wo:execution-agent\nHigh-assurance isolated writer boundary inherited from planning work-3.20.",
+        "wo:owner-policy work-3.23 resolved.\nImplement the chosen fallback surface as part of this slice: per semantic role expose Main and Backup model selectors (with effort), plus one global Model strategy setting: `main-first` or `round-robin`. Existing configured role model becomes Main; default strategy is main-first; absent Backup preserves current behavior. Persist round-robin choice durably enough to alternate across launches without a new scheduler/store. Record selected candidate, fallback, required/achieved assurance, and degraded independence. When every required candidate fails, park visibly. Optional background verifier/Sentinel failures remain non-blocking unless a later explicit gate policy requires them.",
+        "Files changed: agents/work-lead.md; agents/work-worker.md; extensions/work-action-leases.js; extensions/work-models.js; scripts/test-work-lead-escalation.mjs; scripts/test-work-settings.mjs; scripts/test-work-start-finish.mjs; scripts/verify-package.mjs.\nVerification: node scripts/test-work-lead-escalation.mjs && node scripts/test-work-settings.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-telemetry.mjs — PASS; node scripts/test-work-action-leases.mjs — PASS; node scripts/test-work-start-finish.mjs — PASS; npm run verify:quiet — PASS.\nFailure resolved: first final gate found the pre-Lead sensitive-routing fixture still expected work-worker; updated it to the enforced work-lead route and reran the focused fixture plus final gate successfully.\nResult: explicit Lead/high-assurance routing, Main/Backup settings and durable strategy/fallback evidence, bounded Builder repair/escalation, and visible exhaustion parking implemented. Residual risk: provider availability is detected by real launch acknowledgement/failure rather than speculative provider probing; optional Sentinel/background verifier policy remains unchanged by design.",
+        "wo:review-scope [\"agents/work-worker.md\",\"extensions/work-action-leases.js\",\"extensions/work-models.js\",\"scripts/test-work-settings.mjs\",\"scripts/test-work-start-finish.mjs\",\"scripts/verify-package.mjs\",\"agents/work-lead.md\",\"scripts/test-work-lead-escalation.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:8281 - gate escalation on a real specialist failure (pass the terminal outcome in: const recovery = terminal.ok ? null : await recoverBuilderFailure(...)); today any settle rejection (work-item-closed, work-item-superseded, stale-head, stale-store, role-evidence-missing) launches a mutable work-lead and appends wo:escalation, reproduced on a successful Builder run whose item was closed\",\"extensions/work-models.js:8107 - parking must not wedge the repo: scope parked occupancy to its own work item in acquireWorkActionLease (work-action-leases.js:220 queries occupiedWorkActionLease without a workItemId while parked is in OCCUPIED at work-action-leases.js:28 and reconcileWorkActionLeaseLiveness never clears it), and record the park durably on the work item (wo:blocked label + operator/decision note) instead of ledger-only state\",\"extensions/work-models.js:18103 - add parked to the /work-status active-lease state list and to the label at 18107 (and to the telemetry list at 1374-1381); a parked lease currently prints Action lease: none while all mutable work is blocked\",\"extensions/work-models.js:8090 - remove reviewer from ![\\\"lead\\\",\\\"reviewer\\\"].includes(lease.semanticRole) so a transient read-only Reviewer launch rejection keeps the retryable reopen + launch-rejected fence instead of parking the repo\"]}",
+        "wo:fix PASS {\"findings\":[\"successful terminal fences no longer escalate and closed/superseded items cannot launch writers\",\"parking is per-item with durable wo:blocked/operator recovery evidence\",\"parked is visible in work-status and lease telemetry\",\"single reviewer rejection reopens and fences retryably\",\"Lead is in shipped role registry and dead candidate-loop branch removed\"],\"files\":[\"extensions/work-action-leases.js\",\"extensions/work-models.js\",\"scripts/test-work-lead-escalation.mjs\",\"scripts/test-work-action-leases.mjs\",\"scripts/verify-package.mjs\"],\"verification\":[\"node scripts/test-work-lead-escalation.mjs PASS\",\"node scripts/test-work-action-leases.mjs PASS\",\"node scripts/test-work-settings.mjs PASS\",\"node scripts/test-work-start-finish.mjs PASS\",\"node scripts/test-work-resume.mjs PASS\",\"node scripts/test-work-telemetry.mjs PASS\",\"npm run verify:quiet PASS\"]}",
+        "wo:review-scope [\"agents/work-worker.md\",\"extensions/work-action-leases.js\",\"extensions/work-models.js\",\"scripts/test-work-action-leases.mjs\",\"scripts/test-work-settings.mjs\",\"scripts/test-work-start-finish.mjs\",\"scripts/verify-package.mjs\",\"agents/work-lead.md\",\"scripts/test-work-lead-escalation.mjs\"]",
+        "wo:review PASS F1-F4 + Lead registry closed: recoverBuilderFailure gated on terminal.ok===false + closed/superseded guards in acquireWorkActionLease (work-models.js:8209-8218, work-action-leases.js:239-244); parked occupancy is per-item with wo:blocked label + wo:operator-blocker note and recoverParkedWorkActionLease exit; parked shown in /work-status (18136-18140) and telemetry (1381); only lead excluded from retryable launch-rejected fence (8088); verify-package roles include lead. Re-ran green: test-work-lead-escalation, test-work-action-leases, test-work-start-finish, verify-package; worker npm run verify:quiet PASS reused.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-lead-escalation.mjs && node scripts/test-work-settings.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-telemetry.mjs\nOutput: ok - Lead routing, fallback strategy, and bounded escalation\nok - work-settings behavior\nok - coded work-resume behavior\nWork commands that launch implementation turns require TUI or RPC mode. Print/JSON mode stopped before creating or claiming a WorkItem.\nok - work telemetry behavior"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Add Lead routing with one bounded escalation",
       "type": "task",
-      "updatedAt": "2026-07-27T03:13:34.806Z"
+      "updatedAt": "2026-07-27T06:10:26.411Z"
     },
     "work-3.3": {
       "acceptance": "A2: open roadmap/task containers default expanded and closed containers default collapsed; session-local override sets survive frame refresh and reset only when the workspace closes. Space toggles, Left collapses, Right expands, and all three are consumed before filter handling. Cursor and pending selection remain bound to stable IDs across reorder. One muted purpose line, Escape to parent/root close, parent cursor preservation, keyboard filtering, and native fallback remain intact. Injected refresh/timer tests prove unchanged compact signatures cause no requestRender, changed signatures cause exactly one, projection errors retain the last good frame, and every overlay close/back/done/escape path invokes cleanup because ctx.ui.custom has no dispose hook. Focused verification: node scripts/test-work-dialogs.mjs",
@@ -3942,7 +3995,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T05:05:03.117Z"
+    "updatedAt": "2026-07-27T06:10:26.411Z"
   },
   "schemaVersion": 1
 }
