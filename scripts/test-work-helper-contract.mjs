@@ -202,6 +202,7 @@ try {
 		status: "open",
 		title: "Close authentication tracking",
 		acceptance: "Store-only completion requires independent review.",
+		notes: ["wo:review PASS - store-only scope approved"],
 	});
 	saveStore(cwd, storeOnly);
 	assert.match(
@@ -213,19 +214,28 @@ try {
 			"--message",
 			"finish store-only tracking",
 			...verifyArgs,
+			"--reviewed",
+		),
+		/requires a persisted wo:review-scope/,
+		"reviewed store-only completion cannot bypass the coded handoff",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-EMPTY",
+			"--max-files",
+			"1",
+			"--message",
+			"finish store-only tracking",
+			...verifyArgs,
 		),
 		/Review only:\s*\n/,
-		"store-only review emits a coded handoff",
+		"store-only review emits a coded handoff despite preexisting PASS",
 	);
 	assert.ok(
 		loadStore(cwd).items["TASK-EMPTY"].notes.includes("wo:review-scope []"),
 		"store-only handoff persists an explicit empty review scope",
 	);
-	const storeOnlyReviewed = loadStore(cwd);
-	storeOnlyReviewed.items["TASK-EMPTY"].notes.push(
-		"wo:review PASS - store-only scope approved",
-	);
-	saveStore(cwd, storeOnlyReviewed);
 	const storeOnlyFinished = JSON.parse(
 		run(
 			"finish-task",

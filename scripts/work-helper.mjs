@@ -574,6 +574,7 @@ async function finishTaskUnlocked() {
 		const reviewed = args.includes("--reviewed");
 		const priorScope = reviewScope(task);
 		const accepted =
+			priorScope !== undefined &&
 			sameFiles(priorScope, implementationFiles) &&
 			reviewDispositionSatisfied(task);
 		if (!accepted && !reviewed) {
