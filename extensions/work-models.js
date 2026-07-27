@@ -131,7 +131,7 @@ const TELEMETRY_DIR_NAME = "work-runs";
 const HISTORY_DIR_NAME = "history";
 const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
-const WORK_SHORTCUT_STATUS = "F7 Orchestrator · F8 microcompact";
+const WORK_SHORTCUT_STATUS = "F7 Orchestrator · F8 microcompact · F9 Fleet";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
 const DEFAULT_THINKING = "__default_thinking__";
@@ -21287,6 +21287,12 @@ export default function workModelsExtension(pi) {
 		description: "Microcompact work context",
 		handler: async (ctx) => {
 			requestManualMicrocompact(ctx);
+		},
+	});
+	pi.registerShortcut?.("f9", {
+		description: "Open Fleet",
+		handler: async (ctx) => {
+			await openWorkFleet(ctx, pi);
 		},
 	});
 }

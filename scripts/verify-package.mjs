@@ -328,10 +328,12 @@ check(
 	].every((status) => verifierStore.includes(`"${status}"`)),
 );
 check(
-	"orchestrator has one F7 entrypoint and no work slash commands",
+	"orchestrator has F7/F8/F9 shortcuts and no work slash commands",
 	!existsSync(path.join(root, "prompts")) &&
 		!models.match(/registerCommand\(["'`]work-/) &&
-		models.includes('registerShortcut?.("f7"') &&
+		["f7", "f8", "f9"].every((key) =>
+			models.includes(`registerShortcut?.("${key}"`),
+		) &&
 		models.includes('title: "Orchestrator"'),
 );
 const helper = read("scripts/work-helper.mjs");

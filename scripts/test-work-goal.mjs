@@ -219,7 +219,7 @@ assert.equal(
 		blocked: 2,
 		elapsedMs: 123_000,
 	}),
-	"Roadmap [██████░░░░░░] ✅ 3/6 units (3 left · 2 unsliced) 🔴 1 🟠 2 ⏱️ 2m 3s · F7 Orchestrator · F8 microcompact",
+	"Roadmap [██████░░░░░░] ✅ 3/6 units (3 left · 2 unsliced) 🔴 1 🟠 2 ⏱️ 2m 3s · F7 Orchestrator · F8 microcompact · F9 Fleet",
 );
 assert.deepEqual(
 	mod.warpPayload(
@@ -308,6 +308,14 @@ assert.ok(commands["__orchestrator-goal-continue"]);
 assert.ok(shortcuts.f7);
 assert.match(shortcuts.f7.description, /orchestrator/i);
 assert.match(shortcuts.f8.description, /microcompact/i);
+assert.match(shortcuts.f9.description, /fleet/i);
+let fleetNotice;
+await shortcuts.f9.handler({
+	cwd: process.cwd(),
+	mode: "print",
+	ui: { notify: (message) => (fleetNotice = message) },
+});
+assert.ok(fleetNotice, "F9 opens the fleet view");
 let orchestratorLabels = [];
 await shortcuts.f7.handler({
 	cwd: process.cwd(),
@@ -1065,7 +1073,7 @@ try {
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes(
-				"work-orchestrator loaded · F7 Orchestrator · F8 microcompact",
+				"work-orchestrator loaded · F7 Orchestrator · F8 microcompact · F9 Fleet",
 			),
 		),
 	);
