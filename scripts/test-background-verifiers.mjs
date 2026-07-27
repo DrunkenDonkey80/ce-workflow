@@ -444,6 +444,96 @@ try {
 	});
 	await duplicate.launch;
 	assert.equal(requests.length, 2, "equivalent checkpoints launch once");
+	const serialCwd = repo();
+	const serialGit = (...args) =>
+		execFileSync("git", args, { cwd: serialCwd, encoding: "utf8" }).trim();
+	serialGit("init", "-q");
+	serialGit("config", "user.email", "serial@example.test");
+	serialGit("config", "user.name", "Serial Test");
+	writeFileSync(path.join(serialCwd, "tracked.txt"), "serial-launch\n");
+	serialGit("add", "tracked.txt");
+	serialGit("commit", "-qm", "base");
+	writeFileSync(path.join(serialCwd, "tracked.txt"), "serial-ready\n");
+	serialGit("add", "tracked.txt");
+	serialGit("commit", "-qm", "ready");
+	let activeSerialLaunches = 0;
+	let maxSerialLaunches = 0;
+	let serialLaunches = 0;
+	const serialAdapter = {
+		enforcesReadOnlyBoundary: true,
+		async spawn() {
+			serialLaunches += 1;
+			activeSerialLaunches += 1;
+			maxSerialLaunches = Math.max(maxSerialLaunches, activeSerialLaunches);
+			await new Promise((resolve) => setImmediate(resolve));
+			activeSerialLaunches -= 1;
+			return { ok: true, runId: `serial-${serialLaunches}` };
+		},
+	};
+	const serialLaunch = scheduleVerifierBatch(serialCwd, {
+		profiles,
+		serial: true,
+		adapter: serialAdapter,
+		origin: "normal",
+	});
+	await serialLaunch.launch;
+	assert.equal(
+		maxSerialLaunches,
+		1,
+		"background verifier launches can be switched to sequential",
+	);
+	assert.equal(
+		serialLaunches,
+		1,
+		"sequential mode leaves later verifier jobs queued until reconciliation",
+	);
+	assert.deepEqual(
+		Object.values(loadVerifierStore(serialCwd).jobs)
+			.filter((job) => job.batchId === serialLaunch.batch.id)
+			.map((job) => job.status)
+			.sort(),
+		["queued", "running"],
+		"only one sequential background verifier is active",
+	);
+	const runningSerialJob = Object.values(
+		loadVerifierStore(serialCwd).jobs,
+	).find(
+		(job) => job.batchId === serialLaunch.batch.id && job.status === "running",
+	);
+	mutateVerifierStore(serialCwd, (state) => {
+		for (const operation of runningSerialJob.operations)
+			recordOperationResult(state, {
+				jobId: runningSerialJob.id,
+				operation,
+				outcome: "no-findings",
+			});
+	});
+	const serialDuplicate = scheduleVerifierBatch(serialCwd, {
+		profiles,
+		serial: true,
+		adapter: serialAdapter,
+		origin: "normal",
+	});
+	await serialDuplicate.launch;
+	assert.equal(
+		serialLaunches,
+		1,
+		"duplicate scheduling does not launch later sequential jobs",
+	);
+	const concurrentSerialLaunches = await Promise.all([
+		launchQueuedVerifierJobs(serialCwd, serialAdapter, { serial: true }),
+		launchQueuedVerifierJobs(serialCwd, serialAdapter, { serial: true }),
+	]);
+	assert.equal(
+		concurrentSerialLaunches.flat().length,
+		1,
+		"a durable launch claim prevents concurrent reconciliation duplicates",
+	);
+	assert.equal(
+		serialLaunches,
+		2,
+		"the next sequential verifier launches only after the first is terminal",
+	);
 	const verifierFix = scheduleVerifierBatch(gitCwd, {
 		profiles,
 		adapter,

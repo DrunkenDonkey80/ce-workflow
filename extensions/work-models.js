@@ -461,9 +461,32 @@ const WORK_ORCH_BOOLEANS = [
 		key: "browserTestsOnUiDiff",
 		label: "CE-test-browser when diff touches UI",
 	},
+];
+const WORK_PERFORMANCE_FLAGS = [
 	{
-		key: "serialReadOnlyLanes",
-		label: "Serial read-only lanes",
+		key: "prepareNextCandidate",
+		label: "Prepare next candidate",
+		defaultValue: false,
+	},
+	{
+		key: "parallelReadOnlyLanes",
+		label: "Read-only task lanes",
+		defaultValue: true,
+	},
+	{
+		key: "parallelVerification",
+		label: "Verification shards",
+		defaultValue: false,
+	},
+	{
+		key: "parallelBackgroundVerifiers",
+		label: "Background verifiers",
+		defaultValue: true,
+	},
+	{
+		key: "parallelAdvisors",
+		label: "Advisors",
+		defaultValue: true,
 	},
 ];
 const SLICE_PLAN_ADVISOR_USAGE = ["none", "first", "all"];
@@ -3476,6 +3499,33 @@ function workOrchBlock(settings) {
 	return settings.workOrchestrator;
 }
 
+function workPerformanceSettings(cwd) {
+	const settings = readGlobalSettings();
+	const raw = settings.workPerformance ?? {};
+	const forceSerial = process.env.WORK_ORCH_SERIAL === "1";
+	let legacySerial = settings.workOrchestrator?.serialReadOnlyLanes === true;
+	if (!Object.hasOwn(raw, "parallelReadOnlyLanes"))
+		legacySerial ||=
+			readSettings(cwd).workOrchestrator?.serialReadOnlyLanes === true;
+	return Object.fromEntries(
+		WORK_PERFORMANCE_FLAGS.map(({ key, defaultValue }) => [
+			key,
+			!forceSerial &&
+				(raw[key] ??
+					(key === "parallelReadOnlyLanes" && legacySerial
+						? false
+						: defaultValue)),
+		]),
+	);
+}
+
+function setWorkPerformanceBoolean(settings, key, value) {
+	if (!WORK_PERFORMANCE_FLAGS.some((flag) => flag.key === key)) return false;
+	settings.workPerformance ??= {};
+	settings.workPerformance[key] = Boolean(value);
+	return true;
+}
+
 function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	const raw = settings.workOrchestrator ?? {};
 	const profile = EFFORT_PROFILES[raw.profile] ? raw.profile : DEFAULT_PROFILE;
@@ -3494,7 +3544,8 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	const flags = {};
 	for (const { key } of WORK_ORCH_BOOLEANS)
 		flags[key] = raw[key] ?? base[key] ?? false;
-	if (process.env.WORK_ORCH_SERIAL === "1") flags.serialReadOnlyLanes = true;
+	flags.serialReadOnlyLanes =
+		!workPerformanceSettings(cwd).parallelReadOnlyLanes;
 	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
 	const codeReviewBeforeCommit =
 		raw.codeReviewBeforeCommit ?? base.codeReviewBeforeCommit;
@@ -3675,8 +3726,11 @@ function advisorCriticStep(
 		"builder/on-call critic: challenge feasibility, sequencing, operability, and recovery traps",
 		"adversarial simplifier: challenge unnecessary complexity, hidden assumptions, and cheaper alternatives",
 	];
+	const launch = workPerformanceSettings(cwd).parallelAdvisors
+		? `launch exactly one parallel subagent call in tasks mode with context:fresh, one task for each configured agent: ${agents.join(", ")}`
+		: `launch these configured agents one at a time with separate context:fresh single-agent calls, waiting for each before starting the next: ${agents.join(", ")}`;
 	return [
-		`Advisor critic gate (read-only): after the exact ${target} path or WorkItem note is known, launch exactly one parallel subagent call in tasks mode with context:fresh, one task for each configured agent: ${agents.join(", ")}. Use only these packaged work-advisor roles; never invoke ce-doc-review.`,
+		`Advisor critic gate (read-only): after the exact ${target} path or WorkItem note is known, ${launch}. Use only these packaged work-advisor roles; never invoke ce-doc-review.`,
 		`Give every advisor the same exact ${target}, authoritative sources, and review contract, plus its independent charter: ${agents.map((agent, index) => `${agent} = ${charters[index]}`).join("; ")}. Require concrete locations and smallest fixes. Advisors must not edit files, mutate WorkItems, or launch subagents.`,
 		"Wait for all configured advisors, deduplicate their findings, and apply only authority-grounded fixes. Complete this gate before any plan bootstrap, slicing, or implementation. Convert any unresolved blocking gap into a decision/blocker WorkItem before proceeding; an unavailable advisor is recorded and not replaced or retried.",
 		`If fixes changed the artifact, decide whether one focused re-review by ${first} is warranted. Re-run it once only for substantive cross-section changes, ambiguity resolution, or a fix that could create a new inconsistency; skip re-review for mechanical wording/traceability fixes. Never start a recursive review loop.`,
@@ -3749,7 +3803,9 @@ function researchHandoffPrompt(cwd, question) {
 		"While those branches run, independently form the ordinary baseline. If current external facts could affect the answer, call web_search once with 2-4 varied queries; use source_check for load-bearing claims and prefer primary sources. Inspect local code only when the question needs project-specific implications.",
 		"Then call subagent_wait with all:true, cluster duplicate ideas, compare them with the evidence, and draft one coherent answer.",
 		advisors.length
-			? `Challenge that draft with one parallel fresh-context advisor pass using ${advisors.join(", ")}. Give every advisor the same draft, evidence, and source URLs; assign distinct charters in order: evidence/assumption auditor, feasibility/operator critic, adversarial simplifier. Advisors are read-only, must not launch subagents, and unavailable advisors are recorded without retry.`
+			? workPerformanceSettings(cwd).parallelAdvisors
+				? `Challenge that draft with one parallel fresh-context advisor pass using ${advisors.join(", ")}. Give every advisor the same draft, evidence, and source URLs; assign distinct charters in order: evidence/assumption auditor, feasibility/operator critic, adversarial simplifier. Advisors are read-only, must not launch subagents, and unavailable advisors are recorded without retry.`
+				: `Challenge that draft with separate fresh-context single-agent calls, one at a time, using ${advisors.join(", ")}. Wait for each before starting the next. Give every advisor the same draft, evidence, and source URLs; assign distinct charters in order: evidence/assumption auditor, feasibility/operator critic, adversarial simplifier. Advisors are read-only, must not launch subagents, and unavailable advisors are recorded without retry.`
 			: "No advisors are configured; perform one concise evidence, feasibility, and simplicity self-critique instead.",
 		"Return a concise but complete answer with: direct answer; evidence and citations; materially different options and trade-offs; advisor disagreements/challenges; confidence and unknowns; and one refined prompt suitable for F7 → Brainstorm or F7 → Large task.",
 		"Do not create project or research artifacts, work items, roadmaps, commits, or settings. Do not automatically start Brainstorm or Large task.",
@@ -8194,6 +8250,7 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 		origin: input.origin ?? "normal",
 		paths: input.paths,
 		scope: input.scope,
+		serial: !workPerformanceSettings(cwd).parallelBackgroundVerifiers,
 		adapter: createPiSubagentsVerifierAdapter(pi),
 	});
 }
@@ -8214,6 +8271,7 @@ export async function runFrozenCandidateVerification(
 			profiles: input.profiles ?? [],
 			checkpoint,
 			origin: input.origin ?? "normal",
+			serial: !workPerformanceSettings(cwd).parallelBackgroundVerifiers,
 			adapter: input.adapter,
 		});
 		const reviews = verifier.batch
@@ -8233,8 +8291,7 @@ export async function runFrozenCandidateVerification(
 				mutationOwner: true,
 				serial:
 					options.serial === true ||
-					process.env.WORK_ORCH_SERIAL === "1" ||
-					workOrchSettings(cwd).serialReadOnlyLanes,
+					!workPerformanceSettings(cwd).parallelVerification,
 			},
 		);
 		admitVerificationManifest(batch.manifest, {
@@ -8521,6 +8578,7 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 			profiles,
 			checkpoint,
 			origin: "manual-analyze",
+			serial: !workPerformanceSettings(ctx.cwd).parallelBackgroundVerifiers,
 			adapter: createPiSubagentsVerifierAdapter(pi),
 		});
 		ctx.ui.notify(
@@ -8635,9 +8693,7 @@ async function launchCurrentTaskReadOnlyLanes(
 		{
 			maxConcurrency: Math.min(maxLanes, Number(options.maxConcurrency) || 2),
 			failFast: options.failFast,
-			serial:
-				process.env.WORK_ORCH_SERIAL === "1" ||
-				workOrchSettings(cwd, settings).serialReadOnlyLanes,
+			serial: !workPerformanceSettings(cwd).parallelReadOnlyLanes,
 		},
 	);
 	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
@@ -8834,11 +8890,12 @@ function prefetchRequest(cwd, candidate, checkpoint, lane, advisorChallenge) {
 
 function deriveSuccessorPrefetch(cwd, input = {}) {
 	const settings = input.settings ?? readEffectiveSettings(cwd);
-	if (
-		process.env.WORK_ORCH_SERIAL === "1" ||
-		workOrchSettings(cwd, settings).serialReadOnlyLanes
-	)
-		return { eligible: false, reason: "serial-mode" };
+	const performance = workPerformanceSettings(cwd);
+	if (!performance.prepareNextCandidate)
+		return {
+			eligible: false,
+			reason: process.env.WORK_ORCH_SERIAL === "1" ? "serial-mode" : "disabled",
+		};
 	const occupied = pendingPrefetchSlot(cwd);
 	if (occupied)
 		return { eligible: false, reason: "slot-occupied", laneId: occupied.id };
@@ -9312,11 +9369,9 @@ function reconcileReadOnlyLaneRuns(cwd) {
 function readOnlyLaneRuntimeStatus(cwd) {
 	try {
 		return {
-			mode:
-				process.env.WORK_ORCH_SERIAL === "1" ||
-				workOrchSettings(cwd).serialReadOnlyLanes
-					? "serial"
-					: "parallel",
+			mode: workPerformanceSettings(cwd).parallelReadOnlyLanes
+				? "parallel"
+				: "serial",
 			lanes: laneStatus(cwd),
 		};
 	} catch {
@@ -9324,7 +9379,7 @@ function readOnlyLaneRuntimeStatus(cwd) {
 	}
 }
 
-function reconcileBackgroundVerifierRuns(cwd) {
+function reconcileBackgroundVerifierRuns(cwd, pi) {
 	const reconciled = reconcileVerifierRuns(cwd);
 	let store;
 	try {
@@ -9339,6 +9394,10 @@ function reconcileBackgroundVerifierRuns(cwd) {
 	}
 	for (const event of verifierTelemetryEvents(store))
 		recordWorkTelemetry(cwd, event);
+	if (pi && !workPerformanceSettings(cwd).parallelBackgroundVerifiers)
+		void launchQueuedVerifierJobs(cwd, createPiSubagentsVerifierAdapter(pi), {
+			serial: true,
+		}).catch(() => {});
 	return {
 		reconciled,
 		status: verifierStatus(store, backgroundVerifierProfiles(cwd)),
@@ -12960,6 +13019,7 @@ function executeWorkFinishStateUnlocked(cwd, state, currentModel) {
 			origin: state.origin ?? "normal",
 			paths: state.relatedFiles,
 			scope: "commit",
+			serial: !workPerformanceSettings(cwd).parallelBackgroundVerifiers,
 		});
 		if (verifier.batch?.id)
 			recordWorkTelemetry(cwd, {
@@ -17028,6 +17088,7 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 	const unsupported = unsupportedPrintWorkflow(ctx);
 	if (unsupported) return unsupported;
 	cleanupBenignInstructionDirt(ctx.cwd);
+	reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 	const state = buildWorkResumeState(ctx.cwd, args, {
 		ownerSession: verifierTriageOwner(ctx),
 	});
@@ -17272,7 +17333,7 @@ async function handleWorkflowAction(
 	return state;
 }
 
-async function handleWorkStatusCommand(args, ctx) {
+async function handleWorkStatusCommand(args, ctx, pi) {
 	cleanupBenignInstructionDirt(ctx.cwd);
 	try {
 		let readOnly;
@@ -17281,7 +17342,7 @@ async function handleWorkStatusCommand(args, ctx) {
 		} catch {
 			readOnly = { mode: "unavailable", lanes: [] };
 		}
-		reconcileBackgroundVerifierRuns(ctx.cwd);
+		reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 		const output = withRecommendedActionsText(
 			`${buildWorkStatus(ctx.cwd, args, readOnly)}\nVerifier review: ${backgroundVerifierRunStatus(ctx.cwd)}`,
 		);
@@ -19146,11 +19207,18 @@ async function executeOrchestratorAction(
 						state,
 						ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
 					);
-				if (state.verifier?.status === "queued")
+				if (state.verifier?.status === "queued") {
+					const serial = !workPerformanceSettings(ctx.cwd)
+						.parallelBackgroundVerifiers;
 					void launchQueuedVerifierJobs(
 						ctx.cwd,
 						createPiSubagentsVerifierAdapter(pi),
+						{
+							serial,
+							initialBatchId: serial ? state.verifier.batch?.id : undefined,
+						},
 					);
+				}
 				rememberRecommendedActions(
 					ctx.cwd,
 					recommendedActions(state),
@@ -19170,7 +19238,7 @@ async function executeOrchestratorAction(
 		});
 	if (name === "work-status")
 		return withCommandTelemetry(name, text, ctx, () =>
-			handleWorkStatusCommand(text, ctx),
+			handleWorkStatusCommand(text, ctx, pi),
 		);
 	if (name === "work-report")
 		return withCommandTelemetry(name, text, ctx, () =>
@@ -19339,6 +19407,8 @@ export {
 	renderAgentHealth,
 	brainstormAgentHealthPreflight,
 	workOrchSettings,
+	workPerformanceSettings,
+	setWorkPerformanceBoolean,
 	backgroundVerifierProfiles,
 	launchCurrentTaskReadOnlyLanes,
 	deriveSuccessorPrefetch,
@@ -19696,7 +19766,7 @@ export default function workModelsExtension(pi) {
 			} catch {
 				// Lane state must not prevent the rest of session startup.
 			}
-			reconcileBackgroundVerifierRuns(ctx.cwd);
+			reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 		}
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
@@ -20205,6 +20275,7 @@ export default function workModelsExtension(pi) {
 		} catch {
 			// Prefetch settlement is recoverable on the next safe hook.
 		}
+		reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 		const manualMicrocompactStarted =
 			manualMicrocompactPending &&
 			ctx.isIdle?.() !== false &&
@@ -20262,6 +20333,7 @@ function onOff(value) {
 function workSettingsStatus(ctx) {
 	const settings = readEffectiveSettings(ctx.cwd);
 	const resolved = workOrchSettings(ctx.cwd);
+	const performance = workPerformanceSettings(ctx.cwd);
 	const resume = workResumeSettings(ctx.cwd);
 	const lines = [
 		"Work settings",
@@ -20286,6 +20358,15 @@ function workSettingsStatus(ctx) {
 						`  ${SUBMENU_ARROW} ${profile.model}: ${backgroundVerifierSummary(profile)}`,
 				)
 			: ["  none configured"]),
+		"",
+		"Performance tweaks (global)",
+		`  ${onOff(performance.prepareNextCandidate)} prepare next candidate`,
+		...WORK_PERFORMANCE_FLAGS.filter(
+			(flag) => flag.key !== "prepareNextCandidate",
+		).map(
+			(flag) =>
+				`  ${performance[flag.key] ? "parallel" : "sequential"} ${flag.label.toLowerCase()}`,
+		),
 		"",
 		"Gates",
 		`  ${SUBMENU_ARROW} advisor usage for slice plans: ${resolved.advisorUsageForSlicePlans}`,
@@ -20317,6 +20398,42 @@ function boolLabel(label, value) {
 		settingLabel: display,
 		enabled: value,
 	};
+}
+
+async function editPerformanceSettings(ctx) {
+	let selectedIndex = 0;
+	for (;;) {
+		const performance = workPerformanceSettings(ctx.cwd);
+		const result = await showListDialog(ctx, {
+			title: "Performance tweaks: Global",
+			subtitle: "Control workflow concurrency and speculative next-task work",
+			items: WORK_PERFORMANCE_FLAGS.map((flag) => ({
+				value: flag.key,
+				label:
+					flag.key === "prepareNextCandidate"
+						? `${onOff(performance[flag.key])} ${flag.label}`
+						: `${performance[flag.key] ? "⇉ parallel" : "→ sequential"} ${flag.label}`,
+				description:
+					flag.key === "prepareNextCandidate"
+						? "Speculatively prepare one likely successor while current work settles"
+						: "Applies globally to every project",
+			})),
+			selectedIndex,
+			cursorKey: "work-performance-settings",
+			forceCustom: true,
+			selectOnSpace: true,
+			help: "Enter/Space toggle · Esc/Backspace back",
+		});
+		if (!result) return;
+		selectedIndex = result.index;
+		const settings = readGlobalSettings();
+		setWorkPerformanceBoolean(
+			settings,
+			result.item.value,
+			!performance[result.item.value],
+		);
+		writeScopedSettings(ctx.cwd, "global", settings);
+	}
 }
 
 function owns(object, key) {
@@ -20453,6 +20570,7 @@ async function workSettingsLoop(ctx) {
 			return;
 		}
 		const resolved = workOrchSettings(ctx.cwd, settings);
+		const performance = workPerformanceSettings(ctx.cwd);
 		const resume = workResumeSettings(ctx.cwd, settings);
 		const names = await modelDisplayNames(ctx);
 		const items = [
@@ -20494,6 +20612,12 @@ async function workSettingsLoop(ctx) {
 				label: `Creative sidecar: ${titleCase(resolved.creativeMode)} ${SUBMENU_ARROW}`,
 				description:
 					"3 isolated generators reuse Advisor 1–3 models; advisors critique the merged result",
+			},
+			{
+				kind: "performance",
+				value: "performance",
+				label: `Performance tweaks (global only) ${SUBMENU_ARROW}`,
+				description: `Next ${performance.prepareNextCandidate ? "on" : "off"} · verification ${performance.parallelVerification ? "parallel" : "sequential"} · background/advisors ${performance.parallelBackgroundVerifiers && performance.parallelAdvisors ? "parallel" : "mixed"}`,
 			},
 			{
 				kind: "advisorSliceUsage",
@@ -20579,6 +20703,7 @@ async function workSettingsLoop(ctx) {
 			resetAll(settings);
 			delete settings.workOrchestrator;
 			delete settings.workResume;
+			if (scope === "global") delete settings.workPerformance;
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(
 				scope === "global"
@@ -20586,6 +20711,10 @@ async function workSettingsLoop(ctx) {
 					: "Cleared project workflow overrides",
 				"info",
 			);
+			continue;
+		}
+		if (pick.kind === "performance") {
+			await editPerformanceSettings(ctx);
 			continue;
 		}
 		if (pick.kind === "profile") {

@@ -52,20 +52,47 @@ try {
 		"autonomous goals inherit the current effort by default",
 	);
 	assert(
-		mod.workOrchSettings(cwd).serialReadOnlyLanes === false,
-		"read-only lanes default to bounded parallel mode",
+		JSON.stringify(mod.workPerformanceSettings(cwd)) ===
+			JSON.stringify({
+				prepareNextCandidate: false,
+				parallelReadOnlyLanes: true,
+				parallelVerification: false,
+				parallelBackgroundVerifiers: true,
+				parallelAdvisors: true,
+			}),
+		"performance defaults are conservative where model bursts can compound",
 	);
 	assert(!existsSync(settingsFile()), "no default source mutation");
 	process.env.WORK_ORCH_SERIAL = "1";
 	assert(
-		mod.workOrchSettings(cwd).serialReadOnlyLanes === true,
-		"WORK_ORCH_SERIAL forces serial read-only lane mode",
+		Object.values(mod.workPerformanceSettings(cwd)).every(
+			(value) => value === false,
+		),
+		"WORK_ORCH_SERIAL forces every performance path to serial or off",
 	);
 	delete process.env.WORK_ORCH_SERIAL;
+	writeSettings({
+		workPerformance: {
+			prepareNextCandidate: true,
+			parallelVerification: true,
+		},
+	});
+	assert(
+		mod.workPerformanceSettings(cwd).prepareNextCandidate === false &&
+			mod.workPerformanceSettings(cwd).parallelVerification === false,
+		"project performance overrides are ignored",
+	);
 	writeSettings({ workOrchestrator: { serialReadOnlyLanes: true } });
 	assert(
-		mod.workOrchSettings(cwd).serialReadOnlyLanes === true,
-		"F7 project setting enables matching serial lane mode",
+		mod.workPerformanceSettings(cwd).parallelReadOnlyLanes === false,
+		"legacy project serial-lane settings remain a safe compatibility fallback",
+	);
+	writeGlobalSettings({
+		workPerformance: { parallelReadOnlyLanes: true },
+	});
+	assert(
+		mod.workPerformanceSettings(cwd).parallelReadOnlyLanes === true,
+		"an explicit global performance switch replaces the legacy project fallback",
 	);
 	writeSettings({});
 	writeFileSync(
@@ -448,6 +475,11 @@ try {
 		"implementation: configured Work model (isolated work-worker)",
 		"CE-simplify-code before review",
 		"CE-test-browser when diff touches UI",
+		"Performance tweaks (global)",
+		"off prepare next candidate",
+		"sequential verification shards",
+		"parallel background verifiers",
+		"parallel advisors",
 		"self-improving workflow reporting",
 		"new session between iterations",
 	])
@@ -503,6 +535,43 @@ try {
 	assert(
 		readGlobalSettings().workOrchestrator.creativeMode === "auto",
 		"settings UI persists automatic creative sidecars",
+	);
+
+	let performanceBefore = "";
+	let performanceAfter = "";
+	await invoke("work-settings", "", {
+		...ctx,
+		ui: customUi([
+			{ target: "Performance tweaks", key: "enter" },
+			{
+				target: "Verification shards",
+				expectText: "Performance tweaks: Global",
+				key: "enter",
+				capture: (lines) => {
+					performanceBefore = lines.join("\n");
+				},
+			},
+			{
+				expectInitial: "Verification shards",
+				expectText: "Performance tweaks: Global",
+				key: "escape",
+				capture: (lines) => {
+					performanceAfter = lines.join("\n");
+				},
+			},
+			{
+				expectInitial: "Performance tweaks",
+				expectText: "Settings: Global",
+				key: "escape",
+			},
+		]),
+	});
+	assert(
+		performanceBefore.includes("→ sequential Verification shards") &&
+			performanceAfter.includes("⇉ parallel Verification shards") &&
+			readGlobalSettings().workPerformance.parallelVerification === true &&
+			!readSettings().workPerformance,
+		"performance submenu toggles global settings only and retains its cursor",
 	);
 
 	// Global opens first; project overrides are marked and removable in-place.
@@ -687,6 +756,7 @@ try {
 	writeGlobalSettings({
 		workOrchestrator: { browserTestsOnUiDiff: false },
 		workResume: { selfImproving: true },
+		workPerformance: { prepareNextCandidate: true },
 		subagents: {
 			agentOverrides: {
 				"work-worker": { thinking: "low" },
@@ -704,6 +774,7 @@ try {
 	assert(
 		!readGlobalSettings().workOrchestrator &&
 			!readGlobalSettings().workResume &&
+			!readGlobalSettings().workPerformance &&
 			!readGlobalSettings().subagents.agentOverrides["work-worker"] &&
 			readGlobalSettings().subagents.agentOverrides["other-agent"].thinking ===
 				"high",
@@ -1117,6 +1188,25 @@ try {
 			allAdvisors.includes("Never start a recursive review loop"),
 		"parallel synthesis and bounded first-advisor re-review are explicit",
 	);
+	const sequentialAdvisorSettings = readGlobalSettings();
+	mod.setWorkPerformanceBoolean(
+		sequentialAdvisorSettings,
+		"parallelAdvisors",
+		false,
+	);
+	writeGlobalSettings(sequentialAdvisorSettings);
+	assert(
+		mod
+			.advisorCriticStep(cwd, "master plan", "all")
+			.includes("one at a time with separate context:fresh single-agent calls"),
+		"advisor setting switches the prompt to sequential launches",
+	);
+	mod.setWorkPerformanceBoolean(
+		sequentialAdvisorSettings,
+		"parallelAdvisors",
+		true,
+	);
+	writeGlobalSettings(sequentialAdvisorSettings);
 	const firstAdvisor = mod.advisorCriticStep(cwd, "slice plan", "first");
 	assert(
 		firstAdvisor.includes("work-advisor") &&

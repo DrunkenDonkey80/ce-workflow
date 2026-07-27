@@ -18,6 +18,12 @@ import {
 } from "../extensions/read-only-lanes.js";
 import { runFrozenCandidateVerification } from "../extensions/work-models.js";
 
+const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
+const globalSettingsDir = mkdtempSync(
+	path.join(os.tmpdir(), "ce-verification-settings-"),
+);
+process.env.PI_CODING_AGENT_DIR = globalSettingsDir;
+writeFileSync(path.join(globalSettingsDir, "settings.json"), "{}\n");
 const roots = [];
 function repository() {
 	const cwd = mkdtempSync(path.join(os.tmpdir(), "ce-verification-shards-"));
@@ -318,8 +324,11 @@ try {
 		const frozen = await runFrozenCandidateVerification(
 			cwd,
 			{
-				shards: [{ id: "test", command: "test" }],
-				authoritativeCommand: "test",
+				shards: [
+					{ id: "test-a", command: "test-a" },
+					{ id: "test-b", command: "test-b" },
+				],
+				authoritativeCommand: "test-a && test-b",
 				profiles: [
 					{
 						model: "fixture/reviewer",
@@ -341,6 +350,11 @@ try {
 			},
 		]);
 		assert.equal(frozen.manifest.status, "PASS");
+		assert.equal(
+			frozen.manifest.metrics.maxConcurrency,
+			1,
+			"frozen verification defaults to sequential shards",
+		);
 	}
 
 	{
@@ -383,5 +397,8 @@ try {
 		"ok - frozen verification shard scheduling and admission\n",
 	);
 } finally {
+	if (previousConfigDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousConfigDir;
 	for (const cwd of roots) rmSync(cwd, { recursive: true, force: true });
+	rmSync(globalSettingsDir, { recursive: true, force: true });
 }

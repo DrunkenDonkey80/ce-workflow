@@ -19,6 +19,11 @@ import {
 
 const helper = realpathSync(path.join(import.meta.dirname, "work-helper.mjs"));
 const cwd = mkdtempSync(path.join(tmpdir(), "work-helper-contract-"));
+const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
+const globalSettingsDir = mkdtempSync(
+	path.join(tmpdir(), "work-helper-global-settings-"),
+);
+process.env.PI_CODING_AGENT_DIR = globalSettingsDir;
 const run = (...args) =>
 	execFileSync(process.execPath, [helper, ...args], { cwd, encoding: "utf8" });
 const failure = (...args) => {
@@ -316,20 +321,17 @@ try {
 		acceptance: "The exact declared verification command set passes.",
 	});
 	saveStore(cwd, shardStore);
-	execFileSync(
-		"git",
-		["add", "sharded.js", ".ce-workflow/work-items.json"],
-		{ cwd },
-	);
+	execFileSync("git", ["add", "sharded.js", ".ce-workflow/work-items.json"], {
+		cwd,
+	});
 	execFileSync("git", ["commit", "-m", "shard baseline"], {
 		cwd,
 		stdio: "ignore",
 	});
 	writeFileSync(path.join(cwd, "sharded.js"), "export default true;\n");
-	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
-		path.join(cwd, ".pi", "settings.json"),
-		`${JSON.stringify({ workOrchestrator: { serialReadOnlyLanes: true } })}\n`,
+		path.join(globalSettingsDir, "settings.json"),
+		`${JSON.stringify({ workPerformance: { parallelVerification: false } })}\n`,
 	);
 	const shardA = `${JSON.stringify(process.execPath)} -e "require('fs').mkdirSync('build-shard',{recursive:true});require('fs').appendFileSync('build-shard/order.txt','a\\n')"`;
 	const shardB = `${JSON.stringify(process.execPath)} -e "require('fs').appendFileSync('build-shard/order.txt','b\\n')"`;
@@ -360,7 +362,10 @@ try {
 	);
 	assert.equal(shardedFinished.status, "PASS");
 	assert.deepEqual(
-		shardedFinished.verification.shards.map(({ id, status }) => ({ id, status })),
+		shardedFinished.verification.shards.map(({ id, status }) => ({
+			id,
+			status,
+		})),
 		[
 			{ id: "a", status: "PASS" },
 			{ id: "b", status: "PASS" },
@@ -378,5 +383,8 @@ try {
 
 	console.log("ok - work helper contract");
 } finally {
+	if (previousConfigDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousConfigDir;
 	rmSync(cwd, { recursive: true, force: true });
+	rmSync(globalSettingsDir, { recursive: true, force: true });
 }

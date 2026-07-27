@@ -138,8 +138,27 @@ function mutateWithoutPromotion(cwd, derived, mutate, expected) {
 	);
 }
 
+const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
+const globalSettingsDir = mkdtempSync(
+	path.join(tmpdir(), "work-prefetch-settings-"),
+);
+process.env.PI_CODING_AGENT_DIR = globalSettingsDir;
+writeFileSync(path.join(globalSettingsDir, "settings.json"), "{}\n");
 const roots = [];
 try {
+	{
+		const cwd = fixture();
+		roots.push(cwd);
+		assert(
+			deriveSuccessorPrefetch(cwd, { currentWorkItemId: "TASK-1" }).reason ===
+				"disabled",
+			"successor preparation defaults off",
+		);
+	}
+	writeFileSync(
+		path.join(globalSettingsDir, "settings.json"),
+		`${JSON.stringify({ workPerformance: { prepareNextCandidate: true } })}\n`,
+	);
 	{
 		const cwd = fixture();
 		roots.push(cwd);
@@ -443,5 +462,8 @@ try {
 	);
 } finally {
 	delete process.env.WORK_ORCH_SERIAL;
+	if (previousConfigDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousConfigDir;
 	for (const cwd of roots) rmSync(cwd, { recursive: true, force: true });
+	rmSync(globalSettingsDir, { recursive: true, force: true });
 }

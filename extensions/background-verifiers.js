@@ -985,25 +985,44 @@ export function queueVerifierJobs(store, input = {}) {
 		return batch;
 	});
 }
-export function recordVerifierLaunch(store, input = {}) {
+function claimVerifierLaunch(store, input = {}) {
 	return edit(store, (next) => {
 		const job = next.jobs[input.jobId];
 		if (!job?.launch || job.launch.status !== "queued")
+			throw error("invalid", `Verifier job is not claimable: ${input.jobId}`);
+		job.launch = {
+			...job.launch,
+			status: "orphaned",
+			claimedAt: now(input.now),
+		};
+		job.status = "orphaned";
+		return job;
+	});
+}
+
+export function recordVerifierLaunch(store, input = {}) {
+	return edit(store, (next) => {
+		const job = next.jobs[input.jobId];
+		const claimed = job?.launch?.status === "orphaned" && job.launch.claimedAt;
+		if (!job?.launch || (job.launch.status !== "queued" && !claimed))
 			throw error("invalid", `Verifier job is not launchable: ${input.jobId}`);
+		const launch = { ...job.launch };
+		delete launch.claimedAt;
+		delete launch.orphanedAt;
 		const identity = input.identity ?? {};
 		if (
 			input.ambiguous ||
 			(input.ok && !identity.runId && !identity.asyncDir)
 		) {
 			job.launch = {
-				...job.launch,
+				...launch,
 				status: "orphaned",
 				orphanedAt: now(input.now),
 			};
 			job.status = "orphaned";
 		} else if (input.ok) {
 			job.launch = {
-				...job.launch,
+				...launch,
 				status: "running",
 				runId: identity.runId,
 				asyncDir: identity.asyncDir,
@@ -1012,7 +1031,7 @@ export function recordVerifierLaunch(store, input = {}) {
 			job.status = "running";
 		} else {
 			job.launch = {
-				...job.launch,
+				...launch,
 				status: "failed",
 				failure: String(input.failure ?? "launch failed"),
 				failedAt: now(input.now),
@@ -1022,7 +1041,11 @@ export function recordVerifierLaunch(store, input = {}) {
 		return job;
 	});
 }
-export async function launchQueuedVerifierJobs(cwd = process.cwd(), adapter) {
+export async function launchQueuedVerifierJobs(
+	cwd = process.cwd(),
+	adapter,
+	options = {},
+) {
 	if (!adapter?.enforcesReadOnlyBoundary || typeof adapter.spawn !== "function")
 		return [];
 	let store;
@@ -1031,19 +1054,56 @@ export async function launchQueuedVerifierJobs(cwd = process.cwd(), adapter) {
 	} catch {
 		return [];
 	}
-	const jobs = Object.values(store.jobs).filter(
-		(item) => item.launch?.status === "queued",
+	const allJobs = Object.values(store.jobs);
+	if (options.initialBatchId) {
+		const initial = allJobs.filter(
+			(item) => item.batchId === options.initialBatchId,
+		);
+		if (
+			!initial.length ||
+			initial.some((item) => item.status !== "queued") ||
+			allJobs.some(
+				(item) =>
+					item.batchId !== options.initialBatchId &&
+					["queued", "running", "orphaned"].includes(item.status),
+			)
+		)
+			return [];
+	}
+	if (
+		options.serial &&
+		allJobs.some((item) => ["running", "orphaned"].includes(item.status))
+	)
+		return [];
+	const queued = allJobs.filter(
+		(item) =>
+			item.launch?.status === "queued" &&
+			(!options.initialBatchId || item.batchId === options.initialBatchId),
 	);
-	const replies = await Promise.all(
-		jobs.map(async (job) => {
-			try {
-				return await adapter.spawn(structuredClone(job.launch.request));
-			} catch (cause) {
-				return { ok: false, ambiguous: true, failure: cause.message };
-			}
-		}),
-	);
-	for (const [index, job] of jobs.entries()) {
+	const jobs = options.serial ? queued.slice(0, 1) : queued;
+	const claimed = [];
+	for (const job of jobs)
+		try {
+			mutateVerifierStore(cwd, (state) =>
+				claimVerifierLaunch(state, { jobId: job.id }),
+			);
+			claimed.push(job);
+		} catch (cause) {
+			if (
+				!(cause instanceof VerifierStoreError) ||
+				cause.category !== "invalid"
+			)
+				throw cause;
+		}
+	const spawn = async (job) => {
+		try {
+			return await adapter.spawn(structuredClone(job.launch.request));
+		} catch (cause) {
+			return { ok: false, ambiguous: true, failure: cause.message };
+		}
+	};
+	const replies = await Promise.all(claimed.map(spawn));
+	for (const [index, job] of claimed.entries()) {
 		const reply = replies[index];
 		const data = reply?.reply?.data ?? reply?.data ?? reply ?? {};
 		const result = data.result ?? {};
@@ -1063,9 +1123,9 @@ export async function launchQueuedVerifierJobs(cwd = process.cwd(), adapter) {
 			}),
 		);
 	}
-	for (const batchId of new Set(jobs.map((job) => job.batchId)))
+	for (const batchId of new Set(claimed.map((job) => job.batchId)))
 		cleanupVerifierBatchRuntime(cwd, batchId);
-	return jobs.map((job) => job.id);
+	return claimed.map((job) => job.id);
 }
 function recordNotScheduledBatch(cwd, profiles, reason, input) {
 	const base = createHash("sha1").update(path.resolve(cwd)).digest("hex");
@@ -1122,7 +1182,10 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 		return {
 			status: existing.status,
 			batch: existing,
-			launch: launchQueuedVerifierJobs(cwd, input.adapter),
+			launch: launchQueuedVerifierJobs(cwd, input.adapter, {
+				serial: input.serial === true,
+				initialBatchId: input.serial === true ? existing.id : undefined,
+			}),
 		};
 	const provisional = { id: batchId, checkpoint, profiles };
 	const requests = {};
@@ -1144,7 +1207,10 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 		return {
 			status: "queued",
 			batch,
-			launch: launchQueuedVerifierJobs(cwd, input.adapter),
+			launch: launchQueuedVerifierJobs(cwd, input.adapter, {
+				serial: input.serial === true,
+				initialBatchId: input.serial === true ? batch.id : undefined,
+			}),
 		};
 	} catch (cause) {
 		if (workspace) rmSync(workspace, { recursive: true, force: true });
@@ -2014,9 +2080,7 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 				? path.join(job.launch.asyncDir, "status.json")
 				: "";
 			try {
-				state = terminalState(
-					JSON.parse(boundedArtifactRead(statusFile).text),
-				);
+				state = terminalState(JSON.parse(boundedArtifactRead(statusFile).text));
 			} catch {
 				const launchedAt = Date.parse(job.launch.launchedAt ?? "");
 				if (

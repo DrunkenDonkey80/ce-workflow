@@ -318,20 +318,30 @@ async function runVerification(command, shards = []) {
 		const result = await runVerificationCommand(command);
 		return { output: String(result.stdout ?? ""), manifest: null };
 	}
-	const authoritativeCommand = shards.map((shard) => shard.command).join(" && ");
+	const authoritativeCommand = shards
+		.map((shard) => shard.command)
+		.join(" && ");
 	if (command !== authoritativeCommand)
 		throw new Error(
 			"declared verification shards must exactly compose the authoritative --verify command in order",
 		);
-	let serialSetting = false;
+	let serialSetting = true;
 	try {
 		const settings = JSON.parse(
-			readFileSync(path.join(cwd, ".pi", "settings.json"), "utf8"),
+			readFileSync(
+				path.join(
+					process.env.PI_CODING_AGENT_DIR ||
+						path.join(os.homedir(), ".pi", "agent"),
+					"settings.json",
+				),
+				"utf8",
+			),
 		);
-		serialSetting = settings?.workOrchestrator?.serialReadOnlyLanes === true;
+		serialSetting = settings?.workPerformance?.parallelVerification !== true;
 	} catch {
-		// Missing or malformed settings keep the bounded default.
+		// Verification shards default to sequential.
 	}
+	if (process.env.WORK_ORCH_SERIAL === "1") serialSetting = true;
 	const batch = await runVerificationShardBatch(
 		cwd,
 		{ shards, authoritativeCommand, gateVersion: VERIFICATION_GATE_VERSION },
@@ -389,7 +399,9 @@ async function finishTaskUnlocked() {
 	if (stagedBefore.length) git(["restore", "--staged", "--", ...stagedBefore]);
 
 	const canonicalBeforeVerificationPath = storePath(cwd);
-	const canonicalBeforeVerification = existsSync(canonicalBeforeVerificationPath)
+	const canonicalBeforeVerification = existsSync(
+		canonicalBeforeVerificationPath,
+	)
 		? readFileSync(canonicalBeforeVerificationPath, "utf8")
 		: null;
 	const verify = option("--verify");
@@ -455,7 +467,11 @@ async function finishTaskUnlocked() {
 		throw new Error(`verification failed: ${verificationCommand}`);
 	}
 	for (const output of absentShardOutputs)
-		if (verificationManifest?.shards.some((shard) => shard.outputs.includes(output)))
+		if (
+			verificationManifest?.shards.some((shard) =>
+				shard.outputs.includes(output),
+			)
+		)
 			rmSync(path.join(cwd, output), { recursive: true, force: true });
 	if (verificationCommand)
 		verificationResult = {
