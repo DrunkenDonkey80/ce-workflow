@@ -99,6 +99,15 @@ import {
 	classifyShadowAssurance,
 	workflowTelemetryIdentity,
 } from "./workflow-telemetry.js";
+import {
+	acknowledgeWorkActionLease,
+	acquireWorkActionLease,
+	currentWorkActionLeases,
+	fenceWorkActionLease,
+	reconcileWorkActionLeaseLiveness,
+	settleWorkActionLease,
+	workActionLeaseState,
+} from "./work-action-leases.js";
 
 let withFileMutationQueue = async (_file, mutation) => mutation();
 try {
@@ -1324,6 +1333,20 @@ function reconcilePendingDirectRuns(cwd, runtime = {}) {
 		for (const run of pending.values()) {
 			try {
 				if (completed.has(run.workflowRunId)) continue;
+				const actionLease = currentWorkActionLeases(cwd).find(
+					(lease) => lease.workflowRunId === run.workflowRunId,
+				);
+				if (
+					[
+						"queued",
+						"claimed",
+						"acknowledged",
+						"ambiguous",
+						"live",
+						"orphaned",
+					].includes(actionLease?.state)
+				)
+					continue;
 				const statusFile =
 					typeof run.asyncDir === "string"
 						? join(run.asyncDir, "status.json")
@@ -1345,22 +1368,27 @@ function reconcilePendingDirectRuns(cwd, runtime = {}) {
 					: details.every((item) =>
 							DIRECT_SUCCESS_STATES.has(String(item.status).toLowerCase()),
 						);
-				recordWorkTelemetry(cwd, {
-					id: `direct-agent-${run.workflowRunId}`,
-					type: "agent",
-					workflowRunId: run.workflowRunId,
-					activity: run.activity,
-					mode: run.mode ?? runtime.mode,
-					action: run.action,
-					role: handoffRole(run.agent ?? run.action),
-					epicId: run.epicId,
-					workItemId: run.workItemId,
-					ok,
-					handoff: { queued: false, started: true, role: run.agent },
-					tools: [
-						{ name: "subagent", runId: run.runId, subagentDetails: details },
-					],
-				});
+				if (actionLease?.state !== "fenced")
+					recordWorkTelemetry(cwd, {
+						id: `direct-agent-${run.workflowRunId}`,
+						type: "agent",
+						workflowRunId: run.workflowRunId,
+						activity: run.activity,
+						mode: run.mode ?? runtime.mode,
+						action: run.action,
+						role: handoffRole(run.agent ?? run.action),
+						epicId: run.epicId,
+						workItemId: run.workItemId,
+						ok,
+						handoff: { queued: false, started: true, role: run.agent },
+						tools: [
+							{
+								name: "subagent",
+								runId: run.runId,
+								subagentDetails: details,
+							},
+						],
+					});
 				completeWorkflowOnce(
 					cwd,
 					{
@@ -7417,11 +7445,16 @@ function planResumeAction(state, cwd, options = {}) {
 				suggestedCommands: [`/work-finish ${activeImplementation.id}`],
 			};
 		}
+		const leaseStatus = workActionLeaseState(cwd, activeImplementation.id);
 		return {
 			...routed,
 			action: "in-progress-agent",
+			agentState: leaseStatus?.state ?? "untracked",
+			actionLease: leaseStatus?.lease,
 			message:
-				"WorkItem is already in progress; not launching a duplicate writer. Check the active-run widget or record a blocker before retrying.",
+				leaseStatus?.state === "orphaned"
+					? "WorkItem has an orphaned mutable action lease; recovery must reconcile or explicitly fence it before relaunch."
+					: "WorkItem is already in progress; not launching a duplicate writer. Check the active-run widget or record a blocker before retrying.",
 		};
 	}
 	const debug = state.readyExecutable.find(isDebugIssue);
@@ -7692,6 +7725,59 @@ function directRunIdentity(direct, spawned) {
 	};
 }
 
+function directSemanticRole(agent) {
+	return String(agent ?? "").replace(/^work-/, "");
+}
+
+function acquireDirectActionLease(cwd, state, direct, runtime = {}) {
+	let shadowAssurance;
+	try {
+		shadowAssurance = classifyShadowAssurance(
+			readWorkItem(cwd, state.selectedWorkItem?.id),
+		);
+	} catch {
+		// Missing assurance input preserves the one-model normal compatibility floor.
+	}
+	return acquireWorkActionLease(cwd, {
+		workflowRunId:
+			runtime.workflowRunId ??
+			currentCommandWorkflow()?.workflowRunId ??
+			telemetryId("direct"),
+		roadmapId: state.epic?.id,
+		workItemId: state.selectedWorkItem?.id,
+		action: state.action,
+		semanticRole: directSemanticRole(direct.agent),
+		requestedAssurance:
+			shadowAssurance?.requestedAssurance ??
+			shadowAssurance?.suggestedAssurance ??
+			"normal",
+		mode: runtime.mode ?? currentCommandWorkflow()?.mode,
+		session: runtime.session ?? null,
+		activity: runtime.activity ?? workflowActivityMarker(),
+		agent: direct.agent,
+	});
+}
+
+function acknowledgeDirectActionLease(cwd, lease, direct, spawned) {
+	const identity = directRunIdentity(direct, spawned);
+	const acknowledged = acknowledgeWorkActionLease(cwd, lease.leaseId, {
+		...identity,
+		ambiguous: Boolean(spawned.ambiguous),
+	});
+	recordPendingDirectRun(cwd, {
+		workflowRunId: lease.workflowRunId,
+		activity: lease.activity,
+		mode: lease.mode,
+		action: lease.action,
+		agent: direct.agent,
+		epicId: lease.roadmapId,
+		workItemId: lease.workItemId,
+		...identity,
+	});
+	return acknowledged;
+}
+
+// Compatibility telemetry hook for callers that only know the legacy pending-run shape.
 function recordSpawnedDirectRun(cwd, state, direct, spawned) {
 	const identity = directRunIdentity(direct, spawned);
 	return recordPendingDirectRun(cwd, {
@@ -7721,6 +7807,242 @@ function markDirectHandoffStarted(cwd, state) {
 	} catch {
 		return state;
 	}
+}
+
+const actionLeaseWatchers = new Map();
+
+function watchDirectActionLease(cwd, leaseId, runtime) {
+	if (actionLeaseWatchers.has(leaseId)) return;
+	const timer = setInterval(() => {
+		void driveWorkActionLeases(cwd, runtime)
+			.then(() => {
+				const current = currentWorkActionLeases(cwd).find(
+					(lease) => lease.leaseId === leaseId,
+				);
+				if (
+					!current ||
+					!["queued", "claimed", "acknowledged", "ambiguous", "live"].includes(
+						current.state,
+					)
+				) {
+					clearInterval(timer);
+					actionLeaseWatchers.delete(leaseId);
+				}
+			})
+			.catch(() => {
+				// Startup/input recovery will retry a malformed or temporarily unavailable provider artifact.
+			});
+	}, 1_000);
+	timer.unref?.();
+	actionLeaseWatchers.set(leaseId, timer);
+}
+
+export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
+	let lease;
+	try {
+		lease = acquireDirectActionLease(cwd, state, direct, runtime);
+	} catch (error) {
+		return {
+			state,
+			spawned: { ok: false, message: error.message },
+		};
+	}
+	const claimedState = markDirectHandoffStarted(cwd, state);
+	if (
+		state.selectedWorkItem?.status === "open" &&
+		!claimedState.handoffClaimed
+	) {
+		fenceWorkActionLease(cwd, lease.leaseId, "claim-rejected");
+		return {
+			state,
+			lease,
+			spawned: { ok: false, message: "WorkItem claim was rejected" },
+		};
+	}
+	const spawned = await spawnSubagentRpc(pi, direct.params);
+	if (spawned.ok || spawned.ambiguous) {
+		acknowledgeDirectActionLease(cwd, lease, direct, spawned);
+		watchDirectActionLease(cwd, lease.leaseId, { ...runtime, pi });
+		return { state: claimedState, spawned, lease };
+	}
+	let retryableState = claimedState;
+	try {
+		if (claimedState.handoffClaimed) {
+			const reopened = updateWorkItemNative(cwd, state.selectedWorkItem.id, {
+				status: "open",
+			});
+			retryableState = {
+				...state,
+				selectedWorkItem: issueSummary(reopened),
+				handoffClaimed: false,
+			};
+		}
+	} finally {
+		fenceWorkActionLease(cwd, lease.leaseId, "launch-rejected");
+	}
+	return { state: retryableState, spawned, lease };
+}
+
+function directTerminalResult(status) {
+	const details = Array.isArray(status?.steps)
+		? status.steps.map(summarizeSubagentResult)
+		: [];
+	const state = directStatusState(status);
+	const ok = state
+		? DIRECT_SUCCESS_STATES.has(state)
+		: details.length > 0 &&
+			details.every((item) =>
+				DIRECT_SUCCESS_STATES.has(String(item.status).toLowerCase()),
+			);
+	return { ok, state, details };
+}
+
+export async function driveWorkActionLeases(cwd, runtime = {}) {
+	reconcileWorkActionLeaseLiveness(cwd, runtime);
+	const results = [];
+	for (const lease of currentWorkActionLeases(cwd)) {
+		if (
+			!["queued", "claimed", "acknowledged", "ambiguous", "live"].includes(
+				lease.state,
+			)
+		)
+			continue;
+		const asyncDir = lease.launchIdentity?.asyncDir;
+		const statusFile = asyncDir ? join(asyncDir, "status.json") : "";
+		if (!statusFile || !existsSync(statusFile)) continue;
+		let status;
+		try {
+			status = JSON.parse(readFileSync(statusFile, "utf8"));
+		} catch {
+			continue;
+		}
+		if (!directStatusComplete(status)) continue;
+		const terminal = directTerminalResult(status);
+		const settled = settleWorkActionLease(cwd, lease.leaseId, {
+			ok: terminal.ok,
+			reason: terminal.ok ? undefined : terminal.state || "specialist-failed",
+		});
+		if (!settled.ok) {
+			recordWorkTelemetry(cwd, {
+				id: `direct-agent-${lease.workflowRunId}`,
+				type: "agent",
+				workflowRunId: lease.workflowRunId,
+				activity: lease.activity,
+				mode: lease.mode ?? runtime.mode,
+				action: lease.action,
+				role: lease.semanticRole,
+				epicId: lease.roadmapId,
+				workItemId: lease.workItemId,
+				ok: false,
+				handoff: { queued: false, started: true, role: lease.agent },
+				tools: [
+					{
+						name: "subagent",
+						runId: lease.launchIdentity?.runId,
+						subagentDetails: terminal.details,
+					},
+				],
+				reason: settled.reason,
+			});
+			completeWorkflowOnce(cwd, {
+				workflowRunId: lease.workflowRunId,
+				activity: lease.activity,
+				outcome: "failed",
+				action: lease.action,
+				epicId: lease.roadmapId,
+				workItemId: lease.workItemId,
+				reason: settled.reason,
+			});
+			runtime.notify?.({
+				ok: false,
+				action: "action-lease-fenced",
+				message: `Stopped after ${lease.semanticRole} settlement was fenced: ${settled.reason}.`,
+				reason: settled.reason,
+			});
+			results.push({
+				leaseId: lease.leaseId,
+				state: "fenced",
+				reason: settled.reason,
+			});
+			continue;
+		}
+		recordWorkTelemetry(cwd, {
+			id: `direct-agent-${lease.workflowRunId}`,
+			type: "agent",
+			workflowRunId: lease.workflowRunId,
+			activity: lease.activity,
+			mode: lease.mode ?? runtime.mode,
+			action: lease.action,
+			role: lease.semanticRole,
+			epicId: lease.roadmapId,
+			workItemId: lease.workItemId,
+			ok: true,
+			handoff: { queued: false, started: true, role: lease.agent },
+			tools: [
+				{
+					name: "subagent",
+					runId: lease.launchIdentity?.runId,
+					subagentDetails: terminal.details,
+				},
+			],
+		});
+		completeWorkflowOnce(
+			cwd,
+			{
+				workflowRunId: lease.workflowRunId,
+				activity: lease.activity,
+				outcome: "completed",
+				action: lease.action,
+				epicId: lease.roadmapId,
+				workItemId: lease.workItemId,
+			},
+			runtime,
+		);
+		const currentSession = runtime.currentSession?.() ?? runtime.session;
+		const goalStatus = runtime.goalStatus?.() ?? activeWorkGoal?.status;
+		if (
+			(currentSession && lease.session && currentSession !== lease.session) ||
+			runtime.cancelled ||
+			runtime.interrupted ||
+			["stopping", "waiting_decision", "needs_human"].includes(goalStatus) ||
+			runtime.verifierTriagePending ||
+			pendingDirtyRecoveries.size > 0 ||
+			prefetchVerifierStatus(cwd) === "completed-awaiting-triage"
+		) {
+			results.push({
+				leaseId: lease.leaseId,
+				state: "settled",
+				action: "fenced",
+			});
+			continue;
+		}
+		const next = buildWorkResumeState(cwd, lease.roadmapId, {
+			ownerSession: currentSession,
+		});
+		const direct = directRoleHandoffParams(next, cwd);
+		if (!direct || next.action === "finish-ready") {
+			runtime.notify?.(next);
+			results.push({
+				leaseId: lease.leaseId,
+				state: "settled",
+				action: next.action,
+			});
+			continue;
+		}
+		const launched = await launchDirectAction(cwd, next, direct, runtime.pi, {
+			...runtime,
+			session: currentSession,
+			workflowRunId: `${lease.workflowRunId}-g${lease.generation + 1}`,
+		});
+		results.push({
+			leaseId: lease.leaseId,
+			state: "settled",
+			action: next.action,
+			launched: Boolean(launched.spawned.ok || launched.spawned.ambiguous),
+		});
+		break;
+	}
+	return results;
 }
 
 export async function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
@@ -17139,7 +17461,10 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 	});
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-resume");
 	const direct =
-		state.ok && ctx.mode === "rpc"
+		state.ok &&
+		!["print", "json"].includes(ctx.mode) &&
+		pi?.events?.on &&
+		pi?.events?.emit
 			? directRoleHandoffParams(state, ctx.cwd, selectionNote)
 			: null;
 	notify(
@@ -17157,27 +17482,33 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 	)
 		return { ...state, dirtyRecoveryQueued: true };
 	if (direct) {
-		const spawned = await spawnSubagentRpc(pi, direct.params);
-		if (spawned.ok) {
-			recordSpawnedDirectRun(ctx.cwd, state, direct, spawned);
+		const launched = await launchDirectAction(ctx.cwd, state, direct, pi, {
+			mode: ctx.mode,
+			session: ctx.sessionManager?.getSessionId?.(),
+			currentSession: () => ctx.sessionManager?.getSessionId?.(),
+			goalStatus: () => activeWorkGoal?.status,
+			notify: (next) =>
+				notify(ctx, renderWorkResumeText(next), next.ok ? "info" : "warning"),
+		});
+		if (launched.spawned.ok)
 			return {
-				...markDirectHandoffStarted(ctx.cwd, state),
+				...launched.state,
 				directHandoff: direct,
+				actionLease: launched.lease,
 			};
-		}
-		if (spawned.ambiguous)
-			recordSpawnedDirectRun(ctx.cwd, state, direct, spawned);
 		notify(
 			ctx,
-			spawned.ambiguous
+			launched.spawned.ambiguous
 				? `Direct ${direct.agent} acknowledgement timed out; not launching a duplicate. Check the active-run widget before retrying.`
-				: `Required ${direct.agent} could not start (${spawned.message}); stopped without inline fallback.`,
+				: `Required ${direct.agent} could not start (${launched.spawned.message}); stopped without inline fallback.`,
 			"warning",
 		);
 		return {
-			...state,
-			handoffPending: Boolean(spawned.ambiguous),
-			handoffFailed: !spawned.ambiguous,
+			...launched.state,
+			actionLease: launched.lease,
+			handoffPending: Boolean(launched.spawned.ambiguous),
+			handoffFailed: !launched.spawned.ambiguous,
+			handoffError: launched.spawned.message,
 		};
 	}
 	if (state.handoffPrompt)
@@ -17326,7 +17657,11 @@ async function handleWorkflowAction(
 	}
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-action");
 	const direct =
-		state.ok && ctx.mode === "rpc" && !state.controlSessionHandoff
+		state.ok &&
+		!["print", "json"].includes(ctx.mode) &&
+		!state.controlSessionHandoff &&
+		pi?.events?.on &&
+		pi?.events?.emit
 			? directRoleHandoffParams(state, ctx.cwd, selectionNote)
 			: null;
 	notify(
@@ -17344,29 +17679,42 @@ async function handleWorkflowAction(
 	)
 		return { ...state, dirtyRecoveryQueued: true };
 	if (direct) {
-		const spawned = await spawnSubagentRpc(pi, direct.params);
-		if (spawned.ok) {
-			recordSpawnedDirectRun(ctx.cwd, state, direct, spawned);
+		const launched = await launchDirectAction(ctx.cwd, state, direct, pi, {
+			mode: ctx.mode,
+			session: ctx.sessionManager?.getSessionId?.(),
+			currentSession: () => ctx.sessionManager?.getSessionId?.(),
+			goalStatus: () => activeWorkGoal?.status,
+			notify: (next) =>
+				notify(ctx, renderWorkResumeText(next), next.ok ? "info" : "warning"),
+		});
+		if (launched.spawned.ok)
 			return {
-				...markDirectHandoffStarted(ctx.cwd, state),
+				...launched.state,
 				directHandoff: direct,
+				actionLease: launched.lease,
 			};
-		}
-		if (spawned.ambiguous) {
-			recordSpawnedDirectRun(ctx.cwd, state, direct, spawned);
+		if (launched.spawned.ambiguous) {
 			notify(
 				ctx,
 				`Direct ${direct.agent} handoff acknowledgement timed out. Not launching a fallback because the role may already be running; retry /work-resume only after checking the active-run widget.`,
 				"warning",
 			);
-			return { ...state, handoffPending: true };
+			return {
+				...launched.state,
+				actionLease: launched.lease,
+				handoffPending: true,
+			};
 		}
 		notify(
 			ctx,
-			`Required ${direct.agent} could not start before acceptance (${spawned.message}); stopped without inline fallback.`,
+			`Required ${direct.agent} could not start before acceptance (${launched.spawned.message}); stopped without inline fallback.`,
 			"warning",
 		);
-		return { ...state, handoffFailed: true };
+		return {
+			...launched.state,
+			actionLease: launched.lease,
+			handoffFailed: true,
+		};
 	}
 	if (state.handoffPrompt)
 		await sendWorkflowFollowUp(
@@ -17388,8 +17736,21 @@ async function handleWorkStatusCommand(args, ctx, pi) {
 			readOnly = { mode: "unavailable", lanes: [] };
 		}
 		reconcileBackgroundVerifierRuns(ctx.cwd, pi);
+		const activeLease = currentWorkActionLeases(ctx.cwd).find((lease) =>
+			[
+				"queued",
+				"claimed",
+				"acknowledged",
+				"ambiguous",
+				"live",
+				"orphaned",
+			].includes(lease.state),
+		);
+		const leaseStatus = activeLease
+			? `${activeLease.state === "orphaned" ? "orphaned" : "live"} ${activeLease.semanticRole} ${activeLease.workItemId} generation ${activeLease.generation}`
+			: "none";
 		const output = withRecommendedActionsText(
-			`${buildWorkStatus(ctx.cwd, args, readOnly)}\nVerifier review: ${backgroundVerifierRunStatus(ctx.cwd)}`,
+			`${buildWorkStatus(ctx.cwd, args, readOnly)}\nAction lease: ${leaseStatus}\nVerifier review: ${backgroundVerifierRunStatus(ctx.cwd)}`,
 		);
 		rememberRecommendedActions(
 			ctx.cwd,
@@ -19802,9 +20163,20 @@ export default function workModelsExtension(pi) {
 			pi,
 			mode: ctx.mode,
 			session: ctx.sessionManager?.getSessionId?.(),
+			currentSession: () => ctx.sessionManager?.getSessionId?.(),
+			goalStatus: () => activeWorkGoal?.status,
 		};
 		if (ctx.mode !== "print") {
 			reconcilePendingDirectRuns(ctx.cwd, runtime);
+			void driveWorkActionLeases(ctx.cwd, {
+				...runtime,
+				notify: (state) =>
+					notify(
+						ctx,
+						renderWorkResumeText(state),
+						state.ok ? "info" : "warning",
+					),
+			});
 			try {
 				reconcileSuccessorPrefetches(ctx.cwd);
 				reconcileReadOnlyLaneRuns(ctx.cwd);
@@ -19857,6 +20229,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
+		for (const timer of actionLeaseWatchers.values()) clearInterval(timer);
+		actionLeaseWatchers.clear();
 		finishHelperStarts.clear();
 		pendingDirtyRecoveries.clear();
 		pendingInitiativeConversions.clear();
@@ -19892,6 +20266,15 @@ export default function workModelsExtension(pi) {
 			pi,
 			mode: ctx.mode,
 			session: ctx.sessionManager?.getSessionId?.(),
+		});
+		await driveWorkActionLeases(ctx.cwd, {
+			pi,
+			mode: ctx.mode,
+			session: ctx.sessionManager?.getSessionId?.(),
+			currentSession: () => ctx.sessionManager?.getSessionId?.(),
+			goalStatus: () => activeWorkGoal?.status,
+			notify: (state) =>
+				notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning"),
 		});
 		try {
 			reconcileSuccessorPrefetches(ctx.cwd);
@@ -20310,6 +20693,15 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
+		await driveWorkActionLeases(ctx.cwd, {
+			pi,
+			mode: ctx.mode,
+			session: ctx.sessionManager?.getSessionId?.(),
+			currentSession: () => ctx.sessionManager?.getSessionId?.(),
+			goalStatus: () => activeWorkGoal?.status,
+			notify: (state) =>
+				notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning"),
+		});
 		if (pendingSettledAgentEnd) {
 			const event = pendingSettledAgentEnd;
 			pendingSettledAgentEnd = null;

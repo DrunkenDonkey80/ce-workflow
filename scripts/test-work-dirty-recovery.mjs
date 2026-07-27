@@ -233,14 +233,12 @@ try {
 		"approved cleanup ends the analysis turn",
 	);
 	assert.equal(
-		rpcRequest,
-		undefined,
-		"TUI continuation does not launch a worker through RPC",
+		rpcRequest?.params?.agent,
+		"work-worker",
+		"TUI continuation launches the leased worker directly",
 	);
-	assert.equal(sent.length, 2, "TUI continuation queues exactly one follow-up");
-	assert.equal(sent.at(-1)?.source, "pi");
-	assert.match(sent.at(-1)?.message ?? "", /Implementation scope: small/);
-	assert.equal(sent.at(-1)?.options?.deliverAs, "followUp");
+	assert.equal(sent.length, 1, "TUI continuation adds no parent assistant turn");
+	assert.match(rpcRequest?.params?.task ?? "", /Implementation scope: small/);
 	assert.doesNotMatch(
 		notices.at(-1)?.message ?? "",
 		/Dirty files must be resolved/,

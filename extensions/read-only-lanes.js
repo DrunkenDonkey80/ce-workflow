@@ -209,6 +209,14 @@ function repositoryLockPath(cwd) {
 		"repository-mutation.lock",
 	);
 }
+function repositoryAdmissionLockPath(cwd) {
+	return path.join(
+		cwd,
+		".ce-workflow",
+		"work-runs",
+		"repository-admission.lock",
+	);
+}
 function ownerDead(
 	file,
 	processExists = (pid) => {
@@ -259,6 +267,38 @@ function acquireFileLock(file, category) {
 		},
 	};
 }
+export function acquireRepositoryAdmissionLock(cwd = process.cwd()) {
+	return acquireFileLock(
+		repositoryAdmissionLockPath(cwd),
+		"Another repository admission is active",
+	);
+}
+
+function mutableActionLeaseOccupied(cwd) {
+	const file = path.join(
+		cwd,
+		".ce-workflow",
+		"work-runs",
+		"direct",
+		"pending-direct.jsonl",
+	);
+	if (!existsSync(file)) return false;
+	const leases = new Map();
+	for (const line of readFileSync(file, "utf8").split(/\r?\n/).filter(Boolean)) {
+		try {
+			const event = JSON.parse(line);
+			if (event.version !== 2 || !event.leaseId) continue;
+			if (event.type === "lease") leases.set(event.leaseId, event.state);
+			else if (leases.has(event.leaseId)) leases.set(event.leaseId, event.state);
+		} catch {
+			return true;
+		}
+	}
+	return [...leases.values()].some((state) =>
+		["queued", "claimed", "acknowledged", "ambiguous", "live", "orphaned"].includes(state),
+	);
+}
+
 function emptyStore(now) {
 	const createdAt = timestamp(now);
 	return {
@@ -510,23 +550,28 @@ export function repositoryMutationLocked(cwd = process.cwd()) {
 	return true;
 }
 export function acquireRepositoryMutationLock(cwd = process.cwd()) {
+	const admission = acquireRepositoryAdmissionLock(cwd);
 	try {
-		reconcileReadOnlyLanes(cwd);
-	} catch {
-		// A busy or corrupt lane store remains authoritative in the scan below.
-	}
-	const active = Object.values(loadLaneStore(cwd).lanes).filter(
-		(lane) => lane.state === "running",
-	);
-	if (active.length)
-		fail(
-			"locked",
-			`Read-only lanes are using the repository: ${active.map((lane) => lane.id).join(", ")}`,
+		try {
+			reconcileReadOnlyLanes(cwd);
+		} catch {
+			// A busy or corrupt lane store remains authoritative in the scan below.
+		}
+		const active = Object.values(loadLaneStore(cwd).lanes).filter(
+			(lane) => lane.state === "running",
 		);
-	return acquireFileLock(
-		repositoryLockPath(cwd),
-		"Another job owns MUTATE_REPO(repository)",
-	);
+		if (active.length)
+			fail(
+				"locked",
+				`Read-only lanes are using the repository: ${active.map((lane) => lane.id).join(", ")}`,
+			);
+		return acquireFileLock(
+			repositoryLockPath(cwd),
+			"Another job owns MUTATE_REPO(repository)",
+		);
+	} finally {
+		admission.release();
+	}
 }
 
 export function reconcileReadOnlyLanes(cwd = process.cwd(), options = {}) {
@@ -659,19 +704,30 @@ export async function runReadOnlyLaneBatch(
 				void (async () => {
 					const started = Date.now();
 					try {
-						if (!laneCanLaunch(loadLaneStore(cwd).lanes[lane.id]))
-							fail("acknowledgement", `Lane launch is ambiguous: ${lane.id}`);
-						if (repositoryMutationLocked(cwd) && options.mutationOwner !== true)
-							fail("locked", "MUTATE_REPO(repository) is active");
-						const before = captureRepositoryFingerprint(cwd);
-						transitionLane(cwd, lane.id, "running", {
-							launch: {
-								pid: options.pid ?? process.pid,
-								host: options.host ?? os.hostname(),
-								runId: null,
-								fingerprint: before,
-							},
-						});
+						let before;
+						const primaryCheckout = lane.resourceKeys.includes("repo:read");
+						const admission = primaryCheckout
+							? acquireRepositoryAdmissionLock(cwd)
+							: null;
+						try {
+							if (!laneCanLaunch(loadLaneStore(cwd).lanes[lane.id]))
+								fail("acknowledgement", `Lane launch is ambiguous: ${lane.id}`);
+							if (repositoryMutationLocked(cwd) && options.mutationOwner !== true)
+								fail("locked", "MUTATE_REPO(repository) is active");
+							if (primaryCheckout && mutableActionLeaseOccupied(cwd))
+								fail("locked", "A mutable action lease occupies the primary checkout");
+							before = captureRepositoryFingerprint(cwd);
+							transitionLane(cwd, lane.id, "running", {
+								launch: {
+									pid: options.pid ?? process.pid,
+									host: options.host ?? os.hostname(),
+									runId: null,
+									fingerprint: before,
+								},
+							});
+						} finally {
+							admission?.release();
+						}
 						const output = (await runner(lane)) ?? {};
 						durations[index] = Math.max(
 							0,

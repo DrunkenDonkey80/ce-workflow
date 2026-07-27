@@ -675,10 +675,10 @@ try {
 			"extension command records worker handoff role",
 		);
 		assert(
-			compactCalls === 0 && sent.length === 1 && rpcRequest === undefined,
-			"TUI worker handoff emits one visible Pi turn without compaction or RPC",
+			compactCalls === 0 && sent.length === 0 && rpcRequest?.params?.agent === "work-worker",
+			"TUI worker handoff uses the durable direct path without compaction or a parent turn",
 		);
-		const routedPrompt = sent[0].message;
+		const routedPrompt = rpcRequest.params.task;
 		assert(
 			routedPrompt.includes("Implementation scope: small"),
 			"small handoff keeps the configured worker's bounded instructions",
