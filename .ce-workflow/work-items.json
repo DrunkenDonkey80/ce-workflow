@@ -2656,13 +2656,15 @@
       "labels": [],
       "notes": [
         "Classification: work-2.31 atom A is locally-owned launch-baseline attestation; atom B is upstream-owned with insufficient mechanism evidence because the captured planner transcript writes only its runtime output artifact and invokes helper mutations, with no AGENTS.md write call.",
-        "Atom A classified already-fixed/local: commit 9894473 added planner launch baseline paths and a fail-BLOCKED final Git-status contract; node scripts/test-work-start-finish.mjs passes. Atom B classified upstream-owned and routed durably to work-2.46."
+        "Atom A classified already-fixed/local: commit 9894473 added planner launch baseline paths and a fail-BLOCKED final Git-status contract; node scripts/test-work-start-finish.mjs passes. Atom B classified upstream-owned and routed durably to work-2.46.",
+        "Routing/classification commit: 004ce44. Verification: node scripts/test-work-start-finish.mjs PASS. Residual: work-2.46.",
+        "Closed after verified local baseline coverage and durable upstream isolation routing to work-2.46 (commit 004ce44)."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Enforce and audit planner repository write boundaries",
       "type": "bug",
-      "updatedAt": "2026-07-26T05:31:32.514Z"
+      "updatedAt": "2026-07-27T16:40:03.760Z"
     },
     "work-2.39": {
       "acceptance": "An installed pi-subagents runtime must launch an async exact role after goal continuation using authenticated parent provider resolution and expose an auth failure as terminal status without waiting for a no-activity alert.",
@@ -2681,13 +2683,15 @@
       "labels": [],
       "notes": [
         "Classification: both work-2.32 atoms are upstream-owned pi-subagents process/auth lifecycle behavior; ce-workflow already treats startup/auth failure as infrastructure evidence and direct terminal states as failed. Leave this canonical bug open pending continuation-specific runtime proof.",
-        "Both atoms classified upstream-owned and routed durably to work-2.47; current ce-workflow already classifies startup/auth failure as infrastructure evidence, but continuation-specific credential inheritance requires pi-subagents runtime proof."
+        "Both atoms classified upstream-owned and routed durably to work-2.47; current ce-workflow already classifies startup/auth failure as infrastructure evidence, but continuation-specific credential inheritance requires pi-subagents runtime proof.",
+        "Routing/classification commit: 004ce44. Verification: source ownership review confirms ce-workflow infrastructure classification and pi-subagents ownership. Residual: work-2.47.",
+        "Closed as snapshot coverage after durable upstream auth/continuation routing to work-2.47 (commit 004ce44); unresolved runtime work remains open there."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Track async child authentication across goal continuation",
       "type": "bug",
-      "updatedAt": "2026-07-26T05:31:32.915Z"
+      "updatedAt": "2026-07-27T16:40:04.068Z"
     },
     "work-2.4": {
       "createdAt": "2026-07-20T02:33:35.267Z",
@@ -2764,13 +2768,15 @@
         "self-improvement"
       ],
       "notes": [
-        "Single atom classified conflicting with current ownership: work-worker is intentionally permitted to claim and append implementation evidence through the exact helper while coded orchestration exclusively owns commit/close. Rejecting all worker helper mutations would break the current evidence contract; direct store edits remain forbidden. Verified by agents/work-worker.md and passing node scripts/test-work-start-finish.mjs."
+        "Single atom classified conflicting with current ownership: work-worker is intentionally permitted to claim and append implementation evidence through the exact helper while coded orchestration exclusively owns commit/close. Rejecting all worker helper mutations would break the current evidence contract; direct store edits remain forbidden. Verified by agents/work-worker.md and passing node scripts/test-work-start-finish.mjs.",
+        "Classification commit: 004ce44. Verification: node scripts/test-work-start-finish.mjs PASS and current work-worker contract inspected.",
+        "Closed as conflicting with the current deliberate helper-mediated worker evidence contract; coded orchestration retains commit/close ownership (commit 004ce44)."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The work-worker for work-9.8 appended native WorkItem notes even though its handoff explicitly said not to mutate WorkItems; coded",
       "type": "task",
-      "updatedAt": "2026-07-26T05:51:55.731Z"
+      "updatedAt": "2026-07-27T16:40:04.382Z"
     },
     "work-2.41": {
       "createdAt": "2026-07-26T06:44:00.093Z",
@@ -2922,13 +2928,15 @@
         "self-improvement"
       ],
       "notes": [
-        "Single recovery atom classified duplicate of canonical work-2.48 (related-distinct from closed work-2.8's older acceptance-metadata defect). Installed pi-subagents 0.37.0 source reproduces the generator/parser launchContractDigest schema mismatch."
+        "Single recovery atom classified duplicate of canonical work-2.48 (related-distinct from closed work-2.8's older acceptance-metadata defect). Installed pi-subagents 0.37.0 source reproduces the generator/parser launchContractDigest schema mismatch.",
+        "Canonical routing commit: 004ce44. Verification: deterministic installed-source check PASS reproduced pi-subagents 0.37.0 generator/parser mismatch. Canonical: work-2.48.",
+        "Closed as verified duplicate of upstream canonical work-2.48 after commit 004ce44."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A paused async work-fixer could not be resumed because pi-subagents rejected its own generated recovery descriptor with `unknown f",
       "type": "task",
-      "updatedAt": "2026-07-26T14:45:37.999Z"
+      "updatedAt": "2026-07-27T16:40:04.789Z"
     },
     "work-2.45": {
       "createdAt": "2026-07-27T05:06:39.328Z",
@@ -2967,13 +2975,15 @@
         "self-improvement"
       ],
       "notes": [
-        "Atom A classified already-fixed/local: direct role handoffs inject the absolute WORK_HELPER_SCRIPT and work-worker requires that exact path (commits 5899512/46ff9e0); node scripts/test-work-start-finish.mjs passes. Atom B is duplicate of canonical upstream work-2.48 and its pi-subagents 0.37.0 schema mismatch is reproduced."
+        "Atom A classified already-fixed/local: direct role handoffs inject the absolute WORK_HELPER_SCRIPT and work-worker requires that exact path (commits 5899512/46ff9e0); node scripts/test-work-start-finish.mjs passes. Atom B is duplicate of canonical upstream work-2.48 and its pi-subagents 0.37.0 schema mismatch is reproduced.",
+        "Canonical routing commit: 004ce44. Verification: node scripts/test-work-start-finish.mjs PASS for absolute helper handoff; deterministic installed-source check PASS reproduced recovery schema mismatch. Canonical residual: work-2.48.",
+        "Closed after already-fixed helper-path coverage and verified duplicate routing of recovery defect to work-2.48 (commit 004ce44)."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A work-worker stopped because the coded handoff omitted the required absolute work-helper.mjs path. The documented async resume th",
       "type": "task",
-      "updatedAt": "2026-07-27T05:06:39.328Z"
+      "updatedAt": "2026-07-27T16:40:05.077Z"
     },
     "work-2.46": {
       "acceptance": "Close only after an installed pi-subagents runtime proves a planner cannot mutate undeclared repository source, or reports authoritative mutation attribution that identifies the writer; ce-workflow's launch-baseline/final-status contract remains covered locally.",
@@ -4247,7 +4257,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T16:39:44.911Z"
+    "updatedAt": "2026-07-27T16:40:05.078Z"
   },
   "schemaVersion": 1
 }
