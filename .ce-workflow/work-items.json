@@ -2929,6 +2929,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: A work-worker stopped because the coded handoff omitted the required absolute work-helper.mjs path. The documented async resume then failed with an invalid recovery descriptor error for field launchContractDigest.\nExpected: Coded work-worker handoffs should include the resolved absolute helper path, and recovery descriptors emitted by the current runtime should be accepted by resume.\nImpact: Implementation never started and a replacement worker launch is required despite no product failure.\nSuggested improvement: Inject the helper path into worker contracts and maintain recovery descriptor schema compatibility.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Fix worker helper paths and recovery descriptor compatibility"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/cfaff58d-36d0-4fd5-beb2-8f779175973b",
@@ -3157,7 +3161,8 @@
         "wo:misc"
       ],
       "notes": [
-        "All child work and the project-owner TUI evidence gate are complete; workflow parallelism shipped on feat/workflow-parallelism with package verification passing."
+        "All child work and the project-owner TUI evidence gate are complete; workflow parallelism shipped on feat/workflow-parallelism with package verification passing.",
+        "wo:continuation-plan 2026-07-27: stages 4-6 are durable as work-3.28 advisory Sentinel reuse -> work-3.29 resolved review/autonomous-finalization enforcement -> work-3.30 cohort evaluation and deletion of ineffective optional paths. All are wo:execution-agent tracer slices with owned focused verification; work-3.28 is the only intended ready continuation."
       ],
       "status": "open",
       "title": "Misc",
@@ -3562,12 +3567,14 @@
       "evidence": [],
       "id": "work-3.21",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "wo:decision B — Risk/breadth-based review by default, configurable Review All.\nOwner decision:\n- Keep deterministic review admission for large, sensitive, security/concurrency, and otherwise high-risk production diffs.\n- Expose a configurable quality-policy option that requires independent review for every production diff.\n- Preserve existing installations on risk-based behavior; Review All is opt-in unless a project/global setting selects it.\n- Tests/docs-only and mechanical changes remain eligible for existing low-cost handling unless they affect production behavior or a configured Review All policy explicitly includes them.\n- Review evidence remains durable and required before coded finish whenever the selected policy admits review."
+      ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Decide default independent-review policy",
       "type": "decision",
-      "updatedAt": "2026-07-27T03:10:58.471Z"
+      "updatedAt": "2026-07-27T06:20:11.568Z"
     },
     "work-3.22": {
       "acceptance": "The owner records A, B, or C; defines mode-specific behavior for TUI/RPC/autonomous entry points; states the visible stop/cancel semantics; and specifies whether next-item continuation is allowed after commit/close. Until resolved, interactive progression remains finish-ready and stage 2 must not auto-finalize it.",
@@ -3582,12 +3589,14 @@
       "evidence": [],
       "id": "work-3.22",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "wo:decision A — Autonomous goals auto-finalize; normal interactive flows stop at finish-ready.\nOwner decision:\n- Autonomous work-goal mode may run coded verification/review gates, commit, close, push according to repository policy, and continue to the next ready item without another parent orchestration turn.\n- Normal TUI and direct RPC workflows stop visibly at `finish-ready` and require an explicit user finish action.\n- Stop-safely, cancellation, pending human decisions, dirty recovery, verifier triage, failed gates, ambiguous launches, and parked/blocker state always fence automatic finalization.\n- After successful autonomous finalization, next-item continuation is allowed only through a fresh deterministic resume-state rebuild.\n- Existing interactive behavior is the migration default."
+      ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Decide coded automatic-finalization policy",
       "type": "decision",
-      "updatedAt": "2026-07-27T03:11:07.037Z"
+      "updatedAt": "2026-07-27T06:21:09.404Z"
     },
     "work-3.23": {
       "acceptance": "The owner records A or B and defines availability detection, which roles permit fallback, required configuration, achieved-assurance telemetry, operator visibility, and the terminal pause state. The policy must never silently lower a mandatory gate. This decision is durable before Lead enforcement starts.",
@@ -3624,12 +3633,14 @@
       "evidence": [],
       "id": "work-3.24",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "wo:decision B — Sentinel/background analysis remains advisory and optional by default.\nOwner decision (captured with work-3.23):\n- High-assurance foreground gates may be satisfied by Lead plus the configured independent Reviewer policy; Sentinel evidence is not mandatory by default.\n- Sentinel and background verifier jobs use immutable read-only lane/verifier artifacts, remain opt-in/configurable, and individual failures are recorded without halting foreground work.\n- If a future explicit project/global quality policy makes a named Sentinel artifact mandatory, that policy must define freshness, matching WorkItem/HEAD/generation, fallback, and visible pause behavior; no silent downgrade.\n- Never watch mutable live checkout state and never create a third runtime."
+      ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Decide high-assurance Sentinel gate",
       "type": "decision",
-      "updatedAt": "2026-07-27T03:11:25.174Z"
+      "updatedAt": "2026-07-27T06:21:24.502Z"
     },
     "work-3.25": {
       "acceptance": "A deterministic fixture that fails on the current event shape proves: existing telemetry version and evaluation treatmentId semantics are unchanged; new telemetrySchemaVersion plus package version, clean Git revision or dirty workflow-source hash, routing-policy revision, assurance-classifier revision, cached canonical non-secret behavior fingerprint, and ctx.mode are emitted. The same source/settings/prompt inputs yield the same fingerprint and behavior-affecting changes yield a different one. Canonical wo:assurance v1 may raise the deterministic floor; malformed/missing input and high-confidence hard signals produce explicit telemetry reasons/warnings, never a WorkItem-note mutation, LLM classification call, route change, or silent hard-signal waiver. Legacy events remain a separate valid cohort. One-model/provider-neutral configuration and existing Plan/Work/Debug/Review overrides/defaults remain compatible. Focused verification: node scripts/test-work-telemetry.mjs && node scripts/test-work-assurance-routing.mjs && node scripts/test-workflow-evaluation-contract.mjs. Final gate: npm run verify:quiet.",
@@ -3734,6 +3745,62 @@
       "type": "task",
       "updatedAt": "2026-07-27T06:10:26.411Z"
     },
+    "work-3.28": {
+      "acceptance": "A deterministic fixture that fails before this change proves: the default launches no Sentinel; opt-in launches at most one active-slice analysis through the existing bounded per-repository read-only lane substrate against an immutable base. Its versioned artifact contains exactly workItemId, baseHead, workItemHash, planHash, generation, workflowBuild, expiresAt, invariants, risks, and focusedChecks with schema version; optional frozen-diff analysis uses the existing background-verifier checkpoint and report contract. Identical scope and generation coalesce to one launch; changed generation, HEAD, WorkItem or plan hash, expiry, cancellation, or consumption-frontier mismatch records a stable stale/discard reason and cannot promote or rerun automatically. Sentinel failure, absence, or staleness is visible telemetry/status but never blocks foreground review, finish, or one-model use. Existing lane concurrency, serial mode, mutation fences, verifier triage, and post-commit verifier behavior remain unchanged; no mutable live-checkout watcher, global scheduler, third runtime, or third durable store is added. Focused verification: node scripts/test-work-sentinel-reuse.mjs && node scripts/test-work-parallel-lanes.mjs && node scripts/test-background-verifiers.mjs. Final gate: npm run verify:quiet.",
+      "createdAt": "2026-07-27T06:23:17.138Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Deliver one opt-in active-slice Sentinel tracer without a new runtime or ledger. Reuse immutable read-only lane envelopes for pre-implementation invariants, risks, and focused checks, and reuse background verifiers only for optional frozen-diff analysis. Keep Sentinel advisory and non-blocking by default.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Run bounded advisory Sentinel reuse"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.28",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Continuation stage 4; covers the Sentinel reuse experiment from the authoritative planning brief and owner decision work-3.24. Reuse extensions/read-only-lanes.js and extensions/background-verifiers.js; default remains advisory and opt-in.",
+        "Files changed: extensions/work-sentinel.js; scripts/test-work-sentinel-reuse.mjs.\nVerification: node scripts/test-work-sentinel-reuse.mjs && node scripts/test-work-parallel-lanes.mjs && node scripts/test-background-verifiers.mjs — PASS; npm run verify:quiet — PASS.\nResidual risks: Sentinel remains deliberately opt-in/advisory; callers must supply immutable WorkItem/plan hashes and a bounded read-only analysis adapter. Frozen-diff work delegates unchanged background-verifier checkpoints/reports.",
+        "wo:review-scope [\"extensions/work-sentinel.js\",\"scripts/test-work-sentinel-reuse.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-sentinel.js:195 - replace Number(expected.now ?? Date.now()) with an ISO-tolerant parse (const at = typeof expected.now === \\\"number\\\" ? expected.now : Date.parse(expected.now ?? \\\"\\\"); pass Number.isFinite(at) ? at : Date.now()); Number(ISO string) is NaN so the expiry test at line 94 never fires and an expired artifact promotes as ready (probe: expiresAt 2020 + ISO now => ready/promoted)\",\"scripts/test-work-sentinel-reuse.mjs:120 - change the expiry stale case now from Date.parse(\\\"2100-01-01T00:00:00.000Z\\\") to the ISO string \\\"2100-01-01T00:00:00.000Z\\\" so it uses the same now shape as line 41 and fails on the line 195 fail-open\",\"extensions/work-sentinel.js:202 - after promoteLane add: if (promoted.state !== \\\"promoted\\\") return { status: \\\"stale\\\", reason: promoted.discardReason, lane: promoted }; today a lane promoteLane discarded as stale-generation is still returned as status ready with its artifact (probe: consuming completed gen-1 lane while gen-2 exists => ready/discarded)\"]}",
+        "wo:fix PASS {\"findings\":[\"ISO/numeric expected.now expiry parsing is fail-closed with finite wall-clock fallback\",\"expiry fixture now uses the real ISO-string shape\",\"superseded promotion returns stale-generation without an artifact and is covered\",\"enabled frozen-diff fixture proves checkpoint passthrough and sentinel-frozen-diff origin override\"],\"files\":[\"extensions/work-sentinel.js\",\"scripts/test-work-sentinel-reuse.mjs\"],\"verification\":[\"node scripts/test-work-sentinel-reuse.mjs && node scripts/test-work-parallel-lanes.mjs && node scripts/test-background-verifiers.mjs — PASS\",\"npm run verify:quiet — PASS\"]}",
+        "wo:review PASS re-review: ISO/numeric/fallback expiry parse fail-closed (work-sentinel.js consumeSentinelArtifact), expiry fixture uses ISO now shape, superseded promotion returns stale-generation discarded with no artifact, enabled frozen-diff fixture asserts checkpoint passthrough + sentinel-frozen-diff origin; node scripts/test-work-sentinel-reuse.mjs PASS; advisory/no-third-runtime semantics preserved",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-sentinel-reuse.mjs && node scripts/test-work-parallel-lanes.mjs && node scripts/test-background-verifiers.mjs\nOutput: ok - bounded advisory Sentinel reuse fixtures\nread-only parallel lane tests passed\nbackground verifier domain tests passed"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Run bounded advisory Sentinel reuse",
+      "type": "task",
+      "updatedAt": "2026-07-27T14:02:46.941Z"
+    },
+    "work-3.29": {
+      "acceptance": "Deterministic TUI, RPC, autonomous, and direct-helper fixtures that fail before this change prove: existing settings migrate to risk-based review; a global or project Review All selection requires valid independent-review evidence for every production diff even when narrow, while risk-based mode preserves the current sensitive, broad, UI, hardware, and mechanical handling and does not re-review already accepted evidence. Normal TUI and direct RPC routes stop visibly at finish-ready and cannot auto-commit or close. An active autonomous goal with fresh action-lease generation and all configured verification, review, repository, and push gates satisfied invokes the existing coded finish path exactly once, then rebuilds deterministic resume state before launching at most the next ready action. Stop-safely, cancellation, interruption, session change, pending decision, dirty recovery, verifier triage, parked or ambiguous lease, failed gate, unavailable required candidate, and advisory Sentinel failure or staleness all prevent auto-finalization or continuation without silently lowering assurance. One-model Main and configured Backup behavior remains compatible; Sentinel remains advisory and optional. Focused verification: node scripts/test-work-quality-policy.mjs && node scripts/test-work-action-leases.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-work-settings.mjs. Final gate: npm run verify:quiet.",
+      "createdAt": "2026-07-27T06:23:31.187Z",
+      "dependencies": [
+        "work-3.28"
+      ],
+      "dependencyEdges": [],
+      "description": "Make the resolved quality policy executable across resume routing and the coded finish boundary: preserve risk-based review by default, offer Review All for production diffs, and allow coded commit, close, and next-item continuation only for autonomous goals. Interactive TUI and direct RPC remain visibly finish-ready.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Enforce review and autonomous finalization policy"
+      },
+      "evidence": [],
+      "id": "work-3.29",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Continuation stage 5; implements owner decisions work-3.21 through work-3.24. Extend the existing settings, planResumeAction, action-lease driver, and coded work-helper finish path; do not create another finalizer or scheduler."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Enforce review and autonomous finalization policy",
+      "type": "task",
+      "updatedAt": "2026-07-27T06:24:00.867Z"
+    },
     "work-3.3": {
       "acceptance": "A2: open roadmap/task containers default expanded and closed containers default collapsed; session-local override sets survive frame refresh and reset only when the workspace closes. Space toggles, Left collapses, Right expands, and all three are consumed before filter handling. Cursor and pending selection remain bound to stable IDs across reorder. One muted purpose line, Escape to parent/root close, parent cursor preservation, keyboard filtering, and native fallback remain intact. Injected refresh/timer tests prove unchanged compact signatures cause no requestRender, changed signatures cause exactly one, projection errors retain the last good frame, and every overlay close/back/done/escape path invokes cleanup because ctx.ui.custom has no dispose hook. Focused verification: node scripts/test-work-dialogs.mjs",
       "createdAt": "2026-07-25T08:05:09.658Z",
@@ -3763,6 +3830,30 @@
       "title": "Render the stable-ID tree workspace dialog",
       "type": "task",
       "updatedAt": "2026-07-25T11:48:02.440Z"
+    },
+    "work-3.30": {
+      "acceptance": "Deterministic paired fixtures that fail before this change prove one bounded adapter ingests live TUI, RPC, and autonomous telemetry and groups pairs by workflow build or behavior fingerprint, routing policy, role mapping, project, assurance stratum, and mode without merging legacy events. Existing campaign, sentinel, paired identity, scoring, approval, and calibration contracts compute parent turns and parent context per closed executable item as primary outcomes; quality guardrails cover first-pass verification, review and accepted post-close findings, reopen or debug incidence, escalation, and manual intervention; operational and cost outputs include latency, stale or discarded background duration, duplicate or ambiguous recovery, infrastructure failure, and total parent plus child cost. Existing minimum-improvement and maximum-regression thresholds remain authoritative. Passing fixtures retain only paths with material orchestration savings and no quality regression; failing or no-qualified-evidence fixtures keep defaults unchanged and delete or disable the ineffective optional Sentinel or prefetch branch and its now-dead adapter/configuration rather than add a parallel runner, score, or permanent experiment mode. The report names removed paths and leaves one-model/provider-neutral behavior intact. Focused verification: node scripts/test-workflow-evaluation-routing-cohorts.mjs && node scripts/test-workflow-evaluation-contract.mjs && node scripts/test-workflow-evaluation-score.mjs && node scripts/test-workflow-evaluation-sentinel.mjs. Final gate: npm run verify:quiet.",
+      "createdAt": "2026-07-27T06:23:44.225Z",
+      "dependencies": [
+        "work-3.29"
+      ],
+      "dependencyEdges": [],
+      "description": "Close the staged experiment with the existing workflow-evaluation campaign, sentinel, score, and calibration machinery. Compare legacy, stages 1-3, advisory Sentinel, and enforced-policy cohorts using versioned workflow identity, then simplify by removing or retaining opt-in speculative paths according to the existing calibrated thresholds instead of building another experiment system.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Evaluate cohorts and remove ineffective routing paths"
+      },
+      "evidence": [],
+      "id": "work-3.30",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent. Continuation stage 6; reuse scripts/workflow-evaluation*.mjs and existing campaign, sentinel, calibration, and paired-identity assets. Prefer deletion over preserving a path that does not clear the established quality and improvement thresholds."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Evaluate cohorts and remove ineffective routing paths",
+      "type": "task",
+      "updatedAt": "2026-07-27T06:24:01.011Z"
     },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
@@ -3995,7 +4086,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T06:10:26.411Z"
+    "updatedAt": "2026-07-27T14:02:46.941Z"
   },
   "schemaVersion": 1
 }
