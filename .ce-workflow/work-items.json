@@ -3001,7 +3001,8 @@
       "id": "work-2.46",
       "labels": [],
       "notes": [
-        "Classification: upstream-owned runtime isolation/attribution atom split from work-2.38; current ce-workflow local baseline guard is already fixed and tested."
+        "Classification: upstream-owned runtime isolation/attribution atom split from work-2.38; current ce-workflow local baseline guard is already fixed and tested.",
+        "Classification: upstream-owned. Related-distinct from local formatter tolerance work-2.49; runtime isolation/attribution remains owned by pi-subagents. Routed durably to https://github.com/nicobailon/pi-subagents/issues/664; leave open until installed runtime satisfies acceptance."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -3025,7 +3026,8 @@
       "id": "work-2.47",
       "labels": [],
       "notes": [
-        "Classification: upstream-owned provider/process lifecycle behavior; no safe ce-workflow workaround replaces child runtime credential resolution."
+        "Classification: upstream-owned provider/process lifecycle behavior; no safe ce-workflow workaround replaces child runtime credential resolution.",
+        "Classification: upstream-owned. Routed durably to https://github.com/nicobailon/pi-subagents/issues/663; no local credential workaround is safe. Verify current post-continuation success and terminal auth-failure lifecycle before closure."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -3050,13 +3052,64 @@
       "id": "work-2.48",
       "labels": [],
       "notes": [
-        "Classification: work-2.44 and work-2.45 are duplicates for this root cause; source inspection of installed pi-subagents 0.37.0 proves generator/parser schema mismatch."
+        "Classification: work-2.44 and work-2.45 are duplicates for this root cause; source inspection of installed pi-subagents 0.37.0 proves generator/parser schema mismatch.",
+        "Classification: upstream-owned canonical claim; work-2.44 and work-2.45 are duplicates for the recovery atom. Upstream issue https://github.com/nicobailon/pi-subagents/issues/654 was fixed by merged PR https://github.com/nicobailon/pi-subagents/pull/652, but installed 0.37.0 still rejects launchContractDigest, so leave open pending a released/installed proof."
       ],
       "parentId": "work-2",
       "status": "open",
       "title": "Accept generated launch digests in async recovery descriptors",
       "type": "bug",
       "updatedAt": "2026-07-27T16:39:44.136Z"
+    },
+    "work-2.49": {
+      "createdAt": "2026-07-27T18:29:25.397Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The work-planner cleanliness preflight blocked twice because AGENTS.md appeared modified only while the child subagent was active. Parent status was clean immediately before each launch and clean after each child exited. A concurrent parent diff during the third launch showed only formatter whitespace in the generated Compound Pi block (one blank line removed after the heading and one trailing blank line added). The planner treated this transient formatter-only instruction dirt as a manual conflicting edit.\nExpected: Planner preflight should reuse ce-workflow's existing benign/formatter-only instruction-dirt classification (or compare against the parent launch snapshot) so transient generated AGENTS.md whitespace does not block planning, while substantive manual AGENTS.md changes still fail closed.\nImpact: Two planner launches stopped before native WorkItem creation, adding retries, latency, subagent cost, and misleading blocker output for a clean planning workflow.\nSuggested improvement: Route planner launch-baseline checks through the existing formatter-only instruction-dirt helper instead of raw porcelain rejection; preserve fail-closed behavior for substantive AGENTS.md diffs.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/b377a86d-dd91-4ad2-bb72-ebf517c77620",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 4245,
+              "file": "01-planner-work-3.33.md",
+              "sha256": "b173e2b6475cc9bc6255684bcda7a2e4bd7370ef0b52b8a3a351065925110cae"
+            },
+            {
+              "bytes": 3683,
+              "file": "02-planner-work-3.33-retry.md",
+              "sha256": "19cd86449b8a3d1bd06c56ae46401cb704675b4b346c8f148eb6e041b38cc48f"
+            },
+            {
+              "bytes": 192780,
+              "file": "03-session.jsonl",
+              "sha256": "68a7c2e36d0aee7d92fb9062e19532a73d2d8d89632629826aecee1ccbac08d1"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-07-27T18:29:25.392Z",
+          "workflowId": "workflow-ms3jbb2i-m124q2"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.49",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: locally-owned and related-distinct from work-2.46. Required outcome is safe local tolerance of formatter-only instruction dirt in planner preflight; it coexists with upstream process isolation/attribution and must still fail closed on substantive instruction edits.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-start-finish.mjs\nOutput: ok - coded work start/finish behavior"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The work-planner cleanliness preflight blocked twice because AGENTS.md appeared modified only while the child subagent was active.",
+      "type": "task",
+      "updatedAt": "2026-07-27T18:50:44.855Z"
     },
     "work-2.5": {
       "createdAt": "2026-07-20T03:29:59.300Z",
@@ -3099,6 +3152,109 @@
       "title": "Self-improvement report: The exact work-worker for work-4.11 directly edited `.ce-workflow/work-items.json`, omitted the comma after the notes array, and w",
       "type": "task",
       "updatedAt": "2026-07-20T10:05:06.871Z"
+    },
+    "work-2.50": {
+      "createdAt": "2026-07-27T18:38:42.223Z",
+      "dependencies": [
+        "work-2.51",
+        "work-2.52",
+        "work-2.53"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: A deliberately simple implementation task was submitted through Big mode to exercise the workflow. The resulting run took roughly 27 minutes, spawned 10 subagents (3 divergent explorers, 3 advisors, 1 re-reviewer, and 3 planner attempts), generated about 312 KB of parent message/tool text, and stopped before implementation behind open decision work-3.34. Some review depth was valuable—the advisors found Worker lifecycle requirements and the re-review caught an infinite retry risk—but the workflow treated requested size as a reason to run every ceremony and to create a blocking decision even th\nExpected: Big mode should control decomposition and verification depth, while creative fanout, advisor count, and open decisions are gated by measured uncertainty/risk. A task with an explicit solution, bounded files, and clear technical defaults should receive only the specialists that can materially change the plan. Purely technical clear-winner choices should be recorded as a closed rationale/decision or plan note and must not block executable work; open decision WorkItems should be reserved for genuine user/product/architectural authority. Compact intake commands should enforce bounded output or tar\nImpact: The workflow spent substantial wall time, model cost, and context on overlapping analysis, then required another resume before any code could be written. This makes Big mode impractical for routine but well-specified changes and encourages users to avoid assurance features. The unbounded compact outputs also increase compaction pressure and obscure the useful findings.\nSuggested improvement: Add a coded uncertainty/risk gate before creative and advisor launch: Big controls slicing, while low-uncertainty implementation defaults to one requirements reviewer (plus a targeted re-review only after material changes) and high-uncertainty work retains the wider fanout. Teach the planner to auto-record clear technical defaults without leaving an open blocker, reserving open decisions for human",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e135a454-caf8-4be3-af4d-c0cc4fc74a71",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 128001,
+              "file": "01-2026-07-27.jsonl",
+              "sha256": "b3b5df739af9f73665fecb4768a22b8458d3ce1e3ffbf97856a2ba6956f2cbd1"
+            },
+            {
+              "bytes": 2480411,
+              "file": "02-019fa4ac-c2cb-713a-937d-db85fb591b0b.jsonl",
+              "sha256": "b035473a150f0288289bc6ae1b554060c44ecc01f51e72983158cf8c3f972cf3"
+            },
+            {
+              "bytes": 6913,
+              "file": "03-planner-work-3.33-final.md",
+              "sha256": "eeb68c839b3953f6d02813a03360d7dd7ab8d3588b4a88fd0b7a69ac988bd130"
+            },
+            {
+              "bytes": 10499,
+              "file": "04-work-3.33-merged-brief.md",
+              "sha256": "f1d1b51efc538ebfc17ea53c257d0133fbaf84d4233b48197b2b43151c5dd98e"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-07-27T18:38:42.218Z",
+          "workflowId": "019fa4ac-c2cb-713a-937d-db85fb591b0b"
+        }
+      ],
+      "id": "work-2.50",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomized as three related-distinct locally-owned claims: adaptive fanout work-2.51, clear technical defaults work-2.52, and bounded compact intake work-2.53. This report depends on verified completion of all three."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A deliberately simple implementation task was submitted through Big mode to exercise the workflow. The resulting run took roughly ",
+      "type": "task",
+      "updatedAt": "2026-07-27T18:46:18.818Z"
+    },
+    "work-2.51": {
+      "acceptance": "A deterministic classifier records why creative/advisor gates run or skip. A well-specified bounded Big task does not automatically launch the full divergent/advisor fleet; an ambiguous/high-risk Big task retains it. Focused tests cover both routes and telemetry exposes the gate decisions.",
+      "createdAt": "2026-07-27T18:45:55.774Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local claim from work-2.50: Big controls decomposition and verification depth, but creative divergence and advisor fanout must be selected by coded uncertainty/risk rather than task size alone. Preserve full fanout for genuinely broad, ambiguous, or high-stakes work while well-specified bounded changes launch only specialists likely to change the plan.",
+      "evidence": [],
+      "id": "work-2.51",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Gate Big-mode specialist ceremony by uncertainty and risk",
+      "type": "task",
+      "updatedAt": "2026-07-27T18:45:55.774Z"
+    },
+    "work-2.52": {
+      "acceptance": "Planner handoff policy distinguishes human-authority decisions from clear technical defaults. Tests prove a clear technical default is recorded without blocking ready executable work, while a genuine unresolved decision remains open and blocks dependents.",
+      "createdAt": "2026-07-27T18:45:55.944Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local claim from work-2.50: planner choices with a clear technical winner and no user/product authority should be durably recorded without leaving an open decision that blocks executable work. Open decision WorkItems remain mandatory for genuine human/product/architectural authority.",
+      "evidence": [],
+      "id": "work-2.52",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Do not block execution on clear technical planner defaults",
+      "type": "task",
+      "updatedAt": "2026-07-27T18:45:55.944Z"
+    },
+    "work-2.53": {
+      "acceptance": "work-children-summary has a deterministic bounded default with explicit truncation metadata and a targeted/full opt-in when needed. A large synthetic roadmap test proves bounded output while existing small-roadmap summaries remain compatible.",
+      "createdAt": "2026-07-27T18:45:56.124Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local claim from work-2.50: compact helper intake must remain bounded on large roadmaps so work-children-summary and related planner guidance cannot unexpectedly emit tens of thousands of characters. Preserve enough identity, status, type, parent, and dependency context for planning.",
+      "evidence": [],
+      "id": "work-2.53",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Bound compact workflow intake output",
+      "type": "task",
+      "updatedAt": "2026-07-27T18:45:56.124Z"
     },
     "work-2.6": {
       "createdAt": "2026-07-20T04:59:06.183Z",
@@ -3265,10 +3421,10 @@
         "wo:review-scope []",
         "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
-      "status": "closed",
+      "status": "open",
       "title": "Misc",
       "type": "epic",
-      "updatedAt": "2026-07-27T15:51:31.296Z"
+      "updatedAt": "2026-07-27T18:03:20.252Z"
     },
     "work-3.1": {
       "createdAt": "2026-07-25T07:42:39.536Z",
@@ -4038,6 +4194,81 @@
       "type": "bug",
       "updatedAt": "2026-07-27T15:44:57.592Z"
     },
+    "work-3.33": {
+      "createdAt": "2026-07-27T18:03:20.311Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "evidence": [],
+      "id": "work-3.33",
+      "labels": [
+        "wo:planning"
+      ],
+      "notes": [
+        "created by /work-big\nwo:planning\nbig slice: split into executable native work-item store and decision native work-item store before implementation\ntask: Improving the roadmap navigation speed that is slow because of stats calculation: Use a Node Worker; making the existing function merely async would still block navigation. ### Current behavior - C:\\soft\\ce-workflow\\extensions\\work-dialogs.js:726-745 already delays stats by 100 ms and cancels only calculations that have not started. - C:\\soft\\ce-workflow\\extensions\\work-models.js:18643-18658 then runs buildWorkStats() synchronously on the TUI thread. - Once started, calculation cannot be cancelled and keyboard input freezes. Measured in the current project: - Stats calculation: 227–308 ms blocked per newly selected item. - Telemetry footprint: 781 MB work runs plus 174 MB subagent artifacts. - Roadmap projection independently blocks 62–99 ms every 750 ms. ### Recommended implementation 1. Change the dwell delay to 500 ms. 2. Run buildWorkStats() in one lazily created node:worker_threads worker. 3. When selection changes: - cancel the pending 500 ms timer; - if computation started, call worker.terminate(); - discard stale responses using a request generation/job ID. 4. Spawn a replacement worker only after the next item remains selected for 500 ms. 5. Retain completed stats in the existing per-item cache. A proof run kept the main thread responsive while calculating; terminating active calculation completed in roughly 4 ms. No dependency is needed. ### Residual issue This makes stats navigation non-blocking, but the synchronous roadmap refresh can still cause smaller periodic stutters. Address that separately only if navigation remains noticeably uneven.\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name.",
+        "wo:planning-brief work-3.33\n\n## Normalized problem\nRoadmap arrow-key navigation blocks because selection stats eventually call synchronous `buildWorkStats()` on Pi's main Node event loop. That function scans telemetry and hydrates subagent artifacts; wrapping it in `async` would not move the work off-thread. Use native `node:worker_threads` so navigation and the 750 ms roadmap refresh remain responsive.\n\n## Authoritative source facts\n- `extensions/work-dialogs.js:586-969` owns the tree workspace. `queueStats` currently defers synchronous `resolveStats(id)` by 100 ms, cancels only a not-yet-fired timer, and caches rendered lines by selected ID.\n- `extensions/work-models.js:2696-2821` owns synchronous `buildWorkStats(cwd, targetId, options)`. It is also used by report paths and remains synchronous there.\n- `extensions/work-models.js:19344-19482` creates the workspace's per-item rendered-stats cache and calls `buildWorkStats(..., { importLegacy: false })`.\n- `buildWorkStats` is already exported for tests; `package.json` ships the whole `extensions/` directory.\n- Focused coverage exists in `scripts/test-work-dialogs.mjs`, `scripts/test-work-roadmap.mjs`, and `scripts/test-work-stats.mjs`.\n\n## Real constraints and acceptance\n1. No new dependency; use `node:worker_threads`.\n2. A selection must dwell for 500 ms before stats computation starts.\n3. Selection change cancels the pending dwell. If stale computation started, terminate that worker and do not eagerly replace it.\n4. A replacement worker is created lazily only after the next selection dwells for 500 ms.\n5. Every request/reply carries a generation/job ID; stale, post-termination, and post-close replies cannot render or populate cache.\n6. Completed stats stay in the existing per-item workspace cache. Errors render the existing `Stats: / - unknown` fallback.\n7. Workspace close/back/select tears down dwell timers and any active worker. Native/print/RPC behavior and synchronous non-workspace `buildWorkStats` callers remain compatible.\n8. Tests prove ordering with injected timers and a scripted worker seam, not flaky wall-clock thresholds. Include one real worker smoke for message shape/error serialization if practical.\n9. Package verification must ensure the worker entry is shipped. Focused checks: `node scripts/test-work-dialogs.mjs && node scripts/test-work-roadmap.mjs && node scripts/test-work-stats.mjs`; final gate `npm run verify:quiet`.\n\n## Baseline design\n- Add a small dedicated `extensions/work-stats-worker.js` entry. It receives `{ jobId, cwd, targetId, options }`, calls the existing exported `buildWorkStats`, and posts `{ jobId, ok, stats }` or a bounded serialized error. It never mutates the work store and does not duplicate stats logic.\n- Add a workspace-scoped stats controller near `handleWorkRoadmapWorkspace` in `extensions/work-models.js`. It owns the existing rendered-line cache, one active worker/job, generation IDs, lazy worker creation, termination, stale-message rejection, fallback, and cleanup. Keep worker creation injectable for deterministic tests.\n- Make `showTreeWorkspaceDialog` support Promise-returning `resolveStats`, a 500 ms default dwell, and an optional cancellation/cleanup hook. The dialog remains generic: it owns selection/dwell/render generations; the model controller owns Worker lifecycle. Promise settlement checks selected ID, generation, and closed state before caching/rendering.\n- Preserve the current synchronous stats function and report callers unchanged.\n\n## Required native slicing\nBefore implementation, create at least one `type=decision` child and executable child task(s). Decision: choose the Worker integration boundary: (A, recommended) a separately packaged worker entry plus model-owned controller and generic promise-aware dialog hooks; or (B) an inline/eval worker coupled directly to the dialog. Record the choice and make executable children depend on it. Recommended executable split: (1) promise-aware 500 ms dialog scheduling/cancellation contract; (2) worker entry/controller, cache, teardown, packaging, and focused integration tests. Dependency direction is decision -> dialog contract -> worker integration (or decision -> both if interfaces are fixed in the decision); no executable item may depend on a later decision.\n\n## wo:divergent-analysis\n- Inversion/adversary — `anthropic/claude-opus-5`: retained the scripted worker-port transcript test and explicit hostile/stale reply rejection. Rejected SharedArrayBuffer cooperative cancellation because forced `terminate()` is required and `buildWorkStats` lacks cheap checkpoints; rejected viewport prefetch because it violates the 500 ms intent gate and adds load; rejected main-thread hydration because it reintroduces blocking.\n- 3am operator — `openai-codex/gpt-5.6-sol`: retained an explicit workspace-scoped lifecycle, disposable worker, serialized fallback, and deterministic fake timer/worker tests. Rejected extra flight-log telemetry and cooperative cancellation as unrequested complexity.\n- Remove load-bearing assumption — `zai/glm-5.2`: retained passing only `cwd`, target ID, and job ID so the worker reads its own inputs; rejected precompute-all and long-lived incremental indexes because they increase startup work and consistency complexity; rejected splitting `buildWorkStats` because synchronous callers already work and duplication is unnecessary.\n\n## Known residual scope\nThe synchronous roadmap projection refresh may still cause smaller periodic stutters. Do not broaden this slice unless post-change evidence shows it remains a material navigation blocker.\n",
+        "wo:planning-brief work-3.33 — revised after advisor gate\n\n## Normalized problem\nRoadmap arrow-key navigation blocks because selection stats eventually call synchronous `buildWorkStats()` on Pi's main Node event loop. That function scans telemetry and hydrates subagent artifacts; wrapping it in `async` would not move the work off-thread. The owner explicitly requires native `node:worker_threads` so navigation and the 750 ms roadmap refresh remain responsive.\n\n## Authoritative source facts\n- `extensions/work-dialogs.js:586-969` owns the tree workspace. `queueStats` currently defers synchronous `resolveStats(id)` by 100 ms, cancels only a not-yet-fired timer, and caches rendered lines by selected ID.\n- `extensions/work-models.js:2696-2821` owns synchronous `buildWorkStats(cwd, targetId, options)`. It is also used by report paths and remains synchronous there.\n- `extensions/work-models.js:19344-19482` creates the workspace's per-item rendered-stats cache and calls `buildWorkStats(..., { importLegacy: false })`.\n- `scripts/test-work-roadmap.mjs:32-36` pins that current call with a source regex; the test must move to the worker-request boundary rather than leave a vestigial synchronous call.\n- `buildWorkStats` is already exported for tests; `package.json` ships the whole `extensions/` directory.\n- Focused coverage exists in `scripts/test-work-dialogs.mjs`, `scripts/test-work-roadmap.mjs`, and `scripts/test-work-stats.mjs`.\n- Advisor probes on the current repository measured `buildWorkStats` at 405-564 ms, roadmap projection at about 80 ms per 750 ms refresh, and a real Worker importing `work-models.js` plus one stats call at about 137 ms startup/import overhead before computation. These are planning baselines, not timing-threshold tests.\n\n## Real constraints and acceptance\n1. No new dependency; use `node:worker_threads`. Cache-only or `async`-only alternatives do not satisfy the owner's non-blocking requirement.\n2. A selection must dwell for 500 ms before stats computation starts. Deterministic tests capture the injected timer delay and assert exactly 500 ms; `handleWorkRoadmapWorkspace` must not override it.\n3. Selection change, including key navigation, filtering/rebuild, and refresh-driven fallback selection, cancels the pending dwell. If that selection's computation started, terminate the active worker and do not eagerly replace it.\n4. A replacement worker is created lazily only after the next selection dwells for 500 ms. A worker may stay idle and be reused after a successful completed job, but active stale work is terminated as required.\n5. Every request/reply carries a generation/job ID. Stale, post-termination, post-close, and wrong-job replies cannot render or populate cache.\n6. The worker request always carries `{ importLegacy: false }`; no background-thread legacy import/write is allowed. Retarget the existing roadmap source assertion to this request boundary.\n7. Completed stats stay in the existing per-item workspace cache. Cancellation, constructor/post failure, rejection, worker `error`, and early/abnormal `exit` clear the in-flight marker and create no durable cache hit, so re-dwelling the same ID can retry. A currently selected failed job renders the existing `Stats: / - unknown` fallback without leaving permanent `- loading…`.\n8. Every terminal path settles at most once and removes listeners/state. Worker `error`/`exit` never escapes into or crashes the Pi host. Successful idle-worker reuse, active termination, and final disposal are explicit.\n9. Workspace close/back/select cancels the dialog generation and active job. Because the outer workspace can reopen after an action popup, per-dialog cleanup calls reusable `cancelActive()`, while an outer `finally` calls permanent `close()` only when `handleWorkRoadmapWorkspace` returns. No worker/timer survives final close.\n10. `showTreeWorkspaceDialog` preserves synchronous resolver compatibility: a non-thenable result renders in the same callback tick; only thenables settle asynchronously. Promise settlement checks selected ID, generation, and closed state before caching/rendering.\n11. Tests prove ordering with injected timers and a scripted worker port/factory, not flaky wall-clock thresholds. A real Worker smoke is mandatory for ESM entry loading, success message shape, `{ importLegacy:false }`, and bounded error serialization.\n12. Native/print/RPC behavior and synchronous non-workspace `buildWorkStats` callers remain compatible. `handleRoadmapTasksMenu`'s synchronous subtitle stats are explicitly out of scope.\n13. Package verification must assert the dedicated worker entry exists/ships. Focused checks: `node scripts/test-work-dialogs.mjs && node scripts/test-work-roadmap.mjs && node scripts/test-work-stats.mjs`; final gate `npm run verify:quiet`.\n\n## Baseline design\n- Add a small dedicated `extensions/work-stats-worker.js` entry. It receives `{ jobId, cwd, targetId, options: { importLegacy: false } }`, calls the existing exported `buildWorkStats`, and posts `{ jobId, ok: true, stats }` or `{ jobId, ok: false, error }` with bounded serialization. It never mutates the work store and does not duplicate stats logic.\n- Add a workspace-scoped stats controller near `handleWorkRoadmapWorkspace` in `extensions/work-models.js`. It owns the existing rendered-line cache, one worker, one active job, monotonically increasing generations, lazy creation, exactly-once settlement, error/exit/post/constructor handling, stale rejection, `cancelActive()`, and permanent `close()`. Worker creation is injectable for deterministic tests. A worker that completed successfully may serve later jobs; active stale work is terminated, and replacement waits for the next dwell.\n- Make `showTreeWorkspaceDialog` support thenable `resolveStats`, a 500 ms default dwell, and an explicit `onStatsCancel(id)` hook. Centralize selected-ID changes so key/filter/refresh changes all cancel stale dwell/work. Existing `cleanup()` invokes reusable `controller.cancelActive` for each dialog close; the outer workspace function owns permanent controller close.\n- Preserve the current synchronous stats function and report callers unchanged.\n\n## Required native slicing\nBefore implementation, create at least one `type=decision` child and executable child task(s).\n\nDecision child must record both:\n1. Worker boundary: (A, recommended) separately packaged worker entry + model-owned controller + generic promise-aware dialog hooks; or (B) inline/eval worker coupled directly to the dialog. The decision fixes the exact `resolveStats`, `onStatsCancel(id)`, `cancelActive()`, and `close()` contracts.\n2. Hydration-cache evaluation: advisor measurement attributes roughly 430 ms to repeated artifact/transcript hydration from the per-call `new Map()` at `buildWorkStats`. Cache-only is rejected because it still blocks and contradicts the explicit Worker requirement. Decide whether to (A, recommended MVP) ship the Worker first and defer signature-keyed module-level hydration caching until post-change evidence shows stats latency itself is material, or (B) add signature-keyed hydration caching inside the same slice. Any cache must invalidate on transcript/meta mtime+size and must not weaken worker cancellation.\n\nRecommended executable split:\n1. Promise-aware 500 ms dialog scheduling/cancellation contract with deterministic timer/generation tests.\n2. Worker entry/controller, cache, teardown, failure paths, package assertion, real-worker smoke, and focused integration tests.\n\nDependency direction is decision -> dialog contract -> worker integration (or decision -> both only if the decision fully fixes their shared interface). No executable item may depend on a later decision. The planner must verify readiness/dependency direction with `node \"C:\\soft\\ce-workflow\\scripts\\work-helper.mjs\" work-ready-summary work-3` after creation.\n\n## wo:divergent-analysis\n- Inversion/adversary — `anthropic/claude-opus-5`: retained the scripted worker-port transcript test and explicit hostile/stale reply rejection. Rejected SharedArrayBuffer cooperative cancellation because forced `terminate()` is required and `buildWorkStats` lacks cheap checkpoints; rejected viewport prefetch because it violates the 500 ms intent gate and adds load; rejected main-thread hydration because it reintroduces blocking.\n- 3am operator — `openai-codex/gpt-5.6-sol`: retained an explicit workspace-scoped lifecycle, disposable-on-active-cancel worker, serialized fallback, and deterministic fake timer/worker tests. Rejected extra flight-log telemetry and cooperative cancellation as unrequested complexity.\n- Remove load-bearing assumption — `zai/glm-5.2`: retained passing only `cwd`, target ID, options, and job ID so the worker reads its own inputs; rejected precompute-all and long-lived incremental indexes because they increase startup work and consistency complexity; rejected splitting `buildWorkStats` because synchronous callers already work and duplication is unnecessary.\n\n## Advisor-gate dispositions\n- Accepted and incorporated: explicit `{ importLegacy:false }`, regex retarget, retry after cancellation/failure, constructor/post/error/exit handling, same-tick sync compatibility, exact 500 ms proof, mandatory real-worker smoke, named lifecycle hooks, reopen-safe cleanup, exactly-once settlement, and measured baselines.\n- Partially accepted: hydration caching is elevated into the required decision with evidence. Cache-only is rejected as a constraint violation; default is Worker-first because responsiveness, not only aggregate speed, is the acceptance target.\n- Rejected as scope expansion: extra durable flight-log telemetry, SharedArrayBuffer checkpoints, viewport/all-item precompute, incremental index, and splitting `buildWorkStats`.\n\n## Known residual scope\nThe synchronous roadmap projection refresh may still cause smaller periodic stutters. Do not broaden this slice unless post-change evidence shows it remains a material navigation blocker. Off-thread stats may still take roughly 0.5-0.7 seconds after the 500 ms dwell; the requirement is responsive navigation and correct eventual stats, not a wall-clock completion threshold.\n",
+        "wo:planning-brief work-3.33 — revised after advisor gate\n\n## Normalized problem\nRoadmap arrow-key navigation blocks because selection stats eventually call synchronous `buildWorkStats()` on Pi's main Node event loop. That function scans telemetry and hydrates subagent artifacts; wrapping it in `async` would not move the work off-thread. The owner explicitly requires native `node:worker_threads` so navigation and the 750 ms roadmap refresh remain responsive.\n\n## Authoritative source facts\n- `extensions/work-dialogs.js:586-969` owns the tree workspace. `queueStats` currently defers synchronous `resolveStats(id)` by 100 ms, cancels only a not-yet-fired timer, and caches rendered lines by selected ID.\n- `extensions/work-models.js:2696-2821` owns synchronous `buildWorkStats(cwd, targetId, options)`. It is also used by report paths and remains synchronous there.\n- `extensions/work-models.js:19344-19482` creates the workspace's per-item rendered-stats cache and calls `buildWorkStats(..., { importLegacy: false })`.\n- `scripts/test-work-roadmap.mjs:32-36` pins that current call with a source regex; the test must move to the worker-request boundary rather than leave a vestigial synchronous call.\n- `buildWorkStats` is already exported for tests; `package.json` ships the whole `extensions/` directory.\n- Focused coverage exists in `scripts/test-work-dialogs.mjs`, `scripts/test-work-roadmap.mjs`, and `scripts/test-work-stats.mjs`.\n- Advisor probes on the current repository measured `buildWorkStats` at 405-564 ms, roadmap projection at about 80 ms per 750 ms refresh, and a real Worker importing `work-models.js` plus one stats call at about 137 ms startup/import overhead before computation. These are planning baselines, not timing-threshold tests.\n\n## Real constraints and acceptance\n1. No new dependency; use `node:worker_threads`. Cache-only or `async`-only alternatives do not satisfy the owner's non-blocking requirement.\n2. A selection must dwell for 500 ms before stats computation starts. Deterministic tests capture the injected timer delay and assert exactly 500 ms; `handleWorkRoadmapWorkspace` must not override it.\n3. Selection change, including key navigation, filtering/rebuild, and refresh-driven fallback selection, cancels the pending dwell. If that selection's computation started, terminate the active worker and do not eagerly replace it.\n4. A replacement worker is created lazily only after the next selection dwells for 500 ms. A worker may stay idle and be reused after a successful completed job, but active stale work is terminated as required.\n5. Every request/reply carries a generation/job ID. Stale, post-termination, post-close, and wrong-job replies cannot render or populate cache.\n6. The worker request always carries `{ importLegacy: false }`; no background-thread legacy import/write is allowed. Retarget the existing roadmap source assertion to this request boundary.\n7. Completed stats stay in the existing per-item workspace cache. Cancellation, constructor/post failure, rejection, worker `error`, and early/abnormal `exit` clear the in-flight marker and create no durable workspace-cache hit. A failed job records a transient dialog-local failed marker for the currently selected ID: it renders `Stats: / - unknown` and suppresses re-queue while that ID stays selected, then is dropped when selection changes so navigating away and re-dwelling retries. Scripted tests assert exactly one failed job while selected and exactly one new job after navigating away and back. Cancellation after selection has moved creates no failed marker.\n8. Every terminal path settles at most once and removes listeners/state. Worker `error`/`exit` never escapes into or crashes the Pi host. Successful idle-worker reuse, active termination, and final disposal are explicit.\n9. Workspace close/back/select cancels the dialog generation and active job. Because the outer workspace can reopen after an action popup, per-dialog cleanup calls reusable `cancelActive()`, while an outer `finally` calls permanent `close()` only when `handleWorkRoadmapWorkspace` returns. No worker/timer survives final close.\n10. `showTreeWorkspaceDialog` preserves synchronous resolver compatibility: a non-thenable result renders in the same callback tick; only thenables settle asynchronously. Promise settlement checks selected ID, generation, and closed state before caching/rendering.\n11. Tests prove ordering with injected timers and a scripted worker port/factory, not flaky wall-clock thresholds. A real Worker smoke is mandatory for ESM entry loading, success message shape, `{ importLegacy:false }`, and bounded error serialization.\n12. Native/print/RPC behavior and synchronous non-workspace `buildWorkStats` callers remain compatible. `handleRoadmapTasksMenu`'s synchronous subtitle stats are explicitly out of scope.\n13. Package verification must assert the dedicated worker entry exists/ships. Focused checks: `node scripts/test-work-dialogs.mjs && node scripts/test-work-roadmap.mjs && node scripts/test-work-stats.mjs`; final gate `npm run verify:quiet`.\n\n## Baseline design\n- Add a small dedicated `extensions/work-stats-worker.js` entry. It receives `{ jobId, cwd, targetId, options: { importLegacy: false } }`, calls the existing exported `buildWorkStats`, and posts `{ jobId, ok: true, stats }` or `{ jobId, ok: false, error }` with bounded serialization. It never mutates the work store and does not duplicate stats logic.\n- Add a workspace-scoped stats controller near `handleWorkRoadmapWorkspace` in `extensions/work-models.js`. It owns the existing rendered-line cache, one worker, one active job, monotonically increasing generations, lazy creation, exactly-once settlement, error/exit/post/constructor handling, stale rejection, `cancelActive()`, and permanent `close()`. Worker creation is injectable for deterministic tests. A worker that completed successfully may serve later jobs; active stale work is terminated, and replacement waits for the next dwell.\n- Make `showTreeWorkspaceDialog` support thenable `resolveStats`, a 500 ms default dwell, and an explicit `onStatsCancel(id)` hook. Centralize selected-ID changes so key/filter/refresh changes all cancel stale dwell/work. Existing `cleanup()` invokes reusable `controller.cancelActive` for each dialog close; the outer workspace function owns permanent controller close.\n- Preserve the current synchronous stats function and report callers unchanged.\n\n## Required native slicing\nBefore implementation, create at least one `type=decision` child and executable child task(s).\n\nDecision child must record both:\n1. Worker boundary: (A, recommended) separately packaged worker entry + model-owned controller + generic promise-aware dialog hooks; or (B) inline/eval worker coupled directly to the dialog. The decision fixes the exact `resolveStats`, `onStatsCancel(id)`, `cancelActive()`, and `close()` contracts.\n2. Hydration-cache evaluation: advisor measurement attributes roughly 430 ms to repeated artifact/transcript hydration from the per-call `new Map()` at `buildWorkStats`. Cache-only is rejected because it still blocks and contradicts the explicit Worker requirement. Decide whether to (A, recommended MVP) ship the Worker first and defer signature-keyed module-level hydration caching until post-change evidence shows stats latency itself is material, or (B) add signature-keyed hydration caching inside the same slice. Any cache must invalidate on transcript/meta mtime+size and must not weaken worker cancellation.\n\nRecommended executable split:\n1. Promise-aware 500 ms dialog scheduling/cancellation contract with deterministic timer/generation tests.\n2. Worker entry/controller, cache, teardown, failure paths, package assertion, real-worker smoke, and focused integration tests.\n\nDependency direction is decision -> dialog contract -> worker integration (or decision -> both only if the decision fully fixes their shared interface). No executable item may depend on a later decision. The planner must verify readiness/dependency direction with `node \"C:\\soft\\ce-workflow\\scripts\\work-helper.mjs\" work-ready-summary work-3` after creation.\n\n## wo:divergent-analysis\n- Inversion/adversary — `anthropic/claude-opus-5`: retained the scripted worker-port transcript test and explicit hostile/stale reply rejection. Rejected SharedArrayBuffer cooperative cancellation because forced `terminate()` is required and `buildWorkStats` lacks cheap checkpoints; rejected viewport prefetch because it violates the 500 ms intent gate and adds load; rejected main-thread hydration because it reintroduces blocking.\n- 3am operator — `openai-codex/gpt-5.6-sol`: retained an explicit workspace-scoped lifecycle, disposable-on-active-cancel worker, serialized fallback, and deterministic fake timer/worker tests. Rejected extra flight-log telemetry and cooperative cancellation as unrequested complexity.\n- Remove load-bearing assumption — `zai/glm-5.2`: retained passing only `cwd`, target ID, options, and job ID so the worker reads its own inputs; rejected precompute-all and long-lived incremental indexes because they increase startup work and consistency complexity; rejected splitting `buildWorkStats` because synchronous callers already work and duplication is unnecessary.\n\n## Advisor-gate dispositions\n- Accepted and incorporated: explicit `{ importLegacy:false }`, regex retarget, retry after cancellation/failure, transient failed-selection suppression, constructor/post/error/exit handling, same-tick sync compatibility, exact 500 ms proof, mandatory real-worker smoke, named lifecycle hooks, reopen-safe cleanup, exactly-once settlement, and measured baselines.\n- Partially accepted: hydration caching is elevated into the required decision with evidence. Cache-only is rejected as a constraint violation; default is Worker-first because responsiveness, not only aggregate speed, is the acceptance target.\n- Rejected as scope expansion: extra durable flight-log telemetry, SharedArrayBuffer checkpoints, viewport/all-item precompute, incremental index, and splitting `buildWorkStats`.\n\n## Known residual scope\nThe synchronous roadmap projection refresh may still cause smaller periodic stutters. Do not broaden this slice unless post-change evidence shows it remains a material navigation blocker. Off-thread stats may still take roughly 0.5-0.7 seconds after the 500 ms dwell; the requirement is responsive navigation and correct eventual stats, not a wall-clock completion threshold.\n",
+        "## wo:slice-plan\\nCreated work-3.34 (decision: Worker boundary plus hydration-cache scope), work-3.35 (promise-aware exact-500-ms dialog contract), and work-3.36 (Node Worker controller/integration, transient failures, real-worker smoke, packaging, focused and final verification). Dependencies are work-3.35 -> work-3.34 and work-3.36 -> work-3.35: implementation cannot precede the shared architecture/cache choice, and Worker integration consumes the proven dialog contract. Source: C:\\soft\\ce-workflow\\.pi\\work-planning\\work-3.33-merged-brief.md.",
+        "Planning complete: durable decision and sequential executable slices created with full acceptance and dependency direction."
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Improving the roadmap navigation speed that is slow because of stats calculation: Use a Node Worker; making the existing function merely async would still block navigation. ### Cur…",
+      "type": "task",
+      "updatedAt": "2026-07-27T18:27:00.889Z"
+    },
+    "work-3.34": {
+      "acceptance": "A durable choice records A or B for both the Worker boundary and hydration scope. It fixes resolveStats (same-tick value or thenable), onStatsCancel(id), reusable cancelActive(), and permanent close() contracts; preserves lazy 500 ms start, active stale-work termination, generation/job fencing, { importLegacy: false }, and reusable cleanup versus final disposal. If hydration B is selected, the record requires transcript/meta mtime+size invalidation and proves caching cannot weaken cancellation. The choice is precise enough for both dependent tasks to implement without another architecture decision.",
+      "createdAt": "2026-07-27T18:26:11.386Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Resolve two implementation choices for non-blocking roadmap stats. Worker boundary: A (recommended) use a separately packaged extensions/work-stats-worker.js entry, a model-owned workspace controller, and generic promise-aware dialog hooks; B use an inline/eval Worker coupled directly to the dialog. Hydration: A (recommended MVP) ship Worker-first and defer signature-keyed module hydration caching until post-change evidence shows latency remains material; B add that cache now, invalidated by transcript/meta mtime plus size. Cache-only and async-only are rejected because they still block the Pi event loop and violate the explicit Worker requirement. Baselines are 405-564 ms stats, roughly 430 ms repeated hydration, and roughly 137 ms Worker startup/import overhead.",
+      "evidence": [],
+      "id": "work-3.34",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Decide Worker boundary and hydration-cache scope",
+      "type": "decision",
+      "updatedAt": "2026-07-27T18:26:11.386Z"
+    },
+    "work-3.35": {
+      "acceptance": "Deterministic injected-timer tests in scripts/test-work-dialogs.mjs fail before and pass after: handleWorkRoadmapWorkspace does not override the default; the captured dwell is exactly 500 ms; every selected-ID change and cleanup path cancels the pending timer and calls onStatsCancel for started work; no eager replacement starts before a new 500 ms dwell. A non-thenable resolveStats result renders in the same callback tick. Thenable success/rejection settles asynchronously and only the current selected ID and dialog generation while open may cache or render; stale, post-close, and wrong-selection settlement is ignored. Existing filtering, cursor, refresh, native fallback, and synchronous callers remain compatible. Verification: node scripts/test-work-dialogs.mjs.",
+      "createdAt": "2026-07-27T18:26:32.513Z",
+      "dependencies": [
+        "work-3.34"
+      ],
+      "dependencyEdges": [],
+      "description": "Implement the dialog-side scheduling contract in extensions/work-dialogs.js: keep synchronous resolver compatibility, accept thenable stats, default the selection dwell to exactly 500 ms, expose onStatsCancel(id), and centralize selection changes so key navigation, filtering/rebuild, refresh fallback, and close/back/select cancel stale pending or active work. This slice establishes the generic interface selected by work-3.34 without integrating the real Worker.",
+      "evidence": [],
+      "id": "work-3.35",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Make roadmap stats dialog promise-aware after 500 ms dwell",
+      "type": "task",
+      "updatedAt": "2026-07-27T18:27:00.378Z"
+    },
+    "work-3.36": {
+      "acceptance": "Roadmap navigation and the 750 ms projection refresh stay responsive while stats run off-thread after the 500 ms dwell. Every request/reply has a job ID and sends cwd, targetId, and options exactly preserving { importLegacy: false }; the worker reuses buildWorkStats and never imports legacy data or mutates the store. Selection change terminates active stale work without eager replacement; a successfully idle Worker may be reused; outer close permanently disposes while popup/reopen cleanup uses reusable cancelActive(). Stale/wrong-job/post-close replies cannot render or cache. Constructor/post/rejection/error/early or abnormal exit/cancellation paths settle once, remove listeners/state, never escape into Pi, and create no durable cache hit. A current failed selection renders Stats: / - unknown and queues exactly once until selection changes; navigating away/back retries exactly once, while moved-selection cancellation creates no failed marker. Deterministic scripted-port tests cover lifecycle, hostile replies, failure, retry, reuse, terminate, and final disposal. A mandatory real Worker smoke proves ESM entry loading, successful message shape, { importLegacy: false }, and bounded error serialization. scripts/test-work-roadmap.mjs retargets its source assertion to the Worker request; package verification asserts the dedicated entry ships. Native/print/RPC and synchronous non-workspace callers, including buildWorkStats and handleRoadmapTasksMenu subtitle stats, remain compatible. Focused gate: node scripts/test-work-dialogs.mjs && node scripts/test-work-roadmap.mjs && node scripts/test-work-stats.mjs. Final gate: npm run verify:quiet.",
+      "createdAt": "2026-07-27T18:26:49.298Z",
+      "dependencies": [
+        "work-3.35"
+      ],
+      "dependencyEdges": [],
+      "description": "Integrate native node:worker_threads after the dialog contract lands. Add a dedicated packaged Worker entry that calls the existing synchronous buildWorkStats, plus a workspace-scoped model controller owning the current rendered cache, lazy Worker/job lifecycle, generation fencing, cancellation, transient selected-ID failures, teardown, and optional hydration-cache choice recorded by work-3.34. Preserve synchronous report/menu callers and all non-workspace modes.",
+      "evidence": [],
+      "id": "work-3.36",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Run roadmap workspace stats in a lifecycle-safe Node Worker",
+      "type": "task",
+      "updatedAt": "2026-07-27T18:27:00.558Z"
+    },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
       "createdAt": "2026-07-25T08:05:28.786Z",
@@ -4269,7 +4500,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T16:43:13.725Z"
+    "updatedAt": "2026-07-27T18:50:44.855Z"
   },
   "schemaVersion": 1
 }

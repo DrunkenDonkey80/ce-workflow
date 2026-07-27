@@ -250,18 +250,23 @@ try {
 		"big creates a labelled planning intake and directly selects the planner",
 	);
 	assert(
-		bigDirect.params.task.length < 1800 &&
+		bigDirect.params.task.length < 2200 &&
 			bigDirect.params.task.includes(
 				`Target work item: ${state.selectedWorkItem.id}`,
 			) &&
 			bigDirect.params.task.includes("work-ready-summary") &&
 			bigDirect.params.task.includes("Planner launch baseline paths:") &&
-			bigDirect.params.task.includes("fail BLOCKED if final Git status adds") &&
+			bigDirect.params.task.includes(
+				"git diff --quiet --ignore-all-space --ignore-blank-lines",
+			) &&
+			bigDirect.params.task.includes(
+				"Block staged, untracked, substantive, or other added paths",
+			) &&
 			!bigDirect.params.task.includes("raw store readiness") &&
 			!bigDirect.params.task.includes("Subagent output guidance") &&
 			bigDirect.params.acceptance.level === "none" &&
 			bigDirect.params.acceptance.reason.includes("coded work-item"),
-		"big sends the planner a compact direct contract without generic acceptance boilerplate",
+		"big sends the planner a compact direct contract with safe instruction-dirt tolerance",
 	);
 
 	fixture.reset("no-store");

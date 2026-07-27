@@ -7832,7 +7832,7 @@ function directRoleTask(state, cwd) {
 			? `For child state use: node ${helper} work-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
-			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop. Planner launch baseline paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}; fail BLOCKED if final Git status adds any undeclared repository path outside the native store, workflow runtime, or requested dated plan.`
+			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence), verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop. Planner launch baseline paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. Tolerate a new unstaged tracked instruction-file path only when git diff --quiet --ignore-all-space --ignore-blank-lines -- <path> passes; never stage it. Block staged, untracked, substantive, or other added paths. Final Git status must add no undeclared repository path outside the native store, workflow runtime, or requested dated plan.`
 			: "",
 		state.action === "run-implementation" && selected?.id
 			? `Claim exactly with: node ${helper} work-claim ${selected.id}`
