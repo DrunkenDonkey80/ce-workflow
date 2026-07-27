@@ -155,15 +155,15 @@ function statsLine(theme, lines, index) {
 }
 
 function workspaceHeight(tui) {
-	return Math.max(1, (tui.terminal?.rows ?? 24) - 1);
+	return Math.max(1, (tui.terminal?.rows ?? 24) - 2);
 }
 
-// Keep the final column unused: exact-width redraws wrap in Windows terminals.
+// Keep the terminal edges unused: exact-size redraws wrap or scroll on Windows.
 const workspaceOverlayOptions = {
 	anchor: "top-left",
 	width: "100%",
 	maxHeight: "100%",
-	margin: { right: 1 },
+	margin: { top: 1, right: 1, bottom: 1 },
 };
 
 function initialIndex(items, { cursorKey, currentValue, selectedIndex }) {

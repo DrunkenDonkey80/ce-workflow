@@ -66,8 +66,8 @@ async function drive(
 					const initialRender = component.render(70);
 					assert.equal(
 						initialRender.length,
-						Math.max(1, terminalRows - 1),
-						"workspace occupies a stable terminal viewport",
+						Math.max(1, terminalRows - 2),
+						"workspace stays inside a stable terminal viewport",
 					);
 					assert.strictEqual(
 						component.render(70),
@@ -86,10 +86,10 @@ async function drive(
 	assert.equal(overlay.overlayOptions.width, "100%");
 	assert.equal(overlay.overlayOptions.maxHeight, "100%");
 	assert.equal(overlay.overlayOptions.anchor, "top-left");
-	assert.equal(
-		overlay.overlayOptions.margin.right,
-		1,
-		"workspace leaves the terminal wrap column unused",
+	assert.deepEqual(
+		overlay.overlayOptions.margin,
+		{ top: 1, right: 1, bottom: 1 },
+		"workspace avoids terminal-edge redraws",
 	);
 	return result;
 }
@@ -437,7 +437,7 @@ await drive(
 await drive(
 	{ title: "Tiny terminal", items },
 	(component) => {
-		assert.equal(component.render(70).length, 4);
+		assert.equal(component.render(70).length, 3);
 		component.handleInput("escape");
 	},
 	theme,
@@ -863,10 +863,10 @@ assert.equal(treeRun.result.action, "back");
 assert.equal(treeRun.overlay.overlayOptions.anchor, "top-left");
 assert.equal(treeRun.overlay.overlayOptions.width, "100%");
 assert.equal(treeRun.overlay.overlayOptions.maxHeight, "100%");
-assert.equal(
-	treeRun.overlay.overlayOptions.margin.right,
-	1,
-	"tree workspace leaves the terminal wrap column unused",
+assert.deepEqual(
+	treeRun.overlay.overlayOptions.margin,
+	{ top: 1, right: 1, bottom: 1 },
+	"tree workspace avoids terminal-edge redraws",
 );
 assert.equal(treeRun.cleanups, 1, "Escape invokes explicit cleanup once");
 assert.equal(treeRun.cleared, 1, "Escape clears refresh timer");
@@ -939,7 +939,7 @@ assert.equal(cancelledStats, 1, "moving selection cancels stale stats work");
 
 const shortTree = await driveTree({ testRows: 8 }, async (component) => {
 	const lines = component.render(18);
-	assert.equal(lines.length, 7, "short workspace stays within terminal height");
+	assert.equal(lines.length, 6, "short workspace stays within terminal height");
 	assert(lines.some((line) => line.includes(" Work items ")));
 	assert(lines.some((line) => line.includes(" Details ")));
 	assert(lines.some((line) => line.includes(" Keys ")));
