@@ -3053,13 +3053,15 @@
       "labels": [],
       "notes": [
         "Classification: work-2.44 and work-2.45 are duplicates for this root cause; source inspection of installed pi-subagents 0.37.0 proves generator/parser schema mismatch.",
-        "Classification: upstream-owned canonical claim; work-2.44 and work-2.45 are duplicates for the recovery atom. Upstream issue https://github.com/nicobailon/pi-subagents/issues/654 was fixed by merged PR https://github.com/nicobailon/pi-subagents/pull/652, but installed 0.37.0 still rejects launchContractDigest, so leave open pending a released/installed proof."
+        "Classification: upstream-owned canonical claim; work-2.44 and work-2.45 are duplicates for the recovery atom. Upstream issue https://github.com/nicobailon/pi-subagents/issues/654 was fixed by merged PR https://github.com/nicobailon/pi-subagents/pull/652, but installed 0.37.0 still rejects launchContractDigest, so leave open pending a released/installed proof.",
+        "Classification updated to already-fixed upstream: merged pi-subagents PR https://github.com/nicobailon/pi-subagents/pull/652 commit 9315132b66ffd7a809ee3629aa4e167897500bb5 adds launchContractDigest to recovery descriptor allowedFields and validates it as a non-empty string. Added unit regression test test/unit/async-recovery-descriptor.test.ts round-trips the generated field; upstream Linux and Windows test checks both passed. Canonical duplicate coverage remains work-2.44/work-2.45.",
+        "Verified by merged upstream commit 9315132 with Linux/Windows CI and descriptor round-trip regression test."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Accept generated launch digests in async recovery descriptors",
       "type": "bug",
-      "updatedAt": "2026-07-27T16:39:44.136Z"
+      "updatedAt": "2026-07-27T19:18:51.567Z"
     },
     "work-2.49": {
       "createdAt": "2026-07-27T18:29:25.397Z",
@@ -3200,13 +3202,15 @@
         "self-improvement"
       ],
       "notes": [
-        "Atomized as three related-distinct locally-owned claims: adaptive fanout work-2.51, clear technical defaults work-2.52, and bounded compact intake work-2.53. This report depends on verified completion of all three."
+        "Atomized as three related-distinct locally-owned claims: adaptive fanout work-2.51, clear technical defaults work-2.52, and bounded compact intake work-2.53. This report depends on verified completion of all three.",
+        "Verified coverage: work-2.51 commit 8ed1442 gates Big fanout by coded uncertainty/risk with creativeGate telemetry (node scripts/test-work-brainstorm.mjs PASS); work-2.52 commit 10c0abd records clear technical defaults without open blockers while preserving human-authority decisions (test-work-start-finish + test-work-resume PASS); work-2.53 commit 4e5c852 caps compact child intake with truncation metadata and targeted/full options (test-work-helper-summary PASS).",
+        "All three atomic claims verified through canonical work-2.51, work-2.52, and work-2.53."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A deliberately simple implementation task was submitted through Big mode to exercise the workflow. The resulting run took roughly ",
       "type": "task",
-      "updatedAt": "2026-07-27T18:46:18.818Z"
+      "updatedAt": "2026-07-27T18:59:59.934Z"
     },
     "work-2.51": {
       "acceptance": "A deterministic classifier records why creative/advisor gates run or skip. A well-specified bounded Big task does not automatically launch the full divergent/advisor fleet; an ambiguous/high-risk Big task retains it. Focused tests cover both routes and telemetry exposes the gate decisions.",
@@ -4518,7 +4522,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T18:59:31.992Z"
+    "updatedAt": "2026-07-27T19:18:51.567Z"
   },
   "schemaVersion": 1
 }
