@@ -1129,6 +1129,7 @@ function stateTelemetry(state, cwd) {
 		outputChars: state?.outputChars,
 		counts: state?.counts,
 		creativeDepth: state?.creativeDepth,
+		creativeGate: state?.creativeGate,
 		warnings: state?.warnings?.length
 			? { count: state.warnings.length }
 			: undefined,
@@ -3939,12 +3940,45 @@ function researchHandoffPrompt(cwd, question) {
 	].join("\n");
 }
 
-async function chooseCreativeDepth(ctx) {
+function automaticCreativeGate(task) {
+	const text = String(task).trim();
+	const highRisk =
+		/\b(?:security|authentication|authorization|payment|billing|production deploy|data loss|compliance)\b/i.test(
+			text,
+		);
+	const uncertain =
+		/\b(?:unknown|unclear|open question|decide|choose between|investigate|explore|research|architecture)\b/i.test(
+			text,
+		);
+	const bounded =
+		text.length >= 120 &&
+		/(?:[A-Za-z]:[\\/]|\b(?:extensions|scripts|src|test|tests)[\\/])[^\s]+/i.test(
+			text,
+		) &&
+		/\b(?:current behavior|expected|acceptance|verification|must|should|require|do not)\b/i.test(
+			text,
+		);
+	if (!highRisk && !uncertain && bounded)
+		return {
+			depth: "quick",
+			advisorUsage: "first",
+			reason: "bounded-explicit",
+		};
+	return {
+		depth: "wide",
+		advisorUsage: "all",
+		reason: highRisk ? "high-risk" : uncertain ? "uncertain" : "broad",
+	};
+}
+
+async function chooseCreativeGate(ctx, task = "") {
 	const mode = workOrchSettings(ctx.cwd).creativeMode;
-	if (mode === "off") return "quick";
-	if (mode === "auto") return "wide";
-	if (ctx.mode !== "tui") return "quick";
-	return (
+	if (mode === "off")
+		return { depth: "quick", advisorUsage: "none", reason: "disabled" };
+	if (mode === "auto") return automaticCreativeGate(task);
+	if (ctx.mode !== "tui")
+		return { depth: "quick", advisorUsage: "none", reason: "non-tui" };
+	const depth =
 		(await choose(
 			ctx,
 			"Creative sidecar",
@@ -3966,8 +4000,16 @@ async function chooseCreativeDepth(ctx) {
 				purpose:
 					"Choose whether this broad task needs an isolated creative pass.",
 			},
-		)) ?? "quick"
-	);
+		)) ?? "quick";
+	return {
+		depth,
+		advisorUsage: depth === "wide" ? "all" : "none",
+		reason: `selected-${depth}`,
+	};
+}
+
+async function chooseCreativeDepth(ctx, task = "") {
+	return (await chooseCreativeGate(ctx, task)).depth;
 }
 
 async function withCreativeSidecar(builder, args, state, ctx) {
@@ -3975,17 +4017,39 @@ async function withCreativeSidecar(builder, args, state, ctx) {
 	const isPlan =
 		builder === buildWorkPlanState && state.action === "handoff-plan";
 	if (!state.ok || (!isBig && !isPlan)) return state;
-	const depth = await chooseCreativeDepth(ctx);
-	if (depth !== "wide") return { ...state, creativeDepth: depth };
+	const gate = await chooseCreativeGate(ctx, args);
 	const target = isBig
 		? `planning WorkItem ${state.selectedWorkItem.id}`
 		: `master plan input ${String(args).trim()}`;
+	if (gate.depth !== "wide") {
+		const advisorStep =
+			isBig && gate.advisorUsage === "first"
+				? advisorCriticStep(
+						ctx.cwd,
+						`planning brief on WorkItem ${state.selectedWorkItem.id}`,
+						"first",
+					)
+				: "";
+		if (advisorStep)
+			return withHandoffPrompt(
+				{
+					...state,
+					creativeDepth: gate.depth,
+					creativeGate: gate,
+					controlSessionHandoff: true,
+					handoffExtra: [...(state.handoffExtra ?? []), advisorStep],
+				},
+				ctx.cwd,
+			);
+		return { ...state, creativeDepth: gate.depth, creativeGate: gate };
+	}
 	const step = creativeSidecarStep(ctx.cwd, target);
 	if (isBig)
 		return withHandoffPrompt(
 			{
 				...state,
-				creativeDepth: depth,
+				creativeDepth: gate.depth,
+				creativeGate: gate,
 				controlSessionHandoff: true,
 				handoffExtra: [
 					...(state.handoffExtra ?? []),
@@ -4000,7 +4064,8 @@ async function withCreativeSidecar(builder, args, state, ctx) {
 		);
 	return {
 		...state,
-		creativeDepth: depth,
+		creativeDepth: gate.depth,
+		creativeGate: gate,
 		handoffPrompt: [step, state.handoffPrompt].filter(Boolean).join("\n"),
 	};
 }

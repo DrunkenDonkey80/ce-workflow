@@ -422,13 +422,50 @@ try {
 	);
 	assert(
 		broadTask.creativeDepth === "wide" &&
+			broadTask.creativeGate?.reason === "broad" &&
 			broadTask.controlSessionHandoff === true &&
 			planningFollowUps.length === 1 &&
 			planningFollowUps[0]?.includes("Creative sidecar gate") &&
 			planningFollowUps[0]?.includes("work-divergent") &&
 			planningFollowUps[0]?.includes("Advisor critic gate") &&
 			bigTaskRpc === 0,
-		"Auto mode runs the wide sidecar in the control session before work-big planning",
+		"Auto mode runs the wide sidecar in the control session before broad work-big planning",
+	);
+
+	fixture.reset("ideas");
+	const boundedFollowUps = [];
+	const boundedTask = await executeOrchestratorAction(
+		"work-big",
+		"--roadmap E-1 Update extensions/work-models.js. Current behavior launches every specialist for this bounded change. Expected: retain one requirements advisor. Verification: node scripts/test-work-brainstorm.mjs. Do not change other files.",
+		{ cwd, mode: "tui", ui: { notify() {} } },
+		{ sendUserMessage: async (message) => boundedFollowUps.push(message) },
+	);
+	assert(
+		boundedTask.creativeDepth === "quick" &&
+			boundedTask.creativeGate?.reason === "bounded-explicit" &&
+			boundedFollowUps.length === 1 &&
+			!boundedFollowUps[0]?.includes("Creative sidecar gate") &&
+			!boundedFollowUps[0]?.includes("work-divergent") &&
+			boundedFollowUps[0]?.includes("Advisor critic gate") &&
+			!boundedFollowUps[0]?.includes("work-advisor-2"),
+		"Auto mode skips divergence and keeps one requirements advisor for bounded explicit Big work",
+	);
+	const boundedTelemetry = readdirSync(path.join(cwd, ".pi", "work-runs"))
+		.filter((file) => file.endsWith(".jsonl"))
+		.flatMap((file) =>
+			readFileSync(path.join(cwd, ".pi", "work-runs", file), "utf8")
+				.split(/\r?\n/)
+				.filter(Boolean)
+				.map((line) => JSON.parse(line)),
+		)
+		.find(
+			(event) =>
+				event.command === "work-big" &&
+				event.creativeGate?.reason === "bounded-explicit",
+		);
+	assert(
+		boundedTelemetry?.creativeGate?.advisorUsage === "first",
+		"Big routing telemetry records why bounded specialist gates were reduced",
 	);
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), "{}\n");
 

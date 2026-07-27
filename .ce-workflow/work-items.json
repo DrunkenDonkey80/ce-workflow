@@ -3214,15 +3214,21 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim from work-2.50: Big controls decomposition and verification depth, but creative divergence and advisor fanout must be selected by coded uncertainty/risk rather than task size alone. Preserve full fanout for genuinely broad, ambiguous, or high-stakes work while well-specified bounded changes launch only specialists likely to change the plan.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.51",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-brainstorm.mjs\nOutput: ok - work-brainstorm behavior"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Gate Big-mode specialist ceremony by uncertainty and risk",
       "type": "task",
-      "updatedAt": "2026-07-27T18:45:55.774Z"
+      "updatedAt": "2026-07-27T18:54:15.442Z"
     },
     "work-2.52": {
       "acceptance": "Planner handoff policy distinguishes human-authority decisions from clear technical defaults. Tests prove a clear technical default is recorded without blocking ready executable work, while a genuine unresolved decision remains open and blocks dependents.",
@@ -4500,7 +4506,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T18:50:44.855Z"
+    "updatedAt": "2026-07-27T18:54:15.442Z"
   },
   "schemaVersion": 1
 }
