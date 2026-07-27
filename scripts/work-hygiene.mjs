@@ -149,12 +149,17 @@ export function appendGitignorePatterns(dir, patterns) {
 // whether to block on `unrecognized`. Idempotent: a second run finds no new
 // build/cache artifacts (already ignored) and returns an empty `ignored`.
 export function tidyUntrackedFiles({ cwd, gitBin = "git" }) {
+	const scriptedGit = /\.[cm]?js$/i.test(gitBin);
 	const runGit = (argv) =>
-		execFileSync(gitBin, argv, {
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
-		});
+		execFileSync(
+			scriptedGit ? process.execPath : gitBin,
+			scriptedGit ? [gitBin, ...argv] : argv,
+			{
+				cwd,
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "pipe"],
+			},
+		);
 	const status = String(
 		runGit(["status", "--porcelain=v1", "--untracked-files=all"]),
 	);

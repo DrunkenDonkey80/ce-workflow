@@ -109,6 +109,11 @@ import {
 	settleWorkActionLease,
 	workActionLeaseState,
 } from "./work-action-leases.js";
+import {
+	hasProductionDiff,
+	normalizeReviewPolicy,
+	REVIEW_POLICIES,
+} from "./work-quality-policy.js";
 
 let withFileMutationQueue = async (_file, mutation) => mutation();
 try {
@@ -531,6 +536,10 @@ const SLICE_PLAN_ADVISOR_USAGE_DESC = {
 	all: "run all configured advisors in parallel",
 };
 const REVIEW_LEVELS = ["off", "light", "full"];
+const REVIEW_POLICY_DESC = {
+	"risk-based": "Review sensitive, broad, UI, hardware, and other high-risk production diffs",
+	"review-all": "Require independent review for every production diff",
+};
 const CREATIVE_MODES = ["off", "ask", "auto"];
 const CREATIVE_MODE_DESC = {
 	off: "use the normal brainstorm or planning flow",
@@ -3656,6 +3665,7 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
 	const codeReviewBeforeCommit =
 		raw.codeReviewBeforeCommit ?? base.codeReviewBeforeCommit;
+	const reviewPolicy = normalizeReviewPolicy(raw.reviewPolicy);
 	const creativeMode = CREATIVE_MODES.includes(raw.creativeMode)
 		? raw.creativeMode
 		: "ask";
@@ -3669,6 +3679,7 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 		advisorUsageForSlicePlans,
 		slicePlanCeDepth,
 		codeReviewBeforeCommit,
+		reviewPolicy,
 		...flags,
 	};
 }
@@ -3705,6 +3716,10 @@ function setWorkOrchBoolean(settings, key, value) {
 function setWorkOrchReviewLevel(settings, value) {
 	const block = workOrchBlock(settings);
 	block.codeReviewBeforeCommit = REVIEW_LEVELS.includes(value) ? value : "off";
+}
+
+function setWorkOrchReviewPolicy(settings, value) {
+	workOrchBlock(settings).reviewPolicy = normalizeReviewPolicy(value);
 }
 
 function setWorkOrchCreativeMode(settings, value) {
@@ -7545,7 +7560,11 @@ function planResumeAction(state, cwd, options = {}) {
 		)
 			return missingReviewScope();
 		if (activeImplementation.verificationReady) {
+			const reviewAll =
+				workOrchSettings(cwd).reviewPolicy === "review-all" &&
+				hasProductionDiff(activeImplementation.changedPaths);
 			if (
+				reviewAll ||
 				highRiskImplementation(activeImplementation) ||
 				!isSmallDiff(cwd, activeImplementation.changedPaths)
 			)
@@ -7553,8 +7572,9 @@ function planResumeAction(state, cwd, options = {}) {
 					{
 						...routed,
 						action: "run-review",
-						handoffReason:
-							"verified sensitive/broad implementation requires one independent review",
+						handoffReason: reviewAll
+							? "Review All requires one independent review for this production diff"
+							: "verified sensitive/broad implementation requires one independent review",
 					},
 					cwd,
 				);
@@ -8256,6 +8276,94 @@ async function recoverBuilderFailure(cwd, lease, terminal, runtime) {
 	};
 }
 
+function autonomousContinuationFence(cwd, lease, runtime = {}) {
+	const currentSession = runtime.currentSession?.() ?? runtime.session;
+	const goalStatus = runtime.goalStatus?.() ?? activeWorkGoal?.status;
+	if (lease.mode !== "autonomous" || goalStatus !== "active")
+		return "not-active-autonomous-goal";
+	if (currentSession && lease.session && currentSession !== lease.session)
+		return "session-changed";
+	if (lease.state === "ambiguous") return "ambiguous-lease";
+	if (
+		runtime.stopSafely ||
+		runtime.cancelled ||
+		runtime.interrupted ||
+		runtime.pendingDecision ||
+		runtime.verifierTriagePending ||
+		pendingDirtyRecoveries.size > 0 ||
+		prefetchVerifierStatus(cwd) === "completed-awaiting-triage"
+	)
+		return "continuation-fenced";
+	const latest = currentWorkActionLeases(cwd)
+		.filter((candidate) => candidate.workItemId === lease.workItemId)
+		.sort((left, right) => right.generation - left.generation)[0];
+	return latest?.leaseId === lease.leaseId &&
+		latest.generation === lease.generation &&
+		latest.state === "settled"
+		? undefined
+		: "stale-lease-generation";
+}
+
+async function autonomouslyFinishAndResume(cwd, lease, runtime = {}) {
+	const fence = autonomousContinuationFence(cwd, lease, runtime);
+	if (fence) return { action: "finish-ready", finalized: false, reason: fence };
+	const ready = buildWorkFinishState(cwd, lease.workItemId);
+	if (!ready.ok || ready.action !== "commit-ready" || ready.handoffPrompt)
+		return {
+			action: ready.action ?? "finish-stop",
+			finalized: false,
+			reason: ready.reason ?? "finish-gates-required",
+			finishState: ready,
+		};
+	const execute =
+		runtime.executeFinish ??
+		((state) => executeWorkFinishState(cwd, state, runtime.currentModel));
+	let finished;
+	try {
+		finished = await execute(ready);
+	} catch (error) {
+		return {
+			action: "finish-stop",
+			finalized: false,
+			reason: error instanceof Error ? error.message : String(error),
+		};
+	}
+	if (!finished?.ok || finished.action !== "finish-committed")
+		return {
+			action: finished?.action ?? "finish-stop",
+			finalized: false,
+			reason: finished?.reason ?? "coded-finish-failed",
+			finishState: finished,
+		};
+	const postFinishFence = autonomousContinuationFence(cwd, lease, runtime);
+	if (postFinishFence)
+		return {
+			action: "finish-committed",
+			finalized: true,
+			reason: postFinishFence,
+			finishState: finished,
+		};
+	const next = buildWorkResumeState(cwd, lease.roadmapId, {
+		ownerSession: runtime.currentSession?.() ?? runtime.session,
+	});
+	const direct = directRoleHandoffParams(next, cwd);
+	if (!direct || next.action === "finish-ready") {
+		runtime.notify?.(next);
+		return { action: next.action, finalized: true, finishState: finished, next };
+	}
+	const launched = await launchDirectAction(cwd, next, direct, runtime.pi, {
+		...runtime,
+		workflowRunId: `${lease.workflowRunId}-g${lease.generation + 1}`,
+	});
+	return {
+		action: next.action,
+		finalized: true,
+		finishState: finished,
+		next,
+		launched: Boolean(launched.spawned.ok || launched.spawned.ambiguous),
+	};
+}
+
 export async function driveWorkActionLeases(cwd, runtime = {}) {
 	reconcileWorkActionLeaseLiveness(cwd, runtime);
 	const results = [];
@@ -8409,7 +8517,18 @@ export async function driveWorkActionLeases(cwd, runtime = {}) {
 			ownerSession: currentSession,
 		});
 		const direct = directRoleHandoffParams(next, cwd);
-		if (!direct || next.action === "finish-ready") {
+		if (next.action === "finish-ready") {
+			const autonomous = await autonomouslyFinishAndResume(cwd, lease, runtime);
+			if (!autonomous.finalized) runtime.notify?.(autonomous.finishState ?? next);
+			results.push({
+				leaseId: lease.leaseId,
+				state: "settled",
+				...autonomous,
+			});
+			if (autonomous.launched) break;
+			continue;
+		}
+		if (!direct) {
 			runtime.notify?.(next);
 			results.push({
 				leaseId: lease.leaseId,
@@ -13879,16 +13998,23 @@ function buildWorkFinishState(cwd, args = "") {
 				...extra,
 			});
 		const raw = notesOf(workItem);
-		const dirty = git.dirtyPaths ?? [];
+		const dirty = (git.dirtyPaths ?? []).filter((file) => !isWorkStorePath(file));
 		const related = dirty.filter(
 			(file) => raw.includes(file) || raw.includes(file.split(/[\\/]/).pop()),
 		);
 		const verified = hasVerificationEvidence(workItem);
+		const acceptedReview =
+			hasReviewPass(workItem) ||
+			mechanicalFixAccepted(workItem) ||
+			residualFixAccepted(workItem);
+		const reviewAll =
+			workOrchSettings(cwd).reviewPolicy === "review-all" &&
+			hasProductionDiff(related);
 		const codedReview =
-			!hasReviewPass(workItem) && verified && isSmallDiff(cwd, related);
+			!acceptedReview && verified && !reviewAll && isSmallDiff(cwd, related);
 		if (isBlockedIssue(workItem) || debugNeededId(workItem))
 			return stop("blocked", "Selected WorkItem is blocked/debug-needed.");
-		if (!hasReviewPass(workItem) && !codedReview)
+		if (!acceptedReview && !codedReview)
 			return stop("missing-review", "PASS review evidence is missing.");
 		if (!verified)
 			return stop("missing-verification", "Verification evidence is missing.");
@@ -13906,7 +14032,10 @@ function buildWorkFinishState(cwd, args = "") {
 		const gates = workOrchSettings(cwd);
 		const reviewLevel = gates.codeReviewBeforeCommit;
 		const reviewBeforeCommit =
-			reviewLevel && reviewLevel !== "off" && !isSmallDiff(cwd, related);
+			!acceptedReview &&
+			reviewLevel &&
+			reviewLevel !== "off" &&
+			!isSmallDiff(cwd, related);
 		const preCommitSteps = [
 			reviewBeforeCommit ? codeReviewBeforeCommitStep(reviewLevel) : "",
 			gates.browserTestsOnUiDiff && related.some(isUiPath)
@@ -20192,6 +20321,7 @@ export {
 	applyProfile,
 	setWorkOrchBoolean,
 	setWorkOrchReviewLevel,
+	setWorkOrchReviewPolicy,
 	setWorkOrchCreativeMode,
 	setWorkOrchAdvisorSliceUsage,
 	creativeSidecarStep,
@@ -21202,6 +21332,7 @@ function workSettingsStatus(ctx) {
 			(flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`,
 		),
 		`  ${SUBMENU_ARROW} ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
+		`  ${SUBMENU_ARROW} production review policy: ${resolved.reviewPolicy}`,
 		`  ${SUBMENU_ARROW} pre-commit review: ${resolved.codeReviewBeforeCommit}`,
 		"  implementation: configured Work model (isolated work-worker)",
 		"",
@@ -21290,6 +21421,7 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "advisorSliceUsage")
 		return owns(block, "advisorUsageForSlicePlans");
 	if (item.kind === "reviewLevel") return owns(block, "codeReviewBeforeCommit");
+	if (item.kind === "reviewPolicy") return owns(block, "reviewPolicy");
 	if (item.kind === "bool") return owns(block, item.value);
 	if (item.kind === "resumeBool" || item.kind === "resumeThinking")
 		return owns(settings.workResume, item.value);
@@ -21344,6 +21476,7 @@ function clearProjectOverride(settings, item) {
 	else if (item.kind === "advisorSliceUsage")
 		delete block.advisorUsageForSlicePlans;
 	else if (item.kind === "reviewLevel") delete block.codeReviewBeforeCommit;
+	else if (item.kind === "reviewPolicy") delete block.reviewPolicy;
 	else if (item.kind === "bool") delete block[item.value];
 	else if (item.kind === "resumeBool" || item.kind === "resumeThinking")
 		delete settings.workResume[item.value];
@@ -21481,6 +21614,12 @@ async function workSettingsLoop(ctx) {
 				value: flag.key,
 				...boolLabel(flag.label, resolved[flag.key]),
 			})),
+			{
+				kind: "reviewPolicy",
+				value: "reviewPolicy",
+				label: `Production review: ${resolved.reviewPolicy === "review-all" ? "Review All" : "Risk-based"} ${SUBMENU_ARROW}`,
+				description: REVIEW_POLICY_DESC[resolved.reviewPolicy],
+			},
 			{
 				kind: "reviewLevel",
 				value: "codeReviewBeforeCommit",
@@ -21653,6 +21792,24 @@ async function workSettingsLoop(ctx) {
 			setWorkOrchAdvisorSliceUsage(settings, usage);
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Advisor usage for slice plans: ${usage}`, "info");
+			continue;
+		}
+		if (pick.kind === "reviewPolicy") {
+			const policy = await choose(
+				ctx,
+				"Production review policy",
+				REVIEW_POLICIES.map((value) => ({
+					value,
+					label: value === "review-all" ? "Review All" : "Risk-based",
+					description: REVIEW_POLICY_DESC[value],
+				})),
+				resolved.reviewPolicy,
+			);
+			if (!policy) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			setWorkOrchReviewPolicy(settings, policy);
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Production review: ${policy}`, "info");
 			continue;
 		}
 		if (pick.kind === "reviewLevel") {

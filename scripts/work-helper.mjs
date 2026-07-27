@@ -33,6 +33,10 @@ import {
 	isWorkflowManaged,
 	tidyUntrackedFiles,
 } from "./work-hygiene.mjs";
+import {
+	hasProductionDiff,
+	readReviewPolicy,
+} from "../extensions/work-quality-policy.js";
 
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
@@ -561,10 +565,18 @@ async function finishTaskUnlocked() {
 		)
 	)
 		reviewReasons.push("hardware/live-evidence contract");
+	if (
+		readReviewPolicy(cwd) === "review-all" &&
+		hasProductionDiff(implementationFiles)
+	)
+		reviewReasons.push("Review All policy: production diff");
 	if (reviewReasons.length) {
 		const reviewed = args.includes("--reviewed");
 		const priorScope = reviewScope(task);
-		if (!reviewed) {
+		const accepted =
+			sameFiles(priorScope, implementationFiles) &&
+			reviewDispositionSatisfied(task);
+		if (!accepted && !reviewed) {
 			if (!sameFiles(priorScope, implementationFiles))
 				mutateStore(cwd, (store) =>
 					appendWorkNote(
@@ -583,7 +595,7 @@ async function finishTaskUnlocked() {
 			throw new Error(
 				"review scope changed; rerun finish-task without --reviewed to regenerate the coded handoff",
 			);
-		if (!reviewDispositionSatisfied(task))
+		if (!accepted)
 			throw new Error(
 				"--reviewed requires durable wo:review PASS evidence or a verified residual fix after the targeted re-review",
 			);

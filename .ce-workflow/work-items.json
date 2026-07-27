@@ -3789,17 +3789,25 @@
         "schemaVersion": 1,
         "title": "Enforce review and autonomous finalization policy"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3.29",
       "labels": [],
       "notes": [
-        "wo:execution-agent. Continuation stage 5; implements owner decisions work-3.21 through work-3.24. Extend the existing settings, planResumeAction, action-lease driver, and coded work-helper finish path; do not create another finalizer or scheduler."
+        "wo:execution-agent. Continuation stage 5; implements owner decisions work-3.21 through work-3.24. Extend the existing settings, planResumeAction, action-lease driver, and coded work-helper finish path; do not create another finalizer or scheduler.",
+        "Files changed: extensions/work-models.js, extensions/work-quality-policy.js, scripts/work-helper.mjs, scripts/work-hygiene.mjs, scripts/test-work-quality-policy.mjs, scripts/test-work-settings.mjs\nVerification: node scripts/test-work-quality-policy.mjs && node scripts/test-work-action-leases.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-work-settings.mjs — PASS; npm run verify:quiet — PASS\nResult: risk-based migration plus global/project Review All, interactive finish-ready fencing, and single-boundary autonomous coded finish/one-step resume are covered with fake finish boundaries and no test commits.\nResidual risk: production-diff classification is path-based; atypically named test-only files are conservatively treated as production.\n",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-settings.mjs\",\"scripts/work-helper.mjs\",\"scripts/work-hygiene.mjs\",\"extensions/work-quality-policy.js\",\"scripts/test-work-quality-policy.mjs\"]",
+        "wo:review PASS Review All/risk-based settings merge, no-duplicate-review admission, TUI/RPC finish-ready fencing, and single autonomous coded-finish boundary verified; node scripts/test-work-quality-policy.mjs + test-work-settings.mjs re-run PASS, verify:quiet evidence reused.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-quality-policy.mjs && node scripts/test-work-action-leases.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-work-settings.mjs\nOutput: ok - native quality policy and autonomous finish fixtures\nok - durable action leases and one-step coded driver\nok - coded work-resume behavior\nok - coded work start/finish behavior\nok - work-settings behavior"
       ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Enforce review and autonomous finalization policy",
       "type": "task",
-      "updatedAt": "2026-07-27T06:24:00.867Z"
+      "updatedAt": "2026-07-27T14:35:31.008Z"
     },
     "work-3.3": {
       "acceptance": "A2: open roadmap/task containers default expanded and closed containers default collapsed; session-local override sets survive frame refresh and reset only when the workspace closes. Space toggles, Left collapses, Right expands, and all three are consumed before filter handling. Cursor and pending selection remain bound to stable IDs across reorder. One muted purpose line, Escape to parent/root close, parent cursor preservation, keyboard filtering, and native fallback remain intact. Injected refresh/timer tests prove unchanged compact signatures cause no requestRender, changed signatures cause exactly one, projection errors retain the last good frame, and every overlay close/back/done/escape path invokes cleanup because ctx.ui.custom has no dispose hook. Focused verification: node scripts/test-work-dialogs.mjs",
@@ -4086,7 +4094,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T14:02:46.941Z"
+    "updatedAt": "2026-07-27T14:35:31.008Z"
   },
   "schemaVersion": 1
 }

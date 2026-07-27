@@ -52,6 +52,10 @@ try {
 		"autonomous goals inherit the current effort by default",
 	);
 	assert(
+		mod.workOrchSettings(cwd).reviewPolicy === "risk-based",
+		"existing settings migrate to risk-based production review",
+	);
+	assert(
 		JSON.stringify(mod.workPerformanceSettings(cwd)) ===
 			JSON.stringify({
 				prepareNextCandidate: false,
@@ -154,6 +158,20 @@ try {
 			effective.subagents.agentOverrides["work-advisor-2"].thinking ===
 				"medium",
 		"nested project model settings override only selected global fields",
+	);
+	writeSettings({});
+	writeFileSync(path.join(globalDir, "settings.json"), "{}\n");
+	const reviewAllSettings = {};
+	mod.setWorkOrchReviewPolicy(reviewAllSettings, "review-all");
+	writeGlobalSettings(reviewAllSettings);
+	assert(
+		mod.workOrchSettings(cwd).reviewPolicy === "review-all",
+		"global Review All applies to projects without an override",
+	);
+	writeSettings({ workOrchestrator: { reviewPolicy: "risk-based" } });
+	assert(
+		mod.workOrchSettings(cwd).reviewPolicy === "risk-based",
+		"project production-review policy overrides the global selection",
 	);
 	writeSettings({});
 	writeFileSync(path.join(globalDir, "settings.json"), "{}\n");
