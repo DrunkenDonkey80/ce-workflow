@@ -3155,7 +3155,11 @@
         "schemaVersion": 1,
         "title": "Miscellaneous work"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-3",
       "labels": [
         "wo:misc"
@@ -3165,12 +3169,15 @@
         "wo:continuation-plan 2026-07-27: stages 4-6 are durable as work-3.28 advisory Sentinel reuse -> work-3.29 resolved review/autonomous-finalization enforcement -> work-3.30 cohort evaluation and deletion of ineffective optional paths. All are wo:execution-agent tracer slices with owned focused verification; work-3.28 is the only intended ready continuation.",
         "wo:roadmap-complete\nArchitecture redesign shipped in six staged slices with all 30 direct children closed. Delivered versioned cohort/shadow-assurance telemetry; durable pre-spawn action leases and zero-parent one-step continuation; Lead routing with per-role Main/Backup models and global main-first/round-robin strategy; advisory immutable Sentinel reuse; configurable risk-based/Review All policy with autonomous-only coded finalization; and paired routing-cohort evaluation/simplification using existing calibrated thresholds. Owner decisions are durable in work-3.21 through work-3.24. Stage commits: ba32d1d, c5d3649, 688f378, 9a71301, 0e4d415, 976afa6. Every production slice passed focused verification, npm run verify:quiet, coded independent review, coded finish, and push. Final audit: no ready/open direct children and clean branch at origin.",
         "wo:review PASS Consolidated roadmap-close gate; implementation scope is empty. Every production child work-3.25 through work-3.30 has durable independent PASS evidence (including targeted re-review and verified residual fixes where applicable), unchanged committed scope, focused verification, package verification, coded finish, and successful push. Parent close changes only native WorkItem state.",
-        "wo:roadmap-complete-correction\nFinal direct-child count is 31. The live roadmap-close gate exposed and fixed work-3.31: store-only review handoffs now persist explicit empty implementation scopes and can complete without weakening non-empty review admission. Fix commit 0ab72ce passed focused helper/start-finish tests, package verification, independent review, coded finish, and push."
+        "wo:roadmap-complete-correction\nFinal direct-child count is 31. The live roadmap-close gate exposed and fixed work-3.31: store-only review handoffs now persist explicit empty implementation scopes and can complete without weakening non-empty review admission. Fix commit 0ab72ce passed focused helper/start-finish tests, package verification, independent review, coded finish, and push.",
+        "wo:roadmap-complete-final\nFinal direct-child count is 32. A second live close-gate edge case was fixed in work-3.32: preexisting PASS evidence can no longer bypass the first coded empty-scope handoff, while reviewed-without-scope remains rejected. Commits ecf35f1 and 59eead3 passed pre-fix control, focused tests, package verification, independent review, coded close, and push.",
+        "wo:review-scope []",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
-      "status": "open",
+      "status": "closed",
       "title": "Misc",
       "type": "epic",
-      "updatedAt": "2026-07-27T02:47:31.927Z"
+      "updatedAt": "2026-07-27T15:51:31.296Z"
     },
     "work-3.1": {
       "createdAt": "2026-07-25T07:42:39.536Z",
@@ -4171,7 +4178,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T15:44:57.593Z"
+    "updatedAt": "2026-07-27T15:51:31.296Z"
   },
   "schemaVersion": 1
 }
