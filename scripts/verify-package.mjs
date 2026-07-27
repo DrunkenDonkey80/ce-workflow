@@ -82,7 +82,10 @@ check(
 		!agentFiles.includes("work-advisor-backup.md") &&
 		!agentFiles.some((name) => name.startsWith("bead-")),
 );
-const divergentAgent = read("agents/work-divergent.md");
+const divergentAgent = read("agents/work-divergent.md").replaceAll(
+	"\r\n",
+	"\n",
+);
 check(
 	"divergent role is isolated and tool-free",
 	[

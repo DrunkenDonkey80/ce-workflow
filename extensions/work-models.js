@@ -32,6 +32,7 @@ import {
 } from "node:path";
 import { migrateLegacyBeads } from "./legacy-beads-migration.js";
 import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.js";
+import { openWorkFleet } from "./work-fleet.js";
 import {
 	resolveReportingSource,
 	submitImprovementReport,
@@ -17558,6 +17559,12 @@ async function handleWorkMenuCommand(ctx, pi) {
 			placeholder: "Describe the task",
 		},
 		{
+			value: "fleet",
+			label: "🛰️ Subagent Tasks",
+			description:
+				"Monitor ce-workflow background tasks and their subagents.\nInspect live transcripts or message the selected live subagent.",
+		},
+		{
 			value: "work-telemetry",
 			label: "📊 Telemetry",
 			description:
@@ -17619,6 +17626,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		selectedIndex = selected.index;
 		if (selected.value === "microcompact")
 			return requestManualMicrocompact(ctx);
+		if (selected.value === "fleet") return openWorkFleet(ctx, pi);
 		if (selected.value === "cswap") {
 			await handleCswapMenu(ctx, cswapBin);
 			continue;
