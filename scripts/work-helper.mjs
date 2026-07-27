@@ -770,6 +770,17 @@ function summary(issue, notesTail = 2000) {
 	};
 }
 
+function compactChildSummary(issue) {
+	return {
+		id: idOf(issue),
+		title: titleOf(issue),
+		status: statusOf(issue),
+		type: typeOf(issue),
+		parentId: parentOf(issue),
+		dependencies: depsOf(issue),
+	};
+}
+
 function artifact(prefix, ext, content) {
 	const dir = path.join(cwd, ".pi", "work-runs", "helper");
 	mkdirSync(dir, { recursive: true });
@@ -858,12 +869,26 @@ try {
 		const issue = readWorkItem(args[0]);
 		print(summary(issue));
 	} else if (command === "work-children-summary") {
-		print(
-			childWorkItems(args[0]).map((issue) => ({
-				...summary(issue, 300),
-				notes_tail: undefined,
-			})),
+		const full = args.includes("--full");
+		const status = option("--status");
+		const children = childWorkItems(args[0]).filter(
+			(issue) => !status || statusOf(issue) === status,
 		);
+		const requestedLimit = Number(option("--limit", full ? children.length : 50));
+		const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
+			? requestedLimit
+			: 50;
+		const shown = children.slice(0, limit).map((issue) =>
+			full ? summary(issue, 300) : compactChildSummary(issue),
+		);
+		if (children.length > shown.length)
+			shown.push({
+				truncated: true,
+				total: children.length,
+				shown: shown.length,
+				hint: "Use --status <status>, --limit <n>, or --full for targeted detail.",
+			});
+		print(shown);
 	} else if (command === "work-ready-summary") {
 		const epic = args[0];
 		print(
