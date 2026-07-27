@@ -195,6 +195,52 @@ try {
 		"workflow runtime files never enter the task commit",
 	);
 
+	const storeOnly = loadStore(cwd);
+	createWorkItem(storeOnly, {
+		id: "TASK-EMPTY",
+		type: "task",
+		status: "open",
+		title: "Close authentication tracking",
+		acceptance: "Store-only completion requires independent review.",
+	});
+	saveStore(cwd, storeOnly);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-EMPTY",
+			"--max-files",
+			"1",
+			"--message",
+			"finish store-only tracking",
+			...verifyArgs,
+		),
+		/Review only:\s*\n/,
+		"store-only review emits a coded handoff",
+	);
+	assert.ok(
+		loadStore(cwd).items["TASK-EMPTY"].notes.includes("wo:review-scope []"),
+		"store-only handoff persists an explicit empty review scope",
+	);
+	const storeOnlyReviewed = loadStore(cwd);
+	storeOnlyReviewed.items["TASK-EMPTY"].notes.push(
+		"wo:review PASS - store-only scope approved",
+	);
+	saveStore(cwd, storeOnlyReviewed);
+	const storeOnlyFinished = JSON.parse(
+		run(
+			"finish-task",
+			"TASK-EMPTY",
+			"--max-files",
+			"1",
+			"--message",
+			"finish store-only tracking",
+			...verifyArgs,
+			"--reviewed",
+		),
+	);
+	assert.equal(storeOnlyFinished.status, "PASS");
+	assert.equal(loadStore(cwd).items["TASK-EMPTY"].status, "closed");
+
 	writeFileSync(path.join(cwd, "residual.js"), "export default false;\n");
 	const residualStore = loadStore(cwd);
 	createWorkItem(residualStore, {

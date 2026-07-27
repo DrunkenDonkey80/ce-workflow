@@ -577,7 +577,10 @@ async function finishTaskUnlocked() {
 			sameFiles(priorScope, implementationFiles) &&
 			reviewDispositionSatisfied(task);
 		if (!accepted && !reviewed) {
-			if (!sameFiles(priorScope, implementationFiles))
+			if (
+				priorScope === undefined ||
+				!sameFiles(priorScope, implementationFiles)
+			)
 				mutateStore(cwd, (store) =>
 					appendWorkNote(
 						store,

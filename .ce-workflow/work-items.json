@@ -3162,7 +3162,9 @@
       ],
       "notes": [
         "All child work and the project-owner TUI evidence gate are complete; workflow parallelism shipped on feat/workflow-parallelism with package verification passing.",
-        "wo:continuation-plan 2026-07-27: stages 4-6 are durable as work-3.28 advisory Sentinel reuse -> work-3.29 resolved review/autonomous-finalization enforcement -> work-3.30 cohort evaluation and deletion of ineffective optional paths. All are wo:execution-agent tracer slices with owned focused verification; work-3.28 is the only intended ready continuation."
+        "wo:continuation-plan 2026-07-27: stages 4-6 are durable as work-3.28 advisory Sentinel reuse -> work-3.29 resolved review/autonomous-finalization enforcement -> work-3.30 cohort evaluation and deletion of ineffective optional paths. All are wo:execution-agent tracer slices with owned focused verification; work-3.28 is the only intended ready continuation.",
+        "wo:roadmap-complete\nArchitecture redesign shipped in six staged slices with all 30 direct children closed. Delivered versioned cohort/shadow-assurance telemetry; durable pre-spawn action leases and zero-parent one-step continuation; Lead routing with per-role Main/Backup models and global main-first/round-robin strategy; advisory immutable Sentinel reuse; configurable risk-based/Review All policy with autonomous-only coded finalization; and paired routing-cohort evaluation/simplification using existing calibrated thresholds. Owner decisions are durable in work-3.21 through work-3.24. Stage commits: ba32d1d, c5d3649, 688f378, 9a71301, 0e4d415, 976afa6. Every production slice passed focused verification, npm run verify:quiet, coded independent review, coded finish, and push. Final audit: no ready/open direct children and clean branch at origin.",
+        "wo:review PASS Consolidated roadmap-close gate; implementation scope is empty. Every production child work-3.25 through work-3.30 has durable independent PASS evidence (including targeted re-review and verified residual fixes where applicable), unchanged committed scope, focused verification, package verification, coded finish, and successful push. Parent close changes only native WorkItem state."
       ],
       "status": "open",
       "title": "Misc",
@@ -3874,6 +3876,32 @@
       "type": "task",
       "updatedAt": "2026-07-27T15:09:25.903Z"
     },
+    "work-3.31": {
+      "acceptance": "finish-task persists an explicit empty wo:review-scope when review is required for a store-only change, accepts durable PASS evidence on the reviewed retry, and commits/closes without weakening non-empty scope matching. Add a focused regression to the helper/start-finish contract and run npm run verify:quiet.",
+      "createdAt": "2026-07-27T15:18:13.068Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "A store-only roadmap close whose contract text triggers independent review cannot finish: finish-task compares missing prior scope equal to an empty implementation file list, so it does not persist wo:review-scope []; the reviewed retry then rejects because no scope exists.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.31",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent Observed live while closing work-3 after all production children were independently reviewed.",
+        "Implemented explicit persistence of wo:review-scope [] when no prior scope exists; non-empty scope mismatch remains fail-closed.\nFiles: scripts/work-helper.mjs; scripts/test-work-helper-contract.mjs\nVerification PASS: node scripts/test-work-helper-contract.mjs; node scripts/test-work-start-finish.mjs; npm run verify:quiet; git diff --check.",
+        "wo:review-scope [\"scripts/test-work-helper-contract.mjs\",\"scripts/work-helper.mjs\"]",
+        "wo:review PASS - explicit empty wo:review-scope now persisted when priorScope is undefined; regression fails pre-fix (git-archive HEAD tree: AssertionError 'store-only handoff persists an explicit empty review scope') and passes post-fix (node scripts/test-work-helper-contract.mjs ok); non-empty scope mismatch, missing-scope rejection, and PASS/residual disposition gates unchanged.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs && node scripts/test-work-start-finish.mjs\nOutput: ok - work helper contract\nok - coded work start/finish behavior"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Persist empty implementation review scopes",
+      "type": "bug",
+      "updatedAt": "2026-07-27T15:29:27.568Z"
+    },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
       "createdAt": "2026-07-25T08:05:28.786Z",
@@ -4105,7 +4133,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T15:09:25.903Z"
+    "updatedAt": "2026-07-27T15:29:27.568Z"
   },
   "schemaVersion": 1
 }
