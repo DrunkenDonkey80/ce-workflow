@@ -3002,7 +3002,8 @@
       "labels": [],
       "notes": [
         "Classification: upstream-owned runtime isolation/attribution atom split from work-2.38; current ce-workflow local baseline guard is already fixed and tested.",
-        "Classification: upstream-owned. Related-distinct from local formatter tolerance work-2.49; runtime isolation/attribution remains owned by pi-subagents. Routed durably to https://github.com/nicobailon/pi-subagents/issues/664; leave open until installed runtime satisfies acceptance."
+        "Classification: upstream-owned. Related-distinct from local formatter tolerance work-2.49; runtime isolation/attribution remains owned by pi-subagents. Routed durably to https://github.com/nicobailon/pi-subagents/issues/664; leave open until installed runtime satisfies acceptance.",
+        "Human decision: keep this item open until upstream issue #664 is fixed and an installed pi-subagents runtime satisfies the recorded isolation/attribution acceptance; do not close merely for durable routing."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -3027,7 +3028,8 @@
       "labels": [],
       "notes": [
         "Classification: upstream-owned provider/process lifecycle behavior; no safe ce-workflow workaround replaces child runtime credential resolution.",
-        "Classification: upstream-owned. Routed durably to https://github.com/nicobailon/pi-subagents/issues/663; no local credential workaround is safe. Verify current post-continuation success and terminal auth-failure lifecycle before closure."
+        "Classification: upstream-owned. Routed durably to https://github.com/nicobailon/pi-subagents/issues/663; no local credential workaround is safe. Verify current post-continuation success and terminal auth-failure lifecycle before closure.",
+        "Human decision: keep this item open until upstream issue #663 is fixed and an installed pi-subagents runtime proves post-continuation authenticated launch plus terminal auth-failure handling; do not close merely for durable routing."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -4522,7 +4524,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T19:18:51.567Z"
+    "updatedAt": "2026-07-27T23:38:42.527Z"
   },
   "schemaVersion": 1
 }
