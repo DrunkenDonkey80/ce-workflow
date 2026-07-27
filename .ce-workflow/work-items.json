@@ -2891,6 +2891,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: A paused async work-fixer could not be resumed because pi-subagents rejected its own generated recovery descriptor with `unknown field 'launchContractDigest'`. The same project log records an earlier recovery-schema rejection, so this is recurring workflow friction.\nExpected: `subagent action=resume` should accept recovery descriptors emitted by the same runtime and revive the paused child, or migrate/ignore forward-compatible descriptor fields.\nImpact: The bounded fixer lost session continuity after a recoverable edit failure, forcing a replacement specialist and increasing cost/risk while preserving a partially edited tree.\nSuggested improvement: Make recovery descriptor parsing forward-compatible and add a generated-descriptor round-trip test for paused/failed run resume.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make recovery descriptors forward-compatible"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/461a8645-1487-4f2f-aa04-eb36ea122e9e",
@@ -3116,10 +3120,10 @@
       "notes": [
         "All child work and the project-owner TUI evidence gate are complete; workflow parallelism shipped on feat/workflow-parallelism with package verification passing."
       ],
-      "status": "closed",
+      "status": "open",
       "title": "Misc",
       "type": "epic",
-      "updatedAt": "2026-07-26T22:38:47.844Z"
+      "updatedAt": "2026-07-27T02:47:31.927Z"
     },
     "work-3.1": {
       "createdAt": "2026-07-25T07:42:39.536Z",
@@ -3480,6 +3484,191 @@
       "type": "task",
       "updatedAt": "2026-07-25T11:25:43.216Z"
     },
+    "work-3.20": {
+      "createdAt": "2026-07-27T02:47:32.022Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Plan workflow model routing architecture"
+      },
+      "evidence": [],
+      "id": "work-3.20",
+      "labels": [
+        "wo:planning"
+      ],
+      "notes": [
+        "created by /work-big\nwo:planning\nbig slice: split into executable native work-item store and decision native work-item store before implementation\ntask: Treat the architecture document at: C:\\Users\\Flex\\AppData\\Local\\Temp\\ce-workflow-model-routing-architecture.md as design input, not an approved specification. Perform a large architecture brainstorm before making any production changes. 1. Inspect the current ce-workflow implementation, settings system, agent routing, autonomous-goal lifecycle, background verification, direct RPC, concurrency controls, and telemetry. 2. Compare the proposed architecture with what already exists. Prefer reuse and deletion over introducing parallel systems. 3. Challenge every major assumption, especially: - coded orchestration versus model orchestration; - moving all autonomous mutations into agents; - semantic model profiles and role routing; - Sol-medium quality-first implementation; - assurance classification and escalation; - one-writer concurrency; - asynchronous Background Sentinel behavior; - stale result and snapshot handling; - failure recovery after process/session interruption; - telemetry build and behavior fingerprinting; - backward-compatible settings migration. 4. Run independent read-only background analyses: - implementation/current-state analysis; - adversarial architecture and failure-mode analysis; - operational simplicity, maintainability, and UX review. 5. Use fresh bounded contexts. Give analyzers the document and relevant files; do not fork this large conversation. 6. Do not implement yet. Produce: - validated current-state architecture; - decisions that should be accepted; - assumptions that should be rejected or revised; - missing risks and edge cases; - minimal target architecture; - staged migration with compatibility boundaries; - telemetry experiment for evaluating the change; - explicit unresolved decisions requiring user input; - a proposed roadmap decomposition. Optimize first for eliminating orchestration/context waste without reducing production-code quality. ``` Recommended participants: - Sol high: synthesis and architecture ownership. - GLM high: deep asynchronous adversarial/failure analysis. - Opus high: independent correctness and maintainability review. - Optionally one focused current-code analyst—but avoid a large generic fan-out. Then review the decisions before converting them into a plan. Do not combine brainstorm, architecture approval, and implementation into one enormous run.\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name.",
+        "wo:planning-brief\nAuthoritative merged planning brief: C:\\Users\\Flex\\AppData\\Local\\Temp\\ce-workflow-model-routing-planning-brief.md\nSource design input: C:\\Users\\Flex\\AppData\\Local\\Temp\\ce-workflow-model-routing-architecture.md\nwo:divergent-analysis: one bounded three-frame fresh-context pass completed; accepted action leases, preventive assurance floors, expiring background options, and one-state-at-a-time coded progression; rejected a second ledger/runtime, static DAG, rewind machinery, multiplexed writers, and continuous speculation.\nwo:advisor-analysis: requirements/evidence and operator critics completed; GLM simplifier produced a usable artifact but was stopped after nonterminal output-finalization trouble and was not retried. Substantive fixes were applied. One focused work-advisor re-review returned CLEAN/PASS.\nPlanner contract: create decision WorkItems for the four unresolved owner policies and the minimum executable staged slices. Preserve existing substrates, no source implementation, no duplicate model-profile system, and verify dependency direction once.",
+        "wo:planning-result\nDurable decomposition created: owner decisions work-3.21 review policy, work-3.22 automatic finalization, work-3.23 mandatory-role unavailability, and work-3.24 high-assurance Sentinel gate; executable sequence work-3.25 cohort identity/shadow assurance -> work-3.26 pending-direct action lease plus one-step TUI/RPC/autonomous driver -> work-3.27 Lead/bounded escalation, with work-3.27 also blocked by work-3.23. Each executable slice carries wo:execution-agent, focused verification, compatibility constraints, and an independently observable tracer. Validated current substrate is reused: planResumeAction/buildWorkResumeState, direct agents, helper-owned finish, pending-direct JSONL, read-only lanes, background verifiers, role overrides, and workflow-evaluation. Accepted proof-carrying leases, preventive shadow assurance, one-state-at-a-time progression, bounded escalation, immutable background analysis, and versioned cohort identity. Rejected duplicate model profiles, a third intent store/runtime, static DAG/DSL, live-edit Sentinel, multiplexed writers, unlimited speculation, free-form success admission, and worker self-routing. Remaining unsliced by design: bounded opt-in Sentinel reuse experiment (stage 4); review/finalization/Sentinel policy enforcement after owner decisions and telemetry (stage 5); cohort evaluation plus simplification/removal of ineffective paths (stage 6). These remain explicit roadmap traceability, not a fabricated backlog. Source: C:\\Users\\Flex\\AppData\\Local\\Temp\\ce-workflow-model-routing-planning-brief.md. Provenance: one bounded divergent pass, full advisor gate with substantive corrections, and one focused CLEAN/PASS re-review; no further advisor/divergence run.",
+        "Planning complete: four owner-policy decisions and three staged executable tracer slices are durable; dependency direction and remaining stage 4-6 traceability are recorded.",
+        "wo:failure-summary run=agent-ms2mmlme-ylpa2p role=planner action=run-planner duration=28m 49s\nreason: Planning boundary completed; no source code changed. - Accepted minimal architecture: extend existing state machine and pending-direct records—no new runtime/profile layer. - Created decisions `work-3.21`–`work-3.24`. - Created executable sequence `work-3.25 → work-3.26 → work-3.27`. - Dependency direction verified; `work-3.25` is ready. - Focused architecture re-review: CLEAN. Brief: `C:\\Users\\Flex\\AppData\\Local\\Temp\\ce-workflow-model-routing-planning-brief.md` Next: **F7 → Resume work `work-3`…\nartifact: C:\\soft\\ce-workflow\\.pi\\work-runs\\2026-07-27.jsonl\ntool-error: read 102 chars\ntool-error: bash 233 chars\ntool-error: bash 233 chars\nlatest: toolResult: { \"status\": \"PASS\", \"unstaged\": [], \"remaining_staged\": [] }\nlatest: toolResult: M .ce-workflow/work-items.json\nlatest: assistant: Planning boundary completed; no source code changed. - Accepted minimal architecture: extend existing state machine and pending-direct records—no new runtime/profile layer. - Created decisions `work-3.21`–`work-3.24`. - Created executable sequence `work-3.25 →…\nnext: /work-report work-3.20"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Treat the architecture document at: C:\\Users\\Flex\\AppData\\Local\\Temp\\ce-workflow-model-routing-architecture.md as design input, not an approved specification. Perform a large archi…",
+      "type": "task",
+      "updatedAt": "2026-07-27T03:16:22.883Z"
+    },
+    "work-3.21": {
+      "acceptance": "The owner records A or B, the default and override semantics, which changes count as production diffs, and the migration behavior for existing settings. The choice is durable and precise enough for the later quality-policy enforcement slice; no enforcement ships in this decision.",
+      "createdAt": "2026-07-27T03:10:58.471Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Owner policy for production-diff review. Option A: review every production diff (strongest defense in depth, higher latency/cost). Option B: retain deterministic risk/breadth-based review and offer an opt-in review-all quality policy (compatible and cheaper, but ordinary narrow diffs may lack independent review). Recommended default: B, preserving current behavior while telemetry measures quality; enable review-all explicitly where required.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Decide default independent review policy"
+      },
+      "evidence": [],
+      "id": "work-3.21",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Decide default independent-review policy",
+      "type": "decision",
+      "updatedAt": "2026-07-27T03:10:58.471Z"
+    },
+    "work-3.22": {
+      "acceptance": "The owner records A, B, or C; defines mode-specific behavior for TUI/RPC/autonomous entry points; states the visible stop/cancel semantics; and specifies whether next-item continuation is allowed after commit/close. Until resolved, interactive progression remains finish-ready and stage 2 must not auto-finalize it.",
+      "createdAt": "2026-07-27T03:11:07.037Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Owner policy for commit/close after configured gates pass. Option A: normal interactive runs stop visibly at finish-ready while autonomous goals may commit/close and continue automatically. Option B: TUI, RPC, and autonomous flows all auto-finalize after gates. Option C: every mode requires a manual finish action. Recommended default: A, which reduces autonomous turns without surprising interactive users.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Decide coded automatic finalization policy"
+      },
+      "evidence": [],
+      "id": "work-3.22",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Decide coded automatic-finalization policy",
+      "type": "decision",
+      "updatedAt": "2026-07-27T03:11:07.037Z"
+    },
+    "work-3.23": {
+      "acceptance": "The owner records A or B and defines availability detection, which roles permit fallback, required configuration, achieved-assurance telemetry, operator visibility, and the terminal pause state. The policy must never silently lower a mandatory gate. This decision is durable before Lead enforcement starts.",
+      "createdAt": "2026-07-27T03:11:15.376Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Owner policy when required Lead, Reviewer, or Sentinel capacity is unavailable. Option A: always pause for operator action (never degrades, but can deadlock one-model/offline users). Option B: permit only an explicitly configured same-model fallback that records required versus achieved assurance and degraded independence; otherwise pause. Recommended default: B, preserving a valid one-model baseline without silent downgrade.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Decide mandatory role unavailability fallback"
+      },
+      "evidence": [],
+      "id": "work-3.23",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Decide mandatory-role unavailability fallback",
+      "type": "decision",
+      "updatedAt": "2026-07-27T03:11:15.376Z"
+    },
+    "work-3.24": {
+      "acceptance": "The owner records A or B; defines acceptable evidence freshness and fallback behavior; and states whether Sentinel is advisory, required, or mode-specific. The choice must reuse immutable read-only lane/verifier artifacts rather than authorize live primary-checkout watching or a third runtime.",
+      "createdAt": "2026-07-27T03:11:25.174Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Owner policy for high-assurance slices. Option A: require fresh matching Sentinel evidence before the assurance gate can pass (more preventive analysis, with latency/backlog/unavailability risk). Option B: Lead plus independent Reviewer may satisfy the gate while Sentinel remains advisory/opt-in. Recommended default: B until the bounded Sentinel experiment demonstrates incremental quality without deadlock or excessive stale work.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Decide high-assurance Sentinel gate"
+      },
+      "evidence": [],
+      "id": "work-3.24",
+      "labels": [],
+      "notes": [],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Decide high-assurance Sentinel gate",
+      "type": "decision",
+      "updatedAt": "2026-07-27T03:11:25.174Z"
+    },
+    "work-3.25": {
+      "acceptance": "A deterministic fixture that fails on the current event shape proves: existing telemetry version and evaluation treatmentId semantics are unchanged; new telemetrySchemaVersion plus package version, clean Git revision or dirty workflow-source hash, routing-policy revision, assurance-classifier revision, cached canonical non-secret behavior fingerprint, and ctx.mode are emitted. The same source/settings/prompt inputs yield the same fingerprint and behavior-affecting changes yield a different one. Canonical wo:assurance v1 may raise the deterministic floor; malformed/missing input and high-confidence hard signals produce explicit telemetry reasons/warnings, never a WorkItem-note mutation, LLM classification call, route change, or silent hard-signal waiver. Legacy events remain a separate valid cohort. One-model/provider-neutral configuration and existing Plan/Work/Debug/Review overrides/defaults remain compatible. Focused verification: node scripts/test-work-telemetry.mjs && node scripts/test-work-assurance-routing.mjs && node scripts/test-workflow-evaluation-contract.mjs. Final gate: npm run verify:quiet.",
+      "createdAt": "2026-07-27T03:12:03.785Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Deliver the first observable tracer without changing routing: one TUI/RPC/autonomous orchestration decision emits stable versioned workflow identity and a deterministic shadow assurance suggestion. Parse canonical wo:assurance v1 input, derive only coded hard-signal reasons, and reuse the existing telemetry/evaluation path so later stages can be compared by build, behavior fingerprint, mode, and assurance stratum.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Emit cohort identity and shadow assurance telemetry"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.25",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent\nHigh-assurance isolated writer boundary inherited from planning work-3.20.",
+        "Implemented stage-1 telemetry-only tracer.\nFiles changed: extensions/workflow-telemetry.js; extensions/work-models.js; scripts/test-work-telemetry.mjs; scripts/test-work-assurance-routing.mjs; scripts/workflow-evaluation-contract.mjs; scripts/test-workflow-evaluation-contract.mjs.\nVerification: node scripts/test-work-telemetry.mjs && node scripts/test-work-assurance-routing.mjs && node scripts/test-workflow-evaluation-contract.mjs (PASS); npm run verify:quiet (PASS); git diff --check (PASS).\nResidual risks: v1 hard-signal detection is intentionally conservative/keyword-coded and shadow-only; workflow source/prompt identity is cached for the process lifetime.",
+        "wo:review PASS - stage-1 telemetry-only tracer: telemetry version/treatmentId unchanged, workflow identity deterministic+non-secret (hash-only settings/prompts), wo:assurance v1 can only raise never lower hard signals, shadow path mutates no route or notes, legacy cohort preserved; node scripts/test-work-telemetry.mjs && node scripts/test-work-assurance-routing.mjs && node scripts/test-workflow-evaluation-contract.mjs all PASS on re-run.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-telemetry.mjs\",\"scripts/test-workflow-evaluation-contract.mjs\",\"scripts/workflow-evaluation-contract.mjs\",\"extensions/workflow-telemetry.js\",\"scripts/test-work-assurance-routing.mjs\"]",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-telemetry.mjs && node scripts/test-work-assurance-routing.mjs && node scripts/test-workflow-evaluation-contract.mjs\nOutput: Work commands that launch implementation turns require TUI or RPC mode. Print/JSON mode stopped before creating or claiming a WorkItem.\nok - work telemetry behavior\nok - shadow assurance routing fixtures\nok - workflow evaluation contract fixtures"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Emit cohort identity and shadow assurance telemetry",
+      "type": "task",
+      "updatedAt": "2026-07-27T04:07:47.919Z"
+    },
+    "work-3.26": {
+      "acceptance": "A deterministic end-to-end fixture fails before this change and passes when a terminal specialist produces role-valid durable evidence and the driver advances exactly one planResumeAction transition with zero parent assistant continuation turns and no duplicate mutable writer in TUI, RPC, and autonomous modes. The queued/claimed lease is written before spawn with workflow run, roadmap/item, action, semantic role, assurance, base HEAD/store/item hashes, generation, allowed evidence, and nullable launch identity; identity-less ambiguous acknowledgement remains occupied. Settlement rejects free-form success, stale generation/hash/HEAD/store state, manually changed/closed/superseded items, and invalid role evidence. Live versus orphaned in-progress-agent is explicit; crash/startup/input recovery reconciles before relaunch. Mutable lease acquisition and primary-checkout lane admission share one short atomic section; the lease is never the finalize mutation lock, is not held as a process lock, and immutable snapshot jobs remain compatible. Cancellation, interruption, session switch, dirty recovery, verifier triage, decisions, and stop-safely fence continuation. Interactive runs stop visibly at finish-ready pending work-3.22; no /work-explain or permanent scheduler is added. Existing settings, status/work-summary, one-model use, pending-run recovery, prefetch, verifiers, and serial mode remain compatible. Focused verification: node scripts/test-work-action-leases.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-work-parallel-lanes.mjs. Final gate: npm run verify:quiet.",
+      "createdAt": "2026-07-27T03:12:31.241Z",
+      "dependencies": [
+        "work-3.25"
+      ],
+      "dependencyEdges": [],
+      "description": "Extend pending-direct JSONL into a versioned mutable action lease and add the minimum event-driven coded driver. Persist one bounded action before spawn, reconcile schema-validated specialist settlement, rebuild planResumeAction, perform at most one coded-safe next transition, launch at most one required specialist, then persist and stop/wait. Support the same tracer through TUI, RPC, and autonomous entry points without a second scheduler/runtime.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Drive one durable specialist transition without parent turns"
+      },
+      "evidence": [],
+      "id": "work-3.26",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent\nHigh-assurance isolated writer boundary inherited from planning work-3.20."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Drive one durable specialist transition without parent turns",
+      "type": "task",
+      "updatedAt": "2026-07-27T03:13:10.935Z"
+    },
+    "work-3.27": {
+      "acceptance": "Deterministic fixtures prove an ordinary localized understood implementation error permits at most one same-Builder repair, while repeated, ambiguous, cross-layer, plan-contradicting, scope-expanding, or high-consequence failure freezes the mutable lease, records versioned wo:escalation evidence, and gives one Lead ownership of diagnosis/edit/verification end to end; exhaustion parks in one explicit operator/decision state with no relaunch loop. A canonical explicit/high-confidence high-assurance floor selects Lead only under the resolved work-3.23 availability/fallback policy, records requested versus achieved assurance and semantic lease role directly, and never uses substring-derived role telemetry. Lead is an explicit non-advisor slot kind, appears in every effort profile/package verification, and defaults compatibly to the effective Builder model at high effort; one model may serve every role and no provider/model brand is hard-coded. Existing role overrides, settings migration, Builder/Debugger/Reviewer/Fixer behavior, single-writer lease safety, and review/finalization/Sentinel policies remain unchanged. Focused verification: node scripts/test-work-lead-escalation.mjs && node scripts/test-work-settings.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-telemetry.mjs. Final gate: npm run verify:quiet.",
+      "createdAt": "2026-07-27T03:12:59.963Z",
+      "dependencies": [
+        "work-3.23",
+        "work-3.26"
+      ],
+      "dependencyEdges": [],
+      "description": "After the mandatory-role fallback policy is decided, add only the semantic role that changes mutable behavior: a configurable Lead/Resolution writer with the worker safety contract plus architecture and escalation ownership. Route canonical high-assurance work and non-local failures deterministically, permit at most one localized same-Builder repair, and park exhausted or ambiguous escalation instead of looping.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Add Lead routing with one bounded escalation"
+      },
+      "evidence": [],
+      "id": "work-3.27",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent\nHigh-assurance isolated writer boundary inherited from planning work-3.20."
+      ],
+      "parentId": "work-3",
+      "status": "open",
+      "title": "Add Lead routing with one bounded escalation",
+      "type": "task",
+      "updatedAt": "2026-07-27T03:13:34.806Z"
+    },
     "work-3.3": {
       "acceptance": "A2: open roadmap/task containers default expanded and closed containers default collapsed; session-local override sets survive frame refresh and reset only when the workspace closes. Space toggles, Left collapses, Right expands, and all three are consumed before filter handling. Cursor and pending selection remain bound to stable IDs across reorder. One muted purpose line, Escape to parent/root close, parent cursor preservation, keyboard filtering, and native fallback remain intact. Injected refresh/timer tests prove unchanged compact signatures cause no requestRender, changed signatures cause exactly one, projection errors retain the last good frame, and every overlay close/back/done/escape path invokes cleanup because ctx.ui.custom has no dispose hook. Focused verification: node scripts/test-work-dialogs.mjs",
       "createdAt": "2026-07-25T08:05:09.658Z",
@@ -3741,7 +3930,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-26T22:38:47.845Z"
+    "updatedAt": "2026-07-27T04:07:47.919Z"
   },
   "schemaVersion": 1
 }

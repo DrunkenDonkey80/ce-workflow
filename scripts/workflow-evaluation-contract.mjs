@@ -94,6 +94,23 @@ export function fingerprint(value) {
 		.digest("hex");
 }
 
+export function telemetryCohort(event) {
+	if (!event?.telemetrySchemaVersion || !event.workflow?.behaviorFingerprint)
+		return { kind: "legacy" };
+	return {
+		kind: "workflow",
+		telemetrySchemaVersion: event.telemetrySchemaVersion,
+		packageVersion: event.workflow.packageVersion,
+		gitRevision: event.workflow.gitRevision,
+		dirtySourceHash: event.workflow.dirtySourceHash,
+		routingPolicyRevision: event.workflow.routingPolicyRevision,
+		assuranceClassifierRevision: event.workflow.assuranceClassifierRevision,
+		behaviorFingerprint: event.workflow.behaviorFingerprint,
+		mode: event.mode,
+		assuranceStratum: event.shadowAssurance?.suggestedAssurance,
+	};
+}
+
 function requireValue(condition, message) {
 	if (!condition) throw new Error(message);
 }

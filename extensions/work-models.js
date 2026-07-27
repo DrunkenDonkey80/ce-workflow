@@ -95,6 +95,10 @@ import {
 	updateWorkItem,
 	WorkStoreError,
 } from "./work-store.js";
+import {
+	classifyShadowAssurance,
+	workflowTelemetryIdentity,
+} from "./workflow-telemetry.js";
 
 let withFileMutationQueue = async (_file, mutation) => mutation();
 try {
@@ -1035,19 +1039,32 @@ function stopReason(state) {
 	return "completed-command";
 }
 
-function stateTelemetry(state) {
+function stateTelemetry(state, cwd) {
 	const handoffQueued = Boolean(state?.handoffPrompt);
 	const role = state?.inlineWork
 		? `inline-${state.inlineLevel ?? "medium"}`
 		: handoffRole(state?.action);
+	let shadowAssurance;
+	const workItemId = state?.selectedWorkItem?.id ?? state?.workItem?.id;
+	if (cwd && workItemId) {
+		try {
+			shadowAssurance = {
+				...classifyShadowAssurance(readWorkItem(cwd, workItemId)),
+				routedRole: role,
+			};
+		} catch {
+			// A concurrently removed WorkItem must not break telemetry recording.
+		}
+	}
 	return {
 		ok: state?.ok !== false,
 		action: state?.action,
 		reason: state?.reason,
 		stopReason: stopReason(state),
 		epicId: state?.epic?.id,
-		workItemId: state?.selectedWorkItem?.id ?? state?.workItem?.id,
+		workItemId,
 		workItemType: state?.selectedWorkItem?.type ?? state?.workItem?.type,
+		shadowAssurance,
 		handoff: {
 			queued: handoffQueued,
 			started: false,
@@ -1121,6 +1138,27 @@ function isDuplicateTelemetry(file, record) {
 
 const telemetryEventsCache = new Map();
 
+function telemetryBehaviorSettings(cwd) {
+	const settings = readEffectiveSettings(cwd);
+	const agentOverrides = settings.subagents?.agentOverrides ?? {};
+	return {
+		workOrchestrator: settings.workOrchestrator ?? {},
+		workResume: settings.workResume ?? {},
+		workPerformance: settings.workPerformance ?? {},
+		compaction: settings.compaction?.keepRecentTokens
+			? { keepRecentTokens: settings.compaction.keepRecentTokens }
+			: {},
+		roleOverrides: Object.fromEntries(
+			Object.entries(agentOverrides)
+				.filter(([, value]) => value?.model || value?.thinking)
+				.map(([agent, value]) => [
+					agent,
+					{ model: value.model, thinking: value.thinking },
+				]),
+		),
+	};
+}
+
 function recordWorkTelemetry(cwd, event) {
 	if (!cwd || process.env.WORK_ORCH_TELEMETRY_OFF === "1") return "";
 	const enriched = telemetryWithTranscript(event);
@@ -1130,6 +1168,7 @@ function recordWorkTelemetry(cwd, event) {
 		version: identity ? 2 : 1,
 		...identity,
 		...enriched,
+		...workflowTelemetryIdentity(telemetryBehaviorSettings(cwd)),
 		id: enriched.id ?? telemetryId(),
 		timestamp: new Date(timestamp).toISOString(),
 	};
@@ -1181,6 +1220,7 @@ function completeWorkflowOnce(cwd, completion) {
 			timestamp: new Date().toISOString(),
 			type: "workflow-complete",
 			...completion,
+			...workflowTelemetryIdentity(telemetryBehaviorSettings(cwd)),
 			terminal: true,
 		};
 		writeSync(descriptor, `${JSON.stringify(terminal)}\n`);
@@ -1310,6 +1350,7 @@ function reconcilePendingDirectRuns(cwd, runtime = {}) {
 					type: "agent",
 					workflowRunId: run.workflowRunId,
 					activity: run.activity,
+					mode: run.mode ?? runtime.mode,
 					action: run.action,
 					role: handoffRole(run.agent ?? run.action),
 					epicId: run.epicId,
@@ -2013,6 +2054,7 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 			process.env.WORK_ORCH_ACTIVITY_MARKER ??
 			process.env.WORK_ORCH_ACTIVITY ??
 			undefined,
+		mode: ctx.mode,
 		command,
 		args: String(args ?? ""),
 	};
@@ -2029,6 +2071,7 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 			type: "command-start",
 			workflowRunId: workflow.workflowRunId,
 			activity: workflow.activity,
+			mode: workflow.mode,
 			command,
 			args: truncate(args, 300),
 			ok: true,
@@ -2044,12 +2087,13 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 			errorMessage = error instanceof Error ? error.message : String(error);
 			throw error;
 		} finally {
-			const summary = stateTelemetry(state);
+			const summary = stateTelemetry(state, ctx.cwd);
 			const event = {
 				id: telemetryId("cmd"),
 				type: "command",
 				workflowRunId: workflow.workflowRunId,
 				activity: workflow.activity,
+				mode: workflow.mode,
 				command,
 				args: truncate(args, 300),
 				durationMs: Math.max(0, Date.now() - startedAt),
@@ -7653,6 +7697,7 @@ function recordSpawnedDirectRun(cwd, state, direct, spawned) {
 	return recordPendingDirectRun(cwd, {
 		workflowRunId: currentCommandWorkflow()?.workflowRunId,
 		activity: workflowActivityMarker(),
+		mode: currentCommandWorkflow()?.mode,
 		action: state.action,
 		agent: direct.agent,
 		epicId: state.epic?.id,

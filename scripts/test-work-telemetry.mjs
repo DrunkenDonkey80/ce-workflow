@@ -152,10 +152,18 @@ try {
 			evaluationEvents.every(
 				(event) =>
 					event.version === 2 &&
+					event.treatmentId === "treatment-fixture" &&
 					event.pairId === "pair-fixture" &&
-					event.agentId === "sample-fixture:main",
+					event.agentId === "sample-fixture:main" &&
+					event.telemetrySchemaVersion === 1 &&
+					event.workflow.packageVersion === "0.1.0" &&
+					Boolean(event.workflow.gitRevision || event.workflow.dirtySourceHash) &&
+					!(event.workflow.gitRevision && event.workflow.dirtySourceHash) &&
+					event.workflow.routingPolicyRevision === "1" &&
+					event.workflow.assuranceClassifierRevision === "1" &&
+					/^[a-f0-9]{64}$/.test(event.workflow.behaviorFingerprint),
 			),
-		"evaluation telemetry adds stable identity without changing ordinary records",
+		"workflow cohort identity preserves telemetry version and evaluation treatment identity",
 	);
 
 	const directDir = path.join(cwd, ".pi-subagents", "direct-1");

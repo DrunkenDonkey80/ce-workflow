@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
 	auditStageInput,
 	fingerprint,
+	telemetryCohort,
 	validateBundle,
 	validateExperimentPair,
 } from "./workflow-evaluation-contract.mjs";
@@ -379,6 +380,37 @@ for (const leaking of [
 ]) {
 	assert.throws(() => auditStageInput(leaking, "plan"));
 }
+
+assert.deepEqual(telemetryCohort({ version: 1 }), { kind: "legacy" });
+assert.deepEqual(
+	telemetryCohort({
+		version: 2,
+		treatmentId: "unchanged-treatment",
+		telemetrySchemaVersion: 1,
+		mode: "autonomous",
+		workflow: {
+			packageVersion: "0.1.0",
+			gitRevision: "abc",
+			routingPolicyRevision: "1",
+			assuranceClassifierRevision: "1",
+			behaviorFingerprint: "f".repeat(64),
+		},
+		shadowAssurance: { suggestedAssurance: "high" },
+	}),
+	{
+		kind: "workflow",
+		telemetrySchemaVersion: 1,
+		packageVersion: "0.1.0",
+		gitRevision: "abc",
+		dirtySourceHash: undefined,
+		routingPolicyRevision: "1",
+		assuranceClassifierRevision: "1",
+		behaviorFingerprint: "f".repeat(64),
+		mode: "autonomous",
+		assuranceStratum: "high",
+	},
+	"legacy and versioned workflow cohorts remain distinct without rewriting treatmentId",
+);
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const bundleRoot = path.join(root, "benchmarks", "workflow-evaluation", "v1");
