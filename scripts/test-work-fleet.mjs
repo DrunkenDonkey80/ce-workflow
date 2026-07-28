@@ -218,7 +218,10 @@ try {
 			},
 		}),
 		loadVerifiers: () => ({
-			batches: { batch: { id: "batch" } },
+			batches: {
+				batch: { id: "batch", workItemId: "Task-4" },
+				background: { id: "background" },
+			},
 			jobs: {
 				verifier: {
 					id: "verifier",
@@ -226,6 +229,18 @@ try {
 					model: "zai/glm-5.2",
 					status: "completed",
 					createdAt: "2026-01-04T00:00:00Z",
+				},
+				"background-done": {
+					id: "background-done",
+					batchId: "background",
+					model: "old-model",
+					status: "completed",
+				},
+				"background-live": {
+					id: "background-live",
+					batchId: "background",
+					model: "live-model",
+					status: "running",
 				},
 			},
 		}),
@@ -242,8 +257,12 @@ try {
 	);
 	assert.deepEqual(
 		supportSnapshot.tasks[0].agents.map((agent) => agent.name).sort(),
-		["Task-4 · Verifier · zai/glm-5.2", "Task-4 · work-prefetch"],
-		"prefetch and verifier agents appear beneath the orchestrator",
+		[
+			"Task-4 · Verifier · zai/glm-5.2",
+			"Task-4 · work-prefetch",
+			"Verifier · live-model",
+		],
+		"target agents and active unassociated work appear beneath the orchestrator",
 	);
 
 	const recentSnapshot = collectWorkFleet(fleetDir, {
@@ -270,6 +289,41 @@ try {
 		20,
 		"Fleet bounds recent finished agents",
 	);
+
+	mkdirSync(join(fleetDir, ".ce-workflow"), { recursive: true });
+	writeFileSync(
+		join(fleetDir, ".ce-workflow", "work-items.json"),
+		JSON.stringify({
+			schemaVersion: 1,
+			metadata: {},
+			items: {
+				"work-3": {
+					id: "work-3",
+					title: "Misc",
+					type: "epic",
+					status: "closed",
+					updatedAt: "2026-01-05T00:00:00Z",
+					dependencies: [],
+					labels: [],
+					notes: [],
+				},
+			},
+		}),
+	);
+	writeFileSync(
+		join(fleetDir, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({ lastEpicId: "work-3" }),
+	);
+	const completedSnapshot = collectWorkFleet(fleetDir, {
+		loadLanes: () => ({ lanes: {} }),
+		loadVerifiers: () => ({ batches: {}, jobs: {} }),
+	});
+	assert.equal(
+		completedSnapshot.tasks[0].name,
+		"Orchestrator · Misc",
+		"Fleet retains the most recent completed roadmap root",
+	);
+	assert.equal(completedSnapshot.tasks[0].state, "completed");
 
 	const output = join(fleetDir, "output-0.log");
 	writeFileSync(output, "still running");

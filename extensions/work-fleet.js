@@ -178,14 +178,10 @@ function runRecord(cwd, run) {
 	const status = run.asyncDir
 		? readJson(join(run.asyncDir, "status.json"))
 		: undefined;
-	const state = normalizeFleetState(
-		run.authoritativeState
-			? run.state
-			: (status?.state ??
-					status?.status ??
-					run.state ??
-					(run.completed ? "completed" : "queued")),
-	);
+	let rawState = status?.state ?? status?.status ?? run.state;
+	if (run.authoritativeState) rawState = run.state;
+	else if (!rawState) rawState = run.completed ? "completed" : "queued";
+	const state = normalizeFleetState(rawState);
 	const rawSteps =
 		Array.isArray(status?.steps) && status.steps.length
 			? status.steps
@@ -265,18 +261,58 @@ function supportRuns(
 	return runs;
 }
 
-function orchestratorRoot(orchestrator, tasks) {
+function recentOrchestrator(cwd, store, readFile = readFileSync) {
+	let state;
+	try {
+		state = JSON.parse(
+			readFile(join(cwd, ".pi", "work-orchestrator-state.json"), "utf8"),
+		);
+	} catch {
+		return undefined;
+	}
+	const target = store?.items?.[state?.lastEpicId];
+	if (!target) return undefined;
+	return {
+		id: `recent:${target.id}`,
+		targetId: target.id,
+		name: `Orchestrator · ${target.title ?? target.displayMetadata?.title ?? target.id}`,
+		state: target.status,
+		updatedAt: Date.parse(target.updatedAt ?? state.updatedAt ?? "") || 0,
+		objective: target.description,
+	};
+}
+
+function belongsToTarget(store, id, targetId) {
+	if (!targetId || id === targetId) return true;
+	const seen = new Set();
+	let item = store?.items?.[id];
+	while (item?.parentId && !seen.has(item.parentId)) {
+		if (item.parentId === targetId) return true;
+		seen.add(item.parentId);
+		item = store?.items?.[item.parentId];
+	}
+	return false;
+}
+
+function orchestratorRoot(orchestrator, tasks, store) {
 	if (!orchestrator) return undefined;
 	const agents = tasks
-		.flatMap((task) =>
-			task.agents.map((agent) => ({
+		.flatMap((task) => {
+			let taskAgents = [];
+			if (belongsToTarget(store, task.id, orchestrator.targetId))
+				taskAgents = task.agents;
+			else if (task.id === "background")
+				taskAgents = task.agents.filter((agent) =>
+					ACTIVE_STATES.has(agent.state),
+				);
+			return taskAgents.map((agent) => ({
 				...agent,
 				name:
 					task.id === "background"
 						? agent.name
 						: `${task.id} · ${agent.name}`,
-			})),
-		)
+			}));
+		})
 		.sort(byActiveThenRecent);
 	const rootState = normalizeFleetState(orchestrator.state);
 	return {
@@ -310,13 +346,15 @@ export function collectWorkFleet(
 	} catch (cause) {
 		error = cause instanceof Error ? cause.message : String(cause);
 	}
+	const selectedOrchestrator =
+		orchestrator ?? recentOrchestrator(cwd, store, readFile);
 	const direct = pendingRuns(cwd, readFile).map((run) => runRecord(cwd, run));
 	const runs = [
 		...direct,
 		...supportRuns(cwd, {
 			loadLanes,
 			loadVerifiers,
-			fallbackWorkItemId: orchestrator?.targetId ?? "background",
+			fallbackWorkItemId: "background",
 		}),
 	];
 	const active = runs.filter((run) => ACTIVE_STATES.has(run.state));
@@ -325,7 +363,7 @@ export function collectWorkFleet(
 		.sort(byActiveThenRecent)
 		.slice(0, RECENT_TERMINAL_LIMIT);
 	const grouped = groupWorkFleet(store, [...active, ...recent]);
-	const root = orchestratorRoot(orchestrator, grouped);
+	const root = orchestratorRoot(selectedOrchestrator, grouped, store);
 	const tasks = root ? [root] : grouped;
 	return {
 		tasks,

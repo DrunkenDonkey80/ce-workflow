@@ -24,6 +24,7 @@ const {
 	parseWorkPromptMeta,
 	reconcilePendingDirectRuns,
 	recordPendingDirectRun,
+	recordGoalSubagentLaunch,
 	recordSpawnedDirectRun,
 	recordWorkTelemetry,
 	withCommandTelemetry,
@@ -205,6 +206,44 @@ try {
 		"work-runs",
 		"direct",
 		"pending-direct.jsonl",
+	);
+	const goalLaunchFile = recordGoalSubagentLaunch(
+		cwd,
+		{ objective: "Target work item or roadmap ID: work-3" },
+		"tool-call-1",
+		{
+			agent: "work-worker",
+			async: true,
+			task: "Implement native WorkItem work-3.37.",
+		},
+		{
+			details: {
+				runId: "run-goal-worker",
+				asyncDir: path.join(cwd, ".pi-subagents", "goal-worker"),
+			},
+		},
+	);
+	const goalLaunch = readFileSync(goalLaunchFile, "utf8")
+		.trim()
+		.split(/\r?\n/)
+		.map(JSON.parse)
+		.pop();
+	assert(
+		goalLaunch.workItemId === "work-3.37" &&
+			goalLaunch.epicId === "work-3" &&
+			goalLaunch.agent === "work-worker" &&
+			goalLaunch.runId === "run-goal-worker",
+		"work-goal subagent launches persist Fleet correlation",
+	);
+	assert(
+		recordGoalSubagentLaunch(
+			cwd,
+			{ objective: "Target work item or roadmap ID: work-3" },
+			"tool-call-status",
+			{ action: "status", id: "run-goal-worker" },
+			{ details: { runId: "run-goal-worker" } },
+		) === "",
+		"subagent management calls do not create duplicate Fleet runs",
 	);
 	writeFileSync(
 		pendingFile,
@@ -833,7 +872,9 @@ try {
 				toolCallId: "read-1",
 				toolName: "read",
 				isError: false,
-				result: { content: [{ type: "text", text: "full local output" }] },
+				result: {
+					content: [{ type: "text", text: "full local output".repeat(1_000) }],
+				},
 			},
 			historyCtx,
 		);
@@ -862,6 +903,13 @@ try {
 				(line) => line.task.workItemId === commandEvent.workItemId,
 			),
 			"self-improving history is grouped by WorkItem task",
+		);
+		assert(
+			historyLines.some((line) => line.event.truncated) &&
+			readFileSync(historyFile, "utf8")
+				.split(/\r?\n/)
+				.every((line) => line.length < 12_000),
+			"self-improving history bounds large lifecycle payloads",
 		);
 		assert(
 			!fixture

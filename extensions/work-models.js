@@ -628,6 +628,7 @@ const activeRoadmapMenuSessions = new WeakMap();
 let activeHistoryTask = null;
 let activeWorkAgent = null;
 const finishHelperStarts = new Map();
+const goalSubagentStarts = new Map();
 let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
 let activeWorkGoalRunning = false;
@@ -1329,6 +1330,31 @@ function recordPendingDirectRun(cwd, run) {
 	return file;
 }
 
+function recordGoalSubagentLaunch(cwd, goal, toolCallId, args, result) {
+	const input = parseToolArgs(args);
+	if (!goal || input?.action) return "";
+	const details = result && typeof result === "object" ? result.details : undefined;
+	const runId = details?.runId ?? details?.asyncId;
+	const asyncDir = details?.asyncDir;
+	if (!runId && !asyncDir) return "";
+	const candidates = [
+		...JSON.stringify(input).matchAll(/\bwork-\d+(?:\.\d+)*\b/gi),
+	]
+		.map((match) => match[0])
+		.sort((left, right) => right.split(".").length - left.split(".").length);
+	const targetId = workGoalTargetId(goal);
+	return recordPendingDirectRun(cwd, {
+		workflowRunId: `goal-${createHash("sha256").update(String(toolCallId)).digest("hex").slice(0, 16)}`,
+		activity: "work-goal-specialist",
+		action: "goal-subagent",
+		agent: input.agent ?? input.tasks?.[0]?.agent ?? "subagent",
+		epicId: targetId,
+		workItemId: candidates[0] ?? targetId,
+		runId,
+		asyncDir,
+	});
+}
+
 const DIRECT_SUCCESS_STATES = new Set([
 	"complete",
 	"completed",
@@ -1541,6 +1567,34 @@ function selfImprovementHistoryTask(event) {
 	};
 }
 
+function compactHistoryEvent(event) {
+	const safe = jsonSafe(event);
+	const encoded = JSON.stringify(safe);
+	if (encoded.length <= 8_000) return safe;
+	const compact = {
+		truncated: true,
+		originalChars: encoded.length,
+	};
+	for (const key of ["toolCallId", "toolName", "isError", "stopReason"])
+		if (safe?.[key] !== undefined) compact[key] = safe[key];
+	if (safe?.prompt !== undefined)
+		compact.prompt = truncate(String(safe.prompt), 2_000);
+	if (safe?.args !== undefined)
+		compact.args = truncate(JSON.stringify(safe.args), 1_500);
+	if (safe?.result !== undefined)
+		compact.result = truncate(JSON.stringify(safe.result), 3_000);
+	if (safe?.message !== undefined)
+		compact.message = truncate(JSON.stringify(safe.message), 3_000);
+	if (Array.isArray(safe?.messages)) {
+		compact.messageCount = safe.messages.length;
+		compact.lastMessage = truncate(
+			JSON.stringify(safe.messages.at(-1) ?? null),
+			3_000,
+		);
+	}
+	return compact;
+}
+
 function recordSelfImprovementHistory(ctx, type, event = {}) {
 	if (!selfImprovementHistoryEnabled(ctx)) return "";
 	const cwd = ctx?.cwd ?? activeWorkAgent?.cwd ?? activeWorkGoalCwd;
@@ -1576,7 +1630,7 @@ function recordSelfImprovementHistory(ctx, type, event = {}) {
 					activeWorkAgent?.meta?.activity ??
 					pendingWorkPrompt?.meta?.activity ??
 					workflowActivityMarker(),
-				event: jsonSafe(event),
+				event: compactHistoryEvent(event),
 			})}\n`,
 		);
 		return file;
@@ -17312,7 +17366,7 @@ function workFleetOrchestrator(cwd) {
 		// Goal metadata is still enough to render the root.
 	}
 	const title =
-		target?.displayMetadata?.title ?? titleOf(target ?? {}) ?? targetId ?? "work";
+		titleOf(target ?? {}) ?? target?.displayMetadata?.title ?? targetId ?? "work";
 	return {
 		id: goal.id,
 		targetId: targetId ?? idOf(target ?? {}) ?? "background",
@@ -20714,6 +20768,7 @@ export {
 	parseWorkPromptMeta,
 	reconcilePendingDirectRuns,
 	recordPendingDirectRun,
+	recordGoalSubagentLaunch,
 	recordSpawnedDirectRun,
 	deriveIdeaStatus,
 	isIdeaIssue,
@@ -21144,6 +21199,7 @@ export default function workModelsExtension(pi) {
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
 		pendingMainEditorActions.clear();
+		goalSubagentStarts.clear();
 		activeWorkGoalRunning = false;
 		pendingWorkGoalTurn = false;
 		blockedWorkGoalTurn = false;
@@ -21168,6 +21224,7 @@ export default function workModelsExtension(pi) {
 		for (const timer of actionLeaseWatchers.values()) clearInterval(timer);
 		actionLeaseWatchers.clear();
 		finishHelperStarts.clear();
+		goalSubagentStarts.clear();
 		pendingDirtyRecoveries.clear();
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
@@ -21360,6 +21417,11 @@ export default function workModelsExtension(pi) {
 
 	pi.on("tool_execution_start", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "tool_execution_start", event);
+		if (event.toolName === "subagent" && activeWorkGoal)
+			goalSubagentStarts.set(event.toolCallId, {
+				args: event.args,
+				goal: activeWorkGoal,
+			});
 		const helper = finishHelperRequest(event.toolName, event.args);
 		if (helper)
 			try {
@@ -21379,6 +21441,16 @@ export default function workModelsExtension(pi) {
 
 	pi.on("tool_execution_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "tool_execution_end", event);
+		const goalSubagent = goalSubagentStarts.get(event.toolCallId);
+		goalSubagentStarts.delete(event.toolCallId);
+		if (goalSubagent)
+			recordGoalSubagentLaunch(
+				ctx.cwd,
+				goalSubagent.goal,
+				event.toolCallId,
+				goalSubagent.args,
+				event.result,
+			);
 		updateWorkGoalProgress(ctx);
 		const helper = finishHelperStarts.get(event.toolCallId);
 		finishHelperStarts.delete(event.toolCallId);
