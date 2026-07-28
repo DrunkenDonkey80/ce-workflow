@@ -3280,6 +3280,28 @@
       "type": "task",
       "updatedAt": "2026-07-27T18:59:31.992Z"
     },
+    "work-2.54": {
+      "acceptance": "During an active autonomous goal, exact user input pause is handled deterministically, persists paused status, and prevents another automatic continuation; unrelated chat remains unaffected.",
+      "createdAt": "2026-07-28T00:10:26.015Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Typing the exact plain-text command pause during an active autonomous goal currently reaches the model instead of pausing durable goal state, so agent_end queues another automatic continuation.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.54",
+      "labels": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Make plain pause stop an active autonomous goal",
+      "type": "bug",
+      "updatedAt": "2026-07-28T00:13:39.216Z"
+    },
     "work-2.6": {
       "createdAt": "2026-07-20T04:59:06.183Z",
       "dependencies": [
@@ -4524,7 +4546,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-27T23:38:42.527Z"
+    "updatedAt": "2026-07-28T00:13:39.216Z"
   },
   "schemaVersion": 1
 }

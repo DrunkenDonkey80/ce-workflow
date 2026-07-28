@@ -1955,6 +1955,18 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.match(sent.at(-1).message, /waive only disconnection screenshot/);
+	const sentBeforePlainPause = sent.length;
+	const plainPauseResult = await tempHooks.input?.(
+		{ source: "user", text: "pause" },
+		ctx,
+	);
+	assert.deepEqual(plainPauseResult, { action: "handled" });
+	assert.equal(statuses["work-goal"], "⏸️ paused");
+	assert.equal(
+		sent.length,
+		sentBeforePlainPause,
+		"plain pause does not queue another autonomous continuation",
+	);
 
 	writeFileSync(
 		path.join(cwd, ".pi", "work-orchestrator-state.json"),

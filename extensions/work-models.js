@@ -20852,6 +20852,14 @@ export default function workModelsExtension(pi) {
 		const sanitizedEvent = richTaskTransform
 			? { ...event, text: richTaskTransform.text, images: [] }
 			: event;
+		if (
+			sanitizedEvent.source === "user" &&
+			String(sanitizedEvent.text ?? "").trim().toLowerCase() === "pause" &&
+			activeWorkGoal?.status === "active"
+		) {
+			await handleWorkGoalCommand("pause", activeWorkGoal.mode, pi, ctx);
+			return { action: "handled" };
+		}
 		const pendingRuns = readPendingDirectEvents(ctx.cwd).filter(
 			(item) => item.type === "pending",
 		);
