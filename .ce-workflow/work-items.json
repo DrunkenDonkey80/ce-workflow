@@ -3495,7 +3495,7 @@
         "wo:roadmap-complete-final\nFinal direct-child count is 32. A second live close-gate edge case was fixed in work-3.32: preexisting PASS evidence can no longer bypass the first coded empty-scope handoff, while reviewed-without-scope remains rejected. Commits ecf35f1 and 59eead3 passed pre-fix control, focused tests, package verification, independent review, coded close, and push.",
         "wo:review-scope []",
         "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed",
-        "wo:roadmap-complete-final\\nAll 35 direct children are closed. Final slice work-3.37 replaced automatic Worker-based stats with owner-approved explicit s-key stats, passed focused and package verification, committed as 97f295b, and pushed. Final ready-child audit is empty.",
+        "wo:roadmap-complete-final\nAll 35 direct children are closed. Final slice work-3.37 replaced automatic Worker-based stats with owner-approved explicit s-key stats, passed focused and package verification, committed as 97f295b, and pushed. Final ready-child audit is empty.",
         "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
       "status": "closed",
