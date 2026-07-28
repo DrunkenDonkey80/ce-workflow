@@ -4306,12 +4306,14 @@
       "evidence": [],
       "id": "work-3.34",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "Owner decision: replace automatic delayed stats and Worker/cache architecture with explicit on-demand stats for the currently selected row. Pressing lowercase s computes and shows stats; navigation itself performs no stats calculation. No Worker and no hydration cache are required."
+      ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Decide Worker boundary and hydration-cache scope",
       "type": "decision",
-      "updatedAt": "2026-07-27T18:26:11.386Z"
+      "updatedAt": "2026-07-28T07:32:09.795Z"
     },
     "work-3.35": {
       "acceptance": "Deterministic injected-timer tests in scripts/test-work-dialogs.mjs fail before and pass after: handleWorkRoadmapWorkspace does not override the default; the captured dwell is exactly 500 ms; every selected-ID change and cleanup path cancels the pending timer and calls onStatsCancel for started work; no eager replacement starts before a new 500 ms dwell. A non-thenable resolveStats result renders in the same callback tick. Thenable success/rejection settles asynchronously and only the current selected ID and dialog generation while open may cache or render; stale, post-close, and wrong-selection settlement is ignored. Existing filtering, cursor, refresh, native fallback, and synchronous callers remain compatible. Verification: node scripts/test-work-dialogs.mjs.",
@@ -4328,12 +4330,14 @@
       "evidence": [],
       "id": "work-3.35",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "Superseded by the owner-approved explicit s-key stats interaction recorded in work-3.34; promise-aware dwell scheduling is unnecessary."
+      ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Make roadmap stats dialog promise-aware after 500 ms dwell",
       "type": "task",
-      "updatedAt": "2026-07-27T18:27:00.378Z"
+      "updatedAt": "2026-07-28T07:32:09.967Z"
     },
     "work-3.36": {
       "acceptance": "Roadmap navigation and the 750 ms projection refresh stay responsive while stats run off-thread after the 500 ms dwell. Every request/reply has a job ID and sends cwd, targetId, and options exactly preserving { importLegacy: false }; the worker reuses buildWorkStats and never imports legacy data or mutates the store. Selection change terminates active stale work without eager replacement; a successfully idle Worker may be reused; outer close permanently disposes while popup/reopen cleanup uses reusable cancelActive(). Stale/wrong-job/post-close replies cannot render or cache. Constructor/post/rejection/error/early or abnormal exit/cancellation paths settle once, remove listeners/state, never escape into Pi, and create no durable cache hit. A current failed selection renders Stats: / - unknown and queues exactly once until selection changes; navigating away/back retries exactly once, while moved-selection cancellation creates no failed marker. Deterministic scripted-port tests cover lifecycle, hostile replies, failure, retry, reuse, terminate, and final disposal. A mandatory real Worker smoke proves ESM entry loading, successful message shape, { importLegacy: false }, and bounded error serialization. scripts/test-work-roadmap.mjs retargets its source assertion to the Worker request; package verification asserts the dedicated entry ships. Native/print/RPC and synchronous non-workspace callers, including buildWorkStats and handleRoadmapTasksMenu subtitle stats, remain compatible. Focused gate: node scripts/test-work-dialogs.mjs && node scripts/test-work-roadmap.mjs && node scripts/test-work-stats.mjs. Final gate: npm run verify:quiet.",
@@ -4350,12 +4354,36 @@
       "evidence": [],
       "id": "work-3.36",
       "labels": [],
-      "notes": [],
+      "notes": [
+        "Superseded by the owner-approved explicit s-key stats interaction recorded in work-3.34; no Worker or hydration cache will be built."
+      ],
       "parentId": "work-3",
-      "status": "open",
+      "status": "closed",
       "title": "Run roadmap workspace stats in a lifecycle-safe Node Worker",
       "type": "task",
-      "updatedAt": "2026-07-27T18:27:00.558Z"
+      "updatedAt": "2026-07-28T07:32:10.119Z"
+    },
+    "work-3.37": {
+      "acceptance": "In extensions/work-dialogs.js, roadmap workspace stats do not run during render, navigation, filtering, refresh, expansion, or open. Lowercase s invokes resolveStats exactly once for the current selected ID unless that ID is already cached, renders the result, and leaves other selected IDs idle until explicitly requested. Resolver failure renders unknown without escaping. The keys footer advertises s stats. Existing selection, back, expansion, filtering (except the reserved standalone lowercase s key), native fallback, and synchronous non-workspace callers remain compatible. Add focused assertions in scripts/test-work-dialogs.mjs. Verify: node scripts/test-work-dialogs.mjs && npm run verify:quiet.",
+      "createdAt": "2026-07-28T07:32:10.295Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Remove automatic roadmap-workspace stats calculation. Show an idle hint until the user presses lowercase s, then synchronously resolve and cache stats for the currently selected row. Navigation, filtering, refresh, expansion, and dialog open must not invoke resolveStats. Preserve existing synchronous stats computation and all non-workspace callers; do not add a Worker or hydration cache.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.37",
+      "labels": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-dialogs.mjs && npm run verify:quiet\nOutput: ok - shared work dialogs\n\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "Show selected roadmap stats on explicit s key",
+      "type": "task",
+      "updatedAt": "2026-07-28T07:38:24.652Z"
     },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
@@ -4588,7 +4616,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-28T01:45:32.427Z"
+    "updatedAt": "2026-07-28T07:38:24.652Z"
   },
   "schemaVersion": 1
 }

@@ -592,9 +592,6 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		refreshIntervalMs = 1000,
 		setIntervalFn = setInterval,
 		clearIntervalFn = clearInterval,
-		setTimeoutFn = setTimeout,
-		clearTimeoutFn = clearTimeout,
-		statsDelayMs = 100,
 		cleanup,
 		cursorKey = title,
 		filter = true,
@@ -672,8 +669,6 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 				frame?.selectedId ?? dialogCursors.get(cursorKey) ?? rows[0]?.id;
 			let closed = false;
 			let timer;
-			let statsTimer;
-			let statsPendingId;
 			let cachedKey;
 			let cachedLines;
 			const statsById = new Map();
@@ -708,7 +703,6 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 				if (closed) return;
 				closed = true;
 				if (timer !== undefined) clearIntervalFn(timer);
-				if (statsTimer !== undefined) clearTimeoutFn(statsTimer);
 				cleanup?.();
 				if (selectedId) dialogCursors.set(cursorKey, selectedId);
 				done(result);
@@ -728,26 +722,13 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 			};
 			rebuild();
 			if (refresh) timer = setIntervalFn(poll, refreshIntervalMs);
-			const queueStats = (id) => {
-				if (statsPendingId !== id && statsTimer !== undefined) {
-					clearTimeoutFn(statsTimer);
-					statsTimer = undefined;
-					statsPendingId = undefined;
+			const showStats = (id) => {
+				if (!id || statsById.has(id)) return;
+				try {
+					statsById.set(id, resolveStats?.(id) ?? ["Stats:", "- unknown"]);
+				} catch {
+					statsById.set(id, ["Stats:", "- unknown"]);
 				}
-				if (!id || statsById.has(id) || statsPendingId === id) return;
-				statsPendingId = id;
-				statsTimer = setTimeoutFn(() => {
-					statsTimer = undefined;
-					if (closed || statsPendingId !== id) return;
-					statsPendingId = undefined;
-					try {
-						statsById.set(id, resolveStats?.(id) ?? ["Stats:", "- unknown"]);
-					} catch {
-						statsById.set(id, ["Stats:", "- unknown"]);
-					}
-					cachedKey = undefined;
-					tui.requestRender();
-				}, statsDelayMs);
 			};
 
 			const component = {
@@ -758,8 +739,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}`;
 					if (cache === cachedKey) return cachedLines;
 					const selected = visible.find((row) => row.id === selectedId);
-					queueStats(selected?.id);
-					const stats = statsById.get(selected?.id) ?? ["Stats:", "- loading…"];
+					const stats = statsById.get(selected?.id) ?? ["Stats:", "- press s to show"];
 					const lines = [];
 					const add = (line = "") => lines.push(fitOverlayLine(line, width));
 					const header = [
@@ -859,7 +839,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					add(
 						theme.fg(
 							"dim",
-							`${filter ? "Type to filter · " : ""}↑↓ navigate · Space/←/→ expand · Enter select · Esc back`,
+							`${filter ? "Type to filter · " : ""}s stats · ↑↓ navigate · Space/←/→ expand · Enter select · Esc back`,
 						),
 					);
 					while (lines.length < height) add();
@@ -873,7 +853,9 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						visible.findIndex((row) => row.id === selectedId),
 					);
 					const row = visible[index];
-					if (data === "left" || data === "\x1b[D") {
+					if (data === "s") {
+						showStats(row?.id);
+					} else if (data === "left" || data === "\x1b[D") {
 						let parent = row?.container && expanded(row) ? row : undefined;
 						for (let at = index - 1; !parent && at >= 0; at -= 1) {
 							const candidate = visible[at];

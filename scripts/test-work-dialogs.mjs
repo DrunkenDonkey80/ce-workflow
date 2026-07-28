@@ -736,6 +736,10 @@ const treeRun = await driveTree(
 			"header collapses to its three content rows",
 		);
 		assert.equal(initialFirstRowAt, initialSeparatorAt + 1);
+		assert.equal(statsCalls.length, 0, "render does not resolve stats");
+		assert(lines.some((line) => line.includes("- press s to show")));
+		component.handleInput("s");
+		lines = component.render(70);
 		assert(
 			lines[initialSeparatorAt + 1].trimEnd().endsWith("Stats:"),
 			"stats start below the Work items line in the right column",
@@ -847,6 +851,9 @@ const treeRun = await driveTree(
 		component.handleInput("right");
 		lines = component.render(70);
 		assert(lines.some((line) => /❯.*\[-\] ● Task A/.test(line)));
+		assert(lines.some((line) => line.includes("- press s to show")));
+		component.handleInput("s");
+		lines = component.render(70);
 		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
 		assert(
 			lines[initialSeparatorAt + 2].trimEnd().endsWith("- selected task-a"),
@@ -932,8 +939,12 @@ const failedStatsTree = await driveTree(
 		},
 	},
 	async (component) => {
+		assert(component.render(70).some((line) => line.includes("- press s to show")));
+		component.handleInput("s");
 		assert(component.render(70).some((line) => line.includes("- unknown")));
 		component.handleInput("down");
+		assert(component.render(70).some((line) => line.includes("- press s to show")));
+		component.handleInput("s");
 		assert(component.render(70).some((line) => line.includes("- unknown")));
 		component.handleInput("escape");
 	},
@@ -944,47 +955,27 @@ assert.equal(
 	"stats failure does not break navigation",
 );
 
-let deferredStats;
-let cancelledStats = 0;
-const deferredStatsCalls = [];
+const explicitStatsCalls = [];
 await driveTree(
 	{
-		setTimeoutFn(callback) {
-			deferredStats = callback;
-			return 91;
-		},
-		clearTimeoutFn(value) {
-			assert.equal(value, 91);
-			cancelledStats += 1;
-		},
 		resolveStats(id) {
-			deferredStatsCalls.push(id);
+			explicitStatsCalls.push(id);
 			return ["Stats:", `- selected ${id}`];
 		},
 	},
 	async (component) => {
-		assert(component.render(70).some((line) => line.includes("- loading…")));
-		assert.equal(
-			deferredStatsCalls.length,
-			0,
-			"render never resolves stats inline",
-		);
+		assert(component.render(70).some((line) => line.includes("- press s to show")));
 		component.handleInput("down");
-		assert(component.render(70).some((line) => line.includes("- loading…")));
-		assert.equal(
-			deferredStatsCalls.length,
-			0,
-			"arrow navigation stays filesystem-free",
-		);
-		deferredStats();
-		assert.deepEqual(deferredStatsCalls, ["task-a"]);
+		assert.equal(explicitStatsCalls.length, 0, "navigation stays filesystem-free");
+		component.handleInput("s");
+		component.handleInput("s");
+		assert.deepEqual(explicitStatsCalls, ["task-a"]);
 		assert(
 			component.render(70).some((line) => line.includes("- selected task-a")),
 		);
 		component.handleInput("escape");
 	},
 );
-assert.equal(cancelledStats, 1, "moving selection cancels stale stats work");
 
 const shortTree = await driveTree({ testRows: 8 }, async (component) => {
 	const lines = component.render(18);
