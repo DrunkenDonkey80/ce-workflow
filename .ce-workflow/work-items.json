@@ -3003,13 +3003,14 @@
       "notes": [
         "Classification: upstream-owned runtime isolation/attribution atom split from work-2.38; current ce-workflow local baseline guard is already fixed and tested.",
         "Classification: upstream-owned. Related-distinct from local formatter tolerance work-2.49; runtime isolation/attribution remains owned by pi-subagents. Routed durably to https://github.com/nicobailon/pi-subagents/issues/664; leave open until installed runtime satisfies acceptance.",
-        "Human decision: keep this item open until upstream issue #664 is fixed and an installed pi-subagents runtime satisfies the recorded isolation/attribution acceptance; do not close merely for durable routing."
+        "Human decision: keep this item open until upstream issue #664 is fixed and an installed pi-subagents runtime satisfies the recorded isolation/attribution acceptance; do not close merely for durable routing.",
+        "Verified against installed pi-subagents 0.37.1: runtime agent discovery through subagent get planner resolves planner tools to read, grep, find, ls, intercom only (no write/edit/bash), with acceptanceRole read-only; bundled upstream regression for issue #664 asserts the same installed agent contract. Planner repository mutation is technically prevented by tool capability."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Track upstream planner repository mutation isolation",
       "type": "bug",
-      "updatedAt": "2026-07-27T16:39:43.671Z"
+      "updatedAt": "2026-07-28T01:36:25.422Z"
     },
     "work-2.47": {
       "acceptance": "Close only after an installed pi-subagents runtime proves an async exact-role launch after goal continuation uses authenticated parent provider resolution and an auth failure becomes terminal without an idle alert.",
@@ -3029,13 +3030,14 @@
       "notes": [
         "Classification: upstream-owned provider/process lifecycle behavior; no safe ce-workflow workaround replaces child runtime credential resolution.",
         "Classification: upstream-owned. Routed durably to https://github.com/nicobailon/pi-subagents/issues/663; no local credential workaround is safe. Verify current post-continuation success and terminal auth-failure lifecycle before closure.",
-        "Human decision: keep this item open until upstream issue #663 is fixed and an installed pi-subagents runtime proves post-continuation authenticated launch plus terminal auth-failure handling; do not close merely for durable routing."
+        "Human decision: keep this item open until upstream issue #663 is fixed and an installed pi-subagents runtime proves post-continuation authenticated launch plus terminal auth-failure handling; do not close merely for durable routing.",
+        "Verified against installed pi-subagents 0.37.1 after this goal's continuation/compaction: exact work-reviewer async run 6188e72a-01a9-4918-83ac-42fa81705545 completed AUTH_OK (exit 0), and installed continuation regression preserves the last authenticated parent provider/model. A direct installed-runner auth-failure smoke used a fake Pi CLI returning 'No API key found for test-provider' with 1ms attention thresholds; status and step became failed with exit 1 immediately, activityState stayed unset, and needs_attention event count was 0."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Track upstream async authentication after goal continuation",
       "type": "bug",
-      "updatedAt": "2026-07-27T16:39:43.819Z"
+      "updatedAt": "2026-07-28T01:36:18.996Z"
     },
     "work-2.48": {
       "acceptance": "A generated async recovery descriptor containing launchContractDigest round-trips through readAsyncRecoveryDescriptor and resume for paused/failed runs; an automated regression test covers the generated descriptor schema.",
@@ -4546,7 +4548,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-28T00:13:39.216Z"
+    "updatedAt": "2026-07-28T01:36:25.424Z"
   },
   "schemaVersion": 1
 }
