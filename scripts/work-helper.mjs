@@ -874,13 +874,18 @@ try {
 		const children = childWorkItems(args[0]).filter(
 			(issue) => !status || statusOf(issue) === status,
 		);
-		const requestedLimit = Number(option("--limit", full ? children.length : 50));
-		const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
-			? requestedLimit
-			: 50;
-		const shown = children.slice(0, limit).map((issue) =>
-			full ? summary(issue, 300) : compactChildSummary(issue),
+		const requestedLimit = Number(
+			option("--limit", full ? children.length : 50),
 		);
+		const limit =
+			Number.isInteger(requestedLimit) && requestedLimit > 0
+				? requestedLimit
+				: 50;
+		const shown = children
+			.slice(0, limit)
+			.map((issue) =>
+				full ? summary(issue, 300) : compactChildSummary(issue),
+			);
 		if (children.length > shown.length)
 			shown.push({
 				truncated: true,

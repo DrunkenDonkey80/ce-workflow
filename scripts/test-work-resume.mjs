@@ -859,8 +859,11 @@ try {
 	setScenario();
 	state = buildWorkResumeState(cwd, "BUG-1");
 	assert(
-		!state.ok && state.reason === "unsupported-target",
-		"explicit child target is rejected instead of silently replanned",
+		state.ok &&
+			state.target.kind === "work-item" &&
+			state.selectedWorkItem.id === "BUG-1" &&
+			state.action === "run-debug",
+		"an explicit executable child target stays scoped to that WorkItem",
 	);
 
 	state = buildWorkResumeState(
@@ -987,8 +990,9 @@ try {
 	const sent = [];
 	const notices = [];
 	setScenario("plannedIdea");
-	let tuiRpcRequests = 0;
-	await handleWorkResumeCommand(
+	let tuiRpcRequest;
+	const rpcListeners = new Map();
+	const autonomousResult = await handleWorkResumeCommand(
 		"E-1",
 		{
 			cwd: cwd,
@@ -1001,32 +1005,46 @@ try {
 		{
 			sendUserMessage: async (message, options) =>
 				sent.push({ message, options }),
-			events: { emit: () => tuiRpcRequests++ },
+			events: {
+				on: (name, listener) => {
+					rpcListeners.set(name, listener);
+					return () => rpcListeners.delete(name);
+				},
+				emit: (_name, request) => {
+					tuiRpcRequest = request;
+					queueMicrotask(() =>
+						rpcListeners.get(`subagents:rpc:v1:reply:${request.requestId}`)?.({
+							success: true,
+							data: { runId: "autonomous-run" },
+						}),
+					);
+				},
+			},
 		},
 	);
 	assert(
-		sent.length === 1 &&
-			sent[0].message.includes("WorkItem") &&
-			tuiRpcRequests === 0,
-		"TUI resume injects one visible Pi user turn without direct RPC",
+		autonomousResult.autonomousGoalStarted &&
+			autonomousResult.actionLease?.mode === "autonomous" &&
+			sent.length === 1 &&
+			sent[0].message.includes("Work-goal mode is active") &&
+			sent[0].message.includes("Target work item or roadmap ID: E-1") &&
+			sent[0].message.includes("Coded orchestration already launched") &&
+			tuiRpcRequest?.method === "spawn",
+		"TUI resume starts the visible autonomous root and its coded specialist",
 	);
 
 	setScenario();
-	let rpcReply;
-	let rpcRequest;
-	const rpcPi = {
-		events: {
-			on: (_name, reply) => {
-				rpcReply = reply;
-				return () => {};
-			},
-			emit: (_name, request) => {
-				rpcRequest = request;
-				queueMicrotask(() => rpcReply({ success: true, data: {} }));
-			},
-		},
-	};
-	const directResult = await handleWorkResumeCommand(
+	const selectionHandoff = directRoleHandoffParams(
+		buildWorkResumeState(cwd, "E-1"),
+		cwd,
+		"the terminal is next to the probe",
+	);
+	assert(
+		selectionHandoff.params.task.includes("the terminal is next to the probe"),
+		"numbered-selection notes remain in specialist handoffs inside the loop",
+	);
+	const sentBeforeRepeat = sent.length;
+	const repeated = await handleWorkResumeCommand(
 		"E-1",
 		{
 			cwd: cwd,
@@ -1035,21 +1053,14 @@ try {
 			sendUserMessage: async (message, options) =>
 				sent.push({ message, options }),
 		},
-		rpcPi,
-		"the terminal is next to the probe",
+		{ events: { on: () => () => {}, emit: () => {} } },
 	);
 	assert(
-		rpcRequest?.params?.task?.includes("the terminal is next to the probe"),
-		"numbered-selection notes reach direct role handoffs",
-	);
-	assert(
-		directResult.directHandoff?.agent === "work-debugger" &&
-			directResult.handoffClaimed,
-		"live resume directly launches and claims the exact specialist without a duplicate-writer window",
+		!repeated.autonomousGoalStarted && sent.length === sentBeforeRepeat,
+		"repeating Resume for the owned target does not launch a duplicate loop",
 	);
 
 	setScenario();
-	rpcRequest = undefined;
 	const sentBeforeNumberedResume = sent.length;
 	assert(
 		await executeNumberedWorkAction(
@@ -1068,9 +1079,8 @@ try {
 		"numbered /work-resume action executes",
 	);
 	assert(
-		sent.length === sentBeforeNumberedResume + 1 &&
-			sent.at(-1).message.includes("the terminal is next to the probe"),
-		"numbered TUI /work-resume keeps the note in one visible Pi turn",
+		sent.length === sentBeforeNumberedResume,
+		"numbered Resume reuses the active autonomous loop",
 	);
 
 	setScenario("blocked");

@@ -20,6 +20,7 @@ import {
 import {
 	createWorkItem,
 	initStore,
+	loadStore,
 	mutateStore,
 	saveStore,
 	updateWorkItem,
@@ -145,12 +146,12 @@ try {
 			mode,
 			session: "same-session",
 			goalStatus: () => "active",
+			targetId: mode === "autonomous" ? "W-1" : undefined,
 			executeFinish: async (state) => {
 				finishes += 1;
-				mutateStore(cwd, (store) => {
-					updateWorkItem(store, "W-1", { status: "closed" });
-					return updateWorkItem(store, "E-1", { status: "closed" });
-				});
+				mutateStore(cwd, (store) =>
+					updateWorkItem(store, "W-1", { status: "closed" }),
+				);
 				git(cwd, "restore", "--", "src/a.js");
 				return { ...state, ok: true, action: "finish-committed" };
 			},
@@ -164,17 +165,25 @@ try {
 				(mode !== "autonomous" || result[0].action === "done-candidate"),
 			`${mode}: settlement rebuilds at most one deterministic resume state (${JSON.stringify(result)})`,
 		);
+		if (mode === "autonomous")
+			assert(
+				loadStore(cwd).items["E-1"].status === "in_progress",
+				"an explicit task target stops without closing or advancing its roadmap",
+			);
 	}
 
 	for (const [name, runtime] of [
 		["stop safely", { stopSafely: true }],
+		["stopped goal", { goalStatus: () => "stopped" }],
+		["paused goal", { goalStatus: () => "paused" }],
+		["usage-limited goal", { goalStatus: () => "waiting_usage_limit" }],
 		["cancellation", { cancelled: true }],
 		["interruption", { interrupted: true }],
 		["pending decision", { pendingDecision: true }],
 		["verifier triage", { verifierTriagePending: true }],
 		["session change", { currentSession: () => "other-session" }],
 	]) {
-		cwd = fixture(`fence-${name.replaceAll(" ", "-")}`);
+		cwd = fixture(`fence-${String(name).replaceAll(" ", "-")}`);
 		roots.push(cwd);
 		mutateStore(cwd, (store) =>
 			updateWorkItem(store, "W-1", {

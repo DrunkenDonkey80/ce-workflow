@@ -7,12 +7,12 @@ import { pathToFileURL } from "node:url";
 const { assert, installWorkflowFixture } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
-	).href,
+	).href
 );
 const { createWorkItem, mutateStore } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "../extensions/work-store.js")),
-	).href,
+	).href
 );
 
 const fixture = installWorkflowFixture({ native: true });
@@ -59,7 +59,10 @@ try {
 	);
 
 	const targeted = run("work-children-summary", "E-1", "--status", "closed");
-	assert(targeted.length === 0, "status filtering provides targeted compact intake");
+	assert(
+		targeted.length === 0,
+		"status filtering provides targeted compact intake",
+	);
 
 	const full = run("work-children-summary", "E-1", "--full", "--limit", "1");
 	assert(

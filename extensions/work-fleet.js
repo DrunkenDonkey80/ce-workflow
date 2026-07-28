@@ -10,16 +10,20 @@ import {
 	realpathSync,
 } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
+import { loadVerifierStore } from "./background-verifiers.js";
+import { loadLaneStore } from "./read-only-lanes.js";
 import { loadStore } from "./work-store.js";
 
 const REFRESH_MS = 750;
 const RECENT_TERMINAL_LIMIT = 20;
-const ACTIVE_STATES = new Set(["running", "queued"]);
+const ACTIVE_STATES = new Set(["running", "queued", "waiting", "paused"]);
 const LIVE_STATES = new Set(["running"]);
 const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 const STATUS_SYMBOLS = Object.freeze({
 	running: "●",
 	queued: "◦",
+	waiting: "?",
+	paused: "‖",
 	completed: "✓",
 	stopped: "■",
 	failed: "✗",
@@ -27,8 +31,13 @@ const STATUS_SYMBOLS = Object.freeze({
 
 export function normalizeFleetState(value) {
 	const state = String(value ?? "").toLowerCase();
-	if (["running", "active", "in_progress"].includes(state)) return "running";
+	if (["running", "active", "in_progress", "stopping"].includes(state))
+		return "running";
 	if (["queued", "pending", "open", "planned"].includes(state)) return "queued";
+	if (["waiting", "waiting_for_decision", "needs_human"].includes(state))
+		return "waiting";
+	if (["paused", "waiting_usage_limit", "budget_limited"].includes(state))
+		return "paused";
 	if (
 		[
 			"complete",
@@ -37,17 +46,18 @@ export function normalizeFleetState(value) {
 			"success",
 			"succeeded",
 			"done",
+			"promoted",
 		].includes(state)
 	)
 		return "completed";
 	if (
 		[
-			"paused",
 			"stopped",
 			"cancelled",
 			"canceled",
 			"detached",
 			"deferred",
+			"discarded",
 			"blocked",
 		].includes(state)
 	)
@@ -75,6 +85,8 @@ function taskState(item, agents) {
 	const states = agents.map((agent) => normalizeFleetState(agent.state));
 	if (states.includes("running")) return "running";
 	if (states.includes("queued")) return "queued";
+	if (states.includes("waiting")) return "waiting";
+	if (states.includes("paused")) return "paused";
 	if (states.includes("failed")) return "failed";
 	if (states.includes("stopped")) return "stopped";
 	if (states.length) return "completed";
@@ -167,7 +179,12 @@ function runRecord(cwd, run) {
 		? readJson(join(run.asyncDir, "status.json"))
 		: undefined;
 	const state = normalizeFleetState(
-		status?.state ?? status?.status ?? (run.completed ? "completed" : "queued"),
+		run.authoritativeState
+			? run.state
+			: (status?.state ??
+					status?.status ??
+					run.state ??
+					(run.completed ? "completed" : "queued")),
 	);
 	const rawSteps =
 		Array.isArray(status?.steps) && status.steps.length
@@ -185,12 +202,107 @@ function runRecord(cwd, run) {
 		),
 		steps: rawSteps.map((step, index) => ({
 			...step,
+			label: step.label ?? run.label,
 			index: Number.isInteger(step.index) ? step.index : index,
 		})),
 	};
 }
 
-export function collectWorkFleet(cwd, { readFile = readFileSync } = {}) {
+function supportRuns(
+	cwd,
+	{
+		loadLanes = loadLaneStore,
+		loadVerifiers = loadVerifierStore,
+		fallbackWorkItemId = "background",
+	} = {},
+) {
+	const runs = [];
+	try {
+		for (const lane of Object.values(loadLanes(cwd).lanes ?? {}))
+			runs.push(
+				runRecord(cwd, {
+					workflowRunId: lane.id,
+					workItemId: lane.workItemId,
+					agent: lane.producer,
+					label: lane.laneKind === "successor-prefetch" ? "work-prefetch" : lane.producer,
+					runId: lane.launch?.runId,
+					asyncDir: lane.launch?.asyncDir,
+					state: lane.state,
+					authoritativeState: true,
+					timestamp: lane.timestamps?.updatedAt,
+				}),
+			);
+	} catch {
+		// Optional lane state must not hide direct runs.
+	}
+	try {
+		const verifierStore = loadVerifiers(cwd);
+		for (const job of Object.values(verifierStore.jobs ?? {})) {
+			const batch = verifierStore.batches?.[job.batchId];
+			const launch = job.launch ?? {};
+			runs.push(
+				runRecord(cwd, {
+					workflowRunId: job.id,
+					workItemId: batch?.workItemId ?? fallbackWorkItemId,
+					agent: "work-background-verifier",
+					label: `Verifier · ${job.model}`,
+					runId: launch.runId,
+					asyncDir: launch.asyncDir,
+					state: job.status,
+					authoritativeState: true,
+					timestamp:
+						launch.failedAt ??
+						launch.orphanedAt ??
+						launch.launchedAt ??
+						launch.queuedAt ??
+						job.createdAt,
+				}),
+			);
+		}
+	} catch {
+		// A missing verifier store is normal.
+	}
+	return runs;
+}
+
+function orchestratorRoot(orchestrator, tasks) {
+	if (!orchestrator) return undefined;
+	const agents = tasks
+		.flatMap((task) =>
+			task.agents.map((agent) => ({
+				...agent,
+				name:
+					task.id === "background"
+						? agent.name
+						: `${task.id} · ${agent.name}`,
+			})),
+		)
+		.sort(byActiveThenRecent);
+	const rootState = normalizeFleetState(orchestrator.state);
+	return {
+		...orchestrator,
+		key: `orchestrator:${orchestrator.id ?? "main"}`,
+		kind: "orchestrator",
+		id: orchestrator.id ?? "main",
+		name: orchestrator.name ?? "Orchestrator",
+		state: rootState,
+		updatedAt: Math.max(
+			Number(orchestrator.updatedAt ?? 0),
+			...agents.map((agent) => Number(agent.updatedAt ?? 0)),
+		),
+		agents,
+	};
+}
+
+export function collectWorkFleet(
+	cwd,
+	{
+		readFile = readFileSync,
+		orchestrator,
+		loadLanes,
+		loadVerifiers,
+	} = {},
+) {
 	let store = { items: {} };
 	let error;
 	try {
@@ -198,21 +310,23 @@ export function collectWorkFleet(cwd, { readFile = readFileSync } = {}) {
 	} catch (cause) {
 		error = cause instanceof Error ? cause.message : String(cause);
 	}
-	const runs = pendingRuns(cwd, readFile).map((run) => runRecord(cwd, run));
+	const direct = pendingRuns(cwd, readFile).map((run) => runRecord(cwd, run));
+	const runs = [
+		...direct,
+		...supportRuns(cwd, {
+			loadLanes,
+			loadVerifiers,
+			fallbackWorkItemId: orchestrator?.targetId ?? "background",
+		}),
+	];
 	const active = runs.filter((run) => ACTIVE_STATES.has(run.state));
-	const activeTasks = new Set(active.map((run) => run.workItemId));
-	const recent = [];
-	const recentTasks = new Set();
-	for (const run of runs
-		.filter((candidate) => !ACTIVE_STATES.has(candidate.state))
-		.sort(byActiveThenRecent)) {
-		if (activeTasks.has(run.workItemId) || recentTasks.has(run.workItemId))
-			continue;
-		recent.push(run);
-		recentTasks.add(run.workItemId);
-		if (recent.length === RECENT_TERMINAL_LIMIT) break;
-	}
-	const tasks = groupWorkFleet(store, [...active, ...recent]);
+	const recent = runs
+		.filter((run) => !ACTIVE_STATES.has(run.state))
+		.sort(byActiveThenRecent)
+		.slice(0, RECENT_TERMINAL_LIMIT);
+	const grouped = groupWorkFleet(store, [...active, ...recent]);
+	const root = orchestratorRoot(orchestrator, grouped);
+	const tasks = root ? [root] : grouped;
 	return {
 		tasks,
 		rows: tasks.flatMap((task) => [task, ...task.agents]),
@@ -468,7 +582,7 @@ function statusColor(state) {
 	if (normalized === "running") return "accent";
 	if (normalized === "queued") return "muted";
 	if (normalized === "completed") return "success";
-	if (normalized === "stopped") return "warning";
+	if (["waiting", "paused", "stopped"].includes(normalized)) return "warning";
 	return "error";
 }
 
@@ -526,14 +640,21 @@ function detailSections(row, width, theme, expandedTools, error) {
 			header: [],
 			body: [theme.fg("dim", error ?? "No ce-workflow background tasks.")],
 		};
-	if (row.kind === "task") {
+	if (["task", "orchestrator"].includes(row.kind)) {
 		const active = row.agents.filter((agent) =>
-			ACTIVE_STATES.has(agent.state),
+			["running", "queued"].includes(agent.state),
 		).length;
+		let subtitle = `Task ${row.id} · ${row.state}`;
+		if (row.kind === "orchestrator") {
+			const iteration = Number.isInteger(row.iteration)
+				? ` · iteration ${row.iteration}`
+				: "";
+			subtitle = `Main chat · ${row.state}${iteration}`;
+		}
 		return {
 			header: [
 				theme.bold(`${styledStatus(row, theme)} ${row.name}`),
-				theme.fg("dim", `Task ${row.id} · ${row.state}`),
+				theme.fg("dim", subtitle),
 			],
 			body: [
 				`${row.agents.length} subagent${row.agents.length === 1 ? "" : "s"} · ${active} active`,
@@ -589,6 +710,8 @@ export class WorkFleetComponent {
 		this.pi = pi;
 		this.done = done;
 		this.refreshMs = options.refreshMs ?? REFRESH_MS;
+		this.getOrchestrator = options.getOrchestrator;
+		this.orchestrator = options.orchestrator;
 		this.snapshot = { tasks: [], rows: [] };
 		this.selected = 0;
 		this.selectedKey = options.initialKey;
@@ -606,7 +729,9 @@ export class WorkFleetComponent {
 
 	refresh() {
 		const key = this.snapshot.rows[this.selected]?.key ?? this.selectedKey;
-		this.snapshot = collectWorkFleet(this.cwd);
+		this.snapshot = collectWorkFleet(this.cwd, {
+			orchestrator: this.getOrchestrator?.() ?? this.orchestrator,
+		});
 		const retained = key
 			? this.snapshot.rows.findIndex((row) => row.key === key)
 			: -1;
@@ -710,7 +835,7 @@ export class WorkFleetComponent {
 		if (width < 50)
 			return [
 				truncate(
-					"Subagent Tasks needs at least 50 columns. Esc closes.",
+					"Fleet needs at least 50 columns. Esc closes.",
 					width,
 				),
 			];
@@ -758,10 +883,10 @@ export class WorkFleetComponent {
 			? `${styledStatus(selected, this.theme)} ${selected.name} · ${selected.state}`
 			: "no tasks";
 		lines.push(
-			`${this.theme.fg("border", "│")}${rightAligned(` ${this.theme.bold("Subagent Tasks")}`, `${selectedStatus} `, inner)}${this.theme.fg("border", "│")}`,
+			`${this.theme.fg("border", "│")}${rightAligned(` ${this.theme.bold("Fleet")}`, `${selectedStatus} `, inner)}${this.theme.fg("border", "│")}`,
 		);
 		lines.push(
-			`${this.theme.fg("border", "│")}${fit(this.theme.fg("muted", " Monitor ce-workflow background tasks and message live subagents."), inner)}${this.theme.fg("border", "│")}`,
+			`${this.theme.fg("border", "│")}${fit(this.theme.fg("muted", " Monitor the main orchestrator and every background agent."), inner)}${this.theme.fg("border", "│")}`,
 		);
 		lines.push(
 			this.theme.fg(
@@ -820,7 +945,9 @@ export function formatWorkFleetText(snapshot) {
 }
 
 export async function openWorkFleet(ctx, pi, options = {}) {
-	const snapshot = collectWorkFleet(ctx.cwd);
+	const snapshot = collectWorkFleet(ctx.cwd, {
+		orchestrator: options.getOrchestrator?.() ?? options.orchestrator,
+	});
 	if (ctx.mode !== "tui" || typeof ctx.ui.custom !== "function") {
 		ctx.ui.notify?.(
 			formatWorkFleetText(snapshot),

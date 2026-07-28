@@ -3072,6 +3072,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The work-planner cleanliness preflight blocked twice because AGENTS.md appeared modified only while the child subagent was active. Parent status was clean immediately before each launch and clean after each child exited. A concurrent parent diff during the third launch showed only formatter whitespace in the generated Compound Pi block (one blank line removed after the heading and one trailing blank line added). The planner treated this transient formatter-only instruction dirt as a manual conflicting edit.\nExpected: Planner preflight should reuse ce-workflow's existing benign/formatter-only instruction-dirt classification (or compare against the parent launch snapshot) so transient generated AGENTS.md whitespace does not block planning, while substantive manual AGENTS.md changes still fail closed.\nImpact: Two planner launches stopped before native WorkItem creation, adding retries, latency, subagent cost, and misleading blocker output for a clean planning workflow.\nSuggested improvement: Route planner launch-baseline checks through the existing formatter-only instruction-dirt helper instead of raw porcelain rejection; preserve fail-closed behavior for substantive AGENTS.md diffs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Allow formatter-only instruction dirt in planner preflight"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/b377a86d-dd91-4ad2-bb72-ebf517c77620",
@@ -3168,6 +3172,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: A deliberately simple implementation task was submitted through Big mode to exercise the workflow. The resulting run took roughly 27 minutes, spawned 10 subagents (3 divergent explorers, 3 advisors, 1 re-reviewer, and 3 planner attempts), generated about 312 KB of parent message/tool text, and stopped before implementation behind open decision work-3.34. Some review depth was valuable—the advisors found Worker lifecycle requirements and the re-review caught an infinite retry risk—but the workflow treated requested size as a reason to run every ceremony and to create a blocking decision even th\nExpected: Big mode should control decomposition and verification depth, while creative fanout, advisor count, and open decisions are gated by measured uncertainty/risk. A task with an explicit solution, bounded files, and clear technical defaults should receive only the specialists that can materially change the plan. Purely technical clear-winner choices should be recorded as a closed rationale/decision or plan note and must not block executable work; open decision WorkItems should be reserved for genuine user/product/architectural authority. Compact intake commands should enforce bounded output or tar\nImpact: The workflow spent substantial wall time, model cost, and context on overlapping analysis, then required another resume before any code could be written. This makes Big mode impractical for routine but well-specified changes and encourages users to avoid assurance features. The unbounded compact outputs also increase compaction pressure and obscure the useful findings.\nSuggested improvement: Add a coded uncertainty/risk gate before creative and advisor launch: Big controls slicing, while low-uncertainty implementation defaults to one requirements reviewer (plus a targeted re-review only after material changes) and high-uncertainty work retains the wider fanout. Teach the planner to auto-record clear technical defaults without leaving an open blocker, reserving open decisions for human",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Reduce excessive Big-mode workflow ceremony"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/e135a454-caf8-4be3-af4d-c0cc4fc74a71",
@@ -3222,6 +3230,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim from work-2.50: Big controls decomposition and verification depth, but creative divergence and advisor fanout must be selected by coded uncertainty/risk rather than task size alone. Preserve full fanout for genuinely broad, ambiguous, or high-stakes work while well-specified bounded changes launch only specialists likely to change the plan.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Gate Big-mode specialist ceremony by uncertainty and risk"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3244,6 +3256,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim from work-2.50: planner choices with a clear technical winner and no user/product authority should be durably recorded without leaving an open decision that blocks executable work. Open decision WorkItems remain mandatory for genuine human/product/architectural authority.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Do not block execution on clear technical planner defaults"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3266,6 +3282,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim from work-2.50: compact helper intake must remain bounded on large roadmaps so work-children-summary and related planner guidance cannot unexpectedly emit tens of thousands of characters. Preserve enough identity, status, type, parent, and dependency context for planning.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Bound compact workflow intake output"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3288,6 +3308,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Typing the exact plain-text command pause during an active autonomous goal currently reaches the model instead of pausing durable goal state, so agent_end queues another automatic continuation.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make plain pause stop an active autonomous goal"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -4246,6 +4270,10 @@
       "createdAt": "2026-07-27T18:03:20.311Z",
       "dependencies": [],
       "dependencyEdges": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Improve roadmap navigation speed with a Node Worker"
+      },
       "evidence": [],
       "id": "work-3.33",
       "labels": [
@@ -4271,6 +4299,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Resolve two implementation choices for non-blocking roadmap stats. Worker boundary: A (recommended) use a separately packaged extensions/work-stats-worker.js entry, a model-owned workspace controller, and generic promise-aware dialog hooks; B use an inline/eval Worker coupled directly to the dialog. Hydration: A (recommended MVP) ship Worker-first and defer signature-keyed module hydration caching until post-change evidence shows latency remains material; B add that cache now, invalidated by transcript/meta mtime plus size. Cache-only and async-only are rejected because they still block the Pi event loop and violate the explicit Worker requirement. Baselines are 405-564 ms stats, roughly 430 ms repeated hydration, and roughly 137 ms Worker startup/import overhead.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Decide Worker boundary and hydration cache scope"
+      },
       "evidence": [],
       "id": "work-3.34",
       "labels": [],
@@ -4289,6 +4321,10 @@
       ],
       "dependencyEdges": [],
       "description": "Implement the dialog-side scheduling contract in extensions/work-dialogs.js: keep synchronous resolver compatibility, accept thenable stats, default the selection dwell to exactly 500 ms, expose onStatsCancel(id), and centralize selection changes so key navigation, filtering/rebuild, refresh fallback, and close/back/select cancel stale pending or active work. This slice establishes the generic interface selected by work-3.34 without integrating the real Worker.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make roadmap stats dialog promise-aware after 500 ms dwell"
+      },
       "evidence": [],
       "id": "work-3.35",
       "labels": [],
@@ -4307,6 +4343,10 @@
       ],
       "dependencyEdges": [],
       "description": "Integrate native node:worker_threads after the dialog contract lands. Add a dedicated packaged Worker entry that calls the existing synchronous buildWorkStats, plus a workspace-scoped model controller owning the current rendered cache, lazy Worker/job lifecycle, generation fencing, cancellation, transient selected-ID failures, teardown, and optional hydration-cache choice recorded by work-3.34. Preserve synchronous report/menu callers and all non-workspace modes.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Run roadmap workspace stats in a lifecycle-safe Node Worker"
+      },
       "evidence": [],
       "id": "work-3.36",
       "labels": [],
@@ -4548,7 +4588,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-28T01:36:25.424Z"
+    "updatedAt": "2026-07-28T01:45:32.427Z"
   },
   "schemaVersion": 1
 }

@@ -13,6 +13,7 @@ import {
 	collectWorkFleet,
 	fleetMessageTarget,
 	fleetStatusSymbol,
+	normalizeFleetState,
 	groupWorkFleet,
 	sendFleetMessage,
 	transcriptEvents,
@@ -81,11 +82,22 @@ assert.equal(
 	"subagent keys are stable",
 );
 assert.deepEqual(
-	["running", "queued", "completed", "stopped", "failed"].map(
-		fleetStatusSymbol,
-	),
-	["●", "◦", "✓", "■", "✗"],
-	"status symbols remain stable",
+	[
+		"running",
+		"queued",
+		"needs_human",
+		"paused",
+		"completed",
+		"stopped",
+		"failed",
+	].map(fleetStatusSymbol),
+	["●", "◦", "?", "‖", "✓", "■", "✗"],
+	"orchestrator and agent status symbols remain stable",
+);
+assert.equal(
+	normalizeFleetState("waiting_usage_limit"),
+	"paused",
+	"usage waits remain visibly distinct from stopped runs",
 );
 
 const selected = tasks[0].agents[0];
@@ -182,6 +194,81 @@ try {
 		}).rows,
 		[],
 		"a pending-run file removed during refresh produces an empty snapshot",
+	);
+
+	const supportSnapshot = collectWorkFleet(fleetDir, {
+		orchestrator: {
+			id: "goal-1",
+			targetId: "Task-4",
+			name: "Orchestrator · Task Four",
+			state: "needs_human",
+			updatedAt: 30,
+			iteration: 2,
+		},
+		loadLanes: () => ({
+			lanes: {
+				prefetch: {
+					id: "prefetch",
+					workItemId: "Task-4",
+					producer: "work-prefetch",
+					laneKind: "successor-prefetch",
+					state: "running",
+					timestamps: { updatedAt: "2026-01-03T00:00:00Z" },
+				},
+			},
+		}),
+		loadVerifiers: () => ({
+			batches: { batch: { id: "batch" } },
+			jobs: {
+				verifier: {
+					id: "verifier",
+					batchId: "batch",
+					model: "zai/glm-5.2",
+					status: "completed",
+					createdAt: "2026-01-04T00:00:00Z",
+				},
+			},
+		}),
+	});
+	assert.equal(
+		supportSnapshot.tasks[0].kind,
+		"orchestrator",
+		"the main-chat autonomous run is the Fleet root",
+	);
+	assert.equal(
+		supportSnapshot.tasks[0].state,
+		"waiting",
+		"a human-decision root stays visible even while a child is running",
+	);
+	assert.deepEqual(
+		supportSnapshot.tasks[0].agents.map((agent) => agent.name).sort(),
+		["Task-4 · Verifier · zai/glm-5.2", "Task-4 · work-prefetch"],
+		"prefetch and verifier agents appear beneath the orchestrator",
+	);
+
+	const recentSnapshot = collectWorkFleet(fleetDir, {
+		orchestrator: { id: "goal-2", state: "complete" },
+		loadLanes: () => ({ lanes: {} }),
+		loadVerifiers: () => ({
+			batches: { batch: { id: "batch" } },
+			jobs: Object.fromEntries(
+				Array.from({ length: 25 }, (_, index) => [
+					`job-${index}`,
+					{
+						id: `job-${index}`,
+						batchId: "batch",
+						model: `model-${index}`,
+						status: "completed",
+						createdAt: new Date(index * 1_000).toISOString(),
+					},
+				]),
+			),
+		}),
+	});
+	assert.equal(
+		recentSnapshot.tasks[0].agents.length,
+		20,
+		"Fleet bounds recent finished agents",
 	);
 
 	const output = join(fleetDir, "output-0.log");

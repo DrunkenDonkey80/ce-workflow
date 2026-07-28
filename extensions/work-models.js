@@ -538,7 +538,8 @@ const SLICE_PLAN_ADVISOR_USAGE_DESC = {
 };
 const REVIEW_LEVELS = ["off", "light", "full"];
 const REVIEW_POLICY_DESC = {
-	"risk-based": "Review sensitive, broad, UI, hardware, and other high-risk production diffs",
+	"risk-based":
+		"Review sensitive, broad, UI, hardware, and other high-risk production diffs",
 	"review-all": "Require independent review for every production diff",
 };
 const CREATIVE_MODES = ["off", "ask", "auto"];
@@ -4234,7 +4235,10 @@ function slotSelection(slot, settings) {
 function backupSlotSelection(slot, settings) {
 	const selected = settings.workOrchestrator?.roleBackups?.[slot.key];
 	return selected?.model
-		? { model: selected.model, thinking: selected.thinking ?? slot.defaultThinking }
+		? {
+				model: selected.model,
+				thinking: selected.thinking ?? slot.defaultThinking,
+			}
 		: null;
 }
 
@@ -4278,7 +4282,10 @@ function selectedAgentHealthTargets(cwd, currentModel, scope = "all") {
 		const backup = backupSlotSelection(slot, settings);
 		return [
 			{
-				model: configuredModelId(slotSelection(slot, settings).model, currentModel),
+				model: configuredModelId(
+					slotSelection(slot, settings).model,
+					currentModel,
+				),
 				role: slot.label,
 			},
 			...(backup
@@ -4589,12 +4596,10 @@ function setBackupSlot(settings, slot, model, thinking, tombstone = false) {
 	if (model === NONE_MODEL) {
 		if (tombstone) block.roleBackups[slot.key] = null;
 		else delete block.roleBackups[slot.key];
-	}
-	else
+	} else
 		block.roleBackups[slot.key] = {
 			model,
-			thinking:
-				thinking === DEFAULT_THINKING ? slot.defaultThinking : thinking,
+			thinking: thinking === DEFAULT_THINKING ? slot.defaultThinking : thinking,
 		};
 	if (!Object.keys(block.roleBackups).length) delete block.roleBackups;
 }
@@ -4726,7 +4731,10 @@ async function editSlotModel(ctx, settings, slot, scope, backup = false) {
 			);
 		else setAdvisorEnabled(settings, slot, false);
 		writeScopedSettings(ctx.cwd, scope, settings);
-		ctx.ui.notify(`Saved ${backup ? `${slot.label} Backup` : slot.label}: model:none`, "info");
+		ctx.ui.notify(
+			`Saved ${backup ? `${slot.label} Backup` : slot.label}: model:none`,
+			"info",
+		);
 		return true;
 	}
 	if (backup) setBackupSlot(settings, slot, selected.model, selected.thinking);
@@ -7420,9 +7428,16 @@ function resolveResumeTarget(cwd, target) {
 			if (issue.initiative) return resolveInitiativeResumeTarget(cwd, issue);
 			return resolveEpicResumeTarget(cwd, issue);
 		}
+		let ancestorId = parentOf(issue);
+		let epic = ancestorId ? readWorkItem(cwd, ancestorId) : undefined;
+		while (epic && typeOf(epic) !== "epic") {
+			ancestorId = parentOf(epic);
+			epic = ancestorId ? readWorkItem(cwd, ancestorId) : undefined;
+		}
+		if (epic && isWorkSlice(issue)) return { kind: "work-item", epic, workItem: issue };
 		return {
 			error: "unsupported-target",
-			message: `${wanted} is a child WorkItem; run /work-resume ${parentOf(issue) ?? "<roadmap-id>"} or /work-debug ${wanted}`,
+			message: `${wanted} is not an executable child WorkItem; run /work-resume ${idOf(epic) || "<roadmap-id>"}`,
 		};
 	}
 
@@ -7528,6 +7543,15 @@ function planResumeAction(state, cwd, options = {}) {
 				],
 			};
 	}
+	if (state.target.kind === "work-item" && state.targetWorkItem.status === "closed")
+		return {
+			...state,
+			action: "done-candidate",
+			selectedWorkItem: state.targetWorkItem,
+			message: "Target WorkItem is closed.",
+			suggestedCommands: [],
+			nextAction: `Next: WorkItem ${state.targetWorkItem.id} is complete.`,
+		};
 	if (state.epic.status === "closed")
 		return {
 			...state,
@@ -7833,7 +7857,9 @@ function roleModelRouting(cwd, agent) {
 	const strategy = workOrchSettings(cwd, settings).modelStrategy;
 	if (strategy === "round-robin" && candidates.length > 1) {
 		const previous = currentWorkActionLeases(cwd)
-			.filter((lease) => lease.candidateKey === slot.key && lease.selectedCandidate)
+			.filter(
+				(lease) => lease.candidateKey === slot.key && lease.selectedCandidate,
+			)
 			.at(-1)?.selectedCandidate;
 		if (previous === "main") candidates.reverse();
 	}
@@ -7904,14 +7930,21 @@ function directRoleTask(state, cwd) {
 			: "",
 		implementationScopeLine(state),
 		evidenceOnlyImplementationLine(state),
-		["run-implementation", "run-repair", "run-resolution", "run-debug"].includes(
-			state.action,
-		)
+		[
+			"run-implementation",
+			"run-repair",
+			"run-resolution",
+			"run-debug",
+		].includes(state.action)
 			? planReference(state, cwd)
 			: "",
-		["run-implementation", "run-repair", "run-resolution", "run-debug", "run-fix"].includes(
-			state.action,
-		)
+		[
+			"run-implementation",
+			"run-repair",
+			"run-resolution",
+			"run-debug",
+			"run-fix",
+		].includes(state.action)
 			? NATIVE_EDIT_GUIDANCE
 			: "",
 		...(state.handoffExtra ?? []).filter(Boolean),
@@ -7997,7 +8030,9 @@ function acquireDirectActionLease(cwd, state, direct, runtime = {}) {
 		// Missing assurance input preserves the one-model normal compatibility floor.
 	}
 	const selected = direct.routing?.candidates?.[0];
-	const main = direct.routing?.candidates?.find((candidate) => candidate.id === "main");
+	const main = direct.routing?.candidates?.find(
+		(candidate) => candidate.id === "main",
+	);
 	const fallback = selected?.id === "backup";
 	const selectedProvider = String(selected?.model ?? "").split("/")[0];
 	const mainProvider = String(main?.model ?? "").split("/")[0];
@@ -8135,7 +8170,10 @@ export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
 	const candidates = direct.routing?.candidates?.length
 		? direct.routing.candidates
 		: [{ id: "main" }];
-	let spawned = { ok: false, message: "No configured model candidate launched" };
+	let spawned = {
+		ok: false,
+		message: "No configured model candidate launched",
+	};
 	for (const candidate of candidates) {
 		const main = candidates.find((item) => item.id === "main");
 		const candidateProvider = String(candidate.model ?? "").split("/")[0];
@@ -8146,7 +8184,9 @@ export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
 			fallback,
 			degradedIndependence:
 				fallback &&
-				(!candidateProvider || !mainProvider || candidateProvider === mainProvider),
+				(!candidateProvider ||
+					!mainProvider ||
+					candidateProvider === mainProvider),
 			achievedAssurance: lease.requestedAssurance,
 		});
 		const explicitModel =
@@ -8216,7 +8256,9 @@ function directTerminalResult(status) {
 
 function latestFailurePacket(issue) {
 	const matches = [
-		...notesOf(issue).replaceAll("\\n", "\n").matchAll(/(?:^|\n)\s*wo:failure\s+([^\r\n]+)/g),
+		...notesOf(issue)
+			.replaceAll("\\n", "\n")
+			.matchAll(/(?:^|\n)\s*wo:failure\s+([^\r\n]+)/g),
 	];
 	if (!matches.length) return null;
 	try {
@@ -8229,7 +8271,9 @@ function latestFailurePacket(issue) {
 
 export function leadEscalationDecision(issue, history = []) {
 	const packet = latestFailurePacket(issue);
-	const repairs = history.filter((lease) => lease.action === "run-repair").length;
+	const repairs = history.filter(
+		(lease) => lease.action === "run-repair",
+	).length;
 	const classification = String(
 		packet?.classification ?? packet?.kind ?? "ambiguous",
 	).toLowerCase();
@@ -8277,7 +8321,8 @@ function parkWorkActionLease(cwd, lease, reason) {
 			version: 1,
 			reason,
 			leaseId: lease.leaseId,
-			operatorAction: "clear the blocker label after resolving model availability or the recorded decision",
+			operatorAction:
+				"clear the blocker label after resolving model availability or the recorded decision",
 			recoveryCommand: `node scripts/work-helper.mjs work-label ${lease.workItemId} --remove wo:blocked`,
 			resumeCommand: `/work-resume ${lease.roadmapId}`,
 		};
@@ -8342,10 +8387,16 @@ async function recoverBuilderFailure(cwd, lease, terminal, runtime) {
 	};
 }
 
+function autonomousLeaseGoalFenced(lease, goalStatus) {
+	return Boolean(
+		lease.mode === "autonomous" && goalStatus && goalStatus !== "active",
+	);
+}
+
 function autonomousContinuationFence(cwd, lease, runtime = {}) {
 	const currentSession = runtime.currentSession?.() ?? runtime.session;
 	const goalStatus = runtime.goalStatus?.() ?? activeWorkGoal?.status;
-	if (lease.mode !== "autonomous" || goalStatus !== "active")
+	if (lease.mode !== "autonomous" || autonomousLeaseGoalFenced(lease, goalStatus))
 		return "not-active-autonomous-goal";
 	if (currentSession && lease.session && currentSession !== lease.session)
 		return "session-changed";
@@ -8409,13 +8460,30 @@ async function autonomouslyFinishAndResume(cwd, lease, runtime = {}) {
 			reason: postFinishFence,
 			finishState: finished,
 		};
+	if (runtime.targetId === lease.workItemId) {
+		const next = buildWorkResumeState(cwd, lease.workItemId, {
+			ownerSession: runtime.currentSession?.() ?? runtime.session,
+		});
+		runtime.notify?.(next);
+		return {
+			action: next.action,
+			finalized: true,
+			finishState: finished,
+			next,
+		};
+	}
 	const next = buildWorkResumeState(cwd, lease.roadmapId, {
 		ownerSession: runtime.currentSession?.() ?? runtime.session,
 	});
 	const direct = directRoleHandoffParams(next, cwd);
 	if (!direct || next.action === "finish-ready") {
 		runtime.notify?.(next);
-		return { action: next.action, finalized: true, finishState: finished, next };
+		return {
+			action: next.action,
+			finalized: true,
+			finishState: finished,
+			next,
+		};
 	}
 	const launched = await launchDirectAction(cwd, next, direct, runtime.pi, {
 		...runtime,
@@ -8484,7 +8552,10 @@ export async function driveWorkActionLeases(cwd, runtime = {}) {
 				],
 				reason: settled.reason,
 			});
-			const recovery = await recoverBuilderFailure(cwd, lease, terminal, runtime);
+			const goalStatus = runtime.goalStatus?.() ?? activeWorkGoal?.status;
+			const recovery = autonomousLeaseGoalFenced(lease, goalStatus)
+				? null
+				: await recoverBuilderFailure(cwd, lease, terminal, runtime);
 			if (recovery) {
 				runtime.notify?.({
 					ok: recovery.launched,
@@ -8567,6 +8638,7 @@ export async function driveWorkActionLeases(cwd, runtime = {}) {
 			(currentSession && lease.session && currentSession !== lease.session) ||
 			runtime.cancelled ||
 			runtime.interrupted ||
+			autonomousLeaseGoalFenced(lease, goalStatus) ||
 			["stopping", "waiting_decision", "needs_human"].includes(goalStatus) ||
 			runtime.verifierTriagePending ||
 			pendingDirtyRecoveries.size > 0 ||
@@ -8585,7 +8657,8 @@ export async function driveWorkActionLeases(cwd, runtime = {}) {
 		const direct = directRoleHandoffParams(next, cwd);
 		if (next.action === "finish-ready") {
 			const autonomous = await autonomouslyFinishAndResume(cwd, lease, runtime);
-			if (!autonomous.finalized) runtime.notify?.(autonomous.finishState ?? next);
+			if (!autonomous.finalized)
+				runtime.notify?.(autonomous.finishState ?? next);
 			results.push({
 				leaseId: lease.leaseId,
 				state: "settled",
@@ -10685,18 +10758,25 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 		const childState = buildEpicChildState(cwd, resolved.epic);
 		const git = resumeGitReport(cwd, planRefsFromIssue(resolved.epic));
 		const planPath = planPathForEpic(cwd, resolved.epic);
+		const targetWorkItem = resolved.workItem;
+		const inTargetScope = (issue) =>
+			!targetWorkItem || idOf(issue) === idOf(targetWorkItem);
 		const readyPlanning = childState.readyWork
+			.filter(inTargetScope)
 			.filter(isPlanningIssue)
 			.map(issueSummary);
 		const readyExecutable = childState.readyWork
+			.filter(inTargetScope)
 			.filter((issue) => !isPlanningIssue(issue))
 			.map(issueSummary);
 		const executableSlices = childState.slices
+			.filter(inTargetScope)
 			.filter(
 				(issue) => !isPlanningIssue(issue) && typeOf(issue) !== "decision",
 			)
 			.map(issueSummary);
 		const inProgressExecutable = childState.inProgress
+			.filter(inTargetScope)
 			.filter(
 				(issue) => !isPlanningIssue(issue) && typeOf(issue) !== "decision",
 			)
@@ -10720,29 +10800,54 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 				warnings: [],
 			};
 		}
+		const scopedReady = childState.readyWork.filter(inTargetScope);
+		const scopedSlices = childState.slices.filter(inTargetScope);
+		const scopedClosed = childState.closed.filter(inTargetScope);
+		const scopedPlanning = childState.planning.filter(inTargetScope);
+		const scopedBlockers = childState.blockers.filter(inTargetScope);
+		const scopedDownstream = childState.downstreamBlocked.filter((entry) =>
+			inTargetScope(entry.workItem),
+		);
+		const relevantDecisionIds = new Set(
+			targetWorkItem ? depsOf(targetWorkItem) : [],
+		);
+		const scopedDecisions = targetWorkItem
+			? childState.openDecisions.filter((decision) =>
+					relevantDecisionIds.has(idOf(decision)),
+				)
+			: childState.openDecisions;
 		const base = {
 			ok: true,
-			target: { requested: target || "last", kind: "epic" },
-			epic: issueSummary(resolved.epic),
-			counts: {
-				children: childState.children.length,
-				slices: childState.slices.length,
-				closed: childState.closed.length,
-				inProgress: childState.inProgress.length,
-				ready: childState.readyWork.length,
-				readyExecutable: readyExecutable.length,
-				planning: childState.planning.length,
-				blockers: childState.blockers.length,
-				decisions: childState.openDecisions.length,
+			target: {
+				requested: target || "last",
+				kind: targetWorkItem ? "work-item" : "epic",
 			},
-			readyWork: childState.readyWork.map(issueSummary),
+			epic: issueSummary(resolved.epic),
+			...(targetWorkItem ? { targetWorkItem: issueSummary(targetWorkItem) } : {}),
+			counts: {
+				children: targetWorkItem ? 1 : childState.children.length,
+				slices: scopedSlices.length,
+				closed: scopedClosed.length,
+				inProgress: inProgressExecutable.length,
+				ready: scopedReady.length,
+				readyExecutable: readyExecutable.length,
+				planning: scopedPlanning.length,
+				blockers: scopedBlockers.length,
+				decisions: scopedDecisions.length,
+			},
+			readyWork: scopedReady.map(issueSummary),
 			readyExecutable,
 			inProgressExecutable,
 			readyPlanning,
 			executableSlices,
-			blockers: resumeBlockers(childState),
-			downstreamBlocked: childState.downstreamBlocked,
-			openDecisions: childState.openDecisions.map(issueSummary),
+			blockers: resumeBlockers({
+				...childState,
+				blockers: scopedBlockers,
+				openDecisions: scopedDecisions,
+				downstreamBlocked: scopedDownstream,
+			}),
+			downstreamBlocked: scopedDownstream,
+			openDecisions: scopedDecisions.map(issueSummary),
 			...(resolved.initiative
 				? {
 						initiative: issueSummary(resolved.initiative),
@@ -14064,7 +14169,9 @@ function buildWorkFinishState(cwd, args = "") {
 				...extra,
 			});
 		const raw = notesOf(workItem);
-		const dirty = (git.dirtyPaths ?? []).filter((file) => !isWorkStorePath(file));
+		const dirty = (git.dirtyPaths ?? []).filter(
+			(file) => !isWorkStorePath(file),
+		);
 		const related = dirty.filter(
 			(file) => raw.includes(file) || raw.includes(file.split(/[\\/]/).pop()),
 		);
@@ -16166,7 +16273,7 @@ function workProjectAutopilotAppendix() {
 - Do not call subagent list or ask an LLM to select a role. Call the exact role directly: work-worker for implementation, work-planner for ambiguous/large slicing, work-debugger for root-cause failures, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
 - When a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child.
 - Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
-- Use /work-resume for one deterministic WorkItem boundary. Use autonomous goal only when the user explicitly wants a multi-step autonomous loop.
+- Resume work starts the autonomous project loop. Inside that loop, advance one deterministic WorkItem boundary at a time so coded gates, prefetch, review, and recovery remain authoritative.
 - Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it explicitly says N tasks, stop after N executable native work-item store closes. Identifiers such as work-2 are targets, never task counts.
 - When given a target work item or roadmap ID, resolve that exact ID and continue until it is closed; an open roadmap with no ready children needs its next planned slice, not premature completion.
 - At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
@@ -16228,8 +16335,19 @@ function buildWorkSelfImprovingObjective(input = "", options = {}) {
 		.join("\n\n");
 }
 
-function buildWorkResumeGoalObjective(cwd, args = "") {
+function buildWorkResumeGoalObjective(cwd, args = "", options = {}) {
 	const raw = String(args ?? "").trim();
+	if (options.targetId)
+		return [
+			`Target project: ${cwd}`,
+			`Target work item or roadmap ID: ${options.targetId}`,
+			workProjectAutopilotAppendix(),
+			workResumeSettings(cwd).selfImproving
+				? workGoalSelfImprovingAppendix()
+				: "",
+		]
+			.filter(Boolean)
+			.join("\n\n");
 	if (!raw)
 		return buildWorkSelfImprovingObjective(cwd, {
 			project: true,
@@ -16644,7 +16762,7 @@ autonomous goal management rules:
 - The user's objective above is the work prompt; these rules only manage looping, compaction, and human-decision stops.
 - Keep working autonomously until the objective is complete and verified.
 - Before each continuation, autonomous goal will microcompact old reasoning and tool noise; treat native work-item store, git, files, tests, and command output as source of truth.
-- Work directly in this session by default. Do not call subagent list, delegate routine implementation/verification/commit work, or launch duplicate reviewers. Spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
+- In project mode, let coded action leases own exact role selection and specialist launches; monitor the named run from the kickoff prompt and never duplicate it. In other modes, work directly in this session by default and spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
 - ${ROLE_TIMEOUT_GUIDANCE}
 - Prefer coded helpers and deterministic checks over asking an LLM to classify, summarize, validate, stage, commit, close, or choose an agent.
 - ${NATIVE_EDIT_GUIDANCE}
@@ -16926,6 +17044,17 @@ function pauseWorkGoalForDecision(decision, ctx, pi) {
 	pauseWarpForDecision(ctx, decision);
 }
 
+function workGoalTargetId(goal) {
+	const objective = String(goal?.objective ?? "");
+	const explicit = /^Target work item or (?:roadmap|epic) ID:\s*(\S+)$/m.exec(
+		objective,
+	)?.[1];
+	const legacy = /^User instruction for the target project:\s*(\S+)\s*$/m.exec(
+		objective,
+	)?.[1];
+	return explicit ?? (isNativeWorkItemId(legacy) ? legacy : undefined);
+}
+
 function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	const improveBlocker = workImproveCompletionBlocker(goal, cwd);
 	if (improveBlocker) return improveBlocker;
@@ -16934,13 +17063,7 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	if (goal?.mode !== "project") return;
 	const objective = String(goal.objective ?? "");
 	const project = /^Target project:\s*(.+)$/m.exec(objective)?.[1]?.trim();
-	const explicit = /^Target work item or (?:roadmap|epic) ID:\s*(\S+)$/m.exec(
-		objective,
-	)?.[1];
-	const legacy = /^User instruction for the target project:\s*(\S+)\s*$/m.exec(
-		objective,
-	)?.[1];
-	const id = explicit ?? (isNativeWorkItemId(legacy) ? legacy : undefined);
+	const id = workGoalTargetId(goal);
 	if (!project || !id) return;
 	try {
 		const item = readWorkItem(
@@ -17018,7 +17141,14 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	};
 }
 
-async function startWorkGoal(mode, objective, pi, ctx, tokenBudget) {
+async function startWorkGoal(
+	mode,
+	objective,
+	pi,
+	ctx,
+	tokenBudget,
+	options = {},
+) {
 	const text = String(objective ?? "").trim();
 	if (!text) {
 		ctx.ui.notify("Usage: autonomous goal <objective>", "warning");
@@ -17049,7 +17179,9 @@ async function startWorkGoal(mode, objective, pi, ctx, tokenBudget) {
 		`autonomous goal started: ${truncate(text, 240)}${tokenBudget ? ` (budget ${formatTokenCount(tokenBudget)})` : ""}`,
 		"info",
 	);
-	await sendWorkGoalPrompt(pi, ctx, buildWorkGoalKickoffPrompt(activeWorkGoal));
+	if (!options.deferPrompt)
+		await sendWorkGoalPrompt(pi, ctx, buildWorkGoalKickoffPrompt(activeWorkGoal));
+	return activeWorkGoal;
 }
 
 async function handleWorkGoalCommand(args, mode, pi, ctx) {
@@ -17166,6 +17298,36 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		return;
 	}
 	await startWorkGoal(mode, command.objective, pi, ctx, command.tokenBudget);
+}
+
+function workFleetOrchestrator(cwd) {
+	const goal = activeWorkGoal;
+	if (!goal || (activeWorkGoalCwd && !sameCheckout(activeWorkGoalCwd, cwd)))
+		return undefined;
+	const targetId = workGoalTargetId(goal);
+	let target;
+	try {
+		target = targetId ? readWorkItem(cwd, targetId) : currentRoadmap(cwd);
+	} catch {
+		// Goal metadata is still enough to render the root.
+	}
+	const title =
+		target?.displayMetadata?.title ?? titleOf(target ?? {}) ?? targetId ?? "work";
+	return {
+		id: goal.id,
+		targetId: targetId ?? idOf(target ?? {}) ?? "background",
+		name: `Orchestrator · ${title}`,
+		state: goal.status,
+		updatedAt: goal.updatedAt,
+		iteration: goal.iteration,
+		objective: goal.objective,
+	};
+}
+
+function openWorkflowFleet(ctx, pi) {
+	return openWorkFleet(ctx, pi, {
+		getOrchestrator: () => workFleetOrchestrator(ctx.cwd),
+	});
 }
 
 async function handleWorkResumeGoalCommand(args, pi, ctx) {
@@ -17467,7 +17629,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 			value: "work-resume",
 			label: "⏩ Resume work",
 			description:
-				"Run the next safe native work-item step.\nLeave the target blank to continue the current roadmap.",
+				"Run the selected target autonomously until completion or a real decision.\nLeave the target blank to continue the current roadmap.",
 			argumentTitle: "Roadmap ID or guidance",
 			placeholder: "Blank continues the current roadmap",
 		},
@@ -17691,7 +17853,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		selectedIndex = selected.index;
 		if (selected.value === "microcompact")
 			return requestManualMicrocompact(ctx);
-		if (selected.value === "fleet") return openWorkFleet(ctx, pi);
+		if (selected.value === "fleet") return openWorkflowFleet(ctx, pi);
 		if (selected.value === "cswap") {
 			await handleCswapMenu(ctx, cswapBin);
 			continue;
@@ -18042,6 +18204,48 @@ async function sendWorkflowFollowUp(ctx, message, pi, state) {
 	});
 }
 
+function pauseAutonomousGoalAfterError(reason, pi, ctx) {
+	if (!activeWorkGoal) return;
+	activeWorkGoal = {
+		...activeWorkGoal,
+		status: "paused",
+		stopReason: reason,
+		updatedAt: Date.now(),
+	};
+	persistWorkGoal(pi);
+	updateWorkGoalStatus(ctx);
+	notify(ctx, `Autonomous orchestrator paused: ${reason}`, "warning");
+}
+
+async function prepareAutonomousResumeEntry(cwd, state, target, currentModel) {
+	if (state.action !== "finish-ready") return { ok: true, state };
+	const ready = buildWorkFinishState(cwd, state.selectedWorkItem?.id);
+	if (!ready.ok) return { ok: false, state: ready, reason: ready.reason };
+	if (ready.action !== "commit-ready" || ready.handoffPrompt)
+		return { ok: true, state: ready };
+	let finished;
+	try {
+		finished = await executeWorkFinishState(cwd, ready, currentModel);
+	} catch (error) {
+		return {
+			ok: false,
+			state: ready,
+			reason: error instanceof Error ? error.message : String(error),
+		};
+	}
+	if (!finished?.ok || finished.action !== "finish-committed")
+		return {
+			ok: false,
+			state: finished ?? ready,
+			reason: finished?.reason ?? "coded finish failed",
+		};
+	return {
+		ok: true,
+		state: buildWorkResumeState(cwd, target),
+		finished: true,
+	};
+}
+
 async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 	const unsupported = unsupportedPrintWorkflow(ctx);
 	if (unsupported) return unsupported;
@@ -18051,19 +18255,31 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		ownerSession: verifierTriageOwner(ctx),
 	});
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-resume");
-	const direct =
+	const handoff = state.ok
+		? directRoleHandoffParams(state, ctx.cwd, selectionNote)
+		: null;
+	const finishEntry = state.ok && state.action === "finish-ready";
+	const startAutonomous = Boolean(
 		state.ok &&
+			!["print", "json"].includes(ctx.mode) &&
+			!activeWorkGoalRunning &&
+			(handoff || state.handoffPrompt || finishEntry),
+	);
+	const direct =
+		!startAutonomous &&
 		!["print", "json"].includes(ctx.mode) &&
 		pi?.events?.on &&
 		pi?.events?.emit
-			? directRoleHandoffParams(state, ctx.cwd, selectionNote)
+			? handoff
 			: null;
 	notify(
 		ctx,
 		renderWorkResumeText(
-			direct
-				? { ...state, nextAction: `Next: ${direct.agent} queued directly` }
-				: state,
+			startAutonomous
+				? { ...state, nextAction: "Next: autonomous orchestrator started" }
+				: direct
+					? { ...state, nextAction: `Next: ${direct.agent} queued directly` }
+					: state,
 		),
 		state.ok ? "info" : "warning",
 	);
@@ -18072,6 +18288,133 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		(await queueDirtyRecovery(state, ctx, pi))
 	)
 		return { ...state, dirtyRecoveryQueued: true };
+	if (startAutonomous) {
+		const requestedTarget = String(args ?? "").trim();
+		const target = [state.epic?.id, state.selectedWorkItem?.id].includes(
+			requestedTarget,
+		)
+			? requestedTarget
+			: state.epic?.id ?? requestedTarget;
+		const sameGoal =
+			activeWorkGoal?.mode === "project" &&
+			activeWorkGoal.status !== "complete" &&
+			workGoalTargetId(activeWorkGoal) === target &&
+			sameCheckout(activeWorkGoalCwd, ctx.cwd);
+		if (sameGoal) {
+			if (
+				["paused", "budget_limited", "stopped", "waiting_usage_limit"].includes(
+					activeWorkGoal.status,
+				)
+			)
+				await handleWorkGoalCommand("resume", "project", pi, ctx);
+			else
+				notify(ctx, `Autonomous orchestrator already owns ${target}.`, "info");
+			return {
+				...state,
+				autonomousGoalId: activeWorkGoal?.id,
+				autonomousGoalStarted: false,
+			};
+		}
+		const rpcAvailable = Boolean(pi?.events?.on && pi?.events?.emit);
+		const goal = await startWorkGoal(
+			"project",
+			buildWorkResumeGoalObjective(ctx.cwd, target, { targetId: target }),
+			pi,
+			ctx,
+			undefined,
+			{ deferPrompt: Boolean((handoff && rpcAvailable) || finishEntry) },
+		);
+		if (!goal)
+			return { ...state, autonomousGoalStarted: false, replacementDeclined: true };
+		const prepared = await prepareAutonomousResumeEntry(
+			ctx.cwd,
+			state,
+			target,
+			currentModelId(ctx),
+		);
+		if (!prepared.ok) {
+			pauseAutonomousGoalAfterError(prepared.reason, pi, ctx);
+			return {
+				...prepared.state,
+				autonomousGoalId: goal.id,
+				autonomousGoalStarted: true,
+				handoffFailed: true,
+			};
+		}
+		const launchState = prepared.state;
+		const launchHandoff = directRoleHandoffParams(
+			launchState,
+			ctx.cwd,
+			selectionNote,
+		);
+		const codedLaunch = Boolean(launchHandoff && rpcAvailable);
+		if (!codedLaunch) {
+			if (finishEntry) {
+				const entryNote = prepared.finished
+					? "The coded finish boundary completed. Inspect the current native target state and finish the autonomous goal if its requested scope is closed."
+					: `The coded finish gate now requires ${launchState.action}. Continue from that authoritative state.`;
+				await sendWorkGoalPrompt(
+					pi,
+					ctx,
+					`${buildWorkGoalKickoffPrompt(goal)}\n\n${entryNote}`,
+				);
+			}
+			return {
+				...launchState,
+				autonomousGoalId: goal.id,
+				autonomousGoalStarted: true,
+			};
+		}
+		const launched = await launchDirectAction(
+			ctx.cwd,
+			launchState,
+			launchHandoff,
+			pi,
+			{
+				mode: "autonomous",
+				session: ctx.sessionManager?.getSessionId?.(),
+				currentSession: () => ctx.sessionManager?.getSessionId?.(),
+				goalStatus: () => activeWorkGoal?.status,
+				targetId: target,
+				currentModel: currentModelId(ctx),
+				notify: (next) =>
+					notify(ctx, renderWorkResumeText(next), next.ok ? "info" : "warning"),
+			},
+		);
+		const launchedRunId = directRunIdentity(
+			launchHandoff,
+			launched.spawned,
+		).runId;
+		if (!launched.spawned.ok && !launched.spawned.ambiguous) {
+			pauseAutonomousGoalAfterError(
+				`${launchHandoff.agent} could not start: ${launched.spawned.message}`,
+				pi,
+				ctx,
+			);
+			return {
+				...launched.state,
+				actionLease: launched.lease,
+				autonomousGoalId: goal.id,
+				autonomousGoalStarted: true,
+				handoffFailed: true,
+			};
+		}
+		const launchNote = launched.spawned.ok
+			? `Coded orchestration already launched ${launchHandoff.agent}${launchedRunId ? ` as ${launchedRunId}` : ""}. Monitor that run and native work state; do not launch a duplicate specialist. Action leases will advance eligible successor boundaries automatically.`
+			: `The coded ${launchHandoff.agent} launch acknowledgement timed out. Monitor the existing lease and diagnose its infrastructure state without launching a duplicate.`;
+		await sendWorkGoalPrompt(
+			pi,
+			ctx,
+			`${buildWorkGoalKickoffPrompt(goal)}\n\n${launchNote}`,
+		);
+		return {
+			...launched.state,
+			actionLease: launched.lease,
+			autonomousGoalId: goal.id,
+			autonomousGoalStarted: true,
+			handoffPending: Boolean(launched.spawned.ambiguous),
+		};
+	}
 	if (direct) {
 		const launched = await launchDirectAction(ctx.cwd, state, direct, pi, {
 			mode: ctx.mode,
@@ -20854,7 +21197,9 @@ export default function workModelsExtension(pi) {
 			: event;
 		if (
 			sanitizedEvent.source === "user" &&
-			String(sanitizedEvent.text ?? "").trim().toLowerCase() === "pause" &&
+			String(sanitizedEvent.text ?? "")
+				.trim()
+				.toLowerCase() === "pause" &&
 			activeWorkGoal?.status === "active"
 		) {
 			await handleWorkGoalCommand("pause", activeWorkGoal.mode, pi, ctx);
@@ -21365,7 +21710,7 @@ export default function workModelsExtension(pi) {
 	pi.registerShortcut?.("f9", {
 		description: "Open Fleet",
 		handler: async (ctx) => {
-			await openWorkFleet(ctx, pi);
+			await openWorkflowFleet(ctx, pi);
 		},
 	});
 }
@@ -21498,8 +21843,7 @@ function hasProjectOverride(settings, item) {
 				(isAdvisorSlot(slot) && owns(block?.advisorEnabled, slot.key)),
 		);
 	}
-	if (item.kind === "backupSlot")
-		return owns(block?.roleBackups, item.value);
+	if (item.kind === "backupSlot") return owns(block?.roleBackups, item.value);
 	if (item.kind === "modelStrategy") return owns(block, "modelStrategy");
 	if (item.kind === "profile") return owns(block, "profile");
 	if (item.kind === "backgroundVerifiers")
@@ -21641,23 +21985,29 @@ async function workSettingsLoop(ctx) {
 				kind: "modelStrategy",
 				value: "modelStrategy",
 				label: `Model strategy: ${resolved.modelStrategy} ${SUBMENU_ARROW}`,
-				description: "Main first, or durable alternation across configured role candidates",
+				description:
+					"Main first, or durable alternation across configured role candidates",
 			},
 			...SLOTS.flatMap((slot) => {
 				const selected = slotSelection(slot, settings);
 				const backup = backupSlotSelection(slot, settings);
+				const mainLabel = `Model ${slot.label}: [${modelEffortSummary(selected.model, selected.thinking, names)}] ${SUBMENU_ARROW}`;
+				const backupLabel = `   -> Backup: [${backup ? modelEffortSummary(backup.model, backup.thinking, names) : "None"}] ${SUBMENU_ARROW}`;
 				return [
 					{
 						kind: "slot",
 						value: slot.key,
-						label: `Model ${slot.label}: [${modelEffortSummary(selected.model, selected.thinking, names)}] ${SUBMENU_ARROW}`,
+						label: mainLabel,
+						labelSegments: [{ text: mainLabel, color: "text" }],
 						description: `Main · ${slot.description}`,
 					},
 					{
 						kind: "backupSlot",
 						value: slot.key,
-						label: `Backup ${slot.label}: [${backup ? modelEffortSummary(backup.model, backup.thinking, names) : "None"}] ${SUBMENU_ARROW}`,
-						description: "Optional fallback; absent preserves Main-only behavior",
+						label: backupLabel,
+						labelSegments: [{ text: backupLabel, color: "muted" }],
+						description:
+							"Optional fallback; absent preserves Main-only behavior",
 					},
 				];
 			}),

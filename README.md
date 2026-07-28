@@ -23,7 +23,7 @@ No tracker CLI is required for normal operation. Press **F7** to open **Orchestr
 | **Initialize workspace** | Creates the native store when absent. |
 | **Plan** | Creates or resumes a plan roadmap. |
 | **Small task**, **Medium task**, **Large task**, **Auto-route task** | Classifies and creates one scoped work item. |
-| **Resume work**, **Status**, **Blocker report**, **Roadmaps** | Reads and advances native state; Roadmaps also prepares initiative child plans and converts standalone roadmaps into initiatives. |
+| **Resume work**, **Status**, **Blocker report**, **Roadmaps** | Resume starts the extension-owned autonomous loop for the selected target; the other actions inspect or manage native state. Roadmaps also prepares initiative child plans and converts standalone roadmaps into initiatives. |
 | **Add work**, **Debug**, **Checkpoint and pause**, **Finish work item** | Mutates, checkpoints, or finalizes a native work item. |
 | **Brainstorm**, **Ideas**, **Usage report**, **Telemetry** | Manages ideas and local reports. |
 | **Settings**, **Context guard**, **Autonomous goal** | Configures orchestration and context behavior. Proactive compaction defaults on at 150k tokens. |
@@ -31,7 +31,7 @@ No tracker CLI is required for normal operation. Press **F7** to open **Orchestr
 | **Improve orchestrator** | Validates and deduplicates new reports, then executes all open self-improvement work in the configured source checkout. |
 | **Migrate legacy workspace** | Performs the one-way migration for a detected former workflow workspace. |
 
-Ordinary task actions use one durable `Misc` roadmap when no current roadmap is selected. When another roadmap is current, the UI asks whether new work belongs there or in `Misc`. Dedicated planning, brainstorming, and migration actions still create their own roadmaps. Untargeted **Resume work** falls back to ready `Misc` work and leaves an empty `Misc` idle.
+Ordinary task actions use one durable `Misc` roadmap when no current roadmap is selected. When another roadmap is current, the UI asks whether new work belongs there or in `Misc`. Dedicated planning, brainstorming, and migration actions still create their own roadmaps. Untargeted **Resume work** falls back to ready `Misc` work and leaves an empty `Misc` idle. A resumable target runs autonomously until its requested scope completes or a real decision, limit, error, or explicit stop pauses it; an explicit child WorkItem ID limits the loop to that item, and questions use the main chat UI.
 
 Role agents are `work-planner`, `work-worker`, `work-reviewer`,
 `work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, the
@@ -81,8 +81,9 @@ Shard results join in declaration order into the exact version-1 finish manifest
 
 ## Workflow rules
 
-- One executable work item is the normal session boundary.
+- One executable work item remains each deterministic execution boundary; **Resume work** continues across those boundaries autonomously.
 - Use `F7 → Checkpoint and pause` to persist a checkpoint, then `F7 → Resume work <roadmap-id>` in a fresh session.
+- Press **F9** for Fleet: the main-chat orchestrator is the root, with active and recent finished specialists, successor-prefetch lanes, and background verifiers beneath it. Fleet distinguishes running, queued, waiting-for-decision, paused, completed, stopped, and failed states.
 - `F7 → Status` and `F7 → Blocker report` are deterministic local projections; do not edit the store by hand during normal use.
 - Initiatives aggregate child progress and route explicit execution through their durable child order. Planning a child returns to F7 instead of starting implementation; execution consumes the prepared prefix and pauses at the first child that needs planning. Initiative close cannot be forced past unresolved coverage, stale source/plan lineage, or open children. F7 previews complete hierarchy and coverage before its confirmation mints the single-use apply receipt.
 - Finish requires verification evidence and any required review before the store item closes.

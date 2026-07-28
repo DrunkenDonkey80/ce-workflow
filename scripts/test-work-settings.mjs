@@ -474,14 +474,31 @@ try {
 			return result;
 		},
 	});
+	let modelRows = "";
 	const ctx = {
 		cwd,
 		model: { provider: "p", id: "m" },
 		modelRegistry: { getAvailable: async () => [] },
-		ui: customUi([{ expectText: "Settings: Global", key: "escape" }]),
+		ui: customUi([
+			{
+				expectText: "Settings: Global",
+				key: "escape",
+				capture: (lines) => {
+					modelRows = lines.join("\n");
+				},
+			},
+		]),
 	};
 	await invoke("work-settings", "", ctx);
 	assert(notices.length === 0, "escape exits without notify");
+	assert(
+		modelRows.includes(
+			"[text]Model Brainstorm/plan/migration: [Inherit: High] ›[/text]",
+		) &&
+			modelRows.includes("[muted]   -> Backup: [None] ›[/muted]") &&
+			modelRows.includes("[text]Model Work: [Inherit: Medium] ›[/text]"),
+		"task model rows are white with indented light-gray backups",
+	);
 	await invoke("work-settings", "", {
 		...ctx,
 		mode: "rpc",
