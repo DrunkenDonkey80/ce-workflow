@@ -3477,6 +3477,9 @@
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-3",
@@ -3491,12 +3494,14 @@
         "wo:roadmap-complete-correction\nFinal direct-child count is 31. The live roadmap-close gate exposed and fixed work-3.31: store-only review handoffs now persist explicit empty implementation scopes and can complete without weakening non-empty review admission. Fix commit 0ab72ce passed focused helper/start-finish tests, package verification, independent review, coded finish, and push.",
         "wo:roadmap-complete-final\nFinal direct-child count is 32. A second live close-gate edge case was fixed in work-3.32: preexisting PASS evidence can no longer bypass the first coded empty-scope handoff, while reviewed-without-scope remains rejected. Commits ecf35f1 and 59eead3 passed pre-fix control, focused tests, package verification, independent review, coded close, and push.",
         "wo:review-scope []",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed",
+        "wo:roadmap-complete-final\\nAll 35 direct children are closed. Final slice work-3.37 replaced automatic Worker-based stats with owner-approved explicit s-key stats, passed focused and package verification, committed as 97f295b, and pushed. Final ready-child audit is empty.",
         "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
-      "status": "open",
+      "status": "closed",
       "title": "Misc",
       "type": "epic",
-      "updatedAt": "2026-07-27T18:03:20.252Z"
+      "updatedAt": "2026-07-28T07:42:03.505Z"
     },
     "work-3.1": {
       "createdAt": "2026-07-25T07:42:39.536Z",
@@ -4616,7 +4621,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-28T07:38:24.652Z"
+    "updatedAt": "2026-07-28T07:42:03.505Z"
   },
   "schemaVersion": 1
 }
