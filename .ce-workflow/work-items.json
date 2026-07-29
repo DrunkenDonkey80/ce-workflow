@@ -4669,6 +4669,10 @@
       "createdAt": "2026-07-29T10:15:12.906Z",
       "dependencies": [],
       "dependencyEdges": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Plan the next unified subscription status slice"
+      },
       "evidence": [],
       "id": "work-4.2",
       "labels": [],
@@ -4688,6 +4692,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Implement U1 from docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md: global default-off settings, ownership warning, TUI-only footer lifecycle, width-safe model/context row, and fake provider seam. Paths: extensions/subscription-footer.js, extensions/work-models.js, scripts/test-work-subscription-footer.mjs, scripts/test-work-settings.mjs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Build the opt-in footer shell and width-safe model row"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -4715,19 +4723,24 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Implement U2 from docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md: common provider capability contract, Pi-auth allowlist and identity-bound cache, Codex/Claude/Copilot/GLM/Kimi adapters, strict atomic snapshots, independent 120-second refresh/backoff, stale/unavailable transitions, stable wrapping, and secret-safe diagnostics. Paths: extensions/subscription-footer.js and scripts/test-work-subscription-footer.mjs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Add the Pi-auth quota engine and five provider adapters"
+      },
       "evidence": [],
       "id": "work-4.4",
       "labels": [],
       "notes": [
         "wo:execution-plan source=docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md unit=U2 depends=work-4.3",
         "wo:live-check PARTIAL codex=PASS claude=PASS glm=FAIL:unavailable copilot=fixture-only kimi=fixture-only layout=FAIL:providers-rendered-on-separate-lines desired=pack-provider-segments-on-one-row-then-wrap",
-        "wo:acceptance-override user-approved available-live/unavailable-fixture: codex=live-PASS claude=live-PASS glm=live-PASS copilot=pinned-fixture+public-auth-contract kimi=pinned-fixture+public-auth-contract; U2 automated suite=PASS; layout live=PASS"
+        "wo:acceptance-override user-approved available-live/unavailable-fixture: codex=live-PASS claude=live-PASS glm=live-PASS copilot=pinned-fixture+public-auth-contract kimi=pinned-fixture+public-auth-contract; U2 automated suite=PASS; layout live=PASS",
+        "U2 delivered in cba1aad; focused test PASS; live Codex/Claude/GLM PASS; Copilot/Kimi fixture-only acceptance approved by user"
       ],
       "parentId": "work-4",
-      "status": "in_progress",
+      "status": "closed",
       "title": "Add Pi-auth quota engine and five provider adapters",
       "type": "task",
-      "updatedAt": "2026-07-29T10:42:52.394Z"
+      "updatedAt": "2026-07-29T13:02:04.899Z"
     },
     "work-4.5": {
       "acceptance": "GLM/Z.ai live Pi-auth refresh renders quota matching its vendor view; Codex/Claude remain passing; provider segments pack left-to-right on one row when they fit and wrap in fixed order only when needed; focused subscription-footer tests pass.",
@@ -4735,6 +4748,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Live U2 validation found GLM/Z.ai renders unavailable while Codex and Claude match. The renderer also puts every provider on its own row even when multiple segments fit; product contract expects fixed-order packing into the same row and wrapping only at width.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Fix GLM live quota and pack provider segments across rows"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -4758,6 +4775,38 @@
       "title": "Fix GLM live quota and pack provider segments across rows",
       "type": "bug",
       "updatedAt": "2026-07-29T13:01:43.537Z"
+    },
+    "work-4.6": {
+      "acceptance": "Workflow status appears exactly once in custom footer and built-in status remains after disable; incident off makes no status requests; fixture incidents warn without hiding/aging quota and failures retain incident state; provenance packaging passes; focused footer/settings/provenance tests and npm run verify pass; operator confirms readable footer and one normal session without routine quota homepages.",
+      "createdAt": "2026-07-29T13:02:15.667Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Implement U3 from docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md: render the existing active workflow status inside the enabled custom footer; add default-off Claude/Codex/Copilot incident polling isolated from quota freshness; add MIT/pinned-revision/divergence provenance and package inventory proof; run final regression and interactive acceptance.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Integrate workflow status, incidents, provenance, and release gate"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-4.6",
+      "labels": [],
+      "notes": [
+        "wo:execution-plan source=docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md unit=U3 depends=work-4.4",
+        "wo:live-check PASS workflow-row=position+readability accepted-provisionally-with-automated-update/clear coverage; operator-usability=PASS routine-routing-without-quota-homepages; incidents=default-off",
+        "wo:review-scope [\"extensions/subscription-footer.js\",\"extensions/work-models.js\",\"scripts/test-work-subscription-footer.mjs\",\"scripts/verify-package.mjs\",\"extensions/subscription-footer-UPSTREAM.md\"]",
+        "wo:live-check PASS final-status=plain-no-emoji,no-failed-blocked-counters,workflow-no-blue-icon; accepted-provisionally-with-automated-exact-output-coverage",
+        "wo:review-scope [\"extensions/subscription-footer.js\",\"extensions/work-models.js\",\"scripts/test-work-goal.mjs\",\"scripts/test-work-subscription-footer.mjs\",\"scripts/verify-package.mjs\",\"extensions/subscription-footer-UPSTREAM.md\"]",
+        "wo:review PASS typography re-review: plain no-emoji work-goal status + counter-free roadmap row keep semantics (needs human/working/paused/usage wait), clear via updateWorkGoalStatus(ctx,null), incident disable clears markers and stops polling; test-work-goal + test-work-subscription-footer pass",
+        "wo:verify-check PASS\nCommand: npm run verify\nOutput: ons\nok - test-workflow-evaluation-routing-cohorts.mjs passes\nok - workflow evaluation RPC fixtures\nok - test-workflow-evaluation-rpc.mjs passes\nok - workflow evaluation smoke and decision lifecycle fixtures\nok - test-workflow-evaluation-runner.mjs passes\nok - workflow evaluation decision scoring fixtures\nok - test-workflow-evaluation-score.mjs passes\nok - workflow evaluation calibration, approval, and sentinel fixtures\nok - test-workflow-evaluation-sentinel.mjs passes\n\nAll package checks passed."
+      ],
+      "parentId": "work-4",
+      "status": "closed",
+      "title": "Integrate workflow status, incidents, provenance, and release gate",
+      "type": "task",
+      "updatedAt": "2026-07-29T14:14:57.039Z"
     }
   },
   "metadata": {
@@ -4767,7 +4816,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-29T13:01:43.537Z"
+    "updatedAt": "2026-07-29T14:14:57.040Z"
   },
   "schemaVersion": 1
 }

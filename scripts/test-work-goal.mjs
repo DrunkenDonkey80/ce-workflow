@@ -208,19 +208,21 @@ assert.deepEqual(
 		{ key: "U2", title: "Second slice" },
 	],
 );
+const projectGoalProgress = mod.renderProjectGoalProgress({
+	title: "Epic",
+	source: "plan",
+	complete: 3,
+	total: 6,
+	unsliced: 2,
+	failed: 1,
+	blocked: 2,
+	elapsedMs: 123_000,
+});
 assert.equal(
-	mod.renderProjectGoalProgress({
-		title: "Epic",
-		source: "plan",
-		complete: 3,
-		total: 6,
-		unsliced: 2,
-		failed: 1,
-		blocked: 2,
-		elapsedMs: 123_000,
-	}),
-	"Roadmap [██████░░░░░░] ✅ 3/6 units (3 left · 2 unsliced) 🔴 1 🟠 2 ⏱️ 2m 3s · F7 Orchestrator · F8 microcompact · F9 Fleet",
+	projectGoalProgress,
+	"Roadmap [██████░░░░░░] 3/6 units (3 left · 2 unsliced) · 2m 3s · F7 Orchestrator · F8 microcompact · F9 Fleet",
 );
+assert.doesNotMatch(projectGoalProgress, /\p{Extended_Pictographic}/u, "project progress contains no emoji status glyphs");
 assert.deepEqual(
 	mod.warpPayload(
 		"prompt_submit",
@@ -1501,7 +1503,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	assert.equal(thinkingLevel, "medium");
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
-	assert.equal(statuses["work-goal"], "▶️ active #0");
+	assert.equal(statuses["work-goal"], "active #0");
+	assert.doesNotMatch(statuses["work-goal"], /\p{Extended_Pictographic}/u, "workflow status contains no emoji");
 
 	await tempHooks.turn_end(
 		{},
@@ -1540,7 +1543,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	assert.match(compactions[0].customInstructions, /work-goal microcompact/);
 	assert.equal(sent.length, 2);
 	assert.match(sent[1].message, /Automatic continuation #1/);
-	assert.equal(statuses["work-goal"], "▶️ active #1");
+	assert.equal(statuses["work-goal"], "active #1");
 
 	await tempHooks.before_agent_start(
 		{ prompt: sent[1].message, systemPrompt: "base" },
@@ -1564,7 +1567,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	await settle();
-	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	assert.equal(statuses["work-goal"], "needs human");
 	assert.equal(thinkingLevel, "high");
 	assert.ok(
 		notices.some((notice) =>
@@ -1578,7 +1581,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.equal(clarifyResult, undefined);
-	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	assert.equal(statuses["work-goal"], "needs human");
 	const pausedBefore = await tempHooks.before_agent_start(
 		{ prompt: "clarify: what screenshot is missing?", systemPrompt: "base" },
 		ctx,
@@ -1597,7 +1600,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.equal(conversationalResult, undefined);
-	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	assert.equal(statuses["work-goal"], "needs human");
 	assert.equal(sent.length, 2);
 
 	const answerInputResult = await tempHooks.input?.(
@@ -1608,7 +1611,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.equal(answerInputResult, undefined);
-	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	assert.equal(statuses["work-goal"], "needs human");
 	assert.equal(sent.length, 2);
 
 	await invoke(
@@ -1616,7 +1619,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		"resume 2, but use the AI-Wedge connected proof and add a connect button.",
 		ctx,
 	);
-	assert.equal(statuses["work-goal"], "▶️ active #1");
+	assert.equal(statuses["work-goal"], "active #1");
 	assert.equal(thinkingLevel, "medium");
 	assert.equal(sent.length, 3);
 	assert.match(sent[2].message, /User resumed the goal with this answer/);
@@ -1670,7 +1673,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	assert.equal(
 		statuses["work-goal"],
-		"🔵 working #0",
+		"working #0",
 		"agent_end does not consume a goal iteration before Pi settles",
 	);
 	assert.equal(notices.length, retryNotices);
@@ -1869,7 +1872,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		}),
 	);
 	tempHooks.session_start?.({}, ctx);
-	assert.equal(statuses["work-goal"], "⏸️ paused");
+	assert.equal(statuses["work-goal"], "paused");
 	const abortsBeforeStaleContinuation = aborts;
 	const staleBefore = await tempHooks.before_agent_start(
 		{
@@ -1899,7 +1902,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	await settle();
-	assert.equal(statuses["work-goal"], "⏸️ paused");
+	assert.equal(statuses["work-goal"], "paused");
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes("stale autonomous-goal continuation"),
@@ -1948,7 +1951,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.equal(restartedInput, undefined);
-	assert.equal(statuses["work-goal"], "🟣❓ needs human");
+	assert.equal(statuses["work-goal"], "needs human");
 	await invoke(
 		"work-goal",
 		"resume 4, waive only disconnection screenshot",
@@ -1961,7 +1964,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.deepEqual(plainPauseResult, { action: "handled" });
-	assert.equal(statuses["work-goal"], "⏸️ paused");
+	assert.equal(statuses["work-goal"], "paused");
 	assert.equal(
 		sent.length,
 		sentBeforePlainPause,
@@ -2039,7 +2042,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	await settle();
-	assert.equal(statuses["work-goal"], "⏸️ usage wait #0");
+	assert.equal(statuses["work-goal"], "usage wait #0");
 	await new Promise((resolve) => setTimeout(resolve, 20));
 	assert.equal(sent.length, beforeUsageRetry + 1);
 	assert.match(sent.at(-1).message, /usage\/rate limit/);

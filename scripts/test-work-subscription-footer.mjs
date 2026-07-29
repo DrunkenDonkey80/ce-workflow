@@ -7,6 +7,7 @@ import {
 	createSubscriptionFooterController,
 	renderModelRow,
 	renderQuotaRows,
+	renderWorkflowRow,
 	stripAnsi,
 	truncatePlain,
 	visibleWidth,
@@ -49,7 +50,7 @@ class Clock {
 	}
 }
 
-function harness({ providers, auth, fetchImpl, clock = new Clock(), fsImpl, enabled = true, agentDir = "/agent" }) {
+function harness({ providers, auth, fetchImpl, clock = new Clock(), fsImpl, enabled = true, incidents = false, settings, workflowStatus, agentDir = "/agent" }) {
 	const factories = [];
 	const notices = [];
 	let renders = 0;
@@ -64,8 +65,8 @@ function harness({ providers, auth, fetchImpl, clock = new Clock(), fsImpl, enab
 	const controller = createSubscriptionFooterController(
 		{ getThinkingLevel: () => "high" },
 		{
-			readGlobalSettings: () => ({ workOrchestrator: { subscriptionFooter: { enabled } } }),
-			providers, fetchImpl, now: clock.now,
+			readGlobalSettings: () => ({ workOrchestrator: { subscriptionFooter: settings?.() ?? { enabled, incidents } } }),
+			providers, fetchImpl, now: clock.now, getWorkflowStatus: workflowStatus,
 			setTimeoutImpl: clock.setTimeout, clearTimeoutImpl: clock.clearTimeout,
 			setIntervalImpl: clock.setInterval, clearIntervalImpl: clock.clearInterval,
 			...(agentDir === null ? {} : { agentDir }), fsImpl: fsImpl ?? {
@@ -104,6 +105,7 @@ for (const [line, width] of [[full, 80], [compact, 56], [narrow, 55]]) {
 }
 assert.equal(visibleWidth("模型🚀"), 6);
 assert.equal(truncatePlain("模型🚀long", 5), "模型…");
+assert.equal(stripAnsi(renderWorkflowRow("working #7", theme, 18)[0]), "Workflow: working…", "workflow row is width-safe");
 
 // Default/headless/off behavior makes no requests and installs no footer.
 let headlessFetches = 0;
@@ -334,7 +336,7 @@ const defaultCache = harness({
 });
 defaultCache.controller.start(defaultCache.ctx);
 await flush();
-assert.deepEqual(defaultCacheReads, [join(homedir(), ".pi", "agent", "subscription-footer-cache.json")], "default cache uses Pi global storage");
+assert.deepEqual(defaultCacheReads, [join(process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"), "subscription-footer-cache.json")], "default cache uses Pi global storage");
 defaultCache.controller.shutdown(defaultCache.ctx);
 
 let cacheContent;
@@ -463,6 +465,100 @@ lifecycleResolve?.([{ id: "late", label: "late", usedPercent: 99, resetsAt: rese
 await flush();
 assert.equal(lifecycle.controller.isInstalled(), false, "late completion cannot reclaim ownership");
 
+// The custom footer reuses the published workflow text, repaints it once, clears it, and never writes built-in status.
+let workflowStatus;
+let workflowEnabled = true;
+const workflow = harness({
+	providers: [{ id: "workflow-quota", label: "Quota", piProviderId: "quota", identity: () => "quota", fetchQuota: async () => [{ id: "q", label: "q", usedPercent: 10, resetsAt: reset }] }],
+	auth: () => stored("safe"), fetchImpl: async () => {},
+	settings: () => ({ enabled: workflowEnabled, incidents: false }),
+	workflowStatus: () => workflowStatus,
+});
+let builtInStatusWrites = 0;
+workflow.ctx.ui.setStatus = () => builtInStatusWrites++;
+workflow.controller.start(workflow.ctx);
+const workflowComponent = workflow.component();
+await flush();
+assert.doesNotMatch(stripAnsi(workflowComponent.render(80).join("\n")), /Workflow:/);
+const rendersBeforeWorkflowChange = workflow.renders();
+workflowStatus = "working #2";
+workflow.controller.statusChanged(workflow.ctx);
+assert.equal(workflow.renders(), rendersBeforeWorkflowChange + 1);
+const orderedWorkflowRows = workflowComponent.render(80).map(stripAnsi);
+assert.equal(orderedWorkflowRows.length, 3);
+assert.match(orderedWorkflowRows[0], /^Model:/);
+assert.equal(orderedWorkflowRows[1], "Workflow: working #2", "workflow row follows model directly");
+assert.match(orderedWorkflowRows[2], /^Quota /, "quota rows follow workflow status");
+assert.equal((orderedWorkflowRows.join("\n").match(/Workflow: working #2/g) ?? []).length, 1);
+assert.doesNotMatch(orderedWorkflowRows[1], /\p{Extended_Pictographic}/u, "footer workflow status contains no emoji");
+assert.deepEqual(workflowComponent.render(55).map(stripAnsi), ["Subscription footer needs at least 56 columns"], "55 columns render only the minimum-width diagnostic");
+workflowStatus = "needs human";
+workflow.controller.statusChanged(workflow.ctx);
+assert.equal(stripAnsi(workflowComponent.render(56)[1]), "Workflow: needs human");
+workflowStatus = undefined;
+workflow.controller.statusChanged(workflow.ctx);
+assert.doesNotMatch(stripAnsi(workflowComponent.render(80).join("\n")), /Workflow:/);
+workflowEnabled = false;
+workflow.controller.apply(workflow.ctx);
+assert.equal(workflow.factories.at(-1), undefined);
+assert.equal(builtInStatusWrites, 0, "footer lifecycle leaves Pi's setStatus path untouched");
+
+// Incidents are default-off, use only three pinned public sources, retain last-known state on failure, and are generation-fenced.
+const incidentProviders = PRODUCTION_PROVIDERS.map((provider) => ({
+	...provider,
+	identity: () => provider.id,
+	fetchQuota: async () => [{ id: "q", label: "q", usedPercent: 12, resetsAt: reset }],
+}));
+let incidentEnabled = false;
+let statusRequests = 0;
+let failStatuses = false;
+let deferredStatusResolve;
+const incidents = harness({
+	providers: incidentProviders,
+	auth: () => stored("safe"),
+	settings: () => ({ enabled: true, incidents: incidentEnabled }),
+	fetchImpl: async (url) => {
+		if (!url.includes("/status.json")) throw new Error(`unexpected quota fetch ${url}`);
+		statusRequests++;
+		if (failStatuses) return jsonResponse({}, 500);
+		return jsonResponse({ status: { indicator: url.includes("anthropic") ? "major" : "none" } });
+	},
+});
+incidents.controller.start(incidents.ctx);
+const incidentsComponent = incidents.component();
+await flush();
+assert.equal(statusRequests, 0, "incident off performs zero public status requests");
+const claudeQuotaAt = incidents.controller.states.get("claude").lastSuccessAt;
+incidentEnabled = true;
+incidents.controller.apply(incidents.ctx);
+await flush();
+assert.equal(statusRequests, 3);
+assert.match(stripAnsi(incidentsComponent.render(120).join("\n")), /Claude ! q.*12%/, "incident marker does not replace quota");
+assert.equal(incidents.controller.states.get("glm").incident, undefined);
+assert.equal(incidents.controller.states.get("kimi").incident, undefined);
+failStatuses = true;
+await incidents.clock.advance(120000);
+assert.equal(incidents.controller.states.get("claude").incident, "major", "status failure retains incident");
+assert.equal(incidents.controller.states.get("claude").lastSuccessAt, claudeQuotaAt + 120000, "incident failure does not alter quota refresh time");
+const requestsBeforeIncidentDisable = statusRequests;
+incidentEnabled = false;
+incidents.controller.apply(incidents.ctx);
+assert.equal(incidents.controller.states.get("claude").incident, undefined, "incident off clears last-known markers immediately");
+assert.doesNotMatch(stripAnsi(incidentsComponent.render(120).join("\n")), /Claude !/, "disabled incident marker disappears");
+await incidents.clock.advance(120000);
+assert.equal(statusRequests, requestsBeforeIncidentDisable, "incident off aborts polling and makes no further status requests");
+incidents.controller.shutdown(incidents.ctx);
+const lateIncidents = harness({
+	providers: [incidentProviders.find((provider) => provider.id === "claude")], auth: () => stored("safe"), incidents: true,
+	fetchImpl: (url) => url.includes("/status.json") ? new Promise((resolve) => { deferredStatusResolve = resolve; }) : Promise.resolve(jsonResponse({})),
+});
+lateIncidents.controller.start(lateIncidents.ctx);
+await flush();
+lateIncidents.controller.shutdown(lateIncidents.ctx);
+deferredStatusResolve?.(jsonResponse({ status: { indicator: "critical" } }));
+await flush();
+assert.equal(lateIncidents.controller.states.get("claude").incident, undefined, "late incident response is discarded after shutdown");
+
 // Live disable notification and owner disposal behavior remain from U1.
 let enabled = true;
 const settingsFactories = [];
@@ -486,4 +582,4 @@ replacement.dispose();
 assert.equal(settingsController.isInstalled(), false);
 owner.dispose();
 
-process.stdout.write("ok - work-subscription-footer U2 auth, adapters, cache, polling, freshness, rendering, and lifecycle\n");
+process.stdout.write("ok - work-subscription-footer U3 workflow, incidents, provenance-ready rendering, and U1/U2 regression\n");

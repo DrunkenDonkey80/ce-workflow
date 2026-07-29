@@ -35,6 +35,37 @@ check(
 	pkg.pi?.extensions?.includes("extensions/work-models.js"),
 );
 check("native store is packaged", pkg.files?.includes("extensions/"));
+const subscriptionFooterProvenancePath = "extensions/subscription-footer-UPSTREAM.md";
+const subscriptionFooterProvenance = existsSync(path.join(root, subscriptionFooterProvenancePath))
+	? read(subscriptionFooterProvenancePath)
+	: "";
+check(
+	"subscription footer provenance is packaged",
+	pkg.files?.includes("extensions/") && Boolean(subscriptionFooterProvenance),
+);
+check(
+	"subscription footer provenance retains the exact upstream MIT notice and revision",
+	[
+		"MIT License",
+		"Copyright (c) 2026 satas20",
+		"Permission is hereby granted, free of charge",
+		"f21cabaafabe6aef90be88b0de229ab736abb486",
+	].every((marker) => subscriptionFooterProvenance.includes(marker)),
+);
+check(
+	"subscription footer provenance inventories intentional divergences",
+	[
+		"Pi-auth-only",
+		"International Z.ai",
+		"GLM monthly exclusion/resetless session handling",
+		"Footer composition",
+		"Workflow row",
+		"Cache identity/path",
+		"Freshness",
+		"Incidents",
+		"Typography",
+	].every((marker) => subscriptionFooterProvenance.includes(marker)),
+);
 check(
 	"explicit improvement reporting is packaged",
 	existsSync(path.join(root, "extensions/work-improvement-reporting.js")) &&

@@ -91,6 +91,12 @@ function contextBar(percent, cells) {
 	return `${"█".repeat(filled)}${"░".repeat(cells - filled)}`;
 }
 
+export function renderWorkflowRow(status, theme, width) {
+	if (!status || width <= 0) return [];
+	const plain = truncatePlain(`Workflow: ${status}`, width);
+	return [theme?.fg?.("accent", plain) ?? plain];
+}
+
 export function renderModelRow(ctx, theme, width, thinkingLevel) {
 	if (width < MIN_WIDTH) {
 		const diagnostic = truncatePlain("Subscription footer needs at least 56 columns", width);
@@ -263,6 +269,17 @@ function kimiParser(payload, now) {
 	return complete(rows.sort((a, b) => Number(b.label === "5h") - Number(a.label === "5h")));
 }
 
+const INCIDENT_SOURCES = Object.freeze([
+	{ id: "codex", url: "https://status.openai.com/api/v2/status.json" },
+	{ id: "claude", url: "https://status.anthropic.com/api/v2/status.json" },
+	{ id: "copilot", url: "https://www.githubstatus.com/api/v2/status.json" },
+]);
+
+function incidentIndicator(payload) {
+	const value = table(payload).status?.indicator;
+	return ["minor", "major", "critical", "maintenance"].includes(value) ? value : "none";
+}
+
 function provider({ id, label, piProviderId, url, parser, headers }) {
 	return Object.freeze({
 		id, label, piProviderId,
@@ -321,16 +338,23 @@ function windowText(window, now, barCells = 8) {
 	return `${window.label}${reset} [${"█".repeat(filled)}${"░".repeat(barCells - filled)}] ${pct}%`;
 }
 
-function styleSegment(text, window, providerLabel, theme) {
+function providerDisplay(provider, state, theme) {
+	const marker = state?.incident && state.incident !== "none" ? " !" : "";
+	const label = `${provider.label}${marker}`;
+	const styledLabel = theme?.fg?.("accent", theme?.bold?.(provider.label) ?? provider.label) ?? provider.label;
+	if (!marker) return { label, styledLabel };
+	const color = state.incident === "maintenance" ? "accent" : state.incident === "minor" ? "warning" : "error";
+	return { label, styledLabel: `${styledLabel}${theme?.fg?.(color, marker) ?? marker}` };
+}
+
+function styleSegment(text, window, providerLabel, styledProviderLabel, theme) {
 	let styled = text;
 	const reset = styled.match(/\([^)]*\)/)?.[0];
 	if (reset) styled = styled.replace(reset, theme?.fg?.("dim", reset) ?? reset);
 	const quota = styled.match(/\[[█░]+\] \d+%/)?.[0];
 	if (quota) styled = styled.replace(quota, theme?.fg?.(quotaColor(window.usedPercent), quota) ?? quota);
-	if (providerLabel && styled.startsWith(providerLabel)) {
-		const bold = theme?.bold?.(providerLabel) ?? providerLabel;
-		styled = `${theme?.fg?.("accent", bold) ?? bold}${styled.slice(providerLabel.length)}`;
-	}
+	if (providerLabel && styled.startsWith(providerLabel))
+		styled = `${styledProviderLabel}${styled.slice(providerLabel.length)}`;
 	return styled;
 }
 
@@ -355,13 +379,14 @@ export function renderQuotaRows(registry, states, theme, width, now = Date.now()
 	for (const provider of registry) {
 		const state = states.get(provider.id);
 		if (!state?.authenticated) continue;
+		const display = providerDisplay(provider, state, theme);
 		const age = state.lastSuccessAt === undefined ? Infinity : now - state.lastSuccessAt;
 		if (!state.snapshot || age >= UNAVAILABLE_MS) {
 			const failure = state.failure === "auth rejected" || state.failure === "rate limited" ? ` · ${state.failure}` : "";
-			let plain = `${provider.label} unavailable${failure}`;
+			let plain = `${display.label} unavailable${failure}`;
 			if (parts.length && plainWidth + 3 + visibleWidth(plain) > width) flush();
 			plain = truncatePlain(plain, width);
-			append(plain, styleSegment(plain, {}, provider.label, theme), provider.id);
+			append(plain, styleSegment(plain, {}, display.label, display.styledLabel, theme), provider.id);
 			continue;
 		}
 		const marker = state.failure
@@ -369,12 +394,12 @@ export function renderQuotaRows(registry, states, theme, width, now = Date.now()
 			: "";
 		for (const [index, window] of state.snapshot.windows.entries()) {
 			const suffix = index === state.snapshot.windows.length - 1 ? marker : "";
-			let prefix = currentProvider === provider.id ? "" : `${provider.label} `;
+			let prefix = currentProvider === provider.id ? "" : `${display.label} `;
 			let body = windowText(window, now, 8);
 			let plain = `${prefix}${body}${suffix}`;
 			if (parts.length && plainWidth + 3 + visibleWidth(plain) > width) {
 				flush();
-				prefix = `${provider.label} `;
+				prefix = `${display.label} `;
 				plain = `${prefix}${body}${suffix}`;
 			}
 			for (let cells = 7; visibleWidth(plain) > width && cells >= 4; cells--) {
@@ -382,7 +407,7 @@ export function renderQuotaRows(registry, states, theme, width, now = Date.now()
 				plain = `${prefix}${body}${suffix}`;
 			}
 			plain = truncatePlain(plain, width);
-			append(plain, styleSegment(plain, window, prefix ? provider.label : undefined, theme), provider.id);
+			append(plain, styleSegment(plain, window, prefix ? display.label : undefined, display.styledLabel, theme), provider.id);
 		}
 	}
 	flush();
@@ -401,6 +426,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		clearTimeoutImpl = clearTimeout,
 		setIntervalImpl = setInterval,
 		clearIntervalImpl = clearInterval,
+		getWorkflowStatus = () => undefined,
 	} = options;
 	let generation = 0;
 	let activeCtx;
@@ -413,6 +439,8 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	const states = new Map(registry.map((entry) => [entry.id, { authenticated: false }]));
 	const timers = new Map();
 	const aborters = new Map();
+	const incidentTimers = new Map();
+	const incidentAborters = new Map();
 	const cacheFile = join(agentDir, "subscription-footer-cache.json");
 	const setting = () => readGlobalSettings?.().workOrchestrator?.subscriptionFooter ?? {};
 
@@ -440,6 +468,41 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		timers.set(entry.id, setTimeoutImpl(() => void refresh(entry, gen), delay));
 	}
 
+	function scheduleIncident(source, delay, gen) {
+		if (gen !== generation || !setting().incidents) return;
+		clearTimeoutImpl(incidentTimers.get(source.id));
+		incidentTimers.set(source.id, setTimeoutImpl(() => void refreshIncident(source, gen), delay));
+	}
+
+	async function refreshIncident(source, gen) {
+		if (gen !== generation || !activeCtx || !setting().incidents || !states.get(source.id)?.authenticated) return;
+		const controller = new AbortController();
+		incidentAborters.get(source.id)?.abort();
+		incidentAborters.set(source.id, controller);
+		try {
+			const payload = await requestJson(source.url, {}, { fetchImpl, signal: controller.signal, setTimeoutImpl, clearTimeoutImpl });
+			if (gen !== generation || controller.signal.aborted || !setting().incidents) return;
+			states.get(source.id).incident = incidentIndicator(payload);
+			requestRender();
+		} catch {
+			if (gen !== generation || controller.signal.aborted || !setting().incidents) return;
+		}
+		scheduleIncident(source, POLL_MS, gen);
+	}
+
+	function reconcileIncidents(gen) {
+		if (setting().incidents) {
+			for (const source of INCIDENT_SOURCES) if (states.get(source.id)?.authenticated && !incidentTimers.has(source.id) && !incidentAborters.has(source.id)) void refreshIncident(source, gen);
+		} else {
+			for (const timer of incidentTimers.values()) clearTimeoutImpl(timer);
+			incidentTimers.clear();
+			for (const controller of incidentAborters.values()) controller.abort();
+			incidentAborters.clear();
+			for (const state of states.values()) state.incident = undefined;
+		}
+		requestRender();
+	}
+
 	async function refresh(entry, gen) {
 		if (gen !== generation || !activeCtx) return;
 		let resolved;
@@ -463,6 +526,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			if (cache.providers[entry.id]?.identityKey !== identityKey) delete cache.providers[entry.id];
 		}
 		state.authenticated = true;
+		reconcileIncidents(gen);
 		await loadCache();
 		const cached = cache.providers[entry.id];
 		if (cached && cached.identityKey !== identityKey) {
@@ -504,6 +568,10 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		timers.clear();
 		for (const controller of aborters.values()) controller.abort();
 		aborters.clear();
+		for (const timer of incidentTimers.values()) clearTimeoutImpl(timer);
+		incidentTimers.clear();
+		for (const controller of incidentAborters.values()) controller.abort();
+		incidentAborters.clear();
 		if (ticker !== undefined) clearIntervalImpl(ticker);
 		ticker = undefined;
 		const ctx = activeCtx;
@@ -525,12 +593,14 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				invalidate() {},
 				render(width) {
 					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.());
-					return width < MIN_WIDTH ? model : [...model, ...renderQuotaRows(registry, states, theme, width, now())];
+					const workflow = renderWorkflowRow(getWorkflowStatus(), theme, width);
+					return width < MIN_WIDTH ? model : [...model, ...workflow, ...renderQuotaRows(registry, states, theme, width, now())];
 				},
 				dispose() { if (gen === generation) stop({ restore: false }); },
 			};
 		});
 		for (const entry of registry) void refresh(entry, gen);
+		reconcileIncidents(gen);
 		ticker = setIntervalImpl(() => requestRender(), 60_000);
 		return true;
 	}
@@ -539,11 +609,13 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		start: install,
 		apply(ctx) {
 			if (activeCtx && activeCtx !== ctx) return false;
+			if (setting().enabled && activeCtx === ctx) { reconcileIncidents(generation); return true; }
 			if (setting().enabled) return install(ctx);
 			if (activeCtx === ctx) stop({ notify: true });
 			return false;
 		},
 		shutdown(ctx) { if (activeCtx === ctx) stop(); },
+		statusChanged(ctx) { if (activeCtx === ctx) requestRender(); },
 		providers: registry,
 		isInstalled: () => installed,
 		states,

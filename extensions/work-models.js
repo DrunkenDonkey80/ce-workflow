@@ -16482,23 +16482,23 @@ function persistWorkGoal(pi, goal = activeWorkGoal, cwd = activeWorkGoalCwd) {
 function formatWorkGoalStatus(goal = activeWorkGoal) {
 	if (!goal) return undefined;
 	const budget = formatWorkGoalBudget(goal);
-	if (goal.status === "needs_human")
-		return `${statusIcon("needs_human")} needs human`;
+	if (goal.status === "needs_human") return "needs human";
 	if (goal.status === "stopping")
-		return `${statusIcon("stopping")} stopping… #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
+		return `stopping... #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
 	if (goal.status === "stopped")
-		return `${statusIcon("stopped")} stopped #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
+		return `stopped #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
 	if (goal.status === "budget_limited")
-		return `${statusIcon("paused")} budget ${budget ?? "reached"} #${goal.iteration ?? 0}`;
+		return `budget ${budget ?? "reached"} #${goal.iteration ?? 0}`;
 	if (goal.status === "waiting_usage_limit")
-		return `${statusIcon("paused")} usage wait #${goal.iteration ?? 0}`;
+		return `usage wait #${goal.iteration ?? 0}`;
 	if (goal.status === "active")
-		return `${activeWorkGoalRunning || activeWorkAgent ? `${statusIcon("active")} working` : "▶️ active"} #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
-	return statusLabel(goal.status);
+		return `${activeWorkGoalRunning || activeWorkAgent ? "working" : "active"} #${goal.iteration ?? 0}${budget ? ` ${budget}` : ""}`;
+	return String(goal.status ?? "unknown").replaceAll("_", " ");
 }
 
 function updateWorkGoalStatus(ctx, goal = activeWorkGoal) {
 	ctx?.ui?.setStatus?.(WORK_GOAL_STATUS_KEY, formatWorkGoalStatus(goal));
+	subscriptionFooterController?.statusChanged(ctx);
 }
 
 function isFailedIssue(issue) {
@@ -16642,7 +16642,7 @@ function renderProjectGoalProgress(state) {
 	const left = Math.max(0, total - complete);
 	const noun = state.source === "plan" ? "units" : "slices";
 	const unsliced = state.unsliced ? ` · ${state.unsliced} unsliced` : "";
-	return `${roadmapTerminology(state.title)} ${progressBar(complete, total)} ✅ ${complete}/${total} ${noun} (${left} left${unsliced}) 🔴 ${state.failed} 🟠 ${state.blocked} ⏱️ ${formatDuration(state.elapsedMs)} · ${WORK_SHORTCUT_STATUS}`;
+	return `${roadmapTerminology(state.title)} ${progressBar(complete, total)} ${complete}/${total} ${noun} (${left} left${unsliced}) · ${formatDuration(state.elapsedMs)} · ${WORK_SHORTCUT_STATUS}`;
 }
 
 function updateWorkGoalProgress(ctx) {
@@ -17186,7 +17186,7 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	clearWorkGoalRecovery();
 	clearWorkGoalUsageLimitTimer();
 	persistWorkGoal(pi, null);
-	ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+	updateWorkGoalStatus(ctx, null);
 	ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
 	const completionLabel =
 		goal.mode === "improvement"
@@ -17270,7 +17270,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		clearWorkGoalRecovery();
 		clearWorkGoalUsageLimitTimer();
 		persistWorkGoal(pi, null);
-		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+		updateWorkGoalStatus(ctx, null);
 		ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
 		ctx.ui.notify(
 			previous
@@ -20854,6 +20854,7 @@ export default function workModelsExtension(pi) {
 	workExtensionPi = pi;
 	subscriptionFooterController = createSubscriptionFooterController(pi, {
 		readGlobalSettings,
+		getWorkflowStatus: () => formatWorkGoalStatus(),
 	});
 	exposeBundledSubagentAgents();
 
@@ -21253,7 +21254,7 @@ export default function workModelsExtension(pi) {
 		resetContextCompaction();
 		persistWorkGoal(pi);
 		clearWorkGoalUsageLimitTimer();
-		ctx.ui.setStatus(WORK_GOAL_STATUS_KEY, undefined);
+		updateWorkGoalStatus(ctx, null);
 		stopWorkGoalProgressTimer(ctx);
 	});
 
@@ -21896,7 +21897,7 @@ async function editSubscriptionFooterSettings(ctx) {
 				{
 					value: "incidents",
 					...boolLabel("provider incident markers", current.incidents),
-					description: "Global only · no status requests until the provider adapters land",
+					description: "Global only · Claude, Codex, and Copilot public status",
 				},
 			],
 			selectedIndex,
@@ -21929,8 +21930,8 @@ async function editSubscriptionFooterSettings(ctx) {
 				: {}),
 		};
 		writeScopedSettings(ctx.cwd, "global", settings);
-		if (result.item.value === "enabled") subscriptionFooterController.apply(ctx);
-		else
+		subscriptionFooterController.apply(ctx);
+		if (result.item.value !== "enabled")
 			ctx.ui.notify(
 				`Provider incident markers: ${!current.incidents ? "on" : "off"}`,
 				"info",
