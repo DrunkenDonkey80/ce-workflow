@@ -4708,6 +4708,56 @@
       "title": "Global opt-in subscription footer shell and width-safe model row",
       "type": "task",
       "updatedAt": "2026-07-29T10:42:32.370Z"
+    },
+    "work-4.4": {
+      "acceptance": "Deterministic adapter fixtures, fake-clock scheduling, identity/cache, stale/unavailable, secret-sentinel, wrapping, and fake-sixth-provider tests pass. Live Pi-auth-only quota comparison succeeds for each of the five providers; public Copilot auth failure remains an explicit blocker. Verify: node scripts/test-work-subscription-footer.mjs",
+      "createdAt": "2026-07-29T10:42:52.394Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Implement U2 from docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md: common provider capability contract, Pi-auth allowlist and identity-bound cache, Codex/Claude/Copilot/GLM/Kimi adapters, strict atomic snapshots, independent 120-second refresh/backoff, stale/unavailable transitions, stable wrapping, and secret-safe diagnostics. Paths: extensions/subscription-footer.js and scripts/test-work-subscription-footer.mjs.",
+      "evidence": [],
+      "id": "work-4.4",
+      "labels": [],
+      "notes": [
+        "wo:execution-plan source=docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md unit=U2 depends=work-4.3",
+        "wo:live-check PARTIAL codex=PASS claude=PASS glm=FAIL:unavailable copilot=fixture-only kimi=fixture-only layout=FAIL:providers-rendered-on-separate-lines desired=pack-provider-segments-on-one-row-then-wrap",
+        "wo:acceptance-override user-approved available-live/unavailable-fixture: codex=live-PASS claude=live-PASS glm=live-PASS copilot=pinned-fixture+public-auth-contract kimi=pinned-fixture+public-auth-contract; U2 automated suite=PASS; layout live=PASS"
+      ],
+      "parentId": "work-4",
+      "status": "in_progress",
+      "title": "Add Pi-auth quota engine and five provider adapters",
+      "type": "task",
+      "updatedAt": "2026-07-29T10:42:52.394Z"
+    },
+    "work-4.5": {
+      "acceptance": "GLM/Z.ai live Pi-auth refresh renders quota matching its vendor view; Codex/Claude remain passing; provider segments pack left-to-right on one row when they fit and wrap in fixed order only when needed; focused subscription-footer tests pass.",
+      "createdAt": "2026-07-29T11:26:47.413Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Live U2 validation found GLM/Z.ai renders unavailable while Codex and Claude match. The renderer also puts every provider on its own row even when multiple segments fit; product contract expects fixed-order packing into the same row and wrapping only at width.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-4.5",
+      "labels": [],
+      "notes": [
+        "wo:debug source=work-4.4 evidence=glm-unavailable,provider-lines-not-packed paths=extensions/subscription-footer.js,scripts/test-work-subscription-footer.mjs",
+        "wo:debug ROOT_CAUSE glm-endpoint=correct-international-api.z.ai parser=rejects-entire-payload-on-auxiliary-invalid-row renderer=resets-current-line-per-provider fixtures=perfect-rows-and-no-wide-pack-assertion; fix=skip-invalid-glm-rows-if-valid-remain,greedy-cross-provider-packing,plain-before-style,boundary-tests",
+        "wo:debug FOLLOWUP no-snapshot-hides-sanitized-failure cache-defaults-to-repo-cwd-causing-reload-cache-loss glm-valid-5h-dropped-when-reset-omitted; international-endpoint-and-raw-auth-confirmed; no-authoritative-alternate-endpoint; fix=allowlisted-no-snapshot-category,agent-dir-default,optional-glm-reset-for-explicit-known-token-window",
+        "wo:live-check PARTIAL codex=PASS claude=PASS glm=PASS:5h-present layout=CHANGE_REQUEST format=provider-accent,window(reset),bar+percent-threshold-color,intra-provider-middle-dot,inter-provider-pipe; hide=glm-monthly-tools; next-scope=integrate-active-workflow-status-into-custom-footer",
+        "wo:live-check PASS codex=PASS claude=PASS glm=PASS:5h+7d,monthly-hidden layout=PASS:requested-typography+delimiters+packing+colors",
+        "wo:review-scope [\"docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md\",\"extensions/subscription-footer.js\",\"scripts/test-work-subscription-footer.mjs\",\"subscription-footer-cache.json\"]",
+        "wo:review-scope [\"docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md\",\"extensions/subscription-footer.js\",\"scripts/test-work-subscription-footer.mjs\"]",
+        "wo:review PASS {\"evidence\":\"Focused U2 and settings tests pass; live Codex/Claude/GLM pass; auth/cache/parser/scheduler/packing/ANSI/security reviewed; Copilot/Kimi fixture-only acceptance recorded\",\"required_fixes\":[]}",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-subscription-footer.mjs\nOutput: ok - work-subscription-footer U2 auth, adapters, cache, polling, freshness, rendering, and lifecycle"
+      ],
+      "parentId": "work-4",
+      "status": "closed",
+      "title": "Fix GLM live quota and pack provider segments across rows",
+      "type": "bug",
+      "updatedAt": "2026-07-29T13:01:43.537Z"
     }
   },
   "metadata": {
@@ -4717,7 +4767,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-29T10:42:32.370Z"
+    "updatedAt": "2026-07-29T13:01:43.537Z"
   },
   "schemaVersion": 1
 }

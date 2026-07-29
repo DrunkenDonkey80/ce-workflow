@@ -19,7 +19,7 @@ execution: code
 
 ---
 
-> Product Contract preservation: The Product Contract below is preserved verbatim; implementation planning supplements it without changing any stable R/F/AE ID.
+> Product Contract preservation: changed after planning at the user's direction — fixture proof is permitted when a subscription is unavailable, GLM monthly tools are hidden, quota typography is explicit, and active workflow status joins the custom footer; stable R1-R31, F1-F5, and AE1-AE14 IDs are unchanged, with R32-R33, F6, and AE15 added.
 
 ## Product Contract
 
@@ -37,10 +37,10 @@ The trusted outcome is near-real-time terminal visibility that makes those homep
 
 ### Key Decisions
 
-- **A full custom footer, not a status widget.** The first row replaces the current footer with the requested model/context view, while provider quotas occupy subsequent wrapped rows.
+- **A full custom footer, not a status widget.** The first row replaces the current footer with the requested model/context view, active workflow status appears as a conditional row within the same footer, and provider quotas occupy subsequent wrapped rows.
 - **Global-only and default-off.** Subscription state belongs to the operator account rather than a repository, so projects cannot override the feature.
 - **Pi auth is the visibility authority.** The five supported adapters are available by default after enablement, but a provider is rendered only while Pi resolves its credential; CLI, environment, inline-key, and OpenCode fallbacks are excluded.
-- **Complete, stable quota presentation.** Every returned window is shown in the fixed order Codex, Claude, GitHub Copilot, GLM/Z.ai, then Kimi, skipping unauthenticated providers; rows wrap rather than omit providers or rotate content.
+- **Complete, stable quota presentation.** Included subscription windows are shown in the fixed order Codex, Claude, GitHub Copilot, GLM/Z.ai, then Kimi, skipping unauthenticated providers and GLM's monthly tools allowance; rows pack left-to-right and wrap rather than rotate content.
 - **A declared width floor.** Full footer behavior is supported from 56 columns upward; narrower terminals receive one width-safe diagnostic row rather than partial or misleading quota data.
 - **Trust degrades visibly.** Last-known values become stale immediately after a failed refresh and become unavailable after ten minutes without success.
 - **Upstream provider logic is the baseline.** Provider request/parsing, cache, timeout, polling, backoff, and defensive failure behavior derive from the pinned MIT `pi-usage-bar` source, with explicit divergence for Pi-auth-only credentials, footer rendering, account-bound cache validity, and the ten-minute unavailable state.
@@ -57,9 +57,10 @@ The trusted outcome is near-real-time terminal visibility that makes those homep
 ```mermaid
 flowchart TB
   L1[Row 1: current model, effort, context pressure, F8 Compact]
-  L2[Usage row: Codex and Claude windows]
-  L3[Wrapped usage row: Copilot, GLM, and Kimi windows]
-  L1 --> L2 --> L3
+  LW[Conditional row: active workflow status]
+  L2[Usage row: packed provider windows]
+  L3[Wrapped usage row when the next provider or window does not fit]
+  L1 --> LW --> L2 --> L3
 ```
 
 The number of usage rows varies with terminal width and available authenticated providers; the logical order does not vary after refreshes.
@@ -86,9 +87,9 @@ The number of usage rows varies with terminal width and available authenticated 
 **Subscription rows**
 
 - R12. At widths of at least 56 columns, every Pi-authenticated supported provider must be visible simultaneously in the fixed order Codex, Claude, GitHub Copilot, GLM/Z.ai, then Kimi, skipping providers hidden by missing auth.
-- R13. Each provider segment must show every valid quota window returned by that provider, including its label, usage bar, rounded percentage, and reset countdown when supplied.
-- R14. Usage must be green below 50 percent, yellow from 50 through 80 percent, and red above 80 percent.
-- R15. Provider segments must wrap onto additional footer rows rather than omit, rotate, or horizontally overflow content.
+- R13. Each provider segment must show every included subscription quota window returned by that provider as `label(reset countdown) [bar] percentage` when reset is supplied and without parentheses when it is not; GLM's monthly tools allowance is excluded while its 5-hour and 7-day token windows remain.
+- R14. Provider labels must use the accent color, reset countdowns a dim color, and each bar plus percentage the green/yellow/red usage color: green below 50 percent, yellow from 50 through 80 percent, and red above 80 percent.
+- R15. Provider segments must pack left-to-right using ` · ` between windows of one provider and ` │ ` only between providers, wrapping onto additional footer rows only when the next window or provider cannot fit.
 - R16. Width handling must keep a provider label with its first quota window, repeat the provider label on continuation rows, truncate only bars before text fields, and never emit a partial ANSI sequence.
 - R17. Provider and window order must remain stable across refreshes so the footer does not jump as pressure changes.
 
@@ -111,6 +112,8 @@ The number of usage rows varies with terminal width and available authenticated 
 - R29. When incident monitoring is enabled, Claude, Codex, and GitHub Copilot incident state must appear as a compact warning without replacing quota data; incident-fetch failure must retain the last known incident state and must not mark quota unavailable.
 - R30. A provider must implement one common capability contract for identity, quota windows, reset times, and optional incident state so another subscription provider can be added without changing footer composition rules.
 - R31. Vendored upstream logic must retain its MIT copyright and license notice, record the pinned source revision, and keep intentional divergences identifiable for later upstream comparison.
+- R32. While the custom footer is enabled, any active ce-workflow goal status currently published through Pi's workflow status entry must appear as a conditional footer row and disappear when no workflow status exists.
+- R33. Workflow-status changes must repaint the custom footer without creating a duplicate row, while disabling the custom footer must leave the existing built-in `setStatus` behavior intact.
 
 ### Key Flows
 
@@ -144,13 +147,19 @@ The number of usage rows varies with terminal width and available authenticated 
   - **Steps:** A2 invalidates the session generation, cancels timers and in-flight work, discards late callbacks, and releases custom footer ownership.
   - **Outcome:** Pi's built-in footer is restored on live disable and no background work survives shutdown.
   - **Covered by:** R6, R28.
+- F6. **Workflow status changes**
+  - **Trigger:** An autonomous ce-workflow goal starts, changes state, or ends while the custom footer is enabled.
+  - **Actors:** A1, A2.
+  - **Steps:** A2 reads the same formatted status used by Pi's workflow status entry and requests a footer repaint.
+  - **Outcome:** One conditional workflow row appears, updates, or disappears inside the custom footer; disabling the footer returns status rendering to Pi's built-in footer.
+  - **Covered by:** R32-R33.
 
 ### Acceptance Examples
 
 - AE1. **Covers R1, R27.** Given the footer setting is enabled, when a headless session starts, then no custom footer is installed and no provider request is made; the same no-op holds in an interactive session when the setting is off.
-- AE2. **Covers R2, R3, R12, R13, R17.** Given Pi auth contains Codex, Claude, and GLM credentials but not Copilot or Kimi credentials, when two successive snapshots render at 80 columns with changed percentages, then exactly Codex, Claude, and GLM appear in that order and each provider's windows remain in the same order while every valid window is present.
+- AE2. **Covers R2, R3, R12, R13, R17.** Given Pi auth contains Codex, Claude, and GLM credentials but not Copilot or Kimi credentials, when two successive snapshots render at a width where they fit with changed percentages, then exactly Codex, Claude, and GLM appear in that order, each provider's included windows remain in order, and GLM shows 5h and 7d but not its monthly tools allowance.
 - AE3. **Covers R7-R9, R11.** Given 175,000 of 272,000 context tokens are used, when the first row renders at 80 columns, then its 12-cell context bar is yellow and the row includes model, effort, percent, token counts, and `F8 Compact` without cwd or git state.
-- AE4. **Covers R14-R16.** Given five authenticated providers and a 56-column terminal, when their windows do not fit on one usage row, then segments wrap, continuation rows repeat their provider label, bars truncate before text fields, every provider remains visible, and every row fits.
+- AE4. **Covers R14-R16.** Given multiple authenticated providers, when their windows render, then each provider label is accented, reset countdowns are dim, each bar and percentage use its threshold color, windows within one provider use ` · `, providers use ` │ `, and segments pack on the current row until the next one cannot fit; at 56 columns continuation rows repeat their provider label and every row fits.
 - AE5. **Covers R19, R22, R23.** Given a provider has a valid cached snapshot, when refreshes fail for less than ten minutes, then the values remain visible with stale age; once ten minutes elapse without success, the provider shows unavailable.
 - AE6. **Covers R20, R26.** Given Pi auth switches a provider to another account, when the next refresh begins, then the old account's cached snapshot is discarded before the new account's quota can render.
 - AE7. **Covers R3, R24, R26.** Given a provider has Pi auth but no successful snapshot, when it first renders, then it shows unavailable; when that Pi credential is later removed and auth is re-resolved, then the provider disappears rather than continuing through a CLI, environment, or OpenCode fallback.
@@ -161,6 +170,7 @@ The number of usage rows varies with terminal width and available authenticated 
 - AE12. **Covers R25.** Given simulated auth rejection, rate limiting, malformed vendor data, and a thrown response body containing a sentinel secret, when diagnostics render, then only approved failure categories and ages appear and the sentinel never does.
 - AE13. **Covers R30.** Given a conforming fake sixth provider, when it is registered, then its identity and windows render through the existing composition and wrapping behavior without provider-specific renderer changes.
 - AE14. **Covers R31.** Given the packaged extension, when provenance is inspected, then it contains the upstream MIT notice, exact pinned revision, and an identifiable list of intentional divergences.
+- AE15. **Covers R32-R33.** Given an active workflow status and the custom footer enabled, when the status changes and then clears, then exactly one workflow row appears, updates, and disappears inside the custom footer; after disable, Pi's existing built-in status path remains unchanged.
 
 ### Acceptance Coverage
 
@@ -168,15 +178,16 @@ The number of usage rows varies with terminal width and available authenticated 
 |---|---|---|
 | R1-R6 | Settings-state transitions, auth-source fixtures, and footer ownership lifecycle cover AE1, AE2, and AE9. | Interactive approval confirms the ownership warning and built-in footer restoration are understandable. |
 | R7-R17 | Deterministic renderer fixtures cover thresholds, exact order, every-window rendering, widths 80/56/55, visible-width bounds, and ANSI integrity in AE2-AE4 and AE10. | One interactive terminal check confirms the compact and wrapped rows remain readable. |
-| R18-R26 | Fake-clock, fetch, malformed-response, cache-identity, and secret-sentinel fixtures cover AE5-AE7, AE11, and AE12. | Each of the five providers requires one live authenticated sample whose footer values match its vendor quota view within one completed 120-second poll. |
+| R18-R26 | Fake-clock, fetch, malformed-response, cache-identity, secret-sentinel, and pinned provider fixtures cover AE5-AE7, AE11, and AE12. | Each provider with an available operator subscription requires one live authenticated sample whose footer values match its vendor quota view within one completed 120-second poll; an unavailable subscription may use its pinned fixture plus public-auth contract checks. |
 | R27-R29 | UI-absence, shutdown, late-callback, and incident-failure fixtures cover AE1, AE8, and AE9. | A live incident is not required; fixture payloads pinned from the selected baseline prove incident rendering and isolation. |
 | R30 | A fake-provider contract fixture covers AE13. | None. |
 | R31 | Package inventory verifies license text, revision, and divergence record as in AE14. | None. |
+| R32-R33 | Controller/status fixtures prove the conditional workflow row updates without duplication and built-in status remains intact after disable as in AE15. | An active autonomous goal confirms the workflow row is readable inside the enabled custom footer. |
 
 ### Success Criteria
 
 - In normal operation, each authenticated provider starts an independent refresh every 120 seconds, excluding defensive failure backoff, and a completed valid snapshot becomes visible on the next render.
-- Release acceptance includes one live authenticated quota comparison for Codex, Claude, GitHub Copilot, GLM/Z.ai, and Kimi.
+- Release acceptance includes one live authenticated quota comparison for every provider subscription available to the operator; unavailable subscriptions are accepted through pinned payload fixtures and public-auth contract checks.
 - The operator signs off after one normal work session in which foreground, review, and background work are routed without opening provider homepages for routine quota checks.
 - Loss of freshness, credentials, or endpoint availability is distinguishable without exposing secret material.
 - All five first-release providers render together at widths of at least 56 columns, with wrapping rather than silent omission; narrower widths show only the declared diagnostic.
@@ -185,8 +196,9 @@ The number of usage rows varies with terminal width and available authenticated 
 
 - API-key spend, monetary balance, and pay-as-you-go usage are deferred; subscription quota windows are the first-release identity.
 - Project-level overrides, per-window controls, custom provider ordering, and automatic credential-source detection are excluded.
-- cwd, git state, additional current-session fields, and a richer first-row design are deferred.
+- cwd, git state, current-session fields beyond the active workflow status, and a richer first-row design are deferred.
 - Vendor CLI, environment-variable, inline-key, and OpenCode credential fallbacks are excluded even where upstream supports them.
+- GLM's monthly tools allowance is excluded; only its 5-hour and 7-day token windows belong in the footer.
 - Provider-aware automatic work routing is not part of this footer; the footer supplies the visibility needed to design that separately.
 
 ### Dependencies / Assumptions
@@ -289,7 +301,7 @@ The production registry order is Codex (`openai-codex`), Claude (`anthropic`), G
 8. **Independent one-shot timers, not one interval.** Each authenticated provider schedules its next 120-second deadline after success and its own bounded baseline-compatible backoff after failure. Slow requests run concurrently and cannot delay siblings. One controller generation plus per-provider abort controllers fences disable, dispose, shutdown, and late completion.
 9. **Freshness derives from `lastSuccessAt`.** On first failure retain the complete snapshot and render `stale <age>` immediately. At `>= 10 minutes` since success render provider label plus `unavailable` and suppress old values until success. Authenticated providers without a snapshot render unavailable; missing/rejected Pi auth hides them and deletes mismatched in-memory state.
 10. **Cache is best-effort and identity-scoped.** Store versioned snapshots at `${PI_CODING_AGENT_DIR || ~/.pi/agent}/subscription-footer-cache.json`, write through a sibling temporary file plus rename, and ignore malformed/unknown versions. Load only entries whose identity matches auth resolved for the current session, render those immediately, and refresh in the background.
-11. **Render from plain segments, then color.** Measure and truncate plain grapheme segments before applying theme escapes; never slice a themed string. Keep provider label with its first window, repeat it on continuation rows, reduce bars to four cells before truncating only the model label, and assert visible width after stripping ANSI in tests.
+11. **Render from plain segments, then color.** Build each window as `label(reset) [bar] percentage`, measure and truncate plain grapheme segments before applying theme escapes, and never slice a themed string. Accent provider labels, dim reset countdowns, apply threshold color to each bar plus percentage, join same-provider windows with ` · ` and providers with ` │ `, repeat labels on continuation rows, and assert visible width after stripping ANSI in tests.
 12. **Incident state is separate.** Only Codex, Claude, and Copilot receive fixed public Statuspage URLs. Poll them only when `incidents` is true, keep the last known incident when status fetch fails, and never modify quota success/failure timestamps from incident outcomes.
 13. **No new package dependency.** Node built-ins cover hashing, files, aborts, timers, and parsing; the focused renderer avoids importing a transitive TUI package solely for width helpers.
 
@@ -300,7 +312,7 @@ The production registry order is Codex (`openai-codex`), Claude (`anthropic`), G
 | Codex | `openai-codex` | `https://chatgpt.com/backend-api/wham/usage`; primary/secondary duration classification and reset parsing. | Use Pi-resolved OAuth access and optional account header only; derive identity from non-secret JWT/account claim when available. |
 | Claude | `anthropic` | `https://api.anthropic.com/api/oauth/usage`; `anthropic-beta: oauth-2025-04-20`; session/weekly/model windows. | Pi OAuth only; a current upstream 429 is `rate limited`, then stale/unavailable, never hidden. |
 | GitHub Copilot | `github-copilot` | Premium-interactions percentage and monthly reset parser. | Use Pi-resolved OAuth request auth, not raw auth-store fields. Validate the resolved token against the quota endpoint during the live gate; if Pi's public token is not accepted, stop this unit and record an API blocker rather than reading private auth storage. |
-| GLM/Z.ai | `zai` | `https://api.z.ai/api/monitor/usage/quota/limit`; hour/week/month unit classification. | Only a Pi-stored credential source is eligible even though the provider also supports ambient `ZAI_API_KEY`. |
+| GLM/Z.ai | `zai` | `https://api.z.ai/api/monitor/usage/quota/limit`; 5-hour and 7-day token-unit classification, including numeric-string and resetless session shapes. | Only a Pi-stored credential source is eligible even though the provider also supports ambient `ZAI_API_KEY`; omit the monthly tools allowance. |
 | Kimi | `kimi-coding` | `https://api.kimi.com/coding/v1/usages`; defensive data/limits parsing, reset and duration variants. | Map current Pi ID to the baseline's Kimi adapter; reject ambient `KIMI_API_KEY`. |
 
 ## Existing Patterns to Reuse
@@ -318,20 +330,20 @@ The production registry order is Codex (`openai-codex`), Claude (`anthropic`), G
 flowchart LR
   U1[U1 Global opt-in footer shell and width-safe model row]
   U2[U2 Pi-auth quota engine and five provider adapters]
-  U3[U3 Incident isolation, provenance, and release gate]
+  U3[U3 Workflow status, incident isolation, provenance, and release gate]
   U1 --> U2 --> U3
 ```
 
 - U1 must land first because it creates the controller lifecycle, global setting, footer ownership behavior, and renderer contract consumed by quota rows.
 - U2 depends only on U1 and closes all quota/auth/cache/freshness behavior for all five providers as one coherent vertical slice.
-- U3 depends on U2 because incident markers augment provider segments and package provenance describes the completed adaptations.
+- U3 depends on U2 because workflow status and incident markers join the completed custom footer, while package provenance describes the completed adaptations.
 - Do not split parser/service/renderer into separate WorkItems: that would create horizontal units with no independently observable footer behavior.
 
 ## Risks and Mitigations
 
 | Severity | Risk | Mitigation / closure evidence |
 |---|---|---|
-| High | Pi's public Copilot resolved access token may not authorize the baseline premium-quota endpoint, while the baseline reads a private refresh field. | U2 must prove one live Pi-login request. Do not fall back to direct `auth.json`; if rejected, record an explicit Pi public-auth API blocker for `work-4` and leave U2 open. |
+| High | Pi's public Copilot resolved access token may not authorize the baseline premium-quota endpoint, while the baseline reads a private refresh field. | Prefer one live Pi-login request. When the operator has no Copilot subscription, accept the pinned fixture and public-auth contract check, record the missing live proof, and never fall back to direct `auth.json`. |
 | High | Undocumented provider endpoints or payloads drift, especially Claude 429s and Kimi variants. | Fixed-host fetchers, strict complete-snapshot validation, sanitized categories, retained last success, ten-minute cutoff, inline pinned fixtures, and one live sample per provider. |
 | High | A late request could repaint or persist data after disable/session replacement. | Generation comparison before every publish/write/reschedule plus abort controllers; fake deferred promises prove late results are discarded. |
 | Medium | Another extension can replace this footer after enable; Pi exposes no prior-footer capture API. | Persist the one-time ownership notice, restore only built-in footer on disable, explain `/reload`, and stop timers when the component is disposed. |
@@ -350,7 +362,7 @@ flowchart LR
 2. The first row at 80 columns includes current model, effective effort, a 12-cell bar, percent, used/total tokens, and `F8 Compact`; 150000/150001/200000/200001 boundaries use required colors and cwd/git are absent (AE3).
 3. Widths 80, 56, and 55 produce full, compact/wrapped, and diagnostic-only output; every stripped line is within width and every escape sequence is complete (AE4, AE10).
 4. Fake Pi auth for Codex, Claude, and GLM produces exactly that order and all returned windows; missing Copilot/Kimi auth makes no request and renders no segment (AE2).
-5. Inline pinned payloads exercise each production adapter, including Codex duration order, Claude model windows, Copilot remaining-to-used conversion, GLM unit mapping, and Kimi shape variants.
+5. Inline pinned payloads exercise each production adapter, including Codex duration order, Claude model windows, Copilot remaining-to-used conversion, GLM 5h/7d numeric-string and resetless shapes with monthly tools excluded, and Kimi shape variants.
 6. Cached state renders before deferred network completion only for a matching identity; account switch removes the old snapshot before new fetch publication (AE5, AE6).
 7. Auth present/no snapshot renders unavailable; auth removal hides the provider. Environment-like auth sources are rejected without fetch (AE7).
 8. Failure after success renders stale age immediately, retains atomic prior windows, crosses to unavailable at exactly ten minutes, and recovers only on complete success (AE5).
@@ -359,6 +371,7 @@ flowchart LR
 11. Disable, component dispose, and session shutdown cancel timers, restore the built-in footer where applicable, and discard deferred completions by generation (AE9).
 12. Auth rejection, rate limit, malformed payload, and a response-body sentinel secret render only approved categories/ages; neither output, cache, nor thrown diagnostics contains the sentinel (AE12).
 13. A fake sixth provider renders and wraps through the common registry without a renderer change (AE13).
+14. Active workflow status appears once inside the custom footer, repaints on change, clears on completion, and leaves the existing built-in status path intact after footer disable (AE15).
 
 `node scripts/test-work-settings.mjs` additionally proves default-off global persistence, separate default-off incident toggle, one-time/cancelable ownership warning, live controller apply, and ignored project overrides.
 
@@ -379,7 +392,7 @@ npm run verify
 
 ### Required live acceptance
 
-Use an interactive TUI at widths 80, 56, and 55 with the global footer enabled. For Codex, Claude, GitHub Copilot, GLM/Z.ai, and Kimi in turn:
+Use an interactive TUI at widths 80, 56, and 55 with the global footer enabled. For each provider subscription available to the operator:
 
 1. Authenticate through Pi `/login` only; clear matching CLI/environment fallbacks from the test process.
 2. Capture the Pi provider ID, footer windows/percent/reset, terminal width, and observation time without recording credentials.
@@ -387,7 +400,7 @@ Use an interactive TUI at widths 80, 56, and 55 with the global footer enabled. 
 4. Remove or switch the Pi login and confirm the old account value disappears at the next provider deadline.
 5. Disable live incident polling after the status-marker check if routine network requests are not desired.
 
-A live incident is not required. Fixture payloads prove markers. U2 cannot close until all five live quota comparisons pass or a concrete public-API blocker is recorded; final roadmap acceptance also requires the operator's one-session usability sign-off from the Product Contract.
+For a provider whose subscription is unavailable to the operator, pinned payload fixtures plus public `getProviderAuth()` contract checks replace the live comparison and the missing live proof is recorded. A live incident is not required; fixture payloads prove markers. Final roadmap acceptance also requires the operator's one-session usability sign-off from the Product Contract.
 
 ## Implementation Units
 
@@ -405,19 +418,19 @@ A live incident is not required. Fixture payloads prove markers. U2 cannot close
 
 - **Depends on:** U1.
 - **Paths:** `extensions/subscription-footer.js`, `scripts/test-work-subscription-footer.mjs`.
-- **Scope:** Add the common capability contract; production registry; Pi stored-auth allowlist; identity derivation; fixed-host Codex, Claude, Copilot, GLM, and Kimi adapters; strict atomic parsing; immediate identity-matched cache; independent refresh/backoff; stale/unavailable transitions; quota ordering, coloring, wrapping, continuation labels, render invalidation, and secret-safe failures. Incident polling remains off/unimplemented.
+- **Scope:** Add the common capability contract; production registry; Pi stored-auth allowlist; identity derivation; fixed-host Codex, Claude, Copilot, GLM, and Kimi adapters; strict atomic parsing; immediate identity-matched cache; independent refresh/backoff; stale/unavailable transitions; exact quota typography/coloring, shared-row packing, continuation labels, GLM 5h/7d inclusion with monthly tools excluded, render invalidation, and secret-safe failures. Incident polling remains off/unimplemented.
 - **Owned requirements/flows:** R2-R3, R12-R26, R28, R30; F1 quota portion and F2-F4; AE2, AE4-AE7, AE10 quota portion, AE11-AE13.
-- **Acceptance:** Before U2, authenticated production providers cannot render quota. After U2, deterministic adapter fixtures and fake-clock scenarios pass, a fake sixth provider uses the same renderer, and one live Pi-auth-only comparison succeeds for each provider. Missing or ambient-only auth makes no request; an account switch never renders old cache; a failed provider cannot delay or overwrite a sibling.
+- **Acceptance:** Before U2, authenticated production providers cannot render quota. After U2, deterministic adapter fixtures and fake-clock scenarios pass, a fake sixth provider uses the same renderer, each available subscription passes one live Pi-auth-only comparison, and unavailable subscriptions pass pinned fixture plus public-auth contract checks with the missing live proof recorded. Missing or ambient-only auth makes no request; an account switch never renders old cache; a failed provider cannot delay or overwrite a sibling.
 - **Verification:** `node scripts/test-work-subscription-footer.mjs`, followed by the five-provider live acceptance checklist.
-- **Independent close condition:** All quota functionality is observable and releasable with incidents still disabled. If public Copilot auth cannot authorize quota, this unit remains open with the exact API blocker; private auth-store access is not an acceptable workaround.
+- **Independent close condition:** All quota functionality is observable and releasable with incidents still disabled. A provider unavailable for live testing carries explicit fixture-only evidence; private auth-store access is never an acceptable workaround.
 
-### U3 — Optional incident isolation, provenance, and release gate
+### U3 — Integrated workflow status, optional incidents, provenance, and release gate
 
 - **Depends on:** U2.
 - **Paths:** `extensions/subscription-footer.js`, `extensions/work-models.js`, `extensions/subscription-footer-UPSTREAM.md`, `scripts/test-work-subscription-footer.mjs`, `scripts/test-work-settings.mjs`, `scripts/verify-package.mjs`.
-- **Scope:** Add the separate global default-off incident toggle; fixed Claude/Codex/Copilot public status adapters; marker rendering and last-known incident retention isolated from quota freshness; complete MIT/pin/divergence provenance; package inventory checks; final regression and interactive readability/usability evidence.
-- **Owned requirements/flows:** R4, R29, R31; incident portion of F2; AE8, AE14; final Success Criteria and live/human proof not already closed by U2.
-- **Acceptance:** Before U3, incident monitoring and packaged provenance proof are absent. After U3, the off state makes zero status requests; fixture incidents add warnings without hiding or aging quota; status failure retains incident state; provenance inventory passes; `npm run verify` passes; 80/56/55 interactive rows are readable and the operator records one normal session without routine provider-homepage checks.
+- **Scope:** Render the existing active workflow status as a conditional row inside the custom footer without duplicating or replacing the built-in status path; add the separate global default-off incident toggle; fixed Claude/Codex/Copilot public status adapters; marker rendering and last-known incident retention isolated from quota freshness; complete MIT/pin/divergence provenance; package inventory checks; final regression and interactive readability/usability evidence.
+- **Owned requirements/flows:** R4, R29, R31-R33; incident portion of F2 and F6; AE8, AE14-AE15; final Success Criteria and live/human proof not already closed by U2.
+- **Acceptance:** Before U3, workflow status is hidden by the custom footer and incident/provenance proof is absent. After U3, active workflow status appears exactly once inside the enabled custom footer and continues through Pi's built-in path after disable; incident off makes zero status requests; fixture incidents add warnings without hiding or aging quota; status failure retains incident state; provenance inventory passes; `npm run verify` passes; 80/56/55 interactive rows are readable and the operator records one normal session without routine provider-homepage checks.
 - **Verification:** Focused footer/settings/provenance commands, then one final `npm run verify` and the interactive terminal checklist.
 - **Independent close condition:** The feature is release-ready with optional incidents and auditable upstream licensing; no later implementation unit is required.
 
@@ -427,9 +440,9 @@ A live incident is not required. Fixture payloads prove markers. U2 cannot close
 |---|---|---|
 | U1 | R1, R5-R11, R27-R28 | AE1, AE3, AE9 (ownership/lifecycle), AE10 (model/diagnostic) |
 | U2 | R2-R3, R12-R26, R28, R30 | AE2, AE4-AE7, AE10 (quota wrapping), AE11-AE13 |
-| U3 | R4, R29, R31 | AE8, AE14 plus final live/human Success Criteria |
+| U3 | R4, R29, R31-R33 | AE8, AE14-AE15 plus final live/human Success Criteria |
 
-Every R1-R31 requirement and AE1-AE14 example is owned. The unit split follows observable vertical behavior rather than mirroring settings/service/renderer layers.
+Every R1-R33 requirement and AE1-AE15 example is owned. The unit split follows observable vertical behavior rather than mirroring settings/service/renderer layers.
 
 ## Appendix
 

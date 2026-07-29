@@ -1,5 +1,14 @@
+import { createHash } from "node:crypto";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 const MIN_WIDTH = 56;
 const FULL_WIDTH = 80;
+const POLL_MS = 120_000;
+const BACKOFF_MS = 360_000;
+const FETCH_TIMEOUT_MS = 10_000;
+const UNAVAILABLE_MS = 600_000;
 const ANSI_PATTERN = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
@@ -12,12 +21,9 @@ function codePointWidth(codePoint) {
 		(codePoint >= 0xfe00 && codePoint <= 0xfe0f) ||
 		(codePoint >= 0xfe20 && codePoint <= 0xfe2f) ||
 		(codePoint >= 0x1f3fb && codePoint <= 0x1f3ff)
-	)
-		return 0;
+	) return 0;
 	return codePoint >= 0x1100 &&
-		(codePoint <= 0x115f ||
-			codePoint === 0x2329 ||
-			codePoint === 0x232a ||
+		(codePoint <= 0x115f || codePoint === 0x2329 || codePoint === 0x232a ||
 			(codePoint >= 0x2e80 && codePoint <= 0xa4cf) ||
 			(codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
 			(codePoint >= 0xf900 && codePoint <= 0xfaff) ||
@@ -26,9 +32,7 @@ function codePointWidth(codePoint) {
 			(codePoint >= 0xff00 && codePoint <= 0xff60) ||
 			(codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
 			(codePoint >= 0x1f300 && codePoint <= 0x1faff) ||
-			(codePoint >= 0x20000 && codePoint <= 0x3fffd))
-		? 2
-		: 1;
+			(codePoint >= 0x20000 && codePoint <= 0x3fffd)) ? 2 : 1;
 }
 
 function graphemeWidth(value) {
@@ -68,31 +72,18 @@ function formatTokens(count) {
 	if (value < 1000) return String(Math.round(value));
 	if (value < 10000) return `${(value / 1000).toFixed(1)}k`;
 	if (value < 1000000) return `${Math.round(value / 1000)}k`;
-	return value < 10000000
-		? `${(value / 1000000).toFixed(1)}M`
-		: `${Math.round(value / 1000000)}M`;
+	return value < 10000000 ? `${(value / 1000000).toFixed(1)}M` : `${Math.round(value / 1000000)}M`;
 }
 
 function contextValues(ctx) {
 	const usage = ctx.getContextUsage?.() ?? {};
 	const used = Math.max(0, Number(usage.tokens) || 0);
-	const total = Math.max(
-		0,
-		Number(usage.contextWindow ?? usage.maxTokens ?? ctx.model?.contextWindow) || 0,
-	);
+	const total = Math.max(0, Number(usage.contextWindow ?? usage.maxTokens ?? ctx.model?.contextWindow) || 0);
 	const rawPercent = usage.percent;
 	const percent = Number.isFinite(rawPercent)
 		? Math.max(0, Math.min(100, Math.round(rawPercent)))
-		: total
-			? Math.max(0, Math.min(100, Math.round((used / total) * 100)))
-			: 0;
+		: total ? Math.max(0, Math.min(100, Math.round((used / total) * 100))) : 0;
 	return { used, total, percent };
-}
-
-function pressureColor(used) {
-	if (used > 200000) return "error";
-	if (used > 150000) return "warning";
-	return "success";
 }
 
 function contextBar(percent, cells) {
@@ -117,33 +108,409 @@ export function renderModelRow(ctx, theme, width, thinkingLevel) {
 	const prefix = full ? "Model: " : "";
 	const modelWidth = Math.max(1, width - visibleWidth(prefix) - visibleWidth(suffix));
 	const plainModel = truncatePlain(model, modelWidth);
-	const color = pressureColor(used);
+	const color = used > 200000 ? "error" : used > 150000 ? "warning" : "success";
 	const styledBar = theme?.fg?.(color, bar) ?? bar;
 	return [`${prefix}${plainModel}${suffix.replace(bar, styledBar)}`];
 }
 
-export function createSubscriptionFooterController(
-	pi,
-	{ readGlobalSettings, providers = [] } = {},
-) {
+class QuotaError extends Error {
+	constructor(category) { super(category); this.category = category; }
+}
+
+const table = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+const finite = (value) => typeof value === "number" && Number.isFinite(value);
+const percent = (value) => finite(value) ? Math.max(0, Math.min(100, value)) : undefined;
+const resetTime = (value) => {
+	if (finite(value) && value > 0) return value > 1e12 ? value : value * 1000;
+	if (typeof value === "string" && value) { const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : undefined; }
+	return undefined;
+};
+
+function resolvedToken(result) {
+	const headers = table(result?.auth?.headers);
+	const authorization = Object.entries(headers).find(([key]) => key.toLowerCase() === "authorization")?.[1];
+	if (typeof authorization === "string" && authorization) return authorization.replace(/^Bearer\s+/i, "");
+	return typeof result?.auth?.apiKey === "string" && result.auth.apiKey ? result.auth.apiKey : undefined;
+}
+
+function authHeaders(result, extras = {}, raw = false) {
+	const token = resolvedToken(result);
+	if (!token) throw new QuotaError("auth rejected");
+	return { ...extras, authorization: raw ? token : `Bearer ${token}` };
+}
+
+async function requestJson(url, headers, { fetchImpl, signal, timeout = FETCH_TIMEOUT_MS, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout }) {
+	const controller = new AbortController();
+	const abort = () => controller.abort();
+	if (signal?.aborted) abort(); else signal?.addEventListener?.("abort", abort, { once: true });
+	const timer = setTimeoutImpl(abort, timeout);
+	try {
+		const response = await fetchImpl(url, { headers, signal: controller.signal, redirect: "error" });
+		if (response.status === 401 || response.status === 403) throw new QuotaError("auth rejected");
+		if (response.status === 429) throw new QuotaError("rate limited");
+		if (!response.ok) throw new QuotaError("unavailable");
+		try { return await response.json(); } catch { throw new QuotaError("unavailable"); }
+	} catch (error) {
+		if (error instanceof QuotaError) throw error;
+		throw new QuotaError("unavailable");
+	} finally {
+		clearTimeoutImpl(timer);
+		signal?.removeEventListener?.("abort", abort);
+	}
+}
+
+function complete(windows) {
+	if (!Array.isArray(windows) || windows.length === 0 || windows.some((window) =>
+		!window || typeof window.id !== "string" || typeof window.label !== "string" ||
+		!finite(window.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100 ||
+		(window.resetsAt !== undefined && !finite(window.resetsAt)))) throw new QuotaError("unavailable");
+	return windows;
+}
+
+function whamWindow(value, fallback, now) {
+	if (!value) return undefined;
+	if (!finite(value.used_percent)) throw new QuotaError("unavailable");
+	const resetsAt = resetTime(value.reset_at, now) ?? (finite(value.reset_after_seconds) ? now + value.reset_after_seconds * 1000 : undefined);
+	if (!resetsAt) throw new QuotaError("unavailable");
+	const id = finite(value.limit_window_seconds) && value.limit_window_seconds > 0
+		? value.limit_window_seconds <= 21600 ? "5h" : "7d" : fallback;
+	return { id, label: id, usedPercent: percent(value.used_percent), resetsAt };
+}
+
+function codexParser(payload, now) {
+	const rate = table(payload).rate_limit;
+	if (!rate || typeof rate !== "object") throw new QuotaError("unavailable");
+	return complete([whamWindow(rate.primary_window, "5h", now), whamWindow(rate.secondary_window, "7d", now)]
+		.filter(Boolean).sort((a, b) => Number(b.id === "5h") - Number(a.id === "5h")));
+}
+
+function claudeParser(payload) {
+	if (!Array.isArray(table(payload).limits)) throw new QuotaError("unavailable");
+	const windows = table(payload).limits.map((limit, index) => {
+		if (!limit || !finite(limit.percent) || !limit.kind) throw new QuotaError("unavailable");
+		const resetsAt = resetTime(limit.resets_at);
+		if (!resetsAt) throw new QuotaError("unavailable");
+		const id = limit.kind === "session" ? "5h" : limit.kind === "weekly_all" ? "7d" : `model-${index}`;
+		return { id, label: id.startsWith("model-") ? limit.scope?.model?.display_name ?? "model" : id, usedPercent: percent(limit.percent), resetsAt };
+	});
+	return complete(windows.sort((a, b) => Number(b.id === "5h") - Number(a.id === "5h")));
+}
+
+function copilotParser(payload) {
+	const quota = table(table(table(payload).quota_snapshots).premium_interactions);
+	if (quota.unlimited === true || !finite(quota.percent_remaining)) throw new QuotaError("unavailable");
+	const resetsAt = resetTime(table(payload).quota_reset_date);
+	if (!resetsAt) throw new QuotaError("unavailable");
+	return complete([{ id: "mo", label: "mo", usedPercent: 100 - Math.max(0, Math.min(100, quota.percent_remaining)), resetsAt }]);
+}
+
+function numericValue(value) {
+	if (finite(value)) return value;
+	if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+}
+
+function glmParser(payload) {
+	if (table(payload).success === false) throw new QuotaError("unavailable");
+	const limits = table(table(payload).data).limits;
+	if (!Array.isArray(limits)) throw new QuotaError("unavailable");
+	const unitSeconds = { 3: 3600, 6: 604800, 5: 2592000 };
+	const order = { "5h": 0, "7d": 1 };
+	const windows = [];
+	for (const [index, limit] of limits.entries()) {
+		const percentage = numericValue(limit?.percentage);
+		if (percentage === undefined || typeof limit.type !== "string" || !limit.type) continue;
+		const number = numericValue(limit.number);
+		const unit = numericValue(limit.unit);
+		const seconds = number === undefined || unit === undefined ? 0 : number * (unitSeconds[unit] ?? 0);
+		const tokenLimit = limit.type === "TOKENS" || limit.type === "TOKENS_LIMIT";
+		const id = tokenLimit && seconds > 0 && seconds <= 21600 ? "5h" : tokenLimit && seconds > 21600 && seconds <= 604800 ? "7d" : undefined;
+		if (!id) continue;
+		const resetsAt = resetTime(numericValue(limit.nextResetTime) ?? limit.nextResetTime);
+		if (!resetsAt && !(id === "5h" && unit === 3 && number === 5)) continue;
+		windows.push({ id: `${id}-${index}`, label: id, usedPercent: percent(percentage), ...(resetsAt ? { resetsAt } : {}) });
+	}
+	return complete(windows.sort((a, b) => order[a.label] - order[b.label]));
+}
+
+function kimiRow(data, window, fallback, now, index) {
+	const limit = numericValue(data.limit);
+	let used = numericValue(data.used);
+	if (used === undefined && numericValue(data.remaining) !== undefined && limit !== undefined) used = limit - numericValue(data.remaining);
+	if (used === undefined || limit === undefined || limit <= 0) throw new QuotaError("unavailable");
+	let resetsAt;
+	for (const key of ["reset_at", "resetAt", "reset_time", "resetTime"]) if (!resetsAt) resetsAt = resetTime(data[key]);
+	for (const key of ["reset_in", "resetIn", "ttl"]) if (!resetsAt && numericValue(data[key]) > 0) resetsAt = now + numericValue(data[key]) * 1000;
+	if (!resetsAt) throw new QuotaError("unavailable");
+	let label = fallback;
+	const duration = numericValue(window.duration ?? data.duration);
+	if (duration > 0) {
+		const unit = String(window.timeUnit ?? data.timeUnit ?? "");
+		const multiplier = unit.includes("MINUTE") ? 60 : unit.includes("HOUR") ? 3600 : unit.includes("DAY") ? 86400 : unit.includes("WEEK") ? 604800 : unit.includes("MONTH") ? 2592000 : 1;
+		const seconds = duration * multiplier;
+		label = seconds <= 21600 ? "5h" : seconds <= 604800 ? "7d" : "mo";
+	}
+	return { id: `${label}-${index}`, label, usedPercent: percent((used / limit) * 100), resetsAt };
+}
+
+function kimiParser(payload, now) {
+	const root = table(table(payload).data ?? payload);
+	const rows = [];
+	if (root.usage && typeof root.usage === "object") rows.push(kimiRow(table(root.usage), {}, "7d", now, rows.length));
+	if (Array.isArray(root.limits)) for (const item of root.limits) {
+		const row = table(item);
+		rows.push(kimiRow(table(row.detail ?? row), table(row.window), "7d", now, rows.length));
+	}
+	return complete(rows.sort((a, b) => Number(b.label === "5h") - Number(a.label === "5h")));
+}
+
+function provider({ id, label, piProviderId, url, parser, headers }) {
+	return Object.freeze({
+		id, label, piProviderId,
+		resolveAuth: (ctx) => ctx.modelRegistry?.getProviderAuth?.(piProviderId),
+		identity: authIdentity,
+		async fetchQuota(auth, options) {
+			const payload = await requestJson(url, headers(auth), options);
+			return parser(payload, options.now());
+		},
+	});
+}
+
+export const PRODUCTION_PROVIDERS = Object.freeze([
+	provider({ id: "codex", label: "Codex", piProviderId: "openai-codex", url: "https://chatgpt.com/backend-api/wham/usage", parser: codexParser, headers: (auth) => {
+		const headers = authHeaders(auth, { "user-agent": "codex-cli" });
+		const source = table(auth?.auth?.headers);
+		for (const [key, value] of Object.entries(source)) if (key.toLowerCase() === "chatgpt-account-id") headers["chatgpt-account-id"] = value;
+		return headers;
+	} }),
+	provider({ id: "claude", label: "Claude", piProviderId: "anthropic", url: "https://api.anthropic.com/api/oauth/usage", parser: claudeParser, headers: (auth) => authHeaders(auth, { "anthropic-beta": "oauth-2025-04-20" }) }),
+	provider({ id: "copilot", label: "Copilot", piProviderId: "github-copilot", url: "https://api.github.com/copilot_internal/user", parser: copilotParser, headers: (auth) => authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }) }),
+	provider({ id: "glm", label: "GLM/Z.ai", piProviderId: "zai", url: "https://api.z.ai/api/monitor/usage/quota/limit", parser: glmParser, headers: (auth) => authHeaders(auth, {}, true) }),
+	provider({ id: "kimi", label: "Kimi", piProviderId: "kimi-coding", url: "https://api.kimi.com/coding/v1/usages", parser: kimiParser, headers: (auth) => authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }) }),
+]);
+
+function authIdentity(result) {
+	const headers = table(result?.auth?.headers);
+	const stable = Object.entries(headers).find(([key, value]) => /(?:account|user)[-_]?id/i.test(key) && typeof value === "string")?.[1];
+	const token = resolvedToken(result);
+	if (!token) throw new QuotaError("auth rejected");
+	let claim;
+	try {
+		const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
+		claim = payload.account_id ?? payload.sub;
+	} catch {}
+	return createHash("sha256").update(String(stable ?? claim ?? JSON.stringify(result.auth))).digest("hex");
+}
+
+function storedAuth(result) {
+	return result && (result.source === "OAuth" || result.source === "stored credential") && resolvedToken(result) ? result : undefined;
+}
+
+function formatDuration(ms) {
+	const minutes = Math.max(0, Math.ceil(ms / 60000));
+	const days = Math.floor(minutes / 1440);
+	const hours = Math.floor((minutes % 1440) / 60);
+	return days ? `${days}d ${hours}h` : `${hours}h ${minutes % 60}m`;
+}
+
+function quotaColor(value) { return value > 80 ? "error" : value >= 50 ? "warning" : "success"; }
+
+function windowText(window, now, barCells = 8) {
+	const pct = Math.round(window.usedPercent);
+	const filled = Math.round((pct / 100) * barCells);
+	const reset = window.resetsAt ? `(${formatDuration(window.resetsAt - now)})` : "";
+	return `${window.label}${reset} [${"█".repeat(filled)}${"░".repeat(barCells - filled)}] ${pct}%`;
+}
+
+function styleSegment(text, window, providerLabel, theme) {
+	let styled = text;
+	const reset = styled.match(/\([^)]*\)/)?.[0];
+	if (reset) styled = styled.replace(reset, theme?.fg?.("dim", reset) ?? reset);
+	const quota = styled.match(/\[[█░]+\] \d+%/)?.[0];
+	if (quota) styled = styled.replace(quota, theme?.fg?.(quotaColor(window.usedPercent), quota) ?? quota);
+	if (providerLabel && styled.startsWith(providerLabel)) {
+		const bold = theme?.bold?.(providerLabel) ?? providerLabel;
+		styled = `${theme?.fg?.("accent", bold) ?? bold}${styled.slice(providerLabel.length)}`;
+	}
+	return styled;
+}
+
+export function renderQuotaRows(registry, states, theme, width, now = Date.now()) {
+	if (width < MIN_WIDTH) return [];
+	const lines = [];
+	let parts = [];
+	let plainWidth = 0;
+	let currentProvider;
+	const flush = () => {
+		if (parts.length) lines.push(parts.map((part) => `${part.separator}${part.styled}`).join(""));
+		parts = [];
+		plainWidth = 0;
+		currentProvider = undefined;
+	};
+	const append = (plain, styled, providerId) => {
+		const separator = parts.length ? currentProvider === providerId ? " · " : " │ " : "";
+		parts.push({ separator, styled });
+		plainWidth += visibleWidth(separator) + visibleWidth(plain);
+		currentProvider = providerId;
+	};
+	for (const provider of registry) {
+		const state = states.get(provider.id);
+		if (!state?.authenticated) continue;
+		const age = state.lastSuccessAt === undefined ? Infinity : now - state.lastSuccessAt;
+		if (!state.snapshot || age >= UNAVAILABLE_MS) {
+			const failure = state.failure === "auth rejected" || state.failure === "rate limited" ? ` · ${state.failure}` : "";
+			let plain = `${provider.label} unavailable${failure}`;
+			if (parts.length && plainWidth + 3 + visibleWidth(plain) > width) flush();
+			plain = truncatePlain(plain, width);
+			append(plain, styleSegment(plain, {}, provider.label, theme), provider.id);
+			continue;
+		}
+		const marker = state.failure
+			? ` · stale ${formatDuration(age)}${state.failure === "unavailable" ? "" : ` · ${state.failure}`}`
+			: "";
+		for (const [index, window] of state.snapshot.windows.entries()) {
+			const suffix = index === state.snapshot.windows.length - 1 ? marker : "";
+			let prefix = currentProvider === provider.id ? "" : `${provider.label} `;
+			let body = windowText(window, now, 8);
+			let plain = `${prefix}${body}${suffix}`;
+			if (parts.length && plainWidth + 3 + visibleWidth(plain) > width) {
+				flush();
+				prefix = `${provider.label} `;
+				plain = `${prefix}${body}${suffix}`;
+			}
+			for (let cells = 7; visibleWidth(plain) > width && cells >= 4; cells--) {
+				body = windowText(window, now, cells);
+				plain = `${prefix}${body}${suffix}`;
+			}
+			plain = truncatePlain(plain, width);
+			append(plain, styleSegment(plain, window, prefix ? provider.label : undefined, theme), provider.id);
+		}
+	}
+	flush();
+	return lines;
+}
+
+export function createSubscriptionFooterController(pi, options = {}) {
+	const {
+		readGlobalSettings,
+		providers = PRODUCTION_PROVIDERS,
+		now = Date.now,
+		fetchImpl = globalThis.fetch,
+		agentDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
+		fsImpl = { mkdir, readFile, rename, writeFile },
+		setTimeoutImpl = setTimeout,
+		clearTimeoutImpl = clearTimeout,
+		setIntervalImpl = setInterval,
+		clearIntervalImpl = clearInterval,
+	} = options;
 	let generation = 0;
 	let activeCtx;
 	let installed = false;
+	let ticker;
+	let requestRender = () => {};
+	let cacheLoaded = false;
+	let cache = { version: 1, providers: {} };
 	const registry = [...providers];
-	const setting = () =>
-		readGlobalSettings?.().workOrchestrator?.subscriptionFooter ?? {};
+	const states = new Map(registry.map((entry) => [entry.id, { authenticated: false }]));
+	const timers = new Map();
+	const aborters = new Map();
+	const cacheFile = join(agentDir, "subscription-footer-cache.json");
+	const setting = () => readGlobalSettings?.().workOrchestrator?.subscriptionFooter ?? {};
+
+	async function loadCache() {
+		if (cacheLoaded) return;
+		cacheLoaded = true;
+		try {
+			const value = JSON.parse(await fsImpl.readFile(cacheFile, "utf8"));
+			if (value?.version === 1 && value.providers && typeof value.providers === "object") cache = value;
+		} catch {}
+	}
+
+	async function saveCache() {
+		try {
+			await fsImpl.mkdir(agentDir, { recursive: true });
+			const temporary = `${cacheFile}.tmp`;
+			await fsImpl.writeFile(temporary, JSON.stringify(cache));
+			await fsImpl.rename(temporary, cacheFile);
+		} catch {}
+	}
+
+	function schedule(entry, delay, gen) {
+		if (gen !== generation) return;
+		clearTimeoutImpl(timers.get(entry.id));
+		timers.set(entry.id, setTimeoutImpl(() => void refresh(entry, gen), delay));
+	}
+
+	async function refresh(entry, gen) {
+		if (gen !== generation || !activeCtx) return;
+		let resolved;
+		try {
+			const auth = entry.resolveAuth
+				? await entry.resolveAuth(activeCtx)
+				: await activeCtx.modelRegistry?.getProviderAuth?.(entry.piProviderId);
+			resolved = storedAuth(auth);
+		} catch {}
+		if (gen !== generation) return;
+		const state = states.get(entry.id);
+		if (!resolved) {
+			Object.assign(state, { authenticated: false, identityKey: undefined, snapshot: undefined, lastSuccessAt: undefined, failure: undefined });
+			requestRender();
+			schedule(entry, POLL_MS, gen);
+			return;
+		}
+		const identityKey = (entry.identity ?? authIdentity)(resolved);
+		if (state.identityKey !== identityKey) {
+			Object.assign(state, { identityKey, snapshot: undefined, lastSuccessAt: undefined, failure: undefined });
+			if (cache.providers[entry.id]?.identityKey !== identityKey) delete cache.providers[entry.id];
+		}
+		state.authenticated = true;
+		await loadCache();
+		const cached = cache.providers[entry.id];
+		if (cached && cached.identityKey !== identityKey) {
+			delete cache.providers[entry.id];
+			void saveCache();
+		}
+		if (!state.snapshot && cached?.identityKey === identityKey) {
+			try {
+				state.snapshot = { providerId: entry.id, identityKey, fetchedAt: cached.fetchedAt, windows: complete(cached.windows) };
+				state.lastSuccessAt = cached.fetchedAt;
+			} catch {}
+		}
+		requestRender();
+		const controller = new AbortController();
+		aborters.get(entry.id)?.abort();
+		aborters.set(entry.id, controller);
+		try {
+			const windows = complete(await entry.fetchQuota(resolved, { fetchImpl, signal: controller.signal, now, setTimeoutImpl, clearTimeoutImpl }));
+			if (gen !== generation || controller.signal.aborted) return;
+			const fetchedAt = now();
+			state.snapshot = { providerId: entry.id, identityKey, fetchedAt, windows };
+			state.lastSuccessAt = fetchedAt;
+			state.failure = undefined;
+			cache.providers[entry.id] = state.snapshot;
+			void saveCache();
+			requestRender();
+			schedule(entry, POLL_MS, gen);
+		} catch (error) {
+			if (gen !== generation || controller.signal.aborted) return;
+			state.failure = error instanceof QuotaError ? error.category : "unavailable";
+			requestRender();
+			schedule(entry, BACKOFF_MS, gen);
+		}
+	}
 
 	function stop({ restore = true, notify = false } = {}) {
 		generation++;
+		for (const timer of timers.values()) clearTimeoutImpl(timer);
+		timers.clear();
+		for (const controller of aborters.values()) controller.abort();
+		aborters.clear();
+		if (ticker !== undefined) clearIntervalImpl(ticker);
+		ticker = undefined;
 		const ctx = activeCtx;
 		activeCtx = undefined;
 		if (installed && restore) ctx?.ui?.setFooter?.(undefined);
 		installed = false;
-		if (notify)
-			ctx?.ui?.notify?.(
-				"Subscription footer disabled; Pi's built-in footer is restored. Use /reload for another footer extension to reclaim ownership.",
-				"info",
-			);
+		if (notify) ctx?.ui?.notify?.("Subscription footer disabled; Pi's built-in footer is restored. Use /reload for another footer extension to reclaim ownership.", "info");
 	}
 
 	function install(ctx) {
@@ -151,17 +518,20 @@ export function createSubscriptionFooterController(
 		stop({ restore: false });
 		activeCtx = ctx;
 		installed = true;
-		const currentGeneration = generation;
-		ctx.ui.setFooter((tui, theme) => ({
-			invalidate() {},
-			render(width) {
-				return renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.());
-			},
-			dispose() {
-				if (currentGeneration === generation) stop({ restore: false });
-				tui?.requestRender?.();
-			},
-		}));
+		const gen = generation;
+		ctx.ui.setFooter((tui, theme) => {
+			requestRender = () => tui?.requestRender?.();
+			return {
+				invalidate() {},
+				render(width) {
+					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.());
+					return width < MIN_WIDTH ? model : [...model, ...renderQuotaRows(registry, states, theme, width, now())];
+				},
+				dispose() { if (gen === generation) stop({ restore: false }); },
+			};
+		});
+		for (const entry of registry) void refresh(entry, gen);
+		ticker = setIntervalImpl(() => requestRender(), 60_000);
 		return true;
 	}
 
@@ -173,16 +543,11 @@ export function createSubscriptionFooterController(
 			if (activeCtx === ctx) stop({ notify: true });
 			return false;
 		},
-		shutdown(ctx) {
-			if (activeCtx === ctx) stop();
-		},
+		shutdown(ctx) { if (activeCtx === ctx) stop(); },
 		providers: registry,
 		isInstalled: () => installed,
+		states,
 	};
 }
 
-export const SUBSCRIPTION_FOOTER_DEFAULTS = Object.freeze({
-	enabled: false,
-	incidents: false,
-	ownershipNoticeAcknowledged: false,
-});
+export const SUBSCRIPTION_FOOTER_DEFAULTS = Object.freeze({ enabled: false, incidents: false, ownershipNoticeAcknowledged: false });
