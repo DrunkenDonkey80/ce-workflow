@@ -34,6 +34,10 @@ import { migrateLegacyBeads } from "./legacy-beads-migration.js";
 import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.js";
 import { openWorkFleet } from "./work-fleet.js";
 import {
+	createSubscriptionFooterController,
+	SUBSCRIPTION_FOOTER_DEFAULTS,
+} from "./subscription-footer.js";
+import {
 	resolveReportingSource,
 	submitImprovementReport,
 } from "./work-improvement-reporting.js";
@@ -752,6 +756,13 @@ function readSettings(cwd) {
 
 function readGlobalSettings() {
 	return readJsonSettings(globalSettingsPath());
+}
+
+export function subscriptionFooterSettingsForTest() {
+	return {
+		...SUBSCRIPTION_FOOTER_DEFAULTS,
+		...(readGlobalSettings().workOrchestrator?.subscriptionFooter ?? {}),
+	};
 }
 
 function mergeSettings(base, override) {
@@ -20841,6 +20852,9 @@ export {
 
 export default function workModelsExtension(pi) {
 	workExtensionPi = pi;
+	subscriptionFooterController = createSubscriptionFooterController(pi, {
+		readGlobalSettings,
+	});
 	exposeBundledSubagentAgents();
 
 	if (typeof pi.registerTool === "function") {
@@ -21150,6 +21164,7 @@ export default function workModelsExtension(pi) {
 
 	pi.on("session_start", (_event, ctx) => {
 		syncImprovementReportTool(pi, ctx);
+		subscriptionFooterController.start(ctx);
 		const runtime = {
 			pi,
 			mode: ctx.mode,
@@ -21221,6 +21236,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
+		subscriptionFooterController.shutdown(ctx);
 		for (const timer of actionLeaseWatchers.values()) clearInterval(timer);
 		actionLeaseWatchers.clear();
 		finishHelperStarts.clear();
@@ -21851,6 +21867,7 @@ function workSettingsStatus(ctx) {
 
 const SETTINGS_PROFILE = "__profile__";
 const SETTINGS_RESET = "__reset__";
+let subscriptionFooterController;
 
 function boolLabel(label, value) {
 	const display = String(label).replace(/^([a-z])/, (letter) =>
@@ -21861,6 +21878,64 @@ function boolLabel(label, value) {
 		settingLabel: display,
 		enabled: value,
 	};
+}
+
+async function editSubscriptionFooterSettings(ctx) {
+	let selectedIndex = 0;
+	for (;;) {
+		const current = subscriptionFooterSettingsForTest();
+		const result = await showListDialog(ctx, {
+			title: "Subscription footer: Global",
+			subtitle: "Show context pressure in the interactive terminal footer",
+			items: [
+				{
+					value: "enabled",
+					...boolLabel("subscription footer", current.enabled),
+					description: "Global only · takes ownership of Pi's footer",
+				},
+				{
+					value: "incidents",
+					...boolLabel("provider incident markers", current.incidents),
+					description: "Global only · no status requests until the provider adapters land",
+				},
+			],
+			selectedIndex,
+			cursorKey: "work-subscription-footer-settings",
+			forceCustom: true,
+			selectOnSpace: true,
+			help: "Enter/Space toggle · Esc/Backspace back",
+		});
+		if (!result) return;
+		selectedIndex = result.index;
+		if (
+			result.item.value === "enabled" &&
+			!current.enabled &&
+			!current.ownershipNoticeAcknowledged
+		) {
+			const confirmed = await ctx.ui.confirm?.(
+				"Enable subscription footer?",
+				"This replaces any other custom footer. Disabling restores Pi's built-in footer; use /reload for another footer extension to reclaim ownership.",
+			);
+			if (!confirmed) continue;
+		}
+		const settings = readGlobalSettings();
+		settings.workOrchestrator ??= {};
+		settings.workOrchestrator.subscriptionFooter = {
+			...SUBSCRIPTION_FOOTER_DEFAULTS,
+			...(settings.workOrchestrator.subscriptionFooter ?? {}),
+			[result.item.value]: !current[result.item.value],
+			...(result.item.value === "enabled" && !current.enabled
+				? { ownershipNoticeAcknowledged: true }
+				: {}),
+		};
+		writeScopedSettings(ctx.cwd, "global", settings);
+		if (result.item.value === "enabled") subscriptionFooterController.apply(ctx);
+		else
+			ctx.ui.notify(
+				`Provider incident markers: ${!current.incidents ? "on" : "off"}`,
+				"info",
+			);
+	}
 }
 
 async function editPerformanceSettings(ctx) {
@@ -22113,6 +22188,14 @@ async function workSettingsLoop(ctx) {
 				description: `Next ${performance.prepareNextCandidate ? "on" : "off"} · verification ${performance.parallelVerification ? "parallel" : "sequential"} · background/advisors ${performance.parallelBackgroundVerifiers && performance.parallelAdvisors ? "parallel" : "mixed"}`,
 			},
 			{
+				kind: "subscriptionFooter",
+				value: "subscriptionFooter",
+				label: `Subscription footer (global only) ${SUBMENU_ARROW}`,
+				description: subscriptionFooterSettingsForTest().enabled
+					? "on · custom context footer owns the active TUI"
+					: "off · Pi's built-in footer remains active",
+			},
+			{
 				kind: "advisorSliceUsage",
 				value: "advisorUsageForSlicePlans",
 				label: `advisor usage for slice plans ${SUBMENU_ARROW}`,
@@ -22204,12 +22287,17 @@ async function workSettingsLoop(ctx) {
 			delete settings.workResume;
 			if (scope === "global") delete settings.workPerformance;
 			writeScopedSettings(ctx.cwd, scope, settings);
+			if (scope === "global") subscriptionFooterController.apply(ctx);
 			ctx.ui.notify(
 				scope === "global"
 					? "Reset global work settings"
 					: "Cleared project workflow overrides",
 				"info",
 			);
+			continue;
+		}
+		if (pick.kind === "subscriptionFooter") {
+			await editSubscriptionFooterSettings(ctx);
 			continue;
 		}
 		if (pick.kind === "performance") {

@@ -1318,6 +1318,94 @@ try {
 			),
 		"inherited background verifiers resolve to the current model",
 	);
+
+	// Subscription footer is global-only, default-off, cancelable, and live-applied.
+	writeGlobalSettings({});
+	writeSettings({
+		workOrchestrator: { subscriptionFooter: { enabled: true, incidents: true } },
+	});
+	assert(
+		JSON.stringify(mod.subscriptionFooterSettingsForTest()) ===
+			JSON.stringify({
+				enabled: false,
+				incidents: false,
+				ownershipNoticeAcknowledged: false,
+			}),
+		"subscription footer defaults off and ignores contradictory project settings",
+	);
+	let footerCalls = [];
+	let confirmations = 0;
+	const footerCtx = { ...ctx, mode: "tui", hasUI: true };
+	const useFooterCtx = (actions, confirm = true) => {
+		footerCtx.ui = {
+			...customUi(actions, {
+				confirm: async () => {
+					confirmations += 1;
+					return confirm;
+				},
+			}),
+			setFooter: (factory) => footerCalls.push(factory),
+		};
+		return footerCtx;
+	};
+	await invoke(
+		"work-settings",
+		"",
+		useFooterCtx(
+			[
+				{ target: "Subscription footer (global only)", key: "enter" },
+				{ target: "Subscription footer", key: "enter" },
+				{ expectInitial: "Subscription footer", key: "escape" },
+				{ expectInitial: "Subscription footer (global only)", key: "escape" },
+			],
+			false,
+		),
+	);
+	assert(
+		confirmations === 1 && !mod.subscriptionFooterSettingsForTest().enabled,
+		"canceling the ownership warning writes nothing and installs nothing",
+	);
+	assert(footerCalls.length === 0, "canceled enable does not install a footer");
+
+	await invoke(
+		"work-settings",
+		"",
+		useFooterCtx([
+			{ target: "Subscription footer (global only)", key: "enter" },
+			{ target: "Subscription footer", key: "enter" },
+			{ expectInitial: "Subscription footer", target: "Provider incident markers", key: "enter" },
+			{ expectInitial: "Provider incident markers", key: "escape" },
+			{ expectInitial: "Subscription footer (global only)", key: "escape" },
+		]),
+	);
+	assert(
+		mod.subscriptionFooterSettingsForTest().enabled &&
+			mod.subscriptionFooterSettingsForTest().incidents &&
+			mod.subscriptionFooterSettingsForTest().ownershipNoticeAcknowledged,
+		"confirmed enable persists both global defaults and the one-time acknowledgement",
+	);
+	assert(
+		confirmations === 2 && typeof footerCalls.at(-1) === "function",
+		"first confirmed enable warns once and installs immediately",
+	);
+
+	await invoke(
+		"work-settings",
+		"",
+		useFooterCtx([
+			{ target: "Subscription footer (global only)", key: "enter" },
+			{ target: "Subscription footer", key: "enter" },
+			{ expectInitial: "Subscription footer", key: "escape" },
+			{ expectInitial: "Subscription footer (global only)", key: "escape" },
+		]),
+	);
+	assert(
+		confirmations === 2 &&
+			!mod.subscriptionFooterSettingsForTest().enabled &&
+			footerCalls.at(-1) === undefined &&
+			notices.at(-1).message.includes("/reload"),
+		"disable does not warn again, applies live, and explains footer restoration",
+	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalDir, { recursive: true, force: true });

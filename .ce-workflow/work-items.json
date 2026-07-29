@@ -4374,6 +4374,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Remove automatic roadmap-workspace stats calculation. Show an idle hint until the user presses lowercase s, then synchronously resolve and cache stats for the currently selected row. Navigation, filtering, refresh, expansion, and dialog open must not invoke resolveStats. Preserve existing synchronous stats computation and all non-workspace callers; do not add a Worker or hydration cache.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Show selected roadmap stats on explicit s key"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -4612,6 +4616,98 @@
       "title": "Persist model-synthesized titles and file-backed task images",
       "type": "task",
       "updatedAt": "2026-07-25T15:39:12.960Z"
+    },
+    "work-4": {
+      "acceptance": "### Acceptance Examples\n\n- AE1. **Covers R1, R27.** Given the footer setting is enabled, when a headless session starts, then no custom footer is installed and no provider request is made; the same no-op holds in an interactive session when the setting is off.\n- AE2. **Covers R2, R3, R12, R13, R17.** Given Pi auth contains Codex, Claude, and GLM credentials but not Copilot or Kimi credentials, when two successive snapshots render at 80 columns with changed percentages, then exactly Codex, Claude, and GLM appear in that order and each provider's windows remain in the same order while every valid window is present.\n- AE3. **Covers R7-R9, R11.** Given 175,000 of 272,000 context tokens are used, when the first row renders at 80 columns, then its 12-cell context bar is yellow and the row includes model, effort, percent, token counts, and `F8 Compact` without cwd or git state.\n- AE4. **Covers R14-R16.** Given five authenticated providers and a 56-column terminal, when their windows do not fit on one usage row, then segments wrap, continuation rows repeat their provider label, bars truncate before text fields, every provider remains visible, and every row fits.\n- AE5. **Covers R19, R22, R23.** Given a provider has a valid cached snapshot, when refreshes fail for less than ten minutes, then the values remain visible with stale age; once ten minutes elapse without success, the provider shows unavailable.\n- AE6. **Covers R20, R26.** Given Pi auth switches a provider to another account, when the next refresh begins, then the old account's cached snapshot is discarded before the new account's quota can render.\n- AE7. **Covers R3, R24, R26.** Given a provider has Pi auth but no successful snapshot, when it first renders, then it shows unavailable; when that Pi credential is later removed and auth is re-resolved, then the provider disappears rather than continuing through a CLI, environment, or OpenCode fallback.\n- AE8. **Covers R4, R29.** Given incident monitoring is off, when quotas refresh, then no public status request is made; when it is on, only Claude, Codex, and Copilot status sources are polled, a known incident adds a warning without hiding quota, and a failed incident request leaves quota freshness unchanged while retaining the last incident state.\n- AE9. **Covers R5, R6, R28.** Given another custom footer was installed, when this footer is enabled and later disabled, then the operator sees the ownership warning, live disable restores the built-in footer, late callbacks do not reclaim it, and `/reload` remains the path for the other footer to reassert itself.\n- AE10. **Covers R9, R10, R15, R16.** Given identical footer data, when it renders at 80, 56, and 55 columns, then 80 uses full labels and a 12-cell context bar, 56 preserves every required field with at least a four-cell bar and wrapped quotas, and 55 renders only the minimum-width diagnostic; every rendered line has visible width at most the supplied width and valid ANSI boundaries.\n- AE11. **Covers R18, R21.** Given fake time and one slow provider, when 120 seconds elapse, then every other authenticated provider starts its own refresh on schedule; a malformed partial response from the slow provider leaves its prior complete snapshot unchanged.\n- AE12. **Covers R25.** Given simulated auth rejection, rate limiting, malformed vendor data, and a thrown response body containing a sentinel secret, when diagnostics render, then only approved failure categories and ages appear and the sentinel never does.\n- AE13. **Covers R30.** Given a conforming fake sixth provider, when it is registered, then its identity and windows render through the existing composition and wrapping behavior without provider-specific renderer changes.\n- AE14. **Covers R31.** Given the packaged extension, when provenance is inspected, then it contains the upstream MIT notice, exact pinned revision, and an identifiable list of intentional divergences.",
+      "createdAt": "2026-07-28T15:07:40.022Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "This roadmap explores a status plugin that shows usage or availability across multiple AI models at once. It exists because current plugins display status only for the active model, while users may use several models simultaneously. Subscription-based models are the primary scope, with API-based models as a possible extension. The intended outcome is a unified view of relevant model statuses.\n\n## Master plan\n\nMaster roadmap plan from docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md.\n\n## Goal Capsule\n\n- **Objective:** Let a Pi operator see current context pressure and every usable AI subscription quota without leaving the terminal, so review and background work can be routed toward available capacity.\n- **Product authority:** This Product Contract, the confirmed work-4.1 dialogue, and the pinned upstream sources under Sources / Research.\n- **Open blockers:** None before planning.\n\n---\n\n> Product Contract preservation: The Product Contract below is preserved verbatim; implementation planning supplements it without changing any stable R/F/AE ID.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Unified Status for Multiple AI Model Subscriptions"
+      },
+      "documentLinks": {
+        "design": "docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md"
+      },
+      "evidence": [],
+      "id": "work-4",
+      "labels": [],
+      "notes": [
+        "created by /work-brainstorm\nwo:brainstorm\nauto-created for standalone brainstorm\ntask: right so, we use lot of models at the same, time yet all status plugins show only the current model status. I do care about the subscription only, but don't mind we support the api models too, but subs first. so the idea is: create a new statusline that is multimodel, actually showing the info for all the models we have set somewhere in the settings of the extension. currently this is codex, claude and glm for me, but if we do a clever design with modems being added easily through unified interface we can add more. so I'm looking into an \"optional, default off\" statusline in settings, when enabled it shows a line with models like:\nLine1:\nCurrent Model: Effort, ctx ──────── 0% 0/272k, F8 Compact\n\nLine2:\nCodex: Week: ━────── 12% 6d17h, Claude: 5h: ━────── 12% 3h12m, Week: ━────── 8% 5d16h, GLM: 5h:.... \n\nwe will add more stuff in the line1 but this is okay for now, the thing is where do we get a correct info for how to get the status - current extension minimal footer or something supports claude and codex, if you think the code is right we can get. for glm we can probably get some from: https://github.com/TianZuo555/pi-tian-extensions we can copy copilot info from there too\n\nthe progressbars and % should color code when they are bad like green when below 50%, yellow up to 80% then red, for context - green up to 150k, yellow up to 200k, red otherwise.  if you don't like these sources we can look for something else in https://pi.dev/packages to grab info from\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name.",
+        "created by /work-plan\nsource plan: docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md"
+      ],
+      "status": "open",
+      "title": "Unified Status for Multiple AI Model Subscriptions",
+      "type": "epic",
+      "updatedAt": "2026-07-29T10:15:12.905Z"
+    },
+    "work-4.1": {
+      "createdAt": "2026-07-28T15:07:40.044Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Idea created by /work-brainstorm.\n\nFull brainstorm request:\nright so, we use lot of models at the same, time yet all status plugins show only the current model status. I do care about the subscription only, but don't mind we support the api models too, but subs first. so the idea is: create a new statusline that is multimodel, actually showing the info for all the models we have set somewhere in the settings of the extension. currently this is codex, claude and glm for me, but if we do a clever design with modems being added easily through unified interface we can add more. so I'm looking into an \"optional, default off\" statusline in settings, when enabled it shows a line with models like:\nLine1:\nCurrent Model: Effort, ctx ──────── 0% 0/272k, F8 Compact\n\nLine2:\nCodex: Week: ━────── 12% 6d17h, Claude: 5h: ━────── 12% 3h12m, Week: ━────── 8% 5d16h, GLM: 5h:.... \n\nwe will add more stuff in the line1 but this is okay for now, the thing is where do we get a correct info for how to get the status - current extension minimal footer or something supports claude and codex, if you think the code is right we can get. for glm we can probably get some from: https://github.com/TianZuo555/pi-tian-extensions we can copy copilot info from there too\n\nthe progressbars and % should color code when they are bad like green when below 50%, yellow up to 80% then red, for context - green up to 150k, yellow up to 200k, red otherwise.  if you don't like these sources we can look for something else in https://pi.dev/packages to grab info from",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Add an Optional Multi-Model Subscription Status Line"
+      },
+      "evidence": [],
+      "id": "work-4.1",
+      "labels": [],
+      "notes": [
+        "wo:idea schema=1 status=discussed",
+        "wo:idea status=discussed action=completed-brainstorm brainstorm-path=docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md brainstormed-at=2026-07-29T09:06:05.285Z",
+        "wo:failure-summary run=agent-ms5uf7rw-7t0ho2 role=work action=brainstorm duration=17m 1s\nreason: Brainstorm saved: C:\\SOFT\\Universal\\ce-workflow\\docs\\plans\\2026-07-29-001-feat-multimodel-subscription-footer-plan.md\nartifact: C:\\SOFT\\Universal\\ce-workflow\\.pi\\work-runs\\2026-07-29.jsonl\ntool-error: bash 406 chars\ntool-error: bash 187 chars\ntool-error: work_verifier_grep 106 chars\nlatest: toolResult: --- name: work-orchestrator description: Execute Orchestrator workflow handoffs, including verified legacy work-item migration. Do not load for WO_INLINE_V1 or prompts that already contain precomputed extension state; those prompts are self-contained. --- # Wo…\nlatest: toolResult: ?? docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md\nlatest: assistant: Brainstorm saved: C:\\SOFT\\Universal\\ce-workflow\\docs\\plans\\2026-07-29-001-feat-multimodel-subscription-footer-plan.md\nnext: /work-report work-4.1"
+      ],
+      "parentId": "work-4",
+      "status": "open",
+      "title": "right so, we use lot of models at the same, time yet all status plugins show only the current model status. I do care about the subscription only, but don't mind we suppo… [k7xg07]",
+      "type": "task",
+      "updatedAt": "2026-07-29T09:06:05.351Z"
+    },
+    "work-4.2": {
+      "createdAt": "2026-07-29T10:15:12.906Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "evidence": [],
+      "id": "work-4.2",
+      "labels": [],
+      "notes": [
+        "created by /work-plan\nwo:planning\nsource plan: docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md\ncreate one executable slice by default\ntask: Unified Status for Multiple AI Model Subscriptions\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name.",
+        "Planned U1 as executable work-4.3 from the implementation-ready plan"
+      ],
+      "parentId": "work-4",
+      "status": "closed",
+      "title": "Plan next slice for Unified Status for Multiple AI Model Subscriptions",
+      "type": "task",
+      "updatedAt": "2026-07-29T10:15:57.536Z"
+    },
+    "work-4.3": {
+      "acceptance": "F7 live toggle installs/removes the custom first row; 80/56/55 and context-pressure boundary assertions pass; headless/RPC paths make no requests or footer install; first enable warns once; disable restores setFooter(undefined) with /reload guidance. Verify: node scripts/test-work-subscription-footer.mjs && node scripts/test-work-settings.mjs",
+      "createdAt": "2026-07-29T10:15:53.276Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Implement U1 from docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md: global default-off settings, ownership warning, TUI-only footer lifecycle, width-safe model/context row, and fake provider seam. Paths: extensions/subscription-footer.js, extensions/work-models.js, scripts/test-work-subscription-footer.mjs, scripts/test-work-settings.mjs.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-4.3",
+      "labels": [],
+      "notes": [
+        "wo:execution-plan source=docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md unit=U1",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-settings.mjs\",\"docs/plans/2026-07-29-001-feat-multimodel-subscription-footer-plan.md\",\"extensions/subscription-footer.js\",\"scripts/test-work-subscription-footer.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/subscription-footer.js:172,176-177 - unrelated or stale contexts can stop/invalidate the active footer; restrict teardown to activeCtx === ctx and add a two-context lifecycle regression test\"]}",
+        "wo:verify-check FAIL\nCommand: node scripts/test-work-subscription-footer.mjs && node scripts/test-work-settings.mjs\nfile:///C:/SOFT/Universal/ce-workflow/scripts/test-work-settings.mjs:20\r\n\tif (!ok) throw new Error(message);\r\n\t               ^\r\n\r\nError: disable does not warn again, applies live, and explains footer restoration\r\n    at assert (file:///C:/SOFT/Universal/ce-workflow/scripts/test-work-settings.mjs:20:17)\r\n    at file:///C:/SOFT/Universal/ce-workflow/scripts/test-work-settings.mjs:1403:2\r\n\r\nNode.js v26.4.0\r\n",
+        "wo:review PASS {\"evidence\":\"Prior stale-context lifecycle finding fixed; two-context, owner-disposal, settings, width, pressure, ANSI, and headless focused tests pass\",\"required_fixes\":[]}",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-subscription-footer.mjs && node scripts/test-work-settings.mjs\nOutput: ok - work-subscription-footer shell, width, and lifecycle\nok - work-settings behavior"
+      ],
+      "parentId": "work-4",
+      "status": "closed",
+      "title": "Global opt-in subscription footer shell and width-safe model row",
+      "type": "task",
+      "updatedAt": "2026-07-29T10:42:32.370Z"
     }
   },
   "metadata": {
@@ -4621,7 +4717,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-28T07:42:03.505Z"
+    "updatedAt": "2026-07-29T10:42:32.370Z"
   },
   "schemaVersion": 1
 }
