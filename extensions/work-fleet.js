@@ -29,6 +29,26 @@ const STATUS_SYMBOLS = Object.freeze({
 	failed: "✗",
 });
 
+function legacyMatchesKey(data, key) {
+	const aliases = {
+		escape: ["escape", "\x1b"],
+		"ctrl+c": ["ctrl+c", "\x03"],
+		"ctrl+o": ["ctrl+o", "\x0f"],
+		"ctrl+u": ["ctrl+u", "\x15"],
+		enter: ["enter", "return", "\r", "\n"],
+		backspace: ["backspace", "\b", "\x7f"],
+		up: ["up", "\x1b[A"],
+		down: ["down", "\x1b[B"],
+		pageUp: ["pageUp", "\x1b[5~"],
+		pageDown: ["pageDown", "\x1b[6~"],
+		"shift+k": ["K"],
+		"shift+j": ["J"],
+		r: ["r", "R"],
+		x: ["x", "X"],
+	};
+	return aliases[key]?.includes(data) ?? data === key;
+}
+
 export function normalizeFleetState(value) {
 	const state = String(value ?? "").toLowerCase();
 	if (["running", "active", "in_progress", "stopping"].includes(state))
@@ -747,6 +767,8 @@ export class WorkFleetComponent {
 		this.cwd = cwd;
 		this.pi = pi;
 		this.done = done;
+		this.matchesKey = options.matchesKey ?? legacyMatchesKey;
+		this.decodeKittyPrintable = options.decodeKittyPrintable ?? (() => undefined);
 		this.refreshMs = options.refreshMs ?? REFRESH_MS;
 		this.getOrchestrator = options.getOrchestrator;
 		this.orchestrator = options.orchestrator;
@@ -801,25 +823,29 @@ export class WorkFleetComponent {
 
 	handleInput(data) {
 		if (this.editor) return this.handleEditorInput(data);
-		if (["escape", "\x1b", "ctrl+c", "\x03", "q"].includes(data))
+		if (
+			this.matchesKey(data, "escape") ||
+			this.matchesKey(data, "ctrl+c") ||
+			this.matchesKey(data, "q")
+		)
 			return this.done();
-		if (["K"].includes(data)) return this.scroll(-1);
-		if (["J"].includes(data)) return this.scroll(1);
-		if (["up", "\x1b[A", "k"].includes(data)) return this.move(-1);
-		if (["down", "\x1b[B", "j"].includes(data)) return this.move(1);
-		if (["pageUp", "\x1b[5~"].includes(data))
+		if (this.matchesKey(data, "shift+k")) return this.scroll(-1);
+		if (this.matchesKey(data, "shift+j")) return this.scroll(1);
+		if (this.matchesKey(data, "up") || this.matchesKey(data, "k")) return this.move(-1);
+		if (this.matchesKey(data, "down") || this.matchesKey(data, "j")) return this.move(1);
+		if (this.matchesKey(data, "pageUp"))
 			return this.scroll(-this.detailViewportHeight);
-		if (["pageDown", "\x1b[6~"].includes(data))
+		if (this.matchesKey(data, "pageDown"))
 			return this.scroll(this.detailViewportHeight);
-		if (data.toLowerCase() === "r") {
+		if (this.matchesKey(data, "r")) {
 			this.refresh();
 			return this.tui.requestRender();
 		}
-		if (data.toLowerCase() === "x" || data === "\x0f") {
+		if (this.matchesKey(data, "x") || this.matchesKey(data, "ctrl+o")) {
 			this.expandedTools = !this.expandedTools;
 			return this.tui.requestRender();
 		}
-		if (["enter", "return", "\r", "\n"].includes(data)) {
+		if (this.matchesKey(data, "enter")) {
 			const row = this.snapshot.rows[this.selected];
 			if (fleetMessageTarget(row)) {
 				this.editor = { targetKey: row.key, text: "", sending: false };
@@ -829,12 +855,12 @@ export class WorkFleetComponent {
 	}
 
 	handleEditorInput(data) {
-		if (["escape", "\x1b"].includes(data)) {
+		if (this.matchesKey(data, "escape")) {
 			this.editor = undefined;
 			return this.tui.requestRender();
 		}
 		if (this.editor.sending) return;
-		if (["enter", "return", "\r", "\n"].includes(data)) {
+		if (this.matchesKey(data, "enter")) {
 			const editor = this.editor;
 			const row = this.snapshot.rows.find(
 				(candidate) => candidate.key === editor.targetKey,
@@ -858,11 +884,13 @@ export class WorkFleetComponent {
 				});
 			return;
 		}
-		if (["backspace", "\b", "\x7f"].includes(data))
+		if (this.matchesKey(data, "backspace"))
 			this.editor.text = [...this.editor.text].slice(0, -1).join("");
-		else if (data === "\x15") this.editor.text = "";
+		else if (this.matchesKey(data, "ctrl+u")) this.editor.text = "";
 		else {
-			const text = data.replace(/^\x1b\[200~/, "").replace(/\x1b\[201~$/, "");
+			const text =
+				this.decodeKittyPrintable(data) ??
+				data.replace(/^\x1b\[200~/, "").replace(/\x1b\[201~$/, "");
 			if (text && !/[\x00-\x1f\x7f]/u.test(text)) this.editor.text += text;
 		}
 		this.editor.note = undefined;
@@ -993,9 +1021,15 @@ export async function openWorkFleet(ctx, pi, options = {}) {
 		);
 		return;
 	}
+	const tuiKeys = options.tuiKeys ?? (await import("@earendil-works/pi-tui"));
 	await ctx.ui.custom(
 		(tui, theme, _keybindings, done) =>
-			new WorkFleetComponent(tui, theme, ctx.cwd, pi, done, options),
+			new WorkFleetComponent(tui, theme, ctx.cwd, pi, done, {
+				...options,
+				matchesKey: options.matchesKey ?? tuiKeys.matchesKey,
+				decodeKittyPrintable:
+					options.decodeKittyPrintable ?? tuiKeys.decodeKittyPrintable,
+			}),
 		{
 			overlay: true,
 			overlayOptions: {

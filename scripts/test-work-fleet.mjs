@@ -15,6 +15,7 @@ import {
 	fleetStatusSymbol,
 	normalizeFleetState,
 	groupWorkFleet,
+	openWorkFleet,
 	sendFleetMessage,
 	transcriptEvents,
 	WorkFleetComponent,
@@ -345,6 +346,15 @@ try {
 }
 
 const failedListeners = new Map();
+const tuiKeyInputs = {
+	escape: ["\x1b", "\x1b[27u"],
+	enter: ["\r", "\x1b[13u"],
+	backspace: ["\x1b[127u"],
+	up: ["\x1b[57419u"],
+	down: ["\x1b[57420u"],
+	x: ["\x1b[120u"],
+};
+let fleetClosed = 0;
 const component = new WorkFleetComponent(
 	{ terminal: { rows: 24 }, requestRender() {} },
 	{
@@ -367,8 +377,14 @@ const component = new WorkFleetComponent(
 			},
 		},
 	},
-	() => {},
-	{ refreshMs: 60_000 },
+	() => {
+		fleetClosed += 1;
+	},
+	{
+		refreshMs: 60_000,
+		matchesKey: (data, key) => tuiKeyInputs[key]?.includes(data) ?? data === key,
+		decodeKittyPrintable: (data) => (data === "\x1b[122u" ? "z" : undefined),
+	},
 );
 component.snapshot = { tasks, rows: [selected] };
 component.editor = {
@@ -384,6 +400,80 @@ assert.equal(
 	undefined,
 	"Escape safely dismisses an editor while steering settles",
 );
+
+component.snapshot = { tasks, rows: tasks[0].agents };
+component.selected = 0;
+component.handleInput("\x1b[57420u");
+assert.equal(component.selected, 1, "Kitty arrow keys navigate Fleet");
+component.handleInput("\x1b[57419u");
+assert.equal(component.selected, 0, "Kitty arrow keys navigate back");
+component.handleInput("\x1b[120u");
+assert.equal(component.expandedTools, true, "Kitty printable keys toggle tools");
+component.handleInput("\x1b[13u");
+assert.ok(component.editor, "Kitty Enter opens the message editor");
+component.handleEditorInput("\x1b[122u");
+assert.equal(component.editor.text, "z", "Kitty printable keys type messages");
+component.editor.text = "ab";
+component.handleEditorInput("\x1b[127u");
+assert.equal(component.editor.text, "a", "Kitty Backspace edits the message");
+component.handleEditorInput("\x1b[27u");
+assert.equal(component.editor, undefined, "Kitty Escape closes the message editor");
+component.handleInput("\x1b[27u");
+assert.equal(fleetClosed, 1, "Kitty Escape closes Fleet");
 component.dispose();
+
+let legacyClosed = 0;
+const legacyComponent = new WorkFleetComponent(
+	{ terminal: { rows: 24 }, requestRender() {} },
+	{
+		fg: (_color, text) => text,
+		bg: (_color, text) => text,
+		bold: (text) => text,
+	},
+	process.cwd(),
+	{ events: { on: () => () => {}, emit() {} } },
+	() => {
+		legacyClosed += 1;
+	},
+	{ refreshMs: 60_000 },
+);
+legacyComponent.snapshot = { tasks, rows: tasks[0].agents };
+legacyComponent.handleInput("\x1b[B");
+assert.equal(legacyComponent.selected, 1, "legacy arrow keys still navigate Fleet");
+legacyComponent.handleInput("X");
+assert.equal(legacyComponent.expandedTools, true, "legacy uppercase shortcuts still work");
+legacyComponent.handleInput("\x1b");
+assert.equal(legacyClosed, 1, "legacy Escape still closes Fleet");
+legacyComponent.dispose();
+
+let openedComponent;
+await openWorkFleet(
+	{
+		cwd: process.cwd(),
+		mode: "tui",
+		ui: {
+			custom(factory) {
+				openedComponent = factory(
+					{ terminal: { rows: 24 }, requestRender() {} },
+					{ fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text },
+					undefined,
+					() => {},
+				);
+			},
+		},
+	},
+	{},
+	{
+		refreshMs: 60_000,
+		tuiKeys: {
+			matchesKey: (data, key) => tuiKeyInputs[key]?.includes(data) ?? data === key,
+			decodeKittyPrintable: (data) => (data === "\x1b[122u" ? "z" : undefined),
+		},
+	},
+);
+openedComponent.snapshot = { tasks, rows: tasks[0].agents };
+openedComponent.handleInput("\x1b[57420u");
+assert.equal(openedComponent.selected, 1, "Fleet opener injects Pi TUI key helpers");
+openedComponent.dispose();
 
 process.stdout.write("ok - work fleet fixtures pass\n");
