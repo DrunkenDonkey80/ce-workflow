@@ -16,8 +16,8 @@ ideas from `pi-usage-bar` at pinned revision:
   a recognized five-hour token session may render without a reset countdown.
 - **Footer composition:** ce-workflow owns a multi-row Pi custom footer with model,
   context pressure, quota, and diagnostics rather than the upstream bar composition.
-- **Workflow row:** the existing ce-workflow goal status is conditionally composed as
-  one width-safe row without replacing Pi's built-in `setStatus` path.
+- **Workflow separation:** ce-workflow goal progress remains in its existing widget;
+  the subscription footer does not duplicate it.
 - **Cache identity/path:** cache entries are keyed by a hashed Pi-auth identity and live
   under Pi's global agent directory.
 - **Freshness:** complete snapshots update atomically, failures retain stale quota, and

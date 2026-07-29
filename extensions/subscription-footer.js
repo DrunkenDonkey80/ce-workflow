@@ -91,12 +91,6 @@ function contextBar(percent, cells) {
 	return `${"█".repeat(filled)}${"░".repeat(cells - filled)}`;
 }
 
-export function renderWorkflowRow(status, theme, width) {
-	if (!status || width <= 0) return [];
-	const plain = truncatePlain(`Workflow: ${status}`, width);
-	return [theme?.fg?.("accent", plain) ?? plain];
-}
-
 export function renderModelRow(ctx, theme, width, thinkingLevel) {
 	if (width < MIN_WIDTH) {
 		const diagnostic = truncatePlain("Subscription footer needs at least 56 columns", width);
@@ -114,7 +108,7 @@ export function renderModelRow(ctx, theme, width, thinkingLevel) {
 	const prefix = full ? "Model: " : "";
 	const modelWidth = Math.max(1, width - visibleWidth(prefix) - visibleWidth(suffix));
 	const plainModel = truncatePlain(model, modelWidth);
-	const color = used > 200000 ? "error" : used > 150000 ? "warning" : "success";
+	const color = used > 180000 ? "error" : used > 150000 ? "warning" : "text";
 	const styledBar = theme?.fg?.(color, bar) ?? bar;
 	return [`${prefix}${plainModel}${suffix.replace(bar, styledBar)}`];
 }
@@ -329,7 +323,7 @@ function formatDuration(ms) {
 	return days ? `${days}d ${hours}h` : `${hours}h ${minutes % 60}m`;
 }
 
-function quotaColor(value) { return value > 80 ? "error" : value >= 50 ? "warning" : "success"; }
+function quotaColor(value) { return value > 80 ? "error" : value > 50 ? "warning" : "text"; }
 
 function windowText(window, now, barCells = 8) {
 	const pct = Math.round(window.usedPercent);
@@ -426,7 +420,6 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		clearTimeoutImpl = clearTimeout,
 		setIntervalImpl = setInterval,
 		clearIntervalImpl = clearInterval,
-		getWorkflowStatus = () => undefined,
 	} = options;
 	let generation = 0;
 	let activeCtx;
@@ -593,8 +586,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				invalidate() {},
 				render(width) {
 					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.());
-					const workflow = renderWorkflowRow(getWorkflowStatus(), theme, width);
-					return width < MIN_WIDTH ? model : [...model, ...workflow, ...renderQuotaRows(registry, states, theme, width, now())];
+					return width < MIN_WIDTH ? model : [...model, ...renderQuotaRows(registry, states, theme, width, now())];
 				},
 				dispose() { if (gen === generation) stop({ restore: false }); },
 			};
@@ -615,7 +607,6 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			return false;
 		},
 		shutdown(ctx) { if (activeCtx === ctx) stop(); },
-		statusChanged(ctx) { if (activeCtx === ctx) requestRender(); },
 		providers: registry,
 		isInstalled: () => installed,
 		states,

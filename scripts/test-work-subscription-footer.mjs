@@ -7,14 +7,13 @@ import {
 	createSubscriptionFooterController,
 	renderModelRow,
 	renderQuotaRows,
-	renderWorkflowRow,
 	stripAnsi,
 	truncatePlain,
 	visibleWidth,
 } from "../extensions/subscription-footer.js";
 
 const theme = {
-	fg: (color, text) => `\x1b[${color === "success" ? 32 : color === "warning" ? 33 : color === "error" ? 31 : color === "accent" ? 36 : 2}m${text}\x1b[0m`,
+	fg: (color, text) => `\x1b[${color === "text" ? 37 : color === "warning" ? 33 : color === "error" ? 31 : color === "accent" ? 36 : 2}m${text}\x1b[0m`,
 	bold: (text) => `\x1b[1m${text}\x1b[0m`,
 };
 const context = (tokens, window = 272000) => ({
@@ -50,7 +49,7 @@ class Clock {
 	}
 }
 
-function harness({ providers, auth, fetchImpl, clock = new Clock(), fsImpl, enabled = true, incidents = false, settings, workflowStatus, agentDir = "/agent" }) {
+function harness({ providers, auth, fetchImpl, clock = new Clock(), fsImpl, enabled = true, incidents = false, settings, agentDir = "/agent" }) {
 	const factories = [];
 	const notices = [];
 	let renders = 0;
@@ -66,7 +65,7 @@ function harness({ providers, auth, fetchImpl, clock = new Clock(), fsImpl, enab
 		{ getThinkingLevel: () => "high" },
 		{
 			readGlobalSettings: () => ({ workOrchestrator: { subscriptionFooter: settings?.() ?? { enabled, incidents } } }),
-			providers, fetchImpl, now: clock.now, getWorkflowStatus: workflowStatus,
+			providers, fetchImpl, now: clock.now,
 			setTimeoutImpl: clock.setTimeout, clearTimeoutImpl: clock.clearTimeout,
 			setIntervalImpl: clock.setInterval, clearIntervalImpl: clock.clearInterval,
 			...(agentDir === null ? {} : { agentDir }), fsImpl: fsImpl ?? {
@@ -82,8 +81,8 @@ function harness({ providers, auth, fetchImpl, clock = new Clock(), fsImpl, enab
 	};
 }
 
-// U1 remains intact: model thresholds, width floor, and terminal-safe text.
-for (const [tokens, color] of [[150000, "32"], [150001, "33"], [200000, "33"], [200001, "31"]]) {
+// Model thresholds, width floor, and terminal-safe text.
+for (const [tokens, color] of [[150000, "37"], [150001, "33"], [180000, "33"], [180001, "31"]]) {
 	const line = renderModelRow(context(tokens), theme, 80)[0];
 	assert.match(line, new RegExp(`\\x1b\\[${color}m`), `${tokens} pressure color`);
 	assert.ok(visibleWidth(line) <= 80, `${tokens} row fits`);
@@ -105,8 +104,6 @@ for (const [line, width] of [[full, 80], [compact, 56], [narrow, 55]]) {
 }
 assert.equal(visibleWidth("模型🚀"), 6);
 assert.equal(truncatePlain("模型🚀long", 5), "模型…");
-assert.equal(stripAnsi(renderWorkflowRow("working #7", theme, 18)[0]), "Workflow: working…", "workflow row is width-safe");
-
 // Default/headless/off behavior makes no requests and installs no footer.
 let headlessFetches = 0;
 const off = harness({ providers: PRODUCTION_PROVIDERS, auth: () => stored("x"), fetchImpl: async () => { headlessFetches++; } , enabled: false });
@@ -226,7 +223,7 @@ const renderStates = new Map();
 const renderProviders = [...PRODUCTION_PROVIDERS, { id: "sixth", label: "Sixth" }];
 for (const [index, provider] of renderProviders.entries()) renderStates.set(provider.id, {
 	authenticated: true, lastSuccessAt: now(), snapshot: { windows: [
-		{ id: "a", label: "short", usedPercent: [49, 50, 81][index % 3], resetsAt: reset },
+		{ id: "a", label: "short", usedPercent: [50, 51, 80, 81][index % 4], resetsAt: reset },
 		{ id: "b", label: "long", usedPercent: 35, resetsAt: reset },
 	] },
 });
@@ -237,9 +234,10 @@ for (const line of wrapped) {
 	assert.ok(visibleWidth(line) <= 56);
 	assert.equal((line.match(/\x1b\[/g) ?? []).length % 2, 0);
 }
-assert.ok(wrapped.some((line) => /\x1b\[32m\[[█░]+\] 49%\x1b\[0m/.test(line)), "green styles the bar and percentage together");
-assert.ok(wrapped.some((line) => /\x1b\[33m\[[█░]+\] 50%\x1b\[0m/.test(line)), "yellow boundary styles the bar and percentage together");
-assert.ok(wrapped.some((line) => /\x1b\[31m\[[█░]+\] 81%\x1b\[0m/.test(line)), "red boundary styles the bar and percentage together");
+assert.ok(wrapped.some((line) => /\x1b\[37m\[[█░]+\] 50%\x1b\[0m/.test(line)), "white styles the bar and percentage through 50%");
+assert.ok(wrapped.some((line) => /\x1b\[33m\[[█░]+\] 51%\x1b\[0m/.test(line)), "yellow starts above 50%");
+assert.ok(wrapped.some((line) => /\x1b\[33m\[[█░]+\] 80%\x1b\[0m/.test(line)), "yellow continues through 80%");
+assert.ok(wrapped.some((line) => /\x1b\[31m\[[█░]+\] 81%\x1b\[0m/.test(line)), "red starts above 80%");
 
 const typographyProviders = [{ id: "codex", label: "Codex" }, { id: "claude", label: "Claude" }, { id: "glm", label: "GLM/Z.ai" }];
 const after = (days, hours, minutes = 0) => now() + ((days * 24 + hours) * 60 + minutes) * 60_000;
@@ -465,43 +463,20 @@ lifecycleResolve?.([{ id: "late", label: "late", usedPercent: 99, resetsAt: rese
 await flush();
 assert.equal(lifecycle.controller.isInstalled(), false, "late completion cannot reclaim ownership");
 
-// The custom footer reuses the published workflow text, repaints it once, clears it, and never writes built-in status.
-let workflowStatus;
-let workflowEnabled = true;
-const workflow = harness({
-	providers: [{ id: "workflow-quota", label: "Quota", piProviderId: "quota", identity: () => "quota", fetchQuota: async () => [{ id: "q", label: "q", usedPercent: 10, resetsAt: reset }] }],
+// The custom footer stays focused on model and quota data; workflow progress remains in its existing widget.
+const composition = harness({
+	providers: [{ id: "composition-quota", label: "Quota", piProviderId: "quota", identity: () => "quota", fetchQuota: async () => [{ id: "q", label: "q", usedPercent: 10, resetsAt: reset }] }],
 	auth: () => stored("safe"), fetchImpl: async () => {},
-	settings: () => ({ enabled: workflowEnabled, incidents: false }),
-	workflowStatus: () => workflowStatus,
 });
-let builtInStatusWrites = 0;
-workflow.ctx.ui.setStatus = () => builtInStatusWrites++;
-workflow.controller.start(workflow.ctx);
-const workflowComponent = workflow.component();
+composition.controller.start(composition.ctx);
+const compositionComponent = composition.component();
 await flush();
-assert.doesNotMatch(stripAnsi(workflowComponent.render(80).join("\n")), /Workflow:/);
-const rendersBeforeWorkflowChange = workflow.renders();
-workflowStatus = "working #2";
-workflow.controller.statusChanged(workflow.ctx);
-assert.equal(workflow.renders(), rendersBeforeWorkflowChange + 1);
-const orderedWorkflowRows = workflowComponent.render(80).map(stripAnsi);
-assert.equal(orderedWorkflowRows.length, 3);
-assert.match(orderedWorkflowRows[0], /^Model:/);
-assert.equal(orderedWorkflowRows[1], "Workflow: working #2", "workflow row follows model directly");
-assert.match(orderedWorkflowRows[2], /^Quota /, "quota rows follow workflow status");
-assert.equal((orderedWorkflowRows.join("\n").match(/Workflow: working #2/g) ?? []).length, 1);
-assert.doesNotMatch(orderedWorkflowRows[1], /\p{Extended_Pictographic}/u, "footer workflow status contains no emoji");
-assert.deepEqual(workflowComponent.render(55).map(stripAnsi), ["Subscription footer needs at least 56 columns"], "55 columns render only the minimum-width diagnostic");
-workflowStatus = "needs human";
-workflow.controller.statusChanged(workflow.ctx);
-assert.equal(stripAnsi(workflowComponent.render(56)[1]), "Workflow: needs human");
-workflowStatus = undefined;
-workflow.controller.statusChanged(workflow.ctx);
-assert.doesNotMatch(stripAnsi(workflowComponent.render(80).join("\n")), /Workflow:/);
-workflowEnabled = false;
-workflow.controller.apply(workflow.ctx);
-assert.equal(workflow.factories.at(-1), undefined);
-assert.equal(builtInStatusWrites, 0, "footer lifecycle leaves Pi's setStatus path untouched");
+const compositionRows = compositionComponent.render(80).map(stripAnsi);
+assert.equal(compositionRows.length, 2);
+assert.match(compositionRows[0], /^Model:/);
+assert.match(compositionRows[1], /^Quota /);
+assert.doesNotMatch(compositionRows.join("\n"), /Workflow:/);
+composition.controller.shutdown(composition.ctx);
 
 // Incidents are default-off, use only three pinned public sources, retain last-known state on failure, and are generation-fenced.
 const incidentProviders = PRODUCTION_PROVIDERS.map((provider) => ({
@@ -582,4 +557,4 @@ replacement.dispose();
 assert.equal(settingsController.isInstalled(), false);
 owner.dispose();
 
-process.stdout.write("ok - work-subscription-footer U3 workflow, incidents, provenance-ready rendering, and U1/U2 regression\n");
+process.stdout.write("ok - work-subscription-footer composition, incidents, provenance, and quota regression\n");

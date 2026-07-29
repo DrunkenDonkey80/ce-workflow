@@ -16498,7 +16498,6 @@ function formatWorkGoalStatus(goal = activeWorkGoal) {
 
 function updateWorkGoalStatus(ctx, goal = activeWorkGoal) {
 	ctx?.ui?.setStatus?.(WORK_GOAL_STATUS_KEY, formatWorkGoalStatus(goal));
-	subscriptionFooterController?.statusChanged(ctx);
 }
 
 function isFailedIssue(issue) {
@@ -20852,10 +20851,7 @@ export {
 
 export default function workModelsExtension(pi) {
 	workExtensionPi = pi;
-	subscriptionFooterController = createSubscriptionFooterController(pi, {
-		readGlobalSettings,
-		getWorkflowStatus: () => formatWorkGoalStatus(),
-	});
+	subscriptionFooterController = createSubscriptionFooterController(pi, { readGlobalSettings });
 	exposeBundledSubagentAgents();
 
 	if (typeof pi.registerTool === "function") {

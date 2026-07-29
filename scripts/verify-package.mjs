@@ -59,7 +59,7 @@ check(
 		"International Z.ai",
 		"GLM monthly exclusion/resetless session handling",
 		"Footer composition",
-		"Workflow row",
+		"Workflow separation",
 		"Cache identity/path",
 		"Freshness",
 		"Incidents",
