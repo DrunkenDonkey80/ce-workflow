@@ -1,41 +1,41 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-26",
+  "capturedAt": "2026-07-30",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "0.82.1",
-      "reviewedAt": "2026-07-26",
-      "reviewedVersion": "0.82.1",
+      "version": "0.83.0",
+      "reviewedAt": "2026-07-30",
+      "reviewedVersion": "0.83.0",
       "decisions": [
         {
-          "version": "0.82.1",
-          "title": "Preferred strict JSON Schema sampling for workflow tools",
-          "pov": "Adopt",
+          "version": "0.83.0",
+          "title": "Pi-scoped model picker with full-list toggle",
+          "pov": "Trial",
           "status": "adopted",
-          "rationale": "Pi 0.82 adds capability-gated constrained JSON Schema sampling, and ce-workflow registers thirteen nested workflow tools in extensions/work-models.js. Using strict=prefer improves argument reliability on supporting models while preserving fallback behavior everywhere else.",
-          "verification": "node scripts/test-work-goal.mjs passed and asserts all 13 registered tools use constrainedSampling { type: json_schema, strict: prefer }; primary LSP diagnostics reported no errors; npm run verify:quiet passed"
+          "rationale": "ce-workflow model dialogs now start with ctx.scopedModels when Pi configured a scope, preserve pinned thinking metadata, and let the operator press Tab to switch between scoped and full registries. Empty scopes retain the existing full-list behavior.",
+          "verification": "node scripts/test-work-settings.mjs passed and covers scoped-first display, thinking metadata, keyboard filtering, and Tab switching to the full list"
         },
         {
-          "version": "0.82.1",
-          "title": "Session-aware and streaming bash runtime metadata",
+          "version": "0.83.0",
+          "title": "Session, concurrent bash, resource, and tool-output lifecycle fixes",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "Pi now supplies session/model environment variables to built-in and factory bash tools and streams direct RPC bash updates. ce-workflow uses Pi's built-in bash/tool lifecycle and its evaluation RPC client already consumes correlated RPC events, so it inherits the capability without a repository adapter."
+          "rationale": "Abort-before-replacement, tree persistence, concurrent bash cancellation, direct RPC user_bash, startup rebind, resource metadata, and tool-output status are host-owned behavior inherited by ce-workflow's existing extension hooks."
         },
         {
-          "version": "0.82.1",
-          "title": "Provider, model catalog, thinking, authentication, and renderer additions",
+          "version": "0.83.0",
+          "title": "TypeBox 1.3.7 alias removals",
+          "pov": "Adopt",
+          "status": "no-action",
+          "rationale": "The repository has no call sites for the removed Type.Base, Type.Awaited, Type.Promise, Type.AsyncIterator, Type.Iterator, Type.Options, or Value.Mutate aliases, so no compatibility edit is required."
+        },
+        {
+          "version": "0.83.0",
+          "title": "Credential export, provider login, model, and transport additions",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "OpenRouter/Kimi login, Claude Opus 5 and xhigh metadata, Anthropic gateway auth, model-catalog refreshes, and outputPad affect host/provider or custom-renderer surfaces. ce-workflow registers no provider or custom message renderer and already queries the host model registry and applied thinking level."
-        },
-        {
-          "version": "0.82.1",
-          "title": "Inherited runtime and lifecycle fixes",
-          "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "Retry, compaction routing, context discovery, editor, scoped-model, startup-resource, and TUI fixes are internal Pi behavior. The extension hooks used by ce-workflow remain additive and supported, so the installed host supplies these fixes without compatibility code."
+          "rationale": "Credential export, headless OpenRouter login, Copilot Opus 5, per-request fetch injection, and provider stop-reason changes belong to CLI/provider surfaces that ce-workflow neither registers nor wraps."
         }
       ]
     },
@@ -72,44 +72,38 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.37.0",
-      "reviewedAt": "2026-07-26",
-      "reviewedVersion": "0.37.0",
+      "version": "0.37.2",
+      "reviewedAt": "2026-07-30",
+      "reviewedVersion": "0.37.2",
       "decisions": [
         {
-          "version": "0.37.0",
-          "title": "Versioned agent contracts and side-effect-free launch preflight",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "ce-workflow's extension-owned RPC handoff already validates through the same spawn resolver, records a task only after acknowledged launch, disables plugin acceptance with a reason, and applies native work-item gates. Adding a second preflight or agentContract v1 projection would duplicate controls without changing a current decision or failure path."
+          "version": "0.37.2",
+          "title": "Lease-fenced paused specialist resume",
+          "pov": "Trial",
+          "status": "adopted",
+          "rationale": "Explicit work resume now uses pi-subagents' package-owned RPC resume for the exact paused run, but only after current-session, open-work-item, and active-goal fences pass. The acknowledged revived identity replaces the paused lease identity, preventing duplicate relaunches.",
+          "verification": "node scripts/test-work-action-leases.mjs passed with exact-run resume, identity replacement, and existing lease-fence coverage"
         },
         {
-          "version": "0.37.0",
-          "title": "Capability ceilings and shared child extension defaults",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Every packaged ce-workflow role already declares an explicit strict tool allowlist, context mode, skill inheritance, and thinking level in agents/*.md. A global capability ceiling or defaultExtensions/defaultThinking layer would duplicate those fail-closed role contracts rather than simplify them."
-        },
-        {
-          "version": "0.37.0",
-          "title": "Evidence and independent-review semantics",
+          "version": "0.37.2",
+          "title": "Context isolation, async recovery, and scan reductions",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "0.37 separates verified evidence from achieved independent review. ce-workflow already sends reason-bearing acceptance level none for direct role handoffs, orchestrates work-reviewer separately, and its active guidance says evidence ends at verified and review is orthogonal, so no compatibility edit is needed."
+          "rationale": "The --no-context-files fix, preserved revival metadata, reduced repeated scans, and lifecycle recovery improvements are supplied by pi-subagents and strengthen ce-workflow's existing fresh-context async roles without local adapters."
         },
         {
-          "version": "0.37.0",
-          "title": "Fleet, async terminal proof, steering, and worktree handoff manifests",
-          "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "The persistent FleetView, exact wait/steer wakeups, durable process-terminal state, Windows resilience, and status projections are supplied by pi-subagents itself and directly improve ce-workflow's existing async RPC handoffs. Aggregate worktree manifests do not apply because ce-workflow deliberately keeps one writer and does not launch parallel worktree writers."
-        },
-        {
-          "version": "0.37.0",
-          "title": "Delegation v2 and structured foreground leaves",
+          "version": "0.37.2",
+          "title": "Foreground timeout and FleetView presentation",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "ce-workflow needs durable async specialist runs with supervisor coordination and native work-item state, while delegation v2 is an extension-owned concurrent foreground leaf contract. Replacing the existing async spawn RPC would lose the lifecycle shape this repository relies on."
+          "rationale": "ce-workflow specialists launch asynchronously; its short RPC waits acknowledge control messages rather than limit child runtime. FleetView placement is an upstream UI preference and does not change work-item lifecycle."
+        },
+        {
+          "version": "0.37.2",
+          "title": "Native result delivery and delegation policy refresh",
+          "pov": "Hold",
+          "status": "no-action",
+          "rationale": "Changing result delivery without measured duplicate notifications risks losing ce-workflow's correlated replies, while replacing durable async work-item orchestration with foreground delegation would discard required lease semantics."
         }
       ]
     },
@@ -131,7 +125,40 @@
     },
     {
       "name": "pi-intercom",
-      "version": "0.6.0"
+      "version": "0.9.0",
+      "reviewedAt": "2026-07-30",
+      "reviewedVersion": "0.9.0",
+      "decisions": [
+        {
+          "version": "0.9.0",
+          "title": "Exact session targeting and explicit message lifecycle guidance",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "ce-workflow now limits list-cwd to operator discovery, requires exact session IDs for trust-sensitive coordination, and distinguishes timeout from cancellation while documenting authored supersedes and retry links. Existing pending, run-state, and work-item terminal gates remain authoritative.",
+          "verification": "node scripts/test-work-goal.mjs passed with assertions for exact IDs, list-cwd discovery, cancel, supersedes, and retryOf guidance"
+        },
+        {
+          "version": "0.9.0",
+          "title": "Inbound-trigger and broker hardening",
+          "pov": "Adopt",
+          "status": "no-action",
+          "rationale": "Fail-closed configuration, frame/rate limits, spawn locking, and Windows transport hardening are inherited from pi-intercom. ce-workflow keeps intercom optional and does not impose a deployment-wide inboundTrigger default that could suppress expected replies."
+        },
+        {
+          "version": "0.9.0",
+          "title": "Extension channel bus and configurable ask timeout",
+          "pov": "Hold",
+          "status": "no-action",
+          "rationale": "There is no concrete cross-session extension-state consumer, and longer ask timeouts would worsen liveness without telemetry showing pressure. Native work items and run artifacts remain the durable coordination state."
+        },
+        {
+          "version": "0.9.0",
+          "title": "Context display and disconnected mailbox",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "Context percentage is operator metadata, while a runtime-only disconnected mailbox could mask stale child runs. Neither should replace ce-workflow's live-session and durable work-item lifecycle."
+        }
+      ]
     },
     {
       "name": "pi-goal",
@@ -139,37 +166,38 @@
     },
     {
       "name": "pi-lens",
-      "version": "3.8.71",
-      "reviewedAt": "2026-07-21",
-      "reviewedVersion": "3.8.71",
+      "version": "3.8.73",
+      "reviewedAt": "2026-07-30",
+      "reviewedVersion": "3.8.73",
       "decisions": [
         {
-          "version": "3.8.71",
-          "title": "Diagnostic disposition tool",
+          "version": "3.8.73",
+          "title": "Optional project_report orientation for completed-slice verifiers",
+          "pov": "Trial",
+          "status": "adopted",
+          "rationale": "When the host exposes pi-lens project_report, background verifiers now use a lens-enabled read-only role to inspect graph trust/status and prioritize optimization opportunities in the pruned immutable checkpoint. They fall back to the original checkpoint-only role when the tool is absent, never poll a cold graph, and verify every hint through checkpoint-confined tools.",
+          "verification": "node scripts/test-background-verifiers.mjs and node scripts/test-work-start-finish.mjs passed, covering the expanded read-only boundary plus pi-lens availability selection and fallback"
+        },
+        {
+          "version": "3.8.73",
+          "title": "Review-graph correctness and project scale verdicts",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "pi-lens now registers lens_diagnostic_mark as a situational tool and honors its marks across diagnostics (upstream docs/dispositions.md). The host exposes it automatically through pi_lens_activate_tools, while ce-workflow's verifier triage covers a separate review-finding store, so duplicate integration would add no value."
+          "rationale": "Alias, project-reference, workspace-package, and entry-point resolution plus stale pre-cap rejection are internal pi-lens graph behavior inherited by project_report; ce-workflow does not duplicate the graph or cache."
         },
         {
-          "version": "3.8.71",
-          "title": "Deferred formatter and autofix bus signals",
-          "pov": "Hold",
-          "status": "no-action",
-          "rationale": "The new pilens:format:queued, pilens:format:start, and pilens:autofix:start events are useful only for an in-process immutable-snapshot listener. ce-workflow schedules background verification from an explicit settled checkpoint in extensions/work-models.js rather than snapshotting during deferred lens mutation, so there is no current race to fix."
-        },
-        {
-          "version": "3.8.71",
-          "title": "Cached workspace diagnostics and scan correctness fixes",
+          "version": "3.8.73",
+          "title": "Scan safety, LSP sweep, and disposition fixes",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "Persisted LSP sweep caching, tracked-file discovery, source-twin resolution, deduplication, and warm-up timeout fixes are internal pi-lens behavior (upstream CHANGELOG.md); ce-workflow already calls the public lens diagnostics tools and inherits the faster, quieter results automatically."
+          "rationale": "Structural walk budgets, home-root refusal, multi-server clean confirmation, warm-up/backpressure fixes, layered config, and immediate cached disposition filtering are inherited from pi-lens. Existing ce-workflow calls remain scoped and its verifier triage store stays separate."
         },
         {
-          "version": "3.8.71",
-          "title": "Optional ty server and human project map",
+          "version": "3.8.73",
+          "title": "MCP, TSX grammar, YAML, and persistence internals",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "ty is a PATH-only fallback selected inside pi-lens and /lens-map is a human-only command with no agent tool. Neither has a ce-workflow call site or requires repository configuration."
+          "rationale": "MCP root precedence, TSX ast-grep fallback classification, js-yaml migration, atomic persistence, and auxiliary runtime fixes have no ce-workflow integration surface beyond using the installed host tools."
         }
       ]
     }

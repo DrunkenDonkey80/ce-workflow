@@ -139,6 +139,18 @@ check(
 		"trusted runtime persists that final response",
 	].every((marker) => backgroundVerifierAgent.includes(marker)),
 );
+const lensVerifierAgent = read("agents/work-background-verifier-lens.md");
+check(
+	"pi-lens verifier preserves the optional read-only orientation contract",
+	[
+		"name: work-background-verifier-lens",
+		"work_verifier_grep, project_report",
+		"If it is unavailable or cold",
+		"never wait or poll",
+		"Verify every finding",
+		"Return exactly one JSON object",
+	].every((marker) => lensVerifierAgent.includes(marker)),
+);
 const advisorFiles = [
 	"agents/work-advisor.md",
 	"agents/work-advisor-2.md",

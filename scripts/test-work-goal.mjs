@@ -278,8 +278,14 @@ assert.match(
 	prompt,
 	/stale.*do not reply, resume, append another verdict, or restart work/,
 );
+assert.match(prompt, /list-cwd only for operator peer discovery/);
+assert.match(prompt, /exact session ID/);
 assert.match(prompt, /action.*reply/);
 assert.match(prompt, /replyTo.*message ID/);
+assert.match(prompt, /Timeout is not cancellation/);
+assert.match(prompt, /cancel only a known queued message ID/);
+assert.match(prompt, /supersedes.*authored replacement/);
+assert.match(prompt, /retryOf.*authored retry/);
 assert.match(prompt, /never block the TUI on a foreground child/);
 
 const commands = {};

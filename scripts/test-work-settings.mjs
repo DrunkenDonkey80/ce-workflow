@@ -446,6 +446,7 @@ try {
 					lines.some((line) => line.includes(action.expectText)),
 					`missing ${action.expectText}`,
 				);
+			for (const key of action.preKeys ?? []) component.handleInput(key);
 			for (const character of action.typeText ?? "")
 				component.handleInput(character);
 			if (action.target) {
@@ -891,13 +892,31 @@ try {
 				{ provider: "test", id: "gpt-5.6-codex", name: "GPT 5.6 Codex" },
 			],
 		},
+		scopedModels: [
+			{
+				model: {
+					provider: "test",
+					id: "gpt-5.6-high",
+					name: "GPT 5.6 High",
+				},
+				thinkingLevel: "xhigh",
+			},
+			{
+				model: {
+					provider: "test",
+					id: "gpt-5.6-codex",
+					name: "GPT 5.6 Codex",
+				},
+			},
+		],
 		ui: customUi(
 			[
 				{ expectText: "Settings: Global", key: "\t" },
 				{ target: "Model Review:", key: "enter" },
 				{
 					expectInitial: "GPT 5.6 High",
-					expectText: "Current: GPT 5.6 High",
+					expectText: "Showing 2 models scoped by Pi.",
+					preKeys: ["tab"],
 					typeText: "5.6",
 					target: "GPT 5.6 Mini",
 					key: "enter",
@@ -918,7 +937,7 @@ try {
 		["GPT 5.6 High", "GPT 5.6 Mini", "GPT 5.6 Codex"].every((name) =>
 			filteredModels.includes(name),
 		),
-		"typing filters and keeps all matching models visible",
+		"Tab switches from Pi-scoped models to the filterable full model list",
 	);
 	assert(!filteredModels.includes("Other Model"), "filter hides non-matches");
 	assert(

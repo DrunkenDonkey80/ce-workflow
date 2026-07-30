@@ -949,6 +949,7 @@ function verifierRequest(cwd, batch, job, workspace) {
 				"work_verifier_list",
 				"work_verifier_find",
 				"work_verifier_grep",
+				"project_report",
 			],
 			deny: ["write", "edit", "bash", "process", "network"],
 			readOnlyWorkspace: true,

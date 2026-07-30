@@ -31,6 +31,7 @@ import {
 	driveWorkActionLeases,
 	launchDirectAction,
 	reconcilePendingDirectRuns,
+	resumePausedWorkActionLease,
 	recordPendingDirectRun,
 } from "../extensions/work-models.js";
 import {
@@ -284,6 +285,73 @@ for (const mode of ["tui", "rpc", "autonomous"]) {
 		assert(
 			recovered.state === "claimed",
 			"writer admission recovers after stale leases",
+		);
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+}
+
+{
+	const { cwd } = fixture("paused-resume");
+	try {
+		const pausedDir = path.join(cwd, ".pi-subagents", "paused");
+		const resumedDir = path.join(cwd, ".pi-subagents", "resumed");
+		mkdirSync(pausedDir, { recursive: true });
+		mkdirSync(resumedDir, { recursive: true });
+		writeFileSync(
+			path.join(pausedDir, "status.json"),
+			JSON.stringify({ state: "paused", sessionFile: "child.jsonl" }),
+		);
+		const lease = acquireWorkActionLease(cwd, {
+			workflowRunId: "paused-resume",
+			roadmapId: "E-1",
+			workItemId: "W-1",
+			action: "run-implementation",
+			semanticRole: "builder",
+			agent: "work-worker",
+			session: "resume-session",
+		});
+		acknowledgeWorkActionLease(cwd, lease.leaseId, {
+			runId: "paused-run",
+			asyncDir: pausedDir,
+		});
+		let reply;
+		let request;
+		const resumed = await resumePausedWorkActionLease(
+			cwd,
+			{
+				events: {
+					on(_name, handler) {
+						reply = handler;
+						return () => {};
+					},
+					emit(_name, value) {
+						request = value;
+						queueMicrotask(() =>
+							reply({
+								success: true,
+								data: { runId: "resumed-run", asyncDir: resumedDir },
+							}),
+						);
+					},
+				},
+			},
+			"E-1",
+			{ session: "resume-session", watch: false },
+		);
+		assert(
+			resumed?.ok &&
+				request?.method === "resume" &&
+				request.params.id === "paused-run",
+			"explicit workflow resume uses package-owned resume for the exact paused run",
+		);
+		const current = currentWorkActionLeases(cwd).find(
+			(candidate) => candidate.leaseId === lease.leaseId,
+		);
+		assert(
+			current?.launchIdentity?.runId === "resumed-run" &&
+				current.launchIdentity.asyncDir === resumedDir,
+			"resumed child identity replaces the paused lease identity",
 		);
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });

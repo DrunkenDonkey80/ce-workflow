@@ -38,8 +38,11 @@ try {
 		"project-owned verifier tools enforce the launch boundary without provider capabilities",
 	);
 	const listeners = new Map();
+	let projectReportAvailable = false;
 	let verifierRpcParams;
 	const verifierAdapter = createPiSubagentsVerifierAdapter({
+		getAllTools: () =>
+			projectReportAvailable ? [{ name: "project_report" }] : [],
 		events: {
 			on(name, listener) {
 				listeners.set(name, listener);
@@ -55,35 +58,35 @@ try {
 		},
 	});
 	const verifierCheckpoint = { snapshot: "a".repeat(40) };
+	const verifierRequest = {
+		version: 1,
+		agent: "work-background-verifier",
+		context: "fresh",
+		async: true,
+		cwd: fixture.cwd,
+		output: "C:/tmp/output.json",
+		outputMode: "file-only",
+		logicalJobId: "job-test",
+		model: "openai/gpt-5",
+		thinking: "low",
+		operations: ["correctness"],
+		paths: ["tracked.txt"],
+		checkpoint: verifierCheckpoint,
+		boundary: {
+			readOnlyWorkspace: true,
+			cwdConfinedReadTools: true,
+			credentialsIsolated: true,
+			toolAllowlist: [
+				"work_verifier_read",
+				"work_verifier_list",
+				"work_verifier_find",
+				"work_verifier_grep",
+				"project_report",
+			],
+		},
+	};
 	assert(
-		(
-			await verifierAdapter.spawn({
-				version: 1,
-				agent: "work-background-verifier",
-				context: "fresh",
-				async: true,
-				cwd: fixture.cwd,
-				output: "C:/tmp/output.json",
-				outputMode: "file-only",
-				logicalJobId: "job-test",
-				model: "openai/gpt-5",
-				thinking: "low",
-				operations: ["correctness"],
-				paths: ["tracked.txt"],
-				checkpoint: verifierCheckpoint,
-				boundary: {
-					readOnlyWorkspace: true,
-					cwdConfinedReadTools: true,
-					credentialsIsolated: true,
-					toolAllowlist: [
-						"work_verifier_read",
-						"work_verifier_list",
-						"work_verifier_find",
-						"work_verifier_grep",
-					],
-				},
-			})
-		).ok,
+		(await verifierAdapter.spawn(verifierRequest)).ok,
 		"adapter launches without fictional provider capabilities",
 	);
 	assert(
@@ -91,6 +94,21 @@ try {
 			verifierRpcParams.task.includes('"openai/gpt-5"') &&
 			verifierRpcParams.task.includes(JSON.stringify(verifierCheckpoint)),
 		"verifier handoff includes the exact immutable report identity",
+	);
+	assert(
+		verifierRpcParams.agent === "work-background-verifier" &&
+			!verifierRpcParams.tools.includes("project_report"),
+		"verifiers fall back to checkpoint-only tools when pi-lens is unavailable",
+	);
+	projectReportAvailable = true;
+	assert(
+		(await verifierAdapter.spawn(verifierRequest)).ok &&
+			verifierRpcParams.agent === "work-background-verifier-lens" &&
+			verifierRpcParams.tools.includes("project_report") &&
+			verifierRpcParams.task.includes(
+				"Use project_report only as read-only orientation and status",
+			),
+		"verifiers use project_report when the host exposes the pi-lens tool",
 	);
 	let state = buildWorkSmallState(fixture.cwd, "Add coded start gate");
 	assert(
