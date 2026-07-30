@@ -1,12 +1,16 @@
-import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 const MIN_WIDTH = 56;
 const FULL_WIDTH = 80;
 const POLL_MS = 120_000;
+const CLAUDE_POLL_MS = 600_000;
+const FOLLOWER_SYNC_MS = 60_000;
 const BACKOFF_MS = 360_000;
+const MAX_BACKOFF_MS = 3_600_000;
+const LOCK_STALE_MS = 30_000;
 const FETCH_TIMEOUT_MS = 10_000;
 const UNAVAILABLE_MS = 600_000;
 const ANSI_PATTERN = /\x1b\[[0-?]*[ -/]*[@-~]/g;
@@ -114,7 +118,11 @@ export function renderModelRow(ctx, theme, width, thinkingLevel) {
 }
 
 class QuotaError extends Error {
-	constructor(category) { super(category); this.category = category; }
+	constructor(category, retryAfterMs) {
+		super(category);
+		this.category = category;
+		this.retryAfterMs = retryAfterMs;
+	}
 }
 
 const table = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -139,7 +147,16 @@ function authHeaders(result, extras = {}, raw = false) {
 	return { ...extras, authorization: raw ? token : `Bearer ${token}` };
 }
 
-async function requestJson(url, headers, { fetchImpl, signal, timeout = FETCH_TIMEOUT_MS, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout }) {
+function retryAfterMs(response, now = Date.now()) {
+	const value = response?.headers?.get?.("retry-after");
+	if (!value) return;
+	const seconds = Number(value);
+	if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+	const date = Date.parse(value);
+	if (Number.isFinite(date)) return Math.max(0, date - now);
+}
+
+async function requestJson(url, headers, { fetchImpl, signal, timeout = FETCH_TIMEOUT_MS, now = Date.now, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout }) {
 	const controller = new AbortController();
 	const abort = () => controller.abort();
 	if (signal?.aborted) abort(); else signal?.addEventListener?.("abort", abort, { once: true });
@@ -147,7 +164,7 @@ async function requestJson(url, headers, { fetchImpl, signal, timeout = FETCH_TI
 	try {
 		const response = await fetchImpl(url, { headers, signal: controller.signal, redirect: "error" });
 		if (response.status === 401 || response.status === 403) throw new QuotaError("auth rejected");
-		if (response.status === 429) throw new QuotaError("rate limited");
+		if (response.status === 429) throw new QuotaError("rate limited", retryAfterMs(response, now()));
 		if (!response.ok) throw new QuotaError("unavailable");
 		try { return await response.json(); } catch { throw new QuotaError("unavailable"); }
 	} catch (error) {
@@ -274,9 +291,9 @@ function incidentIndicator(payload) {
 	return ["minor", "major", "critical", "maintenance"].includes(value) ? value : "none";
 }
 
-function provider({ id, label, piProviderId, url, parser, headers }) {
+function provider({ id, label, piProviderId, url, parser, headers, pollMs = POLL_MS }) {
 	return Object.freeze({
-		id, label, piProviderId,
+		id, label, piProviderId, pollMs,
 		resolveAuth: (ctx) => ctx.modelRegistry?.getProviderAuth?.(piProviderId),
 		identity: authIdentity,
 		async fetchQuota(auth, options) {
@@ -293,7 +310,7 @@ export const PRODUCTION_PROVIDERS = Object.freeze([
 		for (const [key, value] of Object.entries(source)) if (key.toLowerCase() === "chatgpt-account-id") headers["chatgpt-account-id"] = value;
 		return headers;
 	} }),
-	provider({ id: "claude", label: "Claude", piProviderId: "anthropic", url: "https://api.anthropic.com/api/oauth/usage", parser: claudeParser, headers: (auth) => authHeaders(auth, { "anthropic-beta": "oauth-2025-04-20" }) }),
+	provider({ id: "claude", label: "Claude", piProviderId: "anthropic", url: "https://api.anthropic.com/api/oauth/usage", parser: claudeParser, headers: (auth) => authHeaders(auth, { "anthropic-beta": "oauth-2025-04-20" }), pollMs: CLAUDE_POLL_MS }),
 	provider({ id: "copilot", label: "Copilot", piProviderId: "github-copilot", url: "https://api.github.com/copilot_internal/user", parser: copilotParser, headers: (auth) => authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }) }),
 	provider({ id: "glm", label: "GLM/Z.ai", piProviderId: "zai", url: "https://api.z.ai/api/monitor/usage/quota/limit", parser: glmParser, headers: (auth) => authHeaders(auth, {}, true) }),
 	provider({ id: "kimi", label: "Kimi", piProviderId: "kimi-coding", url: "https://api.kimi.com/coding/v1/usages", parser: kimiParser, headers: (auth) => authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }) }),
@@ -377,14 +394,14 @@ export function renderQuotaRows(registry, states, theme, width, now = Date.now()
 		const age = state.lastSuccessAt === undefined ? Infinity : now - state.lastSuccessAt;
 		if (!state.snapshot || age >= UNAVAILABLE_MS) {
 			const failure = state.failure === "auth rejected" || state.failure === "rate limited" ? ` · ${state.failure}` : "";
-			let plain = `${display.label} unavailable${failure}`;
+			let plain = `${display.label} quota unavailable${failure}`;
 			if (parts.length && plainWidth + 3 + visibleWidth(plain) > width) flush();
 			plain = truncatePlain(plain, width);
 			append(plain, styleSegment(plain, {}, display.label, display.styledLabel, theme), provider.id);
 			continue;
 		}
 		const marker = state.failure
-			? ` · stale ${formatDuration(age)}${state.failure === "unavailable" ? "" : ` · ${state.failure}`}`
+			? ` · stale ${formatDuration(age)}${state.failure === "unavailable" ? "" : ` · quota ${state.failure}`}`
 			: "";
 		for (const [index, window] of state.snapshot.windows.entries()) {
 			const suffix = index === state.snapshot.windows.length - 1 ? marker : "";
@@ -408,6 +425,89 @@ export function renderQuotaRows(registry, states, theme, width, now = Date.now()
 	return lines;
 }
 
+function processAlive(pid) {
+	if (!Number.isInteger(pid) || pid <= 0) return false;
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return error?.code === "EPERM";
+	}
+}
+
+async function pollingLockState(lockFile, fsImpl) {
+	try {
+		const owner = JSON.parse(await fsImpl.readFile(lockFile, "utf8"));
+		return processAlive(owner?.pid) ? "live" : "stale";
+	} catch (error) {
+		if (error?.code === "ENOENT") return "missing";
+		try {
+			return typeof fsImpl.stat === "function" && Date.now() - (await fsImpl.stat(lockFile)).mtimeMs >= LOCK_STALE_MS
+				? "stale"
+				: "live";
+		} catch { return "live"; }
+	}
+}
+
+async function acquireRecoveryOwnership(lockFile, fsImpl) {
+	for (let attempt = 0; attempt < 16; attempt++) {
+		const recoveryFile = `${lockFile}.recovery${attempt ? `.${attempt}` : ""}`;
+		try {
+			return { handle: await fsImpl.open(recoveryFile, "wx"), path: recoveryFile };
+		} catch (error) {
+			if (error?.code !== "EEXIST") return null;
+			try {
+				if (Date.now() - (await fsImpl.stat(recoveryFile)).mtimeMs < LOCK_STALE_MS) return null;
+			} catch { return null; }
+		}
+	}
+	return null;
+}
+
+async function acquirePollingOwnership(lockFile, fsImpl) {
+	if (typeof fsImpl.open !== "function" || typeof fsImpl.unlink !== "function")
+		return async () => {};
+	const claim = async () => {
+		const handle = await fsImpl.open(lockFile, "wx");
+		const nonce = randomUUID();
+		try {
+			await handle.writeFile(JSON.stringify({ pid: process.pid, nonce }));
+		} catch (error) {
+			try { await handle.close(); } catch {}
+			try { await fsImpl.unlink(lockFile); } catch {}
+			throw error;
+		}
+		let released = false;
+		return async () => {
+			if (released) return;
+			released = true;
+			try { await handle.close(); } catch {}
+			try {
+				const owner = JSON.parse(await fsImpl.readFile(lockFile, "utf8"));
+				if (owner?.nonce === nonce) await fsImpl.unlink(lockFile);
+			} catch {}
+		};
+	};
+	try {
+		return await claim();
+	} catch (error) {
+		if (error?.code !== "EEXIST") return null;
+	}
+	if (await pollingLockState(lockFile, fsImpl) !== "stale") return null;
+
+	const recovery = await acquireRecoveryOwnership(lockFile, fsImpl);
+	if (!recovery) return null;
+	try {
+		const state = await pollingLockState(lockFile, fsImpl);
+		if (state === "live") return null;
+		if (state === "stale") await fsImpl.unlink(lockFile);
+		try { return await claim(); } catch { return null; }
+	} finally {
+		try { await recovery.handle.close(); } catch {}
+		try { await fsImpl.unlink(recovery.path); } catch {}
+	}
+}
+
 export function createSubscriptionFooterController(pi, options = {}) {
 	const {
 		readGlobalSettings,
@@ -415,7 +515,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		now = Date.now,
 		fetchImpl = globalThis.fetch,
 		agentDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
-		fsImpl = { mkdir, readFile, rename, writeFile },
+		fsImpl = { mkdir, open, readFile, rename, stat, unlink, writeFile },
 		setTimeoutImpl = setTimeout,
 		clearTimeoutImpl = clearTimeout,
 		setIntervalImpl = setInterval,
@@ -426,8 +526,11 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	let installed = false;
 	let ticker;
 	let requestRender = () => {};
-	let cacheLoaded = false;
 	let cache = { version: 1, providers: {} };
+	let savePending = Promise.resolve();
+	let ownershipLifecycle = Promise.resolve();
+	let releasePollingOwnership;
+	let followerTimer;
 	const registry = [...providers];
 	const states = new Map(registry.map((entry) => [entry.id, { authenticated: false }]));
 	const timers = new Map();
@@ -435,24 +538,26 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	const incidentTimers = new Map();
 	const incidentAborters = new Map();
 	const cacheFile = join(agentDir, "subscription-footer-cache.json");
+	const pollingLockFile = join(agentDir, "subscription-footer-poll.lock");
 	const setting = () => readGlobalSettings?.().workOrchestrator?.subscriptionFooter ?? {};
 
 	async function loadCache() {
-		if (cacheLoaded) return;
-		cacheLoaded = true;
 		try {
 			const value = JSON.parse(await fsImpl.readFile(cacheFile, "utf8"));
 			if (value?.version === 1 && value.providers && typeof value.providers === "object") cache = value;
 		} catch {}
 	}
 
-	async function saveCache() {
-		try {
-			await fsImpl.mkdir(agentDir, { recursive: true });
-			const temporary = `${cacheFile}.tmp`;
-			await fsImpl.writeFile(temporary, JSON.stringify(cache));
-			await fsImpl.rename(temporary, cacheFile);
-		} catch {}
+	function saveCache() {
+		savePending = savePending.then(async () => {
+			try {
+				await fsImpl.mkdir(agentDir, { recursive: true });
+				const temporary = `${cacheFile}.${process.pid}.tmp`;
+				await fsImpl.writeFile(temporary, JSON.stringify(cache));
+				await fsImpl.rename(temporary, cacheFile);
+			} catch {}
+		});
+		return savePending;
 	}
 
 	function schedule(entry, delay, gen) {
@@ -484,7 +589,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	}
 
 	function reconcileIncidents(gen) {
-		if (setting().incidents) {
+		if (setting().incidents && releasePollingOwnership) {
 			for (const source of INCIDENT_SOURCES) if (states.get(source.id)?.authenticated && !incidentTimers.has(source.id) && !incidentAborters.has(source.id)) void refreshIncident(source, gen);
 		} else {
 			for (const timer of incidentTimers.values()) clearTimeoutImpl(timer);
@@ -493,10 +598,9 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			incidentAborters.clear();
 			for (const state of states.values()) state.incident = undefined;
 		}
-		requestRender();
 	}
 
-	async function refresh(entry, gen) {
+	async function refresh(entry, gen, allowNetwork = Boolean(releasePollingOwnership), render = true) {
 		if (gen !== generation || !activeCtx) return;
 		let resolved;
 		try {
@@ -509,30 +613,39 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		const state = states.get(entry.id);
 		if (!resolved) {
 			Object.assign(state, { authenticated: false, identityKey: undefined, snapshot: undefined, lastSuccessAt: undefined, failure: undefined });
-			requestRender();
-			schedule(entry, POLL_MS, gen);
+			if (render) requestRender();
+			if (allowNetwork) schedule(entry, POLL_MS, gen);
 			return;
 		}
 		const identityKey = (entry.identity ?? authIdentity)(resolved);
 		if (state.identityKey !== identityKey) {
 			Object.assign(state, { identityKey, snapshot: undefined, lastSuccessAt: undefined, failure: undefined });
-			if (cache.providers[entry.id]?.identityKey !== identityKey) delete cache.providers[entry.id];
+			if (allowNetwork && cache.providers[entry.id]?.identityKey !== identityKey) {
+				delete cache.providers[entry.id];
+				void saveCache();
+			}
 		}
 		state.authenticated = true;
 		reconcileIncidents(gen);
-		await loadCache();
 		const cached = cache.providers[entry.id];
-		if (cached && cached.identityKey !== identityKey) {
+		if (allowNetwork && cached && cached.identityKey !== identityKey) {
 			delete cache.providers[entry.id];
 			void saveCache();
 		}
-		if (!state.snapshot && cached?.identityKey === identityKey) {
+		if ((!state.snapshot || cached?.fetchedAt > state.lastSuccessAt) && cached?.identityKey === identityKey) {
 			try {
 				state.snapshot = { providerId: entry.id, identityKey, fetchedAt: cached.fetchedAt, windows: complete(cached.windows) };
 				state.lastSuccessAt = cached.fetchedAt;
 			} catch {}
 		}
-		requestRender();
+		if (render) requestRender();
+		if (!allowNetwork) return;
+		const pollMs = entry.pollMs ?? POLL_MS;
+		const age = state.lastSuccessAt === undefined ? Infinity : Math.max(0, now() - state.lastSuccessAt);
+		if (age < pollMs) {
+			schedule(entry, pollMs - age, gen);
+			return;
+		}
 		const controller = new AbortController();
 		aborters.get(entry.id)?.abort();
 		aborters.set(entry.id, controller);
@@ -543,20 +656,58 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			state.snapshot = { providerId: entry.id, identityKey, fetchedAt, windows };
 			state.lastSuccessAt = fetchedAt;
 			state.failure = undefined;
+			state.failureCount = 0;
 			cache.providers[entry.id] = state.snapshot;
 			void saveCache();
-			requestRender();
-			schedule(entry, POLL_MS, gen);
+			if (render) requestRender();
+			schedule(entry, pollMs, gen);
 		} catch (error) {
 			if (gen !== generation || controller.signal.aborted) return;
 			state.failure = error instanceof QuotaError ? error.category : "unavailable";
-			requestRender();
-			schedule(entry, BACKOFF_MS, gen);
+			state.failureCount = (state.failureCount ?? 0) + 1;
+			const backoff = Math.min(MAX_BACKOFF_MS, BACKOFF_MS * 2 ** (state.failureCount - 1));
+			const retryDelay = Math.min(MAX_BACKOFF_MS, error instanceof QuotaError ? error.retryAfterMs ?? 0 : 0);
+			if (render) requestRender();
+			schedule(entry, Math.max(backoff, retryDelay, state.failure === "rate limited" ? pollMs : 0), gen);
 		}
+	}
+
+	function scheduleFollower(gen) {
+		if (gen !== generation || releasePollingOwnership) return;
+		clearTimeoutImpl(followerTimer);
+		followerTimer = setTimeoutImpl(() => void startPolling(gen), FOLLOWER_SYNC_MS);
+	}
+
+	async function ensurePollingOwner(gen) {
+		if (releasePollingOwnership) return true;
+		ownershipLifecycle = ownershipLifecycle.then(async () => {
+			if (gen !== generation || releasePollingOwnership) return;
+			try { await fsImpl.mkdir(agentDir, { recursive: true }); } catch {}
+			const release = await acquirePollingOwnership(pollingLockFile, fsImpl);
+			if (gen !== generation) await release?.();
+			else if (release) releasePollingOwnership = release;
+		});
+		await ownershipLifecycle;
+		return gen === generation && Boolean(releasePollingOwnership);
+	}
+
+	async function startPolling(gen) {
+		if (gen !== generation || !activeCtx) return;
+		await loadCache();
+		const owner = await ensurePollingOwner(gen);
+		if (gen !== generation || !activeCtx) return;
+		await Promise.all(registry.map((entry) => refresh(entry, gen, owner, false)));
+		requestRender();
+		if (!owner) scheduleFollower(gen);
 	}
 
 	function stop({ restore = true, notify = false } = {}) {
 		generation++;
+		const release = releasePollingOwnership;
+		releasePollingOwnership = undefined;
+		ownershipLifecycle = ownershipLifecycle.then(() => release?.()).catch(() => {});
+		clearTimeoutImpl(followerTimer);
+		followerTimer = undefined;
 		for (const timer of timers.values()) clearTimeoutImpl(timer);
 		timers.clear();
 		for (const controller of aborters.values()) controller.abort();
@@ -591,7 +742,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				dispose() { if (gen === generation) stop({ restore: false }); },
 			};
 		});
-		for (const entry of registry) void refresh(entry, gen);
+		void startPolling(gen);
 		reconcileIncidents(gen);
 		ticker = setIntervalImpl(() => requestRender(), 60_000);
 		return true;
@@ -601,7 +752,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		start: install,
 		apply(ctx) {
 			if (activeCtx && activeCtx !== ctx) return false;
-			if (setting().enabled && activeCtx === ctx) { reconcileIncidents(generation); return true; }
+			if (setting().enabled && activeCtx === ctx) { reconcileIncidents(generation); requestRender(); return true; }
 			if (setting().enabled) return install(ctx);
 			if (activeCtx === ctx) stop({ notify: true });
 			return false;

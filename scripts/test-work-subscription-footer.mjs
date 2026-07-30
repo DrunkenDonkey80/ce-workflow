@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { homedir } from "node:os";
+import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import {
 	PRODUCTION_PROVIDERS,
 	createSubscriptionFooterController,
@@ -22,8 +24,20 @@ const context = (tokens, window = 272000) => ({
 	thinkingLevel: "high",
 	getContextUsage: () => ({ tokens, contextWindow: window }),
 });
-const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
-const jsonResponse = (payload, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => payload });
+const flush = async () => { for (let i = 0; i < 32; i++) await Promise.resolve(); };
+const waitFor = async (check, message, timeout = 2_000) => {
+	const deadline = Date.now() + timeout;
+	while (!(await check())) {
+		if (Date.now() >= deadline) assert.fail(message);
+		await delay(10);
+	}
+};
+const jsonResponse = (payload, status = 200, headers = {}) => ({
+	ok: status >= 200 && status < 300,
+	status,
+	headers: { get: (name) => headers[name.toLowerCase()] },
+	json: async () => payload,
+});
 const stored = (key, headers) => ({ source: "stored credential", auth: { apiKey: key, headers } });
 
 class Clock {
@@ -68,10 +82,11 @@ function harness({ providers, auth, fetchImpl, clock = new Clock(), fsImpl, enab
 			providers, fetchImpl, now: clock.now,
 			setTimeoutImpl: clock.setTimeout, clearTimeoutImpl: clock.clearTimeout,
 			setIntervalImpl: clock.setInterval, clearIntervalImpl: clock.clearInterval,
-			...(agentDir === null ? {} : { agentDir }), fsImpl: fsImpl ?? {
+			...(agentDir === null ? {} : { agentDir }),
+			...(fsImpl === null ? {} : { fsImpl: fsImpl ?? {
 				readFile: async () => { throw Object.assign(new Error("missing"), { code: "ENOENT" }); },
 				mkdir: async () => {}, writeFile: async () => {}, rename: async () => {},
-			},
+			} }),
 		},
 	);
 	return {
@@ -289,8 +304,8 @@ const orderedStates = new Map([
 ]);
 const ordered = renderQuotaRows(orderedProviders, orderedStates, theme, 300, now());
 const orderedPlain = stripAnsi(ordered.join("\n"));
-assert.ok(orderedPlain.indexOf("First unavailable") < orderedPlain.indexOf("Second") && orderedPlain.indexOf("Second") < orderedPlain.indexOf("Third unavailable"));
-assert.match(orderedPlain, /Second .*stale.*rate limited/, "stale marker remains attached in registry order");
+assert.ok(orderedPlain.indexOf("First quota unavailable") < orderedPlain.indexOf("Second") && orderedPlain.indexOf("Second") < orderedPlain.indexOf("Third quota unavailable"));
+assert.match(orderedPlain, /Second .*stale.*quota rate limited/, "stale quota marker remains attached in registry order");
 for (const [rows, maxWidth] of [[widePacked, 200], [continuation, 56], [ordered, 300], [wrapped, 56]]) for (const line of rows) {
 	assert.ok(visibleWidth(line) <= maxWidth, `quota row fits ${maxWidth}`);
 	assert.doesNotMatch(String(line).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, ""), /\x1b/, "ANSI sequences remain complete");
@@ -301,7 +316,7 @@ for (const category of ["auth rejected", "rate limited", "unavailable"]) {
 	assert.doesNotMatch(diagnostic, /secret|body|token/i);
 	if (category !== "unavailable") assert.match(diagnostic, new RegExp(category));
 }
-for (const [failure, expected] of [["auth rejected", /unavailable · auth rejected$/], ["rate limited", /unavailable · rate limited$/], ["SENTINEL-SECRET-BODY", /unavailable$/]]) {
+for (const [failure, expected] of [["auth rejected", /quota unavailable · auth rejected$/], ["rate limited", /quota unavailable · rate limited$/], ["SENTINEL-SECRET-BODY", /quota unavailable$/]]) {
 	const diagnostic = stripAnsi(renderQuotaRows([{ id: "empty", label: "Empty" }], new Map([
 		["empty", { authenticated: true, failure }],
 	]), theme, 80, now()).join("\n"));
@@ -313,7 +328,7 @@ for (const [failure, expected] of [["auth rejected", /unavailable · auth reject
 let resolveNetwork;
 let identity = "account-a";
 const cacheProvider = { id: "cache", label: "Cache", piProviderId: "cache", identity: () => identity, fetchQuota: () => new Promise((resolve) => { resolveNetwork = resolve; }) };
-const cacheJson = JSON.stringify({ version: 1, providers: { cache: { providerId: "cache", identityKey: "account-a", fetchedAt: now(), windows: [{ id: "cached", label: "cached", usedPercent: 44, resetsAt: reset }] } } });
+const cacheJson = JSON.stringify({ version: 1, providers: { cache: { providerId: "cache", identityKey: "account-a", fetchedAt: now() - 120_000, windows: [{ id: "cached", label: "cached", usedPercent: 44, resetsAt: reset }] } } });
 const cached = harness({ providers: [cacheProvider], auth: () => stored("secret-a"), fetchImpl: async () => {}, fsImpl: { readFile: async () => cacheJson, mkdir: async () => {}, writeFile: async () => {}, rename: async () => {} } });
 cached.controller.start(cached.ctx);
 const cachedComponent = cached.component();
@@ -356,24 +371,102 @@ await flush();
 assert.ok(cacheContent, "successful fetch persists restart cache");
 seedCache.controller.shutdown(seedCache.ctx);
 let restartCalls = 0;
-const restarted = harness({ providers: [PRODUCTION_PROVIDERS[0]], auth: restartAuth, clock: restartClock, fsImpl: restartFs, fetchImpl: async () => { restartCalls++; return jsonResponse({}, 429); } });
+const restarted = harness({
+	providers: [PRODUCTION_PROVIDERS[0]],
+	auth: restartAuth,
+	clock: restartClock,
+	fsImpl: restartFs,
+	fetchImpl: async () => {
+		restartCalls++;
+		const retryAfter = restartCalls === 1
+			? "1200"
+			: restartCalls === 2
+				? "99999999"
+				: new Date(restartClock.now() + 1_800_000).toUTCString();
+		return jsonResponse({}, 429, { "retry-after": retryAfter });
+	},
+});
 restarted.controller.start(restarted.ctx);
 const restartedComponent = restarted.component();
 await flush();
-assert.match(stripAnsi(restartedComponent.render(120).join("\n")), /Codex 5h.*70%.*stale 0h 0m · rate limited/, "matching restart cache remains visible through 429");
-await restartClock.advance(359_999);
-assert.equal(restartCalls, 1, "429 retry waits for the full backoff");
+assert.equal(restartCalls, 0, "fresh shared cache suppresses the startup quota request");
+assert.match(stripAnsi(restartedComponent.render(120).join("\n")), /Codex 5h.*70%/, "fresh matching cache renders without a request");
+await restartClock.advance(119_999);
+assert.equal(restartCalls, 0, "fresh cache waits for the remaining poll interval");
 await restartClock.advance(1);
-assert.equal(restartCalls, 2, "429 retries at six minutes");
+assert.equal(restartCalls, 1, "quota refresh starts when the shared cache expires");
+assert.match(stripAnsi(restartedComponent.render(120).join("\n")), /Codex 5h.*70%.*stale 0h 2m · quota rate limited/, "matching restart cache remains visible through quota 429");
+await restartClock.advance(1_199_999);
+assert.equal(restartCalls, 1, "429 honors Retry-After");
+await restartClock.advance(1);
+assert.equal(restartCalls, 2, "429 retries after Retry-After");
+await restartClock.advance(3_599_999);
+assert.equal(restartCalls, 2, "oversized Retry-After is bounded");
+await restartClock.advance(1);
+assert.equal(restartCalls, 3, "bounded Retry-After retries at one hour");
+await restartClock.advance(1_799_999);
+assert.equal(restartCalls, 3, "HTTP-date Retry-After uses the injected clock");
+await restartClock.advance(1);
+assert.equal(restartCalls, 4, "HTTP-date Retry-After retries at the requested time");
 restarted.controller.shutdown(restarted.ctx);
 const mismatchedRestart = harness({ providers: [PRODUCTION_PROVIDERS[0]], auth: () => stored("different-token"), clock: restartClock, fsImpl: restartFs, fetchImpl: async () => jsonResponse({}, 429) });
 mismatchedRestart.controller.start(mismatchedRestart.ctx);
 const mismatchedComponent = mismatchedRestart.component();
 await flush();
 const mismatchedText = stripAnsi(mismatchedComponent.render(120).join("\n"));
-assert.match(mismatchedText, /Codex unavailable · rate limited/);
+assert.match(mismatchedText, /Codex quota unavailable · rate limited/);
 assert.doesNotMatch(mismatchedText, /70%|20%/, "identity mismatch never publishes another identity's cache");
 mismatchedRestart.controller.shutdown(mismatchedRestart.ctx);
+
+// One live TUI controller owns quota polling; siblings render the shared cache without duplicate requests.
+const sharedAgentDir = await mkdtemp(join(tmpdir(), "ce-footer-owner-"));
+let sharedPolls = 0;
+let releaseSharedPoll;
+const sharedProvider = {
+	id: "shared", label: "Shared", piProviderId: "shared", identity: () => "same-account",
+	fetchQuota: () => {
+		sharedPolls++;
+		return new Promise((resolve) => { releaseSharedPoll = resolve; });
+	},
+};
+const sharedClock = new Clock();
+const firstProcess = harness({ providers: [sharedProvider], auth: () => stored("safe"), fetchImpl: async () => {}, clock: sharedClock, fsImpl: null, agentDir: sharedAgentDir });
+const secondProcess = harness({ providers: [sharedProvider], auth: () => stored("safe"), fetchImpl: async () => {}, clock: sharedClock, fsImpl: null, agentDir: sharedAgentDir });
+firstProcess.controller.start(firstProcess.ctx);
+secondProcess.controller.start(secondProcess.ctx);
+await waitFor(() => sharedPolls === 1, "one controller should acquire polling ownership");
+assert.equal(sharedPolls, 1, "concurrent footer controllers share one polling owner");
+releaseSharedPoll([{ id: "q", label: "q", usedPercent: 7, resetsAt: reset }]);
+await waitFor(
+	() => [firstProcess, secondProcess].some(({ controller }) => controller.states.get("shared").lastSuccessAt !== undefined),
+	"polling owner should publish its result",
+);
+firstProcess.controller.shutdown(firstProcess.ctx);
+secondProcess.controller.shutdown(secondProcess.ctx);
+await rm(sharedAgentDir, { recursive: true, force: true });
+
+// A partial lock left by a crashed owner self-heals after the lock grace period.
+const staleLockDir = await mkdtemp(join(tmpdir(), "ce-footer-stale-lock-"));
+const staleLockPath = join(staleLockDir, "subscription-footer-poll.lock");
+await writeFile(staleLockPath, "{");
+await writeFile(`${staleLockPath}.recovery`, "");
+const staleLockTime = new Date(Date.now() - 120_000);
+await utimes(staleLockPath, staleLockTime, staleLockTime);
+await utimes(`${staleLockPath}.recovery`, staleLockTime, staleLockTime);
+let recoveredPolls = 0;
+const recoveredProvider = { id: "recovered", label: "Recovered", piProviderId: "recovered", identity: () => "same", fetchQuota: async () => {
+	recoveredPolls++;
+	return [{ id: "q", label: "q", usedPercent: 1, resetsAt: reset }];
+} };
+const recovered = harness({ providers: [recoveredProvider], auth: () => stored("safe"), fetchImpl: async () => {}, fsImpl: null, agentDir: staleLockDir });
+const recoveredPeer = harness({ providers: [recoveredProvider], auth: () => stored("safe"), fetchImpl: async () => {}, fsImpl: null, agentDir: staleLockDir });
+recovered.controller.start(recovered.ctx);
+recoveredPeer.controller.start(recoveredPeer.ctx);
+await waitFor(() => recoveredPolls === 1, "one contender should reclaim the stale partial polling lock");
+assert.equal(recoveredPolls, 1, "concurrent stale-lock recovery elects one polling owner");
+recovered.controller.shutdown(recovered.ctx);
+recoveredPeer.controller.shutdown(recoveredPeer.ctx);
+await rm(staleLockDir, { recursive: true, force: true });
 
 // Freshness is atomic: failure retains old windows, stale is immediate, exactly ten minutes is unavailable, then complete success recovers.
 let call = 0;
@@ -398,7 +491,7 @@ assert.match(freshText, /good.*stale 0h 2m/);
 assert.doesNotMatch(freshText, /SENTINEL|recovered/);
 await fresh.clock.advance(480000);
 freshText = stripAnsi(freshComponent.render(80).join("\n"));
-assert.equal(freshText.includes("Freshness unavailable"), true, "exact ten-minute cutoff");
+assert.equal(freshText.includes("Freshness quota unavailable"), true, "exact ten-minute cutoff");
 await fresh.clock.advance(600000);
 assert.match(stripAnsi(freshComponent.render(80).join("\n")), /recovered.*30%/, "complete success recovers");
 fresh.controller.shutdown(fresh.ctx);
@@ -514,7 +607,7 @@ assert.equal(incidents.controller.states.get("kimi").incident, undefined);
 failStatuses = true;
 await incidents.clock.advance(120000);
 assert.equal(incidents.controller.states.get("claude").incident, "major", "status failure retains incident");
-assert.equal(incidents.controller.states.get("claude").lastSuccessAt, claudeQuotaAt + 120000, "incident failure does not alter quota refresh time");
+assert.equal(incidents.controller.states.get("claude").lastSuccessAt, claudeQuotaAt, "incident polling stays independent of Claude's longer quota cadence");
 const requestsBeforeIncidentDisable = statusRequests;
 incidentEnabled = false;
 incidents.controller.apply(incidents.ctx);
