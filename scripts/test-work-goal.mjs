@@ -357,6 +357,7 @@ for (const action of [
 	"Medium task",
 	"Large task",
 	"Finish work item",
+	"Close work item",
 	"Debug",
 	"Add work",
 	"Auto-route task",

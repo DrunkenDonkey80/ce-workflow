@@ -23,8 +23,10 @@ const {
 	default: workModelsExtension,
 	backfillVisibleDisplayMetadata,
 	bootstrapPlanEpic,
+	buildWorkCloseState,
 	buildWorkPlanState,
 	buildWorkRoadmapState,
+	executeOrchestratorAction,
 	handleWorkRoadmapCommand,
 	renderWorkRoadmapText,
 	roadmapMenuItems,
@@ -1160,7 +1162,51 @@ try {
 			documentLinks: { brainstorm: "docs/brainstorms/standalone.md" },
 		}),
 	};
+	initiativeStore.items["I-1.2.1"] = item("I-1.2.1", "Final task", {
+		type: "task",
+		parentId: "I-1.2",
+	});
 	saveStore(initiativeRoot, initiativeStore);
+	const completedHierarchy = buildWorkCloseState(initiativeRoot, "I-1.2.1");
+	assert.equal(completedHierarchy.action, "work-item-closed");
+	assert.deepEqual(completedHierarchy.ancestorsClosed, ["I-1.2", "I-1"]);
+	assert.equal(loadStore(initiativeRoot).items["I-1.2.1"].status, "closed");
+	assert.equal(loadStore(initiativeRoot).items["I-1.2"].status, "closed");
+	assert.equal(loadStore(initiativeRoot).items["I-1"].status, "closed");
+	const staleHierarchy = loadStore(initiativeRoot);
+	for (const id of ["I-1", "I-1.2", "I-1.2.1"])
+		staleHierarchy.items[id].status = "open";
+	saveStore(initiativeRoot, staleHierarchy);
+	writeFileSync(path.join(initiativeRoot, "docs", "plans", "child.md"), "stale");
+	const guardedHierarchy = buildWorkCloseState(initiativeRoot, "I-1.2.1");
+	assert.deepEqual(guardedHierarchy.ancestorsClosed, ["I-1.2"]);
+	assert.deepEqual(guardedHierarchy.blockedAncestors, [
+		{
+			id: "I-1",
+			blockers: [
+				"stale_plan:I-1.1",
+				"stale_source:docs/plans/child.md",
+			],
+		},
+	]);
+	assert.equal(loadStore(initiativeRoot).items["I-1"].status, "open");
+	writeFileSync(
+		path.join(initiativeRoot, "docs", "plans", "child.md"),
+		childPlan,
+	);
+	const resetHierarchy = loadStore(initiativeRoot);
+	resetHierarchy.items["I-1.2"].status = "open";
+	delete resetHierarchy.items["I-1.2.1"];
+	saveStore(initiativeRoot, resetHierarchy);
+	const commandNotices = [];
+	const alreadyClosed = await executeOrchestratorAction(
+		"work-close",
+		"I-1.1",
+		{ cwd: initiativeRoot, ui: { notify: (message) => commandNotices.push(message) } },
+		{},
+	);
+	assert.equal(alreadyClosed.action, "work-item-already-closed");
+	assert.match(commandNotices.at(-1), /already closed/);
 	const tree = buildWorkRoadmapState(initiativeRoot, "list");
 	assert.deepEqual(
 		tree.roadmaps.map((entry) => [entry.id, entry.role]),

@@ -258,6 +258,22 @@ try {
 		"closed",
 		"open source ideas do not keep a completed brainstorm open",
 	);
+	item(lifecycle, { id: "nested-root", type: "epic", title: "Nested root" });
+	item(lifecycle, {
+		id: "nested-child",
+		type: "epic",
+		title: "Nested child",
+		parentId: "nested-root",
+	});
+	item(lifecycle, {
+		id: "nested-task",
+		type: "task",
+		title: "Nested task",
+		parentId: "nested-child",
+	});
+	closeWorkItem(lifecycle, "nested-task");
+	assert.equal(lifecycle.items["nested-child"].status, "closed");
+	assert.equal(lifecycle.items["nested-root"].status, "closed");
 	for (const [id, title, protect] of [
 		["misc", "Misc", (root) => root.labels.push("wo:misc")],
 		["improvement", "Self-improving", () => {}],

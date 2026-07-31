@@ -736,8 +736,11 @@ function idleParentEpic(store, item) {
 
 export function closeWorkItem(store, id, changes = {}) {
 	const closed = updateWorkItem(store, id, { ...changes, status: "closed" });
-	const parent = idleParentEpic(store, closed);
-	if (parent) updateWorkItem(store, parent.id, { status: "closed" });
+	let completed = closed;
+	for (let parent = idleParentEpic(store, completed); parent; ) {
+		completed = updateWorkItem(store, parent.id, { status: "closed" });
+		parent = idleParentEpic(store, completed);
+	}
 	return closed;
 }
 

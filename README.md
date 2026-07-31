@@ -24,7 +24,7 @@ No tracker CLI is required for normal operation. Press **F7** to open **Orchestr
 | **Plan** | Creates or resumes a plan roadmap. |
 | **Small task**, **Medium task**, **Large task**, **Auto-route task** | Classifies and creates one scoped work item. |
 | **Resume work**, **Status**, **Blocker report**, **Roadmaps** | Resume starts the extension-owned autonomous loop for the selected target; the other actions inspect or manage native state. Roadmaps also prepares initiative child plans and converts standalone roadmaps into initiatives. |
-| **Add work**, **Debug**, **Checkpoint and pause**, **Finish work item** | Mutates, checkpoints, or finalizes a native work item. |
+| **Add work**, **Debug**, **Checkpoint and pause**, **Finish work item**, **Close work item** | Mutates, checkpoints, finalizes, or manually closes a native work item. Closing the last open descendant also closes completed parent roadmaps and initiatives whose guards pass. |
 | **Brainstorm**, **Ideas**, **Usage report**, **Telemetry** | Manages ideas and local reports. |
 | **Settings**, **Context guard**, **Autonomous goal** | Configures orchestration and context behavior. Proactive compaction defaults on at 150k tokens. |
 | **Catch up project** | Reviews changed monitored Pi/plugin releases and records Adopt/Defer/Skip decisions. |

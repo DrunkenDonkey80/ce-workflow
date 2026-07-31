@@ -2161,6 +2161,7 @@ const ORCHESTRATOR_ACTION_LABELS = {
 	"work-brainstorm": "Brainstorm",
 	"work-research": "Research",
 	"work-catch-up": "Catch up project",
+	"work-close": "Close work item",
 	"work-context": "Context guard",
 	"work-debug": "Debug",
 	"work-finish": "Finish work item",
@@ -18127,6 +18128,14 @@ async function handleWorkMenuCommand(ctx, pi) {
 			placeholder: "Enter a WorkItem or roadmap ID",
 		},
 		{
+			value: "work-close",
+			label: "☑️ Close work item",
+			description:
+				"Mark an open WorkItem complete without running finish gates.\nCompleted parent roadmaps and guarded initiatives close automatically.",
+			argumentTitle: "Work item to close",
+			placeholder: "Enter an open WorkItem or roadmap ID",
+		},
+		{
 			value: "work-debug",
 			label: "🪲 Debug",
 			description:
@@ -19122,18 +19131,106 @@ function deletionProtected(item) {
 }
 
 function closeTaskByRequest(cwd, id) {
-	const closed = nativeIssue(
-		mutateStore(cwd, (store) => {
-			const current = store.items[id];
-			if (!current)
-				throw new WorkStoreError("missing", `Work item ${id} is missing.`);
-			if (typeOf(current) === "epic")
-				throw new WorkStoreError("conflict", `${id} is a roadmap, not a task.`);
-			return closeWorkItem(store, id);
-		}),
-	);
+	const result = mutateStore(cwd, (store) => {
+		const current = store.items[id];
+		if (!current)
+			throw new WorkStoreError("missing", `Work item ${id} is missing.`);
+		if (typeOf(current) === "epic")
+			throw new WorkStoreError("conflict", `${id} is a roadmap, not a task.`);
+		const ancestorIds = [];
+		let ancestor = current.parentId ? store.items[current.parentId] : undefined;
+		while (ancestor) {
+			if (ancestor.type === "epic") ancestorIds.push(ancestor.id);
+			ancestor = ancestor.parentId ? store.items[ancestor.parentId] : undefined;
+		}
+		const closed = closeWorkItem(store, id);
+		const ancestorsClosed = ancestorIds.filter(
+			(ancestorId) => store.items[ancestorId].status === "closed",
+		);
+		const blockedAncestors = [];
+		for (const ancestorId of ancestorIds) {
+			const item = store.items[ancestorId];
+			if (!item.initiative || item.status === "closed") continue;
+			const projected = buildInitiativeProjection(cwd, {}, store).nodes.find(
+				(node) => node.id === ancestorId,
+			);
+			if (projected?.closeAllowed) {
+				updateWorkItem(store, ancestorId, { status: "closed" });
+				ancestorsClosed.push(ancestorId);
+			} else
+				blockedAncestors.push({
+					id: ancestorId,
+					blockers: projected?.closeBlockers ?? [],
+				});
+		}
+		return { closed, ancestorsClosed, blockedAncestors };
+	});
 	workRoadmapFrameCache.delete(resolve(cwd));
-	return closed;
+	return { ...result, closed: nativeIssue(result.closed) };
+}
+
+function buildWorkCloseState(cwd, args = "") {
+	const [requestedTarget = "", ...flags] = String(args).trim().split(/\s+/);
+	if (!requestedTarget)
+		return errorState("usage", "Enter an open WorkItem or roadmap ID.", {
+			action: "usage",
+		});
+	const gate = normalReadGate(cwd);
+	if (gate) return errorState(gate.reason, gate.message, { action: gate.reason });
+	try {
+		const expanded = expandNumericWorkItemShorthand(cwd, requestedTarget);
+		if (expanded.error)
+			return errorState(expanded.error, expanded.message, expanded);
+		const target = expanded.target;
+		const item = readWorkItem(cwd, target);
+		if (!item)
+			return errorState("unknown-target", `No WorkItem found for ${target}`);
+		if (statusOf(item) === "closed")
+			return {
+				ok: true,
+				action: "work-item-already-closed",
+				workItem: issueSummary(item),
+				message: `${target} is already closed.`,
+			};
+		if (typeOf(item) === "epic")
+			return buildWorkRoadmapState(
+				cwd,
+				["close", target, ...flags].join(" "),
+			);
+		const result = closeTaskByRequest(cwd, target);
+		const cascade = result.ancestorsClosed.length
+			? ` Also closed completed ancestors: ${result.ancestorsClosed.join(", ")}.`
+			: "";
+		const blocked = result.blockedAncestors.length
+			? ` Guarded ancestors left open: ${result.blockedAncestors.map((ancestor) => ancestor.id).join(", ")}.`
+			: "";
+		return {
+			ok: true,
+			action: "work-item-closed",
+			workItem: issueSummary(result.closed),
+			ancestorsClosed: result.ancestorsClosed,
+			blockedAncestors: result.blockedAncestors,
+			message: `Closed ${target}.${cascade}${blocked}`,
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
+		});
+	}
+}
+
+async function handleWorkCloseCommand(args, ctx) {
+	let state = buildWorkCloseState(ctx.cwd, args);
+	if (state.action === "roadmap-close-needs-confirmation") {
+		const confirm = await choose(ctx, state.message, [
+			{ value: "cancel", label: "cancel" },
+			{ value: "force", label: "close anyway" },
+		]);
+		if (confirm !== "force") return { ok: true, action: "work-close-cancelled" };
+		state = buildWorkCloseState(ctx.cwd, `${state.epic.id} --force`);
+	}
+	notify(ctx, state.message, state.ok ? "info" : "warning");
+	return stateTelemetry(state);
 }
 
 function subtreeIds(store, id) {
@@ -20828,6 +20925,10 @@ async function executeOrchestratorAction(
 					handleWorkImproveCommand(text, pi, ctx),
 				);
 	if (name === "work-catch-up") return handleWorkCatchUpCommand(text, pi, ctx);
+	if (name === "work-close")
+		return withCommandTelemetry(name, text, ctx, () =>
+			handleWorkCloseCommand(text, ctx),
+		);
 	if (name === "work-telemetry") {
 		cleanupBenignInstructionDirt(ctx.cwd);
 		return notify(ctx, buildWorkTelemetry(ctx.cwd, text), "info");
@@ -21039,6 +21140,7 @@ export {
 	buildWorkBrainstormState,
 	buildWorkCatchUpState,
 	buildWorkCatchUpObjective,
+	buildWorkCloseState,
 	captureIdeationIdeas,
 	brainstormHandoffPrompt,
 	researchHandoffPrompt,
