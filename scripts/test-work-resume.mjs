@@ -32,6 +32,7 @@ const {
 	addGroup,
 	createBatch,
 	initVerifierStore,
+	ingestAnalysisReview,
 	loadVerifierStore,
 	mutateVerifierStore,
 	recordOperationResult,
@@ -1248,7 +1249,85 @@ try {
 		buildWorkResumeState(triageCwd, "E-1").action === "run-implementation",
 		"pure resume-state reads do not steal or enforce a triage lease",
 	);
+	const analysisBatch = mutateVerifierStore(triageCwd, (store) =>
+		createBatch(store, {
+			checkpoint: triageCheckpoint,
+			purpose: "analysis",
+			profiles: [
+				{ model: "openai/gpt-5", operations: ["correctness"], thinking: "low" },
+			],
+		}),
+	);
+	const analysisJob = Object.values(loadVerifierStore(triageCwd).jobs).find(
+		(job) => job.batchId === analysisBatch.id,
+	);
+	const analysisReport = mutateVerifierStore(triageCwd, (store) =>
+		recordOperationResult(store, {
+			jobId: analysisJob.id,
+			operation: "correctness",
+			outcome: "findings",
+		}),
+	);
+	const analysisFinding = mutateVerifierStore(triageCwd, (store) =>
+		addFinding(store, {
+			reportId: analysisReport.id,
+			operation: "correctness",
+			model: analysisJob.model,
+			checkpoint: triageCheckpoint,
+			path: "extensions/work-models.js",
+			startLine: 2,
+			endLine: 2,
+			category: "correctness",
+			severity: "medium",
+			rationale: "analysis decision",
+			evidence: "line 2",
+			suggestedAction: "review line 2",
+		}),
+	);
+	mutateVerifierStore(triageCwd, (store) =>
+		ingestAnalysisReview(store, {
+			batchId: analysisBatch.id,
+			candidates: [
+				{
+					sourceFindingId: analysisFinding.id,
+					verdict: "accepted",
+					title: "Review explicit target",
+					rationale: "analysis decision",
+					evidence: "line 2",
+					recommendation: "review first",
+					decisionKey: "resume-precedence",
+				},
+			],
+		}),
+	);
+	assert(
+		buildWorkResumeState(triageCwd, "IMP-1").action ===
+			"review-analysis-required",
+		"Review analysis blocks even an explicit Resume target",
+	);
 	rmSync(triageCwd, { recursive: true, force: true });
+
+	const legacyCwd = mkdtempSync(path.join(tmpdir(), "work-resume-legacy-analysis-"));
+	seedNativeStore(legacyCwd, [
+		...sourcesForScenario("implementation"),
+		{
+			id: "LEGACY-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Legacy analysis underway",
+			labels: ["wo:analysis"],
+		},
+	]);
+	initVerifierStore(legacyCwd);
+	const legacyState = buildWorkResumeState(legacyCwd, "IMP-1", {
+		ownerSession: "resume-test",
+	});
+	assert(
+		legacyState.action === "review-analysis-required" &&
+			legacyState.review[0].state === "migration_blocked",
+		"in-progress legacy analysis is a durable Resume blocker",
+	);
+	rmSync(legacyCwd, { recursive: true, force: true });
 
 	const orphanTriageCwd = mkdtempSync(
 		path.join(tmpdir(), "work-resume-orphan-triage-"),

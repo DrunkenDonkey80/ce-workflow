@@ -281,6 +281,15 @@ function parseSnapshot(content, file) {
 			file,
 		});
 	}
+	// Version-1 review fields are additive so old stores upgrade without losing raw evidence.
+	for (const field of [
+		"analysisCandidates",
+		"analysisReviewGroups",
+		"analysisEvents",
+		"analysisFinalizations",
+		"analysisLegacyMigrations",
+	])
+		store[field] ??= {};
 	validateVerifierStore(store, file);
 	return store;
 }
@@ -446,6 +455,11 @@ export function initVerifierStore(cwd = process.cwd(), options = {}) {
 			claims: {},
 			dispositions: {},
 			fixes: {},
+			analysisCandidates: {},
+			analysisReviewGroups: {},
+			analysisEvents: {},
+			analysisFinalizations: {},
+			analysisLegacyMigrations: {},
 		};
 		saveVerifierStore(cwd, store);
 		return store;
@@ -1185,7 +1199,13 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 			launch: Promise.resolve([]),
 		};
 	}
-	const batchId = stableId("batch", { checkpoint, profiles });
+	const purpose =
+		input.origin === "manual-analyze" ? "analysis" : "verification";
+	const batchId = stableId("batch", {
+		checkpoint,
+		profiles,
+		...(purpose === "analysis" ? { purpose } : {}),
+	});
 	initVerifierStore(cwd);
 	const existing = loadVerifierStore(cwd).batches[batchId];
 	if (existing)
@@ -1212,7 +1232,13 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 			requests[job.id] = verifierRequest(cwd, provisional, job, workspace);
 		}
 		const batch = mutateVerifierStore(cwd, (store) =>
-			createBatch(store, { checkpoint, profiles, requests, now: input.now }),
+			createBatch(store, {
+				checkpoint,
+				profiles,
+				requests,
+				purpose,
+				now: input.now,
+			}),
 		);
 		return {
 			status: "queued",
@@ -1242,13 +1268,21 @@ export function createBatch(store, input = {}) {
 	);
 	const profiles = normalizeProfiles(input.profiles, input);
 	return edit(store, (next) => {
-		const id = stableId("batch", { checkpoint, profiles });
+		const purpose = input.purpose ?? "verification";
+		if (!new Set(["verification", "analysis"]).has(purpose))
+			throw error("invalid", `Invalid batch purpose: ${purpose}`);
+		const id = stableId("batch", {
+			checkpoint,
+			profiles,
+			...(purpose === "analysis" ? { purpose } : {}),
+		});
 		if (next.batches[id]) return next.batches[id];
 		const timestamp = now(input.now);
 		const batch = {
 			id,
 			checkpoint,
 			profiles,
+			purpose,
 			createdAt: timestamp,
 			status: profiles.length ? "queued" : "not-scheduled",
 		};
@@ -1504,7 +1538,11 @@ function groupClaim(next, group) {
 function findingNeedsTriage(store, finding) {
 	const report = store.reports[finding.reportId];
 	const batch = report ? store.batches[report.batchId] : undefined;
-	return !finding.dispositionId && !batch?.analysisMaterializedAt;
+	return (
+		!finding.dispositionId &&
+		(batch?.purpose ?? "verification") !== "analysis" &&
+		!batch?.analysisMaterializedAt
+	);
 }
 function remainingFindings(next, group) {
 	return group.findingIds.filter((id) =>
@@ -2256,6 +2294,417 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 	}
 	return reconciled;
 }
+const REVIEW_STATES = new Set([
+	"pending",
+	"in_review",
+	"proposal_ready",
+	"finalization_pending",
+	"finalized",
+	"deferred",
+	"rejected",
+	"superseded",
+	"revisit_pending",
+	"blocked",
+	"quarantined",
+]);
+const REVIEW_VERDICTS = new Set(["accepted", "rejected"]);
+
+function reviewEvent(next, groupId, type, timestamp, details = {}) {
+	const id = stableId("analysis-event", {
+		groupId,
+		type,
+		timestamp,
+		ordinal: Object.keys(next.analysisEvents).length,
+	});
+	next.analysisEvents[id] = { id, groupId, type, timestamp, ...details };
+}
+
+export function ingestAnalysisReview(store, input = {}) {
+	if (
+		!plainObject(input) ||
+		!nonempty(input.batchId) ||
+		!store.batches[input.batchId]
+	)
+		throw error("invalid", "Analysis review requires a known batch");
+	if (store.batches[input.batchId].purpose !== "analysis")
+		throw error("invalid", "Only Analyze batches may enter analysis review");
+	if (!Array.isArray(input.candidates) || input.candidates.length > 100)
+		throw error(
+			"invalid",
+			"Analysis review candidates must be a bounded array",
+		);
+	return edit(store, (next) => {
+		const timestamp = now(input.now);
+		const grouped = new Map();
+		for (const value of input.candidates) {
+			if (
+				!plainObject(value) ||
+				!REVIEW_VERDICTS.has(value.verdict) ||
+				![
+					value.title,
+					value.rationale,
+					value.evidence,
+					value.recommendation,
+					value.decisionKey,
+				].every((text) => nonempty(text) && text.length <= REPORT_MAX_TEXT)
+			)
+				throw error("invalid", "Malformed analysis review candidate");
+			const sourceFindingId = value.sourceFindingId;
+			const finding = next.findings[sourceFindingId];
+			if (!finding)
+				throw error("invalid", `Unknown source finding: ${sourceFindingId}`);
+			const sourceBatchId = next.reports[finding.reportId].batchId;
+			if (sourceBatchId !== input.batchId)
+				throw error("invalid", "Analysis candidate belongs to another batch");
+			const source = {
+				batchId: sourceBatchId,
+				findingId: sourceFindingId,
+				path: finding.path,
+				startLine: finding.startLine,
+				endLine: finding.endLine,
+			};
+			const contentDigest = digest({
+				verdict: value.verdict,
+				title: value.title.trim(),
+				rationale: value.rationale.trim(),
+				evidence: value.evidence.trim(),
+				recommendation: value.recommendation.trim(),
+				decisionKey: value.decisionKey.trim(),
+			});
+			const id = stableId("analysis-candidate", { source, contentDigest });
+			next.analysisCandidates[id] ??= {
+				id,
+				source,
+				verdict: value.verdict,
+				title: value.title.trim(),
+				rationale: value.rationale.trim(),
+				evidence: value.evidence.trim(),
+				recommendation: value.recommendation.trim(),
+				decisionKey: value.decisionKey.trim(),
+				contentDigest,
+				createdAt: timestamp,
+			};
+			const key = value.decisionKey.trim();
+			if (!grouped.has(key)) grouped.set(key, []);
+			grouped.get(key).push(id);
+		}
+		const created = [];
+		for (const [decisionKey, ids] of grouped) {
+			const candidateIds = [...new Set(ids)].sort();
+			const material = candidateIds
+				.map((id) => next.analysisCandidates[id].contentDigest)
+				.sort();
+			const terminalGroups = Object.values(next.analysisReviewGroups)
+				.filter(
+					(group) =>
+						group.decisionKey === decisionKey &&
+						["finalized", "rejected"].includes(group.state),
+				)
+				.sort((left, right) =>
+					`${right.updatedAt}\0${right.id}`.localeCompare(
+						`${left.updatedAt}\0${left.id}`,
+					),
+				);
+			const repeatedTerminal = terminalGroups.find((group) =>
+				same(
+					group.candidateIds
+						.map((id) => next.analysisCandidates[id].contentDigest)
+						.sort(),
+					material,
+				),
+			);
+			if (repeatedTerminal) {
+				repeatedTerminal.batchIds = [
+					...new Set([...repeatedTerminal.batchIds, input.batchId]),
+				].sort();
+				created.push(repeatedTerminal);
+				continue;
+			}
+			const terminalConflictId =
+				input.conflicts?.[decisionKey] ?? terminalGroups[0]?.id;
+			if (
+				terminalConflictId &&
+				!["finalized", "rejected"].includes(
+					next.analysisReviewGroups[terminalConflictId]?.state,
+				)
+			)
+				throw error(
+					"invalid",
+					`Invalid terminal conflict: ${terminalConflictId}`,
+				);
+			const id = stableId("analysis-review", {
+				repository: next.batches[input.batchId].checkpoint.repository,
+				namespace: "analysis-review/v1",
+				decisionKey,
+				candidateIds,
+				...(terminalConflictId ? { terminalConflictId } : {}),
+			});
+			if (next.analysisReviewGroups[id]) {
+				created.push(next.analysisReviewGroups[id]);
+				continue;
+			}
+			for (const predecessor of Object.values(next.analysisReviewGroups))
+				if (
+					predecessor.decisionKey === decisionKey &&
+					["pending", "deferred"].includes(predecessor.state)
+				) {
+					predecessor.state = "superseded";
+					predecessor.supersededBy = id;
+					predecessor.updatedAt = timestamp;
+					reviewEvent(next, predecessor.id, "superseded", timestamp, {
+						successorId: id,
+					});
+				}
+			const governingDecision = input.decisions?.[decisionKey];
+			if (governingDecision !== undefined && !nonempty(governingDecision))
+				throw error("invalid", `Invalid governing decision: ${decisionKey}`);
+			const group = {
+				id,
+				decisionKey,
+				governingDecision: governingDecision?.trim() || decisionKey,
+				candidateIds,
+				batchIds: [input.batchId],
+				state: terminalConflictId ? "revisit_pending" : "pending",
+				revision: 1,
+				...(terminalConflictId ? { terminalConflictId } : {}),
+				createdAt: timestamp,
+				updatedAt: timestamp,
+			};
+			next.analysisReviewGroups[id] = group;
+			reviewEvent(next, id, "ingested", timestamp);
+			created.push(group);
+		}
+		const batch = next.batches[input.batchId];
+		batch.analysisIngestionStatus = "complete";
+		batch.analysisReviewGroupIds = created.map((group) => group.id).sort();
+		return created;
+	});
+}
+
+export function claimAnalysisReview(store, input = {}) {
+	return edit(store, (next) => {
+		const group = next.analysisReviewGroups[input.groupId];
+		const timestamp = now(input.now);
+		if (
+			!group ||
+			!["pending", "revisit_pending", "in_review", "proposal_ready"].includes(
+				group.state,
+			)
+		)
+			throw error("stale", "Analysis review group is not claimable");
+		if (!nonempty(input.ownerSession))
+			throw error("invalid", "Review owner is required");
+		if (
+			input.leaseMs !== undefined &&
+			(!Number.isInteger(input.leaseMs) || input.leaseMs <= 0)
+		)
+			throw error("invalid", "Review lease duration must be positive");
+		if (
+			group.lease &&
+			Date.parse(group.lease.until) > Date.parse(timestamp) &&
+			group.lease.ownerSession !== input.ownerSession
+		)
+			throw error(
+				"locked",
+				"Analysis review group is claimed by another session",
+			);
+		const proposalReady = group.state === "proposal_ready";
+		group.state = proposalReady ? "proposal_ready" : "in_review";
+		group.lease = {
+			ownerSession: input.ownerSession,
+			until: new Date(
+				Date.parse(timestamp) + (input.leaseMs ?? 15 * 60_000),
+			).toISOString(),
+		};
+		group.revision += 1;
+		group.updatedAt = timestamp;
+		reviewEvent(next, group.id, "claimed", timestamp, {
+			ownerSession: input.ownerSession,
+		});
+		return group;
+	});
+}
+
+export function renewAnalysisReview(store, input = {}) {
+	return edit(store, (next) => {
+		const timestamp = now(input.now);
+		const group = next.analysisReviewGroups[input.groupId];
+		if (!group || !["in_review", "proposal_ready"].includes(group.state))
+			throw error("stale", "Analysis review group is not renewable");
+		if (group.lease?.ownerSession !== input.ownerSession)
+			throw error(
+				"locked",
+				"Analysis review lease is not owned by this session",
+			);
+		if (Date.parse(group.lease.until) <= Date.parse(timestamp))
+			throw error("locked", "Analysis review lease expired");
+		if (
+			input.leaseMs !== undefined &&
+			(!Number.isInteger(input.leaseMs) || input.leaseMs <= 0)
+		)
+			throw error("invalid", "Review lease duration must be positive");
+		group.lease.until = new Date(
+			Date.parse(timestamp) + (input.leaseMs ?? 15 * 60_000),
+		).toISOString();
+		group.updatedAt = timestamp;
+		reviewEvent(next, group.id, "lease-renewed", timestamp, {
+			ownerSession: input.ownerSession,
+		});
+		return group;
+	});
+}
+
+function editableReview(next, input, timestamp) {
+	const group = next.analysisReviewGroups[input.groupId];
+	if (!group || group.state !== "in_review")
+		throw error("stale", "Analysis review group is not in review");
+	if (group.revision !== input.revision)
+		throw error("stale", "Analysis review revision changed");
+	if (
+		group.lease?.ownerSession !== input.ownerSession ||
+		Date.parse(group.lease.until) <= Date.parse(timestamp)
+	)
+		throw error("locked", "Analysis review lease is missing or expired");
+	return group;
+}
+
+export function saveAnalysisReviewProposal(store, input = {}) {
+	return edit(store, (next) => {
+		const timestamp = now(input.now);
+		const group = editableReview(next, input, timestamp);
+		if (!plainObject(input.proposal) || !Array.isArray(input.proposal.tasks))
+			throw error("invalid", "Review proposal requires an exact task list");
+		const payload = canonical(input.proposal);
+		if (Buffer.byteLength(JSON.stringify(payload), "utf8") > REPORT_MAX_BYTES)
+			throw error("invalid", "Review proposal is too large");
+		group.proposal = payload;
+		group.proposalDigest = digest(payload);
+		group.state = "proposal_ready";
+		group.revision += 1;
+		group.updatedAt = timestamp;
+		reviewEvent(next, group.id, "proposal-saved", timestamp, {
+			proposalDigest: group.proposalDigest,
+		});
+		return group;
+	});
+}
+
+export function disposeAnalysisReview(store, input = {}) {
+	return edit(store, (next) => {
+		const timestamp = now(input.now);
+		const group = next.analysisReviewGroups[input.groupId];
+		if (
+			!group ||
+			group.state !== "proposal_ready" ||
+			group.revision !== input.revision
+		)
+			throw error("stale", "Analysis review proposal is not current");
+		if (
+			group.lease?.ownerSession !== input.ownerSession ||
+			Date.parse(group.lease.until) <= Date.parse(timestamp)
+		)
+			throw error("locked", "Analysis review lease is missing or expired");
+		if (
+			!["deferred", "rejected"].includes(input.disposition) ||
+			!nonempty(input.reason)
+		)
+			throw error("invalid", "Review disposition and rationale are required");
+		group.state = input.disposition;
+		group.humanResolution = input.reason.trim();
+		delete group.lease;
+		group.revision += 1;
+		group.updatedAt = timestamp;
+		reviewEvent(next, group.id, input.disposition, timestamp, {
+			reason: group.humanResolution,
+		});
+		return group;
+	});
+}
+
+export function analysisReviewProjection(store) {
+	validateVerifierStore(store);
+	const groups = Object.values(store.analysisReviewGroups)
+		.filter((group) =>
+			[
+				"pending",
+				"revisit_pending",
+				"in_review",
+				"proposal_ready",
+				"finalization_pending",
+				"blocked",
+			].includes(group.state),
+		)
+		.map((group) => ({
+			...structuredClone(group),
+			candidates: group.candidateIds.map((id) =>
+				structuredClone(store.analysisCandidates[id]),
+			),
+			allowedActions:
+				group.state === "in_review"
+					? ["save-proposal", "inspect"]
+					: group.state === "proposal_ready"
+						? ["finalize", "defer", "reject", "inspect"]
+						: group.state === "finalization_pending"
+							? ["reconcile", "inspect"]
+							: group.state === "blocked"
+								? ["inspect", "retry"]
+								: ["claim", "inspect"],
+		}));
+	const failures = Object.values(store.batches)
+		.filter(
+			(batch) =>
+				batch.purpose === "analysis" &&
+				batch.analysisIngestionStatus === "failed",
+		)
+		.map((batch) => ({
+			id: `analysis-ingestion-failed:${batch.id}`,
+			state: "ingestion_failed",
+			readOnly: true,
+			batchId: batch.id,
+			governingDecision: `Analysis ingestion failed: ${batch.id}`,
+			statusMessage:
+				batch.analysisIngestionFailure ??
+				"Inspect preserved synthesis and retry ingestion.",
+			candidates: [],
+			allowedActions: ["inspect", "retry"],
+			createdAt: batch.createdAt,
+		}));
+	const quarantines = Object.values(store.quarantines)
+		.filter(
+			(entry) =>
+				store.batches[store.jobs[entry.jobId]?.batchId]?.purpose === "analysis",
+		)
+		.map((entry) => ({
+			id: `analysis-quarantined:${entry.id}`,
+			state: "quarantined",
+			readOnly: true,
+			batchId: store.jobs[entry.jobId].batchId,
+			governingDecision: `Quarantined analysis evidence: ${entry.reason}`,
+			statusMessage:
+				"Inspect the preserved artifact and retry the analysis run.",
+			candidates: [],
+			allowedActions: ["inspect", "retry"],
+			createdAt: entry.createdAt,
+		}));
+	const migrations = Object.values(store.analysisLegacyMigrations)
+		.filter((entry) => entry.status === "blocked")
+		.map((entry) => ({
+			id: `analysis-migration-blocked:${entry.id}`,
+			state: "migration_blocked",
+			readOnly: true,
+			workItemId: entry.workItemId,
+			governingDecision: `Legacy analysis task needs human resolution: ${entry.workItemId}`,
+			statusMessage:
+				"Inspect the in-progress legacy task and resolve or close it before retrying Resume.",
+			candidates: [],
+			allowedActions: ["inspect", "reload"],
+			createdAt: entry.createdAt,
+		}));
+	return [...groups, ...failures, ...quarantines, ...migrations].sort(
+		(left, right) => left.createdAt.localeCompare(right.createdAt),
+	);
+}
+
 export function verifierStatus(store, configured = undefined) {
 	if (!store) return configured?.length ? "queued/running" : "not-configured";
 	validateVerifierStore(store);
@@ -2417,12 +2866,75 @@ export function validateVerifierStore(store, file = "verifier store") {
 		"claims",
 		"dispositions",
 		"fixes",
+		"analysisCandidates",
+		"analysisReviewGroups",
+		"analysisEvents",
+		"analysisFinalizations",
+		"analysisLegacyMigrations",
 	])
 		objectMap(store[field], field, file);
+	for (const [id, candidate] of Object.entries(store.analysisCandidates)) {
+		if (
+			!plainObject(candidate) ||
+			candidate.id !== id ||
+			!REVIEW_VERDICTS.has(candidate.verdict) ||
+			!nonempty(candidate.decisionKey) ||
+			!plainObject(candidate.source) ||
+			!store.batches[candidate.source.batchId] ||
+			!store.findings[candidate.source.findingId] ||
+			!nonempty(candidate.contentDigest)
+		)
+			throw error("corrupt", `Invalid analysis candidate ${id} in ${file}`);
+	}
+	for (const [id, group] of Object.entries(store.analysisReviewGroups)) {
+		if (
+			!plainObject(group) ||
+			group.id !== id ||
+			!REVIEW_STATES.has(group.state) ||
+			!nonempty(group.decisionKey) ||
+			!Number.isInteger(group.revision) ||
+			group.revision < 1 ||
+			!Array.isArray(group.candidateIds) ||
+			group.candidateIds.some(
+				(candidateId) => !store.analysisCandidates[candidateId],
+			) ||
+			(group.lease !== undefined &&
+				(!plainObject(group.lease) ||
+					!nonempty(group.lease.ownerSession) ||
+					Number.isNaN(Date.parse(group.lease.until))))
+		)
+			throw error("corrupt", `Invalid analysis review group ${id} in ${file}`);
+	}
+	for (const [id, event] of Object.entries(store.analysisEvents))
+		if (
+			!plainObject(event) ||
+			event.id !== id ||
+			!store.analysisReviewGroups[event.groupId] ||
+			!nonempty(event.type) ||
+			!nonempty(event.timestamp)
+		)
+			throw error("corrupt", `Invalid analysis event ${id} in ${file}`);
+	for (const [id, finalization] of Object.entries(store.analysisFinalizations))
+		if (!plainObject(finalization) || finalization.id !== id)
+			throw error("corrupt", `Invalid analysis finalization ${id} in ${file}`);
+	for (const [id, migration] of Object.entries(store.analysisLegacyMigrations))
+		if (
+			!plainObject(migration) ||
+			migration.id !== id ||
+			migration.workItemId !== id ||
+			!plainObject(migration.snapshot) ||
+			!nonempty(migration.sourceDigest) ||
+			!["pending", "completed", "blocked"].includes(migration.status)
+		)
+			throw error(
+				"corrupt",
+				`Invalid legacy analysis migration ${id} in ${file}`,
+			);
 	for (const [id, batch] of Object.entries(store.batches)) {
 		if (
 			!plainObject(batch) ||
 			batch.id !== id ||
+			!["verification", "analysis"].includes(batch.purpose ?? "verification") ||
 			!["queued", "not-scheduled", "terminal"].includes(batch.status) ||
 			(batch.presentationStatus !== undefined &&
 				(!["pending", "queued"].includes(batch.presentationStatus) ||

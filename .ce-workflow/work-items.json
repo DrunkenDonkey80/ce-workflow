@@ -3328,6 +3328,46 @@
       "type": "bug",
       "updatedAt": "2026-07-28T00:13:39.216Z"
     },
+    "work-2.55": {
+      "acceptance": "",
+      "createdAt": "2026-07-31T16:21:14.481Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: F7 Medium task had already launched run 3e6c99d0-a850-478b-a2ed-49ca2e7bd51f, but the work-goal continuation omitted that identity, so the goal agent launched f75baa16/9c24c9cb for the same work item and both edited one checkout. Expected: continuation state names the authoritative active run or a coded no-launch lease and duplicate launch admission fails closed. Impact: sole-writer violation, duplicate model cost, and manual reconciliation.",
+      "evidence": [],
+      "id": "work-2.55",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "Evidence: C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/3e6c99d0-a850-478b-a2ed-49ca2e7bd51f/events.jsonl; C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/9c24c9cb/events.jsonl. work_report_improvement was attempted first but rejected the configured source as not the ce-workflow Git root."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Prevent duplicate work-worker launch after goal handoff",
+      "type": "bug",
+      "updatedAt": "2026-07-31T16:21:14.481Z"
+    },
+    "work-2.56": {
+      "acceptance": "",
+      "createdAt": "2026-07-31T16:21:14.556Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task and package verification selected Git Bash with -lc because MSYSTEM was set; the login profile invoked missing `hypa`, so verification failed before the actual command. Explicit WORK_ORCH_VERIFY_SHELL=C:/Program Files/Git/usr/bin/sh.exe passed. Expected: coded verification must avoid unrelated login-profile commands or fail over to a clean available shell while preserving POSIX env-assignment syntax. Impact: valid work cannot reach coded finish and test-work-optimization-helpers fails for environment-only reasons.",
+      "evidence": [],
+      "id": "work-2.56",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "Evidence: .ce-workflow/work-items.json work-3.38 wo:verify-check FAIL and C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/3e6c99d0-a850-478b-a2ed-49ca2e7bd51f/output-0.log."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Make verification shell independent of broken login profiles",
+      "type": "bug",
+      "updatedAt": "2026-07-31T16:21:14.556Z"
+    },
     "work-2.6": {
       "createdAt": "2026-07-20T04:59:06.183Z",
       "dependencies": [
@@ -3498,10 +3538,10 @@
         "wo:roadmap-complete-final\nAll 35 direct children are closed. Final slice work-3.37 replaced automatic Worker-based stats with owner-approved explicit s-key stats, passed focused and package verification, committed as 97f295b, and pushed. Final ready-child audit is empty.",
         "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
-      "status": "closed",
+      "status": "open",
       "title": "Misc",
       "type": "epic",
-      "updatedAt": "2026-07-28T07:42:03.505Z"
+      "updatedAt": "2026-07-31T15:24:48.572Z"
     },
     "work-3.1": {
       "createdAt": "2026-07-25T07:42:39.536Z",
@@ -4394,6 +4434,39 @@
       "type": "task",
       "updatedAt": "2026-07-28T07:38:24.652Z"
     },
+    "work-3.38": {
+      "createdAt": "2026-07-31T15:24:48.591Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Implement human-gated analysis review plan"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-3.38",
+      "labels": [],
+      "notes": [
+        "created by /work-med\nwo:implementation\nwo:execution-agent\ntask: execute this plan C:\\SOFT\\git\\ce-workflow\\docs\\plans\\2026-07-31-001-feat-human-gated-analysis-review-plan.md",
+        "wo:verify-check FAIL\nCommand: node scripts/verify-package.mjs --quiet\n output: [\r\n    null,\r\n    '{\\n' +\r\n      '  \"status\": \"FAIL\",\\n' +\r\n      '  \"error\": \"verification failed: WORK_ORCH_TEST_TOKEN=checked node -e \\\\\"process.stdout.write(process.env.WORK_ORCH_TEST_TOKEN)\\\\\"\"\\n' +\r\n      '}\\n',\r\n    ''\r\n  ],\r\n  pid: 24752,\r\n  stdout: '{\\n' +\r\n    '  \"status\": \"FAIL\",\\n' +\r\n    '  \"error\": \"verification failed: WORK_ORCH_TEST_TOKEN=checked node -e \\\\\"process.stdout.write(process.env.WORK_ORCH_TEST_TOKEN)\\\\\"\"\\n' +\r\n    '}\\n',\r\n  stderr: ''\r\n}\r\n\r\nNode.js v24.14.0\r\n\n",
+        "wo:review-scope [\"README.md\",\"extensions/background-verifiers.js\",\"extensions/work-models.js\",\"scripts/test-background-verifiers.mjs\",\"scripts/test-work-background-verifier-flow.mjs\",\"scripts/test-work-analysis-review.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/background-verifiers.js:2578 - include or reconcile finalization_pending groups so a crash between outbox save and task creation is recoverable instead of dropping the group from Review analysis\",\"extensions/work-models.js:10786 - add the coded legacy quarantine/migration for pre-existing open|blocked|planned wo:analysis tasks (snapshot first, block on in_progress); the old superseding logic was deleted with no replacement\",\"scripts/test-work-analysis-review.mjs:139 - add finalization coverage: finalize creates exactly the proposal tasks once, retry is idempotent, stale revision/proposalDigest is rejected\",\"extensions/work-models.js:18189 - require a nonempty proposalDigest in finalizeAnalysisReview; undefined===undefined passes the stale check then throws on group.proposal.tasks\",\"extensions/work-models.js:10712 - remove dead parseVerifierAnalysisItems and its obsolete assertions in scripts/test-work-background-verifier-flow.mjs:21,46\"]}",
+        "Fixed all five independent-review findings. extensions/background-verifiers.js now projects finalization_pending groups and persists legacy migration ledgers. extensions/work-models.js reconciles pending finalizations idempotently, validates nonempty/current proposal digests, snapshot-first quarantines eligible legacy wo:analysis tasks while blocking in_progress tasks, and removes the dead Markdown parser. scripts/test-work-analysis-review.mjs covers exact-once finalization/retry, stale revision/digest/missing digest, finalization recovery, and legacy migration; scripts/test-work-background-verifier-flow.mjs drops obsolete parser assertions. Verification PASS: node scripts/test-work-analysis-review.mjs; node scripts/test-work-background-verifier-flow.mjs; node scripts/test-background-verifiers.mjs; node scripts/test-work-resume.mjs; node scripts/test-work-store.mjs; WORK_ORCH_VERIFY_SHELL=C:/Program Files/Git/usr/bin/sh.exe node scripts/verify-package.mjs --quiet (invoked via process.env/import to preserve the spaced path). git diff --check PASS. Remaining findings: none.\nwo:fix PASS",
+        "wo:review PASS - all 5 prior findings fixed and verified; test-work-analysis-review.mjs, test-work-background-verifier-flow.mjs, test-background-verifiers.mjs pass; scoped diff --check clean, no staged files",
+        "Final residual plan-conformance batch: persisted proposal_ready; deterministic automatic terminal revisits; Review-analysis precedence now blocks every Resume target including blocked in-progress legacy migrations; finalization now rejects stale source checkpoints before outbox creation and blocks non-exact ordinal collisions; candidate context is fully displayed before disposition; ingestion/quarantine/migration failures are read-only inbox entries. Files changed in this batch: extensions/background-verifiers.js, extensions/work-models.js, scripts/test-background-verifiers.mjs, scripts/test-work-analysis-review.mjs, scripts/test-work-resume.mjs. Verification PASS: node scripts/test-work-analysis-review.mjs; node scripts/test-background-verifiers.mjs; node scripts/test-work-resume.mjs; node scripts/test-work-background-verifier-flow.mjs; node scripts/test-work-dialogs.mjs; node scripts/test-work-store.mjs; WORK_ORCH_VERIFY_SHELL set via process.env then node scripts/verify-package.mjs --quiet. git diff --check PASS; git diff --cached --name-only empty.\nwo:fix PASS\nwo:residual-fix PASS {\"dispositions\":[{\"finding\":\"Persist the explicit `proposal_ready` lifecycle state: saving a valid proposal transitions `in_review -> proposal_ready`; finalization/defer/reject accept only the current leased `proposal_ready`; projections and validation expose it consistently.\",\"fix\":\"Added proposal_ready persistence, projection, validation, and leased terminal guards.\",\"evidence\":\"test-work-analysis-review and test-background-verifiers pass.\"},{\"finding\":\"Make terminal contradictions reachable without trusting the synthesis model to know private group IDs: when a later group with the same decision key has materially different candidate content after a finalized/rejected predecessor, create `revisit_pending` and link the terminal predecessor deterministically; same reruns remain idempotent.\",\"fix\":\"Derived terminal predecessor links from decision key and candidate content digests; identical terminal content is reused.\",\"evidence\":\"test-background-verifiers automatic revisit and idempotence assertions pass.\"},{\"finding\":\"Enforce Review-analysis precedence for every Resume target, not only targetless Resume, and make a legacy `wo:analysis` item in `in_progress` a durable human-resolution blocker instead of merely writing a blocked migration ledger while Resume continues.\",\"fix\":\"Moved review projection ahead of all target resolution and projected blocked legacy ledgers as durable read-only blockers.\",\"evidence\":\"test-work-resume explicit-target and in-progress legacy assertions pass.\"},{\"finding\":\"Before writing the finalization outbox, re-check every source finding against its captured checkpoint with the existing stale-evidence helper; stale evidence must create no tasks/outbox. During retry/recovery, reuse an existing ordinal task only if its exact title/type/parent/description/provenance labels/notes/dependency chain matches the stored proposal; any collision blocks rather than completing the ledger.\",\"fix\":\"Added pre-outbox source checkpoint validation and exact recovered-task payload matching with blocked ledgers on collision.\",\"evidence\":\"test-work-analysis-review stale-evidence and exact-collision assertions pass.\"},{\"finding\":\"In Review analysis, show each candidate's accepted/rejected verdict, source path/range, rationale, evidence, and recommendation before disposition. Keep terminal actions TUI-only and preserve Back/cancel as non-terminal.\",\"fix\":\"Expanded disposition dialog descriptions with every advisory field while retaining interactive-only capability issuance and cancel returns.\",\"evidence\":\"test-work-dialogs and package verification pass.\"},{\"finding\":\"Make failed analysis ingestion, quarantined analysis evidence, and blocked legacy migration visible as read-only Review-analysis inbox/status entries with inspect/retry guidance; they must never expose Finalize/Defer/Reject.\",\"fix\":\"Added three synthetic read-only projection entry types with inspect/retry/reload-only actions and handler guidance.\",\"evidence\":\"test-work-analysis-review read-only action assertions pass.\"}]}\n",
+        "Final critical residual corrections: proposal-ready Defer/Reject now use their own current leased guard; proposal-ready groups can be reclaimed after expiry without losing the proposal and the TUI reacquires a current-session lease before terminal actions; recovery revalidates checkpoint evidence before creating Misc/tasks and blocks stale ledgers/groups; unexpected finalization ordinals now block recovery. Files changed: extensions/background-verifiers.js, extensions/work-models.js, scripts/test-work-analysis-review.mjs. Verification PASS: node scripts/test-work-analysis-review.mjs; node scripts/test-work-resume.mjs; node scripts/test-background-verifiers.mjs; WORK_ORCH_VERIFY_SHELL set via process.env then node scripts/verify-package.mjs --quiet; git diff --check PASS; no staged files.\nwo:fix PASS\nwo:residual-fix PASS {\"dispositions\":[{\"finding\":\"`disposeAnalysisReview` currently calls `editableReview`, which only accepts `in_review`, so Defer/Reject always fail immediately after `saveAnalysisReviewProposal` transitions to `proposal_ready`. Split/adjust the guard so save requires `in_review`, while terminal Defer/Reject require the current leased `proposal_ready`. Add a focused regression test.\",\"fix\":\"Kept save on the in_review guard and enforced a separate current leased proposal_ready guard for terminal dispositions.\",\"evidence\":\"test-work-analysis-review proposal-ready defer regression passes.\"},{\"finding\":\"Make `proposal_ready` crash/restart-safe: permit a current/expired-lease TUI claimant to reclaim or renew that state without discarding the saved proposal, and ensure the Review handler owns a valid current-session lease before Finalize/Defer/Reject. Add expired-lease/new-session coverage.\",\"fix\":\"Claim and renewal accept proposal_ready while preserving proposal state; the Review handler reclaims it before terminal selection.\",\"evidence\":\"test-work-analysis-review expired-lease new-session reclaim assertions pass.\"},{\"finding\":\"`reconcileAnalysisFinalizations` must re-check source evidence against the captured checkpoint before creating tasks during recovery; stale recovery leaves the ledger/group blocked and creates no tasks. Add coverage.\",\"fix\":\"Moved source-evidence validation into every completion/recovery attempt before Misc or task mutation and block both ledger and group on failure.\",\"evidence\":\"test-work-analysis-review stale recovery assertion confirms blocked ledger/group and zero tasks.\"},{\"finding\":\"Exact recovery collision checks must also reject extra unexpected `wo:analysis-ordinal:*` tasks for the same finalization, not just duplicates/mismatched expected ordinals. Add coverage.\",\"fix\":\"Compared all discovered ordinal labels against the proposal's expected ordinal set before adoption or creation.\",\"evidence\":\"test-work-analysis-review unexpected ordinal collision assertion passes.\"}]}\n",
+        "wo:review-scope [\"README.md\",\"extensions/background-verifiers.js\",\"extensions/work-models.js\",\"scripts/test-background-verifiers.mjs\",\"scripts/test-work-background-verifier-flow.mjs\",\"scripts/test-work-resume.mjs\",\"scripts/test-work-analysis-review.mjs\"]",
+        "wo:verify-check PASS\nCommand: node scripts/verify-package.mjs --quiet\nOutput: ok - package checks passed"
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "execute this plan C:\\SOFT\\git\\ce-workflow\\docs\\plans\\2026-07-31-001-feat-human-gated-analysis-review-plan.md",
+      "type": "task",
+      "updatedAt": "2026-07-31T16:26:07.310Z"
+    },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
       "createdAt": "2026-07-25T08:05:28.786Z",
@@ -4824,7 +4897,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-29T14:15:43.191Z"
+    "updatedAt": "2026-07-31T16:26:07.310Z"
   },
   "schemaVersion": 1
 }

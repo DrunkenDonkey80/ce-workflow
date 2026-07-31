@@ -16,18 +16,24 @@ import {
 	VerifierStoreError,
 	addFinding,
 	addGroup,
+	analysisReviewProjection,
+	claimAnalysisReview,
 	claimCompletedGroups,
 	claimGroup,
 	completeAcceptedFix,
 	createBatch,
 	initVerifierStore,
+	disposeAnalysisReview,
+	ingestAnalysisReview,
 	loadVerifierStore,
 	mutateVerifierStore,
 	normalizeEffectiveProfiles,
 	recordDisposition,
 	recordOperationResult,
 	recordTriageDisposition,
+	renewAnalysisReview,
 	reopenGroup,
+	saveAnalysisReviewProposal,
 	saveVerifierStore,
 	verifierStorePath,
 	captureVerifierCheckpoint,
@@ -286,6 +292,296 @@ try {
 		verifierStorePath(cwd),
 		/\.ce-workflow[\\/]work-runs[\\/]verifiers[\\/]state\.json$/,
 	);
+
+	// Analysis candidates remain advisory until a revision-fenced human review.
+	const reviewCwd = repo();
+	initVerifierStore(reviewCwd, { now: "2026-07-21T00:00:00.000Z" });
+	const reviewProfile = [
+		{
+			model: "openai/gpt-5",
+			operations: ["correctness"],
+			thinking: "high",
+		},
+	];
+	const createAnalysisInput = (suffix, definitions) => {
+		const reviewCheckpoint = {
+			...checkpoint,
+			base: suffix.repeat(40),
+			snapshot: (Number.parseInt(suffix, 16) + 1).toString(16).repeat(40),
+			patchHash: suffix.repeat(64),
+		};
+		const reviewBatch = mutateVerifierStore(reviewCwd, (state) =>
+			createBatch(state, {
+				checkpoint: reviewCheckpoint,
+				profiles: reviewProfile,
+				purpose: "analysis",
+				...options,
+			}),
+		);
+		const reviewJob = Object.values(loadVerifierStore(reviewCwd).jobs).find(
+			(job) => job.batchId === reviewBatch.id,
+		);
+		const reviewReport = mutateVerifierStore(reviewCwd, (state) =>
+			recordOperationResult(state, {
+				jobId: reviewJob.id,
+				operation: "correctness",
+				outcome: "findings",
+			}),
+		);
+		const candidates = definitions.map((definition, index) => {
+			const source = mutateVerifierStore(reviewCwd, (state) =>
+				addFinding(state, {
+					reportId: reviewReport.id,
+					operation: "correctness",
+					model: reviewJob.model,
+					checkpoint: reviewBatch.checkpoint,
+					path: "extensions/work-models.js",
+					startLine: index + 1,
+					endLine: index + 1,
+					category: "correctness",
+					severity: "medium",
+					rationale: `${definition.title} source rationale`,
+					evidence: `${definition.title} source evidence`,
+					suggestedAction: `${definition.title} source recommendation`,
+				}),
+			);
+			return {
+				...definition,
+				sourceFindingId: source.id,
+				rationale: `${definition.title} rationale`,
+				evidence: `${definition.title} evidence`,
+				recommendation: `${definition.title} recommendation`,
+			};
+		});
+		return { batch: reviewBatch, candidates };
+	};
+	const firstAnalysis = createAnalysisInput("1", [
+		{
+			title: "Private identity key",
+			verdict: "accepted",
+			decisionKey: "tag-identity",
+		},
+		{
+			title: "Public equality",
+			verdict: "rejected",
+			decisionKey: "tag-identity",
+		},
+		{
+			title: "Rejected standalone",
+			verdict: "rejected",
+			decisionKey: "standalone",
+		},
+	]);
+	const firstGroups = mutateVerifierStore(reviewCwd, (state) =>
+		ingestAnalysisReview(state, {
+			batchId: firstAnalysis.batch.id,
+			candidates: firstAnalysis.candidates,
+			decisions: { "tag-identity": "What defines tag identity?" },
+			now: "2026-07-21T00:01:00.000Z",
+		}),
+	);
+	assert.equal(firstGroups.length, 2);
+	const mixed = firstGroups.find(
+		(group) => group.decisionKey === "tag-identity",
+	);
+	const standalone = firstGroups.find(
+		(group) => group.decisionKey === "standalone",
+	);
+	assert.deepEqual(
+		analysisReviewProjection(loadVerifierStore(reviewCwd))
+			.find((group) => group.id === mixed.id)
+			.candidates.map((candidate) => candidate.verdict)
+			.sort(),
+		["accepted", "rejected"],
+	);
+	assert.equal(
+		standalone.candidateIds.length,
+		1,
+		"rejected-only review stays visible",
+	);
+	const originalRevision = mixed.revision;
+	const duplicateGroups = mutateVerifierStore(reviewCwd, (state) =>
+		ingestAnalysisReview(state, {
+			batchId: firstAnalysis.batch.id,
+			candidates: firstAnalysis.candidates,
+			decisions: { "tag-identity": "What defines tag identity?" },
+		}),
+	);
+	assert.deepEqual(
+		duplicateGroups.map((group) => group.id).sort(),
+		firstGroups.map((group) => group.id).sort(),
+	);
+	assert.equal(
+		loadVerifierStore(reviewCwd).analysisReviewGroups[mixed.id].revision,
+		originalRevision,
+		"byte-equivalent ingestion is a no-op",
+	);
+	const claimed = mutateVerifierStore(reviewCwd, (state) =>
+		claimAnalysisReview(state, {
+			groupId: mixed.id,
+			ownerSession: "reviewer-a",
+			now: "2026-07-21T00:02:00.000Z",
+			leaseMs: 60_000,
+		}),
+	);
+	throwsCategory(
+		() =>
+			mutateVerifierStore(reviewCwd, (state) =>
+				claimAnalysisReview(state, {
+					groupId: mixed.id,
+					ownerSession: "reviewer-b",
+					now: "2026-07-21T00:02:30.000Z",
+				}),
+			),
+		"locked",
+	);
+	const renewed = mutateVerifierStore(reviewCwd, (state) =>
+		renewAnalysisReview(state, {
+			groupId: mixed.id,
+			ownerSession: "reviewer-a",
+			now: "2026-07-21T00:02:30.000Z",
+		}),
+	);
+	assert.equal(
+		renewed.revision,
+		claimed.revision,
+		"lease renewal preserves revision",
+	);
+	throwsCategory(
+		() =>
+			mutateVerifierStore(reviewCwd, (state) =>
+				saveAnalysisReviewProposal(state, {
+					groupId: mixed.id,
+					ownerSession: "reviewer-a",
+					revision: claimed.revision - 1,
+					proposal: { tasks: [] },
+					now: "2026-07-21T00:03:00.000Z",
+				}),
+			),
+		"stale",
+	);
+	const proposed = mutateVerifierStore(reviewCwd, (state) =>
+		saveAnalysisReviewProposal(state, {
+			groupId: mixed.id,
+			ownerSession: "reviewer-a",
+			revision: renewed.revision,
+			proposal: {
+				decision: "Use a private key",
+				tasks: [{ title: "Deduplicate tags" }],
+			},
+			now: "2026-07-21T00:03:00.000Z",
+		}),
+	);
+	assert.ok(proposed.proposalDigest);
+	const deferredClaim = mutateVerifierStore(reviewCwd, (state) =>
+		claimAnalysisReview(state, {
+			groupId: standalone.id,
+			ownerSession: "reviewer-a",
+			now: "2026-07-21T00:02:00.000Z",
+		}),
+	);
+	const deferredProposal = mutateVerifierStore(reviewCwd, (state) =>
+		saveAnalysisReviewProposal(state, {
+			groupId: standalone.id,
+			ownerSession: "reviewer-a",
+			revision: deferredClaim.revision,
+			proposal: { resolution: "Wait for API policy", tasks: [] },
+			now: "2026-07-21T00:02:30.000Z",
+		}),
+	);
+	assert.equal(deferredProposal.state, "proposal_ready");
+	mutateVerifierStore(reviewCwd, (state) =>
+		disposeAnalysisReview(state, {
+			groupId: standalone.id,
+			ownerSession: "reviewer-a",
+			revision: deferredProposal.revision,
+			disposition: "deferred",
+			reason: "Wait for API policy",
+			now: "2026-07-21T00:03:00.000Z",
+		}),
+	);
+	mutateVerifierStore(reviewCwd, (state) => {
+		const terminal = state.analysisReviewGroups[mixed.id];
+		terminal.state = "finalized";
+		terminal.humanResolution = "Use a private key";
+		delete terminal.lease;
+		terminal.revision += 1;
+	});
+	const laterAnalysis = createAnalysisInput("3", [
+		{
+			title: "New private identity evidence",
+			verdict: "accepted",
+			decisionKey: "tag-identity",
+		},
+		{
+			title: "Refreshed standalone",
+			verdict: "rejected",
+			decisionKey: "standalone",
+		},
+	]);
+	const laterGroups = mutateVerifierStore(reviewCwd, (state) =>
+		ingestAnalysisReview(state, {
+			batchId: laterAnalysis.batch.id,
+			candidates: laterAnalysis.candidates,
+			now: "2026-07-21T00:04:00.000Z",
+		}),
+	);
+	const finalReviewStore = loadVerifierStore(reviewCwd);
+	assert.equal(
+		finalReviewStore.analysisReviewGroups[mixed.id].state,
+		"finalized",
+	);
+	assert.equal(
+		finalReviewStore.analysisReviewGroups[standalone.id].state,
+		"superseded",
+	);
+	assert.equal(
+		laterGroups.find((group) => group.decisionKey === "tag-identity").state,
+		"revisit_pending",
+	);
+	assert.equal(
+		laterGroups.find((group) => group.decisionKey === "tag-identity")
+			.terminalConflictId,
+		mixed.id,
+	);
+	throwsCategory(
+		() =>
+			mutateVerifierStore(reviewCwd, (state) =>
+				disposeAnalysisReview(state, {
+					groupId: mixed.id,
+					ownerSession: "reviewer-a",
+					revision: proposed.revision,
+					disposition: "rejected",
+					reason: "illegal terminal rewrite",
+				}),
+			),
+		"stale",
+	);
+	const legacyReviewCwd = repo();
+	const legacyReviewStore = initVerifierStore(legacyReviewCwd, {
+		now: "2026-07-21T00:00:00.000Z",
+	});
+	legacyReviewStore.batches.legacy = {
+		id: "legacy",
+		checkpoint,
+		profiles: [],
+		createdAt: "2026-07-21T00:00:00.000Z",
+		status: "not-scheduled",
+	};
+	for (const field of [
+		"analysisCandidates",
+		"analysisReviewGroups",
+		"analysisEvents",
+		"analysisFinalizations",
+	])
+		delete legacyReviewStore[field];
+	writeFileSync(
+		verifierStorePath(legacyReviewCwd),
+		`${JSON.stringify(legacyReviewStore, null, 2)}\n`,
+	);
+	const upgradedReviewStore = loadVerifierStore(legacyReviewCwd);
+	assert.equal(upgradedReviewStore.batches.legacy.id, "legacy");
+	assert.deepEqual(upgradedReviewStore.analysisReviewGroups, {});
 
 	// A crash after the candidate write leaves the prior validated snapshot usable.
 	const recoveryCwd = repo();

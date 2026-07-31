@@ -54,8 +54,13 @@ import {
 } from "./work-initiatives.js";
 import {
 	captureVerifierCheckpoint,
+	analysisReviewProjection,
+	claimAnalysisReview,
 	claimCompletedGroups,
 	completeAcceptedFix,
+	disposeAnalysisReview,
+	ingestAnalysisReview,
+	saveAnalysisReviewProposal,
 	launchQueuedVerifierJobs,
 	loadVerifierStore,
 	mutateVerifierStore,
@@ -10687,6 +10692,9 @@ function reconcileBackgroundVerifierRuns(cwd, pi) {
 				: "not-configured",
 		};
 	}
+	reconcileLegacyAnalysisTasks(cwd);
+	reconcileAnalysisFinalizations(cwd);
+	store = loadVerifierStore(cwd);
 	for (const event of verifierTelemetryEvents(store))
 		recordWorkTelemetry(cwd, event);
 	if (pi && !workPerformanceSettings(cwd).parallelBackgroundVerifiers)
@@ -10704,142 +10712,112 @@ function verifierAnalysisReportPath(batchIds) {
 	return join(dir, `${safeHistoryPathPart(batchIds.join("-"))}.md`);
 }
 
-export function parseVerifierAnalysisItems(markdown) {
-	const heading = /^##\s+Actionable items\s*$/im.exec(markdown);
-	if (!heading) return null;
-	const tail = markdown.slice(heading.index + heading[0].length);
-	const nextSection = /^##\s+/m.exec(tail);
-	const section = nextSection ? tail.slice(0, nextSection.index) : tail;
-	const headings = [...section.matchAll(/^###\s+(\d+)\.\s+(.+?)\s*$/gm)];
-	if (!headings.length)
-		return /^\s*(?:none|no actionable findings)\.?\s*$/i.test(section)
-			? []
-			: null;
-	const items = headings.map((match, index) => ({
-		number: Number(match[1]),
-		title: match[2].trim(),
-		description: section
-			.slice(
-				match.index + match[0].length,
-				headings[index + 1]?.index ?? section.length,
-			)
-			.trim(),
-	}));
-	const requiredFields = [
-		"Priority",
-		"Source",
-		"Root cause",
-		"Evidence",
-		"Recommendation",
-	];
-	if (
-		items.some(
-			(item, index) =>
-				item.number !== index + 1 ||
-				!item.title ||
-				requiredFields.some(
-					(field) =>
-						!new RegExp(`\\*\\*${field}:\\*\\*`, "i").test(
-							item.description,
-						),
-				),
-		)
-	)
-		return null;
-	return items.map(({ title, description }) => ({ title, description }));
-}
-
 function analysisBatchLabel(batchId) {
 	return `wo:analysis-batch:${batchId}`;
+}
+
+function cleanAnalysisText(value) {
+	return String(value ?? "").replace(
+		/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,
+		"",
+	);
+}
+
+function parseAnalysisReviewPayload(text) {
+	if (Buffer.byteLength(text, "utf8") > 1024 * 1024) return null;
+	let payload;
+	try {
+		payload = JSON.parse(text);
+	} catch {
+		return null;
+	}
+	if (!payload || !Array.isArray(payload.candidates)) return null;
+	return payload;
+}
+
+function renderAnalysisReviewReport(payload, groups) {
+	const lines = [
+		"# Background analysis",
+		"",
+		"## Summary",
+		"",
+		`${groups.length} decision group${groups.length === 1 ? "" : "s"} await human review. No executable work was created.`,
+		"",
+		"## Review groups",
+	];
+	for (const group of groups) {
+		lines.push("", `### ${cleanAnalysisText(group.governingDecision)}`);
+		for (const candidate of payload.candidates.filter(
+			(value) => value.decisionKey === group.decisionKey,
+		))
+			lines.push(
+				`- **${candidate.verdict}:** ${cleanAnalysisText(candidate.title)} — ${cleanAnalysisText(candidate.recommendation)}`,
+			);
+	}
+	return `${lines.join("\n")}\n`;
 }
 
 export function materializeVerifierAnalysis(
 	cwd,
 	{ batchIds, markdown, reportPath },
 ) {
-	const actionItems = parseVerifierAnalysisItems(markdown);
-	if (actionItems === null) return { recognized: false, count: 0 };
+	const payload = parseAnalysisReviewPayload(markdown);
+	if (!payload) return { recognized: false, count: 0 };
 	const verifierStore = loadVerifierStore(cwd);
 	const latestBatch = batchIds
 		.map((id) => verifierStore.batches[id])
-		.filter(Boolean)
+		.filter((batch) => batch?.purpose === "analysis")
 		.sort((left, right) => left.createdAt.localeCompare(right.createdAt))
 		.at(-1);
 	if (!latestBatch) return { recognized: false, count: 0 };
-	const batchLabel = analysisBatchLabel(latestBatch.id);
-	let misc;
-	if (actionItems.length) misc = ensureMiscRoadmap(cwd);
-	else
-		try {
-			misc = miscRoadmap(cwd);
-		} catch (cause) {
-			if (!(cause instanceof WorkStoreError) || cause.category !== "missing")
-				throw cause;
-		}
-	let tasks = [];
-	if (misc)
-		tasks = mutateStore(cwd, (store) => {
-			const existing = Object.values(store.items).filter(
-				(item) =>
-					item.parentId === misc.id && item.labels?.includes(batchLabel),
-			);
-			if (actionItems.length && existing.length) return existing;
-			for (const item of Object.values(store.items))
-				if (
-					item.status === "open" &&
-					item.labels?.includes("wo:analysis") &&
-					(!item.labels.includes(batchLabel) || !actionItems.length)
-				)
-					updateWorkItem(store, item.id, {
-						status: "closed",
-						labels: [...new Set([...item.labels, "wo:analysis-superseded"])],
-						notes: [
-							...(item.notes ?? []),
-							`Superseded by Analyze batch ${latestBatch.id}.`,
-						],
-					});
-			const created = [];
-			for (const item of actionItems)
-				created.push(
-					createWorkItem(store, {
-						title: compactWorkItemTitle(item.title),
-						type: "task",
-						parentId: misc.id,
-						description: item.description,
-						labels: ["wo:analysis", "wo:debug", batchLabel],
-						notes: [`Synthesized by Analyze from file:${reportPath}`],
-						dependencies: created.length ? [created.at(-1).id] : [],
-					}),
-				);
-			return created;
+	let groups;
+	try {
+		groups = mutateVerifierStore(cwd, (store) =>
+			ingestAnalysisReview(store, {
+				batchId: latestBatch.id,
+				candidates: payload.candidates,
+				decisions: payload.decisions,
+				conflicts: payload.conflicts,
+			}),
+		);
+	} catch {
+		mutateVerifierStore(cwd, (store) => {
+			const batch = store.batches[latestBatch.id];
+			batch.analysisIngestionStatus = "failed";
+			batch.analysisIngestionFailure =
+				"Malformed or inconsistent structured synthesis";
 		});
-	const timestamp = new Date().toISOString();
-	const cutoff = Date.parse(latestBatch.createdAt);
+		return { recognized: false, count: 0 };
+	}
 	mutateVerifierStore(cwd, (store) => {
-		for (const batch of Object.values(store.batches))
-			if (
-				batch.status === "terminal" &&
-				(Date.parse(batch.createdAt) <= cutoff || batchIds.includes(batch.id))
-			) {
-				batch.analysisMaterializedAt = timestamp;
-				batch.analysisSupersededBy = latestBatch.id;
-			}
-		const latest = store.batches[latestBatch.id];
-		latest.analysisReportPath = reportPath;
-		latest.analysisItemCount = tasks.length;
+		const batch = store.batches[latestBatch.id];
+		batch.analysisReportPath = reportPath;
+		batch.analysisItemCount = groups.length;
 	});
-	return { recognized: true, count: tasks.length, tasks };
+	return {
+		recognized: true,
+		count: groups.length,
+		groups,
+		report: renderAnalysisReviewReport(payload, groups),
+	};
 }
 
 function findVerifierAnalysisReport(batchId) {
 	const matches = [];
 	try {
 		for (const directory of readdirSync(tmpdir(), { withFileTypes: true })) {
-			if (!directory.isDirectory() || !directory.name.startsWith("ce-workflow-analysis-"))
+			if (
+				!directory.isDirectory() ||
+				!directory.name.startsWith("ce-workflow-analysis-")
+			)
 				continue;
 			const dir = join(tmpdir(), directory.name);
 			for (const file of readdirSync(dir, { withFileTypes: true }))
-				if (file.isFile() && file.name.endsWith(".md") && file.name.includes(batchId)) {
+				if (
+					file.isFile() &&
+					file.name.endsWith(".md") &&
+					file.name.includes(batchId)
+				) {
 					const path = join(dir, file.name);
 					matches.push({ path, mtime: statSync(path).mtimeMs });
 				}
@@ -10847,44 +10825,20 @@ function findVerifierAnalysisReport(batchId) {
 	} catch {
 		return null;
 	}
-	return matches.sort((left, right) => right.mtime - left.mtime)[0]?.path ?? null;
+	return (
+		matches.sort((left, right) => right.mtime - left.mtime)[0]?.path ?? null
+	);
 }
 
 function recoverLatestVerifierAnalysis(cwd) {
-	let store;
 	try {
-		store = loadVerifierStore(cwd);
+		const groups = analysisReviewProjection(loadVerifierStore(cwd));
+		return groups.length
+			? { recognized: true, count: groups.length, groups }
+			: null;
 	} catch {
 		return null;
 	}
-	const batches = Object.values(store.batches)
-		.filter(
-			(batch) =>
-				batch.status === "terminal" && batch.presentationStatus === "queued",
-		)
-		.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-	for (const batch of batches) {
-		const batchLabel = analysisBatchLabel(batch.id);
-		try {
-			if (
-				Object.values(loadStore(cwd).items).some((item) =>
-					item.labels?.includes(batchLabel),
-				)
-			)
-				return { recognized: true, count: batch.analysisItemCount ?? 0 };
-		} catch {
-			// A missing native store is repaired from the persisted analysis report.
-		}
-		const reportPath = batch.analysisReportPath ?? findVerifierAnalysisReport(batch.id);
-		if (!reportPath || !existsSync(reportPath)) continue;
-		const result = materializeVerifierAnalysis(cwd, {
-			batchIds: [batch.id],
-			markdown: readFileSync(reportPath, "utf8"),
-			reportPath,
-		});
-		if (result.recognized) return result;
-	}
-	return null;
 }
 
 function verifierPresentationPrompt(store, batchId) {
@@ -10906,7 +10860,7 @@ function verifierPresentationPrompt(store, batchId) {
 	);
 	const renderedFindings = findings.map(
 		(finding, index) =>
-			`Finding ${index + 1} · model: ${finding.model} · operation: ${finding.operation}\n${renderVerifierFinding(finding)}`,
+			`Finding ${index + 1} · id: ${finding.id} · model: ${finding.model} · operation: ${finding.operation}\n${renderVerifierFinding(finding)}`,
 	);
 	return [
 		`Background analysis batch ${batchId} finished: ${jobs.length} verifier(s), ${findings.length} raw finding(s).`,
@@ -10927,7 +10881,10 @@ async function presentPendingVerifierBatches(cwd, ctx, pi) {
 		return;
 	}
 	const batchIds = Object.values(store.batches)
-		.filter((batch) => batch.presentationStatus === "pending")
+		.filter(
+			(batch) =>
+				batch.presentationStatus === "pending" && batch.purpose === "analysis",
+		)
 		.map((batch) => batch.id);
 	const prompts = batchIds
 		.map((batchId) => verifierPresentationPrompt(store, batchId))
@@ -10945,7 +10902,7 @@ async function presentPendingVerifierBatches(cwd, ctx, pi) {
 			ctx,
 			[
 				`<!-- ${marker} -->`,
-				"Return only a complete Markdown document without fences or preamble. Use these sections: # Background analysis, ## Summary, ## Actionable items, ## Rejected findings, ## Coverage gaps, and ## Suggested next step. Under ## Actionable items, write each merged root cause as a `### <number>. <title>` section and use no other level-three headings. Every actionable item must include priority, source path and line, root cause, evidence, and a concrete recommendation. If none remain, write exactly `None.` under ## Actionable items. Include the analysis batch IDs. Analyze will save the report and materialize this synthesized list as active Misc work.",
+				'Return only one JSON object, without fences or preamble: {"candidates":[{"sourceFindingId":"finding-...","verdict":"accepted|rejected","title":"...","rationale":"...","evidence":"...","recommendation":"...","decisionKey":"stable-product-or-root-cause-key"}],"decisions":{"decisionKey":"governing product, API, or policy question"},"conflicts":{}}. Preserve every validated accepted and rejected finding as a candidate. Group related candidates with the same decisionKey. Do not propose executable work or infer human approval. Analyze validates this payload, renders Markdown locally, and stores it in the Review analysis inbox.',
 				prompts.join("\n\n---\n\n"),
 			].join("\n\n"),
 			pi,
@@ -11257,6 +11214,22 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 	const { target } = parseWorkResumeArgs(args);
 	try {
 		if (options.ownerSession) reconcileBackgroundVerifierRuns(cwd);
+		let review = [];
+		try {
+			review = analysisReviewProjection(loadVerifierStore(cwd));
+		} catch {
+			// A workspace without verifier state has no review inbox.
+		}
+		if (review.length)
+			return {
+				ok: true,
+				action: "review-analysis-required",
+				reason: "review-analysis-required",
+				message: `${review.length} analysis review entr${review.length === 1 ? "y requires" : "ies require"} human resolution before work resumes.`,
+				review,
+				suggestedCommands: ["Open F7 → Review analysis"],
+				warnings: [],
+			};
 		let resolved = resolveResumeTarget(cwd, target);
 		if (
 			!target &&
@@ -18154,9 +18127,437 @@ export async function consumePendingMainEditorAction(event, ctx, runtime = {}) {
 	return { action: "handled" };
 }
 
+const interactiveAnalysisApprovals = new WeakSet();
+
+function analysisProposalDigest(value) {
+	return createHash("sha256")
+		.update(JSON.stringify(value))
+		.digest("hex")
+		.slice(0, 24);
+}
+
+function blockAnalysisFinalization(cwd, record, cause) {
+	mutateVerifierStore(cwd, (store) => {
+		const finalization = store.analysisFinalizations[record.id];
+		if (finalization && finalization.status !== "completed") {
+			finalization.status = "blocked";
+			finalization.blockedReason = formatError(cause);
+			finalization.blockedAt = new Date().toISOString();
+			const group = store.analysisReviewGroups[record.groupId];
+			if (group) {
+				group.state = "blocked";
+				group.updatedAt = finalization.blockedAt;
+			}
+		}
+	});
+}
+
+function completeAnalysisFinalization(cwd, record) {
+	try {
+		const verifier = loadVerifierStore(cwd);
+		validateAnalysisSourceEvidence(
+			cwd,
+			verifier.analysisReviewGroups[record.groupId],
+			verifier,
+		);
+	} catch (cause) {
+		blockAnalysisFinalization(cwd, record, cause);
+		throw cause;
+	}
+	const misc = ensureMiscRoadmap(cwd);
+	let tasks;
+	try {
+		tasks = mutateStore(cwd, (store) => {
+			const finalizationLabel = `wo:analysis-finalization:${record.id}`;
+			const existing = Object.values(store.items).filter((item) =>
+				item.labels?.includes(finalizationLabel),
+			);
+			const byOrdinal = new Map();
+			for (const item of existing) {
+				const ordinal = item.labels.find((label) =>
+					label.startsWith("wo:analysis-ordinal:"),
+				);
+				if (!ordinal || byOrdinal.has(ordinal))
+					throw new Error(`blocked-analysis-finalization:${record.id}`);
+				byOrdinal.set(ordinal, item);
+			}
+			const expectedOrdinals = new Set(
+				record.tasks.map(
+					(_task, index) =>
+						`wo:analysis-ordinal:${String(index + 1).padStart(4, "0")}`,
+				),
+			);
+			if (
+				[...byOrdinal.keys()].some((ordinal) => !expectedOrdinals.has(ordinal))
+			)
+				throw new Error(`blocked-analysis-finalization:${record.id}`);
+			const completed = [];
+			for (const [index, task] of record.tasks.entries()) {
+				const ordinal = `wo:analysis-ordinal:${String(index + 1).padStart(4, "0")}`;
+				const labels = ["wo:analysis", finalizationLabel, ordinal];
+				const notes = [`Finalized from analysis review ${record.groupId}.`];
+				const dependencies = completed.length ? [completed.at(-1).id] : [];
+				const found = byOrdinal.get(ordinal);
+				if (found) {
+					const exact =
+						found.title === compactWorkItemTitle(task.title) &&
+						typeOf(found) === "task" &&
+						parentOf(found) === misc.id &&
+						(found.description ?? "") === (task.description ?? "") &&
+						JSON.stringify([...(found.labels ?? [])].sort()) ===
+							JSON.stringify([...labels].sort()) &&
+						JSON.stringify(found.notes ?? []) === JSON.stringify(notes) &&
+						JSON.stringify(depsOf(found)) === JSON.stringify(dependencies);
+					if (!exact)
+						throw new Error(`blocked-analysis-finalization:${record.id}`);
+					completed.push(found);
+					continue;
+				}
+				completed.push(
+					createWorkItem(store, {
+						title: compactWorkItemTitle(task.title),
+						type: "task",
+						parentId: misc.id,
+						description: task.description ?? "",
+						labels,
+						notes,
+						dependencies,
+					}),
+				);
+			}
+			return completed;
+		});
+	} catch (cause) {
+		blockAnalysisFinalization(cwd, record, cause);
+		throw cause;
+	}
+	mutateVerifierStore(cwd, (store) => {
+		const finalization = store.analysisFinalizations[record.id];
+		if (finalization.status === "completed") return;
+		finalization.status = "completed";
+		finalization.taskIds = tasks.map((task) => task.id);
+		finalization.completedAt = new Date().toISOString();
+		const group = store.analysisReviewGroups[record.groupId];
+		group.state = "finalized";
+		group.finalizationId = record.id;
+		group.humanResolution = group.proposal.resolution;
+		delete group.lease;
+		group.revision += 1;
+		group.updatedAt = finalization.completedAt;
+	});
+	return tasks;
+}
+
+export function reconcileAnalysisFinalizations(cwd) {
+	let store;
+	try {
+		store = loadVerifierStore(cwd);
+	} catch {
+		return [];
+	}
+	const completed = [];
+	for (const record of Object.values(store.analysisFinalizations).filter(
+		(value) => value.status === "pending",
+	))
+		completed.push(...completeAnalysisFinalization(cwd, record));
+	return completed;
+}
+
+export function reconcileLegacyAnalysisTasks(cwd) {
+	let work;
+	try {
+		work = loadStore(cwd);
+	} catch {
+		return [];
+	}
+	const candidates = Object.values(work.items).filter(
+		(item) =>
+			item.labels?.includes("wo:analysis") &&
+			!item.labels.some((label) =>
+				label.startsWith("wo:analysis-finalization:"),
+			) &&
+			item.status !== "closed",
+	);
+	for (const item of candidates) {
+		const snapshot = structuredClone(item);
+		const sourceDigest = analysisProposalDigest(snapshot);
+		mutateVerifierStore(cwd, (store) => {
+			if (store.analysisLegacyMigrations[item.id]) return;
+			store.analysisLegacyMigrations[item.id] = {
+				id: item.id,
+				workItemId: item.id,
+				snapshot,
+				sourceDigest,
+				status: item.status === "in_progress" ? "blocked" : "pending",
+				createdAt: new Date().toISOString(),
+			};
+		});
+		if (item.status === "in_progress") continue;
+		if (!["open", "blocked", "planned", "deferred"].includes(item.status))
+			continue;
+		mutateStore(cwd, (store) => {
+			const current = store.items[item.id];
+			if (!current || analysisProposalDigest(current) !== sourceDigest)
+				throw new Error(`stale-legacy-analysis-task:${item.id}`);
+			const timestamp = new Date().toISOString();
+			current.status = "closed";
+			current.closedAt = timestamp;
+			current.updatedAt = timestamp;
+			current.notes = [
+				...(current.notes ?? []),
+				"Quarantined as legacy unapproved analysis output; review is required before replacement work is executable.",
+			];
+		});
+		mutateVerifierStore(cwd, (store) => {
+			store.analysisLegacyMigrations[item.id].status = "completed";
+			store.analysisLegacyMigrations[item.id].completedAt =
+				new Date().toISOString();
+		});
+	}
+	return candidates.map((item) => item.id);
+}
+
+export function validateAnalysisFinalizationInput(group, input) {
+	if (
+		typeof input.proposalDigest !== "string" ||
+		!input.proposalDigest.trim() ||
+		!group ||
+		group.state !== "proposal_ready" ||
+		group.revision !== input.revision ||
+		group.proposalDigest !== input.proposalDigest ||
+		!Array.isArray(group.proposal?.tasks)
+	)
+		throw new Error("stale-analysis-review");
+	return true;
+}
+
+export function validateAnalysisSourceEvidence(cwd, group, store) {
+	for (const candidateId of group.candidateIds) {
+		const candidate = store.analysisCandidates[candidateId];
+		const finding = store.findings[candidate?.source?.findingId];
+		if (!finding || verifierFindingChanged(cwd, finding))
+			throw new Error(
+				`stale-analysis-evidence:${candidate?.source?.findingId ?? candidateId}`,
+			);
+	}
+	return true;
+}
+
+function finalizeAnalysisReview(cwd, input) {
+	if (!interactiveAnalysisApprovals.delete(input.capability))
+		throw new Error("confirmation-required");
+	const current = loadVerifierStore(cwd);
+	const currentGroup = current.analysisReviewGroups[input.groupId];
+	validateAnalysisFinalizationInput(currentGroup, input);
+	validateAnalysisSourceEvidence(cwd, currentGroup, current);
+	const finalizationId = `analysis-finalization-${analysisProposalDigest({
+		groupId: input.groupId,
+		revision: input.revision,
+		proposalDigest: input.proposalDigest,
+	})}`;
+	const record = mutateVerifierStore(cwd, (store) => {
+		const group = store.analysisReviewGroups[input.groupId];
+		validateAnalysisFinalizationInput(group, input);
+		const existing = store.analysisFinalizations[finalizationId];
+		if (existing) return existing;
+		const value = {
+			id: finalizationId,
+			groupId: group.id,
+			groupRevision: group.revision,
+			proposalDigest: group.proposalDigest,
+			tasks: group.proposal.tasks,
+			status: "pending",
+			createdAt: new Date().toISOString(),
+		};
+		store.analysisFinalizations[value.id] = value;
+		group.state = "finalization_pending";
+		group.updatedAt = value.createdAt;
+		return value;
+	});
+	return completeAnalysisFinalization(cwd, record);
+}
+
+async function handleWorkReviewAnalysisCommand(ctx, _pi) {
+	let groups;
+	try {
+		groups = analysisReviewProjection(loadVerifierStore(ctx.cwd));
+	} catch (error) {
+		ctx.ui.notify(formatError(error), "warning");
+		return;
+	}
+	if (!groups.length) {
+		ctx.ui.notify("No analysis groups are waiting for review.", "info");
+		return;
+	}
+	const selected = await choose(
+		ctx,
+		"Review analysis",
+		groups.map((group) => ({
+			value: group.id,
+			label: group.governingDecision,
+			description: `${group.candidates.length} candidate(s) · ${group.state.replaceAll("_", " ")}`,
+		})),
+	);
+	if (!selected) return;
+	const ownerSession = ctx.sessionManager?.getSessionId?.() ?? "interactive";
+	let group = groups.find((value) => value.id === selected);
+	if (group.readOnly) {
+		ctx.ui.notify(
+			`${group.governingDecision}\n${group.statusMessage}\nAvailable: ${group.allowedActions.join(", ")}.`,
+			"warning",
+		);
+		return;
+	}
+	if (group.state === "finalization_pending") {
+		const created = reconcileAnalysisFinalizations(ctx.cwd);
+		ctx.ui.notify(
+			`${created.length} approved analysis task(s) recovered under Misc.`,
+			"info",
+		);
+		return;
+	}
+	let resolution = group.proposal?.resolution;
+	let dispositions = group.proposal?.dispositions;
+	let tasks = group.proposal?.tasks;
+	if (group.state === "proposal_ready") {
+		try {
+			group = mutateVerifierStore(ctx.cwd, (store) =>
+				claimAnalysisReview(store, { groupId: selected, ownerSession }),
+			);
+		} catch (error) {
+			ctx.ui.notify(formatError(error), "warning");
+			return;
+		}
+	} else {
+		if (group.state !== "in_review")
+			try {
+				group = mutateVerifierStore(ctx.cwd, (store) =>
+					claimAnalysisReview(store, { groupId: selected, ownerSession }),
+				);
+			} catch (error) {
+				ctx.ui.notify(formatError(error), "warning");
+				return;
+			}
+		const verifier = loadVerifierStore(ctx.cwd);
+		const candidates = group.candidateIds.map(
+			(id) => verifier.analysisCandidates[id],
+		);
+		resolution = await ctx.ui.editor(
+			group.governingDecision,
+			group.proposal?.resolution ?? "",
+		);
+		if (!resolution?.trim()) return;
+		dispositions = {};
+		for (const candidate of candidates) {
+			const context = [
+				`Advisory verdict: ${candidate.verdict}`,
+				`Source: ${candidate.source.path}:${candidate.source.startLine}-${candidate.source.endLine}`,
+				`Rationale: ${candidate.rationale}`,
+				`Evidence: ${candidate.evidence}`,
+				`Recommendation: ${candidate.recommendation}`,
+			].join("\n");
+			const disposition = await choose(ctx, candidate.title, [
+				{ value: "promote", label: "Promote", description: context },
+				{
+					value: "rewrite",
+					label: "Rewrite",
+					description: `${context}\nKeep with revised scope.`,
+				},
+				{
+					value: "defer",
+					label: "Defer",
+					description: `${context}\nRetain for later analysis.`,
+				},
+				{ value: "drop", label: "Drop", description: context },
+			]);
+			if (!disposition) return;
+			dispositions[candidate.id] = disposition;
+		}
+		const taskText = await ctx.ui.editor(
+			"Exact proposed task list (JSON)",
+			JSON.stringify(group.proposal?.tasks ?? [], null, 2),
+		);
+		if (taskText === undefined) return;
+		try {
+			tasks = JSON.parse(taskText);
+			if (
+				!Array.isArray(tasks) ||
+				tasks.some(
+					(task) =>
+						!task || typeof task.title !== "string" || !task.title.trim(),
+				)
+			)
+				throw new Error("Each task needs a title");
+		} catch (error) {
+			ctx.ui.notify(`Invalid task list: ${formatError(error)}`, "warning");
+			return;
+		}
+		group = mutateVerifierStore(ctx.cwd, (store) =>
+			saveAnalysisReviewProposal(store, {
+				groupId: group.id,
+				revision: group.revision,
+				ownerSession,
+				proposal: { resolution: resolution.trim(), dispositions, tasks },
+			}),
+		);
+	}
+	const terminal = await choose(ctx, "Approve reviewed group", [
+		{
+			value: "finalize",
+			label: "Finalize group",
+			description: `${tasks.length} exact task(s) will be created under Misc.`,
+		},
+		{
+			value: "defer",
+			label: "Defer",
+			description: "Create no tasks; later analysis may replace it.",
+		},
+		{
+			value: "reject",
+			label: "Reject",
+			description: "Create no tasks; preserve a terminal human decision.",
+		},
+	]);
+	if (!terminal) return;
+	if (terminal === "finalize") {
+		const capability = {};
+		interactiveAnalysisApprovals.add(capability);
+		const created = finalizeAnalysisReview(ctx.cwd, {
+			groupId: group.id,
+			revision: group.revision,
+			proposalDigest: group.proposalDigest,
+			capability,
+		});
+		ctx.ui.notify(
+			`${created.length} approved analysis task(s) created under Misc.`,
+			"info",
+		);
+		return;
+	}
+	mutateVerifierStore(ctx.cwd, (store) =>
+		disposeAnalysisReview(store, {
+			groupId: group.id,
+			revision: group.revision,
+			ownerSession,
+			disposition: terminal === "defer" ? "deferred" : "rejected",
+			reason: resolution.trim(),
+		}),
+	);
+	ctx.ui.notify(
+		`Analysis group ${terminal === "defer" ? "deferred" : "rejected"}; no tasks created.`,
+		"info",
+	);
+}
+
 async function handleWorkMenuCommand(ctx, pi) {
 	const improvementCount = workImproveCount(ctx.cwd);
 	const cswapBin = resolveCswap();
+	let reviewCount = 0;
+	try {
+		reviewCount = analysisReviewProjection(loadVerifierStore(ctx.cwd)).length;
+	} catch {
+		// A missing verifier store simply has no analysis inbox.
+	}
 	const items = [
 		{
 			value: "work-roadmap",
@@ -18171,6 +18572,16 @@ async function handleWorkMenuCommand(ctx, pi) {
 						label: "🔀 Claude account switcher",
 						description:
 							"Switch the active Claude account via cswap.\nShows 5h and weekly usage and reset times per account.",
+					},
+				]
+			: []),
+		...(reviewCount
+			? [
+					{
+						value: "work-review-analysis",
+						label: `🧭 Review analysis (${reviewCount})`,
+						description:
+							"Resolve analyzer decisions before any executable work is created.\nAccepted and rejected candidates are reviewed together.",
 					},
 				]
 			: []),
@@ -21175,6 +21586,10 @@ async function executeOrchestratorAction(
 		return withCommandTelemetry(name, text, ctx, () =>
 			handleWorkAnalyzeCommand(text, ctx, pi),
 		);
+	if (name === "work-review-analysis")
+		return withCommandTelemetry(name, text, ctx, () =>
+			handleWorkReviewAnalysisCommand(ctx, pi),
+		);
 	if (name === "work-resume")
 		return withCommandTelemetry(
 			name,
@@ -22325,11 +22740,6 @@ export default function workModelsExtension(pi) {
 			const markdown = contentText(event.message.content).trim();
 			if (markdown) {
 				const report = activeVerifierSynthesis;
-				writeFileSync(report.path, `${markdown}\n`, {
-					encoding: "utf8",
-					flag: "wx",
-					mode: 0o600,
-				});
 				const pendingFindings = mutateVerifierStore(ctx.cwd, (store) => {
 					for (const batchId of report.batchIds) {
 						const batch = store.batches[batchId];
@@ -22352,8 +22762,11 @@ export default function workModelsExtension(pi) {
 					} catch {
 						materialized = { recognized: false, count: 0 };
 					}
-				if (pendingFindings && !materialized.recognized)
-					ensureMiscRoadmap(ctx.cwd);
+				writeFileSync(report.path, materialized.report ?? `${markdown}\n`, {
+					encoding: "utf8",
+					flag: "wx",
+					mode: 0o600,
+				});
 				activeVerifierSynthesis = null;
 				const replacement = {
 					...event.message,
@@ -22363,11 +22776,11 @@ export default function workModelsExtension(pi) {
 							text:
 								pendingFindings && materialized.recognized
 									? materialized.count
-										? `Analysis report: ${report.path}\n\n${materialized.count} synthesized item${materialized.count === 1 ? " is" : "s are"} ready under Misc. Open F7 → Resume work.`
-										: `Analysis report: ${report.path}\n\nNo actionable findings require triage.`
+										? `Analysis report: ${report.path}\n\n${materialized.count} decision group${materialized.count === 1 ? " is" : "s are"} waiting under Review analysis. No executable work was created.`
+										: `Analysis report: ${report.path}\n\nNo review candidates remain.`
 									: pendingFindings
-										? `Analysis report: ${report.path}\n\nThe synthesized list could not be materialized; raw findings remain available under Misc.`
-										: `Analysis report: ${report.path}\n\nNo actionable findings require triage.`,
+										? `Analysis report: ${report.path}\n\nStructured analysis ingestion failed. Review the preserved synthesis and retry; no work was created.`
+										: `Analysis report: ${report.path}\n\nNo review candidates remain.`,
 						},
 					],
 				};
