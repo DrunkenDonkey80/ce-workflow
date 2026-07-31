@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-30",
+  "capturedAt": "2026-07-31",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
@@ -72,38 +72,37 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.37.2",
-      "reviewedAt": "2026-07-30",
-      "reviewedVersion": "0.37.2",
+      "version": "0.38.0",
+      "reviewedAt": "2026-07-31",
+      "reviewedVersion": "0.38.0",
       "decisions": [
         {
-          "version": "0.37.2",
-          "title": "Lease-fenced paused specialist resume",
-          "pov": "Trial",
-          "status": "adopted",
-          "rationale": "Explicit work resume now uses pi-subagents' package-owned RPC resume for the exact paused run, but only after current-session, open-work-item, and active-goal fences pass. The acknowledged revived identity replaces the paused lease identity, preventing duplicate relaunches.",
-          "verification": "node scripts/test-work-action-leases.mjs passed with exact-run resume, identity replacement, and existing lease-fence coverage"
-        },
-        {
-          "version": "0.37.2",
-          "title": "Context isolation, async recovery, and scan reductions",
-          "pov": "Adopt",
+          "version": "0.38.0",
+          "title": "Structured fleetStatus RPC for Work Fleet",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "The --no-context-files fix, preserved revival metadata, reduced repeated scans, and lifecycle recovery improvements are supplied by pi-subagents and strengthen ce-workflow's existing fresh-context async roles without local adapters."
+          "rationale": "The new bounded current-session projection is display-only: its opaque keys omit run, async, work-item, state, and artifact identities. ce-workflow's Fleet needs those durable identities for task grouping, history, recovery evidence, transcripts, and steering, so adopting fleetStatus would add an asynchronous merge and fallback path without deleting the incumbent collectors. Revisit only if Fleet intentionally broadens to unassociated foreground runs or measured artifact polling becomes material."
         },
         {
-          "version": "0.37.2",
-          "title": "Foreground timeout and FleetView presentation",
+          "version": "0.38.0",
+          "title": "Git-root project configuration resolution",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "ce-workflow specialists launch asynchronously; its short RPC waits acknowledge control messages rather than limit child runtime. FleetView placement is an upstream UI preference and does not change work-item lifecycle."
+          "rationale": "projectRootResolution is an opt-in policy for target monorepos with nested Pi configuration. This checkout has one root .pi/settings.json, and the packaged extension cannot safely choose git-root semantics for every consuming project."
         },
         {
-          "version": "0.37.2",
-          "title": "Native result delivery and delegation policy refresh",
-          "pov": "Hold",
+          "version": "0.38.0",
+          "title": "Launch, stream, steering, and session reliability fixes",
+          "pov": "Adopt",
           "status": "no-action",
-          "rationale": "Changing result delivery without measured duplicate notifications risks losing ce-workflow's correlated replies, while replacing durable async work-item orchestration with foreground delegation would discard required lease semantics."
+          "rationale": "Bounded zero-activity startup retries, bounded streamed progress, retryable steering inbox scans, canonical session filtering, foreground metadata propagation, and intercom runtime-ID hygiene are inherited from pi-subagents and strengthen ce-workflow's existing async/RPC flows without local adapters."
+        },
+        {
+          "version": "0.38.0",
+          "title": "Acceptance guidance and FleetView input compatibility",
+          "pov": "Adopt",
+          "status": "no-action",
+          "rationale": "Improved invalid-evidence diagnostics, j/k navigation, and structural custom-editor focus detection are upstream schema and TUI behavior. ce-workflow already emits supported acceptance evidence and owns separate dialog key handling, so no compatibility edit is required."
         }
       ]
     },
@@ -125,38 +124,23 @@
     },
     {
       "name": "pi-intercom",
-      "version": "0.9.0",
-      "reviewedAt": "2026-07-30",
-      "reviewedVersion": "0.9.0",
+      "version": "0.9.1",
+      "reviewedAt": "2026-07-31",
+      "reviewedVersion": "0.9.1",
       "decisions": [
         {
-          "version": "0.9.0",
-          "title": "Exact session targeting and explicit message lifecycle guidance",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "ce-workflow now limits list-cwd to operator discovery, requires exact session IDs for trust-sensitive coordination, and distinguishes timeout from cancellation while documenting authored supersedes and retry links. Existing pending, run-state, and work-item terminal gates remain authoritative.",
-          "verification": "node scripts/test-work-goal.mjs passed with assertions for exact IDs, list-cwd discovery, cancel, supersedes, and retryOf guidance"
-        },
-        {
-          "version": "0.9.0",
-          "title": "Inbound-trigger and broker hardening",
+          "version": "0.9.1",
+          "title": "Mailbox redelivery isolated by session or name plus cwd",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "Fail-closed configuration, frame/rate limits, spawn locking, and Windows transport hardening are inherited from pi-intercom. ce-workflow keeps intercom optional and does not impose a deployment-wide inboundTrigger default that could suppress expected replies."
+          "rationale": "The broker now prevents a same-named session in another project from receiving queued mail by requiring matching cwd when stable session ID is unavailable. ce-workflow inherits the fix while retaining exact-ID targeting and its pending-run, open-work-item, and active-goal stale-message fences."
         },
         {
-          "version": "0.9.0",
-          "title": "Extension channel bus and configurable ask timeout",
-          "pov": "Hold",
+          "version": "0.9.1",
+          "title": "Broker framing and inline rendering fixes",
+          "pov": "Adopt",
           "status": "no-action",
-          "rationale": "There is no concrete cross-session extension-state consumer, and longer ask timeouts would worsen liveness without telemetry showing pressure. Native work items and run artifacts remain the durable coordination state."
-        },
-        {
-          "version": "0.9.0",
-          "title": "Context display and disconnected mailbox",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "Context percentage is operator metadata, while a runtime-only disconnected mailbox could mask stale child runs. Neither should replace ce-workflow's live-session and durable work-item lifecycle."
+          "rationale": "Fragmented-frame reassembly, single-allocation writes, and immutable-message render caching are internal pi-intercom transport/UI improvements. The public tool schema, extension lifecycle, and ce-workflow call sites are unchanged."
         }
       ]
     },
