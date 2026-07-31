@@ -1107,10 +1107,19 @@ export async function launchQueuedVerifierJobs(
 	for (const [index, job] of claimed.entries()) {
 		const reply = replies[index];
 		const data = reply?.reply?.data ?? reply?.data ?? reply ?? {};
-		const result = data.result ?? {};
+		const details = data.details ?? {};
+		const result = data.result ?? details.result ?? {};
 		const identity = {
-			runId: data.runId ?? data.id ?? result.runId ?? result.id,
-			asyncDir: data.asyncDir ?? result.asyncDir,
+			runId:
+				data.runId ??
+				data.asyncId ??
+				data.id ??
+				details.runId ??
+				details.asyncId ??
+				result.runId ??
+				result.asyncId ??
+				result.id,
+			asyncDir: data.asyncDir ?? details.asyncDir ?? result.asyncDir,
 		};
 		mutateVerifierStore(cwd, (state) =>
 			recordVerifierLaunch(state, {
@@ -1392,8 +1401,10 @@ export function recordOperationResult(store, input = {}) {
 			Object.values(next.jobs)
 				.filter((candidate) => candidate.batchId === job.batchId)
 				.every((candidate) => !["queued", "running"].includes(candidate.status))
-		)
+		) {
 			next.batches[job.batchId].status = "terminal";
+			next.batches[job.batchId].presentationStatus ??= "pending";
+		}
 		return report;
 	});
 }
@@ -1790,9 +1801,9 @@ function validateFindingRange(job, batch, finding) {
 		finding.startLine < 1 ||
 		finding.endLine < finding.startLine
 	)
-		return;
+		throw error("invalid", "Verifier finding range is invalid");
 	const workspace = job.launch?.request?.cwd;
-	if (!nonempty(workspace)) return;
+	if (!nonempty(workspace)) return finding.endLine;
 	const relative = relativePath(finding.path);
 	let lineCount;
 	try {
@@ -1802,8 +1813,9 @@ function validateFindingRange(job, batch, finding) {
 	} catch {
 		throw error("invalid", "Verifier finding source path is unavailable");
 	}
-	if (finding.endLine > lineCount)
+	if (finding.startLine > lineCount)
 		throw error("invalid", "Verifier finding range exceeds its source file");
+	return Math.min(finding.endLine, lineCount);
 }
 
 function validateResult(job, batch, result) {
@@ -1839,39 +1851,55 @@ function validateResult(job, batch, result) {
 	}
 	if (!Array.isArray(result.findings) || !result.findings.length)
 		throw error("invalid", "Findings result has no findings");
-	const findings = result.findings.map((finding) => {
-		if (
-			!exactKeys(finding, [
-				"path",
-				"startLine",
-				"endLine",
-				"category",
-				"severity",
-				"rationale",
-				"evidence",
-				"suggestion",
-			])
-		)
-			throw error("invalid", "Verifier finding has an invalid schema");
-		validateFindingRange(job, batch, finding);
-		return {
-			path: finding.path,
-			startLine: finding.startLine,
-			endLine: finding.endLine,
-			category: finding.category,
-			severity: finding.severity,
-			rationale: finding.rationale,
-			evidence: finding.evidence,
-			suggestedAction: finding.suggestion,
-		};
-	});
-	if (findings.length > REPORT_MAX_FINDINGS)
-		throw error("over-limit", "Verifier report has too many findings");
+	if (result.findings.length > REPORT_MAX_FINDINGS)
+		throw error("over-limit", "Verifier result has too many findings");
+	const findings = [];
+	let rejectedFindings = 0;
+	for (const finding of result.findings) {
+		try {
+			if (
+				!exactKeys(finding, [
+					"path",
+					"startLine",
+					"endLine",
+					"category",
+					"severity",
+					"rationale",
+					"evidence",
+					"suggestion",
+				]) ||
+				!nonempty(finding.category) ||
+				!REPORT_CATEGORIES.test(finding.category) ||
+				!SEVERITIES.has(finding.severity) ||
+				![finding.rationale, finding.evidence, finding.suggestion].every(
+					(value) => nonempty(value) && value.length <= REPORT_MAX_TEXT,
+				)
+			)
+				throw error("invalid", "Verifier finding has an invalid schema");
+			const endLine = validateFindingRange(job, batch, finding);
+			findings.push({
+				path: finding.path,
+				startLine: finding.startLine,
+				endLine,
+				category: finding.category,
+				severity: finding.severity,
+				rationale: finding.rationale,
+				evidence: finding.evidence,
+				suggestedAction: finding.suggestion,
+			});
+		} catch (cause) {
+			if (!(cause instanceof VerifierStoreError)) throw cause;
+			rejectedFindings += 1;
+		}
+	}
+	if (!findings.length)
+		throw error("invalid", "Verifier result has no valid findings");
 	return {
 		operation: result.operation,
 		outcome: "findings",
 		usage: result.usage,
 		findings,
+		rejectedFindings,
 	};
 }
 function validateTerminalReport(job, batch, text) {
@@ -1902,19 +1930,37 @@ function validateTerminalReport(job, batch, text) {
 		throw error("invalid", "Verifier report identity is invalid");
 	if (report.results.length > job.operations.length)
 		throw error("invalid", "Verifier report has unexpected operations");
-	const results = report.results.map((result) =>
-		validateResult(job, batch, result),
-	);
-	const operations = new Set(results.map((result) => result.operation));
-	if (operations.size !== results.length)
-		throw error("invalid", "Verifier report duplicates an operation");
-	if (
-		results.reduce((sum, result) => sum + (result.findings?.length ?? 0), 0) >
-		REPORT_MAX_FINDINGS
-	)
-		throw error("over-limit", "Verifier report has too many findings");
+	const operations = new Set();
+	for (const result of report.results) {
+		if (
+			!result ||
+			typeof result !== "object" ||
+			!job.operations.includes(result.operation) ||
+			operations.has(result.operation)
+		)
+			throw error("invalid", "Verifier report has unexpected operations");
+		operations.add(result.operation);
+	}
+	const results = [];
+	const rejected = [];
+	let rejectedFindings = 0;
+	for (const result of report.results) {
+		try {
+			const validated = validateResult(job, batch, result);
+			results.push(validated);
+			rejectedFindings += validated.rejectedFindings ?? 0;
+		} catch (cause) {
+			rejected.push({
+				operation: result.operation,
+				reason:
+					cause instanceof VerifierStoreError ? cause.category : "invalid",
+			});
+		}
+	}
 	return {
 		results,
+		rejected,
+		rejectedFindings,
 		omitted: job.operations.filter((operation) => !operations.has(operation)),
 	};
 }
@@ -1975,6 +2021,13 @@ export function ingestVerifierReport(store, input = {}) {
 		);
 		return { quarantined: true, reason };
 	}
+	if (validated.rejected.length || validated.rejectedFindings)
+		quarantineVerifierReport(store, {
+			jobId: job.id,
+			artifact,
+			reason: validated.rejected[0]?.reason ?? "invalid",
+			now: input.now,
+		});
 	for (const result of validated.results) {
 		const report = recordOperationResult(store, {
 			jobId: job.id,
@@ -1997,9 +2050,22 @@ export function ingestVerifierReport(store, input = {}) {
 				now: input.now,
 			});
 	}
-	recordTerminalFailures(store, job.id, validated.omitted, artifact, input.now);
+	recordTerminalFailures(
+		store,
+		job.id,
+		[
+			...validated.rejected.map((result) => result.operation),
+			...validated.omitted,
+		],
+		artifact,
+		input.now,
+	);
 	groupValidatedFindings(store, { now: input.now });
-	return { quarantined: false, omitted: validated.omitted };
+	return {
+		quarantined:
+			validated.rejected.length > 0 || validated.rejectedFindings > 0,
+		omitted: validated.omitted,
+	};
 }
 function rangesOverlap(left, right) {
 	return left.startLine <= right.endLine && right.startLine <= left.endLine;
@@ -2050,6 +2116,18 @@ export function groupValidatedFindings(store, input = {}) {
 function terminalState(status) {
 	return String(status?.state ?? status?.status ?? "").toLowerCase();
 }
+function structuredArtifactForStatus(asyncDir, status) {
+	const file =
+		status?.structuredOutputPath ??
+		status?.steps?.find((step) => nonempty(step?.structuredOutputPath))
+			?.structuredOutputPath;
+	if (!nonempty(file)) return "";
+	const root = path.resolve(asyncDir);
+	const resolved = path.resolve(asyncDir, file);
+	if (!resolved.startsWith(`${root}${path.sep}`))
+		throw error("artifact", "Verifier structured output escaped its async run");
+	return resolved;
+}
 function markVerifierOrphaned(store, jobId, nowValue) {
 	return edit(store, (next) => {
 		const job = next.jobs[jobId];
@@ -2076,12 +2154,14 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 		["running", "orphaned"].includes(item.launch?.status),
 	)) {
 		let state = "";
+		let runtimeStatus;
 		if (job.launch.status === "running") {
 			const statusFile = job.launch.asyncDir
 				? path.join(job.launch.asyncDir, "status.json")
 				: "";
 			try {
-				state = terminalState(JSON.parse(boundedArtifactRead(statusFile).text));
+				runtimeStatus = JSON.parse(boundedArtifactRead(statusFile).text);
+				state = terminalState(runtimeStatus);
 			} catch {
 				const launchedAt = Date.parse(job.launch.launchedAt ?? "");
 				if (
@@ -2106,7 +2186,9 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 
 		let artifact;
 		try {
-			const file = artifactForJob(cwd, job);
+			let file = artifactForJob(cwd, job);
+			if (!existsSync(file))
+				file = structuredArtifactForStatus(job.launch.asyncDir, runtimeStatus);
 			const fileStat = lstatSync(file);
 			if (
 				state === "orphaned" &&
@@ -2125,19 +2207,6 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 			mutateVerifierStore(
 				cwd,
 				(next) => {
-					if (TERMINAL_FAILURE_STATES.has(state)) {
-						recordTerminalFailures(
-							next,
-							job.id,
-							job.operations.filter(
-								(operation) =>
-									next.jobs[job.id].operationStatus[operation] === "pending",
-							),
-							artifact,
-							input.now,
-						);
-						return { failed: true };
-					}
 					return ingestVerifierReport(next, {
 						jobId: job.id,
 						artifact,
@@ -2342,7 +2411,12 @@ export function validateVerifierStore(store, file = "verifier store") {
 		if (
 			!plainObject(batch) ||
 			batch.id !== id ||
-			!["queued", "not-scheduled", "terminal"].includes(batch.status)
+			!["queued", "not-scheduled", "terminal"].includes(batch.status) ||
+			(batch.presentationStatus !== undefined &&
+				(!["pending", "queued"].includes(batch.presentationStatus) ||
+					batch.status !== "terminal")) ||
+			(batch.presentedAt !== undefined &&
+				(batch.presentationStatus !== "queued" || !nonempty(batch.presentedAt)))
 		)
 			throw error("corrupt", `Invalid batch ${id} in ${file}`);
 		validateCheckpoint(batch.checkpoint, file);

@@ -35,8 +35,11 @@ check(
 	pkg.pi?.extensions?.includes("extensions/work-models.js"),
 );
 check("native store is packaged", pkg.files?.includes("extensions/"));
-const subscriptionFooterProvenancePath = "extensions/subscription-footer-UPSTREAM.md";
-const subscriptionFooterProvenance = existsSync(path.join(root, subscriptionFooterProvenancePath))
+const subscriptionFooterProvenancePath =
+	"extensions/subscription-footer-UPSTREAM.md";
+const subscriptionFooterProvenance = existsSync(
+	path.join(root, subscriptionFooterProvenancePath),
+)
 	? read(subscriptionFooterProvenancePath)
 	: "";
 check(
@@ -485,15 +488,20 @@ check(
 	tests.filter((script) => script === "test-background-verifiers.mjs")
 		.length === 1,
 );
+const gitConfigCount = Number(process.env.GIT_CONFIG_COUNT ?? 0);
+const testEnvironment = {
+	...process.env,
+	GIT_CONFIG_COUNT: String(gitConfigCount + 1),
+	[`GIT_CONFIG_KEY_${gitConfigCount}`]: "core.autocrlf",
+	[`GIT_CONFIG_VALUE_${gitConfigCount}`]: "false",
+	PI_CODING_AGENT_DIR: path.join(root, ".pi-test-empty-agent"),
+};
 for (const script of [...new Set(tests)]) {
 	try {
 		execFileSync(process.execPath, [path.join("scripts", script)], {
 			cwd: root,
 			stdio: quiet ? "pipe" : "inherit",
-			env: {
-				...process.env,
-				PI_CODING_AGENT_DIR: path.join(root, ".pi-test-empty-agent"),
-			},
+			env: testEnvironment,
 		});
 		check(`${script} passes`, true);
 	} catch (error) {

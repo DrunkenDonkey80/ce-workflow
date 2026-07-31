@@ -97,18 +97,18 @@ try {
 	);
 	assert(
 		verifierRpcParams.agent === "work-background-verifier" &&
-			!verifierRpcParams.tools.includes("project_report"),
-		"verifiers fall back to checkpoint-only tools when pi-lens is unavailable",
+			!verifierRpcParams.tools.includes("project_report") &&
+			verifierRpcParams.agentContract?.version === 1 &&
+			verifierRpcParams.acceptance === false,
+		"verifiers use checkpoint-only tools without a conflicting acceptance contract",
 	);
 	projectReportAvailable = true;
 	assert(
 		(await verifierAdapter.spawn(verifierRequest)).ok &&
-			verifierRpcParams.agent === "work-background-verifier-lens" &&
-			verifierRpcParams.tools.includes("project_report") &&
-			verifierRpcParams.task.includes(
-				"Use project_report only as read-only orientation and status",
-			),
-		"verifiers use project_report when the host exposes the pi-lens tool",
+			verifierRpcParams.agent === "work-background-verifier" &&
+			!verifierRpcParams.tools.includes("project_report") &&
+			!verifierRpcParams.task.includes("project_report"),
+		"isolated verifiers do not inherit host-only pi-lens tools",
 	);
 	let state = buildWorkSmallState(fixture.cwd, "Add coded start gate");
 	assert(

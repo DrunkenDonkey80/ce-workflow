@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -38,12 +46,13 @@ try {
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
 		path.join(cwd, ".pi", "settings.json"),
-		`${JSON.stringify({ workOrchestrator: { backgroundVerifiers: { "fixture/verifier": { operations: ["correctness"], thinking: "low" } } } })}\n`,
+		`${JSON.stringify({ workOrchestrator: { backgroundVerifiers: { "fixture/verifier": { operations: ["correctness", "performance"], thinking: "low" }, "anthropic/claude-opus-5": { operations: ["correctness"], thinking: "high" } } } })}\n`,
 	);
 
 	const hooks = {};
 	const rpcListeners = new Map();
 	const launches = [];
+	const followUps = [];
 	const events = {
 		on(name, handler) {
 			const listeners = rpcListeners.get(name) ?? new Set();
@@ -61,7 +70,12 @@ try {
 			) ?? [])
 				listener({
 					success: true,
-					data: { runId: `run-${launches.length}`, asyncDir },
+					data: {
+						details: {
+							asyncId: `run-${launches.length}`,
+							asyncDir,
+						},
+					},
 				});
 		},
 	};
@@ -71,13 +85,20 @@ try {
 			hooks[name] = handler;
 		},
 		registerCommand: () => {},
+		sendUserMessage: async (text, options) => {
+			followUps.push({ text, options });
+		},
 	};
 	workModelsExtension(pi);
+	let aborts = 0;
 	const ctx = {
 		cwd,
 		model: { provider: "fixture", id: "main", name: "Main" },
 		getContextUsage: () => ({ tokens: 0 }),
 		isIdle: () => true,
+		abort: () => {
+			aborts += 1;
+		},
 		ui: { notify: () => {}, setStatus: () => {}, setTitle: () => {} },
 	};
 	const prompt = [
@@ -119,32 +140,68 @@ try {
 		await new Promise((resolve) => setImmediate(resolve));
 		store = loadVerifierStore(cwd);
 		if (
-			launches.length > 0 &&
-			Object.values(store.jobs).some((job) => job.launch?.status === "running")
+			launches.length === 2 &&
+			Object.values(store.jobs).every((job) => job.launch?.status === "running")
 		)
 			break;
 	}
 	store ??= loadVerifierStore(cwd);
 	assert(
-		launches.length === 1,
-		`completed task commit fires one background verifier (${JSON.stringify({ batches: Object.values(store.batches), jobs: Object.values(store.jobs).map((job) => ({ status: job.status, launch: job.launch?.status, failure: job.launch?.failure })) })})`,
+		launches.length === 2,
+		`completed task commit fires every configured background verifier (${JSON.stringify({ batches: Object.values(store.batches), jobs: Object.values(store.jobs).map((job) => ({ status: job.status, launch: job.launch?.status, failure: job.launch?.failure })) })})`,
 	);
+	const fixtureLaunch = launches.find(
+		(launch) => launch.model === "fixture/verifier:low",
+	);
+	const opusLaunch = launches.find(
+		(launch) => launch.model === "anthropic/claude-opus-5:high",
+	);
+	assert(fixtureLaunch && opusLaunch, "both configured verifier models launch");
 	assert(
-		launches[0].agent === "work-background-verifier",
+		launches.every((launch) => launch.agent === "work-background-verifier"),
 		"completion launches the verifier role",
 	);
 	assert(
-		launches[0].paths.includes("feature.js"),
+		fixtureLaunch?.thinking === undefined,
+		"the requested verifier thinking level is encoded in the model override",
+	);
+	assert(
+		fixtureLaunch?.outputSchema?.required?.join(",") ===
+			"version,jobId,model,checkpoint,results" &&
+			fixtureLaunch.outputSchema.properties.results.minItems === 2 &&
+			fixtureLaunch.outputSchema.properties.results.maxItems === 2,
+		"verifier output requires one result for every requested operation",
+	);
+	assert(
+		fixtureLaunch?.task.includes("Never print a tool-call object as text"),
+		"verifier instructions reject textual pseudo-tool calls",
+	);
+	assert(
+		fixtureLaunch?.output === undefined &&
+			fixtureLaunch.outputMode === undefined,
+		"structured verifier output does not request an impossible agent-side file write",
+	);
+	assert(
+		fixtureLaunch?.paths.includes("feature.js"),
 		"verifier receives the completed task source path",
 	);
 	assert(
-		!launches[0].paths.some((file) => file.startsWith(".ce-workflow/")),
+		!fixtureLaunch?.paths.some((file) => file.startsWith(".ce-workflow/")),
 		"workflow state is excluded from verifier source paths",
 	);
-	const job = Object.values(store.jobs)[0];
+	const job = Object.values(store.jobs).find(
+		(candidate) => candidate.model === "fixture/verifier",
+	);
 	assert(
 		job?.launch?.status === "running",
 		"verifier launch is durably recorded as running",
+	);
+	const opusJob = Object.values(store.jobs).find(
+		(candidate) => candidate.model === "anthropic/claude-opus-5",
+	);
+	assert(
+		opusJob?.launch?.status === "running" && opusLaunch,
+		"Opus launches after its provider adapter passes the live checkpoint-tool probe",
 	);
 	assert(
 		buildWorkStats(cwd, "TASK-1").phases.some((phase) =>
@@ -176,6 +233,237 @@ try {
 	assert(
 		Object.keys(loadVerifierStore(cwd).batches).length === batchCount,
 		"read-only lane settlement is separate from activeWorkAgent commit attribution",
+	);
+	const asyncDir = path.join(
+		cwd,
+		".runtime",
+		`run-${launches.indexOf(fixtureLaunch) + 1}`,
+	);
+	const structuredOutput = path.join(asyncDir, "structured-output.json");
+	const checkpoint = store.batches[job.batchId].checkpoint;
+	writeFileSync(
+		structuredOutput,
+		JSON.stringify({
+			version: 1,
+			jobId: job.id,
+			model: job.model,
+			checkpoint,
+			results: [
+				{
+					jobId: job.id,
+					model: job.model,
+					checkpoint,
+					operation: "correctness",
+					outcome: "findings",
+					findings: [
+						{
+							path: "feature.js",
+							startLine: 1,
+							endLine: 1,
+							category: "fixture-correctness",
+							severity: "high",
+							rationale: "The fixture needs review.",
+							evidence: "The exported value is fixed.",
+							suggestion: "Confirm the intended value.",
+						},
+					],
+				},
+				{
+					jobId: job.id,
+					model: job.model,
+					checkpoint,
+					operation: "performance",
+					outcome: "no-findings",
+				},
+			],
+		}),
+	);
+	writeFileSync(
+		path.join(asyncDir, "status.json"),
+		JSON.stringify({
+			state: "completed",
+			steps: [{ structuredOutputPath: structuredOutput }],
+		}),
+	);
+	const opusAsyncDir = path.join(
+		cwd,
+		".runtime",
+		`run-${launches.indexOf(opusLaunch) + 1}`,
+	);
+	const opusStructuredOutput = path.join(
+		opusAsyncDir,
+		"structured-output.json",
+	);
+	writeFileSync(
+		opusStructuredOutput,
+		JSON.stringify({
+			version: 1,
+			jobId: opusJob.id,
+			model: opusJob.model,
+			checkpoint,
+			results: [
+				{
+					jobId: opusJob.id,
+					model: opusJob.model,
+					checkpoint,
+					operation: "correctness",
+					outcome: "no-findings",
+				},
+			],
+		}),
+	);
+	writeFileSync(
+		path.join(opusAsyncDir, "status.json"),
+		JSON.stringify({
+			state: "completed",
+			steps: [{ structuredOutputPath: opusStructuredOutput }],
+		}),
+	);
+	const completion = {
+		message: {
+			role: "custom",
+			customType: "intercom_message",
+			content: "subagent results: Step 0 (work-background-verifier): completed",
+		},
+	};
+	await hooks.message_end(completion, ctx);
+	assert(
+		aborts === 1 &&
+			followUps.length === 0 &&
+			loadVerifierStore(cwd).batches[job.batchId].presentationStatus ===
+				"pending",
+		"the verifier wake turn is aborted before synthesis is queued",
+	);
+	const hiddenWakeAbort = await hooks.message_end(
+		{
+			message: {
+				role: "assistant",
+				content: [],
+				stopReason: "aborted",
+				errorMessage: "Operation aborted",
+			},
+		},
+		ctx,
+	);
+	assert(
+		hiddenWakeAbort?.message?.stopReason === "stop" &&
+			!hiddenWakeAbort.message.errorMessage,
+		"the internal verifier wake cancellation is not shown as Operation aborted",
+	);
+	await hooks.agent_settled({}, ctx);
+	assert(
+		followUps.length === 1 &&
+			followUps[0].options?.deliverAs === "followUp" &&
+			followUps[0].text.includes("analysis-only synthesis handoff") &&
+			followUps[0].text.includes("Return only a complete Markdown document") &&
+			followUps[0].text.includes("feature.js") &&
+			loadVerifierStore(cwd).batches[job.batchId].presentationStatus ===
+				"pending",
+		"settlement starts synthesis only after the verifier wake abort completes",
+	);
+	await hooks.before_agent_start(
+		{ prompt: followUps[0].text, systemPrompt: "" },
+		ctx,
+	);
+	await hooks.agent_start({}, ctx);
+	assert(
+		(await hooks.message_end(
+			{
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: "Inspecting current source." }],
+					stopReason: "toolUse",
+				},
+			},
+			ctx,
+		)) === undefined,
+		"intermediate synthesis tool turns are never persisted as the report",
+	);
+	const synthesis = await hooks.message_end(
+		{
+			message: {
+				role: "assistant",
+				content: [
+					{
+						type: "text",
+						text: "# Background analysis\n\n## Actionable items\n\n1. Fix it.\n",
+					},
+				],
+				stopReason: "stop",
+			},
+		},
+		ctx,
+	);
+	const reportPath = synthesis?.message?.content?.[0]?.text
+		?.split("Analysis report: ")[1]
+		?.split("\n")[0];
+	assert(
+		reportPath &&
+			existsSync(reportPath) &&
+			(process.platform === "win32" ||
+				((statSync(path.dirname(reportPath)).mode & 0o077) === 0 &&
+					(statSync(reportPath).mode & 0o077) === 0)) &&
+			readFileSync(reportPath, "utf8").includes("## Actionable items") &&
+			synthesis.message.content[0].text.includes(
+				"Feed this file into brainstorm, plan, or work-big",
+			) &&
+			loadVerifierStore(cwd).batches[job.batchId].presentationStatus ===
+				"queued",
+		"only a completed, persisted synthesis marks the batch as presented",
+	);
+	rmSync(path.dirname(reportPath), { recursive: true, force: true });
+	await hooks.agent_settled({}, ctx);
+	await hooks.agent_start({}, ctx);
+	await hooks.message_end(completion, ctx);
+	assert(
+		aborts === 2 && followUps.length === 1,
+		"a later completion banner is hidden without duplicating the synthesis",
+	);
+	const hiddenAbort = await hooks.message_end(
+		{
+			message: {
+				role: "assistant",
+				content: [],
+				stopReason: "aborted",
+				errorMessage: "Operation aborted",
+			},
+		},
+		ctx,
+	);
+	assert(
+		hiddenAbort?.message?.stopReason === "stop" &&
+			!hiddenAbort.message.errorMessage,
+		"the internal verifier wake cancellation is not shown as Operation aborted",
+	);
+	await hooks.agent_settled({}, ctx);
+	await hooks.before_agent_start(
+		{ prompt: "Current user request", systemPrompt: "" },
+		ctx,
+	);
+	await hooks.message_end(completion, ctx);
+	assert(
+		aborts === 2,
+		"a verifier notification cannot abort a pending prompt-backed user turn",
+	);
+	await hooks.agent_start({}, ctx);
+	await hooks.message_end(completion, ctx);
+	assert(
+		aborts === 2,
+		"a verifier notification cannot abort an active prompt-backed user turn",
+	);
+	assert(
+		(await hooks.message_end(
+			{
+				message: {
+					role: "assistant",
+					content: [],
+					stopReason: "aborted",
+					errorMessage: "User aborted",
+				},
+			},
+			ctx,
+		)) === undefined,
+		"real user aborts remain visible",
 	);
 	process.stdout.write(
 		"ok - completed task commit fires a background verifier in a disposable repository\n",

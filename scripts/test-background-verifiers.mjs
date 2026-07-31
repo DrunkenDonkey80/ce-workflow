@@ -40,6 +40,10 @@ import {
 	renderVerifierFinding,
 	verifierTelemetryEvents,
 } from "../extensions/background-verifiers.js";
+const gitConfigCount = Number(process.env.GIT_CONFIG_COUNT ?? 0);
+process.env.GIT_CONFIG_COUNT = String(gitConfigCount + 1);
+process.env[`GIT_CONFIG_KEY_${gitConfigCount}`] = "core.autocrlf";
+process.env[`GIT_CONFIG_VALUE_${gitConfigCount}`] = "false";
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 const previousSerial = process.env.WORK_ORCH_SERIAL;
 const isolatedAgentDir = mkdtempSync(
@@ -315,6 +319,7 @@ try {
 	git("add", "tracked.txt");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
 	writeFileSync(path.join(gitCwd, "untracked.txt"), "untracked\n");
+	writeFileSync(path.join(gitCwd, "a-binary.so"), Buffer.alloc(32_001, 1));
 	writeFileSync(
 		path.join(gitCwd, "large.txt"),
 		Array.from(
@@ -339,8 +344,14 @@ try {
 			requests.push(request);
 			return {
 				ok: true,
-				runId: `run-${requests.length}`,
-				asyncDir: `/tmp/run-${requests.length}`,
+				reply: {
+					data: {
+						details: {
+							asyncId: `run-${requests.length}`,
+							asyncDir: `/tmp/run-${requests.length}`,
+						},
+					},
+				},
 			};
 		},
 	};
@@ -396,6 +407,7 @@ try {
 	);
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
 	assert.deepEqual(requests[0].paths.sort(), [
+		"a-binary.so",
 		"large.txt",
 		"tracked.txt",
 		"untracked.txt",
@@ -426,6 +438,16 @@ try {
 	assert.equal(
 		executeVerifierGrep(requests[0].cwd, { query: "unstaged" }).matches[0].path,
 		"tracked.txt",
+		"broad grep skips binary or overlong-line files",
+	);
+	assert.throws(
+		() =>
+			executeVerifierGrep(requests[0].cwd, {
+				path: "a-binary.so",
+				query: "needle",
+			}),
+		/line exceeds the read limit/,
+		"targeted grep retains the line-size safety limit",
 	);
 	assert.throws(() =>
 		executeVerifierRead(requests[0].cwd, { path: "/etc/passwd" }),
@@ -1228,13 +1250,105 @@ try {
 		"raw private artifact is retained",
 	);
 
+	// Pi-subagents persists schema-validated output inside the async run, even when no requested output file exists.
+	const structuredCwd = repo();
+	initVerifierStore(structuredCwd);
+	const structuredBatch = mutateVerifierStore(structuredCwd, (state) =>
+		createBatch(state, {
+			checkpoint,
+			profiles: [
+				{
+					model: "openai/gpt-5",
+					operations: ["correctness"],
+					thinking: "low",
+				},
+			],
+			...options,
+		}),
+	);
+	const structuredJob = Object.values(loadVerifierStore(structuredCwd).jobs)[0];
+	const structuredWorkspace = mkdtempSync(
+		path.join(os.tmpdir(), "ce-verifier-workspace-"),
+	);
+	mkdirSync(path.join(structuredWorkspace, "extensions"), { recursive: true });
+	writeFileSync(
+		path.join(structuredWorkspace, "extensions", "work-models.js"),
+		Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join("\n"),
+	);
+	writeFileSync(
+		path.join(structuredWorkspace, ".ce-verifier-workspace.json"),
+		JSON.stringify({ version: 1, paths: checkpoint.paths }),
+	);
+	const missingRequestedOutput = path.join(
+		path.dirname(verifierStorePath(structuredCwd)),
+		"runtime",
+		"outputs",
+		`${structuredJob.id}.json`,
+	);
+	mutateVerifierStore(structuredCwd, (state) =>
+		queueVerifierJobs(state, {
+			batchId: structuredBatch.id,
+			requests: {
+				[structuredJob.id]: {
+					logicalJobId: structuredJob.id,
+					model: structuredJob.model,
+					cwd: structuredWorkspace,
+					output: missingRequestedOutput,
+				},
+			},
+		}),
+	);
+	const structuredAsync = path.join(structuredCwd, "async");
+	mkdirSync(structuredAsync);
+	const structuredOutput = path.join(structuredAsync, "structured-output.json");
+	mutateVerifierStore(structuredCwd, (state) =>
+		recordVerifierLaunch(state, {
+			jobId: structuredJob.id,
+			ok: true,
+			identity: { runId: "structured", asyncDir: structuredAsync },
+		}),
+	);
+	writeFileSync(
+		path.join(structuredAsync, "status.json"),
+		JSON.stringify({
+			state: "failed",
+			steps: [{ structuredOutputPath: structuredOutput }],
+		}),
+	);
+	writeFileSync(
+		structuredOutput,
+		reportPayload(structuredJob, findingPayload(10, 12)),
+	);
+	assert.deepEqual(
+		reconcileVerifierRuns(structuredCwd),
+		[structuredJob.id],
+		"schema-validated async output reconciles without the requested output file",
+	);
+	const structuredStore = loadVerifierStore(structuredCwd);
+	assert.equal(Object.keys(structuredStore.findings).length, 1);
+	assert.equal(
+		verifierStatus(structuredStore),
+		"completed-awaiting-triage",
+		"a valid structured report survives a later non-reporting runner failure",
+	);
+
 	// Traversal, spoofing, depth, count, and size limits are quarantined and never actionable.
 	const malformedCwd = repo();
 	initVerifierStore(malformedCwd);
 	const malformedBatch = mutateVerifierStore(malformedCwd, (state) =>
 		createBatch(state, {
 			checkpoint,
-			profiles: [reportProfiles[0]],
+			profiles: [
+				{
+					...reportProfiles[0],
+					operations: [
+						"correctness",
+						"maintainability",
+						"performance",
+						"security",
+					],
+				},
+			],
 			...options,
 		}),
 	);
@@ -1286,14 +1400,59 @@ try {
 	);
 	writeFileSync(
 		malformedOutput,
-		reportPayload(malformedJob, findingPayload(999, 999)),
+		JSON.stringify({
+			version: 1,
+			jobId: malformedJob.id,
+			model: malformedJob.model,
+			checkpoint,
+			results: [
+				{
+					...JSON.parse(reportPayload(malformedJob, findingPayload(999, 999)))
+						.results[0],
+					findings: [findingPayload(999, 999), findingPayload(1, 1)],
+				},
+				{
+					jobId: malformedJob.id,
+					model: malformedJob.model,
+					checkpoint,
+					operation: "security",
+					outcome: "findings",
+					findings: [findingPayload(1, 1, "security")],
+				},
+				{
+					jobId: malformedJob.id,
+					model: malformedJob.model,
+					checkpoint,
+					operation: "performance",
+					outcome: "findings",
+					findings: [findingPayload(1, 999, "performance")],
+				},
+				{
+					jobId: malformedJob.id,
+					model: malformedJob.model,
+					checkpoint,
+					operation: "maintainability",
+					outcome: "findings",
+					findings: Array.from({ length: 101 }, () =>
+						findingPayload(1, 1, "maintainability"),
+					),
+				},
+			],
+		}),
 	);
 	reconcileVerifierRuns(malformedCwd);
 	const malformedStore = loadVerifierStore(malformedCwd);
 	assert.equal(
 		Object.keys(malformedStore.findings).length,
-		0,
-		"out-of-range output is never actionable",
+		3,
+		"an invalid finding cannot discard valid sibling findings or operations",
+	);
+	const malformedFindings = Object.values(malformedStore.findings);
+	assert.equal(
+		malformedFindings.find((finding) => finding.operation === "performance")
+			?.endLine,
+		1,
+		"a valid start with an overlong end is clamped to the source file",
 	);
 	assert.equal(
 		Object.keys(malformedStore.quarantines).length,
@@ -1301,11 +1460,17 @@ try {
 		"out-of-range output is quarantined",
 	);
 	assert.equal(verifierStatus(malformedStore), "failed/orphaned");
-	assert(
-		Object.values(malformedStore.reports).every(
-			(report) => report.outcome === "failed",
-		),
-		"malformed terminal reports fail every requested operation",
+	assert.deepEqual(
+		Object.values(malformedStore.reports)
+			.map((report) => [report.operation, report.outcome])
+			.sort(),
+		[
+			["correctness", "findings"],
+			["maintainability", "failed"],
+			["performance", "findings"],
+			["security", "findings"],
+		],
+		"only an operation with no usable findings fails",
 	);
 
 	// U5: completed groups claim atomically, require changed-code evidence, and stay gated through accepted fix evidence.
