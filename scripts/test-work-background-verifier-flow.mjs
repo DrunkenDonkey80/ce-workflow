@@ -379,6 +379,7 @@ try {
 		)) === undefined,
 		"intermediate synthesis tool turns are never persisted as the report",
 	);
+	seedNativeStore(cwd, []);
 	const synthesis = await hooks.message_end(
 		{
 			message: {
@@ -397,6 +398,12 @@ try {
 	const reportPath = synthesis?.message?.content?.[0]?.text
 		?.split("Analysis report: ")[1]
 		?.split("\n")[0];
+	const synthesizedText = synthesis.message.content[0].text;
+	const synthesizedItems = Object.values(
+		JSON.parse(
+			readFileSync(path.join(cwd, ".ce-workflow", "work-items.json"), "utf8"),
+		).items,
+	);
 	assert(
 		reportPath &&
 			existsSync(reportPath) &&
@@ -404,12 +411,25 @@ try {
 				((statSync(path.dirname(reportPath)).mode & 0o077) === 0 &&
 					(statSync(reportPath).mode & 0o077) === 0)) &&
 			readFileSync(reportPath, "utf8").includes("## Actionable items") &&
-			synthesis.message.content[0].text.includes(
-				"Feed this file into brainstorm, plan, or work-big",
-			) &&
+			synthesizedText.includes("F7 → Resume work") &&
+			!synthesizedText.includes("Feed this file") &&
+			synthesizedItems.some((item) => item.labels?.includes("wo:misc")) &&
 			loadVerifierStore(cwd).batches[job.batchId].presentationStatus ===
 				"queued",
-		"only a completed, persisted synthesis marks the batch as presented",
+		"completed synthesis persists its report, creates Misc, and routes to Resume",
+	);
+	seedNativeStore(cwd, []);
+	await hooks.session_start({}, ctx);
+	assert(
+		Object.values(
+			JSON.parse(
+				readFileSync(
+					path.join(cwd, ".ce-workflow", "work-items.json"),
+					"utf8",
+				),
+			).items,
+		).some((item) => item.labels?.includes("wo:misc")),
+		"session startup repairs missing Misc for findings saved by an earlier Analyze",
 	);
 	rmSync(path.dirname(reportPath), { recursive: true, force: true });
 	await hooks.agent_settled({}, ctx);

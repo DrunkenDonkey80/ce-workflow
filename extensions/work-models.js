@@ -11081,14 +11081,8 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 			options.ownerSession
 		) {
 			try {
-				if (
-					Object.values(loadVerifierStore(cwd).findings).some(
-						(finding) => !finding.dispositionId,
-					)
-				) {
-					ensureMiscRoadmap(cwd);
+				if (ensureVerifierTriageRoadmap(cwd))
 					resolved = resolveResumeTarget(cwd, target);
-				}
 			} catch {
 				// No completed verifier report needs a fallback roadmap.
 			}
@@ -11617,6 +11611,7 @@ function miscRoadmap(cwd) {
 }
 
 function ensureMiscRoadmap(cwd) {
+	initStore(cwd);
 	return nativeIssue(
 		mutateStore(cwd, (store) => {
 			const existing = miscRoadmapIn(store);
@@ -11633,6 +11628,20 @@ function ensureMiscRoadmap(cwd) {
 			});
 		}),
 	);
+}
+
+function ensureVerifierTriageRoadmap(cwd) {
+	try {
+		if (
+			Object.values(loadVerifierStore(cwd).findings).some(
+				(finding) => !finding.dispositionId,
+			)
+		)
+			return ensureMiscRoadmap(cwd);
+	} catch (cause) {
+		if (cause?.category !== "missing") throw cause;
+	}
+	return null;
 }
 
 function ordinaryTaskEpicError(resolved) {
@@ -21515,6 +21524,11 @@ export default function workModelsExtension(pi) {
 				// Lane state must not prevent the rest of session startup.
 			}
 			reconcileBackgroundVerifierRuns(ctx.cwd, pi);
+			try {
+				ensureVerifierTriageRoadmap(ctx.cwd);
+			} catch {
+				// Saved findings must not prevent the rest of session startup.
+			}
 		}
 		activeWorkGoalCwd = ctx.cwd;
 		activeWorkGoal = loadWorkGoalFromSession(ctx);
@@ -22132,22 +22146,27 @@ export default function workModelsExtension(pi) {
 					flag: "wx",
 					mode: 0o600,
 				});
-				mutateVerifierStore(ctx.cwd, (store) => {
+				const pendingFindings = mutateVerifierStore(ctx.cwd, (store) => {
 					for (const batchId of report.batchIds) {
 						const batch = store.batches[batchId];
 						if (batch?.presentationStatus !== "pending") continue;
 						batch.presentationStatus = "queued";
 						batch.presentedAt = new Date().toISOString();
 					}
-					return report.batchIds;
+					return Object.values(store.findings).some(
+						(finding) => !finding.dispositionId,
+					);
 				});
+				if (pendingFindings) ensureMiscRoadmap(ctx.cwd);
 				activeVerifierSynthesis = null;
 				const replacement = {
 					...event.message,
 					content: [
 						{
 							type: "text",
-							text: `Analysis report: ${report.path}\n\nFeed this file into brainstorm, plan, or work-big.`,
+							text: pendingFindings
+								? `Analysis report: ${report.path}\n\nFindings are ready under Misc. Open F7 → Resume work to triage one group at a time.`
+								: `Analysis report: ${report.path}\n\nNo actionable findings require triage.`,
 						},
 					],
 				};
