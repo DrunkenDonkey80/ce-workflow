@@ -1501,8 +1501,15 @@ function leaseExpiry(input) {
 function groupClaim(next, group) {
 	return group.claimId ? next.claims[group.claimId] : undefined;
 }
+function findingNeedsTriage(store, finding) {
+	const report = store.reports[finding.reportId];
+	const batch = report ? store.batches[report.batchId] : undefined;
+	return !finding.dispositionId && !batch?.analysisMaterializedAt;
+}
 function remainingFindings(next, group) {
-	return group.findingIds.filter((id) => !next.findings[id].dispositionId);
+	return group.findingIds.filter((id) =>
+		findingNeedsTriage(next, next.findings[id]),
+	);
 }
 function updateGroupTriage(next, group) {
 	const members = group.findingIds.map((id) => next.findings[id]);
@@ -2263,7 +2270,11 @@ export function verifierStatus(store, configured = undefined) {
 		return "failed/orphaned";
 	if (jobs.some((job) => ["queued", "running"].includes(job.status)))
 		return "queued/running";
-	if (Object.values(store.findings).some((finding) => !finding.dispositionId))
+	if (
+		Object.values(store.findings).some((finding) =>
+			findingNeedsTriage(store, finding),
+		)
+	)
 		return "completed-awaiting-triage";
 	return "fully-triaged";
 }

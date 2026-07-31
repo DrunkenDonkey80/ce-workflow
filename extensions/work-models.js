@@ -10704,6 +10704,189 @@ function verifierAnalysisReportPath(batchIds) {
 	return join(dir, `${safeHistoryPathPart(batchIds.join("-"))}.md`);
 }
 
+export function parseVerifierAnalysisItems(markdown) {
+	const heading = /^##\s+Actionable items\s*$/im.exec(markdown);
+	if (!heading) return null;
+	const tail = markdown.slice(heading.index + heading[0].length);
+	const nextSection = /^##\s+/m.exec(tail);
+	const section = nextSection ? tail.slice(0, nextSection.index) : tail;
+	const headings = [...section.matchAll(/^###\s+(\d+)\.\s+(.+?)\s*$/gm)];
+	if (!headings.length)
+		return /^\s*(?:none|no actionable findings)\.?\s*$/i.test(section)
+			? []
+			: null;
+	const items = headings.map((match, index) => ({
+		number: Number(match[1]),
+		title: match[2].trim(),
+		description: section
+			.slice(
+				match.index + match[0].length,
+				headings[index + 1]?.index ?? section.length,
+			)
+			.trim(),
+	}));
+	const requiredFields = [
+		"Priority",
+		"Source",
+		"Root cause",
+		"Evidence",
+		"Recommendation",
+	];
+	if (
+		items.some(
+			(item, index) =>
+				item.number !== index + 1 ||
+				!item.title ||
+				requiredFields.some(
+					(field) =>
+						!new RegExp(`\\*\\*${field}:\\*\\*`, "i").test(
+							item.description,
+						),
+				),
+		)
+	)
+		return null;
+	return items.map(({ title, description }) => ({ title, description }));
+}
+
+function analysisBatchLabel(batchId) {
+	return `wo:analysis-batch:${batchId}`;
+}
+
+export function materializeVerifierAnalysis(
+	cwd,
+	{ batchIds, markdown, reportPath },
+) {
+	const actionItems = parseVerifierAnalysisItems(markdown);
+	if (actionItems === null) return { recognized: false, count: 0 };
+	const verifierStore = loadVerifierStore(cwd);
+	const latestBatch = batchIds
+		.map((id) => verifierStore.batches[id])
+		.filter(Boolean)
+		.sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+		.at(-1);
+	if (!latestBatch) return { recognized: false, count: 0 };
+	const batchLabel = analysisBatchLabel(latestBatch.id);
+	let misc;
+	if (actionItems.length) misc = ensureMiscRoadmap(cwd);
+	else
+		try {
+			misc = miscRoadmap(cwd);
+		} catch (cause) {
+			if (!(cause instanceof WorkStoreError) || cause.category !== "missing")
+				throw cause;
+		}
+	let tasks = [];
+	if (misc)
+		tasks = mutateStore(cwd, (store) => {
+			const existing = Object.values(store.items).filter(
+				(item) =>
+					item.parentId === misc.id && item.labels?.includes(batchLabel),
+			);
+			if (actionItems.length && existing.length) return existing;
+			for (const item of Object.values(store.items))
+				if (
+					item.status === "open" &&
+					item.labels?.includes("wo:analysis") &&
+					(!item.labels.includes(batchLabel) || !actionItems.length)
+				)
+					updateWorkItem(store, item.id, {
+						status: "closed",
+						labels: [...new Set([...item.labels, "wo:analysis-superseded"])],
+						notes: [
+							...(item.notes ?? []),
+							`Superseded by Analyze batch ${latestBatch.id}.`,
+						],
+					});
+			const created = [];
+			for (const item of actionItems)
+				created.push(
+					createWorkItem(store, {
+						title: compactWorkItemTitle(item.title),
+						type: "task",
+						parentId: misc.id,
+						description: item.description,
+						labels: ["wo:analysis", "wo:debug", batchLabel],
+						notes: [`Synthesized by Analyze from file:${reportPath}`],
+						dependencies: created.length ? [created.at(-1).id] : [],
+					}),
+				);
+			return created;
+		});
+	const timestamp = new Date().toISOString();
+	const cutoff = Date.parse(latestBatch.createdAt);
+	mutateVerifierStore(cwd, (store) => {
+		for (const batch of Object.values(store.batches))
+			if (
+				batch.status === "terminal" &&
+				(Date.parse(batch.createdAt) <= cutoff || batchIds.includes(batch.id))
+			) {
+				batch.analysisMaterializedAt = timestamp;
+				batch.analysisSupersededBy = latestBatch.id;
+			}
+		const latest = store.batches[latestBatch.id];
+		latest.analysisReportPath = reportPath;
+		latest.analysisItemCount = tasks.length;
+	});
+	return { recognized: true, count: tasks.length, tasks };
+}
+
+function findVerifierAnalysisReport(batchId) {
+	const matches = [];
+	try {
+		for (const directory of readdirSync(tmpdir(), { withFileTypes: true })) {
+			if (!directory.isDirectory() || !directory.name.startsWith("ce-workflow-analysis-"))
+				continue;
+			const dir = join(tmpdir(), directory.name);
+			for (const file of readdirSync(dir, { withFileTypes: true }))
+				if (file.isFile() && file.name.endsWith(".md") && file.name.includes(batchId)) {
+					const path = join(dir, file.name);
+					matches.push({ path, mtime: statSync(path).mtimeMs });
+				}
+		}
+	} catch {
+		return null;
+	}
+	return matches.sort((left, right) => right.mtime - left.mtime)[0]?.path ?? null;
+}
+
+function recoverLatestVerifierAnalysis(cwd) {
+	let store;
+	try {
+		store = loadVerifierStore(cwd);
+	} catch {
+		return null;
+	}
+	const batches = Object.values(store.batches)
+		.filter(
+			(batch) =>
+				batch.status === "terminal" && batch.presentationStatus === "queued",
+		)
+		.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+	for (const batch of batches) {
+		const batchLabel = analysisBatchLabel(batch.id);
+		try {
+			if (
+				Object.values(loadStore(cwd).items).some((item) =>
+					item.labels?.includes(batchLabel),
+				)
+			)
+				return { recognized: true, count: batch.analysisItemCount ?? 0 };
+		} catch {
+			// A missing native store is repaired from the persisted analysis report.
+		}
+		const reportPath = batch.analysisReportPath ?? findVerifierAnalysisReport(batch.id);
+		if (!reportPath || !existsSync(reportPath)) continue;
+		const result = materializeVerifierAnalysis(cwd, {
+			batchIds: [batch.id],
+			markdown: readFileSync(reportPath, "utf8"),
+			reportPath,
+		});
+		if (result.recognized) return result;
+	}
+	return null;
+}
+
 function verifierPresentationPrompt(store, batchId) {
 	const batch = store.batches[batchId];
 	if (!batch || batch.status !== "terminal") return "";
@@ -10762,7 +10945,7 @@ async function presentPendingVerifierBatches(cwd, ctx, pi) {
 			ctx,
 			[
 				`<!-- ${marker} -->`,
-				"Return only a complete Markdown document without fences or preamble. Use these sections: # Background analysis, ## Summary, ## Actionable items, ## Rejected findings, ## Coverage gaps, and ## Suggested next step. Every actionable item must include priority, source path and line, root cause, evidence, and a concrete recommendation. Include the analysis batch IDs. This document will be saved automatically for later brainstorm, plan, or work-big input.",
+				"Return only a complete Markdown document without fences or preamble. Use these sections: # Background analysis, ## Summary, ## Actionable items, ## Rejected findings, ## Coverage gaps, and ## Suggested next step. Under ## Actionable items, write each merged root cause as a `### <number>. <title>` section and use no other level-three headings. Every actionable item must include priority, source path and line, root cause, evidence, and a concrete recommendation. If none remain, write exactly `None.` under ## Actionable items. Include the analysis batch IDs. Analyze will save the report and materialize this synthesized list as active Misc work.",
 				prompts.join("\n\n---\n\n"),
 			].join("\n\n"),
 			pi,
@@ -21525,6 +21708,7 @@ export default function workModelsExtension(pi) {
 			}
 			reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 			try {
+				recoverLatestVerifierAnalysis(ctx.cwd);
 				ensureVerifierTriageRoadmap(ctx.cwd);
 			} catch {
 				// Saved findings must not prevent the rest of session startup.
@@ -22157,16 +22341,33 @@ export default function workModelsExtension(pi) {
 						(finding) => !finding.dispositionId,
 					);
 				});
-				if (pendingFindings) ensureMiscRoadmap(ctx.cwd);
+				let materialized = { recognized: true, count: 0 };
+				if (pendingFindings)
+					try {
+						materialized = materializeVerifierAnalysis(ctx.cwd, {
+							batchIds: report.batchIds,
+							markdown,
+							reportPath: report.path,
+						});
+					} catch {
+						materialized = { recognized: false, count: 0 };
+					}
+				if (pendingFindings && !materialized.recognized)
+					ensureMiscRoadmap(ctx.cwd);
 				activeVerifierSynthesis = null;
 				const replacement = {
 					...event.message,
 					content: [
 						{
 							type: "text",
-							text: pendingFindings
-								? `Analysis report: ${report.path}\n\nFindings are ready under Misc. Open F7 → Resume work to triage one group at a time.`
-								: `Analysis report: ${report.path}\n\nNo actionable findings require triage.`,
+							text:
+								pendingFindings && materialized.recognized
+									? materialized.count
+										? `Analysis report: ${report.path}\n\n${materialized.count} synthesized item${materialized.count === 1 ? " is" : "s are"} ready under Misc. Open F7 → Resume work.`
+										: `Analysis report: ${report.path}\n\nNo actionable findings require triage.`
+									: pendingFindings
+										? `Analysis report: ${report.path}\n\nThe synthesized list could not be materialized; raw findings remain available under Misc.`
+										: `Analysis report: ${report.path}\n\nNo actionable findings require triage.`,
 						},
 					],
 				};

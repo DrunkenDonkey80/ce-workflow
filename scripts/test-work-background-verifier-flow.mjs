@@ -17,11 +17,20 @@ const {
 	buildWorkStats,
 	default: workModelsExtension,
 	launchCurrentTaskReadOnlyLanes,
+	materializeVerifierAnalysis,
+	parseVerifierAnalysisItems,
 } = await import(
 	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
 		.href
 );
-const { loadVerifierStore } = await import(
+const {
+	addFinding,
+	createBatch,
+	loadVerifierStore,
+	mutateVerifierStore,
+	recordOperationResult,
+	verifierStatus,
+} = await import(
 	pathToFileURL(
 		path.join(import.meta.dirname, "../extensions/background-verifiers.js"),
 	).href
@@ -29,6 +38,18 @@ const { loadVerifierStore } = await import(
 const { assert, seedNativeStore } = await import(
 	pathToFileURL(path.join(import.meta.dirname, "./work-command-fixture.mjs"))
 		.href
+);
+
+const requiredItemFields =
+	"- **Priority:** P1\n- **Source:** `feature.js:1`\n- **Root cause:** cause\n- **Evidence:** evidence\n- **Recommendation:** fix\n";
+assert(
+	parseVerifierAnalysisItems(
+		`## Actionable items\n\n### Finding without a number\n\n${requiredItemFields}`,
+	) === null &&
+		parseVerifierAnalysisItems(
+			"## Actionable items\n\n### 2. Wrong sequence\n\n- **Priority:** P1\n",
+		) === null,
+	"analysis materialization rejects malformed or incomplete synthesis headings",
 );
 
 const cwd = mkdtempSync(path.join(tmpdir(), "work-verifier-flow-"));
@@ -379,6 +400,53 @@ try {
 		)) === undefined,
 		"intermediate synthesis tool turns are never persisted as the report",
 	);
+	const firstCheckpoint = loadVerifierStore(cwd).batches[job.batchId].checkpoint;
+	const newerCheckpoint = {
+		...firstCheckpoint,
+		snapshot: "c".repeat(40),
+		patchHash: "d".repeat(64),
+	};
+	const newerBatch = mutateVerifierStore(cwd, (state) =>
+		createBatch(state, {
+			checkpoint: newerCheckpoint,
+			profiles: [
+				{
+					model: "fixture/newer",
+					operations: ["correctness"],
+					thinking: "low",
+				},
+			],
+			now: "2099-01-01T00:00:00.000Z",
+		}),
+	);
+	const newerJob = Object.values(loadVerifierStore(cwd).jobs).find(
+		(candidate) => candidate.batchId === newerBatch.id,
+	);
+	const newerReport = mutateVerifierStore(cwd, (state) =>
+		recordOperationResult(state, {
+			jobId: newerJob.id,
+			operation: "correctness",
+			outcome: "findings",
+			now: "2099-01-01T00:00:01.000Z",
+		}),
+	);
+	mutateVerifierStore(cwd, (state) =>
+		addFinding(state, {
+			reportId: newerReport.id,
+			operation: "correctness",
+			model: newerJob.model,
+			checkpoint: newerCheckpoint,
+			path: "feature.js",
+			startLine: 1,
+			endLine: 1,
+			category: "correctness",
+			severity: "high",
+			rationale: "newer race",
+			evidence: "feature.js:1",
+			suggestedAction: "fix newer race",
+			now: "2099-01-01T00:00:02.000Z",
+		}),
+	);
 	seedNativeStore(cwd, []);
 	const synthesis = await hooks.message_end(
 		{
@@ -387,7 +455,7 @@ try {
 				content: [
 					{
 						type: "text",
-						text: "# Background analysis\n\n## Actionable items\n\n1. Fix it.\n",
+						text: "# Background analysis\n\n## Actionable items\n\n### 1. Fix the race\n\n- **Priority:** P1\n- **Source:** `feature.js:1`\n- **Root cause:** The update is not serialized.\n- **Evidence:** Concurrent calls overlap.\n- **Recommendation:** Serialize the update.\n\n### 2. Clean up state\n\n- **Priority:** P2\n- **Source:** `feature.js:1`\n- **Root cause:** Cleanup is incomplete.\n- **Evidence:** State remains set.\n- **Recommendation:** Reset state in finally.\n",
 					},
 				],
 				stopReason: "stop",
@@ -404,6 +472,11 @@ try {
 			readFileSync(path.join(cwd, ".ce-workflow", "work-items.json"), "utf8"),
 		).items,
 	);
+	const synthesizedTasks = synthesizedItems.filter((item) => item.parentId);
+	const raceTask = synthesizedTasks.find((item) => item.title === "Fix the race");
+	const cleanupTask = synthesizedTasks.find(
+		(item) => item.title === "Clean up state",
+	);
 	assert(
 		reportPath &&
 			existsSync(reportPath) &&
@@ -411,15 +484,82 @@ try {
 				((statSync(path.dirname(reportPath)).mode & 0o077) === 0 &&
 					(statSync(reportPath).mode & 0o077) === 0)) &&
 			readFileSync(reportPath, "utf8").includes("## Actionable items") &&
+			synthesizedText.includes("2 synthesized items") &&
 			synthesizedText.includes("F7 → Resume work") &&
 			!synthesizedText.includes("Feed this file") &&
 			synthesizedItems.some((item) => item.labels?.includes("wo:misc")) &&
+			synthesizedTasks.length === 2 &&
+			raceTask.labels.includes("wo:analysis") &&
+			raceTask.labels.includes("wo:debug") &&
+			cleanupTask.dependencies.includes(raceTask.id) &&
 			loadVerifierStore(cwd).batches[job.batchId].presentationStatus ===
 				"queued",
-		"completed synthesis persists its report, creates Misc, and routes to Resume",
+		"completed synthesis persists its report and materializes its merged items under Misc",
+	);
+	assert(
+		verifierStatus(loadVerifierStore(cwd)) === "completed-awaiting-triage",
+		"a newer batch that was not represented by the report remains triageable",
+	);
+	const newerMarkdown = `# Background analysis
+
+## Actionable items
+
+### 1. Fix the newest race
+
+${requiredItemFields}`;
+	const newerReportPath = path.join(path.dirname(reportPath), "newer.md");
+	writeFileSync(newerReportPath, newerMarkdown);
+	mutateVerifierStore(cwd, (state) => {
+		state.batches[newerBatch.id].presentationStatus = "queued";
+		state.batches[newerBatch.id].presentedAt = "2099-01-01T00:00:03.000Z";
+	});
+	const newerMaterialization = materializeVerifierAnalysis(cwd, {
+		batchIds: [newerBatch.id],
+		markdown: newerMarkdown,
+		reportPath: newerReportPath,
+	});
+	materializeVerifierAnalysis(cwd, {
+		batchIds: [newerBatch.id],
+		markdown: newerMarkdown,
+		reportPath: newerReportPath,
+	});
+	const repeatedItems = Object.values(
+		JSON.parse(
+			readFileSync(path.join(cwd, ".ce-workflow", "work-items.json"), "utf8"),
+		).items,
+	);
+	assert(
+		newerMaterialization.count === 1 &&
+			repeatedItems.filter(
+				(item) => item.status === "open" && item.labels?.includes("wo:analysis"),
+			).length === 1 &&
+			repeatedItems.filter((item) => item.labels?.includes("wo:analysis"))
+				.length === 3 &&
+			repeatedItems
+				.filter((item) => item.title !== "Fix the newest race" && item.parentId)
+				.every((item) => item.status === "closed") &&
+			verifierStatus(loadVerifierStore(cwd)) === "fully-triaged",
+		"a newer synthesis supersedes prior active tasks, is idempotent, and suppresses covered raw findings",
 	);
 	seedNativeStore(cwd, []);
 	await hooks.session_start({}, ctx);
+	assert(
+		Object.values(
+			JSON.parse(
+				readFileSync(path.join(cwd, ".ce-workflow", "work-items.json"), "utf8"),
+			).items,
+		).filter((item) => item.parentId && item.labels?.includes("wo:analysis"))
+			.length === 1,
+		"session startup rematerializes the latest synthesized list without duplicates",
+	);
+	const emptyReportPath = path.join(path.dirname(reportPath), "empty.md");
+	const emptyMarkdown = "# Background analysis\n\n## Actionable items\n\nNone.\n";
+	writeFileSync(emptyReportPath, emptyMarkdown);
+	materializeVerifierAnalysis(cwd, {
+		batchIds: [newerBatch.id],
+		markdown: emptyMarkdown,
+		reportPath: emptyReportPath,
+	});
 	assert(
 		Object.values(
 			JSON.parse(
@@ -428,8 +568,10 @@ try {
 					"utf8",
 				),
 			).items,
-		).some((item) => item.labels?.includes("wo:misc")),
-		"session startup repairs missing Misc for findings saved by an earlier Analyze",
+		).every(
+			(item) => item.status !== "open" || !item.labels?.includes("wo:analysis"),
+		),
+		"an empty latest synthesis closes previously active analysis tasks",
 	);
 	rmSync(path.dirname(reportPath), { recursive: true, force: true });
 	await hooks.agent_settled({}, ctx);
