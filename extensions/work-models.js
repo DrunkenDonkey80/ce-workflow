@@ -9878,7 +9878,7 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 		});
 		ctx.ui.notify(
 			scheduled.status === "queued"
-				? `Analysis queued as ${scheduled.batch.id}. Inspect with /work-status; triage with /work-resume.`
+				? `Analysis queued as ${scheduled.batch.id}. Inspect with F7 → Status; triage with F7 → Resume work.`
 				: `Analysis ${scheduled.status}: ${scheduled.reason ?? "not scheduled"}${scheduled.batch?.id ? ` (${scheduled.batch.id})` : ""}`,
 			scheduled.status === "queued" ? "info" : "warning",
 		);
@@ -10808,7 +10808,7 @@ function verifierTriageState(cwd, ownerSession, resumeTarget) {
 	let claims;
 	try {
 		claims = mutateVerifierStore(cwd, (store) =>
-			claimCompletedGroups(store, { ownerSession, resumeTarget }),
+			claimCompletedGroups(store, { ownerSession, resumeTarget, limit: 1 }),
 		);
 	} catch (cause) {
 		if (cause?.category === "missing") return null;
@@ -11082,7 +11082,9 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 		) {
 			try {
 				if (
-					verifierStatus(loadVerifierStore(cwd)) === "completed-awaiting-triage"
+					Object.values(loadVerifierStore(cwd).findings).some(
+						(finding) => !finding.dispositionId,
+					)
 				) {
 					ensureMiscRoadmap(cwd);
 					resolved = resolveResumeTarget(cwd, target);
@@ -17990,6 +17992,12 @@ async function handleWorkMenuCommand(ctx, pi) {
 					},
 				]
 			: []),
+		{
+			value: "work-status",
+			label: "📍 Status",
+			description:
+				"Show current roadmap, action leases, and background verifier state.\nUse this when the next workflow action is unclear.",
+		},
 		{
 			value: "work-resume",
 			label: "⏩ Resume work",

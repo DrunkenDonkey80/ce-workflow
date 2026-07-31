@@ -1577,6 +1577,7 @@ export function claimCompletedGroups(store, input = {}) {
 					group.status === "claimed",
 			)
 			.sort((left, right) => left.id.localeCompare(right.id))
+			.slice(0, input.limit ?? Number.POSITIVE_INFINITY)
 			.map((group) => claimGroupIn(next, { ...input, groupId: group.id })),
 	);
 }

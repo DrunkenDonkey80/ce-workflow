@@ -222,7 +222,11 @@ assert.equal(
 	projectGoalProgress,
 	"Roadmap [██████░░░░░░] 3/6 units (3 left · 2 unsliced) · 2m 3s · F7 Orchestrator · F8 microcompact · F9 Fleet",
 );
-assert.doesNotMatch(projectGoalProgress, /\p{Extended_Pictographic}/u, "project progress contains no emoji status glyphs");
+assert.doesNotMatch(
+	projectGoalProgress,
+	/\p{Extended_Pictographic}/u,
+	"project progress contains no emoji status glyphs",
+);
 assert.deepEqual(
 	mod.warpPayload(
 		"prompt_submit",
@@ -339,6 +343,7 @@ await shortcuts.f7.handler({
 assert.match(orchestratorLabels[0], /Roadmaps/);
 for (const action of [
 	"Roadmaps",
+	"Status",
 	"Resume work",
 	"Autonomous goal",
 	"Stop safely",
@@ -372,7 +377,6 @@ for (const action of [
 		action,
 	);
 assert(orchestratorLabels.every((label) => !label.includes("/work-")));
-assert(orchestratorLabels.every((label) => !label.includes("📍 Status")));
 assert(
 	orchestratorLabels.some((label) => /\p{Emoji_Presentation}/u.test(label)),
 	"F7 labels keep their workflow icons",
@@ -1510,7 +1514,11 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
 	assert.equal(statuses["work-goal"], "active #0");
-	assert.doesNotMatch(statuses["work-goal"], /\p{Extended_Pictographic}/u, "workflow status contains no emoji");
+	assert.doesNotMatch(
+		statuses["work-goal"],
+		/\p{Extended_Pictographic}/u,
+		"workflow status contains no emoji",
+	);
 
 	await tempHooks.turn_end(
 		{},

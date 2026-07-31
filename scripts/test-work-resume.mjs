@@ -1264,10 +1264,16 @@ try {
 					operations: ["correctness"],
 					thinking: "low",
 				},
+				{
+					model: "anthropic/claude-opus-5",
+					operations: ["security"],
+					thinking: "low",
+				},
 			],
 		}),
 	);
-	const orphanJob = Object.values(loadVerifierStore(orphanTriageCwd).jobs)[0];
+	const orphanJobs = Object.values(loadVerifierStore(orphanTriageCwd).jobs);
+	const orphanJob = orphanJobs.find((job) => job.model === "openai/gpt-5");
 	const orphanReport = mutateVerifierStore(orphanTriageCwd, (store) =>
 		recordOperationResult(store, {
 			jobId: orphanJob.id,
@@ -1294,16 +1300,47 @@ try {
 	mutateVerifierStore(orphanTriageCwd, (store) =>
 		addGroup(store, { findingIds: [orphanFinding.id] }),
 	);
+	const secondOrphanFinding = mutateVerifierStore(orphanTriageCwd, (store) =>
+		addFinding(store, {
+			reportId: orphanReport.id,
+			operation: "correctness",
+			model: orphanJob.model,
+			checkpoint: triageCheckpoint,
+			path: "extensions/work-models.js",
+			startLine: 2,
+			endLine: 2,
+			category: "maintainability",
+			severity: "medium",
+			rationale: "second reproduced issue",
+			evidence: "line 2",
+			suggestedAction: "fix line 2",
+		}),
+	);
+	mutateVerifierStore(orphanTriageCwd, (store) =>
+		addGroup(store, { findingIds: [secondOrphanFinding.id] }),
+	);
+	mutateVerifierStore(orphanTriageCwd, (store) =>
+		recordOperationResult(store, {
+			jobId: orphanJobs.find((job) => job.model === "anthropic/claude-opus-5")
+				.id,
+			operation: "security",
+			outcome: "failed",
+			failure: "provider unavailable",
+		}),
+	);
 	const orphanTriageState = buildWorkResumeState(orphanTriageCwd, "", {
 		ownerSession: "orphan-resume-test",
 	});
 	const orphanTriageStore = loadVerifierStore(orphanTriageCwd);
 	const orphanClaim = Object.values(orphanTriageStore.claims)[0];
 	assert(
-		orphanTriageState.action === "triage-required" &&
-			orphanClaim.resumeTarget &&
-			orphanTriageState.handoffPrompt.includes(orphanFinding.id),
+		orphanTriageState.action === "triage-required" && orphanClaim.resumeTarget,
 		"verifier triage without a roadmap creates and claims Misc",
+	);
+	assert(
+		orphanTriageState.triage.length === 1 &&
+			Object.keys(orphanTriageStore.claims).length === 1,
+		"resume presents one verifier group at a time for bounded triage",
 	);
 	assert(
 		Object.values(
