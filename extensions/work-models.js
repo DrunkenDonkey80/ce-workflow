@@ -22750,6 +22750,12 @@ export default function workModelsExtension(pi) {
 
 	pi.on("turn_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "turn_end", event);
+		if (!manualMicrocompactPending && activeWorkGoal?.status === "active")
+			try {
+				maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
+			} catch {
+				maybeCompact(ctx, {});
+			}
 		if (manualMicrocompactPending) runManualMicrocompact(ctx);
 		cleanupBenignInstructionDirt(ctx.cwd);
 		await flushWorkGoalContinuationRetry(ctx, pi);

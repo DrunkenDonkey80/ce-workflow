@@ -1562,8 +1562,32 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	assert.equal(
 		compactions.length,
 		0,
-		"active work goals do not compact inside turn_end",
+		"active work goals honor the auto-compaction opt-out",
 	);
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workResume: {
+				selfImproving: true,
+				goalThinkingLevel: "medium",
+			},
+			workOrchestrator: { context: { autoCompact: true } },
+		}),
+	);
+	await tempHooks.turn_end(
+		{},
+		{
+			...ctx,
+			getContextUsage: () => ({ tokens: 160_000 }),
+		},
+	);
+	assert.equal(
+		compactions.length,
+		1,
+		"active work goals compact at the configured threshold",
+	);
+	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
+	compactions.length = 0;
 
 	const before = await tempHooks.before_agent_start(
 		{ prompt: sent[0].message, systemPrompt: "base" },
