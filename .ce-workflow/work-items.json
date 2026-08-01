@@ -3519,12 +3519,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned atomic Windows path-identity bug, related to work-2.55 only as the reason its evidence tool initially failed, not the same required outcome. Fixed in commit 007ac28 by reusing samePath for Git-root identity; node scripts/test-work-improvement-reporting.mjs PASS with a mixed-case Windows regression.",
+        "Closed after verified coverage in commit 007ac28; mixed-case Windows source resolution regression passes."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Improvement reporting rejected the valid checkout `C:\\soft\\git\\ce-workflow` as 'not the ce-workflow Git root' on Windows. `resolve",
       "type": "task",
-      "updatedAt": "2026-07-31T17:20:46.377Z"
+      "updatedAt": "2026-08-01T07:49:09.931Z"
     },
     "work-2.6": {
       "createdAt": "2026-07-20T04:59:06.183Z",
@@ -5060,7 +5063,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-01T07:48:35.224Z"
+    "updatedAt": "2026-08-01T07:49:09.932Z"
   },
   "schemaVersion": 1
 }
