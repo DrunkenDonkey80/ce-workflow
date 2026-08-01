@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-31",
+  "capturedAt": "2026-08-01",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
@@ -146,7 +146,33 @@
     },
     {
       "name": "pi-goal",
-      "version": "0.1.7"
+      "version": "0.1.7",
+      "reviewedAt": "2026-08-01",
+      "reviewedVersion": "0.1.7",
+      "decisions": [
+        {
+          "version": "0.1.7",
+          "title": "Active-only autonomous-goal tools",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "ce-workflow now follows pi-goal's lifecycle pattern by exposing work_goal_complete and work_goal_human_decision only while an autonomous goal is active, preserving unrelated tools and failing open when the host lacks active-tool APIs.",
+          "verification": "node scripts/test-work-goal.mjs passed and covers inactive, active, needs-human, resumed, and completed tool exposure"
+        },
+        {
+          "version": "0.1.7",
+          "title": "Explicit goal replacement semantics",
+          "pov": "Adopt",
+          "status": "no-action",
+          "rationale": "pi-goal 0.1.7 changes create_goal to replace an existing goal when explicitly requested. ce-workflow already confirms and replaces an active autonomous goal through startWorkGoal, so no compatibility edit is required."
+        },
+        {
+          "version": "0.1.7",
+          "title": "Replace ce-workflow's goal engine or import pi-goal-writer",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "The generic package and writing skill would duplicate rather than simplify ce-workflow's work-item-aware completion gates, guided decisions, retry recovery, fresh-session continuation, telemetry, and self-improving goal modes."
+        }
+      ]
     },
     {
       "name": "pi-lens",

@@ -848,7 +848,16 @@ try {
 	const thinkingChanges = [];
 	let thinkingLevel = "high";
 	let aborts = 0;
+	let activeTools = [
+		"ask_user",
+		"work_goal_complete",
+		"work_goal_human_decision",
+	];
 	const pi = {
+		getActiveTools: () => activeTools,
+		setActiveTools: (next) => {
+			activeTools = next;
+		},
 		getThinkingLevel: () => thinkingLevel,
 		setThinkingLevel: (level) => {
 			thinkingLevel = level;
@@ -984,8 +993,8 @@ try {
 	assert.equal(catchUpState.packages.length, baseline.packages.length);
 	assert.equal(
 		catchUpState.packages.find((pkg) => pkg.name === "pi-goal")?.needsReview,
-		true,
-		"unchanged packages without review evidence remain pending",
+		false,
+		"unchanged packages with completed review evidence remain skipped",
 	);
 	assert.equal(
 		catchUpState.packages.find(
@@ -996,7 +1005,7 @@ try {
 	);
 	const catchUpObjective = mod.buildWorkCatchUpObjective(catchUpState);
 	assert.match(catchUpObjective, /WO_CATCH_UP_V2/);
-	assert.match(catchUpObjective, /Catch-up review targets:.*pi-goal/);
+	assert.match(catchUpObjective, /Catch-up review targets: \[\]/);
 	assert.match(catchUpObjective, /ce-pov for each actionable candidate/);
 	assert.match(
 		catchUpObjective,
@@ -1019,6 +1028,7 @@ try {
 		},
 		"focus\nCatch-up review targets: []",
 	);
+	assert.match(injectedObjective, /Catch-up review targets:.*example-package/);
 	assert.equal(
 		[...injectedObjective.matchAll(/^Catch-up review targets:/gm)].length,
 		1,
@@ -1086,6 +1096,13 @@ try {
 	const invoke = (name, args, commandCtx = ctx) =>
 		mod.executeOrchestratorAction(name, args, commandCtx, pi);
 	tempHooks.session_start?.({}, ctx);
+	assert.ok(activeTools.includes("ask_user"));
+	assert.ok(activeTools.includes("work_report_improvement"));
+	assert.ok(!activeTools.includes("work_goal_complete"));
+	assert.ok(
+		!activeTools.includes("work_goal_human_decision"),
+		"goal tools are hidden outside an active autonomous goal",
+	);
 	const automationResult = await tempHooks.input?.(
 		{ source: "extension", text: "ORCHESTRATOR_RUN_V1 work-status" },
 		ctx,
@@ -1527,6 +1544,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].message, /write temp proof file/);
 	assert.equal(statuses["work-goal"], "active #0");
+	assert.ok(activeTools.includes("work_goal_complete"));
+	assert.ok(activeTools.includes("work_goal_human_decision"));
 	assert.doesNotMatch(
 		statuses["work-goal"],
 		/\p{Extended_Pictographic}/u,
@@ -1595,6 +1614,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	await settle();
 	assert.equal(statuses["work-goal"], "needs human");
+	assert.ok(!activeTools.includes("work_goal_complete"));
+	assert.ok(!activeTools.includes("work_goal_human_decision"));
 	assert.equal(thinkingLevel, "high");
 	assert.ok(
 		notices.some((notice) =>
@@ -1647,6 +1668,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	assert.equal(statuses["work-goal"], "active #1");
+	assert.ok(activeTools.includes("work_goal_complete"));
+	assert.ok(activeTools.includes("work_goal_human_decision"));
 	assert.equal(thinkingLevel, "medium");
 	assert.equal(sent.length, 3);
 	assert.match(sent[2].message, /User resumed the goal with this answer/);
@@ -1669,6 +1692,8 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		/Now give the user a concise final summary/,
 	);
 	assert.equal(statuses["work-goal"], undefined);
+	assert.ok(!activeTools.includes("work_goal_complete"));
+	assert.ok(!activeTools.includes("work_goal_human_decision"));
 	assert.equal(thinkingLevel, "high");
 	assert.deepEqual(thinkingChanges.slice(0, 4), [
 		"medium",

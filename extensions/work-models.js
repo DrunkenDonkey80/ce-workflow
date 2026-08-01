@@ -686,6 +686,7 @@ function clearWorkGoalRecovery() {
 }
 
 const WORK_GOAL_STATE_ENTRY_TYPE = "work-goal-state";
+const WORK_GOAL_TOOL_NAMES = ["work_goal_complete", "work_goal_human_decision"];
 const ORCHESTRATOR_GOAL_CONTINUE_COMMAND = "__orchestrator-goal-continue";
 const ORCHESTRATOR_AUTOMATION_PREFIX = "ORCHESTRATOR_RUN_V1";
 const WORK_GOAL_STATUS_KEY = "work-goal";
@@ -827,6 +828,14 @@ function syncImprovementReportTool(pi, ctx) {
 	if (workResumeSettings(ctx.cwd).selfImproving)
 		active.add(IMPROVEMENT_REPORT_TOOL);
 	else active.delete(IMPROVEMENT_REPORT_TOOL);
+	pi.setActiveTools([...active]);
+}
+
+function syncWorkGoalTools(pi, goal = activeWorkGoal) {
+	if (!pi?.getActiveTools || !pi?.setActiveTools) return;
+	const active = new Set(Array.from(pi.getActiveTools() ?? []));
+	for (const name of WORK_GOAL_TOOL_NAMES)
+		goal?.status === "active" ? active.add(name) : active.delete(name);
 	pi.setActiveTools([...active]);
 }
 
@@ -16626,7 +16635,8 @@ function writeWorkCatchUpDiff(cwd, dir, name, from, to) {
 }
 
 function catchUpReviewBlocker(pkg, targetVersion) {
-	if (!String(pkg?.reviewedAt ?? "").trim()) return "has no reviewedAt evidence";
+	if (!String(pkg?.reviewedAt ?? "").trim())
+		return "has no reviewedAt evidence";
 	if (pkg.reviewedVersion !== targetVersion)
 		return `review does not cover ${targetVersion}`;
 	if (!Array.isArray(pkg.decisions) || pkg.decisions.length === 0)
@@ -16688,7 +16698,8 @@ function buildWorkCatchUpState(cwd) {
 			latestVersion,
 			targetVersion,
 			changed,
-			needsReview: changed || Boolean(catchUpReviewBlocker(item, targetVersion)),
+			needsReview:
+				changed || Boolean(catchUpReviewBlocker(item, targetVersion)),
 			diffPath,
 		};
 	});
@@ -16753,8 +16764,9 @@ function buildWorkCatchUpObjective(state, args = "") {
 function catchUpCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	const objective = String(goal?.objective ?? "");
 	if (!objective.includes("WO_CATCH_UP_V2")) return;
-	const targetsText =
-		/^Catch-up (?:review|changed) targets:\s*(.+)$/m.exec(objective)?.[1];
+	const targetsText = /^Catch-up (?:review|changed) targets:\s*(.+)$/m.exec(
+		objective,
+	)?.[1];
 	const baselineRef = /^Catch-up baseline manifest:\s*(.+)$/m.exec(
 		objective,
 	)?.[1];
@@ -16941,6 +16953,7 @@ function loadWorkGoalFromSession(ctx) {
 
 function persistWorkGoal(pi, goal = activeWorkGoal, cwd = activeWorkGoalCwd) {
 	pi?.appendEntry?.(WORK_GOAL_STATE_ENTRY_TYPE, { goal: goal ?? null });
+	syncWorkGoalTools(pi, goal);
 	if (!cwd) return;
 	const state = readWorkState(cwd);
 	if (goal) state.workGoal = goal;
@@ -22156,7 +22169,10 @@ export default function workModelsExtension(pi) {
 				};
 			}
 			persistWorkGoal(pi);
-		} else restoreWorkGoalThinking(pi, activeWorkGoal);
+		} else {
+			restoreWorkGoalThinking(pi, activeWorkGoal);
+			syncWorkGoalTools(pi);
+		}
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
 		pendingMainEditorActions.clear();
