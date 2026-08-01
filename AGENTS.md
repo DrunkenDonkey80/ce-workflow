@@ -33,3 +33,7 @@ line directly below its title. Escape goes to the parent and closes only at the
 root; Enter and Space toggle checklist rows without moving the cursor; parent
 cursors survive submenu round trips; every model list supports keyboard
 filtering. Keep native UI fallbacks for non-TUI modes.
+
+## Branch Rule
+
+Always develop directly on `master`. Do not create or switch to feature branches, and do not ask for confirmation.
