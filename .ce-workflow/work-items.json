@@ -3334,6 +3334,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: F7 Medium task had already launched run 3e6c99d0-a850-478b-a2ed-49ca2e7bd51f, but the work-goal continuation omitted that identity, so the goal agent launched f75baa16/9c24c9cb for the same work item and both edited one checkout. Expected: continuation state names the authoritative active run or a coded no-launch lease and duplicate launch admission fails closed. Impact: sole-writer violation, duplicate model cost, and manual reconciliation.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prevent duplicate worker launch after goal handoff"
+      },
       "evidence": [],
       "id": "work-2.55",
       "labels": [
@@ -3354,19 +3358,153 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: finish-task and package verification selected Git Bash with -lc because MSYSTEM was set; the login profile invoked missing `hypa`, so verification failed before the actual command. Explicit WORK_ORCH_VERIFY_SHELL=C:/Program Files/Git/usr/bin/sh.exe passed. Expected: coded verification must avoid unrelated login-profile commands or fail over to a clean available shell while preserving POSIX env-assignment syntax. Impact: valid work cannot reach coded finish and test-work-optimization-helpers fails for environment-only reasons.",
-      "evidence": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make verification shell independent of broken login profiles"
+      },
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.56",
       "labels": [
         "self-improvement"
       ],
       "notes": [
-        "Evidence: .ce-workflow/work-items.json work-3.38 wo:verify-check FAIL and C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/3e6c99d0-a850-478b-a2ed-49ca2e7bd51f/output-0.log."
+        "Evidence: .ce-workflow/work-items.json work-3.38 wo:verify-check FAIL and C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/3e6c99d0-a850-478b-a2ed-49ca2e7bd51f/output-0.log.",
+        "Classification: locally-owned atomic verification-shell bug. Root cause is runVerificationCommand invoking Bash with -lc; fixed by using non-login -c while preserving POSIX command syntax. Focused proof: node scripts/test-work-optimization-helpers.mjs (PASS, including a broken login-profile regression).",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Make verification shell independent of broken login profiles",
       "type": "bug",
-      "updatedAt": "2026-07-31T16:21:14.556Z"
+      "updatedAt": "2026-08-01T07:42:19.657Z"
+    },
+    "work-2.57": {
+      "createdAt": "2026-07-31T17:20:24.220Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The target project's initialized `.gitignore` ignores `.ce-workflow/`, but `work-helper.mjs finish-task` always runs `git add -- .ce-workflow/work-items.json` after closing. On work-1.2, all implementation/review/verification gates passed and a code commit was created, then finalization failed on the ignored store path and rolled back the code commit.\nExpected: finish-task should honor the workspace store mode produced by initialization: close an intentionally ignored/local store without amending it into Git, or initialization should bootstrap a versioned store that is not ignored.\nImpact: The authoritative coded finalizer cannot finish tasks in this initialized workspace, causing rollback after expensive verification/review and requiring deterministic manual commit/close recovery.\nSuggested improvement: Detect ignored native stores and skip the add/amend step while persisting local close state, or make initialization and finish-task consistently use a versioned-store mode.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Allow finish-task with ignored local workflow stores"
+      },
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e5bd70ab-69c1-4f49-9226-39d8316f9e27",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1727646,
+              "file": "01-2026-07-31T13-06-13-704Z_019fb848-4c48-7045-b891-33840fe34444.jsonl",
+              "sha256": "d1b28c2ba5993522d25c8f4597cca74fdbfb138135a84632d476285401ca0d8a"
+            },
+            {
+              "bytes": 2506,
+              "file": "02-a66ef2d8-de17-468f-b948-19aa24b471d1_work-fixer_output.md",
+              "sha256": "89979ca6152aeddc903a89925590848ff18190b043274ea7b427ac32c4e6b5b1"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-07-31T17:20:24.217Z",
+          "workflowId": "019fb848-4c48-7045-b891-33840fe34444"
+        }
+      ],
+      "id": "work-2.57",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The target project's initialized `.gitignore` ignores `.ce-workflow/`, but `work-helper.mjs finish-task` always runs `git add -- .",
+      "type": "task",
+      "updatedAt": "2026-07-31T17:20:24.220Z"
+    },
+    "work-2.58": {
+      "createdAt": "2026-07-31T17:20:34.509Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task skipped the mandatory reviewer handoff for work-1.2, a P0 firmware/concurrency production task. `evidenceOnly` is computed from title + mutable implementation notes + acceptance; the worker's normal note contained 'Verification'/'tests', so the evidence-only regex matched and suppressed firmware/hardware review reasons. The helper proceeded to commit and only rolled back later for a separate ignored-store failure.\nExpected: Evidence-only classification should depend on the immutable task contract or an explicit label, never routine post-implementation notes. Firmware/concurrency production diffs must still generate the coded reviewer handoff after verification notes are appended.\nImpact: Sensitive production changes can bypass independent review simply because normal worker evidence mentions tests or verification, weakening a coded safety gate.\nSuggested improvement: Compute evidenceOnly from title/description/acceptance before concatenating notes, or require an explicit `wo:evidence-only` label.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Preserve mandatory review for firmware and concurrency tasks"
+      },
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/f8ab7fb1-ad0e-47e6-bf5a-9db60f373198",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1731907,
+              "file": "01-2026-07-31T13-06-13-704Z_019fb848-4c48-7045-b891-33840fe34444.jsonl",
+              "sha256": "c7ce796fe44d975e4166bb6301f1b01faa0d0e73966c7f7b40306fbc1ed22a38"
+            },
+            {
+              "bytes": 2385,
+              "file": "02-11af1d62-fa94-4248-8148-e0d566d54576_work-worker_output.md",
+              "sha256": "e1243f420c2fd7ca3d103d72d475240a700a749dbbfe2604d779c88a9f548014"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-07-31T17:20:34.505Z",
+          "workflowId": "019fb848-4c48-7045-b891-33840fe34444"
+        }
+      ],
+      "id": "work-2.58",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: finish-task skipped the mandatory reviewer handoff for work-1.2, a P0 firmware/concurrency production task. `evidenceOnly` is comp",
+      "type": "task",
+      "updatedAt": "2026-07-31T17:20:34.509Z"
+    },
+    "work-2.59": {
+      "createdAt": "2026-07-31T17:20:46.377Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Improvement reporting rejected the valid checkout `C:\\soft\\git\\ce-workflow` as 'not the ce-workflow Git root' on Windows. `resolveReportingSource` compares `realpathSync(candidate)` to `realpathSync(git rev-parse --show-toplevel)` with strict string equality. The candidate resolved as `C:\\soft\\...` while Git returned `C:\\SOFT\\...`; changing only path casing made reporting succeed.\nExpected: Git-root identity checks on Windows should use the existing case-insensitive path comparison helper (`samePath`) rather than strict string equality.\nImpact: Valid configured source checkouts are rejected solely due to drive/path casing, silently preventing self-improvement reports until users diagnose and duplicate Git's casing.\nSuggested improvement: Replace `gitRoot !== sourceCwd` in `resolveReportingSource` with `!samePath(gitRoot, sourceCwd)` and add a Windows mixed-case regression test.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Handle Windows path casing in improvement reporting"
+      },
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/f8eef903-ba12-407e-9719-9eacc216b20f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1736072,
+              "file": "01-2026-07-31T13-06-13-704Z_019fb848-4c48-7045-b891-33840fe34444.jsonl",
+              "sha256": "59b64242b6594838f80138ccebc68cdfbec4642d33db52c31bb741e93bc4497c"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-07-31T17:20:46.371Z",
+          "workflowId": "019fb848-4c48-7045-b891-33840fe34444"
+        }
+      ],
+      "id": "work-2.59",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Improvement reporting rejected the valid checkout `C:\\soft\\git\\ce-workflow` as 'not the ce-workflow Git root' on Windows. `resolve",
+      "type": "task",
+      "updatedAt": "2026-07-31T17:20:46.377Z"
     },
     "work-2.6": {
       "createdAt": "2026-07-20T04:59:06.183Z",
@@ -4902,7 +5040,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-07-31T16:28:44.023Z"
+    "updatedAt": "2026-08-01T07:42:19.658Z"
   },
   "schemaVersion": 1
 }

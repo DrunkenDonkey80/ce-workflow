@@ -308,7 +308,7 @@ async function runVerificationCommand(command) {
 		(process.platform === "win32" && process.env.MSYSTEM ? "bash" : "");
 	try {
 		const result = shell
-			? await execFileAsync(shell, ["-lc", command], options)
+			? await execFileAsync(shell, ["-c", command], options)
 			: await execAsync(command, options);
 		return { exitStatus: 0, stdout: result.stdout, stderr: result.stderr };
 	} catch (error) {

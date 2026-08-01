@@ -372,6 +372,15 @@ try {
 	);
 
 	writeFileSync(path.join(finishCwd, "shell.js"), "export default true;\n");
+	const shellEnv = { ...process.env };
+	delete shellEnv.WORK_ORCH_VERIFY_SHELL;
+	if (process.platform === "win32") {
+		const profileHome = path.join(cwd, "broken-profile");
+		mkdirSync(profileHome);
+		writeFileSync(path.join(profileHome, ".bash_profile"), "exit 97\n");
+		shellEnv.HOME = profileHome;
+		shellEnv.MSYSTEM ||= "MINGW64";
+	}
 	const shellFinished = JSON.parse(
 		execFileSync(
 			process.execPath,
@@ -388,12 +397,12 @@ try {
 				"--expect",
 				"checked",
 			],
-			{ cwd: finishCwd, encoding: "utf8" },
+			{ cwd: finishCwd, encoding: "utf8", env: shellEnv },
 		),
 	);
 	assert(
 		shellFinished.verification?.output === "checked",
-		"finish-task verification honors Git Bash environment syntax on Windows",
+		"finish-task verification avoids login profiles while honoring POSIX environment syntax",
 	);
 
 	writeFileSync(
