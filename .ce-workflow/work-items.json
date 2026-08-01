@@ -3411,6 +3411,9 @@
           "producer": "NexusConnectSDK-Android",
           "submittedAt": "2026-07-31T17:20:24.217Z",
           "workflowId": "019fb848-4c48-7045-b891-33840fe34444"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.57",
@@ -3418,12 +3421,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned atomic finalization bug, related-distinct from verification and review routing. Root cause is unconditional staging of the native store after close; fixed by amending only when Git already versions the store, while preserving ignored local close state. Focused proof: node scripts/test-work-optimization-helpers.mjs (PASS with an ignored .ce-workflow fixture).",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The target project's initialized `.gitignore` ignores `.ce-workflow/`, but `work-helper.mjs finish-task` always runs `git add -- .",
       "type": "task",
-      "updatedAt": "2026-07-31T17:20:24.220Z"
+      "updatedAt": "2026-08-01T07:43:26.413Z"
     },
     "work-2.58": {
       "createdAt": "2026-07-31T17:20:34.509Z",
@@ -5040,7 +5046,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-01T07:42:19.658Z"
+    "updatedAt": "2026-08-01T07:43:26.414Z"
   },
   "schemaVersion": 1
 }

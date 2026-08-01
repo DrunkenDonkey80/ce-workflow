@@ -301,6 +301,7 @@ try {
 		cwd: finishCwd,
 	});
 	execFileSync("git", ["config", "user.name", "Test"], { cwd: finishCwd });
+	writeFileSync(path.join(finishCwd, ".gitignore"), ".ce-workflow/\n");
 	writeFileSync(
 		path.join(finishCwd, "result.js"),
 		"const result = 'before';\n",
@@ -369,6 +370,15 @@ try {
 			encoding: "utf8",
 		}).trim() === "TASK-1: record result",
 		"finish-task creates the WorkItem commit",
+	);
+	assert(
+		loadStore(finishCwd).items["TASK-1"].status === "closed" &&
+			!execFileSync(
+				"git",
+				["ls-files", "--", ".ce-workflow/work-items.json"],
+				{ cwd: finishCwd, encoding: "utf8" },
+			).trim(),
+		"finish-task closes an intentionally ignored local WorkItem store",
 	);
 
 	writeFileSync(path.join(finishCwd, "shell.js"), "export default true;\n");

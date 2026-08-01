@@ -646,8 +646,10 @@ async function finishTaskUnlocked() {
 			throw new Error(
 				`non-work-store files changed during close: ${closeChanges.join(", ")}`,
 			);
-		git(["add", "--", ".ce-workflow/work-items.json"]);
-		git(["commit", "--amend", "--no-edit"]);
+		if (git(["ls-files", "--", ".ce-workflow/work-items.json"]).trim()) {
+			git(["add", "--", ".ce-workflow/work-items.json"]);
+			git(["commit", "--amend", "--no-edit"]);
+		}
 		const remaining = gitStatusPaths().filter((file) => !isRuntimePath(file));
 		if (remaining.length)
 			throw new Error(`related files remain dirty: ${remaining.join(", ")}`);
