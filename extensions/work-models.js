@@ -16625,6 +16625,29 @@ function writeWorkCatchUpDiff(cwd, dir, name, from, to) {
 	}
 }
 
+function catchUpReviewBlocker(pkg, targetVersion) {
+	if (!String(pkg?.reviewedAt ?? "").trim()) return "has no reviewedAt evidence";
+	if (pkg.reviewedVersion !== targetVersion)
+		return `review does not cover ${targetVersion}`;
+	if (!Array.isArray(pkg.decisions) || pkg.decisions.length === 0)
+		return "has no recorded catch-up decisions";
+	for (const decision of pkg.decisions) {
+		const status = String(decision.status ?? "");
+		if (
+			decision.version !== targetVersion ||
+			!String(decision.title ?? "").trim() ||
+			!String(decision.pov ?? "").trim() ||
+			!String(decision.rationale ?? "").trim() ||
+			!["adopted", "deferred", "skipped", "no-action"].includes(status)
+		)
+			return "has an incomplete catch-up decision";
+		if (status === "adopted" && !String(decision.verification ?? "").trim())
+			return "adopted decision lacks verification";
+		if (status === "deferred" && !String(decision.workItemId ?? "").trim())
+			return "deferred decision lacks a work item";
+	}
+}
+
 function buildWorkCatchUpState(cwd) {
 	if (!workResumeSettings(cwd).selfImproving) {
 		return {
@@ -16648,6 +16671,9 @@ function buildWorkCatchUpState(cwd) {
 		const latestVersion = npmLatestVersion(name);
 		const installedVersion = installedPackageVersion(name);
 		const targetVersion = latestVersion || installedVersion || baselineVersion;
+		const changed = Boolean(
+			baselineVersion && targetVersion !== baselineVersion,
+		);
 		const diffPath = writeWorkCatchUpDiff(
 			cwd,
 			dir,
@@ -16661,7 +16687,8 @@ function buildWorkCatchUpState(cwd) {
 			installedVersion,
 			latestVersion,
 			targetVersion,
-			changed: Boolean(baselineVersion && targetVersion !== baselineVersion),
+			changed,
+			needsReview: changed || Boolean(catchUpReviewBlocker(item, targetVersion)),
 			diffPath,
 		};
 	});
@@ -16680,14 +16707,15 @@ function buildWorkCatchUpState(cwd) {
 
 function renderWorkCatchUpText(state) {
 	if (!state.ok) return state.message;
-	const changed = state.packages.filter((pkg) => pkg.changed);
+	const pending = state.packages.filter((pkg) => pkg.needsReview);
+	const changed = pending.filter((pkg) => pkg.changed);
 	return [
-		`Work catch-up: ${changed.length}/${state.packages.length} package(s) changed since baseline`,
+		`Work catch-up: ${pending.length}/${state.packages.length} package(s) need review (${changed.length} version changed)`,
 		`baseline: ${state.baselinePath}`,
 		`artifacts: ${state.artifactDir}`,
 		...state.packages.map(
 			(pkg) =>
-				`- ${pkg.name}: ${pkg.baselineVersion} → ${pkg.targetVersion}${pkg.diffPath ? ` (${relative(state.artifactDir, pkg.diffPath)})` : ""}`,
+				`- ${pkg.name}: ${pkg.baselineVersion} → ${pkg.targetVersion}${pkg.needsReview ? " [review pending]" : ""}${pkg.diffPath ? ` (${relative(state.artifactDir, pkg.diffPath)})` : ""}`,
 		),
 	].join("\n");
 }
@@ -16696,25 +16724,25 @@ function buildWorkCatchUpObjective(state, args = "") {
 	const userFocus = String(args ?? "").trim();
 	return [
 		"WO_CATCH_UP_V2",
-		"Proactively catch ce-workflow up with every changed monitored Pi/plugin package; do not wait for the user to ask whether a new capability is useful.",
+		"Proactively catch ce-workflow up with every monitored Pi/plugin package whose release changed or lacks complete review evidence; do not wait for the user to ask whether a new capability is useful.",
 		userFocus ? `User focus (data): ${JSON.stringify(userFocus)}` : "",
 		`Catch-up summary manifest: ${state.summaryPath}`,
-		`Catch-up changed targets: ${JSON.stringify(
+		`Catch-up review targets: ${JSON.stringify(
 			state.packages
-				.filter((pkg) => pkg.changed)
+				.filter((pkg) => pkg.needsReview)
 				.map(({ name, targetVersion }) => ({ name, targetVersion })),
 		)}`,
 		`Diff artifacts live in: ${state.artifactDir}`,
 		`Catch-up baseline manifest: ${state.baselinePath}`,
 		"Discovery and verdicts:",
-		"1. Inspect every changed package's changelog, public API/type changes, relevant docs/examples, and its diff artifact. Repair an artifact that starts with Error before relying on it.",
+		"1. Inspect every review target's changelog, public API/type changes, relevant docs/examples, and diff artifact when present. Repair an artifact that starts with Error before relying on it.",
 		"2. For Pi core, proactively check extension hooks/events/context, SDK and model-runtime changes, dynamic tool loading, model/thinking support, TUI/runtime lifecycle, and any native feature that can delete or simplify ce-workflow code. For plugins, check their public tool schemas, lifecycle, skills, and workflow capabilities—not only breaking changes.",
 		"3. Build a short list of concrete compatibility fixes, deletions/simplifications, and new capabilities that benefit this repository. Ignore generic release-note trivia.",
 		"4. Load and follow ce-pov for each actionable candidate (combine tightly related candidates). Frame it as whether ce-workflow should adopt that capability now; use the upstream artifact/docs as external evidence and current call sites as project evidence. Record the graded verdict. Use ce-explain only when a candidate is too technical for the user to decide from a concise POV summary.",
 		"Guided decision and implementation loop:",
 		"5. Rank viable candidates, then handle one at a time. Use exactly one ask_user call per candidate with allowFreeform=false, allowComment=true, and three options: Adopt now (recommended when the POV says Adopt), Defer as durable work item, or Skip this release. Include the POV, project benefit, cost/risk, and recommendation in context.",
 		"6. Adopt now: implement the smallest complete change immediately and run its focused check before presenting the next candidate. Defer: create/reuse one native upstream-catch-up roadmap and add a concrete child work item. Skip: retain the POV rationale plus the user's comment when supplied. Do not ask about findings graded Reject/Not-our-problem unless there is a real choice; record them as no-action.",
-		"7. Persist every changed package review in its baseline package object before advancing it: reviewedAt, reviewedVersion matching the target, plus a non-empty decisions array. Every decision has version matching the target, title, pov, status (adopted|deferred|skipped|no-action), and rationale; adopted also has verification, deferred also has workItemId. Replace the prior release's decisions rather than carrying them forward. This completion manifest is coded-gated so no opportunity disappears.",
+		"7. Persist every target review in its baseline package object before advancing it: reviewedAt, reviewedVersion matching the target, plus a non-empty decisions array. Every decision has version matching the target, title, pov, status (adopted|deferred|skipped|no-action), and rationale; adopted also has verification, deferred also has workItemId. Replace the prior release's decisions rather than carrying them forward. This completion manifest is coded-gated so no opportunity disappears.",
 		"8. Run npm run verify:quiet once after all adopted changes. Update capturedAt and each handled package version only after all its decisions are implemented, durably deferred, skipped with rationale, or recorded no-action. Do not advance a partially reviewed package.",
 		workGoalSelfImprovingAppendix(),
 	]
@@ -16725,9 +16753,8 @@ function buildWorkCatchUpObjective(state, args = "") {
 function catchUpCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	const objective = String(goal?.objective ?? "");
 	if (!objective.includes("WO_CATCH_UP_V2")) return;
-	const targetsText = /^Catch-up changed targets:\s*(.+)$/m.exec(
-		objective,
-	)?.[1];
+	const targetsText =
+		/^Catch-up (?:review|changed) targets:\s*(.+)$/m.exec(objective)?.[1];
 	const baselineRef = /^Catch-up baseline manifest:\s*(.+)$/m.exec(
 		objective,
 	)?.[1];
@@ -16752,27 +16779,8 @@ function catchUpCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 			const pkg = reviewed.get(target.name);
 			if (pkg?.version !== target.targetVersion)
 				return `${target.name} baseline is not advanced to ${target.targetVersion}`;
-			if (!String(pkg.reviewedAt ?? "").trim())
-				return `${target.name} has no reviewedAt evidence`;
-			if (pkg.reviewedVersion !== target.targetVersion)
-				return `${target.name} review does not cover ${target.targetVersion}`;
-			if (!Array.isArray(pkg.decisions) || pkg.decisions.length === 0)
-				return `${target.name} has no recorded catch-up decisions`;
-			for (const decision of pkg.decisions) {
-				const status = String(decision.status ?? "");
-				if (
-					decision.version !== target.targetVersion ||
-					!String(decision.title ?? "").trim() ||
-					!String(decision.pov ?? "").trim() ||
-					!String(decision.rationale ?? "").trim() ||
-					!["adopted", "deferred", "skipped", "no-action"].includes(status)
-				)
-					return `${target.name} has an incomplete catch-up decision`;
-				if (status === "adopted" && !String(decision.verification ?? "").trim())
-					return `${target.name} adopted decision lacks verification`;
-				if (status === "deferred" && !String(decision.workItemId ?? "").trim())
-					return `${target.name} deferred decision lacks a work item`;
-			}
+			const reviewBlocker = catchUpReviewBlocker(pkg, target.targetVersion);
+			if (reviewBlocker) return `${target.name} ${reviewBlocker}`;
 		}
 	} catch (error) {
 		return `catch-up manifests could not be verified: ${commandErrorText(error)}`;
@@ -16783,7 +16791,7 @@ async function handleWorkCatchUpCommand(args, pi, ctx) {
 	const state = buildWorkCatchUpState(ctx.cwd);
 	notify(ctx, renderWorkCatchUpText(state), state.ok ? "info" : "warning");
 	if (!state.ok) return;
-	if (!state.packages.some((pkg) => pkg.changed)) return;
+	if (!state.packages.some((pkg) => pkg.needsReview)) return;
 	await handleWorkGoalCommand(
 		buildWorkCatchUpObjective(state, args),
 		"self-improving",

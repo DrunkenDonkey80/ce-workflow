@@ -982,9 +982,21 @@ try {
 	);
 	assert.equal(catchUpState.ok, true);
 	assert.equal(catchUpState.packages.length, baseline.packages.length);
+	assert.equal(
+		catchUpState.packages.find((pkg) => pkg.name === "pi-goal")?.needsReview,
+		true,
+		"unchanged packages without review evidence remain pending",
+	);
+	assert.equal(
+		catchUpState.packages.find(
+			(pkg) => pkg.name === "@earendil-works/pi-coding-agent",
+		)?.needsReview,
+		false,
+		"unchanged packages with complete review evidence remain skipped",
+	);
 	const catchUpObjective = mod.buildWorkCatchUpObjective(catchUpState);
 	assert.match(catchUpObjective, /WO_CATCH_UP_V2/);
-	assert.match(catchUpObjective, /Catch-up changed targets:/);
+	assert.match(catchUpObjective, /Catch-up review targets:.*pi-goal/);
 	assert.match(catchUpObjective, /ce-pov for each actionable candidate/);
 	assert.match(
 		catchUpObjective,
@@ -1000,14 +1012,15 @@ try {
 				{
 					name: "example-package",
 					targetVersion: "2.0.0",
-					changed: true,
+					changed: false,
+					needsReview: true,
 				},
 			],
 		},
-		"focus\nCatch-up changed targets: []",
+		"focus\nCatch-up review targets: []",
 	);
 	assert.equal(
-		[...injectedObjective.matchAll(/^Catch-up changed targets:/gm)].length,
+		[...injectedObjective.matchAll(/^Catch-up review targets:/gm)].length,
 		1,
 		"user focus cannot inject a second completion target marker",
 	);
