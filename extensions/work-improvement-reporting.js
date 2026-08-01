@@ -19,7 +19,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { createWorkItem, initStore, mutateStore, storePath } from "./work-store.js";
+import {
+	createWorkItem,
+	initStore,
+	mutateStore,
+	storePath,
+} from "./work-store.js";
 
 const PACKAGE_NAME = "pi-work-orchestrator";
 const REPORT_ROOT = [".pi", "self-improvement-reports"];
@@ -27,7 +32,12 @@ const MAX_FILES = 16;
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 16 * 1024 * 1024;
 const GRACE_MS = 24 * 60 * 60 * 1000;
-const ACTIVE_EPIC_STATUSES = new Set(["open", "in_progress", "planned", "blocked"]);
+const ACTIVE_EPIC_STATUSES = new Set([
+	"open",
+	"in_progress",
+	"planned",
+	"blocked",
+]);
 
 export class ImprovementReportingError extends Error {
 	constructor(message, code = "report-failed") {
@@ -51,8 +61,9 @@ function bounded(value, limit) {
 
 function safeLabel(value) {
 	return (
-		bounded(value, 80).replace(/[\\/]/g, "-").replace(/[A-Za-z]:/g, "") ||
-		"producer"
+		bounded(value, 80)
+			.replace(/[\\/]/g, "-")
+			.replace(/[A-Za-z]:/g, "") || "producer"
 	);
 }
 
@@ -69,33 +80,56 @@ function samePath(left, right) {
 
 function ensureSafeDirectoryPath(sourceCwd, directory) {
 	if (!contained(sourceCwd, directory))
-		fail("self-improvement report destination escapes the source checkout", "unsafe-destination");
+		fail(
+			"self-improvement report destination escapes the source checkout",
+			"unsafe-destination",
+		);
 	let current = sourceCwd;
-	for (const part of path.relative(sourceCwd, directory).split(path.sep).filter(Boolean)) {
+	for (const part of path
+		.relative(sourceCwd, directory)
+		.split(path.sep)
+		.filter(Boolean)) {
 		current = path.join(current, part);
 		if (!existsSync(current)) continue;
 		const stat = lstatSync(current);
-		if (!stat.isDirectory() || stat.isSymbolicLink() || !samePath(realpathSync(current), current))
-			fail("self-improvement report destination must not contain symlinks", "unsafe-destination");
+		if (
+			!stat.isDirectory() ||
+			stat.isSymbolicLink() ||
+			!samePath(realpathSync(current), current)
+		)
+			fail(
+				"self-improvement report destination must not contain symlinks",
+				"unsafe-destination",
+			);
 	}
 }
 
 function sourceChoice(options) {
 	const configured = options.settings?.workImprovement?.sourceCheckout;
-	if (configured && String(configured).trim()) return ["setting", String(configured)];
-	const environment = options.env?.CE_WORKFLOW_SOURCE_DIR ?? process.env.CE_WORKFLOW_SOURCE_DIR;
-	return environment ? ["environment", environment] : ["package", options.packageRoot];
+	if (configured && String(configured).trim())
+		return ["setting", String(configured)];
+	const environment =
+		options.env?.CE_WORKFLOW_SOURCE_DIR ?? process.env.CE_WORKFLOW_SOURCE_DIR;
+	return environment
+		? ["environment", environment]
+		: ["package", options.packageRoot];
 }
 
 /** Resolve package identity only; reporting deliberately skips delivery preflight. */
 export function resolveReportingSource(options = {}) {
 	const [source, candidate] = sourceChoice(options);
-	if (!candidate) fail("ce-workflow source checkout is not configured", "source-unavailable");
+	if (!candidate)
+		fail("ce-workflow source checkout is not configured", "source-unavailable");
 	let sourceCwd;
 	try {
-		sourceCwd = realpathSync(path.resolve(options.cwd ?? process.cwd(), candidate));
+		sourceCwd = realpathSync(
+			path.resolve(options.cwd ?? process.cwd(), candidate),
+		);
 	} catch {
-		fail(`ce-workflow source checkout is unavailable (${source})`, "source-unavailable");
+		fail(
+			`ce-workflow source checkout is unavailable (${source})`,
+			"source-unavailable",
+		);
 	}
 	try {
 		const gitRoot = realpathSync(
@@ -106,28 +140,50 @@ export function resolveReportingSource(options = {}) {
 			}).trim(),
 		);
 		if (!samePath(gitRoot, sourceCwd))
-			fail("configured source is not the ce-workflow Git root", "source-identity");
-		const pkg = JSON.parse(readFileSync(path.join(sourceCwd, "package.json"), "utf8"));
+			fail(
+				"configured source is not the ce-workflow Git root",
+				"source-identity",
+			);
+		const pkg = JSON.parse(
+			readFileSync(path.join(sourceCwd, "package.json"), "utf8"),
+		);
 		if (
 			pkg.name !== PACKAGE_NAME ||
 			!existsSync(path.join(sourceCwd, "extensions", "work-models.js"))
 		)
-			fail("configured source is not a pi-work-orchestrator checkout", "source-identity");
-		return { sourceCwd, source, revision: `package-${pkg.version ?? "unknown"}` };
+			fail(
+				"configured source is not a pi-work-orchestrator checkout",
+				"source-identity",
+			);
+		return {
+			sourceCwd,
+			source,
+			revision: `package-${pkg.version ?? "unknown"}`,
+		};
 	} catch (error) {
 		if (error instanceof ImprovementReportingError) throw error;
-		fail("configured source is not a pi-work-orchestrator checkout", "source-identity");
+		fail(
+			"configured source is not a pi-work-orchestrator checkout",
+			"source-identity",
+		);
 	}
 }
 
 function ensureReportRootIgnored(sourceCwd) {
 	try {
-		execFileSync("git", ["check-ignore", "-q", "--", ".pi/self-improvement-reports"], {
-			cwd: sourceCwd,
-			stdio: "ignore",
-		});
+		execFileSync(
+			"git",
+			["check-ignore", "-q", "--", ".pi/self-improvement-reports"],
+			{
+				cwd: sourceCwd,
+				stdio: "ignore",
+			},
+		);
 	} catch {
-		fail("self-improvement report destination is not ignored", "unsafe-destination");
+		fail(
+			"self-improvement report destination is not ignored",
+			"unsafe-destination",
+		);
 	}
 	initStore(sourceCwd);
 }
@@ -148,7 +204,10 @@ function checkedLog(file, roots, baseCwd) {
 	if (!samePath(canonical, lexical))
 		fail("evidence path must not contain symlinks", "unsafe-evidence");
 	if (!roots.some((root) => contained(root, canonical)))
-		fail("evidence path is outside an approved evidence root", "unsafe-evidence");
+		fail(
+			"evidence path is outside an approved evidence root",
+			"unsafe-evidence",
+		);
 	let listed;
 	try {
 		listed = lstatSync(canonical);
@@ -160,10 +219,16 @@ function checkedLog(file, roots, baseCwd) {
 	let fd;
 	let accepted = false;
 	try {
-		fd = openSync(canonical, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+		fd = openSync(
+			canonical,
+			fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
+		);
 		const before = fstatSync(fd);
 		if (!before.isFile() || identity(before) !== identity(listed))
-			fail("evidence file changed before it could be opened", "unsafe-evidence");
+			fail(
+				"evidence file changed before it could be opened",
+				"unsafe-evidence",
+			);
 		if (before.size > MAX_FILE_BYTES)
 			fail("evidence file exceeds the reporting limit", "evidence-too-large");
 		accepted = true;
@@ -201,7 +266,10 @@ function copyStable(input, destination) {
 			offset += count;
 		}
 		const after = fstatSync(input.fd);
-		if (identity(after) !== input.beforeIdentity || offset !== input.before.size)
+		if (
+			identity(after) !== input.beforeIdentity ||
+			offset !== input.before.size
+		)
 			fail("evidence changed while being copied", "unstable-evidence");
 		return { bytes: offset, sha256: hash.digest("hex") };
 	} finally {
@@ -229,8 +297,12 @@ function reportFields(report) {
 	const impact = bounded(report?.impact, 400);
 	const logs = Array.isArray(report?.logs) ? report.logs.map(String) : [];
 	if (!observation || !expectedBehavior || !impact || !logs.length)
-		fail("observation, expectedBehavior, impact, and at least one log are required", "invalid-report");
-	if (logs.length > MAX_FILES) fail("too many evidence files", "evidence-too-large");
+		fail(
+			"observation, expectedBehavior, impact, and at least one log are required",
+			"invalid-report",
+		);
+	if (logs.length > MAX_FILES)
+		fail("too many evidence files", "evidence-too-large");
 	return {
 		observation,
 		expectedBehavior,
@@ -261,7 +333,10 @@ export function cleanupImprovementReportBundles(sourceCwd, now = Date.now()) {
 	const referenced = new Map();
 	for (const item of Object.values(items)) {
 		for (const evidence of item.evidence ?? []) {
-			if (evidence?.kind === "self-improvement-report" && typeof evidence.bundle === "string")
+			if (
+				evidence?.kind === "self-improvement-report" &&
+				typeof evidence.bundle === "string"
+			)
 				referenced.set(evidence.bundle, item.status);
 		}
 	}
@@ -281,7 +356,11 @@ export function cleanupImprovementReportBundles(sourceCwd, now = Date.now()) {
 		}
 		if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
 		const status = referenced.get(relativeBundle(sourceCwd, bundle));
-		if (status === "closed" || status === "deferred" || (!status && now - stat.mtimeMs > GRACE_MS)) {
+		if (
+			status === "closed" ||
+			status === "deferred" ||
+			(!status && now - stat.mtimeMs > GRACE_MS)
+		) {
 			try {
 				rmSync(bundle, { recursive: true, force: true });
 			} catch {
@@ -305,8 +384,12 @@ export async function submitImprovementReport(options = {}) {
 		.map((root) => realpathSync(root));
 	const inputs = [];
 	try {
-		for (const log of report.logs) inputs.push(checkedLog(log, roots, consumerCwd));
-		if (inputs.reduce((sum, input) => sum + input.before.size, 0) > MAX_TOTAL_BYTES)
+		for (const log of report.logs)
+			inputs.push(checkedLog(log, roots, consumerCwd));
+		if (
+			inputs.reduce((sum, input) => sum + input.before.size, 0) >
+			MAX_TOTAL_BYTES
+		)
 			fail("evidence bundle exceeds the reporting limit", "evidence-too-large");
 	} catch (error) {
 		closeInputs(inputs);
@@ -317,7 +400,9 @@ export async function submitImprovementReport(options = {}) {
 	const files = [];
 	try {
 		try {
-			(options._cleanupBundles ?? cleanupImprovementReportBundles)(resolved.sourceCwd);
+			(options._cleanupBundles ?? cleanupImprovementReportBundles)(
+				resolved.sourceCwd,
+			);
 		} catch {
 			// Retention is best-effort; intake must survive cleanup failures.
 		}
@@ -333,9 +418,17 @@ export async function submitImprovementReport(options = {}) {
 		setOwnerOnly(staging, 0o700);
 		await options._beforeCopy?.(inputs);
 		for (const [index, input] of inputs.entries()) {
-			const filename = path.basename(input.file).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 80) || "log";
+			const filename =
+				path
+					.basename(input.file)
+					.replace(/[^A-Za-z0-9._-]/g, "_")
+					.slice(0, 80) || "log";
 			const target = `${String(index + 1).padStart(2, "0")}-${filename}`;
-			files.push({ file: target, source: input.file, ...copyStable(input, path.join(staging, target)) });
+			files.push({
+				file: target,
+				source: input.file,
+				...copyStable(input, path.join(staging, target)),
+			});
 		}
 		const submittedAt = new Date().toISOString();
 		writeFileSync(
@@ -352,7 +445,10 @@ export async function submitImprovementReport(options = {}) {
 		const mutation = () =>
 			mutateStore(resolved.sourceCwd, (store) => {
 				let epic = Object.values(store.items).find(
-					(item) => item.type === "epic" && item.title === "Self-improving" && ACTIVE_EPIC_STATUSES.has(item.status),
+					(item) =>
+						item.type === "epic" &&
+						item.title === "Self-improving" &&
+						ACTIVE_EPIC_STATUSES.has(item.status),
 				);
 				if (!epic)
 					epic = createWorkItem(store, {
@@ -369,24 +465,38 @@ export async function submitImprovementReport(options = {}) {
 					title: `Self-improvement report: ${report.observation.slice(0, 130)}`,
 					description: `Observed: ${report.observation}\nExpected: ${report.expectedBehavior}\nImpact: ${report.impact}${report.suggestedImprovement ? `\nSuggested improvement: ${report.suggestedImprovement}` : ""}`,
 					labels: ["self-improvement", "report"],
-					evidence: [{
-						kind: "self-improvement-report",
-						bundle,
-						submittedAt,
-						producer: report.producer,
-						workflowId: report.workflowId || undefined,
-						extensionRevision: resolved.revision,
-						files: files.map(({ file, bytes, sha256 }) => ({ file, bytes, sha256 })),
-					}],
+					evidence: [
+						{
+							kind: "self-improvement-report",
+							bundle,
+							submittedAt,
+							producer: report.producer,
+							workflowId: report.workflowId || undefined,
+							extensionRevision: resolved.revision,
+							files: files.map(({ file, bytes, sha256 }) => ({
+								file,
+								bytes,
+								sha256,
+							})),
+						},
+					],
 				});
 				return { epic, task };
 			});
 		const queue = options.withFileMutationQueue ?? (async (_file, fn) => fn());
 		const { epic, task } = await queue(storePath(resolved.sourceCwd), mutation);
-		return { taskId: task.id, epicId: epic.id, bundlePath, bundle, sourceCwd: resolved.sourceCwd, source: resolved.source };
+		return {
+			taskId: task.id,
+			epicId: epic.id,
+			bundlePath,
+			bundle,
+			sourceCwd: resolved.sourceCwd,
+			source: resolved.source,
+		};
 	} catch (error) {
 		closeInputs(inputs);
-		if (staging && existsSync(staging)) rmSync(staging, { recursive: true, force: true });
+		if (staging && existsSync(staging))
+			rmSync(staging, { recursive: true, force: true });
 		throw error;
 	}
 }
