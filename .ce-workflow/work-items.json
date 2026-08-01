@@ -3666,6 +3666,74 @@
       "type": "task",
       "updatedAt": "2026-07-20T14:41:04.347Z"
     },
+    "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495": {
+      "createdAt": "2026-08-01T09:25:47.590Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After work-1.3 closed and the roadmap had no ready children, rerunning `bootstrap-plan-roadmap ... --roadmap work-1` returned the already-closed planning item work-1.2 instead of creating the next planning boundary. `work-ready-summary work-1` remained empty.\nExpected: For an open roadmap whose prior planning boundary is closed and which has no ready executable children, bootstrap/resume should create a fresh `wo:planning` child and return that new ID.\nImpact: Autonomous roadmap execution stalls after the first slice unless the parent manually creates native planning items, bypassing the intended coded deterministic resume loop.\nSuggested improvement: Make bootstrapPlanEpic detect closed selected planning items and allocate the next child ID when no open planning or executable child exists.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/0fb408ff-26f2-4b59-8122-b5139c179f32",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2834659,
+              "file": "01-019fbc92-57ec-76d9-9d40-3300132b194f.jsonl",
+              "sha256": "fe234dfa1be1f431a336960dfd5353b19bbb4fa5898dd7ad02e97459bae647da"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-01T09:25:47.586Z",
+          "workflowId": "019fbc92-57ec-76d9-9d40-3300132b194f"
+        }
+      ],
+      "id": "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After work-1.3 closed and the roadmap had no ready children, rerunning `bootstrap-plan-roadmap ... --roadmap work-1` returned the ",
+      "type": "task",
+      "updatedAt": "2026-08-01T09:25:47.590Z"
+    },
+    "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
+      "createdAt": "2026-08-01T09:15:12.789Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The session's normal bash tool is rewritten to invoke `hypa`, but the executable is unavailable, producing `/usr/bin/bash: line 1: hypa: command not found`. The same condition prevented the work-planner from running final Git-status attestation and caused its otherwise-completed planning run to fail acceptance.\nExpected: When Hypa is unavailable, bash-backed workflow commands and specialist attestations should transparently fall back to direct shell execution instead of failing before the requested command runs.\nImpact: Valid durable planning was reported as failed, forcing parent-side forensic verification and risking duplicate specialists or abandoned WorkItem state in autonomous loops.\nSuggested improvement: Add capability detection and direct-shell fallback around the Hypa rewrite path, preserving the requested command and exit status.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/f53c56df-0235-4eee-b2f3-fbc377e4e9c9",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 933520,
+              "file": "01-019fbc92-57ec-76d9-9d40-3300132b194f.jsonl",
+              "sha256": "4aa8ca3dedbe2d40c8328d11de655c1a6d93dcdaa53a774545769ac2792d1317"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-01T09:15:12.784Z",
+          "workflowId": "019fbc92-57ec-76d9-9d40-3300132b194f"
+        }
+      ],
+      "id": "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The session's normal bash tool is rewritten to invoke `hypa`, but the executable is unavailable, producing `/usr/bin/bash: line 1:",
+      "type": "task",
+      "updatedAt": "2026-08-01T09:15:12.789Z"
+    },
     "work-3": {
       "createdAt": "2026-07-25T07:42:39.407Z",
       "dependencies": [],
@@ -5063,7 +5131,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-01T07:49:09.932Z"
+    "updatedAt": "2026-08-01T09:25:47.590Z"
   },
   "schemaVersion": 1
 }
