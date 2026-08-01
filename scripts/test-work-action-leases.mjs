@@ -218,6 +218,59 @@ for (const mode of ["tui", "rpc", "autonomous"]) {
 }
 
 {
+	const { cwd } = fixture("goal-handoff");
+	try {
+		const statusDir = path.join(cwd, ".pi-subagents", "authoritative-worker");
+		mkdirSync(statusDir, { recursive: true });
+		writeFileSync(
+			path.join(statusDir, "status.json"),
+			JSON.stringify({ state: "running", steps: [{ status: "running" }] }),
+		);
+		const active = acquireWorkActionLease(cwd, {
+			workflowRunId: "medium-handoff",
+			roadmapId: "E-1",
+			workItemId: "W-1",
+			action: "run-implementation",
+			semanticRole: "builder",
+			agent: "work-worker",
+			session: "medium-session",
+		});
+		acknowledgeWorkActionLease(cwd, active.leaseId, {
+			runId: "authoritative-worker",
+			asyncDir: statusDir,
+		});
+		let launchRequests = 0;
+		const duplicate = await launchDirectAction(
+			cwd,
+			{
+				action: "run-implementation",
+				epic: { id: "E-1" },
+				selectedWorkItem: { id: "W-1", status: "in_progress" },
+			},
+			{
+				agent: "work-worker",
+				params: { agent: "work-worker", task: "duplicate" },
+			},
+			{ events: { emit: () => (launchRequests += 1) } },
+			{
+				workflowRunId: "goal-continuation",
+				mode: "autonomous",
+				session: "goal-session",
+			},
+		);
+		const occupied = occupiedWorkActionLease(cwd, "W-1");
+		assert(
+			!duplicate.spawned.ok &&
+				launchRequests === 0 &&
+				occupied?.launchIdentity?.runId === "authoritative-worker",
+			"goal continuation cannot relaunch a worker while the authoritative handoff lease is active",
+		);
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+}
+
+{
 	const { cwd } = fixture("stale-recovery");
 	try {
 		const input = (workflowRunId, claimed) => ({

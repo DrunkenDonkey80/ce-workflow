@@ -3338,19 +3338,25 @@
         "schemaVersion": 1,
         "title": "Prevent duplicate worker launch after goal handoff"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.55",
       "labels": [
         "self-improvement"
       ],
       "notes": [
-        "Evidence: C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/3e6c99d0-a850-478b-a2ed-49ca2e7bd51f/events.jsonl; C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/9c24c9cb/events.jsonl. work_report_improvement was attempted first but rejected the configured source as not the ce-workflow Git root."
+        "Evidence: C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/3e6c99d0-a850-478b-a2ed-49ca2e7bd51f/events.jsonl; C:/Users/Flex/AppData/Local/Temp/pi-subagents-user-Flex/async-subagent-runs/9c24c9cb/events.jsonl. work_report_improvement was attempted first but rejected the configured source as not the ce-workflow Git root.",
+        "Classification: already-fixed atomic duplicate-launch claim (current source), not a duplicate of the other snapshot items. Commit 95c2764 routes project-goal kickoff through launchDirectAction, includes the authoritative run ID in the kickoff, and durable action-lease admission rejects a second mutable launch. Added exact regression proof; node scripts/test-work-action-leases.mjs PASS.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-action-leases.mjs\nOutput: ok - durable action leases and one-step coded driver"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Prevent duplicate work-worker launch after goal handoff",
       "type": "bug",
-      "updatedAt": "2026-07-31T16:21:14.481Z"
+      "updatedAt": "2026-08-01T07:48:35.224Z"
     },
     "work-2.56": {
       "acceptance": "",
@@ -5054,7 +5060,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-01T07:46:38.716Z"
+    "updatedAt": "2026-08-01T07:48:35.224Z"
   },
   "schemaVersion": 1
 }
