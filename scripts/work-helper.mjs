@@ -513,10 +513,10 @@ async function finishTaskUnlocked() {
 		throw new Error(
 			`scope exceeds ${maxFiles} implementation files: ${implementationFiles.join(", ")}`,
 		);
-	const taskText = `${titleOf(task)}\n${notesOf(task)}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
+	const taskContractText = `${titleOf(task)}\n${field(task, "description") ?? ""}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
 	const evidenceOnly =
 		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
-			taskText,
+			taskContractText,
 		);
 	const reviewReasons = [];
 	const sensitivePaths = implementationFiles.filter((file) =>
@@ -528,7 +528,7 @@ async function finishTaskUnlocked() {
 		reviewReasons.push(`sensitive paths: ${sensitivePaths.join(", ")}`);
 	if (
 		/\b(?:auth(?:entication|orization)?|permission|credential|secret|payment|billing|migration|schema|database|destructive|production|deploy|release|breaking|concurren(?:cy|t)|race condition|thread safety|crypt|security|firmware flash)\b/i.test(
-			taskText,
+			taskContractText,
 		)
 	)
 		reviewReasons.push("sensitive task contract");
@@ -555,13 +555,13 @@ async function finishTaskUnlocked() {
 	);
 	if (
 		uiFiles.length &&
-		/\b(?:ui|visual|browser|screenshot|interaction)\b/i.test(taskText)
+		/\b(?:ui|visual|browser|screenshot|interaction)\b/i.test(taskContractText)
 	)
 		reviewReasons.push(`UI acceptance: ${uiFiles.join(", ")}`);
 	if (
 		!evidenceOnly &&
 		/\b(?:hardware|firmware|device|live evidence|real[- ]world)\b/i.test(
-			taskText,
+			taskContractText,
 		)
 	)
 		reviewReasons.push("hardware/live-evidence contract");

@@ -3460,6 +3460,9 @@
           "producer": "NexusConnectSDK-Android",
           "submittedAt": "2026-07-31T17:20:34.505Z",
           "workflowId": "019fb848-4c48-7045-b891-33840fe34444"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.58",
@@ -3467,12 +3470,17 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned atomic review-gate bug, related-distinct from ignored-store finalization. Root cause is evidence-only detection reading mutable implementation notes and omitting description; fixed by deriving review semantics only from title, description, and acceptance. Focused proof: node scripts/test-work-optimization-helpers.mjs (PASS with verification notes on a firmware/concurrency contract still requiring review).",
+        "wo:review-scope [\"scripts/test-work-optimization-helpers.mjs\",\"scripts/work-helper.mjs\"]",
+        "wo:review PASS - review semantics now derive from title+description+acceptance only (work-helper.mjs:516); node scripts/test-work-optimization-helpers.mjs passes incl. new TASK-6 case proving verification notes cannot suppress firmware review",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: finish-task skipped the mandatory reviewer handoff for work-1.2, a P0 firmware/concurrency production task. `evidenceOnly` is comp",
       "type": "task",
-      "updatedAt": "2026-07-31T17:20:34.509Z"
+      "updatedAt": "2026-08-01T07:46:38.715Z"
     },
     "work-2.59": {
       "createdAt": "2026-07-31T17:20:46.377Z",
@@ -5046,7 +5054,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-01T07:43:26.414Z"
+    "updatedAt": "2026-08-01T07:46:38.716Z"
   },
   "schemaVersion": 1
 }

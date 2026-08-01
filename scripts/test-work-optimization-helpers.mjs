@@ -295,6 +295,14 @@ try {
 		status: "open",
 		title: "Update authentication permission checks",
 	});
+	createWorkItem(finishStore, {
+		id: "TASK-6",
+		type: "task",
+		status: "open",
+		title: "Update controller",
+		description: "P0 firmware concurrency production change",
+		notes: ["Verification: tests passed"],
+	});
 	saveStore(finishCwd, finishStore);
 	execFileSync("git", ["init"], { cwd: finishCwd, stdio: "ignore" });
 	execFileSync("git", ["config", "user.email", "test@example.com"], {
@@ -686,6 +694,35 @@ process.exit(result.status ?? 1);
 	assert(
 		contractReviewError.includes("sensitive task contract"),
 		"finish-task enforces sensitive WorkItem review even for neutral file paths",
+	);
+	let firmwareReviewError = "";
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-6",
+				"--max-files",
+				"2",
+				"--message",
+				"firmware controller",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+			],
+			{
+				cwd: finishCwd,
+				encoding: "utf8",
+				env: { ...process.env, WORK_ORCH_BD_BIN: fakeBdScript },
+			},
+		);
+	} catch (error) {
+		firmwareReviewError = String(error.stdout ?? "");
+	}
+	assert(
+		firmwareReviewError.includes("sensitive task contract") &&
+			firmwareReviewError.includes("hardware/live-evidence contract"),
+		"implementation notes cannot suppress firmware review from the immutable task contract",
 	);
 
 	console.log("ok - workflow optimization helpers");
