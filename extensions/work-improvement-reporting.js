@@ -105,7 +105,7 @@ export function resolveReportingSource(options = {}) {
 				stdio: ["ignore", "pipe", "pipe"],
 			}).trim(),
 		);
-		if (gitRoot !== sourceCwd)
+		if (!samePath(gitRoot, sourceCwd))
 			fail("configured source is not the ce-workflow Git root", "source-identity");
 		const pkg = JSON.parse(readFileSync(path.join(sourceCwd, "package.json"), "utf8"));
 		if (

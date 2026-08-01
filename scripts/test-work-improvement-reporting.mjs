@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { initStore, loadStore, mutateStore } from "../extensions/work-store.js";
 
-const { cleanupImprovementReportBundles, submitImprovementReport } = await import("../extensions/work-improvement-reporting.js");
+const { cleanupImprovementReportBundles, resolveReportingSource, submitImprovementReport } = await import("../extensions/work-improvement-reporting.js");
 const { default: workModelsExtension } = await import("../extensions/work-models.js");
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const root = mkdtempSync(path.join(tmpdir(), "work-improvement-reporting-"));
@@ -18,6 +18,18 @@ writeFileSync(path.join(source, ".gitignore"), ".pi/\n.pi-subagents/\n");
 writeFileSync(path.join(source, "package.json"), JSON.stringify({ name: "pi-work-orchestrator", version: "1.2.3" }));
 writeFileSync(path.join(source, "extensions", "work-models.js"), "export {};\n");
 initStore(source);
+if (process.platform === "win32") {
+	const alternateCaseSource = source.replace(/[a-z]/i, (character) =>
+		character === character.toLowerCase()
+			? character.toUpperCase()
+			: character.toLowerCase(),
+	);
+	resolveReportingSource({
+		cwd: consumer,
+		packageRoot: source,
+		settings: { workImprovement: { sourceCheckout: alternateCaseSource } },
+	});
+}
 const log = path.join(consumer, ".pi", "work-runs", "run.jsonl");
 const secondLog = path.join(consumer, ".pi", "work-runs", "tool.jsonl");
 writeFileSync(log, "{\"event\":\"SECRET_RAW_LOG_MARKER\"}\n");
