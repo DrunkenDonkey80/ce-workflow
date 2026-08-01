@@ -362,6 +362,7 @@ export async function submitImprovementReport(options = {}) {
 						labels: ["self-improvement"],
 					});
 				const task = createWorkItem(store, {
+					id: `${epic.id}.report-${randomUUID()}`,
 					type: "task",
 					status: "open",
 					parentId: epic.id,

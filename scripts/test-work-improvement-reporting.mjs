@@ -50,6 +50,20 @@ try {
 		report,
 	});
 	assert(result.taskId && result.epicId && existsSync(result.bundlePath), "report returns durable task and bundle");
+	const mirror = path.join(root, "mirror");
+	mkdirSync(path.join(mirror, "extensions"), { recursive: true });
+	execFileSync("git", ["init", "--quiet"], { cwd: mirror });
+	writeFileSync(path.join(mirror, ".gitignore"), ".pi/\n.pi-subagents/\n");
+	writeFileSync(path.join(mirror, "package.json"), JSON.stringify({ name: "pi-work-orchestrator", version: "1.2.3" }));
+	writeFileSync(path.join(mirror, "extensions", "work-models.js"), "export {};\n");
+	initStore(mirror);
+	const mirrorResult = await submitImprovementReport({
+		cwd: consumer,
+		packageRoot: mirror,
+		settings: { workImprovement: { sourceCheckout: mirror } },
+		report,
+	});
+	assert(mirrorResult.taskId !== result.taskId, "independent clones allocate collision-resistant report ids");
 	const store = loadStore(source);
 	assert(store.items[result.epicId].title === "Self-improving", "creates exact epic");
 	assert(store.items[result.taskId].parentId === result.epicId, "creates epic child");
