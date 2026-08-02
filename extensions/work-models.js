@@ -642,6 +642,7 @@ const contextCompactState = {
 	requested: false,
 };
 let manualMicrocompactPending = false;
+let manualMicrocompactGoalResume = null;
 let manualMicrocompactResumePrompt = null;
 let manualMicrocompactWorkflowRunId = null;
 let pendingWorkPrompt = null;
@@ -5340,6 +5341,7 @@ function resetContextCompaction() {
 	contextCompactState.generation += 1;
 	contextCompactState.inFlight = false;
 	contextCompactState.requested = false;
+	manualMicrocompactGoalResume = null;
 }
 
 function maybeCompact(ctx, settings) {
@@ -5365,10 +5367,46 @@ function runManualMicrocompact(ctx) {
 	}
 	const resumeAfter =
 		manualMicrocompactPending && activeWorkGoal?.status !== "active";
+	const resumeGoalId =
+		activeWorkGoalRunning && activeWorkGoal?.status === "active"
+			? activeWorkGoal.id
+			: null;
+	const willResume = resumeAfter || Boolean(resumeGoalId);
 	const workflowPrompt = manualMicrocompactResumePrompt;
 	manualMicrocompactResumePrompt = null;
 	const generation = beginContextCompaction();
+	if (resumeGoalId)
+		manualMicrocompactGoalResume = {
+			goalId: resumeGoalId,
+			generation,
+			ready: false,
+			requested: false,
+			note: "",
+		};
 	const resume = () => {
+		const goalResume = manualMicrocompactGoalResume;
+		if (
+			goalResume?.goalId === resumeGoalId &&
+			goalResume.generation === generation
+		) {
+			goalResume.ready = true;
+			if (workGoalContinuationPending?.goalId === resumeGoalId) {
+				manualMicrocompactGoalResume = null;
+				return;
+			}
+			if (goalResume.requested || !activeWorkGoalRunning) {
+				const goal = activeWorkGoal;
+				if (goal?.id === resumeGoalId && goal.status === "active")
+					void sendWorkGoalContinuation(
+						workExtensionPi,
+						ctx,
+						goal,
+						goalResume.note,
+					);
+				else manualMicrocompactGoalResume = null;
+			}
+			return;
+		}
 		if (!resumeAfter) return;
 		const message = workflowPrompt
 			? `Continue the active work-orchestrator turn after compaction. Resume from current native work-item store and git state; do not repeat completed steps. The original self-contained handoff follows:\n\n${workflowPrompt}`
@@ -5388,7 +5426,7 @@ function runManualMicrocompact(ctx) {
 			onComplete: () => {
 				if (!finishContextCompaction(generation)) return;
 				ctx.ui.notify(
-					resumeAfter
+					willResume
 						? "Microcompaction completed; resuming work"
 						: "Microcompaction completed",
 					"info",
@@ -17432,9 +17470,18 @@ async function microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt) {
 }
 
 async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
+	const manualResume =
+		manualMicrocompactGoalResume?.goalId === goal.id
+			? manualMicrocompactGoalResume
+			: null;
+	if (manualResume && !manualResume.ready) {
+		manualResume.requested = true;
+		manualResume.note = note;
+		return true;
+	}
 	if (workGoalContinuationPending?.goalId === goal.id) return false;
 	applyWorkGoalThinking(pi, goal, ctx);
-	if (workGoalHasPendingMessages(ctx)) return false;
+	if (!manualResume && workGoalHasPendingMessages(ctx)) return false;
 	const marker = workGoalContinuationMarker(goal);
 	const prompt = buildWorkGoalContinuePrompt(goal, marker, note);
 	workGoalContinuationPending = {
@@ -17442,6 +17489,7 @@ async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
 		marker,
 		iteration: goal.iteration,
 	};
+	if (manualResume) manualMicrocompactGoalResume = null;
 	if (
 		goal.mode === "project" &&
 		workResumeSettings(activeWorkGoalCwd ?? ctx.cwd).newSessionBetweenIterations
@@ -17455,7 +17503,9 @@ async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
 			workGoalContinuationPending = null;
 		return queued;
 	}
-	const sent = await microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt);
+	const sent = manualResume
+		? await sendWorkGoalPrompt(pi, ctx, prompt)
+		: await microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt);
 	if (!sent && workGoalContinuationPending?.marker === marker)
 		workGoalContinuationPending = null;
 	return sent;

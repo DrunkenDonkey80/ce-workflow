@@ -1620,6 +1620,36 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		ctx,
 	);
 	await tempHooks.agent_start({}, ctx);
+	await tempShortcuts.f8.handler(ctx);
+	await tempHooks.turn_end({}, ctx);
+	assert.equal(compactions.length, 2, "F8 microcompacts the active goal turn");
+	assert.match(compactions[1].customInstructions, /on-demand microcompact/);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Made more progress." }],
+				},
+			],
+		},
+		ctx,
+	);
+	await settle();
+	assert.equal(
+		compactions.length,
+		2,
+		"active-goal continuation reuses the completed F8 microcompact",
+	);
+	assert.equal(sent.length, 3, "active goal resumes after F8 microcompaction");
+	assert.match(sent[2].message, /Automatic continuation #2/);
+	assert.equal(statuses["work-goal"], "active #2");
+
+	await tempHooks.before_agent_start(
+		{ prompt: sent[2].message, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
 	await tempHooks.agent_end(
 		{
 			messages: [
@@ -1646,7 +1676,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 			String(notice.message).includes("needs human decision"),
 		),
 	);
-	assert.equal(sent.length, 2);
+	assert.equal(sent.length, 3);
 
 	const clarifyResult = await tempHooks.input?.(
 		{ source: "user", text: "clarify: what screenshot is missing?" },
@@ -1673,7 +1703,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	assert.equal(conversationalResult, undefined);
 	assert.equal(statuses["work-goal"], "needs human");
-	assert.equal(sent.length, 2);
+	assert.equal(sent.length, 3);
 
 	const answerInputResult = await tempHooks.input?.(
 		{
@@ -1684,23 +1714,23 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	assert.equal(answerInputResult, undefined);
 	assert.equal(statuses["work-goal"], "needs human");
-	assert.equal(sent.length, 2);
+	assert.equal(sent.length, 3);
 
 	await invoke(
 		"work-goal",
 		"resume 2, but use the AI-Wedge connected proof and add a connect button.",
 		ctx,
 	);
-	assert.equal(statuses["work-goal"], "active #1");
+	assert.equal(statuses["work-goal"], "active #2");
 	assert.ok(activeTools.includes("work_goal_complete"));
 	assert.ok(activeTools.includes("work_goal_human_decision"));
 	assert.equal(thinkingLevel, "medium");
-	assert.equal(sent.length, 3);
-	assert.match(sent[2].message, /User resumed the goal with this answer/);
-	assert.match(sent[2].message, /add a connect button/);
+	assert.equal(sent.length, 4);
+	assert.match(sent[3].message, /User resumed the goal with this answer/);
+	assert.match(sent[3].message, /add a connect button/);
 
 	await tempHooks.before_agent_start(
-		{ prompt: sent[2].message, systemPrompt: "base" },
+		{ prompt: sent[3].message, systemPrompt: "base" },
 		ctx,
 	);
 	const completionResult = await tempTools.work_goal_complete.execute(
