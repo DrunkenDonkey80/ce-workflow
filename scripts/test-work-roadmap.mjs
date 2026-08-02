@@ -1025,6 +1025,18 @@ try {
 	);
 	assert.notEqual(nextPlanning.selectedWorkItem.id, planCreated.selectedWorkItem.id);
 	assert.equal(nextPlanning.selectedWorkItem.status, "open");
+	const repeatedNextPlanning = bootstrapPlanEpic(
+		root,
+		"docs/plans/overhaul.md",
+		"/work-plan",
+		{ safeForHandoff: true, warnings: [], dirtyPaths: [], dirtyFiles: [] },
+		{ initialized: false },
+		{ targetEpicId: planCreated.epic.id },
+	);
+	assert.equal(
+		repeatedNextPlanning.selectedWorkItem.id,
+		nextPlanning.selectedWorkItem.id,
+	);
 	assert.equal(
 		Object.values(loadStore(root).items).filter(
 			(item) =>

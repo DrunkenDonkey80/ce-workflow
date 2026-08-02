@@ -3689,6 +3689,9 @@
         },
         {
           "closeEvidence": "Completed by coded inline work path"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495",
@@ -3698,13 +3701,17 @@
       ],
       "notes": [
         "classification: locally-owned. Atomic claim: bootstrapPlanEpic reuses a closed planning boundary when an attached roadmap has no ready executable child. Canonical execution item: this report. Fix and focused regression are in extensions/work-models.js and scripts/test-work-roadmap.mjs.",
-        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs\nOutput: "
+        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs\nOutput: ",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:12951 - planning lookup must prefer a non-closed match: collect the matching planning children and select `children.find(item => statusOf(item) !== \\\"closed\\\") ?? children[0]` before the closed-boundary guard, otherwise the stale closed boundary is found again and every rerun of `bootstrap-plan-roadmap --roadmap <id>` creates another open planning child (verified: 4 sequential calls produced work-1.1 closed + work-1.2/1.3/1.4 open)\",\"scripts/test-work-roadmap.mjs:1018 - extend the new regression: after `nextPlanning`, call bootstrapPlanEpic a third time with the same targetEpicId and assert it returns `nextPlanning.selectedWorkItem.id` and that the planning-child count stays 2\"]}",
+        "review disposition: accepted. Fixed duplicate planning creation by preferring an existing non-closed matching planning child before considering the historical closed child; added a third-bootstrap idempotence assertion and retained the two-child count check.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs\nOutput: ",
+        "wo:review PASS - d640f5b prefers non-closed matching planning child before the closed-boundary guard (extensions/work-models.js:12952-12959) and test-work-roadmap.mjs adds third-bootstrap idempotence + 2-child count; node scripts/test-work-roadmap.mjs exit 0"
       ],
       "parentId": "work-2",
       "status": "closed",
       "title": "Self-improvement report: After work-1.3 closed and the roadmap had no ready children, rerunning `bootstrap-plan-roadmap ... --roadmap work-1` returned the ",
       "type": "task",
-      "updatedAt": "2026-08-02T19:21:33.252Z"
+      "updatedAt": "2026-08-02T19:28:21.628Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -5140,7 +5147,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-02T19:21:33.253Z"
+    "updatedAt": "2026-08-02T19:29:14.895Z"
   },
   "schemaVersion": 1
 }

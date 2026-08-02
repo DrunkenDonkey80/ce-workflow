@@ -12949,12 +12949,15 @@ export function bootstrapPlanEpic(
 				: undefined;
 			if (parentInitiativeId)
 				return { epic: nativeIssue(epic), parentInitiativeId };
-			let planning = Object.values(store.items).find(
+			const planningChildren = Object.values(store.items).filter(
 				(item) =>
 					item.parentId === epic.id &&
 					isPlanningIssue(item) &&
 					notesOf(item).includes(`source plan: ${rel}`),
 			);
+			let planning =
+				planningChildren.find((item) => statusOf(item) !== "closed") ??
+				planningChildren[0];
 			if (
 				statusOf(planning) === "closed" &&
 				!readyWorkItems(store).some(
