@@ -20,8 +20,9 @@ ideas from `pi-usage-bar` at pinned revision:
   the subscription footer does not duplicate it.
 - **Cache identity/path:** cache entries are keyed by a hashed Pi-auth identity and live
   under Pi's global agent directory.
-- **Freshness:** complete snapshots update atomically, failures retain stale quota, and
-  quota becomes unavailable after ten minutes.
+- **Freshness:** complete snapshots update atomically and failures retain stale quota.
+  Most quota becomes unavailable after ten minutes; Claude polls every thirty minutes
+  and remains cached for an additional thirty minutes after one failed poll.
 - **Incidents:** a separate default-off global toggle polls only the pinned Claude,
   Codex, and GitHub Copilot public Statuspage endpoints; failures retain last-known
   incident state and never alter quota freshness.

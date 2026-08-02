@@ -6,7 +6,8 @@ import { join } from "node:path";
 const MIN_WIDTH = 56;
 const FULL_WIDTH = 80;
 const POLL_MS = 120_000;
-const CLAUDE_POLL_MS = 600_000;
+const CLAUDE_POLL_MS = 1_800_000;
+const CLAUDE_UNAVAILABLE_MS = 3_600_000;
 const FOLLOWER_SYNC_MS = 60_000;
 const BACKOFF_MS = 360_000;
 const MAX_BACKOFF_MS = 3_600_000;
@@ -291,9 +292,9 @@ function incidentIndicator(payload) {
 	return ["minor", "major", "critical", "maintenance"].includes(value) ? value : "none";
 }
 
-function provider({ id, label, piProviderId, url, parser, headers, pollMs = POLL_MS }) {
+function provider({ id, label, piProviderId, url, parser, headers, pollMs = POLL_MS, unavailableMs = UNAVAILABLE_MS }) {
 	return Object.freeze({
-		id, label, piProviderId, pollMs,
+		id, label, piProviderId, pollMs, unavailableMs,
 		resolveAuth: (ctx) => ctx.modelRegistry?.getProviderAuth?.(piProviderId),
 		identity: authIdentity,
 		async fetchQuota(auth, options) {
@@ -310,7 +311,7 @@ export const PRODUCTION_PROVIDERS = Object.freeze([
 		for (const [key, value] of Object.entries(source)) if (key.toLowerCase() === "chatgpt-account-id") headers["chatgpt-account-id"] = value;
 		return headers;
 	} }),
-	provider({ id: "claude", label: "Claude", piProviderId: "anthropic", url: "https://api.anthropic.com/api/oauth/usage", parser: claudeParser, headers: (auth) => authHeaders(auth, { "anthropic-beta": "oauth-2025-04-20" }), pollMs: CLAUDE_POLL_MS }),
+	provider({ id: "claude", label: "Claude", piProviderId: "anthropic", url: "https://api.anthropic.com/api/oauth/usage", parser: claudeParser, headers: (auth) => authHeaders(auth, { "anthropic-beta": "oauth-2025-04-20" }), pollMs: CLAUDE_POLL_MS, unavailableMs: CLAUDE_UNAVAILABLE_MS }),
 	provider({ id: "copilot", label: "Copilot", piProviderId: "github-copilot", url: "https://api.github.com/copilot_internal/user", parser: copilotParser, headers: (auth) => authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }) }),
 	provider({ id: "glm", label: "GLM/Z.ai", piProviderId: "zai", url: "https://api.z.ai/api/monitor/usage/quota/limit", parser: glmParser, headers: (auth) => authHeaders(auth, {}, true) }),
 	provider({ id: "kimi", label: "Kimi", piProviderId: "kimi-coding", url: "https://api.kimi.com/coding/v1/usages", parser: kimiParser, headers: (auth) => authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }) }),
@@ -392,7 +393,7 @@ export function renderQuotaRows(registry, states, theme, width, now = Date.now()
 		if (!state?.authenticated) continue;
 		const display = providerDisplay(provider, state, theme);
 		const age = state.lastSuccessAt === undefined ? Infinity : now - state.lastSuccessAt;
-		if (!state.snapshot || age >= UNAVAILABLE_MS) {
+		if (!state.snapshot || age >= (provider.unavailableMs ?? UNAVAILABLE_MS)) {
 			const failure = state.failure === "auth rejected" || state.failure === "rate limited" ? ` · ${state.failure}` : "";
 			let plain = `${display.label} quota unavailable${failure}`;
 			if (parts.length && plainWidth + 3 + visibleWidth(plain) > width) flush();
@@ -668,7 +669,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			const backoff = Math.min(MAX_BACKOFF_MS, BACKOFF_MS * 2 ** (state.failureCount - 1));
 			const retryDelay = Math.min(MAX_BACKOFF_MS, error instanceof QuotaError ? error.retryAfterMs ?? 0 : 0);
 			if (render) requestRender();
-			schedule(entry, Math.max(backoff, retryDelay, state.failure === "rate limited" ? pollMs : 0), gen);
+			schedule(entry, Math.max(backoff, retryDelay, pollMs), gen);
 		}
 	}
 

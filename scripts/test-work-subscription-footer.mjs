@@ -131,6 +131,9 @@ assert.equal(headlessFetches, 0);
 assert.deepEqual(PRODUCTION_PROVIDERS.map((provider) => [provider.label, provider.piProviderId]), [
 	["Codex", "openai-codex"], ["Claude", "anthropic"], ["Copilot", "github-copilot"], ["GLM/Z.ai", "zai"], ["Kimi", "kimi-coding"],
 ]);
+const claudeProvider = PRODUCTION_PROVIDERS.find((provider) => provider.id === "claude");
+assert.equal(claudeProvider.pollMs, 1_800_000, "Claude quota is polled every 30 minutes");
+assert.equal(claudeProvider.unavailableMs, 3_600_000, "Claude cache survives one failed poll for another 30 minutes");
 const now = () => 1_800_000_000_000;
 const reset = now() + 3_600_000;
 const payloads = {
@@ -495,6 +498,35 @@ assert.equal(freshText.includes("Freshness quota unavailable"), true, "exact ten
 await fresh.clock.advance(600000);
 assert.match(stripAnsi(freshComponent.render(80).join("\n")), /recovered.*30%/, "complete success recovers");
 fresh.controller.shutdown(fresh.ctx);
+
+const claudeStaleState = new Map([["claude", {
+	authenticated: true,
+	lastSuccessAt: now() - 3_599_999,
+	failure: "unavailable",
+	snapshot: { windows: [{ id: "5h", label: "5h", usedPercent: 20, resetsAt: reset }] },
+}]]);
+assert.match(stripAnsi(renderQuotaRows([claudeProvider], claudeStaleState, theme, 80, now()).join("\n")), /Claude 5h.*stale/);
+claudeStaleState.get("claude").lastSuccessAt--;
+assert.match(stripAnsi(renderQuotaRows([claudeProvider], claudeStaleState, theme, 80, now()).join("\n")), /Claude quota unavailable/);
+
+let claudePolls = 0;
+const claudePolling = harness({
+	providers: [{ ...claudeProvider, identity: () => "same", fetchQuota: async () => {
+		claudePolls++;
+		if (claudePolls > 1) throw new Error("unavailable");
+		return [{ id: "5h", label: "5h", usedPercent: 20, resetsAt: reset }];
+	} }],
+	auth: () => stored("safe"), fetchImpl: async () => {},
+});
+claudePolling.controller.start(claudePolling.ctx);
+await flush();
+await claudePolling.clock.advance(1_800_000);
+assert.equal(claudePolls, 2, "Claude polls after 30 minutes");
+await claudePolling.clock.advance(1_799_999);
+assert.equal(claudePolls, 2, "a failed Claude poll does not fall back to the generic retry cadence");
+await claudePolling.clock.advance(1);
+assert.equal(claudePolls, 3, "a failed Claude poll retries after another 30 minutes");
+claudePolling.controller.shutdown(claudePolling.ctx);
 
 // Independent 120-second schedules: a pending provider cannot delay its sibling; malformed partial snapshots never publish.
 let slowResolve;
