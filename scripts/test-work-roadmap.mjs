@@ -1012,6 +1012,28 @@ try {
 		throw new Error(
 			`reviewed plan file creates native roadmap work: ${JSON.stringify(planCreated)}`,
 		);
+	const closedPlanningStore = loadStore(root);
+	closedPlanningStore.items[planCreated.selectedWorkItem.id].status = "closed";
+	saveStore(root, closedPlanningStore);
+	const nextPlanning = bootstrapPlanEpic(
+		root,
+		"docs/plans/overhaul.md",
+		"/work-plan",
+		{ safeForHandoff: true, warnings: [], dirtyPaths: [], dirtyFiles: [] },
+		{ initialized: false },
+		{ targetEpicId: planCreated.epic.id },
+	);
+	assert.notEqual(nextPlanning.selectedWorkItem.id, planCreated.selectedWorkItem.id);
+	assert.equal(nextPlanning.selectedWorkItem.status, "open");
+	assert.equal(
+		Object.values(loadStore(root).items).filter(
+			(item) =>
+				item.parentId === planCreated.epic.id &&
+				item.notes?.some((note) => note.includes("wo:planning")),
+		).length,
+		2,
+		"repeated bootstrap creates a fresh planning boundary after the prior one closes",
+	);
 
 	const handoffs = [];
 	let roadmapPlanRpc = 0;

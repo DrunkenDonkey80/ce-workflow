@@ -3686,6 +3686,9 @@
           "producer": "LPGLibrarySDK-Android",
           "submittedAt": "2026-08-01T09:25:47.586Z",
           "workflowId": "019fbc92-57ec-76d9-9d40-3300132b194f"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495",
@@ -3693,12 +3696,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "classification: locally-owned. Atomic claim: bootstrapPlanEpic reuses a closed planning boundary when an attached roadmap has no ready executable child. Canonical execution item: this report. Fix and focused regression are in extensions/work-models.js and scripts/test-work-roadmap.mjs.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs\nOutput: "
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After work-1.3 closed and the roadmap had no ready children, rerunning `bootstrap-plan-roadmap ... --roadmap work-1` returned the ",
       "type": "task",
-      "updatedAt": "2026-08-01T09:25:47.590Z"
+      "updatedAt": "2026-08-02T19:21:33.252Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -3727,12 +3733,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "classification: already-fixed (upstream-owned runtime behavior). Atomic claim: missing Hypa must not prevent bash execution. Current verification: command -v hypa is empty while the normal bash tool successfully ran git, node, rg, and shell commands in this session; no Hypa rewrite or ce-workflow-owned Hypa integration exists in current source. The required transparent direct-shell behavior is current, so no local workaround or code commit is warranted.",
+        "Already fixed upstream/current runtime: Hypa is absent and normal bash executes directly; verified in this session. No ce-workflow source owns the rewrite."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The session's normal bash tool is rewritten to invoke `hypa`, but the executable is unavailable, producing `/usr/bin/bash: line 1:",
       "type": "task",
-      "updatedAt": "2026-08-01T09:15:12.789Z"
+      "updatedAt": "2026-08-02T17:29:11.312Z"
     },
     "work-3": {
       "createdAt": "2026-07-25T07:42:39.407Z",
@@ -3772,10 +3781,10 @@
         "All 38 direct children are closed; final child work-3.38 passed focused and package verification, independent review, coded finish, commit, and push.",
         "wo:verify-check PASS\nCommand: node scripts/verify-package.mjs --quiet\nOutput: ok - package checks passed"
       ],
-      "status": "closed",
+      "status": "open",
       "title": "Misc",
       "type": "epic",
-      "updatedAt": "2026-07-31T16:28:44.023Z"
+      "updatedAt": "2026-08-02T12:12:21.927Z"
     },
     "work-3.1": {
       "createdAt": "2026-07-25T07:42:39.536Z",
@@ -5131,7 +5140,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-01T09:25:47.590Z"
+    "updatedAt": "2026-08-02T19:21:33.253Z"
   },
   "schemaVersion": 1
 }

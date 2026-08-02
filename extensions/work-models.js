@@ -12955,6 +12955,14 @@ export function bootstrapPlanEpic(
 					isPlanningIssue(item) &&
 					notesOf(item).includes(`source plan: ${rel}`),
 			);
+			if (
+				statusOf(planning) === "closed" &&
+				!readyWorkItems(store).some(
+					(item) =>
+						item.parentId === epic.id && !isPlanningIssue(item),
+				)
+			)
+				planning = undefined;
 			if (!planning) {
 				const title = `Plan next slice for ${epic.title}`;
 				const notes = workflowWorkItemNotes(command, epic.title, [
