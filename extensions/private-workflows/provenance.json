@@ -14,16 +14,20 @@
   },
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "19e1fb55e50563d8b1b69fe0e3a87a640c6b6032297e1dac13df44eb7b234bec",
-    "version": 1,
+    "sha256": "ebe62bd5708c093c60beaf13ff1aee20c175112d2a17d192f5a1fcf7e9c29e74",
+    "version": 2,
     "rules": [
       "verify-complete-u1-brainstorm-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-one-question-clarification-and-requirements-only-scope",
-      "adapt-output-to-work-brainstorm-markdown-link-contract"
+      "adapt-output-to-work-brainstorm-markdown-link-contract",
+      "verify-complete-u1-plan-closure",
+      "remove-pi-discovery-frontmatter-and-executable-helpers",
+      "preserve-clarification-requirements-self-audit-and-open-question-gate",
+      "adapt-output-to-work-plan-master-and-slice-handoff-contracts"
     ]
   },
-  "sourceClosureSha256": "38e07f8e37d0d89478962251bcba17cf7fe967d37675c38f0a2be55b34ce69f5",
+  "sourceClosureSha256": "bcdca63054d82471854da810c379214b674ab12427068718294feb9d73e9569d",
   "sources": [
     {
       "path": "skills/ce-brainstorm/SKILL.md",
@@ -119,6 +123,156 @@
       "path": "skills/ce-brainstorm/scripts/visual-probe-server.js",
       "bytes": 12949,
       "sha256": "5c48f3ee2b12b28cedb1ecbbb40a738c240272b7124b9289a488d48864282007"
+    },
+    {
+      "path": "skills/ce-plan/SKILL.md",
+      "bytes": 109295,
+      "sha256": "2c637c03377572f05d8377c9a3f5cc99c393d93710e5fd3b0c65bf325c7f0e44"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/agent-native-planning-strategist.md",
+      "bytes": 4169,
+      "sha256": "5856902c4ec44449c55eb8c790c3433c72cbba6618fa9ce9d7448dfd1cd93e63"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/architecture-strategist.md",
+      "bytes": 3299,
+      "sha256": "cbddff079b0feba9c00224ba7791a35e078052573ee8d56355795da72b7b03f6"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/best-practices-researcher.md",
+      "bytes": 7292,
+      "sha256": "1d233a0f7e21427f67ea60a4d8fe676f532532446eb3371681c56123f6da1a91"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/data-integrity-guardian.md",
+      "bytes": 3314,
+      "sha256": "0d615b880fb8d91b988a1e5e419e947b8c06d5ee12e7d4dc4437e30bba1a5375"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/data-migration-reviewer.md",
+      "bytes": 5909,
+      "sha256": "98d218baa5cbab35f9c032cab1449f20c4320d0f7637c4a4fb613d6de4fcc504"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/deployment-verification-agent.md",
+      "bytes": 5308,
+      "sha256": "33db20f608e8cd161848f56d431171e7bac7a3404a4b2219563baa4cd7404f68"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/framework-docs-researcher.md",
+      "bytes": 5730,
+      "sha256": "25055379c07c02ab9d2fc5f5a50f79040d2fb980011d0c858bfd98b465cd6a01"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/git-history-analyzer.md",
+      "bytes": 2876,
+      "sha256": "083f52222c5d85dda5db7b96c4ed09f947a49fb44d45a947b465c429a4e0a56d"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/learnings-researcher.md",
+      "bytes": 16879,
+      "sha256": "a6ecb153773406fbe095311317a71f72d08384cd14eb36431b39b30ccdd83641"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/pattern-recognition-specialist.md",
+      "bytes": 3715,
+      "sha256": "458c963a6faf7b8ef5943aa575a755a4cc108b3a670edf671dd75e76f025e66e"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/performance-oracle.md",
+      "bytes": 4674,
+      "sha256": "6fbf14a66c5a84dca517fea272346328c8f1e1d4a698e17032f93dba73c09b24"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/repo-research-analyst.md",
+      "bytes": 15285,
+      "sha256": "586ef79776b2a0de4ca7fa7c11b9f690b9e3b32a80b5bbb9a2b503413bcc6e87"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/security-sentinel.md",
+      "bytes": 4226,
+      "sha256": "631ddb7d83d2daf8fd3bb974225f0a45bba7f371d73c0cac9ec68e98bbd2ddff"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/slack-researcher.md",
+      "bytes": 10590,
+      "sha256": "26c701431b43406c557a4568b816d659342a2b4d83c2cf76a4e334d072bafb05"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/spec-flow-analyzer.md",
+      "bytes": 4882,
+      "sha256": "575ecb9be1c795bd147ab1066457a5f139c2086fa07b1e4c712e4e70d9119092"
+    },
+    {
+      "path": "skills/ce-plan/references/agents/web-researcher.md",
+      "bytes": 9243,
+      "sha256": "9003f2730b71402fc2e1fd389f733ca95a48eea8dfa2d0dff7507d54012ea1ce"
+    },
+    {
+      "path": "skills/ce-plan/references/approach-altitude.md",
+      "bytes": 7393,
+      "sha256": "e376992f2647c658eae9ad5debccd0bca74e0be87f6e9224b1882837c74c9a45"
+    },
+    {
+      "path": "skills/ce-plan/references/deepening-workflow.md",
+      "bytes": 20666,
+      "sha256": "4a87080a45aed8aac9479f63f353829035a930e5929d53f4155a995add5d7deb"
+    },
+    {
+      "path": "skills/ce-plan/references/html-rendering.md",
+      "bytes": 35376,
+      "sha256": "7dfe7af0da723942622699ed99cd5588ef6b91d65d6174a7038607b3941fbc78"
+    },
+    {
+      "path": "skills/ce-plan/references/markdown-rendering.md",
+      "bytes": 11039,
+      "sha256": "5f2f351b69dc945381b5ad08fe51d949118a8ad6a6e41a9dde8f4518bded1516"
+    },
+    {
+      "path": "skills/ce-plan/references/plan-handoff.md",
+      "bytes": 27875,
+      "sha256": "bdc30f2ce986a629e449744b2f56cfe44f365cc9a3bcb270a10185eacd82c16b"
+    },
+    {
+      "path": "skills/ce-plan/references/plan-sections.md",
+      "bytes": 26859,
+      "sha256": "816ea2ccf22db25497dbf52033f537b1e0f5d5705a668f11ae43087a00f34be9"
+    },
+    {
+      "path": "skills/ce-plan/references/reasoning-elevation.md",
+      "bytes": 16095,
+      "sha256": "0b5350fab2f9f1bf5f78f9ac415adf90c58afcadb3b9c1a865840398a1f4c849"
+    },
+    {
+      "path": "skills/ce-plan/references/settled-decisions.md",
+      "bytes": 4986,
+      "sha256": "24ca6fe155b4bfd9a742ce09a0e1354b043c1505df70c2999f1dfe3c8ac00b46"
+    },
+    {
+      "path": "skills/ce-plan/references/synthesis-summary.md",
+      "bytes": 41967,
+      "sha256": "b4735e4345bea04aff5fec350ffdd1c1b88df03e5c4afe2f07dffe18d96b68c6"
+    },
+    {
+      "path": "skills/ce-plan/references/universal-planning.md",
+      "bytes": 15753,
+      "sha256": "6d7b24ddf567f5978b325de13a4a89e0f3568b86fcac26963531532e87133f06"
+    },
+    {
+      "path": "skills/ce-plan/scripts/context.mjs",
+      "bytes": 4021,
+      "sha256": "e4b804742641cf2a5c6e6ae96a4ae66df3bde1fc4919c8b3f1829ef5020e9e27"
+    },
+    {
+      "path": "skills/ce-plan/scripts/elevation-dispatch.sh",
+      "bytes": 12780,
+      "sha256": "43d135f0af298f3a375e7c34cc5d4ef915331ea954603f86d181432d4235b249"
+    },
+    {
+      "path": "skills/ce-plan/scripts/peer-job-runner.py",
+      "bytes": 80098,
+      "sha256": "e26d03497b5c12dcec784578ef9ec7c21393b4757d77850dbc38d6fe715e25cd"
     }
   ]
 }

@@ -5319,17 +5319,25 @@
       ],
       "dependencyEdges": [],
       "description": "Implement Planning Contract U3 only: translate the verified planning closure through U2's existing dispatcher, route every F7 plan/master/slice-plan entry through it, and make candidate brainstorm/plan evaluation resolve private resources while retaining the legacy package only as an explicit comparison baseline. Do not migrate debug, review, simplify, browser, POV, explain, catch-up, activation, or legacy removal.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-5.4",
       "labels": [],
       "notes": [
-        "wo:implementation\nwo:execution-agent\nplan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\ncovered-unit-parts: U3; R7-R12; R20-R21 brainstorm and plan\nsequence: 3/3\nreview-gate: required"
+        "wo:implementation\nwo:execution-agent\nplan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\ncovered-unit-parts: U3; R7-R12; R20-R21 brainstorm and plan\nsequence: 3/3\nreview-gate: required",
+        "wo:implementation\nImplemented Planning Contract U3 only.\nChanged files:\n- extensions/private-workflows/plan.md (new verified private planning playbook)\n- extensions/private-workflows/manifest.json\n- extensions/private-workflows/provenance.json\n- extensions/work-private-workflows.js\n- extensions/work-models.js\n- scripts/generate-work-private-workflows.mjs\n- scripts/workflow-evaluation.mjs\n- scripts/workflow-evaluation-rpc.mjs\n- scripts/test-work-private-workflows.mjs\n- scripts/test-work-start-finish.mjs\n- scripts/test-workflow-evaluation-rpc.mjs\nBehavior: reused U2 dispatcher/translator for verified plan closure; routed F7 plan/master/starting-state master and Lightweight/Standard/Deep slice-plan handoffs through plan.md; retained clarification, requirement preservation/self-audit, artifact, Open Question Gate, and actor-visible handoff. Candidate brainstorm/plan evaluation now records private manifest resources without pi-compound-engineering; installed legacy is available only through legacyParityBaseline.name=installed-pi-compound-engineering on baseline. Unknown/mutated plan resources and implicit legacy dependency/skill lookup fail closed. Brainstorm/plan parity row observables are asserted.\nTests added/updated: scripts/test-work-private-workflows.mjs; scripts/test-work-start-finish.mjs; scripts/test-workflow-evaluation-rpc.mjs.\nProactive JS/TS LSP diagnostics reported clean on each changed JavaScript file.\nResidual risks: no known product risk in U3 scope. Source generation used the pinned peeled commit c553b957842fbd87f65f90ff5af4f18deb91f56c and verified every U1 closure hash. An empty ignored build-work-u3-source directory could not be removed because a Windows process retained directory handles; all generated contents were removed and it is absent from git status.\nRemaining work: independent reviewer wo:review PASS; parent commit/close.\n\nwo:verify-check PASS\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-brainstorm.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-workflow-evaluation-rpc.mjs\nExit: 0\nOutput: test-work-private-workflows 16/16 offline checks PASS zeroSurface=true; work-brainstorm behavior ok; coded work start/finish behavior ok; workflow evaluation RPC fixtures ok.\nAdditional checks: node --check on all changed JS/MJS files PASS; git diff --check PASS; node scripts/test-work-compound-source.mjs PASS 16/16.\nNo staged files: node C:/soft/ce-workflow/scripts/work-helper.mjs ensure-no-staged --allow-work-store => status PASS, remaining_staged=[]; git diff --cached --name-only empty.\n",
+        "wo:review-scope [\"extensions/private-workflows/manifest.json\",\"extensions/private-workflows/provenance.json\",\"extensions/work-models.js\",\"extensions/work-private-workflows.js\",\"scripts/generate-work-private-workflows.mjs\",\"scripts/test-work-private-workflows.mjs\",\"scripts/test-work-start-finish.mjs\",\"scripts/test-workflow-evaluation-rpc.mjs\",\"scripts/workflow-evaluation-rpc.mjs\",\"scripts/workflow-evaluation.mjs\",\"extensions/private-workflows/plan.md\"]",
+        "wo:review PASS - U3 plan dispatch verified: F7 plan/master/roadmap-gate/slice (all 3 depths) route through dispatchPrivateWorkflow(\"plan\") with per-workflow action tokens; candidate evaluation resolves private plan/brainstorm resources and rejects implicit pi-compound-engineering dependency and implicit skill resource; reran acceptance command (test-work-private-workflows && test-work-brainstorm && test-work-start-finish && test-workflow-evaluation-rpc) => exit 0, 16/16 offline checks, zeroSurface=true; plan.md sha256 dd0ca78f matches manifest; no staged files. Non-blocking: settings label 'ce-plan slice depth' (work-models.js:23048) still names the legacy skill; provenance translator.rules repeats remove-pi-discovery-frontmatter-and-executable-helpers.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-brainstorm.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-workflow-evaluation-rpc.mjs\nOutput: jection\nok 12 - two offline translations from one verified closure are byte-identical\nok 13 - brainstorm and plan release, path, hash, license, and translator provenance\nok 14 - mutated verified closure rejection\nok 15 - unverified source generation rejection\nok 16 - clean package runtime exposes zero private or CE surface\nPASS test-work-private-workflows (16 offline checks) zeroSurface=true\nok - work-brainstorm behavior\nok - coded work start/finish behavior\nok - workflow evaluation RPC fixtures"
       ],
       "parentId": "work-5",
-      "status": "open",
+      "status": "closed",
       "title": "Dispatch private planning and isolate candidate evaluation",
       "type": "task",
-      "updatedAt": "2026-08-03T15:55:10.060Z"
+      "updatedAt": "2026-08-03T16:53:47.414Z"
     }
   },
   "metadata": {
@@ -5339,7 +5347,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-03T16:33:33.335Z"
+    "updatedAt": "2026-08-03T16:53:47.415Z"
   },
   "schemaVersion": 1
 }

@@ -4,9 +4,20 @@ import { fileURLToPath } from "node:url";
 import { normalizeSourcePath, sha256 } from "./work-compound-source.js";
 
 const RESOURCE_ROOT = fileURLToPath(new URL("./private-workflows/", import.meta.url));
-const INTERNAL_CALLER = fileURLToPath(new URL("./work-models.js", import.meta.url));
-const ACTION_TOKEN = "work-models:F7:brainstorm:v1";
-const ALLOWLIST = new Map([["brainstorm", "brainstorm.md"]]);
+const WORK_MODELS_CALLER = fileURLToPath(new URL("./work-models.js", import.meta.url));
+const EVALUATION_CALLER = fileURLToPath(new URL("../scripts/workflow-evaluation.mjs", import.meta.url));
+const ALLOWLIST = new Map([
+	["brainstorm", "brainstorm.md"],
+	["plan", "plan.md"],
+]);
+const AUTHORITIES = new Map([
+	["work-models:F7:brainstorm:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["brainstorm"]) }],
+	["work-models:F7:plan:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["plan"]) }],
+	[
+		"workflow-evaluation:candidate-private-resource:v1",
+		{ caller: EVALUATION_CALLER, workflows: new Set(["brainstorm", "plan"]) },
+	],
+]);
 
 function exactKeys(value, expected, label) {
 	if (!value || typeof value !== "object" || Array.isArray(value))
@@ -28,7 +39,7 @@ function confinedFile(relativePath) {
 	const real = realpathSync(absolute);
 	if (!real.startsWith(`${root}${path.sep}`))
 		throw new Error(`private workflow path resolves outside resource root: ${relativePath}`);
-	return readFileSync(real);
+	return { bytes: readFileSync(real), path: real };
 }
 
 function parseJson(bytes, label) {
@@ -49,36 +60,45 @@ function verifyManifest(manifest) {
 		throw new Error("unverified private workflow generation");
 	exactKeys(manifest.translator, ["path", "sha256", "version"], "translator");
 	exactKeys(manifest.provenance, ["path", "sha256"], "provenance");
-	exactKeys(manifest.workflows, ["brainstorm"], "allowlist");
-	exactKeys(manifest.workflows.brainstorm, ["path", "sha256"], "brainstorm entry");
-
-	for (const relativePath of [manifest.provenance.path, manifest.workflows.brainstorm.path])
-		normalizeSourcePath(relativePath);
-	if (
-		manifest.provenance.path !== "provenance.json" ||
-		manifest.workflows.brainstorm.path !== ALLOWLIST.get("brainstorm")
-	)
+	exactKeys(manifest.workflows, [...ALLOWLIST.keys()], "allowlist");
+	for (const [workflow, expectedPath] of ALLOWLIST) {
+		const entry = manifest.workflows[workflow];
+		exactKeys(entry, ["path", "sha256"], `${workflow} entry`);
+		normalizeSourcePath(entry.path);
+		if (entry.path !== expectedPath)
+			throw new Error("private workflow resource is outside the allowlist");
+	}
+	normalizeSourcePath(manifest.provenance.path);
+	if (manifest.provenance.path !== "provenance.json")
 		throw new Error("private workflow resource is outside the allowlist");
 	const { generationSha256, ...generation } = manifest;
 	if (generationSha256 !== sha256(JSON.stringify(generation)))
 		throw new Error("unverified private workflow generation");
 }
 
-export function dispatchPrivateWorkflow(workflow, authority = {}) {
+function verifyAuthority(workflow, authority) {
+	const permitted = AUTHORITIES.get(authority.actionToken);
+	const caller = fileURLToPath(authority.callerUrl ?? "file:///external");
 	if (
-		authority.actionToken !== ACTION_TOKEN ||
-		path.resolve(fileURLToPath(authority.callerUrl ?? "file:///external")) !== path.resolve(INTERNAL_CALLER)
+		!permitted ||
+		!permitted.workflows.has(workflow) ||
+		path.resolve(caller) !== path.resolve(permitted.caller)
 	)
 		throw new Error("external private workflow caller rejected");
+}
+
+function resolvePrivateWorkflow(workflow, authority) {
 	if (!ALLOWLIST.has(workflow))
 		throw new Error(`unknown private workflow: ${workflow}`);
+	verifyAuthority(workflow, authority);
 
-	const manifest = parseJson(confinedFile("manifest.json"), "manifest");
+	const manifestFile = confinedFile("manifest.json");
+	const manifest = parseJson(manifestFile.bytes, "manifest");
 	verifyManifest(manifest);
 	const provenance = confinedFile(manifest.provenance.path);
-	if (sha256(provenance) !== manifest.provenance.sha256)
+	if (sha256(provenance.bytes) !== manifest.provenance.sha256)
 		throw new Error("private workflow provenance changed");
-	const provenanceRecord = parseJson(provenance, "provenance");
+	const provenanceRecord = parseJson(provenance.bytes, "provenance");
 	if (
 		provenanceRecord.schemaVersion !== 1 ||
 		provenanceRecord.translator?.path !== manifest.translator.path ||
@@ -96,8 +116,20 @@ export function dispatchPrivateWorkflow(workflow, authority = {}) {
 
 	const entry = manifest.workflows[workflow];
 	const resource = confinedFile(entry.path);
-	if (sha256(resource) !== entry.sha256)
+	if (sha256(resource.bytes) !== entry.sha256)
 		throw new Error(`private workflow resource changed: ${workflow}`);
-	return resource.toString("utf8");
+	return { entry, resource };
 }
 
+export function dispatchPrivateWorkflow(workflow, authority = {}) {
+	return resolvePrivateWorkflow(workflow, authority).resource.bytes.toString("utf8");
+}
+
+export function describePrivateWorkflowForEvaluation(workflow, authority = {}) {
+	const { entry, resource } = resolvePrivateWorkflow(workflow, authority);
+	return {
+		name: `private-workflow:${workflow}`,
+		path: resource.path,
+		sha256: entry.sha256,
+	};
+}

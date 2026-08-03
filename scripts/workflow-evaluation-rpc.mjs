@@ -739,6 +739,25 @@ function commandName(stage) {
 	return stage === "work" ? "work-resume" : `work-${stage}`;
 }
 
+export function validatePrivateWorkflowResources(resources, packageRoot) {
+	return (resources ?? []).map((resource) => {
+		if (
+			!resource ||
+			JSON.stringify(Object.keys(resource).sort()) !==
+				JSON.stringify(["name", "path", "sha256"].sort()) ||
+			!/^private-workflow:(?:brainstorm|plan)$/.test(resource.name) ||
+			!path.isAbsolute(resource.path) ||
+			!contained(packageRoot, resource.path)
+		)
+			throw new Error("invalid private workflow evaluation resource");
+		const file = realpathSync(resource.path);
+		const observed = createHash("sha256").update(readFileSync(file)).digest("hex");
+		if (observed !== resource.sha256)
+			throw new Error(`private workflow evaluation resource changed: ${resource.name}`);
+		return { ...resource, path: file, source: "private-manifest" };
+	});
+}
+
 function validateCommands(commands, options) {
 	const requiredCommands = options.requiredCommands ?? [
 		commandName(options.stage),
@@ -1117,13 +1136,19 @@ export async function runRpcSample(options) {
 							...required,
 							...(options.requiredResources ?? []),
 						]);
-						resourceProvenance = (event.data?.commands ?? [])
-							.filter((item) => names.has(item.name))
-							.map((item) => ({
-								name: item.name,
-								source: item.source,
-								path: canonicalPath(item.path ?? item.sourceInfo?.path),
-							}));
+						resourceProvenance = [
+							...(event.data?.commands ?? [])
+								.filter((item) => names.has(item.name))
+								.map((item) => ({
+									name: item.name,
+									source: item.source,
+									path: canonicalPath(item.path ?? item.sourceInfo?.path),
+								})),
+							...validatePrivateWorkflowResources(
+								options.requiredPrivateResources,
+								preflight.packageRoot,
+							),
+						];
 					} catch (error) {
 						return fail(
 							"resource-provenance",

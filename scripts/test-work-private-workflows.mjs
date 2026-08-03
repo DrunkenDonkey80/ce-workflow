@@ -12,7 +12,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { sha256 } from "../extensions/work-compound-source.js";
 import { dispatchPrivateWorkflow } from "../extensions/work-private-workflows.js";
-import { translateVerifiedBrainstorm } from "./generate-work-private-workflows.mjs";
+import { translateVerifiedWorkflows } from "./generate-work-private-workflows.mjs";
 
 let checks = 0;
 const check = (fn, label) => {
@@ -30,8 +30,9 @@ const authority = {
 	actionToken: "work-models:F7:brainstorm:v1",
 	callerUrl: pathToFileURL(path.join(extensionRoot, "work-models.js")).href,
 };
+const planAuthority = { ...authority, actionToken: "work-models:F7:plan:v1" };
 const generated = Object.fromEntries(
-	["brainstorm.md", "manifest.json", "provenance.json"].map((name) => [
+	["brainstorm.md", "plan.md", "manifest.json", "provenance.json"].map((name) => [
 		name,
 		readFileSync(path.join(resourceRoot, name)),
 	]),
@@ -51,10 +52,35 @@ rejects(
 	/external private workflow caller rejected/,
 	"external caller rejection",
 );
+const planPlaybook = dispatchPrivateWorkflow("plan", planAuthority);
+check(() => {
+	assert.match(planPlaybook, /Ask exactly one focused clarification per turn/);
+	assert.match(planPlaybook, /Requirement preservation and self-audit/);
+	assert.match(planPlaybook, /Open Question Gate/);
+	assert.match(planPlaybook, /Actor-visible handoff/);
+}, "verified plan resource dispatch preserves the planning contract");
+const parity = JSON.parse(
+	readFileSync(path.join(extensionRoot, "work-compound-inventory.json"), "utf8"),
+).parityIndex;
+check(() => {
+	assert.deepEqual(Object.keys(parity).filter((name) => ["ce-brainstorm", "ce-plan"].includes(name)), [
+		"ce-brainstorm",
+		"ce-plan",
+	]);
+	for (const field of ["trigger", "decisions", "toolBoundary", "artifacts", "failure", "actorVisibleOutcome"])
+		assert.ok(parity["ce-brainstorm"][field] && parity["ce-plan"][field]);
+	assert.match(playbook, /stop without inventing it/i);
+	assert.match(planPlaybook, /Do not bootstrap.*blocking open questions/i);
+}, "brainstorm and plan parity rows cover trigger through actor-visible failure outcome");
 rejects(
-	() => dispatchPrivateWorkflow("plan", authority),
+	() => dispatchPrivateWorkflow("unknown", authority),
 	/unknown private workflow/,
 	"literal workflow allowlist",
+);
+rejects(
+	() => dispatchPrivateWorkflow("plan", authority),
+	/external private workflow caller rejected/,
+	"workflow-specific action token rejection",
 );
 
 try {
@@ -84,6 +110,14 @@ try {
 	);
 	restore();
 
+	writeFileSync(path.join(resourceRoot, "plan.md"), `${planPlaybook}\nmutated\n`);
+	rejects(
+		() => dispatchPrivateWorkflow("plan", planAuthority),
+		/resource changed: plan/,
+		"mutated plan resource rejection",
+	);
+	restore();
+
 	const unverified = JSON.parse(generated["manifest.json"]);
 	unverified.verified = false;
 	writeFileSync(path.join(resourceRoot, "manifest.json"), `${JSON.stringify(unverified, null, 2)}\n`);
@@ -100,9 +134,14 @@ const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "private-workflow-transla
 try {
 	const sourcePath = "skills/ce-brainstorm/SKILL.md";
 	const sourceBytes = Buffer.from("---\nname: source-brainstorm\n---\nAsk one question.\n");
+	const planSourcePath = "skills/ce-plan/SKILL.md";
+	const planSourceBytes = Buffer.from("---\nname: source-plan\n---\nPreserve and plan.\n");
 	const target = path.join(fixtureRoot, ...sourcePath.split("/"));
+	const planTarget = path.join(fixtureRoot, ...planSourcePath.split("/"));
 	mkdirSync(path.dirname(target), { recursive: true });
+	mkdirSync(path.dirname(planTarget), { recursive: true });
 	writeFileSync(target, sourceBytes);
+	writeFileSync(planTarget, planSourceBytes);
 	const policy = {
 		release: "fixture-v1",
 		peeledCommitSha: "a".repeat(40),
@@ -128,12 +167,15 @@ try {
 				"ce-brainstorm": [
 					{ path: sourcePath, bytes: sourceBytes.length, sha256: sha256(sourceBytes) },
 				],
+				"ce-plan": [
+					{ path: planSourcePath, bytes: planSourceBytes.length, sha256: sha256(planSourceBytes) },
+				],
 			},
 		},
 	};
 	const args = { sourceRoot: fixtureRoot, evidence, policy, translatorBytes: "translator" };
-	const first = translateVerifiedBrainstorm(args);
-	const second = translateVerifiedBrainstorm(args);
+	const first = translateVerifiedWorkflows(args);
+	const second = translateVerifiedWorkflows(args);
 	check(
 		() => assert.deepEqual(first, second),
 		"two offline translations from one verified closure are byte-identical",
@@ -143,18 +185,21 @@ try {
 		assert.equal(provenance.release, policy.release);
 		assert.equal(provenance.sources[0].path, sourcePath);
 		assert.equal(provenance.sources[0].sha256, sha256(sourceBytes));
+		assert.equal(provenance.sources[1].path, planSourcePath);
+		assert.equal(provenance.sources[1].sha256, sha256(planSourceBytes));
 		assert.equal(provenance.license.spdx, "MIT");
-		assert.equal(provenance.translator.version, 1);
-	}, "release, path, hash, license, and translator provenance");
-	writeFileSync(target, "changed\n");
+		assert.equal(provenance.translator.version, 2);
+		assert.match(first["plan.md"], /Open Question Gate/);
+	}, "brainstorm and plan release, path, hash, license, and translator provenance");
+	writeFileSync(planTarget, "changed\n");
 	rejects(
-		() => translateVerifiedBrainstorm(args),
+		() => translateVerifiedWorkflows(args),
 		/verified source resource changed/,
 		"mutated verified closure rejection",
 	);
 	evidence.runtimeProbe.zeroEffectiveSurface = false;
 	rejects(
-		() => translateVerifiedBrainstorm(args),
+		() => translateVerifiedWorkflows(args),
 		/unverified U1 source evidence/,
 		"unverified source generation rejection",
 	);

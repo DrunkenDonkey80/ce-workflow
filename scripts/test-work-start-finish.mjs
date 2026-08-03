@@ -21,6 +21,7 @@ const {
 	buildWorkMigrateState,
 	buildWorkSmallState,
 	buildWorkTelemetryState,
+	cePlanSliceStep,
 	directRoleHandoffParams,
 	createPiSubagentsVerifierAdapter,
 } = await import(
@@ -305,7 +306,7 @@ try {
 	state = buildWorkPlanState(fixture.cwd, "raw product idea");
 	assert(
 		state.ok && state.action === "handoff-plan",
-		"raw work-plan input routes to ce-plan",
+		"raw work-plan input routes to private planning",
 	);
 	assert(fixture.logs().length === 0, "work-plan does not initialize bd");
 	assert(
@@ -314,23 +315,46 @@ try {
 		"raw work-plan bootstraps the roadmap in-flow instead of asking to re-run /work-plan",
 	);
 	assert(
-		state.handoffPrompt.includes("Preserve every decided requirement") &&
+		state.handoffPrompt.includes("BEGIN VERIFIED PRIVATE PLAN PLAYBOOK") &&
+			state.handoffPrompt.includes("Preserve every decided requirement") &&
 			state.handoffPrompt.includes("Acceptance Contract") &&
 			state.handoffPrompt.includes("hardening loop") &&
-			state.handoffPrompt.includes("blocking question"),
-		"work-plan handoff asks ce-plan to preserve source decisions and audit uncertainties",
+			state.handoffPrompt.includes("Open Question Gate") &&
+			state.handoffPrompt.includes("Actor-visible handoff") &&
+			!state.handoffPrompt.includes("Invoke the ce-plan skill"),
+		"work-plan handoff dispatches verified private planning while preserving closure contracts",
 	);
 
 	fixture.reset("active");
 	state = buildWorkMasterState(fixture.cwd, "raw product idea");
 	assert(
 		state.ok && state.action === "handoff-plan",
-		"raw master input routes to ce-plan",
+		"raw master input routes to private planning",
+	);
+	assert(
+		state.handoffPrompt.includes("BEGIN VERIFIED PRIVATE PLAN PLAYBOOK") &&
+			state.handoffPrompt.includes("bootstrap-plan-roadmap"),
+		"master planning dispatches the same verified plan resource and actor-visible handoff",
 	);
 	assert(
 		fixture.logs().length === 0,
 		"raw master input does not mutate WorkItems",
 	);
+	for (const depth of ["Lightweight", "Standard", "Deep"]) {
+		const slice = cePlanSliceStep(
+			{ id: "SLICE-1", title: "Depth fixture", acceptance: "checked" },
+			fixture.cwd,
+			undefined,
+			depth,
+		);
+		assert(
+			slice.includes("BEGIN VERIFIED PRIVATE PLAN PLAYBOOK") &&
+				slice.includes(`Use ${depth} depth`) &&
+				slice.includes("wo:slice-plan") &&
+				!slice.includes("Invoke the ce-plan skill"),
+			`${depth} slice planning dispatches the verified private plan resource`,
+		);
+	}
 
 	state = buildWorkMasterState(fixture.cwd, "missing-plan.md");
 	assert(

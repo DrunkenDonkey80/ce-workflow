@@ -19,7 +19,9 @@ import {
 	runRpcSample,
 	snapshotProviderPayload,
 	terminationPlan,
+	validatePrivateWorkflowResources,
 } from "./workflow-evaluation-rpc.mjs";
+import { resolveEvaluationResources } from "./workflow-evaluation.mjs";
 
 const records = [];
 const parser = createJsonlParser((record) => records.push(record));
@@ -183,6 +185,61 @@ assert.equal(
 );
 
 const packageRoot = path.resolve(".");
+for (const stage of ["brainstorm", "plan"]) {
+	const candidateResources = resolveEvaluationResources(
+		{ stage, dependencyPackages: [] },
+		"candidate",
+		packageRoot,
+	);
+	assert.deepEqual(candidateResources.requiredResources, []);
+	assert.equal(candidateResources.privateResources[0].name, `private-workflow:${stage}`);
+	assert.doesNotThrow(() =>
+		validatePrivateWorkflowResources(candidateResources.privateResources, packageRoot),
+	);
+	assert.equal(
+		candidateResources.dependencyRoots.some(
+			(root) => path.basename(root) === "pi-compound-engineering",
+		),
+		false,
+	);
+	const baselineResources = resolveEvaluationResources(
+		{
+			stage,
+			dependencyPackages: [],
+			legacyParityBaseline: {
+				name: "installed-pi-compound-engineering",
+				packageRoot,
+				side: "baseline",
+			},
+		},
+		"baseline",
+		packageRoot,
+	);
+	assert.deepEqual(baselineResources.requiredResources, [`skill:ce-${stage}`]);
+	assert.deepEqual(baselineResources.privateResources, []);
+}
+assert.throws(
+	() =>
+		resolveEvaluationResources(
+			{ stage: "plan", dependencyPackages: [path.join(packageRoot, "pi-compound-engineering")] },
+			"candidate",
+			packageRoot,
+		),
+	/implicit legacy evaluation dependency rejected/,
+);
+assert.throws(
+	() =>
+		resolveEvaluationResources(
+			{
+				stage: "plan",
+				dependencyPackages: [],
+				legacyParityBaseline: { name: "legacy", packageRoot, side: "baseline" },
+			},
+			"baseline",
+			packageRoot,
+		),
+	/invalid explicit legacy parity baseline descriptor/,
+);
 assert.doesNotThrow(() =>
 	preflightRpcSample({
 		packageRoot,

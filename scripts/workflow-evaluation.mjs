@@ -37,6 +37,7 @@ import {
 import { verifyCsvProject } from "../benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/verify.mjs";
 import { verifyCalculatorProject } from "../benchmarks/workflow-evaluation/v1/projects/calculator/acceptance/verify.mjs";
 import { initStore, loadStore } from "../extensions/work-store.js";
+import { describePrivateWorkflowForEvaluation } from "../extensions/work-private-workflows.js";
 
 const scriptRoot = path.dirname(fileURLToPath(import.meta.url));
 const defaultSourceRoot = path.dirname(scriptRoot);
@@ -497,20 +498,65 @@ function projectRoot(sourceRoot, project) {
 	);
 }
 
-function dependencyRoots(descriptor) {
-	if (descriptor.dependencyPackages)
-		return descriptor.dependencyPackages.map((root) => path.resolve(root));
-	return ["pi-compound-engineering", "pi-subagents", "pi-ask-user"]
-		.map((name) =>
-			path.join(os.homedir(), ".pi", "agent", "npm", "node_modules", name),
-		)
-		.filter(existsSync);
+const LEGACY_PARITY_BASELINE_NAME = "installed-pi-compound-engineering";
+
+function candidateDependencyRoots(descriptor) {
+	const roots = descriptor.dependencyPackages
+		? descriptor.dependencyPackages.map((root) => path.resolve(root))
+		: ["pi-subagents", "pi-ask-user"]
+				.map((name) =>
+					path.join(os.homedir(), ".pi", "agent", "npm", "node_modules", name),
+				)
+				.filter(existsSync);
+	if (roots.some((root) => path.basename(root) === "pi-compound-engineering"))
+		throw new Error("implicit legacy evaluation dependency rejected");
+	return roots;
 }
 
-function requiredStageResources(stage) {
-	if (stage === "brainstorm") return ["skill:ce-brainstorm"];
-	if (stage === "plan") return ["skill:ce-plan"];
-	return ["skill:work-orchestrator"];
+export function resolveEvaluationResources(
+	descriptor,
+	side,
+	sourceRoot = defaultSourceRoot,
+) {
+	const dependencyRoots = candidateDependencyRoots(descriptor);
+	const privateStage = new Set(["brainstorm", "plan"]).has(descriptor.stage);
+	const legacy = descriptor.legacyParityBaseline;
+	if (legacy) {
+		if (
+			legacy.name !== LEGACY_PARITY_BASELINE_NAME ||
+			!legacy.packageRoot ||
+			legacy.side !== "baseline"
+		)
+			throw new Error("invalid explicit legacy parity baseline descriptor");
+		if (side === "candidate" && path.resolve(legacy.packageRoot) === path.resolve(sourceRoot))
+			throw new Error("candidate cannot use the legacy parity baseline");
+	}
+	if (privateStage && side === "baseline" && legacy) {
+		const legacyRoot = path.resolve(legacy.packageRoot);
+		if (!existsSync(legacyRoot))
+			throw new Error("explicit legacy parity baseline is unavailable");
+		return {
+			dependencyRoots: [...dependencyRoots, legacyRoot],
+			privateResources: [],
+			requiredResources: [`skill:ce-${descriptor.stage}`],
+		};
+	}
+	if (privateStage) {
+		const resource = describePrivateWorkflowForEvaluation(descriptor.stage, {
+			actionToken: "workflow-evaluation:candidate-private-resource:v1",
+			callerUrl: import.meta.url,
+		});
+		return {
+			dependencyRoots,
+			privateResources: [resource],
+			requiredResources: [],
+		};
+	}
+	return {
+		dependencyRoots,
+		privateResources: [],
+		requiredResources: ["skill:work-orchestrator"],
+	};
 }
 
 export function buildEvaluationSettings(
@@ -764,12 +810,21 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 	const customPrompt = side.prompt ?? descriptor.prompt;
 	let prompts = [customPrompt ?? `/${commandName} ${argument}`];
 	let requiredCommands = [commandName];
-	let requiredResources = requiredStageResources(sample.stage);
+	const evaluationResources = resolveEvaluationResources(
+		descriptor,
+		sample.side,
+		sourceRoot,
+	);
+	let requiredResources = evaluationResources.requiredResources;
 	if (customPrompt) {
 		const customCommand = customPrompt.match(/^\/(work-[A-Za-z0-9-]+)/)?.[1];
 		const skillCommand = customPrompt.match(/^\/(ce-[A-Za-z0-9-]+)/)?.[1];
 		requiredCommands = customCommand ? [customCommand] : [];
-		if (skillCommand) requiredResources = [`skill:${skillCommand}`];
+		if (skillCommand) {
+			if (!descriptor.legacyParityBaseline || sample.side !== "baseline")
+				throw new Error("implicit legacy evaluation resource rejected");
+			requiredResources = [`skill:${skillCommand}`];
+		}
 	}
 	if (sample.stage === "work" && !customPrompt) {
 		prompts = [
@@ -836,7 +891,8 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		workspaceRoot: sample.workspaceRoot,
 		sourceRoot,
 		bundleRoot: sample.projectDir,
-		dependencyRoots: dependencyRoots(descriptor),
+		dependencyRoots: evaluationResources.dependencyRoots,
+		requiredPrivateResources: evaluationResources.privateResources,
 		requiredResources,
 		requiredCommands,
 		provider,

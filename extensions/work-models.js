@@ -4290,6 +4290,14 @@ function applyInlineSlicePlan(cwd, state, issue) {
 	}
 }
 
+function privatePlanPlaybookBlock() {
+	const playbook = dispatchPrivateWorkflow("plan", {
+		actionToken: "work-models:F7:plan:v1",
+		callerUrl: import.meta.url,
+	});
+	return `--- BEGIN VERIFIED PRIVATE PLAN PLAYBOOK ---\n${playbook}--- END VERIFIED PRIVATE PLAN PLAYBOOK ---`;
+}
+
 function cePlanSliceStep(
 	issue,
 	cwd,
@@ -4301,16 +4309,17 @@ function cePlanSliceStep(
 		? `Scope: this WorkItem's acceptance/design plus the matching Implementation Unit from ${relative(cwd, masterPlanPath)}.`
 		: `Scope: this WorkItem's acceptance/design and notes.`;
 	let depthLine =
-		"Use Lightweight depth so ce-plan skips flow analysis and external research when local patterns are strong.";
+		"Use Lightweight depth: skip flow analysis and external research when local patterns are strong.";
 	if (depth === "Deep")
-		depthLine = "Use Deep depth for the full ce-plan research/deepening pass.";
+		depthLine = "Use Deep depth for the full private planning research/deepening pass.";
 	else if (depth === "Standard")
 		depthLine =
-			"Use Standard depth (ce-plan's normal tier) so flow analysis runs without Deep extensions.";
+			"Use Standard depth so repository flow analysis runs without Deep extensions.";
 	return [
-		`Slice-planning pass (ce-plan) before implementation: target ${issueRefText(issue)} already exists as executable work. Do not create child native work-item store and do not dispatch work-planner.`,
+		`Private slice-planning pass before implementation: target ${issueRefText(issue)} already exists as executable work. Do not create child native work-item store and do not dispatch work-planner.`,
+		privatePlanPlaybookBlock(),
 		scopeLine,
-		`Invoke the ce-plan skill in the control session on this slice to produce a compact plan doc at docs/plans/YYYY-MM-DD-NNN-slice-${safeArtifactPart(idOf(issue))}-plan.md with a single Implementation Unit (Goal, Files, Approach, Test scenarios, Verification). ${depthLine}`,
+		`Follow the verified private playbook in the control session to produce a compact plan doc at docs/plans/YYYY-MM-DD-NNN-slice-${safeArtifactPart(idOf(issue))}-plan.md with a single Implementation Unit (Goal, Files, Approach, Test scenarios, Verification). ${depthLine}`,
 		`Then append a WorkItem note headed \`wo:slice-plan\` containing \`plan-path: <repo-relative plan doc path>\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the WorkItem title.`,
 		advisorCriticStep(
 			cwd,
@@ -13896,7 +13905,7 @@ function brainstormHandoffPrompt(
 			? `Brainstorm artifact: ${artifact}\n${advisorStep ? "After the advisor gate, run" : "Run"} /work-plan ${state.epic.id} now; skip the legacy post-document planning menu.`
 			: `Follow the verified private playbook below. The extension retains ownership of the artifact link. End the final response with exactly "Brainstorm saved: <absolute path>" so it links to ${state.idea.id}.`,
 		privatePlaybook ? `--- BEGIN VERIFIED PRIVATE BRAINSTORM PLAYBOOK ---\n${privatePlaybook}--- END VERIFIED PRIVATE BRAINSTORM PLAYBOOK ---` : "",
-		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can call ce-plan with the preservation and self-audit contract.",
+		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can dispatch verified private planning with the preservation and self-audit contract.",
 		"Never silently skip clarification for broad, important, or underspecified work.",
 		creativeStep,
 		preBrainstormStep,
@@ -14197,7 +14206,8 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				message: `${init.initialized ? `${init.message} ` : ""}${message}`,
 				...extra,
 				handoffPrompt: [
-					"Use ce-plan to convert this input into a detailed master roadmap plan, then create the roadmap from it in this same flow; do not stop and ask the user to re-run /work-plan.",
+					privatePlanPlaybookBlock(),
+					"Follow the verified private planning playbook to convert this input into a detailed master roadmap plan, then create the roadmap from it in this same flow; do not stop and ask the user to re-run /work-plan.",
 					sourceArtifacts.length
 						? `Source artifacts to read and cite verbatim in the final plan: ${sourceArtifacts.join(", ")}`
 						: "",
@@ -14207,7 +14217,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					"For any authoritative reference or target behavior, create an Acceptance Contract: source, must-match traits/invariants, must-not regressions, proof artifacts/checks, and who/what can approve it. This is generic: UI visual parity, API compatibility, CLI behavior, C++ ABI/performance/thread-safety, data migration invariants, security posture, hardware behavior, etc.",
 					"After the first plan draft, self-audit it. Any material uncertainty, subjective acceptance, weak proof, missing asset/input, or P0/P1 doc-review finding must become a plan fix, a blocking question, a decision/blocker WorkItem instruction, or an explicit user waiver; never leave it as passive risk prose.",
 					`Repeat that hardening loop — update the plan, re-check unresolved uncertainties, and ask the user only for decisions that cannot be inferred — until no blocking uncertainty remains. Then run \`${bootstrapCommand}\`. That helper enforces the Open Question Gate; if it reports open-questions-block, resolve each open question via one ask_user (show the question and its suggested default), fold the answer into the plan, and re-run the helper. ${bootstrapRoadmapId ? "Return the coded initiative preparation choices; plan completion is not execution approval." : "Do NOT run /work-resume before the roadmap exists. Once the helper returns the roadmap id, end with Next: /work-resume <roadmap-id>."}`,
-					"Ask ce-plan clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
+					"Ask private planning clarification questions one at a time when the input is broad, important, or underspecified; auto-accept only skips the final write-confirmation, not discovery questions.",
 					detail,
 					`Git dirty classification: ${gitDirtyClassification(masterGit)}`,
 					ROLE_TIMEOUT_GUIDANCE,
@@ -14217,8 +14227,8 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				warnings: masterGit.warnings,
 				suggestedCommands: [],
 				nextAction: bootstrapRoadmapId
-					? `Next: after ce-plan writes the plan, attach it with \`${bootstrapCommand}\` and return to initiative preparation.`
-					: "Next: after ce-plan writes the plan, bootstrap the roadmap with `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>` (runs the Open Question Gate), then resume the roadmap.",
+					? `Next: after private planning writes the plan, attach it with \`${bootstrapCommand}\` and return to initiative preparation.`
+					: "Next: after private planning writes the plan, bootstrap the roadmap with `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>` (runs the Open Question Gate), then resume the roadmap.",
 			};
 		};
 		const planTarget = splitPlanTarget(input);
@@ -14264,7 +14274,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 						{ action: "missing-source", epic: issueSummary(resolved.epic) },
 					);
 				return handoffPlan(
-					`Planning source from roadmap ${idOf(resolved.epic)} handed to ce-plan.`,
+					`Planning source from roadmap ${idOf(resolved.epic)} handed to verified private planning.`,
 					[
 						`Source roadmap: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
 						`Source artifact: ${planningSource}`,
@@ -14288,7 +14298,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 						{ action: "missing-source", epic: issueSummary(resolved.epic) },
 					);
 				return handoffPlan(
-					`Existing plan from roadmap ${idOf(resolved.epic)} handed to ce-plan for hardening.`,
+					`Existing plan from roadmap ${idOf(resolved.epic)} handed to verified private planning for hardening.`,
 					[
 						`Source roadmap: ${idOf(resolved.epic)} — ${titleOf(resolved.epic)}`,
 						planningSource
@@ -14310,12 +14320,12 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 		}
 		if (!pathExists)
 			return handoffPlan(
-				"Raw idea handed to ce-plan before roadmap creation.",
+				"Raw idea handed to verified private planning before roadmap creation.",
 				`Task: ${input}`,
 			);
 		if (!/docs[\\/]plans[\\/].+\.(?:md|html)$/i.test(first))
 			return handoffPlan(
-				"Source artifact needs ce-plan before roadmap creation.",
+				"Source artifact needs verified private planning before roadmap creation.",
 				`Source: ${first}`,
 			);
 		const alignment = planSourceAlignmentReport(cwd, first);
@@ -21246,7 +21256,7 @@ async function handleWorkRoadmapCommand(
 						value: "plan",
 						label: "🧭 create master plan, then implement",
 						description:
-							"answer ce-plan questions, attach the plan, then start implementation",
+							"answer private planning questions, attach the plan, then start implementation",
 					},
 					{ value: "cancel", label: "cancel" },
 				],
@@ -21260,8 +21270,9 @@ async function handleWorkRoadmapCommand(
 				}),
 				`Starting-state planning gate: ${selected} has source intent but no roadmap-specific master plan or executable child tasks.`,
 				`Source intent artifacts: ${sources.join(", ")}`,
-				"Before normal implementation, run ce-plan on those sources. Ask its genuine clarification questions one at a time and write the complete master plan; do not replace discovery questions with assumptions.",
-				`After ce-plan writes the plan, run \`node ${JSON.stringify(WORK_HELPER_SCRIPT)} bootstrap-plan-roadmap <plan-path> --roadmap ${selected}\` to attach it to this existing roadmap and create its planning WorkItem. Then continue the normal \`/work-resume ${selected}\` golden path in this same project goal.`,
+				privatePlanPlaybookBlock(),
+				"Before normal implementation, follow the verified private planning playbook on those sources. Ask its genuine clarification questions one at a time and write the complete master plan; do not replace discovery questions with assumptions.",
+				`After private planning writes the plan, run \`node ${JSON.stringify(WORK_HELPER_SCRIPT)} bootstrap-plan-roadmap <plan-path> --roadmap ${selected}\` to attach it to this existing roadmap and create its planning WorkItem. Then continue the normal \`/work-resume ${selected}\` golden path in this same project goal.`,
 			].join("\n\n");
 			await startWorkGoal("project", objective, pi, ctx);
 			return {
@@ -21798,6 +21809,7 @@ export {
 	previewInitiativeReconciliation,
 	buildWorkMasterState,
 	buildWorkMedState,
+	cePlanSliceStep,
 	buildWorkPlanState,
 	buildWorkMigrateState,
 	buildWorkRemoveBeadsState,
