@@ -63,9 +63,9 @@ function exactKeys(value, expected, label) {
 		throw new Error(`unknown private workflow ${label} surface`);
 }
 
-function confinedFile(relativePath) {
+function confinedFile(relativePath, resourceRoot = RESOURCE_ROOT) {
 	const normalized = normalizeSourcePath(relativePath);
-	const root = realpathSync(RESOURCE_ROOT);
+	const root = realpathSync(resourceRoot);
 	const absolute = path.resolve(root, ...normalized.split("/"));
 	if (!absolute.startsWith(`${root}${path.sep}`))
 		throw new Error(`private workflow path escapes resource root: ${relativePath}`);
@@ -136,16 +136,12 @@ function verifyAuthority(workflow, authority) {
 		throw new Error("external private workflow caller rejected");
 }
 
-function resolvePrivateWorkflow(workflow, authority) {
-	if (!ALLOWLIST.has(workflow))
-		throw new Error(`unknown private workflow: ${workflow}`);
-	verifyAuthority(workflow, authority);
+export function verifyPrivateWorkflowGeneration(resourceRoot = RESOURCE_ROOT) {
 	assertCompletePrivateWorkflowParity();
-
-	const manifestFile = confinedFile("manifest.json");
+	const manifestFile = confinedFile("manifest.json", resourceRoot);
 	const manifest = parseJson(manifestFile.bytes, "manifest");
 	verifyManifest(manifest);
-	const provenance = confinedFile(manifest.provenance.path);
+	const provenance = confinedFile(manifest.provenance.path, resourceRoot);
 	if (sha256(provenance.bytes) !== manifest.provenance.sha256)
 		throw new Error("private workflow provenance changed");
 	const provenanceRecord = parseJson(provenance.bytes, "provenance");
@@ -163,12 +159,21 @@ function resolvePrivateWorkflow(workflow, authority) {
 		!provenanceRecord.license?.spdx
 	)
 		throw new Error("unverified private workflow provenance");
+	for (const [workflow, entry] of Object.entries(manifest.workflows)) {
+		const resource = confinedFile(entry.path, resourceRoot);
+		if (sha256(resource.bytes) !== entry.sha256)
+			throw new Error(`private workflow resource changed: ${workflow}`);
+	}
+	return { manifest, provenance: provenanceRecord };
+}
 
+function resolvePrivateWorkflow(workflow, authority) {
+	if (!ALLOWLIST.has(workflow))
+		throw new Error(`unknown private workflow: ${workflow}`);
+	verifyAuthority(workflow, authority);
+	const { manifest } = verifyPrivateWorkflowGeneration();
 	const entry = manifest.workflows[workflow];
-	const resource = confinedFile(entry.path);
-	if (sha256(resource.bytes) !== entry.sha256)
-		throw new Error(`private workflow resource changed: ${workflow}`);
-	return { entry, resource };
+	return { entry, resource: confinedFile(entry.path) };
 }
 
 export function dispatchPrivateWorkflow(workflow, authority = {}) {

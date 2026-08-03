@@ -102,7 +102,8 @@ function assertVerifiedEvidence(evidence, policy) {
 		evidence.licenseEvidence?.spdx !== policy.license.spdx ||
 		evidence.licenseEvidence?.permissionTextPresent !== true ||
 		evidence.runtimeProbe?.zeroEffectiveSurface !== true ||
-		evidence.containment?.quarantineRemoved !== true ||
+		(evidence.containment?.quarantineRemoved !== true &&
+			evidence.containment?.temporarySourceOnly !== true) ||
 		evidence.containment?.globalStateUnchanged !== true
 	)
 		throw new Error("unverified U1 source evidence");

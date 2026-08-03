@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -12,6 +13,13 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { sha256 } from "../extensions/work-compound-source.js";
 import { dispatchPrivateWorkflow } from "../extensions/work-private-workflows.js";
+import {
+	classifyPrivateWorkflowRelease,
+	PRIVATE_WORKFLOW_OWNED_OUTPUTS,
+	PRIVATE_WORKFLOW_RELEASE_GATES,
+	promoteVerifiedPrivateWorkflowRelease,
+	resolveLatestOfficialStableRelease,
+} from "../extensions/work-compound-catch-up.js";
 import { translateVerifiedWorkflows } from "./generate-work-private-workflows.mjs";
 
 let checks = 0;
@@ -437,6 +445,189 @@ try {
 		assert.match(first["pov.md"], /Graded verdict/);
 		assert.match(first["explain.md"], /Conditional boundary/);
 	}, "nine-workflow release, path, hash, license, and translator provenance");
+
+	check(() => {
+		for (const status of ["current", "update", "unknown", "blocked", "failed"])
+			assert.equal(
+				classifyPrivateWorkflowRelease({ resolution: { status } }).status,
+				status,
+			);
+		assert.equal(
+			classifyPrivateWorkflowRelease({ resolution: { status: "update" }, writable: false }).status,
+			"non-writable",
+		);
+		assert.equal(
+			classifyPrivateWorkflowRelease({
+				resolution: { status: "update" },
+				dirtyPaths: ["notes.txt"],
+			}).status,
+			"unrelated-dirt",
+		);
+		assert.equal(
+			classifyPrivateWorkflowRelease({
+				resolution: { status: "update" },
+				dirtyPaths: [".ce-workflow/work-items.json", ...PRIVATE_WORKFLOW_OWNED_OUTPUTS],
+			}).status,
+			"update",
+		);
+	}, "stable release states distinguish current, update, unknown, blocked, failed, non-writable, and unrelated dirt");
+	check(() => {
+		const resolution = resolveLatestOfficialStableRelease(
+			{
+				repository: "https://github.com/EveryInc/compound-engineering-plugin.git",
+				release: "compound-engineering-v3.21.0",
+				version: "3.21.0",
+			},
+			{
+				execFileSync: () => [
+					`${"a".repeat(40)}\trefs/tags/compound-engineering-v3.21.0`,
+					`${"b".repeat(40)}\trefs/tags/compound-engineering-v3.22.0`,
+					`${"c".repeat(40)}\trefs/tags/compound-engineering-v3.22.0^{}`,
+					`${"d".repeat(40)}\trefs/tags/compound-engineering-v3.23.0-rc.1`,
+				].join("\n"),
+			},
+		);
+		assert.deepEqual(resolution, {
+			status: "update",
+			release: "compound-engineering-v3.22.0",
+			version: "3.22.0",
+			peeledCommitSha: "c".repeat(40),
+		});
+	}, "official resolver selects the highest stable tag and peeled commit");
+
+	const releaseFixtureRoot = mkdtempSync(path.join(os.tmpdir(), "private-workflow-release-"));
+	const makeRepository = (name) => {
+		const root = path.join(releaseFixtureRoot, name);
+		const canonical = path.join(root, "extensions", "private-workflows");
+		mkdirSync(canonical, { recursive: true });
+		for (const [file, bytes] of Object.entries(generated)) writeFileSync(path.join(canonical, file), bytes);
+		return root;
+	};
+	const canonicalBytes = (root) => Object.fromEntries(
+		PRIVATE_WORKFLOW_OWNED_OUTPUTS.map((relativePath) => [
+			relativePath,
+			readFileSync(path.join(root, ...relativePath.split("/"))),
+		]),
+	);
+	const assertCanonicalBytes = (root, before) => {
+		for (const [relativePath, bytes] of Object.entries(before))
+			assert.ok(readFileSync(path.join(root, ...relativePath.split("/"))).equals(bytes), relativePath);
+		const artifactRoot = path.join(root, ".ce-workflow", "work-runs", "compound-releases");
+		if (existsSync(artifactRoot))
+			assert.equal(
+				readdirSync(artifactRoot).some((name) => name.startsWith("quarantine-")),
+				false,
+				"release quarantine is removed",
+			);
+	};
+	const releaseOptions = (root, overrides = {}) => ({
+		repositoryRoot: root,
+		descriptor: policy,
+		resolution: {
+			status: "update",
+			release: evidence.release,
+			version: "1.0.0",
+			peeledCommitSha: evidence.peeledCommitSha,
+		},
+		dirtyPaths: () => [],
+		writable: () => true,
+		acquireCandidate: async () => ({
+			sourceRoot: fixtureRoot,
+			evidence: structuredClone(evidence),
+			policy: structuredClone(policy),
+		}),
+		gates: PRIVATE_WORKFLOW_RELEASE_GATES,
+		runGate: async () => true,
+		...overrides,
+	});
+	try {
+		const firstRoot = makeRepository("success-one");
+		const secondRoot = makeRepository("success-two");
+		const firstBefore = canonicalBytes(firstRoot);
+		const secondBefore = canonicalBytes(secondRoot);
+		const promoted = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(firstRoot));
+		const repeated = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(secondRoot));
+		check(() => {
+			assert.equal(promoted.status, "promoted", promoted.reason);
+			assert.equal(repeated.status, "promoted", repeated.reason);
+			assert.deepEqual(promoted.ownedOutputs, PRIVATE_WORKFLOW_OWNED_OUTPUTS);
+			assert.deepEqual(promoted.gates, [
+				{ name: "u4-private-workflow-parity", status: "passed" },
+				{ name: "package-work-goal", status: "passed" },
+			]);
+			assert.ok(readFileSync(promoted.auditPath).equals(readFileSync(repeated.auditPath)));
+			const audit = JSON.parse(readFileSync(promoted.auditPath, "utf8"));
+			assert.deepEqual(audit.ownedOutputs, PRIVATE_WORKFLOW_OWNED_OUTPUTS);
+			assert.equal(audit.source.toRelease, evidence.release);
+			assert.equal(audit.provenance.license.spdx, "MIT");
+			assert.equal(audit.provenance.translator.version, 5);
+			assert.equal(audit.compatibility.parity.complete, true);
+			assert.equal(audit.compatibility.zeroEffectiveSurface, true);
+			assert.equal(audit.quarantineRemoved, true);
+			assertCanonicalBytes(firstRoot, canonicalBytes(firstRoot));
+			assertCanonicalBytes(secondRoot, canonicalBytes(secondRoot));
+			for (const [relativePath, bytes] of Object.entries(firstBefore)) {
+				const name = path.posix.basename(relativePath);
+				assert.ok(readFileSync(path.join(promoted.retainedGenerationPath, name)).equals(bytes));
+			}
+			for (const [relativePath, bytes] of Object.entries(secondBefore)) {
+				const name = path.posix.basename(relativePath);
+				assert.ok(readFileSync(path.join(repeated.retainedGenerationPath, name)).equals(bytes));
+			}
+		}, "verified update promotes exact owned outputs with deterministic audit and retained prior generation");
+
+		const failureCases = [
+			["acquisition failure", { acquireCandidate: async () => { throw new Error("network failed"); } }],
+			["failing gate", { runGate: async (gate) => gate.name !== "package-work-goal" }],
+			["incomplete parity", { parityCheck: () => { throw new Error("incomplete parity"); } }],
+			["interrupted quarantine", { interrupt: (phase) => { if (phase === "after-gates") throw new Error("interrupted"); } }],
+			["interrupted prior rename", { interrupt: (phase) => { if (phase === "after-prior-rename") throw new Error("interrupted"); } }],
+			["interrupted candidate rename", { interrupt: (phase) => { if (phase === "after-candidate-rename") throw new Error("interrupted"); } }],
+		];
+		for (const [label, overrides] of failureCases) {
+			const root = makeRepository(label.replaceAll(" ", "-"));
+			const before = canonicalBytes(root);
+			const result = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(root, overrides));
+			check(() => {
+				assert.notEqual(result.status, "promoted");
+				assertCanonicalBytes(root, before);
+			}, `${label} preserves canonical bytes and removes quarantine`);
+		}
+
+		const mutatedSourceRoot = makeRepository("mutated-source");
+		const mutatedSourceBefore = canonicalBytes(mutatedSourceRoot);
+		const sourceFile = path.join(fixtureRoot, ...sourcePath.split("/"));
+		const sourceOriginal = readFileSync(sourceFile);
+		const mutatedSource = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(mutatedSourceRoot, {
+			interrupt: (phase) => {
+				if (phase === "after-first-generation") writeFileSync(sourceFile, "mutated\n");
+			},
+		}));
+		writeFileSync(sourceFile, sourceOriginal);
+		check(() => {
+			assert.equal(mutatedSource.status, "blocked");
+			assertCanonicalBytes(mutatedSourceRoot, mutatedSourceBefore);
+		}, "mutated verified source preserves canonical bytes and removes quarantine");
+
+		const mutatedCanonicalRoot = makeRepository("mutated-canonical");
+		const mutatedCanonicalBefore = canonicalBytes(mutatedCanonicalRoot);
+		const mutatedCanonical = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(mutatedCanonicalRoot, {
+			interrupt: (phase) => {
+				if (phase === "after-gates")
+					writeFileSync(
+						path.join(mutatedCanonicalRoot, "extensions", "private-workflows", "brainstorm.md"),
+						"mutated\n",
+					);
+			},
+		}));
+		check(() => {
+			assert.equal(mutatedCanonical.status, "blocked");
+			assertCanonicalBytes(mutatedCanonicalRoot, mutatedCanonicalBefore);
+		}, "canonical mutation during audit restores exact prior bytes and removes quarantine");
+	} finally {
+		rmSync(releaseFixtureRoot, { recursive: true, force: true });
+	}
+
 	writeFileSync(path.join(fixtureRoot, ...planSourcePath.split("/")), "changed\n");
 	rejects(
 		() => translateVerifiedWorkflows(args),

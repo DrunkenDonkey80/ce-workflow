@@ -36,6 +36,10 @@ import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.js";
 import { openWorkFleet } from "./work-fleet.js";
 import { dispatchPrivateWorkflow } from "./work-private-workflows.js";
 import {
+	promoteVerifiedPrivateWorkflowRelease,
+	resolveLatestOfficialStableRelease,
+} from "./work-compound-catch-up.js";
+import {
 	createSubscriptionFooterController,
 	SUBSCRIPTION_FOOTER_DEFAULTS,
 } from "./subscription-footer.js";
@@ -16868,6 +16872,41 @@ function buildWorkCatchUpState(cwd) {
 	mkdirSync(dir, { recursive: true });
 	const packages = baseline.packages.map((item) => {
 		const name = String(item.name ?? "").trim();
+		if (item.source === "official-github-stable-release") {
+			const policy = JSON.parse(
+				readFileSync(resolve(WORKFLOW_REPO_DIR, "extensions", "work-compound-source-policy.json"), "utf8"),
+			);
+			let currentRelease = policy.release;
+			try {
+				currentRelease = JSON.parse(
+					readFileSync(resolve(WORKFLOW_REPO_DIR, "extensions", "private-workflows", "provenance.json"), "utf8"),
+				).release;
+			} catch {
+				// The verified source policy remains the fail-closed current pin.
+			}
+			const prefix = policy.release.slice(0, -policy.version.length);
+			const currentVersion = currentRelease.startsWith(prefix)
+				? currentRelease.slice(prefix.length)
+				: policy.version;
+			const resolution = resolveLatestOfficialStableRelease({
+				...policy,
+				release: currentRelease,
+				version: currentVersion,
+			});
+			return {
+				name,
+				source: item.source,
+				baselineVersion: currentVersion,
+				installedVersion: "",
+				latestVersion: resolution.version ?? "",
+				targetVersion: resolution.version ?? currentVersion,
+				changed: resolution.status === "update",
+				needsReview: false,
+				status: resolution.status,
+				reason: resolution.reason,
+				resolution,
+			};
+		}
 		const baselineVersion = String(item.version ?? "").trim();
 		const latestVersion = npmLatestVersion(name);
 		const installedVersion = installedPackageVersion(name);
@@ -16917,7 +16956,7 @@ function renderWorkCatchUpText(state) {
 		`artifacts: ${state.artifactDir}`,
 		...state.packages.map(
 			(pkg) =>
-				`- ${pkg.name}: ${pkg.baselineVersion} → ${pkg.targetVersion}${pkg.needsReview ? " [review pending]" : ""}${pkg.diffPath ? ` (${relative(state.artifactDir, pkg.diffPath)})` : ""}`,
+				`- ${pkg.name}: ${pkg.baselineVersion} → ${pkg.targetVersion}${pkg.status ? ` [${pkg.status}]` : pkg.needsReview ? " [review pending]" : ""}${pkg.reason ? ` (${pkg.reason})` : pkg.diffPath ? ` (${relative(state.artifactDir, pkg.diffPath)})` : ""}`,
 		),
 	].join("\n");
 }
@@ -16995,6 +17034,26 @@ async function handleWorkCatchUpCommand(args, pi, ctx) {
 	const state = buildWorkCatchUpState(ctx.cwd);
 	notify(ctx, renderWorkCatchUpText(state), state.ok ? "info" : "warning");
 	if (!state.ok) return;
+	const stableUpdate = state.packages.find(
+		(pkg) => pkg.source === "official-github-stable-release" && pkg.status === "update",
+	);
+	if (stableUpdate) {
+		const descriptor = JSON.parse(
+			readFileSync(resolve(WORKFLOW_REPO_DIR, "extensions", "work-compound-source-policy.json"), "utf8"),
+		);
+		const promotion = await promoteVerifiedPrivateWorkflowRelease({
+			repositoryRoot: WORKFLOW_REPO_DIR,
+			descriptor,
+			resolution: stableUpdate.resolution,
+		});
+		notify(
+			ctx,
+			promotion.status === "promoted"
+				? `Private workflow release promoted: ${promotion.release}; audit=${promotion.auditPath}; restart retains prior=${promotion.retainedGenerationPath}`
+				: `Private workflow release ${promotion.status}: ${promotion.reason ?? "promotion stopped"}`,
+			promotion.status === "promoted" ? "info" : "warning",
+		);
+	}
 	if (!state.packages.some((pkg) => pkg.needsReview)) return;
 	await handleWorkGoalCommand(
 		buildWorkCatchUpObjective(state, args),

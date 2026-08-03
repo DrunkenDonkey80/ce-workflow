@@ -40,33 +40,21 @@
       ]
     },
     {
-      "name": "pi-compound-engineering",
-      "version": "3.19.2",
-      "reviewedAt": "2026-07-19",
-      "reviewedVersion": "3.19.2",
+      "name": "compound-engineering",
+      "source": "official-github-stable-release",
+      "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
+      "release": "compound-engineering-v3.21.0",
+      "version": "3.21.0",
+      "reviewedAt": "2026-08-03",
+      "reviewedVersion": "3.21.0",
       "decisions": [
         {
-          "version": "3.19.2",
-          "title": "Project-grounded proactive catch-up verdicts",
+          "version": "3.21.0",
+          "title": "Verified private workflow generation",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "ce-pov turns upstream release notes into repository-specific adoption decisions before the baseline advances.",
-          "verification": "work-catch-up objective and completion-gate tests passed"
-        },
-        {
-          "version": "3.19.2",
-          "title": "Technical explainers for difficult adoption choices",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "ce-explain is useful only when a candidate cannot be decided from the compact POV summary.",
-          "verification": "work-catch-up objective test covers conditional ce-explain guidance"
-        },
-        {
-          "version": "3.19.2",
-          "title": "Recurring external feedback sweep",
-          "pov": "Hold",
-          "status": "skipped",
-          "rationale": "ce-sweep overlaps the native work-item and improvement-reporting flow until Slack, GitHub Issues, or email ingestion is explicitly configured."
+          "rationale": "The official stable release is translated into the complete private nine-workflow generation with no ordinary CE runtime surface.",
+          "verification": "node scripts/test-work-private-workflows.mjs"
         }
       ]
     },

@@ -991,6 +991,12 @@ try {
 	);
 	assert.equal(catchUpState.ok, true);
 	assert.equal(catchUpState.packages.length, baseline.packages.length);
+	const stableRelease = catchUpState.packages.find(
+		(pkg) => pkg.source === "official-github-stable-release",
+	);
+	assert.equal(stableRelease?.status, "unknown");
+	assert.equal(stableRelease?.reason, "offline");
+	assert.equal(stableRelease?.changed, false, "unknown release state is never promotable or current");
 	assert.equal(
 		catchUpState.packages.find((pkg) => pkg.name === "pi-goal")?.needsReview,
 		false,
