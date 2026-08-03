@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "verified": true,
+  "translator": {
+    "path": "scripts/generate-work-private-workflows.mjs",
+    "sha256": "19e1fb55e50563d8b1b69fe0e3a87a640c6b6032297e1dac13df44eb7b234bec",
+    "version": 1
+  },
+  "provenance": {
+    "path": "provenance.json",
+    "sha256": "f00f80d28ac67e94d2cf9c40e8f3e35a243536aa9e048ab5aa2bfa3402711be4"
+  },
+  "workflows": {
+    "brainstorm": {
+      "path": "brainstorm.md",
+      "sha256": "cc261e4013ddaf060945b414d74f67b7f8c1a1062c806aded1b5684ff36d30eb"
+    }
+  },
+  "generationSha256": "c1832d46c1728f38ec6919fd31e4cb579c30a3c19fbd159c7cf0709e3199da3d"
+}

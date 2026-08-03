@@ -278,13 +278,19 @@ try {
 			standalone.epic.id !== "E-1",
 		"a new menu brainstorm creates its own visible roadmap",
 	);
-	const handoffMeta = parseWorkPromptMeta(
-		brainstormHandoffPrompt(standalone, cwd),
-	);
+	const privateHandoff = brainstormHandoffPrompt(standalone, cwd);
+	const handoffMeta = parseWorkPromptMeta(privateHandoff);
 	assert(
 		handoffMeta.epicId === standalone.epic.id &&
 			handoffMeta.workItemId === standalone.idea.id,
 		"brainstorm handoff keeps roadmap and idea identity for automatic linking",
+	);
+	assert(
+		privateHandoff.includes("BEGIN VERIFIED PRIVATE BRAINSTORM PLAYBOOK") &&
+			privateHandoff.includes("Ask exactly one focused clarification per turn") &&
+			privateHandoff.includes("Brainstorm saved: <absolute path>") &&
+			!privateHandoff.includes(`Run ${"ce-"}brainstorm`),
+		"F7 brainstorm loads only the verified private playbook and preserves clarification and saved-artifact contracts",
 	);
 	const wideHandoff = brainstormHandoffPrompt(standalone, cwd, "wide");
 	assert(
@@ -305,7 +311,7 @@ try {
 	assert(
 		researchedHandoff.includes("Optional pre-brainstorm research gate") &&
 			researchedHandoff.includes("work-advisor") &&
-			researchedHandoff.includes("feed that synthesis into the main ce-brainstorm") &&
+			researchedHandoff.includes("feed that synthesis into the main private brainstorm") &&
 			researchedHandoff.indexOf("Optional pre-brainstorm research gate") <
 				researchedHandoff.indexOf("Advisor critic gate"),
 		"optional configured advisors research the clarified request before the main brainstorm artifact",
@@ -576,7 +582,7 @@ try {
 	assert(
 		brainstormHandoffPrompt(state).includes("Run /work-plan E-1 now") &&
 			brainstormHandoffPrompt(state).includes(
-				"do not use ce-brainstorm's post-doc planning menu",
+				"skip the legacy post-document planning menu",
 			),
 		"linked brainstorm handoff routes planning through work-plan",
 	);

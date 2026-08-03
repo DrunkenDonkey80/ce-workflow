@@ -5291,17 +5291,25 @@
       ],
       "dependencyEdges": [],
       "description": "Implement Planning Contract U2 only: deterministically translate the verified brainstorm closure from U1, add the sole internal allowlisted dispatcher, and route F7 Brainstorm through that private verified resource. Do not migrate planning or any other CE-backed path.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-5.3",
       "labels": [],
       "notes": [
-        "wo:implementation\nwo:execution-agent\nplan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\ncovered-unit-parts: U2; R5; R7-R12; AE1-AE2 brainstorm\nsequence: 2/3\nreview-gate: required"
+        "wo:implementation\nwo:execution-agent\nplan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\ncovered-unit-parts: U2; R5; R7-R12; AE1-AE2 brainstorm\nsequence: 2/3\nreview-gate: required",
+        "wo:implementation\nImplemented U2 only: deterministic verified brainstorm translation, one internal allowlisted/path-confined dispatcher, F7 private-playbook routing, and focused runtime/brainstorm proof. Planning and every other CE-backed path remain unchanged.\nChanged files: extensions/work-private-workflows.js; extensions/private-workflows/brainstorm.md; extensions/private-workflows/manifest.json; extensions/private-workflows/provenance.json; scripts/generate-work-private-workflows.mjs; scripts/test-work-private-workflows.mjs; extensions/work-models.js; extensions/work-compound-inventory.json; scripts/test-work-brainstorm.mjs.\nTests added/updated: scripts/test-work-private-workflows.mjs; scripts/test-work-brainstorm.mjs.\nwo:verify-check {\"command\":\"node scripts/test-work-compound-source.mjs && node scripts/test-work-private-workflows.mjs && node scripts/test-work-brainstorm.mjs\",\"result\":\"PASS\",\"output\":[\"PASS test-work-compound-source (16 offline checks)\",\"PASS test-work-private-workflows (12 offline checks) zeroSurface=true\",\"ok - work-brainstorm behavior\"],\"lsp\":\"changed JavaScript/JSON files clean; node --check passed\",\"noStagedFiles\":true}\nResidual risks: brainstorm-only generated playbook intentionally does not migrate planning, evaluation, catch-up, or other CE-backed workflows; independent review is still required.",
+        "wo:review-scope [\"extensions/work-compound-inventory.json\",\"extensions/work-models.js\",\"scripts/test-work-brainstorm.mjs\",\"extensions/private-workflows/brainstorm.md\",\"extensions/private-workflows/manifest.json\",\"extensions/private-workflows/provenance.json\",\"extensions/work-private-workflows.js\",\"scripts/generate-work-private-workflows.mjs\",\"scripts/test-work-private-workflows.mjs\"]",
+        "wo:review PASS - U2 scope verified: dispatcher path/allowlist/hash/generation checks + F7 private-playbook routing; ran test-work-compound-source (16 ok), test-work-private-workflows (12 ok, zeroSurface=true), test-work-brainstorm (ok); inventory scan re-run clean; no staged files. Residual: skills/work-orchestrator/references/full-policy.md:132 still names ce-brainstorm (plan defers to U4).",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-compound-source.mjs && node scripts/test-work-private-workflows.mjs && node scripts/test-work-brainstorm.mjs\nOutput: k 5 - missing resource rejection\nok 6 - mutated resource rejection\nok 7 - unverified generation rejection\nok 8 - two offline translations from one verified closure are byte-identical\nok 9 - release, path, hash, license, and translator provenance\nok 10 - mutated verified closure rejection\nok 11 - unverified source generation rejection\nok 12 - clean package runtime exposes zero private or CE surface\nPASS test-work-private-workflows (12 offline checks) zeroSurface=true\nok - work-brainstorm behavior"
       ],
       "parentId": "work-5",
-      "status": "open",
+      "status": "closed",
       "title": "Dispatch the private brainstorm workflow end to end",
       "type": "task",
-      "updatedAt": "2026-08-03T15:55:09.914Z"
+      "updatedAt": "2026-08-03T16:33:33.334Z"
     },
     "work-5.4": {
       "acceptance": "1. node scripts/test-work-private-workflows.mjs && node scripts/test-work-brainstorm.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-workflow-evaluation-rpc.mjs passes. 2. Every F7 plan/master/slice-plan entry and depth variant loads the verified private plan resource and preserves clarification, requirement-preservation/self-audit, artifact, Open Question Gate, and actor-visible handoff behavior. 3. Candidate brainstorm/plan evaluation succeeds without a pi-compound-engineering dependency root; only an explicitly named legacy baseline descriptor may resolve the installed package for parity. 4. Mutated/unknown plan resources and implicit legacy fallback fail closed, and brainstorm/plan parity rows pass against their observable contracts. 5. Work-item evidence records changed files, tests added/updated, exact command output, residual risks, and no staged files; an independent reviewer appends wo:review PASS.",
@@ -5331,7 +5339,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-03T16:19:11.017Z"
+    "updatedAt": "2026-08-03T16:33:33.335Z"
   },
   "schemaVersion": 1
 }

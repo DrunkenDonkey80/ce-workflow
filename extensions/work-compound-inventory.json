@@ -7,14 +7,19 @@
     "extensions/work-compound-source-policy.json",
     "extensions/work-compound-source.js",
     "scripts/probe-work-compound-source.mjs",
-    "scripts/test-work-compound-source.mjs"
+    "scripts/test-work-compound-source.mjs",
+    "extensions/work-private-workflows.js",
+    "extensions/private-workflows/manifest.json",
+    "extensions/private-workflows/provenance.json",
+    "extensions/private-workflows/brainstorm.md",
+    "scripts/generate-work-private-workflows.mjs",
+    "scripts/test-work-private-workflows.mjs"
   ],
   "expectedMentions": {
     "agents/work-debugger.md": { "ce-compound": 1, "ce-debug": 3 },
     "agents/work-migrator.md": { "ce-plan": 1 },
     "extensions/work-catch-up-baseline.json": { "ce-explain": 2, "ce-pov": 1 },
-    "extensions/work-models.js": { "ce-brainstorm": 6, "ce-code-review": 2, "ce-explain": 1, "ce-plan": 18, "ce-pov": 1, "ce-simplify-code": 1, "ce-test-browser": 1 },
-    "scripts/test-work-brainstorm.mjs": { "ce-brainstorm": 2 },
+    "extensions/work-models.js": { "ce-code-review": 2, "ce-explain": 1, "ce-plan": 18, "ce-pov": 1, "ce-simplify-code": 1, "ce-test-browser": 1 },
     "scripts/test-work-fleet.mjs": { "ce-plan": 2 },
     "scripts/test-work-goal.mjs": { "ce-explain": 1, "ce-pov": 1 },
     "scripts/test-work-settings.mjs": { "ce-plan": 5 },

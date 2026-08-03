@@ -34,6 +34,7 @@ import {
 import { migrateLegacyBeads } from "./legacy-beads-migration.js";
 import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.js";
 import { openWorkFleet } from "./work-fleet.js";
+import { dispatchPrivateWorkflow } from "./work-private-workflows.js";
 import {
 	createSubscriptionFooterController,
 	SUBSCRIPTION_FOOTER_DEFAULTS,
@@ -3995,9 +3996,9 @@ function preBrainstormAdvisorStep(
 		? `launch exactly one parallel subagent call in tasks mode with context:fresh, one task for each configured agent: ${agents.join(", ")}`
 		: `launch these configured agents one at a time with separate context:fresh single-agent calls, waiting for each before starting the next: ${agents.join(", ")}`;
 	return [
-		`Optional pre-brainstorm research gate: after ce-brainstorm has clarified the request but before it writes the artifact, ${launch}. Use only these packaged work-advisor roles.`,
+		`Optional pre-brainstorm research gate: after the private brainstorm has clarified the request but before it writes the artifact, ${launch}. Use only these packaged work-advisor roles.`,
 		"Give every advisor the same clarified request and authoritative local sources. Ask for independent relevant research, constraints, risks, and concrete options. Advisors are read-only, must not mutate WorkItems or files, and must not launch subagents.",
-		"Wait for every configured advisor, deduplicate and synthesize their findings, then feed that synthesis into the main ce-brainstorm reasoning before writing the brainstorm artifact. Record unavailable advisors without retry; do not replace them.",
+		"Wait for every configured advisor, deduplicate and synthesize their findings, then feed that synthesis into the main private brainstorm reasoning before writing the brainstorm artifact. Record unavailable advisors without retry; do not replace them.",
 	].join("\n");
 }
 
@@ -13880,16 +13881,23 @@ function brainstormHandoffPrompt(
 			)
 		: "";
 	const criticLines = advisorStep ? [advisorStep] : [];
+	const privatePlaybook = artifact
+		? ""
+		: dispatchPrivateWorkflow("brainstorm", {
+				actionToken: "work-models:F7:brainstorm:v1",
+				callerUrl: import.meta.url,
+			});
 	return [
 		`Use the work-orchestrator skill in mode: ${artifact ? "master" : "brainstorm"} with this precomputed extension state.`,
 		`Roadmap: ${state.epic.id} — ${state.epic.title}`,
 		`Idea: ${state.idea.id} — ${state.idea.title}`,
 		state.topic ? `Full brainstorm request:\n${state.topic}` : "",
 		artifact
-			? `Brainstorm artifact: ${artifact}\n${advisorStep ? "After the advisor gate, run" : "Run"} /work-plan ${state.epic.id} now; do not use ce-brainstorm's post-doc planning menu.`
-			: `Run ce-brainstorm interactively, ask one question at a time until the requirements are clear, write only the brainstorm artifact, and skip ce-brainstorm's post-doc planning menu. End the final response with exactly "Brainstorm saved: <absolute path>" so the extension links it to ${state.idea.id}.`,
+			? `Brainstorm artifact: ${artifact}\n${advisorStep ? "After the advisor gate, run" : "Run"} /work-plan ${state.epic.id} now; skip the legacy post-document planning menu.`
+			: `Follow the verified private playbook below. The extension retains ownership of the artifact link. End the final response with exactly "Brainstorm saved: <absolute path>" so it links to ${state.idea.id}.`,
+		privatePlaybook ? `--- BEGIN VERIFIED PRIVATE BRAINSTORM PLAYBOOK ---\n${privatePlaybook}--- END VERIFIED PRIVATE BRAINSTORM PLAYBOOK ---` : "",
 		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can call ce-plan with the preservation and self-audit contract.",
-		"Never silently skip ce-brainstorm questions for broad, important, or underspecified work.",
+		"Never silently skip clarification for broad, important, or underspecified work.",
 		creativeStep,
 		preBrainstormStep,
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
