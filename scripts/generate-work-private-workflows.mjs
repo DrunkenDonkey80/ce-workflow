@@ -8,7 +8,7 @@ import {
 	sha256,
 } from "../extensions/work-compound-source.js";
 
-export const TRANSLATOR_VERSION = 4;
+export const TRANSLATOR_VERSION = 5;
 export const BRAINSTORM_SOURCE = "skills/ce-brainstorm/SKILL.md";
 export const PLAN_SOURCE = "skills/ce-plan/SKILL.md";
 export const DEBUG_SOURCE = "skills/ce-debug/SKILL.md";
@@ -16,6 +16,8 @@ export const LEARNING_SOURCE = "skills/ce-compound/SKILL.md";
 export const REVIEW_SOURCE = "skills/ce-code-review/SKILL.md";
 export const SIMPLIFY_SOURCE = "skills/ce-simplify-code/SKILL.md";
 export const BROWSER_SOURCE = "skills/ce-test-browser/SKILL.md";
+export const POV_SOURCE = "skills/ce-pov/SKILL.md";
+export const EXPLAIN_SOURCE = "skills/ce-explain/SKILL.md";
 const TRANSLATOR_PATH = "scripts/generate-work-private-workflows.mjs";
 const WORKFLOW_RULES = {
 	brainstorm: [
@@ -60,13 +62,27 @@ const WORKFLOW_RULES = {
 		"preserve-affected-ui-selection-browser-evidence-and-waiver",
 		"adapt-output-to-work-finish-browser-evidence-contract",
 	],
+	pov: [
+		"verify-complete-u1-pov-closure",
+		"remove-pi-discovery-frontmatter-and-executable-helpers",
+		"preserve-project-grounded-graded-verdict-and-read-only-boundary",
+		"adapt-output-to-catch-up-candidate-recommendation-contract",
+	],
+	explain: [
+		"verify-complete-u1-explain-closure",
+		"remove-pi-discovery-frontmatter-and-executable-helpers",
+		"preserve-deep-technical-explanation-without-changing-the-verdict",
+		"adapt-output-to-conditional-catch-up-decision-support-contract",
+	],
 };
 const WORKFLOW_SOURCES = {
 	brainstorm: { closure: "ce-brainstorm", source: BRAINSTORM_SOURCE },
 	browser: { closure: "ce-test-browser", source: BROWSER_SOURCE },
 	debug: { closure: "ce-debug", source: DEBUG_SOURCE },
+	explain: { closure: "ce-explain", source: EXPLAIN_SOURCE },
 	learning: { closure: "ce-compound", source: LEARNING_SOURCE },
 	plan: { closure: "ce-plan", source: PLAN_SOURCE },
+	pov: { closure: "ce-pov", source: POV_SOURCE },
 	review: { closure: "ce-code-review", source: REVIEW_SOURCE },
 	simplify: { closure: "ce-simplify-code", source: SIMPLIFY_SOURCE },
 };
@@ -142,12 +158,22 @@ function browserPlaybook(sourceClosureSha256) {
 	return `# Private Affected-UI Browser Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Affected UI selection\n\nUse only the caller-supplied UI diff and acceptance contract. Map changed routes, pages, components, views, templates, and styles to the smallest runnable affected pages and user flows. Do not test unrelated pages or infer backend-only coverage from a UI-looking filename. If the project has no runnable web frontend or the affected surface cannot execute, append \`wo:browser NOOP\` with the observed reason.\n\n## Browser verification\n\nStart the documented local app when safe, use the available browser driver, and exercise the smallest non-destructive path for each affected flow, including the relevant failure state and console/network evidence. Preserve user data and restore any toggle or value changed by the check. Append \`wo:browser PASS\` with affected pages, commands/tools, and concise observed evidence only when every required check passes.\n\n## Waiver and failure\n\nOnly an explicit evidence-only user waiver may replace runnable required evidence; append \`wo:browser WAIVED\` with the user's reason. Tool unavailability, a blocking UI failure, or incomplete evidence is not an implicit waiver: record the exact failure and stop. Without PASS, NOOP, or explicit WAIVED evidence, coded commit and close remain blocked. Do not stage, commit, close work items, simplify code, or perform the code-review gate.\n`;
 }
 
+function povPlaybook(sourceClosureSha256) {
+	return `# Private Catch-up POV Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary and evidence floor\n\nApply this read-only playbook to every actionable catch-up candidate, one candidate (or one tightly related group) at a time. Ground the recommendation in both verified upstream release/API evidence and current repository call sites, constraints, prior decisions, and incumbent behavior. Conversation claims are pointers to verify, not evidence. Do not implement, mutate the baseline, ask the actor, or advance the candidate while forming the POV.\n\n## Graded verdict\n\nReturn exactly one project-grounded grade: Adopt, Trial, Hold, Reject, or Not-our-problem. Include the reversibility tier, concise bottom line, verified project fit, benefit, cost/risk, confidence, and one actor-visible recommendation. Adopt or Reject is forbidden when either the project or external evidence floor is missing; return Hold with the missing evidence instead. Preserve the grade and rationale unchanged into the catch-up decision record.\n\n## Handoff and failure\n\nThe caller owns the one-at-a-time Adopt now, Defer, or Skip this release question and all implementation or durable work-item mutation. Reject and Not-our-problem normally become no-action without a question. Missing, contradictory, or unverifiable evidence leaves the candidate undecided and blocks baseline advancement; report the exact evidence needed rather than producing a generic opinion.\n`;
+}
+
+function explainPlaybook(sourceClosureSha256) {
+	return `# Private Catch-up Technical-Explanation Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Conditional boundary\n\nInvoke this read-only playbook only after the POV marks a candidate intentionally too-technical for the actor to decide from its concise summary. Do not invoke it for ordinary candidates, brief follow-ups, status reporting, or as a substitute for missing POV evidence. It teaches the already-grounded candidate and never selects, changes, or softens the graded verdict.\n\n## Decision-ready explanation\n\nExplain the candidate's mechanism in the repository's actual terms, then connect it to the current call sites, incumbent behavior, likely change, benefit, cost, risk, and reversibility. Prefer a compact worked example or before/after flow over generic background. Label any unverified claim and keep internal workflow mechanics out of the actor-visible explanation.\n\n## Return and failure\n\nReturn the explanation to the same undecided candidate so the caller can present its original POV, recommendation, and one-at-a-time Adopt now, Defer, or Skip this release choice. If the explanation cannot be grounded safely, identify the missing fact and keep the candidate undecided; do not advance the completion manifest.\n`;
+}
+
 const PLAYBOOKS = {
 	brainstorm: brainstormPlaybook,
 	browser: browserPlaybook,
 	debug: debugPlaybook,
+	explain: explainPlaybook,
 	learning: learningPlaybook,
 	plan: planPlaybook,
+	pov: povPlaybook,
 	review: reviewPlaybook,
 	simplify: simplifyPlaybook,
 };
@@ -157,7 +183,7 @@ export function translateVerifiedWorkflows({
 	evidence,
 	policy,
 	translatorBytes,
-	workflows = ["brainstorm", "browser", "debug", "learning", "plan", "review", "simplify"],
+	workflows = ["brainstorm", "browser", "debug", "explain", "learning", "plan", "pov", "review", "simplify"],
 }) {
 	assertVerifiedEvidence(evidence, policy);
 	if (!workflows.length || workflows.some((workflow) => !WORKFLOW_SOURCES[workflow]))
@@ -255,5 +281,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	);
 	const files = translateVerifiedWorkflows({ sourceRoot: path.resolve(args.source), evidence, policy });
 	writePrivateWorkflowGeneration(outputRoot, files);
-	console.log(`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,learning,plan,review,simplify files=${Object.keys(files).length}`);
+	console.log(`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,explain,learning,plan,pov,review,simplify files=${Object.keys(files).length}`);
 }

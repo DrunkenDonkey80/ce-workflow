@@ -4,17 +4,39 @@ import { fileURLToPath } from "node:url";
 import { normalizeSourcePath, sha256 } from "./work-compound-source.js";
 
 const RESOURCE_ROOT = fileURLToPath(new URL("./private-workflows/", import.meta.url));
+const INVENTORY_PATH = fileURLToPath(new URL("./work-compound-inventory.json", import.meta.url));
 const WORK_MODELS_CALLER = fileURLToPath(new URL("./work-models.js", import.meta.url));
 const EVALUATION_CALLER = fileURLToPath(new URL("../scripts/workflow-evaluation.mjs", import.meta.url));
 const ALLOWLIST = new Map([
 	["brainstorm", "brainstorm.md"],
 	["browser", "browser.md"],
 	["debug", "debug.md"],
+	["explain", "explain.md"],
 	["learning", "learning.md"],
 	["plan", "plan.md"],
+	["pov", "pov.md"],
 	["review", "review.md"],
 	["simplify", "simplify.md"],
 ]);
+const PARITY_WORKFLOWS = [
+	"ce-brainstorm",
+	"ce-plan",
+	"ce-code-review",
+	"ce-simplify-code",
+	"ce-test-browser",
+	"ce-pov",
+	"ce-explain",
+	"ce-debug",
+	"ce-compound",
+];
+const PARITY_FIELDS = [
+	"trigger",
+	"decisions",
+	"toolBoundary",
+	"artifacts",
+	"failure",
+	"actorVisibleOutcome",
+];
 const AUTHORITIES = new Map([
 	["work-models:F7:brainstorm:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["brainstorm"]) }],
 	["work-models:debug:investigation:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["debug"]) }],
@@ -23,6 +45,10 @@ const AUTHORITIES = new Map([
 	["work-models:finish:review:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["review"]) }],
 	["work-models:finish:simplify:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["simplify"]) }],
 	["work-models:F7:plan:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["plan"]) }],
+	[
+		"work-models:catch-up:candidate-review:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["pov", "explain"]) },
+	],
 	[
 		"workflow-evaluation:candidate-private-resource:v1",
 		{ caller: EVALUATION_CALLER, workflows: new Set(["brainstorm", "plan"]) },
@@ -86,6 +112,19 @@ function verifyManifest(manifest) {
 		throw new Error("unverified private workflow generation");
 }
 
+export function assertCompletePrivateWorkflowParity() {
+	const inventory = parseJson(readFileSync(INVENTORY_PATH), "parity inventory");
+	const parity = inventory.parityIndex;
+	exactKeys(parity, PARITY_WORKFLOWS, "parity rows");
+	for (const workflow of PARITY_WORKFLOWS) {
+		exactKeys(parity[workflow], PARITY_FIELDS, `${workflow} parity row`);
+		for (const field of PARITY_FIELDS)
+			if (!String(parity[workflow][field] ?? "").trim())
+				throw new Error(`incomplete private workflow parity row: ${workflow}.${field}`);
+	}
+	return true;
+}
+
 function verifyAuthority(workflow, authority) {
 	const permitted = AUTHORITIES.get(authority.actionToken);
 	const caller = fileURLToPath(authority.callerUrl ?? "file:///external");
@@ -101,6 +140,7 @@ function resolvePrivateWorkflow(workflow, authority) {
 	if (!ALLOWLIST.has(workflow))
 		throw new Error(`unknown private workflow: ${workflow}`);
 	verifyAuthority(workflow, authority);
+	assertCompletePrivateWorkflowParity();
 
 	const manifestFile = confinedFile("manifest.json");
 	const manifest = parseJson(manifestFile.bytes, "manifest");

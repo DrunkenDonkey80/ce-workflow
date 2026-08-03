@@ -14,8 +14,8 @@
   },
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "797916a6efc420d30423886b3c723cb32fe299e6f1d7cd935036841b5d25da93",
-    "version": 4,
+    "sha256": "cc905468bb359093c2e521dc2a26c94269c104adce0f3783df1328d8f859d754",
+    "version": 5,
     "rules": [
       "verify-complete-u1-brainstorm-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
@@ -29,6 +29,10 @@
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-reproduce-root-cause-fix-verify-and-blocker-evidence",
       "adapt-output-to-work-debugger-handoff-contract",
+      "verify-complete-u1-explain-closure",
+      "remove-pi-discovery-frontmatter-and-executable-helpers",
+      "preserve-deep-technical-explanation-without-changing-the-verdict",
+      "adapt-output-to-conditional-catch-up-decision-support-contract",
       "verify-complete-u1-compound-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-destination-deduplication-key-and-skip-gates",
@@ -37,6 +41,10 @@
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-clarification-requirements-self-audit-and-open-question-gate",
       "adapt-output-to-work-plan-master-and-slice-handoff-contracts",
+      "verify-complete-u1-pov-closure",
+      "remove-pi-discovery-frontmatter-and-executable-helpers",
+      "preserve-project-grounded-graded-verdict-and-read-only-boundary",
+      "adapt-output-to-catch-up-candidate-recommendation-contract",
       "verify-complete-u1-code-review-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-scoped-findings-read-only-review-and-bounded-rereview",
@@ -47,7 +55,7 @@
       "adapt-output-to-work-finish-simplify-evidence-contract"
     ]
   },
-  "sourceClosureSha256": "6addaff2df0c915975dbda24f3e72a753146c7d0fbe1d73937e9e3896ef5684a",
+  "sourceClosureSha256": "17946fcb7dfd38bdbff1e035eabf8ececd307a8405d6f8b7145f834b4170442c",
   "sources": [
     {
       "path": "skills/ce-brainstorm/SKILL.md",
@@ -186,6 +194,46 @@
     },
     {
       "path": "skills/ce-debug/scripts/context.mjs",
+      "bytes": 4021,
+      "sha256": "e4b804742641cf2a5c6e6ae96a4ae66df3bde1fc4919c8b3f1829ef5020e9e27"
+    },
+    {
+      "path": "skills/ce-explain/SKILL.md",
+      "bytes": 21375,
+      "sha256": "61c282635e4d634ed8ba366fdd84adc1bf9f2cfaa71eeffe837bcf66d077ce50"
+    },
+    {
+      "path": "skills/ce-explain/references/agents/work-recap-scout.md",
+      "bytes": 2189,
+      "sha256": "ad536c51820178d2431b9a719302196a2c1b0529771771d3f725bb8f947a67ea"
+    },
+    {
+      "path": "skills/ce-explain/references/check-in.md",
+      "bytes": 3857,
+      "sha256": "fd244c1e0e81dc464ca3e9d0451d69daf51a9e5f694c6e3142c0bcb73aa6a91e"
+    },
+    {
+      "path": "skills/ce-explain/references/destinations.md",
+      "bytes": 4800,
+      "sha256": "0dcc91bffb4b2ecd32d2ba799fcb9a95713155fa87d2983c77e6de63e68ae865"
+    },
+    {
+      "path": "skills/ce-explain/references/explainer-html.md",
+      "bytes": 5199,
+      "sha256": "743d63053b41ef5060f196f4d84788dfb65b46b5c566745bb014fd31ae42e861"
+    },
+    {
+      "path": "skills/ce-explain/references/explainer-markdown.md",
+      "bytes": 3489,
+      "sha256": "274ccd8522caad32a22a24c797f0d6c077633dd652590c33c4864a3871aa135b"
+    },
+    {
+      "path": "skills/ce-explain/references/intake.md",
+      "bytes": 6508,
+      "sha256": "9ebd338888a7bb6fba6b8796e5f825b892dfd89075f0138a132e01becd05675d"
+    },
+    {
+      "path": "skills/ce-explain/scripts/context.mjs",
       "bytes": 4021,
       "sha256": "e4b804742641cf2a5c6e6ae96a4ae66df3bde1fc4919c8b3f1829ef5020e9e27"
     },
@@ -436,6 +484,81 @@
     },
     {
       "path": "skills/ce-plan/scripts/peer-job-runner.py",
+      "bytes": 80098,
+      "sha256": "e26d03497b5c12dcec784578ef9ec7c21393b4757d77850dbc38d6fe715e25cd"
+    },
+    {
+      "path": "skills/ce-pov/SKILL.md",
+      "bytes": 22986,
+      "sha256": "8719664af93a05c475db3ff16d9d0fb11dc6c0304a1c34b422a75093c2ed62c2"
+    },
+    {
+      "path": "skills/ce-pov/references/agents/external-evidence-researcher.md",
+      "bytes": 2608,
+      "sha256": "4037cc2a3dd60dccee25ca16f307d2c7dc7cd2619cc1e472ba52452d183980d8"
+    },
+    {
+      "path": "skills/ce-pov/references/agents/pov-peer.md",
+      "bytes": 2301,
+      "sha256": "44730cb890152a47947a5a692b708586083136c5d277dc357e65f6b1aeb139f8"
+    },
+    {
+      "path": "skills/ce-pov/references/agents/precedent-activity-scout.md",
+      "bytes": 3007,
+      "sha256": "cc3fce602c5a41cc266bc3f82d202472832cc73f73c3afa548003e0c563a2868"
+    },
+    {
+      "path": "skills/ce-pov/references/agents/project-grounding-scout.md",
+      "bytes": 4587,
+      "sha256": "f7fca63c61039a3ab3f36775a56d30c664a7b3a9b0fc8ee9c93392791493eee5"
+    },
+    {
+      "path": "skills/ce-pov/references/boundaries.md",
+      "bytes": 3505,
+      "sha256": "902fd4c0cd9da87dfd115dabaf972931c72a37457a635087ed49a592e297320f"
+    },
+    {
+      "path": "skills/ce-pov/references/cross-model-panel.md",
+      "bytes": 24731,
+      "sha256": "fe89f2cbfb8293b5b4a9c0e11fa0bae3f3f42c7b02edb779c1bd8a0a5e5646d2"
+    },
+    {
+      "path": "skills/ce-pov/references/intake.md",
+      "bytes": 4801,
+      "sha256": "8970723f64c5a9d4bdcc6068ff8943e7782b0d5453cc4095abee37a40b3b347b"
+    },
+    {
+      "path": "skills/ce-pov/references/invocation.md",
+      "bytes": 4555,
+      "sha256": "fd6d73180a0f925e8d9fc6b5b0a53f47ea121d9ec4078daca03cad89dc339366"
+    },
+    {
+      "path": "skills/ce-pov/references/method.md",
+      "bytes": 10117,
+      "sha256": "8f8d1a8dac4439c3bb09abca42251ec2c59d4a6636d693ef63626fdb5571562c"
+    },
+    {
+      "path": "skills/ce-pov/references/pov-schema.json",
+      "bytes": 1767,
+      "sha256": "a5c3c2d9469a0c8eb436b52714c67357bcb2d391a9af8a8592d1b2397e30abcb"
+    },
+    {
+      "path": "skills/ce-pov/references/report.md",
+      "bytes": 1875,
+      "sha256": "aa06659e90aa56e0ced500b0ea35c9f23c20389c1517d49040a7faeaf720fe66"
+    },
+    {
+      "path": "skills/ce-pov/scripts/context.mjs",
+      "bytes": 4021,
+      "sha256": "e4b804742641cf2a5c6e6ae96a4ae66df3bde1fc4919c8b3f1829ef5020e9e27"
+    },
+    {
+      "path": "skills/ce-pov/scripts/cross-model-pov.sh",
+      "bytes": 39624,
+      "sha256": "8180d91e3485d7c55901b6e2dc5bf1901016aa8bf9d7d0c5a6ffca389ce23b46"
+    },
+    {
+      "path": "skills/ce-pov/scripts/peer-job-runner.py",
       "bytes": 80098,
       "sha256": "e26d03497b5c12dcec784578ef9ec7c21393b4757d77850dbc38d6fe715e25cd"
     },

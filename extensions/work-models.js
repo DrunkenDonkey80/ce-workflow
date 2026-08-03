@@ -4322,6 +4322,19 @@ function privateFinishPlaybookBlock(workflow, label) {
 	return `--- BEGIN VERIFIED PRIVATE ${label} PLAYBOOK ---\n${playbook}--- END VERIFIED PRIVATE ${label} PLAYBOOK ---`;
 }
 
+function privateCatchUpCandidatePlaybooks() {
+	const authority = {
+		actionToken: "work-models:catch-up:candidate-review:v1",
+		callerUrl: import.meta.url,
+	};
+	const pov = dispatchPrivateWorkflow("pov", authority);
+	const explain = dispatchPrivateWorkflow("explain", authority);
+	return [
+		`--- BEGIN VERIFIED PRIVATE CATCH-UP POV PLAYBOOK (REQUIRED FOR EVERY ACTIONABLE CANDIDATE) ---\n${pov}--- END VERIFIED PRIVATE CATCH-UP POV PLAYBOOK ---`,
+		`--- BEGIN VERIFIED PRIVATE CATCH-UP EXPLAIN PLAYBOOK (CONDITIONAL: INTENTIONALLY TOO-TECHNICAL CANDIDATES ONLY) ---\n${explain}--- END VERIFIED PRIVATE CATCH-UP EXPLAIN PLAYBOOK ---`,
+	].join("\n\n");
+}
+
 function cePlanSliceStep(
 	issue,
 	cwd,
@@ -16923,11 +16936,12 @@ function buildWorkCatchUpObjective(state, args = "") {
 		)}`,
 		`Diff artifacts live in: ${state.artifactDir}`,
 		`Catch-up baseline manifest: ${state.baselinePath}`,
+		privateCatchUpCandidatePlaybooks(),
 		"Discovery and verdicts:",
 		"1. Inspect every review target's changelog, public API/type changes, relevant docs/examples, and diff artifact when present. Repair an artifact that starts with Error before relying on it.",
 		"2. For Pi core, proactively check extension hooks/events/context, SDK and model-runtime changes, dynamic tool loading, model/thinking support, TUI/runtime lifecycle, and any native feature that can delete or simplify ce-workflow code. For plugins, check their public tool schemas, lifecycle, skills, and workflow capabilities—not only breaking changes.",
 		"3. Build a short list of concrete compatibility fixes, deletions/simplifications, and new capabilities that benefit this repository. Ignore generic release-note trivia.",
-		"4. Load and follow ce-pov for each actionable candidate (combine tightly related candidates). Frame it as whether ce-workflow should adopt that capability now; use the upstream artifact/docs as external evidence and current call sites as project evidence. Record the graded verdict. Use ce-explain only when a candidate is too technical for the user to decide from a concise POV summary.",
+		"4. Route every actionable candidate through the verified private POV playbook above (combine only tightly related candidates), preserving its graded verdict and actor-visible recommendation. Invoke the verified private explain playbook only after explicitly marking that candidate tooTechnical because its concise POV is insufficient for an informed actor decision; record the reason and never invoke explain for any other candidate.",
 		"Guided decision and implementation loop:",
 		"5. Rank viable candidates, then handle one at a time. Use exactly one ask_user call per candidate with allowFreeform=false, allowComment=true, and three options: Adopt now (recommended when the POV says Adopt), Defer as durable work item, or Skip this release. Include the POV, project benefit, cost/risk, and recommendation in context.",
 		"6. Adopt now: implement the smallest complete change immediately and run its focused check before presenting the next candidate. Defer: create/reuse one native upstream-catch-up roadmap and add a concrete child work item. Skip: retain the POV rationale plus the user's comment when supplied. Do not ask about findings graded Reject/Not-our-problem unless there is a real choice; record them as no-action.",

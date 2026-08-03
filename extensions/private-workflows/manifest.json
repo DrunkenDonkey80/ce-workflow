@@ -3,12 +3,12 @@
   "verified": true,
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "797916a6efc420d30423886b3c723cb32fe299e6f1d7cd935036841b5d25da93",
-    "version": 4
+    "sha256": "cc905468bb359093c2e521dc2a26c94269c104adce0f3783df1328d8f859d754",
+    "version": 5
   },
   "provenance": {
     "path": "provenance.json",
-    "sha256": "d17e82994938b7899b793c67a71abed6085d5f58e3b89b6c4b21455b80621713"
+    "sha256": "0878993f6aeb574f781689c4011f03b2e16e09dc4069d41532c04614d6a0aa3d"
   },
   "workflows": {
     "brainstorm": {
@@ -23,6 +23,10 @@
       "path": "debug.md",
       "sha256": "bd5d5642ad0ef6e66b93903a05825c5ee10705e9611886e02ca7922104e4aea7"
     },
+    "explain": {
+      "path": "explain.md",
+      "sha256": "75a53d141aa7bc1fa0c8c95c994bf2ee319a2d00eb8e2df14729949af9998423"
+    },
     "learning": {
       "path": "learning.md",
       "sha256": "e92af7dab08030e426b594eddf3d6db55058c6d0387130258ef50cb8ca8baacc"
@@ -30,6 +34,10 @@
     "plan": {
       "path": "plan.md",
       "sha256": "dd0ca78ff9c776025790d910d1dd26b5b2a032f552aa26f2d5d37de6895961f1"
+    },
+    "pov": {
+      "path": "pov.md",
+      "sha256": "560e65d73286f4e55e1e25a24d2d63d3fde41ad34123dad174c8f2dd9bd19008"
     },
     "review": {
       "path": "review.md",
@@ -40,5 +48,5 @@
       "sha256": "63bf9bb826b2852b9a88bb91fb283bdac7d575f5d8cea48d56a99115f02e2140"
     }
   },
-  "generationSha256": "51d3fbd780991e22be082326ea07bd6c54ee3e9296ce449abf8e3c13b43fb9da"
+  "generationSha256": "7042ef8f42398568d7ffbdcb1d8a4d02655a01a33401487149de6287c7dcf410"
 }

@@ -26,6 +26,7 @@ const rejects = (fn, expression, label) =>
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 const extensionRoot = path.join(repositoryRoot, "extensions");
 const resourceRoot = path.join(extensionRoot, "private-workflows");
+const inventoryPath = path.join(extensionRoot, "work-compound-inventory.json");
 const authority = {
 	actionToken: "work-models:F7:brainstorm:v1",
 	callerUrl: pathToFileURL(path.join(extensionRoot, "work-models.js")).href,
@@ -36,22 +37,30 @@ const planAuthority = { ...authority, actionToken: "work-models:F7:plan:v1" };
 const reviewAuthority = { ...authority, actionToken: "work-models:finish:review:v1" };
 const simplifyAuthority = { ...authority, actionToken: "work-models:finish:simplify:v1" };
 const browserAuthority = { ...authority, actionToken: "work-models:finish:browser:v1" };
+const catchUpAuthority = {
+	...authority,
+	actionToken: "work-models:catch-up:candidate-review:v1",
+};
 const generated = Object.fromEntries(
 	[
 		"brainstorm.md",
 		"browser.md",
 		"debug.md",
+		"explain.md",
 		"learning.md",
 		"plan.md",
+		"pov.md",
 		"review.md",
 		"simplify.md",
 		"manifest.json",
 		"provenance.json",
 	].map((name) => [name, readFileSync(path.join(resourceRoot, name))]),
 );
+const inventoryBytes = readFileSync(inventoryPath);
 const restore = () => {
 	for (const [name, bytes] of Object.entries(generated))
 		writeFileSync(path.join(resourceRoot, name), bytes);
+	writeFileSync(inventoryPath, inventoryBytes);
 };
 
 const playbook = dispatchPrivateWorkflow("brainstorm", authority);
@@ -88,6 +97,8 @@ check(() => {
 const reviewPlaybook = dispatchPrivateWorkflow("review", reviewAuthority);
 const simplifyPlaybook = dispatchPrivateWorkflow("simplify", simplifyAuthority);
 const browserPlaybook = dispatchPrivateWorkflow("browser", browserAuthority);
+const povPlaybook = dispatchPrivateWorkflow("pov", catchUpAuthority);
+const explainPlaybook = dispatchPrivateWorkflow("explain", catchUpAuthority);
 check(() => {
 	assert.match(reviewPlaybook, /Review is read-only/);
 	assert.match(reviewPlaybook, /at most one targeted re-review/);
@@ -108,9 +119,15 @@ check(() => {
 	assert.notEqual(browserPlaybook, reviewPlaybook);
 	assert.notEqual(browserPlaybook, simplifyPlaybook);
 }, "verified browser resource preserves affected-UI, waiver, and distinct specialist contracts");
-const parity = JSON.parse(
-	readFileSync(path.join(extensionRoot, "work-compound-inventory.json"), "utf8"),
-).parityIndex;
+check(() => {
+	assert.match(povPlaybook, /every actionable catch-up candidate/);
+	assert.match(povPlaybook, /Adopt, Trial, Hold, Reject, or Not-our-problem/);
+	assert.match(povPlaybook, /actor-visible recommendation/);
+	assert.match(explainPlaybook, /intentionally too-technical/);
+	assert.match(explainPlaybook, /never selects, changes, or softens the graded verdict/);
+	assert.notEqual(povPlaybook, explainPlaybook);
+}, "verified POV and conditional explain resources preserve candidate-review contracts");
+const parity = JSON.parse(inventoryBytes).parityIndex;
 check(() => {
 	assert.deepEqual(
 		Object.keys(parity).filter((name) =>
@@ -119,7 +136,9 @@ check(() => {
 				"ce-code-review",
 				"ce-compound",
 				"ce-debug",
+				"ce-explain",
 				"ce-plan",
+				"ce-pov",
 				"ce-simplify-code",
 				"ce-test-browser",
 			].includes(name),
@@ -130,6 +149,8 @@ check(() => {
 			"ce-code-review",
 			"ce-simplify-code",
 			"ce-test-browser",
+			"ce-pov",
+			"ce-explain",
 			"ce-debug",
 			"ce-compound",
 		],
@@ -141,6 +162,8 @@ check(() => {
 			"ce-compound",
 			"ce-debug",
 			"ce-plan",
+			"ce-pov",
+			"ce-explain",
 			"ce-simplify-code",
 			"ce-test-browser",
 		]) assert.ok(parity[name][field]);
@@ -151,7 +174,9 @@ check(() => {
 	assert.match(reviewPlaybook, /failed.*blocks coded commit and close/i);
 	assert.match(simplifyPlaybook, /Missing PASS\/NOOP evidence blocks/i);
 	assert.match(browserPlaybook, /not an implicit waiver/i);
-}, "private tracer parity rows cover trigger through actor-visible failure outcome");
+	assert.match(povPlaybook, /blocks baseline advancement/i);
+	assert.match(explainPlaybook, /keep the candidate undecided/i);
+}, "complete private parity matrix covers trigger through actor-visible failure outcome");
 rejects(
 	() => dispatchPrivateWorkflow("unknown", authority),
 	/unknown private workflow/,
@@ -171,6 +196,11 @@ rejects(
 	() => dispatchPrivateWorkflow("review", browserAuthority),
 	/external private workflow caller rejected/,
 	"browser authority cannot load non-equivalent review resource",
+);
+rejects(
+	() => dispatchPrivateWorkflow("pov", planAuthority),
+	/external private workflow caller rejected/,
+	"plan authority cannot load catch-up POV resource",
 );
 
 try {
@@ -212,6 +242,8 @@ try {
 		["review", reviewAuthority],
 		["simplify", simplifyAuthority],
 		["browser", browserAuthority],
+		["pov", catchUpAuthority],
+		["explain", catchUpAuthority],
 	]) {
 		rmSync(path.join(resourceRoot, `${workflow}.md`));
 		rejects(
@@ -258,6 +290,8 @@ try {
 		["review", reviewAuthority, reviewPlaybook],
 		["simplify", simplifyAuthority, simplifyPlaybook],
 		["browser", browserAuthority, browserPlaybook],
+		["pov", catchUpAuthority, povPlaybook],
+		["explain", catchUpAuthority, explainPlaybook],
 	]) {
 		writeFileSync(path.join(resourceRoot, `${workflow}.md`), `${workflowPlaybook}\nmutated\n`);
 		rejects(
@@ -275,6 +309,16 @@ try {
 		() => dispatchPrivateWorkflow("brainstorm", authority),
 		/unverified private workflow generation/,
 		"unverified generation rejection",
+	);
+	restore();
+
+	const incompleteParity = JSON.parse(inventoryBytes);
+	delete incompleteParity.parityIndex["ce-pov"].actorVisibleOutcome;
+	writeFileSync(inventoryPath, `${JSON.stringify(incompleteParity, null, 2)}\n`);
+	rejects(
+		() => dispatchPrivateWorkflow("pov", catchUpAuthority),
+		/unknown private workflow ce-pov parity row surface/,
+		"incomplete U4 parity row rejection",
 	);
 } finally {
 	restore();
@@ -296,6 +340,10 @@ try {
 	const simplifySourceBytes = Buffer.from("---\nname: source-simplify\n---\nSimplify equivalently.\n");
 	const browserSourcePath = "skills/ce-test-browser/SKILL.md";
 	const browserSourceBytes = Buffer.from("---\nname: source-browser\n---\nTest affected pages.\n");
+	const povSourcePath = "skills/ce-pov/SKILL.md";
+	const povSourceBytes = Buffer.from("---\nname: source-pov\n---\nForm a graded verdict.\n");
+	const explainSourcePath = "skills/ce-explain/SKILL.md";
+	const explainSourceBytes = Buffer.from("---\nname: source-explain\n---\nTeach the technical subject.\n");
 	const fixtureSources = [
 		[sourcePath, sourceBytes],
 		[debugSourcePath, debugSourceBytes],
@@ -304,6 +352,8 @@ try {
 		[reviewSourcePath, reviewSourceBytes],
 		[simplifySourcePath, simplifySourceBytes],
 		[browserSourcePath, browserSourceBytes],
+		[povSourcePath, povSourceBytes],
+		[explainSourcePath, explainSourceBytes],
 	];
 	for (const [source, bytes] of fixtureSources) {
 		const file = path.join(fixtureRoot, ...source.split("/"));
@@ -353,6 +403,12 @@ try {
 				"ce-test-browser": [
 					{ path: browserSourcePath, bytes: browserSourceBytes.length, sha256: sha256(browserSourceBytes) },
 				],
+				"ce-pov": [
+					{ path: povSourcePath, bytes: povSourceBytes.length, sha256: sha256(povSourceBytes) },
+				],
+				"ce-explain": [
+					{ path: explainSourcePath, bytes: explainSourceBytes.length, sha256: sha256(explainSourceBytes) },
+				],
 			},
 		},
 	};
@@ -371,14 +427,16 @@ try {
 			assert.equal(recorded?.sha256, sha256(bytes));
 		}
 		assert.equal(provenance.license.spdx, "MIT");
-		assert.equal(provenance.translator.version, 4);
+		assert.equal(provenance.translator.version, 5);
 		assert.match(first["debug.md"], /Failure and blocker evidence/);
 		assert.match(first["learning.md"], /Destination and deduplication/);
 		assert.match(first["plan.md"], /Open Question Gate/);
 		assert.match(first["review.md"], /bounded cycle/);
 		assert.match(first["simplify.md"], /Equivalent change or no-op/);
 		assert.match(first["browser.md"], /Affected UI selection/);
-	}, "seven-workflow release, path, hash, license, and translator provenance");
+		assert.match(first["pov.md"], /Graded verdict/);
+		assert.match(first["explain.md"], /Conditional boundary/);
+	}, "nine-workflow release, path, hash, license, and translator provenance");
 	writeFileSync(path.join(fixtureRoot, ...planSourcePath.split("/")), "changed\n");
 	rejects(
 		() => translateVerifiedWorkflows(args),

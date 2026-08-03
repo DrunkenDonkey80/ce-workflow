@@ -5428,17 +5428,26 @@
       ],
       "dependencyEdges": [],
       "description": "Finish U4 with the ce-pov and ce-explain catch-up tracer: route actionable-candidate grading and only-when-needed technical explanation through verified private resources, preserve adopt/defer/skip/no-action decisions and durable baseline evidence, and make the complete observable parity matrix the coded prerequisite for later U5 promotion. Do not implement stable-release generation or promotion.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-5.8",
       "labels": [],
       "notes": [
-        "wo:execution-agent; review-gate: required; covered-unit-parts: U4 ce-pov + ce-explain vertical catch-up candidate-review path and complete parity gate; plan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md; remaining-unsliced-after-this: U5 verified catch-up generation/promotion, U6 restart activation/rollback/no-discovery, U7 legacy retirement/operator cleanup"
+        "wo:execution-agent; review-gate: required; covered-unit-parts: U4 ce-pov + ce-explain vertical catch-up candidate-review path and complete parity gate; plan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md; remaining-unsliced-after-this: U5 verified catch-up generation/promotion, U6 restart activation/rollback/no-discovery, U7 legacy retirement/operator cleanup",
+        "wo:implementation\nImplemented U4 catch-up candidate-review parity only. Extended the verified translator/manifest/provenance and private dispatcher with POV and explain resources; embedded the verified POV contract for every actionable catch-up candidate and conditional explain contract only for candidates explicitly marked tooTechnical; preserved graded verdicts, actor-visible recommendations, one-at-a-time adopt/defer/skip/no-action instructions, completion-manifest validation, and durable baseline evidence. Added a fail-closed exact nine-row/six-field U4 parity prerequisite and missing/mutated/authority tests. Stable-release generation/promotion remains out of scope.\nFiles changed: extensions/private-workflows/explain.md; extensions/private-workflows/manifest.json; extensions/private-workflows/pov.md; extensions/private-workflows/provenance.json; extensions/work-compound-inventory.json; extensions/work-models.js; extensions/work-private-workflows.js; scripts/generate-work-private-workflows.mjs; scripts/test-work-goal.mjs; scripts/test-work-private-workflows.mjs.",
+        "wo:verify-check\nLSP/syntax diagnostics: editor JavaScript/TypeScript diagnostics reported clean on each edited source; node --check extensions/work-models.js && node --check extensions/work-private-workflows.js && node --check scripts/generate-work-private-workflows.mjs && node --check scripts/test-work-private-workflows.mjs && node --check scripts/test-work-goal.mjs => PASS (exit 0, no output).\nAcceptance: node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs => PASS; private workflow output ended \"PASS test-work-private-workflows (40 offline checks) zeroSurface=true\" and goal output ended \"ok - work-goal helpers\". Coverage includes verified POV/explain dispatch, conditional explain contract, complete parity rows, unknown authorities, missing/mutated resources, incomplete parity, byte-identical translation, provenance, zero ordinary CE/private surface, one-at-a-time decisions, all adopted/deferred/skipped/no-action manifest states, and durable baseline completion.\nResidual risks: candidate technicality remains an explicit model-recorded tooTechnical classification governed by the private playbook; stable-release generation/promotion is intentionally deferred to U5. No staged files: git diff --cached --name-only returned empty after verification.",
+        "wo:review-scope [\"extensions/private-workflows/manifest.json\",\"extensions/private-workflows/provenance.json\",\"extensions/work-compound-inventory.json\",\"extensions/work-models.js\",\"extensions/work-private-workflows.js\",\"scripts/generate-work-private-workflows.mjs\",\"scripts/test-work-goal.mjs\",\"scripts/test-work-private-workflows.mjs\",\"extensions/private-workflows/explain.md\",\"extensions/private-workflows/pov.md\"]",
+        "wo:review PASS - U4 catch-up POV/explain dispatch verified: node scripts/test-work-private-workflows.mjs (40 checks, zeroSurface=true), node scripts/test-work-goal.mjs, node scripts/test-work-compound-source.mjs all PASS; recomputed manifest/provenance/translator and per-workflow closure sha256 (pov 5159f73, explain 581041c) all reproduce; scanRepositoryCallSites with policy.workflows matches updated expectedMentions (zero ce-pov/ce-explain mentions in work-models.js and test-work-goal.mjs); parity gate fails closed on incomplete rows; no staged files.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs\nOutput: rce rejection\nok 34 - unverified generation rejection\nok 35 - incomplete U4 parity row rejection\nok 36 - two offline translations from one verified closure are byte-identical\nok 37 - nine-workflow release, path, hash, license, and translator provenance\nok 38 - mutated verified closure rejection\nok 39 - unverified source generation rejection\nok 40 - clean package runtime exposes zero private or CE surface\nPASS test-work-private-workflows (40 offline checks) zeroSurface=true\nok - work-goal helpers"
       ],
       "parentId": "work-5",
-      "status": "open",
+      "status": "closed",
       "title": "Dispatch private catch-up candidate review",
       "type": "task",
-      "updatedAt": "2026-08-03T16:56:04.947Z"
+      "updatedAt": "2026-08-03T22:09:58.347Z"
     }
   },
   "metadata": {
@@ -5448,7 +5457,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-03T21:55:57.345Z"
+    "updatedAt": "2026-08-03T22:09:58.348Z"
   },
   "schemaVersion": 1
 }

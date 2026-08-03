@@ -1006,13 +1006,21 @@ try {
 	const catchUpObjective = mod.buildWorkCatchUpObjective(catchUpState);
 	assert.match(catchUpObjective, /WO_CATCH_UP_V2/);
 	assert.match(catchUpObjective, /Catch-up review targets: \[\]/);
-	assert.match(catchUpObjective, /ce-pov for each actionable candidate/);
 	assert.match(
 		catchUpObjective,
-		/Use ce-explain only when a candidate is too technical/,
+		/VERIFIED PRIVATE CATCH-UP POV PLAYBOOK \(REQUIRED FOR EVERY ACTIONABLE CANDIDATE\)/,
 	);
+	assert.match(catchUpObjective, /Adopt, Trial, Hold, Reject, or Not-our-problem/);
+	assert.match(catchUpObjective, /actor-visible recommendation/);
+	assert.match(
+		catchUpObjective,
+		/VERIFIED PRIVATE CATCH-UP EXPLAIN PLAYBOOK \(CONDITIONAL: INTENTIONALLY TOO-TECHNICAL CANDIDATES ONLY\)/,
+	);
+	assert.match(catchUpObjective, /never invoke explain for any other candidate/);
 	assert.match(catchUpObjective, /allowComment=true/);
+	assert.match(catchUpObjective, /Rank viable candidates, then handle one at a time/);
 	assert.match(catchUpObjective, /Adopt now.*Defer.*Skip this release/);
+	assert.match(catchUpObjective, /record them as no-action/);
 	assert.match(catchUpObjective, /npm run verify:quiet/);
 	const injectedObjective = mod.buildWorkCatchUpObjective(
 		{
@@ -1080,6 +1088,28 @@ try {
 							status: "adopted",
 							rationale: "Removes compatibility code",
 							verification: "focused test passed",
+						},
+						{
+							version: "2.0.0",
+							title: "Defer the larger migration",
+							pov: "Trial",
+							status: "deferred",
+							rationale: "Needs a bounded follow-up",
+							workItemId: "work-2",
+						},
+						{
+							version: "2.0.0",
+							title: "Skip optional polish",
+							pov: "Hold",
+							status: "skipped",
+							rationale: "Actor skipped this release",
+						},
+						{
+							version: "2.0.0",
+							title: "Host-owned fix",
+							pov: "Not-our-problem",
+							status: "no-action",
+							rationale: "Inherited without a local change",
 						},
 					],
 				},
