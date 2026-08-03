@@ -8,14 +8,20 @@ const WORK_MODELS_CALLER = fileURLToPath(new URL("./work-models.js", import.meta
 const EVALUATION_CALLER = fileURLToPath(new URL("../scripts/workflow-evaluation.mjs", import.meta.url));
 const ALLOWLIST = new Map([
 	["brainstorm", "brainstorm.md"],
+	["browser", "browser.md"],
 	["debug", "debug.md"],
 	["learning", "learning.md"],
 	["plan", "plan.md"],
+	["review", "review.md"],
+	["simplify", "simplify.md"],
 ]);
 const AUTHORITIES = new Map([
 	["work-models:F7:brainstorm:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["brainstorm"]) }],
 	["work-models:debug:investigation:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["debug"]) }],
 	["work-models:finish:learning-capture:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["learning"]) }],
+	["work-models:finish:browser:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["browser"]) }],
+	["work-models:finish:review:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["review"]) }],
+	["work-models:finish:simplify:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["simplify"]) }],
 	["work-models:F7:plan:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["plan"]) }],
 	[
 		"workflow-evaluation:candidate-private-resource:v1",

@@ -216,6 +216,27 @@ const scenarioChildren = {
 			notes: "Review: PASS\nFiles: extensions/work-models.js",
 		},
 	],
+	finishUiMissingReview: [
+		{
+			id: "FIN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Unreviewed UI slice",
+			notes: "Verification: npm run verify passed\nFiles changed: src/components/App.tsx",
+		},
+	],
+	finishUiWaived: [
+		{
+			id: "FIN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Gated UI slice",
+			notes:
+				"wo:simplify NOOP\nwo:review PASS\nwo:browser WAIVED user approved evidence-only waiver\nVerification: npm run verify passed\nFiles changed: src/components/App.tsx",
+		},
+	],
 };
 
 export function assert(ok, message) {
@@ -355,6 +376,7 @@ function log(value) { appendFileSync(logPath, JSON.stringify({ tool: "git", args
 function dirtyLines() {
   if (state.gitCommitted) return [];
   if (dirty === "unknown" || dirty === "large") return [" M extensions/work-models.js"];
+  if (dirty === "large-ui") return [" M src/components/App.tsx"];
   if (dirty === "benign" || dirty === "instruction-substantive") return [" M AGENTS.md"];
   if (dirty === "staged-instruction") return ["M  AGENTS.md"];
   if (dirty === "untracked-instruction") return ["?? AGENTS.md"];
@@ -365,6 +387,7 @@ function dirtyLines() {
 if (args[0] === "diff" && args.includes("--numstat")) {
   if (dirty === "unknown") console.log("12\t3\textensions/work-models.js");
   if (dirty === "large") console.log("90\t40\textensions/work-models.js");
+  if (dirty === "large-ui") console.log("90\t40\tsrc/components/App.tsx");
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-only")) {
   if (state.gitStaged) console.log("extensions/work-models.js\\n.ce-workflow/work-items.json");
 } else if (args[0] === "diff") process.exit(dirty === "benign" ? 0 : 1);

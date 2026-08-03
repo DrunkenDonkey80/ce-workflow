@@ -12,16 +12,19 @@
     "extensions/private-workflows/manifest.json",
     "extensions/private-workflows/provenance.json",
     "extensions/private-workflows/brainstorm.md",
+    "extensions/private-workflows/browser.md",
     "extensions/private-workflows/debug.md",
     "extensions/private-workflows/learning.md",
     "extensions/private-workflows/plan.md",
+    "extensions/private-workflows/review.md",
+    "extensions/private-workflows/simplify.md",
     "scripts/generate-work-private-workflows.mjs",
     "scripts/test-work-private-workflows.mjs"
   ],
   "expectedMentions": {
     "agents/work-migrator.md": { "ce-plan": 1 },
     "extensions/work-catch-up-baseline.json": { "ce-explain": 2, "ce-pov": 1 },
-    "extensions/work-models.js": { "ce-code-review": 2, "ce-explain": 1, "ce-plan": 1, "ce-pov": 1, "ce-simplify-code": 1, "ce-test-browser": 1 },
+    "extensions/work-models.js": { "ce-explain": 1, "ce-plan": 1, "ce-pov": 1 },
     "scripts/test-work-fleet.mjs": { "ce-plan": 2 },
     "scripts/test-work-goal.mjs": { "ce-explain": 1, "ce-pov": 1 },
     "scripts/test-work-settings.mjs": { "ce-plan": 5 },
@@ -30,7 +33,7 @@
     "scripts/test-workflow-evaluation-rpc.mjs": { "ce-brainstorm": 1 },
     "scripts/test-workflow-evaluation-sentinel.mjs": { "ce-plan": 1 },
     "skills/work-orchestrator/SKILL.md": { "ce-plan": 1 },
-    "skills/work-orchestrator/references/full-policy.md": { "ce-brainstorm": 3, "ce-code-review": 1, "ce-plan": 6, "ce-simplify-code": 1 }
+    "skills/work-orchestrator/references/full-policy.md": { "ce-brainstorm": 3, "ce-plan": 6 }
   },
   "parityIndex": {
     "ce-brainstorm": { "trigger": "F7 Brainstorm and fallback brainstorm policy", "decisions": "interactive clarification and artifact verdict", "toolBoundary": "read/research and brainstorm artifact write", "artifacts": "linked brainstorm markdown or HTML", "failure": "stop without silently inventing requirements", "actorVisibleOutcome": "requirements artifact and work-item backlink" },

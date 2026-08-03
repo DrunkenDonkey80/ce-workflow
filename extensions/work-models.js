@@ -529,11 +529,11 @@ const WORK_ORCH_BOOLEANS = [
 	},
 	{
 		key: "simplifyBeforeReview",
-		label: "CE-simplify-code before review",
+		label: "Private simplification before review",
 	},
 	{
 		key: "browserTestsOnUiDiff",
-		label: "CE-test-browser when diff touches UI",
+		label: "Private browser checks when diff touches UI",
 	},
 ];
 const WORK_PERFORMANCE_FLAGS = [
@@ -601,7 +601,7 @@ const DIVERGENT_FRAMES = [
 const REVIEW_LEVEL_DESC = {
 	off: "no pre-commit review (low profile)",
 	light: "one work-reviewer pass on the scoped diff (medium/high)",
-	full: "full ce-code-review skill on the slice diff (max)",
+	full: "verified private scoped review on the slice diff (max)",
 };
 const SUBMENU_ARROW = "›";
 const BACKGROUND_VERIFIER_OPERATIONS = VERIFIER_OPERATIONS;
@@ -4314,6 +4314,14 @@ function privateLearningPlaybookBlock() {
 	return `--- BEGIN VERIFIED PRIVATE LEARNING-CAPTURE PLAYBOOK ---\n${playbook}--- END VERIFIED PRIVATE LEARNING-CAPTURE PLAYBOOK ---`;
 }
 
+function privateFinishPlaybookBlock(workflow, label) {
+	const playbook = dispatchPrivateWorkflow(workflow, {
+		actionToken: `work-models:finish:${workflow}:v1`,
+		callerUrl: import.meta.url,
+	});
+	return `--- BEGIN VERIFIED PRIVATE ${label} PLAYBOOK ---\n${playbook}--- END VERIFIED PRIVATE ${label} PLAYBOOK ---`;
+}
+
 function cePlanSliceStep(
 	issue,
 	cwd,
@@ -4350,19 +4358,15 @@ function cePlanSliceStep(
 function codeReviewBeforeCommitStep(level) {
 	if (level === "light")
 		return "Pre-commit review gate (light): launch exactly one work-reviewer on the scoped slice diff. Batch its blocking findings into one work-fixer pass, then run at most one scoped re-review only for substantive production-code fixes. Never re-review mechanical fixes or launch a third review cycle.";
-	return "Pre-commit code-review gate: run one full ce-code-review cycle on the current slice diff. Batch blocking fixes, then run at most one targeted re-review only for substantive production-code changes; never re-review mechanical fixes or launch a third review cycle.";
+	return privateFinishPlaybookBlock("review", "SCOPED CODE-REVIEW");
 }
 
 function simplifyBeforeReviewStep() {
-	return [
-		"Simplify-before-review gate: after a real implementation diff is self-verified, inspect the scoped diff directly and remove obvious duplication, dead flexibility, or an unnecessary abstraction. Launch ce-simplify-code only when that direct pass finds a non-trivial cleanup requiring separate judgment; otherwise no-op. Keep behavior and scope.",
-	].join("\n");
+	return privateFinishPlaybookBlock("simplify", "SCOPED SIMPLIFICATION");
 }
 
 function browserTestsOnUiDiffStep() {
-	return [
-		`UI-diff browser-test gate: before committing, if the related dirty files touch a runnable web frontend surface (routes/pages/components/styles — e.g. *.tsx, *.jsx, *.vue, *.svelte, *.html, *.css, *.scss under app/, src/app/, pages/, routes/, components/, views/), run the ce-test-browser skill on the affected pages and resolve blocking failures (or record an evidence-only user waiver) before commit. Skip when the diff is backend/CLI/docs-only or the project has no runnable web frontend.`,
-	].join("\n");
+	return privateFinishPlaybookBlock("browser", "AFFECTED-UI BROWSER");
 }
 
 function titleCase(value) {
@@ -7923,8 +7927,20 @@ function planResumeAction(state, cwd, options = {}) {
 		)
 			return missingReviewScope();
 		if (activeImplementation.verificationReady) {
+			const finishSettings = workOrchSettings(cwd);
+			if (
+				finishSettings.codeReviewBeforeCommit === "full" &&
+				!isSmallDiff(cwd, activeImplementation.changedPaths)
+			)
+				return {
+					...routed,
+					action: "finish-ready",
+					message:
+						"Verified non-trivial implementation requires the coded private finish pipeline.",
+					suggestedCommands: [`/work-finish ${activeImplementation.id}`],
+				};
 			const reviewAll =
-				workOrchSettings(cwd).reviewPolicy === "review-all" &&
+				finishSettings.reviewPolicy === "review-all" &&
 				hasProductionDiff(activeImplementation.changedPaths);
 			if (
 				reviewAll ||
@@ -11202,9 +11218,6 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 			: [];
 	const settings = cwd ? workOrchSettings(cwd) : null;
 	const advisorLines = settings?.advisorVerifyTask ? [advisorVerifyStep()] : [];
-	const simplifyLines = settings?.simplifyBeforeReview
-		? [simplifyBeforeReviewStep()]
-		: [];
 	return [
 		`Use the work-orchestrator skill in mode: ${mode} with this precomputed extension state.`,
 		...workflowPromptMetadata(),
@@ -11230,7 +11243,6 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 			? `Review scope default: current work item ${selected.id} and its diff/verification evidence; do not run broad whole-repo review unless this work item explicitly requires it.`
 			: "Review scope default: current diff for this roadmap; do not run broad whole-repo review unless the action explicitly requires it.",
 		...plannerLines,
-		...simplifyLines,
 		...advisorLines,
 		implementationScopeLine(state),
 		evidenceOnlyImplementationLine(state),
@@ -14638,6 +14650,13 @@ function hasVerificationEvidence(issue) {
 	);
 }
 
+function hasFinishGateEvidence(issue, gate) {
+	return new RegExp(
+		`\\bwo:${gate}\\s+(?:PASS|NOOP${gate === "browser" ? "|WAIVED" : ""})\\b`,
+		"i",
+	).test(notesOf(issue));
+}
+
 function gitDiffChangeCount(cwd, files) {
 	if (!files.length) return Number.POSITIVE_INFINITY;
 	const output = run(cwd, "git", ["diff", "--numstat", "--", ...files]);
@@ -14719,7 +14738,7 @@ function executeWorkFinishStateUnlocked(cwd, state, currentModel) {
 		return errorState(
 			"finish-gates-required",
 			"Pre-commit gates are still required before coded commit/close.",
-			state,
+			{ ...state, ok: false, action: "finish-stop" },
 		);
 	let headBefore;
 	let canonicalBefore;
@@ -14865,14 +14884,22 @@ function buildWorkFinishState(cwd, args = "") {
 			hasReviewPass(workItem) ||
 			mechanicalFixAccepted(workItem) ||
 			residualFixAccepted(workItem);
+		const gates = workOrchSettings(cwd);
+		const nonTrivial = !isSmallDiff(cwd, related);
 		const reviewAll =
-			workOrchSettings(cwd).reviewPolicy === "review-all" &&
-			hasProductionDiff(related);
+			gates.reviewPolicy === "review-all" && hasProductionDiff(related);
+		const reviewLevel = gates.codeReviewBeforeCommit;
+		const reviewBeforeCommit =
+			!acceptedReview &&
+			(!reviewAll || reviewLevel === "full") &&
+			reviewLevel &&
+			reviewLevel !== "off" &&
+			nonTrivial;
 		const codedReview =
-			!acceptedReview && verified && !reviewAll && isSmallDiff(cwd, related);
+			!acceptedReview && verified && !reviewAll && !nonTrivial;
 		if (isBlockedIssue(workItem) || debugNeededId(workItem))
 			return stop("blocked", "Selected WorkItem is blocked/debug-needed.");
-		if (!acceptedReview && !codedReview)
+		if (!acceptedReview && !codedReview && !reviewBeforeCommit)
 			return stop("missing-review", "PASS review evidence is missing.");
 		if (!verified)
 			return stop("missing-verification", "Verification evidence is missing.");
@@ -14887,16 +14914,16 @@ function buildWorkFinishState(cwd, args = "") {
 				"Dirty files are not all tied to the selected WorkItem notes.",
 				{ relatedFiles: related },
 			);
-		const gates = workOrchSettings(cwd);
-		const reviewLevel = gates.codeReviewBeforeCommit;
-		const reviewBeforeCommit =
-			!acceptedReview &&
-			reviewLevel &&
-			reviewLevel !== "off" &&
-			!isSmallDiff(cwd, related);
 		const preCommitSteps = [
+			gates.simplifyBeforeReview &&
+			nonTrivial &&
+			!hasFinishGateEvidence(workItem, "simplify")
+				? simplifyBeforeReviewStep()
+				: "",
 			reviewBeforeCommit ? codeReviewBeforeCommitStep(reviewLevel) : "",
-			gates.browserTestsOnUiDiff && related.some(isUiPath)
+			gates.browserTestsOnUiDiff &&
+			related.some(isUiPath) &&
+			!hasFinishGateEvidence(workItem, "browser")
 				? browserTestsOnUiDiffStep()
 				: "",
 		].filter(Boolean);
@@ -14924,7 +14951,7 @@ function buildWorkFinishState(cwd, args = "") {
 						`Commit message: ${idOf(workItem)}: ${titleOf(workItem)}`,
 						`Files: ${related.join(", ")}`,
 						...preCommitSteps,
-						"After the gates pass (or explicit user waivers), commit with the seed message and close the WorkItem; do not rediscover the target.",
+						"Run these gates in the coded order shown. Append each playbook's exact durable PASS/NOOP/WAIVED or review verdict through the native helper, then rerun /work-finish for this WorkItem. Do not stage, commit, or close directly; a failed or incomplete required gate must remain blocked.",
 					].join("\n")
 				: undefined,
 			warnings: git.warnings,

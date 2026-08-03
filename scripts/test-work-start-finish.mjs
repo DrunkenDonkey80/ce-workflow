@@ -18,6 +18,7 @@ const {
 	buildWorkMasterState,
 	buildWorkMedState,
 	buildWorkPlanState,
+	buildWorkResumeState,
 	buildWorkMigrateState,
 	buildWorkSmallState,
 	buildWorkTelemetryState,
@@ -548,7 +549,88 @@ try {
 	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
 		!state.ok && state.reason === "missing-review",
-		"finish requires PASS review for large diffs",
+		"finish requires PASS review for large diffs when configured review is off",
+	);
+
+	writeFileSync(
+		path.join(finishCwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workOrchestrator: {
+				profile: "max",
+				reviewPolicy: "review-all",
+				simplifyBeforeReview: true,
+				browserTestsOnUiDiff: true,
+				codeReviewBeforeCommit: "full",
+			},
+		}),
+	);
+	fixture.reset("finishReady", "unknown");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		state.ok && !state.handoffPrompt,
+		"max-profile small backend diff preserves the coded no-op path",
+	);
+
+	fixture.reset("finishMissingReview", "large");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		state.ok &&
+			state.action === "commit-ready" &&
+			state.handoffPrompt?.includes(
+				"BEGIN VERIFIED PRIVATE SCOPED CODE-REVIEW PLAYBOOK",
+			),
+		"max-profile Review All finish dispatches the private review playbook instead of stopping for missing review",
+	);
+
+	fixture.reset("finishUiMissingReview", "large-ui");
+	state = buildWorkResumeState(finishCwd, "E-1");
+	assert(
+		state.action === "finish-ready" &&
+			state.message.includes("coded private finish pipeline"),
+		"max-profile resume routes verified non-trivial work to the coded finish pipeline before review",
+	);
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	const simplifyAt = state.handoffPrompt?.indexOf(
+		"BEGIN VERIFIED PRIVATE SCOPED SIMPLIFICATION PLAYBOOK",
+	);
+	const reviewAt = state.handoffPrompt?.indexOf(
+		"BEGIN VERIFIED PRIVATE SCOPED CODE-REVIEW PLAYBOOK",
+	);
+	const browserAt = state.handoffPrompt?.indexOf(
+		"BEGIN VERIFIED PRIVATE AFFECTED-UI BROWSER PLAYBOOK",
+	);
+	assert(
+		state.ok &&
+			state.action === "commit-ready" &&
+			simplifyAt >= 0 &&
+			simplifyAt < reviewAt &&
+			reviewAt < browserAt,
+		"max-profile non-trivial UI finish routes private simplify, review, and browser resources in coded order",
+	);
+	assert(
+		state.handoffPrompt.includes("wo:simplify NOOP") &&
+			state.handoffPrompt.includes("wo:review PASS") &&
+			state.handoffPrompt.includes("wo:browser WAIVED") &&
+			state.handoffPrompt.includes("at most one targeted re-review") &&
+			state.handoffPrompt.includes("smallest runnable affected pages") &&
+			!state.handoffPrompt.includes("run the ce-") &&
+			!state.handoffPrompt.includes("skill on the affected"),
+		"finish pipeline preserves distinct no-op, bounded-review, affected-UI, and waiver contracts without imported prompts",
+	);
+	const blockedFinish = executeWorkFinishState(finishCwd, state);
+	assert(
+		!blockedFinish.ok &&
+			blockedFinish.reason === "finish-gates-required" &&
+			fixture.store().items["FIN-1"].status === "in_progress" &&
+			!fixture.logs().some((entry) => entry.op === "commit"),
+		"required private gate handoff blocks coded commit and close until durable evidence exists",
+	);
+
+	fixture.reset("finishUiWaived", "large-ui");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		state.ok && !state.handoffPrompt,
+		"durable simplify no-op, review PASS, and explicit browser waiver satisfy the gated finish path",
 	);
 
 	fixture.reset("finishMissingVerification", "unknown");

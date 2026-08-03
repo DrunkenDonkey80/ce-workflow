@@ -462,9 +462,9 @@ Responsibilities:
 - **advisor usage for slice plans** — profile-driven 3-state: none (low), first configured advisor (medium), or all configured advisors in parallel (high/max).
 - **slice plan before work** — code writes a compact `wo:slice-plan` note for routine slices and continues without a planning boundary. Only genuinely ambiguous, architectural, or explicit big work launches planner/ce-plan.
 - **advisor verifies task vs plan** — use `work-advisor` only when plan-to-diff alignment remains ambiguous after the coded acceptance/evidence check.
-- **simplify before review** — use `ce-simplify-code` only when a non-trivial risky diff would materially benefit; routine bounded changes stay inline.
-- **browser tests on UI diff** — at finish, run browser verification when UI acceptance requires it; backend/CLI/docs-only diffs skip it.
-- **pre-commit review** — profile-driven 3-state: off (low), one `work-reviewer` pass on the scoped diff (medium/high), or full `ce-code-review` (max). Skips small diffs automatically.
+- **simplify before review** — the coded finish gate loads the verified private simplification playbook only for non-trivial diffs; its durable PASS/NOOP evidence is required before review.
+- **browser tests on UI diff** — the coded finish gate selects affected UI paths and loads the verified private browser playbook; PASS/NOOP or an explicit evidence-only user waiver is required, while backend/CLI/docs-only diffs skip it.
+- **pre-commit review** — profile-driven 3-state: off (low), one `work-reviewer` pass on the scoped diff (medium/high), or the verified private scoped-review playbook (max). Review stays bounded and skips small diffs automatically.
 
 Gates are orthogonal to role effort. Flip any of them live without changing models.
 

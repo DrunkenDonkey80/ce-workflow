@@ -14,13 +14,17 @@
   },
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "e0581e869826ca10074b3c3951db0465c785526652c12209eb993456aea1c7e8",
-    "version": 3,
+    "sha256": "797916a6efc420d30423886b3c723cb32fe299e6f1d7cd935036841b5d25da93",
+    "version": 4,
     "rules": [
       "verify-complete-u1-brainstorm-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-one-question-clarification-and-requirements-only-scope",
       "adapt-output-to-work-brainstorm-markdown-link-contract",
+      "verify-complete-u1-test-browser-closure",
+      "remove-pi-discovery-frontmatter-and-executable-helpers",
+      "preserve-affected-ui-selection-browser-evidence-and-waiver",
+      "adapt-output-to-work-finish-browser-evidence-contract",
       "verify-complete-u1-debug-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-reproduce-root-cause-fix-verify-and-blocker-evidence",
@@ -32,10 +36,18 @@
       "verify-complete-u1-plan-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-clarification-requirements-self-audit-and-open-question-gate",
-      "adapt-output-to-work-plan-master-and-slice-handoff-contracts"
+      "adapt-output-to-work-plan-master-and-slice-handoff-contracts",
+      "verify-complete-u1-code-review-closure",
+      "remove-pi-discovery-frontmatter-and-executable-helpers",
+      "preserve-scoped-findings-read-only-review-and-bounded-rereview",
+      "adapt-output-to-work-finish-review-evidence-contract",
+      "verify-complete-u1-simplify-code-closure",
+      "remove-pi-discovery-frontmatter-and-executable-helpers",
+      "preserve-equivalent-scoped-simplification-and-noop",
+      "adapt-output-to-work-finish-simplify-evidence-contract"
     ]
   },
-  "sourceClosureSha256": "9881ec416ad69f4bb9dcb0af465cf67b3e4b45d62c0b57f76fa480ac85501acc",
+  "sourceClosureSha256": "6addaff2df0c915975dbda24f3e72a753146c7d0fbe1d73937e9e3896ef5684a",
   "sources": [
     {
       "path": "skills/ce-brainstorm/SKILL.md",
@@ -131,6 +143,21 @@
       "path": "skills/ce-brainstorm/scripts/visual-probe-server.js",
       "bytes": 12949,
       "sha256": "5c48f3ee2b12b28cedb1ecbbb40a738c240272b7124b9289a488d48864282007"
+    },
+    {
+      "path": "skills/ce-test-browser/SKILL.md",
+      "bytes": 10574,
+      "sha256": "40248f09e5cb80f2475dba2ffbe6ed2fdef4cb0f99c190ea1acea867be68cf88"
+    },
+    {
+      "path": "skills/ce-test-browser/references/agent-browser-driver.md",
+      "bytes": 1751,
+      "sha256": "3d4c304fe534530b9b8384ef231d3fa2687a6f72b426374fa25ec0655691b65d"
+    },
+    {
+      "path": "skills/ce-test-browser/references/pipeline-orchestration.md",
+      "bytes": 2882,
+      "sha256": "560ae424670580f87f7b91eda5d4b7ce631365b7d203f53f04fab55b0f726626"
     },
     {
       "path": "skills/ce-debug/SKILL.md",
@@ -411,6 +438,201 @@
       "path": "skills/ce-plan/scripts/peer-job-runner.py",
       "bytes": 80098,
       "sha256": "e26d03497b5c12dcec784578ef9ec7c21393b4757d77850dbc38d6fe715e25cd"
+    },
+    {
+      "path": "skills/ce-code-review/SKILL.md",
+      "bytes": 56188,
+      "sha256": "ac132dd6ba3ab036611b8bea6b3f7499660fd75974a50302c7d01cf279b6d2b5"
+    },
+    {
+      "path": "skills/ce-code-review/references/action-class-rubric.md",
+      "bytes": 1523,
+      "sha256": "0d6144704728def1fc3a1c2fbd4713a96e76b2219440bd31fb2e939527bfc4d3"
+    },
+    {
+      "path": "skills/ce-code-review/references/cross-model-eval.md",
+      "bytes": 4385,
+      "sha256": "9ac3000f3e0e62f97ee03c7a7fad684ffda7e4a6a586d9490cbb7a35c53d21ed"
+    },
+    {
+      "path": "skills/ce-code-review/references/cross-model-review.md",
+      "bytes": 24550,
+      "sha256": "31a0b8280aa8d4abd24037d4bc6d55e0c611c0c66513feae08883712404c19d1"
+    },
+    {
+      "path": "skills/ce-code-review/references/diff-scope.md",
+      "bytes": 4817,
+      "sha256": "53901e2be40f3c5b499e253f5d73f1aff6f27b54ffe7fac32d780ddb7775ed0f"
+    },
+    {
+      "path": "skills/ce-code-review/references/dispatch-reviewers.md",
+      "bytes": 18097,
+      "sha256": "0f19558e1befd2162555fa00061581bd14af226dc4402f9ba73d75870813aa87"
+    },
+    {
+      "path": "skills/ce-code-review/references/findings-schema.json",
+      "bytes": 6501,
+      "sha256": "5a682c21bdb90a718496b1751512cdc315132e221a881047bfd5d4634774b99e"
+    },
+    {
+      "path": "skills/ce-code-review/references/finish-review.md",
+      "bytes": 34810,
+      "sha256": "5be78f0122819d51d474c6f9a1c5c9fac86fc006d797c45f865fdfc33c5fd7e0"
+    },
+    {
+      "path": "skills/ce-code-review/references/persona-catalog.md",
+      "bytes": 7336,
+      "sha256": "fa11675f78c8e881ee6ebd924796066f421ae88b0b89cd542ea6eae5f7283d25"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/adversarial-reviewer.md",
+      "bytes": 10478,
+      "sha256": "796f155b43995aabf6391c211264958504832f8c40112e343b8ba1a49ce1927a"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/agent-native-reviewer.md",
+      "bytes": 9552,
+      "sha256": "63ce9c1fd78c1816be92f0636371958e5ab3d17a9c684f50921463d3da4d1c8e"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/api-contract-reviewer.md",
+      "bytes": 3803,
+      "sha256": "309f5c8b193ba06fa88f6ba8027c47f5fcf357b2dab1a158be43c693ccac68f6"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/correctness-reviewer.md",
+      "bytes": 5769,
+      "sha256": "a46c6bf26e8ac82503df9be4e580dc9d7e16fd0cb156608a16a1e03f9fdee384"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/data-migration-reviewer.md",
+      "bytes": 5111,
+      "sha256": "21ce6cf65c482925532e3632ff69a64aaf16e2cdb77df7eb54c65aa9cd986692"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/deployment-verification-agent.md",
+      "bytes": 5206,
+      "sha256": "fc883ed55495f1c0553634dfb2b3dd26b16fca7135230aa6280788964b3f45ba"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/julik-frontend-races-reviewer.md",
+      "bytes": 3729,
+      "sha256": "ddd99200b31c0c143449075795165f552627dbaf3a416fe5c5ceb0b38ad060b8"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/learnings-researcher.md",
+      "bytes": 16894,
+      "sha256": "ffb875d910ca88e2b52b6dccf8f712e28210f3b2b762980ebca1a747cc2a328c"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/maintainability-reviewer.md",
+      "bytes": 6097,
+      "sha256": "772a3d80c2a14641b5f0f8bbfc057ef5eb17de90d7e8d0bd3ad065c0afd02519"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/performance-reviewer.md",
+      "bytes": 3599,
+      "sha256": "cbf35d3e6bccf5051ec5ac7493a1c53b61352f8f4cc81e8bc27219ba7b9e5753"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/previous-comments-reviewer.md",
+      "bytes": 3476,
+      "sha256": "953a489989b1e836a5d21a699b5a637ed75e4c8d4b4a490c560c49f48230c67c"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/project-standards-reviewer.md",
+      "bytes": 6898,
+      "sha256": "27f4f62c43a112df8f2d3e5587ec8cc4ce2e892f31a339145abd19b91b26e7eb"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/reliability-reviewer.md",
+      "bytes": 3981,
+      "sha256": "34367e7590fd359b8219cb31ee86c4e82d59557ac9876aaf7af10abedef022ac"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/security-reviewer.md",
+      "bytes": 3804,
+      "sha256": "f542bf75b230cdf9f4f3556d11addf3aca6be22996e8d5f2745c59d36260a83a"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/swift-ios-reviewer.md",
+      "bytes": 10878,
+      "sha256": "fb9e76dc803676655d67b7a91ae134be25a38326a5de0219d74205fe7b947abe"
+    },
+    {
+      "path": "skills/ce-code-review/references/personas/testing-reviewer.md",
+      "bytes": 5062,
+      "sha256": "50a2df53c1a698ae7f8ee093e9bd21691085f0a970c5a37445e3d94c350b4705"
+    },
+    {
+      "path": "skills/ce-code-review/references/review-output-template.md",
+      "bytes": 14171,
+      "sha256": "84fa283c35904dc780e1ab3d958b2248932a968d225c5f3b540d6a59ace4eb23"
+    },
+    {
+      "path": "skills/ce-code-review/references/subagent-template.md",
+      "bytes": 24298,
+      "sha256": "1d5a9ceb5b70a08432fbc6a39e598d5f988bea0dfa64d1cbbcfb7be631748091"
+    },
+    {
+      "path": "skills/ce-code-review/references/validator-batch-template.md",
+      "bytes": 1567,
+      "sha256": "1a43b450602383ad045f4acd79fe02ebe125d39a42b5c5388a316ccdf5dcb300"
+    },
+    {
+      "path": "skills/ce-code-review/references/validator-template.md",
+      "bytes": 5859,
+      "sha256": "9e0f325d16bec905629643c8cea01259310ed8b9d09c7f55bc80e4cbd9fa7df6"
+    },
+    {
+      "path": "skills/ce-code-review/scripts/context.mjs",
+      "bytes": 4021,
+      "sha256": "e4b804742641cf2a5c6e6ae96a4ae66df3bde1fc4919c8b3f1829ef5020e9e27"
+    },
+    {
+      "path": "skills/ce-code-review/scripts/cross-model-adversarial-review.sh",
+      "bytes": 44413,
+      "sha256": "71cc88ef6e73c6abd03c6a20b8b3582479f3df671ad9b730a933d6cad9508168"
+    },
+    {
+      "path": "skills/ce-code-review/scripts/findings-mechanics.py",
+      "bytes": 8933,
+      "sha256": "cce42f7f7f87d78bb4a5d3dcfc8a575b5f769beffdfa58af13eecd56cacde459"
+    },
+    {
+      "path": "skills/ce-code-review/scripts/peer-job-runner.py",
+      "bytes": 80098,
+      "sha256": "e26d03497b5c12dcec784578ef9ec7c21393b4757d77850dbc38d6fe715e25cd"
+    },
+    {
+      "path": "skills/ce-code-review/scripts/review-scope.py",
+      "bytes": 7014,
+      "sha256": "571f1a24d794da0f59a36f9b3e912e3f311e11be74bee673467ab037b1697666"
+    },
+    {
+      "path": "skills/ce-simplify-code/SKILL.md",
+      "bytes": 10151,
+      "sha256": "e49878232970edbb9714192db2ab97e83573f6d97ba51c6af256cf519b55e554"
+    },
+    {
+      "path": "skills/ce-simplify-code/references/personas/code-quality-reviewer.md",
+      "bytes": 3906,
+      "sha256": "af6114f81497b3ad021c2f9587412c995412368f4a494f42d9c7f4b8d72e5663"
+    },
+    {
+      "path": "skills/ce-simplify-code/references/personas/code-reuse-reviewer.md",
+      "bytes": 2650,
+      "sha256": "b452ca92597cc1d0cf9846ea586b94865b3e00ce84a258450bceabb1c71559a8"
+    },
+    {
+      "path": "skills/ce-simplify-code/references/personas/efficiency-reviewer.md",
+      "bytes": 1434,
+      "sha256": "c4afb82cee06ac88c7332dd8f42e8f483ec1da2b83bbe398645919c0010e849d"
+    },
+    {
+      "path": "skills/ce-simplify-code/scripts/context.mjs",
+      "bytes": 4021,
+      "sha256": "e4b804742641cf2a5c6e6ae96a4ae66df3bde1fc4919c8b3f1829ef5020e9e27"
     }
   ]
 }

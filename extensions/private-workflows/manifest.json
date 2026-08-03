@@ -3,17 +3,21 @@
   "verified": true,
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "e0581e869826ca10074b3c3951db0465c785526652c12209eb993456aea1c7e8",
-    "version": 3
+    "sha256": "797916a6efc420d30423886b3c723cb32fe299e6f1d7cd935036841b5d25da93",
+    "version": 4
   },
   "provenance": {
     "path": "provenance.json",
-    "sha256": "20d52f5ff527b3de437822d7a7d39e48adc6e6e807cf3cbf1f23392c94d913b2"
+    "sha256": "d17e82994938b7899b793c67a71abed6085d5f58e3b89b6c4b21455b80621713"
   },
   "workflows": {
     "brainstorm": {
       "path": "brainstorm.md",
       "sha256": "cc261e4013ddaf060945b414d74f67b7f8c1a1062c806aded1b5684ff36d30eb"
+    },
+    "browser": {
+      "path": "browser.md",
+      "sha256": "e6820ea334fcd6bb8a9b21f008a7dbac6f0dca79028a280ddd864c1d958a4679"
     },
     "debug": {
       "path": "debug.md",
@@ -26,7 +30,15 @@
     "plan": {
       "path": "plan.md",
       "sha256": "dd0ca78ff9c776025790d910d1dd26b5b2a032f552aa26f2d5d37de6895961f1"
+    },
+    "review": {
+      "path": "review.md",
+      "sha256": "1b6ae5ba014552254851d6b05dea46f2d9240639136a309dbe4700fc4a6e9fc6"
+    },
+    "simplify": {
+      "path": "simplify.md",
+      "sha256": "63bf9bb826b2852b9a88bb91fb283bdac7d575f5d8cea48d56a99115f02e2140"
     }
   },
-  "generationSha256": "54c9990c74c1564935e80c538fc62077a6e94d84420fcfd61fac4fc612dd5273"
+  "generationSha256": "51d3fbd780991e22be082326ea07bd6c54ee3e9296ce449abf8e3c13b43fb9da"
 }

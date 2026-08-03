@@ -1,0 +1,15 @@
+# Private Scoped Simplification Playbook
+
+<!-- generated; source-closure-sha256: fffdbbb71f67a8ee9c1b3b6bf8c341ab9affc0f125cbb0122f367430debcc635 -->
+
+## Boundary and selection
+
+Run only on the caller-supplied non-trivial implementation diff after self-verification and before review. Inspect the scoped diff for concrete duplication, dead flexibility, unnecessary abstraction, avoidable indirection, or code that can be made plainly smaller without changing behavior, public contracts, error handling, validation, security, or accessibility. Do not redesign or widen scope.
+
+## Equivalent change or no-op
+
+If no material simplification is justified, do not churn the diff; append `wo:simplify NOOP`. Otherwise make the smallest equivalent cleanup, rerun the focused verification affected by the edit, and append `wo:simplify PASS` with the command and result. Do not stage, commit, close the work item, or perform correctness review or browser testing here.
+
+## Failure
+
+If equivalence or verification is uncertain, restore or leave the last verified behavior unchanged, record the exact failure evidence, and stop. Missing PASS/NOOP evidence blocks the coded review/commit path.

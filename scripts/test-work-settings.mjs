@@ -544,8 +544,8 @@ try {
 		"ce-plan slice depth: Lightweight",
 		"pre-commit review:",
 		"implementation: configured Work model (isolated work-worker)",
-		"CE-simplify-code before review",
-		"CE-test-browser when diff touches UI",
+		"Private simplification before review",
+		"Private browser checks when diff touches UI",
 		"Performance tweaks (global)",
 		"off prepare next candidate",
 		"sequential verification shards",
@@ -862,14 +862,14 @@ try {
 		ui: customUi([
 			{ expectText: "Settings: Global", key: "\t" },
 			{
-				target: "CE-test-browser when diff touches UI",
+				target: "Private browser checks when diff touches UI",
 				key: " ",
 				capture: (lines) => {
 					enabledRender = lines.join("\n");
 				},
 			},
 			{
-				expectInitial: "CE-test-browser when diff touches UI",
+				expectInitial: "Private browser checks when diff touches UI",
 				target: "Coded task-vs-plan checklist",
 				key: "enter",
 				capture: (lines) => {

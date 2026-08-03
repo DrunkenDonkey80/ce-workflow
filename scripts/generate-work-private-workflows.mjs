@@ -8,11 +8,14 @@ import {
 	sha256,
 } from "../extensions/work-compound-source.js";
 
-export const TRANSLATOR_VERSION = 3;
+export const TRANSLATOR_VERSION = 4;
 export const BRAINSTORM_SOURCE = "skills/ce-brainstorm/SKILL.md";
 export const PLAN_SOURCE = "skills/ce-plan/SKILL.md";
 export const DEBUG_SOURCE = "skills/ce-debug/SKILL.md";
 export const LEARNING_SOURCE = "skills/ce-compound/SKILL.md";
+export const REVIEW_SOURCE = "skills/ce-code-review/SKILL.md";
+export const SIMPLIFY_SOURCE = "skills/ce-simplify-code/SKILL.md";
+export const BROWSER_SOURCE = "skills/ce-test-browser/SKILL.md";
 const TRANSLATOR_PATH = "scripts/generate-work-private-workflows.mjs";
 const WORKFLOW_RULES = {
 	brainstorm: [
@@ -39,12 +42,33 @@ const WORKFLOW_RULES = {
 		"preserve-clarification-requirements-self-audit-and-open-question-gate",
 		"adapt-output-to-work-plan-master-and-slice-handoff-contracts",
 	],
+	review: [
+		"verify-complete-u1-code-review-closure",
+		"remove-pi-discovery-frontmatter-and-executable-helpers",
+		"preserve-scoped-findings-read-only-review-and-bounded-rereview",
+		"adapt-output-to-work-finish-review-evidence-contract",
+	],
+	simplify: [
+		"verify-complete-u1-simplify-code-closure",
+		"remove-pi-discovery-frontmatter-and-executable-helpers",
+		"preserve-equivalent-scoped-simplification-and-noop",
+		"adapt-output-to-work-finish-simplify-evidence-contract",
+	],
+	browser: [
+		"verify-complete-u1-test-browser-closure",
+		"remove-pi-discovery-frontmatter-and-executable-helpers",
+		"preserve-affected-ui-selection-browser-evidence-and-waiver",
+		"adapt-output-to-work-finish-browser-evidence-contract",
+	],
 };
 const WORKFLOW_SOURCES = {
 	brainstorm: { closure: "ce-brainstorm", source: BRAINSTORM_SOURCE },
+	browser: { closure: "ce-test-browser", source: BROWSER_SOURCE },
 	debug: { closure: "ce-debug", source: DEBUG_SOURCE },
 	learning: { closure: "ce-compound", source: LEARNING_SOURCE },
 	plan: { closure: "ce-plan", source: PLAN_SOURCE },
+	review: { closure: "ce-code-review", source: REVIEW_SOURCE },
+	simplify: { closure: "ce-simplify-code", source: SIMPLIFY_SOURCE },
 };
 
 function json(value) {
@@ -106,11 +130,26 @@ function learningPlaybook(sourceClosureSha256) {
 	return `# Private Learning-Capture Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Eligibility and skip gate\n\nRun only after a verified root-cause fix or eligible big-work completion. Capture a durable project-specific debugging, architecture, workflow, integration, or operational fact only when it is non-obvious and reusable. Skip routine implementation facts, unverified conclusions, secrets, transient incident data, and any learning key already recorded on the roadmap. Skipping is a successful gate outcome.\n\n## Destination and deduplication\n\nSearch existing project instructions, executable configuration, and \`docs/solutions/\` before writing. Update the existing canonical location instead of duplicating it. Put direct procedures in executable configuration or project instructions; put non-obvious rationale and troubleshooting in \`docs/solutions/\`. Keep the artifact scoped, searchable, and free of session-only narration.\n\n## Work-item key and handoff\n\nDerive one stable lowercase hyphenated key. Check roadmap notes for \`wo:learning:<key>=<artifact>\`; if present, skip capture. After creating or updating the durable artifact, append that exact marker through the caller-provided work helper so future gates deduplicate it, then commit the artifact and marker through the coded finish path before roadmap closure. Report the destination, key, whether content was created, updated, or skipped, and the caller's exact next action.\n`;
 }
 
+function reviewPlaybook(sourceClosureSha256) {
+	return `# Private Scoped Code-Review Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary\n\nReview only the caller-supplied work item, scoped dirty files, current diff, acceptance contract, and verification evidence. Review is read-only: do not edit, stage, commit, close work items, broaden to the whole repository, simplify code, or run browser acceptance.\n\n## Findings and bounded cycle\n\n1. Inspect the complete scoped diff and the smallest surrounding code needed to validate correctness, security, reliability, compatibility, tests, and project conventions. Apply only relevant specialist lenses; do not manufacture findings to fill categories.\n2. Report each actionable finding with severity, file and location, observed risk, and the smallest safe fix. Reject duplicates, speculation without a causal path, and pre-existing issues outside the slice.\n3. Run one initial review cycle. The caller batches blocking fixes into one fixer pass, then runs at most one targeted re-review only when those fixes materially changed production behavior. Skip re-review for tests, docs, formatting, traceability, or other mechanical fixes. Never launch a third review cycle.\n\n## Evidence and failure\n\nAppend exactly one durable \`wo:review PASS\` note when no blocking findings remain, or \`wo:review FAIL\` with the actionable findings when they do. A failed, unavailable, or incomplete required review blocks coded commit and close; do not claim PASS or substitute prose. Return the scoped verdict and the caller's exact next finish action.\n`;
+}
+
+function simplifyPlaybook(sourceClosureSha256) {
+	return `# Private Scoped Simplification Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary and selection\n\nRun only on the caller-supplied non-trivial implementation diff after self-verification and before review. Inspect the scoped diff for concrete duplication, dead flexibility, unnecessary abstraction, avoidable indirection, or code that can be made plainly smaller without changing behavior, public contracts, error handling, validation, security, or accessibility. Do not redesign or widen scope.\n\n## Equivalent change or no-op\n\nIf no material simplification is justified, do not churn the diff; append \`wo:simplify NOOP\`. Otherwise make the smallest equivalent cleanup, rerun the focused verification affected by the edit, and append \`wo:simplify PASS\` with the command and result. Do not stage, commit, close the work item, or perform correctness review or browser testing here.\n\n## Failure\n\nIf equivalence or verification is uncertain, restore or leave the last verified behavior unchanged, record the exact failure evidence, and stop. Missing PASS/NOOP evidence blocks the coded review/commit path.\n`;
+}
+
+function browserPlaybook(sourceClosureSha256) {
+	return `# Private Affected-UI Browser Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Affected UI selection\n\nUse only the caller-supplied UI diff and acceptance contract. Map changed routes, pages, components, views, templates, and styles to the smallest runnable affected pages and user flows. Do not test unrelated pages or infer backend-only coverage from a UI-looking filename. If the project has no runnable web frontend or the affected surface cannot execute, append \`wo:browser NOOP\` with the observed reason.\n\n## Browser verification\n\nStart the documented local app when safe, use the available browser driver, and exercise the smallest non-destructive path for each affected flow, including the relevant failure state and console/network evidence. Preserve user data and restore any toggle or value changed by the check. Append \`wo:browser PASS\` with affected pages, commands/tools, and concise observed evidence only when every required check passes.\n\n## Waiver and failure\n\nOnly an explicit evidence-only user waiver may replace runnable required evidence; append \`wo:browser WAIVED\` with the user's reason. Tool unavailability, a blocking UI failure, or incomplete evidence is not an implicit waiver: record the exact failure and stop. Without PASS, NOOP, or explicit WAIVED evidence, coded commit and close remain blocked. Do not stage, commit, close work items, simplify code, or perform the code-review gate.\n`;
+}
+
 const PLAYBOOKS = {
 	brainstorm: brainstormPlaybook,
+	browser: browserPlaybook,
 	debug: debugPlaybook,
 	learning: learningPlaybook,
 	plan: planPlaybook,
+	review: reviewPlaybook,
+	simplify: simplifyPlaybook,
 };
 
 export function translateVerifiedWorkflows({
@@ -118,7 +157,7 @@ export function translateVerifiedWorkflows({
 	evidence,
 	policy,
 	translatorBytes,
-	workflows = ["brainstorm", "debug", "learning", "plan"],
+	workflows = ["brainstorm", "browser", "debug", "learning", "plan", "review", "simplify"],
 }) {
 	assertVerifiedEvidence(evidence, policy);
 	if (!workflows.length || workflows.some((workflow) => !WORKFLOW_SOURCES[workflow]))
@@ -216,5 +255,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	);
 	const files = translateVerifiedWorkflows({ sourceRoot: path.resolve(args.source), evidence, policy });
 	writePrivateWorkflowGeneration(outputRoot, files);
-	console.log(`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,debug,learning,plan files=${Object.keys(files).length}`);
+	console.log(`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,learning,plan,review,simplify files=${Object.keys(files).length}`);
 }
