@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": "compound-engineering-v3.21.0",
+  "scanRoots": ["extensions", "agents", "skills", "scripts", "package.json", "README.md"],
+  "excludePaths": [
+    "extensions/work-compound-inventory.json",
+    "extensions/work-compound-source-policy.json",
+    "extensions/work-compound-source.js",
+    "scripts/probe-work-compound-source.mjs",
+    "scripts/test-work-compound-source.mjs"
+  ],
+  "expectedMentions": {
+    "agents/work-debugger.md": { "ce-compound": 1, "ce-debug": 3 },
+    "agents/work-migrator.md": { "ce-plan": 1 },
+    "extensions/work-catch-up-baseline.json": { "ce-explain": 2, "ce-pov": 1 },
+    "extensions/work-models.js": { "ce-brainstorm": 6, "ce-code-review": 2, "ce-explain": 1, "ce-plan": 18, "ce-pov": 1, "ce-simplify-code": 1, "ce-test-browser": 1 },
+    "scripts/test-work-brainstorm.mjs": { "ce-brainstorm": 2 },
+    "scripts/test-work-fleet.mjs": { "ce-plan": 2 },
+    "scripts/test-work-goal.mjs": { "ce-explain": 1, "ce-pov": 1 },
+    "scripts/test-work-settings.mjs": { "ce-plan": 5 },
+    "scripts/test-work-start-finish.mjs": { "ce-plan": 3 },
+    "scripts/test-work-telemetry.mjs": { "ce-compound": 1 },
+    "scripts/test-workflow-evaluation-rpc.mjs": { "ce-brainstorm": 1 },
+    "scripts/test-workflow-evaluation-sentinel.mjs": { "ce-plan": 1 },
+    "scripts/workflow-evaluation.mjs": { "ce-brainstorm": 1, "ce-plan": 1 },
+    "skills/work-orchestrator/SKILL.md": { "ce-plan": 1 },
+    "skills/work-orchestrator/references/full-policy.md": { "ce-brainstorm": 3, "ce-code-review": 1, "ce-compound": 2, "ce-debug": 5, "ce-plan": 6, "ce-simplify-code": 1 }
+  },
+  "parityIndex": {
+    "ce-brainstorm": { "trigger": "F7 Brainstorm and fallback brainstorm policy", "decisions": "interactive clarification and artifact verdict", "toolBoundary": "read/research and brainstorm artifact write", "artifacts": "linked brainstorm markdown or HTML", "failure": "stop without silently inventing requirements", "actorVisibleOutcome": "requirements artifact and work-item backlink" },
+    "ce-plan": { "trigger": "F7 Plan, master/slice planning, migration consolidation", "decisions": "clarifications, open-question gate, scope mapping", "toolBoundary": "repository reads and plan artifact/work-item planning writes", "artifacts": "versioned plan plus roadmap planning state", "failure": "block roadmap bootstrap on unresolved questions", "actorVisibleOutcome": "hardened plan and next coded action" },
+    "ce-code-review": { "trigger": "max-profile pre-commit review gate", "decisions": "blocking finding classification and bounded re-review", "toolBoundary": "scoped diff and read-only review tools", "artifacts": "review findings and PASS evidence", "failure": "do not commit or close", "actorVisibleOutcome": "actionable findings or review PASS" },
+    "ce-simplify-code": { "trigger": "non-trivial simplify-before-review gate", "decisions": "remove duplication/dead flexibility without behavior change", "toolBoundary": "scoped implementation diff", "artifacts": "simplified source diff", "failure": "leave verified behavior unchanged", "actorVisibleOutcome": "smaller equivalent implementation" },
+    "ce-test-browser": { "trigger": "UI-diff browser verification gate", "decisions": "affected pages and blocking UI failures", "toolBoundary": "runnable web UI and browser tools", "artifacts": "browser evidence", "failure": "block commit unless evidence-only waiver applies", "actorVisibleOutcome": "verified affected UI" },
+    "ce-pov": { "trigger": "catch-up actionable candidate review", "decisions": "adopt, defer, or reject", "toolBoundary": "upstream evidence and current repository call sites", "artifacts": "graded catch-up verdict", "failure": "candidate does not advance", "actorVisibleOutcome": "concise adoption recommendation" },
+    "ce-explain": { "trigger": "catch-up candidate too technical for concise POV", "decisions": "whether deeper explanation is required", "toolBoundary": "read-only candidate evidence", "artifacts": "optional technical explanation", "failure": "return to undecided catch-up state", "actorVisibleOutcome": "decision-ready explanation" },
+    "ce-debug": { "trigger": "work-debugger bug investigation", "decisions": "root cause, safe fix, verification, escalation", "toolBoundary": "assigned bug scope and smallest reproduction", "artifacts": "fix, verification, failure/debug evidence", "failure": "block and preserve exact reproduction evidence", "actorVisibleOutcome": "verified root-cause fix or explicit blocker" },
+    "ce-compound": { "trigger": "post-fix or big-work learning capture", "decisions": "durable learning worth and destination", "toolBoundary": "project instructions, executable config, or docs/solutions", "artifacts": "deduplicated learning plus work-item key", "failure": "skip capture rather than duplicate", "actorVisibleOutcome": "durable non-obvious learning" }
+  }
+}

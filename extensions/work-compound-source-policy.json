@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
+  "release": "compound-engineering-v3.21.0",
+  "version": "3.21.0",
+  "peeledCommitSha": "c553b957842fbd87f65f90ff5af4f18deb91f56c",
+  "archive": {
+    "url": "https://codeload.github.com/EveryInc/compound-engineering-plugin/tar.gz/refs/tags/compound-engineering-v3.21.0",
+    "sha256": "faec7a2c7582c7606327abff7356d30830dd30e1455012537f1a7d9b3b4f36e2",
+    "bytes": 3546636
+  },
+  "packageIdentity": {
+    "name": "compound-engineering",
+    "repository": "https://github.com/EveryInc/compound-engineering-plugin"
+  },
+  "knownManifestKeys": [
+    "name",
+    "version",
+    "description",
+    "type",
+    "private",
+    "main",
+    "pi",
+    "homepage",
+    "repository",
+    "scripts",
+    "dependencies",
+    "devDependencies"
+  ],
+  "knownPiManifestKeys": ["extensions", "skills"],
+  "declaredPiSurface": {
+    "extensions": ["./.pi/extensions/compound-engineering.ts"],
+    "skills": ["./skills"]
+  },
+  "license": {
+    "path": "LICENSE",
+    "spdx": "MIT",
+    "sha256": "957b98d327e7b3c55cead4d726022d3617d6aeff5ea824f715c6f9cca15493b4",
+    "requiredPermissionText": "Permission is hereby granted, free of charge"
+  },
+  "notices": [],
+  "verifiedSourceRoots": ["package.json", "LICENSE", ".pi", "skills"],
+  "workflows": [
+    "ce-brainstorm",
+    "ce-code-review",
+    "ce-compound",
+    "ce-debug",
+    "ce-explain",
+    "ce-plan",
+    "ce-pov",
+    "ce-simplify-code",
+    "ce-test-browser"
+  ]
+}

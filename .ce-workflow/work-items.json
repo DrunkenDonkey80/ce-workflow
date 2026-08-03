@@ -3671,6 +3671,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: After work-1.3 closed and the roadmap had no ready children, rerunning `bootstrap-plan-roadmap ... --roadmap work-1` returned the already-closed planning item work-1.2 instead of creating the next planning boundary. `work-ready-summary work-1` remained empty.\nExpected: For an open roadmap whose prior planning boundary is closed and which has no ready executable children, bootstrap/resume should create a fresh `wo:planning` child and return that new ID.\nImpact: Autonomous roadmap execution stalls after the first slice unless the parent manually creates native planning items, bypassing the intended coded deterministic resume loop.\nSuggested improvement: Make bootstrapPlanEpic detect closed selected planning items and allocate the next child ID when no open planning or executable child exists.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Create a new planning boundary after the prior one closes"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/0fb408ff-26f2-4b59-8122-b5139c179f32",
@@ -3713,11 +3717,53 @@
       "type": "task",
       "updatedAt": "2026-08-02T19:28:21.628Z"
     },
+    "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
+      "createdAt": "2026-08-03T13:21:32.961Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The mandatory exact `work-worker` launch for LPG work-9.1 started, then remained activity-silent and exposed `No API key found for openai-codex` only in its transcript after the needs-attention timer. The target checkout also has no local `scripts/work-helper.mjs`, so coded commands require the source-checkout helper path.\nExpected: Before launching a mandatory specialist, ce-workflow should validate that the role's effective provider is authenticated (or select a configured available model) and fail fast with a deterministic actionable result. Generated handoffs/helper examples should resolve the installed/source helper path rather than assuming every target project contains scripts/work-helper.mjs.\nImpact: Mandatory worker routing cannot proceed even though the parent session is operational, and the delayed auth failure wastes a goal turn. The incorrect helper path also causes avoidable MODULE_NOT_FOUND failures during recovery.\nSuggested improvement: Add specialist-model/provider preflight before lease launch and centralize helper path resolution in generated commands.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Preflight specialist authentication and resolve helper paths"
+      },
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/23d57e57-1475-4f6b-bc41-816cb0d14e1e",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 643,
+              "file": "01-work-9-work-worker-auth-failure.log",
+              "sha256": "ce0b9ef0ad7c436fd4b67f53b93ff419cd57792b38b5f718673be950ee4bc98b"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPG",
+          "submittedAt": "2026-08-03T13:21:32.954Z",
+          "workflowId": "019fc638-9ff4-7b42-b08b-60ede49dbf9b"
+        }
+      ],
+      "id": "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The mandatory exact `work-worker` launch for LPG work-9.1 started, then remained activity-silent and exposed `No API key found for",
+      "type": "task",
+      "updatedAt": "2026-08-03T13:21:32.961Z"
+    },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The session's normal bash tool is rewritten to invoke `hypa`, but the executable is unavailable, producing `/usr/bin/bash: line 1: hypa: command not found`. The same condition prevented the work-planner from running final Git-status attestation and caused its otherwise-completed planning run to fail acceptance.\nExpected: When Hypa is unavailable, bash-backed workflow commands and specialist attestations should transparently fall back to direct shell execution instead of failing before the requested command runs.\nImpact: Valid durable planning was reported as failed, forcing parent-side forensic verification and risking duplicate specialists or abandoned WorkItem state in autonomous loops.\nSuggested improvement: Add capability detection and direct-shell fallback around the Hypa rewrite path, preserving the requested command and exit status.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Fall back to direct shell execution when Hypa is unavailable"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/f53c56df-0235-4eee-b2f3-fbc377e4e9c9",
@@ -4721,6 +4767,10 @@
       "createdAt": "2026-08-03T06:00:52.226Z",
       "dependencies": [],
       "dependencyEdges": [],
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Add optional advisor research before brainstorming"
+      },
       "evidence": [],
       "id": "work-3.39",
       "labels": [],
@@ -5158,6 +5208,120 @@
       "title": "Integrate workflow status, incidents, provenance, and release gate",
       "type": "task",
       "updatedAt": "2026-07-29T14:14:57.039Z"
+    },
+    "work-5": {
+      "createdAt": "2026-08-03T10:43:02.708Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "This roadmap explores replacing the current npm source with the official Compound Engineering plugin. Its scope is an initial prototype using the latest stable release as a pinned, inert, explicit-only upstream source. The intended outcome is a controlled migration path to the official upstream plugin.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Migrate ce-workflow to the official Compound Engineering plugin"
+      },
+      "evidence": [],
+      "id": "work-5",
+      "labels": [],
+      "notes": [
+        "created by /work-brainstorm\nwo:brainstorm\nauto-created for standalone brainstorm\ntask: Migrate ce-workflow from npm:pi-compound-engineering to the official EveryInc/compound-engineering-plugin as a pinned, inert,\n │ explicit-only upstream source. First prototype a Pi git-package entry pinned to the latest stable release with both extensions: []\n │ and skills: []; prove that no upstream CE skills, commands, descriptions, or resource-discovery extension enter the generated\n │ runtime while exact source files remain readable. Inventory every ce-workflow CE call site and its referenced resource closure.\n │ Implement one path-confined allowlisted dispatcher that explicitly injects the required upstream playbook only for\n │ ce-workflow-owned flows, with a thin policy adapter for our work items, advisors, agents, tools, and verification gates; preserve\n │ non-equivalent upstream specialist prompts. Generalize /work-catch-up with a GitHub-release source descriptor containing stable\n │ tag, peeled commit SHA, archive digest, and explicit unknown/network-failure state. Updates must produce a review diff and pass\n │ no-discovery, resource-closure, explicit-dispatch, parity, Windows, and restart/rollback checks before a reviewed pin change.\n │ Remove the npm-port peer dependency and documentation only after parity passes. Detect the legacy package and recommend—but never\n │ automatically perform—pi remove npm:pi-compound-engineering; preview and confirm exact marker-bounded AGENTS.md cleanup. If native\n │ filtering cannot guarantee isolation, fall back to a committed inert allowlisted snapshot rather than active transformed skills.\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work."
+      ],
+      "status": "open",
+      "title": "Migrate ce-workflow to the official Compound Engineering plugin",
+      "type": "epic",
+      "updatedAt": "2026-08-03T10:43:09.424Z"
+    },
+    "work-5.1": {
+      "createdAt": "2026-08-03T10:43:02.780Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Idea created by /work-brainstorm.\n\nFull brainstorm request:\nMigrate ce-workflow from npm:pi-compound-engineering to the official EveryInc/compound-engineering-plugin as a pinned, inert,\n │ explicit-only upstream source. First prototype a Pi git-package entry pinned to the latest stable release with both extensions: []\n │ and skills: []; prove that no upstream CE skills, commands, descriptions, or resource-discovery extension enter the generated\n │ runtime while exact source files remain readable. Inventory every ce-workflow CE call site and its referenced resource closure.\n │ Implement one path-confined allowlisted dispatcher that explicitly injects the required upstream playbook only for\n │ ce-workflow-owned flows, with a thin policy adapter for our work items, advisors, agents, tools, and verification gates; preserve\n │ non-equivalent upstream specialist prompts. Generalize /work-catch-up with a GitHub-release source descriptor containing stable\n │ tag, peeled commit SHA, archive digest, and explicit unknown/network-failure state. Updates must produce a review diff and pass\n │ no-discovery, resource-closure, explicit-dispatch, parity, Windows, and restart/rollback checks before a reviewed pin change.\n │ Remove the npm-port peer dependency and documentation only after parity passes. Detect the legacy package and recommend—but never\n │ automatically perform—pi remove npm:pi-compound-engineering; preview and confirm exact marker-bounded AGENTS.md cleanup. If native\n │ filtering cannot guarantee isolation, fall back to a committed inert allowlisted snapshot rather than active transformed skills.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prototype a pinned, inert Compound Engineering plugin source"
+      },
+      "evidence": [],
+      "id": "work-5.1",
+      "labels": [
+        "wo:planning"
+      ],
+      "notes": [
+        "wo:idea schema=1 status=discussed",
+        "wo:failure-summary run=agent-msd3p7y5-qordfk role=work action=brainstorm duration=49m 11s\nreason: unknown\nartifact: C:\\soft\\ce-workflow\\.pi\\work-runs\\2026-08-03.jsonl\ntool-error: read 102 chars\nnext: /work-report work-5.1",
+        "wo:planning requirements=C:\\soft\\ce-workflow\\docs\\plans\\2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md roadmap=work-5 execution=work-worker",
+        "wo:infrastructure-blocker role=work-planner run=98523af0-df62-4786-8bab-8ca5bdb13837 reason='No API key found for openai-codex' next='authenticate configured provider, then resume work-5'",
+        "wo:planning-complete\nplan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\ncreated-slices: work-5.2 (U1 source isolation/inventory), work-5.3 (U2 brainstorm tracer), work-5.4 (U3 plan/evaluation tracer)\ndependencies: work-5.3 waits for work-5.2; work-5.4 waits for work-5.3\nremaining-unsliced: U4 remaining workflow parity; U5 stable-release catch-up/promotion; U6 restart/rollback/no-discovery; U7 legacy retirement/cleanup\ndecisions: none",
+        "Durable Planning Contract added and sequential executable slices work-5.2 through work-5.4 created; later U4-U7 remain explicit for the next planning boundary."
+      ],
+      "parentId": "work-5",
+      "status": "closed",
+      "title": "Migrate ce-workflow from npm:pi-compound-engineering to the official EveryInc/compound-engineering-plugin as a pinned, inert, │ explicit-only upstream source. First proto… [3rk6qr]",
+      "type": "task",
+      "updatedAt": "2026-08-03T15:55:17.262Z"
+    },
+    "work-5.2": {
+      "acceptance": "1. node scripts/test-work-compound-source.mjs passes offline positive and adversarial fixtures for identity, containment, symlinks, Windows collisions, unknown manifest surfaces, license evidence, and cleanup. 2. node scripts/probe-work-compound-source.mjs --release compound-engineering-v3.21.0 --require-zero-surface --require-cleanup exits 0 and writes ignored JSON evidence containing tag, peeled commit SHA, observed archive digest, imported-file hashes, license/notice identity, exact source-read proof, zero effective commands/skill descriptions/extension hooks/resource roots/model-invocable entries, the complete repository call-site/resource-closure inventory, and quarantineRemoved=true. 3. The probe uses only temporary Pi/package state and leaves global Pi settings and installed packages unchanged. 4. Work-item evidence records changed files, tests added/updated, exact command output, residual risks, and no staged files; an independent reviewer appends wo:review PASS.",
+      "createdAt": "2026-08-03T15:54:27.639Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Implement Planning Contract U1 only: verify a pinned official EveryInc stable release as inert readable source, reject unsafe or unknown source shapes, and produce the authoritative current CE call-site/resource-closure inventory. Do not add runtime dispatch or migrate any F7 behavior in this slice.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-5.2",
+      "labels": [],
+      "notes": [
+        "wo:implementation\nwo:execution-agent\nplan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\ncovered-unit-parts: U1; R1-R6; R20 inventory prerequisite\nsequence: 1/3\nreview-gate: required",
+        "wo:verify-check\nfiles: extensions/work-compound-source.js; extensions/work-compound-source-policy.json; extensions/work-compound-inventory.json; scripts/probe-work-compound-source.mjs; scripts/test-work-compound-source.mjs\ntests-added: offline positive/adversarial identity, containment, tracked symlink, Windows collision/reserved names, unknown package/Pi manifest surfaces, unresolved closure, license, success/failure cleanup; live official-source probe\ndiagnostics: Pi source diagnostics reported clean on all three JS writes; node --check (3 JS) and JSON.parse (2 JSON) PASS\nverification: node scripts/test-work-compound-source.mjs => PASS (16 offline checks); node scripts/probe-work-compound-source.mjs --release compound-engineering-v3.21.0 --require-zero-surface --require-cleanup => PASS sha=c553b957842fbd87f65f90ff5af4f18deb91f56c archive=faec7a2c7582c7606327abff7356d30830dd30e1455012537f1a7d9b3b4f36e2 imported=140 callSites=76 zeroSurface=true quarantineRemoved=true; evidence schema assertion => PASS globalUnchanged=true; git check-ignore => .ce-workflow/work-runs evidence ignored; scoped git diff --check => PASS\nevidence: .ce-workflow/work-runs/compound-source/compound-engineering-v3.21.0.json\nresidual-risks: live proof requires network, git/npm, and an installed @earendil-works/pi-coding-agent runtime; archive digest is observed acquisition evidence while peeled SHA/imported hashes remain canonical; non-imported upstream compatibility symlinks outside verified package/LICENSE/.pi/skills roots are not translation inputs\nno-staged-files: git diff --cached --name-only returned empty\nremaining: independent wo:review PASS and commit/close by parent",
+        "wo:review-scope [\"docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\",\"extensions/work-compound-inventory.json\",\"extensions/work-compound-source-policy.json\",\"extensions/work-compound-source.js\",\"scripts/probe-work-compound-source.mjs\",\"scripts/test-work-compound-source.mjs\"]",
+        "wo:review PASS - reran node scripts/test-work-compound-source.mjs => 16/16 ok; verified ignored evidence .ce-workflow/work-runs/compound-source/compound-engineering-v3.21.0.json has tag/peeledSHA c553b95/archive faec7a2c/140 imported hashes/MIT license identity/9 exact SKILL.md read proofs/beforeFiltering 32 skills+1 hook vs afterFiltering all-empty zeroEffectiveSurface=true/76 call sites+9 resource closures/quarantineRemoved=true/globalState before==after; no runtime dispatch wired (module imported only by the two scripts); no staged files",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-compound-source.mjs && node scripts/probe-work-compound-source.mjs --release compound-engineering-v3.21.0 --require-zero-surface --require-cleanup\nOutput: e checks)\n\nadded 4 packages, and audited 5 packages in 3s\n\n1 package is looking for funding\n  run `npm fund` for details\n\nfound 0 vulnerabilities\nPASS probe-work-compound-source release=compound-engineering-v3.21.0 sha=c553b957842fbd87f65f90ff5af4f18deb91f56c archive=faec7a2c7582c7606327abff7356d30830dd30e1455012537f1a7d9b3b4f36e2 imported=140 callSites=76 zeroSurface=true quarantineRemoved=true\nevidence=C:\\soft\\ce-workflow\\.ce-workflow\\work-runs\\compound-source\\compound-engineering-v3.21.0.json"
+      ],
+      "parentId": "work-5",
+      "status": "closed",
+      "title": "Prove official CE source isolation and freeze the parity inventory",
+      "type": "task",
+      "updatedAt": "2026-08-03T16:19:11.016Z"
+    },
+    "work-5.3": {
+      "acceptance": "1. node scripts/test-work-compound-source.mjs && node scripts/test-work-private-workflows.mjs && node scripts/test-work-brainstorm.mjs passes. 2. Two translations from the same verified U1 closure are byte-identical and the generated brainstorm resource has release/path/hash/license/translator provenance. 3. F7 Brainstorm preserves its existing clarification and Brainstorm saved artifact/link contract while loading only the verified private brainstorm playbook. 4. Unknown workflow names, external callers, path escape, missing/mutated resources, and unverified generations are rejected; a clean runtime probe exposes zero CE command, skill description, extension hook, resource root, or model-invocable entry. 5. Work-item evidence records changed files, tests added/updated, exact command output, residual risks, and no staged files; an independent reviewer appends wo:review PASS.",
+      "createdAt": "2026-08-03T15:54:45.181Z",
+      "dependencies": [
+        "work-5.2"
+      ],
+      "dependencyEdges": [],
+      "description": "Implement Planning Contract U2 only: deterministically translate the verified brainstorm closure from U1, add the sole internal allowlisted dispatcher, and route F7 Brainstorm through that private verified resource. Do not migrate planning or any other CE-backed path.",
+      "evidence": [],
+      "id": "work-5.3",
+      "labels": [],
+      "notes": [
+        "wo:implementation\nwo:execution-agent\nplan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\ncovered-unit-parts: U2; R5; R7-R12; AE1-AE2 brainstorm\nsequence: 2/3\nreview-gate: required"
+      ],
+      "parentId": "work-5",
+      "status": "open",
+      "title": "Dispatch the private brainstorm workflow end to end",
+      "type": "task",
+      "updatedAt": "2026-08-03T15:55:09.914Z"
+    },
+    "work-5.4": {
+      "acceptance": "1. node scripts/test-work-private-workflows.mjs && node scripts/test-work-brainstorm.mjs && node scripts/test-work-start-finish.mjs && node scripts/test-workflow-evaluation-rpc.mjs passes. 2. Every F7 plan/master/slice-plan entry and depth variant loads the verified private plan resource and preserves clarification, requirement-preservation/self-audit, artifact, Open Question Gate, and actor-visible handoff behavior. 3. Candidate brainstorm/plan evaluation succeeds without a pi-compound-engineering dependency root; only an explicitly named legacy baseline descriptor may resolve the installed package for parity. 4. Mutated/unknown plan resources and implicit legacy fallback fail closed, and brainstorm/plan parity rows pass against their observable contracts. 5. Work-item evidence records changed files, tests added/updated, exact command output, residual risks, and no staged files; an independent reviewer appends wo:review PASS.",
+      "createdAt": "2026-08-03T15:54:54.949Z",
+      "dependencies": [
+        "work-5.3"
+      ],
+      "dependencyEdges": [],
+      "description": "Implement Planning Contract U3 only: translate the verified planning closure through U2's existing dispatcher, route every F7 plan/master/slice-plan entry through it, and make candidate brainstorm/plan evaluation resolve private resources while retaining the legacy package only as an explicit comparison baseline. Do not migrate debug, review, simplify, browser, POV, explain, catch-up, activation, or legacy removal.",
+      "evidence": [],
+      "id": "work-5.4",
+      "labels": [],
+      "notes": [
+        "wo:implementation\nwo:execution-agent\nplan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md\ncovered-unit-parts: U3; R7-R12; R20-R21 brainstorm and plan\nsequence: 3/3\nreview-gate: required"
+      ],
+      "parentId": "work-5",
+      "status": "open",
+      "title": "Dispatch private planning and isolate candidate evaluation",
+      "type": "task",
+      "updatedAt": "2026-08-03T15:55:10.060Z"
     }
   },
   "metadata": {
@@ -5167,7 +5331,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-03T06:14:08.009Z"
+    "updatedAt": "2026-08-03T16:19:11.017Z"
   },
   "schemaVersion": 1
 }
