@@ -196,50 +196,13 @@ for (const stage of ["brainstorm", "plan"]) {
 	assert.doesNotThrow(() =>
 		validatePrivateWorkflowResources(candidateResources.privateResources, packageRoot),
 	);
-	assert.equal(
-		candidateResources.dependencyRoots.some(
-			(root) => path.basename(root) === "pi-compound-engineering",
-		),
-		false,
-	);
 	const baselineResources = resolveEvaluationResources(
-		{
-			stage,
-			dependencyPackages: [],
-			legacyParityBaseline: {
-				name: "installed-pi-compound-engineering",
-				packageRoot,
-				side: "baseline",
-			},
-		},
+		{ stage, dependencyPackages: [] },
 		"baseline",
 		packageRoot,
 	);
-	assert.deepEqual(baselineResources.requiredResources, [`skill:ce-${stage}`]);
-	assert.deepEqual(baselineResources.privateResources, []);
+	assert.deepEqual(baselineResources, candidateResources);
 }
-assert.throws(
-	() =>
-		resolveEvaluationResources(
-			{ stage: "plan", dependencyPackages: [path.join(packageRoot, "pi-compound-engineering")] },
-			"candidate",
-			packageRoot,
-		),
-	/implicit legacy evaluation dependency rejected/,
-);
-assert.throws(
-	() =>
-		resolveEvaluationResources(
-			{
-				stage: "plan",
-				dependencyPackages: [],
-				legacyParityBaseline: { name: "legacy", packageRoot, side: "baseline" },
-			},
-			"baseline",
-			packageRoot,
-		),
-	/invalid explicit legacy parity baseline descriptor/,
-);
 assert.doesNotThrow(() =>
 	preflightRpcSample({
 		packageRoot,
@@ -795,12 +758,12 @@ const blocked = await runRpcSample({
 	spawnProcess: () => escaping,
 });
 assert.equal(blocked.failure, "forbidden-write");
-const scratchRoot = path.join(os.tmpdir(), "compound-engineering");
+const scratchRoot = path.join(os.tmpdir(), "workflow-evaluation");
 const scratchWrite = fakeProcess([
 	{
 		type: "tool_execution_start",
 		toolName: "write",
-		args: { path: path.join(scratchRoot, "ce-brainstorm", "fixture.md") },
+		args: { path: path.join(scratchRoot, "brainstorm", "fixture.md") },
 	},
 	{ type: "agent_settled" },
 ]);

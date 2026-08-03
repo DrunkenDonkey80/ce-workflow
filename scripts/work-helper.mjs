@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { exec, execFile, execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
@@ -126,20 +127,69 @@ function gitStatusPaths() {
 	return [...new Set(paths)].filter(Boolean);
 }
 
-function cleanupGeneratedInstructions() {
-	for (const file of gitStatusPaths()) {
-		if (!/(?:^|\/)AGENTS\.md$/i.test(file) || !existsSync(file)) continue;
-		try {
-			git(["ls-files", "--error-unmatch", "--", file]);
-		} catch {
-			const text = readFileSync(file, "utf8").trim();
-			if (
-				text.startsWith("<!-- BEGIN COMPOUND PI TOOL MAP -->") &&
-				text.endsWith("<!-- END COMPOUND PI TOOL MAP -->")
-			)
-				rmSync(file);
-		}
+const LEGACY_INSTRUCTIONS_BEGIN = "<!-- BEGIN COMPOUND PI TOOL MAP -->";
+const LEGACY_INSTRUCTIONS_END = "<!-- END COMPOUND PI TOOL MAP -->";
+const LEGACY_INSTRUCTIONS_PHRASE = "COMPOUND PI TOOL MAP";
+
+function markerOccurrences(text, marker) {
+	const occurrences = [];
+	for (let offset = text.indexOf(marker); offset !== -1; offset = text.indexOf(marker, offset + 1)) {
+		const after = offset + marker.length;
+		const lineStart = offset === 0 || text[offset - 1] === "\n";
+		const lineEnd =
+			after === text.length ||
+			text[after] === "\n" ||
+			(text[after] === "\r" && text[after + 1] === "\n");
+		let end = after;
+		if (text.slice(end, end + 2) === "\r\n") end += 2;
+		else if (text[end] === "\n") end += 1;
+		occurrences.push({ start: offset, end, exactLine: lineStart && lineEnd });
 	}
+	return occurrences;
+}
+
+function legacyInstructionsPreview(requestedFile = "AGENTS.md") {
+	const file = path.resolve(cwd, requestedFile);
+	if (!/(?:^|[/\\])AGENTS\.md$/i.test(file))
+		return { status: "refused", reason: "not-an-AGENTS-file", file };
+	if (!existsSync(file)) return { status: "no-op", reason: "file-absent", file };
+	const text = readFileSync(file, "utf8");
+	const begins = markerOccurrences(text, LEGACY_INSTRUCTIONS_BEGIN);
+	const ends = markerOccurrences(text, LEGACY_INSTRUCTIONS_END);
+	const phraseCount = text.split(LEGACY_INSTRUCTIONS_PHRASE).length - 1;
+	if (!begins.length && !ends.length && phraseCount === 0)
+		return { status: "no-op", reason: "markers-absent", file };
+	let reason;
+	if (begins.some((item) => !item.exactLine) || ends.some((item) => !item.exactLine))
+		reason = "malformed-markers";
+	else if (phraseCount !== begins.length + ends.length) reason = "malformed-markers";
+	else if (begins.length !== 1 || ends.length !== 1)
+		reason = !begins.length || !ends.length ? "missing-marker" : "duplicated-markers";
+	else if (begins[0].start > ends[0].start) reason = "reversed-markers";
+	if (reason) return { status: "refused", reason, file };
+	const removed = text.slice(begins[0].start, ends[0].end);
+	const result = text.slice(0, begins[0].start) + text.slice(ends[0].end);
+	const confirmation = createHash("sha256")
+		.update(`legacy-instructions-cleanup\0${file}\0${text}`)
+		.digest("hex");
+	return {
+		status: "preview",
+		file,
+		confirmation,
+		removed,
+		result,
+	};
+}
+
+function applyLegacyInstructionsCleanup(requestedFile, confirmation) {
+	const preview = legacyInstructionsPreview(requestedFile);
+	if (preview.status !== "preview") return preview;
+	if (!confirmation)
+		return { ...preview, status: "refused", reason: "confirmation-required" };
+	if (confirmation !== preview.confirmation)
+		return { ...preview, status: "refused", reason: "confirmation-mismatch" };
+	writeFileSync(preview.file, preview.result);
+	return { ...preview, status: "applied" };
 }
 
 function reviewerHandoff(id, implementationFiles, reviewReasons) {
@@ -388,7 +438,6 @@ async function finishTaskUnlocked() {
 		throw new Error(
 			`Initiative ${id} must be closed through /work-roadmap guarded close.`,
 		);
-	cleanupGeneratedInstructions();
 	const formatted = formatPendingFiles();
 	const stagedBefore = git(["diff", "--cached", "--name-only"])
 		.split(/\r?\n/)
@@ -978,6 +1027,10 @@ try {
 		});
 	} else if (command === "finish-small" || command === "finish-task") {
 		print(await finishTask());
+	} else if (command === "legacy-instructions-preview") {
+		print(legacyInstructionsPreview(positional()[0]));
+	} else if (command === "legacy-instructions-apply") {
+		print(applyLegacyInstructionsCleanup(positional()[0], option("--confirm")));
 	} else if (command === "ensure-no-staged") {
 		const allowWorkStore = args.includes("--allow-work-store");
 		const staged = git(["diff", "--cached", "--name-only"])

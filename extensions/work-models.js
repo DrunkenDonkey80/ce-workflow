@@ -2250,6 +2250,16 @@ export function privateWorkflowActivationWarning(activation) {
 	return `Private workflow activation ${activation.status} (${activation.code}): ${activation.reason}`;
 }
 
+export function legacyCompoundRemovalRecommendation(
+	agentDir = process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"),
+) {
+	return existsSync(
+		join(agentDir, "npm", "node_modules", "pi-compound-engineering"),
+	)
+		? "pi remove npm:pi-compound-engineering"
+		: undefined;
+}
+
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 	const workflow = {
 		workflowRunId: telemetryId("workflow"),
@@ -22438,6 +22448,8 @@ export default function workModelsExtension(pi) {
 		} catch (error) {
 			notify(ctx, `Private workflow activation blocked: ${formatError(error)}`, "warning");
 		}
+		const legacyRecommendation = legacyCompoundRemovalRecommendation();
+		if (legacyRecommendation) notify(ctx, legacyRecommendation, "warning");
 		syncImprovementReportTool(pi, ctx);
 		subscriptionFooterController.start(ctx);
 		const runtime = {

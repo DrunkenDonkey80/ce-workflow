@@ -498,49 +498,23 @@ function projectRoot(sourceRoot, project) {
 	);
 }
 
-const LEGACY_PARITY_BASELINE_NAME = "installed-pi-compound-engineering";
-
-function candidateDependencyRoots(descriptor) {
-	const roots = descriptor.dependencyPackages
+function evaluationDependencyRoots(descriptor) {
+	return descriptor.dependencyPackages
 		? descriptor.dependencyPackages.map((root) => path.resolve(root))
 		: ["pi-subagents", "pi-ask-user"]
 				.map((name) =>
 					path.join(os.homedir(), ".pi", "agent", "npm", "node_modules", name),
 				)
 				.filter(existsSync);
-	if (roots.some((root) => path.basename(root) === "pi-compound-engineering"))
-		throw new Error("implicit legacy evaluation dependency rejected");
-	return roots;
 }
 
 export function resolveEvaluationResources(
 	descriptor,
-	side,
-	sourceRoot = defaultSourceRoot,
+	_side,
+	_sourceRoot = defaultSourceRoot,
 ) {
-	const dependencyRoots = candidateDependencyRoots(descriptor);
+	const dependencyRoots = evaluationDependencyRoots(descriptor);
 	const privateStage = new Set(["brainstorm", "plan"]).has(descriptor.stage);
-	const legacy = descriptor.legacyParityBaseline;
-	if (legacy) {
-		if (
-			legacy.name !== LEGACY_PARITY_BASELINE_NAME ||
-			!legacy.packageRoot ||
-			legacy.side !== "baseline"
-		)
-			throw new Error("invalid explicit legacy parity baseline descriptor");
-		if (side === "candidate" && path.resolve(legacy.packageRoot) === path.resolve(sourceRoot))
-			throw new Error("candidate cannot use the legacy parity baseline");
-	}
-	if (privateStage && side === "baseline" && legacy) {
-		const legacyRoot = path.resolve(legacy.packageRoot);
-		if (!existsSync(legacyRoot))
-			throw new Error("explicit legacy parity baseline is unavailable");
-		return {
-			dependencyRoots: [...dependencyRoots, legacyRoot],
-			privateResources: [],
-			requiredResources: [`skill:ce-${descriptor.stage}`],
-		};
-	}
 	if (privateStage) {
 		const resource = describePrivateWorkflowForEvaluation(descriptor.stage, {
 			actionToken: "workflow-evaluation:candidate-private-resource:v1",
@@ -815,16 +789,13 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		sample.side,
 		sourceRoot,
 	);
-	let requiredResources = evaluationResources.requiredResources;
+	const requiredResources = evaluationResources.requiredResources;
 	if (customPrompt) {
-		const customCommand = customPrompt.match(/^\/(work-[A-Za-z0-9-]+)/)?.[1];
-		const skillCommand = customPrompt.match(/^\/(ce-[A-Za-z0-9-]+)/)?.[1];
+		const promptCommand = customPrompt.match(/^\/([A-Za-z0-9-]+)/)?.[1];
+		const customCommand = promptCommand?.startsWith("work-") ? promptCommand : undefined;
+		if (promptCommand && !customCommand)
+			throw new Error("only native work commands are supported for evaluation");
 		requiredCommands = customCommand ? [customCommand] : [];
-		if (skillCommand) {
-			if (!descriptor.legacyParityBaseline || sample.side !== "baseline")
-				throw new Error("implicit legacy evaluation resource rejected");
-			requiredResources = [`skill:${skillCommand}`];
-		}
 	}
 	if (sample.stage === "work" && !customPrompt) {
 		prompts = [
@@ -877,7 +848,6 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 			TEMP: runtimeTemp,
 			TMP: runtimeTemp,
 			TMPDIR: runtimeTemp,
-			CE_SCRATCH_ROOT: path.join(runtimeTemp, "compound-engineering"),
 			CE_EVAL_SAMPLE_ID: sampleId,
 			CE_EVAL_PAIR_ID: pairId,
 			CE_EVAL_ATTEMPT_ID: String(attemptIndex),
@@ -902,8 +872,6 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 		roleMap: side.roleMap,
 		expectedRoles: side.expectedRoles ?? descriptor.expectedRoles,
 		providerPolicy,
-		// ponytail: CE skills currently hardcode this disposable scratch root;
-		// remove the exception when upstream accepts a per-run scratch setting.
 		allowedWriteRoots: descriptor.allowedScratchRoots ?? [],
 	});
 	const totalRpcWallMs = Date.now() - started;
@@ -1798,7 +1766,7 @@ export function requiresSentinel(changedPaths, declaredChangeType = "") {
 		/^(README\.md|docs\/|scripts\/test-|benchmarks\/workflow-evaluation\/)/;
 	return changedPaths.some(
 		(file) =>
-			/^(extensions\/work-models\.js|skills\/ce-(brainstorm|plan|work)\/|agents\/workItem-)/.test(
+			/^(extensions\/(work-models\.js|private-workflows\/)|agents\/work-)/.test(
 				file.replaceAll("\\", "/"),
 			) || !knownNarrow.test(file.replaceAll("\\", "/")),
 	);

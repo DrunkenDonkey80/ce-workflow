@@ -5399,17 +5399,28 @@
       ],
       "dependencyEdges": [],
       "description": "After U5 promotion and U6 restart/rollback proof, remove runtime and policy coupling to pi-compound-engineering from package metadata, README, catch-up data, evaluation roots, prompts/policies, and stale assertions. Detect an installed legacy package and recommend but never execute pi remove npm:pi-compound-engineering; extend the existing marker-bounded instruction cleanup seam with preview plus explicit confirmation.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-5.12",
       "labels": [],
       "notes": [
-        "wo:execution-agent | review-gate: required | Covered plan boundary: all U7 as one independently demonstrable legacy-present/legacy-absent operator-cleanup tracer, contractually after U5-U6."
+        "wo:execution-agent | review-gate: required | Covered plan boundary: all U7 as one independently demonstrable legacy-present/legacy-absent operator-cleanup tracer, contractually after U5-U6.",
+        "wo:implementation\nImplemented U7 legacy retirement and safe operator cleanup.\nFiles changed: AGENTS.md; README.md; agents/work-migrator.md; benchmarks/workflow-evaluation/v1/experiments/role-calibration.example.json; extensions/work-models.js; package.json; scripts/work-helper.mjs; scripts/workflow-evaluation.mjs; scripts/test-work-private-workflows.mjs; scripts/test-work-optimization-helpers.mjs; scripts/test-workflow-evaluation-rpc.mjs; scripts/test-workflow-evaluation-sentinel.mjs; skills/work-orchestrator/SKILL.md; skills/work-orchestrator/references/full-policy.md.\nResult: removed package/docs/policy/evaluation legacy coupling; startup detection returns and displays only pi remove npm:pi-compound-engineering; no package-manager invocation; cleanup preview/apply uses content-bound confirmation and refuses absent-invalid marker mutations while preserving surrounding bytes.\nTests added/updated: legacy present/absent release/catch-up/restart/rollback parity, package dependency absence, exact recommendation, cleanup preview/confirmation/no-op/missing/reversed/duplicated/malformed fixtures, private-only evaluation resources and current sentinel paths.\nRisk: installed legacy detection uses the canonical Pi agent npm directory; custom installations outside PI_CODING_AGENT_DIR are intentionally not probed.\nNo staged files: confirmed by git diff --cached --name-only.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs && node scripts/test-work-optimization-helpers.mjs\nOutput: PASS test-work-private-workflows (61 offline checks) zeroSurface=true; actor-visible pi remove npm:pi-compound-engineering emitted for installed legacy fixture/environment; ok - work-goal helpers; ok - workflow optimization helpers.\nSupplemental: node scripts/test-workflow-evaluation-rpc.mjs && node scripts/test-workflow-evaluation-sentinel.mjs => both passed. node --check scripts/work-helper.mjs && node --check scripts/workflow-evaluation.mjs && node --check extensions/work-models.js => passed. Edit-time JavaScript/Markdown/JSON diagnostics clean.\nNo staged files: true.",
+        "wo:review-scope [\"AGENTS.md\",\"README.md\",\"agents/work-migrator.md\",\"benchmarks/workflow-evaluation/v1/experiments/role-calibration.example.json\",\"extensions/work-models.js\",\"package.json\",\"scripts/test-work-optimization-helpers.mjs\",\"scripts/test-work-private-workflows.mjs\",\"scripts/test-workflow-evaluation-rpc.mjs\",\"scripts/test-workflow-evaluation-sentinel.mjs\",\"scripts/work-helper.mjs\",\"scripts/workflow-evaluation.mjs\",\"skills/work-orchestrator/SKILL.md\",\"skills/work-orchestrator/references/full-policy.md\"]",
+        "wo:review PASS - legacy coupling removed (package.json peerDep, evaluation legacyParityBaseline/CE_SCRATCH_ROOT, ce-* prompt refs); detection is notify-only 'pi remove npm:pi-compound-engineering' with no package-manager invocation; preview/confirm-token cleanup refuses missing/reversed/duplicated/malformed markers without mutation; verified node scripts/test-work-private-workflows.mjs (61 checks) && test-work-goal.mjs && test-work-optimization-helpers.mjs pass, plus evaluation rpc/sentinel tests; no staged files.",
+        "wo:review-scope [\"README.md\",\"agents/work-migrator.md\",\"benchmarks/workflow-evaluation/v1/experiments/role-calibration.example.json\",\"extensions/work-models.js\",\"package.json\",\"scripts/test-work-optimization-helpers.mjs\",\"scripts/test-work-private-workflows.mjs\",\"scripts/test-workflow-evaluation-rpc.mjs\",\"scripts/test-workflow-evaluation-sentinel.mjs\",\"scripts/work-helper.mjs\",\"scripts/workflow-evaluation.mjs\",\"skills/work-orchestrator/SKILL.md\",\"skills/work-orchestrator/references/full-policy.md\"]",
+        "wo:review PASS - re-review of scoped diff: package.json peerDep dropped and asserted absent; startup emits notify-only 'pi remove npm:pi-compound-engineering' (extensions/work-models.js:2253) with no package-manager call; finish-task auto-delete replaced by preview/apply confirm-token seam that refuses missing/reversed/duplicated/malformed markers without mutation; evaluation legacyParityBaseline, ce-* skill routes and CE_SCRATCH_ROOT removed; verified test-work-optimization-helpers, test-work-private-workflows (61 checks), test-workflow-evaluation-sentinel, test-workflow-evaluation-rpc all pass; only the 13 scoped files dirty, nothing staged.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs && node scripts/test-work-optimization-helpers.mjs\nOutput: 7 - failed-verification next-start check preserves complete A and never mixes generations\nok 58 - canonical mutation during audit restores exact prior bytes and removes quarantine\nok 59 - mutated verified closure rejection\nok 60 - unverified source generation rejection\nok 61 - clean package runtime exposes zero private or CE surface\nPASS test-work-private-workflows (61 offline checks) zeroSurface=true\npi remove npm:pi-compound-engineering\nok - work-goal helpers\nok - workflow optimization helpers"
       ],
       "parentId": "work-5",
-      "status": "open",
+      "status": "closed",
       "title": "Retire legacy CE coupling with preview-only operator cleanup",
       "type": "task",
-      "updatedAt": "2026-08-03T22:15:06.341Z"
+      "updatedAt": "2026-08-03T23:06:19.120Z"
     },
     "work-5.2": {
       "acceptance": "1. node scripts/test-work-compound-source.mjs passes offline positive and adversarial fixtures for identity, containment, symlinks, Windows collisions, unknown manifest surfaces, license evidence, and cleanup. 2. node scripts/probe-work-compound-source.mjs --release compound-engineering-v3.21.0 --require-zero-surface --require-cleanup exits 0 and writes ignored JSON evidence containing tag, peeled commit SHA, observed archive digest, imported-file hashes, license/notice identity, exact source-read proof, zero effective commands/skill descriptions/extension hooks/resource roots/model-invocable entries, the complete repository call-site/resource-closure inventory, and quarantineRemoved=true. 3. The probe uses only temporary Pi/package state and leaves global Pi settings and installed packages unchanged. 4. Work-item evidence records changed files, tests added/updated, exact command output, residual risks, and no staged files; an independent reviewer appends wo:review PASS.",
@@ -5633,7 +5644,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-03T22:47:23.854Z"
+    "updatedAt": "2026-08-03T23:06:19.121Z"
   },
   "schemaVersion": 1
 }

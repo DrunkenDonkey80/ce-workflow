@@ -33,7 +33,7 @@
   ],
   "providerEndpoint": "https://chatgpt.com/backend-api",
   "visibility": "internal",
-  "allowedScratchRoots": ["/tmp/compound-engineering"],
+  "allowedScratchRoots": ["/tmp/workflow-evaluation"],
   "roleMap": {
       "main": {
         "provider": "openai-codex",

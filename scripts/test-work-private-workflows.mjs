@@ -12,7 +12,10 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { sha256 } from "../extensions/work-compound-source.js";
-import { privateWorkflowActivationWarning } from "../extensions/work-models.js";
+import {
+	legacyCompoundRemovalRecommendation,
+	privateWorkflowActivationWarning,
+} from "../extensions/work-models.js";
 import { dispatchPrivateWorkflow } from "../extensions/work-private-workflows.js";
 import {
 	activatePendingPrivateWorkflowRelease,
@@ -617,14 +620,42 @@ try {
 			}
 		}, "promotion persists pending B and retained A while complete A remains active with zero CE surface");
 
+		const legacyAgentDir = path.join(releaseFixtureRoot, "legacy-agent");
+		mkdirSync(
+			path.join(legacyAgentDir, "npm", "node_modules", "pi-compound-engineering"),
+			{ recursive: true },
+		);
+		const cleanAgentDir = path.join(releaseFixtureRoot, "clean-agent");
+		const independentBefore = {
+			playbook: dispatchPrivateWorkflow("brainstorm", authority),
+			catchUp: readFileSync(path.join(extensionRoot, "work-catch-up-baseline.json")),
+			surface: packageZeroSurface(),
+		};
 		const activated = activatePendingPrivateWorkflowRelease(firstRoot);
+		const activatedWithoutLegacy = activatePendingPrivateWorkflowRelease(secondRoot);
 		check(() => {
+			assert.equal(
+				legacyCompoundRemovalRecommendation(legacyAgentDir),
+				"pi remove npm:pi-compound-engineering",
+			);
+			assert.equal(legacyCompoundRemovalRecommendation(cleanAgentDir), undefined);
 			assert.equal(activated.status, "activated", activated.reason);
+			assert.equal(activatedWithoutLegacy.status, activated.status);
 			assertCanonicalBytes(firstRoot, candidateBytes);
+			assertCanonicalBytes(secondRoot, candidateBytes);
 			assert.equal(readPrivateWorkflowActivationState(firstRoot).status, "active");
-			assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
-		}, "simulated next start fully verifies and atomically activates complete B with zero CE surface");
+			assert.equal(readPrivateWorkflowActivationState(secondRoot).status, "active");
+			assert.deepEqual(
+				{
+					playbook: dispatchPrivateWorkflow("brainstorm", authority),
+					catchUp: readFileSync(path.join(extensionRoot, "work-catch-up-baseline.json")),
+					surface: packageZeroSurface(),
+				},
+				independentBefore,
+			);
+		}, "legacy presence only returns the exact actor recommendation while release, catch-up, and restart behavior stays identical");
 		const rolledBack = rollbackPrivateWorkflowRelease(firstRoot);
+		const rolledBackWithoutLegacy = rollbackPrivateWorkflowRelease(secondRoot);
 		check(() => {
 			assert.deepEqual(
 				{
@@ -634,10 +665,24 @@ try {
 				},
 				{ status: "rolled-back", code: "private-workflow-rollback", automatic: false },
 			);
+			assert.deepEqual(
+				{
+					status: rolledBackWithoutLegacy.status,
+					code: rolledBackWithoutLegacy.code,
+					automatic: rolledBackWithoutLegacy.automatic,
+				},
+				{
+					status: rolledBack.status,
+					code: rolledBack.code,
+					automatic: rolledBack.automatic,
+				},
+			);
 			assertCanonicalBytes(firstRoot, firstBefore);
+			assertCanonicalBytes(secondRoot, secondBefore);
 			assert.equal(readPrivateWorkflowActivationState(firstRoot).status, "rolled-back");
+			assert.equal(readPrivateWorkflowActivationState(secondRoot).status, "rolled-back");
 			assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
-		}, "coded actor-visible rollback restores complete A without mixed outputs or CE discovery");
+		}, "coded rollback is identical with the legacy package present or absent");
 		const persistedRollback = activatePendingPrivateWorkflowRelease(firstRoot);
 		check(() => {
 			assert.equal(persistedRollback.status, "rolled-back");
@@ -778,6 +823,7 @@ check(() => {
 	assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
 	assert.deepEqual(packageManifest.pi.extensions, ["extensions/work-models.js"]);
 	assert.deepEqual(packageManifest.pi.skills, ["./skills"]);
+	assert.equal(packageManifest.peerDependencies["pi-compound-engineering"], undefined);
 }, "clean package runtime exposes zero private or CE surface");
 
 console.log(`PASS test-work-private-workflows (${checks} offline checks) zeroSurface=true`);

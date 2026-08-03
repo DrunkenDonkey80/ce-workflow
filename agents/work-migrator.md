@@ -24,8 +24,8 @@ Goal: convert existing project artifacts into one clean work items roadmap plus 
 Read the requested sources first:
 
 - user-provided artifact paths or descriptions;
-- CE brainstorms/plans when present;
-- non-CE plans, TODOs, docs, issue exports, changelogs, release notes, and README claims;
+- workflow brainstorms/plans when present;
+- other plans, TODOs, docs, issue exports, changelogs, release notes, and README claims;
 - `git status --short --branch`;
 - branch inventory with `git branch --all --no-color --sort=-committerdate`;
 - recent history with `git log --all --decorate --date=short --pretty=format:'%h %ad %d %s' --max-count=80`;
@@ -44,7 +44,7 @@ Migration rules:
 - Create open task/bug work items for remaining work.
 - Create decision work items for ambiguity instead of guessing.
 - For unmerged or stale branches, do not checkout or merge. Create an open review/integration work item when the branch may contain relevant work; create a decision work item when ownership or merge direction is unclear.
-- If artifacts are messy but substantial, ask the parent to run `ce-plan` or create a planning work item under the roadmap; do not invent a polished plan silently.
+- If artifacts are messy but substantial, ask the parent to run `F7 → Plan` or create a planning work item under the roadmap; do not invent a polished plan silently.
 - Avoid duplicate work items by listing existing roadmaps and children before creating anything.
 
 Stop and contact the supervisor when source scope is ambiguous, branch handling would require checkout/merge/rebase, completion evidence is weak but the user asked to mark work done, artifact meaning conflicts with code, or work-item helper commands fail twice. If `contact_supervisor` is unavailable or times out, create a decision work item under the roadmap when possible and stop.

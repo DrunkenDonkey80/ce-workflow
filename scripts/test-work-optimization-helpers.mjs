@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import {
-	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -267,6 +266,95 @@ try {
 		"work helper runs deterministic JSON assertions",
 	);
 
+	const cleanupCwd = path.join(cwd, "legacy-cleanup");
+	mkdirSync(cleanupCwd, { recursive: true });
+	const cleanupFile = path.join(cleanupCwd, "AGENTS.md");
+	const workHelper = path.join(import.meta.dirname, "work-helper.mjs");
+	const cleanupCommand = (...commandArgs) =>
+		JSON.parse(
+			execFileSync(process.execPath, [workHelper, ...commandArgs], {
+				cwd: cleanupCwd,
+				encoding: "utf8",
+			}),
+		);
+	const beforeMarker = "prefix \u2603\r\n";
+	const managedBlock =
+		"<!-- BEGIN COMPOUND PI TOOL MAP -->\r\ngenerated\r\n<!-- END COMPOUND PI TOOL MAP -->\r\n";
+	const afterMarker = "suffix\n";
+	writeFileSync(cleanupFile, beforeMarker + managedBlock + afterMarker);
+	const cleanupPreview = cleanupCommand("legacy-instructions-preview", "AGENTS.md");
+	assert(
+		cleanupPreview.status === "preview" &&
+			cleanupPreview.removed === managedBlock &&
+			cleanupPreview.result === beforeMarker + afterMarker,
+		"legacy instruction cleanup previews the exact marker-bounded bytes",
+	);
+	const unconfirmed = cleanupCommand("legacy-instructions-apply", "AGENTS.md");
+	assert(
+		unconfirmed.status === "refused" &&
+			unconfirmed.reason === "confirmation-required" &&
+			readFileSync(cleanupFile, "utf8") === beforeMarker + managedBlock + afterMarker,
+		"legacy instruction cleanup requires explicit confirmation",
+	);
+	const staleConfirmation = cleanupCommand(
+		"legacy-instructions-apply",
+		"AGENTS.md",
+		"--confirm",
+		"wrong-token",
+	);
+	assert(
+		staleConfirmation.status === "refused" &&
+			readFileSync(cleanupFile, "utf8") === beforeMarker + managedBlock + afterMarker,
+		"legacy instruction cleanup refuses a mismatched preview token",
+	);
+	const cleanupApplied = cleanupCommand(
+		"legacy-instructions-apply",
+		"AGENTS.md",
+		"--confirm",
+		cleanupPreview.confirmation,
+	);
+	assert(
+		cleanupApplied.status === "applied" &&
+			readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
+		"confirmed legacy instruction cleanup preserves every surrounding byte",
+	);
+	assert(
+		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status === "no-op" &&
+			readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
+		"legacy instruction cleanup is a no-op when markers are absent",
+	);
+	const refusedFixtures = [
+		["missing end", "<!-- BEGIN COMPOUND PI TOOL MAP -->\nbody\n"],
+		["missing begin", "body\n<!-- END COMPOUND PI TOOL MAP -->\n"],
+		[
+			"reversed",
+			"<!-- END COMPOUND PI TOOL MAP -->\nbody\n<!-- BEGIN COMPOUND PI TOOL MAP -->\n",
+		],
+		[
+			"duplicated",
+			"<!-- BEGIN COMPOUND PI TOOL MAP -->\na\n<!-- END COMPOUND PI TOOL MAP -->\n<!-- BEGIN COMPOUND PI TOOL MAP -->\nb\n<!-- END COMPOUND PI TOOL MAP -->\n",
+		],
+		["malformed", "prefix <!-- BEGIN COMPOUND PI TOOL MAP -->\nbody\n<!-- END COMPOUND PI TOOL MAP -->\n"],
+	];
+	for (const [name, content] of refusedFixtures) {
+		writeFileSync(cleanupFile, content);
+		const refused = cleanupCommand(
+			"legacy-instructions-apply",
+			"AGENTS.md",
+			"--confirm",
+			"not-used",
+		);
+		assert(
+			refused.status === "refused" && readFileSync(cleanupFile, "utf8") === content,
+			`legacy instruction cleanup refuses ${name} markers without mutation`,
+		);
+	}
+	rmSync(cleanupFile);
+	assert(
+		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status === "no-op",
+		"legacy instruction cleanup is a no-op when AGENTS.md is absent",
+	);
+
 	const finishCwd = path.join(cwd, "finish-task");
 	mkdirSync(finishCwd, { recursive: true });
 	const finishStore = initStore(finishCwd);
@@ -328,10 +416,6 @@ try {
 		fakeFormatter,
 		'#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst files = process.argv.slice(2);\nif (files.some((file) => file.replaceAll("\\\\", "/").endsWith(".ce-workflow/work-items.json"))) throw new Error("runtime store must not be formatted");\nfor (const file of files) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
 	);
-	writeFileSync(
-		path.join(finishCwd, "AGENTS.md"),
-		"<!-- BEGIN COMPOUND PI TOOL MAP -->\ngenerated\n<!-- END COMPOUND PI TOOL MAP -->\n",
-	);
 	const fakeBdScript = path.join(finishCwd, "tracker-must-not-run");
 	const finished = JSON.parse(
 		execFileSync(
@@ -368,9 +452,8 @@ try {
 			readFileSync(path.join(finishCwd, "result.js"), "utf8").includes(
 				'"after"',
 			) &&
-			finished.clean &&
-			!existsSync(path.join(finishCwd, "AGENTS.md")),
-		"finish-task closes, removes generated instruction dirt, and leaves git clean",
+			finished.clean,
+		"finish-task closes and leaves git clean",
 	);
 	assert(
 		execFileSync("git", ["log", "-1", "--pretty=%s"], {
