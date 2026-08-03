@@ -511,7 +511,12 @@ const PROFILE_GUIDANCE = {
 		consumption: "Highest tokens · longest time",
 	},
 };
+const PRE_BRAINSTORM_ADVISORS = "preBrainstormAdvisors";
 const WORK_ORCH_BOOLEANS = [
+	{
+		key: PRE_BRAINSTORM_ADVISORS,
+		label: "Background advisor research before brainstorm",
+	},
 	{ key: "advisorVerifyTask", label: "Coded task-vs-plan checklist" },
 	{
 		key: "slicePlanBeforeWork",
@@ -3966,6 +3971,33 @@ function advisorCriticStep(
 		`Give every advisor the same exact ${target}, authoritative sources, and review contract, plus its independent charter: ${agents.map((agent, index) => `${agent} = ${charters[index]}`).join("; ")}. Require concrete locations and smallest fixes. Advisors must not edit files, mutate WorkItems, or launch subagents.`,
 		"Wait for all configured advisors, deduplicate their findings, and apply only authority-grounded fixes. Complete this gate before any plan bootstrap, slicing, or implementation. Convert any unresolved blocking gap into a decision/blocker WorkItem before proceeding; an unavailable advisor is recorded and not replaced or retried.",
 		`If fixes changed the artifact, decide whether one focused re-review by ${first} is warranted. Re-run it once only for substantive cross-section changes, ambiguity resolution, or a fix that could create a new inconsistency; skip re-review for mechanical wording/traceability fixes. Never start a recursive review loop.`,
+	].join("\n");
+}
+
+function preBrainstormAdvisorStep(
+	cwd,
+	offlineModels = [],
+	currentModel = "",
+) {
+	if (!workOrchSettings(cwd).preBrainstormAdvisors) return "";
+	const settings = readEffectiveSettings(cwd);
+	const offline = new Set(offlineModels);
+	const agents = configuredAdvisorSlots(settings)
+		.filter(
+			(slot) =>
+				!offline.has(
+					configuredModelId(slotSelection(slot, settings).model, currentModel),
+				),
+		)
+		.map((slot) => slot.agents[0]);
+	if (!agents.length) return "";
+	const launch = workPerformanceSettings(cwd).parallelAdvisors
+		? `launch exactly one parallel subagent call in tasks mode with context:fresh, one task for each configured agent: ${agents.join(", ")}`
+		: `launch these configured agents one at a time with separate context:fresh single-agent calls, waiting for each before starting the next: ${agents.join(", ")}`;
+	return [
+		`Optional pre-brainstorm research gate: after ce-brainstorm has clarified the request but before it writes the artifact, ${launch}. Use only these packaged work-advisor roles.`,
+		"Give every advisor the same clarified request and authoritative local sources. Ask for independent relevant research, constraints, risks, and concrete options. Advisors are read-only, must not mutate WorkItems or files, and must not launch subagents.",
+		"Wait for every configured advisor, deduplicate and synthesize their findings, then feed that synthesis into the main ce-brainstorm reasoning before writing the brainstorm artifact. Record unavailable advisors without retry; do not replace them.",
 	].join("\n");
 }
 
@@ -13834,6 +13866,10 @@ function brainstormHandoffPrompt(
 					currentModel,
 				)
 			: "";
+	const preBrainstormStep =
+		cwd && !artifact
+			? preBrainstormAdvisorStep(cwd, offlineModels, currentModel)
+			: "";
 	const advisorStep = cwd
 		? advisorCriticStep(
 				cwd,
@@ -13855,6 +13891,7 @@ function brainstormHandoffPrompt(
 		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can call ce-plan with the preservation and self-audit contract.",
 		"Never silently skip ce-brainstorm questions for broad, important, or underspecified work.",
 		creativeStep,
+		preBrainstormStep,
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
 		ROLE_TIMEOUT_GUIDANCE,
 		...criticLines,
@@ -22964,6 +23001,7 @@ function workSettingsStatus(ctx) {
 		"Creative analysis",
 		`  ${SUBMENU_ARROW} creative sidecar: ${resolved.creativeMode}`,
 		"  generators reuse Advisor 1–3 models; configured advisors critique the merged result",
+		`  ${onOff(resolved[PRE_BRAINSTORM_ADVISORS])} background advisor research before brainstorm`,
 		"",
 		"Background verifiers",
 		...(backgroundVerifierProfiles(ctx.cwd).length
@@ -22984,9 +23022,9 @@ function workSettingsStatus(ctx) {
 		"",
 		"Gates",
 		`  ${SUBMENU_ARROW} advisor usage for slice plans: ${resolved.advisorUsageForSlicePlans}`,
-		...WORK_ORCH_BOOLEANS.map(
-			(flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`,
-		),
+		...WORK_ORCH_BOOLEANS.filter(
+			(flag) => flag.key !== PRE_BRAINSTORM_ADVISORS,
+		).map((flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`),
 		`  ${SUBMENU_ARROW} ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
 		`  ${SUBMENU_ARROW} production review policy: ${resolved.reviewPolicy}`,
 		`  ${SUBMENU_ARROW} pre-commit review: ${resolved.codeReviewBeforeCommit}`,
@@ -23292,6 +23330,20 @@ async function workSettingsLoop(ctx) {
 						description:
 							"Optional fallback; absent preserves Main-only behavior",
 					},
+					...(slot.key === "plan"
+						? [
+								{
+									kind: "bool",
+									value: PRE_BRAINSTORM_ADVISORS,
+									...boolLabel(
+										"background advisor research before brainstorm",
+										resolved[PRE_BRAINSTORM_ADVISORS],
+									),
+									description:
+										"Feed configured advisors’ read-only research into the main brainstorm",
+								},
+							]
+						: []),
 				];
 			}),
 			{
@@ -23337,7 +23389,9 @@ async function workSettingsLoop(ctx) {
 				label: `advisor usage for slice plans ${SUBMENU_ARROW}`,
 				description: resolved.advisorUsageForSlicePlans,
 			},
-			...WORK_ORCH_BOOLEANS.map((flag) => ({
+			...WORK_ORCH_BOOLEANS.filter(
+				(flag) => flag.key !== PRE_BRAINSTORM_ADVISORS,
+			).map((flag) => ({
 				kind: "bool",
 				value: flag.key,
 				...boolLabel(flag.label, resolved[flag.key]),

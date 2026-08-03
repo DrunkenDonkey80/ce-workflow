@@ -179,6 +179,21 @@ try {
 		mod.workOrchSettings(cwd).creativeMode === "ask",
 		"creative sidecar defaults to one Quick/Wide question",
 	);
+	assert(
+		mod.workOrchSettings(cwd).preBrainstormAdvisors === false,
+		"pre-brainstorm advisor research defaults off",
+	);
+	const advisorResearchSettings = {};
+	mod.setWorkOrchBoolean(
+		advisorResearchSettings,
+		"preBrainstormAdvisors",
+		true,
+	);
+	writeSettings(advisorResearchSettings);
+	assert(
+		mod.workOrchSettings(cwd).preBrainstormAdvisors === true,
+		"pre-brainstorm advisor research persists",
+	);
 	const creativeSettings = {};
 	mod.setWorkOrchCreativeMode(creativeSettings, "auto");
 	writeSettings(creativeSettings);
@@ -1352,7 +1367,7 @@ try {
 			}),
 		"subscription footer defaults off and ignores contradictory project settings",
 	);
-	let footerCalls = [];
+	const footerCalls = [];
 	let confirmations = 0;
 	const footerCtx = { ...ctx, mode: "tui", hasUI: true };
 	const useFooterCtx = (actions, confirm = true) => {

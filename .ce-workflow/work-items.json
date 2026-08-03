@@ -4717,6 +4717,26 @@
       "type": "task",
       "updatedAt": "2026-07-31T16:26:07.310Z"
     },
+    "work-3.39": {
+      "createdAt": "2026-08-03T06:00:52.226Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "evidence": [],
+      "id": "work-3.39",
+      "labels": [],
+      "notes": [
+        "created by /work-med\nwo:implementation\nwo:execution-agent\ntask: think of will it be possible to add the background advisors as pre-step or braintorm operation (checkbox in settings where brainstorm is after the backup brainstorm) so they do a reserach adn ten it is fed to the main brainstorm",
+        "Implemented optional pre-brainstorm background advisor research.\nFiles: extensions/work-models.js; scripts/test-work-brainstorm.mjs; scripts/test-work-settings.mjs.\nBehavior: global/project checkbox defaults off beside Brainstorm/plan model settings; when enabled, configured online advisors research the clarified request read-only, findings are deduplicated/synthesized, and synthesis is fed into ce-brainstorm before artifact creation.\nVerification: node scripts/test-work-brainstorm.mjs (pass); node scripts/test-work-settings.mjs (pass); npm run verify -- --quiet (pass).\nRemaining: review and commit.",
+        "wo:failure-summary run=agent-msctmbxk-vrmlyc role=worker action=run-implementation duration=8m 58s\nreason: Implemented `work-3.39`. - Added opt-in pre-brainstorm advisor research setting. - Updated brainstorm and settings tests. - Focused tests and full package verification pass. - Work item evidence updated; no blockers or staged files. Next: reviewer for work-3.39\nartifact: C:\\soft\\ce-workflow\\.pi\\work-runs\\2026-08-03.jsonl\ntool-error: grep 96 chars\nlatest: toolResult: { \"status\": \"PASS\", \"unstaged\": [], \"remaining_staged\": [] } warning: in the working copy of 'scripts/test-work-brainstorm.mjs', CRLF will be replaced by LF the next time Git touches it .ce-workflow/work-items.json extensions/work-models.js scripts/test-work-b…\nlatest: toolResult: Successfully wrote 1022 bytes to C:\\soft\\ce-workflow\\.pi-subagents\\artifacts\\outputs\\56a96547-9b2a-42f8-9e3f-d1f7753247a4\\work-work-3.39-work-worker.md\nlatest: assistant: Implemented `work-3.39`. - Added opt-in pre-brainstorm advisor research setting. - Updated brainstorm and settings tests. - Focused tests and full package verification pass. - Work item evidence updated; no blockers or staged files. Next: reviewer for work-3.3…\nnext: /work-report work-3.39",
+        "wo:review PASS. Independent review verified default-off global/project checkbox placement, configured online read-only advisor synthesis before ce-brainstorm artifact creation, deduplication instructions, and focused tests/biome checks. Required fixes: none.",
+        "Commit gate verification: independent review PASS with no required fixes. Focused tests rerun: node scripts/test-work-brainstorm.mjs (pass); node scripts/test-work-settings.mjs (pass). Diff limited to extensions/work-models.js, scripts/test-work-brainstorm.mjs, scripts/test-work-settings.mjs, and native work-item store."
+      ],
+      "parentId": "work-3",
+      "status": "closed",
+      "title": "think of will it be possible to add the background advisors as pre-step or braintorm operation (checkbox in settings where brainstorm is after the backup brainstorm) so they do a r…",
+      "type": "task",
+      "updatedAt": "2026-08-03T06:14:08.008Z"
+    },
     "work-3.4": {
       "acceptance": "A1/A2 integration: no open/all Tab support or visible Open/Closed labels; workspace uses live projected ordering, preserves stable cursor/action IDs, refreshes every 750ms, requests render only on signature change, retains last-good frame on projection error, and clears its timer through every close/back/done path. A6: Enter on roadmap/task opens one small context-sensitive popup and returns to the same workspace; roadmap-operations/task-report nesting is no longer primary; reports remain popup actions. Every mutation rereads the stable ID and revalidates status/action eligibility so removed, closed, or ineligible races warn, return, and cannot mutate. A7: TUI Add task closes the workspace and prepares Pi's normal composer with a human-readable roadmap/selected-parent natural-language envelope excluding /work-add. Empty editor is set; non-empty editor gets shared Append to draft or Cancel popup, appends exactly two newlines only after approval, and cancel preserves bytes. Normal composer preserves multiline/image path. If rich composer APIs are unavailable, warn exactly that image attachment is unavailable and use ctx.ui.editor as explicit text-only multiline fallback. A deterministic helper calls createWorkflowWorkItem with selected task parent or roadmap, takes compact title from first non-empty line, preserves full multiline description, and never uses buildWorkAddState. RPC/print/json keep existing command/text behavior and never claim image support. Focused verification: node scripts/test-work-roadmap.mjs && node scripts/test-work-add.mjs. A8 regression: node scripts/test-work-roadmap.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-add.mjs. Final gate: npm run verify:quiet",
       "createdAt": "2026-07-25T08:05:28.786Z",
@@ -5147,7 +5167,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-02T19:29:14.895Z"
+    "updatedAt": "2026-08-03T06:14:08.009Z"
   },
   "schemaVersion": 1
 }

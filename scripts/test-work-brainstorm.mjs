@@ -297,6 +297,20 @@ try {
 			),
 		"wide brainstorm merges three isolated branches before configured critics",
 	);
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({ workOrchestrator: { preBrainstormAdvisors: true } }),
+	);
+	const researchedHandoff = brainstormHandoffPrompt(standalone, cwd);
+	assert(
+		researchedHandoff.includes("Optional pre-brainstorm research gate") &&
+			researchedHandoff.includes("work-advisor") &&
+			researchedHandoff.includes("feed that synthesis into the main ce-brainstorm") &&
+			researchedHandoff.indexOf("Optional pre-brainstorm research gate") <
+				researchedHandoff.indexOf("Advisor critic gate"),
+		"optional configured advisors research the clarified request before the main brainstorm artifact",
+	);
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), "{}\n");
 	const followUps = [];
 	let brainstormRpc = 0;
 	const routedClipboardBody =
