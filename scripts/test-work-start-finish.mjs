@@ -268,7 +268,9 @@ try {
 				"create an open decision only for unresolved human, product, or architectural authority",
 			) &&
 			bigDirect?.agent === "work-planner" &&
-			state.selectedWorkItem.labels.includes("wo:planning"),
+			state.selectedWorkItem.labels.includes("wo:planning") &&
+			state.selectedWorkItem.labels.includes("wo:big-work") &&
+			state.handoffPrompt.includes("Propagate the wo:big-work marker"),
 		"big creates a labelled planning intake without forcing a technical decision blocker",
 	);
 	assert(
@@ -473,8 +475,8 @@ try {
 	);
 	state = executeWorkFinishState(finishCwd, state);
 	assert(
-		state.ok && state.action === "finish-committed",
-		"finish commits and closes without a committer agent",
+		state.ok && state.action === "finish-committed" && !state.handoffPrompt,
+		"routine finish commits and closes without a committer or learning-capture handoff",
 	);
 	assert(
 		state.verifier && state.verifier.status !== "suppressed",
@@ -499,6 +501,23 @@ try {
 			!fixture.logs().some((entry) => entry.op === "close"),
 		"finish stages work, closes native state, and amends one commit without bd",
 	);
+
+	for (const scenario of ["finishDebugReady", "finishBigReady"]) {
+		fixture.reset(scenario, "unknown");
+		state = executeWorkFinishState(
+			finishCwd,
+			buildWorkFinishState(finishCwd, "FIN-1"),
+		);
+		assert(
+			state.ok &&
+				state.action === "finish-committed" &&
+				state.handoffPrompt.includes("BEGIN VERIFIED PRIVATE LEARNING-CAPTURE PLAYBOOK") &&
+				state.handoffPrompt.includes("Destination and deduplication") &&
+				state.handoffPrompt.includes("wo:learning:<key>=<artifact>") &&
+				!state.handoffPrompt.includes("PRIVATE DEBUG PLAYBOOK"),
+			`${scenario} completion loads only the private learning-capture playbook`,
+		);
+	}
 
 	fixture.reset("finishReady", "unknown");
 	state = buildWorkFinishState(finishCwd, "FIN-1");

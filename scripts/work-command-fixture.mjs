@@ -172,6 +172,29 @@ const scenarioChildren = {
 				"Review: PASS\nVerification: npm run verify passed\nFiles: extensions/work-models.js",
 		},
 	],
+	finishDebugReady: [
+		{
+			id: "FIN-1",
+			parent_id: "E-1",
+			issue_type: "bug",
+			status: "in_progress",
+			title: "Verified root-cause fix",
+			notes:
+				"Review: PASS\nVerification: npm run verify passed\nFiles: extensions/work-models.js",
+		},
+	],
+	finishBigReady: [
+		{
+			id: "FIN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Verified big-work slice",
+			labels: ["wo:big-work"],
+			notes:
+				"Review: PASS\nVerification: npm run verify passed\nFiles: extensions/work-models.js",
+		},
+	],
 	finishMissingReview: [
 		{
 			id: "FIN-1",

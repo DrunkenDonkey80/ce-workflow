@@ -5338,6 +5338,97 @@
       "title": "Dispatch private planning and isolate candidate evaluation",
       "type": "task",
       "updatedAt": "2026-08-03T16:53:47.414Z"
+    },
+    "work-5.5": {
+      "acceptance": "The planner reconciles closed work-5.2 through work-5.4 against the plan, creates up to three smallest sequential executable children with falsifiable focused verification, records remaining unsliced units, closes this planning item, and work-ready-summary work-5 exposes exactly the next slice.",
+      "createdAt": "2026-08-03T16:54:02.116Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Slice remaining Planning Contract units U4-U7 after U1-U3 evidence: complete CE-backed flow parity, stable-release catch-up and promotion, activation/rollback, and legacy retirement.",
+      "evidence": [],
+      "id": "work-5.5",
+      "labels": [
+        "wo:planning"
+      ],
+      "notes": [
+        "wo:planning plan-path=docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md wo:execution-agent remaining=U4-U7",
+        "Planned next execution boundary after reconciling closed U1-U3 evidence in work-5.2/work-5.3/work-5.4. Created sequential U4 vertical slices work-5.6 (debug + learning capture), work-5.7 (finish quality gates), and work-5.8 (catch-up POV/explain + complete parity gate). Dependencies: work-5.7 waits for work-5.6; work-5.8 waits for work-5.7. Remaining unsliced: U5 verified stable-release generation/promotion; U6 retained activation, restart verification, rollback, and no-discovery; U7 legacy coupling retirement and conservative operator cleanup. No product decision is unresolved.",
+        "U4 now has three smallest sequential executable vertical slices with focused falsifiable verification and required review; U5-U7 remain explicitly unsliced for the next planning boundary."
+      ],
+      "parentId": "work-5",
+      "status": "closed",
+      "title": "Plan remaining CE workflow parity and catch-up",
+      "type": "task",
+      "updatedAt": "2026-08-03T16:56:11.713Z"
+    },
+    "work-5.6": {
+      "acceptance": "1. node scripts/test-work-private-workflows.mjs && node scripts/test-work-debug.mjs && node scripts/test-work-start-finish.mjs passes. 2. A debug WorkItem loads only the verified private debug playbook while preserving reproduce/root-cause/fix/verify, blocker evidence, and actor-visible handoff behavior; an eligible completed debug/big slice loads only the verified private learning-capture playbook while preserving destination, deduplication, work-item key, and skip behavior. 3. Focused fixtures reject unknown, missing, or mutated debug/learning resources and prove an ordinary clean runtime exposes zero CE command, skill description, extension hook, resource root, or model-invocable entry. 4. The U4 parity rows for ce-debug and ce-compound pass on observable fixtures without importing prompts, evidence records changed files/tests/commands/residual risks/no staged files, and an independent reviewer appends wo:review PASS.",
+      "createdAt": "2026-08-03T16:55:20.947Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Complete U4's ce-debug and ce-compound tracer: extend the verified U1-U3 translator and sole internal dispatcher, route the work-debugger investigation path and post-fix/big-work learning-capture gate through private resources, and preserve their existing observable contracts without migrating finish review/browser/simplify or catch-up POV/explain.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-5.6",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent; review-gate: required; covered-unit-parts: U4 ce-debug + ce-compound vertical debug-to-learning path; plan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md; predecessor-evidence: work-5.2 U1 source isolation/inventory, work-5.3 U2 sole dispatcher/translator, work-5.4 U3 private planning/evaluation isolation",
+        "Implementation evidence (work-5.6)\nFiles changed: agents/work-debugger.md; extensions/private-workflows/debug.md; extensions/private-workflows/learning.md; extensions/private-workflows/manifest.json; extensions/private-workflows/provenance.json; extensions/work-compound-inventory.json; extensions/work-models.js; extensions/work-private-workflows.js; scripts/generate-work-private-workflows.mjs; scripts/test-work-debug.mjs; scripts/test-work-private-workflows.mjs; scripts/test-work-start-finish.mjs; scripts/work-command-fixture.mjs; skills/work-orchestrator/references/full-policy.md.\nResult: extended the existing verified translator and sole internal dispatcher for only private debug and learning-capture resources; debug investigation receives only the debug playbook; completed bug/wo:big-work finish paths receive only the learning-capture playbook; routine finish skips it. Preserved reproduce/root-cause/fix/verify, blocker evidence, destination/dedup/key/skip, actor handoff, and zero runtime CE surface. Added wo:big-work propagation for finish eligibility. Did not migrate finish review/browser/simplify or catch-up POV/explain.\nTests updated: scripts/test-work-private-workflows.mjs, scripts/test-work-debug.mjs, scripts/test-work-start-finish.mjs, scripts/work-command-fixture.mjs.\nResidual risks: independent reviewer gate remains required; no known implementation blocker.\nNo staged files: helper ensure-no-staged --allow-work-store PASS, remaining_staged=[]; generated source quarantine removed.\n",
+        "wo:verify-check\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-debug.mjs && node scripts/test-work-start-finish.mjs\nResult: PASS. Private workflow suite: 23 offline checks, zeroSurface=true; debug suite: ok - coded work-debug behavior; start/finish suite: ok - coded work start/finish behavior.\nProactive diagnostics: PASS syntax=7 JSON=3 CE call-site inventory parity callSites=37; git diff --check passed (line-ending warnings only).\nFail-closed evidence: unknown authority/name, missing debug/learning files, mutated debug/learning resources, changed closure, and unverified generation rejected. Debug and learning U4 parity rows cover trigger/decisions/tool boundary/artifacts/failure/actor-visible outcome.\nNo staged files: PASS, remaining_staged=[].\n",
+        "wo:review-scope [\"agents/work-debugger.md\",\"extensions/private-workflows/manifest.json\",\"extensions/private-workflows/provenance.json\",\"extensions/work-compound-inventory.json\",\"extensions/work-models.js\",\"extensions/work-private-workflows.js\",\"scripts/generate-work-private-workflows.mjs\",\"scripts/test-work-debug.mjs\",\"scripts/test-work-private-workflows.mjs\",\"scripts/test-work-start-finish.mjs\",\"scripts/work-command-fixture.mjs\",\"skills/work-orchestrator/references/full-policy.md\",\"extensions/private-workflows/debug.md\",\"extensions/private-workflows/learning.md\"]",
+        "wo:infrastructure-blocker role=work-reviewer run=cae3cc84-9054-4059-801f-cb2c19a663d3 reason='Anthropic OAuth invalid_grant: refresh token not found or invalid' next='authenticate configured anthropic provider and rerun coded reviewer handoff'",
+        "wo:infrastructure-blocker retry=2 role=work-reviewer run=2a2073cb-aebf-4195-b2c6-e05b3719647f reason='Anthropic OAuth invalid_grant persisted after user-authenticated retry; current Pi process may need refreshed credential state' next='re-login/restart Pi, then resume work-5'",
+        "wo:review PASS - scoped diff satisfies acceptance; reran node scripts/test-work-private-workflows.mjs (23 checks, zeroSurface=true), test-work-debug.mjs, test-work-start-finish.mjs all PASS; manifest/provenance/debug.md/learning.md hashes and per-workflow source-closure-sha256 recomputed MATCH; CE call-site inventory parity matches expectedMentions with policy workflow order; no staged files.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-debug.mjs && node scripts/test-work-start-finish.mjs\nOutput:  rejection\nok 18 - unverified generation rejection\nok 19 - two offline translations from one verified closure are byte-identical\nok 20 - four-workflow release, path, hash, license, and translator provenance\nok 21 - mutated verified closure rejection\nok 22 - unverified source generation rejection\nok 23 - clean package runtime exposes zero private or CE surface\nPASS test-work-private-workflows (23 offline checks) zeroSurface=true\nok - coded work-debug behavior\nok - coded work start/finish behavior"
+      ],
+      "parentId": "work-5",
+      "status": "closed",
+      "title": "Dispatch private debugging and learning capture",
+      "type": "task",
+      "updatedAt": "2026-08-03T21:30:04.014Z"
+    },
+    "work-5.7": {
+      "acceptance": "1. node scripts/test-work-private-workflows.mjs && node scripts/test-work-settings.mjs && node scripts/test-work-start-finish.mjs passes. 2. A max-profile non-trivial UI implementation demonstrates private simplify, scoped review, and affected-UI browser gates in coded finish order, while existing no-op/waiver paths remain observable and a failed required gate prevents commit and close. 3. Focused fixtures reject unknown, missing, or mutated quality-gate resources, retain each non-equivalent specialist prompt contract, and prove a clean ordinary runtime exposes zero CE command, skill description, extension hook, resource root, or model-invocable entry. 4. The U4 parity rows for ce-simplify-code, ce-code-review, and ce-test-browser pass on observable fixtures without imported prompts, evidence records changed files/tests/commands/residual risks/no staged files, and an independent reviewer appends wo:review PASS.",
+      "createdAt": "2026-08-03T16:55:39.877Z",
+      "dependencies": [
+        "work-5.6"
+      ],
+      "dependencyEdges": [],
+      "description": "Complete U4's ce-simplify-code, ce-code-review, and ce-test-browser tracer as one observable finish pipeline: extend the existing verified dispatcher and route each configured quality gate through its private specialist resource while preserving gate order, bounded review cycles, UI-diff selection, waivers, and commit/close blocking. Do not migrate catch-up POV/explain or U5 promotion.",
+      "evidence": [],
+      "id": "work-5.7",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent; review-gate: required; covered-unit-parts: U4 ce-simplify-code + ce-code-review + ce-test-browser vertical finish pipeline; plan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md"
+      ],
+      "parentId": "work-5",
+      "status": "open",
+      "title": "Dispatch private finish quality gates",
+      "type": "task",
+      "updatedAt": "2026-08-03T16:56:04.784Z"
+    },
+    "work-5.8": {
+      "acceptance": "1. node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs passes. 2. A catch-up fixture routes each actionable candidate through the verified private POV resource, invokes the verified private explain resource only for an intentionally too-technical candidate, and preserves graded verdicts, one-at-a-time adopt/defer/skip handling, completion-manifest persistence, and actor-visible recommendations. 3. Missing, unknown, or mutated POV/explain resources and any incomplete U4 parity row fail closed; the same observable fixtures pass without imported prompts and a clean ordinary runtime exposes zero CE command, skill description, extension hook, resource root, or model-invocable entry. 4. All U4 parity rows are coded passing before U5 promotion can become eligible, evidence records changed files/tests/commands/residual risks/no staged files, and an independent reviewer appends wo:review PASS.",
+      "createdAt": "2026-08-03T16:55:55.360Z",
+      "dependencies": [
+        "work-5.7"
+      ],
+      "dependencyEdges": [],
+      "description": "Finish U4 with the ce-pov and ce-explain catch-up tracer: route actionable-candidate grading and only-when-needed technical explanation through verified private resources, preserve adopt/defer/skip/no-action decisions and durable baseline evidence, and make the complete observable parity matrix the coded prerequisite for later U5 promotion. Do not implement stable-release generation or promotion.",
+      "evidence": [],
+      "id": "work-5.8",
+      "labels": [],
+      "notes": [
+        "wo:execution-agent; review-gate: required; covered-unit-parts: U4 ce-pov + ce-explain vertical catch-up candidate-review path and complete parity gate; plan-path: docs/plans/2026-08-03-001-refactor-private-compound-engineering-workflows-plan.md; remaining-unsliced-after-this: U5 verified catch-up generation/promotion, U6 restart activation/rollback/no-discovery, U7 legacy retirement/operator cleanup"
+      ],
+      "parentId": "work-5",
+      "status": "open",
+      "title": "Dispatch private catch-up candidate review",
+      "type": "task",
+      "updatedAt": "2026-08-03T16:56:04.947Z"
     }
   },
   "metadata": {
@@ -5347,7 +5438,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-03T16:53:47.415Z"
+    "updatedAt": "2026-08-03T21:30:04.014Z"
   },
   "schemaVersion": 1
 }

@@ -4298,6 +4298,22 @@ function privatePlanPlaybookBlock() {
 	return `--- BEGIN VERIFIED PRIVATE PLAN PLAYBOOK ---\n${playbook}--- END VERIFIED PRIVATE PLAN PLAYBOOK ---`;
 }
 
+function privateDebugPlaybookBlock() {
+	const playbook = dispatchPrivateWorkflow("debug", {
+		actionToken: "work-models:debug:investigation:v1",
+		callerUrl: import.meta.url,
+	});
+	return `--- BEGIN VERIFIED PRIVATE DEBUG PLAYBOOK ---\n${playbook}--- END VERIFIED PRIVATE DEBUG PLAYBOOK ---`;
+}
+
+function privateLearningPlaybookBlock() {
+	const playbook = dispatchPrivateWorkflow("learning", {
+		actionToken: "work-models:finish:learning-capture:v1",
+		callerUrl: import.meta.url,
+	});
+	return `--- BEGIN VERIFIED PRIVATE LEARNING-CAPTURE PLAYBOOK ---\n${playbook}--- END VERIFIED PRIVATE LEARNING-CAPTURE PLAYBOOK ---`;
+}
+
 function cePlanSliceStep(
 	issue,
 	cwd,
@@ -6710,11 +6726,20 @@ function workflowImplementationScope(issue) {
 }
 
 function workflowImplementationRisk(issue) {
-	return /wo:execution-agent|created by \/work-big|big slice/i.test(
+	return /wo:execution-agent|wo:big-work|created by \/work-big|big slice/i.test(
 		`${labelsOf(issue).join(" ")}\n${notesOf(issue)}`,
 	)
 		? "high"
 		: "normal";
+}
+
+function learningCaptureEligible(issue) {
+	return (
+		typeOf(issue) === "bug" ||
+		/wo:big-work|created by \/work-big|big slice/i.test(
+			`${labelsOf(issue).join(" ")}\n${notesOf(issue)}`,
+		)
+	);
 }
 
 function implementationPathsFromNotes(issue) {
@@ -12142,6 +12167,7 @@ function debugHandoff(state, guidance = "", cwd) {
 			[
 				`Debug WorkItem: ${state.selectedWorkItem.id} — ${state.selectedWorkItem.title}`,
 				guidance ? `Guidance: ${guidance}` : "Guidance: none",
+				privateDebugPlaybookBlock(),
 				"Do not rediscover the debug target. Verify native work-item store/git freshness, then run the debug loop for this WorkItem.",
 			],
 			cwd,
@@ -12610,9 +12636,12 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 			title: parsed.task,
 			type: "task",
 			parent: idOf(resolved.epic),
-			labels: ["wo:planning"],
+			labels: ["wo:planning", ...(size === "big" ? ["wo:big-work"] : [])],
 			notes: workflowWorkItemNotes(`/work-${size}`, parsed.task, [
 				"wo:planning",
+				...(size === "big"
+					? ["wo:big-work; propagate this marker to executable descendants"]
+					: []),
 				posture,
 			]),
 		});
@@ -12627,6 +12656,9 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 				warnings: git.warnings,
 				handoffExtra: [
 					posture,
+					size === "big"
+						? "Propagate the wo:big-work marker to every executable descendant so the coded post-completion learning-capture gate remains eligible."
+						: "",
 					`Planner must verify dependency direction once with node ${JSON.stringify(WORK_HELPER_SCRIPT)} work-ready-summary ${idOf(resolved.epic)}.`,
 				],
 			},
@@ -14670,6 +14702,17 @@ function amendIfOnly(cwd, dirty, files, message) {
 	run(cwd, "git", ["commit", "--amend", "--no-edit"]);
 }
 
+function learningCaptureHandoff(state, commitHash) {
+	return [
+		"Run the private learning-capture gate for this completed eligible work item.",
+		`Roadmap: ${state.epic.id} — ${state.epic.title}`,
+		`Completed work item: ${state.selectedWorkItem.id} — ${state.selectedWorkItem.title}`,
+		`Fix/work commit: ${commitHash}`,
+		privateLearningPlaybookBlock(),
+		"Preserve the coded next action after capture or skip; do not rerun finish review, browser, or simplification gates.",
+	].join("\n");
+}
+
 function executeWorkFinishStateUnlocked(cwd, state, currentModel) {
 	if (!state?.ok || state.action !== "commit-ready") return state;
 	if (state.handoffPrompt)
@@ -14722,6 +14765,9 @@ function executeWorkFinishStateUnlocked(cwd, state, currentModel) {
 			message: "Committed related files and closed the WorkItem.",
 			note: `Commit: ${commitHash} ${state.commitMessage}`,
 			nextAction: `Next: /work-resume ${state.epic.id}`,
+			handoffPrompt: state.learningCaptureEligible
+				? learningCaptureHandoff(state, commitHash)
+				: undefined,
 		};
 	} catch (error) {
 		// ponytail: only the canonical state needs restoring; Git reset restores the commit.
@@ -14861,6 +14907,7 @@ function buildWorkFinishState(cwd, args = "") {
 			epic: issueSummary(epic),
 			selectedWorkItem: issueSummary(workItem),
 			git,
+			learningCaptureEligible: learningCaptureEligible(workItem),
 			relatedFiles: related,
 			commitMessage: `${idOf(workItem)}: ${titleOf(workItem)}`,
 			message: gated

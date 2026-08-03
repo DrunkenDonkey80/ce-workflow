@@ -3,22 +3,30 @@
   "verified": true,
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "ebe62bd5708c093c60beaf13ff1aee20c175112d2a17d192f5a1fcf7e9c29e74",
-    "version": 2
+    "sha256": "e0581e869826ca10074b3c3951db0465c785526652c12209eb993456aea1c7e8",
+    "version": 3
   },
   "provenance": {
     "path": "provenance.json",
-    "sha256": "811a563ff30e090d22ee4c76b7ae87a89286905ff4d685e2fbd15f5e9cd23662"
+    "sha256": "20d52f5ff527b3de437822d7a7d39e48adc6e6e807cf3cbf1f23392c94d913b2"
   },
   "workflows": {
     "brainstorm": {
       "path": "brainstorm.md",
       "sha256": "cc261e4013ddaf060945b414d74f67b7f8c1a1062c806aded1b5684ff36d30eb"
     },
+    "debug": {
+      "path": "debug.md",
+      "sha256": "bd5d5642ad0ef6e66b93903a05825c5ee10705e9611886e02ca7922104e4aea7"
+    },
+    "learning": {
+      "path": "learning.md",
+      "sha256": "e92af7dab08030e426b594eddf3d6db55058c6d0387130258ef50cb8ca8baacc"
+    },
     "plan": {
       "path": "plan.md",
       "sha256": "dd0ca78ff9c776025790d910d1dd26b5b2a032f552aa26f2d5d37de6895961f1"
     }
   },
-  "generationSha256": "36cd9f518fe588b7cca638dcd1d0494d8cac6ba026e3f86a8a4555b7e7617c36"
+  "generationSha256": "54c9990c74c1564935e80c538fc62077a6e94d84420fcfd61fac4fc612dd5273"
 }

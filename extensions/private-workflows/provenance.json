@@ -14,20 +14,28 @@
   },
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "ebe62bd5708c093c60beaf13ff1aee20c175112d2a17d192f5a1fcf7e9c29e74",
-    "version": 2,
+    "sha256": "e0581e869826ca10074b3c3951db0465c785526652c12209eb993456aea1c7e8",
+    "version": 3,
     "rules": [
       "verify-complete-u1-brainstorm-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-one-question-clarification-and-requirements-only-scope",
       "adapt-output-to-work-brainstorm-markdown-link-contract",
+      "verify-complete-u1-debug-closure",
+      "remove-pi-discovery-frontmatter-and-executable-helpers",
+      "preserve-reproduce-root-cause-fix-verify-and-blocker-evidence",
+      "adapt-output-to-work-debugger-handoff-contract",
+      "verify-complete-u1-compound-closure",
+      "remove-pi-discovery-frontmatter-and-executable-helpers",
+      "preserve-destination-deduplication-key-and-skip-gates",
+      "adapt-output-to-post-fix-and-big-work-learning-contract",
       "verify-complete-u1-plan-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-clarification-requirements-self-audit-and-open-question-gate",
       "adapt-output-to-work-plan-master-and-slice-handoff-contracts"
     ]
   },
-  "sourceClosureSha256": "bcdca63054d82471854da810c379214b674ab12427068718294feb9d73e9569d",
+  "sourceClosureSha256": "9881ec416ad69f4bb9dcb0af465cf67b3e4b45d62c0b57f76fa480ac85501acc",
   "sources": [
     {
       "path": "skills/ce-brainstorm/SKILL.md",
@@ -123,6 +131,136 @@
       "path": "skills/ce-brainstorm/scripts/visual-probe-server.js",
       "bytes": 12949,
       "sha256": "5c48f3ee2b12b28cedb1ecbbb40a738c240272b7124b9289a488d48864282007"
+    },
+    {
+      "path": "skills/ce-debug/SKILL.md",
+      "bytes": 36039,
+      "sha256": "88e9d69bc1b92f5ecf7d35d0e4955b000e4b926d2f73efbcfec7c169c6129870"
+    },
+    {
+      "path": "skills/ce-debug/references/anti-patterns.md",
+      "bytes": 6304,
+      "sha256": "d2fbb93a0602509f2bacd6221638912e17fe55841a8d87a7bb10255f5250b299"
+    },
+    {
+      "path": "skills/ce-debug/references/defense-in-depth.md",
+      "bytes": 2863,
+      "sha256": "bb8804796f31265dea05ff555ceadbd3b0956e8ac8f3db73d8add9fa720ce373"
+    },
+    {
+      "path": "skills/ce-debug/references/investigation-techniques.md",
+      "bytes": 23351,
+      "sha256": "bb5987cf3d96acbbdceca08255b5329d684db0d4281ebd934d986bf9246e1370"
+    },
+    {
+      "path": "skills/ce-debug/references/pipeline-mode.md",
+      "bytes": 6662,
+      "sha256": "297856fdd79ae64fc4453aca11583cc74ebb617caed8c4b2bd7f7a03b259543c"
+    },
+    {
+      "path": "skills/ce-debug/scripts/context.mjs",
+      "bytes": 4021,
+      "sha256": "e4b804742641cf2a5c6e6ae96a4ae66df3bde1fc4919c8b3f1829ef5020e9e27"
+    },
+    {
+      "path": "skills/ce-compound/SKILL.md",
+      "bytes": 73903,
+      "sha256": "d1cd3666acc82914fa009638a9843c14ad35f91a2c012551f188e39ec0cf3d1c"
+    },
+    {
+      "path": "skills/ce-compound/assets/resolution-template.md",
+      "bytes": 2532,
+      "sha256": "968326b9f2cd5df257fd338eafb0ca3183f3cbe90454cd1611c699e32b10568b"
+    },
+    {
+      "path": "skills/ce-compound/references/agents/best-practices-researcher.md",
+      "bytes": 7523,
+      "sha256": "0de3cbd2f372be386ac652e9b08315f7eb5a8df7febdfa9efc84d628d013b931"
+    },
+    {
+      "path": "skills/ce-compound/references/agents/data-integrity-guardian.md",
+      "bytes": 3284,
+      "sha256": "325c9bab656b2b37514e65274ee9b2e09b5dfc10dfdfea34f3e35ab4d1fcba0c"
+    },
+    {
+      "path": "skills/ce-compound/references/agents/framework-docs-researcher.md",
+      "bytes": 5765,
+      "sha256": "b4993e4cec5f260a34d19144f4831299a8b160b56bb791db046cafe30ef1182c"
+    },
+    {
+      "path": "skills/ce-compound/references/agents/pattern-recognition-specialist.md",
+      "bytes": 3730,
+      "sha256": "da8464ad1e5f04e598ef4e8e6e38528933937e50d7c4aca04c4cd2e18679ef9c"
+    },
+    {
+      "path": "skills/ce-compound/references/agents/performance-oracle.md",
+      "bytes": 4696,
+      "sha256": "b2f3d154597ab75fa06d3e6a66dc9165a8926e9a2aa5863eb9d59f17418d4f1f"
+    },
+    {
+      "path": "skills/ce-compound/references/agents/security-sentinel.md",
+      "bytes": 4238,
+      "sha256": "303f182ea51d644d57cc04d93a088f2d6aef761951fb1bbbb88d3a38d8fc5896"
+    },
+    {
+      "path": "skills/ce-compound/references/agents/session-historian.md",
+      "bytes": 6958,
+      "sha256": "454f714f53d1ee957fd12af77d657a5926448ed294e6df352b6e6bfcd7f9ef1d"
+    },
+    {
+      "path": "skills/ce-compound/references/concepts-vocabulary.md",
+      "bytes": 6416,
+      "sha256": "8a9053b9073cbb981bf01bf1186e83c3597411048d7c3b1002829b35e38a581b"
+    },
+    {
+      "path": "skills/ce-compound/references/grounding-validation.md",
+      "bytes": 6403,
+      "sha256": "dc7169b6e5b1e5205f156969db4c7333e557881d85cf1da6407a5f8037e7c87b"
+    },
+    {
+      "path": "skills/ce-compound/references/schema.yaml",
+      "bytes": 7859,
+      "sha256": "b173c46fad68565e8795dbceda7ebdb757117ac03df4e36046ca0cacbad197d7"
+    },
+    {
+      "path": "skills/ce-compound/references/yaml-schema.md",
+      "bytes": 6034,
+      "sha256": "058c575f6f02a56994a4ebeddc44173d89b8649c95d2edc7c32bbf0d9cb945ed"
+    },
+    {
+      "path": "skills/ce-compound/scripts/context.mjs",
+      "bytes": 4021,
+      "sha256": "e4b804742641cf2a5c6e6ae96a4ae66df3bde1fc4919c8b3f1829ef5020e9e27"
+    },
+    {
+      "path": "skills/ce-compound/scripts/session-history/discover-sessions.sh",
+      "bytes": 4282,
+      "sha256": "2b00a0147dd33ab0c5d8beac5b2e92800e6de6ec955586861565edfb1b67abe4"
+    },
+    {
+      "path": "skills/ce-compound/scripts/session-history/extract-errors.py",
+      "bytes": 8689,
+      "sha256": "5016a2254030043f90e36844c895fdd64fe093665645f06637cb51e48f781921"
+    },
+    {
+      "path": "skills/ce-compound/scripts/session-history/extract-metadata.py",
+      "bytes": 17566,
+      "sha256": "d4c7c836b53c56c01b8152f4d49272e824e6dff072154b7168f749c8954ad0c0"
+    },
+    {
+      "path": "skills/ce-compound/scripts/session-history/extract-skeleton.py",
+      "bytes": 21278,
+      "sha256": "4331aa53c825d7fc2ea01c46c626fb24827793bea54d0acfd9ac832b9ed1c4e8"
+    },
+    {
+      "path": "skills/ce-compound/scripts/validate-doc-claims.py",
+      "bytes": 14563,
+      "sha256": "d0fdce1f7d941326db319f32d266c64ed66ac97b43b2064070ae600793ced3ca"
+    },
+    {
+      "path": "skills/ce-compound/scripts/validate-frontmatter.py",
+      "bytes": 5060,
+      "sha256": "580815f6b6030f5f3383972283927ff7354649b7b599b008941a9440d5a5e674"
     },
     {
       "path": "skills/ce-plan/SKILL.md",

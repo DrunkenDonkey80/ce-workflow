@@ -30,9 +30,11 @@ const authority = {
 	actionToken: "work-models:F7:brainstorm:v1",
 	callerUrl: pathToFileURL(path.join(extensionRoot, "work-models.js")).href,
 };
+const debugAuthority = { ...authority, actionToken: "work-models:debug:investigation:v1" };
+const learningAuthority = { ...authority, actionToken: "work-models:finish:learning-capture:v1" };
 const planAuthority = { ...authority, actionToken: "work-models:F7:plan:v1" };
 const generated = Object.fromEntries(
-	["brainstorm.md", "plan.md", "manifest.json", "provenance.json"].map((name) => [
+	["brainstorm.md", "debug.md", "learning.md", "plan.md", "manifest.json", "provenance.json"].map((name) => [
 		name,
 		readFileSync(path.join(resourceRoot, name)),
 	]),
@@ -52,6 +54,20 @@ rejects(
 	/external private workflow caller rejected/,
 	"external caller rejection",
 );
+const debugPlaybook = dispatchPrivateWorkflow("debug", debugAuthority);
+check(() => {
+	assert.match(debugPlaybook, /Reproduce, root cause, fix, verify/);
+	assert.match(debugPlaybook, /causal chain/);
+	assert.match(debugPlaybook, /Failure and blocker evidence/);
+	assert.match(debugPlaybook, /Actor-visible handoff/);
+}, "verified debug resource preserves investigation and blocker contracts");
+const learningPlaybook = dispatchPrivateWorkflow("learning", learningAuthority);
+check(() => {
+	assert.match(learningPlaybook, /Eligibility and skip gate/);
+	assert.match(learningPlaybook, /Destination and deduplication/);
+	assert.match(learningPlaybook, /wo:learning:<key>=<artifact>/);
+	assert.match(learningPlaybook, /created, updated, or skipped/);
+}, "verified learning resource preserves destination, deduplication, key, and skip contracts");
 const planPlaybook = dispatchPrivateWorkflow("plan", planAuthority);
 check(() => {
 	assert.match(planPlaybook, /Ask exactly one focused clarification per turn/);
@@ -63,15 +79,20 @@ const parity = JSON.parse(
 	readFileSync(path.join(extensionRoot, "work-compound-inventory.json"), "utf8"),
 ).parityIndex;
 check(() => {
-	assert.deepEqual(Object.keys(parity).filter((name) => ["ce-brainstorm", "ce-plan"].includes(name)), [
-		"ce-brainstorm",
-		"ce-plan",
-	]);
+	assert.deepEqual(
+		Object.keys(parity).filter((name) =>
+			["ce-brainstorm", "ce-debug", "ce-compound", "ce-plan"].includes(name),
+		),
+		["ce-brainstorm", "ce-plan", "ce-debug", "ce-compound"],
+	);
 	for (const field of ["trigger", "decisions", "toolBoundary", "artifacts", "failure", "actorVisibleOutcome"])
-		assert.ok(parity["ce-brainstorm"][field] && parity["ce-plan"][field]);
+		for (const name of ["ce-brainstorm", "ce-debug", "ce-compound", "ce-plan"])
+			assert.ok(parity[name][field]);
 	assert.match(playbook, /stop without inventing it/i);
+	assert.match(debugPlaybook, /do not guess or report success/i);
+	assert.match(learningPlaybook, /Skipping is a successful gate outcome/i);
 	assert.match(planPlaybook, /Do not bootstrap.*blocking open questions/i);
-}, "brainstorm and plan parity rows cover trigger through actor-visible failure outcome");
+}, "brainstorm, plan, debug, and learning parity rows cover trigger through actor-visible failure outcome");
 rejects(
 	() => dispatchPrivateWorkflow("unknown", authority),
 	/unknown private workflow/,
@@ -81,6 +102,11 @@ rejects(
 	() => dispatchPrivateWorkflow("plan", authority),
 	/external private workflow caller rejected/,
 	"workflow-specific action token rejection",
+);
+rejects(
+	() => dispatchPrivateWorkflow("learning", debugAuthority),
+	/external private workflow caller rejected/,
+	"debug authority cannot load learning resource",
 );
 
 try {
@@ -102,11 +128,43 @@ try {
 	);
 	restore();
 
+	rmSync(path.join(resourceRoot, "debug.md"));
+	rejects(
+		() => dispatchPrivateWorkflow("debug", debugAuthority),
+		/ENOENT/,
+		"missing debug resource rejection",
+	);
+	restore();
+
+	rmSync(path.join(resourceRoot, "learning.md"));
+	rejects(
+		() => dispatchPrivateWorkflow("learning", learningAuthority),
+		/ENOENT/,
+		"missing learning resource rejection",
+	);
+	restore();
+
 	writeFileSync(path.join(resourceRoot, "brainstorm.md"), `${playbook}\nmutated\n`);
 	rejects(
 		() => dispatchPrivateWorkflow("brainstorm", authority),
 		/resource changed/,
 		"mutated resource rejection",
+	);
+	restore();
+
+	writeFileSync(path.join(resourceRoot, "debug.md"), `${debugPlaybook}\nmutated\n`);
+	rejects(
+		() => dispatchPrivateWorkflow("debug", debugAuthority),
+		/resource changed: debug/,
+		"mutated debug resource rejection",
+	);
+	restore();
+
+	writeFileSync(path.join(resourceRoot, "learning.md"), `${learningPlaybook}\nmutated\n`);
+	rejects(
+		() => dispatchPrivateWorkflow("learning", learningAuthority),
+		/resource changed: learning/,
+		"mutated learning resource rejection",
 	);
 	restore();
 
@@ -134,14 +192,25 @@ const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "private-workflow-transla
 try {
 	const sourcePath = "skills/ce-brainstorm/SKILL.md";
 	const sourceBytes = Buffer.from("---\nname: source-brainstorm\n---\nAsk one question.\n");
+	const debugSourcePath = "skills/ce-debug/SKILL.md";
+	const debugSourceBytes = Buffer.from("---\nname: source-debug\n---\nReproduce and trace.\n");
+	const learningSourcePath = "skills/ce-compound/SKILL.md";
+	const learningSourceBytes = Buffer.from("---\nname: source-compound\n---\nCapture learning.\n");
 	const planSourcePath = "skills/ce-plan/SKILL.md";
 	const planSourceBytes = Buffer.from("---\nname: source-plan\n---\nPreserve and plan.\n");
 	const target = path.join(fixtureRoot, ...sourcePath.split("/"));
+	const debugTarget = path.join(fixtureRoot, ...debugSourcePath.split("/"));
+	const learningTarget = path.join(fixtureRoot, ...learningSourcePath.split("/"));
 	const planTarget = path.join(fixtureRoot, ...planSourcePath.split("/"));
-	mkdirSync(path.dirname(target), { recursive: true });
-	mkdirSync(path.dirname(planTarget), { recursive: true });
-	writeFileSync(target, sourceBytes);
-	writeFileSync(planTarget, planSourceBytes);
+	for (const [file, bytes] of [
+		[target, sourceBytes],
+		[debugTarget, debugSourceBytes],
+		[learningTarget, learningSourceBytes],
+		[planTarget, planSourceBytes],
+	]) {
+		mkdirSync(path.dirname(file), { recursive: true });
+		writeFileSync(file, bytes);
+	}
 	const policy = {
 		release: "fixture-v1",
 		peeledCommitSha: "a".repeat(40),
@@ -167,6 +236,12 @@ try {
 				"ce-brainstorm": [
 					{ path: sourcePath, bytes: sourceBytes.length, sha256: sha256(sourceBytes) },
 				],
+				"ce-debug": [
+					{ path: debugSourcePath, bytes: debugSourceBytes.length, sha256: sha256(debugSourceBytes) },
+				],
+				"ce-compound": [
+					{ path: learningSourcePath, bytes: learningSourceBytes.length, sha256: sha256(learningSourceBytes) },
+				],
 				"ce-plan": [
 					{ path: planSourcePath, bytes: planSourceBytes.length, sha256: sha256(planSourceBytes) },
 				],
@@ -185,12 +260,18 @@ try {
 		assert.equal(provenance.release, policy.release);
 		assert.equal(provenance.sources[0].path, sourcePath);
 		assert.equal(provenance.sources[0].sha256, sha256(sourceBytes));
-		assert.equal(provenance.sources[1].path, planSourcePath);
-		assert.equal(provenance.sources[1].sha256, sha256(planSourceBytes));
+		assert.equal(provenance.sources[1].path, debugSourcePath);
+		assert.equal(provenance.sources[1].sha256, sha256(debugSourceBytes));
+		assert.equal(provenance.sources[2].path, learningSourcePath);
+		assert.equal(provenance.sources[2].sha256, sha256(learningSourceBytes));
+		assert.equal(provenance.sources[3].path, planSourcePath);
+		assert.equal(provenance.sources[3].sha256, sha256(planSourceBytes));
 		assert.equal(provenance.license.spdx, "MIT");
-		assert.equal(provenance.translator.version, 2);
+		assert.equal(provenance.translator.version, 3);
+		assert.match(first["debug.md"], /Failure and blocker evidence/);
+		assert.match(first["learning.md"], /Destination and deduplication/);
 		assert.match(first["plan.md"], /Open Question Gate/);
-	}, "brainstorm and plan release, path, hash, license, and translator provenance");
+	}, "four-workflow release, path, hash, license, and translator provenance");
 	writeFileSync(planTarget, "changed\n");
 	rejects(
 		() => translateVerifiedWorkflows(args),

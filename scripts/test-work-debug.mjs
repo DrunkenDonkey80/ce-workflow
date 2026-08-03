@@ -24,6 +24,13 @@ try {
 		state.handoffPrompt.includes("Debug WorkItem: BUG-1"),
 		"debug handoff names target",
 	);
+	assert(
+		state.handoffPrompt.includes("BEGIN VERIFIED PRIVATE DEBUG PLAYBOOK") &&
+			state.handoffPrompt.includes("Reproduce, root cause, fix, verify") &&
+			state.handoffPrompt.includes("Failure and blocker evidence") &&
+			!state.handoffPrompt.includes("PRIVATE LEARNING-CAPTURE PLAYBOOK"),
+		"debug investigation loads only the private debug playbook",
+	);
 
 	fixture.reset("debug");
 	state = buildWorkDebugState(fixture.cwd, "IMP-2");
