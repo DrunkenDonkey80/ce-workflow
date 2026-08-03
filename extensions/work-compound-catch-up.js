@@ -182,6 +182,302 @@ function restoreSnapshot(root, snapshot) {
 		writeFileSync(path.join(root, name), entry.bytes);
 }
 
+const ACTIVATION_SCHEMA_VERSION = 1;
+const ACTIVATION_STATUSES = new Set(["pending", "activating", "active", "rolling-back", "rolled-back"]);
+
+function releaseArtifactRoot(repositoryRoot) {
+	return path.join(repositoryRoot, ".ce-workflow", "work-runs", "compound-releases");
+}
+
+function activationStatePath(repositoryRoot) {
+	return path.join(releaseArtifactRoot(repositoryRoot), "activation.json");
+}
+
+function writeActivationState(repositoryRoot, state) {
+	const target = activationStatePath(repositoryRoot);
+	const temporary = `${target}.new`;
+	const backup = `${target}.old`;
+	mkdirSync(path.dirname(target), { recursive: true });
+	writeFileSync(temporary, json(state));
+	rmSync(backup, { force: true });
+	if (existsSync(target)) renameSync(target, backup);
+	try {
+		renameSync(temporary, target);
+		rmSync(backup, { force: true });
+	} catch (error) {
+		if (!existsSync(target) && existsSync(backup)) renameSync(backup, target);
+		throw error;
+	}
+	return target;
+}
+
+export function readPrivateWorkflowActivationState(repositoryRoot) {
+	const target = activationStatePath(path.resolve(repositoryRoot));
+	const backup = `${target}.old`;
+	if (!existsSync(target) && existsSync(backup)) renameSync(backup, target);
+	if (!existsSync(target)) return undefined;
+	const state = JSON.parse(readFileSync(target, "utf8"));
+	if (
+		state?.schemaVersion !== ACTIVATION_SCHEMA_VERSION ||
+		!ACTIVATION_STATUSES.has(state.status) ||
+		!String(state.activeGenerationSha256 ?? "").trim() ||
+		!String(state.pendingGenerationSha256 ?? "").trim() ||
+		!String(state.retainedGenerationSha256 ?? "").trim()
+	)
+		throw new Error("invalid private workflow activation state");
+	return state;
+}
+
+function generationSha256(root, expected) {
+	assertExactOwnedNames(root);
+	const { manifest } = verifyPrivateWorkflowGeneration(root);
+	if (expected && manifest.generationSha256 !== expected)
+		throw new Error("private workflow generation identity changed");
+	return manifest.generationSha256;
+}
+
+function pendingGenerationPath(repositoryRoot, generation) {
+	return path.join(releaseArtifactRoot(repositoryRoot), "pending", generation);
+}
+
+function retainedGenerationPath(repositoryRoot, generation) {
+	return path.join(releaseArtifactRoot(repositoryRoot), "prior", generation);
+}
+
+function activationTransactionRoot(repositoryRoot) {
+	return path.join(releaseArtifactRoot(repositoryRoot), "activation-transaction");
+}
+
+function rollbackResult(state, reason, automatic) {
+	return {
+		status: "rolled-back",
+		code: "private-workflow-rollback",
+		automatic,
+		activeGenerationSha256: state.retainedGenerationSha256,
+		rolledBackGenerationSha256: state.pendingGenerationSha256,
+		reason,
+	};
+}
+
+function rolledBackState(state, reason, automatic) {
+	return {
+		...state,
+		status: "rolled-back",
+		activeGenerationSha256: state.retainedGenerationSha256,
+		rollback: {
+			code: "private-workflow-rollback",
+			automatic,
+			reason,
+		},
+	};
+}
+
+function recoverInterruptedRollback(repositoryRoot, state, reason) {
+	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
+	const retainedRoot = retainedGenerationPath(repositoryRoot, state.retainedGenerationSha256);
+	const pendingRoot = pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256);
+	const transactionRoot = activationTransactionRoot(repositoryRoot);
+	const transactionCurrent = path.join(transactionRoot, "current");
+	const transactionRestore = path.join(transactionRoot, "restore");
+	let canonicalGeneration;
+	if (existsSync(canonicalRoot)) {
+		try {
+			canonicalGeneration = generationSha256(canonicalRoot);
+		} catch {
+			canonicalGeneration = undefined;
+		}
+	}
+	if (canonicalGeneration === state.pendingGenerationSha256 && !existsSync(transactionCurrent))
+		renameSync(canonicalRoot, transactionCurrent);
+	else if (canonicalGeneration !== state.retainedGenerationSha256 && existsSync(canonicalRoot))
+		rmSync(canonicalRoot, { recursive: true, force: true });
+	if (!existsSync(canonicalRoot)) {
+		if (existsSync(transactionRestore)) {
+			generationSha256(transactionRestore, state.retainedGenerationSha256);
+			renameSync(transactionRestore, canonicalRoot);
+		} else {
+			generationSha256(retainedRoot, state.retainedGenerationSha256);
+			cpSync(retainedRoot, canonicalRoot, { recursive: true });
+		}
+	}
+	generationSha256(canonicalRoot, state.retainedGenerationSha256);
+	if (existsSync(transactionCurrent)) {
+		generationSha256(transactionCurrent, state.pendingGenerationSha256);
+		rmSync(pendingRoot, { recursive: true, force: true });
+		mkdirSync(path.dirname(pendingRoot), { recursive: true });
+		renameSync(transactionCurrent, pendingRoot);
+	}
+	const next = rolledBackState(state, reason, false);
+	writeActivationState(repositoryRoot, next);
+	rmSync(transactionRoot, { recursive: true, force: true });
+	return rollbackResult(next, reason, false);
+}
+
+function restoreActivationPrior(repositoryRoot, state, reason) {
+	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
+	const pendingRoot = pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256);
+	const transactionRoot = activationTransactionRoot(repositoryRoot);
+	const transactionActive = path.join(transactionRoot, "active");
+	if (existsSync(canonicalRoot)) {
+		let canonicalGeneration;
+		try {
+			canonicalGeneration = generationSha256(canonicalRoot);
+		} catch {
+			canonicalGeneration = undefined;
+		}
+		if (canonicalGeneration === state.pendingGenerationSha256) {
+			if (existsSync(pendingRoot)) rmSync(canonicalRoot, { recursive: true, force: true });
+			else {
+				mkdirSync(path.dirname(pendingRoot), { recursive: true });
+				renameSync(canonicalRoot, pendingRoot);
+			}
+		} else if (canonicalGeneration !== state.retainedGenerationSha256) {
+			rmSync(canonicalRoot, { recursive: true, force: true });
+		}
+	}
+	if (!existsSync(canonicalRoot) && existsSync(transactionActive))
+		renameSync(transactionActive, canonicalRoot);
+	generationSha256(canonicalRoot, state.retainedGenerationSha256);
+	rmSync(transactionRoot, { recursive: true, force: true });
+	const next = rolledBackState(state, reason, true);
+	writeActivationState(repositoryRoot, next);
+	return rollbackResult(next, reason, true);
+}
+
+export function activatePendingPrivateWorkflowRelease(repositoryRoot, options = {}) {
+	repositoryRoot = path.resolve(repositoryRoot);
+	let state = readPrivateWorkflowActivationState(repositoryRoot);
+	if (!state) return { status: "current", reason: "no pending private workflow release" };
+	if (state.status === "activating")
+		return restoreActivationPrior(repositoryRoot, state, "interrupted activation recovered on start");
+	if (state.status === "rolling-back")
+		return recoverInterruptedRollback(repositoryRoot, state, "interrupted rollback recovered on start");
+	if (state.status !== "pending") {
+		if (state.status === "active")
+			rmSync(activationTransactionRoot(repositoryRoot), { recursive: true, force: true });
+		if (state.status === "rolled-back")
+			return {
+				status: state.status,
+				code: state.rollback?.code,
+				reason: state.rollback?.reason,
+				alreadyReported: true,
+				state,
+			};
+		return { status: state.status, state };
+	}
+	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
+	const pendingRoot = pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256);
+	const retainedRoot = retainedGenerationPath(repositoryRoot, state.retainedGenerationSha256);
+	const transactionRoot = activationTransactionRoot(repositoryRoot);
+	const transactionActive = path.join(transactionRoot, "active");
+	try {
+		generationSha256(canonicalRoot, state.activeGenerationSha256);
+		generationSha256(retainedRoot, state.retainedGenerationSha256);
+		generationSha256(pendingRoot, state.pendingGenerationSha256);
+		(options.verify ?? verifyPrivateWorkflowGeneration)(pendingRoot);
+		rmSync(transactionRoot, { recursive: true, force: true });
+		mkdirSync(transactionRoot, { recursive: true });
+		state = { ...state, status: "activating" };
+		writeActivationState(repositoryRoot, state);
+		renameSync(canonicalRoot, transactionActive);
+		options.interrupt?.("after-active-rename");
+		renameSync(pendingRoot, canonicalRoot);
+		options.interrupt?.("after-candidate-rename");
+		generationSha256(canonicalRoot, state.pendingGenerationSha256);
+		state = {
+			...state,
+			status: "active",
+			activeGenerationSha256: state.pendingGenerationSha256,
+		};
+		writeActivationState(repositoryRoot, state);
+		rmSync(transactionRoot, { recursive: true, force: true });
+		return {
+			status: "activated",
+			activeGenerationSha256: state.activeGenerationSha256,
+			retainedGenerationSha256: state.retainedGenerationSha256,
+		};
+	} catch (error) {
+		const reason = String(error?.message ?? error);
+		try {
+			if (state.status === "activating")
+				return restoreActivationPrior(repositoryRoot, state, reason);
+			generationSha256(canonicalRoot, state.activeGenerationSha256);
+			const next = rolledBackState(state, reason, true);
+			writeActivationState(repositoryRoot, next);
+			return rollbackResult(next, reason, true);
+		} catch (restoreError) {
+			return {
+				status: "failed",
+				code: "private-workflow-rollback",
+				reason: `${reason}; rollback failed: ${String(restoreError?.message ?? restoreError)}`,
+			};
+		}
+	}
+}
+
+export function rollbackPrivateWorkflowRelease(repositoryRoot, options = {}) {
+	repositoryRoot = path.resolve(repositoryRoot);
+	let state = readPrivateWorkflowActivationState(repositoryRoot);
+	if (!state) return { status: "current", reason: "no private workflow release to roll back" };
+	if (state.status === "pending") {
+		const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
+		generationSha256(canonicalRoot, state.activeGenerationSha256);
+		rmSync(pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256), {
+			recursive: true,
+			force: true,
+		});
+		state = rolledBackState(state, options.reason ?? "operator rollback before activation", false);
+		writeActivationState(repositoryRoot, state);
+		return rollbackResult(state, state.rollback.reason, false);
+	}
+	if (state.status === "rolled-back")
+		return rollbackResult(state, state.rollback?.reason ?? "already rolled back", false);
+	if (state.status !== "active")
+		return { status: "failed", code: "private-workflow-rollback", reason: `cannot roll back ${state.status} state` };
+	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
+	const retainedRoot = retainedGenerationPath(repositoryRoot, state.retainedGenerationSha256);
+	const pendingRoot = pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256);
+	const transactionRoot = activationTransactionRoot(repositoryRoot);
+	const transactionCurrent = path.join(transactionRoot, "current");
+	const transactionRestore = path.join(transactionRoot, "restore");
+	try {
+		generationSha256(canonicalRoot, state.activeGenerationSha256);
+		generationSha256(retainedRoot, state.retainedGenerationSha256);
+		rmSync(transactionRoot, { recursive: true, force: true });
+		mkdirSync(transactionRoot, { recursive: true });
+		cpSync(retainedRoot, transactionRestore, { recursive: true });
+		generationSha256(transactionRestore, state.retainedGenerationSha256);
+		state = { ...state, status: "rolling-back" };
+		writeActivationState(repositoryRoot, state);
+		renameSync(canonicalRoot, transactionCurrent);
+		options.interrupt?.("after-current-rename");
+		renameSync(transactionRestore, canonicalRoot);
+		options.interrupt?.("after-retained-rename");
+		generationSha256(canonicalRoot, state.retainedGenerationSha256);
+		rmSync(pendingRoot, { recursive: true, force: true });
+		mkdirSync(path.dirname(pendingRoot), { recursive: true });
+		renameSync(transactionCurrent, pendingRoot);
+		state = rolledBackState(state, options.reason ?? "operator requested rollback", false);
+		writeActivationState(repositoryRoot, state);
+		rmSync(transactionRoot, { recursive: true, force: true });
+		return rollbackResult(state, state.rollback.reason, false);
+	} catch (error) {
+		const reason = String(error?.message ?? error);
+		if (state.status === "rolling-back") {
+			try {
+				return recoverInterruptedRollback(repositoryRoot, state, reason);
+			} catch (recoveryError) {
+				return {
+					status: "failed",
+					code: "private-workflow-rollback",
+					reason: `${reason}; rollback recovery failed: ${String(recoveryError?.message ?? recoveryError)}`,
+				};
+			}
+		}
+		return { status: "failed", code: "private-workflow-rollback", reason };
+	}
+}
+
 function equalGenerations(left, right) {
 	const leftNames = Object.keys(left).sort();
 	const rightNames = Object.keys(right).sort();
@@ -377,15 +673,14 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 	});
 	if (classification.status !== "update") return classification;
 
-	const artifactRoot = path.join(repositoryRoot, ".ce-workflow", "work-runs", "compound-releases");
+	const artifactRoot = releaseArtifactRoot(repositoryRoot);
 	mkdirSync(artifactRoot, { recursive: true });
 	const quarantineRoot = mkdtempSync(path.join(artifactRoot, "quarantine-"));
 	const candidateRoot = path.join(quarantineRoot, "candidate");
 	const transactionPrior = path.join(quarantineRoot, "prior");
-	let canonicalMoved = false;
-	let candidateInstalled = false;
 	let auditPath;
 	let retentionPath;
+	let pendingPath;
 	let current;
 	try {
 		assertExactOwnedNames(canonicalRoot);
@@ -441,14 +736,9 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 		auditPath = path.join(evidenceRoot, "audit.json");
 		mkdirSync(evidenceRoot, { recursive: true });
 		writeFileSync(auditPath, json(audit));
-		renameSync(canonicalRoot, transactionPrior);
-		canonicalMoved = true;
-		await options.interrupt?.("after-prior-rename");
-		renameSync(candidateRoot, canonicalRoot);
-		candidateInstalled = true;
-		await options.interrupt?.("after-candidate-rename");
-		verifyPrivateWorkflowGeneration(canonicalRoot);
-		assertSnapshot(canonicalRoot, directorySnapshot(canonicalRoot), "promoted generation");
+		cpSync(canonicalRoot, transactionPrior, { recursive: true });
+		assertSnapshot(transactionPrior, current, "retained prior generation");
+		await options.interrupt?.("after-prior-retention");
 		mkdirSync(path.dirname(retentionPath), { recursive: true });
 		if (existsSync(retentionPath)) {
 			assertSnapshot(retentionPath, current, "retained prior generation");
@@ -456,31 +746,47 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 		} else {
 			renameSync(transactionPrior, retentionPath);
 		}
-		canonicalMoved = false;
+		pendingPath = pendingGenerationPath(repositoryRoot, generation);
+		mkdirSync(path.dirname(pendingPath), { recursive: true });
+		if (existsSync(pendingPath)) {
+			assertSnapshot(pendingPath, directorySnapshot(candidateRoot), "pending generation");
+			rmSync(candidateRoot, { recursive: true, force: true });
+		} else {
+			renameSync(candidateRoot, pendingPath);
+		}
+		await options.interrupt?.("after-pending-retention");
+		const state = {
+			schemaVersion: ACTIVATION_SCHEMA_VERSION,
+			status: "pending",
+			activeGenerationSha256: priorGeneration,
+			pendingGenerationSha256: generation,
+			retainedGenerationSha256: priorGeneration,
+			release: acquired.evidence.release,
+		};
+		const statePath = writeActivationState(repositoryRoot, state);
+		assertSnapshot(canonicalRoot, current, "canonical generation before restart");
 		return {
 			status: "promoted",
 			release: acquired.evidence.release,
 			generationSha256: generation,
 			ownedOutputs: PRIVATE_WORKFLOW_OWNED_OUTPUTS,
 			auditPath,
+			activationStatePath: statePath,
+			pendingGenerationPath: pendingPath,
 			retainedGenerationPath: retentionPath,
 			gates,
 			quarantineRemoved: true,
 		};
 	} catch (error) {
 		try {
-			if (candidateInstalled && existsSync(canonicalRoot))
-				rmSync(canonicalRoot, { recursive: true, force: true });
-			if (canonicalMoved) {
-				if (existsSync(transactionPrior)) renameSync(transactionPrior, canonicalRoot);
-				else if (retentionPath && existsSync(retentionPath)) cpSync(retentionPath, canonicalRoot, { recursive: true });
-			} else if (current && existsSync(canonicalRoot)) {
+			if (current && existsSync(canonicalRoot)) {
 				try {
 					assertSnapshot(canonicalRoot, current, "canonical generation");
 				} catch {
 					restoreSnapshot(canonicalRoot, current);
 				}
 			}
+			if (pendingPath) rmSync(pendingPath, { recursive: true, force: true });
 		} finally {
 			if (auditPath) rmSync(path.dirname(auditPath), { recursive: true, force: true });
 		}

@@ -36,8 +36,11 @@ import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.js";
 import { openWorkFleet } from "./work-fleet.js";
 import { dispatchPrivateWorkflow } from "./work-private-workflows.js";
 import {
+	activatePendingPrivateWorkflowRelease,
 	promoteVerifiedPrivateWorkflowRelease,
+	readPrivateWorkflowActivationState,
 	resolveLatestOfficialStableRelease,
+	rollbackPrivateWorkflowRelease,
 } from "./work-compound-catch-up.js";
 import {
 	createSubscriptionFooterController,
@@ -2234,6 +2237,17 @@ function notify(ctx, message, level = "info") {
 	const text = roadmapTerminology(message);
 	ctx.ui.notify(text, level);
 	if (ctx.mode === "print" || ctx.hasUI === false) console.log(text);
+}
+
+export function privateWorkflowActivationWarning(activation) {
+	if (
+		activation.alreadyReported ||
+		!(activation.status === "rolled-back" || activation.status === "failed") ||
+		!activation.code ||
+		!activation.reason
+	)
+		return undefined;
+	return `Private workflow activation ${activation.status} (${activation.code}): ${activation.reason}`;
 }
 
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
@@ -17049,7 +17063,7 @@ async function handleWorkCatchUpCommand(args, pi, ctx) {
 		notify(
 			ctx,
 			promotion.status === "promoted"
-				? `Private workflow release promoted: ${promotion.release}; audit=${promotion.auditPath}; restart retains prior=${promotion.retainedGenerationPath}`
+				? `Private workflow release promoted pending restart: ${promotion.release}; audit=${promotion.auditPath}; pending=${promotion.pendingGenerationPath}; retained prior=${promotion.retainedGenerationPath}`
 				: `Private workflow release ${promotion.status}: ${promotion.reason ?? "promotion stopped"}`,
 			promotion.status === "promoted" ? "info" : "warning",
 		);
@@ -18842,6 +18856,14 @@ async function handleWorkMenuCommand(ctx, pi) {
 	} catch {
 		// A missing verifier store simply has no analysis inbox.
 	}
+	let privateWorkflowRollbackAvailable = false;
+	try {
+		privateWorkflowRollbackAvailable = ["pending", "active"].includes(
+			readPrivateWorkflowActivationState(WORKFLOW_REPO_DIR)?.status,
+		);
+	} catch {
+		// Invalid activation state is reported during startup, not while rendering F7.
+	}
 	const items = [
 		{
 			value: "work-roadmap",
@@ -19088,6 +19110,16 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description:
 				"Review a project's workflow history and continue missed improvements.\nAvailable when self-improving reporting is enabled.",
 		},
+		...(privateWorkflowRollbackAvailable
+			? [
+					{
+						value: "private-workflow-rollback",
+						label: "↩️ Roll back private workflows",
+						description:
+							"Restore the retained verified private-workflow generation.\nThe complete active generation is preserved if rollback verification fails.",
+					},
+				]
+			: []),
 		{
 			value: "microcompact",
 			label: "🧽 Microcompact now",
@@ -19114,6 +19146,16 @@ async function handleWorkMenuCommand(ctx, pi) {
 		if (selected.value === "microcompact")
 			return requestManualMicrocompact(ctx);
 		if (selected.value === "fleet") return openWorkflowFleet(ctx, pi);
+		if (selected.value === "private-workflow-rollback") {
+			const result = rollbackPrivateWorkflowRelease(WORKFLOW_REPO_DIR);
+			return notify(
+				ctx,
+				result.status === "rolled-back"
+					? `Private workflows rolled back (${result.code}): ${result.activeGenerationSha256}`
+					: `Private workflow rollback failed: ${result.reason}`,
+				result.status === "rolled-back" ? "info" : "warning",
+			);
+		}
 		if (selected.value === "cswap") {
 			await handleCswapMenu(ctx, cswapBin);
 			continue;
@@ -22381,6 +22423,21 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_start", (_event, ctx) => {
+		try {
+			const activation = activatePendingPrivateWorkflowRelease(WORKFLOW_REPO_DIR);
+			if (activation.status === "activated")
+				notify(
+					ctx,
+					`Private workflow release activated after restart: ${activation.activeGenerationSha256}`,
+					"info",
+				);
+			else {
+				const warning = privateWorkflowActivationWarning(activation);
+				if (warning) notify(ctx, warning, "warning");
+			}
+		} catch (error) {
+			notify(ctx, `Private workflow activation blocked: ${formatError(error)}`, "warning");
+		}
 		syncImprovementReportTool(pi, ctx);
 		subscriptionFooterController.start(ctx);
 		const runtime = {

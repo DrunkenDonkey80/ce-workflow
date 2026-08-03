@@ -5366,17 +5366,30 @@
       ],
       "dependencyEdges": [],
       "description": "Carry one promoted U5 generation through the actual next-start lifecycle: persist pending and retained generation state, activate only on restart, verify the complete candidate before use, expose one coded rollback action, and preserve or restore the prior complete generation on interruption or activation failure.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-5.11",
       "labels": [],
       "notes": [
-        "wo:execution-agent | review-gate: required | Covered plan boundary: all U6 as one restart-to-observable-dispatch tracer using U5 retained generations; excludes U7 legacy removal."
+        "wo:execution-agent | review-gate: required | Covered plan boundary: all U6 as one restart-to-observable-dispatch tracer using U5 retained generations; excludes U7 legacy removal.",
+        "Implementation: persisted versioned pending/active/retained private-workflow activation state; promotion now retains complete A while staging verified B; session_start fully verifies and generation-swaps B; F7 exposes coded private-workflow rollback; activation/rollback interruption and invalid retained/candidate recovery never mix outputs.\nFiles: extensions/work-compound-catch-up.js; extensions/work-models.js; scripts/test-work-private-workflows.mjs.\nRisks: activation uses whole-directory rename transactions plus Windows-safe state backup recovery; no U7 legacy-removal scope included.",
+        "wo:verify-check acceptance=checked\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs\nResult: PASS; private workflow suite 60 offline checks with zeroSurface=true; work-goal helpers passed.\nDiagnostics: node --check on all three changed JS/MJS files and git diff --check passed; edit-time JavaScript/TypeScript diagnostics clean.\nCoverage: zero CE surface before promotion, while B pending, after restart activation, and after rollback; interruption, missing/mutated retained generation, failed next-start verification, successful restart, and coded rollback all passed.\nNo staged files: git diff --cached --name-only returned empty.\nRemaining: independent review gate only.",
+        "wo:review-scope [\"extensions/work-compound-catch-up.js\",\"extensions/work-models.js\",\"scripts/test-work-private-workflows.mjs\"]",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:22423 - session_start warns on every start once activation state is persisted terminal rolled-back; guard the warning on a freshly produced result (e.g. only notify when activation.code/activation.reason is set) so the message never renders \\\"rolled-back (undefined): undefined\\\"\",\"extensions/work-compound-catch-up.js:358 - terminal-state early return drops the persisted rollback identity; return code/reason from state.rollback (or an explicit alreadyReported flag) so callers can distinguish a fresh coded rollback from an already-reported one\"]}",
+        "Fix: terminal rolled-back activation results now preserve rollback code/reason and set alreadyReported=true; session_start warning rendering requires a fresh, coded result and suppresses persisted terminal state; focused regression covers quiet persisted rollback and actor-visible fresh rollback. Files: extensions/work-compound-catch-up.js; extensions/work-models.js; scripts/test-work-private-workflows.mjs.",
+        "wo:verify-check acceptance=checked | PASS | node --check extensions/work-compound-catch-up.js && node --check extensions/work-models.js && node --check scripts/test-work-private-workflows.mjs && git diff --check; node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs => 61 offline checks, zeroSurface=true, work-goal helpers ok; JavaScript/TypeScript edit-time diagnostics clean; git diff --cached --name-only empty.",
+        "wo:fix PASS reviewer findings fixed: persisted rolled-back identity retained with alreadyReported marker; session_start warns only for fresh coded rollback/failure; focused regression and required suites pass.",
+        "wo:review PASS pending/retained activation state, restart-only activation with full verification, and coded rollback verified; node scripts/test-work-private-workflows.mjs => 61 offline checks zeroSurface=true (incl. activation/rollback interruption, missing/mutated retained, failed next-start verification, quiet persisted rollback) and node scripts/test-work-goal.mjs => ok; no staged files.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs\nOutput: ed next-start check preserves complete A and never mixes generations\nok 57 - failed-verification next-start check preserves complete A and never mixes generations\nok 58 - canonical mutation during audit restores exact prior bytes and removes quarantine\nok 59 - mutated verified closure rejection\nok 60 - unverified source generation rejection\nok 61 - clean package runtime exposes zero private or CE surface\nPASS test-work-private-workflows (61 offline checks) zeroSurface=true\nok - work-goal helpers"
       ],
       "parentId": "work-5",
-      "status": "open",
+      "status": "closed",
       "title": "Activate a retained release on restart with coded rollback",
       "type": "task",
-      "updatedAt": "2026-08-03T22:15:06.169Z"
+      "updatedAt": "2026-08-03T22:47:23.854Z"
     },
     "work-5.12": {
       "acceptance": "1. Focused fixtures run with the legacy package present and absent and prove the active private release, catch-up, restart, and rollback behavior is identical while no runtime, evaluation, prompt, policy, package, README, or catch-up-data path depends on the legacy root; command: node scripts/test-work-private-workflows.mjs && node scripts/test-work-goal.mjs && node scripts/test-work-optimization-helpers.mjs. 2. The same command proves legacy detection only returns an actor-visible recommendation containing pi remove npm:pi-compound-engineering and never invokes a package manager. 3. Cleanup fixtures preview the exact marker-bounded removal, mutate only after explicit confirmation, preserve every surrounding byte, no-op when markers are absent, and refuse missing, reversed, duplicated, or malformed markers without changing the file. 4. package.json no longer declares pi-compound-engineering and package verification represented by the focused fixtures remains green. 5. Independent review appends wo:review PASS; review-gate: required.",
@@ -5620,7 +5633,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-03T22:31:34.163Z"
+    "updatedAt": "2026-08-03T22:47:23.854Z"
   },
   "schemaVersion": 1
 }
