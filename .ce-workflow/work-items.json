@@ -3884,6 +3884,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-03T22:11:07.917Z",
           "workflowId": "019fc263-a1c8-7f03-b4ad-a1d09d47129d"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25",
@@ -3891,12 +3894,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Reconciliation: this atomic shell-quoting claim is covered by canonical work-2.61, commit bb1a66c. It is related-distinct from work-2.45's already-fixed absolute-path selection: the shared outcome now requires JSON-quoted absolute helper commands in generated planner/worker handoffs and explicit packaged-role enforcement. work helper handoff fixtures passed verifies Windows quoting and rejects an unquoted helper command.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-handoffs.mjs\nOutput: work helper handoff fixtures passed"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A work-planner received the exact Windows helper path `C:\\soft\\ce-workflow\\scripts\\work-helper.mjs` but invoked it unquoted as `no",
       "type": "task",
-      "updatedAt": "2026-08-04T05:15:47.860Z"
+      "updatedAt": "2026-08-04T05:54:21.241Z"
     },
     "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7": {
       "createdAt": "2026-08-03T22:12:58.507Z",
@@ -5776,7 +5782,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-04T05:54:06.748Z"
+    "updatedAt": "2026-08-04T05:54:21.241Z"
   },
   "schemaVersion": 1
 }
