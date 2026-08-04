@@ -3795,6 +3795,9 @@
           "producer": "LPG",
           "submittedAt": "2026-08-03T13:21:32.954Z",
           "workflowId": "019fc638-9ff4-7b42-b08b-60ede49dbf9b"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6",
@@ -3802,12 +3805,17 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Reconciliation: atom A (mandatory specialist auth preflight) covered by canonical work-2.60, commit 438cd19; focused routing/action-lease fixtures prove unhealthy-primary fallback, all-unavailable no-launch/no-claim, and healthy-primary launch. Atom B (resolved helper path) is shared with work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25 and covered by canonical work-2.61, commit bb1a66c; helper-handoff fixtures prove JSON-quoted absolute paths and packaged role enforcement. Both locally-owned atoms are closed and coexist; work-2.47 was related-distinct upstream continuation lifecycle behavior.",
+        "wo:review-scope []",
+        "wo:review PASS report is fully reconciled to closed canonical fixes work-2.60 (438cd19) and work-2.61 (bb1a66c), with focused and package verification evidence recorded",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-lead-escalation.mjs && node scripts/test-work-action-leases.mjs && node scripts/test-work-helper-handoffs.mjs\nOutput: ok - Lead routing, fallback strategy, and bounded escalation\nok - durable action leases and one-step coded driver\nwork helper handoff fixtures passed"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The mandatory exact `work-worker` launch for LPG work-9.1 started, then remained activity-silent and exposed `No API key found for",
       "type": "task",
-      "updatedAt": "2026-08-04T05:15:47.685Z"
+      "updatedAt": "2026-08-04T05:54:06.748Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -5768,7 +5776,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-04T05:52:03.401Z"
+    "updatedAt": "2026-08-04T05:54:06.748Z"
   },
   "schemaVersion": 1
 }
