@@ -108,9 +108,13 @@ function highState(cwd) {
 	);
 	return { state, direct };
 }
-function fakePi(outcomes, seen) {
+function fakePi(outcomes, seen, credential = () => ({ ok: true, apiKey: "fixture" })) {
 	let reply;
 	return {
+		modelRegistry: {
+			find: (provider, id) => ({ provider, id }),
+			getApiKeyAndHeaders: credential,
+		},
 		events: {
 			on(_name, handler) {
 				reply = handler;
@@ -162,6 +166,86 @@ try {
 	assert(
 		alternated.routing.candidates[0].id === "backup",
 		"round-robin alternates eligible candidates durably through the action ledger",
+	);
+
+	const unhealthyPrimary = fixture("unhealthy-primary");
+	cleanup.push(unhealthyPrimary);
+	const unhealthyRoute = highState(unhealthyPrimary);
+	const unhealthyAttempts = [];
+	const unhealthyChecks = [];
+	const backupLaunch = await launchDirectAction(
+		unhealthyPrimary,
+		unhealthyRoute.state,
+		unhealthyRoute.direct,
+		fakePi([true], unhealthyAttempts, (model) => {
+			unhealthyChecks.push(`${model.provider}/${model.id}`);
+			return model.provider === "main-provider"
+				? { ok: false, error: "No API key for main-provider" }
+				: { ok: true, apiKey: "fixture" };
+		}),
+		{ mode: "rpc" },
+	);
+	assert(
+		backupLaunch.spawned.ok &&
+			unhealthyChecks.join(",") ===
+				"main-provider/builder,backup-provider/lead" &&
+			unhealthyAttempts.join(",") === "backup-provider/lead" &&
+			currentWorkActionLeases(unhealthyPrimary).at(-1).selectedCandidate ===
+				"backup" &&
+			currentWorkActionLeases(unhealthyPrimary).at(-1)
+				.degradedIndependence === false,
+		"credential preflight skips an unauthenticated Main and launches the authenticated Backup",
+	);
+
+	const unavailable = fixture("preflight-unavailable");
+	cleanup.push(unavailable);
+	const unavailableRoute = highState(unavailable);
+	const unavailableAttempts = [];
+	const unavailableLeaseCount = currentWorkActionLeases(unavailable).length;
+	const unavailableLaunch = await launchDirectAction(
+		unavailable,
+		unavailableRoute.state,
+		unavailableRoute.direct,
+		fakePi([], unavailableAttempts, (model) => ({
+			ok: false,
+			error: `No API key for ${model.provider}`,
+		})),
+		{ mode: "rpc" },
+	);
+	const unavailableEvidence = unavailableLaunch.spawned.infrastructureEvidence;
+	assert(
+		unavailableLaunch.state.action === "model-routing-unavailable" &&
+			unavailableAttempts.length === 0 &&
+			currentWorkActionLeases(unavailable).length === unavailableLeaseCount &&
+			loadStore(unavailable).items["W-1"].status === "open" &&
+			unavailableEvidence?.candidates
+				.map((candidate) => `${candidate.id}:${candidate.model}:${candidate.reason}`)
+				.join("|") ===
+				"main:main-provider/builder:No API key or login is available.|backup:backup-provider/lead:No API key or login is available.",
+		"all-unavailable preflight performs no RPC or mutable lease/claim and returns deterministic candidate evidence",
+	);
+
+	const healthyPrimary = fixture("healthy-primary");
+	cleanup.push(healthyPrimary);
+	const healthyRoute = highState(healthyPrimary);
+	const healthyAttempts = [];
+	const healthyChecks = [];
+	const primaryLaunch = await launchDirectAction(
+		healthyPrimary,
+		healthyRoute.state,
+		healthyRoute.direct,
+		fakePi([true], healthyAttempts, (model) => {
+			healthyChecks.push(`${model.provider}/${model.id}`);
+			return { ok: true, apiKey: "fixture" };
+		}),
+		{ mode: "rpc" },
+	);
+	assert(
+		primaryLaunch.spawned.ok &&
+			healthyChecks.join(",") ===
+				"main-provider/builder,backup-provider/lead" &&
+			healthyAttempts.join(",") === "main-provider/builder",
+		"healthy Main launches normally after registry credential lookups only, without a provider inference probe",
 	);
 
 	const fallback = fixture("fallback");

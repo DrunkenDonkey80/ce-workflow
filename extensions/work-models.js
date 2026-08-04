@@ -8360,9 +8360,9 @@ function acquireDirectActionLease(cwd, state, direct, runtime = {}) {
 		// Missing assurance input preserves the one-model normal compatibility floor.
 	}
 	const selected = direct.routing?.candidates?.[0];
-	const main = direct.routing?.candidates?.find(
-		(candidate) => candidate.id === "main",
-	);
+	const main =
+		direct.routing?.mainCandidate ??
+		direct.routing?.candidates?.find((candidate) => candidate.id === "main");
 	const fallback = selected?.id === "backup";
 	const selectedProvider = String(selected?.model ?? "").split("/")[0];
 	const mainProvider = String(main?.model ?? "").split("/")[0];
@@ -8475,7 +8475,104 @@ function watchDirectActionLease(cwd, leaseId, runtime) {
 	actionLeaseWatchers.set(leaseId, timer);
 }
 
+function explicitDirectModel(candidate) {
+	return Boolean(
+		candidate?.model &&
+			![INHERIT_MODEL, "mixed"].includes(candidate.model),
+	);
+}
+
+async function preflightDirectModelCandidates(direct, registry) {
+	const candidates = direct.routing?.candidates?.length
+		? direct.routing.candidates
+		: [{ id: "main" }];
+	const results = [];
+	for (const candidate of candidates) {
+		if (!explicitDirectModel(candidate)) {
+			results.push({ candidate, ok: true });
+			continue;
+		}
+		const parsed = splitModelId(candidate.model);
+		let reason;
+		if (!parsed) reason = "Model ID must be provider/model.";
+		else if (!registry?.find || !registry?.getApiKeyAndHeaders)
+			reason = "Pi model registry credential lookup is unavailable.";
+		else {
+			try {
+				const model = registry.find(parsed.provider, parsed.id);
+				if (!model) reason = "Model is not registered in Pi.";
+				else {
+					const auth = await registry.getApiKeyAndHeaders(model);
+					if (!auth?.ok || !auth.apiKey)
+						reason = agentHealthError(
+							auth?.ok
+								? `No API key for ${parsed.provider}`
+								: auth?.error ||
+									`Authentication failed for ${parsed.provider}`,
+							);
+				}
+			} catch (error) {
+				reason = agentHealthError(error);
+			}
+		}
+		results.push({ candidate, ok: !reason, reason });
+	}
+	const healthy = results.filter((result) => result.ok).map((result) => result.candidate);
+	const evidence = {
+		version: 1,
+		classification: "model-auth-preflight",
+		candidates: results.map(({ candidate, ok, reason }) => ({
+			id: candidate.id ?? "main",
+			model: explicitDirectModel(candidate) ? candidate.model : "inherit-current",
+			ok,
+			...(reason ? { reason } : {}),
+		})),
+	};
+	if (!healthy.length) {
+		const failures = evidence.candidates
+			.map((candidate) => `${candidate.id} (${candidate.model}): ${candidate.reason}`)
+			.join("; ");
+		return {
+			ok: false,
+			evidence,
+			message: `Direct model preflight failed: ${failures}. Configure or authenticate one listed provider/model, then retry.`,
+		};
+	}
+	return {
+		ok: true,
+		evidence,
+		direct: {
+			...direct,
+			routing: {
+				...direct.routing,
+				configuredCandidateCount: candidates.length,
+				mainCandidate: candidates.find((candidate) => candidate.id === "main"),
+				candidates: healthy,
+			},
+		},
+	};
+}
+
 export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
+	const preflight = await preflightDirectModelCandidates(
+		direct,
+		runtime.modelRegistry ?? pi?.modelRegistry,
+	);
+	if (!preflight.ok)
+		return {
+			state: {
+				...state,
+				action: "model-routing-unavailable",
+				message: preflight.message,
+				infrastructureEvidence: preflight.evidence,
+			},
+			spawned: {
+				ok: false,
+				message: preflight.message,
+				infrastructureEvidence: preflight.evidence,
+			},
+		};
+	direct = preflight.direct;
 	let lease;
 	try {
 		lease = acquireDirectActionLease(cwd, state, direct, runtime);
@@ -8505,7 +8602,9 @@ export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
 		message: "No configured model candidate launched",
 	};
 	for (const candidate of candidates) {
-		const main = candidates.find((item) => item.id === "main");
+		const main =
+			direct.routing?.mainCandidate ??
+			candidates.find((item) => item.id === "main");
 		const candidateProvider = String(candidate.model ?? "").split("/")[0];
 		const mainProvider = String(main?.model ?? "").split("/")[0];
 		const fallback = candidate.id === "backup";
@@ -8542,7 +8641,10 @@ export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
 			return { state: claimedState, spawned, lease };
 		}
 	}
-	if (candidates.length === 1 && lease.semanticRole !== "lead") {
+	if (
+		(direct.routing?.configuredCandidateCount ?? candidates.length) === 1 &&
+		lease.semanticRole !== "lead"
+	) {
 		let retryableState = claimedState;
 		if (claimedState.handoffClaimed) {
 			const reopened = updateWorkItemNative(cwd, state.selectedWorkItem.id, {
@@ -19705,6 +19807,7 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 				goalStatus: () => activeWorkGoal?.status,
 				targetId: target,
 				currentModel: currentModelId(ctx),
+				modelRegistry: ctx.modelRegistry,
 				notify: (next) =>
 					notify(ctx, renderWorkResumeText(next), next.ok ? "info" : "warning"),
 			},
@@ -19749,6 +19852,7 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 			session: ctx.sessionManager?.getSessionId?.(),
 			currentSession: () => ctx.sessionManager?.getSessionId?.(),
 			goalStatus: () => activeWorkGoal?.status,
+			modelRegistry: ctx.modelRegistry,
 			notify: (next) =>
 				notify(ctx, renderWorkResumeText(next), next.ok ? "info" : "warning"),
 		});
@@ -19946,6 +20050,7 @@ async function handleWorkflowAction(
 			session: ctx.sessionManager?.getSessionId?.(),
 			currentSession: () => ctx.sessionManager?.getSessionId?.(),
 			goalStatus: () => activeWorkGoal?.status,
+			modelRegistry: ctx.modelRegistry,
 			notify: (next) =>
 				notify(ctx, renderWorkResumeText(next), next.ok ? "info" : "warning"),
 		});
@@ -22458,6 +22563,7 @@ export default function workModelsExtension(pi) {
 			session: ctx.sessionManager?.getSessionId?.(),
 			currentSession: () => ctx.sessionManager?.getSessionId?.(),
 			goalStatus: () => activeWorkGoal?.status,
+			modelRegistry: ctx.modelRegistry,
 		};
 		if (ctx.mode !== "print") {
 			reconcilePendingDirectRuns(ctx.cwd, runtime);
@@ -22600,6 +22706,7 @@ export default function workModelsExtension(pi) {
 			session: ctx.sessionManager?.getSessionId?.(),
 			currentSession: () => ctx.sessionManager?.getSessionId?.(),
 			goalStatus: () => activeWorkGoal?.status,
+			modelRegistry: ctx.modelRegistry,
 			notify: (state) =>
 				notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning"),
 		});
@@ -23051,6 +23158,7 @@ export default function workModelsExtension(pi) {
 			session: ctx.sessionManager?.getSessionId?.(),
 			currentSession: () => ctx.sessionManager?.getSessionId?.(),
 			goalStatus: () => activeWorkGoal?.status,
+			modelRegistry: ctx.modelRegistry,
 			notify: (state) =>
 				notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning"),
 		});

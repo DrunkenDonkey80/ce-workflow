@@ -3572,6 +3572,50 @@
       "type": "task",
       "updatedAt": "2026-07-20T10:05:06.985Z"
     },
+    "work-2.60": {
+      "acceptance": "Focused direct-launch fixtures prove an unauthenticated primary is skipped for an authenticated backup, an all-unavailable route performs no subagent launch and leaves the work item retryable with actionable provider/model errors, and a healthy primary launches normally without an extra remote inference probe.",
+      "createdAt": "2026-08-04T05:15:34.896Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Before a coded mandatory exact-role launch acquires or claims mutable work, validate each configured model candidate against the active Pi model registry/authentication and select the first healthy candidate; if none is healthy, fail fast with deterministic actionable infrastructure evidence rather than waiting for needs-attention.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.60",
+      "labels": [],
+      "notes": [
+        "Canonical atom from work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6. Classification: locally-owned, related-distinct from closed upstream continuation lifecycle work-2.47; this claim is pre-launch candidate authentication/routing in ce-workflow.",
+        "Implemented local direct-role model preflight before lease acquisition/claim. Explicit candidates are checked only through Pi registry find + getApiKeyAndHeaders; unhealthy candidates are removed, inherited/current routing is preserved, and all-unavailable returns deterministic candidate evidence without RPC or mutation.\nFiles changed: extensions/work-models.js; scripts/test-work-lead-escalation.mjs; scripts/test-work-action-leases.mjs.\nwo:verify-check node scripts/test-work-lead-escalation.mjs PASS; node scripts/test-work-action-leases.mjs PASS; npm run verify:quiet PASS; proactive edit-time JS/TS diagnostics clean.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-action-leases.mjs\",\"scripts/test-work-lead-escalation.mjs\"]",
+        "wo:review PASS preflight filters unauthenticated candidates before lease/claim, preserves authenticated fallback routing, and focused lease/escalation tests pass",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-lead-escalation.mjs && node scripts/test-work-action-leases.mjs\nOutput: ok - Lead routing, fallback strategy, and bounded escalation\nok - durable action leases and one-step coded driver"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Preflight mandatory specialist model authentication",
+      "type": "bug",
+      "updatedAt": "2026-08-04T05:34:05.940Z"
+    },
+    "work-2.61": {
+      "acceptance": "Focused handoff/agent-contract fixtures prove generated planner and worker commands render as node followed by a JSON-quoted absolute helper path, packaged roles require quoting the exact supplied path, and no generated specialist command assumes target-local scripts/work-helper.mjs.",
+      "createdAt": "2026-08-04T05:15:35.068Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Every generated specialist handoff and packaged role contract must use the resolved absolute work-helper.mjs path and explicitly require shell-safe quoting when invoking it, including Windows paths, so valid helper commands cannot be misparsed or fall back to target-local scripts.",
+      "evidence": [],
+      "id": "work-2.61",
+      "labels": [],
+      "notes": [
+        "Canonical shared helper atom from work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6 and work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25. Absolute path selection is already covered by work-2.45; shell-safe role enforcement is related-distinct and locally owned."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Make specialist helper commands absolute and shell-safe",
+      "type": "bug",
+      "updatedAt": "2026-08-04T05:15:35.068Z"
+    },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
       "createdAt": "2026-07-20T09:58:53.226Z",
@@ -3719,7 +3763,10 @@
     },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.60",
+        "work-2.61"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The mandatory exact `work-worker` launch for LPG work-9.1 started, then remained activity-silent and exposed `No API key found for openai-codex` only in its transcript after the needs-attention timer. The target checkout also has no local `scripts/work-helper.mjs`, so coded commands require the source-checkout helper path.\nExpected: Before launching a mandatory specialist, ce-workflow should validate that the role's effective provider is authenticated (or select a configured available model) and fail fast with a deterministic actionable result. Generated handoffs/helper examples should resolve the installed/source helper path rather than assuming every target project contains scripts/work-helper.mjs.\nImpact: Mandatory worker routing cannot proceed even though the parent session is operational, and the delayed auth failure wastes a goal turn. The incorrect helper path also causes avoidable MODULE_NOT_FOUND failures during recovery.\nSuggested improvement: Add specialist-model/provider preflight before lease launch and centralize helper path resolution in generated commands.",
       "displayMetadata": {
@@ -3753,7 +3800,7 @@
       "status": "open",
       "title": "Self-improvement report: The mandatory exact `work-worker` launch for LPG work-9.1 started, then remained activity-silent and exposed `No API key found for",
       "type": "task",
-      "updatedAt": "2026-08-03T13:21:32.961Z"
+      "updatedAt": "2026-08-04T05:15:47.685Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -3798,9 +3845,15 @@
     },
     "work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25": {
       "createdAt": "2026-08-03T22:11:07.924Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.61"
+      ],
       "dependencyEdges": [],
       "description": "Observed: A work-planner received the exact Windows helper path `C:\\soft\\ce-workflow\\scripts\\work-helper.mjs` but invoked it unquoted as `node C:\\soft\\...`, so the shell path was resolved incorrectly and planning stopped with MODULE_NOT_FOUND before any mutation.\nExpected: Specialist handoffs or agent instructions should force shell-safe quoting of absolute helper paths on Windows (for example `node \"C:\\soft\\ce-workflow\\scripts\\work-helper.mjs\" ...`) so deterministic planning does not fail on a valid supplied path.\nImpact: The autonomous roadmap loop stopped at work-5.9 and required a full planner relaunch despite a valid helper and no product blocker, wasting one specialist run and context.\nSuggested improvement: Add a tested Windows-path quoting rule to generated planner handoffs and the work-planner agent contract.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Quote Windows helper paths in planner handoffs"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/f56d2a43-602a-41f4-97e8-8f8121e6d87f",
@@ -3828,13 +3881,17 @@
       "status": "open",
       "title": "Self-improvement report: A work-planner received the exact Windows helper path `C:\\soft\\ce-workflow\\scripts\\work-helper.mjs` but invoked it unquoted as `no",
       "type": "task",
-      "updatedAt": "2026-08-03T22:11:07.924Z"
+      "updatedAt": "2026-08-04T05:15:47.860Z"
     },
     "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7": {
       "createdAt": "2026-08-03T22:12:58.507Z",
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: Fresh work-planner runs transiently observe `AGENTS.md` as modified during agent startup even though the parent verifies its working-tree blob equals HEAD immediately before and after (`git hash-object AGENTS.md` equals `git rev-parse HEAD:AGENTS.md`). The planner baseline guard therefore blocked twice on a false dirty path.\nExpected: Planner dirty-tree intake should compare against the parent-supplied launch baseline or tolerate a verified managed AGENTS startup overlay when the canonical file returns byte-identical to HEAD, without weakening unrelated-dirt protection.\nImpact: Roadmap work-5.9 could not be sliced after two valid launches; the loop spent two planner runs on a transient extension side effect rather than planning U5-U7.\nSuggested improvement: Record parent launch-status hashes in the handoff and have the planner guard distinguish a known managed AGENTS overlay from user-authored dirt.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Ignore verified transient AGENTS startup overlays"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/df7ed475-f9d0-4185-ad19-e077a3a2748b",
@@ -5344,6 +5401,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Replace npm-oriented catch-up with one end-to-end stable-release path: classify current/update/unknown/blocked/failed/non-writable/unrelated-dirt states, stage a quarantined deterministic candidate from the verified U1 source through the U2 translator, emit an audit diff and exact owned-output declaration, run the complete U4 parity and package gates, and atomically promote only a fully verified candidate while retaining the prior generation.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Generate and safely promote a verified private workflow release"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5374,6 +5435,10 @@
       ],
       "dependencyEdges": [],
       "description": "Carry one promoted U5 generation through the actual next-start lifecycle: persist pending and retained generation state, activate only on restart, verify the complete candidate before use, expose one coded rollback action, and preserve or restore the prior complete generation on interruption or activation failure.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Activate a retained release on restart with coded rollback"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5407,6 +5472,10 @@
       ],
       "dependencyEdges": [],
       "description": "After U5 promotion and U6 restart/rollback proof, remove runtime and policy coupling to pi-compound-engineering from package metadata, README, catch-up data, evaluation roots, prompts/policies, and stale assertions. Detect an installed legacy package and recommend but never execute pi remove npm:pi-compound-engineering; extend the existing marker-bounded instruction cleanup seam with preview plus explicit confirmation.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Retire legacy CE coupling with preview-only cleanup"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5436,6 +5505,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Implement Planning Contract U1 only: verify a pinned official EveryInc stable release as inert readable source, reject unsafe or unknown source shapes, and produce the authoritative current CE call-site/resource-closure inventory. Do not add runtime dispatch or migrate any F7 behavior in this slice.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prove official CE source isolation and freeze parity inventory"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5464,6 +5537,10 @@
       ],
       "dependencyEdges": [],
       "description": "Implement Planning Contract U2 only: deterministically translate the verified brainstorm closure from U1, add the sole internal allowlisted dispatcher, and route F7 Brainstorm through that private verified resource. Do not migrate planning or any other CE-backed path.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Dispatch the private brainstorm workflow end to end"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5492,6 +5569,10 @@
       ],
       "dependencyEdges": [],
       "description": "Implement Planning Contract U3 only: translate the verified planning closure through U2's existing dispatcher, route every F7 plan/master/slice-plan entry through it, and make candidate brainstorm/plan evaluation resolve private resources while retaining the legacy package only as an explicit comparison baseline. Do not migrate debug, review, simplify, browser, POV, explain, catch-up, activation, or legacy removal.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Dispatch private planning and isolate candidate evaluation"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5518,6 +5599,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Slice remaining Planning Contract units U4-U7 after U1-U3 evidence: complete CE-backed flow parity, stable-release catch-up and promotion, activation/rollback, and legacy retirement.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Plan remaining CE workflow parity and catch-up"
+      },
       "evidence": [],
       "id": "work-5.5",
       "labels": [
@@ -5540,6 +5625,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Complete U4's ce-debug and ce-compound tracer: extend the verified U1-U3 translator and sole internal dispatcher, route the work-debugger investigation path and post-fix/big-work learning-capture gate through private resources, and preserve their existing observable contracts without migrating finish review/browser/simplify or catch-up POV/explain.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Dispatch private debugging and learning capture"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5571,6 +5660,10 @@
       ],
       "dependencyEdges": [],
       "description": "Complete U4's ce-simplify-code, ce-code-review, and ce-test-browser tracer as one observable finish pipeline: extend the existing verified dispatcher and route each configured quality gate through its private specialist resource while preserving gate order, bounded review cycles, UI-diff selection, waivers, and commit/close blocking. Do not migrate catch-up POV/explain or U5 promotion.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Dispatch private finish quality gates"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5601,6 +5694,10 @@
       ],
       "dependencyEdges": [],
       "description": "Finish U4 with the ce-pov and ce-explain catch-up tracer: route actionable-candidate grading and only-when-needed technical explanation through verified private resources, preserve adopt/defer/skip/no-action decisions and durable baseline evidence, and make the complete observable parity matrix the coded prerequisite for later U5 promotion. Do not implement stable-release generation or promotion.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Dispatch private catch-up candidate review"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -5628,6 +5725,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Slice remaining Planning Contract U5-U7 after all nine U4 parity rows pass: stable-release generation and promotion, restart activation/rollback/no-discovery, and legacy retirement/operator cleanup.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Plan verified catch-up, activation, and legacy retirement"
+      },
       "evidence": [],
       "id": "work-5.9",
       "labels": [
@@ -5652,7 +5753,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-03T23:14:26.314Z"
+    "updatedAt": "2026-08-04T05:34:05.940Z"
   },
   "schemaVersion": 1
 }

@@ -169,6 +169,10 @@ for (const mode of ["tui", "rpc", "autonomous"]) {
 		let requests = 0;
 		let reply;
 		const pi = {
+			modelRegistry: {
+				find: (provider, id) => ({ provider, id }),
+				getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "fixture" }),
+			},
 			events: {
 				on(_name, handler) {
 					reply = handler;
