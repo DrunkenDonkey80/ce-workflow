@@ -3604,17 +3604,24 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Every generated specialist handoff and packaged role contract must use the resolved absolute work-helper.mjs path and explicitly require shell-safe quoting when invoking it, including Windows paths, so valid helper commands cannot be misparsed or fall back to target-local scripts.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.61",
       "labels": [],
       "notes": [
-        "Canonical shared helper atom from work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6 and work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25. Absolute path selection is already covered by work-2.45; shell-safe role enforcement is related-distinct and locally owned."
+        "Canonical shared helper atom from work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6 and work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25. Absolute path selection is already covered by work-2.45; shell-safe role enforcement is related-distinct and locally owned.",
+        "Implementation:\nFiles changed: agents/work-planner.md, agents/work-worker.md, extensions/work-models.js, scripts/test-work-helper-handoffs.mjs.\nAdded one direct-handoff rule requiring the supplied JSON-quoted absolute helper path for every shell invocation, matching explicit planner/worker packaged-role rules and a quoted worker claim example. Added focused planner/worker generated-handoff and role-contract fixtures, including rejection of an unquoted Windows path.\nRemaining work: independent review and commit.",
+        "wo:verify-check PASS\nCommands: node scripts/test-work-helper-handoffs.mjs; git diff --check; npm run verify:quiet.\nResult: focused fixtures passed, diff diagnostics passed (line-ending warnings only), and all package checks passed.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-handoffs.mjs\nOutput: work helper handoff fixtures passed"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Make specialist helper commands absolute and shell-safe",
       "type": "bug",
-      "updatedAt": "2026-08-04T05:15:35.068Z"
+      "updatedAt": "2026-08-04T05:41:23.495Z"
     },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
@@ -5753,7 +5760,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-04T05:34:05.940Z"
+    "updatedAt": "2026-08-04T05:41:23.495Z"
   },
   "schemaVersion": 1
 }

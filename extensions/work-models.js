@@ -8223,6 +8223,7 @@ function directRoleTask(state, cwd) {
 		selected?.changedPaths?.length;
 	return [
 		"Precomputed work-orchestrator handoff. Run this role directly; do not delegate or rediscover target selection.",
+		`Every shell command that invokes the helper must use the exact supplied absolute path shell-quoted as ${helper}, especially on Windows; never invoke it bare, unquoted, or from a target-local path.`,
 		...workflowPromptMetadata(),
 		state.epic
 			? `Roadmap: ${state.epic.id} — ${state.epic.title}`
