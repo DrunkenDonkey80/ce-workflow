@@ -3919,6 +3919,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-03T22:12:58.501Z",
           "workflowId": "019fc263-a1c8-7f03-b4ad-a1d09d47129d"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7",
@@ -3926,12 +3929,17 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned and related-distinct from work-2.49. The older fix tolerates formatter-only instruction dirt; this report proves a transient managed AGENTS overlay can be substantive while the parent launch baseline and post-run canonical blob are byte-identical to HEAD. Reuse this atomic report as the execution item. Required outcome: bind planner intake to a parent-captured HEAD/working-tree AGENTS hash, tolerate only that known clean managed-overlay path when no staged/untracked/unrelated dirt exists, and retain fail-closed behavior for preexisting or concurrent user-authored dirt.",
+        "Implementation: captured live planner parent HEAD plus AGENTS HEAD/worktree object IDs and launch dirt safety in direct handoffs. Managed substantive AGENTS startup-overlay tolerance is enabled only for a clean matching launch baseline; staged, untracked, preexisting, concurrent unrelated, and final undeclared dirt remain fail-closed.\nFiles changed: agents/work-planner.md; extensions/work-models.js; scripts/test-work-start-finish.mjs; scripts/work-command-fixture.mjs.\nTests added/updated: focused planner handoff baseline/overlay eligibility, concurrent AGENTS and unrelated launch dirt, preexisting substantive/staged/untracked dirt, formatter-only compatibility, and final staged/untracked/unrelated mutation fixtures.",
+        "wo:verify-check PASS\nDiagnostics: node --check extensions/work-models.js; node --check scripts/test-work-start-finish.mjs; node --check scripts/work-command-fixture.mjs; git diff --check.\nFocused verification: node scripts/test-work-start-finish.mjs PASS; node scripts/test-work-helper-handoffs.mjs PASS; node scripts/test-work-planner-slicing.mjs PASS.\nIteration failure: the first start/finish run failed because the new fake-git multi-line numstat string needed double escaping in its generated script; fixed, then all focused checks passed.\nResidual risk: managed-overlay attribution remains intentionally narrow and contractual; a substantive AGENTS overlay that does not restore both parent hashes before planner finish blocks rather than being auto-reverted.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-start-finish.mjs && node scripts/test-work-helper-handoffs.mjs && node scripts/test-work-planner-slicing.mjs\nOutput: ok - coded work start/finish behavior\nwork helper handoff fixtures passed\nok - work planner slicing contract passes"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Fresh work-planner runs transiently observe `AGENTS.md` as modified during agent startup even though the parent verifies its worki",
       "type": "task",
-      "updatedAt": "2026-08-03T22:12:58.507Z"
+      "updatedAt": "2026-08-04T05:52:03.401Z"
     },
     "work-3": {
       "createdAt": "2026-07-25T07:42:39.407Z",
@@ -5760,7 +5768,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-04T05:41:23.495Z"
+    "updatedAt": "2026-08-04T05:52:03.401Z"
   },
   "schemaVersion": 1
 }

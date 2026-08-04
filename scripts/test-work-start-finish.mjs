@@ -275,27 +275,78 @@ try {
 		"big creates a labelled planning intake without forcing a technical decision blocker",
 	);
 	assert(
-		bigDirect.params.task.length < 2500 &&
+		bigDirect.params.task.length < 3200 &&
 			bigDirect.params.task.includes(
 				`Target work item: ${state.selectedWorkItem.id}`,
 			) &&
 			bigDirect.params.task.includes("work-ready-summary") &&
+			bigDirect.params.task.includes("record a technical winner otherwise") &&
+			bigDirect.params.task.includes("Planner parent launch baseline:") &&
+			bigDirect.params.task.includes('"head":"c0ffee1"') &&
+			bigDirect.params.task.includes('"agentsHead":"agents111"') &&
+			bigDirect.params.task.includes('"agentsWorktree":"agents111"') &&
+			bigDirect.params.task.includes('"launchSafe":true') &&
 			bigDirect.params.task.includes(
-				"record a clear technical winner in the slice note and do not block executable work",
+				'"managedAgentsOverlayEligible":true',
 			) &&
-			bigDirect.params.task.includes("Planner launch baseline paths:") &&
 			bigDirect.params.task.includes(
-				"git diff --quiet --ignore-all-space --ignore-blank-lines",
+				"a new unstaged tracked AGENTS.md modification may be treated as a transient managed startup overlay",
 			) &&
 			bigDirect.params.task.includes(
-				"Block staged, untracked, substantive, or other added paths",
+				"Staged/untracked AGENTS, a baseline AGENTS entry, or unrelated dirt always blocks",
+			) &&
+			bigDirect.params.task.includes(
+				"require AGENTS.md to hash to agentsWorktree and agentsHead",
 			) &&
 			!bigDirect.params.task.includes("raw store readiness") &&
 			!bigDirect.params.task.includes("Subagent output guidance") &&
 			bigDirect.params.acceptance.level === "none" &&
 			bigDirect.params.acceptance.reason.includes("coded work-item"),
-		"big sends the planner a compact direct contract with safe instruction-dirt tolerance",
+		"big sends the planner a compact parent-bound instruction-dirt contract",
 	);
+
+	process.env.WORK_FLOW_GIT_DIRTY = "instruction-substantive";
+	const changedAtHandoff = directRoleHandoffParams(state, fixture.cwd)?.params.task;
+	assert(
+		changedAtHandoff?.includes('"launchSafe":false') &&
+			changedAtHandoff.includes('"launchBlockedPaths":["AGENTS.md"]') &&
+			changedAtHandoff.includes('"managedAgentsOverlayEligible":false'),
+		"planner launch fails closed when AGENTS changes after the parent status snapshot but before handoff generation",
+	);
+	process.env.WORK_FLOW_GIT_DIRTY = "unknown";
+	assert(
+		directRoleHandoffParams(state, fixture.cwd)?.params.task.includes(
+			'"launchBlockedPaths":["extensions/work-models.js"]',
+		),
+		"planner handoff records unrelated dirt that appears after intake as a launch blocker",
+	);
+
+	fixture.reset("active", "benign");
+	state = buildWorkBigState(fixture.cwd, "Design with formatter-only instructions");
+	assert(
+		state.ok &&
+			directRoleHandoffParams(state, fixture.cwd)?.params.task.includes(
+				'"managedAgentsOverlayEligible":false',
+			) &&
+			directRoleHandoffParams(state, fixture.cwd)?.params.task.includes(
+				"whitespace-ignored diff is empty",
+			),
+		"preexisting formatter-only AGENTS dirt keeps its narrow tolerance without enabling substantive overlays",
+	);
+
+	for (const dirty of [
+		"instruction-substantive",
+		"staged-instruction",
+		"untracked-instruction",
+		"unknown",
+	]) {
+		fixture.reset("active", dirty);
+		state = buildWorkBigState(fixture.cwd, `Blocked planner launch: ${dirty}`);
+		assert(
+			!state.ok && state.reason === "dirty-stop",
+			`planner launch rejects preexisting ${dirty} dirt`,
+		);
+	}
 
 	fixture.reset("no-store");
 	state = buildWorkInitState(fixture.cwd);
@@ -644,7 +695,21 @@ try {
 	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
 		!state.ok && state.reason === "unrelated-dirty-files",
-		"finish rejects unrelated dirty files",
+		"finish rejects staged AGENTS dirt",
+	);
+
+	fixture.reset("finishReady", "untracked-instruction");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		!state.ok && state.reason === "unrelated-dirty-files",
+		"finish rejects untracked AGENTS dirt",
+	);
+
+	fixture.reset("finishReady", "related-plus-unrelated");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		!state.ok && state.reason === "unrelated-dirty-files",
+		"finish rejects undeclared mutations even when the declared implementation file is also dirty",
 	);
 
 	fixture.reset("finishReady", "clean");

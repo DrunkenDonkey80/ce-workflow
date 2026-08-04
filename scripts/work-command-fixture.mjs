@@ -376,6 +376,7 @@ function log(value) { appendFileSync(logPath, JSON.stringify({ tool: "git", args
 function dirtyLines() {
   if (state.gitCommitted) return [];
   if (dirty === "unknown" || dirty === "large") return [" M extensions/work-models.js"];
+  if (dirty === "related-plus-unrelated") return [" M extensions/work-models.js", " M unrelated.txt"];
   if (dirty === "large-ui") return [" M src/components/App.tsx"];
   if (dirty === "benign" || dirty === "instruction-substantive") return [" M AGENTS.md"];
   if (dirty === "staged-instruction") return ["M  AGENTS.md"];
@@ -386,6 +387,7 @@ function dirtyLines() {
 }
 if (args[0] === "diff" && args.includes("--numstat")) {
   if (dirty === "unknown") console.log("12\t3\textensions/work-models.js");
+  if (dirty === "related-plus-unrelated") console.log("12\t3\textensions/work-models.js\\n1\t0\tunrelated.txt");
   if (dirty === "large") console.log("90\t40\textensions/work-models.js");
   if (dirty === "large-ui") console.log("90\t40\tsrc/components/App.tsx");
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-only")) {
@@ -398,7 +400,13 @@ else if (args[0] === "commit") {
   state.gitStaged = false;
   save(); log({ op: args.includes("--amend") ? "amend" : "commit" });
 }
-else if (args[0] === "rev-parse") console.log(state.closeCommitted ? "feed123" : "c0ffee1");
+else if (args[0] === "rev-parse") {
+  if (args[1] === "HEAD:AGENTS.md") console.log("agents111");
+  else console.log(state.closeCommitted ? "feed123" : "c0ffee1");
+}
+else if (args[0] === "hash-object") {
+  console.log(["benign", "instruction-substantive", "staged-instruction", "untracked-instruction"].includes(dirty) ? "agents222" : "agents111");
+}
 else if (args.includes("--porcelain=v1")) console.log(dirtyLines().join("\\n"));
 else {
   console.log("## feat/workflow-intake");

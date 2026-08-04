@@ -8215,9 +8215,43 @@ function reviewerHandoffLines(state) {
 	];
 }
 
+function plannerLaunchBaseline(cwd) {
+	const launchGit = resumeGitReport(cwd);
+	const objectId = (args) => {
+		try {
+			return run(cwd, "git", args).trim();
+		} catch {
+			return "";
+		}
+	};
+	const head = objectId(["rev-parse", "HEAD"]);
+	const agentsHead = objectId(["rev-parse", "HEAD:AGENTS.md"]);
+	const agentsWorktree = objectId(["hash-object", "--", "AGENTS.md"]);
+	const agentsStatus = launchGit.dirtyFiles.find(
+		(item) => normalizedRepoPath(item.path) === "AGENTS.md",
+	)?.status;
+	return {
+		head,
+		agentsHead,
+		agentsWorktree,
+		agentsStatus: agentsStatus ?? "clean",
+		launchSafe: launchGit.ok && launchGit.safeForHandoff,
+		launchBlockedPaths: launchGit.blockedPaths,
+		managedAgentsOverlayEligible: Boolean(
+			launchGit.ok &&
+			launchGit.safeForHandoff &&
+			!agentsStatus &&
+			agentsHead &&
+			agentsHead === agentsWorktree,
+		),
+	};
+}
+
 function directRoleTask(state, cwd) {
 	const selected = state.selectedWorkItem;
 	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
+	const plannerBaseline =
+		state.action === "run-planner" ? plannerLaunchBaseline(cwd) : undefined;
 	const expectedImplementationDiff =
 		["run-review", "run-fix"].includes(state.action) &&
 		selected?.changedPaths?.length;
@@ -8254,7 +8288,7 @@ function directRoleTask(state, cwd) {
 			? `For child state use: node ${helper} work-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
-			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence). Open decision WorkItems are only for unresolved human, product, or architectural authority; record a clear technical winner in the slice note and do not block executable work. Verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning work item, then stop. Planner launch baseline paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. Tolerate a new unstaged tracked instruction-file path only when git diff --quiet --ignore-all-space --ignore-blank-lines -- <path> passes; never stage it. Block staged, untracked, substantive, or other added paths. Final Git status must add no undeclared repository path outside the native store, workflow runtime, or requested dated plan.`
+			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence). Open decisions are only for unresolved human, product, or architectural authority; record a technical winner otherwise. Verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning item, then stop. Planner parent launch baseline: ${JSON.stringify(plannerBaseline)}; predeclared paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. If launchSafe is false, stop BLOCKED; new paths fail closed. A new unstaged tracked instruction path is tolerable only when its whitespace-ignored diff is empty. Additionally, only when managedAgentsOverlayEligible is true, a new unstaged tracked AGENTS.md modification may be treated as a transient managed startup overlay even when substantive; never modify, stage, or revert it. Staged/untracked AGENTS, a baseline AGENTS entry, or unrelated dirt always blocks. Before finishing, require AGENTS.md to hash to agentsWorktree and agentsHead and reject every final undeclared mutation outside the native store, workflow runtime, or requested dated plan.`
 			: "",
 		state.action === "run-implementation" && selected?.id
 			? `Claim exactly with: node ${helper} work-claim ${selected.id}`
