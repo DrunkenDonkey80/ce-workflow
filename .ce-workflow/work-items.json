@@ -4017,6 +4017,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-07T08:43:36.866Z",
           "workflowId": "019fdb5a-5f12-7b87-9686-87dc010c168c"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05",
@@ -4024,12 +4027,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Reconciliation: atom A (goal lifecycle race) and related-distinct atom B (misleading early completion projection) are covered by canonical work-2.62, commit 4cdc721. work_goal_complete now reconciles durable verifier artifacts and remains active for goal-scoped queued/running, failed/orphaned, or untriaged batches; terminal no-findings/fully-triaged batches permit completion. Independent review PASS; npm run verify:quiet passed.",
+        "wo:verify-check PASS\nCommand: node scripts/work-helper.mjs work-summary work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05\nOutput: 19fdb5a-5f12-7b87-9686-87dc010c168c\"\n    }\n  ],\n  \"notes_tail\": \"Reconciliation: atom A (goal lifecycle race) and related-distinct atom B (misleading early completion projection) are covered by canonical work-2.62, commit 4cdc721. work_goal_complete now reconciles durable verifier artifacts and remains active for goal-scoped queued/running, failed/orphaned, or untriaged batches; terminal no-findings/fully-triaged batches permit completion. Independent review PASS; npm run verify:quiet passed.\"\n}"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_goal_complete succeeded while configured work-background-verifier jobs for commit 4514126 were still active. One verifier lat",
       "type": "task",
-      "updatedAt": "2026-08-07T21:33:39.614Z"
+      "updatedAt": "2026-08-07T21:50:57.951Z"
     },
     "work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25": {
       "createdAt": "2026-08-03T22:11:07.924Z",
@@ -4106,12 +4112,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Reconciliation: single upstream-owned atom is durably covered by open canonical work-2.63 and https://github.com/nicobailon/pi-subagents/issues/889. Installed 0.42.1 and latest npm 0.43.0 remain affected; direct Windows mkdir reproduction returns ENOENT for call_demo|fc_demo. No ce-workflow workaround was added. This snapshot intake item is closed as routed while canonical work-2.63 remains open until an installed upstream fix satisfies acceptance."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: An async pi-subagents workflow failed before launch because its generated Windows async-run directory embedded the provider call i",
       "type": "task",
-      "updatedAt": "2026-08-07T21:33:39.775Z"
+      "updatedAt": "2026-08-07T21:50:27.863Z"
     },
     "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7": {
       "createdAt": "2026-08-03T22:12:58.507Z",
@@ -5991,7 +5999,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-07T21:49:57.385Z"
+    "updatedAt": "2026-08-07T21:50:57.951Z"
   },
   "schemaVersion": 1
 }
