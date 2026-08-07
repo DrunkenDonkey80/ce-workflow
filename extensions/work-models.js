@@ -3993,7 +3993,7 @@ function advisorCriticStep(
 		"adversarial simplifier: challenge unnecessary complexity, hidden assumptions, and cheaper alternatives",
 	];
 	const launch = workPerformanceSettings(cwd).parallelAdvisors
-		? `launch exactly one parallel subagent call in tasks mode with context:fresh, one task for each configured agent: ${agents.join(", ")}`
+		? `launch exactly one parallel subagent call via workflowScript using runs.all with context:fresh and one stable-key child for each configured agent: ${agents.join(", ")}`
 		: `launch these configured agents one at a time with separate context:fresh single-agent calls, waiting for each before starting the next: ${agents.join(", ")}`;
 	return [
 		`Advisor critic gate (read-only): after the exact ${target} path or WorkItem note is known, ${launch}. Use only these packaged work-advisor roles; never invoke ce-doc-review.`,
@@ -4021,7 +4021,7 @@ function preBrainstormAdvisorStep(
 		.map((slot) => slot.agents[0]);
 	if (!agents.length) return "";
 	const launch = workPerformanceSettings(cwd).parallelAdvisors
-		? `launch exactly one parallel subagent call in tasks mode with context:fresh, one task for each configured agent: ${agents.join(", ")}`
+		? `launch exactly one parallel subagent call via workflowScript using runs.all with context:fresh and one stable-key child for each configured agent: ${agents.join(", ")}`
 		: `launch these configured agents one at a time with separate context:fresh single-agent calls, waiting for each before starting the next: ${agents.join(", ")}`;
 	return [
 		`Optional pre-brainstorm research gate: after the private brainstorm has clarified the request but before it writes the artifact, ${launch}. Use only these packaged work-advisor roles.`,
@@ -4052,7 +4052,8 @@ function creativeSidecarStep(
 		model: models[index],
 	}))
 		.filter(({ model }) => !offline.has(configuredModelId(model, currentModel)))
-		.map(({ frame, model }) => ({
+		.map(({ frame, model }, index) => ({
+			key: `divergent-${index + 1}`,
 			agent: "work-divergent",
 			...(model && model !== INHERIT_MODEL ? { model } : {}),
 			task: [
@@ -4063,7 +4064,7 @@ function creativeSidecarStep(
 		}));
 	if (!tasks.length) return "";
 	return [
-		`Creative sidecar gate for ${target}: finish required clarification and source reading first, then launch exactly one PARALLEL subagent call with async:true, context:fresh, concurrency:${tasks.length}, and these task templates: ${JSON.stringify(tasks)}. Prepend the same normalized problem and real constraints to every task; never include sibling output.`,
+		`Creative sidecar gate for ${target}: finish required clarification and source reading first, then launch exactly one subagent workflowScript with async:true, context:fresh and runs.all over these stable-key child templates: ${JSON.stringify(tasks)}. Prepend the same normalized problem and real constraints to every child task; never include sibling output.`,
 		"While those branches run, form the normal baseline independently. Then call subagent_wait with all:true, cluster duplicates, reject constraint violations, and merge only useful non-obvious candidates into the artifact or planning note. Preserve provenance as a compact `wo:divergent-analysis` section naming each frame and model. A failed branch is recorded and not retried.",
 		"If an authoritative source already contains a current `wo:divergent-analysis` section for this problem, reuse it and skip generation. This is one bounded divergence pass: no branch deepening and no second generation round. Configured work-advisor critics challenge the merged artifact afterward.",
 	].join("\n");
@@ -4072,6 +4073,7 @@ function creativeSidecarStep(
 function researchHandoffPrompt(cwd, question) {
 	const models = divergentTaskModels(cwd);
 	const branches = DIVERGENT_FRAMES.map((frame, index) => ({
+		key: `divergent-${index + 1}`,
 		agent: "work-divergent",
 		...(models[index] && models[index] !== INHERIT_MODEL
 			? { model: models[index] }
@@ -4092,7 +4094,7 @@ function researchHandoffPrompt(cwd, question) {
 		"Action: run-research",
 		`Research question:\n${question}`,
 		"Ask at most one focused clarification only when different answers would materially change the investigation; otherwise state reasonable assumptions and proceed.",
-		`Call subagent with action:list once, then immediately launch exactly one PARALLEL tasks call with async:true, context:fresh, concurrency:${branches.length}, and these independent branches: ${JSON.stringify(branches)}. A failed branch is recorded and not retried.`,
+		`Call subagent with action:list once, then immediately launch exactly one workflowScript with async:true, context:fresh and runs.all over these stable-key independent child branches: ${JSON.stringify(branches)}. A failed branch is recorded and not retried.`,
 		"While those branches run, independently form the ordinary baseline. If current external facts could affect the answer, call web_search once with 2-4 varied queries; use source_check for load-bearing claims and prefer primary sources. Inspect local code only when the question needs project-specific implications.",
 		"Then call subagent_wait with all:true, cluster duplicate ideas, compare them with the evidence, and draft one coherent answer.",
 		advisors.length
@@ -4577,44 +4579,27 @@ async function probeAgentModel(
 				? ctx.model
 				: null);
 		if (!model) return fail("Model is not registered in Pi.");
-		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-		if (!auth?.ok || !auth.apiKey)
-			return fail(
-				agentHealthError(
-					auth?.ok
-						? `No API key for ${parsed.provider}`
-						: auth?.error || `Authentication failed for ${parsed.provider}`,
-				),
-			);
-		const provider = ctx.modelRegistry.getProvider(parsed.provider);
-		if (!provider?.streamSimple)
-			return fail(`No provider runtime for ${parsed.provider}.`);
+		if (!ctx.modelRegistry.complete)
+			return fail("Pi model runtime completion is unavailable.");
 		const controller = new AbortController();
 		let timer;
 		try {
 			const response = await Promise.race([
-				provider
-					.streamSimple(
-						model,
-						{
-							systemPrompt:
-								"This is an agent health probe. Reply with exactly HI.",
-							messages: [
-								{
-									role: "user",
-									content: [{ type: "text", text: "HI" }],
-									timestamp: Date.now(),
-								},
-							],
-						},
-						{
-							apiKey: auth.apiKey,
-							headers: auth.headers,
-							env: auth.env,
-							signal: controller.signal,
-						},
-					)
-					.result(),
+				ctx.modelRegistry.complete(
+					model,
+					{
+						systemPrompt:
+							"This is an agent health probe. Reply with exactly HI.",
+						messages: [
+							{
+								role: "user",
+								content: [{ type: "text", text: "HI" }],
+								timestamp: Date.now(),
+							},
+						],
+					},
+					{ signal: controller.signal },
+				),
 				new Promise((_, reject) => {
 					timer = setTimeout(() => {
 						controller.abort();
@@ -4674,7 +4659,7 @@ async function runAgentHealthMenu(ctx) {
 }
 
 async function brainstormAgentHealthPreflight(ctx) {
-	if (!ctx.modelRegistry?.getApiKeyAndHeaders)
+	if (!ctx.modelRegistry?.complete)
 		return { proceed: true, offlineModels: [] };
 	ctx.ui.notify("Checking brainstorm agent models...", "info");
 	const results = await checkAgentHealth(ctx, "brainstorm");
@@ -20551,11 +20536,6 @@ async function synthesizeRoadmapMetadata(cwd, epic, ctx, runtime = {}) {
 					};
 			if (runtime.BorderedLoader) loader.onAbort = () => done(null);
 			(async () => {
-				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
-				if (!auth.ok || !auth.apiKey)
-					throw new Error(
-						auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
-					);
 				const context = {
 					systemPrompt:
 						'Create durable display metadata for a software roadmap. Return only JSON: {"title":"...","description":"..."}. The title must be plain language, at most 72 characters, and contain no work-item IDs or file paths. The description must contain no work-item IDs or file paths and must be 3–5 concise sentences, at most 1000 characters, explaining what this roadmap is, why it exists, its scope, and intended outcome for someone returning months later. Use only supplied context; say when intent is undocumented. No markdown or implementation advice.',
@@ -20572,20 +20552,13 @@ async function synthesizeRoadmapMetadata(cwd, epic, ctx, runtime = {}) {
 						},
 					],
 				};
-				const options = {
-					apiKey: auth.apiKey,
-					headers: auth.headers,
-					env: auth.env,
+				const complete =
+					runtime.complete ?? ctx.modelRegistry.complete?.bind(ctx.modelRegistry);
+				if (!complete)
+					throw new Error("Pi model runtime completion is unavailable.");
+				const response = await complete(ctx.model, context, {
 					signal: loader.signal,
-				};
-				const response = runtime.complete
-					? await runtime.complete(ctx.model, context, options)
-					: await ctx.modelRegistry
-							.getProvider(ctx.model.provider)
-							?.streamSimple(ctx.model, context, options)
-							.result();
-				if (!response)
-					throw new Error(`No provider runtime for ${ctx.model.provider}.`);
+				});
 				if (response.stopReason === "aborted") return null;
 				if (response.stopReason === "error")
 					throw new Error(response.errorMessage || "Model request failed.");
@@ -20830,18 +20803,11 @@ export async function backfillVisibleDisplayMetadata(
 			);
 			background = (async () => {
 				if (progress.signal.aborted) return;
-				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
-				if (progress.signal.aborted) return;
-				if (!auth.ok || !auth.apiKey)
-					throw new Error(
-						auth.ok ? `No API key for ${ctx.model.provider}` : auth.error,
-					);
-				const options = {
-					apiKey: auth.apiKey,
-					headers: auth.headers,
-					env: auth.env,
-					signal: progress.signal,
-				};
+				const completeModel =
+					runtime.complete ?? ctx.modelRegistry.complete?.bind(ctx.modelRegistry);
+				if (!completeModel)
+					throw new Error("Pi model runtime completion is unavailable.");
+				const options = { signal: progress.signal };
 				const fingerprints = new Map(
 					missing.map((item) => [idOf(item), displayMetadataFingerprint(item)]),
 				);
@@ -20878,20 +20844,11 @@ export async function backfillVisibleDisplayMetadata(
 					if (progress.signal.aborted) return;
 					let response;
 					try {
-						response = runtime.complete
-							? await runtime.complete(
-									ctx.model,
-									displayMetadataRequest(items),
-									options,
-								)
-							: await ctx.modelRegistry
-									.getProvider(ctx.model.provider)
-									?.streamSimple(
-										ctx.model,
-										displayMetadataRequest(items),
-										options,
-									)
-									.result();
+						response = await completeModel(
+							ctx.model,
+							displayMetadataRequest(items),
+							options,
+						);
 					} catch {
 						if (progress.signal.aborted) return;
 						return {
@@ -22567,6 +22524,7 @@ export default function workModelsExtension(pi) {
 		)
 			return {
 				block: true,
+				terminate: true,
 				reason:
 					"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
 			};

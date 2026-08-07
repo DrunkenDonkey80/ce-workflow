@@ -3817,6 +3817,91 @@
       "type": "task",
       "updatedAt": "2026-08-04T05:54:06.748Z"
     },
+    "work-2.report-60ff67ad-d2d8-46de-a7a4-b5b4d918e984": {
+      "createdAt": "2026-08-07T06:29:07.173Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: An async ce-workflow reviewer run rendered pi-subagents' widget with a 137-column output-path row in a 135-column terminal, causing Pi v0.84.1 to terminate with an uncaughtException. The installed pi-subagents was 0.42.0; upstream 0.42.1 contains the exact paddedWidgetLine width fix.\nExpected: ce-workflow should prevent known-incompatible orchestration dependency versions from running (or clearly warn/update before launch), so an async reviewer cannot crash the parent Pi TUI.\nImpact: The parent Pi session exits during review, interrupting active workflow work and risking repeated crashes whenever async output paths are long. A local package hotfix works, but it is overwritten by package reinstall/update.\nSuggested improvement: Add a lightweight startup/runtime compatibility check requiring pi-subagents >=0.42.1 for async TUI workflows, with a concise update instruction; avoid duplicating pi-subagents rendering code.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/07635bf8-4490-4bc7-91c8-c19fe0c5efaa",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 214539,
+              "file": "01-pi-crash.log",
+              "sha256": "2cac32f95449bc22be58767ee02e01d1a89380a04be4b914dd17580f6fb113dc"
+            },
+            {
+              "bytes": 4700,
+              "file": "02-npm-update.log",
+              "sha256": "12f8746516e2c37ff05f9a23d51a9437b0357f9dcb9846205b6a0a766135ddf9"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-07T06:29:07.166Z",
+          "workflowId": "019fdadf-9876-7131-b561-7f84a044d397"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.report-60ff67ad-d2d8-46de-a7a4-b5b4d918e984",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:review-scope [\"extensions/work-catch-up-baseline.json\",\"extensions/work-models.js\",\"package.json\",\"scripts/test-work-brainstorm.mjs\",\"scripts/test-work-goal.mjs\",\"scripts/test-work-settings.mjs\",\"scripts/verify-package.mjs\"]",
+        "wo:review PASS scoped diff verified: node scripts/test-work-goal.mjs, test-work-settings.mjs, test-work-brainstorm.mjs, test-work-roadmap.mjs, verify-package.mjs all passed; modelRegistry.complete and blocked tool_call terminate confirmed in installed pi-coding-agent 0.84.1; pi-subagents >=0.42.1 floor matches upstream 0.42.1 narrow-terminal crash fix; catch-up baseline versions match installed packages",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: An async ce-workflow reviewer run rendered pi-subagents' widget with a 137-column output-path row in a 135-column terminal, causin",
+      "type": "task",
+      "updatedAt": "2026-08-07T08:26:23.305Z"
+    },
+    "work-2.report-62fb9577-ee2e-4536-aa72-fcf4d1d25ce6": {
+      "createdAt": "2026-08-05T08:07:27.045Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The native roadmap epic work-2 became status=closed after closing the then-last executable child (work-2.19), even though the authoritative roadmap still had unsliced U6-U11. Subsequent planners created ready work-2.21 and work-2.22 under the already-closed parent; work-ready-summary still exposes them.\nExpected: finish-task should not auto-close a roadmap/epic merely because all currently created children are closed. Roadmap closure should require an explicit completion marker/command or verified coverage of the source roadmap; alternatively planners must be able to reopen the parent atomically before adding remaining slices.\nImpact: The store reports the target roadmap complete while substantial required units remain, which can cause premature autonomous-goal completion, confusing status output, and children executing beneath a closed parent.\nSuggested improvement: Add an explicit epic/roadmap completion gate (for example wo:roadmap-complete or finish-roadmap) and prevent child finish from cascading closure for roadmap types without that gate.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/4aee412b-6687-4ff5-a4e5-382ea640f633",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 248225,
+              "file": "01-work-items.json",
+              "sha256": "ec6017140bb203266a04356fb4e5d82e62369ae9d6e903ab44bdec481046210b"
+            },
+            {
+              "bytes": 613,
+              "file": "02-aef07536-732f-4fc3-a469-989e7b3fe965_work-planner_output.md",
+              "sha256": "3ff9d6bcf259e95041524ab93667b3fb9da23ce598e58d2bb2ffeab1b3facd56"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-08-05T08:07:27.038Z",
+          "workflowId": "019fccd2-fa6b-7838-99d1-d2752a1adf69"
+        }
+      ],
+      "id": "work-2.report-62fb9577-ee2e-4536-aa72-fcf4d1d25ce6",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The native roadmap epic work-2 became status=closed after closing the then-last executable child (work-2.19), even though the auth",
+      "type": "task",
+      "updatedAt": "2026-08-05T08:07:27.045Z"
+    },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
       "dependencies": [],
@@ -5782,7 +5867,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-04T05:54:21.241Z"
+    "updatedAt": "2026-08-07T08:26:23.305Z"
   },
   "schemaVersion": 1
 }

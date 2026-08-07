@@ -1136,13 +1136,29 @@ try {
 		"divergent branches reuse the configured advisor models",
 	);
 	const creativeStep = mod.creativeSidecarStep(cwd, "brainstorm artifact");
+	const creativeKeys = creativeStep.match(/"key":"divergent-\d+"/g) ?? [];
 	assert(
 		(creativeStep.match(/work-divergent/g) ?? []).length === 3 &&
+			creativeStep.includes("workflowScript") &&
+			creativeStep.includes("runs.all") &&
+			creativeKeys.length === 3 &&
+			new Set(creativeKeys).size === 3 &&
+			!creativeStep.includes("tasks mode") &&
 			creativeStep.includes("async:true") &&
 			creativeStep.includes("subagent_wait with all:true") &&
 			creativeStep.includes("wo:divergent-analysis") &&
 			creativeStep.includes("test/generator-c"),
-		"creative sidecar launches three isolated model-assigned branches and preserves provenance",
+		"creative sidecar uses unique stable-key workflowScript branches and preserves provenance",
+	);
+	const researchPrompt = mod.researchHandoffPrompt(cwd, "Which path is best?");
+	const researchKeys = researchPrompt.match(/"key":"divergent-\d+"/g) ?? [];
+	assert(
+		researchPrompt.includes("workflowScript") &&
+			researchPrompt.includes("runs.all") &&
+			researchKeys.length === 3 &&
+			new Set(researchKeys).size === 3 &&
+			!researchPrompt.includes("tasks mode"),
+		"research uses unique stable-key workflowScript branches without stale tasks-mode guidance",
 	);
 	const healthTargets = mod.selectedAgentHealthTargets(
 		cwd,
@@ -1166,18 +1182,14 @@ try {
 		model: { provider: "test", id: "control" },
 		modelRegistry: {
 			find: (provider, id) => ({ provider, id }),
-			getApiKeyAndHeaders: async (model) =>
-				model.id === "generator-b"
-					? { ok: true }
-					: { ok: true, apiKey: "test-key" },
-			getProvider: () => ({
-				streamSimple: () => ({
-					result: async () => ({
-						stopReason: "stop",
-						content: [{ type: "text", text: "HI" }],
-					}),
-				}),
-			}),
+			complete: async (model) => {
+				if (model.id === "generator-b")
+					throw new Error("No API key or login is available");
+				return {
+					stopReason: "stop",
+					content: [{ type: "text", text: "HI" }],
+				};
+			},
 		},
 		ui: {
 			notify: (message, level) => healthNotices.push({ message, level }),
@@ -1202,14 +1214,9 @@ try {
 			...healthCtx,
 			modelRegistry: {
 				...healthCtx.modelRegistry,
-				getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test-key" }),
-				getProvider: () => ({
-					streamSimple: () => ({
-						result: async () => ({
-							stopReason: "error",
-							errorMessage: "gateway token=secret-value-123456 failed",
-						}),
-					}),
+				complete: async () => ({
+					stopReason: "error",
+					errorMessage: "gateway token=secret-value-123456 failed",
 				}),
 			},
 		},
@@ -1228,13 +1235,10 @@ try {
 			...healthCtx,
 			modelRegistry: {
 				...healthCtx.modelRegistry,
-				getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "test-key" }),
-				getProvider: () => ({
-					streamSimple: (_model, _context, options) => {
-						timeoutSignal = options.signal;
-						return { result: async () => new Promise(() => {}) };
-					},
-				}),
+				complete: async (_model, _context, options) => {
+					timeoutSignal = options.signal;
+					return new Promise(() => {});
+				},
 			},
 		},
 		{ model: "test/generator-a", roles: ["Advisor 1"] },
@@ -1269,6 +1273,8 @@ try {
 		assert(allAdvisors.includes(agent), `parallel gate includes ${agent}`);
 	assert(
 		allAdvisors.includes("exactly one parallel subagent call") &&
+			allAdvisors.includes("workflowScript using runs.all") &&
+			!allAdvisors.includes("tasks mode") &&
 			allAdvisors.includes("requirements/evidence auditor") &&
 			allAdvisors.includes("builder/on-call critic") &&
 			allAdvisors.includes("adversarial simplifier") &&

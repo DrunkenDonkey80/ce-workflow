@@ -404,7 +404,9 @@ try {
 			model: { provider: "test", id: "offline" },
 			modelRegistry: {
 				find: (provider, id) => ({ provider, id }),
-				getApiKeyAndHeaders: async () => ({ ok: true }),
+				complete: async () => {
+					throw new Error("No API key or login is available");
+				},
 			},
 			ui: {
 				notify() {},

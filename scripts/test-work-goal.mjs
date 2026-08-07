@@ -824,6 +824,7 @@ assert.deepEqual(
 	hooks.tool_call({ toolName: "work_goal_human_decision" }, { hasUI: true }),
 	{
 		block: true,
+		terminate: true,
 		reason:
 			"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
 	},
@@ -977,9 +978,7 @@ try {
 	);
 	const oldCatchUpOffline = process.env.WORK_CATCH_UP_OFFLINE;
 	const oldPiCodingAgentDir = process.env.PI_CODING_AGENT_DIR;
-	process.env.WORK_CATCH_UP_OFFLINE = "1";
-	process.env.PI_CODING_AGENT_DIR = path.join(cwd, "pi-agent");
-	const catchUpState = mod.buildWorkCatchUpState(cwd);
+	const oldAppData = process.env.APPDATA;
 	const baseline = JSON.parse(
 		readFileSync(
 			path.join(
@@ -989,6 +988,27 @@ try {
 			"utf8",
 		),
 	);
+	const piCodingAgentDir = path.join(
+		cwd,
+		"pi-agent",
+		"npm",
+		"node_modules",
+		"@earendil-works",
+		"pi-coding-agent",
+	);
+	mkdirSync(piCodingAgentDir, { recursive: true });
+	writeFileSync(
+		path.join(piCodingAgentDir, "package.json"),
+		JSON.stringify({
+			version: baseline.packages.find(
+				(pkg) => pkg.name === "@earendil-works/pi-coding-agent",
+			).version,
+		}),
+	);
+	process.env.WORK_CATCH_UP_OFFLINE = "1";
+	process.env.APPDATA = path.join(cwd, "empty-appdata");
+	process.env.PI_CODING_AGENT_DIR = path.join(cwd, "pi-agent");
+	const catchUpState = mod.buildWorkCatchUpState(cwd);
 	assert.equal(catchUpState.ok, true);
 	assert.equal(catchUpState.packages.length, baseline.packages.length);
 	const stableRelease = catchUpState.packages.find(
@@ -1127,6 +1147,8 @@ try {
 	else process.env.WORK_CATCH_UP_OFFLINE = oldCatchUpOffline;
 	if (oldPiCodingAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = oldPiCodingAgentDir;
+	if (oldAppData === undefined) delete process.env.APPDATA;
+	else process.env.APPDATA = oldAppData;
 
 	mod.default(pi);
 	const invoke = (name, args, commandCtx = ctx) =>

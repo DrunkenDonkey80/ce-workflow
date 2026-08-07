@@ -35,6 +35,10 @@ check(
 	pkg.pi?.extensions?.includes("extensions/work-models.js"),
 );
 check("native store is packaged", pkg.files?.includes("extensions/"));
+check(
+	"pi-subagents crash-safe compatibility floor",
+	pkg.peerDependencies?.["pi-subagents"] === ">=0.42.1",
+);
 const subscriptionFooterProvenancePath =
 	"extensions/subscription-footer-UPSTREAM.md";
 const subscriptionFooterProvenance = existsSync(

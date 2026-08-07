@@ -1,41 +1,34 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-01",
+  "capturedAt": "2026-08-07",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "0.83.0",
-      "reviewedAt": "2026-07-30",
-      "reviewedVersion": "0.83.0",
+      "version": "0.84.1",
+      "reviewedAt": "2026-08-07",
+      "reviewedVersion": "0.84.1",
       "decisions": [
         {
-          "version": "0.83.0",
-          "title": "Pi-scoped model picker with full-list toggle",
-          "pov": "Trial",
+          "version": "0.84.1",
+          "title": "Terminate blocked interactive-fallback tool calls",
+          "pov": "Adopt",
           "status": "adopted",
-          "rationale": "ce-workflow model dialogs now start with ctx.scopedModels when Pi configured a scope, preserve pinned thinking metadata, and let the operator press Tab to switch between scoped and full registries. Empty scopes retain the existing full-list behavior.",
-          "verification": "node scripts/test-work-settings.mjs passed and covers scoped-first display, thinking metadata, keyboard filtering, and Tab switching to the full list"
+          "rationale": "Pi's new terminating block result is a reversible, low-risk way to stop the automatic follow-up model call when ce-workflow rejects work_goal_human_decision because ask_user is available. The existing tool_call guard is the exact shared boundary, so adding terminate removes one unnecessary model turn without changing the decision flow.",
+          "verification": "node scripts/test-work-goal.mjs passed and asserts the blocked interactive fallback returns block=true and terminate=true"
         },
         {
-          "version": "0.83.0",
-          "title": "Session, concurrent bash, resource, and tool-output lifecycle fixes",
-          "pov": "Adopt",
+          "version": "0.84.1",
+          "title": "Provider authentication readiness CLI",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "Abort-before-replacement, tree persistence, concurrent bash cancellation, direct RPC user_bash, startup rebind, resource metadata, and tool-output status are host-owned behavior inherited by ce-workflow's existing extension hooks."
+          "rationale": "pi auth check validates provider credential readiness, while ce-workflow's agent health preflight must verify each configured model through the in-process ModelRegistry.complete path, including its actual endpoint and response. Spawning the CLI would add a second runtime-resolution path and still require the current probe; revisit only if Pi exposes a model-level readiness API through the extension context that can replace inference probes without losing coverage."
         },
         {
-          "version": "0.83.0",
-          "title": "TypeBox 1.3.7 alias removals",
-          "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "The repository has no call sites for the removed Type.Base, Type.Awaited, Type.Promise, Type.AsyncIterator, Type.Iterator, Type.Options, or Value.Mutate aliases, so no compatibility edit is required."
-        },
-        {
-          "version": "0.83.0",
-          "title": "Credential export, provider login, model, and transport additions",
+          "version": "0.84.1",
+          "title": "Host tool-prompt, provider, TUI, theme, and runtime updates",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Credential export, headless OpenRouter login, Copilot Opus 5, per-request fetch injection, and provider stop-reason changes belong to CLI/provider surfaces that ce-workflow neither registers nor wraps."
+          "rationale": "Built-in tool prompt contribution exports, Qwen catalog support, fullscreen interaction and rendering fixes, terminal theme probing, Agent.reset safety, and binary startup fixes are host-owned behavior inherited by ce-workflow. This package neither constructs Pi's built-in tool harness nor duplicates those provider and TUI internals, so local adapters would add code without replacing an incumbent path."
         }
       ]
     },
@@ -60,75 +53,61 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.38.0",
-      "reviewedAt": "2026-07-31",
-      "reviewedVersion": "0.38.0",
+      "version": "0.42.1",
+      "reviewedAt": "2026-08-07",
+      "reviewedVersion": "0.42.1",
       "decisions": [
         {
-          "version": "0.38.0",
-          "title": "Structured fleetStatus RPC for Work Fleet",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "The new bounded current-session projection is display-only: its opaque keys omit run, async, work-item, state, and artifact identities. ce-workflow's Fleet needs those durable identities for task grouping, history, recovery evidence, transcripts, and steering, so adopting fleetStatus would add an asynchronous merge and fallback path without deleting the incumbent collectors. Revisit only if Fleet intentionally broadens to unassociated foreground runs or measured artifact polling becomes material."
+          "version": "0.42.1",
+          "title": "Crash-safe subagent TUI compatibility floor",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "The narrow-terminal widget overflow reproduced in a ce-workflow async reviewer can terminate the parent Pi session, and 0.42.1 contains the exact width-bounded rendering fix. Requiring pi-subagents >=0.42.1 is a reversible, one-line compatibility floor that prevents known-unsafe installations without duplicating upstream TUI code.",
+          "verification": "npm run verify:quiet passed and validates the pi-subagents >=0.42.1 peer dependency floor"
         },
         {
-          "version": "0.38.0",
-          "title": "Git-root project configuration resolution",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "projectRootResolution is an opt-in policy for target monorepos with nested Pi configuration. This checkout has one root .pi/settings.json, and the packaged extension cannot safely choose git-root semantics for every consuming project."
-        },
-        {
-          "version": "0.38.0",
-          "title": "Launch, stream, steering, and session reliability fixes",
+          "version": "0.42.1",
+          "title": "Async workflow timeout and chat-progress compatibility",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "Bounded zero-activity startup retries, bounded streamed progress, retryable steering inbox scans, canonical session filtering, foreground metadata propagation, and intercom runtime-ID hygiene are inherited from pi-subagents and strengthen ce-workflow's existing async/RPC flows without local adapters."
-        },
-        {
-          "version": "0.38.0",
-          "title": "Acceptance guidance and FleetView input compatibility",
-          "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "Improved invalid-evidence diagnostics, j/k navigation, and structural custom-editor focus detection are upstream schema and TUI behavior. ce-workflow already emits supported acceptance evidence and owns separate dialog key handling, so no compatibility edit is required."
+          "rationale": "Async workflowScript runs now avoid an implicit 30-minute timeout and unsupported terminal/milestone chat projections were removed inside pi-subagents. ce-workflow's generated workflowScript handoffs use async:true without deprecated chatProgress values or a local timeout shim, so they inherit the corrected lifecycle and quieter projection with no adapter change."
         }
       ]
     },
     {
       "name": "pi-ask-user",
-      "version": "0.13.0",
-      "reviewedAt": "2026-07-19",
-      "reviewedVersion": "0.13.0",
+      "version": "0.14.0",
+      "reviewedAt": "2026-08-06",
+      "reviewedVersion": "0.14.0",
       "decisions": [
         {
-          "version": "0.13.0",
-          "title": "Selective optional comments",
+          "version": "0.14.0",
+          "title": "Responsive decision UI and Herdr attention signaling",
           "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Planning and adoption choices benefit from caveats, while destructive binary approvals must explicitly disable comments.",
-          "verification": "open-question, work-goal, and dirty-recovery tests passed"
+          "status": "no-action",
+          "rationale": "Responsive list layouts and blocked/waiting attention signals are implemented inside pi-ask-user and inherited by ce-workflow's existing ask_user calls. Local dialog policy remains separate and no compatibility shim is required."
+        },
+        {
+          "version": "0.14.0",
+          "title": "ask_user telemetry integration",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "The release exposes no stable per-call telemetry API, while ce-workflow already records tool timing and dialog decisions. Local wrapping would duplicate package behavior without measurable savings; revisit if a public metrics hook appears."
         }
       ]
     },
     {
       "name": "pi-intercom",
-      "version": "0.9.1",
-      "reviewedAt": "2026-07-31",
-      "reviewedVersion": "0.9.1",
+      "version": "0.9.2",
+      "reviewedAt": "2026-08-06",
+      "reviewedVersion": "0.9.2",
       "decisions": [
         {
-          "version": "0.9.1",
-          "title": "Mailbox redelivery isolated by session or name plus cwd",
+          "version": "0.9.2",
+          "title": "Standalone executable ESM startup fix",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "The broker now prevents a same-named session in another project from receiving queued mail by requiring matching cwd when stable session ID is unavailable. ce-workflow inherits the fix while retaining exact-ID targeting and its pending-run, open-work-item, and active-goal stale-message fences."
-        },
-        {
-          "version": "0.9.1",
-          "title": "Broker framing and inline rendering fixes",
-          "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "Fragmented-frame reassembly, single-allocation writes, and immutable-message render caching are internal pi-intercom transport/UI improvements. The public tool schema, extension lifecycle, and ce-workflow call sites are unchanged."
+          "rationale": "The removed require() startup crash is wholly inside pi-intercom's executable. ce-workflow uses the extension tool rather than spawning that binary, so it inherits the reliability fix with zero local code and no changed contract."
         }
       ]
     },
@@ -164,38 +143,30 @@
     },
     {
       "name": "pi-lens",
-      "version": "3.8.73",
-      "reviewedAt": "2026-07-30",
-      "reviewedVersion": "3.8.73",
+      "version": "3.8.74",
+      "reviewedAt": "2026-08-06",
+      "reviewedVersion": "3.8.74",
       "decisions": [
         {
-          "version": "3.8.73",
-          "title": "Optional project_report orientation for completed-slice verifiers",
-          "pov": "Trial",
-          "status": "adopted",
-          "rationale": "When the host exposes pi-lens project_report, background verifiers now use a lens-enabled read-only role to inspect graph trust/status and prioritize optimization opportunities in the pruned immutable checkpoint. They fall back to the original checkpoint-only role when the tool is absent, never poll a cold graph, and verify every hint through checkpoint-confined tools.",
-          "verification": "node scripts/test-background-verifiers.mjs and node scripts/test-work-start-finish.mjs passed, covering the expanded read-only boundary plus pi-lens availability selection and fallback"
-        },
-        {
-          "version": "3.8.73",
-          "title": "Review-graph correctness and project scale verdicts",
+          "version": "3.8.74",
+          "title": "Checkpoint trust, resumable graphs, and diagnostic quality",
           "pov": "Adopt",
           "status": "no-action",
-          "rationale": "Alias, project-reference, workspace-package, and entry-point resolution plus stale pre-cap rejection are internal pi-lens graph behavior inherited by project_report; ce-workflow does not duplicate the graph or cache."
+          "rationale": "Checkpoint-bounded secret scanning, trusted cold-start graph resume, stricter structural scans, improved LSP diagnostics, confidence labels, and duplicate suppression directly improve tools ce-workflow already invokes. They are package-owned and require no local adapter."
         },
         {
-          "version": "3.8.73",
-          "title": "Scan safety, LSP sweep, and disposition fixes",
-          "pov": "Adopt",
+          "version": "3.8.74",
+          "title": "Standalone build-graph command for verifier cold starts",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "Structural walk budgets, home-root refusal, multi-server clean confirmation, warm-up/backpressure fixes, layered config, and immediate cached disposition filtering are inherited from pi-lens. Existing ce-workflow calls remain scoped and its verifier triage store stays separate."
+          "rationale": "ce-workflow's verifier intentionally falls back when a review graph is cold rather than initiating a workspace-wide build from a read-only checkpoint. Calling build-graph would add latency and trust-scope complexity without improving required correctness; revisit only if measured cold-cache misses materially reduce verifier value."
         },
         {
-          "version": "3.8.73",
-          "title": "MCP, TSX grammar, YAML, and persistence internals",
+          "version": "3.8.74",
+          "title": "Prompt-cache and scanner observability surfaces",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "MCP root precedence, TSX ast-grep fallback classification, js-yaml migration, atomic persistence, and auxiliary runtime fixes have no ce-workflow integration surface beyond using the installed host tools."
+          "rationale": "Machine-global cache metrics, CLI output, language coverage, and scanner rule maintenance are pi-lens operational surfaces. ce-workflow consumes bounded diagnostics and has no stable local API or abstraction to replace."
         }
       ]
     }

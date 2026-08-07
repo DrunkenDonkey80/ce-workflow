@@ -40,7 +40,7 @@
     "@earendil-works/pi-tui": "*",
     "pi-ask-user": "*",
     "pi-intercom": "*",
-    "pi-subagents": "*"
+    "pi-subagents": ">=0.42.1"
   },
   "peerDependenciesMeta": {
     "pi-intercom": {
