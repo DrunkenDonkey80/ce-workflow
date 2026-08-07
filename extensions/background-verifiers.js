@@ -2727,6 +2727,39 @@ export function verifierStatus(store, configured = undefined) {
 		return "completed-awaiting-triage";
 	return "fully-triaged";
 }
+
+export function verifierCompletionBlocker(store, since) {
+	validateVerifierStore(store);
+	const startedAt = typeof since === "number" ? since : Date.parse(since);
+	if (!Number.isFinite(startedAt)) return;
+	const batchIds = new Set(
+		Object.values(store.batches)
+			.filter(
+				(batch) =>
+					batch.purpose === "verification" &&
+					Date.parse(batch.createdAt) >= startedAt,
+			)
+			.map((batch) => batch.id),
+	);
+	const jobs = Object.values(store.jobs).filter((job) =>
+		batchIds.has(job.batchId),
+	);
+	if (jobs.some((job) => ["queued", "running"].includes(job.status)))
+		return "background verification is still queued or running";
+	if (
+		jobs.some((job) =>
+			["failed", "orphaned", "partially-failed"].includes(job.status),
+		)
+	)
+		return "background verification failed or became orphaned";
+	if (
+		Object.values(store.findings).some((finding) => {
+			const report = store.reports[finding.reportId];
+			return batchIds.has(report?.batchId) && findingNeedsTriage(store, finding);
+		})
+	)
+		return "background verification has findings awaiting triage";
+}
 function quoted(value, limit = 500) {
 	return JSON.stringify(String(value).slice(0, limit));
 }

@@ -42,6 +42,7 @@ import {
 	queueVerifierJobs,
 	recordVerifierLaunch,
 	reconcileVerifierRuns,
+	verifierCompletionBlocker,
 	verifierStatus,
 	renderVerifierFinding,
 	verifierTelemetryEvents,
@@ -291,6 +292,98 @@ try {
 	assert.match(
 		verifierStorePath(cwd),
 		/\.ce-workflow[\\/]work-runs[\\/]verifiers[\\/]state\.json$/,
+	);
+	assert.match(
+		verifierCompletionBlocker(store, "2026-07-21T00:00:00.000Z"),
+		/still queued or running/,
+	);
+	assert.equal(
+		verifierCompletionBlocker(store, "2026-07-21T00:00:02.000Z"),
+		undefined,
+		"batches predating the active goal do not block it",
+	);
+
+	const triageCwd = repo();
+	initVerifierStore(triageCwd);
+	const triageBatch = mutateVerifierStore(triageCwd, (state) =>
+		createBatch(state, {
+			checkpoint,
+			profiles: [profiles[1]],
+			...options,
+			now: "2026-07-21T00:00:04.000Z",
+		}),
+	);
+	const triageJob = Object.values(loadVerifierStore(triageCwd).jobs)[0];
+	const triageReport = mutateVerifierStore(triageCwd, (state) =>
+		recordOperationResult(state, {
+			jobId: triageJob.id,
+			operation: "security",
+			outcome: "findings",
+		}),
+	);
+	const triageFinding = mutateVerifierStore(triageCwd, (state) =>
+		addFinding(state, {
+			reportId: triageReport.id,
+			operation: "security",
+			model: triageJob.model,
+			checkpoint: triageBatch.checkpoint,
+			path: "extensions/work-models.js",
+			startLine: 1,
+			endLine: 1,
+			category: "security",
+			severity: "medium",
+			rationale: "unsafe completion",
+			evidence: "finding is pending",
+			suggestedAction: "triage it",
+		}),
+	);
+	const triageStore = loadVerifierStore(triageCwd);
+	assert.match(
+		verifierCompletionBlocker(triageStore, "2026-07-21T00:00:03.000Z"),
+		/findings awaiting triage/,
+	);
+	mutateVerifierStore(triageCwd, (state) =>
+		recordDisposition(state, {
+			findingId: triageFinding.id,
+			disposition: "rejected",
+			reason: "verified false positive",
+		}),
+	);
+	assert.equal(
+		verifierCompletionBlocker(
+			loadVerifierStore(triageCwd),
+			"2026-07-21T00:00:03.000Z",
+		),
+		undefined,
+	);
+
+	const failedCwd = repo();
+	initVerifierStore(failedCwd);
+	const failedBatch = mutateVerifierStore(failedCwd, (state) =>
+		createBatch(state, {
+			checkpoint,
+			profiles: [profiles[1]],
+			...options,
+			now: "2026-07-21T00:00:04.000Z",
+		}),
+	);
+	const failedJob = Object.values(loadVerifierStore(failedCwd).jobs).find(
+		(job) => job.batchId === failedBatch.id,
+	);
+	mutateVerifierStore(failedCwd, (state) =>
+		recordOperationResult(state, {
+			jobId: failedJob.id,
+			operation: "security",
+			outcome: "failed",
+			failure: "provider unavailable",
+		}),
+	);
+	assert.match(
+		verifierCompletionBlocker(
+			loadVerifierStore(failedCwd),
+			"2026-07-21T00:00:03.000Z",
+		),
+		/failed or became orphaned/,
 	);
 
 	// Analysis candidates remain advisory until a revision-fenced human review.

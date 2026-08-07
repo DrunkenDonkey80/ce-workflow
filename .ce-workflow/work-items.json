@@ -3623,6 +3623,51 @@
       "type": "bug",
       "updatedAt": "2026-08-04T05:41:23.495Z"
     },
+    "work-2.62": {
+      "acceptance": "work_goal_complete reconciles verifier state and rejects completion while any verification batch created since the active goal started is queued/running, failed/orphaned, or awaiting triage; after terminal no-finding or fully-triaged results it succeeds. Automated coverage proves goal state remains active on rejection and no early child progress text is treated as final verifier evidence.",
+      "createdAt": "2026-08-07T21:33:33.874Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local claim for work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05. A goal must not clear while verification-purpose batches created during that goal remain queued/running, failed without resolution, or have findings awaiting triage. Reconciliation must use durable structured verifier artifacts; internal early progress/completion wake text is not completion evidence.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.62",
+      "labels": [
+        "wo:debug"
+      ],
+      "notes": [
+        "Classification: atom A is locally-owned goal lifecycle gating; atom B is a related-distinct presentation symptom covered by the same root fix because completion now consumes only reconciled durable verifier state and cannot project success before terminal structured evidence. No conflicting expected outcomes.\nwo:review-scope [\"extensions/background-verifiers.js\",\"extensions/work-models.js\",\"scripts/test-background-verifiers.mjs\",\"scripts/test-work-goal.mjs\"]\nwo:review PASS Independent work-reviewer ebf3afa1-7dba-4d46-804d-7022c1010fd6 found no actionable correctness issues; scoped gate, durable reconciliation, fail-closed corruption handling, and queued/failed/triage/terminal coverage satisfy acceptance.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: > pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Gate goal completion on background verifier reconciliation",
+      "type": "bug",
+      "updatedAt": "2026-08-07T21:49:57.385Z"
+    },
+    "work-2.63": {
+      "acceptance": "Upstream pi-subagents derives a portable async directory component from every workflow tool-call id while retaining the original id as metadata/correlation, and a Windows regression fixture containing call_...|fc_... launches successfully.",
+      "createdAt": "2026-08-07T21:33:34.052Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical upstream-owned claim for work-2.report-ec289716-ad4f-4177-919a-47e4ed6b750e. pi-subagents uses the host/provider tool call id directly as workflowRunId and as a DIRS.async path component; composite ids containing Windows-reserved characters such as | fail before launch.",
+      "evidence": [],
+      "id": "work-2.63",
+      "labels": [
+        "upstream"
+      ],
+      "notes": [
+        "Classification: upstream-owned pi-subagents async workflow path construction; related to ce-workflow orchestration but no local workaround can make the provider-owned run directory safe. Installed 0.42.1 and latest npm 0.43.0 both use the raw tool-call id as workflowRunId before path.join(DIRS.async, workflowRunId). Windows reproduction with call_demo|fc_demo returns mkdir ENOENT. Routed durably to https://github.com/nicobailon/pi-subagents/issues/889; keep canonical item open until an installed upstream release satisfies acceptance."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Sanitize async workflow run IDs before path construction",
+      "type": "bug",
+      "updatedAt": "2026-08-07T21:33:34.052Z"
+    },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
       "createdAt": "2026-07-20T09:58:53.226Z",
@@ -3952,7 +3997,9 @@
     },
     "work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05": {
       "createdAt": "2026-08-07T08:43:36.872Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.62"
+      ],
       "dependencyEdges": [],
       "description": "Observed: work_goal_complete succeeded while configured work-background-verifier jobs for commit 4514126 were still active. One verifier later captured structured findings, but the goal was already cleared (`work-goal-state goal:null`), `work_verifier_inbox` returned empty, and the user-facing completion projection showed only \"I'll start by listing the checkpoint scope\"/blank, making the verifier appear aborted.\nExpected: Goal completion should either wait for checkpoint verifiers that are required for the goal, explicitly cancel them with a visible reason, or durably queue late findings for triage; the completion notification should surface the verifier's final structured outcome rather than an early progress line.\nImpact: Independent verifier results can miss reconciliation after a goal closes, while users see misleading aborted/empty notifications and may believe verification never ran.\nSuggested improvement: Gate work_goal_complete on active verifier providers and ensure structured verifier output is delivered or queued before clearing goal state.",
       "evidence": [
@@ -3982,7 +4029,7 @@
       "status": "open",
       "title": "Self-improvement report: work_goal_complete succeeded while configured work-background-verifier jobs for commit 4514126 were still active. One verifier lat",
       "type": "task",
-      "updatedAt": "2026-08-07T08:43:36.872Z"
+      "updatedAt": "2026-08-07T21:33:39.614Z"
     },
     "work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25": {
       "createdAt": "2026-08-03T22:11:07.924Z",
@@ -4032,7 +4079,9 @@
     },
     "work-2.report-ec289716-ad4f-4177-919a-47e4ed6b750e": {
       "createdAt": "2026-08-07T09:46:23.611Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.63"
+      ],
       "dependencyEdges": [],
       "description": "Observed: An async pi-subagents workflow failed before launch because its generated Windows async-run directory embedded the provider call id `call_...|fc_...`; `|` is illegal in a Windows path, so mkdir returned ENOENT.\nExpected: pi-subagents should sanitize every provider/tool call identifier before using it as a directory component, while retaining the original identifier only as metadata.\nImpact: Async plan/review orchestration could not start and had to be retried in the foreground; the fallback then timed out after 20 minutes with one advisor stopped, increasing latency and losing one review result.\nSuggested improvement: Apply the existing safe path-part normalization (or replace Windows-reserved characters `[<>:\"/\\\\|?*]`) to async call IDs before joining the run directory path, and add a Windows fixture containing `|fc_`.",
       "evidence": [
@@ -4062,7 +4111,7 @@
       "status": "open",
       "title": "Self-improvement report: An async pi-subagents workflow failed before launch because its generated Windows async-run directory embedded the provider call i",
       "type": "task",
-      "updatedAt": "2026-08-07T09:46:23.611Z"
+      "updatedAt": "2026-08-07T21:33:39.775Z"
     },
     "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7": {
       "createdAt": "2026-08-03T22:12:58.507Z",
@@ -5942,7 +5991,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-07T11:29:24.229Z"
+    "updatedAt": "2026-08-07T21:49:57.385Z"
   },
   "schemaVersion": 1
 }

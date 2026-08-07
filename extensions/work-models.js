@@ -79,6 +79,7 @@ import {
 	renderVerifierFinding,
 	reopenGroup,
 	scheduleVerifierBatch,
+	verifierCompletionBlocker,
 	verifierStatus,
 	verifierTelemetryEvents,
 	VERIFIER_OPERATIONS,
@@ -18156,6 +18157,17 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	if (improveBlocker) return improveBlocker;
 	const catchUpBlocker = catchUpCompletionBlocker(goal, cwd);
 	if (catchUpBlocker) return catchUpBlocker;
+	try {
+		reconcileVerifierRuns(cwd);
+		const verifierBlocker = verifierCompletionBlocker(
+			loadVerifierStore(cwd),
+			goal?.startedAt,
+		);
+		if (verifierBlocker) return verifierBlocker;
+	} catch (error) {
+		if (error?.category !== "missing")
+			return `background verification could not be reconciled: ${commandErrorText(error)}`;
+	}
 	if (goal?.mode !== "project") return;
 	const objective = String(goal.objective ?? "");
 	const project = /^Target project:\s*(.+)$/m.exec(objective)?.[1]?.trim();

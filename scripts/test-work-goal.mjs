@@ -15,6 +15,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+	createBatch,
+	initVerifierStore,
+	loadVerifierStore,
+	mutateVerifierStore,
+	recordOperationResult,
+} from "../extensions/background-verifiers.js";
+import {
 	createWorkItem,
 	initStore,
 	mutateStore,
@@ -1944,6 +1951,46 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempHooks.before_agent_start(
 		{ prompt: sent[4].message, systemPrompt: "base" },
 		ctx,
+	);
+	initVerifierStore(cwd);
+	const completionBatch = mutateVerifierStore(cwd, (store) =>
+		createBatch(store, {
+			checkpoint: {
+				repository: "goal-test",
+				base: "a".repeat(40),
+				snapshot: "b".repeat(40),
+				paths: ["tracked.txt"],
+				patchHash: "c".repeat(64),
+			},
+			profiles: [
+				{
+					model: "test/verifier",
+					operations: ["correctness"],
+					thinking: "low",
+				},
+			],
+			now: new Date(Date.now() + 1_000).toISOString(),
+		}),
+	);
+	const blockedCompletion = await tempTools.work_goal_complete.execute(
+		"t-verifier-active",
+		{ summary: "verification still running" },
+		null,
+		null,
+		ctx,
+	);
+	assert.equal(blockedCompletion.completed, false);
+	assert.match(blockedCompletion.content[0].text, /still queued or running/);
+	assert.equal(statuses["work-goal"], "active #2");
+	const completionJob = Object.values(loadVerifierStore(cwd).jobs).find(
+		(job) => job.batchId === completionBatch.id,
+	);
+	mutateVerifierStore(cwd, (store) =>
+		recordOperationResult(store, {
+			jobId: completionJob.id,
+			operation: "correctness",
+			outcome: "no-findings",
+		}),
 	);
 	const completionResult = await tempTools.work_goal_complete.execute(
 		"t1",
