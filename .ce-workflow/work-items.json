@@ -3950,6 +3950,40 @@
       "type": "task",
       "updatedAt": "2026-08-02T17:29:11.312Z"
     },
+    "work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05": {
+      "createdAt": "2026-08-07T08:43:36.872Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: work_goal_complete succeeded while configured work-background-verifier jobs for commit 4514126 were still active. One verifier later captured structured findings, but the goal was already cleared (`work-goal-state goal:null`), `work_verifier_inbox` returned empty, and the user-facing completion projection showed only \"I'll start by listing the checkpoint scope\"/blank, making the verifier appear aborted.\nExpected: Goal completion should either wait for checkpoint verifiers that are required for the goal, explicitly cancel them with a visible reason, or durably queue late findings for triage; the completion notification should surface the verifier's final structured outcome rather than an early progress line.\nImpact: Independent verifier results can miss reconciliation after a goal closes, while users see misleading aborted/empty notifications and may believe verification never ran.\nSuggested improvement: Gate work_goal_complete on active verifier providers and ensure structured verifier output is delivered or queued before clearing goal state.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/1cd61e32-0fc7-4ffb-a8a4-dc87e943c992",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 698,
+              "file": "01-evidence.log",
+              "sha256": "2b5febc73c0cb7373fe9c0e31f341ff7c9672186520a22655dbc34f5d9cb87ea"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-07T08:43:36.866Z",
+          "workflowId": "019fdb5a-5f12-7b87-9686-87dc010c168c"
+        }
+      ],
+      "id": "work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: work_goal_complete succeeded while configured work-background-verifier jobs for commit 4514126 were still active. One verifier lat",
+      "type": "task",
+      "updatedAt": "2026-08-07T08:43:36.872Z"
+    },
     "work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25": {
       "createdAt": "2026-08-03T22:11:07.924Z",
       "dependencies": [
@@ -3995,6 +4029,40 @@
       "title": "Self-improvement report: A work-planner received the exact Windows helper path `C:\\soft\\ce-workflow\\scripts\\work-helper.mjs` but invoked it unquoted as `no",
       "type": "task",
       "updatedAt": "2026-08-04T05:54:21.241Z"
+    },
+    "work-2.report-ec289716-ad4f-4177-919a-47e4ed6b750e": {
+      "createdAt": "2026-08-07T09:46:23.611Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: An async pi-subagents workflow failed before launch because its generated Windows async-run directory embedded the provider call id `call_...|fc_...`; `|` is illegal in a Windows path, so mkdir returned ENOENT.\nExpected: pi-subagents should sanitize every provider/tool call identifier before using it as a directory component, while retaining the original identifier only as metadata.\nImpact: Async plan/review orchestration could not start and had to be retried in the foreground; the fallback then timed out after 20 minutes with one advisor stopped, increasing latency and losing one review result.\nSuggested improvement: Apply the existing safe path-part normalization (or replace Windows-reserved characters `[<>:\"/\\\\|?*]`) to async call IDs before joining the run directory path, and add a Windows fixture containing `|fc_`.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/04c132a3-68d7-48ed-8154-8ab5f7115f3e",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3531949,
+              "file": "01-2026-08-07T06-18-34-487Z_019fdadf-9876-7131-b561-7f84a044d397.jsonl",
+              "sha256": "8a0fff4c44408ea883a82d44ca7bbb5d9bd5293c1eead1a89d39db1ca2603e5d"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-07T09:46:23.604Z",
+          "workflowId": "019fdadf-9876-7131-b561-7f84a044d397"
+        }
+      ],
+      "id": "work-2.report-ec289716-ad4f-4177-919a-47e4ed6b750e",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: An async pi-subagents workflow failed before launch because its generated Windows async-run directory embedded the provider call i",
+      "type": "task",
+      "updatedAt": "2026-08-07T09:46:23.611Z"
     },
     "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7": {
       "createdAt": "2026-08-03T22:12:58.507Z",
@@ -5874,7 +5942,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-07T08:38:36.365Z"
+    "updatedAt": "2026-08-07T11:29:24.229Z"
   },
   "schemaVersion": 1
 }

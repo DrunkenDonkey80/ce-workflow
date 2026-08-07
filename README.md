@@ -34,6 +34,14 @@ If startup prints `pi remove npm:pi-compound-engineering`, the retired legacy pa
 
 Ordinary task actions use one durable `Misc` roadmap when no current roadmap is selected. When another roadmap is current, the UI asks whether new work belongs there or in `Misc`. Dedicated planning, brainstorming, and migration actions still create their own roadmaps. Untargeted **Resume work** falls back to ready `Misc` work and leaves an empty `Misc` idle. A resumable target runs autonomously until its requested scope completes or a real decision, limit, error, or explicit stop pauses it; an explicit child WorkItem ID limits the loop to that item, and questions use the main chat UI.
 
+## Context compaction
+
+ce-workflow formats every Pi compaction locally and deterministically. It selects one of three profiles without a model call: **freeform** preserves the current user request and bounded visible context; **work-resume** rereads the explicitly selected WorkItem, evidence, related decisions, and Git state; **autonomous-goal** rereads the persisted goal and its selected durable work. Successful tool payloads and reasoning are omitted, while failed tool output is bounded and retained.
+
+The context guard controls proactive triggering only. Turning it off does not relinquish formatter ownership: native overflow compaction and F8/manual compaction still receive a local profile. The default trigger is 150k tokens when the model is large enough; smaller context windows reserve effective recent-context retention plus the summary allowance, capped at half the window, before calculating the trigger. F8 runs immediately when idle or once at the next safe boundary and preserves the existing exactly-once continuation path.
+
+Do not install another automatic compaction extension into the same Pi profile. ce-workflow makes no background memory, embedding, summarization-model, or network request for compaction.
+
 Role agents are `work-planner`, `work-worker`, `work-reviewer`,
 `work-fixer`, `work-debugger`, `work-committer`, `work-migrator`, the
 tool-free `work-divergent` generator, and three configurable advisor roles:

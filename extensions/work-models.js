@@ -134,6 +134,15 @@ import {
 	normalizeReviewPolicy,
 	REVIEW_POLICIES,
 } from "./work-quality-policy.js";
+import {
+	AUTONOMOUS_GOAL_STATUSES,
+	COMPACTION_PROFILES,
+	compactionProfileFor,
+	compactionThreshold,
+	contentText,
+	filesFromOps,
+	formatCompactionSummary,
+} from "./work-compaction.js";
 
 let withFileMutationQueue = async (_file, mutation) => mutation();
 try {
@@ -653,6 +662,8 @@ const contextCompactState = {
 	generation: 0,
 	inFlight: false,
 	requested: false,
+	owner: null,
+	targetId: null,
 };
 let manualMicrocompactPending = false;
 let manualMicrocompactGoalResume = null;
@@ -3716,14 +3727,28 @@ function clampCompactAt(value) {
 	return Math.max(MIN_COMPACT_AT_TOKENS, Math.round(number));
 }
 
-function compactTriggerTokens(ctx, settings) {
-	const configured = clampCompactAt(contextSettings(settings).compactAtTokens);
-	const contextWindow = ctx.model?.contextWindow ?? ctx.model?.context_window;
-	if (!contextWindow) return configured;
+function effectiveSummaryChars(current) {
 	return Math.max(
-		MIN_COMPACT_AT_TOKENS,
-		Math.min(configured, contextWindow - DEFAULT_CONTEXT.keepRecentTokens),
+		4_000,
+		Number(current.maxSummaryChars) || DEFAULT_CONTEXT.maxSummaryChars,
 	);
+}
+
+function compactionThresholdFor(ctx, settings) {
+	const current = contextSettings(settings);
+	return compactionThreshold({
+		compactAtTokens: clampCompactAt(current.compactAtTokens),
+		contextWindow: ctx.model?.contextWindow ?? ctx.model?.context_window,
+		keepRecentTokens: Math.max(
+			Number(current.keepRecentTokens) || 0,
+			Number(settings.compaction?.keepRecentTokens) || 0,
+		),
+		maxSummaryChars: effectiveSummaryChars(current),
+	});
+}
+
+function compactTriggerTokens(ctx, settings) {
+	return compactionThresholdFor(ctx, settings).trigger;
 }
 
 function overrides(settings) {
@@ -5294,19 +5319,6 @@ function rememberRecommendedActions(cwd, actions, source = "work") {
 	writeWorkState(cwd, state);
 }
 
-function contentText(content) {
-	if (!content) return "";
-	if (typeof content === "string") return content;
-	if (Array.isArray(content))
-		return content
-			.map((item) => contentText(item))
-			.filter(Boolean)
-			.join("\n");
-	if (typeof content === "object")
-		return contentText(content.text ?? content.content ?? content.message);
-	return "";
-}
-
 function isBackgroundVerifierCompletionMessage(message) {
 	return (
 		message?.role === "custom" &&
@@ -5315,113 +5327,208 @@ function isBackgroundVerifierCompletionMessage(message) {
 	);
 }
 
-function messageRole(message) {
-	return String(message?.role ?? message?.type ?? "message");
+function compactionEvidence(issue) {
+	return asArray(issue?.evidence)
+		.slice(-4)
+		.map((entry) =>
+			truncate(
+				typeof entry === "string" ? entry : JSON.stringify(entry),
+				700,
+			),
+		);
 }
 
-function toolNames(message) {
-	const calls =
-		message?.toolCalls ?? message?.tool_calls ?? message?.calls ?? [];
-	if (!Array.isArray(calls)) return [];
-	return calls
-		.map((call) => call?.name ?? call?.function?.name ?? call?.toolName)
-		.filter(Boolean)
-		.map(String);
-}
-
-function messageLine(message) {
-	const role = messageRole(message);
-	if (/thinking|reasoning/i.test(role)) return "";
-	if (/tool/i.test(role)) {
-		const name = message?.toolName ?? message?.name ?? "tool";
-		return `[tool:${name}] result omitted`;
-	}
-	const tools = toolNames(message);
-	const text = truncate(contentText(message?.content ?? message?.message), 900);
-	const suffix = tools.length ? ` tools:${tools.join(",")}` : "";
-	return text || suffix ? `[${role}] ${text}${suffix}` : "";
-}
-
-function filesFromOps(fileOps) {
-	const read = fileOps?.readFiles ?? fileOps?.read ?? [];
-	const modified =
-		fileOps?.modifiedFiles ?? fileOps?.modified ?? fileOps?.written ?? [];
+function compactionItem(item, store) {
+	if (!item) return null;
 	return {
-		read: Array.from(new Set(Array.isArray(read) ? read : [])).map(String),
-		modified: Array.from(new Set(Array.isArray(modified) ? modified : [])).map(
-			String,
+		id: idOf(item),
+		title: truncate(titleOf(item), 300),
+		type: typeOf(item),
+		status: statusOf(item),
+		parentId: parentOf(item) || undefined,
+		description: truncate(field(item, "description", "design"), 1_200),
+		acceptance: truncate(
+			field(item, "acceptance", "acceptance_criteria", "acceptanceCriteria"),
+			1_600,
 		),
+		dependencies: depsOf(item).map((id) => ({
+			id,
+			status: statusOf(store.items?.[id]) || "missing",
+		})),
+		notes: truncate(notesOf(item), 1_600),
+		evidence: compactionEvidence(item),
 	};
 }
 
-function instantSummary(preparation, customInstructions = "") {
-	const maxSummaryChars = Number.isFinite(
-		Number(preparation.settings?.maxSummaryChars),
-	)
-		? Math.max(4_000, Number(preparation.settings.maxSummaryChars))
-		: DEFAULT_CONTEXT.maxSummaryChars;
-	const messages = [
-		...(preparation.messagesToSummarize ?? []),
-		...(preparation.turnPrefixMessages ?? []),
-	];
-	const lines = messages.map(messageLine).filter(Boolean);
-	const userLines = lines.filter((line) => /^\[user\]/i.test(line)).slice(-6);
-	const recentLines = lines.slice(-12);
-	const files = filesFromOps(preparation.fileOps);
-	const previous = truncate(preparation.previousSummary ?? "", 1_500);
-	const summary = [
-		"## Work-orchestrator instant compaction",
-		"Assistant reasoning and full tool results were intentionally dropped; native work-item store, git, and files are the source of truth.",
-		customInstructions
-			? `\n## Instructions\n${truncate(customInstructions, 1_000)}`
-			: "",
-		previous ? `\n## Previous summary\n${previous}` : "",
-		userLines.length
-			? `\n## Recent user goals\n${userLines.map((line) => `- ${line}`).join("\n")}`
-			: "",
-		recentLines.length
-			? `\n## Recent visible conversation\n${recentLines.map((line) => `- ${line}`).join("\n")}`
-			: "",
-		files.read.length
-			? `\n<read-files>\n${files.read.join("\n")}\n</read-files>`
-			: "",
-		files.modified.length
-			? `\n<modified-files>\n${files.modified.join("\n")}\n</modified-files>`
-			: "",
-		"\n## Next recovery step\nRun `/work-status` or `node scripts/work-helper.mjs work-ready-summary`, then continue with `/work-resume`.",
-	]
-		.filter(Boolean)
-		.join("\n");
-	return summary.slice(0, maxSummaryChars);
+function compactionGitState(cwd) {
+	const status = safeRun(cwd, "git", ["status", "--short", "--branch"]);
+	return {
+		head: safeRun(cwd, "git", ["rev-parse", "--short", "HEAD"]).trim(),
+		status: status
+			.split(/\r?\n/)
+			.filter(Boolean)
+			.slice(0, 24)
+			.map((line) => line.replaceAll("\\", "/")),
+	};
+}
+
+function relatedCompactionItems(store, target) {
+	if (!target) return [];
+	const scopeId = parentOf(target) || idOf(target);
+	return Object.values(store.items ?? {})
+		.filter(
+			(item) =>
+				idOf(item) !== idOf(target) &&
+				parentOf(item) === scopeId &&
+				(typeOf(item) === "decision" ||
+					["blocked", "failed", "needs_human"].includes(statusOf(item))),
+		)
+		.sort(
+			(left, right) =>
+				String(updatedAt(right)).localeCompare(String(updatedAt(left))) ||
+				idOf(left).localeCompare(idOf(right)),
+		)
+		.slice(0, 6)
+		.map((item) => ({
+			id: idOf(item),
+			title: truncate(titleOf(item), 300),
+			type: typeOf(item),
+			status: statusOf(item),
+			notes: truncate(notesOf(item), 700),
+		}));
+}
+
+function buildCompactionProjection(cwd, targetId, profile) {
+	const projection = {
+		available: true,
+		git: compactionGitState(cwd),
+	};
+	if (!targetId) return projection;
+	try {
+		const store = loadNativeWorkStore(cwd);
+		const target = store.items?.[targetId];
+		if (!target)
+			return {
+				...projection,
+				available: false,
+				diagnostic: `WorkItem ${targetId} was not found in the native store.`,
+				nextAction: `Run /work-status, then retry /work-resume ${targetId}.`,
+			};
+		projection.target = compactionItem(target, store);
+		projection.parent = compactionItem(store.items?.[parentOf(target)], store);
+		projection.decisionsAndBlockers = relatedCompactionItems(store, target);
+		projection.verification = compactionEvidence(target);
+		if (profile === COMPACTION_PROFILES.WORK_RESUME)
+			projection.nextAction = `Run /work-resume ${targetId}.`;
+		return projection;
+	} catch (error) {
+		return {
+			...projection,
+			available: false,
+			diagnostic: `Durable work state unavailable: ${formatError(error)}`,
+			nextAction: `Run /work-status, then retry /work-resume ${targetId}.`,
+		};
+	}
+}
+
+function compactionGoal(goal) {
+	if (!goal) return null;
+	return {
+		id: goal.id,
+		mode: goal.mode,
+		objective: truncate(goal.objective, 2_400),
+		status: goal.status,
+		iteration: goal.iteration ?? 0,
+		tokenBudget: goal.tokenBudget,
+		tokensUsed: goal.tokensUsed,
+		retries: goal.retries ?? 0,
+		stopReason: truncate(goal.stopReason, 600),
+		nextRetryAt: goal.nextRetryAt,
+		pendingDecision: goal.decision
+			? truncate(formatWorkGoalDecision(goal.decision), 2_000)
+			: undefined,
+	};
+}
+
+function compactionTargetId(goal) {
+	return (
+		contextCompactState.targetId ??
+		activeWorkAgent?.meta?.workItemId ??
+		pendingWorkPrompt?.meta?.workItemId ??
+		workGoalTargetId(goal) ??
+		null
+	);
+}
+
+function buildCompactionContext(event, ctx, current) {
+	const loadedGoal = activeWorkGoal ?? loadWorkGoalFromSession(ctx);
+	const goal =
+		loadedGoal && AUTONOMOUS_GOAL_STATUSES.includes(loadedGoal.status)
+			? loadedGoal
+			: null;
+	const targetId = compactionTargetId(goal);
+	const profile = compactionProfileFor({
+		goalStatus: goal?.status,
+		targetId,
+	});
+	const durable =
+		profile === COMPACTION_PROFILES.FREEFORM
+			? null
+			: buildCompactionProjection(ctx.cwd, targetId, profile);
+	const compactGoal = compactionGoal(goal);
+	return {
+		profile,
+		durable,
+		goal: compactGoal,
+		summary: formatCompactionSummary({
+			profile,
+			preparation: event.preparation,
+			durable,
+			goal: compactGoal,
+			maxSummaryChars: effectiveSummaryChars(current),
+		}),
+	};
 }
 
 function contextStatus(ctx, settings) {
 	const current = contextSettings(settings);
 	const usage = ctx.getContextUsage?.();
-	const trigger = compactTriggerTokens(ctx, settings);
+	const threshold = compactionThresholdFor(ctx, settings);
+	const keep = `${threshold.requestedKeepRecentTokens.toLocaleString()} requested / ${threshold.effectiveKeepRecentTokens.toLocaleString()} effective`;
 	return [
 		`Work context guard: ${current.enabled === false ? "disabled" : "enabled"}`,
 		`Auto compact: ${current.autoCompact === true ? "enabled" : "disabled"}`,
 		`Usage: ${usage?.tokens ? `${usage.tokens.toLocaleString()} tokens` : "unknown"}`,
-		`Trigger: ${trigger.toLocaleString()} tokens`,
-		`Keep recent: ${Math.max(DEFAULT_CONTEXT.keepRecentTokens, Number(settings.compaction?.keepRecentTokens) || 0).toLocaleString()} tokens`,
-		`Summary budget: ${Number(current.maxSummaryChars ?? DEFAULT_CONTEXT.maxSummaryChars).toLocaleString()} chars`,
-		"Compaction style: instant, local, no LLM call; only for context guard or opted-in work auto-compaction.",
+		`Trigger: ${threshold.trigger.toLocaleString()} tokens`,
+		`Keep recent: ${keep} tokens`,
+		threshold.headroom
+			? `Reserved headroom: ${threshold.headroom.toLocaleString()} tokens (ceiling ${threshold.ceiling.toLocaleString()})`
+			: "Reserved headroom: model context window unavailable",
+		`Summary budget: ${effectiveSummaryChars(current).toLocaleString()} chars`,
+		"Compaction style: deterministic local profiles; context guard settings control proactive triggering only.",
 	].join("\n");
 }
 
-function beginContextCompaction() {
+function beginContextCompaction(targetId = null, owner = "ce-workflow") {
 	manualMicrocompactPending = false;
 	contextCompactState.generation += 1;
 	contextCompactState.inFlight = true;
-	contextCompactState.requested = true;
+	contextCompactState.requested = owner === "ce-workflow";
+	contextCompactState.owner = owner;
+	contextCompactState.targetId = targetId || null;
 	return contextCompactState.generation;
 }
 
 function finishContextCompaction(generation) {
-	if (generation !== contextCompactState.generation) return false;
+	if (
+		generation !== contextCompactState.generation ||
+		!contextCompactState.inFlight
+	)
+		return false;
 	contextCompactState.inFlight = false;
 	contextCompactState.requested = false;
+	contextCompactState.owner = null;
+	contextCompactState.targetId = null;
 	return true;
 }
 
@@ -5429,7 +5536,35 @@ function resetContextCompaction() {
 	contextCompactState.generation += 1;
 	contextCompactState.inFlight = false;
 	contextCompactState.requested = false;
+	contextCompactState.owner = null;
+	contextCompactState.targetId = null;
 	manualMicrocompactGoalResume = null;
+}
+
+function resumeWorkGoalAfterCompaction(ctx, goalId, generation) {
+	const goalResume = manualMicrocompactGoalResume;
+	if (
+		goalResume?.goalId !== goalId ||
+		goalResume.generation !== generation
+	)
+		return false;
+	goalResume.ready = true;
+	if (workGoalContinuationPending?.goalId === goalId) {
+		manualMicrocompactGoalResume = null;
+		return true;
+	}
+	if (goalResume.requested || !activeWorkGoalRunning) {
+		const goal = activeWorkGoal;
+		if (goal?.id === goalId && goal.status === "active")
+			void sendWorkGoalContinuation(
+				workExtensionPi,
+				ctx,
+				goal,
+				goalResume.note,
+			);
+		else manualMicrocompactGoalResume = null;
+	}
+	return true;
 }
 
 function maybeCompact(ctx, settings) {
@@ -5462,7 +5597,11 @@ function runManualMicrocompact(ctx) {
 	const willResume = resumeAfter || Boolean(resumeGoalId);
 	const workflowPrompt = manualMicrocompactResumePrompt;
 	manualMicrocompactResumePrompt = null;
-	const generation = beginContextCompaction();
+	const targetId =
+		activeWorkAgent?.meta?.workItemId ??
+		pendingWorkPrompt?.meta?.workItemId ??
+		workGoalTargetId(activeWorkGoal);
+	const generation = beginContextCompaction(targetId);
 	if (resumeGoalId)
 		manualMicrocompactGoalResume = {
 			goalId: resumeGoalId,
@@ -5472,29 +5611,11 @@ function runManualMicrocompact(ctx) {
 			note: "",
 		};
 	const resume = () => {
-		const goalResume = manualMicrocompactGoalResume;
 		if (
-			goalResume?.goalId === resumeGoalId &&
-			goalResume.generation === generation
-		) {
-			goalResume.ready = true;
-			if (workGoalContinuationPending?.goalId === resumeGoalId) {
-				manualMicrocompactGoalResume = null;
-				return;
-			}
-			if (goalResume.requested || !activeWorkGoalRunning) {
-				const goal = activeWorkGoal;
-				if (goal?.id === resumeGoalId && goal.status === "active")
-					void sendWorkGoalContinuation(
-						workExtensionPi,
-						ctx,
-						goal,
-						goalResume.note,
-					);
-				else manualMicrocompactGoalResume = null;
-			}
+			resumeGoalId &&
+			resumeWorkGoalAfterCompaction(ctx, resumeGoalId, generation)
+		)
 			return;
-		}
 		if (!resumeAfter) return;
 		const message = workflowPrompt
 			? `Continue the active work-orchestrator turn after compaction. Resume from current native work-item store and git state; do not repeat completed steps. The original self-contained handoff follows:\n\n${workflowPrompt}`
@@ -17777,9 +17898,12 @@ async function sendWorkGoalPrompt(pi, ctx, prompt) {
 }
 
 async function microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt) {
-	if (typeof ctx.compact !== "function")
+	if (
+		typeof ctx.compact !== "function" ||
+		contextCompactState.inFlight
+	)
 		return sendWorkGoalPrompt(pi, ctx, prompt);
-	const generation = beginContextCompaction();
+	const generation = beginContextCompaction(workGoalTargetId(goal));
 	return new Promise((resolvePromise) => {
 		let settled = false;
 		const finish = async (warning) => {
@@ -17817,7 +17941,13 @@ async function microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt) {
 	});
 }
 
-async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
+async function sendWorkGoalContinuation(
+	pi,
+	ctx,
+	goal,
+	note = "",
+	alreadyCompacted = false,
+) {
 	const manualResume =
 		manualMicrocompactGoalResume?.goalId === goal.id
 			? manualMicrocompactGoalResume
@@ -17851,15 +17981,25 @@ async function sendWorkGoalContinuation(pi, ctx, goal, note = "") {
 			workGoalContinuationPending = null;
 		return queued;
 	}
-	const sent = manualResume
-		? await sendWorkGoalPrompt(pi, ctx, prompt)
-		: await microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt);
+	const sent =
+		manualResume || alreadyCompacted
+			? await sendWorkGoalPrompt(pi, ctx, prompt)
+			: await microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt);
 	if (!sent && workGoalContinuationPending?.marker === marker)
 		workGoalContinuationPending = null;
 	return sent;
 }
 
 async function sendWorkGoalAnswerContinuation(pi, ctx, goal, note = "") {
+	const manualResume =
+		manualMicrocompactGoalResume?.goalId === goal.id
+			? manualMicrocompactGoalResume
+			: null;
+	if (manualResume && !manualResume.ready) {
+		manualResume.requested = true;
+		manualResume.note = note;
+		return true;
+	}
 	if (workGoalContinuationPending?.goalId === goal.id) return false;
 	applyWorkGoalThinking(pi, goal, ctx);
 	const marker = workGoalContinuationMarker(goal);
@@ -17869,6 +18009,7 @@ async function sendWorkGoalAnswerContinuation(pi, ctx, goal, note = "") {
 		marker,
 		iteration: goal.iteration,
 	};
+	if (manualResume) manualMicrocompactGoalResume = null;
 	const sent = await sendWorkGoalPrompt(pi, ctx, prompt);
 	if (!sent && workGoalContinuationPending?.marker === marker)
 		workGoalContinuationPending = null;
@@ -19444,6 +19585,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		return;
 	}
 	let retrying = false;
+	let compactionInterrupted = false;
 	if (
 		["aborted", "error"].includes(String(assistant?.stopReason ?? "")) ||
 		isWorkGoalUsageLimit(assistant)
@@ -19469,9 +19611,13 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 			);
 			return;
 		}
-		if (isRetryableWorkGoalInterruption(assistant)) {
-			const nextRetries = (goal.retries ?? 0) + 1;
-			if (nextRetries > WORK_GOAL_MAX_RETRIES) {
+		compactionInterrupted = Boolean(
+			manualMicrocompactGoalResume?.goalId === goal.id,
+		);
+		if (compactionInterrupted || isRetryableWorkGoalInterruption(assistant)) {
+			const nextRetries =
+				(goal.retries ?? 0) + (compactionInterrupted ? 0 : 1);
+			if (!compactionInterrupted && nextRetries > WORK_GOAL_MAX_RETRIES) {
 				restoreWorkGoalThinking(pi, goal);
 				activeWorkGoal = {
 					...goal,
@@ -19496,7 +19642,9 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 					: "provider_retry",
 			};
 			ctx.ui.notify(
-				`autonomous goal hit a transient error (retry ${nextRetries}/${WORK_GOAL_MAX_RETRIES}); continuing.`,
+				compactionInterrupted
+					? "Compaction interrupted the active goal turn; continuing after compaction."
+					: `autonomous goal hit a transient error (retry ${nextRetries}/${WORK_GOAL_MAX_RETRIES}); continuing.`,
 				"info",
 			);
 		} else {
@@ -19517,7 +19665,9 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	activeWorkGoal = {
 		...goal,
 		iteration: (goal.iteration ?? 0) + 1,
-		retries: retrying ? (goal.retries ?? 0) + 1 : 0,
+		retries: retrying
+			? (goal.retries ?? 0) + (compactionInterrupted ? 0 : 1)
+			: 0,
 		updatedAt: Date.now(),
 	};
 	updateWorkGoalUsage(activeWorkGoal, ctx);
@@ -19614,15 +19764,17 @@ async function sendWorkflowFollowUp(ctx, message, pi, state) {
 		["print", "json"].includes(ctx.mode)
 	)
 		return sendFollowUp(ctx, message, pi);
-	contextCompactState.inFlight = true;
-	contextCompactState.requested = true;
+	if (contextCompactState.inFlight) return sendFollowUp(ctx, message, pi);
+	const generation = beginContextCompaction(state.selectedWorkItem?.id);
 	return new Promise((resolvePromise) => {
 		let settled = false;
 		const finish = async () => {
 			if (settled) return;
 			settled = true;
-			contextCompactState.inFlight = false;
-			contextCompactState.requested = false;
+			if (!finishContextCompaction(generation)) {
+				resolvePromise(false);
+				return;
+			}
 			resolvePromise(await sendFollowUp(ctx, message, pi));
 		};
 		try {
@@ -21792,22 +21944,7 @@ async function handleWorkContextCommand(args, ctx) {
 	if (!command || command === "status")
 		return ctx.ui.notify(contextStatus(ctx, settings), "info");
 	if (command === "compact") {
-		contextCompactState.requested = true;
-		ctx.compact({
-			customInstructions:
-				"manual orchestrator context compact: preserve native work-item store/git state, files, blockers, and next action; omit reasoning and full tool logs.",
-			onComplete: () => {
-				contextCompactState.requested = false;
-				ctx.ui.notify("Work context compacted", "info");
-			},
-			onError: (error) => {
-				contextCompactState.requested = false;
-				ctx.ui.notify(
-					`Work context compaction failed: ${error.message}`,
-					"warning",
-				);
-			},
-		});
+		requestManualMicrocompact(ctx);
 		return;
 	}
 	if (["off", "disable"].includes(command)) {
@@ -23082,20 +23219,8 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
-		if (activeWorkGoal?.status === "active") {
+		if (activeWorkGoal?.status === "active")
 			updateWorkGoalUsage(activeWorkGoal, ctx);
-			if (workGoalContinuationPending?.goalId === activeWorkGoal.id) {
-				workGoalCompactionResume = { goalId: activeWorkGoal.id };
-				workGoalContinuationPending = null;
-			}
-			persistWorkGoal(pi);
-		}
-		const instructions = event.customInstructions ?? "";
-		if (
-			!contextCompactState.requested &&
-			!instructions.includes("work-context")
-		)
-			return;
 		let settings = {};
 		try {
 			settings = readEffectiveSettings(ctx.cwd);
@@ -23103,20 +23228,58 @@ export default function workModelsExtension(pi) {
 			// Ignore unreadable settings and keep compaction safe.
 		}
 		const current = contextSettings(settings);
-		if (current.enabled === false && !contextCompactState.requested) return;
+		const triggeredByCe = contextCompactState.inFlight
+			? contextCompactState.owner === "ce-workflow"
+			: false;
+		let generation = contextCompactState.generation;
+		const startedNative = !contextCompactState.inFlight;
+		if (startedNative) {
+			generation = beginContextCompaction(
+				compactionTargetId(activeWorkGoal),
+				"native",
+			);
+			manualMicrocompactResumePrompt = null;
+			if (activeWorkGoalRunning && activeWorkGoal?.status === "active")
+				manualMicrocompactGoalResume = {
+					goalId: activeWorkGoal.id,
+					generation,
+					ready: false,
+					requested: false,
+					note: "",
+				};
+		}
+		if (activeWorkGoal?.status === "active") {
+			if (startedNative) {
+				workGoalCompactionResume =
+					workGoalContinuationPending?.goalId === activeWorkGoal.id
+						? { goalId: activeWorkGoal.id, generation }
+						: null;
+				if (workGoalCompactionResume) workGoalContinuationPending = null;
+			} else if (triggeredByCe) workGoalCompactionResume = null;
+			persistWorkGoal(pi);
+		}
+		const preparation =
+			event.preparation && typeof event.preparation === "object"
+				? event.preparation
+				: {};
+		const compacted = buildCompactionContext(
+			{ ...event, preparation },
+			ctx,
+			current,
+		);
 		return {
 			compaction: {
-				summary: instantSummary(
-					{ ...event.preparation, settings: current },
-					event.customInstructions,
-				),
-				firstKeptEntryId: event.preparation.firstKeptEntryId,
-				tokensBefore: event.preparation.tokensBefore,
+				summary: compacted.summary,
+				firstKeptEntryId: preparation.firstKeptEntryId,
+				tokensBefore: preparation.tokensBefore,
 				details: {
 					kind: "work-orchestrator-instant",
-					generation: contextCompactState.generation,
+					generation,
 					reason: event.reason,
-					files: filesFromOps(event.preparation.fileOps),
+					triggerOwner: triggeredByCe ? "ce-workflow" : "native",
+					profile: compacted.profile,
+					durableStateAvailable: compacted.durable?.available ?? null,
+					files: filesFromOps(preparation.fileOps),
 				},
 			},
 		};
@@ -23124,13 +23287,27 @@ export default function workModelsExtension(pi) {
 
 	pi.on("session_compact", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "session_compact", event);
-		const wasOurs =
-			event.compactionEntry?.details?.kind === "work-orchestrator-instant" ||
-			contextCompactState.inFlight;
+		const details = event.compactionEntry?.details;
+		const triggeredByCe = details?.triggerOwner
+			? details.triggerOwner === "ce-workflow"
+			: contextCompactState.owner === "ce-workflow" ||
+				contextCompactState.requested;
+		let nativeFinished = false;
+		if (!triggeredByCe && Number.isInteger(details?.generation)) {
+			const generation = details.generation;
+			nativeFinished = finishContextCompaction(generation);
+			if (nativeFinished && activeWorkGoal?.id)
+				resumeWorkGoalAfterCompaction(
+					ctx,
+					activeWorkGoal.id,
+					generation,
+				);
+		}
 		if (
-			!wasOurs &&
+			nativeFinished &&
 			activeWorkGoal?.status === "active" &&
 			workGoalCompactionResume?.goalId === activeWorkGoal.id &&
+			workGoalCompactionResume.generation === details.generation &&
 			!workGoalHasPendingMessages(ctx) &&
 			ctx?.sessionManager
 		) {
@@ -23140,7 +23317,7 @@ export default function workModelsExtension(pi) {
 			updateWorkGoalUsage(activeWorkGoal, ctx);
 			persistWorkGoal(pi);
 			updateWorkGoalStatus(ctx);
-			await sendWorkGoalContinuation(pi, ctx, activeWorkGoal);
+			await sendWorkGoalContinuation(pi, ctx, activeWorkGoal, "", true);
 		}
 	});
 

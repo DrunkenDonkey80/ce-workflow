@@ -1222,6 +1222,29 @@ try {
 	});
 	assert.equal(compactions.length, 1, "idle F8 microcompacts immediately");
 	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
+	const freeformCompaction = await tempHooks.session_before_compact(
+		{
+			reason: "overflow",
+			preparation: {
+				messagesToSummarize: [
+					{ role: "user", content: "Keep this freeform task active." },
+				],
+				fileOps: { modifiedFiles: ["src\\freeform.js"] },
+				firstKeptEntryId: "freeform-1",
+				tokensBefore: 31_000,
+			},
+		},
+		ctx,
+	);
+	assert.equal(freeformCompaction.compaction.details.profile, "freeform");
+	assert.equal(freeformCompaction.compaction.details.triggerOwner, "native");
+	assert.match(freeformCompaction.compaction.summary, /Keep this freeform task active/);
+	assert.match(freeformCompaction.compaction.summary, /src\/freeform\.js/);
+	assert.doesNotMatch(freeformCompaction.compaction.summary, /\/work-resume/);
+	await tempHooks.session_compact(
+		{ compactionEntry: { details: freeformCompaction.compaction.details } },
+		ctx,
+	);
 	compactions.length = 0;
 	notices.length = 0;
 	await tempShortcuts.f8.handler(ctx);
@@ -1263,18 +1286,80 @@ try {
 			"claims",
 			`${createHash("sha256").update(workflowId).digest("hex")}.complete`,
 		);
+	initStore(cwd);
+	mutateStore(cwd, (store) => {
+		createWorkItem(store, {
+			id: "work-7",
+			type: "epic",
+			title: "Compaction roadmap",
+		});
+		createWorkItem(store, {
+			id: "work-7.1",
+			parentId: "work-7",
+			title: "Preserve workflow state",
+			status: "in_progress",
+			description: "Use the explicitly selected durable task.",
+			acceptance: "Selected task acceptance survives compaction.",
+			evidence: [{ closeEvidence: "focused durable evidence" }],
+		});
+		createWorkItem(store, {
+			id: "work-7.2",
+			parentId: "work-7",
+			type: "decision",
+			title: "Choose compaction rollout",
+		});
+		createWorkItem(store, {
+			id: "work-8",
+			type: "epic",
+			title: "Unrelated roadmap",
+		});
+		createWorkItem(store, {
+			id: "work-8.1",
+			parentId: "work-8",
+			title: "Unrelated in-progress task",
+			status: "in_progress",
+		});
+	});
 	const inlineWorkflowPrompt = `work-orchestrator inline execution
 WO_INLINE_V1: complete this medium WorkItem
 Workflow Run ID: wr-compact-resume
 Activity: work-resume
 mode: resume
-Epic: E-1 Test roadmap
-Selected WorkItem: T-1 Preserve workflow state`;
+Roadmap: work-7 Test roadmap
+Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempHooks.before_agent_start(
 		{ prompt: inlineWorkflowPrompt, systemPrompt: "base" },
 		ctx,
 	);
 	await tempHooks.agent_start({}, ctx);
+	const workCompaction = await tempHooks.session_before_compact(
+		{
+			reason: "overflow",
+			preparation: {
+				messagesToSummarize: [
+					{ role: "user", content: "Continue the selected workflow slice." },
+				],
+				fileOps: {},
+				firstKeptEntryId: "work-1",
+				tokensBefore: 90_000,
+			},
+		},
+		ctx,
+	);
+	assert.equal(workCompaction.compaction.details.profile, "work-resume");
+	assert.equal(workCompaction.compaction.details.triggerOwner, "native");
+	assert.equal(workCompaction.compaction.details.durableStateAvailable, true);
+	assert.match(workCompaction.compaction.summary, /work-7\.1/);
+	assert.match(
+		workCompaction.compaction.summary,
+		/Selected task acceptance survives compaction/,
+	);
+	assert.match(workCompaction.compaction.summary, /focused durable evidence/);
+	assert.doesNotMatch(workCompaction.compaction.summary, /work-8\.1/);
+	await tempHooks.session_compact(
+		{ compactionEntry: { details: workCompaction.compaction.details } },
+		ctx,
+	);
 	await tempShortcuts.f8.handler(ctx);
 	await tempHooks.turn_end(
 		{},
@@ -1288,7 +1373,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		"compaction continuation keeps work-orchestrator metadata",
 	);
 	assert.equal(resumedWorkflow.workflowRunId, "wr-compact-resume");
-	assert.equal(resumedWorkflow.workItemId, "T-1");
+	assert.equal(resumedWorkflow.workItemId, "work-7.1");
 	assert.equal(resumedWorkflow.inlineWork, true);
 	await tempHooks.agent_end(
 		{
@@ -1673,8 +1758,77 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	assert.match(sent[1].message, /Automatic continuation #1/);
 	assert.equal(statuses["work-goal"], "active #1");
 
+	const nativeGoalCompaction = await tempHooks.session_before_compact(
+		{
+			reason: "overflow",
+			preparation: {
+				messagesToSummarize: [
+					{ role: "user", content: "Continue the autonomous goal." },
+				],
+				fileOps: {},
+				firstKeptEntryId: "goal-native-1",
+				tokensBefore: 120_000,
+			},
+		},
+		ctx,
+	);
+	assert.equal(
+		nativeGoalCompaction.compaction.details.profile,
+		"autonomous-goal",
+	);
+	assert.equal(nativeGoalCompaction.compaction.details.triggerOwner, "native");
+	const sentBeforeGoalRecovery = sent.length;
+	await tempHooks.session_compact(
+		{
+			compactionEntry: {
+				details: {
+					...nativeGoalCompaction.compaction.details,
+					triggerOwner: "ce-workflow",
+				},
+			},
+		},
+		ctx,
+	);
+	assert.equal(
+		sent.length,
+		sentBeforeGoalRecovery,
+		"ce-triggered compaction leaves continuation to its callback",
+	);
+	await tempHooks.turn_end(
+		{},
+		{ ...ctx, getContextUsage: () => ({ tokens: 160_000 }) },
+	);
+	assert.equal(
+		compactions.length,
+		1,
+		"native compaction fences the overlapping ce-workflow threshold",
+	);
+	await tempHooks.session_compact(
+		{ compactionEntry: { details: nativeGoalCompaction.compaction.details } },
+		ctx,
+	);
+	assert.equal(
+		sent.length,
+		sentBeforeGoalRecovery + 1,
+		"native compaction recovers exactly one pending continuation",
+	);
+	assert.equal(
+		compactions.length,
+		1,
+		"native recovery reuses the completed compaction",
+	);
+	await tempHooks.session_compact(
+		{ compactionEntry: { details: nativeGoalCompaction.compaction.details } },
+		ctx,
+	);
+	assert.equal(
+		sent.length,
+		sentBeforeGoalRecovery + 1,
+		"repeated native compact event cannot duplicate continuation",
+	);
+
 	await tempHooks.before_agent_start(
-		{ prompt: sent[1].message, systemPrompt: "base" },
+		{ prompt: sent[2].message, systemPrompt: "base" },
 		ctx,
 	);
 	await tempHooks.agent_start({}, ctx);
@@ -1699,12 +1853,12 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		2,
 		"active-goal continuation reuses the completed F8 microcompact",
 	);
-	assert.equal(sent.length, 3, "active goal resumes after F8 microcompaction");
-	assert.match(sent[2].message, /Automatic continuation #2/);
+	assert.equal(sent.length, 4, "active goal resumes after F8 microcompaction");
+	assert.match(sent[3].message, /Automatic continuation #2/);
 	assert.equal(statuses["work-goal"], "active #2");
 
 	await tempHooks.before_agent_start(
-		{ prompt: sent[2].message, systemPrompt: "base" },
+		{ prompt: sent[3].message, systemPrompt: "base" },
 		ctx,
 	);
 	await tempHooks.agent_start({}, ctx);
@@ -1734,7 +1888,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 			String(notice.message).includes("needs human decision"),
 		),
 	);
-	assert.equal(sent.length, 3);
+	assert.equal(sent.length, 4);
 
 	const clarifyResult = await tempHooks.input?.(
 		{ source: "user", text: "clarify: what screenshot is missing?" },
@@ -1761,7 +1915,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	assert.equal(conversationalResult, undefined);
 	assert.equal(statuses["work-goal"], "needs human");
-	assert.equal(sent.length, 3);
+	assert.equal(sent.length, 4);
 
 	const answerInputResult = await tempHooks.input?.(
 		{
@@ -1772,7 +1926,7 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	);
 	assert.equal(answerInputResult, undefined);
 	assert.equal(statuses["work-goal"], "needs human");
-	assert.equal(sent.length, 3);
+	assert.equal(sent.length, 4);
 
 	await invoke(
 		"work-goal",
@@ -1783,12 +1937,12 @@ Selected WorkItem: T-1 Preserve workflow state`;
 	assert.ok(activeTools.includes("work_goal_complete"));
 	assert.ok(activeTools.includes("work_goal_human_decision"));
 	assert.equal(thinkingLevel, "medium");
-	assert.equal(sent.length, 4);
-	assert.match(sent[3].message, /User resumed the goal with this answer/);
-	assert.match(sent[3].message, /add a connect button/);
+	assert.equal(sent.length, 5);
+	assert.match(sent[4].message, /User resumed the goal with this answer/);
+	assert.match(sent[4].message, /add a connect button/);
 
 	await tempHooks.before_agent_start(
-		{ prompt: sent[3].message, systemPrompt: "base" },
+		{ prompt: sent[4].message, systemPrompt: "base" },
 		ctx,
 	);
 	const completionResult = await tempTools.work_goal_complete.execute(
@@ -1813,6 +1967,305 @@ Selected WorkItem: T-1 Preserve workflow state`;
 		"medium",
 		"high",
 	]);
+
+	// Compaction continuation matrix. A 30k threshold exercises the same hooks as
+	// production without spending model tokens in a nested Pi process.
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workResume: {
+				selfImproving: true,
+				goalThinkingLevel: "medium",
+			},
+			workOrchestrator: {
+				context: { autoCompact: true, compactAtTokens: 30_000 },
+			},
+		}),
+	);
+	const queuedCallbackCompactions = [];
+	const queuedCallbackSent = sent.length;
+	const queuedCallbackCtx = {
+		...ctx,
+		compact: (options) => queuedCallbackCompactions.push(options),
+	};
+	await tempShortcuts.f8.handler(queuedCallbackCtx);
+	await tempHooks.turn_end(
+		{},
+		{ ...queuedCallbackCtx, getContextUsage: () => ({ tokens: 1 }) },
+	);
+	assert.equal(queuedCallbackCompactions.length, 1);
+	queuedCallbackCompactions[0].onError?.(new Error("operation aborted"));
+	queuedCallbackCompactions[0].onComplete?.();
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(
+		sent.length,
+		queuedCallbackSent + 1,
+		"ordinary queued compaction resumes once across duplicate callbacks",
+	);
+
+	const directLifecycleCompactions = [];
+	const directLifecycleSent = sent.length;
+	const directLifecycleCtx = {
+		...ctx,
+		isIdle: () => true,
+		getContextUsage: () => ({ tokens: 33_000 }),
+		compact: (options) => directLifecycleCompactions.push(options),
+	};
+	const directLifecycleRun = mod.handleWorkflowAction(
+		() => ({
+			ok: true,
+			reason: "ready",
+			action: "implement",
+			inlineWork: true,
+			inlineLevel: "medium",
+			epic: { id: "work-7" },
+			selectedWorkItem: { id: "work-7.1" },
+			handoffPrompt: inlineWorkflowPrompt.replace(
+				"wr-compact-resume",
+				"wr-direct-threshold",
+			),
+		}),
+		"",
+		directLifecycleCtx,
+		pi,
+	);
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(
+		directLifecycleCompactions.length,
+		1,
+		"direct work compacts once before a high-context handoff",
+	);
+	assert.equal(
+		sent.length,
+		directLifecycleSent,
+		"direct work waits for compaction before dispatch",
+	);
+	directLifecycleCompactions[0].onComplete?.();
+	directLifecycleCompactions[0].onError?.(new Error("late duplicate callback"));
+	await directLifecycleRun;
+	assert.equal(
+		sent.length,
+		directLifecycleSent + 1,
+		"direct work dispatches exactly once after compaction",
+	);
+
+	const finishedLifecycleCompactions = [];
+	const finishedLifecycleSent = sent.length;
+	const finishedPrompt = inlineWorkflowPrompt.replace(
+		"wr-compact-resume",
+		"wr-finished-threshold",
+	);
+	await tempHooks.before_agent_start(
+		{ prompt: finishedPrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Direct task finished." }],
+				},
+			],
+		},
+		ctx,
+	);
+	const finishedLifecycleCtx = {
+		...ctx,
+		isIdle: () => true,
+		getContextUsage: () => ({ tokens: 30_001 }),
+		compact: (options) => finishedLifecycleCompactions.push(options),
+	};
+	await tempHooks.agent_settled({}, finishedLifecycleCtx);
+	assert.equal(
+		finishedLifecycleCompactions.length,
+		1,
+		"finished direct work still performs one threshold compaction",
+	);
+	finishedLifecycleCompactions[0].onComplete?.();
+	finishedLifecycleCompactions[0].onError?.(
+		new Error("late duplicate callback"),
+	);
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(
+		sent.length,
+		finishedLifecycleSent,
+		"finished direct work does not invent another turn",
+	);
+
+	const beforeProjectGoal = sent.length;
+	await invoke("work-goal", "exercise work-resume phase compaction", ctx);
+	assert.equal(
+		sent.length,
+		beforeProjectGoal + 1,
+		"autonomous work starts its goal turn",
+	);
+	const projectGoalPrompt = sent.at(-1).message;
+	await tempHooks.before_agent_start(
+		{ prompt: projectGoalPrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	const projectGoalCompactions = [];
+	const projectGoalSent = sent.length;
+	const projectGoalCtx = {
+		...ctx,
+		isIdle: () => false,
+		getContextUsage: () => ({ tokens: 30_001 }),
+		compact: (options) => projectGoalCompactions.push(options),
+	};
+	await tempHooks.turn_end({}, projectGoalCtx);
+	assert.equal(
+		projectGoalCompactions.length,
+		1,
+		"goal threshold and phase boundary share one compaction",
+	);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					stopReason: "error",
+					errorMessage: "This operation was aborted",
+					content: [],
+				},
+			],
+		},
+		projectGoalCtx,
+	);
+	await tempHooks.agent_settled(
+		{},
+		{ ...projectGoalCtx, isIdle: () => true },
+	);
+	assert.equal(
+		sent.length,
+		projectGoalSent,
+		"goal continuation waits for the in-flight compaction callback",
+	);
+	projectGoalCompactions[0].onError?.(
+		new Error("This operation was aborted"),
+	);
+	projectGoalCompactions[0].onComplete?.();
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(
+		projectGoalCompactions.length,
+		1,
+		"aborted and completed callbacks cannot launch a second compaction",
+	);
+	assert.equal(
+		sent.length,
+		projectGoalSent + 1,
+		"goal work continues exactly once after the winning callback",
+	);
+	assert.match(sent.at(-1).message, /Automatic continuation/);
+
+	const ceOwnedPrompt = sent.at(-1).message;
+	await tempHooks.before_agent_start(
+		{ prompt: ceOwnedPrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Completed the next phase." }],
+				},
+			],
+		},
+		ctx,
+	);
+	const ceOwnedCompactions = [];
+	const ceOwnedSent = sent.length;
+	const ceOwnedCtx = {
+		...ctx,
+		isIdle: () => true,
+		getContextUsage: () => ({ tokens: 1 }),
+		compact: (options) => ceOwnedCompactions.push(options),
+	};
+	const ceOwnedSettle = tempHooks.agent_settled({}, ceOwnedCtx);
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(
+		ceOwnedCompactions.length,
+		1,
+		"a normal goal phase starts one ce-owned compaction",
+	);
+	const ceOwnedEntry = await tempHooks.session_before_compact(
+		{
+			reason: "manual",
+			preparation: {
+				messagesToSummarize: [],
+				fileOps: {},
+				firstKeptEntryId: "ce-owned-phase",
+				tokensBefore: 30_001,
+			},
+		},
+		ceOwnedCtx,
+	);
+	assert.equal(ceOwnedEntry.compaction.details.triggerOwner, "ce-workflow");
+	await tempHooks.session_compact(
+		{ compactionEntry: { details: ceOwnedEntry.compaction.details } },
+		ceOwnedCtx,
+	);
+	assert.equal(
+		sent.length,
+		ceOwnedSent,
+		"ce-owned session_compact cannot race its completion callback",
+	);
+	ceOwnedCompactions[0].onComplete?.();
+	ceOwnedCompactions[0].onError?.(new Error("late duplicate callback"));
+	await ceOwnedSettle;
+	assert.equal(
+		sent.length,
+		ceOwnedSent + 1,
+		"ce-owned compaction delivers one continuation",
+	);
+	await tempHooks.before_agent_start(
+		{ prompt: sent.at(-1).message, systemPrompt: "base" },
+		ctx,
+	);
+	const beforeNativeWithoutPending = sent.length;
+	const nativeWithoutPending = await tempHooks.session_before_compact(
+		{
+			reason: "overflow",
+			preparation: {
+				messagesToSummarize: [],
+				fileOps: {},
+				firstKeptEntryId: "native-after-ce",
+				tokensBefore: 30_001,
+			},
+		},
+		ctx,
+	);
+	await tempHooks.session_compact(
+		{ compactionEntry: { details: nativeWithoutPending.compaction.details } },
+		ctx,
+	);
+	assert.equal(
+		sent.length,
+		beforeNativeWithoutPending,
+		"ce-owned recovery state cannot leak into the next native compaction",
+	);
+
+	await tempTools.work_goal_complete.execute(
+		"t-compaction-matrix",
+		{ summary: "compaction lifecycle matrix verified" },
+		null,
+		null,
+		ctx,
+	);
+	writeFileSync(
+		path.join(cwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workResume: {
+				selfImproving: true,
+				goalThinkingLevel: "medium",
+			},
+			workOrchestrator: { context: { autoCompact: true } },
+		}),
+	);
 
 	await invoke("work-goal", "survive a WebSocket retry", ctx);
 	const retryPrompt = sent.at(-1).message;
