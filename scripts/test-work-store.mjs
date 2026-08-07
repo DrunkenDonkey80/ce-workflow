@@ -229,7 +229,7 @@ try {
 		(error) => error.category === "corrupt",
 	);
 
-	// Closing or deleting the final active task closes ordinary roadmap containers only.
+	// Roadmap closure is explicit, never inferred from the current child set.
 	const lifecycle = initStore(repo(), { now: "2026-07-15T00:00:00.000Z" });
 	item(lifecycle, { id: "roadmap", type: "epic", title: "Roadmap" });
 	item(lifecycle, {
@@ -255,9 +255,11 @@ try {
 	closeWorkItem(lifecycle, "task-b");
 	assert.equal(
 		lifecycle.items.roadmap.status,
-		"closed",
-		"open source ideas do not keep a completed brainstorm open",
+		"open",
+		"closing the last current child does not imply roadmap completion",
 	);
+	closeWorkItem(lifecycle, "roadmap");
+	assert.equal(lifecycle.items.roadmap.status, "closed");
 	for (const [id, title, protect] of [
 		["misc", "Misc", (root) => root.labels.push("wo:misc")],
 		["improvement", "Self-improving", () => {}],
@@ -312,7 +314,11 @@ try {
 		parentId: "delete-parent",
 	});
 	deleteWorkItemSubtree(lifecycle, "delete-last");
-	assert.equal(lifecycle.items["delete-parent"].status, "closed");
+	assert.equal(
+		lifecycle.items["delete-parent"].status,
+		"open",
+		"deleting the last current child does not imply roadmap completion",
+	);
 
 	// Recursive deletion validates first, permits internal dependencies, and publishes once.
 	const subtreeDir = repo();

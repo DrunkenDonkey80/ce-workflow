@@ -706,39 +706,8 @@ export function deleteWorkItem(store, id) {
 	return store;
 }
 
-function idleParentEpic(store, item) {
-	let parent = item?.parentId ? store.items[item.parentId] : undefined;
-	while (parent && parent.type !== "epic")
-		parent = parent.parentId ? store.items[parent.parentId] : undefined;
-	if (
-		!parent ||
-		parent.initiative ||
-		parent.protected === true ||
-		parent.title === "Misc" ||
-		parent.title === "Self-improving" ||
-		parent.labels?.some((label) =>
-			["wo:misc", "wo:protected", "wo:protected-root"].includes(label),
-		)
-	)
-		return undefined;
-	const incomplete = Object.values(store.items).some((candidate) => {
-		if (candidate.status === "closed" || candidate.type === "idea")
-			return false;
-		let ancestor = candidate;
-		while (ancestor?.parentId) {
-			if (ancestor.parentId === parent.id) return true;
-			ancestor = store.items[ancestor.parentId];
-		}
-		return false;
-	});
-	return incomplete ? undefined : parent;
-}
-
 export function closeWorkItem(store, id, changes = {}) {
-	const closed = updateWorkItem(store, id, { ...changes, status: "closed" });
-	const parent = idleParentEpic(store, closed);
-	if (parent) updateWorkItem(store, parent.id, { status: "closed" });
-	return closed;
+	return updateWorkItem(store, id, { ...changes, status: "closed" });
 }
 
 export function deleteWorkItemSubtree(store, id) {
@@ -782,8 +751,6 @@ export function deleteWorkItemSubtree(store, id) {
 	);
 	validateStore({ ...store, items });
 	store.items = items;
-	const parent = idleParentEpic(store, selected);
-	if (parent) updateWorkItem(store, parent.id, { status: "closed" });
 	return [...deletedIds];
 }
 

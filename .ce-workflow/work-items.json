@@ -3888,6 +3888,9 @@
           "producer": "NexusConnectSDK-Android",
           "submittedAt": "2026-08-05T08:07:27.038Z",
           "workflowId": "019fccd2-fa6b-7838-99d1-d2752a1adf69"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-62fb9577-ee2e-4536-aa72-fcf4d1d25ce6",
@@ -3895,12 +3898,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:review-scope [\"extensions/work-store.js\",\"scripts/test-work-store.mjs\"]",
+        "wo:review PASS - cascade auto-close removed from closeWorkItem/deleteWorkItemSubtree; explicit /work-roadmap close gate remains and epic completion projection is child-state derived; test-work-store/roadmap/start-finish/goal/status/auto all pass",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-store.mjs\nOutput: work-store tests passed"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The native roadmap epic work-2 became status=closed after closing the then-last executable child (work-2.19), even though the auth",
       "type": "task",
-      "updatedAt": "2026-08-05T08:07:27.045Z"
+      "updatedAt": "2026-08-07T08:38:36.364Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -5867,7 +5874,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-07T08:26:23.305Z"
+    "updatedAt": "2026-08-07T08:38:36.365Z"
   },
   "schemaVersion": 1
 }
