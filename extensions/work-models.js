@@ -15975,7 +15975,10 @@ function directRunFacts(cwd, runtime = {}) {
 }
 
 function workRoadmapLiveFacts(cwd, runtime = {}) {
-	const facts = directRunFacts(cwd, runtime);
+	const items = loadNativeWorkStore(cwd).items;
+	const facts = directRunFacts(cwd, runtime).filter(
+		(fact) => !fact.attention || statusOf(items[fact.id]) !== "closed",
+	);
 	const agent = runtime.activeWorkAgent ?? activeWorkAgent;
 	const agentCwd = agent?.cwd ? resolve(agent.cwd) : "";
 	if (agent?.meta?.workItemId && agentCwd === resolve(cwd))

@@ -1778,7 +1778,8 @@ try {
 		"T-stale": item("T-stale", "Stale runtime leaf", {
 			type: "task",
 			parentId: "R-current",
-			status: "open",
+			status: "closed",
+			labels: ["blocked", "debug", "wo:debug"],
 		}),
 		"T-engaged": item("T-engaged", "Durably engaged", {
 			type: "task",
@@ -1900,6 +1901,12 @@ try {
 			}),
 			JSON.stringify({
 				type: "pending",
+				workflowRunId: "closed-attention",
+				workItemId: "T-stale",
+				asyncDir: attentionDir,
+			}),
+			JSON.stringify({
+				type: "pending",
 				workflowRunId: "missing",
 				workItemId: "T-stale",
 				asyncDir: path.join(projectionRoot, ".pi", "missing"),
@@ -1972,7 +1979,7 @@ try {
 	);
 	assert.deepEqual(
 		projectedInitiative.progress,
-		{ completed: 1, total: 8 },
+		{ completed: 2, total: 8 },
 		"initiative progress combines child executable progress",
 	);
 	assert.equal(
@@ -2071,11 +2078,25 @@ try {
 		liveContainer.children.find((task) => task.id === "T-grace").exactLive,
 		true,
 	);
+	const currentProjected = projected.roadmaps.find(
+		(roadmap) => roadmap.id === "R-current",
+	);
 	assert.equal(
-		projected.roadmaps.find((roadmap) => roadmap.id === "R-current").live,
+		currentProjected.live,
 		false,
 		"missing, malformed, terminal, and expired direct states are stale",
 	);
+	assert.equal(
+		currentProjected.attention,
+		false,
+		"stale paused runtime state does not make a closed item actionable",
+	);
+	const staleClosedTask = currentProjected.tasks.find(
+		(task) => task.id === "T-stale",
+	);
+	assert.equal(staleClosedTask.aggregateStatus, "closed");
+	assert.equal(staleClosedTask.attention, false);
+	assert.deepEqual(staleClosedTask.labels, ["blocked", "debug", "wo:debug"]);
 	const openProjected = projected.roadmaps.find(
 		(roadmap) => roadmap.id === "R-open",
 	);

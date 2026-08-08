@@ -3660,13 +3660,39 @@
         "upstream"
       ],
       "notes": [
-        "Classification: upstream-owned pi-subagents async workflow path construction; related to ce-workflow orchestration but no local workaround can make the provider-owned run directory safe. Installed 0.42.1 and latest npm 0.43.0 both use the raw tool-call id as workflowRunId before path.join(DIRS.async, workflowRunId). Windows reproduction with call_demo|fc_demo returns mkdir ENOENT. Routed durably to https://github.com/nicobailon/pi-subagents/issues/889; keep canonical item open until an installed upstream release satisfies acceptance."
+        "Classification: upstream-owned pi-subagents async workflow path construction; related to ce-workflow orchestration but no local workaround can make the provider-owned run directory safe. Installed 0.42.1 and latest npm 0.43.0 both use the raw tool-call id as workflowRunId before path.join(DIRS.async, workflowRunId). Windows reproduction with call_demo|fc_demo returns mkdir ENOENT. Routed durably to https://github.com/nicobailon/pi-subagents/issues/889; keep canonical item open until an installed upstream release satisfies acceptance.",
+        "Snapshot classification 2026-08-08: upstream-owned and unresolved. Installed/latest pi-subagents 0.43.0 still permits raw external tool-call IDs to reach async path construction; issue #889 remains the durable owner."
       ],
       "parentId": "work-2",
       "status": "open",
       "title": "Sanitize async workflow run IDs before path construction",
       "type": "bug",
       "updatedAt": "2026-08-07T21:33:34.052Z"
+    },
+    "work-2.64": {
+      "acceptance": "Roadmap projection ignores pending-direct and transient blocked/debug attention for closed work items while retaining native closed status and historical labels/notes; open paused items still show needs_attention; focused regression passes.",
+      "createdAt": "2026-08-08T08:41:22.364Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local claim for reports work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021 and work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169: closed items can inherit attention from unmatched pending-direct records whose status remains paused/needs_attention; historical blocked/debug labels must not make closed items actionable.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.64",
+      "labels": [
+        "bug"
+      ],
+      "notes": [
+        "Classification: locally-owned canonical claim. The current projector already ignores blocked/debug/wo:debug labels, so the label-causation atom from report-5473 is already-fixed; the shared false-attention outcome is related-distinct and covered here. Report-6c00 supplies direct evidence that stale paused pending-direct facts still attach attention to closed items.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs\nOutput: "
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Ignore stale runtime attention for closed work items",
+      "type": "bug",
+      "updatedAt": "2026-08-08T08:43:12.962Z"
     },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
@@ -3813,6 +3839,47 @@
       "type": "task",
       "updatedAt": "2026-08-02T19:28:21.628Z"
     },
+    "work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021": {
+      "createdAt": "2026-08-08T08:19:55.067Z",
+      "dependencies": [
+        "work-2.64"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: A closed roadmap was shown as complete (12/12) but still reported two items needing attention. In the native store, the two closed descendants work-1.16 and work-1.17 retain attention-oriented labels (`blocked`, `debug`, and `wo:debug`) even though both have terminal review/verification evidence and work-1 is closed.\nExpected: Closing a work item should clear transient blocking/debug attention state, or roadmap/status projection should ignore transient attention labels for closed items while retaining historical notes/evidence.\nImpact: Operators receive a contradictory completion signal and may believe a closed roadmap still requires action; completion verification based only on status can miss the stale attention presentation.\nSuggested improvement: Normalize transient `blocked`/`debug` labels during coded close, or exclude them from attention aggregation when status is `closed`; keep debug provenance in notes or a non-attention historical label.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/b1c80250-2804-4a8a-931b-0cb025b75ed7",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 140539,
+              "file": "01-work-items.json",
+              "sha256": "e9841023d62dd964db6bc2387b08776a7954dd6b35a730b60eae6d848756efb0"
+            },
+            {
+              "bytes": 25616,
+              "file": "02-pending-direct.jsonl",
+              "sha256": "320f7fc11a622127494ee914919bc3852a17ccb354eded90762ceae8914e5d1f"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-08T08:19:55.056Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A closed roadmap was shown as complete (12/12) but still reported two items needing attention. In the native store, the two closed",
+      "type": "task",
+      "updatedAt": "2026-08-08T08:41:34.115Z"
+    },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
       "dependencies": [
@@ -3953,6 +4020,57 @@
       "title": "Self-improvement report: The native roadmap epic work-2 became status=closed after closing the then-last executable child (work-2.19), even though the auth",
       "type": "task",
       "updatedAt": "2026-08-07T08:38:36.364Z"
+    },
+    "work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169": {
+      "createdAt": "2026-08-08T08:21:15.842Z",
+      "dependencies": [
+        "work-2.64"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: The roadmap projection for closed work-1 returns `aggregateStatus: needs_attention`, progress 12/12, with work-1.6 and work-1.11 marked attention. Both have unmatched `pending` records in `.pi/work-runs/direct/pending-direct.jsonl`. Their child metadata is terminal/rejected, while referenced runtime status remained stale-paused; later review, verification, commit, and work-item closure all succeeded. Pending-direct reconciliation therefore leaves historical runtime attention attached to closed items.\nExpected: Pending-direct reconciliation should terminalize ended child runs and append completion events, or closed work items should not inherit stale historical runtime attention.\nImpact: A fully closed 12/12 roadmap is falsely displayed as needing attention on two dead, non-actionable historical runs.\nSuggested improvement: Reconcile terminal child metadata/process evidence even when a stale status field says paused; add a regression fixture for unmatched pending events on closed items and ensure roadmap projection does not emit Needs attention.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/fa873123-e0dc-4032-b071-beaef55e3c2e",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 25616,
+              "file": "01-pending-direct.jsonl",
+              "sha256": "320f7fc11a622127494ee914919bc3852a17ccb354eded90762ceae8914e5d1f"
+            },
+            {
+              "bytes": 7214,
+              "file": "02-7a6fa22b-322e-4fbe-917c-30bbe1103635_work-worker_meta.json",
+              "sha256": "ee9125681aef38ec03ac0f42223f5f09b660c6892711e5f5718962d5b58e2e50"
+            },
+            {
+              "bytes": 6345,
+              "file": "03-650383a2-887a-4475-9072-2277b76954da_work-worker_meta.json",
+              "sha256": "370d1bd5f1e41fdf008024265ec91d57f3e73c4a425fa808863da1a61e94734a"
+            },
+            {
+              "bytes": 140471,
+              "file": "04-work-items.json",
+              "sha256": "72cf7e4d3665763526705f7c1addf4da43490acef10990d2bc44501a94e8d772"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-08T08:21:15.835Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The roadmap projection for closed work-1 returns `aggregateStatus: needs_attention`, progress 12/12, with work-1.6 and work-1.11 m",
+      "type": "task",
+      "updatedAt": "2026-08-08T08:41:34.332Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -4120,6 +4238,44 @@
       "title": "Self-improvement report: An async pi-subagents workflow failed before launch because its generated Windows async-run directory embedded the provider call i",
       "type": "task",
       "updatedAt": "2026-08-07T21:50:27.863Z"
+    },
+    "work-2.report-f7d1e813-e0ae-49bf-b188-8477e9fbe685": {
+      "createdAt": "2026-08-08T08:27:18.043Z",
+      "dependencies": [
+        "work-2.63"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: Three direct async specialist launches for work-planner failed before startup on Windows with ENOENT while trying to mkdir an async-run directory whose basename was the raw tool call ID containing `|` (for example `call_...|fc_...`). The same work-planner workflow succeeded only after routing it through a one-shot project schedule, which generated a filesystem-safe UUID async ID.\nExpected: Direct async subagent workflows should sanitize externally supplied/tool call identifiers before using them as Windows path components and launch the configured specialist normally.\nImpact: The coded autonomous loop cannot use its required direct async specialist path on Windows; it needs an unnecessary schedule create/run/delete workaround and repeated failed launches.\nSuggested improvement: Generate a UUID/internal safe run directory name or replace Windows-invalid characters (`|`, etc.) before mkdir; add a Windows regression test for OpenAI Responses-style call IDs.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/a23319df-8fa7-4136-b98a-e8ceec882dfe",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 503484,
+              "file": "01-019fe06f-a14b-7e17-a2c8-6e141d393d1f.jsonl",
+              "sha256": "842403adf5bb7502d4986eca554ccf4dc5d63eb3d9e3fbd51ef0c9d2c3dfdeaa"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-08T08:27:18.036Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-f7d1e813-e0ae-49bf-b188-8477e9fbe685",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: duplicate of canonical upstream bug work-2.63. Same required outcome and Windows call_...|fc_... reproduction; no separate local claim. Keep open until work-2.63 acceptance is verified."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Three direct async specialist launches for work-planner failed before startup on Windows with ENOENT while trying to mkdir an asyn",
+      "type": "task",
+      "updatedAt": "2026-08-08T08:41:34.502Z"
     },
     "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7": {
       "createdAt": "2026-08-03T22:12:58.507Z",
@@ -5999,7 +6155,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-07T21:50:57.951Z"
+    "updatedAt": "2026-08-08T08:43:12.962Z"
   },
   "schemaVersion": 1
 }
