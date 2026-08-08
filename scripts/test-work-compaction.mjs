@@ -89,6 +89,31 @@ assert.doesNotMatch(freeform, /private chain of thought|secret successful payloa
 assert.doesNotMatch(freeform, /\/work-resume/);
 assert.equal(freeform.includes("\r"), false);
 
+const interruptedAfterWrite = formatCompactionSummary({
+	preparation: {
+		messagesToSummarize: [
+			{ role: "toolResult", toolName: "write", content: "completed" },
+			...Array.from({ length: 15 }, (_, index) => ({
+				role: "assistant",
+				content: `Older distinct progress ${index}`,
+			})),
+			{ role: "toolResult", toolName: "write", content: "completed" },
+			{
+				role: "assistant",
+				stopReason: "aborted",
+				errorMessage: "This operation was aborted",
+				content: [],
+			},
+		],
+	},
+});
+assert.match(
+	interruptedAfterWrite,
+	/\[tool:write\] completed/,
+	"the newest successful tool boundary survives duplicate compaction noise",
+);
+assert.doesNotMatch(interruptedAfterWrite, /This operation was aborted/);
+
 const durable = {
 	available: true,
 	target: {

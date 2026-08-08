@@ -1839,10 +1839,72 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		ctx,
 	);
 	await tempHooks.agent_start({}, ctx);
-	await tempShortcuts.f8.handler(ctx);
-	await tempHooks.turn_end({}, ctx);
-	assert.equal(compactions.length, 2, "F8 microcompacts the active goal turn");
+	const proactiveCompactionCtx = {
+		...ctx,
+		compact: (options) => compactions.push(options),
+	};
+	await tempHooks.turn_end(
+		{
+			message: {
+				role: "assistant",
+				stopReason: "toolUse",
+				content: [
+					{
+						type: "toolCall",
+						name: "write",
+						arguments: { path: "browser-evidence.md" },
+					},
+				],
+			},
+			toolResults: [
+				{
+					role: "toolResult",
+					toolName: "write",
+					isError: false,
+					content: [{ type: "text", text: "Successfully wrote evidence" }],
+				},
+			],
+		},
+		{ ...proactiveCompactionCtx, getContextUsage: () => ({ tokens: 160_000 }) },
+	);
+	assert.equal(
+		compactions.length,
+		2,
+		"successful write crossing the active-goal threshold starts compaction",
+	);
 	assert.match(compactions[1].customInstructions, /on-demand microcompact/);
+	assert.equal(
+		await tempHooks.message_end(
+			{
+				message: {
+					role: "assistant",
+					stopReason: "aborted",
+					errorMessage: "Provider socket closed",
+					content: [],
+				},
+			},
+			proactiveCompactionCtx,
+		),
+		undefined,
+		"compaction does not hide unrelated abort errors",
+	);
+	const hiddenCompactionAbort = await tempHooks.message_end(
+		{
+			message: {
+				role: "assistant",
+				stopReason: "aborted",
+				errorMessage: "This operation was aborted",
+				content: [],
+			},
+		},
+		proactiveCompactionCtx,
+	);
+	assert.deepEqual(hiddenCompactionAbort?.message, {
+		role: "assistant",
+		stopReason: "stop",
+		content: [],
+	});
+	compactions[1].onComplete?.();
 	await tempHooks.agent_end(
 		{
 			messages: [

@@ -326,7 +326,11 @@ export function formatCompactionSummary({
 	const users = latestUserRequests(messages);
 	const previous = normalizeText(source.previousSummary);
 	const files = filesFromOps(source.fileOps);
-	const recent = stableUnique(messages.map(messageLine).filter(Boolean)).slice(-14);
+	const recent = stableUnique(
+		messages.map(messageLine).filter(Boolean).reverse(),
+	)
+		.reverse()
+		.slice(-14);
 	const objective = objectiveFor(selectedProfile, users, durable, goal, previous);
 	const durableState =
 		selectedProfile === COMPACTION_PROFILES.FREEFORM

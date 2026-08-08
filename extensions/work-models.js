@@ -23458,12 +23458,21 @@ export default function workModelsExtension(pi) {
 				return { message: replacement };
 			}
 		}
+		const hideCompactionAbort =
+			contextCompactState.inFlight &&
+			contextCompactState.owner === "ce-workflow" &&
+			event.message?.role === "assistant" &&
+			event.message.stopReason === "aborted" &&
+			!contentText(event.message.content).trim() &&
+			/^(?:This operation was aborted|Request (?:was )?aborted(?: for manual compaction)?)$/i.test(
+				String(event.message.errorMessage ?? "").trim(),
+			);
 		if (
-			hideBackgroundVerifierAbort &&
+			(hideBackgroundVerifierAbort || hideCompactionAbort) &&
 			event.message?.role === "assistant" &&
 			event.message.stopReason === "aborted"
 		) {
-			hideBackgroundVerifierAbort = false;
+			if (hideBackgroundVerifierAbort) hideBackgroundVerifierAbort = false;
 			const { errorMessage: _errorMessage, ...message } = event.message;
 			const replacement = { ...message, stopReason: "stop" };
 			recordSelfImprovementHistory(ctx, "message_end", {
