@@ -3953,6 +3953,45 @@
       "type": "task",
       "updatedAt": "2026-08-02T19:28:21.628Z"
     },
+    "work-2.report-4daa1f58-daa5-4c95-b085-9aa157913d36": {
+      "createdAt": "2026-08-08T19:00:46.744Z",
+      "dependencies": [
+        "work-2.63"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: Three consecutive required async work-worker launches failed before child creation because pi-subagents attempted to mkdir an async run directory whose leaf name concatenated tool call IDs with a literal `|`, which is illegal in Windows paths.\nExpected: Async runs should sanitize or hash invocation identifiers before using them as Windows directory names, so the configured work-worker starts detached.\nImpact: The autonomous work-3.24 evidence slice cannot currently be routed through the mandated work-worker; each retry deterministically creates no child.\nSuggested improvement: Replace Windows-reserved path characters in async run leaf names or derive a filesystem-safe stable hash.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/b1bf4c0a-19b2-4589-b383-3335fb881c61",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 4558,
+              "file": "01-subagent-windows-path-failure.log",
+              "sha256": "24dbdeaa03506402e6b0adb80213f0200bec8ebb5be1931ea28676217147dfd7"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-08T19:00:46.735Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-4daa1f58-daa5-4c95-b085-9aa157913d36",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic classification: one duplicate, upstream-owned claim covered by canonical work-2.63. The evidence shows the exact same root cause and outcome: raw OpenAI composite tool-call id call_...|fc_... became the Windows async directory leaf before work-worker child creation. Canonical fix commit 436aae1 tracks upstream verified commit 4b18863d8046292a326c76b284cc76ee75465eb1, released in pi-subagents 0.44.0. Verification PASS against this report: npm-packed 0.44.0 source derives the async run id with randomUUID().slice(0, 8), so the report's composite id cannot reach path construction; no related-distinct ce-workflow claim or local workaround is needed. Installed 0.43.0 predates the fix and normal package catch-up is required for that environment.",
+        "Duplicate covered by work-2.63; exact failure excluded by released pi-subagents 0.44.0 UUID async IDs"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: Three consecutive required async work-worker launches failed before child creation because pi-subagents attempted to mkdir an asyn",
+      "type": "task",
+      "updatedAt": "2026-08-08T19:53:25.349Z"
+    },
     "work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021": {
       "createdAt": "2026-08-08T08:19:55.067Z",
       "dependencies": [
@@ -6286,7 +6325,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-08T17:54:52.878Z"
+    "updatedAt": "2026-08-08T19:53:25.351Z"
   },
   "schemaVersion": 1
 }
