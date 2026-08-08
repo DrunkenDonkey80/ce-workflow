@@ -4058,6 +4058,9 @@
           "producer": "HelpBuddy",
           "submittedAt": "2026-08-08T08:21:15.835Z",
           "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169",
@@ -4065,12 +4068,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: duplicate of canonical local bug work-2.64. Verified shared fix in commit 516ec80: closed work items no longer inherit paused/needs_attention pending-direct facts, while open paused items remain attention. Proof: node scripts/test-work-roadmap.mjs PASS; regression includes a closed task with unmatched paused runtime plus historical blocked/debug/wo:debug labels.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs\nOutput: "
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The roadmap projection for closed work-1 returns `aggregateStatus: needs_attention`, progress 12/12, with work-1.6 and work-1.11 m",
       "type": "task",
-      "updatedAt": "2026-08-08T08:41:34.332Z"
+      "updatedAt": "2026-08-08T08:43:45.147Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -6155,7 +6161,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-08T08:43:12.962Z"
+    "updatedAt": "2026-08-08T08:43:45.148Z"
   },
   "schemaVersion": 1
 }
