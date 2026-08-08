@@ -20,6 +20,8 @@ const keybindings = {
 		(id === "tui.select.down" && data === "down") ||
 		(id === "tui.select.confirm" && data === "enter") ||
 		(id === "tui.select.cancel" && data === "escape") ||
+		(id === "tui.editor.cursorLeft" && data === "cursor-left") ||
+		(id === "tui.editor.cursorRight" && data === "cursor-right") ||
 		(id === "tui.editor.deleteCharBackward" && data === "backspace"),
 };
 
@@ -832,13 +834,13 @@ const treeRun = await driveTree(
 			lines.some((line) => line.includes("Filter: ")),
 			"Space is not appended to the filter",
 		);
-		component.handleInput("right");
+		component.handleInput("cursor-right");
 		component.handleInput("down");
 		component.handleInput("down");
 		const movedLines = component.render(70);
 		assertAutowrapSafeOverlayLines(movedLines, 70);
 		assert(movedLines.some((line) => /❯\s+● Task A child/.test(line)));
-		component.handleInput("left");
+		component.handleInput("cursor-left");
 		lines = component.render(70);
 		assert(lines.some((line) => /❯.*\[\+\] ● Task A/.test(line)));
 		assert(!lines.some((line) => line.includes("Task A child")));

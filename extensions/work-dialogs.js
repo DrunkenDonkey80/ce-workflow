@@ -855,7 +855,16 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					const row = visible[index];
 					if (data === "s") {
 						showStats(row?.id);
-					} else if (data === "left" || data === "\x1b[D") {
+					} else if (
+						keyMatches(
+							keybindings,
+							data,
+							"tui.editor.cursorLeft",
+							"left",
+							"\x1b[D",
+							"\x1bOD",
+						)
+					) {
 						let parent = row?.container && expanded(row) ? row : undefined;
 						for (let at = index - 1; !parent && at >= 0; at -= 1) {
 							const candidate = visible[at];
@@ -871,7 +880,16 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 							expansion.set(parent.id, false);
 							rebuild();
 						}
-					} else if (data === "right" || data === "\x1b[C") {
+					} else if (
+						keyMatches(
+							keybindings,
+							data,
+							"tui.editor.cursorRight",
+							"right",
+							"\x1b[C",
+							"\x1bOC",
+						)
+					) {
 						if (row?.container) {
 							expansion.set(row.id, true);
 							rebuild();
