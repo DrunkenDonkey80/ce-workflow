@@ -9326,7 +9326,17 @@ async function subagentRpc(pi, method, params, timeoutMs = 2000) {
 }
 
 export function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
-	return subagentRpc(pi, "spawn", params, timeoutMs);
+	const { async = true, clarify: _clarify, ...child } = params;
+	return subagentRpc(
+		pi,
+		"spawn",
+		{
+			workflowScript: `return runs.run("main", ${JSON.stringify(child)})`,
+			async,
+			...(child.cwd ? { cwd: child.cwd } : {}),
+		},
+		timeoutMs,
+	);
 }
 
 export async function resumePausedWorkActionLease(

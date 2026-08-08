@@ -35,7 +35,7 @@ const {
 		),
 	).href
 );
-const { installWorkflowFixture, seedNativeStore } = await import(
+const { installWorkflowFixture, seedNativeStore, workflowChildParams } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
 	).href
@@ -713,11 +713,12 @@ try {
 				commandSummary.slowest[0].handoff.role === "worker",
 			"extension command records worker handoff role",
 		);
+		const rpcChild = workflowChildParams(rpcRequest.params);
 		assert(
-			compactCalls === 0 && sent.length === 0 && rpcRequest?.params?.agent === "work-worker",
-			"TUI worker handoff uses the durable direct path without compaction or a parent turn",
+			compactCalls === 0 && sent.length === 0 && rpcChild.agent === "work-worker",
+			"TUI worker handoff uses workflowScript without compaction or a parent turn",
 		);
-		const routedPrompt = rpcRequest.params.task;
+		const routedPrompt = rpcChild.task;
 		assert(
 			routedPrompt.includes("Implementation scope: small"),
 			"small handoff keeps the configured worker's bounded instructions",

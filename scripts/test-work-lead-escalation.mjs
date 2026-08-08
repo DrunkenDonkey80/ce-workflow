@@ -28,6 +28,7 @@ const {
 } = await import("../extensions/work-action-leases.js");
 const { createWorkItem, initStore, loadStore, saveStore, updateWorkItem } =
 	await import("../extensions/work-store.js");
+const { workflowChildParams } = await import("./work-command-fixture.mjs");
 
 function assert(value, message) {
 	if (!value) throw new Error(message);
@@ -121,7 +122,8 @@ function fakePi(outcomes, seen, credential = () => ({ ok: true, apiKey: "fixture
 				return () => {};
 			},
 			emit(_name, request) {
-				seen.push(request.params.model ?? "inherit");
+				const child = workflowChildParams(request.params);
+				seen.push(child.model ?? "inherit");
 				const success = outcomes.shift();
 				queueMicrotask(() =>
 					reply(
@@ -130,7 +132,7 @@ function fakePi(outcomes, seen, credential = () => ({ ok: true, apiKey: "fixture
 									success: true,
 									data: {
 										runId: `run-${seen.length}`,
-										asyncDir: path.join(request.params.cwd, `.run-${seen.length}`),
+										asyncDir: path.join(child.cwd, `.run-${seen.length}`),
 									},
 								}
 							: { success: false, error: { message: "candidate unavailable" } },
@@ -363,7 +365,7 @@ try {
 	updateWorkItem(successfulStore, "W-1", { notes: [] });
 	saveStore(successfulFence, successfulStore);
 	const successfulState = buildWorkResumeState(successfulFence, "E-1");
-	const successfulLaunch = await launchDirectAction(
+	await launchDirectAction(
 		successfulFence,
 		successfulState,
 		directRoleHandoffParams(successfulState, successfulFence),
@@ -400,7 +402,7 @@ try {
 	updateWorkItem(supersededStore, "W-1", { notes: [] });
 	saveStore(supersededFence, supersededStore);
 	const supersededState = buildWorkResumeState(supersededFence, "E-1");
-	const supersededLaunch = await launchDirectAction(
+	await launchDirectAction(
 		supersededFence,
 		supersededState,
 		directRoleHandoffParams(supersededState, supersededFence),
@@ -489,7 +491,7 @@ try {
 			leadContract.includes("do not hand mutable ownership back to Builder"),
 		"Lead owns diagnosis, edit, and verification end to end",
 	);
-	console.log("ok - Lead routing, fallback strategy, and bounded escalation");
+	process.stdout.write("ok - Lead routing, fallback strategy, and bounded escalation\n");
 } finally {
 	for (const cwd of cleanup) rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalDir, { recursive: true, force: true });

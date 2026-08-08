@@ -34,7 +34,7 @@ const {
 		path.join(import.meta.dirname, "../extensions/background-verifiers.js"),
 	).href
 );
-const { assert, seedNativeStore } = await import(
+const { assert, seedNativeStore, workflowChildParams } = await import(
 	pathToFileURL(path.join(import.meta.dirname, "./work-command-fixture.mjs"))
 		.href
 );
@@ -70,7 +70,7 @@ try {
 		},
 		emit(name, payload) {
 			if (name !== "subagents:rpc:v1:request") return;
-			launches.push(payload.params);
+			launches.push(workflowChildParams(payload.params));
 			const asyncDir = path.join(cwd, ".runtime", `run-${launches.length}`);
 			mkdirSync(asyncDir, { recursive: true });
 			for (const listener of rpcListeners.get(

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-07",
+  "capturedAt": "2026-08-08",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
@@ -53,24 +53,38 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.42.1",
-      "reviewedAt": "2026-08-07",
-      "reviewedVersion": "0.42.1",
+      "version": "0.43.0",
+      "reviewedAt": "2026-08-08",
+      "reviewedVersion": "0.43.0",
       "decisions": [
         {
-          "version": "0.42.1",
-          "title": "Crash-safe subagent TUI compatibility floor",
+          "version": "0.43.0",
+          "title": "WorkflowScript-only RPC execution cutover",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "The narrow-terminal widget overflow reproduced in a ce-workflow async reviewer can terminate the parent Pi session, and 0.42.1 contains the exact width-bounded rendering fix. Requiring pi-subagents >=0.42.1 is a reversible, one-line compatibility floor that prevents known-unsafe installations without duplicating upstream TUI code.",
-          "verification": "npm run verify:quiet passed and validates the pi-subagents >=0.42.1 peer dependency floor"
+          "rationale": "Reversibility: Tier 1 (small, easily reverted compatibility adapter). Bottom line: migrate ce-workflow's RPC spawn boundary from removed direct {agent, task} execution to a one-child workflowScript. Verified project fit: extensions/work-models.js still sends direct execution from role handoffs, background verifiers, and successor prefetch; pi-subagents 0.43.0's changelog, RPC docs, schema, and normalizePublicSubagentExecution require workflowScript and reject those requests. Benefit: restores planner/reviewer/worker, verifier, and prefetch launches on the installed 0.43.0 package. Cost/risk: low; JSON-safe child parameters must be wrapped once at the shared RPC boundary and covered by focused tests. Confidence: high. Recommendation: Adopt now.",
+          "verification": "node scripts/test-work-start-finish.mjs and node scripts/test-work-action-leases.mjs passed; npm run verify:quiet passed"
         },
         {
-          "version": "0.42.1",
-          "title": "Async workflow timeout and chat-progress compatibility",
-          "pov": "Adopt",
+          "version": "0.43.0",
+          "title": "Host gate verification and memoization",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "Async workflowScript runs now avoid an implicit 30-minute timeout and unsupported terminal/milestone chat projections were removed inside pi-subagents. ce-workflow's generated workflowScript handoffs use async:true without deprecated chatProgress values or a local timeout shim, so they inherit the corrected lifecycle and quieter projection with no adapter change."
+          "rationale": "Reversibility Tier 1, high confidence. The new one-command gate is useful upstream, but ce-workflow intentionally launches specialists with acceptance disabled and runs verification through its coded finish helper after work-item scope, review, and evidence checks. Adding a child gate would duplicate commands and move verification before ce-workflow's authoritative lifecycle boundary; retain the incumbent coded gate and revisit only if it can replace that boundary without losing evidence."
+        },
+        {
+          "version": "0.43.0",
+          "title": "Mission state, retained-child resume, refinement, and steer delivery modes",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Reversibility Tier 2, high confidence. ce-workflow already owns durable work items, autonomous goals, action leases, role/model settings, resume selection, and Fleet messaging. Adopting pi-subagents mission state, goal continuation, retained-child revival, project refinement overlays, or extra steering choices would create a second source of truth or extra UI without deleting an incumbent path; keep the package APIs available for direct users but do not integrate them locally absent measured workflow loss."
+        },
+        {
+          "version": "0.43.0",
+          "title": "Bundled-role removals and package-owned lifecycle/TUI fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "ce-workflow uses its own work-planner and other work-* agents rather than the removed bundled planner/context-builder roles. Provider-portable history ids, stale-context finalization, fanout listener cleanup, narrow rendering, status animation, schedule labels, and filesystem-test safety are pi-subagents internals inherited by existing consumers, so local shims would add code without replacing project behavior."
         }
       ]
     },

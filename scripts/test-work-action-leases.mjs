@@ -39,6 +39,7 @@ import {
 	queueLane,
 	runReadOnlyLaneBatch,
 } from "../extensions/read-only-lanes.js";
+import { workflowChildParams } from "./work-command-fixture.mjs";
 
 function assert(value, message) {
 	if (!value) throw new Error(message);
@@ -189,9 +190,10 @@ for (const mode of ["tui", "rpc", "autonomous"]) {
 							},
 						}),
 					);
+					const child = workflowChildParams(request.params);
 					assert(
-						request.params.agent === "work-fixer",
-						`${mode}: role-valid reviewer evidence routes exactly to fixer`,
+						request.params.async === true && child.agent === "work-fixer",
+						`${mode}: role-valid reviewer evidence routes exactly to fixer through workflowScript`,
 					);
 				},
 			},

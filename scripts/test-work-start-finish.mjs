@@ -2,7 +2,7 @@
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-const { assert, installWorkflowFixture } = await import(
+const { assert, installWorkflowFixture, workflowChildParams } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
 	).href
@@ -91,25 +91,29 @@ try {
 		(await verifierAdapter.spawn(verifierRequest)).ok,
 		"adapter launches without fictional provider capabilities",
 	);
+	let verifierChild = workflowChildParams(verifierRpcParams);
 	assert(
-		verifierRpcParams.task.includes('"job-test"') &&
-			verifierRpcParams.task.includes('"openai/gpt-5"') &&
-			verifierRpcParams.task.includes(JSON.stringify(verifierCheckpoint)),
-		"verifier handoff includes the exact immutable report identity",
+		verifierRpcParams.async === true &&
+			verifierChild.task.includes('"job-test"') &&
+			verifierChild.task.includes('"openai/gpt-5"') &&
+			verifierChild.task.includes(JSON.stringify(verifierCheckpoint)),
+		"verifier handoff uses workflowScript with the exact immutable report identity",
 	);
 	assert(
-		verifierRpcParams.agent === "work-background-verifier" &&
-			!verifierRpcParams.tools.includes("project_report") &&
-			verifierRpcParams.agentContract?.version === 1 &&
-			verifierRpcParams.acceptance === false,
+		verifierChild.agent === "work-background-verifier" &&
+			!verifierChild.tools.includes("project_report") &&
+			verifierChild.agentContract?.version === 1 &&
+			verifierChild.acceptance === false,
 		"verifiers use checkpoint-only tools without a conflicting acceptance contract",
 	);
 	projectReportAvailable = true;
+	const secondVerifierLaunch = await verifierAdapter.spawn(verifierRequest);
+	verifierChild = workflowChildParams(verifierRpcParams);
 	assert(
-		(await verifierAdapter.spawn(verifierRequest)).ok &&
-			verifierRpcParams.agent === "work-background-verifier" &&
-			!verifierRpcParams.tools.includes("project_report") &&
-			!verifierRpcParams.task.includes("project_report"),
+		secondVerifierLaunch.ok &&
+			verifierChild.agent === "work-background-verifier" &&
+			!verifierChild.tools.includes("project_report") &&
+			!verifierChild.task.includes("project_report"),
 		"isolated verifiers do not inherit host-only pi-lens tools",
 	);
 	let state = buildWorkSmallState(fixture.cwd, "Add coded start gate");

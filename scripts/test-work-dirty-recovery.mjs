@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import workModelsExtension, {
 	executeOrchestratorAction,
 } from "../extensions/work-models.js";
-import { installWorkflowFixture } from "./work-command-fixture.mjs";
+import {
+	installWorkflowFixture,
+	workflowChildParams,
+} from "./work-command-fixture.mjs";
 
 const fixture = installWorkflowFixture();
 try {
@@ -16,6 +19,10 @@ try {
 	const rpcListeners = new Map();
 	let rpcRequest;
 	const pi = {
+		modelRegistry: {
+			find: (provider, id) => ({ provider, id }),
+			getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "fixture" }),
+		},
 		events: {
 			on: (name, listener) => {
 				rpcListeners.set(name, listener);
@@ -232,13 +239,14 @@ try {
 		true,
 		"approved cleanup ends the analysis turn",
 	);
+	const rpcChild = workflowChildParams(rpcRequest.params);
 	assert.equal(
-		rpcRequest?.params?.agent,
+		rpcChild.agent,
 		"work-worker",
-		"TUI continuation launches the leased worker directly",
+		"TUI continuation launches the leased worker through workflowScript",
 	);
 	assert.equal(sent.length, 1, "TUI continuation adds no parent assistant turn");
-	assert.match(rpcRequest?.params?.task ?? "", /Implementation scope: small/);
+	assert.match(rpcChild.task ?? "", /Implementation scope: small/);
 	assert.doesNotMatch(
 		notices.at(-1)?.message ?? "",
 		/Dirty files must be resolved/,

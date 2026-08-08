@@ -243,6 +243,18 @@ export function assert(ok, message) {
 	if (!ok) throw new Error(message);
 }
 
+export function workflowChildParams(params) {
+	try {
+		const body = params.workflowScript.match(
+			/^return runs\.run\("main", (.*)\)$/s,
+		)?.[1];
+		if (!body) throw new Error("missing one-child workflowScript");
+		return JSON.parse(body);
+	} catch (error) {
+		throw new Error(`Invalid one-child workflowScript: ${error.message}`);
+	}
+}
+
 export function seedNativeStore(cwd, sources) {
 	const store = initStore(cwd);
 	store.items = {};
@@ -323,19 +335,16 @@ export function installWorkflowFixture() {
 		const children = structuredClone(
 			scenarioChildren[scenario] ?? scenarioChildren.active,
 		);
-		const scenarioEpics =
-			scenario === "empty" ||
-			scenario === "no-legacy-empty" ||
-			scenario === "no-store"
-				? []
-				: scenario === "ambiguous" || scenario === "openReadyAmbiguous"
-					? epics.map((epic) => ({
-							...epic,
-							...(scenario === "openReadyAmbiguous" ? { status: "open" } : {}),
-						}))
-					: scenario === "oneOpen"
-						? [{ ...epics[0], status: "open" }]
-						: [epics[0]];
+		let scenarioEpics = [epics[0]];
+		if (["empty", "no-legacy-empty", "no-store"].includes(scenario))
+			scenarioEpics = [];
+		else if (["ambiguous", "openReadyAmbiguous"].includes(scenario))
+			scenarioEpics = epics.map((epic) => ({
+				...epic,
+				...(scenario === "openReadyAmbiguous" ? { status: "open" } : {}),
+			}));
+		else if (scenario === "oneOpen")
+			scenarioEpics = [{ ...epics[0], status: "open" }];
 		writeFileSync(
 			statePath,
 			JSON.stringify(
