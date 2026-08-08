@@ -3654,20 +3654,26 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical upstream-owned claim for work-2.report-ec289716-ad4f-4177-919a-47e4ed6b750e. pi-subagents uses the host/provider tool call id directly as workflowRunId and as a DIRS.async path component; composite ids containing Windows-reserved characters such as | fail before launch.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.63",
       "labels": [
         "upstream"
       ],
       "notes": [
         "Classification: upstream-owned pi-subagents async workflow path construction; related to ce-workflow orchestration but no local workaround can make the provider-owned run directory safe. Installed 0.42.1 and latest npm 0.43.0 both use the raw tool-call id as workflowRunId before path.join(DIRS.async, workflowRunId). Windows reproduction with call_demo|fc_demo returns mkdir ENOENT. Routed durably to https://github.com/nicobailon/pi-subagents/issues/889; keep canonical item open until an installed upstream release satisfies acceptance.",
-        "Snapshot classification 2026-08-08: upstream-owned and unresolved. Installed/latest pi-subagents 0.43.0 still permits raw external tool-call IDs to reach async path construction; issue #889 remains the durable owner."
+        "Snapshot classification 2026-08-08: upstream-owned and unresolved. Installed/latest pi-subagents 0.43.0 still permits raw external tool-call IDs to reach async path construction; issue #889 remains the durable owner.",
+        "Resolution evidence 2026-08-08: upstream issue #889 is closed as completed by verified commit 4b18863d8046292a326c76b284cc76ee75465eb1. The commit replaces the host tool-call id with randomUUID() for workflowRunId/path construction, retains toolCallId in status/results, and adds an integration regression using call_demo|fc_demo that asserts no path is created from the composite id. Acceptance is satisfied on upstream main; npm 0.43.0 predates the commit, so release adoption remains catch-up work rather than an unresolved defect.",
+        "wo:verify-check PASS\nCommand: node -e \"fetch('https://api.github.com/repos/nicobailon/pi-subagents/commits/4b18863d8046292a326c76b284cc76ee75465eb1').then(r=>r.json()).then(c=>{const p=c.files.map(f=>f.patch||'').join(' ');if(!c.commit.verification.verified||!p.includes('randomUUID()')||!p.includes('call_demo|fc_demo'))process.exit(1)})\"\nOutput: "
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Sanitize async workflow run IDs before path construction",
       "type": "bug",
-      "updatedAt": "2026-08-07T21:33:34.052Z"
+      "updatedAt": "2026-08-08T08:49:06.230Z"
     },
     "work-2.64": {
       "acceptance": "Roadmap projection ignores pending-direct and transient blocked/debug attention for closed work items while retaining native closed status and historical labels/notes; open paused items still show needs_attention; focused regression passes.",
@@ -6167,7 +6173,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-08T08:44:02.862Z"
+    "updatedAt": "2026-08-08T08:49:06.231Z"
   },
   "schemaVersion": 1
 }
