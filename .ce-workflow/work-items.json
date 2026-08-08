@@ -3866,6 +3866,9 @@
           "producer": "HelpBuddy",
           "submittedAt": "2026-08-08T08:19:55.056Z",
           "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021",
@@ -3873,12 +3876,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomic classification: (1) stale blocked/debug/wo:debug labels as the attention cause is already-fixed in current projection because labels are not aggregated; (2) contradictory attention on closed descendants is related-distinct but shares canonical work-2.64's required outcome. Verified commit 516ec80 and node scripts/test-work-roadmap.mjs PASS against both atoms: the closed fixture retains all historical labels yet aggregateStatus remains closed and attention=false despite unmatched paused runtime.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-roadmap.mjs\nOutput: "
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A closed roadmap was shown as complete (12/12) but still reported two items needing attention. In the native store, the two closed",
       "type": "task",
-      "updatedAt": "2026-08-08T08:41:34.115Z"
+      "updatedAt": "2026-08-08T08:44:02.861Z"
     },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
@@ -6161,7 +6167,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-08T08:43:45.148Z"
+    "updatedAt": "2026-08-08T08:44:02.862Z"
   },
   "schemaVersion": 1
 }
