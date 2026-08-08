@@ -3700,6 +3700,31 @@
       "type": "bug",
       "updatedAt": "2026-08-08T08:43:12.962Z"
     },
+    "work-2.65": {
+      "acceptance": "The work-planner contract forbids provider-specific browser artifacts such as trace archives unless the project contract or verified configured provider capability explicitly supplies them; otherwise it requires provider-supported evidence or creates a blocker before implementation. Focused planner-contract test and package verification pass.",
+      "createdAt": "2026-08-08T17:48:50.081Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local claim for work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8: planner-created acceptance required a Playwright trace archive although the configured BetterWright browser intentionally removes context.tracing and exposes no trace-zip helper, making the evidence gate impossible after a UI defect.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.65",
+      "labels": [
+        "bug"
+      ],
+      "notes": [
+        "Classification: locally-owned evidence-contract defect. BetterWright 1.7.0's official browser API explicitly removes context.tracing; adding a trace API is upstream-owned and related-distinct, while ce-workflow can fully prevent impossible acceptance locally.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-planner-slicing.mjs\nOutput: ok - work planner slicing contract passes"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Require provider-supported browser evidence in planner acceptance",
+      "type": "bug",
+      "updatedAt": "2026-08-08T17:49:48.622Z"
+    },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
       "createdAt": "2026-07-20T09:58:53.226Z",
@@ -3793,6 +3818,83 @@
       "title": "Self-improvement report: `work-helper.mjs work-close work-4.2 --reason \"...\"` changed the decision status to closed but did not persist the supplied closur",
       "type": "task",
       "updatedAt": "2026-07-20T14:41:04.347Z"
+    },
+    "work-2.report-2161af52-ac96-4b1d-8c22-5e4d16d82d8c": {
+      "createdAt": "2026-08-08T13:36:08.061Z",
+      "dependencies": [
+        "work-2.63"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: Launching the exact required async work-planner via pi-subagents fails before startup on Windows because the generated async-run directory name contains a literal pipe character. Supplying a safe sessionDir does not change the failing default async-run path. Two consecutive exact-role launches failed.\nExpected: Async specialist launches should sanitize host-generated run/call identifiers for Windows path rules, or honor sessionDir without first creating a default directory containing invalid characters.\nImpact: The mandated work-planner/work-worker routing cannot start, so autonomous roadmap execution is blocked before any planned implementation slice can be created.\nSuggested improvement: Replace Windows-invalid path characters in async run directory components with `-` before mkdir, and add a Windows regression test for tool-call IDs containing `|fc_...`.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/9f3e7f93-f8cf-4d45-8221-fc731097d3f5",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 686,
+              "file": "01-subagent-windows-path-failure.txt",
+              "sha256": "f09f3a7c14854092310dd74df7df5bd2ded62adc07eda0dc7fe52ef068f69dba"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-08T13:36:08.054Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-2161af52-ac96-4b1d-8c22-5e4d16d82d8c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Launching the exact required async work-planner via pi-subagents fails before startup on Windows because the generated async-run d",
+      "type": "task",
+      "updatedAt": "2026-08-08T17:48:57.351Z"
+    },
+    "work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8": {
+      "createdAt": "2026-08-08T17:28:28.534Z",
+      "dependencies": [
+        "work-2.65"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: A native work-item acceptance required a Playwright trace archive when a browser failure occurred. BetterWright exposed a guarded `context` global but `context.tracing` was undefined; attempting `context.tracing.start(...)` failed. Automatic failure artifacts contained screenshots only and no trace/zip. This made the literal evidence gate impossible after a product overflow defect was found and fixed.\nExpected: BetterWright should either automatically retain a trace archive for failed browser calls/journeys or expose a supported trace start/stop helper/API, and the work evidence policy should distinguish product failures from harness scripting errors.\nImpact: The product journey and all other evidence passed, but the workflow cannot truthfully satisfy its explicit trace-on-failure artifact requirement despite rerunning the fixed journey successfully.\nSuggested improvement: Add a BetterWright `trace.start()`/`trace.stop()` helper or auto-attach `trace.zip` on browser tool errors; have planning acceptance request a trace only when the configured browser provider supports it.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/84b1edc9-9e0a-4d3e-ba7e-a64ed809fb20",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1166,
+              "file": "01-browser-evidence.md",
+              "sha256": "69802a98b1706c3261d22b64ff3763c33de6a15fcc125f833b76417e53f12eec"
+            },
+            {
+              "bytes": 2716,
+              "file": "02-dev-server.log",
+              "sha256": "3a38a2a9947380a1dd51b186082eef35bb639773cc75b58e5837912091e9151e"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-08T17:28:28.526Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A native work-item acceptance required a Playwright trace archive when a browser failure occurred. BetterWright exposed a guarded ",
+      "type": "task",
+      "updatedAt": "2026-08-08T17:49:02.390Z"
     },
     "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495": {
       "createdAt": "2026-08-01T09:25:47.590Z",
@@ -6178,7 +6280,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-08T08:49:20.868Z"
+    "updatedAt": "2026-08-08T17:49:48.623Z"
   },
   "schemaVersion": 1
 }
