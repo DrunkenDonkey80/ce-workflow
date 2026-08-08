@@ -3848,12 +3848,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomic classification: duplicate and upstream-owned by canonical work-2.63. This report has the same raw OpenAI call_...|fc_... async-directory root cause and required filesystem-safe launch outcome; no related-distinct local claim. Shared fix verified in canonical ce-workflow commit 436aae1 and upstream verified commit 4b18863d8046292a326c76b284cc76ee75465eb1, now released in pi-subagents 0.44.0 (npm gitHead 96c3fec9b502c61295e244c3fce4d97ff22b13b3). The released source uses randomUUID().slice(0, 8) for async run IDs while retaining tool-call correlation. Verification PASS: npm pack pi-subagents@0.44.0 and source assertion for the UUID run ID. Installed 0.43.0 predates the fix and should be upgraded through normal package catch-up.",
+        "Duplicate covered by canonical work-2.63; upstream fix verified in released pi-subagents 0.44.0"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Launching the exact required async work-planner via pi-subagents fails before startup on Windows because the generated async-run d",
       "type": "task",
-      "updatedAt": "2026-08-08T17:48:57.351Z"
+      "updatedAt": "2026-08-08T17:50:32.619Z"
     },
     "work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8": {
       "createdAt": "2026-08-08T17:28:28.534Z",
@@ -3889,12 +3892,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomic classifications: (1) locally-owned impossible evidence-contract defect, canonical work-2.65; fixed in commit e25f54b by requiring provider capability verification before planner acceptance names trace/video/provider-specific artifacts and falling back to supported screenshots, DOM assertions, logs, and state checks or a blocker. Focused planner-contract test PASS and npm run verify:quiet PASS. (2) BetterWright 1.7.0 Playwright trace-zip support is upstream-owned and related-distinct: its official browser API intentionally removes context.tracing while offering tracked screenshots and host JSONL step tracing. The report's required disjunctive outcome is fully satisfied by the local provider-aware acceptance guard, so no insecure provider workaround was added. Canonical work-2.65 and commit e25f54b cover the exact HelpBuddy acceptance that required an unsupported trace archive.",
+        "Covered by work-2.65 in e25f54b; provider-aware browser evidence contract verified"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A native work-item acceptance required a Playwright trace archive when a browser failure occurred. BetterWright exposed a guarded ",
       "type": "task",
-      "updatedAt": "2026-08-08T17:49:02.390Z"
+      "updatedAt": "2026-08-08T17:54:52.875Z"
     },
     "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495": {
       "createdAt": "2026-08-01T09:25:47.590Z",
@@ -6280,7 +6286,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-08T17:49:48.623Z"
+    "updatedAt": "2026-08-08T17:54:52.878Z"
   },
   "schemaVersion": 1
 }
