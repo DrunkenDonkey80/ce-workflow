@@ -4279,6 +4279,9 @@
           "producer": "HelpBuddy",
           "submittedAt": "2026-08-08T08:27:18.036Z",
           "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-f7d1e813-e0ae-49bf-b188-8477e9fbe685",
@@ -4287,13 +4290,15 @@
         "self-improvement"
       ],
       "notes": [
-        "Classification: duplicate of canonical upstream bug work-2.63. Same required outcome and Windows call_...|fc_... reproduction; no separate local claim. Keep open until work-2.63 acceptance is verified."
+        "Classification: duplicate of canonical upstream bug work-2.63. Same required outcome and Windows call_...|fc_... reproduction; no separate local claim. Keep open until work-2.63 acceptance is verified.",
+        "Shared fix verified: canonical work-2.63 closed in commit 436aae1 after upstream issue #889 closed as completed by verified commit 4b18863d8046292a326c76b284cc76ee75465eb1. Upstream uses a UUID async path, retains the original toolCallId for correlation, and its integration test launches call_demo|fc_demo without creating a composite-ID path. This covers all three reported Windows launch failures; npm 0.43.0 predates the fix and a future catch-up will adopt its release.",
+        "wo:verify-check PASS\nCommand: node -e \"fetch('https://api.github.com/repos/nicobailon/pi-subagents/commits/4b18863d8046292a326c76b284cc76ee75465eb1').then(r=>r.json()).then(c=>{const p=c.files.map(f=>f.patch||'').join(' ');if(!c.commit.verification.verified||!p.includes('randomUUID()')||!p.includes('call_demo|fc_demo'))process.exit(1)})\"\nOutput: "
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Three direct async specialist launches for work-planner failed before startup on Windows with ENOENT while trying to mkdir an asyn",
       "type": "task",
-      "updatedAt": "2026-08-08T08:41:34.502Z"
+      "updatedAt": "2026-08-08T08:49:20.867Z"
     },
     "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7": {
       "createdAt": "2026-08-03T22:12:58.507Z",
@@ -6173,7 +6178,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-08T08:49:06.231Z"
+    "updatedAt": "2026-08-08T08:49:20.868Z"
   },
   "schemaVersion": 1
 }
