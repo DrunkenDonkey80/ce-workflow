@@ -17710,7 +17710,38 @@ function workGoalSummary(goal = activeWorkGoal) {
 		.join("\n");
 }
 
-function createWorkGoal(mode, objective, tokenBudget, baselineTokens = 0) {
+function currentWorkGoalBaselineHead(cwd) {
+	try {
+		return run(cwd, "git", ["rev-parse", "HEAD"]);
+	} catch {
+		return;
+	}
+}
+
+function workGoalBaselineHead(goal, cwd = activeWorkGoalCwd) {
+	if (/^[0-9a-f]{40,64}$/i.test(String(goal?.baselineHead ?? "")))
+		return goal.baselineHead;
+	const startedAt = Number(goal?.startedAt);
+	if (!Number.isFinite(startedAt)) return;
+	try {
+		return run(cwd, "git", [
+			"rev-list",
+			"-1",
+			`--before=${new Date(startedAt).toISOString()}`,
+			"HEAD",
+		]);
+	} catch {
+		return;
+	}
+}
+
+function createWorkGoal(
+	mode,
+	objective,
+	tokenBudget,
+	baselineTokens = 0,
+	baselineHead,
+) {
 	const now = Date.now();
 	return {
 		id: telemetryId("wg"),
@@ -17723,6 +17754,7 @@ function createWorkGoal(mode, objective, tokenBudget, baselineTokens = 0) {
 		tokenBudget,
 		tokensUsed: 0,
 		baselineTokens,
+		...(baselineHead ? { baselineHead } : {}),
 		retries: 0,
 	};
 }
@@ -18177,6 +18209,7 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 		const verifierBlocker = verifierCompletionBlocker(
 			loadVerifierStore(cwd),
 			goal?.startedAt,
+			workGoalBaselineHead(goal, cwd),
 		);
 		if (verifierBlocker) return verifierBlocker;
 	} catch (error) {
@@ -18293,6 +18326,7 @@ async function startWorkGoal(
 		text,
 		tokenBudget,
 		workGoalTokenTotal(ctx),
+		currentWorkGoalBaselineHead(ctx.cwd),
 	);
 	activeWorkGoalCwd = ctx.cwd;
 	applyWorkGoalThinking(pi, activeWorkGoal, ctx);
@@ -22329,6 +22363,7 @@ export {
 	isWorkGoalUsageLimit,
 	parseWorkProjectGoalInput,
 	workGoalCompletionBlocker,
+	workGoalBaselineHead,
 	planResumeAction,
 	progressBar,
 	applyProfile,

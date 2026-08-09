@@ -2728,15 +2728,17 @@ export function verifierStatus(store, configured = undefined) {
 	return "fully-triaged";
 }
 
-export function verifierCompletionBlocker(store, since) {
+export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 	validateVerifierStore(store);
 	const startedAt = typeof since === "number" ? since : Date.parse(since);
 	if (!Number.isFinite(startedAt)) return;
+	const baseline = nonempty(baselineSnapshot) ? baselineSnapshot : undefined;
 	const batchIds = new Set(
 		Object.values(store.batches)
 			.filter(
 				(batch) =>
 					batch.purpose === "verification" &&
+					batch.checkpoint.snapshot !== baseline &&
 					Date.parse(batch.createdAt) >= startedAt,
 			)
 			.map((batch) => batch.id),

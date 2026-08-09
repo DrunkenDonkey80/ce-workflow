@@ -4417,6 +4417,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-09T14:29:03.486Z",
           "workflowId": "019fe52c-6cdc-70f5-8ff2-6727eaf41997"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-8687048c-ef65-40aa-8a38-3836e4f406a5",
@@ -4424,12 +4427,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:review FAIL {\"findings\":[\"scripts/test-work-goal.mjs:250 - add a regression assertion for the Git-derived baseline branch (extensions/work-models.js:17721-17734): build a temp git repo like scripts/test-work-goal.mjs:951, commit, capture HEAD, then assert mod.workGoalBaselineHead({ startedAt: <between that commit and a later commit> }, repoCwd) === the pre-startedAt commit, and that {} / non-repo cwd return undefined; the exported helper is currently unused by any test so the legacy-goal path in the acceptance has no check\"]}",
+        "--message classification: locally-owned atomic claim. Root cause: goal completion scoped verifier batches only by wall-clock creation time, without persisting the goal's Git baseline. Implemented exact-baseline exclusion, persisted baselineHead for new goals, Git-at-start fallback for legacy goals, and regression coverage for baseline/post-baseline failures plus legacy derivation. Initial independent review confirmed production logic and requested only the now-passing legacy fallback regression.",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs && node scripts/test-work-goal.mjs\nOutput: background verifier domain tests passed\nok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A verification batch for the previous catch-up checkpoint e1bb133 was created after the next autonomous goal had started. work_goa",
       "type": "task",
-      "updatedAt": "2026-08-09T14:29:03.493Z"
+      "updatedAt": "2026-08-09T14:50:00.841Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -6560,7 +6567,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-09T14:29:03.493Z"
+    "updatedAt": "2026-08-09T14:50:00.841Z"
   },
   "schemaVersion": 1
 }

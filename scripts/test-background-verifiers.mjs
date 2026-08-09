@@ -385,6 +385,15 @@ try {
 		),
 		/failed or became orphaned/,
 	);
+	assert.equal(
+		verifierCompletionBlocker(
+			loadVerifierStore(failedCwd),
+			"2026-07-21T00:00:03.000Z",
+			failedBatch.checkpoint.snapshot,
+		),
+		undefined,
+		"a failed verifier for the active goal baseline does not block that goal",
+	);
 
 	// Analysis candidates remain advisory until a revision-fenced human review.
 	const reviewCwd = repo();
