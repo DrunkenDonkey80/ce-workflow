@@ -53,31 +53,24 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.44.0",
+      "version": "0.45.1",
       "reviewedAt": "2026-08-09",
-      "reviewedVersion": "0.44.0",
+      "reviewedVersion": "0.45.1",
       "decisions": [
         {
-          "version": "0.44.0",
-          "title": "Opt ce-workflow RPC launches out of automatic missions",
+          "version": "0.45.1",
+          "title": "Async interrupt safety and workflow completion reliability",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 (one shared-boundary option, easy rollback). Bottom line: set `mission:false` on ce-workflow’s shared `workflowScript` RPC launches. Verified project fit: pi-subagents 0.44.0 now creates an automatic enclosing mission and durable workflow state for every plain workflowScript; `extensions/work-models.js` routes role handoffs, background verifiers, and successor prefetch through `spawnSubagentRpc` without a mission setting, while ce-workflow already uses native work items, action leases, autonomous goals, and telemetry as its durable source of truth. Benefit: avoids duplicate mission files/state and preserves the prior decision not to integrate a second lifecycle store. Cost/risk: very low; one wrapper change plus a focused assertion, but package mission UI/state will not appear for these ce-workflow-owned launches. Confidence: high. Recommendation: Adopt now.",
-          "verification": "node scripts/test-work-start-finish.mjs passed and asserts mission=false on the shared verifier RPC launch"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 (baseline-only adoption; easy rollback by package version). Bottom line: adopt 0.45.1’s package-owned async safety and workflow reliability fixes with no ce-workflow source shim. Verified project fit: ce-workflow routes coded roles through `extensions/work-models.js`’s shared async RPC wrapper and relies on status/reconciliation; upstream 0.45.1 prevents interrupts from signaling unverified/shared host PIDs, publishes result data before terminal status, and drops late child responses after workflow settlement. Benefit: safer async control and fewer completion races/duplicates. Cost/risk: low package regression risk; no local code change. Confidence: high. Recommendation: Adopt now.",
+          "verification": "Installed pi-subagents version is 0.45.1 and node scripts/test-work-start-finish.mjs passed against the shared RPC wrapper"
         },
         {
-          "version": "0.44.0",
-          "title": "Portable async identities and package-owned workflow reliability",
-          "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1; confidence: high. pi-subagents 0.44.0's portable async directory identifiers directly resolve the Windows-invalid tool-call-id failure recorded in ce-workflow's self-improvement reports, while explicit workflow cwd records, bounded inherited tool ids, detached-worktree retention, structured-output recovery, and serialized mission writes are package-owned fixes inherited by the installed extension. No local shim can delete more code or improve the contract, so adopt the release behavior with no ce-workflow change."
-        },
-        {
-          "version": "0.44.0",
-          "title": "Non-blocking wake subscriptions and supervisor documentation",
+          "version": "0.45.1",
+          "title": "Structured wait completions, live activity, and caller guidance",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1; confidence: high. The new non-blocking wait subscription is optional caller guidance, and native supervisor/result-delivery clarification documents package lifecycle already consumed by ce-workflow's coded action leases and exact-session supervisor rules. Replacing those project-owned liveness gates would lose work-item state without removing an upstream dependency; keep the APIs available for direct agents and add no adapter."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1. Bottom line: add no ce-workflow adapter for structured `subagent_wait` completions, live workflow activity, Markdown-fence diagnostics, Herdr command quoting, configured reads, or clarified mission policy. Verified project fit: current direct-role status and transcript reconciliation already covers required telemetry, the shared RPC wrapper safely serializes task text with JSON.stringify, and ce-workflow deliberately keeps `mission:false`; no current correctness gap or removable local code was found. Benefit: avoids duplicating canonical upstream status and UI behavior. Cost/risk: exact wait-only artifact identity remains unused, but can be revisited if a measured telemetry gap appears. Confidence: high. Recommendation: inherit the package behavior without local code."
         }
       ]
     },
@@ -105,23 +98,24 @@
     },
     {
       "name": "pi-intercom",
-      "version": "0.9.3",
+      "version": "0.10.0",
       "reviewedAt": "2026-08-09",
-      "reviewedVersion": "0.9.3",
+      "reviewedVersion": "0.10.0",
       "decisions": [
         {
-          "version": "0.9.3",
-          "title": "Safe busy-turn delivery, broker liveness, and unique session prefixes",
+          "version": "0.10.0",
+          "title": "Connected-target safety and broker routing reliability",
           "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1; confidence: high. pi-intercom 0.9.3 now steers connected busy recipients at a safe model boundary, actively reconnects after half-open broker loss, and emits unambiguous session-id prefixes. ce-workflow already consumes the public intercom tool and exact-session coordination contract rather than implementing broker transport, delivery queues, or roster formatting, so it inherits these reliability gains with no local code or migration risk."
+          "status": "adopted",
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 (baseline-only adoption; easy package rollback). Bottom line: adopt 0.10.0’s package-owned routing and reliability improvements with no ce-workflow source change. Verified project fit: ce-workflow treats pi-intercom as optional and uses only public `contact_supervisor`/`intercom` actions plus exact-session, pending-ask, and explicit-reply safeguards. Upstream 0.10.0 hardens reconnect/mailbox identity, refuses blocking asks to disconnected targets, validates broker payloads, and adds cwd-scoped visible project panes without changing required existing calls. Benefit: safer stale/disconnected coordination and inherited broker reliability. Cost/risk: low package regression risk; project panes and extension-bus state remain unused. Confidence: high. Recommendation: Adopt now.",
+          "verification": "Installed pi-intercom version is 0.10.0 and node scripts/test-work-goal.mjs passed the exact-session, pending-ask, and explicit-reply policy assertions"
         },
         {
-          "version": "0.9.3",
-          "title": "Implicit reply inference for send",
+          "version": "0.10.0",
+          "title": "Implicit replies, project panes, and extension-bus state",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1; confidence: high. ce-workflow's delayed-supervisor rule intentionally checks pending asks and uses explicit `reply`/`replyTo` only after confirming the child run and work item are live. Switching coded guidance to `send` inference would hide the thread identity and weaken the stale-message guard without deleting any adapter; retain explicit replies while allowing the package behavior for ordinary direct users."
+          "rationale": "Grade: Reject. Reversibility: Tier 1. Bottom line: retain ce-workflow’s explicit `pending` plus `reply` coordination rule and add no project-pane or extension-bus integration. Verified project fit: exact reply threading is a deliberate stale-message safety boundary, bounded cross-codebase work already uses pi-subagents with explicit cwd, and ce-workflow has no shared-state consumer that would justify a second cross-session store. Benefit: preserves thread identity and avoids new Herdr/state coupling. Cost/risk: ce-workflow does not use the release’s convenience surfaces, while ordinary direct users still can. Confidence: high. Recommendation: no local action."
         }
       ]
     },
