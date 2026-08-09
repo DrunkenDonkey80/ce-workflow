@@ -6,6 +6,7 @@ import {
 	mkdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -431,13 +432,45 @@ async function finishTaskUnlocked() {
 	);
 	if (!id || !message || !Number.isInteger(maxFiles) || maxFiles < 1)
 		throw new Error(
-			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--immediate-format] [--reviewed] [--push]",
+			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--evidence-file <docs/evidence/task-owned-image> ...] [--immediate-format] [--reviewed] [--push]",
 		);
 	const task = readWorkItem(id);
 	if (task?.initiative)
 		throw new Error(
 			`Initiative ${id} must be closed through /work-roadmap guarded close.`,
 		);
+	const taskContractText = `${titleOf(task)}\n${field(task, "description") ?? ""}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
+	const evidenceOnly =
+		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
+			taskContractText,
+		);
+	const evidenceFiles = [
+		...new Set(
+			options("--evidence-file").map((file) =>
+				path.posix.normalize(file.replaceAll("\\", "/")),
+			),
+		),
+	];
+	if (evidenceFiles.length > 20)
+		throw new Error("finish-task accepts at most 20 declared evidence files");
+	for (const file of evidenceFiles) {
+		const taskEvidencePrefix = `docs/evidence/${id}`;
+		if (
+			!evidenceOnly ||
+			path.posix.isAbsolute(file) ||
+			file.startsWith("../") ||
+			!(file.startsWith(`${taskEvidencePrefix}/`) ||
+				file.startsWith(`${taskEvidencePrefix}-`)) ||
+			!/\.(?:png|jpe?g|webp)$/i.test(file) ||
+			!existsSync(path.join(cwd, file)) ||
+			!statSync(path.join(cwd, file)).isFile() ||
+			statSync(path.join(cwd, file)).size > 10 * 1024 * 1024
+		)
+			throw new Error(
+				`invalid evidence file ${file}: require an existing image up to 10 MiB under docs/evidence/${id}... for an evidence task`,
+			);
+	}
+	const evidenceFileSet = new Set(evidenceFiles);
 	const formatted = formatPendingFiles();
 	const stagedBefore = git(["diff", "--cached", "--name-only"])
 		.split(/\r?\n/)
@@ -541,10 +574,13 @@ async function finishTaskUnlocked() {
 				: {}),
 		};
 	const tidy = tidyUntrackedFiles({ cwd, gitBin });
-	if (tidy.unrecognized.length)
+	const unrecognized = tidy.unrecognized.filter(
+		(file) => !evidenceFileSet.has(file.replaceAll("\\", "/")),
+	);
+	if (unrecognized.length)
 		throw new Error(
 			`untracked files need a decision before commit (add, gitignore, or remove):\n` +
-				tidy.unrecognized.map((file) => `  - ${file}`).join("\n") +
+				unrecognized.map((file) => `  - ${file}`).join("\n") +
 				`\nResolve each, then re-run finish-task.`,
 		);
 	const changed = gitStatusPaths().filter(
@@ -555,17 +591,13 @@ async function finishTaskUnlocked() {
 		const normalized = file.replaceAll("\\", "/");
 		return (
 			!normalized.startsWith(".ce-workflow/") &&
-			normalized !== ".ce-workflow/work-items.json"
+			normalized !== ".ce-workflow/work-items.json" &&
+			!evidenceFileSet.has(normalized)
 		);
 	});
 	if (implementationFiles.length > maxFiles)
 		throw new Error(
 			`scope exceeds ${maxFiles} implementation files: ${implementationFiles.join(", ")}`,
-		);
-	const taskContractText = `${titleOf(task)}\n${field(task, "description") ?? ""}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
-	const evidenceOnly =
-		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
-			taskContractText,
 		);
 	const reviewReasons = [];
 	const sensitivePaths = implementationFiles.filter((file) =>

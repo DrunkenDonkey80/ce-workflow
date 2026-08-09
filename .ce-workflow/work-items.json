@@ -3839,6 +3839,9 @@
           "producer": "HelpBuddy",
           "submittedAt": "2026-08-09T06:53:59.349Z",
           "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-004a4a47-7ce7-4de6-ad15-4d3d9c59efbe",
@@ -3846,12 +3849,17 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:review FAIL {\"findings\":[\"scripts/work-helper.mjs:628 - exclude declared evidence files from the untracked changedLines loop (filter item => untracked.has(item) && !evidenceFileSet.has(item.replaceAll(String.raw`\\`,\\\"/\\\"))); a real 200KiB PNG read as utf8 counts ~805 lines, pushing changedLines past the 300 threshold at line 631 so finish-task throws the reviewer handoff instead of staging the evidence\",\"scripts/work-helper.mjs:590 - exclude declared evidence files from implementationFiles so screenshots do not consume the --max-files implementation budget (line 599); the reported 8-PNG case exhausts the default max of 8 before any code file\",\"scripts/test-work-optimization-helpers.mjs:549 - add one negative assertion that finish-task rejects an invalid declaration (wrong extension or path outside docs/evidence/<id>) so the bounded-validation branch has a runnable check\"]}",
+        "wo:review PASS declared --evidence-file images excluded from implementationFiles/changedLines yet staged via changed; wrong-owner rejection + 200KiB PNG happy path assert in scripts/test-work-optimization-helpers.mjs; node scripts/test-work-optimization-helpers.mjs ok",
+        "wo:reconcile locally-owned. Single atomic claim: finish-task lacked a bounded declaration for intentional image evidence. Implemented repeated --evidence-file declarations restricted to evidence tasks, at most 20 existing PNG/JPEG/WebP files, at most 10 MiB each, under docs/evidence/<task-id>...; declared files bypass unknown-binary hygiene, implementation-file limits, and binary line accounting while remaining staged through changed. Focused positive 200 KiB and wrong-owner negative regressions pass; independent targeted re-review PASS.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: For evidence-only work-3.40, the coded finish helper accepted Markdown/JSON artifacts but rejected all eight acceptance-required P",
       "type": "task",
-      "updatedAt": "2026-08-09T06:53:59.357Z"
+      "updatedAt": "2026-08-09T08:43:55.719Z"
     },
     "work-2.report-2161af52-ac96-4b1d-8c22-5e4d16d82d8c": {
       "createdAt": "2026-08-08T13:36:08.061Z",
@@ -3938,7 +3946,9 @@
     },
     "work-2.report-4ca95de9-d319-413b-a538-af6b8ef98c6f": {
       "createdAt": "2026-08-08T22:04:02.473Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.59"
+      ],
       "dependencyEdges": [],
       "description": "Observed: Two consecutive async pi-subagents review launches failed before child startup because the raw tool call id, containing `|fc_...`, was used as a Windows directory name under async-subagent-runs. The attached local evidence contains both failures.\nExpected: pi-subagents must sanitize every call-derived async run directory component for Windows before mkdir, then launch the child normally without retries or manual session-file revival.\nImpact: Fresh-context review cannot launch reliably on Windows, wasting turns and causing autonomous workflows to retry, time out, and manually recover child session files.\nSuggested improvement: Normalize or hash toolCallId before joining it into async run paths; add a Windows regression using an OpenAI Codex id shaped like `call_x|fc_y`.",
       "evidence": [
@@ -3963,12 +3973,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconcile duplicate + upstream-owned + already-fixed. Atomic claim matches work-2.report-95f...: raw call_x|fc_y tool ID became a Windows path component. Canonical WorkItem: work-2.59; upstream pi-subagents issue #407. Shared fix released in pi-subagents 0.44.0. Verified installed portableToolId sanitation plus UUID-keyed workflow asyncDir. Covered provider-shaped IDs are normalized to portable base64url/hash values, and workflow directories use workflowRunId. No local workaround required.",
+        "Closed as verified duplicate of canonical work-2.59 / upstream pi-subagents #407, fixed in installed 0.44.0."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Two consecutive async pi-subagents review launches failed before child startup because the raw tool call id, containing `|fc_...`,",
       "type": "task",
-      "updatedAt": "2026-08-08T22:04:02.473Z"
+      "updatedAt": "2026-08-09T08:43:38.401Z"
     },
     "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495": {
       "createdAt": "2026-08-01T09:25:47.590Z",
@@ -4332,12 +4345,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconcile already-fixed + locally-owned. Atomic claim: work-worker handoff omitted exact absolute helper/claim/summary boilerplate. Current directRoleTask injects the absolute WORK_HELPER_SCRIPT instruction, exact work-summary read, and exact work-claim command. Canonical local fixes: commits 5899512 and 46ff9e0. Verified with node scripts/test-work-start-finish.mjs => ok - coded work start/finish behavior. No new implementation required.",
+        "Closed already-fixed by 5899512 and 46ff9e0; current coded handoff and regression test verified."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The first work-worker launch for work-3.41 immediately returned BLOCKED without reading or editing because the handoff did not rep",
       "type": "task",
-      "updatedAt": "2026-08-09T07:10:03.901Z"
+      "updatedAt": "2026-08-09T08:43:38.743Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -4382,7 +4398,9 @@
     },
     "work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98": {
       "createdAt": "2026-08-08T19:55:34.274Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.59"
+      ],
       "dependencyEdges": [],
       "description": "Observed: Required async specialist launches in project autopilot repeatedly fail before start with ENOENT because the async-run directory name includes a Windows-invalid `|` copied from the tool call ID; the bounded log contains nine concrete failures including the latest planner launch.\nExpected: Sanitize generated async run directory names for Windows, or use only the stable run ID, so required async specialist launches start normally without a foreground-timeout-and-resume workaround.\nImpact: Every required specialist boundary incurs a failed launch and manual workaround, adding latency/noise and risking coded project-autopilot liveness on Windows.\nSuggested improvement: Sanitize `|` and all Windows-invalid characters from provider call IDs before joining asyncDir, or key async directories solely by retained child run ID.",
       "evidence": [
@@ -4407,12 +4425,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:reconcile duplicate + upstream-owned + already-fixed. Atomic claim: Windows-invalid raw provider tool-call IDs broke async-run directory creation. Canonical WorkItem: work-2.59; upstream pi-subagents issue #407. Shared fix released in pi-subagents 0.44.0. Verified installed source separates toolCallId from randomUUID workflowRunId and sanitizes cross-provider tool history IDs with portableToolId; local source-text check printed \"pi-subagents 0.44.0 portable tool-ID sanitation present\". Covered outcome verified before closure; no local workaround required.",
+        "Closed as verified duplicate of canonical work-2.59 / upstream pi-subagents #407, fixed in installed 0.44.0."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Required async specialist launches in project autopilot repeatedly fail before start with ENOENT because the async-run directory n",
       "type": "task",
-      "updatedAt": "2026-08-08T19:55:34.274Z"
+      "updatedAt": "2026-08-09T08:43:37.837Z"
     },
     "work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05": {
       "createdAt": "2026-08-07T08:43:36.872Z",
@@ -6461,7 +6482,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-09T07:10:03.901Z"
+    "updatedAt": "2026-08-09T08:43:55.720Z"
   },
   "schemaVersion": 1
 }

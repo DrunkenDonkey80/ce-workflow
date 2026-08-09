@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -378,6 +379,12 @@ try {
 			title: "Routine task",
 		});
 	createWorkItem(finishStore, {
+		id: "TASK-EVIDENCE",
+		type: "task",
+		status: "open",
+		title: "Capture evidence-only screenshots",
+	});
+	createWorkItem(finishStore, {
 		id: "TASK-5",
 		type: "task",
 		status: "open",
@@ -538,6 +545,72 @@ try {
 	assert(
 		jsonFinished.verification?.status === "PASS" && jsonFinished.clean,
 		"finish-task validates JSON inline without a nested shell command",
+	);
+
+	const rejectedEvidenceFile = "docs/evidence/other-task/screenshot.png";
+	mkdirSync(path.join(finishCwd, path.dirname(rejectedEvidenceFile)), {
+		recursive: true,
+	});
+	writeFileSync(path.join(finishCwd, rejectedEvidenceFile), "wrong-owner");
+	let evidencePathError = "";
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-EVIDENCE",
+				"--max-files",
+				"2",
+				"--message",
+				"reject wrong owner",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+				"--evidence-file",
+				rejectedEvidenceFile,
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		);
+	} catch (error) {
+		evidencePathError = String(error.stdout ?? "");
+	}
+	assert(
+		evidencePathError.includes("invalid evidence file"),
+		"finish-task rejects evidence outside the task-owned path",
+	);
+	rmSync(path.join(finishCwd, "docs"), { recursive: true, force: true });
+
+	const evidenceFile =
+		"docs/evidence/TASK-EVIDENCE-pixel/terminal-state.png";
+	mkdirSync(path.join(finishCwd, path.dirname(evidenceFile)), {
+		recursive: true,
+	});
+	writeFileSync(path.join(finishCwd, evidenceFile), randomBytes(200 * 1024));
+	const evidenceFinished = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-EVIDENCE",
+				"--max-files",
+				"2",
+				"--message",
+				"retain screenshot evidence",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+				"--expect",
+				"ok",
+				"--evidence-file",
+				evidenceFile,
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		),
+	);
+	assert(
+		evidenceFinished.files.includes(evidenceFile) &&
+			loadStore(finishCwd).items["TASK-EVIDENCE"].status === "closed",
+		"finish-task accepts a bounded declared image under the task-owned evidence path",
 	);
 
 	const headBeforePush = execFileSync("git", ["rev-parse", "HEAD"], {
