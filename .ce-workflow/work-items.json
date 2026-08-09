@@ -3725,6 +3725,31 @@
       "type": "bug",
       "updatedAt": "2026-08-08T17:49:48.622Z"
     },
+    "work-2.66": {
+      "acceptance": "Both reports link here; installed pi-subagents uses a portable/sanitized tool ID and UUID-keyed workflow async directory; verification is recorded before canonical closure.",
+      "createdAt": "2026-08-09T08:47:34.202Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical claim shared by reports work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98 and work-2.report-4ca95de9-d319-413b-a538-af6b8ef98c6f: raw provider tool-call IDs containing Windows-invalid characters were used as async path components. Ownership is upstream pi-subagents issue #407; fixed in 0.44.0.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.66",
+      "labels": [
+        "upstream-owned"
+      ],
+      "notes": [
+        "wo:reconcile upstream-owned + already-fixed. Canonical for the two duplicate snapshot reports. Upstream issue: pi-subagents #407; released in 0.44.0. Installed source verification confirms portableToolId base64url/hash sanitation and UUID workflowRunId async directories. No local workaround or conflicting outcome.",
+        "wo:verify-check PASS\nCommand: node -e \"const fs=require('fs');const p='C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents/src/runs/shared/subagent-prompt-runtime.ts';const s=fs.readFileSync(p,'utf8');if(!s.includes('function portableToolId')||!s.includes('base64url'))process.exit(1);process.stdout.write('portable-id-ok')\"\nOutput: portable-id-ok"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Track upstream pi-subagents Windows async directory ID sanitation",
+      "type": "bug",
+      "updatedAt": "2026-08-09T08:47:54.525Z"
+    },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
       "createdAt": "2026-07-20T09:58:53.226Z",
@@ -3947,7 +3972,8 @@
     "work-2.report-4ca95de9-d319-413b-a538-af6b8ef98c6f": {
       "createdAt": "2026-08-08T22:04:02.473Z",
       "dependencies": [
-        "work-2.59"
+        "work-2.59",
+        "work-2.66"
       ],
       "dependencyEdges": [],
       "description": "Observed: Two consecutive async pi-subagents review launches failed before child startup because the raw tool call id, containing `|fc_...`, was used as a Windows directory name under async-subagent-runs. The attached local evidence contains both failures.\nExpected: pi-subagents must sanitize every call-derived async run directory component for Windows before mkdir, then launch the child normally without retries or manual session-file revival.\nImpact: Fresh-context review cannot launch reliably on Windows, wasting turns and causing autonomous workflows to retry, time out, and manually recover child session files.\nSuggested improvement: Normalize or hash toolCallId before joining it into async run paths; add a Windows regression using an OpenAI Codex id shaped like `call_x|fc_y`.",
@@ -3975,13 +4001,14 @@
       ],
       "notes": [
         "wo:reconcile duplicate + upstream-owned + already-fixed. Atomic claim matches work-2.report-95f...: raw call_x|fc_y tool ID became a Windows path component. Canonical WorkItem: work-2.59; upstream pi-subagents issue #407. Shared fix released in pi-subagents 0.44.0. Verified installed portableToolId sanitation plus UUID-keyed workflow asyncDir. Covered provider-shaped IDs are normalized to portable base64url/hash values, and workflow directories use workflowRunId. No local workaround required.",
-        "Closed as verified duplicate of canonical work-2.59 / upstream pi-subagents #407, fixed in installed 0.44.0."
+        "Closed as verified duplicate of canonical work-2.59 / upstream pi-subagents #407, fixed in installed 0.44.0.",
+        "wo:reconcile correction: canonical shared async-path claim is work-2.66. The earlier work-2.59 reference is unrelated Windows path-identity work and is superseded by this correction; work-2.66 owns the shared upstream disposition and verification."
       ],
       "parentId": "work-2",
       "status": "closed",
       "title": "Self-improvement report: Two consecutive async pi-subagents review launches failed before child startup because the raw tool call id, containing `|fc_...`,",
       "type": "task",
-      "updatedAt": "2026-08-09T08:43:38.401Z"
+      "updatedAt": "2026-08-09T08:47:53.269Z"
     },
     "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495": {
       "createdAt": "2026-08-01T09:25:47.590Z",
@@ -4399,7 +4426,8 @@
     "work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98": {
       "createdAt": "2026-08-08T19:55:34.274Z",
       "dependencies": [
-        "work-2.59"
+        "work-2.59",
+        "work-2.66"
       ],
       "dependencyEdges": [],
       "description": "Observed: Required async specialist launches in project autopilot repeatedly fail before start with ENOENT because the async-run directory name includes a Windows-invalid `|` copied from the tool call ID; the bounded log contains nine concrete failures including the latest planner launch.\nExpected: Sanitize generated async run directory names for Windows, or use only the stable run ID, so required async specialist launches start normally without a foreground-timeout-and-resume workaround.\nImpact: Every required specialist boundary incurs a failed launch and manual workaround, adding latency/noise and risking coded project-autopilot liveness on Windows.\nSuggested improvement: Sanitize `|` and all Windows-invalid characters from provider call IDs before joining asyncDir, or key async directories solely by retained child run ID.",
@@ -4427,13 +4455,14 @@
       ],
       "notes": [
         "wo:reconcile duplicate + upstream-owned + already-fixed. Atomic claim: Windows-invalid raw provider tool-call IDs broke async-run directory creation. Canonical WorkItem: work-2.59; upstream pi-subagents issue #407. Shared fix released in pi-subagents 0.44.0. Verified installed source separates toolCallId from randomUUID workflowRunId and sanitizes cross-provider tool history IDs with portableToolId; local source-text check printed \"pi-subagents 0.44.0 portable tool-ID sanitation present\". Covered outcome verified before closure; no local workaround required.",
-        "Closed as verified duplicate of canonical work-2.59 / upstream pi-subagents #407, fixed in installed 0.44.0."
+        "Closed as verified duplicate of canonical work-2.59 / upstream pi-subagents #407, fixed in installed 0.44.0.",
+        "wo:reconcile correction: canonical shared async-path claim is work-2.66. The earlier work-2.59 reference is unrelated Windows path-identity work and is superseded by this correction; work-2.66 owns the shared upstream disposition and verification."
       ],
       "parentId": "work-2",
       "status": "closed",
       "title": "Self-improvement report: Required async specialist launches in project autopilot repeatedly fail before start with ENOENT because the async-run directory n",
       "type": "task",
-      "updatedAt": "2026-08-09T08:43:37.837Z"
+      "updatedAt": "2026-08-09T08:47:52.928Z"
     },
     "work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05": {
       "createdAt": "2026-08-07T08:43:36.872Z",
@@ -6482,7 +6511,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-09T08:43:55.720Z"
+    "updatedAt": "2026-08-09T08:47:54.525Z"
   },
   "schemaVersion": 1
 }
