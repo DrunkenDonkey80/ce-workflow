@@ -5540,6 +5540,7 @@ function resetContextCompaction() {
 	contextCompactState.owner = null;
 	contextCompactState.targetId = null;
 	manualMicrocompactGoalResume = null;
+	workGoalCompactionResume = null;
 }
 
 function resumeWorkGoalAfterCompaction(ctx, goalId, generation) {
@@ -9332,6 +9333,7 @@ export function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
 		"spawn",
 		{
 			workflowScript: `return runs.run("main", ${JSON.stringify(child)})`,
+			mission: false,
 			async,
 			...(child.cwd ? { cwd: child.cwd } : {}),
 		},
@@ -23494,6 +23496,12 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("turn_start", async (event, ctx) => {
+		// A new turn without session_compact proves native compaction was abandoned.
+		if (
+			contextCompactState.inFlight &&
+			contextCompactState.owner === "native"
+		)
+			resetContextCompaction();
 		recordSelfImprovementHistory(ctx, "turn_start", event);
 	});
 

@@ -94,6 +94,7 @@ try {
 	let verifierChild = workflowChildParams(verifierRpcParams);
 	assert(
 		verifierRpcParams.async === true &&
+			verifierRpcParams.mission === false &&
 			verifierChild.task.includes('"job-test"') &&
 			verifierChild.task.includes('"openai/gpt-5"') &&
 			verifierChild.task.includes(JSON.stringify(verifierCheckpoint)),

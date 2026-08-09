@@ -1025,7 +1025,8 @@ try {
 	assert.equal(stableRelease?.reason, "offline");
 	assert.equal(stableRelease?.changed, false, "unknown release state is never promotable or current");
 	assert.equal(
-		catchUpState.packages.find((pkg) => pkg.name === "pi-goal")?.needsReview,
+		catchUpState.packages.find((pkg) => pkg.name === "@narumitw/pi-goal")
+			?.needsReview,
 		false,
 		"unchanged packages with completed review evidence remain skipped",
 	);
@@ -1833,6 +1834,40 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		sentBeforeGoalRecovery + 1,
 		"repeated native compact event cannot duplicate continuation",
 	);
+
+	await tempHooks.session_before_compact(
+		{
+			reason: "threshold",
+			preparation: {
+				messagesToSummarize: [],
+				fileOps: {},
+				firstKeptEntryId: "abandoned-native",
+				tokensBefore: 160_000,
+			},
+		},
+		ctx,
+	);
+	const compactionsBeforeStaleRecovery = compactions.length;
+	const noticesBeforeStaleRecovery = notices.length;
+	await tempShortcuts.f8.handler({ ...ctx, isIdle: () => true });
+	assert.equal(
+		compactions.length,
+		compactionsBeforeStaleRecovery,
+		"an unfinished native compaction initially fences F8",
+	);
+	assert.ok(
+		notices
+			.slice(noticesBeforeStaleRecovery)
+			.some((notice) => String(notice.message).includes("already in progress")),
+	);
+	await tempHooks.turn_start({}, ctx);
+	await tempShortcuts.f8.handler({ ...ctx, isIdle: () => true });
+	assert.equal(
+		compactions.length,
+		compactionsBeforeStaleRecovery + 1,
+		"a new turn releases an abandoned native compaction fence",
+	);
+	compactions.length = compactionsBeforeStaleRecovery;
 
 	await tempHooks.before_agent_start(
 		{ prompt: sent[2].message, systemPrompt: "base" },

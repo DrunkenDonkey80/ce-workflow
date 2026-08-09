@@ -3819,6 +3819,40 @@
       "type": "task",
       "updatedAt": "2026-07-20T14:41:04.347Z"
     },
+    "work-2.report-004a4a47-7ce7-4de6-ad15-4d3d9c59efbe": {
+      "createdAt": "2026-08-09T06:53:59.357Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: For evidence-only work-3.40, the coded finish helper accepted Markdown/JSON artifacts but rejected all eight acceptance-required PNG screenshots as unrecognized untracked files. The parent had to use `git add -N` on each PNG before the helper could finish.\nExpected: finish-task should provide a coded declaration for intentional evidence artifacts, or recognize bounded image files under a task-owned docs/evidence path while retaining hygiene checks for unrelated binaries.\nImpact: Valid hardware/browser evidence could not be committed and closed through the normal deterministic path without a manual Git index workaround, risking omitted proof and confusing finalization.\nSuggested improvement: Accept a bounded evidence manifest or task-owned docs/evidence image rule, validate extension/count/size, then stage those files inside finish-task.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/20461766-38a8-4e2f-8659-00a99c1a3e39",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1196,
+              "file": "01-work-3.40-finish-png-friction.log",
+              "sha256": "e1d96c17cd06eaf1bd95cd429f8c28a1dd876ca61df426ea0d7e1ac4762c6ecb"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-09T06:53:59.349Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-004a4a47-7ce7-4de6-ad15-4d3d9c59efbe",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: For evidence-only work-3.40, the coded finish helper accepted Markdown/JSON artifacts but rejected all eight acceptance-required P",
+      "type": "task",
+      "updatedAt": "2026-08-09T06:53:59.357Z"
+    },
     "work-2.report-2161af52-ac96-4b1d-8c22-5e4d16d82d8c": {
       "createdAt": "2026-08-08T13:36:08.061Z",
       "dependencies": [
@@ -3901,6 +3935,40 @@
       "title": "Self-improvement report: A native work-item acceptance required a Playwright trace archive when a browser failure occurred. BetterWright exposed a guarded ",
       "type": "task",
       "updatedAt": "2026-08-08T17:54:52.875Z"
+    },
+    "work-2.report-4ca95de9-d319-413b-a538-af6b8ef98c6f": {
+      "createdAt": "2026-08-08T22:04:02.473Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Two consecutive async pi-subagents review launches failed before child startup because the raw tool call id, containing `|fc_...`, was used as a Windows directory name under async-subagent-runs. The attached local evidence contains both failures.\nExpected: pi-subagents must sanitize every call-derived async run directory component for Windows before mkdir, then launch the child normally without retries or manual session-file revival.\nImpact: Fresh-context review cannot launch reliably on Windows, wasting turns and causing autonomous workflows to retry, time out, and manually recover child session files.\nSuggested improvement: Normalize or hash toolCallId before joining it into async run paths; add a Windows regression using an OpenAI Codex id shaped like `call_x|fc_y`.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/080af665-c515-45df-b511-e307c45da8bb",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 7059,
+              "file": "01-019fe357-subagent-enoent.log",
+              "sha256": "dbe1cb89fa6e130b8771157361d87119309f0c78d5948f8f660cdacda470b6b4"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-08T22:04:02.464Z",
+          "workflowId": "019fe357-95f8-78b8-a028-3d3376b5b69b"
+        }
+      ],
+      "id": "work-2.report-4ca95de9-d319-413b-a538-af6b8ef98c6f",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Two consecutive async pi-subagents review launches failed before child startup because the raw tool call id, containing `|fc_...`,",
+      "type": "task",
+      "updatedAt": "2026-08-08T22:04:02.473Z"
     },
     "work-2.report-4cfcb5bc-4530-44c4-9d3f-5a7fd2bb0495": {
       "createdAt": "2026-08-01T09:25:47.590Z",
@@ -4237,6 +4305,40 @@
       "type": "task",
       "updatedAt": "2026-08-08T08:43:45.147Z"
     },
+    "work-2.report-77cca2ef-12e6-44dc-9749-4dfa30b2c8bb": {
+      "createdAt": "2026-08-09T07:10:03.901Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The first work-worker launch for work-3.41 immediately returned BLOCKED without reading or editing because the handoff did not repeat the absolute work-helper path, even though the target project and work item were explicit. A retry with `C:/soft/ce-workflow/scripts/work-helper.mjs` succeeded.\nExpected: Coded resume/worker handoffs should always inject the resolved absolute work-helper path and required initial claim/summary commands, so a bounded worker cannot fail solely because the parent omitted boilerplate.\nImpact: The implementation lane wasted a subagent launch and required a manual retry for no project-level reason, increasing latency and usage while leaving the task untouched.\nSuggested improvement: Have the coded handoff builder append the resolved helper path and canonical work-claim/work-summary commands to every work-worker task.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/a079b16b-8b39-4394-9eae-a47214e87574",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1124,
+              "file": "01-87e49256_work-worker_0_output.md",
+              "sha256": "807f79e6d096d5da764eeccfd6cf39e73a27e9f44a6fd57d9959fbb36636c881"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-09T07:10:03.894Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-77cca2ef-12e6-44dc-9749-4dfa30b2c8bb",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The first work-worker launch for work-3.41 immediately returned BLOCKED without reading or editing because the handoff did not rep",
+      "type": "task",
+      "updatedAt": "2026-08-09T07:10:03.901Z"
+    },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
       "dependencies": [],
@@ -4277,6 +4379,40 @@
       "title": "Self-improvement report: The session's normal bash tool is rewritten to invoke `hypa`, but the executable is unavailable, producing `/usr/bin/bash: line 1:",
       "type": "task",
       "updatedAt": "2026-08-02T17:29:11.312Z"
+    },
+    "work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98": {
+      "createdAt": "2026-08-08T19:55:34.274Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Required async specialist launches in project autopilot repeatedly fail before start with ENOENT because the async-run directory name includes a Windows-invalid `|` copied from the tool call ID; the bounded log contains nine concrete failures including the latest planner launch.\nExpected: Sanitize generated async run directory names for Windows, or use only the stable run ID, so required async specialist launches start normally without a foreground-timeout-and-resume workaround.\nImpact: Every required specialist boundary incurs a failed launch and manual workaround, adding latency/noise and risking coded project-autopilot liveness on Windows.\nSuggested improvement: Sanitize `|` and all Windows-invalid characters from provider call IDs before joining asyncDir, or key async directories solely by retained child run ID.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/995b24e6-1744-474d-bca7-2cd38db322ec",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1945,
+              "file": "01-ce-workflow-async-enoent.log",
+              "sha256": "806be70ba12087ad187393a86a9599dacb4c69e799d3a57516af016726889b07"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-08T19:55:34.265Z",
+          "workflowId": "019fe06f-a14b-7e17-a2c8-6e141d393d1f"
+        }
+      ],
+      "id": "work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Required async specialist launches in project autopilot repeatedly fail before start with ENOENT because the async-run directory n",
+      "type": "task",
+      "updatedAt": "2026-08-08T19:55:34.274Z"
     },
     "work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05": {
       "createdAt": "2026-08-07T08:43:36.872Z",
@@ -6325,7 +6461,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-08T19:53:25.351Z"
+    "updatedAt": "2026-08-09T07:10:03.901Z"
   },
   "schemaVersion": 1
 }
