@@ -6825,17 +6825,27 @@
       ],
       "dependencyEdges": [],
       "description": "Consume up to 10 queued candidates per run and inspect promising repositories without executing their code: shallow-clone without submodules into a disposable read-only quarantine, enforce containment and symlink safety, then have Luna emit bounded evidence-backed capability, quality, maintenance, dependency, security, overlap, and install-versus-borrow facts.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-6.2",
       "labels": [],
       "notes": [
-        "wo:slice-plan Covers criteria 4-7 and quarantine/source-inspection portions of 9-10. Reuse containment/confined-read patterns from extensions/work-compound-source.js; do not add a second generic sandbox abstraction. Expected files: extensions/work-extension-scout.js, scripts/test-work-extension-scout.mjs, and extensions/work-models.js only for invocation wiring. Verify exactly: node scripts/test-work-extension-scout.mjs. Prompting and installation are deliberately owned by work-6.3."
+        "wo:slice-plan Covers criteria 4-7 and quarantine/source-inspection portions of 9-10. Reuse containment/confined-read patterns from extensions/work-compound-source.js; do not add a second generic sandbox abstraction. Expected files: extensions/work-extension-scout.js, scripts/test-work-extension-scout.mjs, and extensions/work-models.js only for invocation wiring. Verify exactly: node scripts/test-work-extension-scout.mjs. Prompting and installation are deliberately owned by work-6.3.",
+        "wo:verify-check\nPlan match: implemented work-6.2 source quarantine inspection in the planned scout/model/test files, reusing normalizeSourcePath/readConfinedFile; actor prompting and installation remain out of scope.\nAcceptance coverage: screened currentRun only (max 10); credential-scrubbed shallow clone with submodules disabled; tracked-entry confinement/symlink fail-closed validation; no package/source execution; bounded source and seven evidence fact categories; durable revision, failure, cleanup status, and resumable queue entries.\nCommand/proof: node scripts/test-work-extension-scout.mjs — PASS; deterministic fixtures cover allowed inert reads, revision, no execution, traversal/symlink rejection, malformed/over-limit facts, cleanup, and resumable failures.\nGaps: no live remote repository/model call; deterministic local clone and injected Luna-output fixtures cover the contract without network nondeterminism.\nFiles: extensions/work-extension-scout.js; extensions/work-models.js; scripts/test-work-extension-scout.mjs.\n",
+        "wo:review-scope [\"extensions/work-extension-scout.js\",\"extensions/work-models.js\",\"scripts/test-work-extension-scout.mjs\"]",
+        "wo:review PASS node scripts/test-work-extension-scout.mjs passed (28 assertions incl. traversal/symlink fail-closed, no-execution, cleanup failure, malformed facts); argv-only git, scrubbed env, confined tracked-file reads, bounded facts, per-candidate durable ledger. Non-blocking: re-validate repositoryUrl scheme before clone; no retry counter.",
+        "wo:fix PASS Revalidated clone-time repository URLs against HTTP(S) forge allowlist; added tampered remote-helper fixture proving clone is not called and queue/currentRun remain resumable. Files: extensions/work-extension-scout.js, scripts/test-work-extension-scout.mjs. Verify: node scripts/test-work-extension-scout.mjs — PASS (29 assertions). Remaining findings: none.",
+        "Verification detail: passing fixture run emitted 27 ok assertions plus the final success marker.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-extension-scout.mjs\nOutput: source revision\nok - source execution remains disabled after cleanup\nok - tampered remote-helper URL is rejected before clone and remains resumable\nok - traversal fails closed and remains resumable\nok - symlink fails closed and remains resumable\nok - malformed Luna output is visible and leaves the queue entry resumable\nok - cleanup failure fails closed, remains visible, and preserves the queue entry\nok - command is unavailable unless self-improving is enabled\nwork extension scout fixtures passed"
       ],
       "parentId": "work-6",
-      "status": "open",
+      "status": "closed",
       "title": "Inspect queued extensions in a source quarantine",
       "type": "task",
-      "updatedAt": "2026-08-10T12:20:40.701Z"
+      "updatedAt": "2026-08-10T12:43:13.201Z"
     },
     "work-6.3": {
       "acceptance": "Before this change inspected facts cannot become governed actor decisions or scheduled revisits. After it: (1) one configured Sol-or-GLM reviewer applies the existing private POV playbook to bounded Luna facts; invalid reviewer output fails visibly and leaves the candidate resumable; (2) only actionable finalists prompt the actor to proceed with the recommendation, defer, or reject, and no package installation occurs without an explicit proceed choice; (3) the atomic .pi ledger records every seen package, queue state, review time, source revision, enum reason, rationale, and revisit date; (4) out-of-scope is permanent, while weak-idea=180d+update, duplicate=90d+update, immature=30d+update, bad-implementation=30d+update, unsafe=180d+update, and insufficient-evidence=30d are enforced before requeue; inaccessible source is insufficient-evidence; (5) fixtures prove decision prompting, malformed reviewer output, each expiry/update rule, permanent rejection, explicit-install gating, and later processing of prior overflow; (6) package verification passes. Verify: node scripts/test-work-extension-scout.mjs && npm run verify:quiet",
@@ -6865,7 +6875,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T12:32:13.279Z"
+    "updatedAt": "2026-08-10T12:43:13.202Z"
   },
   "schemaVersion": 1
 }

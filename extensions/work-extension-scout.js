@@ -1,8 +1,15 @@
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path, { dirname, join } from "node:path";
+import { normalizeSourcePath, readConfinedFile } from "./work-compound-source.js";
 
 export const EXTENSION_SCOUT_LEDGER = ".pi/work-extension-scout.json";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const FACT_LIMIT = 32 * 1024;
+const SOURCE_LIMIT = 256 * 1024;
+const FILE_LIMIT = 64 * 1024;
+const FACT_CATEGORIES = ["capability", "quality", "maintenance", "dependency", "security", "overlap", "installVersusBorrow"];
 const text = (value = "") => String(value).replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
 const attr = (html, name) => html.match(new RegExp(`${name}=["']([^"']+)["']`, "i"))?.[1];
 
@@ -50,6 +57,107 @@ export function writeExtensionScoutLedger(cwd, ledger) {
 function mergeQueue(previous, additions) {
 	const byName = new Map([...previous, ...additions].map((item) => [item.name, item]));
 	return [...byName.values()].sort((a, b) => b.score - a.score || b.timestamp.localeCompare(a.timestamp) || a.name.localeCompare(b.name));
+}
+
+export function parseExtensionInspectionFacts(value) {
+	const raw = typeof value === "string" ? value : JSON.stringify(value);
+	if (Buffer.byteLength(raw, "utf8") > FACT_LIMIT) throw new Error("inspection facts exceed 32 KiB");
+	let parsed;
+	try { parsed = typeof value === "string" ? JSON.parse(value) : value; }
+	catch (error) { throw new Error(`inspection facts are malformed: ${error.message}`); }
+	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).some((key) => !FACT_CATEGORIES.includes(key)))
+		throw new Error("inspection facts have an invalid shape");
+	const facts = {};
+	for (const category of FACT_CATEGORIES) {
+		if (!Array.isArray(parsed[category]) || parsed[category].length > 20)
+			throw new Error(`inspection facts require a bounded ${category} array`);
+		facts[category] = parsed[category].map((fact) => {
+			if (!fact || typeof fact !== "object" || Array.isArray(fact) || typeof fact.claim !== "string" || typeof fact.evidence !== "string")
+				throw new Error(`inspection ${category} facts require claim and evidence strings`);
+			const claim = text(fact.claim);
+			const evidence = text(fact.evidence);
+			if (!claim || !evidence || claim.length > 500 || evidence.length > 500)
+				throw new Error(`inspection ${category} fact is empty or over limit`);
+			return { claim, evidence };
+		});
+	}
+	return facts;
+}
+
+function cloneEnvironment(home) {
+	const env = { HOME: home, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "echo" };
+	for (const key of ["PATH", "Path", "PATHEXT", "SystemRoot", "SYSTEMROOT", "WINDIR", "COMSPEC", "TMP", "TEMP"]) if (process.env[key]) env[key] = process.env[key];
+	return env;
+}
+
+function defaultClone(repositoryUrl, destination, home) {
+	execFileSync("git", ["-c", "submodule.recurse=false", "clone", "--quiet", "--depth", "1", "--no-recurse-submodules", "--", repositoryUrl, destination], {
+		env: cloneEnvironment(home), stdio: ["ignore", "ignore", "pipe"], timeout: 180_000,
+	});
+}
+
+function defaultGit(root, args) {
+	return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 });
+}
+
+function inspectionFiles(root, git = defaultGit) {
+	const records = git(root, ["ls-files", "-s", "-z"]).split("\0").filter(Boolean);
+	if (!records.length || records.length > 2_000) throw new Error("tracked source file count is empty or over limit");
+	const allowed = new Set();
+	for (const record of records) {
+		const tab = record.indexOf("\t");
+		if (tab < 0) throw new Error("malformed tracked source entry");
+		const [mode, , stage] = record.slice(0, tab).split(" ");
+		const relative = normalizeSourcePath(record.slice(tab + 1));
+		if (stage !== "0" || mode === "120000") throw new Error(`source symlink or unmerged entry rejected: ${relative}`);
+		if (!['100644', '100755'].includes(mode)) throw new Error(`unsupported source entry mode ${mode}: ${relative}`);
+		allowed.add(relative);
+	}
+	const selected = [...allowed].filter((name) => /^(?:package\.json|readme(?:\.[^/]*)?|licen[cs]e(?:\.[^/]*)?|extensions\/[^/]+\.(?:js|mjs|cjs|ts)|src\/[^/]+\.(?:js|mjs|cjs|ts))$/i.test(name)).sort();
+	let total = 0;
+	return selected.map((name) => {
+		const stat = lstatSync(path.join(root, ...name.split("/")));
+		if (stat.size > FILE_LIMIT) throw new Error(`inspection file exceeds 64 KiB: ${name}`);
+		const bytes = readConfinedFile(root, name, allowed);
+		total += bytes.length;
+		if (total > SOURCE_LIMIT) throw new Error("inspection source exceeds 256 KiB");
+		return { path: name, content: bytes.toString("utf8") };
+	});
+}
+
+export async function inspectQueuedExtensions(cwd, options = {}) {
+	if (typeof options.inspect !== "function") throw new Error("extension source inspector is required");
+	const initial = readExtensionScoutLedger(cwd);
+	const candidates = initial.currentRun.slice(0, 10);
+	const results = [];
+	for (const candidate of candidates) {
+		const quarantine = mkdtempSync(path.join(options.tempRoot ?? tmpdir(), "extension-source-"));
+		const source = path.join(quarantine, "source");
+		let outcome;
+		try {
+			let repository;
+			try { repository = new URL(candidate.repositoryUrl); } catch {}
+			if (!repository || !["http:", "https:"].includes(repository.protocol) || !["github.com", "gitlab.com", "codeberg.org"].includes(repository.hostname.toLowerCase()))
+				throw new Error("repository URL is not an allowed HTTP(S) forge URL");
+			await (options.clone ?? defaultClone)(candidate.repositoryUrl, source, quarantine);
+			const revision = (await (options.git ?? defaultGit)(source, ["rev-parse", "HEAD"])).trim();
+			if (!/^[0-9a-f]{40}$/i.test(revision)) throw new Error("cloned source revision is invalid");
+			const files = inspectionFiles(source, options.git ?? defaultGit);
+			const facts = parseExtensionInspectionFacts(await options.inspect({ name: candidate.name, revision, files }));
+			outcome = { ok: true, revision, facts };
+		} catch (error) {
+			outcome = { ok: false, error: text(error.message).slice(0, 500) };
+		}
+		try { await (options.cleanup ?? ((root) => rmSync(root, { recursive: true, force: true })))(quarantine); }
+		catch (error) { outcome = { ok: false, error: `cleanup: ${text(error.message).slice(0, 480)}` }; }
+		const ledger = readExtensionScoutLedger(cwd);
+		const packages = { ...ledger.packages, [candidate.name]: { ...ledger.packages[candidate.name], inspection: { ...outcome, attemptedAt: new Date(options.now ?? Date.now()).toISOString() } } };
+		const queue = outcome.ok ? ledger.queue.filter((item) => item.name !== candidate.name) : ledger.queue;
+		const currentRun = outcome.ok ? ledger.currentRun.filter((item) => item.name !== candidate.name) : ledger.currentRun;
+		writeExtensionScoutLedger(cwd, { ...ledger, packages, queue, currentRun, lastError: outcome.ok ? null : `inspection ${candidate.name}: ${outcome.error}` });
+		results.push({ name: candidate.name, ...outcome });
+	}
+	return { inspected: results, ledger: readExtensionScoutLedger(cwd) };
 }
 
 export async function runExtensionScout(cwd, options = {}) {
