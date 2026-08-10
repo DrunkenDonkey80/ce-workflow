@@ -3814,6 +3814,53 @@
       "type": "bug",
       "updatedAt": "2026-08-10T12:12:45.299Z"
     },
+    "work-2.68": {
+      "acceptance": "A production-shaped nested ToolResult is recognized; two successful finish calls in one turn create two immutable verifier batches tied to distinct commits; focused verifier-flow tests pass.",
+      "createdAt": "2026-08-10T13:22:29.711Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Locally owned. finishHelperSucceeded currently stringifies a live nested Pi ToolResult, so escaped finish-task JSON can miss PASS/work_item_id matching and later commits can obscure the checkpoint base. Normalize tool_execution_end content using the existing contentText path and schedule each successful finish immediately.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.68",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic claim from work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63. Classification: locally-owned, related-distinct from prior closed verifier reports because this is the live ToolResult parsing/per-finish boundary.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-finish-verifier-hook.mjs\"]",
+        "wo:review PASS finishHelperSucceeded normalizes nested ToolResult via contentText; scripts/test-work-finish-verifier-hook.mjs passes (two distinct immutable verifier batches, base=initial then base=first) and is auto-discovered by the verify-package test-work-*.mjs glob",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-finish-verifier-hook.mjs\nOutput: ok - nested finish ToolResults create one immutable verifier batch per commit"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Create one background verifier batch per successful finish ToolResult",
+      "type": "bug",
+      "updatedAt": "2026-08-10T13:28:49.234Z"
+    },
+    "work-2.69": {
+      "acceptance": "Planner-created first/all slice plans cannot proceed without the configured advisor challenge (or a coded pending advisor gate); none remains unchanged; focused planner/resume tests prove the policy.",
+      "createdAt": "2026-08-10T13:22:37.627Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Locally owned. Planner-created executable slice plans can bypass advisorUsageForSlicePlans even when the resolved setting is first or all. Make the planner handoff or durable state enforce the configured advisor challenge before implementation.",
+      "evidence": [],
+      "id": "work-2.69",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic claim from work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63. Classification: locally-owned, related-distinct from existing settings coverage because enforcement for planner-created slice plans is missing."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Enforce configured advisor usage for planner-created slice plans",
+      "type": "bug",
+      "updatedAt": "2026-08-10T13:22:37.627Z"
+    },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
       "createdAt": "2026-07-20T09:58:53.226Z",
@@ -4186,7 +4233,10 @@
     },
     "work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63": {
       "createdAt": "2026-08-10T12:58:04.547Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.68",
+        "work-2.69"
+      ],
       "dependencyEdges": [],
       "description": "Observed: Live work-goal roadmap work-6 closed three slices in one long parent turn. Configured background verifier profiles existed, but no per-finish batch was created for work-6.1 or work-6.2. At parent agent-end, one batch was finally created only for the latest commit (3774c08..af44113), so work-6.1 was never checkpoint-reviewed. The likely boundary defect is finishHelperSucceeded(): its test passes a raw string, while the live Pi tool_execution_end result is a nested ToolResult/content payload whose JSON.stringify contains escaped JSON and does not match the PASS/work_item_id regex. Separately, wo\nExpected: Every successful coded finish must durably create exactly one immutable verifier batch for that commit before later commits can obscure its base, parsing the real Pi ToolResult shape. Initial work-planner-created executable slice plans must also honor advisorUsageForSlicePlans (first here), or durably expose a coded pending advisor gate before implementation.\nImpact: Assurance silently degraded: work-6.1 received no configured Opus/Sol/GLM background review, work-6.2 review started only after the parent turn ended, and none of the three planner-created slice plans received the configured advisor challenge. The main session initially reported that no background verifiers existed because extension-owned launches were not visible in its normal role-run list.\nSuggested improvement: Normalize tool_execution_end output with the existing contentText helper before PASS/work_item_id matching and add a production-shaped nested ToolResult fixture proving two finish calls in one agent turn create two distinct commit batches. Add coded advisor-gate state/tests for planner-created wo:slice-plan notes so they cannot bypass advisorUsageForSlicePlans.",
       "evidence": [
@@ -4231,7 +4281,7 @@
       "status": "open",
       "title": "Self-improvement report: Live work-goal roadmap work-6 closed three slices in one long parent turn. Configured background verifier profiles existed, but no",
       "type": "task",
-      "updatedAt": "2026-08-10T12:58:04.547Z"
+      "updatedAt": "2026-08-10T13:22:48.649Z"
     },
     "work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021": {
       "createdAt": "2026-08-08T08:19:55.067Z",
@@ -6940,7 +6990,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T13:18:34.818Z"
+    "updatedAt": "2026-08-10T13:28:49.234Z"
   },
   "schemaVersion": 1
 }

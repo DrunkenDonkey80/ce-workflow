@@ -10079,10 +10079,7 @@ function finishHelperRequest(toolName, args) {
 
 function finishHelperSucceeded(event, workItemId) {
 	if (event.isError) return false;
-	const text =
-		typeof event.result === "string"
-			? event.result
-			: JSON.stringify(event.result ?? "");
+	const text = contentText(event.result);
 	const escaped = workItemId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	return (
 		/["']?status["']?\s*:\s*["']PASS["']/i.test(text) &&
