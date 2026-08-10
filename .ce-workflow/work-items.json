@@ -4286,12 +4286,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Reconciled atomic claims: (1) locally-owned, related-distinct live ToolResult/per-finish verifier boundary fixed by canonical work-2.68 in commit aa6cb87; focused nested-result/two-commit proof passed. (2) locally-owned, related-distinct planner-created slice advisor enforcement fixed by canonical work-2.69 in commit fec13e6; exact first/all durable gate and inline-plan non-regression are covered. Full package regression: node scripts/verify-package.mjs --quiet => ok - package checks passed.",
+        "All atomic claims are covered by closed canonical WorkItems work-2.68 and work-2.69 with pushed commits and passing focused/full verification."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Live work-goal roadmap work-6 closed three slices in one long parent turn. Configured background verifier profiles existed, but no",
       "type": "task",
-      "updatedAt": "2026-08-10T13:22:48.649Z"
+      "updatedAt": "2026-08-10T13:45:29.683Z"
     },
     "work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021": {
       "createdAt": "2026-08-08T08:19:55.067Z",
@@ -7000,7 +7003,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T13:45:10.785Z"
+    "updatedAt": "2026-08-10T13:45:29.684Z"
   },
   "schemaVersion": 1
 }
