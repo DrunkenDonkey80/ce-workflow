@@ -200,6 +200,8 @@ const childrenByScenario = {
 			status: "open",
 			title: "Executable idea child",
 			labels: ["wo:slice-planned"],
+			notes:
+				"wo:slice-plan\nplan-path: docs/plans/idea.md\nplanner: work-planner",
 			created_at: "2026-07-03T02:00:00Z",
 		},
 	],
@@ -1184,7 +1186,7 @@ try {
 		"blocked resume output includes blocker next action",
 	);
 
-	// Profiles keep coded slice planning, then enforce their configured advisor policy.
+	// Coded inline plans remain direct implementation handoffs across profiles.
 	setScenario("implementation");
 	for (const profile of ["low", "medium", "high"]) {
 		const profileCwd = mkdtempSync(path.join(tmpdir(), "work-resume-agent-"));
@@ -1198,13 +1200,10 @@ try {
 		seedNativeStore(profileCwd, sourcesForScenario("implementation"));
 		const profileState = buildWorkResumeState(profileCwd, "E-1");
 		assert(
-			profile === "low"
-				? profileState.action === "run-implementation" &&
-					directRoleHandoffParams(profileState, profileCwd)?.agent ===
-						"work-worker"
-				: profileState.action === "advisor-gate-pending" &&
-					directRoleHandoffParams(profileState, profileCwd) === null,
-			`${profile} enforces its configured slice-plan advisor policy`,
+			profileState.action === "run-implementation" &&
+				directRoleHandoffParams(profileState, profileCwd)?.agent ===
+					"work-worker",
+			`${profile} routes coded inline plans directly to work-worker`,
 		);
 		rmSync(profileCwd, { recursive: true, force: true });
 	}
@@ -1218,9 +1217,9 @@ try {
 	seedNativeStore(maxCwd, sourcesForScenario("implementation"));
 	const maxState = buildWorkResumeState(maxCwd, "E-1");
 	assert(
-		maxState.action === "advisor-gate-pending" &&
-			directRoleHandoffParams(maxState, maxCwd) === null,
-		"max stops at its configured advisor gate before work-worker",
+		maxState.action === "run-implementation" &&
+			directRoleHandoffParams(maxState, maxCwd)?.agent === "work-worker",
+		"max routes a coded inline plan directly to work-worker",
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
 

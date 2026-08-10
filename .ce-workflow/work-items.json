@@ -3850,6 +3850,9 @@
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.69",
@@ -3858,13 +3861,15 @@
       ],
       "notes": [
         "Atomic claim from work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63. Classification: locally-owned, related-distinct from existing settings coverage because enforcement for planner-created slice plans is missing.",
-        "wo:verify-check PASS\nCommand: node scripts/test-work-resume.mjs\nOutput: ok - coded work-resume behavior"
+        "wo:verify-check PASS\nCommand: node scripts/test-work-resume.mjs\nOutput: ok - coded work-resume behavior",
+        "Regression follow-up: scope the durable advisor gate to work-planner-authored slice plans via planner: work-planner provenance; coded inline plans retain existing direct worker behavior.",
+        "wo:verify-check PASS\nCommand: node scripts/verify-package.mjs --quiet\nOutput: ok - package checks passed"
       ],
       "parentId": "work-2",
       "status": "closed",
       "title": "Enforce configured advisor usage for planner-created slice plans",
       "type": "bug",
-      "updatedAt": "2026-08-10T13:37:30.596Z"
+      "updatedAt": "2026-08-10T13:45:10.784Z"
     },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
@@ -6995,7 +7000,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T13:37:30.596Z"
+    "updatedAt": "2026-08-10T13:45:10.785Z"
   },
   "schemaVersion": 1
 }

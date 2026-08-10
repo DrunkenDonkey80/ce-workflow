@@ -4292,6 +4292,12 @@ function slicePlanAdvisorAgents(cwd) {
 	).map((slot) => slot.agents[0]);
 }
 
+function hasPlannerCreatedSlicePlan(issue) {
+	return /(?:^|\n)planner:\s*work-planner\s*(?:\n|$)/i.test(
+		issue.slicePlan ?? notesOf(issue),
+	);
+}
+
 function hasSlicePlanAdvisorPass(issue, agents) {
 	return (
 		issue.sliceAdvisorGate?.verdict === "PASS" &&
@@ -4360,17 +4366,20 @@ function applyInlineSlicePlan(cwd, state, issue) {
 			labels: [...new Set([...labelsOf(issue), "wo:slice-planned"])],
 			notes: `${notesOf(issue)}\n${plan}`,
 		};
-		const plannedSummary = issueSummary(planned);
-		const advisorGate = slicePlanAdvisorGateState(cwd, state, plannedSummary);
-		if (advisorGate) return advisorGate;
+		const advisorStep = advisorCriticStep(
+			cwd,
+			`slice plan note on WorkItem ${idOf(issue)}`,
+			workOrchSettings(cwd).advisorUsageForSlicePlans,
+		);
 		return withHandoffPrompt(
 			withImplementationPolicy(
 				{
 					...state,
 					action: "run-implementation",
-					selectedWorkItem: plannedSummary,
+					selectedWorkItem: issueSummary(planned),
 					message:
 						"Added coded slice-plan note and continued directly to implementation; no planner boundary needed.",
+					handoffExtra: advisorStep ? [advisorStep] : [],
 				},
 				cwd,
 			),
@@ -4456,7 +4465,7 @@ function cePlanSliceStep(
 		privatePlanPlaybookBlock(),
 		scopeLine,
 		`Follow the verified private playbook in the control session to produce a compact plan doc at docs/plans/YYYY-MM-DD-NNN-slice-${safeArtifactPart(idOf(issue))}-plan.md with a single Implementation Unit (Goal, Files, Approach, Test scenarios, Verification). ${depthLine}`,
-		`Then append a WorkItem note headed \`wo:slice-plan\` containing \`plan-path: <repo-relative plan doc path>\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the WorkItem title.`,
+		`Then append a WorkItem note headed \`wo:slice-plan\` containing both \`plan-path: <repo-relative plan doc path>\` and \`planner: work-planner\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the WorkItem title.`,
 		advisorUsage !== "none"
 			? "Do not launch advisors from work-planner. The next coded resume boundary durably blocks implementation until the configured slice-plan advisor gate passes."
 			: "",
@@ -8222,12 +8231,14 @@ function planResumeAction(state, cwd, options = {}) {
 			if (!options.readOnlyPlanning)
 				return applyInlineSlicePlan(cwd, state, implementation);
 		}
-		const advisorGate = slicePlanAdvisorGateState(
-			cwd,
-			state,
-			implementation,
-		);
-		if (advisorGate) return advisorGate;
+		if (hasPlannerCreatedSlicePlan(implementation)) {
+			const advisorGate = slicePlanAdvisorGateState(
+				cwd,
+				state,
+				implementation,
+			);
+			if (advisorGate) return advisorGate;
+		}
 		return withHandoffPrompt(
 			withImplementationPolicy(
 				{
