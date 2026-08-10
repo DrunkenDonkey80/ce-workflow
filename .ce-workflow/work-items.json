@@ -4184,6 +4184,55 @@
       "type": "task",
       "updatedAt": "2026-08-08T19:53:25.349Z"
     },
+    "work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63": {
+      "createdAt": "2026-08-10T12:58:04.547Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Live work-goal roadmap work-6 closed three slices in one long parent turn. Configured background verifier profiles existed, but no per-finish batch was created for work-6.1 or work-6.2. At parent agent-end, one batch was finally created only for the latest commit (3774c08..af44113), so work-6.1 was never checkpoint-reviewed. The likely boundary defect is finishHelperSucceeded(): its test passes a raw string, while the live Pi tool_execution_end result is a nested ToolResult/content payload whose JSON.stringify contains escaped JSON and does not match the PASS/work_item_id regex. Separately, wo\nExpected: Every successful coded finish must durably create exactly one immutable verifier batch for that commit before later commits can obscure its base, parsing the real Pi ToolResult shape. Initial work-planner-created executable slice plans must also honor advisorUsageForSlicePlans (first here), or durably expose a coded pending advisor gate before implementation.\nImpact: Assurance silently degraded: work-6.1 received no configured Opus/Sol/GLM background review, work-6.2 review started only after the parent turn ended, and none of the three planner-created slice plans received the configured advisor challenge. The main session initially reported that no background verifiers existed because extension-owned launches were not visible in its normal role-run list.\nSuggested improvement: Normalize tool_execution_end output with the existing contentText helper before PASS/work_item_id matching and add a production-shaped nested ToolResult fixture proving two finish calls in one agent turn create two distinct commit batches. Add coded advisor-gate state/tests for planner-created wo:slice-plan notes so they cannot bypass advisorUsageForSlicePlans.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/69cc9531-e434-4129-92af-6f2fdb0b5d82",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2107966,
+              "file": "01-2026-08-10T11-03-04-574Z_019feb57-247e-77d2-8fbf-674486dd4650.jsonl",
+              "sha256": "678c81ad4e9703961656b57a0f90c9039c70cfbf7e31b01064a99a56b7b5c433"
+            },
+            {
+              "bytes": 12380,
+              "file": "02-state.json",
+              "sha256": "c6a291cef0f4aa013f5b4d2778bff456ca3f74a5be44eb8c0bc171fcc3e17ae8"
+            },
+            {
+              "bytes": 2575,
+              "file": "03-9975a17a_work-planner_0_input.md",
+              "sha256": "ec16dec6c871292892431fd5afea6eb1249a4cae33ed3179b89901dd4c446501"
+            },
+            {
+              "bytes": 33395,
+              "file": "04-2026-08-10.jsonl",
+              "sha256": "21dd1fddd49bf4ba084be1bd239e542b145506934f25b06d449e80623d64f237"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-10T12:58:04.542Z",
+          "workflowId": "019fea8a-0040-7c06-9eac-d1833c076362"
+        }
+      ],
+      "id": "work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Live work-goal roadmap work-6 closed three slices in one long parent turn. Configured background verifier profiles existed, but no",
+      "type": "task",
+      "updatedAt": "2026-08-10T12:58:04.547Z"
+    },
     "work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021": {
       "createdAt": "2026-08-08T08:19:55.067Z",
       "dependencies": [
@@ -6778,7 +6827,11 @@
         "schemaVersion": 1,
         "title": "Scout Pi extensions for workflow improvements"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-6",
       "labels": [
         "wo:planning",
@@ -6786,12 +6839,18 @@
       ],
       "notes": [
         "Confirmed discovery policy: guided full pipeline; retrieve source only after description screening indicates plausible value; cap quarantined source inspections at 10 per invocation and persist overflow. Default reconsideration policy: out-of-scope permanent; weak-idea 180 days plus a package update; duplicate 90 days plus an update; immature 30 days plus an update; bad-implementation 30 days plus an update; unsafe 180 days plus an update; insufficient-evidence 30 days. The catalog currently distinguishes extension packages from the larger all-package count. Prefer repository inspection over npm tarball extraction for v1; inaccessible source is insufficient evidence, never trust.",
-        "Planning completed: three vertical executable slices created. work-6.1 owns gated discovery, cursor, metadata screening, and durable ranked queue; work-6.2 owns safe quarantined source inspection and bounded Luna facts; work-6.3 owns Sol/GLM POV review, guided decisions, explicit installation gating, revisit policy, and final package verification. Dependencies are work-6.2 blocked by work-6.1 and work-6.3 blocked by work-6.2. No separate wo:planning child was created because this roadmap itself is the authoritative wo:planning intake; creating a disposable duplicate would add no durable scope. Keep roadmap open until all children close."
+        "Planning completed: three vertical executable slices created. work-6.1 owns gated discovery, cursor, metadata screening, and durable ranked queue; work-6.2 owns safe quarantined source inspection and bounded Luna facts; work-6.3 owns Sol/GLM POV review, guided decisions, explicit installation gating, revisit policy, and final package verification. Dependencies are work-6.2 blocked by work-6.1 and work-6.3 blocked by work-6.2. No separate wo:planning child was created because this roadmap itself is the authoritative wo:planning intake; creating a disposable duplicate would add no durable scope. Keep roadmap open until all children close.",
+        "wo:review-scope []",
+        "wo:review FAIL {\"findings\":[\"extensions/work-models.js:2202 - add an ORCHESTRATOR_ACTION_LABELS entry for work-extension-scout\",\"extensions/work-models.js:19453 - add a self-improving F7 orchestrator menu item for work-extension-scout mirroring work-catch-up so the gated action is reachable (package has no slash commands per scripts/verify-package.mjs:381)\",\"scripts/test-work-extension-scout.mjs:209 - add a fixture asserting work-extension-scout is exposed/available when workResume.selfImproving is true, not only that it returns false when disabled\"]}",
+        "wo:fix PASS Added work-extension-scout action label and self-improving-only F7 menu entry; enabled fixture selects the menu action and proves dispatch into scout flow via visible HTTP 503. Files: extensions/work-models.js, scripts/test-work-extension-scout.mjs. Verify: node scripts/test-work-extension-scout.mjs — PASS; node scripts/verify-package.mjs --quiet — PASS. Remaining findings: none.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-extension-scout.mjs\"]",
+        "wo:review PASS Re-review: action label at work-models.js:2210, self-improving-only F7 item at :19460 gated by workResumeSettings(...).selfImproving, disabled guard intact, dispatch proven by fixture \"enabled F7 scout action is exposed and dispatches through the scout flow\"; node scripts/test-work-extension-scout.mjs PASS.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-extension-scout.mjs && node scripts/verify-package.mjs --quiet\nOutput: enforces its exact permanent/window/update policy without prompting\nok - insufficient-evidence enforces its exact permanent/window/update policy without prompting\nok - inaccessible source is durably classified as insufficient-evidence\nok - durable finalist overflow continues on a later invocation\nok - command is unavailable unless self-improving is enabled\nok - enabled F7 scout action is exposed and dispatches through the scout flow\nwork extension scout fixtures passed\nok - package checks passed"
       ],
-      "status": "open",
+      "status": "closed",
       "title": "Scout Pi extensions for ce-workflow improvements",
       "type": "epic",
-      "updatedAt": "2026-08-10T11:23:19.389Z"
+      "updatedAt": "2026-08-10T13:18:34.817Z"
     },
     "work-6.1": {
       "acceptance": "Before this change the scout command and collector fixtures do not exist. After it: (1) /work-extension-scout is unavailable unless workResume.selfImproving is true; (2) fixtures prove extraction of package name, description, publish/update timestamp, npm URL, and repository URL from recent-sorted pi.dev HTML; (3) the first successful scan covers 30 days and later successful scans start at the saved cursor; parser/catalog/model failures are visible and do not advance that cursor; (4) Luna screening treats metadata as untrusted data and only plausible descriptions enter the ranked source queue; (5) no more than 10 candidates are selected for the current run while overflow remains durably ordered and deduplicated; (6) ledger writes are atomic and preserve every seen package. Verify: node scripts/test-work-extension-scout.mjs",
@@ -6881,7 +6940,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T12:55:48.865Z"
+    "updatedAt": "2026-08-10T13:18:34.818Z"
   },
   "schemaVersion": 1
 }

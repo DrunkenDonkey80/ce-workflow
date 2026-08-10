@@ -208,6 +208,27 @@ try {
 	const { executeOrchestratorAction } = await import(`../extensions/work-models.js?scout=${Date.now()}`);
 	const unavailable = await executeOrchestratorAction("work-extension-scout", "", { cwd, ui: { notify() {} } }, {});
 	assert(unavailable === false, "command is unavailable unless self-improving is enabled");
+
+	writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ workResume: { selfImproving: true } }));
+	const previousFetch = globalThis.fetch;
+	let scoutMenuLabel = "";
+	const notifications = [];
+	globalThis.fetch = async () => ({ ok: false, status: 503 });
+	try {
+		await executeOrchestratorAction("work-menu", "", {
+			cwd,
+			ui: {
+				notify(message) { notifications.push(message); },
+				select(_title, labels) {
+					scoutMenuLabel = labels.find((label) => label.includes("Scout Pi extensions")) ?? "";
+					return scoutMenuLabel;
+				},
+			},
+		}, {});
+	} finally {
+		globalThis.fetch = previousFetch;
+	}
+	assert(Boolean(scoutMenuLabel) && notifications.some((message) => message.includes("pi.dev returned HTTP 503")), "enabled F7 scout action is exposed and dispatches through the scout flow");
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

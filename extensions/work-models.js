@@ -2207,6 +2207,7 @@ const ORCHESTRATOR_ACTION_LABELS = {
 	"work-brainstorm": "Brainstorm",
 	"work-research": "Research",
 	"work-catch-up": "Catch up project",
+	"work-extension-scout": "Scout Pi extensions",
 	"work-context": "Context guard",
 	"work-debug": "Debug",
 	"work-finish": "Finish work item",
@@ -19456,6 +19457,16 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description:
 				"Review a project's workflow history and continue missed improvements.\nAvailable when self-improving reporting is enabled.",
 		},
+		...(workResumeSettings(ctx.cwd).selfImproving
+			? [
+					{
+						value: "work-extension-scout",
+						label: "🔭 Scout Pi extensions",
+						description:
+							"Discover and evaluate recent Pi extensions for workflow improvements.\nSource inspection and installation remain gated and explicit.",
+					},
+				]
+			: []),
 		...(privateWorkflowRollbackAvailable
 			? [
 					{
