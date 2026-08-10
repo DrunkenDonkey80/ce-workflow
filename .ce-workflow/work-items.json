@@ -4608,6 +4608,86 @@
       "type": "task",
       "updatedAt": "2026-08-04T05:54:21.241Z"
     },
+    "work-2.report-c1b571e8-2545-47e6-ac98-078db3518c3d": {
+      "createdAt": "2026-08-09T21:09:37.017Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The coded finish helper rejected four task-owned sanitized NDJSON evidence files as unrecognized untracked files, even though NDJSON is the natural required format for chronological event/server logs and all other evidence files were accepted.\nExpected: finish-task should recognize task-owned .ndjson (and ideally .jsonl) evidence as deterministic text artifacts, validate they are regular bounded files, and include them in scope like JSON/CSV/Markdown.\nImpact: A verified hardware evidence slice cannot pass the coded commit/close gate without renaming or structurally converting truthful append-only logs solely to satisfy extension classification.\nSuggested improvement: Add .ndjson/.jsonl to tidyUntrackedFiles recognized text/evidence extensions and optionally parse each non-empty line as JSON during finish.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/7a8bb1fc-e88b-482f-a527-d3f29d05d731",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 8552,
+              "file": "01-work-3.50-debugger-output.md",
+              "sha256": "8cbc91e8a9b3ae5cd0e23ac3d167bf1da030973d6ce7849e2cbdcdd7a99368b4"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-09T21:09:37.010Z",
+          "workflowId": "019fe7f4-a6f5-7b35-bb4c-f4aece7a2321"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.report-c1b571e8-2545-47e6-ac98-078db3518c3d",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic claim classified locally-owned and related-distinct from prior untracked hygiene fixes: NDJSON/JSONL are absent from recognized source extensions, so task-owned append-only evidence is rejected. Reusing this atomic report as the execution item; scope is scripts/work-hygiene.mjs plus its focused test.",
+        "wo:review-scope [\"scripts/test-work-untracked-hygiene.mjs\",\"scripts/work-hygiene.mjs\"]",
+        "wo:review PASS - .ndjson/.jsonl added to SOURCE_EXTS with lstat regular-file + 10MB bound; scripts/test-work-untracked-hygiene.mjs covers recognition, oversized escalation, idempotency; node scripts/test-work-untracked-hygiene.mjs -> PASS",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-untracked-hygiene.mjs\nOutput: untracked hygiene: PASS"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The coded finish helper rejected four task-owned sanitized NDJSON evidence files as unrecognized untracked files, even though NDJS",
+      "type": "task",
+      "updatedAt": "2026-08-10T08:37:03.710Z"
+    },
+    "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
+      "createdAt": "2026-08-09T19:21:08.278Z",
+      "dependencies": [
+        "work-2.45"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: The required work-worker refused an otherwise complete work-3.48 handoff because the parent prompt did not include the exact absolute work-helper.mjs path or a precomputed compact work summary, even though the target repo and exact work item were supplied and the target store existed.\nExpected: Coded resume/kickoff should include the resolved helper path and compact work-item summary automatically in the worker handoff, or the worker should be able to use a deterministic documented helper lookup without guessing.\nImpact: The authorized physical-device recording window was wasted; no hardware threshold was exercised, and autonomous progress stopped on avoidable handoff metadata rather than project behavior.\nSuggested improvement: Have resume handoff generation inject C:\\soft\\ce-workflow\\scripts\\work-helper.mjs and the output of work-summary for the claimed item.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/0138ca72-92ad-416f-9f87-825ad13dfe1f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3287,
+              "file": "01-work-3.48-worker-output.md",
+              "sha256": "e6ea670df83d72c003df35cd8ed7cd7db8f6809211ae81d2ae718168b012e8b8"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-09T19:21:08.271Z",
+          "workflowId": "019fe7f4-a6f5-7b35-bb4c-f4aece7a2321"
+        }
+      ],
+      "id": "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic claim classified duplicate/already-fixed by work-2.45 atom A: coded work-worker handoffs now inject the shell-quoted absolute helper path and exact work-summary command. Verified against this report's required outcome with node scripts/test-work-helper-handoffs.mjs and node scripts/test-work-start-finish.mjs (both PASS). Canonical coverage: work-2.45, commits 5899512/46ff9e0; the report arose from an older loaded package revision, not current source behavior."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The required work-worker refused an otherwise complete work-3.48 handoff because the parent prompt did not include the exact absol",
+      "type": "task",
+      "updatedAt": "2026-08-10T08:34:39.387Z"
+    },
     "work-2.report-ec289716-ad4f-4177-919a-47e4ed6b750e": {
       "createdAt": "2026-08-07T09:46:23.611Z",
       "dependencies": [
@@ -6567,7 +6647,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-09T14:50:00.841Z"
+    "updatedAt": "2026-08-10T08:37:03.710Z"
   },
   "schemaVersion": 1
 }

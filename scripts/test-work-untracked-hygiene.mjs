@@ -6,6 +6,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	truncateSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -102,6 +103,14 @@ assert(
 	isRecognizedSource("toolchain.cmake", noGit),
 	".cmake is recognized source",
 );
+assert(
+	isRecognizedSource("events.ndjson", noGit),
+	".ndjson is recognized evidence",
+);
+assert(
+	isRecognizedSource("events.jsonl", noGit),
+	".jsonl is recognized evidence",
+);
 assert(isRecognizedSource("settings.gradle", noGit), ".gradle is recognized");
 assert(isRecognizedSource("gradlew", noGit), "gradlew is recognized");
 assert(
@@ -172,6 +181,10 @@ writeFileSync(path.join(repo, "src", "new.py"), "y = 2\n");
 writeFileSync(path.join(repo, "src", "m.pyc"), "x");
 writeFileSync(path.join(repo, "mystery.dat"), "x");
 writeFileSync(path.join(repo, "data.bin"), "x");
+writeFileSync(path.join(repo, "events.ndjson"), '{"event":"start"}\n');
+writeFileSync(path.join(repo, "server.jsonl"), '{"status":200}\n');
+writeFileSync(path.join(repo, "too-large.ndjson"), "");
+truncateSync(path.join(repo, "too-large.ndjson"), 10 * 1024 * 1024 + 1);
 mkdirSync(path.join(repo, "node_modules", "lib"), { recursive: true });
 writeFileSync(path.join(repo, "node_modules", "lib", "index.js"), "x");
 mkdirSync(path.join(repo, "rf-lib", "build-work-9-4"), { recursive: true });
@@ -211,13 +224,15 @@ assert(
 );
 assert(
 	sorted(tidy.unrecognized).join(",") ===
-		sorted(["mystery.dat", "data.bin"]).join(","),
-	"only the unknown extensions are escalated",
+		sorted(["mystery.dat", "data.bin", "too-large.ndjson"]).join(","),
+	"only unknown or oversized evidence files are escalated",
 );
 assert(
 	!tidy.unrecognized.includes("src/new.py") &&
+		!tidy.unrecognized.includes("events.ndjson") &&
+		!tidy.unrecognized.includes("server.jsonl") &&
 		!tidy.unrecognized.some((file) => file.startsWith("android/")),
-	"new source and standard Gradle infrastructure are not escalated",
+	"new source, bounded event logs, and standard Gradle infrastructure are not escalated",
 );
 assert(
 	!tidy.unrecognized.includes(".ce-workflow/work-items.json"),
@@ -236,13 +251,13 @@ assert(tidy2.ignored.length === 0, "second run collects no new artifacts");
 assert(!tidy2.gitignoreWritten, "second run does not rewrite .gitignore");
 assert(
 	sorted(tidy2.unrecognized).join(",") ===
-		sorted(["mystery.dat", "data.bin"]).join(","),
-	"unknown files remain escalated on the second run",
+		sorted(["mystery.dat", "data.bin", "too-large.ndjson"]).join(","),
+	"unknown and oversized files remain escalated on the second run",
 );
 
 // once every unknown is resolved (tracked as legit source, or gitignored),
 // a run is clean.
-g(["add", "mystery.dat"]);
+g(["add", "mystery.dat", "too-large.ndjson"]);
 appendGitignorePatterns(repo, ["*.bin"]);
 const tidy3 = tidyUntrackedFiles({ cwd: repo });
 assert(

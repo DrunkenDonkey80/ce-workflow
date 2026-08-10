@@ -4,7 +4,7 @@
 // decision. Pure + dir-aware so it is unit-testable against a temp git repo.
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const RUNTIME_PREFIXES = [
@@ -36,7 +36,7 @@ const SOURCE_EXTS = new Set(
 		"c h cpp hpp cc hh cs fs vb clj cljs ex exs erl elm hs jl lua pl pm " +
 		"r dart vue svelte astro md mdx html htm xml svg rst adoc tex " +
 		"css scss sass less styl toml yaml yml json json5 jsonc ini cfg conf properties " +
-		"gradle sh bash zsh fish ps1 psm1 bat cmd sql graphql gql proto txt lock csv tsv sha256 cmake"
+		"gradle sh bash zsh fish ps1 psm1 bat cmd sql graphql gql proto txt lock csv tsv ndjson jsonl sha256 cmake"
 	).split(" "),
 );
 
@@ -179,7 +179,19 @@ export function tidyUntrackedFiles({ cwd, gitBin = "git" }) {
 			toIgnore.add(pattern);
 			continue;
 		}
-		if (isRecognizedSource(file, runGit)) continue;
+		if (isRecognizedSource(file, runGit)) {
+			if (/\.(?:ndjson|jsonl)$/i.test(file)) {
+				try {
+					const stat = lstatSync(path.join(cwd, file));
+					if (!stat.isFile() || stat.size > 10 * 1024 * 1024) {
+						unrecognized.push(file);
+					}
+				} catch {
+					unrecognized.push(file);
+				}
+			}
+			continue;
+		}
 		unrecognized.push(file);
 	}
 	const gitignoreWritten = appendGitignorePatterns(cwd, [...toIgnore]);
