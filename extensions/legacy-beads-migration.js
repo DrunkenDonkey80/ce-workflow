@@ -41,6 +41,31 @@ const ROLE_KEYS = [
 	"reviewer",
 	"worker",
 ];
+const LEGACY_AGENT_OVERRIDE_ALIASES = [
+	...ROLE_KEYS.filter(
+		(role) => !["advisor-backup", "committer"].includes(role),
+	).map((role) => [`bead-${role}`, `work-${role}`]),
+	["bead-advisor-backup", "work-advisor-2"],
+	["work-advisor-backup", "work-advisor-2"],
+];
+
+export function modernizeLegacyAgentOverrides(settings, options = {}) {
+	const current = settings?.subagents?.agentOverrides;
+	if (!current) return settings;
+	for (const [legacy, agent] of LEGACY_AGENT_OVERRIDE_ALIASES)
+		if (current[legacy] && !current[agent]) current[agent] = { ...current[legacy] };
+	if (
+		(current["bead-advisor-backup"] || current["work-advisor-backup"]) &&
+		settings.workOrchestrator?.advisorEnabled?.advisor2 === undefined
+	) {
+		settings.workOrchestrator ??= {};
+		settings.workOrchestrator.advisorEnabled ??= {};
+		settings.workOrchestrator.advisorEnabled.advisor2 = true;
+	}
+	if (options.remove)
+		for (const [legacy] of LEGACY_AGENT_OVERRIDE_ALIASES) delete current[legacy];
+	return settings;
+}
 
 export class MigrationError extends Error {
 	constructor(category, message, details = {}) {

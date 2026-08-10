@@ -1104,6 +1104,13 @@ try {
 				labels,
 			}),
 		);
+		if (created.type === "epic" && !created.parentId) {
+			const modUrl = pathToFileURL(
+				path.join(import.meta.dirname, "..", "extensions", "work-models.js"),
+			);
+			const { rememberWorkflowEpicForHelper } = await import(modUrl.href);
+			rememberWorkflowEpicForHelper(cwd, created);
+		}
 		print(summary(created, 300));
 	} else if (command === "work-close") {
 		const id = args[0];

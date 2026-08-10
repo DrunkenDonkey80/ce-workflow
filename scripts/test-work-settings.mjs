@@ -201,6 +201,35 @@ try {
 		mod.workOrchSettings(cwd).creativeMode === "auto",
 		"creative sidecar mode persists",
 	);
+	writeSettings({
+		subagents: {
+			agentOverrides: {
+				"bead-worker": { model: "test/terra", thinking: "medium" },
+				"bead-advisor": { model: "test/opus", thinking: "xhigh" },
+				"bead-advisor-backup": {
+					model: "test/sol",
+					thinking: "high",
+				},
+			},
+		},
+	});
+	const legacyEffective = mod.effectiveSettingsForTest(cwd);
+	assert(
+		legacyEffective.subagents.agentOverrides["work-worker"].model ===
+			"test/terra" &&
+			legacyEffective.subagents.agentOverrides["work-advisor"].model ===
+				"test/opus" &&
+			legacyEffective.subagents.agentOverrides["work-advisor-2"].model ===
+				"test/sol",
+		"legacy bead role overrides feed the current work role slots",
+	);
+	assert(
+		mod.workOrchSettings(cwd).advisorEnabled.advisor2 === true &&
+			mod
+				.advisorCriticStep(cwd, "brainstorm artifact", "all")
+				.includes("work-advisor-2"),
+		"a legacy advisor backup keeps the configured multi-model brainstorm critic enabled",
+	);
 	writeSettings({});
 
 	// Verifier profiles merge by canonical model ID; project null tombstones win.

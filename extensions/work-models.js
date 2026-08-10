@@ -31,7 +31,10 @@ import {
 	relative,
 	resolve,
 } from "node:path";
-import { migrateLegacyBeads } from "./legacy-beads-migration.js";
+import {
+	migrateLegacyBeads,
+	modernizeLegacyAgentOverrides,
+} from "./legacy-beads-migration.js";
 import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.js";
 import { openWorkFleet } from "./work-fleet.js";
 import { dispatchPrivateWorkflow } from "./work-private-workflows.js";
@@ -799,7 +802,9 @@ function globalSettingsPath() {
 function readJsonSettings(file) {
 	if (!existsSync(file)) return {};
 	try {
-		return JSON.parse(readFileSync(file, "utf8"));
+		return modernizeLegacyAgentOverrides(
+			JSON.parse(readFileSync(file, "utf8")),
+		);
 	} catch {
 		return {};
 	}
@@ -3761,7 +3766,7 @@ function overrides(settings) {
 function compactOverrides(settings) {
 	const current = settings.subagents?.agentOverrides;
 	if (!current) return;
-	delete current["work-advisor-backup"];
+	modernizeLegacyAgentOverrides(settings, { remove: true });
 	for (const [agent, value] of Object.entries(current)) {
 		if (!value.model && !value.thinking) delete current[agent];
 	}
@@ -18722,11 +18727,17 @@ export async function consumePendingMainEditorAction(event, ctx, runtime = {}) {
 		return;
 	}
 	const text = String(event.text ?? "");
-	if (!text.startsWith(pending.marker)) {
+	const brainstormMarker =
+		pending.action === "work-brainstorm"
+			? /^Idea or promp?t:\s*(?:\r?\n)?/i.exec(text)?.[0]
+			: undefined;
+	if (!text.startsWith(pending.marker) && !brainstormMarker) {
 		pendingMainEditorActions.delete(mainEditorActionKey(ctx));
 		return;
 	}
-	let body = text.slice(pending.marker.length).trim();
+	let body = text
+		.slice(text.startsWith(pending.marker) ? pending.marker.length : brainstormMarker.length)
+		.trim();
 	if (!body) {
 		pending.createdAt = now;
 		ctx.ui?.setEditorText?.(pending.marker);
@@ -22398,6 +22409,7 @@ export {
 	scheduleConfiguredBackgroundVerifiers,
 	createPiSubagentsVerifierAdapter,
 	readEffectiveSettings as effectiveSettingsForTest,
+	rememberWorkflowEpic as rememberWorkflowEpicForHelper,
 	workResumeSettings as workResumeSettingsForTest,
 	renderWorkIdeateText,
 	renderWorkBrainstormText,

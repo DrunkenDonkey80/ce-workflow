@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -70,6 +70,18 @@ try {
 			full[0].description.length === 4000 &&
 			full[1].truncated === true,
 		"full detail remains an explicit bounded opt-in",
+	);
+
+	const epic = run("work-create", "Fresh roadmap", "--type", "epic");
+	const state = JSON.parse(
+		readFileSync(
+			path.join(fixture.cwd, ".pi", "work-orchestrator-state.json"),
+			"utf8",
+		),
+	);
+	assert(
+		state.lastEpicId === epic.id && state.lastEpicStatus === "open",
+		"helper-created top-level epics become the current roadmap",
 	);
 } finally {
 	fixture.cleanup();

@@ -3755,6 +3755,33 @@
       "type": "bug",
       "updatedAt": "2026-08-09T08:57:39.444Z"
     },
+    "work-2.67": {
+      "acceptance": "Accept the common 'Idea or promt:' marker typo for an armed Brainstorm without weakening mismatch clearing for ordinary chat; preserve exact marker behavior and tests. Interpret legacy bead-* role overrides as current work-* slot overrides, enabling legacy advisor-backup as Advisor 2 unless explicitly disabled, and remove legacy keys on the next settings write. Make helper-created top-level epics current so Resume selects the new roadmap. Add focused regression coverage, set work-6 current, run the focused goal/settings checks and package verification, then finish through the coded helper.",
+      "createdAt": "2026-08-10T11:56:35.981Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "A live F7 Brainstorm submission reached ordinary chat when the visible marker was edited from 'prompt' to 'promt', so coded brainstorm state, creative depth, and advisor review never ran. The subsequently helper-created roadmap did not become current, leaving F7 Resume focused on stale closed work-4. Existing bead-* model overrides are also ignored by current work-* advisor slots, preventing the configured multi-model critic from running.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.67",
+      "labels": [
+        "wo:self-improvement"
+      ],
+      "notes": [
+        "Root cause confirmed from .pi/work-orchestrator-state.json and the submitted text: F7 armed Brainstorm with exact marker 'Idea or prompt:', but the submitted visible prefix was 'Idea or promt:', so consumePendingMainEditorAction cleared the pending action and the request became ordinary chat. The later helper-created work-6 epic did not update current-roadmap state, leaving lastEpicId/lastRoadmapMenuId on closed work-4. Project model settings still used legacy bead-advisor/bead-advisor-backup keys, so current work-advisor slots inherited defaults and Advisor 2 was not enabled. Fixes and focused tests cover all three boundaries.",
+        "wo:verify-check FAIL\nCommand: npm run verify:quiet\nFAIL - extensions/work-models.js has no normal-path legacy vocabulary: bead-planner, bead-migrator, bead-worker, bead-fixer, bead-debugger, bead-reviewer, bead-advisor, bead-advisor-backup, bead-advisor-backup\n\n1 verification check(s) failed:\n- extensions/work-models.js has no normal-path legacy vocabulary: bead-planner, bead-migrator, bead-worker, bead-fixer, bead-debugger, bead-reviewer, bead-advisor, bead-advisor-backup, bead-advisor-backup\n",
+        "wo:verify-check PASS\nCommand: node scripts/verify-package.mjs --quiet\nOutput: ok - package checks passed",
+        "wo:verify-check PASS\nCommand: node scripts/verify-package.mjs --quiet\nOutput: ok - package checks passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Repair brainstorm routing and legacy multi-model settings",
+      "type": "bug",
+      "updatedAt": "2026-08-10T12:12:45.299Z"
+    },
     "work-2.7": {
       "acceptance": "Focused helper tests prove managed-store formatting exclusion and Git Bash verification syntax; package verification proves planner/worker/reviewer helper fail-closed contracts and reviewer non-blocking coordination.",
       "createdAt": "2026-07-20T09:58:53.226Z",
@@ -6640,6 +6667,30 @@
       "title": "Plan verified catch-up, activation, and legacy retirement",
       "type": "task",
       "updatedAt": "2026-08-03T22:15:14.191Z"
+    },
+    "work-6": {
+      "acceptance": "1. Command is unavailable unless workResume.selfImproving is true. 2. Collector reads pi.dev extension pages sorted by recent, records package name, description, publish/update timestamp, npm URL, and repository URL, backfills 30 days initially, and thereafter scans from a saved successful cursor. 3. Catalog or parser failure is visible and never advances the cursor. 4. Luna batch-screens metadata as untrusted data; source is retrieved only when the description indicates plausible ce-workflow value. 5. At most 10 candidates receive source inspection per run, ranked by expected value; overflow is durably queued and processed on later runs. 6. Source inspection uses a disposable read-only quarantine, shallow clone without submodules, containment and symlink protections, and no package install, scripts, build, tests, credentials, or execution. 7. Luna extracts bounded capability, implementation-quality, maintenance, dependency, security, overlap, install-versus-borrow, and evidence facts; one configured Sol-or-GLM reviewer applies the existing private POV playbook. 8. Only actionable finalists prompt the actor to proceed with the recommendation, defer, or reject; installation remains explicit. 9. One atomic local .pi ledger remembers every seen package, queue state, review timestamp, source revision, enum reason, rationale, and revisit date. Permanent out-of-scope rejects never return; weak-idea, duplicate, immature, bad-implementation, unsafe, and insufficient-evidence reasons use defined retry windows and require appropriate update evidence. 10. Focused fixtures cover HTML extraction, initial and incremental cursors, deduplication, queue cap/order, rejection expiry, malformed model output, quarantine containment, and self-improving gating; package verification passes.",
+      "createdAt": "2026-08-10T11:23:19.389Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Add a self-improving-only /work-extension-scout command that discovers recently published Pi extension packages, cheaply screens their descriptions for ce-workflow value, safely inspects only promising source, and guides install, borrow, defer, or reject decisions without duplicating /work-catch-up. First run backfills 30 days; later runs resume from durable local state. The implementation should reuse the existing catch-up POV and decision machinery where practical.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Scout Pi extensions for workflow improvements"
+      },
+      "evidence": [],
+      "id": "work-6",
+      "labels": [
+        "wo:planning",
+        "wo:self-improvement"
+      ],
+      "notes": [
+        "Confirmed discovery policy: guided full pipeline; retrieve source only after description screening indicates plausible value; cap quarantined source inspections at 10 per invocation and persist overflow. Default reconsideration policy: out-of-scope permanent; weak-idea 180 days plus a package update; duplicate 90 days plus an update; immature 30 days plus an update; bad-implementation 30 days plus an update; unsafe 180 days plus an update; insufficient-evidence 30 days. The catalog currently distinguishes extension packages from the larger all-package count. Prefer repository inspection over npm tarball extraction for v1; inaccessible source is insufficient evidence, never trust."
+      ],
+      "status": "open",
+      "title": "Scout Pi extensions for ce-workflow improvements",
+      "type": "epic",
+      "updatedAt": "2026-08-10T11:23:19.389Z"
     }
   },
   "metadata": {
@@ -6649,7 +6700,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T08:37:20.121Z"
+    "updatedAt": "2026-08-10T12:12:45.300Z"
   },
   "schemaVersion": 1
 }

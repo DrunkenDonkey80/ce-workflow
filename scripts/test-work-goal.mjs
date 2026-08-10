@@ -618,6 +618,29 @@ assert.deepEqual(
 	"all six main-editor actions route freeform input and only Brainstorm carries private freeform provenance",
 );
 
+editorCtx.selection = "Brainstorm";
+const typoMarkerCtx = editorCtx("editor-brainstorm-typo-marker");
+await shortcuts.f7.handler(typoMarkerCtx);
+let typoMarkerRoute;
+await mod.consumePendingMainEditorAction(
+	{ source: "interactive", text: "Idea or promt:\nKeep this brainstorm" },
+	typoMarkerCtx,
+	{
+		execute: async (command, args, _ctx, options) => {
+			typoMarkerRoute = { command, args, options };
+		},
+	},
+);
+assert.deepEqual(
+	typoMarkerRoute,
+	{
+		command: "work-brainstorm",
+		args: "Keep this brainstorm",
+		options: { explicitFreeform: true },
+	},
+	"an armed Brainstorm tolerates the common visible prompt marker typo",
+);
+
 const clipboardPath =
 	"C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-clipboard-68605870-29c4-41f9-a1e9-5878ea4f214a.png";
 const clipboardBody = `First line\nSecond line\n${clipboardPath}`;
