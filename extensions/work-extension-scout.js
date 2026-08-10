@@ -10,6 +10,16 @@ const FACT_LIMIT = 32 * 1024;
 const SOURCE_LIMIT = 256 * 1024;
 const FILE_LIMIT = 64 * 1024;
 const FACT_CATEGORIES = ["capability", "quality", "maintenance", "dependency", "security", "overlap", "installVersusBorrow"];
+const REVIEW_RECOMMENDATIONS = ["proceed", "defer", "reject"];
+export const EXTENSION_SCOUT_REVISIT_POLICY = Object.freeze({
+	"out-of-scope": { permanent: true, days: null, updateRequired: false },
+	"weak-idea": { permanent: false, days: 180, updateRequired: true },
+	duplicate: { permanent: false, days: 90, updateRequired: true },
+	immature: { permanent: false, days: 30, updateRequired: true },
+	"bad-implementation": { permanent: false, days: 30, updateRequired: true },
+	unsafe: { permanent: false, days: 180, updateRequired: true },
+	"insufficient-evidence": { permanent: false, days: 30, updateRequired: false },
+});
 const text = (value = "") => String(value).replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
 const attr = (html, name) => html.match(new RegExp(`${name}=["']([^"']+)["']`, "i"))?.[1];
 
@@ -35,10 +45,10 @@ export function parseRecentExtensions(html) {
 export function readExtensionScoutLedger(cwd) {
 	try {
 		const parsed = JSON.parse(readFileSync(join(cwd, EXTENSION_SCOUT_LEDGER), "utf8"));
-		return { version: 1, cursor: null, packages: {}, queue: [], currentRun: [], ...parsed };
+		return { version: 1, cursor: null, packages: {}, queue: [], currentRun: [], finalists: [], ...parsed };
 	} catch (error) {
 		if (error?.code !== "ENOENT") throw error;
-		return { version: 1, cursor: null, packages: {}, queue: [], currentRun: [] };
+		return { version: 1, cursor: null, packages: {}, queue: [], currentRun: [], finalists: [] };
 	}
 }
 
@@ -57,6 +67,75 @@ export function writeExtensionScoutLedger(cwd, ledger) {
 function mergeQueue(previous, additions) {
 	const byName = new Map([...previous, ...additions].map((item) => [item.name, item]));
 	return [...byName.values()].sort((a, b) => b.score - a.score || b.timestamp.localeCompare(a.timestamp) || a.name.localeCompare(b.name));
+}
+
+function revisitDue(record, now) {
+	const decision = record?.decision;
+	if (!decision || decision.status === "proceed") return true;
+	const policy = EXTENSION_SCOUT_REVISIT_POLICY[decision.reason];
+	return Boolean(policy && !policy.permanent && Date.parse(decision.revisitAt) <= now.getTime());
+}
+
+export function parseExtensionReview(value) {
+	const raw = typeof value === "string" ? value : JSON.stringify(value);
+	if (Buffer.byteLength(raw, "utf8") > FACT_LIMIT) throw new Error("extension review exceeds 32 KiB");
+	let parsed;
+	try { parsed = typeof value === "string" ? JSON.parse(value) : value; }
+	catch (error) { throw new Error(`extension review is malformed: ${error.message}`); }
+	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).some((key) => !["actionable", "recommendation", "reason", "rationale", "pov", "benefit", "costRisk"].includes(key)))
+		throw new Error("extension review has an invalid shape");
+	const result = Object.fromEntries(["reason", "rationale", "pov", "benefit", "costRisk"].map((key) => [key, text(parsed[key])]));
+	if (typeof parsed.actionable !== "boolean" || !REVIEW_RECOMMENDATIONS.includes(parsed.recommendation) || Object.values(result).some((item) => !item || item.length > 1_000))
+		throw new Error("extension review requires bounded actionable recommendation evidence");
+	if (!(result.reason in EXTENSION_SCOUT_REVISIT_POLICY)) throw new Error("extension review reason is invalid");
+	return { actionable: parsed.actionable, recommendation: parsed.recommendation, ...result };
+}
+
+function decisionRecord(status, reason, rationale, reviewedAt, sourceRevision) {
+	const policy = EXTENSION_SCOUT_REVISIT_POLICY[reason];
+	if (!REVIEW_RECOMMENDATIONS.includes(status) || !policy || !text(rationale)) throw new Error("extension decision is invalid");
+	return {
+		status, reason, rationale: text(rationale).slice(0, 1_000), decidedAt: reviewedAt, sourceRevision,
+		revisitAt: policy.permanent ? null : new Date(Date.parse(reviewedAt) + policy.days * DAY_MS).toISOString(),
+		updateRequired: policy.updateRequired,
+	};
+}
+
+export async function reviewInspectedExtensions(cwd, options = {}) {
+	if (typeof options.review !== "function" || typeof options.decide !== "function") throw new Error("extension reviewer and guided decision are required");
+	const results = [];
+	for (const candidate of readExtensionScoutLedger(cwd).finalists.slice(0, 10)) {
+		const before = readExtensionScoutLedger(cwd);
+		const record = before.packages[candidate.name];
+		if (!record?.inspection?.ok) continue;
+		const reviewedAt = new Date(options.now ?? Date.now()).toISOString();
+		let review;
+		try { review = parseExtensionReview(await options.review({ name: candidate.name, revision: record.inspection.revision, facts: record.inspection.facts })); }
+		catch (error) {
+			writeExtensionScoutLedger(cwd, { ...before, lastError: `review ${candidate.name}: ${text(error.message).slice(0, 500)}` });
+			throw new Error(`Extension finalist review failed for ${candidate.name}; candidate remains resumable: ${error.message}`);
+		}
+		const prior = record.decision;
+		const policy = EXTENSION_SCOUT_REVISIT_POLICY[prior?.reason];
+		let choice = prior && policy?.updateRequired && prior.sourceRevision === record.inspection.revision
+			? { status: prior.status, reason: prior.reason, rationale: "Revisit window elapsed but inspected source revision is unchanged." }
+			: review.actionable ? await options.decide({ candidate, review }) : { status: "reject", reason: review.reason, rationale: review.rationale };
+		if (!choice || !REVIEW_RECOMMENDATIONS.includes(choice.status)) throw new Error(`Extension decision cancelled for ${candidate.name}; candidate remains resumable`);
+		const reason = choice.reason ?? review.reason;
+		const rationale = text(choice.rationale ?? review.rationale);
+		if (choice.status === "proceed") {
+			if (choice.explicit !== true) throw new Error(`Explicit proceed is required before installing ${candidate.name}`);
+			if (typeof options.install === "function") await options.install(candidate.name);
+		}
+		const latest = readExtensionScoutLedger(cwd);
+		const packages = { ...latest.packages, [candidate.name]: { ...latest.packages[candidate.name], reviewedAt, review, decision: decisionRecord(choice.status, choice.reason ?? reason, choice.rationale ?? rationale, reviewedAt, record.inspection.revision) } };
+		const queue = latest.queue.filter((item) => item.name !== candidate.name);
+		const finalists = latest.finalists.filter((item) => item.name !== candidate.name);
+		const next = { ...latest, packages, queue, finalists, currentRun: queue.slice(0, 10), lastError: null };
+		writeExtensionScoutLedger(cwd, next);
+		results.push({ name: candidate.name, review, decision: packages[candidate.name].decision });
+	}
+	return { reviewed: results, ledger: readExtensionScoutLedger(cwd) };
 }
 
 export function parseExtensionInspectionFacts(value) {
@@ -134,27 +213,33 @@ export async function inspectQueuedExtensions(cwd, options = {}) {
 		const quarantine = mkdtempSync(path.join(options.tempRoot ?? tmpdir(), "extension-source-"));
 		const source = path.join(quarantine, "source");
 		let outcome;
+		let inaccessible = false;
 		try {
 			let repository;
 			try { repository = new URL(candidate.repositoryUrl); } catch {}
 			if (!repository || !["http:", "https:"].includes(repository.protocol) || !["github.com", "gitlab.com", "codeberg.org"].includes(repository.hostname.toLowerCase()))
 				throw new Error("repository URL is not an allowed HTTP(S) forge URL");
-			await (options.clone ?? defaultClone)(candidate.repositoryUrl, source, quarantine);
+			try { await (options.clone ?? defaultClone)(candidate.repositoryUrl, source, quarantine); }
+			catch (error) { inaccessible = true; throw error; }
 			const revision = (await (options.git ?? defaultGit)(source, ["rev-parse", "HEAD"])).trim();
 			if (!/^[0-9a-f]{40}$/i.test(revision)) throw new Error("cloned source revision is invalid");
 			const files = inspectionFiles(source, options.git ?? defaultGit);
 			const facts = parseExtensionInspectionFacts(await options.inspect({ name: candidate.name, revision, files }));
 			outcome = { ok: true, revision, facts };
 		} catch (error) {
-			outcome = { ok: false, error: text(error.message).slice(0, 500) };
+			outcome = { ok: false, inaccessible, error: text(error.message).slice(0, 500) };
 		}
 		try { await (options.cleanup ?? ((root) => rmSync(root, { recursive: true, force: true })))(quarantine); }
 		catch (error) { outcome = { ok: false, error: `cleanup: ${text(error.message).slice(0, 480)}` }; }
 		const ledger = readExtensionScoutLedger(cwd);
-		const packages = { ...ledger.packages, [candidate.name]: { ...ledger.packages[candidate.name], inspection: { ...outcome, attemptedAt: new Date(options.now ?? Date.now()).toISOString() } } };
-		const queue = outcome.ok ? ledger.queue.filter((item) => item.name !== candidate.name) : ledger.queue;
-		const currentRun = outcome.ok ? ledger.currentRun.filter((item) => item.name !== candidate.name) : ledger.currentRun;
-		writeExtensionScoutLedger(cwd, { ...ledger, packages, queue, currentRun, lastError: outcome.ok ? null : `inspection ${candidate.name}: ${outcome.error}` });
+		const attemptedAt = new Date(options.now ?? Date.now()).toISOString();
+		const inaccessibleDecision = outcome.inaccessible ? decisionRecord("reject", "insufficient-evidence", `Source was inaccessible: ${outcome.error}`, attemptedAt, null) : undefined;
+		const packages = { ...ledger.packages, [candidate.name]: { ...ledger.packages[candidate.name], inspection: { ...outcome, attemptedAt }, ...(inaccessibleDecision ? { reviewedAt: attemptedAt, decision: inaccessibleDecision } : {}) } };
+		const complete = outcome.ok || outcome.inaccessible;
+		const queue = complete ? ledger.queue.filter((item) => item.name !== candidate.name) : ledger.queue;
+		const currentRun = complete ? ledger.currentRun.filter((item) => item.name !== candidate.name) : ledger.currentRun;
+		const finalists = outcome.ok ? mergeQueue(ledger.finalists, [candidate]) : ledger.finalists;
+		writeExtensionScoutLedger(cwd, { ...ledger, packages, queue, currentRun, finalists, lastError: outcome.ok ? null : `inspection ${candidate.name}: ${outcome.error}` });
 		results.push({ name: candidate.name, ...outcome });
 	}
 	return { inspected: results, ledger: readExtensionScoutLedger(cwd) };
@@ -184,12 +269,12 @@ export async function runExtensionScout(cwd, options = {}) {
 	const known = new Map(discovered.map((item) => [item.name, item]));
 	const additions = screened.flatMap((decision) => {
 		const item = known.get(decision.name);
-		return item && decision.plausible === true && Number.isFinite(Number(decision.score))
+		return item && revisitDue(packages[item.name], now) && decision.plausible === true && Number.isFinite(Number(decision.score))
 			? [{ ...item, score: Number(decision.score), rationale: text(decision.rationale).slice(0, 300) }]
 			: [];
 	});
-	const queue = mergeQueue(ledger.queue, additions);
-	const next = { version: 1, cursor: now.toISOString(), packages, queue, currentRun: queue.slice(0, 10), lastError: null };
+	const queue = mergeQueue(ledger.queue.filter((item) => revisitDue(packages[item.name], now)), additions);
+	const next = { version: 1, cursor: now.toISOString(), packages, queue, currentRun: queue.slice(0, 10), finalists: ledger.finalists ?? [], lastError: null };
 	writeExtensionScoutLedger(cwd, next);
 	return { since, discovered: discovered.length, selected: next.currentRun, overflow: queue.slice(10), ledger: next };
 }

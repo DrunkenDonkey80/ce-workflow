@@ -6855,17 +6855,23 @@
       ],
       "dependencyEdges": [],
       "description": "Complete the guided scout flow: send evidence-backed finalists to one configured Sol-or-GLM reviewer using the existing private POV playbook, prompt only actionable finalists for proceed/defer/reject, keep installation explicit, and enforce durable rejection/revisit policy from the atomic extension ledger.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-6.3",
       "labels": [],
       "notes": [
-        "wo:slice-plan Covers criteria 7-10 and final integration. Reuse privateCatchUpCandidatePlaybooks and the existing ask_user guided-decision pattern rather than duplicating /work-catch-up. Expected files: extensions/work-extension-scout.js, extensions/work-models.js, scripts/test-work-extension-scout.mjs, and README.md only if command discoverability conventions require it. Verify exactly: node scripts/test-work-extension-scout.mjs; then npm run verify:quiet."
+        "wo:slice-plan Covers criteria 7-10 and final integration. Reuse privateCatchUpCandidatePlaybooks and the existing ask_user guided-decision pattern rather than duplicating /work-catch-up. Expected files: extensions/work-extension-scout.js, extensions/work-models.js, scripts/test-work-extension-scout.mjs, and README.md only if command discoverability conventions require it. Verify exactly: node scripts/test-work-extension-scout.mjs; then npm run verify:quiet.",
+        "wo:verify-check\nPlan match: finalist review reuses privateCatchUpCandidatePlaybooks and guided three-way decision flow without duplicating catch-up machinery.\nAcceptance: configured Sol/GLM reviewer; bounded validated actionable output; explicit proceed install gate; atomic decision/revisit ledger; exact permanent/window/update policies; inaccessible-source insufficient-evidence; durable finalist overflow.\nProof: node scripts/test-work-extension-scout.mjs (passed all fixtures, independently reconfirmed by parent); node scripts/verify-package.mjs --quiet (passed: package checks passed).\nGaps: none known; independent reviewer gate remains.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-extension-scout.mjs && node scripts/verify-package.mjs --quiet\nOutput: forces its exact permanent/window/update policy without prompting\nok - unsafe enforces its exact permanent/window/update policy without prompting\nok - insufficient-evidence enforces its exact permanent/window/update policy without prompting\nok - inaccessible source is durably classified as insufficient-evidence\nok - durable finalist overflow continues on a later invocation\nok - command is unavailable unless self-improving is enabled\nwork extension scout fixtures passed\nok - package checks passed"
       ],
       "parentId": "work-6",
-      "status": "open",
+      "status": "closed",
       "title": "Review finalists and enforce durable revisit decisions",
       "type": "task",
-      "updatedAt": "2026-08-10T12:20:40.778Z"
+      "updatedAt": "2026-08-10T12:55:48.864Z"
     }
   },
   "metadata": {
@@ -6875,7 +6881,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T12:43:13.202Z"
+    "updatedAt": "2026-08-10T12:55:48.865Z"
   },
   "schemaVersion": 1
 }

@@ -4,10 +4,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
 	EXTENSION_SCOUT_LEDGER,
+	EXTENSION_SCOUT_REVISIT_POLICY,
 	inspectQueuedExtensions,
 	parseExtensionInspectionFacts,
+	parseExtensionReview,
 	parseRecentExtensions,
 	readExtensionScoutLedger,
+	reviewInspectedExtensions,
 	runExtensionScout,
 	writeExtensionScoutLedger,
 } from "../extensions/work-extension-scout.js";
@@ -139,6 +142,63 @@ try {
 		cleanup: (root) => { rmSync(root, { recursive: true, force: true }); throw new Error("locked"); },
 	});
 	assert(!cleanupResult.inspected[0].ok && /cleanup/.test(cleanupResult.ledger.lastError) && cleanupResult.ledger.queue.length === 1, "cleanup failure fails closed, remains visible, and preserves the queue entry");
+
+	const review = { actionable: true, recommendation: "proceed", reason: "insufficient-evidence", rationale: "Bounded rationale", pov: "Adopt a concrete capability", benefit: "Less manual work", costRisk: "Low, package-scoped risk" };
+	assert(parseExtensionReview(review).recommendation === "proceed", "accepts bounded finalist reviewer output");
+	for (const invalid of ["not json", { ...review, recommendation: "install" }, { ...review, extra: true }, { ...review, rationale: "x".repeat(1_001) }]) {
+		let rejected = false;
+		try { parseExtensionReview(invalid); } catch { rejected = true; }
+		assert(rejected, "rejects malformed, unknown, or over-limit finalist reviews");
+	}
+
+	const finalist = { ...candidate, name: "finalist" };
+	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: { finalist: { ...finalist, inspection: { ok: true, revision: sourceRevision, facts } } }, queue: [], currentRun: [], finalists: [finalist] });
+	let reviewFailed = false;
+	try { await reviewInspectedExtensions(cwd, { review: async () => "not json", decide: async () => null }); }
+	catch (error) { reviewFailed = /remains resumable/.test(error.message); }
+	assert(reviewFailed && readExtensionScoutLedger(cwd).finalists.length === 1, "malformed reviewer output fails visibly and leaves the finalist resumable");
+
+	let installed = 0;
+	let prompted = 0;
+	await reviewInspectedExtensions(cwd, {
+		now: "2026-03-01T00:00:00Z",
+		review: async () => review,
+		decide: async () => { prompted += 1; return { status: "proceed", reason: "insufficient-evidence", rationale: "Actor chose proceed", explicit: true }; },
+		install: async (name) => { installed += name === "finalist" ? 1 : 0; },
+	});
+	assert(prompted === 1 && installed === 1 && readExtensionScoutLedger(cwd).packages.finalist.decision.status === "proceed", "actionable finalist prompts once and explicit proceed gates installation");
+
+	const gated = { ...finalist, name: "install-gated" };
+	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: { [gated.name]: { ...gated, inspection: { ok: true, revision: sourceRevision, facts } } }, queue: [], currentRun: [], finalists: [gated] });
+	let gatedFailure = false;
+	try {
+		await reviewInspectedExtensions(cwd, { review: async () => review, decide: async () => ({ status: "proceed", reason: "insufficient-evidence", rationale: "not explicit" }), install: async () => { installed += 1; } });
+	} catch (error) { gatedFailure = /Explicit proceed/.test(error.message); }
+	assert(gatedFailure && installed === 1 && readExtensionScoutLedger(cwd).finalists.length === 1, "installation never runs without explicit proceed and the finalist stays resumable");
+
+	for (const [reason, expected] of Object.entries({ "out-of-scope": null, "weak-idea": 180, duplicate: 90, immature: 30, "bad-implementation": 30, unsafe: 180, "insufficient-evidence": 30 })) {
+		const item = { ...finalist, name: `reason-${reason}` };
+		writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: { [item.name]: { ...item, inspection: { ok: true, revision: sourceRevision, facts } } }, queue: [], currentRun: [], finalists: [item] });
+		const result = await reviewInspectedExtensions(cwd, {
+			now: "2026-03-01T00:00:00Z",
+			review: async () => ({ ...review, actionable: false, recommendation: "reject", reason }),
+			decide: async () => { throw new Error("non-actionable review must not prompt"); },
+		});
+		const decision = result.ledger.packages[item.name].decision;
+		assert(decision.reason === reason && decision.revisitAt === (expected === null ? null : new Date(Date.parse("2026-03-01T00:00:00Z") + expected * 86400000).toISOString()) && decision.updateRequired === EXTENSION_SCOUT_REVISIT_POLICY[reason].updateRequired, `${reason} enforces its exact permanent/window/update policy without prompting`);
+	}
+
+	const inaccessible = { ...candidate, name: "inaccessible-source" };
+	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: { [inaccessible.name]: inaccessible }, queue: [inaccessible], currentRun: [inaccessible], finalists: [] });
+	const inaccessibleResult = await inspectQueuedExtensions(cwd, { now: "2026-03-01T00:00:00Z", clone: async () => { throw new Error("forge unavailable"); }, inspect: async () => facts });
+	assert(inaccessibleResult.ledger.packages[inaccessible.name].decision.reason === "insufficient-evidence" && inaccessibleResult.ledger.queue.length === 0, "inaccessible source is durably classified as insufficient-evidence");
+
+	const overflowFinalists = Array.from({ length: 11 }, (_, index) => ({ ...finalist, name: `overflow-${index}` }));
+	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: Object.fromEntries(overflowFinalists.map((item) => [item.name, { ...item, inspection: { ok: true, revision: sourceRevision, facts } }])), queue: [], currentRun: [], finalists: overflowFinalists });
+	const reviewOptions = { review: async () => ({ ...review, actionable: false, recommendation: "reject", reason: "out-of-scope" }), decide: async () => null };
+	const firstFinalistBatch = await reviewInspectedExtensions(cwd, reviewOptions);
+	const secondFinalistBatch = await reviewInspectedExtensions(cwd, reviewOptions);
+	assert(firstFinalistBatch.reviewed.length === 10 && secondFinalistBatch.reviewed.length === 1 && secondFinalistBatch.ledger.finalists.length === 0, "durable finalist overflow continues on a later invocation");
 
 	const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 	const agentDir = path.join(cwd, "agent");
