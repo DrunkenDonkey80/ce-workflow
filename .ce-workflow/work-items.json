@@ -4642,7 +4642,8 @@
         "Atomic claim classified locally-owned and related-distinct from prior untracked hygiene fixes: NDJSON/JSONL are absent from recognized source extensions, so task-owned append-only evidence is rejected. Reusing this atomic report as the execution item; scope is scripts/work-hygiene.mjs plus its focused test.",
         "wo:review-scope [\"scripts/test-work-untracked-hygiene.mjs\",\"scripts/work-hygiene.mjs\"]",
         "wo:review PASS - .ndjson/.jsonl added to SOURCE_EXTS with lstat regular-file + 10MB bound; scripts/test-work-untracked-hygiene.mjs covers recognition, oversized escalation, idempotency; node scripts/test-work-untracked-hygiene.mjs -> PASS",
-        "wo:verify-check PASS\nCommand: node scripts/test-work-untracked-hygiene.mjs\nOutput: untracked hygiene: PASS"
+        "wo:verify-check PASS\nCommand: node scripts/test-work-untracked-hygiene.mjs\nOutput: untracked hygiene: PASS",
+        "Implemented and closed in commit 3f06d0e after focused test PASS and independent wo:review PASS."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -4680,7 +4681,8 @@
         "self-improvement"
       ],
       "notes": [
-        "Atomic claim classified duplicate/already-fixed by work-2.45 atom A: coded work-worker handoffs now inject the shell-quoted absolute helper path and exact work-summary command. Verified against this report's required outcome with node scripts/test-work-helper-handoffs.mjs and node scripts/test-work-start-finish.mjs (both PASS). Canonical coverage: work-2.45, commits 5899512/46ff9e0; the report arose from an older loaded package revision, not current source behavior."
+        "Atomic claim classified duplicate/already-fixed by work-2.45 atom A: coded work-worker handoffs now inject the shell-quoted absolute helper path and exact work-summary command. Verified against this report's required outcome with node scripts/test-work-helper-handoffs.mjs and node scripts/test-work-start-finish.mjs (both PASS). Canonical coverage: work-2.45, commits 5899512/46ff9e0; the report arose from an older loaded package revision, not current source behavior.",
+        "Snapshot reconciliation and verified duplicate coverage committed in 3f06d0e; canonical work-2.45 remains closed."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -6647,7 +6649,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T08:37:03.710Z"
+    "updatedAt": "2026-08-10T08:37:20.121Z"
   },
   "schemaVersion": 1
 }
