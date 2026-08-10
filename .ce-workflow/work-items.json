@@ -3578,6 +3578,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Before a coded mandatory exact-role launch acquires or claims mutable work, validate each configured model candidate against the active Pi model registry/authentication and select the first healthy candidate; if none is healthy, fail fast with deterministic actionable infrastructure evidence rather than waiting for needs-attention.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Preflight mandatory specialist model authentication"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3604,6 +3608,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Every generated specialist handoff and packaged role contract must use the resolved absolute work-helper.mjs path and explicitly require shell-safe quoting when invoking it, including Windows paths, so valid helper commands cannot be misparsed or fall back to target-local scripts.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make specialist helper commands absolute and shell-safe"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3629,6 +3637,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim for work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05. A goal must not clear while verification-purpose batches created during that goal remain queued/running, failed without resolution, or have findings awaiting triage. Reconciliation must use durable structured verifier artifacts; internal early progress/completion wake text is not completion evidence.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Gate goal completion on verifier reconciliation"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3654,6 +3666,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical upstream-owned claim for work-2.report-ec289716-ad4f-4177-919a-47e4ed6b750e. pi-subagents uses the host/provider tool call id directly as workflowRunId and as a DIRS.async path component; composite ids containing Windows-reserved characters such as | fail before launch.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Sanitize async workflow run IDs before path construction"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3681,6 +3697,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim for reports work-2.report-5473fb2f-3d8d-4924-abd7-adf171408021 and work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169: closed items can inherit attention from unmatched pending-direct records whose status remains paused/needs_attention; historical blocked/debug labels must not make closed items actionable.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Ignore stale runtime attention for closed work items"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3706,6 +3726,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim for work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8: planner-created acceptance required a Playwright trace archive although the configured BetterWright browser intentionally removes context.tracing and exposes no trace-zip helper, making the evidence gate impossible after a UI defect.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Require supported browser evidence in planner acceptance"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3731,6 +3755,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical claim shared by reports work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98 and work-2.report-4ca95de9-d319-413b-a538-af6b8ef98c6f: raw provider tool-call IDs containing Windows-invalid characters were used as async path components. Ownership is upstream pi-subagents issue #407; fixed in 0.44.0.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Track upstream Windows async directory ID sanitation"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3761,6 +3789,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "A live F7 Brainstorm submission reached ordinary chat when the visible marker was edited from 'prompt' to 'promt', so coded brainstorm state, creative depth, and advisor review never ran. The subsequently helper-created roadmap did not become current, leaving F7 Resume focused on stale closed work-4. Existing bead-* model overrides are also ignored by current work-* advisor slots, preventing the configured multi-model critic from running.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Repair brainstorm routing and legacy model settings"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3881,6 +3913,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: For evidence-only work-3.40, the coded finish helper accepted Markdown/JSON artifacts but rejected all eight acceptance-required PNG screenshots as unrecognized untracked files. The parent had to use `git add -N` on each PNG before the helper could finish.\nExpected: finish-task should provide a coded declaration for intentional evidence artifacts, or recognize bounded image files under a task-owned docs/evidence path while retaining hygiene checks for unrelated binaries.\nImpact: Valid hardware/browser evidence could not be committed and closed through the normal deterministic path without a manual Git index workaround, risking omitted proof and confusing finalization.\nSuggested improvement: Accept a bounded evidence manifest or task-owned docs/evidence image rule, validate extension/count/size, then stage those files inside finish-task.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Allow bounded image evidence in the finish helper"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/20461766-38a8-4e2f-8659-00a99c1a3e39",
@@ -3925,6 +3961,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: Launching the exact required async work-planner via pi-subagents fails before startup on Windows because the generated async-run directory name contains a literal pipe character. Supplying a safe sessionDir does not change the failing default async-run path. Two consecutive exact-role launches failed.\nExpected: Async specialist launches should sanitize host-generated run/call identifiers for Windows path rules, or honor sessionDir without first creating a default directory containing invalid characters.\nImpact: The mandated work-planner/work-worker routing cannot start, so autonomous roadmap execution is blocked before any planned implementation slice can be created.\nSuggested improvement: Replace Windows-invalid path characters in async run directory components with `-` before mkdir, and add a Windows regression test for tool-call IDs containing `|fc_...`.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Fix Windows async launch paths containing pipe characters"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/9f3e7f93-f8cf-4d45-8221-fc731097d3f5",
@@ -3964,6 +4004,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: A native work-item acceptance required a Playwright trace archive when a browser failure occurred. BetterWright exposed a guarded `context` global but `context.tracing` was undefined; attempting `context.tracing.start(...)` failed. Automatic failure artifacts contained screenshots only and no trace/zip. This made the literal evidence gate impossible after a product overflow defect was found and fixed.\nExpected: BetterWright should either automatically retain a trace archive for failed browser calls/journeys or expose a supported trace start/stop helper/API, and the work evidence policy should distinguish product failures from harness scripting errors.\nImpact: The product journey and all other evidence passed, but the workflow cannot truthfully satisfy its explicit trace-on-failure artifact requirement despite rerunning the fixed journey successfully.\nSuggested improvement: Add a BetterWright `trace.start()`/`trace.stop()` helper or auto-attach `trace.zip` on browser tool errors; have planning acceptance request a trace only when the configured browser provider supports it.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Avoid unsupported browser trace requirements"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/84b1edc9-9e0a-4d3e-ba7e-a64ed809fb20",
@@ -4009,6 +4053,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: Two consecutive async pi-subagents review launches failed before child startup because the raw tool call id, containing `|fc_...`, was used as a Windows directory name under async-subagent-runs. The attached local evidence contains both failures.\nExpected: pi-subagents must sanitize every call-derived async run directory component for Windows before mkdir, then launch the child normally without retries or manual session-file revival.\nImpact: Fresh-context review cannot launch reliably on Windows, wasting turns and causing autonomous workflows to retry, time out, and manually recover child session files.\nSuggested improvement: Normalize or hash toolCallId before joining it into async run paths; add a Windows regression using an OpenAI Codex id shaped like `call_x|fc_y`.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Sanitize async review run directories on Windows"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/080af665-c515-45df-b511-e307c45da8bb",
@@ -4100,6 +4148,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: Three consecutive required async work-worker launches failed before child creation because pi-subagents attempted to mkdir an async run directory whose leaf name concatenated tool call IDs with a literal `|`, which is illegal in Windows paths.\nExpected: Async runs should sanitize or hash invocation identifiers before using them as Windows directory names, so the configured work-worker starts detached.\nImpact: The autonomous work-3.24 evidence slice cannot currently be routed through the mandated work-worker; each retry deterministically creates no child.\nSuggested improvement: Replace Windows-reserved path characters in async run leaf names or derive a filesystem-safe stable hash.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prevent invalid Windows paths in worker launches"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/b1bf4c0a-19b2-4589-b383-3335fb881c61",
@@ -4139,6 +4191,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: A closed roadmap was shown as complete (12/12) but still reported two items needing attention. In the native store, the two closed descendants work-1.16 and work-1.17 retain attention-oriented labels (`blocked`, `debug`, and `wo:debug`) even though both have terminal review/verification evidence and work-1 is closed.\nExpected: Closing a work item should clear transient blocking/debug attention state, or roadmap/status projection should ignore transient attention labels for closed items while retaining historical notes/evidence.\nImpact: Operators receive a contradictory completion signal and may believe a closed roadmap still requires action; completion verification based only on status can miss the stale attention presentation.\nSuggested improvement: Normalize transient `blocked`/`debug` labels during coded close, or exclude them from attention aggregation when status is `closed`; keep debug provenance in notes or a non-attention historical label.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Hide historical attention labels on closed roadmaps"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/b1c80250-2804-4a8a-931b-0cb025b75ed7",
@@ -4233,6 +4289,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: An async ce-workflow reviewer run rendered pi-subagents' widget with a 137-column output-path row in a 135-column terminal, causing Pi v0.84.1 to terminate with an uncaughtException. The installed pi-subagents was 0.42.0; upstream 0.42.1 contains the exact paddedWidgetLine width fix.\nExpected: ce-workflow should prevent known-incompatible orchestration dependency versions from running (or clearly warn/update before launch), so an async reviewer cannot crash the parent Pi TUI.\nImpact: The parent Pi session exits during review, interrupting active workflow work and risking repeated crashes whenever async output paths are long. A local package hotfix works, but it is overwritten by package reinstall/update.\nSuggested improvement: Add a lightweight startup/runtime compatibility check requiring pi-subagents >=0.42.1 for async TUI workflows, with a concise update instruction; avoid duplicating pi-subagents rendering code.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Require a safe async widget dependency version"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/07635bf8-4490-4bc7-91c8-c19fe0c5efaa",
@@ -4279,6 +4339,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The native roadmap epic work-2 became status=closed after closing the then-last executable child (work-2.19), even though the authoritative roadmap still had unsliced U6-U11. Subsequent planners created ready work-2.21 and work-2.22 under the already-closed parent; work-ready-summary still exposes them.\nExpected: finish-task should not auto-close a roadmap/epic merely because all currently created children are closed. Roadmap closure should require an explicit completion marker/command or verified coverage of the source roadmap; alternatively planners must be able to reopen the parent atomically before adding remaining slices.\nImpact: The store reports the target roadmap complete while substantial required units remain, which can cause premature autonomous-goal completion, confusing status output, and children executing beneath a closed parent.\nSuggested improvement: Add an explicit epic/roadmap completion gate (for example wo:roadmap-complete or finish-roadmap) and prevent child finish from cascading closure for roadmap types without that gate.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prevent premature roadmap epic closure"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/4aee412b-6687-4ff5-a4e5-382ea640f633",
@@ -4327,6 +4391,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The roadmap projection for closed work-1 returns `aggregateStatus: needs_attention`, progress 12/12, with work-1.6 and work-1.11 marked attention. Both have unmatched `pending` records in `.pi/work-runs/direct/pending-direct.jsonl`. Their child metadata is terminal/rejected, while referenced runtime status remained stale-paused; later review, verification, commit, and work-item closure all succeeded. Pending-direct reconciliation therefore leaves historical runtime attention attached to closed items.\nExpected: Pending-direct reconciliation should terminalize ended child runs and append completion events, or closed work items should not inherit stale historical runtime attention.\nImpact: A fully closed 12/12 roadmap is falsely displayed as needing attention on two dead, non-actionable historical runs.\nSuggested improvement: Reconcile terminal child metadata/process evidence even when a stale status field says paused; add a regression fixture for unmatched pending events on closed items and ensure roadmap projection does not emit Needs attention.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Ignore stale pending runs for closed roadmap items"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/fa873123-e0dc-4032-b071-beaef55e3c2e",
@@ -4382,6 +4450,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The first work-worker launch for work-3.41 immediately returned BLOCKED without reading or editing because the handoff did not repeat the absolute work-helper path, even though the target project and work item were explicit. A retry with `C:/soft/ce-workflow/scripts/work-helper.mjs` succeeded.\nExpected: Coded resume/worker handoffs should always inject the resolved absolute work-helper path and required initial claim/summary commands, so a bounded worker cannot fail solely because the parent omitted boilerplate.\nImpact: The implementation lane wasted a subagent launch and required a manual retry for no project-level reason, increasing latency and usage while leaving the task untouched.\nSuggested improvement: Have the coded handoff builder append the resolved helper path and canonical work-claim/work-summary commands to every work-worker task.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Include absolute helper commands in worker handoffs"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/a079b16b-8b39-4394-9eae-a47214e87574",
@@ -4419,6 +4491,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: A verification batch for the previous catch-up checkpoint e1bb133 was created after the next autonomous goal had started. work_goal_complete gates every verification batch by createdAt >= goal.startedAt, so the prior goal's failed/orphaned batch permanently blocks the unrelated current snapshot even after four later clean commits and repeated package verification.\nExpected: Goal completion should exclude a verifier batch whose checkpoint is the active goal's baseline HEAD (or otherwise retain logical goal ownership), while still blocking failed verification of changes produced by the active goal.\nImpact: A fully closed, clean, verified self-improvement snapshot cannot call work_goal_complete; repeated commits and tests do not clear the stale failure because verifierCompletionBlocker considers any failed job since the timestamp.\nSuggested improvement: Persist baselineHead when a goal starts, pass it to verifierCompletionBlocker, and ignore verification batches whose checkpoint snapshot equals that baseline. For older persisted goals, derive baseline HEAD from Git at goal.startedAt.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Exclude baseline verifier batches from new goals"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/00bb829c-3fe1-4f34-abff-4b347bb57afa",
@@ -4514,6 +4590,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: Required async specialist launches in project autopilot repeatedly fail before start with ENOENT because the async-run directory name includes a Windows-invalid `|` copied from the tool call ID; the bounded log contains nine concrete failures including the latest planner launch.\nExpected: Sanitize generated async run directory names for Windows, or use only the stable run ID, so required async specialist launches start normally without a foreground-timeout-and-resume workaround.\nImpact: Every required specialist boundary incurs a failed launch and manual workaround, adding latency/noise and risking coded project-autopilot liveness on Windows.\nSuggested improvement: Sanitize `|` and all Windows-invalid characters from provider call IDs before joining asyncDir, or key async directories solely by retained child run ID.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Use portable IDs for Windows async run directories"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/995b24e6-1744-474d-bca7-2cd38db322ec",
@@ -4554,6 +4634,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: work_goal_complete succeeded while configured work-background-verifier jobs for commit 4514126 were still active. One verifier later captured structured findings, but the goal was already cleared (`work-goal-state goal:null`), `work_verifier_inbox` returned empty, and the user-facing completion projection showed only \"I'll start by listing the checkpoint scope\"/blank, making the verifier appear aborted.\nExpected: Goal completion should either wait for checkpoint verifiers that are required for the goal, explicitly cancel them with a visible reason, or durably queue late findings for triage; the completion notification should surface the verifier's final structured outcome rather than an early progress line.\nImpact: Independent verifier results can miss reconciliation after a goal closes, while users see misleading aborted/empty notifications and may believe verification never ran.\nSuggested improvement: Gate work_goal_complete on active verifier providers and ensure structured verifier output is delivered or queued before clearing goal state.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Wait for background verifiers before completing goals"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/1cd61e32-0fc7-4ffb-a8a4-dc87e943c992",
@@ -4640,6 +4724,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The coded finish helper rejected four task-owned sanitized NDJSON evidence files as unrecognized untracked files, even though NDJSON is the natural required format for chronological event/server logs and all other evidence files were accepted.\nExpected: finish-task should recognize task-owned .ndjson (and ideally .jsonl) evidence as deterministic text artifacts, validate they are regular bounded files, and include them in scope like JSON/CSV/Markdown.\nImpact: A verified hardware evidence slice cannot pass the coded commit/close gate without renaming or structurally converting truthful append-only logs solely to satisfy extension classification.\nSuggested improvement: Add .ndjson/.jsonl to tidyUntrackedFiles recognized text/evidence extensions and optionally parse each non-empty line as JSON during finish.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Recognize line-delimited JSON evidence files"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/7a8bb1fc-e88b-482f-a527-d3f29d05d731",
@@ -4685,6 +4773,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The required work-worker refused an otherwise complete work-3.48 handoff because the parent prompt did not include the exact absolute work-helper.mjs path or a precomputed compact work summary, even though the target repo and exact work item were supplied and the target store existed.\nExpected: Coded resume/kickoff should include the resolved helper path and compact work-item summary automatically in the worker handoff, or the worker should be able to use a deterministic documented helper lookup without guessing.\nImpact: The authorized physical-device recording window was wasted; no hardware threshold was exercised, and autonomous progress stopped on avoidable handoff metadata rather than project behavior.\nSuggested improvement: Have resume handoff generation inject C:\\soft\\ce-workflow\\scripts\\work-helper.mjs and the output of work-summary for the claimed item.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Inject helper paths and summaries into worker handoffs"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/0138ca72-92ad-416f-9f87-825ad13dfe1f",
@@ -4724,6 +4816,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: An async pi-subagents workflow failed before launch because its generated Windows async-run directory embedded the provider call id `call_...|fc_...`; `|` is illegal in a Windows path, so mkdir returned ENOENT.\nExpected: pi-subagents should sanitize every provider/tool call identifier before using it as a directory component, while retaining the original identifier only as metadata.\nImpact: Async plan/review orchestration could not start and had to be retried in the foreground; the fallback then timed out after 20 minutes with one advisor stopped, increasing latency and losing one review result.\nSuggested improvement: Apply the existing safe path-part normalization (or replace Windows-reserved characters `[<>:\"/\\\\|?*]`) to async call IDs before joining the run directory path, and add a Windows fixture containing `|fc_`.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Sanitize provider call IDs used in async paths"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/04c132a3-68d7-48ed-8154-8ab5f7115f3e",
@@ -4762,6 +4858,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: Three direct async specialist launches for work-planner failed before startup on Windows with ENOENT while trying to mkdir an async-run directory whose basename was the raw tool call ID containing `|` (for example `call_...|fc_...`). The same work-planner workflow succeeded only after routing it through a one-shot project schedule, which generated a filesystem-safe UUID async ID.\nExpected: Direct async subagent workflows should sanitize externally supplied/tool call identifiers before using them as Windows path components and launch the configured specialist normally.\nImpact: The coded autonomous loop cannot use its required direct async specialist path on Windows; it needs an unnecessary schedule create/run/delete workaround and repeated failed launches.\nSuggested improvement: Generate a UUID/internal safe run directory name or replace Windows-invalid characters (`|`, etc.) before mkdir; add a Windows regression test for OpenAI Responses-style call IDs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make direct async specialist paths safe on Windows"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/a23319df-8fa7-4136-b98a-e8ceec882dfe",
@@ -6685,12 +6785,77 @@
         "wo:self-improvement"
       ],
       "notes": [
-        "Confirmed discovery policy: guided full pipeline; retrieve source only after description screening indicates plausible value; cap quarantined source inspections at 10 per invocation and persist overflow. Default reconsideration policy: out-of-scope permanent; weak-idea 180 days plus a package update; duplicate 90 days plus an update; immature 30 days plus an update; bad-implementation 30 days plus an update; unsafe 180 days plus an update; insufficient-evidence 30 days. The catalog currently distinguishes extension packages from the larger all-package count. Prefer repository inspection over npm tarball extraction for v1; inaccessible source is insufficient evidence, never trust."
+        "Confirmed discovery policy: guided full pipeline; retrieve source only after description screening indicates plausible value; cap quarantined source inspections at 10 per invocation and persist overflow. Default reconsideration policy: out-of-scope permanent; weak-idea 180 days plus a package update; duplicate 90 days plus an update; immature 30 days plus an update; bad-implementation 30 days plus an update; unsafe 180 days plus an update; insufficient-evidence 30 days. The catalog currently distinguishes extension packages from the larger all-package count. Prefer repository inspection over npm tarball extraction for v1; inaccessible source is insufficient evidence, never trust.",
+        "Planning completed: three vertical executable slices created. work-6.1 owns gated discovery, cursor, metadata screening, and durable ranked queue; work-6.2 owns safe quarantined source inspection and bounded Luna facts; work-6.3 owns Sol/GLM POV review, guided decisions, explicit installation gating, revisit policy, and final package verification. Dependencies are work-6.2 blocked by work-6.1 and work-6.3 blocked by work-6.2. No separate wo:planning child was created because this roadmap itself is the authoritative wo:planning intake; creating a disposable duplicate would add no durable scope. Keep roadmap open until all children close."
       ],
       "status": "open",
       "title": "Scout Pi extensions for ce-workflow improvements",
       "type": "epic",
       "updatedAt": "2026-08-10T11:23:19.389Z"
+    },
+    "work-6.1": {
+      "acceptance": "Before this change the scout command and collector fixtures do not exist. After it: (1) /work-extension-scout is unavailable unless workResume.selfImproving is true; (2) fixtures prove extraction of package name, description, publish/update timestamp, npm URL, and repository URL from recent-sorted pi.dev HTML; (3) the first successful scan covers 30 days and later successful scans start at the saved cursor; parser/catalog/model failures are visible and do not advance that cursor; (4) Luna screening treats metadata as untrusted data and only plausible descriptions enter the ranked source queue; (5) no more than 10 candidates are selected for the current run while overflow remains durably ordered and deduplicated; (6) ledger writes are atomic and preserve every seen package. Verify: node scripts/test-work-extension-scout.mjs",
+      "createdAt": "2026-08-10T12:19:36.710Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Add the self-improving-only /work-extension-scout entry point and the collection/scheduling half of the pipeline: parse pi.dev recent-extension pages, normalize package metadata, batch-screen descriptions as untrusted data, and atomically persist a 30-day initial cursor plus ranked source-inspection queue with durable overflow.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-6.1",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan Covers roadmap criteria 1-5 and collection/queue portions of 9-10. Reuse workResumeSettings, command dispatch, model selection, and atomic local-state patterns in extensions/work-models.js; extract extensions/work-extension-scout.js only if smaller than extending the monolith. Expected files: extensions/work-models.js, optional extensions/work-extension-scout.js, scripts/test-work-extension-scout.mjs. Deterministic fixtures only; no live network acceptance dependency. Verify exactly: node scripts/test-work-extension-scout.mjs. Source retrieval is deliberately owned by work-6.2.",
+        "wo:verify-check\nplan-match: implemented only gated discovery, recent catalog parsing, untrusted Luna metadata screening, cursor, atomic ledger, ranked queue/current-run cap; no source retrieval.\nacceptance-coverage: criteria 1-6 covered by deterministic fixtures including metadata extraction, 30-day/later cursor, visible failure cursor safety, seen-package preservation, deduped 10+overflow queue.\ncommand/proof: node scripts/test-work-extension-scout.mjs — PASS (11 assertions; final: work extension scout fixtures passed).\ngaps: live pi.dev catalog and live Luna were intentionally not acceptance dependencies.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-extension-scout.mjs\nOutput: rves every seen package and ordered queue\nok - later scan starts at cursor and deduplicates durable queue\nok - model failure is visible, preserves seen metadata, and does not advance cursor\nok - catalog/parser failure is visible and leaves cursor unchanged\nok - catalog/parser failure is visible and leaves cursor unchanged\nok - screening ledger contains decisions, not executable metadata instructions\nok - command is unavailable unless self-improving is enabled\nwork extension scout fixtures passed"
+      ],
+      "parentId": "work-6",
+      "status": "closed",
+      "title": "Discover, screen, and queue recent Pi extensions",
+      "type": "task",
+      "updatedAt": "2026-08-10T12:32:13.279Z"
+    },
+    "work-6.2": {
+      "acceptance": "Before this change a queued extension cannot be safely inspected. After it: (1) only candidates emitted by description screening are cloned; (2) each clone is shallow, has submodules disabled, receives no package install and runs no package scripts/build/tests/source, and cannot access workflow credentials; (3) path containment, symlink escape, and cleanup failures fail closed and remain visible; (4) at most the 10 candidates selected by the prior slice are inspected and each inspected source revision is recorded; (5) malformed or over-limit Luna output is rejected without losing or completing the queue entry; (6) deterministic fixtures demonstrate allowed-file reading, traversal/symlink rejection, disabled execution, bounded fact extraction, cleanup, and resumable failure. Verify: node scripts/test-work-extension-scout.mjs",
+      "createdAt": "2026-08-10T12:19:50.282Z",
+      "dependencies": [
+        "work-6.1"
+      ],
+      "dependencyEdges": [],
+      "description": "Consume up to 10 queued candidates per run and inspect promising repositories without executing their code: shallow-clone without submodules into a disposable read-only quarantine, enforce containment and symlink safety, then have Luna emit bounded evidence-backed capability, quality, maintenance, dependency, security, overlap, and install-versus-borrow facts.",
+      "evidence": [],
+      "id": "work-6.2",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan Covers criteria 4-7 and quarantine/source-inspection portions of 9-10. Reuse containment/confined-read patterns from extensions/work-compound-source.js; do not add a second generic sandbox abstraction. Expected files: extensions/work-extension-scout.js, scripts/test-work-extension-scout.mjs, and extensions/work-models.js only for invocation wiring. Verify exactly: node scripts/test-work-extension-scout.mjs. Prompting and installation are deliberately owned by work-6.3."
+      ],
+      "parentId": "work-6",
+      "status": "open",
+      "title": "Inspect queued extensions in a source quarantine",
+      "type": "task",
+      "updatedAt": "2026-08-10T12:20:40.701Z"
+    },
+    "work-6.3": {
+      "acceptance": "Before this change inspected facts cannot become governed actor decisions or scheduled revisits. After it: (1) one configured Sol-or-GLM reviewer applies the existing private POV playbook to bounded Luna facts; invalid reviewer output fails visibly and leaves the candidate resumable; (2) only actionable finalists prompt the actor to proceed with the recommendation, defer, or reject, and no package installation occurs without an explicit proceed choice; (3) the atomic .pi ledger records every seen package, queue state, review time, source revision, enum reason, rationale, and revisit date; (4) out-of-scope is permanent, while weak-idea=180d+update, duplicate=90d+update, immature=30d+update, bad-implementation=30d+update, unsafe=180d+update, and insufficient-evidence=30d are enforced before requeue; inaccessible source is insufficient-evidence; (5) fixtures prove decision prompting, malformed reviewer output, each expiry/update rule, permanent rejection, explicit-install gating, and later processing of prior overflow; (6) package verification passes. Verify: node scripts/test-work-extension-scout.mjs && npm run verify:quiet",
+      "createdAt": "2026-08-10T12:20:09.423Z",
+      "dependencies": [
+        "work-6.2"
+      ],
+      "dependencyEdges": [],
+      "description": "Complete the guided scout flow: send evidence-backed finalists to one configured Sol-or-GLM reviewer using the existing private POV playbook, prompt only actionable finalists for proceed/defer/reject, keep installation explicit, and enforce durable rejection/revisit policy from the atomic extension ledger.",
+      "evidence": [],
+      "id": "work-6.3",
+      "labels": [],
+      "notes": [
+        "wo:slice-plan Covers criteria 7-10 and final integration. Reuse privateCatchUpCandidatePlaybooks and the existing ask_user guided-decision pattern rather than duplicating /work-catch-up. Expected files: extensions/work-extension-scout.js, extensions/work-models.js, scripts/test-work-extension-scout.mjs, and README.md only if command discoverability conventions require it. Verify exactly: node scripts/test-work-extension-scout.mjs; then npm run verify:quiet."
+      ],
+      "parentId": "work-6",
+      "status": "open",
+      "title": "Review finalists and enforce durable revisit decisions",
+      "type": "task",
+      "updatedAt": "2026-08-10T12:20:40.778Z"
     }
   },
   "metadata": {
@@ -6700,7 +6865,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T12:12:45.300Z"
+    "updatedAt": "2026-08-10T12:32:13.279Z"
   },
   "schemaVersion": 1
 }
