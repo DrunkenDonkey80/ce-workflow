@@ -4284,6 +4284,45 @@ function hasSlicePlan(issue) {
 	);
 }
 
+function slicePlanAdvisorAgents(cwd) {
+	const settings = readEffectiveSettings(cwd);
+	return configuredAdvisorSlots(
+		settings,
+		workOrchSettings(cwd, settings).advisorUsageForSlicePlans,
+	).map((slot) => slot.agents[0]);
+}
+
+function hasSlicePlanAdvisorPass(issue, agents) {
+	return (
+		issue.sliceAdvisorGate?.verdict === "PASS" &&
+		issue.sliceAdvisorGate.agents.join(",") === agents.join(",")
+	);
+}
+
+function slicePlanAdvisorGateState(cwd, state, issue) {
+	const agents = slicePlanAdvisorAgents(cwd);
+	if (!agents.length || hasSlicePlanAdvisorPass(issue, agents)) return null;
+	const marker = `wo:slice-advisor PASS agents=${agents.join(",")}`;
+	return withHandoffPrompt(
+		{
+			...state,
+			action: "advisor-gate-pending",
+			selectedWorkItem: issue,
+			message: `Configured slice-plan advisor challenge is pending: ${agents.join(", ")}.`,
+			handoffExtra: [
+				advisorCriticStep(
+					cwd,
+					`slice plan for WorkItem ${issue.id}`,
+					workOrchSettings(cwd).advisorUsageForSlicePlans,
+				),
+				`Do not claim or implement this WorkItem yet. After every configured advisor returns CLEAN and any grounded plan fixes are applied, append the exact durable note with node ${JSON.stringify(WORK_HELPER_SCRIPT)} work-note ${issue.id} ${JSON.stringify(marker)}. If concerns remain, persist them with work-note and stop without the PASS marker. Resume only after the exact marker is present.`,
+			],
+			suggestedCommands: [],
+		},
+		cwd,
+	);
+}
+
 function issueRefText(issue) {
 	const summary = issueRef(issue);
 	return (
@@ -4321,20 +4360,17 @@ function applyInlineSlicePlan(cwd, state, issue) {
 			labels: [...new Set([...labelsOf(issue), "wo:slice-planned"])],
 			notes: `${notesOf(issue)}\n${plan}`,
 		};
-		const advisorStep = advisorCriticStep(
-			cwd,
-			`slice plan note on WorkItem ${idOf(issue)}`,
-			workOrchSettings(cwd).advisorUsageForSlicePlans,
-		);
+		const plannedSummary = issueSummary(planned);
+		const advisorGate = slicePlanAdvisorGateState(cwd, state, plannedSummary);
+		if (advisorGate) return advisorGate;
 		return withHandoffPrompt(
 			withImplementationPolicy(
 				{
 					...state,
 					action: "run-implementation",
-					selectedWorkItem: issueSummary(planned),
+					selectedWorkItem: plannedSummary,
 					message:
 						"Added coded slice-plan note and continued directly to implementation; no planner boundary needed.",
-					handoffExtra: advisorStep ? [advisorStep] : [],
 				},
 				cwd,
 			),
@@ -4421,11 +4457,9 @@ function cePlanSliceStep(
 		scopeLine,
 		`Follow the verified private playbook in the control session to produce a compact plan doc at docs/plans/YYYY-MM-DD-NNN-slice-${safeArtifactPart(idOf(issue))}-plan.md with a single Implementation Unit (Goal, Files, Approach, Test scenarios, Verification). ${depthLine}`,
 		`Then append a WorkItem note headed \`wo:slice-plan\` containing \`plan-path: <repo-relative plan doc path>\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the WorkItem title.`,
-		advisorCriticStep(
-			cwd,
-			`slice plan for WorkItem ${idOf(issue)}`,
-			advisorUsage,
-		),
+		advisorUsage !== "none"
+			? "Do not launch advisors from work-planner. The next coded resume boundary durably blocks implementation until the configured slice-plan advisor gate passes."
+			: "",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -6950,6 +6984,17 @@ function issueSummary(issue) {
 		const slicePlanAt = notes.lastIndexOf("wo:slice-plan");
 		if (slicePlanAt >= 0)
 			summary.slicePlan = notes.slice(slicePlanAt, slicePlanAt + 1600);
+		const advisorGates = [
+			...notes.matchAll(
+				/^wo:slice-advisor\s+(PASS|CONCERNS)\s+agents=([^\r\n]+)$/gim,
+			),
+		];
+		const advisorGate = advisorGates.at(-1);
+		if (advisorGate)
+			summary.sliceAdvisorGate = {
+				verdict: advisorGate[1].toUpperCase(),
+				agents: advisorGate[2].split(",").filter(Boolean),
+			};
 		summary.verificationReady = hasVerificationEvidence(issue);
 		summary.reviewPassed = hasReviewPass(issue);
 		summary.reviewFailed = hasReviewFail(issue);
@@ -8177,6 +8222,12 @@ function planResumeAction(state, cwd, options = {}) {
 			if (!options.readOnlyPlanning)
 				return applyInlineSlicePlan(cwd, state, implementation);
 		}
+		const advisorGate = slicePlanAdvisorGateState(
+			cwd,
+			state,
+			implementation,
+		);
+		if (advisorGate) return advisorGate;
 		return withHandoffPrompt(
 			withImplementationPolicy(
 				{
@@ -20032,16 +20083,19 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		);
 		const codedLaunch = Boolean(launchHandoff && rpcAvailable);
 		if (!codedLaunch) {
-			if (finishEntry) {
-				const entryNote = prepared.finished
-					? "The coded finish boundary completed. Inspect the current native target state and finish the autonomous goal if its requested scope is closed."
-					: `The coded finish gate now requires ${launchState.action}. Continue from that authoritative state.`;
+			const entryNote = launchState.handoffPrompt
+				? launchState.handoffPrompt
+				: finishEntry
+					? prepared.finished
+						? "The coded finish boundary completed. Inspect the current native target state and finish the autonomous goal if its requested scope is closed."
+						: `The coded finish gate now requires ${launchState.action}. Continue from that authoritative state.`
+					: "";
+			if (entryNote)
 				await sendWorkGoalPrompt(
 					pi,
 					ctx,
 					`${buildWorkGoalKickoffPrompt(goal)}\n\n${entryNote}`,
 				);
-			}
 			return {
 				...launchState,
 				autonomousGoalId: goal.id,

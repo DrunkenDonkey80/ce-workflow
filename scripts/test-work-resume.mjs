@@ -503,6 +503,11 @@ const oldEnv = {
 };
 process.env.PI_CODING_AGENT_DIR = globalDir;
 process.env.WORK_ORCH_GIT_BIN = path.join(bin, "fake-git.mjs");
+mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+writeFileSync(
+	path.join(cwd, ".pi", "settings.json"),
+	JSON.stringify({ workOrchestrator: { profile: "low" } }),
+);
 function sourcesForScenario(scenario = "default") {
 	const closed = epics.find((epic) => epic.id === "E-C");
 	if (
@@ -645,6 +650,73 @@ try {
 		),
 		"implementation handoff points to the slice plan, not the workItem alone",
 	);
+
+	const advisorCwd = mkdtempSync(path.join(tmpdir(), "work-resume-advisor-"));
+	try {
+		mkdirSync(path.join(advisorCwd, ".pi"), { recursive: true });
+		writeFileSync(
+			path.join(advisorCwd, ".pi", "settings.json"),
+			JSON.stringify({ workOrchestrator: { profile: "medium" } }),
+		);
+		seedNativeStore(advisorCwd, sourcesForScenario("plannedIdea"));
+		let advisorState = buildWorkResumeState(advisorCwd, "E-1");
+		assert(
+			advisorState.action === "advisor-gate-pending" &&
+				directRoleHandoffParams(advisorState, advisorCwd) === null,
+			"a planner-created slice stops at the coded advisor gate before its worker",
+		);
+		assert(
+			advisorState.handoffPrompt.includes("work-advisor") &&
+				advisorState.handoffPrompt.includes(
+					"wo:slice-advisor PASS agents=work-advisor",
+				),
+			"medium profile exposes the first configured advisor and exact durable PASS marker",
+		);
+
+		seedNativeStore(
+			advisorCwd,
+			sourcesForScenario("plannedIdea").map((item) =>
+				item.id === "IMP-1"
+					? {
+							...item,
+							notes: "wo:slice-advisor PASS agents=work-advisor",
+						}
+					: item,
+			),
+		);
+		advisorState = buildWorkResumeState(advisorCwd, "E-1");
+		assert(
+			advisorState.action === "run-implementation" &&
+				directRoleHandoffParams(advisorState, advisorCwd)?.agent ===
+					"work-worker",
+			"the exact durable advisor PASS releases implementation",
+		);
+
+		writeFileSync(
+			path.join(advisorCwd, ".pi", "settings.json"),
+			JSON.stringify({
+				workOrchestrator: {
+					profile: "high",
+					advisorEnabled: {
+						advisor: true,
+						advisor2: true,
+						advisor3: true,
+					},
+				},
+			}),
+		);
+		seedNativeStore(advisorCwd, sourcesForScenario("plannedIdea"));
+		advisorState = buildWorkResumeState(advisorCwd, "E-1");
+		assert(
+			advisorState.action === "advisor-gate-pending" &&
+				advisorState.handoffPrompt.includes(
+					"wo:slice-advisor PASS agents=work-advisor,work-advisor-2,work-advisor-3",
+				),
+			"high profile keeps all configured advisors pending before implementation",
+		);
+	} finally {
+		rmSync(advisorCwd, { recursive: true, force: true });
+	}
 
 	setScenario("planning");
 	state = buildWorkResumeState(cwd, "E-1");
@@ -1112,7 +1184,7 @@ try {
 		"blocked resume output includes blocker next action",
 	);
 
-	// Every profile keeps coded slice planning but routes implementation to work-worker.
+	// Profiles keep coded slice planning, then enforce their configured advisor policy.
 	setScenario("implementation");
 	for (const profile of ["low", "medium", "high"]) {
 		const profileCwd = mkdtempSync(path.join(tmpdir(), "work-resume-agent-"));
@@ -1126,10 +1198,13 @@ try {
 		seedNativeStore(profileCwd, sourcesForScenario("implementation"));
 		const profileState = buildWorkResumeState(profileCwd, "E-1");
 		assert(
-			profileState.action === "run-implementation" &&
-				directRoleHandoffParams(profileState, profileCwd)?.agent ===
-					"work-worker",
-			`${profile} routes implementation to work-worker despite legacy inline config`,
+			profile === "low"
+				? profileState.action === "run-implementation" &&
+					directRoleHandoffParams(profileState, profileCwd)?.agent ===
+						"work-worker"
+				: profileState.action === "advisor-gate-pending" &&
+					directRoleHandoffParams(profileState, profileCwd) === null,
+			`${profile} enforces its configured slice-plan advisor policy`,
 		);
 		rmSync(profileCwd, { recursive: true, force: true });
 	}
@@ -1143,9 +1218,9 @@ try {
 	seedNativeStore(maxCwd, sourcesForScenario("implementation"));
 	const maxState = buildWorkResumeState(maxCwd, "E-1");
 	assert(
-		maxState.action === "run-implementation" &&
-			directRoleHandoffParams(maxState, maxCwd)?.agent === "work-worker",
-		"max skips a planner boundary but still uses work-worker",
+		maxState.action === "advisor-gate-pending" &&
+			directRoleHandoffParams(maxState, maxCwd) === null,
+		"max stops at its configured advisor gate before work-worker",
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
 
@@ -1189,6 +1264,11 @@ try {
 	rmSync(miscCwd, { recursive: true, force: true });
 
 	const triageCwd = mkdtempSync(path.join(tmpdir(), "work-resume-triage-"));
+	mkdirSync(path.join(triageCwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(triageCwd, ".pi", "settings.json"),
+		JSON.stringify({ workOrchestrator: { profile: "low" } }),
+	);
 	seedNativeStore(triageCwd, sourcesForScenario("implementation"));
 	initVerifierStore(triageCwd);
 	const triageCheckpoint = {
