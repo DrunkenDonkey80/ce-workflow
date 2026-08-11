@@ -3935,7 +3935,8 @@
         "upstream"
       ],
       "notes": [
-        "Classification: upstream-owned shared browser-evidence lifecycle atom. Installed BetterWright 1.7.1 and current npm 1.7.2 expose only initialize/prove/audit and reject a second initialize, so no ce-workflow-local change can provide the missing provider operation safely."
+        "Classification: upstream-owned shared browser-evidence lifecycle atom. Installed BetterWright 1.7.1 and current npm 1.7.2 expose only initialize/prove/audit and reject a second initialize, so no ce-workflow-local change can provide the missing provider operation safely.",
+        "Durably routed upstream as BetterWright issue https://github.com/BetterWright/betterwright/issues/106. Rechecked installed 1.7.1 and current npm 1.7.2: tool schema only supports initialize/prove/audit and implementation rejects a second initialize, so the canonical remains open pending upstream resolution; no local workaround is safe because the provider owns checklist/proof state."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -3949,19 +3950,25 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim split from multi-claim report work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55: after a successful browser/browser_evidence result or compaction, an active autonomous goal must proceed through deterministic verification, commit, close, and push gates without a user prompt.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.72",
       "labels": [
         "bug"
       ],
       "notes": [
-        "Classification: locally-owned continuation atom, related-distinct from the upstream browser checklist lifecycle. Current generic agent_end continuation exists, but the report demonstrates a browser-heavy turn that settled without dispatching the next phase, so targeted lifecycle evidence is required before classifying already-fixed."
+        "Classification: locally-owned continuation atom, related-distinct from the upstream browser checklist lifecycle. Current generic agent_end continuation exists, but the report demonstrates a browser-heavy turn that settled without dispatching the next phase, so targeted lifecycle evidence is required before classifying already-fixed.",
+        "Classification refined to already-fixed current behavior with insufficient evidence of the alleged settled-turn failure. The submitted telemetry ends with a successful work-3.62 specialist at 17:54:29 and contains no subsequent parent agent-end record before report submission at 17:57:02, so it cannot establish that ce-workflow observed a settled goal turn and failed to continue. Current lifecycle code schedules continuation from agent_end/agent_settled, recovers pending continuations after native/ce compaction exactly once, and intentionally defers while messages are pending. Existing focused test-work-goal coverage models active-goal tool progress, compaction, continuation, duplicate fences, and human-decision/completion fences; node scripts/test-work-goal.mjs passed. No code change is justified.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Continue autonomous goals after browser acceptance turns",
       "type": "bug",
-      "updatedAt": "2026-08-11T18:36:54.286Z"
+      "updatedAt": "2026-08-11T18:41:55.655Z"
     },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
@@ -4843,12 +4850,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: duplicate/shared upstream-owned atom covered by canonical work-2.71, related to (not conflicting with) the continuation atom in work-2.72. Verified against installed BetterWright 1.7.1 and npm 1.7.2, searched existing GitHub issues, and routed durably as https://github.com/BetterWright/betterwright/issues/106. This report is reconciled into the open upstream canonical; no ce-workflow-local workaround is warranted.",
+        "Reconciled and routed to canonical work-2.71 / BetterWright issue #106; canonical intentionally remains open for upstream delivery."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: During an autonomous roadmap loop, browser_evidence retained the completed work-3.60 checklist and rejected initialize for the nex",
       "type": "task",
-      "updatedAt": "2026-08-11T18:37:01.604Z"
+      "updatedAt": "2026-08-11T18:41:00.508Z"
     },
     "work-2.report-8687048c-ef65-40aa-8a38-3836e4f406a5": {
       "createdAt": "2026-08-09T14:29:03.493Z",
@@ -7295,7 +7305,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-11T18:39:13.489Z"
+    "updatedAt": "2026-08-11T18:41:55.656Z"
   },
   "schemaVersion": 1
 }
