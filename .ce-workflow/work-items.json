@@ -3936,7 +3936,8 @@
       ],
       "notes": [
         "Classification: upstream-owned shared browser-evidence lifecycle atom. Installed BetterWright 1.7.1 and current npm 1.7.2 expose only initialize/prove/audit and reject a second initialize, so no ce-workflow-local change can provide the missing provider operation safely.",
-        "Durably routed upstream as BetterWright issue https://github.com/BetterWright/betterwright/issues/106. Rechecked installed 1.7.1 and current npm 1.7.2: tool schema only supports initialize/prove/audit and implementation rejects a second initialize, so the canonical remains open pending upstream resolution; no local workaround is safe because the provider owns checklist/proof state."
+        "Durably routed upstream as BetterWright issue https://github.com/BetterWright/betterwright/issues/106. Rechecked installed 1.7.1 and current npm 1.7.2: tool schema only supports initialize/prove/audit and implementation rejects a second initialize, so the canonical remains open pending upstream resolution; no local workaround is safe because the provider owns checklist/proof state.",
+        "Fresh upstream verification: BetterWright issue #106 remains open with no comments or assignee; npm latest remains 1.7.2; installed 1.7.1 still exposes initialize/prove/audit only and rejects a second initialize. Classification remains upstream-owned and unresolved. User decision for this snapshot: keep the canonical open pending upstream delivery; do not add a ce-workflow-local workaround or expand into an upstream source contribution."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -7340,7 +7341,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-11T19:17:53.423Z"
+    "updatedAt": "2026-08-11T19:50:38.083Z"
   },
   "schemaVersion": 1
 }
