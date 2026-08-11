@@ -4698,6 +4698,40 @@
       "type": "task",
       "updatedAt": "2026-08-07T08:38:36.364Z"
     },
+    "work-2.report-6834863f-7e5e-47f1-9a57-7961f8cbafc4": {
+      "createdAt": "2026-08-11T20:04:02.851Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: In active autonomous-goal mode, the user selected “Pause as externally blocked” through ask_user after an upstream-only work item could not be completed locally. The goal nevertheless emitted repeated automatic continuation prompts (#3 and #4). Calling work_goal_human_decision to durably pause was rejected because ask_user was available, even though ask_user had already returned the explicit pause decision.\nExpected: An explicit ask_user response choosing to pause should durably pause the active goal immediately, or a dedicated non-question pause operation should accept that decision. The continuation scheduler must not keep reactivating an externally blocked goal after the user selected pause.\nImpact: The goal enters an unsatisfiable loop: completion is forbidden while the snapshot remains open, upstream implementation is forbidden by the user, repeated questioning is forbidden, and the only durable pause tool rejects the state. This wastes turns and can pressure an agent into violating either the user decision or completion contract.\nSuggested improvement: Persist a paused goal state when ask_user returns a pause/block outcome, or allow work_goal_human_decision to accept an already-collected ask_user receipt without presenting another decision.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/35d74127-7b10-4019-ae8e-cd9a30328fa1",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2353217,
+              "file": "01-2026-08-11T18-30-15-396Z_019ff216-e864-7e85-8bbb-514f2fdca87b.jsonl",
+              "sha256": "82a232dc5912efbf61a58144840fbe2c6bc5fd0675a259a4e6d31e24031ce549"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-11T20:04:02.843Z",
+          "workflowId": "workflow-msp2nl4y-6q1131"
+        }
+      ],
+      "id": "work-2.report-6834863f-7e5e-47f1-9a57-7961f8cbafc4",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: In active autonomous-goal mode, the user selected “Pause as externally blocked” through ask_user after an upstream-only work item ",
+      "type": "task",
+      "updatedAt": "2026-08-11T20:04:02.851Z"
+    },
     "work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169": {
       "createdAt": "2026-08-08T08:21:15.842Z",
       "dependencies": [
@@ -7341,7 +7375,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-11T19:50:38.083Z"
+    "updatedAt": "2026-08-11T20:04:02.852Z"
   },
   "schemaVersion": 1
 }
