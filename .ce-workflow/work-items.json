@@ -5002,6 +5002,40 @@
       "type": "task",
       "updatedAt": "2026-08-10T08:37:03.710Z"
     },
+    "work-2.report-e1bfdebd-c352-4c9d-95e1-c2c1690358a3": {
+      "createdAt": "2026-08-11T16:36:58.409Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: All three background verifiers for commit 4aae1a5 completed with structuredOutput visible in their pi-subagents results, but ce-workflow quarantined each as artifact bytes=0/path=private and recorded every operation as `Verifier terminal output was unavailable or invalid`. work_goal_complete then rejected the otherwise fully verified snapshot as failed/orphaned.\nExpected: Background verifier reconciliation should consume the validated structuredOutput returned by pi-subagents (or persist the configured file-only artifact reliably), produce normal findings/no-findings, and allow goal completion when reviewers completed successfully.\nImpact: A fully implemented, independently reviewed, focused-test-passing, pushed self-improvement snapshot cannot complete autonomously; three successful model reviews are discarded and the workflow remains blocked.\nSuggested improvement: In background verifier terminal reconciliation, fall back to the run result's validated structuredOutput when outputMode=file-only yields no readable artifact, and add a focused contract test for completed children whose structuredOutput exists while artifactPath is private/empty.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/c75ea9ee-5d2b-469e-a5a3-b9db3a23f0b9",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 224798,
+              "file": "01-state.json",
+              "sha256": "737139d4b46ffafa03ec41981dd274e5100b01df8bba672cabb63d749380e755"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-11T16:36:58.402Z",
+          "workflowId": "workflow-msovcyuh-v8b38f"
+        }
+      ],
+      "id": "work-2.report-e1bfdebd-c352-4c9d-95e1-c2c1690358a3",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: All three background verifiers for commit 4aae1a5 completed with structuredOutput visible in their pi-subagents results, but ce-wo",
+      "type": "task",
+      "updatedAt": "2026-08-11T16:36:58.409Z"
+    },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
       "dependencies": [
@@ -7127,7 +7161,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-11T16:29:36.294Z"
+    "updatedAt": "2026-08-11T16:36:58.410Z"
   },
   "schemaVersion": 1
 }
