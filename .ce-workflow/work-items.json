@@ -4397,6 +4397,9 @@
           "producer": "HelpBuddy",
           "submittedAt": "2026-08-11T16:12:46.603Z",
           "workflowId": "019fed1c-3516-736b-a32e-96a7a53c145a"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-54bf40d5-13f2-4f0e-a43d-d84cd2009241",
@@ -4405,13 +4408,16 @@
         "self-improvement"
       ],
       "notes": [
-        "Reconciliation: the single atomic claim is already-fixed by commit e666f2d (fix: keep browser acceptance in parent gate). The work-worker contract now records Browser gate: pending parent, forbids supervisor/blocker escalation solely for missing browser tools, and the focused handoff contract test enforces all three outcomes. Related-distinct work-2.65 governs planner acceptance against provider-supported browser evidence."
+        "Reconciliation: the single atomic claim is already-fixed by commit e666f2d (fix: keep browser acceptance in parent gate). The work-worker contract now records Browser gate: pending parent, forbids supervisor/blocker escalation solely for missing browser tools, and the focused handoff contract test enforces all three outcomes. Related-distinct work-2.65 governs planner acceptance against provider-supported browser evidence.",
+        "wo:review-scope []",
+        "wo:review PASS - reconciliation verified: e666f2d adds parent-owned browser gate, 'Browser gate: pending parent', and no-supervisor-escalation clause at agents/work-worker.md:32 plus 3 asserts at scripts/test-work-helper-handoffs.mjs:76-83; node scripts/test-work-helper-handoffs.mjs passes; related-distinct work-2.65 exists (closed).",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-handoffs.mjs\nOutput: work helper handoff fixtures passed"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A work-worker implementing HelpBuddy work-3.60 completed production tests and build but contacted the supervisor and caused the au",
       "type": "task",
-      "updatedAt": "2026-08-11T16:12:46.609Z"
+      "updatedAt": "2026-08-11T16:29:36.294Z"
     },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
@@ -7121,7 +7127,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-11T16:27:42.422Z"
+    "updatedAt": "2026-08-11T16:29:36.294Z"
   },
   "schemaVersion": 1
 }
