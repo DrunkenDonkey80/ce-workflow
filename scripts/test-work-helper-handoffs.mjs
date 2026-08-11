@@ -73,6 +73,14 @@ for (const role of ["work-planner.md", "work-worker.md"]) {
 	assert(!/\bnode\s+"?(?:\.?[\\/])?scripts[\\/]work-helper\.mjs\b/.test(contract));
 }
 
+const workerContract = readFileSync(
+	path.join(root, "agents", "work-worker.md"),
+	"utf8",
+);
+assert.match(workerContract, /browser-driven web acceptance.*parent-owned finish gate/);
+assert.match(workerContract, /Browser gate: pending parent/);
+assert.match(workerContract, /do not contact the supervisor, create a blocker, or report verification failure/);
+
 const windowsHelper = String.raw`C:\Program Files\ce workflow\scripts\work-helper.mjs`;
 assertQuotedHelperCommands(
 	`node ${JSON.stringify(windowsHelper)} work-summary work-1`,
