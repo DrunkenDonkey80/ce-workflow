@@ -219,11 +219,24 @@ function sameFiles(left = [], right = []) {
 
 function reviewScope(task) {
 	const matches = [...notesOf(task).matchAll(/^wo:review-scope (.+)$/gim)];
+	if (!matches.length) return undefined;
+	const raw = matches.at(-1)[1];
+	let scope;
 	try {
-		return matches.length ? JSON.parse(matches.at(-1)[1]) : undefined;
+		scope = JSON.parse(raw);
 	} catch {
-		return undefined;
+		throw new Error(
+			`invalid persisted wo:review-scope ${JSON.stringify(raw)}: expected a JSON array of file paths`,
+		);
 	}
+	if (
+		!Array.isArray(scope) ||
+		scope.some((file) => typeof file !== "string" || !file.trim())
+	)
+		throw new Error(
+			`invalid persisted wo:review-scope ${JSON.stringify(scope)}: expected a JSON array of file paths`,
+		);
+	return scope;
 }
 
 function targetedReviewFindings(task) {

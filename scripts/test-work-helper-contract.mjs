@@ -137,6 +137,22 @@ try {
 	const scopeNote = reviewed.items["TASK-1"].notes.find((note) =>
 		note.startsWith("wo:review-scope "),
 	);
+	reviewed.items["TASK-1"].notes = reviewed.items["TASK-1"].notes.map((note) =>
+		note === scopeNote ? 'wo:review-scope {"files":["source.js"]}' : note,
+	);
+	saveStore(cwd, reviewed);
+	const malformedScope = failure(
+		"finish-task",
+		"TASK-1",
+		"--max-files",
+		"2",
+		"--message",
+		"scope finalization",
+		...verifyArgs,
+		"--reviewed",
+	);
+	assert.match(malformedScope, /invalid persisted wo:review-scope .*expected a JSON array/);
+	assert.doesNotMatch(malformedScope, /iterable/);
 	reviewed.items["TASK-1"].notes = reviewed.items["TASK-1"].notes.filter(
 		(note) => !note.startsWith("wo:review-scope "),
 	);

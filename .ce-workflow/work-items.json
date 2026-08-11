@@ -3898,6 +3898,31 @@
       "type": "bug",
       "updatedAt": "2026-07-20T10:04:39.723Z"
     },
+    "work-2.70": {
+      "acceptance": "finish-task validates persisted wo:review-scope values before comparison, emits an actionable diagnostic naming wo:review-scope for malformed values, and a focused contract test covers malformed scope plus a renamed evidence artifact without exposing an internal iterable error.",
+      "createdAt": "2026-08-11T16:24:44.338Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local claim for work-2.report-6f4c69c0-3367-4afa-b5ec-9313899e1480: finish-task passes a parsed but non-array wo:review-scope value into sameFiles, producing the opaque internal error 'left is not iterable' after otherwise valid evidence-only changes.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.70",
+      "labels": [
+        "bug"
+      ],
+      "notes": [
+        "Classification: locally-owned finalizer validation bug. Related distinct claim: ignored non-image evidence already receives the deterministic add/gitignore/remove diagnostic required by the report; explicit --evidence-file support remains intentionally bounded to reviewed images. Source report will close only after canonical fix verification.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs\nOutput: ok - work helper contract"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Validate persisted review scopes before finalization",
+      "type": "bug",
+      "updatedAt": "2026-08-11T16:26:58.151Z"
+    },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
       "createdAt": "2026-07-20T09:59:01.555Z",
@@ -4347,6 +4372,45 @@
       "type": "task",
       "updatedAt": "2026-08-08T08:44:02.861Z"
     },
+    "work-2.report-54bf40d5-13f2-4f0e-a43d-d84cd2009241": {
+      "createdAt": "2026-08-11T16:12:46.609Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A work-worker implementing HelpBuddy work-3.60 completed production tests and build but contacted the supervisor and caused the autonomous flow to appear stopped because the work item also required BetterWright evidence and the worker's strict tool allowlist excludes browser/browser_evidence.\nExpected: Browser acceptance should remain a parent-owned coded finish gate. A work-worker without browser tools should complete deterministic implementation verification, record browser evidence as pending, return immediately, and let the parent automatically execute the private browser playbook with its available BetterWright tools instead of pausing for a supervisor decision.\nImpact: Web-development resume flows can pause after otherwise successful implementation, requiring manual intervention despite BetterWright being installed and available in the parent session.\nSuggested improvement: Clarify the work-worker contract and orchestrator policy that browser acceptance is deferred to the parent finish gate; add a focused handoff test preventing supervisor escalation solely for unavailable browser tools.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/77e81ec1-79d6-48ec-9911-54e0be3ffe86",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3188,
+              "file": "01-135f1e3f_work-worker_0_output.md",
+              "sha256": "4f1f4b5eaef6f4f0bc773511b7485dba70f4eef00ce52d29dc4786d864233503"
+            },
+            {
+              "bytes": 586334,
+              "file": "02-135f1e3f_work-worker_0_transcript.jsonl",
+              "sha256": "41f0be3a9b7ef2e67c33386a3af179b1ab1399b28793cb18312fbdde19463c49"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-11T16:12:46.603Z",
+          "workflowId": "019fed1c-3516-736b-a32e-96a7a53c145a"
+        }
+      ],
+      "id": "work-2.report-54bf40d5-13f2-4f0e-a43d-d84cd2009241",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A work-worker implementing HelpBuddy work-3.60 completed production tests and build but contacted the supervisor and caused the au",
+      "type": "task",
+      "updatedAt": "2026-08-11T16:12:46.609Z"
+    },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
       "dependencies": [
@@ -4556,6 +4620,52 @@
       "title": "Self-improvement report: The roadmap projection for closed work-1 returns `aggregateStatus: needs_attention`, progress 12/12, with work-1.6 and work-1.11 m",
       "type": "task",
       "updatedAt": "2026-08-08T08:43:45.147Z"
+    },
+    "work-2.report-6f4c69c0-3367-4afa-b5ec-9313899e1480": {
+      "createdAt": "2026-08-10T20:11:22.271Z",
+      "dependencies": [
+        "work-2.70"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: The coded finish helper fails work-3.54 with the opaque error `left is not iterable` after a reviewed evidence-only task renamed one retained ignored `.log` artifact to `.txt`. The helper had previously rejected the ignored `.log` as needing an add/gitignore/remove decision and then rejected pre-staging it, forcing the rename workaround.\nExpected: finish-task should either accept a task-owned reviewed ignored evidence file through an explicit deterministic path, or produce a structured actionable diagnostic naming the malformed value/path. After the file is renamed to a normal tracked extension and manifest/review evidence are valid, finish-task should verify, stage, commit, close, and report push status without an internal iterable error.\nImpact: The work item has passing verification and review but cannot be finalized, leaving target git/work-item state incomplete and forcing manual debugging of ce-workflow internals.\nSuggested improvement: Validate parsed review-scope/diff set operands before spreading them and include the operand source in errors; add a contract test for an evidence-only task containing an ignored artifact that is renamed before finalization.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/226f7e4a-7e2e-432b-8679-94a763d5aea2",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 58,
+              "file": "01-work-3.54-finish-left-not-iterable.txt",
+              "sha256": "84f8e2bb3072153c95e6f229f5148bb18befbe6036767b7b65753a2116eff7be"
+            },
+            {
+              "bytes": 4683,
+              "file": "02-work-3.54-review-output.md",
+              "sha256": "d85e09535f4e33186400f2ab45a5968f31873d8a4cab715ae901e1dd2a55c59c"
+            },
+            {
+              "bytes": 3779,
+              "file": "03-work-3.54-fix-output.md",
+              "sha256": "4a62db6e41e75f0c2151216ece96cfcb3147d383f81530a469cf5fdc223d57b1"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-10T20:11:22.264Z",
+          "workflowId": "019fed1c-3516-736b-a32e-96a7a53c145a"
+        }
+      ],
+      "id": "work-2.report-6f4c69c0-3367-4afa-b5ec-9313899e1480",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The coded finish helper fails work-3.54 with the opaque error `left is not iterable` after a reviewed evidence-only task renamed o",
+      "type": "task",
+      "updatedAt": "2026-08-11T16:24:49.186Z"
     },
     "work-2.report-77cca2ef-12e6-44dc-9749-4dfa30b2c8bb": {
       "createdAt": "2026-08-09T07:10:03.901Z",
@@ -7003,7 +7113,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-10T13:45:29.684Z"
+    "updatedAt": "2026-08-11T16:26:58.151Z"
   },
   "schemaVersion": 1
 }
