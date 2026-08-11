@@ -1648,7 +1648,7 @@ try {
 		"raw private artifact is retained",
 	);
 
-	// Pi-subagents persists schema-validated output inside the async run, even when no requested output file exists.
+	// Pi-subagents persists schema-validated output in status.workflow.value, even when file-only output is absent.
 	const structuredCwd = repo();
 	initVerifierStore(structuredCwd);
 	const structuredBatch = mutateVerifierStore(structuredCwd, (state) =>
@@ -1698,7 +1698,6 @@ try {
 	);
 	const structuredAsync = path.join(structuredCwd, "async");
 	mkdirSync(structuredAsync);
-	const structuredOutput = path.join(structuredAsync, "structured-output.json");
 	mutateVerifierStore(structuredCwd, (state) =>
 		recordVerifierLaunch(state, {
 			jobId: structuredJob.id,
@@ -1710,17 +1709,19 @@ try {
 		path.join(structuredAsync, "status.json"),
 		JSON.stringify({
 			state: "failed",
-			steps: [{ structuredOutputPath: structuredOutput }],
+			workflow: {
+				value: {
+					structuredOutput: JSON.parse(
+						reportPayload(structuredJob, findingPayload(10, 12)),
+					),
+				},
+			},
 		}),
-	);
-	writeFileSync(
-		structuredOutput,
-		reportPayload(structuredJob, findingPayload(10, 12)),
 	);
 	assert.deepEqual(
 		reconcileVerifierRuns(structuredCwd),
 		[structuredJob.id],
-		"schema-validated async output reconciles without the requested output file",
+		"inline schema-validated async output reconciles without a readable artifact file",
 	);
 	const structuredStore = loadVerifierStore(structuredCwd);
 	assert.equal(Object.keys(structuredStore.findings).length, 1);

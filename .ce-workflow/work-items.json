@@ -3923,6 +3923,46 @@
       "type": "bug",
       "updatedAt": "2026-08-11T16:26:58.151Z"
     },
+    "work-2.71": {
+      "acceptance": "An installed BetterWright runtime can initialize, prove, and audit one checklist, then initialize a distinct named/task-scoped checklist in the same Pi session; both journeys retain independently attributable proof artifacts and a regression test covers the sequence.",
+      "createdAt": "2026-08-11T18:36:44.812Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical shared claim for snapshot reports work-2.report-80bf598b-4278-49aa-ace4-e9c57bfbddb8 and work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55: BetterWright browser_evidence must permit a new task-scoped checklist after the prior checklist audits ready while retaining prior proof artifacts.",
+      "evidence": [],
+      "id": "work-2.71",
+      "labels": [
+        "upstream"
+      ],
+      "notes": [
+        "Classification: upstream-owned shared browser-evidence lifecycle atom. Installed BetterWright 1.7.1 and current npm 1.7.2 expose only initialize/prove/audit and reject a second initialize, so no ce-workflow-local change can provide the missing provider operation safely."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Allow sequential browser-evidence journeys in one session",
+      "type": "bug",
+      "updatedAt": "2026-08-11T18:36:44.812Z"
+    },
+    "work-2.72": {
+      "acceptance": "A focused lifecycle regression models a goal turn ending after successful browser/browser_evidence activity and proves exactly one automatic continuation reaches the next phase, including when context compaction or pending-message deferral occurs; existing completion and human-decision fences remain intact.",
+      "createdAt": "2026-08-11T18:36:54.286Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical local claim split from multi-claim report work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55: after a successful browser/browser_evidence result or compaction, an active autonomous goal must proceed through deterministic verification, commit, close, and push gates without a user prompt.",
+      "evidence": [],
+      "id": "work-2.72",
+      "labels": [
+        "bug"
+      ],
+      "notes": [
+        "Classification: locally-owned continuation atom, related-distinct from the upstream browser checklist lifecycle. Current generic agent_end continuation exists, but the report demonstrates a browser-heavy turn that settled without dispatching the next phase, so targeted lifecycle evidence is required before classifying already-fixed."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Continue autonomous goals after browser acceptance turns",
+      "type": "bug",
+      "updatedAt": "2026-08-11T18:36:54.286Z"
+    },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
       "createdAt": "2026-07-20T09:59:01.555Z",
@@ -4035,6 +4075,53 @@
       "title": "Self-improvement report: For evidence-only work-3.40, the coded finish helper accepted Markdown/JSON artifacts but rejected all eight acceptance-required P",
       "type": "task",
       "updatedAt": "2026-08-09T08:43:55.719Z"
+    },
+    "work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55": {
+      "createdAt": "2026-08-11T17:57:41.101Z",
+      "dependencies": [
+        "work-2.71",
+        "work-2.72"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: During autonomous resume of work-3.62, browser tools were available and the browser journey reached a successful VALID PACK-ONLY export, but the parent loop ended its turn after a browser evidence/screenshot operation instead of automatically continuing to the deterministic finish gates (verification, commit, close, push). The user had to prompt the session again. An already-initialized browser_evidence checklist from a prior journey also collided with initialization, increasing the chance of an early return.\nExpected: After any successful browser/browser_evidence tool result—or after context compaction—the active autonomous goal should re-enter the coded continuation point and proceed through remaining finish gates without requiring user intervention. Browser evidence state should either be journey-scoped or allow an explicit reset/new checklist so prior evidence cannot derail a later acceptance journey.\nImpact: Autopilot appeared to stop even though required tools were healthy and the target work item remained open. This undermines run-to-completion behavior, confuses browser availability with orchestration failure, and leaves implemented work uncommitted/unclosed until the user notices.\nSuggested improvement: Persist a mandatory next-phase continuation marker around browser calls and compaction, then schedule immediate autonomous continuation until the work item is closed or a real blocker exists; make browser evidence checklists explicitly journey-scoped/resettable.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/4c6b1394-e21d-4304-ace7-03fb87a098af",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 4410,
+              "file": "01-work-3.62-dev.log",
+              "sha256": "204916d3f510d6a1f7b9c72b8cdfb66ff16f0965a0bf7a1611e615cbca88bb2e"
+            },
+            {
+              "bytes": 178112,
+              "file": "02-2026-08-11.jsonl",
+              "sha256": "09ad30eff98d546aafa2c9e4e9e2da3228d28799ceff98c27915aa1be4f8da91"
+            },
+            {
+              "bytes": 453796,
+              "file": "03-session.jsonl",
+              "sha256": "dda24c2b3291ee176567c06504f031621e22eed416b3fd74d6ac7c2aa9a99319"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-11T17:57:41.094Z",
+          "workflowId": "019fed1c-3516-736b-a32e-96a7a53c145a"
+        }
+      ],
+      "id": "work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: During autonomous resume of work-3.62, browser tools were available and the browser journey reached a successful VALID PACK-ONLY e",
+      "type": "task",
+      "updatedAt": "2026-08-11T18:37:01.964Z"
     },
     "work-2.report-2161af52-ac96-4b1d-8c22-5e4d16d82d8c": {
       "createdAt": "2026-08-08T13:36:08.061Z",
@@ -4722,6 +4809,47 @@
       "type": "task",
       "updatedAt": "2026-08-09T08:43:38.743Z"
     },
+    "work-2.report-80bf598b-4278-49aa-ace4-e9c57bfbddb8": {
+      "createdAt": "2026-08-11T17:49:02.188Z",
+      "dependencies": [
+        "work-2.71"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: During an autonomous roadmap loop, browser_evidence retained the completed work-3.60 checklist and rejected initialize for the next distinct browser-gated work item work-3.62 with `browser_evidence is already initialized; prove or audit the existing checklist.` There is no reset/new-checklist operation, so sequential browser acceptance tasks in one session cannot each have requirement-linked evidence.\nExpected: browser_evidence should support starting a new named checklist after the current checklist audits ready, or automatically scope checklists by work item/journey so work-3.62 can initialize its own atomic requirements without discarding work-3.60 evidence.\nImpact: The autonomous loop cannot comply literally with initialize-before-browser and capture task-specific proof for subsequent roadmap slices; reusing old IDs would misattribute evidence, while skipping initialization weakens the acceptance contract.\nSuggested improvement: Add browser_evidence operation `reset`/`new` with a checklist name or allow initialize after audit-ready while retaining prior checklist artifacts.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/11d5d752-3c9d-4f6b-8418-c5d9e8d5ecb9",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3574,
+              "file": "01-work-orchestrator-state.json",
+              "sha256": "435fd4608282e99a61e8d17f7602ad198b217b4563a703d571ee5d134024c97e"
+            },
+            {
+              "bytes": 172994,
+              "file": "02-2026-08-11.jsonl",
+              "sha256": "d526bb35ee80b769ed564e38f73171ea14008512f7c52bb868919efe4ec1931e"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-11T17:49:02.180Z",
+          "workflowId": "019fed1c-3516-736b-a32e-96a7a53c145a"
+        }
+      ],
+      "id": "work-2.report-80bf598b-4278-49aa-ace4-e9c57bfbddb8",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: During an autonomous roadmap loop, browser_evidence retained the completed work-3.60 checklist and rejected initialize for the nex",
+      "type": "task",
+      "updatedAt": "2026-08-11T18:37:01.604Z"
+    },
     "work-2.report-8687048c-ef65-40aa-8a38-3836e4f406a5": {
       "createdAt": "2026-08-09T14:29:03.493Z",
       "dependencies": [],
@@ -5022,6 +5150,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-11T16:36:58.402Z",
           "workflowId": "workflow-msovcyuh-v8b38f"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-e1bfdebd-c352-4c9d-95e1-c2c1690358a3",
@@ -5029,12 +5160,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned atomic reconciliation defect. Installed pi-subagents status.json for all three reported runs contains the schema-validated report at workflow.value.structuredOutput while requested file-only artifacts are absent; ce-workflow only checked output files/structuredOutputPath, so the shared terminal reconciler is the root cause. Implemented bounded inline structured-output fallback with identity/schema validation unchanged and focused regression coverage.",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: All three background verifiers for commit 4aae1a5 completed with structuredOutput visible in their pi-subagents results, but ce-wo",
       "type": "task",
-      "updatedAt": "2026-08-11T16:36:58.409Z"
+      "updatedAt": "2026-08-11T18:39:13.488Z"
     },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
@@ -7161,7 +7295,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-11T16:36:58.410Z"
+    "updatedAt": "2026-08-11T18:39:13.489Z"
   },
   "schemaVersion": 1
 }

@@ -2174,6 +2174,22 @@ function structuredArtifactForStatus(asyncDir, status) {
 		throw error("artifact", "Verifier structured output escaped its async run");
 	return resolved;
 }
+
+function structuredReportForStatus(status) {
+	const value =
+		status?.structuredOutput ??
+		status?.workflow?.value?.structuredOutput ??
+		status?.steps?.find((step) => step?.structuredOutput !== undefined)
+			?.structuredOutput;
+	if (value === undefined) return undefined;
+	const text = typeof value === "string" ? value : JSON.stringify(value);
+	const bytes = Buffer.byteLength(text);
+	if (bytes > REPORT_MAX_BYTES)
+		throw error("over-limit", "Verifier artifact exceeds the size limit", {
+			bytes,
+		});
+	return { bytes, text };
+}
 function markVerifierOrphaned(store, jobId, nowValue) {
 	return edit(store, (next) => {
 		const job = next.jobs[jobId];
@@ -2201,10 +2217,10 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 	)) {
 		let state = "";
 		let runtimeStatus;
+		const statusFile = job.launch.asyncDir
+			? path.join(job.launch.asyncDir, "status.json")
+			: "";
 		if (job.launch.status === "running") {
-			const statusFile = job.launch.asyncDir
-				? path.join(job.launch.asyncDir, "status.json")
-				: "";
 			try {
 				runtimeStatus = JSON.parse(boundedArtifactRead(statusFile).text);
 				state = terminalState(runtimeStatus);
@@ -2235,21 +2251,26 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 			let file = artifactForJob(cwd, job);
 			if (!existsSync(file))
 				file = structuredArtifactForStatus(job.launch.asyncDir, runtimeStatus);
-			const fileStat = lstatSync(file);
-			if (
-				state === "orphaned" &&
-				currentTime - fileStat.mtimeMs < LAUNCH_STATUS_GRACE_MS
-			)
-				continue;
-			artifact = { path: file, bytes: fileStat.size };
-			const raw = boundedArtifactRead(file);
-			artifact.bytes = raw.bytes;
-			try {
-				chmodSync(file, 0o600);
-			} catch {
-				// Windows ACLs, when present, remain authoritative.
+			let raw;
+			if (file && existsSync(file)) {
+				const fileStat = lstatSync(file);
+				if (
+					state === "orphaned" &&
+					currentTime - fileStat.mtimeMs < LAUNCH_STATUS_GRACE_MS
+				)
+					continue;
+				raw = boundedArtifactRead(file);
+				try {
+					chmodSync(file, 0o600);
+				} catch {
+					// Windows ACLs, when present, remain authoritative.
+				}
+				artifact = { path: file, bytes: raw.bytes };
+			} else {
+				raw = structuredReportForStatus(runtimeStatus);
+				if (!raw) throw error("artifact", "Verifier artifact is unavailable");
+				artifact = { path: statusFile, bytes: raw.bytes };
 			}
-			artifact = { path: file, bytes: raw.bytes };
 			mutateVerifierStore(
 				cwd,
 				(next) => {
