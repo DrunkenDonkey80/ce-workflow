@@ -2220,11 +2220,11 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 		const statusFile = job.launch.asyncDir
 			? path.join(job.launch.asyncDir, "status.json")
 			: "";
-		if (job.launch.status === "running") {
-			try {
-				runtimeStatus = JSON.parse(boundedArtifactRead(statusFile).text);
-				state = terminalState(runtimeStatus);
-			} catch {
+		try {
+			runtimeStatus = JSON.parse(boundedArtifactRead(statusFile).text);
+			state = terminalState(runtimeStatus);
+		} catch {
+			if (job.launch.status === "running") {
 				const launchedAt = Date.parse(job.launch.launchedAt ?? "");
 				if (
 					Number.isFinite(launchedAt) &&
@@ -2236,15 +2236,15 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 					(next) => markVerifierOrphaned(next, job.id, input.now),
 					input,
 				);
-				state = "orphaned";
 			}
-			if (
-				state !== "orphaned" &&
-				!TERMINAL_SUCCESS_STATES.has(state) &&
-				!TERMINAL_FAILURE_STATES.has(state)
-			)
-				continue;
-		} else state = "orphaned";
+			state = "orphaned";
+		}
+		if (
+			state !== "orphaned" &&
+			!TERMINAL_SUCCESS_STATES.has(state) &&
+			!TERMINAL_FAILURE_STATES.has(state)
+		)
+			continue;
 
 		let artifact;
 		try {

@@ -1705,6 +1705,20 @@ try {
 			identity: { runId: "structured", asyncDir: structuredAsync },
 		}),
 	);
+	const structuredLaunchedAt = Date.parse(
+		loadVerifierStore(structuredCwd).jobs[structuredJob.id].launch.launchedAt,
+	);
+	assert.deepEqual(
+		reconcileVerifierRuns(structuredCwd, {
+			now: new Date(structuredLaunchedAt + 31_000).toISOString(),
+		}),
+		[],
+		"a missing status first orphans the verifier launch",
+	);
+	assert.equal(
+		loadVerifierStore(structuredCwd).jobs[structuredJob.id].status,
+		"orphaned",
+	);
 	writeFileSync(
 		path.join(structuredAsync, "status.json"),
 		JSON.stringify({
@@ -1719,9 +1733,11 @@ try {
 		}),
 	);
 	assert.deepEqual(
-		reconcileVerifierRuns(structuredCwd),
+		reconcileVerifierRuns(structuredCwd, {
+			now: new Date(structuredLaunchedAt + 32_000).toISOString(),
+		}),
 		[structuredJob.id],
-		"inline schema-validated async output reconciles without a readable artifact file",
+		"late inline schema-validated output recovers an orphaned launch",
 	);
 	const structuredStore = loadVerifierStore(structuredCwd);
 	assert.equal(Object.keys(structuredStore.findings).length, 1);

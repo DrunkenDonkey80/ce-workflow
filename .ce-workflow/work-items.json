@@ -3970,6 +3970,35 @@
       "type": "bug",
       "updatedAt": "2026-08-11T18:41:55.655Z"
     },
+    "work-2.73": {
+      "acceptance": "A verifier launch first becomes orphaned because status.json is unavailable, then a late terminal status containing workflow.value.structuredOutput is ingested through the normal bounded identity/schema/checkpoint path; a focused regression covers the sequence.",
+      "createdAt": "2026-08-11T19:12:52.640Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Independent review of commit a56b9de found that reconcileVerifierRuns only reads status.json while launch.status is running. Once a missing status marks the launch orphaned, later workflow.value.structuredOutput can never be recovered.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.73",
+      "labels": [
+        "bug"
+      ],
+      "notes": [
+        "Locally-owned actionable finding from retry review run 054c6360 for snapshot a56b9de. This is a related edge of the inline-output root cause and must close before goal completion.",
+        "Implemented the reviewer-requested root fix: every tracked running/orphaned launch now bounded-reads status.json, while only running launches can transition into orphaned state. A focused regression first forces missing-status orphaning, then writes late workflow.value.structuredOutput and proves normal ingestion. node scripts/test-background-verifiers.mjs passed; LSP errors are clean.",
+        "Targeted independent re-review PASS (run c559347e): confirmed orphaned launches re-read bounded status.json; grace/orphan transitions remain limited to running launches; terminal gating and identity/schema/checkpoint ingestion remain unchanged; regression explicitly covers orphan-then-late-output recovery.",
+        "wo:review-scope [\"extensions/background-verifiers.js\",\"scripts/test-background-verifiers.mjs\"]",
+        "wo:review PASS — targeted independent reviewer run c559347e checked only extensions/background-verifiers.js and scripts/test-background-verifiers.mjs; late orphan recovery is correct, grace/terminal/validation boundaries remain intact, and no residual findings remain.",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Recover verifier output that arrives after launch orphaning",
+      "type": "bug",
+      "updatedAt": "2026-08-11T19:17:53.422Z"
+    },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
       "createdAt": "2026-07-20T09:59:01.555Z",
@@ -7311,7 +7340,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-11T18:42:24.048Z"
+    "updatedAt": "2026-08-11T19:17:53.423Z"
   },
   "schemaVersion": 1
 }
