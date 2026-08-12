@@ -385,6 +385,12 @@ try {
 		title: "Capture evidence-only screenshots",
 	});
 	createWorkItem(finishStore, {
+		id: "TASK-EVIDENCE-AUTO",
+		type: "task",
+		status: "open",
+		title: "Capture evidence-only screenshots and logs",
+	});
+	createWorkItem(finishStore, {
 		id: "TASK-5",
 		type: "task",
 		status: "open",
@@ -612,6 +618,81 @@ try {
 			loadStore(finishCwd).items["TASK-EVIDENCE"].status === "closed",
 		"finish-task accepts a bounded declared image under the task-owned evidence path",
 	);
+
+	const automaticEvidenceDir = "docs/evidence/TASK-EVIDENCE-AUTO";
+	mkdirSync(path.join(finishCwd, automaticEvidenceDir), { recursive: true });
+	const automaticEvidenceFiles = Array.from(
+		{ length: 21 },
+		(_, index) => `${automaticEvidenceDir}/proof-${index + 1}.png`,
+	);
+	for (const file of automaticEvidenceFiles)
+		writeFileSync(path.join(finishCwd, file), `proof-${file}`);
+	const evidenceLog = `${automaticEvidenceDir}/capture.log`;
+	writeFileSync(path.join(finishCwd, evidenceLog), "sanitized capture metadata\n");
+	execFileSync("git", ["add", "--", automaticEvidenceDir], { cwd: finishCwd });
+	const automaticEvidenceFinished = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-EVIDENCE-AUTO",
+				"--max-files",
+				"2",
+				"--message",
+				"retain automatic evidence bundle",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+				"--expect",
+				"ok",
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		),
+	);
+	assert(
+		automaticEvidenceFiles.every((file) =>
+			automaticEvidenceFinished.files.includes(file),
+		) &&
+			automaticEvidenceFinished.files.includes(evidenceLog) &&
+			loadStore(finishCwd).items["TASK-EVIDENCE-AUTO"].status === "closed",
+		"finish-task automatically accepts more than 20 bounded pre-staged task-owned screenshots and logs",
+	);
+
+	writeFileSync(path.join(finishCwd, "unrelated-staged.txt"), "unrelated\n");
+	execFileSync("git", ["add", "--", "unrelated-staged.txt"], {
+		cwd: finishCwd,
+	});
+	let stagedRecoveryError = "";
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-ROLLBACK",
+				"--max-files",
+				"2",
+				"--message",
+				"reject unrelated staged file",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		);
+	} catch (error) {
+		stagedRecoveryError = String(error.stdout ?? "");
+	}
+	assert(
+		stagedRecoveryError.includes("refusing pre-staged files") &&
+			stagedRecoveryError.includes(
+				'git restore --staged -- \\"unrelated-staged.txt\\"',
+			),
+		"finish-task keeps unrelated pre-staged files blocked with an exact recovery command",
+	);
+	execFileSync("git", ["restore", "--staged", "--", "unrelated-staged.txt"], {
+		cwd: finishCwd,
+	});
+	rmSync(path.join(finishCwd, "unrelated-staged.txt"));
 
 	const headBeforePush = execFileSync("git", ["rev-parse", "HEAD"], {
 		cwd: finishCwd,

@@ -4007,19 +4007,25 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical for work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777 atomic claims: recognize bounded task-owned evidence under docs/evidence/<work-id>, accept safe screenshot and sanitized text/log metadata evidence, replace the fixed 20-file declaration ceiling with a bounded directory/manifest path, and give exact recovery for untracked or pre-staged evidence without weakening unrelated-file gates.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.74",
       "labels": [
         "self-improvement"
       ],
       "notes": [
-        "Classification: locally-owned multi-claim report consolidated into one canonical bug because all atoms share the same finish-task evidence boundary and can coexist."
+        "Classification: locally-owned multi-claim report consolidated into one canonical bug because all atoms share the same finish-task evidence boundary and can coexist.",
+        "wo:review PASS - finish-task auto-recognizes bounded task-owned evidence (100 files/100 MiB), accepts png/jpg/webp/txt/log/json, exempts it from pre-staged and untracked gates, keeps unrelated files blocked with exact git restore --staged recovery; node scripts/test-work-optimization-helpers.mjs passed",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Make finish-task evidence recovery bounded and actionable",
       "type": "bug",
-      "updatedAt": "2026-08-12T17:17:10.069Z"
+      "updatedAt": "2026-08-12T17:26:35.294Z"
     },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
@@ -7443,7 +7449,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-12T17:19:55.794Z"
+    "updatedAt": "2026-08-12T17:26:35.295Z"
   },
   "schemaVersion": 1
 }

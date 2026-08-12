@@ -445,7 +445,7 @@ async function finishTaskUnlocked() {
 	);
 	if (!id || !message || !Number.isInteger(maxFiles) || maxFiles < 1)
 		throw new Error(
-			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--evidence-file <docs/evidence/task-owned-image> ...] [--immediate-format] [--reviewed] [--push]",
+			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--evidence-file <docs/evidence/task-owned-file> ...] [--immediate-format] [--reviewed] [--push]",
 		);
 	const task = readWorkItem(id);
 	if (task?.initiative)
@@ -457,43 +457,59 @@ async function finishTaskUnlocked() {
 		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
 			taskContractText,
 		);
+	const taskEvidencePrefix = `docs/evidence/${id}`;
+	const evidencePath = (file) =>
+		file.startsWith(`${taskEvidencePrefix}/`) ||
+		file.startsWith(`${taskEvidencePrefix}-`);
 	const evidenceFiles = [
-		...new Set(
-			options("--evidence-file").map((file) =>
+		...new Set([
+			...options("--evidence-file").map((file) =>
 				path.posix.normalize(file.replaceAll("\\", "/")),
 			),
-		),
+			...(evidenceOnly
+				? gitStatusPaths()
+						.map((file) => file.replaceAll("\\", "/"))
+						.filter(evidencePath)
+				: []),
+		]),
 	];
-	if (evidenceFiles.length > 20)
-		throw new Error("finish-task accepts at most 20 declared evidence files");
+	let evidenceBytes = 0;
 	for (const file of evidenceFiles) {
-		const taskEvidencePrefix = `docs/evidence/${id}`;
+		const absolute = path.join(cwd, file);
 		if (
 			!evidenceOnly ||
 			path.posix.isAbsolute(file) ||
 			file.startsWith("../") ||
-			!(file.startsWith(`${taskEvidencePrefix}/`) ||
-				file.startsWith(`${taskEvidencePrefix}-`)) ||
-			!/\.(?:png|jpe?g|webp)$/i.test(file) ||
-			!existsSync(path.join(cwd, file)) ||
-			!statSync(path.join(cwd, file)).isFile() ||
-			statSync(path.join(cwd, file)).size > 10 * 1024 * 1024
+			!evidencePath(file) ||
+			!/\.(?:png|jpe?g|webp|txt|log|json)$/i.test(file) ||
+			!existsSync(absolute) ||
+			!statSync(absolute).isFile() ||
+			statSync(absolute).size > 10 * 1024 * 1024
 		)
 			throw new Error(
-				`invalid evidence file ${file}: require an existing image up to 10 MiB under docs/evidence/${id}... for an evidence task`,
+				`invalid evidence file ${file}: require an existing image or sanitized .txt/.log/.json file up to 10 MiB under docs/evidence/${id}... for an evidence task`,
 			);
+		evidenceBytes += statSync(absolute).size;
 	}
+	if (evidenceFiles.length > 100 || evidenceBytes > 100 * 1024 * 1024)
+		throw new Error(
+			"task-owned evidence is limited to 100 files and 100 MiB per finish-task run",
+		);
 	const evidenceFileSet = new Set(evidenceFiles);
 	const formatted = formatPendingFiles();
 	const stagedBefore = git(["diff", "--cached", "--name-only"])
 		.split(/\r?\n/)
 		.filter(Boolean);
-	const unexpectedStaged = stagedBefore.filter(
-		(file) => !file.replaceAll("\\", "/").startsWith(".ce-workflow/"),
-	);
+	const unexpectedStaged = stagedBefore.filter((file) => {
+		const normalized = file.replaceAll("\\", "/");
+		return (
+			!normalized.startsWith(".ce-workflow/") &&
+			!evidenceFileSet.has(normalized)
+		);
+	});
 	if (unexpectedStaged.length)
 		throw new Error(
-			`refusing pre-staged files: ${unexpectedStaged.join(", ")}`,
+			`refusing pre-staged files: ${unexpectedStaged.join(", ")}\nRun: git restore --staged -- ${unexpectedStaged.map((file) => JSON.stringify(file)).join(" ")}\nThen re-run finish-task; task-owned evidence under ${taskEvidencePrefix} is handled automatically.`,
 		);
 	if (stagedBefore.length) git(["restore", "--staged", "--", ...stagedBefore]);
 
@@ -594,7 +610,7 @@ async function finishTaskUnlocked() {
 		throw new Error(
 			`untracked files need a decision before commit (add, gitignore, or remove):\n` +
 				unrecognized.map((file) => `  - ${file}`).join("\n") +
-				`\nResolve each, then re-run finish-task.`,
+				`\nTask-owned evidence under ${taskEvidencePrefix} is recognized automatically; resolve unrelated files, then re-run finish-task.`,
 		);
 	const changed = gitStatusPaths().filter(
 		(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
