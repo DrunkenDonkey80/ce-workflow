@@ -976,6 +976,7 @@ assert.equal(
 	hooks.tool_call({ toolName: "work_goal_human_decision" }, { hasUI: false }),
 	undefined,
 );
+assert.ok(hooks.tool_result);
 
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-work-goal-"));
 try {
@@ -2177,12 +2178,70 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.ok(activeTools.includes("work_goal_complete"));
 	assert.ok(activeTools.includes("work_goal_human_decision"));
 	assert.equal(thinkingLevel, "medium");
-	assert.equal(sent.length, 5);
-	assert.match(sent[4].message, /User resumed the goal with this answer/);
-	assert.match(sent[4].message, /add a connect button/);
+
+	const sentBeforeAskPause = sent.length;
+	await tempHooks.tool_result(
+		{
+			toolName: "ask_user",
+			isError: false,
+			details: {
+				question: "How should this blocked goal proceed?",
+				response: {
+					kind: "selection",
+					selections: ["Pause as externally blocked"],
+				},
+				cancelled: false,
+			},
+		},
+		ctx,
+	);
+	assert.equal(statuses["work-goal"], "paused");
+	assert.equal(thinkingLevel, "high");
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Pause selected." }],
+				},
+			],
+		},
+		ctx,
+	);
+	await settle();
+	assert.equal(
+		sent.length,
+		sentBeforeAskPause,
+		"ask_user pause selection does not queue another continuation",
+	);
+	await invoke(
+		"work-goal",
+		"resume 2, but use the AI-Wedge connected proof and add a connect button.",
+		ctx,
+	);
+	assert.equal(statuses["work-goal"], "active #2");
+	await tempHooks.tool_result(
+		{
+			toolName: "ask_user",
+			isError: false,
+			details: {
+				response: { kind: "selection", selections: ["Implement upstream"] },
+				cancelled: false,
+			},
+		},
+		ctx,
+	);
+	assert.equal(
+		statuses["work-goal"],
+		"active #2",
+		"ordinary ask_user selections do not pause the goal",
+	);
+	assert.equal(sent.length, 6);
+	assert.match(sent[5].message, /User resumed the goal with this answer/);
+	assert.match(sent[5].message, /add a connect button/);
 
 	await tempHooks.before_agent_start(
-		{ prompt: sent[4].message, systemPrompt: "base" },
+		{ prompt: sent[5].message, systemPrompt: "base" },
 		ctx,
 	);
 	initVerifierStore(cwd);

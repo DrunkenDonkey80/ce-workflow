@@ -3937,7 +3937,8 @@
       "notes": [
         "Classification: upstream-owned shared browser-evidence lifecycle atom. Installed BetterWright 1.7.1 and current npm 1.7.2 expose only initialize/prove/audit and reject a second initialize, so no ce-workflow-local change can provide the missing provider operation safely.",
         "Durably routed upstream as BetterWright issue https://github.com/BetterWright/betterwright/issues/106. Rechecked installed 1.7.1 and current npm 1.7.2: tool schema only supports initialize/prove/audit and implementation rejects a second initialize, so the canonical remains open pending upstream resolution; no local workaround is safe because the provider owns checklist/proof state.",
-        "Fresh upstream verification: BetterWright issue #106 remains open with no comments or assignee; npm latest remains 1.7.2; installed 1.7.1 still exposes initialize/prove/audit only and rejects a second initialize. Classification remains upstream-owned and unresolved. User decision for this snapshot: keep the canonical open pending upstream delivery; do not add a ce-workflow-local workaround or expand into an upstream source contribution."
+        "Fresh upstream verification: BetterWright issue #106 remains open with no comments or assignee; npm latest remains 1.7.2; installed 1.7.1 still exposes initialize/prove/audit only and rejects a second initialize. Classification remains upstream-owned and unresolved. User decision for this snapshot: keep the canonical open pending upstream delivery; do not add a ce-workflow-local workaround or expand into an upstream source contribution.",
+        "Fresh verification after pull: upstream issue #106 remains unresolved and npm latest remains 1.7.2. Classification remains upstream-owned; acceptance is not yet satisfied."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -3999,6 +4000,26 @@
       "title": "Recover verifier output that arrives after launch orphaning",
       "type": "bug",
       "updatedAt": "2026-08-11T19:17:53.422Z"
+    },
+    "work-2.74": {
+      "acceptance": "finish-task can safely finalize an evidence task with more than 20 bounded task-owned evidence files including screenshots and sanitized .log/.txt metadata; omitted declarations and accidentally pre-staged task-owned evidence either succeed safely or return an exact rerunnable recovery command; unrelated untracked/staged files remain blocked; focused regressions cover the flows.",
+      "createdAt": "2026-08-12T17:17:10.069Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical for work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777 atomic claims: recognize bounded task-owned evidence under docs/evidence/<work-id>, accept safe screenshot and sanitized text/log metadata evidence, replace the fixed 20-file declaration ceiling with a bounded directory/manifest path, and give exact recovery for untracked or pre-staged evidence without weakening unrelated-file gates.",
+      "evidence": [],
+      "id": "work-2.74",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "Classification: locally-owned multi-claim report consolidated into one canonical bug because all atoms share the same finish-task evidence boundary and can coexist."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Make finish-task evidence recovery bounded and actionable",
+      "type": "bug",
+      "updatedAt": "2026-08-12T17:17:10.069Z"
     },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
@@ -4718,6 +4739,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-11T20:04:02.843Z",
           "workflowId": "workflow-msp2nl4y-6q1131"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-6834863f-7e5e-47f1-9a57-7961f8cbafc4",
@@ -4725,12 +4749,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned atomic autonomous-goal pause persistence defect; execute this report directly. Root cause confirmed in extensions/work-models.js: ask_user results are not observed, so an explicit Pause selection leaves the goal active and agent_end schedules another continuation.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: In active autonomous-goal mode, the user selected “Pause as externally blocked” through ask_user after an upstream-only work item ",
       "type": "task",
-      "updatedAt": "2026-08-11T20:04:02.851Z"
+      "updatedAt": "2026-08-12T17:19:55.793Z"
     },
     "work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169": {
       "createdAt": "2026-08-08T08:21:15.842Z",
@@ -5209,6 +5236,47 @@
       "title": "Self-improvement report: The coded finish helper rejected four task-owned sanitized NDJSON evidence files as unrecognized untracked files, even though NDJS",
       "type": "task",
       "updatedAt": "2026-08-10T08:37:03.710Z"
+    },
+    "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
+      "createdAt": "2026-08-12T16:54:19.072Z",
+      "dependencies": [
+        "work-2.74"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task supports declared evidence images via repeated --evidence-file, but an evidence task with many task-owned screenshots plus a log gets a generic 'untracked files need a decision' error when declarations are omitted. The message does not identify --evidence-file as the intended resolution; declarations are capped at 20; .log cannot be declared. A natural `git add` recovery then hits 'refusing pre-staged files', creating an avoidable loop and delaying the user answer.\nExpected: For evidence tasks, finish-task should recognize safe bounded files under docs/evidence/<work-id> automatically or emit a directly runnable corrected command with declarations. It should support a bounded evidence manifest/directory and sanitized metadata/log types. For task-owned pre-staged evidence, explain the precise unstage/declaration recovery or safely handle it. Autonomous cleanup should still return a concise resumable status when finalization fails.\nImpact: Repeated failed finalizer attempts caused an aborted response, user confusion, and unnecessary staging/reset operations despite valid reviewed evidence.\nSuggested improvement: Add task-owned evidence auto-recognition or actionable remediation text; use a bounded manifest/directory declaration; test unstaged and accidentally pre-staged evidence flows; preserve a user-facing progress response on gate failure.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e239e178-a2f2-4e9d-90e1-34782c249cce",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 89806,
+              "file": "01-session.jsonl",
+              "sha256": "009e9ad409899128ec8a38a11f5c2618f25021f9ca59755a233551a417b56a45"
+            },
+            {
+              "bytes": 4512,
+              "file": "02-report.md",
+              "sha256": "c2ccddbb7f20c15364102bb50dbf65a2e18c66f73da3eecf1c8ae889a7450c8b"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "HelpBuddy",
+          "submittedAt": "2026-08-12T16:54:19.064Z",
+          "workflowId": "019ff29f-a339-794d-bbac-ef4d4bdc1041"
+        }
+      ],
+      "id": "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: finish-task supports declared evidence images via repeated --evidence-file, but an evidence task with many task-owned screenshots ",
+      "type": "task",
+      "updatedAt": "2026-08-12T17:17:16.966Z"
     },
     "work-2.report-e1bfdebd-c352-4c9d-95e1-c2c1690358a3": {
       "createdAt": "2026-08-11T16:36:58.409Z",
@@ -7375,7 +7443,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-11T20:04:02.852Z"
+    "updatedAt": "2026-08-12T17:19:55.794Z"
   },
   "schemaVersion": 1
 }

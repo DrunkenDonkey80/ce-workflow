@@ -18254,6 +18254,38 @@ function pauseWorkGoalForDecision(decision, ctx, pi) {
 	pauseWarpForDecision(ctx, decision);
 }
 
+function askUserPauseSelection(event) {
+	if (event.toolName !== "ask_user" || event.isError || event.details?.cancelled)
+		return "";
+	return (
+		event.details?.response?.selections?.find((selection) =>
+			/^\s*(?:pause|wait)\b/i.test(String(selection)),
+		) ?? ""
+	);
+}
+
+function pauseWorkGoalFromAskUser(event, ctx, pi) {
+	const selection = askUserPauseSelection(event);
+	if (!selection || activeWorkGoal?.status !== "active") return;
+	restoreWorkGoalThinking(pi, activeWorkGoal);
+	workGoalContinuationPending = null;
+	clearWorkGoalRecovery();
+	clearWorkGoalUsageLimitTimer();
+	activeWorkGoal = {
+		...activeWorkGoal,
+		status: "paused",
+		decision: {
+			question: String(event.details?.question ?? "").trim(),
+			answer: String(selection),
+			source: "ask_user",
+		},
+		updatedAt: Date.now(),
+	};
+	persistWorkGoal(pi);
+	updateWorkGoalStatus(ctx);
+	ctx.ui.notify(`autonomous goal paused: ${selection}`, "info");
+}
+
 function workGoalTargetId(goal) {
 	const objective = String(goal?.objective ?? "");
 	const explicit = /^Target work item or (?:roadmap|epic) ID:\s*(\S+)$/m.exec(
@@ -22142,7 +22174,7 @@ async function inspectExtensionSourceWithLuna(source, ctx) {
 
 function extensionScoutReviewer(ctx) {
 	const selected = configuredModelId(slotSelection(slotByKey("review"), readEffectiveSettings(ctx.cwd)).model, currentModelId(ctx));
-	if (!/(?:^|[\/_-])(?:sol|glm)(?:[\/_\d.-]|$)/i.test(selected)) throw new Error("Extension scout requires the configured Review model to be Sol or GLM");
+	if (!/(?:^|[/_-])(?:sol|glm)(?:[/_\d.-]|$)/i.test(selected)) throw new Error("Extension scout requires the configured Review model to be Sol or GLM");
 	const parsed = splitModelId(selected);
 	const model = parsed && ctx.modelRegistry?.find?.(parsed.provider, parsed.id);
 	if (!model || !ctx.modelRegistry?.complete) throw new Error("Configured Sol-or-GLM extension reviewer is unavailable");
@@ -22907,6 +22939,10 @@ export default function workModelsExtension(pi) {
 					"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
 			};
 	});
+
+	pi.on("tool_result", (event, ctx) =>
+		pauseWorkGoalFromAskUser(event, ctx, pi),
+	);
 
 	pi.on("session_start", (_event, ctx) => {
 		try {
