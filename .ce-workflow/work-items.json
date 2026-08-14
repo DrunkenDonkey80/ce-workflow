@@ -4200,7 +4200,8 @@
       ],
       "notes": [
         "Atomized classification: (1) browser_evidence checklist lifecycle is duplicate/shared upstream-owned, canonical work-2.71, durably routed as https://github.com/BetterWright/betterwright/issues/106 and intentionally remains open; (2) claimed autonomous continuation failure is related-distinct and classified already-fixed/insufficient-evidence, canonical work-2.72 closed by commit 899e2f5 after node scripts/test-work-goal.mjs passed. The submitted telemetry contains no settled parent-agent record after the work-3.62 specialist before report submission, while current tests cover tool progress, native/ce compaction recovery, exactly-once continuation, and completion/human fences. The two outcomes coexist and are not conflicting.",
-        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers",
+        "Final shared-fix reconciliation: canonical work-2.71 closed by commit 405d023 after the published BetterWright 1.8.3 runtime passed two sequential named initialize/prove/audit journeys with independently retained archived/current proof URLs. Upstream tag v1.8.3 also contains the exact regression in tests/node/pi-extension.test.ts. This report's browser_evidence lifecycle atom is verified and fully covered; no ce-workflow-local workaround was added."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -4974,7 +4975,8 @@
       ],
       "notes": [
         "Classification: duplicate/shared upstream-owned atom covered by canonical work-2.71, related to (not conflicting with) the continuation atom in work-2.72. Verified against installed BetterWright 1.7.1 and npm 1.7.2, searched existing GitHub issues, and routed durably as https://github.com/BetterWright/betterwright/issues/106. This report is reconciled into the open upstream canonical; no ce-workflow-local workaround is warranted.",
-        "Reconciled and routed to canonical work-2.71 / BetterWright issue #106; canonical intentionally remains open for upstream delivery."
+        "Reconciled and routed to canonical work-2.71 / BetterWright issue #106; canonical intentionally remains open for upstream delivery.",
+        "Final shared-fix reconciliation: canonical work-2.71 closed by commit 405d023 after the published BetterWright 1.8.3 runtime passed two sequential named initialize/prove/audit journeys with independently retained archived/current proof URLs. Upstream tag v1.8.3 also contains the exact regression in tests/node/pi-extension.test.ts. This report's browser_evidence lifecycle atom is verified and fully covered; no ce-workflow-local workaround was added."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -7483,7 +7485,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-14T13:51:09.446Z"
+    "updatedAt": "2026-08-14T13:51:27.948Z"
   },
   "schemaVersion": 1
 }
