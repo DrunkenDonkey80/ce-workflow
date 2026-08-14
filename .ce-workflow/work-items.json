@@ -3820,6 +3820,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Locally owned. finishHelperSucceeded currently stringifies a live nested Pi ToolResult, so escaped finish-task JSON can miss PASS/work_item_id matching and later commits can obscure the checkpoint base. Normalize tool_execution_end content using the existing contentText path and schedule each successful finish immediately.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Create a verifier batch for every successful finish result"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3847,6 +3851,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Locally owned. Planner-created executable slice plans can bypass advisorUsageForSlicePlans even when the resolved setting is first or all. Make the planner handoff or durable state enforce the configured advisor challenge before implementation.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Enforce advisor review for planner-created slice plans"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3929,7 +3937,11 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical shared claim for snapshot reports work-2.report-80bf598b-4278-49aa-ace4-e9c57bfbddb8 and work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55: BetterWright browser_evidence must permit a new task-scoped checklist after the prior checklist audits ready while retaining prior proof artifacts.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.71",
       "labels": [
         "upstream"
@@ -3938,13 +3950,16 @@
         "Classification: upstream-owned shared browser-evidence lifecycle atom. Installed BetterWright 1.7.1 and current npm 1.7.2 expose only initialize/prove/audit and reject a second initialize, so no ce-workflow-local change can provide the missing provider operation safely.",
         "Durably routed upstream as BetterWright issue https://github.com/BetterWright/betterwright/issues/106. Rechecked installed 1.7.1 and current npm 1.7.2: tool schema only supports initialize/prove/audit and implementation rejects a second initialize, so the canonical remains open pending upstream resolution; no local workaround is safe because the provider owns checklist/proof state.",
         "Fresh upstream verification: BetterWright issue #106 remains open with no comments or assignee; npm latest remains 1.7.2; installed 1.7.1 still exposes initialize/prove/audit only and rejects a second initialize. Classification remains upstream-owned and unresolved. User decision for this snapshot: keep the canonical open pending upstream delivery; do not add a ce-workflow-local workaround or expand into an upstream source contribution.",
-        "Fresh verification after pull: upstream issue #106 remains unresolved and npm latest remains 1.7.2. Classification remains upstream-owned; acceptance is not yet satisfied."
+        "Fresh verification after pull: upstream issue #106 remains unresolved and npm latest remains 1.7.2. Classification remains upstream-owned; acceptance is not yet satisfied.",
+        "Snapshot atomization/classification (2026-08-14): one shared claim—start a second named browser_evidence checklist after the first is proved and audited while retaining independently attributable proof. Previously upstream-owned; now already-fixed upstream in BetterWright v1.8.0 and present in npm stable 1.8.3. Verified tag v1.8.3 commit d31c1f4f2d1b9b3c30a24379259839db968f5a34: CHANGELOG documents sequential checklists for issue #106; tests/node/pi-extension.test.ts exercises two named initialize/prove/audit journeys and asserts archived/current proof URLs; the published 1.8.3 runtime was installed into an isolated temp prefix and the same sequence passed with retained `find-product` and `add-to-cart` proof URLs. GitHub issue #106 remains open only as stale upstream bookkeeping; current published behavior satisfies acceptance. Covered reports: work-2.report-80bf598b-4278-49aa-ace4-e9c57bfbddb8 is duplicate/shared; work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55 contains this same shared atom plus the related-distinct continuation atom already closed as work-2.72. Outcomes coexist; no conflict and no ce-workflow-local workaround or source change is needed.",
+        "wo:verify-check FAIL\nCommand: node C:\\Users\\flex\\AppData\\Local\\Temp\\bw-S0wqln\\verify-sequential.mjs\n7)\r\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)\r\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)\r\n    at Module._load (node:internal/modules/cjs/loader:1346:5)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47 {\r\n  code: 'MODULE_NOT_FOUND',\r\n  requireStack: []\r\n}\r\n\r\nNode.js v26.7.0\r\n",
+        "wo:verify-check PASS\nCommand: node C:/Users/flex/AppData/Local/Temp/bw-S0wqln/verify-sequential.mjs\nOutput: ok - BetterWright 1.8.3 retains two independently attributable sequential browser_evidence journeys"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Allow sequential browser-evidence journeys in one session",
       "type": "bug",
-      "updatedAt": "2026-08-11T18:36:44.812Z"
+      "updatedAt": "2026-08-14T13:51:09.446Z"
     },
     "work-2.72": {
       "acceptance": "A focused lifecycle regression models a goal turn ending after successful browser/browser_evidence activity and proves exactly one automatic continuation reaches the next phase, including when context compaction or pending-message deferral occurs; existing completion and human-decision fences remain intact.",
@@ -4431,6 +4446,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: Live work-goal roadmap work-6 closed three slices in one long parent turn. Configured background verifier profiles existed, but no per-finish batch was created for work-6.1 or work-6.2. At parent agent-end, one batch was finally created only for the latest commit (3774c08..af44113), so work-6.1 was never checkpoint-reviewed. The likely boundary defect is finishHelperSucceeded(): its test passes a raw string, while the live Pi tool_execution_end result is a nested ToolResult/content payload whose JSON.stringify contains escaped JSON and does not match the PASS/work_item_id regex. Separately, wo\nExpected: Every successful coded finish must durably create exactly one immutable verifier batch for that commit before later commits can obscure its base, parsing the real Pi ToolResult shape. Initial work-planner-created executable slice plans must also honor advisorUsageForSlicePlans (first here), or durably expose a coded pending advisor gate before implementation.\nImpact: Assurance silently degraded: work-6.1 received no configured Opus/Sol/GLM background review, work-6.2 review started only after the parent turn ended, and none of the three planner-created slice plans received the configured advisor challenge. The main session initially reported that no background verifiers existed because extension-owned launches were not visible in its normal role-run list.\nSuggested improvement: Normalize tool_execution_end output with the existing contentText helper before PASS/work_item_id matching and add a production-shaped nested ToolResult fixture proving two finish calls in one agent turn create two distinct commit batches. Add coded advisor-gate state/tests for planner-created wo:slice-plan notes so they cannot bypass advisorUsageForSlicePlans.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Fix verifier checkpoints and planner advisor enforcement"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/69cc9531-e434-4129-92af-6f2fdb0b5d82",
@@ -7370,6 +7389,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Add the self-improving-only /work-extension-scout entry point and the collection/scheduling half of the pipeline: parse pi.dev recent-extension pages, normalize package metadata, batch-screen descriptions as untrusted data, and atomically persist a 30-day initial cursor plus ranked source-inspection queue with durable overflow.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Discover, screen, and queue recent Pi extensions"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -7396,6 +7419,10 @@
       ],
       "dependencyEdges": [],
       "description": "Consume up to 10 queued candidates per run and inspect promising repositories without executing their code: shallow-clone without submodules into a disposable read-only quarantine, enforce containment and symlink safety, then have Luna emit bounded evidence-backed capability, quality, maintenance, dependency, security, overlap, and install-versus-borrow facts.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Inspect queued extensions in a secure source quarantine"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -7426,6 +7453,10 @@
       ],
       "dependencyEdges": [],
       "description": "Complete the guided scout flow: send evidence-backed finalists to one configured Sol-or-GLM reviewer using the existing private POV playbook, prompt only actionable finalists for proceed/defer/reject, keep installation explicit, and enforce durable rejection/revisit policy from the atomic extension ledger.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Review finalists and enforce durable revisit policies"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -7452,7 +7483,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-12T17:26:56.366Z"
+    "updatedAt": "2026-08-14T13:51:09.446Z"
   },
   "schemaVersion": 1
 }
