@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const MIN_WIDTH = 56;
 const FULL_WIDTH = 80;
@@ -102,20 +102,40 @@ export function renderModelRow(ctx, theme, width, thinkingLevel) {
 		return [theme?.fg?.("warning", diagnostic) ?? diagnostic];
 	}
 	const { used, total, percent } = contextValues(ctx);
-	const full = width >= FULL_WIDTH;
-	const barCells = full ? 12 : Math.max(4, Math.min(10, width - 52));
 	const effort = String(thinkingLevel ?? ctx.thinkingLevel ?? "off");
 	const model = String(ctx.model?.name ?? ctx.model?.id ?? "no model");
-	const bar = contextBar(percent, barCells);
+	const folder = resolve(String(ctx.cwd ?? process.cwd()));
+	const fullBar = contextBar(percent, 12);
+	const fullSuffix = ` · Effort: ${effort} · Context [${fullBar}] ${percent}% ${formatTokens(used)}/${formatTokens(total)} · F8 Compact`;
+	const fullFolder = `Folder: ${folder}`;
+	const full =
+		width >= FULL_WIDTH &&
+		width >=
+			visibleWidth(fullFolder) +
+			visibleWidth(" · Model: ") +
+			visibleWidth(fullSuffix) +
+			4;
+	const bar = full
+		? fullBar
+		: contextBar(percent, Math.max(4, Math.min(10, width - 52)));
 	const suffix = full
-		? ` · Effort: ${effort} · Context [${bar}] ${percent}% ${formatTokens(used)}/${formatTokens(total)} · F8 Compact`
+		? fullSuffix
 		: ` · ${effort} · [${bar}] ${percent}% ${formatTokens(used)}/${formatTokens(total)} · F8 Compact`;
-	const prefix = full ? "Model: " : "";
-	const modelWidth = Math.max(1, width - visibleWidth(prefix) - visibleWidth(suffix));
-	const plainModel = truncatePlain(model, modelWidth);
+	const folderText = full ? fullFolder : folder;
+	const identityWidth = Math.max(1, width - visibleWidth(suffix));
+	const plainFolder = truncatePlain(
+		folderText,
+		Math.min(identityWidth, visibleWidth(folderText)),
+	);
+	const modelPrefix = full ? " · Model: " : " · ";
+	const modelWidth = identityWidth - visibleWidth(plainFolder) - visibleWidth(modelPrefix);
+	const identity =
+		modelWidth > 0
+			? `${plainFolder}${modelPrefix}${truncatePlain(model, modelWidth)}`
+			: plainFolder;
 	const color = used > 180000 ? "error" : used > 150000 ? "warning" : "text";
 	const styledBar = theme?.fg?.(color, bar) ?? bar;
-	return [`${prefix}${plainModel}${suffix.replace(bar, styledBar)}`];
+	return [`${identity}${suffix.replace(bar, styledBar)}`];
 }
 
 class QuotaError extends Error {

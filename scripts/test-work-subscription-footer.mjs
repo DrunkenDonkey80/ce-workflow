@@ -20,6 +20,7 @@ const theme = {
 };
 const context = (tokens, window = 272000) => ({
 	mode: "tui", hasUI: true,
+	cwd: "C:\\soft\\Universal\\ce-workflow",
 	model: { id: "模型-very-long-🚀-model-name", contextWindow: window },
 	thinkingLevel: "high",
 	getContextUsage: () => ({ tokens, contextWindow: window }),
@@ -102,18 +103,23 @@ for (const [tokens, color] of [[150000, "37"], [150001, "33"], [180000, "33"], [
 	assert.match(line, new RegExp(`\\x1b\\[${color}m`), `${tokens} pressure color`);
 	assert.ok(visibleWidth(line) <= 80, `${tokens} row fits`);
 }
-const full = renderModelRow(context(175000), theme, 80)[0];
-assert.match(stripAnsi(full), /^Model: /);
+const full = renderModelRow(context(175000), theme, 160)[0];
+assert.match(stripAnsi(full), /^Folder: C:\\soft\\Universal\\ce-workflow · Model: /);
 assert.match(stripAnsi(full), /Effort: high/);
 assert.match(stripAnsi(full), /Context \[[█░]{12}\]/);
 assert.match(stripAnsi(full), /64% 175k\/272k · F8 Compact$/);
-assert.doesNotMatch(stripAnsi(full), /cwd|git/i);
+const standard = renderModelRow(context(175000), theme, 80)[0];
+assert.match(
+	stripAnsi(standard),
+	/^C:\\soft\\Universal\\ce-workflow/,
+	"the standard first status row keeps the full current folder",
+);
 const compact = renderModelRow(context(175000), theme, 56)[0];
 assert.match(stripAnsi(compact), /\[[█░]{4,}\] 64% 175k\/272k · F8 Compact$/);
 assert.match(stripAnsi(compact), /…/);
 const narrow = renderModelRow(context(175000), theme, 55)[0];
 assert.equal(stripAnsi(narrow), "Subscription footer needs at least 56 columns");
-for (const [line, width] of [[full, 80], [compact, 56], [narrow, 55]]) {
+for (const [line, width] of [[full, 160], [standard, 80], [compact, 56], [narrow, 55]]) {
 	assert.ok(visibleWidth(line) <= width);
 	assert.equal((line.match(/\x1b\[/g) ?? []).length % 2, 0);
 }
@@ -588,7 +594,7 @@ lifecycleResolve?.([{ id: "late", label: "late", usedPercent: 99, resetsAt: rese
 await flush();
 assert.equal(lifecycle.controller.isInstalled(), false, "late completion cannot reclaim ownership");
 
-// The custom footer stays focused on model and quota data; workflow progress remains in its existing widget.
+// The custom footer stays focused on folder, model, and quota data; workflow progress remains in its existing widget.
 const composition = harness({
 	providers: [{ id: "composition-quota", label: "Quota", piProviderId: "quota", identity: () => "quota", fetchQuota: async () => [{ id: "q", label: "q", usedPercent: 10, resetsAt: reset }] }],
 	auth: () => stored("safe"), fetchImpl: async () => {},
@@ -598,7 +604,7 @@ const compositionComponent = composition.component();
 await flush();
 const compositionRows = compositionComponent.render(80).map(stripAnsi);
 assert.equal(compositionRows.length, 2);
-assert.match(compositionRows[0], /^Model:/);
+assert.match(compositionRows[0], /^C:\\soft\\Universal\\ce-workflow/);
 assert.match(compositionRows[1], /^Quota /);
 assert.doesNotMatch(compositionRows.join("\n"), /Workflow:/);
 composition.controller.shutdown(composition.ctx);

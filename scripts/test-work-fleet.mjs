@@ -326,6 +326,51 @@ try {
 	);
 	assert.equal(completedSnapshot.tasks[0].state, "completed");
 
+	const sessionRoot = join(fleetDir, "session-root");
+	const sessionArtifacts = join(sessionRoot, "subagent-artifacts");
+	const sessionTranscript = join(
+		sessionArtifacts,
+		"session-run_work-worker_0_transcript.jsonl",
+	);
+	mkdirSync(sessionArtifacts, { recursive: true });
+	writeFileSync(
+		sessionTranscript,
+		`${JSON.stringify({ recordType: "message", role: "assistant", text: "session artifact" })}\n`,
+	);
+	assert.deepEqual(
+		transcriptEvents(
+			{
+				asyncDir: join(fleetDir, ".pi", "subagents", "async", "session-run"),
+				cwd: fleetDir,
+				index: 0,
+				step: { transcriptPath: sessionTranscript },
+			},
+			{ sessionFile: join(sessionRoot, "parent-session.jsonl") },
+		),
+		[{ kind: "assistant", text: "session artifact", model: undefined }],
+		"Fleet trusts transcripts in the current session-scoped pi-subagents artifact root",
+	);
+	const outsideDir = join(fleetDir, "forged-async-root");
+	const outsideTranscript = join(outsideDir, "outside.jsonl");
+	mkdirSync(outsideDir, { recursive: true });
+	writeFileSync(
+		outsideTranscript,
+		`${JSON.stringify({ recordType: "message", role: "assistant", text: "outside" })}\n`,
+	);
+	assert.deepEqual(
+		transcriptEvents(
+			{
+				asyncDir: outsideDir,
+				cwd: fleetDir,
+				index: 0,
+				step: { transcriptPath: outsideTranscript },
+			},
+			{ sessionFile: join(sessionRoot, "parent-session.jsonl") },
+		),
+		[],
+		"Fleet does not turn a persisted arbitrary asyncDir into a transcript trust root",
+	);
+
 	const output = join(fleetDir, "output-0.log");
 	writeFileSync(output, "still running");
 	assert.deepEqual(

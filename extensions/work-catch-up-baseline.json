@@ -1,34 +1,48 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-09",
+  "capturedAt": "2026-08-17",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "0.84.1",
-      "reviewedAt": "2026-08-07",
-      "reviewedVersion": "0.84.1",
+      "version": "0.84.2",
+      "reviewedAt": "2026-08-14",
+      "reviewedVersion": "0.84.2",
       "decisions": [
         {
-          "version": "0.84.1",
-          "title": "Terminate blocked interactive-fallback tool calls",
+          "version": "0.84.2",
+          "title": "Installed host release and catch-up baseline",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Pi's new terminating block result is a reversible, low-risk way to stop the automatic follow-up model call when ce-workflow rejects work_goal_human_decision because ask_user is available. The existing tool_call guard is the exact shared boundary, so adding terminate removes one unnecessary model turn without changing the decision flow.",
-          "verification": "node scripts/test-work-goal.mjs passed and asserts the blocked interactive fallback returns block=true and terminate=true"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1—revert one baseline record. Bottom line: host 0.84.2 is already installed; record this review as the new baseline. Project fit: `extensions/work-catch-up-baseline.json` still recorded 0.84.1 and `package.json` intentionally accepts the host peer dependency. Upstream evidence: the installed package manifest is 0.84.2 and its changelog documents the release. Benefit: prevents repeat review and preserves decisions. Cost/risk: none beyond release-regression exposure. Confidence: high. Recommendation: adopt the baseline record after owner verification.",
+          "verification": "Installed @earendil-works/pi-coding-agent is 0.84.2; node scripts/verify-package.mjs passed against the release"
         },
         {
-          "version": "0.84.1",
-          "title": "Provider authentication readiness CLI",
+          "version": "0.84.2",
+          "title": "Experimental strict sampling for native tools",
+          "pov": "Trial",
+          "status": "skipped",
+          "rationale": "Grade: Trial. Reversibility: Tier 1—unset one environment variable. Bottom line: trial native strict sampling for built-in read/bash/edit/write; do not make it a project default yet. Project fit: ce-workflow relies on native edit/write and already protects its custom tools with strict schemas. Upstream evidence: the captured 0.84.1-to-0.84.2 artifact adds experimental preferred JSON-schema sampling to the four built-ins and confirms the `PI_EXPERIMENTAL=1` gate. Benefit: may reduce malformed native-tool arguments. Cost/risk: explicitly experimental provider/schema behavior. Confidence: medium. Recommendation: run one non-production work item first; retain current default unless it is clean."
+        },
+        {
+          "version": "0.84.2",
+          "title": "Replace the custom strict-tool wrapper",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "pi auth check validates provider credential readiness, while ce-workflow's agent health preflight must verify each configured model through the in-process ModelRegistry.complete path, including its actual endpoint and response. Spawning the CLI would add a second runtime-resolution path and still require the current probe; revisit only if Pi exposes a model-level readiness API through the extension context that can replace inference probes without losing coverage."
+          "rationale": "Grade: Reject. Reversibility: Tier 1. Bottom line: retain registerConstrainedTool. Verified project fit: it normalizes nullable custom-tool parameters and wraps verifier, goal, and mutation tools under tested contracts. Upstream evidence: native experimental sampling applies only to built-in read, bash, edit, and write and does not normalize custom schemas. Benefit: avoids breaking custom tool contracts. Cost/risk: retains a small tested adapter. Confidence: high. Recommendation: do not simplify this code."
         },
         {
-          "version": "0.84.1",
-          "title": "Host tool-prompt, provider, TUI, theme, and runtime updates",
+          "version": "0.84.2",
+          "title": "Expand templates in generated internal handoffs",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 1. Bottom line: preserve sendUserMessage expandPromptTemplates=false for generated protocol messages. Verified project fit: autonomous-goal and role follow-ups are fully materialized and recognized through lifecycle markers. Upstream evidence: 0.84.2 adds an explicit opt-in that dispatches commands and expands skills/templates. Benefit: deterministic internal handoffs. Cost/risk: generated prompts intentionally skip expansion. Confidence: high. Recommendation: no local change."
+        },
+        {
+          "version": "0.84.2",
+          "title": "Host provider, TUI, runtime, and sendMessage fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Built-in tool prompt contribution exports, Qwen catalog support, fullscreen interaction and rendering fixes, terminal theme probing, Agent.reset safety, and binary startup fixes are host-owned behavior inherited by ce-workflow. This package neither constructs Pi's built-in tool harness nor duplicates those provider and TUI internals, so local adapters would add code without replacing an incumbent path."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit provider/runtime fixes, fullscreen and startup improvements, streaming-usage repair, default tools, and triggerTurn:false behavior without local adapters. Verified project fit: ce-workflow has no sendMessage call site or JSON streaming consumer and already uses agent_end to agent_settled lifecycle boundaries. Upstream evidence: the 0.84.2 changelog and captured diff place these changes in host-owned surfaces. Benefit: avoids duplicating canonical host behavior. Cost/risk: none beyond package regression risk. Confidence: high. Recommendation: inherit with no local code."
         }
       ]
     },
@@ -53,24 +67,38 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.45.1",
-      "reviewedAt": "2026-08-09",
-      "reviewedVersion": "0.45.1",
+      "version": "0.50.0",
+      "reviewedAt": "2026-08-17",
+      "reviewedVersion": "0.50.0",
       "decisions": [
         {
-          "version": "0.45.1",
-          "title": "Async interrupt safety and workflow completion reliability",
+          "version": "0.50.0",
+          "title": "Managed-run control, recovery, and supervisor safety release",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 (baseline-only adoption; easy rollback by package version). Bottom line: adopt 0.45.1’s package-owned async safety and workflow reliability fixes with no ce-workflow source shim. Verified project fit: ce-workflow routes coded roles through `extensions/work-models.js`’s shared async RPC wrapper and relies on status/reconciliation; upstream 0.45.1 prevents interrupts from signaling unverified/shared host PIDs, publishes result data before terminal status, and drops late child responses after workflow settlement. Benefit: safer async control and fewer completion races/duplicates. Cost/risk: low package regression risk; no local code change. Confidence: high. Recommendation: Adopt now.",
-          "verification": "Installed pi-subagents version is 0.45.1 and node scripts/test-work-start-finish.mjs passed against the shared RPC wrapper"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 (package rollback/baseline-only record). Bottom line: adopt the already-installed 0.50.0 release with no ce-workflow runtime shim. Verified project fit: ce-workflow launches exact async role runs through the shared RPC wrapper, persists run IDs, and reconciles terminal status; its child roles already use contact_supervisor and durable work-item fallback rather than the removed generic-intercom fallback. Verified upstream evidence: the 0.49.0→0.50.0 changelog/diff adds retained-run resumability checks, safer follow-up/steer behavior, async snapshot/status improvements, child-safe supervisor handling, live-control/watchdog fixes, and external-run APIs. Benefit: safer recovery and control of the same managed runs ce-workflow already uses. Cost/risk: ordinary upstream regression exposure; adding local external-run/Fleet integration would duplicate ce-workflow’s own Fleet and is therefore excluded. Confidence: high. Recommendation: Adopt now and record package-owned verification; no source shim.",
+          "verification": "Installed pi-subagents package manifest is 0.50.0; node scripts/test-work-start-finish.mjs passed against ce-workflow's shared async RPC and reconciliation path"
         },
         {
-          "version": "0.45.1",
-          "title": "Structured wait completions, live activity, and caller guidance",
+          "version": "0.50.0",
+          "title": "Register ce-workflow state as package external runs",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not mirror ce-workflow work items, verifier lanes, or extension jobs into pi-subagents external-run state. Verified project fit: `extensions/work-fleet.js` already groups native work items with exact managed child runs, while `extensions/work-models.js` owns durable leases and terminal reconciliation. Upstream evidence: 0.50.0 exports external-run registration for work owned outside pi-subagents and displays it in package Fleet. Benefit: avoids duplicate rows, status translation, and two lifecycle owners. Cost/risk: users keep two intentionally different Fleet views. Confidence: high. Recommendation: retain ce-workflow Fleet as the domain view and use package Fleet for package-owned runs."
+        },
+        {
+          "version": "0.50.0",
+          "title": "Replace native run reconciliation with async snapshots or retained-run follow-ups",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: retain ce-workflow's status-file reconciliation and exact RPC spawn contract. Verified project fit: pending runs survive restart through `.pi/work-runs` events, action leases, and terminal `status.json` evidence; follow-up work is selected from the native work-item store rather than an old chat session. Upstream evidence: 0.50.0 adds async snapshots and validates whether retained child sessions are resumable before follow-up. Benefit: preserves deterministic durable ownership while inheriting safer package controls. Cost/risk: one small reconciliation adapter remains. Confidence: high. Recommendation: do not substitute package session resumability for native work-item resumability."
+        },
+        {
+          "version": "0.50.0",
+          "title": "Package-owned schemas, guides, UI, watchdog, and model/runtime fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1. Bottom line: add no ce-workflow adapter for structured `subagent_wait` completions, live workflow activity, Markdown-fence diagnostics, Herdr command quoting, configured reads, or clarified mission policy. Verified project fit: current direct-role status and transcript reconciliation already covers required telemetry, the shared RPC wrapper safely serializes task text with JSON.stringify, and ce-workflow deliberately keeps `mission:false`; no current correctness gap or removable local code was found. Benefit: avoids duplicating canonical upstream status and UI behavior. Cost/risk: exact wait-only artifact identity remains unused, but can be revisited if a measured telemetry gap appears. Confidence: high. Recommendation: inherit the package behavior without local code."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit 0.50.0's control-channel, supervisor, skill, model-provider, Fleet, guide, watchdog, and project-pane fixes without local adapters. Verified project fit: ce-workflow consumes the public subagent tool/RPC boundary and does not duplicate these package internals. Upstream evidence: the reviewed changelog, public exports, tool schema, skills, and diff place these fixes inside pi-subagents. Benefit: keeps ce-workflow smaller and avoids shadow implementations. Cost/risk: normal package regression exposure. Confidence: high. Recommendation: no local action."
         }
       ]
     },
@@ -98,76 +126,104 @@
     },
     {
       "name": "pi-intercom",
-      "version": "0.10.0",
-      "reviewedAt": "2026-08-09",
-      "reviewedVersion": "0.10.0",
+      "version": "0.10.1",
+      "reviewedAt": "2026-08-14",
+      "reviewedVersion": "0.10.1",
       "decisions": [
         {
-          "version": "0.10.0",
-          "title": "Connected-target safety and broker routing reliability",
+          "version": "0.10.1",
+          "title": "Installed broker reliability release",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 (baseline-only adoption; easy package rollback). Bottom line: adopt 0.10.0’s package-owned routing and reliability improvements with no ce-workflow source change. Verified project fit: ce-workflow treats pi-intercom as optional and uses only public `contact_supervisor`/`intercom` actions plus exact-session, pending-ask, and explicit-reply safeguards. Upstream 0.10.0 hardens reconnect/mailbox identity, refuses blocking asks to disconnected targets, validates broker payloads, and adds cwd-scoped visible project panes without changing required existing calls. Benefit: safer stale/disconnected coordination and inherited broker reliability. Cost/risk: low package regression risk; project panes and extension-bus state remain unused. Confidence: high. Recommendation: Adopt now.",
-          "verification": "Installed pi-intercom version is 0.10.0 and node scripts/test-work-goal.mjs passed the exact-session, pending-ask, and explicit-reply policy assertions"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1—revert one catch-up ledger entry or package version. Bottom line: the installed package is already 0.10.1 while the baseline still recorded 0.10.0; record a baseline-only adoption with no production or policy change. Project fit: `package.json` keeps intercom optional and the existing explicit pending/reply policy remains compatible. Upstream evidence: the installed package is 0.10.1 and the captured artifact adds flat-store `tsx` resolution with package regression coverage. Benefit: avoids a false repeat catch-up and inherits safer broker startup. Cost/risk: low; no ce-workflow runtime surface changes. Confidence: high. Recommendation: adopt as baseline bookkeeping only.",
+          "verification": "Installed pi-intercom is 0.10.1; package-owned broker resolution and startup diagnostic tests are present in the reviewed release artifact"
         },
         {
-          "version": "0.10.0",
-          "title": "Implicit replies, project panes, and extension-bus state",
+          "version": "0.10.1",
+          "title": "Attachment-based supervisor reply convention",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1. Bottom line: retain ce-workflow’s explicit `pending` plus `reply` coordination rule and add no project-pane or extension-bus integration. Verified project fit: exact reply threading is a deliberate stale-message safety boundary, bounded cross-codebase work already uses pi-subagents with explicit cwd, and ce-workflow has no shared-state consumer that would justify a second cross-session store. Benefit: preserves thread identity and avoids new Herdr/state coupling. Cost/risk: ce-workflow does not use the release’s convenience surfaces, while ordinary direct users still can. Confidence: high. Recommendation: no local action."
+          "rationale": "Grade: Reject. Reversibility: Tier 1. Bottom line: do not add an attachment-based supervisor-reply convention. Verified project fit: ce-workflow has no attachment-bearing intercom call site and uses durable work items rather than chat attachments for coordination evidence. Upstream evidence: 0.10.1 fixes attachment forwarding in reply while the public attachment schema already existed. Benefit: preserves concise, durable handoffs. Cost/risk: rich replies would duplicate evidence into disposable context. Confidence: high. Recommendation: reject local adoption and continue using paths plus concise text."
+        },
+        {
+          "version": "0.10.1",
+          "title": "Broker startup stderr diagnostics",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit bounded startup stderr diagnostics and flat package-store resolution without a ce-workflow wrapper. Verified project fit: ce-workflow only declares the optional peer and never launches the broker. Upstream evidence: broker/spawn.ts owns the resolution and stderr capture with package tests. Benefit: better package startup errors. Cost/risk: local duplication would create an unsupported second broker path. Confidence: high. Recommendation: no local action."
         }
       ]
     },
     {
       "name": "@narumitw/pi-goal",
-      "version": "0.49.7",
-      "reviewedAt": "2026-08-09",
-      "reviewedVersion": "0.49.7",
+      "version": "0.51.0",
+      "reviewedAt": "2026-08-14",
+      "reviewedVersion": "0.51.0",
       "decisions": [
         {
-          "version": "0.49.7",
-          "title": "Recover abandoned native-compaction fences",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 (small guard plus one focused regression). Bottom line: release ce-workflow’s native-compaction single-flight fence when a new turn begins without the expected `session_compact` event. Verified project fit: `extensions/work-models.js` marks native compaction in flight during `session_before_compact`; previously only `session_compact`/explicit reset cleared it, so an abandoned host compaction could leave F8 microcompaction permanently reporting “already in progress.” The reviewed pi-goal 0.49.7 lifecycle avoids treating `session_before_compact` as proof of completion and schedules continuation only after compact/settled boundaries. Benefit: prevents a stuck autonomous-goal compaction fence. Cost/risk: low; the guard only clears native-owned state at an actual new-turn boundary and leaves ce-workflow-owned compaction untouched. Confidence: high. Recommendation: Adopt now.",
-          "verification": "node scripts/test-work-goal.mjs passed and covers native fence retention before turn_start plus recovery on the next turn"
+          "version": "0.51.0",
+          "title": "Dynamic Goal-tool ownership",
+          "pov": "Trial",
+          "status": "skipped",
+          "rationale": "Grade: Trial. Reversibility: Tier 2—highly reversible when isolated behind `syncWorkGoalTools()` and focused tests. Bottom line: trial only if restrictive active-tool policies are observed; do not copy upstream’s default change wholesale. Project fit: `extensions/work-models.js` unconditionally adds/removes local goal tools and active-only visibility is covered by focused tests. Upstream evidence: pi-goal 0.51.0 tracks only tools it hid, waits for idle before schema changes, and rolls back failed activation; the release changes the default to `after-first-goal` and documents restrictive-policy coexistence. Benefit: avoid overriding another extension’s restrictive allowlist or changing tools mid-turn. Cost/risk: local tools are intentionally visible only while active; ownership snapshots and busy-state tests add lifecycle complexity. Confidence: medium. Recommendation: reproduce a conflicting active-tool policy first; then trial ownership tracking without changing current active-only behavior."
         },
         {
-          "version": "0.49.7",
-          "title": "Replace ce-workflow autonomous goals with pi-goal managed runs",
+          "version": "0.51.0",
+          "title": "General external wait state and tool",
+          "pov": "Hold",
+          "status": "skipped",
+          "rationale": "Grade: Hold. Reversibility: Tier 2—a new persisted status, timer, lifecycle hooks, and tool schema would touch the autonomous engine. Bottom line: the pattern is useful, but upstream wake semantics are too broad for ce-workflow today. Project fit: ce-workflow already has a narrow persisted timer for provider limits, while external human dependencies deliberately use ask_user and durable decisions. Upstream evidence: pi-goal 0.51.0 validates and terminates `goal_wait`, persists and restores deadlines, and explicitly treats any non-Goal extension message as a wake because sender identity is unavailable. Benefit: could prevent wasteful continuations while a verifier or asynchronous monitor is pending. Cost/risk: ce-workflow emits substantial extension-driven automation and broad wake semantics can cause premature resumes. Confidence: high. Recommendation: hold until a named monitor can emit an authenticated/owned completion event; reuse the usage-limit timer pattern rather than porting `goal_wait` directly."
+        },
+        {
+          "version": "0.51.0",
+          "title": "Managed-run RPC bridge",
+          "pov": "Hold",
+          "status": "skipped",
+          "rationale": "Grade: Hold. Reversibility: Tier 2—adding public event channels creates a compatibility contract. Bottom line: no local caller requires this protocol, and it would create a second owner for the same lifecycle. Project fit: ce-workflow persists its own goal state and the settled lifecycle already drives leases plus goal finalization. Upstream evidence: pi-goal exposes default-off start/cancel/state events and documents them as trusted-extension cooperation rather than a security boundary. Benefit: a future sibling extension could start/cancel one isolated goal. Cost/risk: duplicate goal ownership, session-local run identities, and a public API to maintain. Confidence: high. Recommendation: retain local lease orchestration; revisit only when a concrete sibling extension needs a supported cross-extension run API."
+        },
+        {
+          "version": "0.51.0",
+          "title": "Replace ce-workflow autonomous goals with pi-goal",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2; confidence: high. pi-goal 0.49.7's default-off managed-run RPC, response/no-progress limits, queue, tools, TUI, and settled continuation lifecycle are well-defined, but replacing ce-workflow's engine would add an optional package dependency while losing self-improving mode, work-item-aware completion gates, guided ask_user decisions, context microcompaction, usage-limit retry, and ce-workflow telemetry. The RPC cannot delete the incumbent path without a parallel compatibility layer, so retain the project-owned engine and reuse only the concrete lifecycle fix above."
+          "rationale": "Grade: Reject. Reversibility: Tier 3 after state and command migration. Bottom line: pi-goal is not a substitute for ce-workflow work-item, lease, compaction, and completion-gate behavior. Verified project fit: local completion validates verifier, catch-up, and project state and exposes distinct work_goal tools. Upstream evidence: 0.51.0 adds generic waiting, visibility, and prompt ownership to the generic /goal extension, not ce-workflow integration. Benefit: none beyond deleting code while losing required behavior. Cost/risk: high migration and correctness risk. Confidence: high. Recommendation: reject replacement and borrow only proven narrow patterns."
         }
       ]
     },
     {
       "name": "pi-lens",
-      "version": "3.8.74",
-      "reviewedAt": "2026-08-06",
-      "reviewedVersion": "3.8.74",
+      "version": "4.0.1",
+      "reviewedAt": "2026-08-17",
+      "reviewedVersion": "4.0.1",
       "decisions": [
         {
-          "version": "3.8.74",
-          "title": "Checkpoint trust, resumable graphs, and diagnostic quality",
+          "version": "4.0.1",
+          "title": "Diagnostics, navigation, and subagent-efficiency release",
           "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "Checkpoint-bounded secret scanning, trusted cold-start graph resume, stricter structural scans, improved LSP diagnostics, confidence labels, and duplicate suppression directly improve tools ce-workflow already invokes. They are package-owned and require no local adapter."
+          "status": "adopted",
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 (package rollback/baseline-only record). Bottom line: adopt the already-installed 4.0.1 release and its package-owned diagnostics/navigation improvements without changing ce-workflow role allowlists. Verified project fit: ce-workflow already uses `project_report` only in an availability-gated background verifier and uses native read/grep plus focused LSP checks elsewhere; no repository call site hardcodes the v4-renamed `filePath` tool argument. Verified upstream evidence: the 3.8.74→4.0.1 changelog, public tool schemas, docs, package manifest, and captured diff add always-active `symbol_search`/`module_report`/`read_symbol`/`read_enclosing`, deferred activation for situational AST/LSP tools, subagent light mode, more honest diagnostic coverage, safer read/edit guards, and numerous scanner/LSP correctness fixes. Benefit: faster, lower-context discovery and safer diagnostics are inherited automatically in Pi sessions and subagents. Cost/risk: normal package regression exposure; putting optional pi-lens tools into every ce-workflow agent allowlist would make role launch depend on an optional ambient extension, while the isolated verifier must not read live files through symbol tools. Confidence: high. Recommendation: Adopt now as a package-owned capability release; keep the current optional, availability-gated integration boundary.",
+          "verification": "Installed pi-lens package manifest is 4.0.1; node scripts/test-work-start-finish.mjs passed the availability-gated project_report selection and isolated-verifier boundaries; primary LSP diagnostics were clean for extensions/work-models.js and extensions/work-fleet.js"
         },
         {
-          "version": "3.8.74",
-          "title": "Standalone build-graph command for verifier cold starts",
+          "version": "4.0.1",
+          "title": "Add optional pi-lens tools to every durable role allowlist",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "ce-workflow's verifier intentionally falls back when a review graph is cold rather than initiating a workspace-wide build from a read-only checkpoint. Calling build-graph would add latency and trust-scope complexity without improving required correctness; revisit only if measured cold-cache misses materially reduce verifier value."
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not make worker, planner, reviewer, fixer, or debugger launch depend on optional ambient pi-lens tools. Verified project fit: each role has an explicit required-tool allowlist, while only `work-background-verifier-lens` is selected after a coded `project_report` availability check. Upstream evidence: pi-lens 4.0.1 registers six always-active discovery/diagnostic tools and five situational tools behind `pi_lens_activate_tools`; pi-subagents passes an agent's explicit tool names as required child tools. Benefit: preserves role availability when pi-lens is absent while installed sessions still inherit package guidance and per-edit diagnostics. Cost/risk: roles use native targeted reads rather than forcing the lower-context symbol funnel. Confidence: high. Recommendation: retain the optional integration boundary until pi-lens becomes a declared required dependency."
         },
         {
-          "version": "3.8.74",
-          "title": "Prompt-cache and scanner observability surfaces",
+          "version": "4.0.1",
+          "title": "Use live symbol reads inside immutable checkpoint verification",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: keep checkpoint findings verified through `work_verifier_*` tools, not `module_report`, `read_symbol`, or `read_enclosing`. Verified project fit: the lens verifier treats `project_report` only as hostile orientation and validates every finding against immutable checkpoint-scoped content. Upstream evidence: the new symbol tools read the active workspace and record live read-guard coverage, not ce-workflow's checkpoint. Benefit: avoids time-of-check/time-of-use drift and scope escape. Cost/risk: bounded checkpoint reads remain somewhat less token-efficient. Confidence: high. Recommendation: no verifier tool expansion."
+        },
+        {
+          "version": "4.0.1",
+          "title": "Tool-schema rename, dynamic activation, scanners, LSP, and runtime fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Machine-global cache metrics, CLI output, language coverage, and scanner rule maintenance are pi-lens operational surfaces. ce-workflow consumes bounded diagnostics and has no stable local API or abstraction to replace."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit v4's `path`/`paths` schema, deferred situational-tool loading, subagent light mode, diagnostic honesty, scanner coverage, read guards, graph maintenance, and runtime/UI fixes without ce-workflow adapters. Verified project fit: repository code does not invoke pi-lens tool schemas programmatically and consumes only the stable availability check plus package-owned tool results. Upstream evidence: these changes are implemented and documented within pi-lens 4.0.1. Benefit: avoids duplicating package internals. Cost/risk: normal upstream regression exposure. Confidence: high. Recommendation: no local action."
         }
       ]
     }

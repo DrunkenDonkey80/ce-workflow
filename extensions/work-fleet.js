@@ -9,7 +9,7 @@ import {
 	readSync,
 	realpathSync,
 } from "node:fs";
-import { isAbsolute, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { loadVerifierStore } from "./background-verifiers.js";
 import { loadLaneStore } from "./read-only-lanes.js";
 import { loadStore } from "./work-store.js";
@@ -517,7 +517,7 @@ function trustedFile(file, roots) {
 	try {
 		if (lstatSync(resolvedFile).isSymbolicLink()) return undefined;
 		const realFile = realpathSync(resolvedFile);
-		const realRoots = roots.filter(existsSync).map(realpathSync);
+		const realRoots = roots.filter(existsSync).map((root) => realpathSync(root));
 		return realRoots.some((root) => pathWithin(root, realFile))
 			? realFile
 			: undefined;
@@ -561,9 +561,34 @@ function contentText(value) {
 		.join("\n");
 }
 
-export function transcriptEvents(row, { readFile = readFileSync } = {}) {
+export function transcriptEvents(
+	row,
+	{ readFile = readFileSync, sessionFile = process.env.PI_SESSION_FILE } = {},
+) {
 	const step = row.step ?? {};
-	const roots = [row.asyncDir, join(row.cwd, ".pi-subagents")].filter(Boolean);
+	const projectRoots = [
+		join(row.cwd, ".pi", "subagents"),
+		join(row.cwd, ".pi-subagents"),
+	];
+	const sessionRunRoot = sessionFile
+		? sessionFile.replace(/\.jsonl$/i, "")
+		: undefined;
+	const asyncRoot =
+		row.asyncDir &&
+		[...projectRoots, sessionRunRoot]
+			.filter(Boolean)
+			.some(
+				(root) =>
+					resolve(root) !== resolve(row.asyncDir) &&
+					pathWithin(root, row.asyncDir),
+			)
+			? row.asyncDir
+			: undefined;
+	const roots = [
+		asyncRoot,
+		...projectRoots,
+		sessionFile ? join(dirname(sessionFile), "subagent-artifacts") : undefined,
+	].filter(Boolean);
 	let requested;
 	if (step.transcriptPath) {
 		requested = isAbsolute(step.transcriptPath)

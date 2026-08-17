@@ -27,6 +27,7 @@ const { assert, seedNativeStore } = await import(
 );
 
 const cwd = mkdtempSync(path.join(tmpdir(), "work-stats-"));
+const previousSessionFile = process.env.PI_SESSION_FILE;
 try {
 	seedNativeStore(cwd, [
 		{ id: "IDEA-1", type: "idea", status: "open", title: "Measured idea" },
@@ -418,7 +419,86 @@ try {
 		artifactTask.phases.some(
 			(phase) => phase.phase === "Work" && phase.tokens === 1_000,
 		),
-		"stats recover child model usage from pi-subagents artifacts",
+		"stats recover child model usage from legacy project pi-subagents artifacts",
+	);
+	const sessionArtifactDir = path.join(cwd, "session-root", "subagent-artifacts");
+	mkdirSync(sessionArtifactDir, { recursive: true });
+	for (const file of [
+		"artifact-run_work-worker.jsonl",
+		"artifact-run_work-worker_meta.json",
+	]) {
+		writeFileSync(
+			path.join(sessionArtifactDir, file),
+			readFileSync(path.join(artifactDir, file)),
+		);
+	}
+	rmSync(artifactDir, { recursive: true, force: true });
+	process.env.PI_SESSION_FILE = path.join(cwd, "session-root", "parent.jsonl");
+	assert(
+		buildWorkStats(cwd, "TASK-ARTIFACT").phases.some(
+			(phase) => phase.phase === "Work" && phase.tokens === 1_000,
+		),
+		"stats recover child model usage from current session-scoped pi-subagents artifacts",
+	);
+	const currentArtifactDir = path.join(cwd, ".pi", "subagents", "artifacts");
+	mkdirSync(currentArtifactDir, { recursive: true });
+	const currentTranscript = path.join(
+		currentArtifactDir,
+		"artifact-run_work-worker.jsonl",
+	);
+	writeFileSync(
+		currentTranscript,
+		readFileSync(
+			path.join(sessionArtifactDir, "artifact-run_work-worker.jsonl"),
+		),
+	);
+	const currentMetaPath = path.join(
+		currentArtifactDir,
+		"artifact-run_work-worker_meta.json",
+	);
+	writeFileSync(
+		currentMetaPath,
+		JSON.stringify({
+			...JSON.parse(
+				readFileSync(
+					path.join(sessionArtifactDir, "artifact-run_work-worker_meta.json"),
+					"utf8",
+				),
+			),
+			transcriptPath: currentTranscript,
+		}),
+	);
+	rmSync(path.join(cwd, "session-root"), { recursive: true, force: true });
+	assert(
+		buildWorkStats(cwd, "TASK-ARTIFACT").phases.some(
+			(phase) => phase.phase === "Work" && phase.tokens === 1_000,
+		),
+		"stats recover child model usage from current project pi-subagents artifacts",
+	);
+	const outsideTranscript = path.join(cwd, "forged-transcript.jsonl");
+	writeFileSync(
+		outsideTranscript,
+		`${JSON.stringify({
+			type: "message",
+			timestamp: new Date(now + 10_000).toISOString(),
+			message: {
+				role: "assistant",
+				usage: { input: 9_000, output: 999, totalTokens: 9_999 },
+			},
+		})}\n`,
+	);
+	writeFileSync(
+		currentMetaPath,
+		JSON.stringify({
+			...JSON.parse(readFileSync(currentMetaPath, "utf8")),
+			transcriptPath: outsideTranscript,
+		}),
+	);
+	assert(
+		buildWorkStats(cwd, "TASK-ARTIFACT").phases.some(
+			(phase) => phase.phase === "Work" && phase.tokens === 1_000,
+		),
+		"stats reject transcript paths outside the trusted pi-subagents artifact root",
 	);
 	assert(
 		artifactTask.totals.parentWallDurationMs === 0,
@@ -519,5 +599,7 @@ try {
 		"ok - work stats roll up by task, roadmap, initiative, idea, phase, and model\n",
 	);
 } finally {
+	if (previousSessionFile === undefined) delete process.env.PI_SESSION_FILE;
+	else process.env.PI_SESSION_FILE = previousSessionFile;
 	rmSync(cwd, { recursive: true, force: true });
 }

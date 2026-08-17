@@ -3,6 +3,8 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
+	collectRecentExtensionPage,
+	collectRecentExtensionPages,
 	EXTENSION_SCOUT_LEDGER,
 	EXTENSION_SCOUT_REVISIT_POLICY,
 	inspectQueuedExtensions,
@@ -21,10 +23,23 @@ function assert(value, message) {
 }
 
 const entry = (name, description, timestamp, repo = `https://github.com/acme/${name}`) => `<article><a href="https://www.npmjs.com/package/${name}">${name}</a><p class="description">${description}</p><time datetime="${timestamp}">recent</time><a href="${repo}">repository</a></article>`;
+const packageCard = (name, description, timestamp, repo = `https://github.com/acme/${name}`) => `<article data-package-date="${Date.parse(timestamp)}"><p class="packages-desc">${description}</p><a href="https://www.npmjs.com/package/${name}">npm</a><a href="${repo}">repo</a></article>`;
 const html = (entries) => `<main>${entries.join("\n")}</main>`;
 const sample = parseRecentExtensions(html([entry("pi-useful", "Useful &amp; safe", "2026-01-20T12:00:00Z")]));
 assert(sample[0].name === "pi-useful" && sample[0].description === "Useful & safe", "extracts package name and description");
 assert(sample[0].timestamp === "2026-01-20T12:00:00.000Z" && sample[0].npmUrl.endsWith("/pi-useful") && sample[0].repositoryUrl.endsWith("/pi-useful"), "extracts timestamp, npm URL, and repository URL");
+const currentCatalogSample = parseRecentExtensions(html([packageCard("pi-current", "Current catalog card", "2026-01-21T12:00:00Z")]));
+assert(currentCatalogSample[0].name === "pi-current" && currentCatalogSample[0].timestamp === "2026-01-21T12:00:00.000Z", "parses the current pi.dev package catalog markup");
+const requestedPages = [];
+const catalogPages = await collectRecentExtensionPages("2026-01-20T00:00:00Z", async (url) => {
+	requestedPages.push(url);
+	return { ok: true, text: async () => `${html([packageCard("pi-new", "New", "2026-01-21T00:00:00Z")])}<a href="/packages?type=extension&amp;sort=recent&amp;page=2">next</a>` };
+});
+const secondCatalogPage = await collectRecentExtensionPage(2, async (url) => {
+	requestedPages.push(url);
+	return { ok: true, text: async () => `${html([packageCard("pi-older", "Older", "2026-01-20T00:00:00Z")])}<a href="/packages?type=extension&amp;sort=recent&amp;page=3">next</a>` };
+});
+assert(catalogPages.length === 1 && requestedPages[0].endsWith("page=1") && requestedPages[1].endsWith("page=2") && secondCatalogPage.hasNext, "fetches any requested catalog page and detects the next page");
 
 const cwd = mkdtempSync(path.join(tmpdir(), "extension-scout-"));
 try {
@@ -36,15 +51,15 @@ try {
 		screen: async (items) => items.map((item, index) => ({ name: item.name, plausible: true, score: 100 - index, rationale: "metadata suggests workflow value" })),
 	});
 	assert(requestedSince === "2026-01-02T00:00:00.000Z", "initial successful scan covers 30 days");
-	assert(first.selected.length === 10 && first.overflow.length === 3, "caps current run at 10 and durably retains overflow");
-	assert(Object.keys(first.ledger.packages).length === 13 && first.ledger.queue.length === 13, "atomic ledger preserves every seen package and ordered queue");
+	assert(first.selected.length === 3 && first.overflow.length === 0, "shortlists only the top three metadata candidates");
+	assert(Object.keys(first.ledger.packages).length === 13 && first.ledger.queue.length === 3, "atomic ledger preserves seen metadata without retaining shortlist overflow");
 
 	await runExtensionScout(cwd, {
 		now: "2026-02-02T00:00:00Z",
 		collect: ({ since }) => { requestedSince = since; return html([entry("pi-0", "Updated helper", "2026-02-01T12:00:00Z")]); },
 		screen: async () => [{ name: "pi-0", plausible: true, score: 200, rationale: "updated" }],
 	});
-	assert(requestedSince === "2026-02-01T00:00:00.000Z" && readExtensionScoutLedger(cwd).queue.length === 13, "later scan starts at cursor and deduplicates durable queue");
+	assert(requestedSince === "2026-02-01T00:00:00.000Z" && readExtensionScoutLedger(cwd).queue.length === 3 && readExtensionScoutLedger(cwd).queue[0].name === "pi-0", "later scan starts at cursor, reprioritizes, and preserves the bounded resumable shortlist");
 
 	const cursor = readExtensionScoutLedger(cwd).cursor;
 	let failed = false;
@@ -100,6 +115,27 @@ try {
 	assert(quarantinePath && !existsSync(quarantinePath), "disposable source quarantine is cleaned after inspection");
 	assert(inspected.ledger.packages["safe-source"].inspection.revision === sourceRevision, "durably records the inspected source revision");
 	assert(!existsSync(path.join(sourceRepo, "EXECUTED")), "source execution remains disabled after cleanup");
+
+	const parallelCandidates = Array.from({ length: 3 }, (_, index) => ({ ...candidate, name: `parallel-${index}` }));
+	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: Object.fromEntries(parallelCandidates.map((item) => [item.name, item])), queue: parallelCandidates, currentRun: parallelCandidates, finalists: [] });
+	let activeInspections = 0;
+	let peakInspections = 0;
+	const parallelInspection = await inspectQueuedExtensions(cwd, {
+		clone: (_url, destination) => { mkdirSync(destination, { recursive: true }); writeFileSync(path.join(destination, "package.json"), "{}\n"); },
+		git: (_root, args) => args[0] === "rev-parse" ? sourceRevision : `100644 ${"a".repeat(40)} 0\tpackage.json\0`,
+		inspect: async () => { activeInspections += 1; peakInspections = Math.max(peakInspections, activeInspections); await new Promise((resolve) => setTimeout(resolve, 5)); activeInspections -= 1; return facts; },
+	});
+	assert(parallelInspection.inspected.length === 3 && peakInspections === 3, "inspects the three shortlisted sources concurrently");
+
+	const interrupted = Array.from({ length: 3 }, (_, index) => ({ ...candidate, name: `interrupted-${index}`, score: index + 1 }));
+	const newAfterInterrupt = Array.from({ length: 3 }, (_, index) => entry(`new-after-interrupt-${index}`, "New candidate", "2026-02-02T00:00:00Z"));
+	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: Object.fromEntries(interrupted.map((item) => [item.name, item])), queue: interrupted, currentRun: interrupted, finalists: [] });
+	const resumedQueue = await runExtensionScout(cwd, {
+		page: 2,
+		collect: async () => html(newAfterInterrupt),
+		screen: async (items) => items.map((item, index) => ({ name: item.name, plausible: true, score: 100 - index, rationale: "new" })),
+	});
+	assert(resumedQueue.selected.every((item) => item.name.startsWith("interrupted-")) && resumedQueue.overflow.length === 3 && resumedQueue.overflow.every((item) => item.name.startsWith("new-after-interrupt-")), "all interrupted candidates remain ahead of higher-scored new candidates without losing the deferred batch");
 
 	const tampered = { ...candidate, name: "tampered-remote", repositoryUrl: "ext::sh -c touch% /tmp/owned" };
 	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: { [tampered.name]: tampered }, queue: [tampered], currentRun: [tampered] });
@@ -193,12 +229,14 @@ try {
 	const inaccessibleResult = await inspectQueuedExtensions(cwd, { now: "2026-03-01T00:00:00Z", clone: async () => { throw new Error("forge unavailable"); }, inspect: async () => facts });
 	assert(inaccessibleResult.ledger.packages[inaccessible.name].decision.reason === "insufficient-evidence" && inaccessibleResult.ledger.queue.length === 0, "inaccessible source is durably classified as insufficient-evidence");
 
-	const overflowFinalists = Array.from({ length: 11 }, (_, index) => ({ ...finalist, name: `overflow-${index}` }));
+	const overflowFinalists = Array.from({ length: 4 }, (_, index) => ({ ...finalist, name: `overflow-${index}` }));
 	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: Object.fromEntries(overflowFinalists.map((item) => [item.name, { ...item, inspection: { ok: true, revision: sourceRevision, facts } }])), queue: [], currentRun: [], finalists: overflowFinalists });
-	const reviewOptions = { review: async () => ({ ...review, actionable: false, recommendation: "reject", reason: "out-of-scope" }), decide: async () => null };
+	let activeReviews = 0;
+	let peakReviews = 0;
+	const reviewOptions = { review: async () => { activeReviews += 1; peakReviews = Math.max(peakReviews, activeReviews); await new Promise((resolve) => setTimeout(resolve, 5)); activeReviews -= 1; return { ...review, actionable: false, recommendation: "reject", reason: "out-of-scope" }; }, decide: async () => null };
 	const firstFinalistBatch = await reviewInspectedExtensions(cwd, reviewOptions);
 	const secondFinalistBatch = await reviewInspectedExtensions(cwd, reviewOptions);
-	assert(firstFinalistBatch.reviewed.length === 10 && secondFinalistBatch.reviewed.length === 1 && secondFinalistBatch.ledger.finalists.length === 0, "durable finalist overflow continues on a later invocation");
+	assert(firstFinalistBatch.reviewed.length === 3 && secondFinalistBatch.reviewed.length === 1 && secondFinalistBatch.ledger.finalists.length === 0 && peakReviews === 3, "reviews at most three finalists concurrently");
 
 	const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 	const agentDir = path.join(cwd, "agent");
@@ -209,16 +247,100 @@ try {
 	const unavailable = await executeOrchestratorAction("work-extension-scout", "", { cwd, ui: { notify() {} } }, {});
 	assert(unavailable === false, "command is unavailable unless self-improving is enabled");
 
-	writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ workResume: { selfImproving: true } }));
+	writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ workResume: { selfImproving: true }, packages: ["git:https://secret@example.com/acme/private?token=bad", "C:/Users/example/private-extension"] }));
+	const routed = { ...finalist, name: "backup-routed" };
+	writeExtensionScoutLedger(cwd, { version: 1, cursor, packages: { [routed.name]: { ...routed, inspection: { ok: true, revision: sourceRevision, facts } } }, queue: [], currentRun: [], finalists: [routed], preferences: { trialResults: { [routed.name]: { status: "ledger-secret-free-text" } } } });
+	const completedModels = [];
+	const reviewerFetch = globalThis.fetch;
+	globalThis.fetch = async () => ({ ok: true, text: async () => html([entry("pi-old", "Already scanned", "2026-01-01T00:00:00Z")]) });
+	try {
+		await executeOrchestratorAction("work-extension-scout", "", {
+			cwd,
+			ui: { notify() {}, setStatus() {}, setWidget() {} },
+			modelRegistry: {
+				find: (provider, id) => ({ provider, id }),
+				complete: async (model, request, callOptions) => {
+					const input = JSON.parse(request.messages[0].content[0].text);
+					completedModels.push({ id: model.id, reasoningEffort: callOptions?.reasoningEffort, projectContext: input.projectContext });
+					const value = request.systemPrompt.startsWith("Screen extension metadata") ? [] : { ...review, actionable: true, recommendation: "proceed", reason: "insufficient-evidence" };
+					return { stopReason: "stop", content: [{ type: "text", text: JSON.stringify(value) }] };
+				},
+			},
+		}, {}, "", { background: false });
+	} finally {
+		globalThis.fetch = reviewerFetch;
+	}
+	const reviewedProgress = readExtensionScoutLedger(cwd).progress;
+	const opusContext = completedModels.find((item) => item.id === "claude-opus-5")?.projectContext;
+	assert(opusContext?.repository && !JSON.stringify(opusContext).includes("secret") && !JSON.stringify(opusContext).includes("token=bad") && reviewedProgress.accepted === 1 && reviewedProgress.findings[0].benefit === "Less manual work", "extension finalist review uses Opus 5 high with bounded redacted current-project context and records accepted report-only value without installing");
+	const cachedBefore = readExtensionScoutLedger(cwd);
+	const preserved = { ...routed, name: "preserved-normal-finalist" };
+	cachedBefore.packages[routed.name].decision.status = "defer";
+	cachedBefore.packages[preserved.name] = { ...preserved, inspection: { ok: true, revision: sourceRevision, facts } };
+	cachedBefore.finalists = [preserved];
+	const cachedInspection = JSON.stringify(cachedBefore.packages[routed.name].inspection);
+	writeExtensionScoutLedger(cwd, cachedBefore);
+	const cachedReview = await executeOrchestratorAction("work-extension-scout", `review ${routed.name}`, {
+		cwd, ui: { notify() {}, setStatus() {}, setWidget() {} },
+		modelRegistry: {
+			find: (provider, id) => ({ provider, id }),
+			complete: async (_model, request) => {
+				const input = JSON.parse(request.messages[0].content[0].text);
+				assert(input.name === routed.name && input.projectContext?.repository, "cached review receives inspected facts plus current-project context");
+				return { stopReason: "stop", content: [{ type: "text", text: JSON.stringify({ ...review, actionable: true, recommendation: "proceed" }) }] };
+			},
+		},
+	}, {}, "", {
+		background: false,
+		collectPage: async () => { throw new Error("cached review fetched the catalog"); },
+		inspect: async () => { throw new Error("cached review inspected source"); },
+	});
+	const cachedAfter = readExtensionScoutLedger(cwd);
+	assert(cachedReview.reviewed.length === 1 && cachedAfter.packages[routed.name].decision.status === "proceed" && JSON.stringify(cachedAfter.packages[routed.name].inspection) === cachedInspection && cachedAfter.finalists.some((item) => item.name === preserved.name), "cached candidates can be force re-reviewed without fetching, cloning, or losing normal finalists");
+
+	let blockedPageSignal;
+	const background = await executeOrchestratorAction("work-extension-scout", "", {
+		cwd,
+		ui: { notify() {}, setStatus() {}, setWidget() {} },
+	}, {}, "", {
+		collectPage: async (page, _fetch, signal) => {
+			if (page === 2) {
+				blockedPageSignal = signal;
+				await new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true }));
+			}
+			return { page, html: html([entry(`background-${page}`, "Background candidate", `2026-01-${String(22 - page).padStart(2, "0")}T00:00:00Z`)]), hasNext: page === 1 };
+		},
+		screen: async () => [],
+	});
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	const otherCwd = mkdtempSync(path.join(tmpdir(), "extension-scout-other-"));
+	let otherSignal;
+	const otherBackground = await executeOrchestratorAction("work-extension-scout", "", { cwd: otherCwd, ui: { notify() {}, setStatus() {}, setWidget() {} } }, {}, "", {
+		collectPage: async (_page, _fetch, signal) => {
+			otherSignal = signal;
+			await new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true }));
+		},
+	});
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	const stopping = await executeOrchestratorAction("work-extension-scout", "stop", { cwd, ui: { notify() {}, setStatus() {}, setWidget() {} } }, {});
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	const stoppedProgress = readExtensionScoutLedger(cwd).progress;
+	assert(background.background && otherBackground.background && stopping.stopping && blockedPageSignal?.aborted && !otherSignal?.aborted && stoppedProgress.status === "stopped" && stoppedProgress.processed === 1 && stoppedProgress.dateReached === "2026-01-21T00:00:00.000Z" && stoppedProgress.nextPage === 2, "background scouts are independently cancellable per project and persist resumable counts/date");
+	await executeOrchestratorAction("work-extension-scout", "stop", { cwd: otherCwd, ui: { notify() {}, setStatus() {}, setWidget() {} } }, {});
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	rmSync(otherCwd, { recursive: true, force: true });
+
 	const previousFetch = globalThis.fetch;
 	let scoutMenuLabel = "";
 	const notifications = [];
+	const statuses = [];
 	globalThis.fetch = async () => ({ ok: false, status: 503 });
 	try {
 		await executeOrchestratorAction("work-menu", "", {
 			cwd,
 			ui: {
 				notify(message) { notifications.push(message); },
+				setStatus(_key, message) { statuses.push(message); },
 				select(_title, labels) {
 					scoutMenuLabel = labels.find((label) => label.includes("Scout Pi extensions")) ?? "";
 					return scoutMenuLabel;
@@ -228,7 +350,9 @@ try {
 	} finally {
 		globalThis.fetch = previousFetch;
 	}
-	assert(Boolean(scoutMenuLabel) && notifications.some((message) => message.includes("pi.dev returned HTTP 503")), "enabled F7 scout action is exposed and dispatches through the scout flow");
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	assert(Boolean(scoutMenuLabel) && notifications.some((message) => message.includes("pi.dev returned HTTP 503")), "enabled F7 scout action is exposed and dispatches through the background scout flow");
+	assert(notifications.some((message) => message.includes("running in the background")) && statuses[0]?.includes("Scout running") && statuses.at(-1)?.includes("Scout failed"), "scout immediately reports durable background progress and leaves the terminal state visible");
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

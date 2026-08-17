@@ -36,7 +36,11 @@ assert(
 );
 assert(
 	dirt(".pi-subagents/artifacts/x_output.md"),
-	".pi-subagents dirt is tolerated",
+	"legacy .pi-subagents dirt is tolerated",
+);
+assert(
+	dirt(".pi/subagents/artifacts/x_output.md"),
+	"current .pi/subagents dirt is tolerated",
 );
 
 // Generated build artifacts (PyInstaller build/dist, __pycache__, etc.) must not
