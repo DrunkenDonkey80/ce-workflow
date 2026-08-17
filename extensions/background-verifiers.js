@@ -2199,7 +2199,7 @@ function markVerifierOrphaned(store, jobId, nowValue) {
 			status: "orphaned",
 			orphanedAt: now(nowValue),
 		};
-		job.status = "orphaned";
+		job.status = jobStatus(job.operationStatus, job.launch);
 		return job;
 	});
 }
@@ -2778,7 +2778,9 @@ export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 	if (
 		Object.values(store.findings).some((finding) => {
 			const report = store.reports[finding.reportId];
-			return batchIds.has(report?.batchId) && findingNeedsTriage(store, finding);
+			return (
+				batchIds.has(report?.batchId) && findingNeedsTriage(store, finding)
+			);
 		})
 	)
 		return "background verification has findings awaiting triage";

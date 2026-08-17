@@ -1104,6 +1104,28 @@ try {
 		"orphaned",
 		"missing runtime status becomes recoverable orphan after grace",
 	);
+	mutateVerifierStore(gitCwd, (state) => {
+		const job = state.jobs[graceJob.id];
+		job.launch.status = "running";
+		delete job.launch.orphanedAt;
+		job.status = "running";
+		for (const operation of job.operations)
+			recordOperationResult(state, {
+				jobId: job.id,
+				operation,
+				outcome: "no-findings",
+			});
+	});
+	reconcileVerifierRuns(gitCwd, {
+		now: new Date(launchedAt + 32_000).toISOString(),
+	});
+	const terminalOrphan = loadVerifierStore(gitCwd).jobs[graceJob.id];
+	assert.equal(terminalOrphan.launch.status, "orphaned");
+	assert.equal(
+		terminalOrphan.status,
+		"completed",
+		"orphaning stale launch evidence preserves terminal operation status",
+	);
 	const linkBlob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
 		cwd: gitCwd,
 		input: "outside",

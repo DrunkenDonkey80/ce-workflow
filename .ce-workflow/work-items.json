@@ -5171,6 +5171,51 @@
       "type": "task",
       "updatedAt": "2026-08-07T21:50:57.951Z"
     },
+    "work-2.report-ab9d5ad4-e5a0-48a6-86ad-7c7598d295e0": {
+      "createdAt": "2026-08-17T17:58:59.425Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: On every agent_settled hook, reconcileBackgroundVerifierRuns calls reconcileVerifierRuns. For job-08176e4795dcd554bb3a0277, all operationStatus values are terminal findings and job.status is completed, but launch.status remains running and its temporary status.json is gone. markVerifierOrphaned changes launch.status to orphaned and unconditionally sets job.status to orphaned; validateVerifierStore then recomputes completed from the terminal operations and throws \"Invalid operation accounting\". The same stale launch shape exists for 16 jobs in this verifier store.\nExpected: Missing runtime status should orphan only the launch evidence while preserving/recomputing the aggregate job status from operationStatus, e.g. job.status = jobStatus(job.operationStatus, job.launch). Completed/failed jobs must remain valid and agent_settled must not emit an extension error.\nImpact: The work-models extension logs an uncaught error after every settled turn, verifier reconciliation aborts at the first stale completed launch, and later verifier jobs are never reconciled. The Git operation itself succeeds and the store is not mutated because validation rejects the clone.\nSuggested improvement: In extensions/background-verifiers.js markVerifierOrphaned, replace the unconditional job.status = \"orphaned\" with job.status = jobStatus(job.operationStatus, job.launch), and add a regression test for a terminal job whose launch still says running after its runtime directory is deleted.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/66a85aa6-0331-4c96-bb5d-9834271de80f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 438055,
+              "file": "01-2026-08-17T17-55-09-053Z_01a010dc-ec7d-7d2d-baa8-fdee31927688.jsonl",
+              "sha256": "c4b944d0570d6cd1aef2c1885aeb902f8ef4138e5babb9a5551b09770edaccb5"
+            },
+            {
+              "bytes": 2865472,
+              "file": "02-state.json",
+              "sha256": "ae7d9b6e0166e9ba08ee7a96322b259a50744395aef4a37e2fc51f9528e47abe"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-08-17T17:58:59.420Z",
+          "workflowId": "01a010dc-ec7d-7d2d-baa8-fdee31927688"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.report-ab9d5ad4-e5a0-48a6-86ad-7c7598d295e0",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic classification: locally-owned. One root cause: markVerifierOrphaned invalidates terminal aggregate job status when only launch evidence is stale. No duplicate or conflicting open snapshot item; implementation and regression proof belong in extensions/background-verifiers.js and scripts/test-background-verifiers.mjs.",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: On every agent_settled hook, reconcileBackgroundVerifierRuns calls reconcileVerifierRuns. For job-08176e4795dcd554bb3a0277, all op",
+      "type": "task",
+      "updatedAt": "2026-08-17T18:02:12.406Z"
+    },
     "work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25": {
       "createdAt": "2026-08-03T22:11:07.924Z",
       "dependencies": [
@@ -7485,7 +7530,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-14T13:51:27.948Z"
+    "updatedAt": "2026-08-17T18:02:12.407Z"
   },
   "schemaVersion": 1
 }
