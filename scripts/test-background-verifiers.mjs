@@ -1641,7 +1641,13 @@ try {
 		[reportJobA.id, reportJobB.id].sort(),
 		"terminal fake Pi artifacts reconcile exactly once",
 	);
+	assert.deepEqual(
+		reconcileVerifierRuns(reconcileCwd),
+		[],
+		"completed verifier launches are not reprocessed",
+	);
 	const reconciledStore = loadVerifierStore(reconcileCwd);
+	assert.equal(Object.keys(reconciledStore.quarantines).length, 0);
 	assert.equal(Object.keys(reconciledStore.findings).length, 2);
 	assert.equal(
 		existsSync(reportWorkspace),
