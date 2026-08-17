@@ -2274,12 +2274,16 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 			mutateVerifierStore(
 				cwd,
 				(next) => {
-					return ingestVerifierReport(next, {
+					const result = ingestVerifierReport(next, {
 						jobId: job.id,
 						artifact,
 						text: raw.text,
 						now: input.now,
 					});
+					next.jobs[job.id].launch.status = TERMINAL_FAILURE_STATES.has(state)
+						? "failed"
+						: "completed";
+					return result;
 				},
 				input,
 			);
@@ -2306,6 +2310,7 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 						artifact,
 						input.now,
 					);
+					next.jobs[job.id].launch.status = "failed";
 				},
 				input,
 			);
@@ -3036,9 +3041,11 @@ export function validateVerifierStore(store, file = "verifier store") {
 			job.launch !== undefined &&
 			(!plainObject(job.launch) ||
 				job.launch.logicalJobId !== job.id ||
-				!["queued", "running", "orphaned", "failed"].includes(
+				!["queued", "running", "completed", "orphaned", "failed"].includes(
 					job.launch.status,
 				) ||
+				(job.launch.status === "completed" &&
+					Object.values(job.operationStatus).includes("pending")) ||
 				!plainObject(job.launch.request) ||
 				job.launch.request.logicalJobId !== job.id ||
 				job.launch.request.model !== job.model)
