@@ -18,6 +18,7 @@ const {
 	buildWorkResumeState,
 	directRoleHandoffParams,
 	executeNumberedWorkAction,
+	executeOrchestratorAction,
 	handleWorkResumeCommand,
 	renderWorkResumeText,
 } = await import(
@@ -1343,6 +1344,43 @@ try {
 			handledTriage.autonomousGoalStarted === undefined,
 		"triage uses its coded handoff without autonomous fallback",
 	);
+	const goalPrompts = [];
+	const goalStatuses = {};
+	const goalCtx = {
+		cwd: triageCwd,
+		mode: "tui",
+		getContextUsage: () => ({ tokens: 0, maxTokens: 100_000 }),
+		ui: {
+			confirm: async () => true,
+			notify: () => {},
+			setStatus: (key, value) => {
+				goalStatuses[key] = value;
+			},
+		},
+	};
+	const goalPi = {
+		appendEntry: () => {},
+		sendUserMessage: async (message) => goalPrompts.push(message),
+	};
+	const autonomousResume = await executeOrchestratorAction(
+		"work-resume-goal",
+		"E-1",
+		goalCtx,
+		goalPi,
+	);
+	assert(
+		autonomousResume.mode === "project",
+		"programmatic roadmap resume starts a project goal",
+	);
+	assert(
+		goalStatuses["work-goal"]?.startsWith("active #0"),
+		"programmatic roadmap resume activates durable goal status",
+	);
+	assert(
+		goalPrompts.length === 1 && goalPrompts[0].includes("E-1"),
+		"programmatic roadmap resume sends the autonomous kickoff",
+	);
+	await executeOrchestratorAction("work-goal", "clear", goalCtx, goalPi);
 	const analysisBatch = mutateVerifierStore(triageCwd, (store) =>
 		createBatch(store, {
 			checkpoint: triageCheckpoint,

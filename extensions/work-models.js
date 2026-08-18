@@ -2250,6 +2250,7 @@ const ORCHESTRATOR_ACTION_LABELS = {
 	"work-remove-beads": "Migrate legacy workspace",
 	"work-report": "Blocker report",
 	"work-resume": "Resume work",
+	"work-resume-goal": "Resume roadmap autonomously",
 	"work-resume-stop": "Stop safely",
 	"work-roadmap": "Roadmaps",
 	"work-settings": "Settings",
@@ -22814,6 +22815,14 @@ async function executeOrchestratorAction(
 	if (name === "work-review-analysis")
 		return withCommandTelemetry(name, text, ctx, () =>
 			handleWorkReviewAnalysisCommand(ctx, pi),
+		);
+	if (name === "work-resume-goal")
+		return withCommandTelemetry(
+			name,
+			text,
+			ctx,
+			() => handleWorkResumeGoalCommand(text, pi, ctx),
+			true,
 		);
 	if (name === "work-resume")
 		return withCommandTelemetry(
