@@ -1246,7 +1246,9 @@
       "labels": [
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Improve orchestrator snapshot 2026-08-18T10:16Z: work-2.report-4f5ba7ee-3fc6-4bb9-ab47-a99239fb6bf6"
+      ],
       "status": "open",
       "title": "Self-improving",
       "type": "epic",
@@ -4478,6 +4480,48 @@
       "title": "Self-improvement report: Three consecutive required async work-worker launches failed before child creation because pi-subagents attempted to mkdir an asyn",
       "type": "task",
       "updatedAt": "2026-08-08T19:53:25.349Z"
+    },
+    "work-2.report-4f5ba7ee-3fc6-4bb9-ab47-a99239fb6bf6": {
+      "createdAt": "2026-08-18T10:14:53.899Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Current durable NexusConnectSDK-Android state contains a permanently blocked legacy analysis migration for `work-1.4`. The native work item is now `closed` and carries two `wo:review PASS` notes, a passing focused verification note, and commit/push evidence, but `.ce-workflow/work-runs/verifiers/state.json` still has `analysisLegacyMigrations[\"work-1.4\"].status = \"blocked\"` with an `in_progress` snapshot and no completion timestamp. Source inspection confirms `reconcileLegacyAnalysisTasks` first filters out every closed analysis item, creates `blocked` migrations for in-progress items, and the\nExpected: Reconciliation must revisit existing blocked legacy migrations even after their source work items close. When current durable state proves the source item closed, it should deterministically resolve the migration according to its evidence/policy (or expose an actionable accept/reject disposition that persists the user's decision), clear the migration-blocked gate, and preserve an audit record. Review analysis must not present a permanently read-only blocker with no disposition path.\nImpact: The stale migration blocks `work-resume work-3` despite completed, reviewed, verified, and committed product work. A user-approved rejection cannot be recorded, leaving the roadmap permanently unresumable without direct state mutation. The defect can affect any legacy analysis task that was first reconciled while in progress and later closed.\nSuggested improvement: Separate discovery of new legacy analysis tasks from reconciliation of existing migrations. Iterate existing `analysisLegacyMigrations` first (including blocked entries whose live source item is now closed), transition them to a terminal auditable state or create a disposable review entry, and ensure the Review analysis UI offers a persisted rejection action. Add regression coverage for: in_progre",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/024238fb-ef66-4d77-8701-12d21017625a",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1721,
+              "file": "01-legacy-analysis-work-1.4-evidence.log",
+              "sha256": "4685d45743822c3610cce85d695759f13a146e4a6bbff4d2b3ef82d5c23a9732"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-08-18T10:14:53.893Z",
+          "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.report-4f5ba7ee-3fc6-4bb9-ab47-a99239fb6bf6",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic classification: locally-owned. One root cause: reconcileLegacyAnalysisTasks discovers only currently open legacy tasks and never revisits a durable blocked migration after its source item closes. Deterministically complete that migration with an auditable source-closed resolution; a separate rejection UI is unnecessary once the stale gate self-resolves.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-analysis-review.mjs\"]",
+        "wo:review PASS - reconcileLegacyAnalysisTasks resolves blocked migrations whose source item is closed (completed/source-work-item-closed/completedAt), clears migration_blocked projection gate, idempotent; node scripts/test-work-analysis-review.mjs passed",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-analysis-review.mjs\nOutput: analysis review lifecycle tests passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: Current durable NexusConnectSDK-Android state contains a permanently blocked legacy analysis migration for `work-1.4`. The native ",
+      "type": "task",
+      "updatedAt": "2026-08-18T10:19:24.338Z"
     },
     "work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63": {
       "createdAt": "2026-08-10T12:58:04.547Z",
@@ -7776,7 +7820,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T08:27:51.143Z"
+    "updatedAt": "2026-08-18T10:19:24.338Z"
   },
   "schemaVersion": 1
 }

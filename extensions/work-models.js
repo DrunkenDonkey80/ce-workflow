@@ -18821,6 +18821,27 @@ export function reconcileLegacyAnalysisTasks(cwd) {
 	} catch {
 		return [];
 	}
+	const resolved = [];
+	try {
+		const migrations = loadVerifierStore(cwd).analysisLegacyMigrations;
+		for (const migration of Object.values(migrations)) {
+			if (
+				migration.status !== "blocked" ||
+				work.items[migration.workItemId]?.status !== "closed"
+			)
+				continue;
+			mutateVerifierStore(cwd, (store) => {
+				const current = store.analysisLegacyMigrations[migration.id];
+				if (!current || current.status !== "blocked") return;
+				current.status = "completed";
+				current.completedAt = new Date().toISOString();
+				current.resolution = "source-work-item-closed";
+			});
+			resolved.push(migration.id);
+		}
+	} catch {
+		// Discovery below initializes or repairs migrations when a verifier store exists.
+	}
 	const candidates = Object.values(work.items).filter(
 		(item) =>
 			item.labels?.includes("wo:analysis") &&
@@ -18865,7 +18886,7 @@ export function reconcileLegacyAnalysisTasks(cwd) {
 				new Date().toISOString();
 		});
 	}
-	return candidates.map((item) => item.id);
+	return [...new Set([...resolved, ...candidates.map((item) => item.id)])];
 }
 
 export function validateAnalysisFinalizationInput(group, input) {

@@ -282,6 +282,9 @@ try {
 	assert.equal(reconcileLegacyAnalysisTasks(cwd).length, 4);
 	const migratedWork = loadStore(cwd);
 	const migrations = loadVerifierStore(cwd).analysisLegacyMigrations;
+	const blockedLegacy = Object.values(migratedWork.items).find(
+		(item) => item.title === "Legacy in_progress",
+	);
 	for (const item of Object.values(migratedWork.items).filter(
 		(item) =>
 			item.labels?.includes("wo:analysis") &&
@@ -332,6 +335,30 @@ try {
 				),
 		),
 		"read-only analysis errors never expose terminal actions",
+	);
+
+	mutateStore(cwd, (store) => {
+		const current = store.items[blockedLegacy.id];
+		current.status = "closed";
+		current.closedAt = "2026-01-01T00:00:09.000Z";
+		current.updatedAt = current.closedAt;
+	});
+	assert.deepEqual(reconcileLegacyAnalysisTasks(cwd), [blockedLegacy.id]);
+	const resolvedMigration =
+		loadVerifierStore(cwd).analysisLegacyMigrations[blockedLegacy.id];
+	assert.equal(resolvedMigration.status, "completed");
+	assert.equal(resolvedMigration.resolution, "source-work-item-closed");
+	assert.ok(resolvedMigration.completedAt);
+	assert.ok(
+		!analysisReviewProjection(loadVerifierStore(cwd)).some(
+			(entry) => entry.workItemId === blockedLegacy.id,
+		),
+		"closing an in-progress legacy task clears its durable migration gate",
+	);
+	assert.deepEqual(
+		reconcileLegacyAnalysisTasks(cwd),
+		[],
+		"closed legacy migration reconciliation is idempotent",
 	);
 
 	mutateStore(cwd, (store) => {
