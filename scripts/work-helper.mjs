@@ -49,19 +49,17 @@ const execFileAsync = promisify(execFile);
 
 function run(bin, argv, options = {}) {
 	let executable = bin;
-	let args = argv;
-	let shell = false;
+	let childArgs = argv;
 	if (/\.[cm]?js$/i.test(bin)) {
 		executable = process.execPath;
-		args = [bin, ...argv];
+		childArgs = [bin, ...argv];
 	} else if (process.platform === "win32" && /\.(?:cmd|bat)$/i.test(bin)) {
-		shell = true;
+		throw new Error(`refusing shell-backed executable ${bin}; use an .exe or Node script`);
 	}
-	return execFileSync(executable, args, {
+	return execFileSync(executable, childArgs, {
 		cwd,
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
-		shell,
 		...options,
 	});
 }
@@ -87,6 +85,7 @@ function descendantIds(parentId) {
 	const pending = [parentId];
 	while (pending.length) {
 		for (const item of byParent.get(pending.pop()) ?? []) {
+			if (ids.has(item.id)) continue;
 			ids.add(item.id);
 			pending.push(item.id);
 		}
@@ -164,10 +163,21 @@ function markerOccurrences(text, marker) {
 }
 
 function legacyInstructionsPreview(requestedFile = "AGENTS.md") {
-	const file = path.resolve(cwd, requestedFile);
+	let file = path.resolve(cwd, requestedFile);
 	if (!/(?:^|[/\\])AGENTS\.md$/i.test(file))
 		return { status: "refused", reason: "not-an-AGENTS-file", file };
+	const relative = path.relative(cwd, file);
+	if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+		return { status: "refused", reason: "outside-repository", file };
 	if (!existsSync(file)) return { status: "no-op", reason: "file-absent", file };
+	file = realpathSync(file);
+	const canonicalRelative = path.relative(realpathSync(cwd), file);
+	if (
+		canonicalRelative === ".." ||
+		canonicalRelative.startsWith(`..${path.sep}`) ||
+		path.isAbsolute(canonicalRelative)
+	)
+		return { status: "refused", reason: "outside-repository", file };
 	const text = readFileSync(file, "utf8");
 	const begins = markerOccurrences(text, LEGACY_INSTRUCTIONS_BEGIN);
 	const ends = markerOccurrences(text, LEGACY_INSTRUCTIONS_END);
@@ -292,9 +302,9 @@ function targetedReviewFindings(task) {
 	return payload ? { index: match.index, findings: [payload] } : undefined;
 }
 
-function residualDisposition(task) {
+function dispositionNote(task, kind) {
 	const matches = [
-		...notesOf(task).matchAll(/^wo:residual-fix PASS (\{.*\})$/gim),
+		...notesOf(task).matchAll(new RegExp(`^wo:${kind} PASS (\\{.*\\})$`, "gim")),
 	];
 	for (const match of matches.reverse()) {
 		try {
@@ -316,30 +326,6 @@ function residualDisposition(task) {
 	return undefined;
 }
 
-function mechanicalDisposition(task) {
-	const matches = [
-		...notesOf(task).matchAll(/^wo:mechanical-fix PASS (\{.*\})$/gim),
-	];
-	for (const match of matches.reverse()) {
-		try {
-			const value = JSON.parse(match[1]);
-			if (
-				Array.isArray(value.dispositions) &&
-				value.dispositions.length > 0 &&
-				value.dispositions.every((item) =>
-					["finding", "fix", "evidence"].every(
-						(key) => typeof item?.[key] === "string" && item[key].trim(),
-					),
-				)
-			)
-				return { index: match.index, dispositions: value.dispositions };
-		} catch {
-			// Ignore malformed mechanical dispositions and require a valid one.
-		}
-	}
-	return undefined;
-}
-
 function dispositionCovers(target, disposition) {
 	return (
 		target &&
@@ -355,17 +341,19 @@ function dispositionCovers(target, disposition) {
 
 function reviewDispositionSatisfied(task) {
 	const notes = notesOf(task);
-	const reviews = [
-		...notes.matchAll(/(?:wo:review|review(?: result)?):?\s*(PASS|FAIL)\b/gi),
-	];
+	const scopeIndex = [...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
+	const reviews = [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)].filter(
+		(event) => event.index > scopeIndex,
+	);
 	if (reviews.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
 	const failures = reviews.filter(
 		(event) => event[1]?.toUpperCase() === "FAIL",
 	).length;
 	const target = targetedReviewFindings(task);
 	return failures === 1
-		? dispositionCovers(target, mechanicalDisposition(task))
-		: failures >= 2 && dispositionCovers(target, residualDisposition(task));
+		? dispositionCovers(target, dispositionNote(task, "mechanical-fix"))
+		: failures >= 2 &&
+				dispositionCovers(target, dispositionNote(task, "residual-fix"));
 }
 
 function formatPendingFiles(root = cwd) {
@@ -377,22 +365,31 @@ function formatPendingFiles(root = cwd) {
 			existsSync(path.join(root, file)),
 	);
 	if (!files.length) return [];
-	const suffix = process.platform === "win32" ? ".cmd" : "";
-	const candidates = [
-		process.env.WORK_ORCH_FORMATTER_BIN,
-		path.join(root, "node_modules", ".bin", `biome${suffix}`),
+	const packageFormatters = [
+		path.join(root, "node_modules", "@biomejs", "biome", "bin", "biome"),
 		path.join(
 			os.homedir(),
 			".pi-lens",
 			"tools",
 			"node_modules",
-			".bin",
-			`biome${suffix}`,
+			"@biomejs",
+			"biome",
+			"bin",
+			"biome",
 		),
-	].filter(Boolean);
-	const formatter = candidates.find(existsSync);
-	if (!formatter) return [];
-	run(formatter, ["format", "--write", ...files], { cwd: root });
+	];
+	const packageFormatter = packageFormatters.find(existsSync);
+	const formatter =
+		process.env.WORK_ORCH_FORMATTER_BIN ||
+		packageFormatter ||
+		path.join(root, "node_modules", ".bin", "biome");
+	if (!existsSync(formatter)) return [];
+	run(packageFormatter === formatter ? process.execPath : formatter, [
+		...(packageFormatter === formatter ? [formatter] : []),
+		"format",
+		"--write",
+		...files,
+	], { cwd: root });
 	return files;
 }
 
@@ -487,11 +484,9 @@ async function finishTaskUnlocked() {
 			"distinct-root --push is not supported; push each repository explicitly after finalization",
 		);
 	const task = readWorkItem(id);
+	if (!task) throw new Error(`Work item not found: ${id}`);
 	const taskContractText = `${titleOf(task)}\n${field(task, "description") ?? ""}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
-	const evidenceOnly =
-		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
-			taskContractText,
-		);
+	const evidenceOnly = /\bevidence[- ](?:only|capture)\b/i.test(taskContractText);
 	const declaredImplementationFiles = [
 		...new Set(
 			options("--implementation-file").map((file) =>
@@ -537,20 +532,20 @@ async function finishTaskUnlocked() {
 	let evidenceBytes = 0;
 	for (const file of evidenceFiles) {
 		const absolute = path.join(executionRoot, file);
+		const stat = existsSync(absolute) ? statSync(absolute) : undefined;
 		if (
 			!evidenceOnly ||
 			path.posix.isAbsolute(file) ||
 			file.startsWith("../") ||
 			!evidencePath(file) ||
 			!/\.(?:png|jpe?g|webp|txt|log|json)$/i.test(file) ||
-			!existsSync(absolute) ||
-			!statSync(absolute).isFile() ||
-			statSync(absolute).size > 10 * 1024 * 1024
+			!stat?.isFile() ||
+			stat.size > 10 * 1024 * 1024
 		)
 			throw new Error(
 				`invalid evidence file ${file}: require an existing image or sanitized .txt/.log/.json file up to 10 MiB under docs/evidence/${id}... for an evidence task`,
 			);
-		evidenceBytes += statSync(absolute).size;
+		evidenceBytes += stat.size;
 	}
 	if (evidenceFiles.length > 100 || evidenceBytes > 100 * 1024 * 1024)
 		throw new Error(
@@ -595,15 +590,27 @@ async function finishTaskUnlocked() {
 			throw new Error(`--verify-shard ${index + 1} must be valid JSON`);
 		}
 	});
+	const shardOutputs = shardDeclarations.flatMap((shard) =>
+		Array.isArray(shard.outputs) ? shard.outputs : [],
+	);
+	for (const output of shardOutputs) {
+		const normalized =
+			typeof output === "string"
+				? path.posix.normalize(output.replaceAll("\\", "/"))
+				: "";
+		if (
+			!normalized ||
+			normalized === "." ||
+			normalized === ".." ||
+			normalized.startsWith("../") ||
+			path.posix.isAbsolute(normalized)
+		)
+			throw new Error(`invalid verification shard output ${JSON.stringify(output)}`);
+	}
 	const absentShardOutputs = new Set(
-		shardDeclarations
-			.flatMap((shard) => (Array.isArray(shard.outputs) ? shard.outputs : []))
-			.filter(
-				(output) =>
-					typeof output === "string" &&
-					!path.isAbsolute(output) &&
-					!existsSync(path.join(executionRoot, output)),
-			),
+		shardOutputs.filter(
+			(output) => !existsSync(path.join(executionRoot, output)),
+		),
 	);
 	const jsonFile = option("--json");
 	if (!verify && !jsonFile)
@@ -650,11 +657,16 @@ async function finishTaskUnlocked() {
 		}
 		throw new Error(`verification failed: ${verificationCommand}`);
 	}
-	for (const output of absentShardOutputs)
+	for (const outputPath of absentShardOutputs)
 		if (
-			verificationManifest?.shards.some((shard) => shard.outputs.includes(output))
+			verificationManifest?.shards.some((shard) =>
+				shard.outputs.includes(outputPath),
+			)
 		)
-			rmSync(path.join(executionRoot, output), { recursive: true, force: true });
+			rmSync(path.join(executionRoot, outputPath), {
+				recursive: true,
+				force: true,
+			});
 	if (verificationCommand)
 		verificationResult = {
 			command: verificationCommand,
@@ -701,7 +713,6 @@ async function finishTaskUnlocked() {
 		const normalized = file.replaceAll("\\", "/");
 		return (
 			!normalized.startsWith(".ce-workflow/") &&
-			normalized !== ".ce-workflow/work-items.json" &&
 			!evidenceFileSet.has(normalized)
 		);
 	});
@@ -1090,11 +1101,20 @@ function option(name, fallback = undefined) {
 	return options(name)[0] ?? fallback;
 }
 
+const BOOLEAN_OPTIONS = new Set([
+	"--allow-work-store",
+	"--append-notes",
+	"--full",
+	"--immediate-format",
+	"--push",
+	"--reviewed",
+]);
+
 function positional() {
 	const out = [];
 	for (let i = 0; i < args.length; i += 1) {
 		if (args[i].startsWith("--")) {
-			i += 1;
+			if (!BOOLEAN_OPTIONS.has(args[i])) i += 1;
 			continue;
 		}
 		out.push(args[i]);
@@ -1128,7 +1148,14 @@ function jsonAssertionFailures(file, root = cwd) {
 	}
 	for (let i = 1; i < args.length; i += 1) {
 		if (args[i] === "--equals") {
-			const [key, expected] = String(args[++i]).split("=", 2);
+			const assertion = String(args[++i]);
+			const separator = assertion.indexOf("=");
+			if (separator < 0) {
+				failures.push(`invalid --equals ${assertion}`);
+				continue;
+			}
+			const key = assertion.slice(0, separator);
+			const expected = assertion.slice(separator + 1);
 			if (String(jsonPath(data, key)) !== expected)
 				failures.push(`${key} != ${expected}`);
 		} else if (args[i] === "--forbid-string") {
@@ -1166,9 +1193,10 @@ try {
 		print(shown);
 	} else if (command === "work-ready-summary") {
 		const epic = args[0];
+		const scope = epic ? descendantIds(epic) : undefined;
 		print(
 			readyNativeWorkItems()
-				.filter((issue) => !epic || descendantIds(epic).has(idOf(issue)))
+				.filter((issue) => !scope || scope.has(idOf(issue)))
 				.map((issue) => ({
 					id: idOf(issue),
 					title: titleOf(issue),
@@ -1256,10 +1284,7 @@ try {
 			.split(/\r?\n/)
 			.filter(Boolean);
 		const allowed = allowWorkStore
-			? staged.filter(
-					(file) =>
-						file === ".ce-workflow/issues.jsonl" || file.startsWith(".ce-workflow/"),
-				)
+			? staged.filter((file) => file.startsWith(".ce-workflow/"))
 			: [];
 		if (allowed.length) git(["restore", "--staged", ...allowed]);
 		const remaining = git(["diff", "--cached", "--name-only"])
@@ -1435,7 +1460,9 @@ try {
 		const targetEpicId = option("--roadmap") ?? option("--epic");
 		if (!rel)
 			throw new Error(
-				"usage: bootstrap-plan-roadmap <plan-path> [--roadmap <existing-roadmap-id>]",
+				command === "bootstrap-plan-epic"
+					? "usage: bootstrap-plan-epic <plan-path> [--epic <existing-epic-id>]"
+					: "usage: bootstrap-plan-roadmap <plan-path> [--roadmap <existing-roadmap-id>]",
 			);
 		const modUrl = pathToFileURL(
 			path.join(import.meta.dirname, "..", "extensions", "work-models.js"),

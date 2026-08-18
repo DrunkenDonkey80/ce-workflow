@@ -245,7 +245,7 @@ try {
 	const jsonFile = path.join(cwd, "artifact.json");
 	writeFileSync(
 		jsonFile,
-		JSON.stringify({ status: "PASS", nested: { count: 2 } }),
+		JSON.stringify({ status: "PASS", nested: { count: 2, query: "a=b" } }),
 	);
 	const helper = JSON.parse(
 		execFileSync(
@@ -258,6 +258,8 @@ try {
 				"status,nested.count",
 				"--equals",
 				"status=PASS",
+				"--equals",
+				"nested.query=a=b",
 			],
 			{ cwd, encoding: "utf8" },
 		),
@@ -324,6 +326,11 @@ try {
 			readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
 		"legacy instruction cleanup is a no-op when markers are absent",
 	);
+	assert(
+		cleanupCommand("legacy-instructions-preview", "--full", "AGENTS.md").status ===
+			"no-op",
+		"boolean flags do not swallow following positional arguments",
+	);
 	const refusedFixtures = [
 		["missing end", "<!-- BEGIN COMPOUND PI TOOL MAP -->\nbody\n"],
 		["missing begin", "body\n<!-- END COMPOUND PI TOOL MAP -->\n"],
@@ -355,6 +362,14 @@ try {
 		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status === "no-op",
 		"legacy instruction cleanup is a no-op when AGENTS.md is absent",
 	);
+	const outsideFile = path.join(cwd, "AGENTS.md");
+	writeFileSync(outsideFile, managedBlock);
+	assert(
+		cleanupCommand("legacy-instructions-apply", "../AGENTS.md", "--confirm", "ignored")
+			.reason === "outside-repository" &&
+			readFileSync(outsideFile, "utf8") === managedBlock,
+		"legacy instruction cleanup refuses parent-directory targets",
+	);
 
 	const finishCwd = path.join(cwd, "finish-task");
 	mkdirSync(finishCwd, { recursive: true });
@@ -370,6 +385,7 @@ try {
 		"TASK-3",
 		"TASK-4",
 		"TASK-ROLLBACK",
+		"TASK-SHARD",
 		"TASK-SHELL",
 		"TASK-UNTRACKED",
 	])
@@ -406,6 +422,12 @@ try {
 		notes: ["Verification: tests passed"],
 	});
 	createWorkItem(finishStore, {
+		id: "TASK-7",
+		type: "task",
+		status: "open",
+		title: "Test hardware device behavior",
+	});
+	createWorkItem(finishStore, {
 		id: "TASK-PLANNING",
 		type: "task",
 		status: "open",
@@ -438,6 +460,36 @@ try {
 		'#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst files = process.argv.slice(2);\nif (files.some((file) => file.replaceAll("\\\\", "/").endsWith(".ce-workflow/work-items.json"))) throw new Error("runtime store must not be formatted");\nfor (const file of files) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
 	);
 	const fakeBdScript = path.join(finishCwd, "tracker-must-not-run");
+	let shardTraversalError = "";
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-SHARD",
+				"--max-files",
+				"2",
+				"--message",
+				"reject shard traversal",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+				"--verify-shard",
+				JSON.stringify({
+					id: "escape",
+					command: `"${process.execPath}" -e "process.stdout.write('ok')"`,
+					outputs: ["../outside"],
+				}),
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		);
+	} catch (error) {
+		shardTraversalError = String(error.stdout ?? "");
+	}
+	assert(
+		shardTraversalError.includes("invalid verification shard output"),
+		"finish-task rejects shard outputs outside the execution repository",
+	);
 	const finished = JSON.parse(
 		execFileSync(
 			process.execPath,
@@ -998,6 +1050,34 @@ process.exit(result.status ?? 1);
 		firmwareReviewError.includes("sensitive task contract") &&
 			firmwareReviewError.includes("hardware/live-evidence contract"),
 		"implementation notes cannot suppress firmware review from the immutable task contract",
+	);
+	let genericHardwareReviewError = "";
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-7",
+				"--max-files",
+				"2",
+				"--message",
+				"test hardware",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+			],
+			{
+				cwd: finishCwd,
+				encoding: "utf8",
+				env: { ...process.env, WORK_ORCH_BD_BIN: fakeBdScript },
+			},
+		);
+	} catch (error) {
+		genericHardwareReviewError = String(error.stdout ?? "");
+	}
+	assert(
+		genericHardwareReviewError.includes("hardware/live-evidence contract"),
+		"generic test wording cannot misclassify hardware implementation as evidence-only",
 	);
 	rmSync(path.join(finishCwd, "config.js"));
 

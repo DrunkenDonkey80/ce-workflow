@@ -164,14 +164,12 @@ export function tidyUntrackedFiles({ cwd, gitBin = "git", preserve = [] }) {
 			},
 		);
 	const status = String(
-		runGit(["status", "--porcelain=v1", "--untracked-files=all"]),
+		runGit(["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
 	);
 	const untracked = status
-		.split(/\r?\n/)
-		.filter((line) => line.startsWith("??"))
-		.map((line) =>
-			line.slice(3).trim().replace(/^"|"$/g, "").replaceAll("\\", "/"),
-		)
+		.split("\0")
+		.filter((record) => record.startsWith("?? "))
+		.map((record) => record.slice(3).replaceAll("\\", "/"))
 		.filter(Boolean);
 	const toIgnore = new Set();
 	const unrecognized = [];

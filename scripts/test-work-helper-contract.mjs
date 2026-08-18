@@ -184,6 +184,25 @@ try {
 	const scoped = loadStore(cwd);
 	scoped.items["TASK-1"].notes.push(scopeNote);
 	saveStore(cwd, scoped);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-1",
+			"--max-files",
+			"2",
+			"--message",
+			"scope finalization",
+			...verifyArgs,
+			"--reviewed",
+		),
+		/durable wo:review PASS evidence/,
+		"a PASS before the latest review scope is stale",
+	);
+	const freshlyReviewed = loadStore(cwd);
+	freshlyReviewed.items["TASK-1"].notes.push(
+		"wo:review PASS - latest scoped diff approved",
+	);
+	saveStore(cwd, freshlyReviewed);
 	writeFileSync(path.join(cwd, "extra.js"), "export default true;\n");
 	assert.match(
 		failure(
@@ -262,6 +281,11 @@ try {
 		loadStore(cwd).items["TASK-EMPTY"].notes.includes("wo:review-scope []"),
 		"store-only handoff persists an explicit empty review scope",
 	);
+	const reviewedStoreOnly = loadStore(cwd);
+	reviewedStoreOnly.items["TASK-EMPTY"].notes.push(
+		"wo:review PASS - empty scope approved",
+	);
+	saveStore(cwd, reviewedStoreOnly);
 	const storeOnlyFinished = JSON.parse(
 		run(
 			"finish-task",
@@ -285,11 +309,11 @@ try {
 		status: "open",
 		title: "Update authentication residual",
 		notes: [
+			'wo:review-scope ["residual.js"]',
 			"wo:review FAIL - first",
 			"wo:fix PASS - first fix",
 			'wo:review FAIL {"findings":["residual A","residual B"]}',
 			"wo:fix PASS - generic residual summary",
-			'wo:review-scope ["residual.js"]',
 		],
 	});
 	saveStore(cwd, residualStore);
@@ -342,9 +366,9 @@ try {
 		status: "open",
 		title: "Update authentication documentation",
 		notes: [
+			'wo:review-scope ["mechanical.md"]',
 			"wo:review FAIL - source comment date is missing",
 			"wo:fix PASS - comment corrected and docs check passed",
-			'wo:review-scope ["mechanical.md"]',
 		],
 	});
 	saveStore(cwd, mechanicalStore);
