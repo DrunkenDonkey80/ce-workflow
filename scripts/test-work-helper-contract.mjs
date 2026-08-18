@@ -599,9 +599,40 @@ try {
 		...verifyArgs,
 	);
 	const canonicalExecutionRoot = JSON.stringify(realpathSync(executionRoot));
+	const canonicalOwnerRoot = JSON.stringify(realpathSync(ownerRoot));
 	assert.ok(
 		crossReviewHandoff.includes(
 			`Execution repository: ${canonicalExecutionRoot}`,
+		),
+	);
+	assert.ok(
+		crossReviewHandoff.includes(
+			`Run file-inspection and repository preflight commands with ${canonicalExecutionRoot} as the current working directory.`,
+		),
+	);
+	assert.ok(
+		crossReviewHandoff.includes(
+			`Run helper summary and note commands with ${canonicalOwnerRoot} as the current working directory.`,
+		),
+	);
+	assert.ok(
+		crossReviewHandoff.includes(
+			`Summary command (from owner repository): cd ${canonicalOwnerRoot} && node ${JSON.stringify(helper)} work-summary CROSS-REVIEW`,
+		),
+	);
+	assert.ok(
+		crossReviewHandoff.includes(
+			`Verdict command: cd ${canonicalOwnerRoot} && node ${JSON.stringify(helper)} work-note "CROSS-REVIEW"`,
+		),
+	);
+	assert.ok(
+		crossReviewHandoff.includes(
+			`Verdict postcondition: rerun cd ${canonicalOwnerRoot} && node ${JSON.stringify(helper)} work-summary "CROSS-REVIEW"`,
+		),
+	);
+	assert.ok(
+		!crossReviewHandoff.includes(
+			`Summary command (from execution repository): node ${JSON.stringify(helper)} work-summary CROSS-REVIEW`,
 		),
 	);
 	assert.ok(

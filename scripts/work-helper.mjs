@@ -233,10 +233,13 @@ function reviewerHandoff(
 	implementationFiles,
 	reviewReasons,
 	executionRoot,
+	ownerRepositoryRoot,
 	distinctRoots,
 ) {
 	const helper = path.resolve(process.argv[1]);
 	const root = JSON.stringify(executionRoot);
+	const ownerRoot = JSON.stringify(ownerRepositoryRoot);
+	const helperPrefix = distinctRoots ? `cd ${ownerRoot} && ` : "";
 	const reviewOnly = implementationFiles
 		.map((file) => JSON.stringify(file.replaceAll("\\", "/")))
 		.join(", ");
@@ -245,15 +248,24 @@ function reviewerHandoff(
 		`Work item: ${id}`,
 		`Execution repository: ${root}`,
 		`Repository preflight: git -C ${root} rev-parse --show-toplevel must resolve to this execution repository; stop BLOCKED before reading files or writing notes if it does not.`,
-		`Run every helper and file-inspection command with ${root} as the current working directory.`,
-		`Helper: ${JSON.stringify(helper)}`,
-		`Summary command (from execution repository): node ${JSON.stringify(helper)} work-summary ${id}`,
-		...(distinctRoots ? [`Finish retry option: --execution-root ${root}`] : []),
+		...(distinctRoots
+			? [
+					`Run file-inspection and repository preflight commands with ${root} as the current working directory.`,
+					`Run helper summary and note commands with ${ownerRoot} as the current working directory.`,
+					`Helper: ${JSON.stringify(helper)}`,
+					`Summary command (from owner repository): ${helperPrefix}node ${JSON.stringify(helper)} work-summary ${id}`,
+					`Finish retry option: --execution-root ${root}`,
+				]
+			: [
+					`Run every helper and file-inspection command with ${root} as the current working directory.`,
+					`Helper: ${JSON.stringify(helper)}`,
+					`Summary command (from execution repository): node ${JSON.stringify(helper)} work-summary ${id}`,
+				]),
 		`Review only: ${reviewOnly}`,
 		`Review reasons: ${reviewReasons.join("; ")}`,
 		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${id}.`,
-		`Verdict command: node ${JSON.stringify(helper)} work-note ${JSON.stringify(id)} --append-notes "wo:review PASS <one-line evidence>" (replace PASS with the structured FAIL verdict when fixes are required).`,
-		`Verdict postcondition: rerun node ${JSON.stringify(helper)} work-summary ${JSON.stringify(id)} and confirm notes_tail contains a line beginning exactly with wo:review PASS or wo:review FAIL.`,
+		`Verdict command: ${helperPrefix}node ${JSON.stringify(helper)} work-note ${JSON.stringify(id)} --append-notes "wo:review PASS <one-line evidence>" (replace PASS with the structured FAIL verdict when fixes are required).`,
+		`Verdict postcondition: rerun ${helperPrefix}node ${JSON.stringify(helper)} work-summary ${JSON.stringify(id)} and confirm notes_tail contains a line beginning exactly with wo:review PASS or wo:review FAIL.`,
 		"Do not use --body or shell redirection to nul/NUL; read-only checks need no redirection.",
 		"Reviewer coordination: this handoff is complete. Do not contact the supervisor; return BLOCKED immediately if any supplied path or command is unusable.",
 		"Finish retry: rerun the same finish-task command with --reviewed after durable PASS evidence, or after fixing and verifying residual findings from the targeted re-review.",
@@ -823,6 +835,7 @@ async function finishTaskUnlocked() {
 					implementationFiles,
 					reviewReasons,
 					canonicalExecutionRoot,
+					ownerRepositoryRoot,
 					distinctRoots,
 				),
 			);
