@@ -594,6 +594,11 @@ ${requiredItemFields}`;
 			"the internal verifier wake cancellation is not shown as Operation aborted",
 		);
 		await hooks.agent_settled({}, ctx);
+		await hooks.message_end(completion, { ...ctx, isIdle: () => false });
+		assert(
+			aborts === 2,
+			"a verifier notification cannot abort an active non-prompt-backed turn",
+		);
 		await hooks.before_agent_start(
 			{ prompt: "Current user request", systemPrompt: "" },
 			ctx,

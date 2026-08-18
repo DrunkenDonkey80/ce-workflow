@@ -24155,6 +24155,7 @@ export default function workModelsExtension(pi) {
 		}
 		recordSelfImprovementHistory(ctx, "message_end", event);
 		if (
+			ctx.isIdle?.() !== false &&
 			!pendingPromptBackedAgentStart &&
 			!activePromptBackedAgent &&
 			isBackgroundVerifierCompletionMessage(event.message)
