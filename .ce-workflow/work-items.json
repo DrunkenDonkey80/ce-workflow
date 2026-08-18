@@ -4720,6 +4720,45 @@
       "type": "task",
       "updatedAt": "2026-08-18T05:26:26.752Z"
     },
+    "work-2.report-58c405d0-ac21-4770-8767-98085ff2a128": {
+      "createdAt": "2026-08-18T17:38:51.141Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A transient overloaded work-reviewer workflow failed. subagent_wait explicitly required resume-first because a persisted child session existed, but action=resume on that exact workflow ID then failed with `missing its required run fan-out recovery identity. Start a new run instead.`\nExpected: Either retain the fan-out recovery identity so the mandated resume succeeds, or have subagent_wait classify the run as non-resumable and authorize a replacement immediately.\nImpact: The contradictory recovery guidance blocks the coded reviewer path, forces a duplicate reviewer launch, and can consume the project's bounded review-cycle budget without producing a verdict.\nSuggested improvement: Persist or reconstruct the workflow child recovery identity before emitting resume-first guidance; otherwise mark the run non-resumable.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/c188060e-2e70-4159-80f5-e8adb3aa2bc3",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 490,
+              "file": "01-14d99785_work-reviewer_0_output.md",
+              "sha256": "1c447711eaf4a9e4cc95c9a09a62ad5fb9ecb75245ebd3b050fdb80fdc07b2dc"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-18T17:38:51.135Z",
+          "workflowId": "01a01595-a8d8-721b-b447-eb7d10993f2e"
+        }
+      ],
+      "id": "work-2.report-58c405d0-ac21-4770-8767-98085ff2a128",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atom A classification: upstream-owned and duplicate of the exact pi-subagents defect durably routed as https://github.com/nicobailon/pi-subagents/issues/1241. Verified against installed pi-subagents 0.50.0: src/runs/background/resume-guidance.ts advertises resume from sessionFile existence alone, while the failed workflow run d53052d4-48e9-4e97-ac2a-9d6e5b042c03 has a persisted child session but no recovery-descriptor.json, so resume deterministically rejects the missing run fan-out recovery identity. Issue #1241 records the matching expected outcome and a tested upstream patch; no ce-workflow-local workaround is warranted.",
+        "Verified exact upstream duplicate and durable route: pi-subagents #1241.",
+        "wo:reconciliation PASS — upstream classification and report closure committed as f1e874d; exact runtime artifact inspection and pi-subagents issue #1241 verify full snapshot coverage.",
+        "The provisional hash above was superseded by the reconciliation-note amend; the canonical reconciliation is the containing commit named work-2.report-58c405d0: route async resume guidance defect upstream."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: A transient overloaded work-reviewer workflow failed. subagent_wait explicitly required resume-first because a persisted child ses",
+      "type": "task",
+      "updatedAt": "2026-08-18T18:55:36.042Z"
+    },
     "work-2.report-5a46890b-cb60-4585-93ba-e22956cf2b4a": {
       "createdAt": "2026-08-17T22:19:29.390Z",
       "dependencies": [],
@@ -7859,7 +7898,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T15:24:34.190Z"
+    "updatedAt": "2026-08-18T18:55:57.944Z"
   },
   "schemaVersion": 1
 }
