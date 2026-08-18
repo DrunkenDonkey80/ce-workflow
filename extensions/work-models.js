@@ -5587,10 +5587,8 @@ function resumeWorkGoalAfterCompaction(ctx, goalId, generation) {
 	if (goalResume?.goalId !== goalId || goalResume.generation !== generation)
 		return false;
 	goalResume.ready = true;
-	if (workGoalContinuationPending?.goalId === goalId) {
-		manualMicrocompactGoalResume = null;
-		return true;
-	}
+	if (workGoalContinuationPending?.goalId === goalId)
+		workGoalContinuationPending = null;
 	if (goalResume.requested || !activeWorkGoalRunning) {
 		const goal = activeWorkGoal;
 		if (goal?.id === goalId && goal.status === "active")
@@ -5623,8 +5621,12 @@ function runManualMicrocompact(ctx) {
 	}
 	const resumeAfter =
 		manualMicrocompactPending && activeWorkGoal?.status !== "active";
+	const pendingGoalContinuation =
+		activeWorkGoal?.status === "active" &&
+		workGoalContinuationPending?.goalId === activeWorkGoal.id;
 	const resumeGoalId =
-		activeWorkGoalRunning && activeWorkGoal?.status === "active"
+		activeWorkGoal?.status === "active" &&
+		(activeWorkGoalRunning || pendingGoalContinuation)
 			? activeWorkGoal.id
 			: null;
 	const willResume = resumeAfter || Boolean(resumeGoalId);

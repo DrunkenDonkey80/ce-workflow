@@ -2561,6 +2561,26 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		ceOwnedSent + 1,
 		"ce-owned compaction delivers one continuation",
 	);
+	const pendingContinuationCompactions = [];
+	const pendingContinuationSent = sent.length;
+	const pendingContinuationCtx = {
+		...ctx,
+		isIdle: () => true,
+		compact: (options) => pendingContinuationCompactions.push(options),
+	};
+	await tempShortcuts.f8.handler(pendingContinuationCtx);
+	assert.equal(
+		pendingContinuationCompactions.length,
+		1,
+		"microcompaction starts while a goal continuation is queued",
+	);
+	pendingContinuationCompactions[0].onComplete?.();
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(
+		sent.length,
+		pendingContinuationSent + 1,
+		"completed microcompaction replaces the queued continuation exactly once",
+	);
 	await tempHooks.before_agent_start(
 		{ prompt: sent.at(-1).message, systemPrompt: "base" },
 		ctx,

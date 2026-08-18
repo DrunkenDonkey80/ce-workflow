@@ -5291,6 +5291,45 @@
       "type": "task",
       "updatedAt": "2026-08-02T17:29:11.312Z"
     },
+    "work-2.report-92d3e6d4-7a3f-453c-b171-845dc257eb4c": {
+      "createdAt": "2026-08-18T15:18:15.935Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: In NexusConnectSDK session 01a0112b-59bb-7656-839b-f4c1ae14d0e2, an active project autonomous goal entered automatic microcompaction at iteration 1. The transcript ended with `Microcompaction completed`, persisted `work-goal-state.status=active`, and then remained idle/done for over 30 seconds with no `__orchestrator-goal-continue` prompt. The previous compaction in the same goal did emit `Microcompaction completed; resuming work`, so this is not an intentional pause. A coded pause/resume was required to restart the goal.\nExpected: Every completed automatic work-goal microcompaction must enqueue exactly one continuation prompt (or durably record a recoverable pending continuation) before becoming idle, so an active project goal cannot stall between iterations.\nImpact: Autonomous `F7 Roadmap -> Resume work` can silently stop while its progress widget still says active. An unattended workflow never reaches remaining verifier triage, roadmap slices, or genuine decision gates.\nSuggested improvement: Make the compaction completion callback persist and deliver one idempotent continuation token before clearing pending state; add a regression where compaction completes after an aborted turn and agent_settled observes an active goal.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e44376ff-30fa-487a-bc8e-22074e329893",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 878,
+              "file": "01-nexus-goal-microcompact-stall.log",
+              "sha256": "5de3e28b112c7288d03c045f47d91e5b1914fb3b63d67e916827285f6836d1e4"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-18T15:18:15.929Z",
+          "workflowId": "01a01376-5af3-7cc2-ac23-cbf25a73c17d"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.report-92d3e6d4-7a3f-453c-b171-845dc257eb4c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: In NexusConnectSDK session 01a0112b-59bb-7656-839b-f4c1ae14d0e2, an active project autonomous goal entered automatic microcompacti",
+      "type": "task",
+      "updatedAt": "2026-08-18T15:24:34.190Z"
+    },
     "work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98": {
       "createdAt": "2026-08-08T19:55:34.274Z",
       "dependencies": [
@@ -7820,7 +7859,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T10:19:24.338Z"
+    "updatedAt": "2026-08-18T15:24:34.190Z"
   },
   "schemaVersion": 1
 }
