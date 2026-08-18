@@ -5473,6 +5473,40 @@
       "type": "task",
       "updatedAt": "2026-08-18T05:28:47.628Z"
     },
+    "work-2.report-d3a44b03-1ac9-446d-b9e3-76cd0f0927ad": {
+      "createdAt": "2026-08-18T06:38:45.654Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Background verifier reconciliation permanently marked four jobs failed with \"Verifier terminal output was unavailable or invalid\", although their retained run status later contained valid schema-validated structured output. Failed jobs are excluded from later reconcileVerifierRuns passes, so work_goal_complete remained blocked.\nExpected: A terminal-success run should receive an artifact-finalization grace window and/or artifact-only failed jobs should be rechecked when valid structured output later appears, then ingested exactly once.\nImpact: Autonomous goal completion deadlocked despite completed verifier runs and valid retained evidence; deterministic manual recovery through the verifier store API was required.\nSuggested improvement: Delay artifact-only terminal failure for the existing grace period and permit safe recovery when a valid structured output appears later.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/b2ae0901-b796-46f3-874a-9dad08b0465b",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 443403,
+              "file": "01-state.json",
+              "sha256": "8e3d87e6a8d9758eb617db8d4f826ee61904e4c82c66d5ea0fdd51cc00831303"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-18T06:38:45.650Z",
+          "workflowId": "01a010da-19e6-70b3-8a39-6102abd0510e"
+        }
+      ],
+      "id": "work-2.report-d3a44b03-1ac9-446d-b9e3-76cd0f0927ad",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Background verifier reconciliation permanently marked four jobs failed with \"Verifier terminal output was unavailable or invalid\",",
+      "type": "task",
+      "updatedAt": "2026-08-18T06:38:45.654Z"
+    },
     "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
       "createdAt": "2026-08-12T16:54:19.072Z",
       "dependencies": [
@@ -7694,7 +7728,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T06:19:08.098Z"
+    "updatedAt": "2026-08-18T06:38:45.654Z"
   },
   "schemaVersion": 1
 }
