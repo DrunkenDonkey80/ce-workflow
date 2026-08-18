@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,16 +25,22 @@ const globalSettingsDir = mkdtempSync(
 	path.join(tmpdir(), "work-helper-global-settings-"),
 );
 process.env.PI_CODING_AGENT_DIR = globalSettingsDir;
-const run = (...args) =>
-	execFileSync(process.execPath, [helper, ...args], { cwd, encoding: "utf8" });
-const failure = (...args) => {
+const runFrom = (root, ...args) =>
+	execFileSync(process.execPath, [helper, ...args], {
+		cwd: root,
+		encoding: "utf8",
+	});
+const run = (...args) => runFrom(cwd, ...args);
+const failureFrom = (root, ...args) => {
 	try {
-		run(...args);
+		runFrom(root, ...args);
 		assert.fail("command should fail");
 	} catch (error) {
+		if (!error.stdout) throw error;
 		return JSON.parse(String(error.stdout)).error;
 	}
 };
+const failure = (...args) => failureFrom(cwd, ...args);
 const verifyArgs = [
 	"--verify",
 	`"${process.execPath}" -e "process.stdout.write('ok')"`,
@@ -151,7 +158,10 @@ try {
 		...verifyArgs,
 		"--reviewed",
 	);
-	assert.match(malformedScope, /invalid persisted wo:review-scope .*expected a JSON array/);
+	assert.match(
+		malformedScope,
+		/invalid persisted wo:review-scope .*expected a JSON array/,
+	);
 	assert.doesNotMatch(malformedScope, /iterable/);
 	reviewed.items["TASK-1"].notes = reviewed.items["TASK-1"].notes.filter(
 		(note) => !note.startsWith("wo:review-scope "),
@@ -338,13 +348,9 @@ try {
 		],
 	});
 	saveStore(cwd, mechanicalStore);
-	execFileSync(
-		"git",
-		["add", "mechanical.md", ".ce-workflow/work-items.json"],
-		{
-			cwd,
-		},
-	);
+	execFileSync("git", ["add", "mechanical.md", ".ce-workflow/work-items.json"], {
+		cwd,
+	});
 	execFileSync("git", ["commit", "-m", "mechanical baseline"], {
 		cwd,
 		stdio: "ignore",
@@ -452,6 +458,383 @@ try {
 		"finish writes one compact verification PASS note",
 	);
 	assert.equal(loadStore(cwd).items["TASK-4"].status, "closed");
+
+	const cwdAlias = `${cwd}-alias`;
+	symlinkSync(cwd, cwdAlias, process.platform === "win32" ? "junction" : "dir");
+	assert.match(
+		failureFrom(cwdAlias, "finish-small"),
+		/usage: finish-task/,
+		"an aliased cwd without --execution-root acquires the same-root lock once",
+	);
+	rmSync(cwdAlias, { recursive: true, force: true });
+
+	const ownerRoot = mkdtempSync(path.join(tmpdir(), "work-helper-owner-"));
+	const executionRoot = mkdtempSync(
+		path.join(tmpdir(), "work-helper-execution-"),
+	);
+	for (const root of [ownerRoot, executionRoot]) {
+		execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+		execFileSync("git", ["config", "user.email", "test@example.com"], {
+			cwd: root,
+		});
+		execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+	}
+	const crossStore = initStore(ownerRoot);
+	createWorkItem(crossStore, {
+		id: "CROSS-1",
+		type: "task",
+		status: "open",
+		title: "Update companion repository",
+	});
+	saveStore(ownerRoot, crossStore);
+	execFileSync("git", ["add", ".ce-workflow/work-items.json"], {
+		cwd: ownerRoot,
+	});
+	execFileSync("git", ["commit", "-m", "owner baseline"], {
+		cwd: ownerRoot,
+		stdio: "ignore",
+	});
+	writeFileSync(
+		path.join(executionRoot, "source.js"),
+		"export default false;\n",
+	);
+	execFileSync("git", ["add", "source.js"], { cwd: executionRoot });
+	execFileSync("git", ["commit", "-m", "execution baseline"], {
+		cwd: executionRoot,
+		stdio: "ignore",
+	});
+	writeFileSync(path.join(executionRoot, "source.js"), "export default true;\n");
+	const crossFinished = JSON.parse(
+		runFrom(
+			ownerRoot,
+			"finish-small",
+			"CROSS-1",
+			"--execution-root",
+			executionRoot,
+			"--message",
+			"finish companion change",
+			...verifyArgs,
+		),
+	);
+	const closedCross = loadStore(ownerRoot).items["CROSS-1"];
+	assert.equal(closedCross.status, "closed");
+	assert.equal(closedCross.executionRepositoryRoot, realpathSync(executionRoot));
+	assert.equal(closedCross.executionCommit, crossFinished.executionCommit);
+	assert.equal(crossFinished.commit, crossFinished.executionCommit.slice(0, 7));
+	assert.notEqual(crossFinished.ownerCommit, crossFinished.executionCommit);
+	assert.equal(
+		execFileSync("git", ["show", "--pretty=", "--name-only", "HEAD"], {
+			cwd: ownerRoot,
+			encoding: "utf8",
+		}).trim(),
+		".ce-workflow/work-items.json",
+		"tracked owner metadata gets a separate store-only commit",
+	);
+
+	const reviewStore = loadStore(ownerRoot);
+	createWorkItem(reviewStore, {
+		id: "CROSS-REVIEW",
+		type: "task",
+		status: "open",
+		title: "Update authentication in companion repository",
+	});
+	saveStore(ownerRoot, reviewStore);
+	writeFileSync(path.join(executionRoot, "source.js"), "review these bytes\n");
+	const ownerBeforeReview = execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: ownerRoot,
+		encoding: "utf8",
+	}).trim();
+	const executionBeforeReview = execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: executionRoot,
+		encoding: "utf8",
+	}).trim();
+	const crossReviewHandoff = failureFrom(
+		ownerRoot,
+		"finish-small",
+		"CROSS-REVIEW",
+		"--execution-root",
+		executionRoot,
+		"--message",
+		"request companion review",
+		...verifyArgs,
+	);
+	const canonicalExecutionRoot = JSON.stringify(realpathSync(executionRoot));
+	assert.ok(
+		crossReviewHandoff.includes(
+			`Execution repository: ${canonicalExecutionRoot}`,
+		),
+	);
+	assert.ok(
+		crossReviewHandoff.includes(
+			`Finish retry option: --execution-root ${canonicalExecutionRoot}`,
+		),
+	);
+	assert.equal(
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: ownerRoot,
+			encoding: "utf8",
+		}).trim(),
+		ownerBeforeReview,
+		"review handoff does not commit the owner repository",
+	);
+	assert.equal(
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: executionRoot,
+			encoding: "utf8",
+		}).trim(),
+		executionBeforeReview,
+		"review handoff does not commit the execution repository",
+	);
+	execFileSync("git", ["restore", "source.js"], { cwd: executionRoot });
+
+	const executionStore = initStore(executionRoot);
+	createWorkItem(executionStore, {
+		id: "OTHER-STORE",
+		type: "task",
+		status: "open",
+		title: "Execution repository work",
+	});
+	saveStore(executionRoot, executionStore);
+	execFileSync("git", ["add", ".ce-workflow/work-items.json"], {
+		cwd: executionRoot,
+	});
+	execFileSync("git", ["commit", "-m", "execution store baseline"], {
+		cwd: executionRoot,
+		stdio: "ignore",
+	});
+	const foreignStoreOwner = loadStore(ownerRoot);
+	createWorkItem(foreignStoreOwner, {
+		id: "CROSS-FOREIGN-STORE",
+		type: "task",
+		status: "open",
+		title: "Refuse a foreign work store",
+	});
+	saveStore(ownerRoot, foreignStoreOwner);
+	writeFileSync(path.join(executionRoot, "source.js"), "must not commit\n");
+	const changedExecutionStore = loadStore(executionRoot);
+	changedExecutionStore.items["OTHER-STORE"].title = "Changed execution work";
+	saveStore(executionRoot, changedExecutionStore);
+	const ownerBeforeForeignStore = execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: ownerRoot,
+		encoding: "utf8",
+	}).trim();
+	const executionBeforeForeignStore = execFileSync(
+		"git",
+		["rev-parse", "HEAD"],
+		{ cwd: executionRoot, encoding: "utf8" },
+	).trim();
+	assert.match(
+		failureFrom(
+			ownerRoot,
+			"finish-small",
+			"CROSS-FOREIGN-STORE",
+			"--execution-root",
+			executionRoot,
+			"--message",
+			"reject foreign store",
+			...verifyArgs,
+		),
+		/refusing changed \.ce-workflow\/work-items\.json in distinct execution repository/,
+	);
+	assert.equal(
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: ownerRoot,
+			encoding: "utf8",
+		}).trim(),
+		ownerBeforeForeignStore,
+		"foreign store refusal does not commit the owner repository",
+	);
+	assert.equal(
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: executionRoot,
+			encoding: "utf8",
+		}).trim(),
+		executionBeforeForeignStore,
+		"foreign store refusal does not commit the execution repository",
+	);
+	execFileSync("git", ["restore", "source.js", ".ce-workflow/work-items.json"], {
+		cwd: executionRoot,
+	});
+
+	const pushStore = loadStore(ownerRoot);
+	createWorkItem(pushStore, {
+		id: "CROSS-PUSH",
+		type: "task",
+		status: "open",
+		title: "Reject companion push",
+	});
+	saveStore(ownerRoot, pushStore);
+	writeFileSync(
+		path.join(executionRoot, "source.js"),
+		"push must not commit;\n",
+	);
+	const ownerBeforePush = execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: ownerRoot,
+		encoding: "utf8",
+	}).trim();
+	const executionBeforePush = execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: executionRoot,
+		encoding: "utf8",
+	}).trim();
+	assert.match(
+		failureFrom(
+			ownerRoot,
+			"finish-small",
+			"CROSS-PUSH",
+			"--execution-root",
+			executionRoot,
+			"--message",
+			"reject companion push",
+			...verifyArgs,
+			"--push",
+		),
+		/distinct-root --push is not supported/,
+	);
+	assert.equal(
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: ownerRoot,
+			encoding: "utf8",
+		}).trim(),
+		ownerBeforePush,
+		"push refusal occurs before an owner commit",
+	);
+	assert.equal(
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: executionRoot,
+			encoding: "utf8",
+		}).trim(),
+		executionBeforePush,
+		"push refusal occurs before an execution commit",
+	);
+	assert.equal(loadStore(ownerRoot).items["CROSS-PUSH"].status, "open");
+	execFileSync("git", ["restore", "source.js"], { cwd: executionRoot });
+
+	const rollbackStore = loadStore(ownerRoot);
+	createWorkItem(rollbackStore, {
+		id: "CROSS-ROLLBACK",
+		type: "task",
+		status: "open",
+		title: "Roll back companion finalization",
+	});
+	saveStore(ownerRoot, rollbackStore);
+	writeFileSync(path.join(ownerRoot, "unrelated.txt"), "owner dirt\n");
+	writeFileSync(path.join(executionRoot, "source.js"), "retryable bytes\n");
+	const executionBeforeRollback = execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: executionRoot,
+		encoding: "utf8",
+	}).trim();
+	assert.match(
+		failureFrom(
+			ownerRoot,
+			"finish-small",
+			"CROSS-ROLLBACK",
+			"--execution-root",
+			executionRoot,
+			"--message",
+			"exercise companion rollback",
+			...verifyArgs,
+		),
+		/finalization rolled back before close: non-work-store files changed during close/,
+	);
+	assert.equal(
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: executionRoot,
+			encoding: "utf8",
+		}).trim(),
+		executionBeforeRollback,
+		"post-execution failure restores the execution HEAD",
+	);
+	assert.equal(loadStore(ownerRoot).items["CROSS-ROLLBACK"].status, "open");
+	assert.equal(
+		execFileSync("git", ["diff", "--cached", "--name-only"], {
+			cwd: executionRoot,
+			encoding: "utf8",
+		}).trim(),
+		"",
+		"retryable implementation bytes are left unstaged",
+	);
+	assert.equal(
+		execFileSync("git", ["diff", "--", "source.js"], {
+			cwd: executionRoot,
+			encoding: "utf8",
+		}).includes("retryable bytes"),
+		true,
+	);
+	rmSync(path.join(ownerRoot, "unrelated.txt"));
+	execFileSync("git", ["restore", "source.js"], { cwd: executionRoot });
+
+	const ignoredOwnerRoot = mkdtempSync(
+		path.join(tmpdir(), "work-helper-ignored-owner-"),
+	);
+	const ignoredExecutionRoot = mkdtempSync(
+		path.join(tmpdir(), "work-helper-ignored-execution-"),
+	);
+	for (const root of [ignoredOwnerRoot, ignoredExecutionRoot]) {
+		execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+		execFileSync("git", ["config", "user.email", "test@example.com"], {
+			cwd: root,
+		});
+		execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+	}
+	writeFileSync(path.join(ignoredOwnerRoot, ".gitignore"), ".ce-workflow/\n");
+	execFileSync("git", ["add", ".gitignore"], { cwd: ignoredOwnerRoot });
+	execFileSync("git", ["commit", "-m", "ignored owner baseline"], {
+		cwd: ignoredOwnerRoot,
+		stdio: "ignore",
+	});
+	const ignoredStore = initStore(ignoredOwnerRoot);
+	createWorkItem(ignoredStore, {
+		id: "CROSS-IGNORED",
+		type: "task",
+		status: "open",
+		title: "Update companion with local owner store",
+	});
+	saveStore(ignoredOwnerRoot, ignoredStore);
+	writeFileSync(path.join(ignoredExecutionRoot, "source.js"), "before\n");
+	execFileSync("git", ["add", "source.js"], { cwd: ignoredExecutionRoot });
+	execFileSync("git", ["commit", "-m", "ignored execution baseline"], {
+		cwd: ignoredExecutionRoot,
+		stdio: "ignore",
+	});
+	writeFileSync(path.join(ignoredExecutionRoot, "source.js"), "after\n");
+	const ignoredOwnerHead = execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: ignoredOwnerRoot,
+		encoding: "utf8",
+	}).trim();
+	const ignoredFinished = JSON.parse(
+		runFrom(
+			ignoredOwnerRoot,
+			"finish-task",
+			"CROSS-IGNORED",
+			"--execution-root",
+			ignoredExecutionRoot,
+			"--max-files",
+			"1",
+			"--message",
+			"finish ignored companion",
+			...verifyArgs,
+		),
+	);
+	assert.equal(ignoredFinished.ownerCommit, null);
+	assert.equal(
+		loadStore(ignoredOwnerRoot).items["CROSS-IGNORED"].status,
+		"closed",
+	);
+	assert.equal(
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: ignoredOwnerRoot,
+			encoding: "utf8",
+		}).trim(),
+		ignoredOwnerHead,
+		"ignored owner store remains durable without a metadata commit",
+	);
+	for (const root of [
+		ownerRoot,
+		executionRoot,
+		ignoredOwnerRoot,
+		ignoredExecutionRoot,
+	])
+		rmSync(root, { recursive: true, force: true });
 
 	console.log("ok - work helper contract");
 } finally {

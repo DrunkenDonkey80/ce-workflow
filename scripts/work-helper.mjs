@@ -5,6 +5,7 @@ import {
 	existsSync,
 	mkdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	statSync,
 	writeFileSync,
@@ -105,17 +106,26 @@ function updateNativeWorkItem(id, changes) {
 	});
 }
 
-function git(argv) {
-	return run(gitBin, argv);
+function git(argv, root = cwd) {
+	return run(gitBin, argv, { cwd: root });
 }
 
-function gitStatusPaths() {
-	const records = git([
-		"status",
-		"--porcelain=v1",
-		"-z",
-		"--untracked-files=all",
-	])
+function canonicalGitRoot(candidate, label) {
+	const requested = realpathSync(path.resolve(candidate));
+	let root;
+	try {
+		root = git(["rev-parse", "--show-toplevel"], requested).trim();
+	} catch {
+		throw new Error(`${label} is not inside a Git repository: ${requested}`);
+	}
+	return realpathSync(root);
+}
+
+function gitStatusPaths(root = cwd) {
+	const records = git(
+		["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+		root,
+	)
 		.split("\0")
 		.filter(Boolean);
 	const paths = [];
@@ -134,7 +144,11 @@ const LEGACY_INSTRUCTIONS_PHRASE = "COMPOUND PI TOOL MAP";
 
 function markerOccurrences(text, marker) {
 	const occurrences = [];
-	for (let offset = text.indexOf(marker); offset !== -1; offset = text.indexOf(marker, offset + 1)) {
+	for (
+		let offset = text.indexOf(marker);
+		offset !== -1;
+		offset = text.indexOf(marker, offset + 1)
+	) {
 		const after = offset + marker.length;
 		const lineStart = offset === 0 || text[offset - 1] === "\n";
 		const lineEnd =
@@ -161,11 +175,16 @@ function legacyInstructionsPreview(requestedFile = "AGENTS.md") {
 	if (!begins.length && !ends.length && phraseCount === 0)
 		return { status: "no-op", reason: "markers-absent", file };
 	let reason;
-	if (begins.some((item) => !item.exactLine) || ends.some((item) => !item.exactLine))
+	if (
+		begins.some((item) => !item.exactLine) ||
+		ends.some((item) => !item.exactLine)
+	)
 		reason = "malformed-markers";
-	else if (phraseCount !== begins.length + ends.length) reason = "malformed-markers";
+	else if (phraseCount !== begins.length + ends.length)
+		reason = "malformed-markers";
 	else if (begins.length !== 1 || ends.length !== 1)
-		reason = !begins.length || !ends.length ? "missing-marker" : "duplicated-markers";
+		reason =
+			!begins.length || !ends.length ? "missing-marker" : "duplicated-markers";
 	else if (begins[0].start > ends[0].start) reason = "reversed-markers";
 	if (reason) return { status: "refused", reason, file };
 	const removed = text.slice(begins[0].start, ends[0].end);
@@ -193,7 +212,13 @@ function applyLegacyInstructionsCleanup(requestedFile, confirmation) {
 	return { ...preview, status: "applied" };
 }
 
-function reviewerHandoff(id, implementationFiles, reviewReasons) {
+function reviewerHandoff(
+	id,
+	implementationFiles,
+	reviewReasons,
+	executionRoot,
+	distinctRoots,
+) {
 	const helper = path.resolve(process.argv[1]);
 	const reviewOnly = implementationFiles
 		.map((file) => JSON.stringify(file.replaceAll("\\", "/")))
@@ -203,6 +228,12 @@ function reviewerHandoff(id, implementationFiles, reviewReasons) {
 		`Work item: ${id}`,
 		`Helper: ${JSON.stringify(helper)}`,
 		`Summary command: node ${JSON.stringify(helper)} work-summary ${id}`,
+		...(distinctRoots
+			? [
+					`Execution repository: ${JSON.stringify(executionRoot)}`,
+					`Finish retry option: --execution-root ${JSON.stringify(executionRoot)}`,
+				]
+			: []),
 		`Review only: ${reviewOnly}`,
 		`Review reasons: ${reviewReasons.join("; ")}`,
 		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${id}.`,
@@ -337,19 +368,19 @@ function reviewDispositionSatisfied(task) {
 		: failures >= 2 && dispositionCovers(target, residualDisposition(task));
 }
 
-function formatPendingFiles() {
+function formatPendingFiles(root = cwd) {
 	if (!args.includes("--immediate-format")) return [];
-	const files = gitStatusPaths().filter(
+	const files = gitStatusPaths(root).filter(
 		(file) =>
 			!isWorkflowManaged(file) &&
 			/\.(?:[cm]?[jt]sx?|jsonc?|css|scss|sass|vue|svelte|html?)$/i.test(file) &&
-			existsSync(file),
+			existsSync(path.join(root, file)),
 	);
 	if (!files.length) return [];
 	const suffix = process.platform === "win32" ? ".cmd" : "";
 	const candidates = [
 		process.env.WORK_ORCH_FORMATTER_BIN,
-		path.join(cwd, "node_modules", ".bin", `biome${suffix}`),
+		path.join(root, "node_modules", ".bin", `biome${suffix}`),
 		path.join(
 			os.homedir(),
 			".pi-lens",
@@ -361,12 +392,12 @@ function formatPendingFiles() {
 	].filter(Boolean);
 	const formatter = candidates.find(existsSync);
 	if (!formatter) return [];
-	run(formatter, ["format", "--write", ...files]);
+	run(formatter, ["format", "--write", ...files], { cwd: root });
 	return files;
 }
 
-async function runVerificationCommand(command) {
-	const options = { cwd, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 };
+async function runVerificationCommand(command, root = cwd) {
+	const options = { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 };
 	const shell =
 		process.env.WORK_ORCH_VERIFY_SHELL ||
 		(process.platform === "win32" && process.env.MSYSTEM ? "bash" : "");
@@ -381,14 +412,12 @@ async function runVerificationCommand(command) {
 	}
 }
 
-async function runVerification(command, shards = []) {
+async function runVerification(command, shards = [], root = cwd) {
 	if (!shards.length) {
-		const result = await runVerificationCommand(command);
+		const result = await runVerificationCommand(command, root);
 		return { output: String(result.stdout ?? ""), manifest: null };
 	}
-	const authoritativeCommand = shards
-		.map((shard) => shard.command)
-		.join(" && ");
+	const authoritativeCommand = shards.map((shard) => shard.command).join(" && ");
 	if (command !== authoritativeCommand)
 		throw new Error(
 			"declared verification shards must exactly compose the authoritative --verify command in order",
@@ -398,8 +427,7 @@ async function runVerification(command, shards = []) {
 		const settings = JSON.parse(
 			readFileSync(
 				path.join(
-					process.env.PI_CODING_AGENT_DIR ||
-						path.join(os.homedir(), ".pi", "agent"),
+					process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"),
 					"settings.json",
 				),
 				"utf8",
@@ -411,9 +439,9 @@ async function runVerification(command, shards = []) {
 	}
 	if (process.env.WORK_ORCH_SERIAL === "1") serialSetting = true;
 	const batch = await runVerificationShardBatch(
-		cwd,
+		root,
 		{ shards, authoritativeCommand, gateVersion: VERIFICATION_GATE_VERSION },
-		async (shard) => runVerificationCommand(shard.command),
+		async (shard) => runVerificationCommand(shard.command, root),
 		{ serial: serialSetting, failFast: true, mutationOwner: true },
 	);
 	admitVerificationManifest(batch.manifest, {
@@ -429,8 +457,7 @@ async function runVerification(command, shards = []) {
 	return {
 		output: batch.manifest.shards
 			.map(
-				(shard) =>
-					`${shard.id}:${shard.status}:${shard.outputHash.slice(0, 12)}`,
+				(shard) => `${shard.id}:${shard.status}:${shard.outputHash.slice(0, 12)}`,
 			)
 			.join(", "),
 		manifest: batch.manifest,
@@ -445,13 +472,21 @@ async function finishTaskUnlocked() {
 	);
 	if (!id || !message || !Number.isInteger(maxFiles) || maxFiles < 1)
 		throw new Error(
-			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--implementation-file <task-owned-new-file> ...] [--evidence-file <docs/evidence/task-owned-file> ...] [--immediate-format] [--reviewed] [--push]",
+			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--execution-root <git-path>] [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--implementation-file <task-owned-new-file> ...] [--evidence-file <docs/evidence/task-owned-file> ...] [--immediate-format] [--reviewed] [--push]",
+		);
+	const ownerRepositoryRoot = canonicalGitRoot(cwd, "owner root");
+	const requestedExecutionRoot = option("--execution-root");
+	const canonicalExecutionRoot = canonicalGitRoot(
+		requestedExecutionRoot ?? cwd,
+		"execution root",
+	);
+	const executionRoot = requestedExecutionRoot ? canonicalExecutionRoot : cwd;
+	const distinctRoots = canonicalExecutionRoot !== ownerRepositoryRoot;
+	if (distinctRoots && args.includes("--push"))
+		throw new Error(
+			"distinct-root --push is not supported; push each repository explicitly after finalization",
 		);
 	const task = readWorkItem(id);
-	if (task?.initiative)
-		throw new Error(
-			`Initiative ${id} must be closed through /work-roadmap guarded close.`,
-		);
 	const taskContractText = `${titleOf(task)}\n${field(task, "description") ?? ""}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
 	const evidenceOnly =
 		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
@@ -465,7 +500,7 @@ async function finishTaskUnlocked() {
 		),
 	];
 	for (const file of declaredImplementationFiles) {
-		const absolute = path.join(cwd, file);
+		const absolute = path.join(executionRoot, file);
 		if (
 			path.posix.isAbsolute(file) ||
 			file.startsWith("../") ||
@@ -493,7 +528,7 @@ async function finishTaskUnlocked() {
 				path.posix.normalize(file.replaceAll("\\", "/")),
 			),
 			...(evidenceOnly
-				? gitStatusPaths()
+				? gitStatusPaths(executionRoot)
 						.map((file) => file.replaceAll("\\", "/"))
 						.filter(evidencePath)
 				: []),
@@ -501,7 +536,7 @@ async function finishTaskUnlocked() {
 	];
 	let evidenceBytes = 0;
 	for (const file of evidenceFiles) {
-		const absolute = path.join(cwd, file);
+		const absolute = path.join(executionRoot, file);
 		if (
 			!evidenceOnly ||
 			path.posix.isAbsolute(file) ||
@@ -522,27 +557,34 @@ async function finishTaskUnlocked() {
 			"task-owned evidence is limited to 100 files and 100 MiB per finish-task run",
 		);
 	const evidenceFileSet = new Set(evidenceFiles);
-	const formatted = formatPendingFiles();
-	const stagedBefore = git(["diff", "--cached", "--name-only"])
+	const formatted = formatPendingFiles(executionRoot);
+	const stagedBefore = git(["diff", "--cached", "--name-only"], executionRoot)
 		.split(/\r?\n/)
 		.filter(Boolean);
 	const unexpectedStaged = stagedBefore.filter((file) => {
 		const normalized = file.replaceAll("\\", "/");
 		return (
-			!normalized.startsWith(".ce-workflow/") &&
-			!evidenceFileSet.has(normalized)
+			!normalized.startsWith(".ce-workflow/") && !evidenceFileSet.has(normalized)
 		);
 	});
 	if (unexpectedStaged.length)
 		throw new Error(
 			`refusing pre-staged files: ${unexpectedStaged.join(", ")}\nRun: git restore --staged -- ${unexpectedStaged.map((file) => JSON.stringify(file)).join(" ")}\nThen re-run finish-task; task-owned evidence under ${taskEvidencePrefix} is handled automatically.`,
 		);
-	if (stagedBefore.length) git(["restore", "--staged", "--", ...stagedBefore]);
+	if (stagedBefore.length)
+		git(["restore", "--staged", "--", ...stagedBefore], executionRoot);
+	if (
+		distinctRoots &&
+		gitStatusPaths(executionRoot).some(
+			(file) => file.replaceAll("\\", "/") === ".ce-workflow/work-items.json",
+		)
+	)
+		throw new Error(
+			"refusing changed .ce-workflow/work-items.json in distinct execution repository",
+		);
 
 	const canonicalBeforeVerificationPath = storePath(cwd);
-	const canonicalBeforeVerification = existsSync(
-		canonicalBeforeVerificationPath,
-	)
+	const canonicalBeforeVerification = existsSync(canonicalBeforeVerificationPath)
 		? readFileSync(canonicalBeforeVerificationPath, "utf8")
 		: null;
 	const verify = option("--verify");
@@ -560,7 +602,7 @@ async function finishTaskUnlocked() {
 				(output) =>
 					typeof output === "string" &&
 					!path.isAbsolute(output) &&
-					!existsSync(path.join(cwd, output)),
+					!existsSync(path.join(executionRoot, output)),
 			),
 	);
 	const jsonFile = option("--json");
@@ -573,12 +615,16 @@ async function finishTaskUnlocked() {
 	try {
 		if (jsonFile) {
 			verificationCommand = `json-assert ${jsonFile}`;
-			const failures = jsonAssertionFailures(jsonFile);
+			const failures = jsonAssertionFailures(jsonFile, executionRoot);
 			if (failures.length) throw new Error(failures.join("; "));
 			output = "all JSON assertions passed";
 		} else if (verify) {
 			verificationCommand = verify;
-			const verification = await runVerification(verify, shardDeclarations);
+			const verification = await runVerification(
+				verify,
+				shardDeclarations,
+				executionRoot,
+			);
 			output = verification.output.trim();
 			verificationManifest = verification.manifest;
 			const expected = option("--expect");
@@ -592,10 +638,7 @@ async function finishTaskUnlocked() {
 			if (canonicalBeforeVerification === null)
 				rmSync(canonicalBeforeVerificationPath, { force: true });
 			else
-				writeFileSync(
-					canonicalBeforeVerificationPath,
-					canonicalBeforeVerification,
-				);
+				writeFileSync(canonicalBeforeVerificationPath, canonicalBeforeVerification);
 		} else {
 			mutateStore(cwd, (store) =>
 				appendWorkNote(
@@ -609,11 +652,9 @@ async function finishTaskUnlocked() {
 	}
 	for (const output of absentShardOutputs)
 		if (
-			verificationManifest?.shards.some((shard) =>
-				shard.outputs.includes(output),
-			)
+			verificationManifest?.shards.some((shard) => shard.outputs.includes(output))
 		)
-			rmSync(path.join(cwd, output), { recursive: true, force: true });
+			rmSync(path.join(executionRoot, output), { recursive: true, force: true });
 	if (verificationCommand)
 		verificationResult = {
 			command: verificationCommand,
@@ -622,22 +663,23 @@ async function finishTaskUnlocked() {
 			...(verificationManifest
 				? {
 						gateVersion: verificationManifest.gateVersion,
-						shards: verificationManifest.shards.map(
-							({ id, status, outputHash }) => ({ id, status, outputHash }),
-						),
+						shards: verificationManifest.shards.map(({ id, status, outputHash }) => ({
+							id,
+							status,
+							outputHash,
+						})),
 					}
 				: {}),
 		};
 	const tidy = tidyUntrackedFiles({
-		cwd,
+		cwd: executionRoot,
 		gitBin,
 		preserve: [...ownedImplementationFiles],
 	});
 	const unrecognized = tidy.unrecognized.filter((file) => {
 		const normalized = file.replaceAll("\\", "/");
 		return (
-			!evidenceFileSet.has(normalized) &&
-			!ownedImplementationFiles.has(normalized)
+			!evidenceFileSet.has(normalized) && !ownedImplementationFiles.has(normalized)
 		);
 	});
 	if (unrecognized.length)
@@ -646,11 +688,12 @@ async function finishTaskUnlocked() {
 				unrecognized.map((file) => `  - ${file}`).join("\n") +
 				`\nFor each task-owned new implementation file, rerun with --implementation-file <path>; resolve unrelated files first. Task-owned evidence under ${taskEvidencePrefix} is recognized automatically.`,
 		);
-	const changed = gitStatusPaths().filter((file) => {
+	const changed = gitStatusPaths(executionRoot).filter((file) => {
 		const normalized = file.replaceAll("\\", "/");
 		return (
-			ownedImplementationFiles.has(normalized) ||
-			(!isRuntimePath(file) && !isGeneratedBuildPath(file))
+			!(distinctRoots && normalized === ".ce-workflow/work-items.json") &&
+			(ownedImplementationFiles.has(normalized) ||
+				(!isRuntimePath(file) && !isGeneratedBuildPath(file)))
 		);
 	});
 	if (!changed.length) throw new Error("no related changes to commit");
@@ -674,14 +717,20 @@ async function finishTaskUnlocked() {
 	);
 	if (sensitivePaths.length)
 		reviewReasons.push(`sensitive paths: ${sensitivePaths.join(", ")}`);
+	const planningOnly =
+		implementationFiles.length === 0 &&
+		arr(field(task, "labels")).includes("wo:planning");
 	if (
-		implementationFiles.length > 0 &&
+		!planningOnly &&
 		/\b(?:auth(?:entication|orization)?|permission|credential|secret|payment|billing|migration|schema|database|destructive|production|deploy|release|breaking|concurren(?:cy|t)|race condition|thread safety|crypt|security|firmware flash)\b/i.test(
 			taskContractText,
 		)
 	)
 		reviewReasons.push("sensitive task contract");
-	const numstat = git(["diff", "--numstat", "--", ...implementationFiles]);
+	const numstat = git(
+		["diff", "--numstat", "--", ...implementationFiles],
+		executionRoot,
+	);
 	let changedLines = numstat
 		.split(/\r?\n/)
 		.filter(Boolean)
@@ -690,13 +739,15 @@ async function finishTaskUnlocked() {
 			return sum + (Number(added) || 0) + (Number(removed) || 0);
 		}, 0);
 	const untracked = new Set(
-		git(["ls-files", "--others", "--exclude-standard"])
+		git(["ls-files", "--others", "--exclude-standard"], executionRoot)
 			.split(/\r?\n/)
 			.filter(Boolean),
 	);
 	for (const file of implementationFiles.filter((item) => untracked.has(item)))
-		if (existsSync(file))
-			changedLines += readFileSync(file, "utf8").split(/\r?\n/).length;
+		if (existsSync(path.join(executionRoot, file)))
+			changedLines += readFileSync(path.join(executionRoot, file), "utf8").split(
+				/\r?\n/,
+			).length;
 	if (changedLines > 300)
 		reviewReasons.push(`large diff: ${changedLines} lines`);
 	const uiFiles = implementationFiles.filter((file) =>
@@ -716,7 +767,7 @@ async function finishTaskUnlocked() {
 	)
 		reviewReasons.push("hardware/live-evidence contract");
 	if (
-		readReviewPolicy(cwd) === "review-all" &&
+		readReviewPolicy(executionRoot) === "review-all" &&
 		hasProductionDiff(implementationFiles)
 	)
 		reviewReasons.push("Review All policy: production diff");
@@ -739,7 +790,15 @@ async function finishTaskUnlocked() {
 						`wo:review-scope ${JSON.stringify(implementationFiles)}`,
 					),
 				);
-			throw new Error(reviewerHandoff(id, implementationFiles, reviewReasons));
+			throw new Error(
+				reviewerHandoff(
+					id,
+					implementationFiles,
+					reviewReasons,
+					canonicalExecutionRoot,
+					distinctRoots,
+				),
+			);
 		}
 		if (!persistedReviewScope)
 			throw new Error(
@@ -762,20 +821,43 @@ async function finishTaskUnlocked() {
 				`wo:verify-check PASS\nCommand: ${verificationCommand}\nOutput: ${output.slice(-500)}`,
 			),
 		);
-	git(["add", "-A", "--", ...changed]);
-	const staged = git(["diff", "--cached", "--name-only"])
+	if (distinctRoots) {
+		const ownerStaged = git(
+			["diff", "--cached", "--name-only"],
+			ownerRepositoryRoot,
+		)
+			.split(/\r?\n/)
+			.filter(Boolean);
+		if (ownerStaged.length)
+			throw new Error(
+				`refusing pre-staged owner files: ${ownerStaged.join(", ")}`,
+			);
+	}
+	git(["add", "-A", "--", ...changed], executionRoot);
+	const staged = git(["diff", "--cached", "--name-only"], executionRoot)
 		.split(/\r?\n/)
 		.filter(Boolean);
 	if (!staged.length)
 		throw new Error("no staged changes after filtering runtime files");
-	const headBefore = git(["rev-parse", "HEAD"]).trim();
+	const executionHeadBefore = git(["rev-parse", "HEAD"], executionRoot).trim();
+	const ownerHeadBefore = git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim();
 	const canonical = storePath(cwd);
 	const canonicalBefore = existsSync(canonical)
 		? readFileSync(canonical, "utf8")
 		: null;
 	let push = "skipped";
+	let executionCommit;
+	let ownerCommit = null;
 	try {
-		git(["commit", "-m", `${id}: ${message}`]);
+		git(["commit", "-m", `${id}: ${message}`], executionRoot);
+		executionCommit = git(["rev-parse", "HEAD"], executionRoot).trim();
+		if (distinctRoots)
+			mutateStore(cwd, (store) =>
+				updateWorkItem(store, id, {
+					executionRepositoryRoot: canonicalExecutionRoot,
+					executionCommit,
+				}),
+			);
 		mutateStore(cwd, (store) =>
 			updateWorkItem(store, id, {
 				status: "closed",
@@ -785,46 +867,71 @@ async function finishTaskUnlocked() {
 				],
 			}),
 		);
-		const closeChanges = gitStatusPaths().filter(
+		const ownerChanges = gitStatusPaths(ownerRepositoryRoot).filter(
 			(file) => !isRuntimePath(file),
 		);
 		if (
-			closeChanges.some(
+			ownerChanges.some(
 				(file) => file.replaceAll("\\", "/") !== ".ce-workflow/work-items.json",
 			)
 		)
 			throw new Error(
-				`non-work-store files changed during close: ${closeChanges.join(", ")}`,
+				`non-work-store files changed during close: ${ownerChanges.join(", ")}`,
 			);
-		if (git(["ls-files", "--", ".ce-workflow/work-items.json"]).trim()) {
-			git(["add", "--", ".ce-workflow/work-items.json"]);
-			git(["commit", "--amend", "--no-edit"]);
+		const storeTracked = Boolean(
+			git(
+				["ls-files", "--", ".ce-workflow/work-items.json"],
+				ownerRepositoryRoot,
+			).trim(),
+		);
+		if (storeTracked) {
+			git(["add", "--", ".ce-workflow/work-items.json"], ownerRepositoryRoot);
+			if (distinctRoots)
+				git(
+					["commit", "-m", `${id}: record execution metadata`],
+					ownerRepositoryRoot,
+				);
+			else git(["commit", "--amend", "--no-edit"], executionRoot);
 		}
-		const remaining = gitStatusPaths().filter((file) => !isRuntimePath(file));
-		if (remaining.length)
-			throw new Error(`related files remain dirty: ${remaining.join(", ")}`);
+		executionCommit = git(["rev-parse", "HEAD"], executionRoot).trim();
+		ownerCommit = storeTracked
+			? git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim()
+			: null;
+		const executionRemaining = gitStatusPaths(executionRoot).filter(
+			(file) => !isRuntimePath(file),
+		);
+		const ownerRemaining = distinctRoots
+			? gitStatusPaths(ownerRepositoryRoot).filter((file) => !isRuntimePath(file))
+			: executionRemaining;
+		if (executionRemaining.length || ownerRemaining.length)
+			throw new Error(
+				`related files remain dirty: ${[
+					...executionRemaining,
+					...ownerRemaining,
+				].join(", ")}`,
+			);
 		if (args.includes("--push")) {
 			try {
-				git([
-					"rev-parse",
-					"--abbrev-ref",
-					"--symbolic-full-name",
-					"@{upstream}",
-				]);
+				git(
+					["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+					executionRoot,
+				);
 			} catch (error) {
 				if (/upstream/i.test(String(error.stderr ?? error.message ?? error)))
 					push = "skipped-no-upstream";
 				else throw error;
 			}
 			if (push !== "skipped-no-upstream") {
-				git(["push"]);
+				git(["push"], executionRoot);
 				push = "passed";
 			}
 		}
 	} catch (error) {
+		if (distinctRoots)
+			git(["reset", "--mixed", ownerHeadBefore], ownerRepositoryRoot);
+		git(["reset", "--mixed", executionHeadBefore], executionRoot);
 		if (canonicalBefore === null) rmSync(canonical, { force: true });
 		else writeFileSync(canonical, canonicalBefore);
-		git(["reset", "--mixed", headBefore]);
 		throw new Error(
 			`finalization rolled back before close: ${error.message ?? error}`,
 		);
@@ -832,7 +939,11 @@ async function finishTaskUnlocked() {
 	return {
 		status: "PASS",
 		work_item_id: id,
-		commit: git(["rev-parse", "--short", "HEAD"]).trim(),
+		commit: executionCommit.slice(0, 7),
+		executionRepositoryRoot: canonicalExecutionRoot,
+		executionCommit,
+		ownerRepositoryRoot,
+		ownerCommit,
 		files: staged,
 		verification: verificationResult,
 		formatted,
@@ -842,11 +953,28 @@ async function finishTaskUnlocked() {
 }
 
 async function finishTask() {
-	const mutation = acquireRepositoryMutationLock(cwd);
+	const id = args[0];
+	if (readWorkItem(id)?.initiative)
+		throw new Error(
+			`Initiative ${id} must be closed through /work-roadmap guarded close.`,
+		);
+	const requestedExecutionRoot = option("--execution-root");
+	const executionRoot = canonicalGitRoot(
+		requestedExecutionRoot ?? cwd,
+		"execution root",
+	);
+	const ownerRoot = canonicalGitRoot(cwd, "owner root");
+	const lockRoots =
+		executionRoot === ownerRoot
+			? [requestedExecutionRoot ? ownerRoot : cwd]
+			: [ownerRoot, executionRoot].sort();
+	const mutations = [];
 	try {
+		for (const root of lockRoots)
+			mutations.push(acquireRepositoryMutationLock(root));
 		return await finishTaskUnlocked();
 	} finally {
-		mutation.release();
+		for (const mutation of mutations.reverse()) mutation.release();
 	}
 }
 
@@ -857,8 +985,7 @@ function arr(value) {
 
 function field(issue, ...names) {
 	for (const name of names)
-		if (issue?.[name] !== null && issue?.[name] !== undefined)
-			return issue[name];
+		if (issue?.[name] !== null && issue?.[name] !== undefined) return issue[name];
 }
 
 function idOf(issue) {
@@ -978,20 +1105,17 @@ function positional() {
 function termScore(issue, terms) {
 	const haystack =
 		`${titleOf(issue)}\n${labelsOf(issue).join(" ")}\n${notesOf(issue).slice(-2000)}`.toLowerCase();
-	return terms.reduce(
-		(sum, term) => sum + (haystack.includes(term) ? 1 : 0),
-		0,
-	);
+	return terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
 }
 
 function jsonPath(object, key) {
 	return key.split(".").reduce((value, part) => value?.[part], object);
 }
 
-function jsonAssertionFailures(file) {
+function jsonAssertionFailures(file, root = cwd) {
 	let data;
 	try {
-		data = JSON.parse(readFileSync(file, "utf8"));
+		data = JSON.parse(readFileSync(path.resolve(root, file), "utf8"));
 	} catch (error) {
 		return [`invalid JSON assertion file: ${error.message}`];
 	}
@@ -1026,18 +1150,12 @@ try {
 		const children = childWorkItems(args[0]).filter(
 			(issue) => !status || statusOf(issue) === status,
 		);
-		const requestedLimit = Number(
-			option("--limit", full ? children.length : 50),
-		);
+		const requestedLimit = Number(option("--limit", full ? children.length : 50));
 		const limit =
-			Number.isInteger(requestedLimit) && requestedLimit > 0
-				? requestedLimit
-				: 50;
+			Number.isInteger(requestedLimit) && requestedLimit > 0 ? requestedLimit : 50;
 		const shown = children
 			.slice(0, limit)
-			.map((issue) =>
-				full ? summary(issue, 300) : compactChildSummary(issue),
-			);
+			.map((issue) => (full ? summary(issue, 300) : compactChildSummary(issue)));
 		if (children.length > shown.length)
 			shown.push({
 				truncated: true,
@@ -1140,8 +1258,7 @@ try {
 		const allowed = allowWorkStore
 			? staged.filter(
 					(file) =>
-						file === ".ce-workflow/issues.jsonl" ||
-						file.startsWith(".ce-workflow/"),
+						file === ".ce-workflow/issues.jsonl" || file.startsWith(".ce-workflow/"),
 				)
 			: [];
 		if (allowed.length) git(["restore", "--staged", ...allowed]);
@@ -1214,9 +1331,7 @@ try {
 		const [id] = args;
 		const noteArgs = args.slice(args[1] === "--append-notes" ? 2 : 1);
 		if (!id || !noteArgs.length)
-			throw new Error(
-				"usage: work-note <work-item-id> [--append-notes] <note>",
-			);
+			throw new Error("usage: work-note <work-item-id> [--append-notes] <note>");
 		const note =
 			noteArgs.length === 1 && existsSync(noteArgs[0])
 				? readFileSync(noteArgs[0], "utf8")

@@ -4845,6 +4845,9 @@
           "producer": "NexusConnectSDK-Android",
           "submittedAt": "2026-08-18T00:16:35.403Z",
           "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-67c4d7c9-d110-42ac-9430-d5c518ea0c62",
@@ -4853,13 +4856,21 @@
         "self-improvement"
       ],
       "notes": [
-        "Atomic classification: locally-owned architectural gap. One root cause: work-helper binds store mutation and Git finalization to one cwd; cross-repository execution needs explicit, durable ownership and commit evidence rather than manual dual-store bookkeeping."
+        "Atomic classification: locally-owned architectural gap. One root cause: work-helper binds store mutation and Git finalization to one cwd; cross-repository execution needs explicit, durable ownership and commit evidence rather than manual dual-store bookkeeping.",
+        "Execution plan: keep this atomic report as the execution item. Add optional --execution-root to finish-task/finish-small; cwd remains owner-store root while execution paths, verification, review, Git commit, and rollback use the canonical execution repository. Cross-root mode records canonical executionRepositoryRoot and full executionCommit before closure, creates a store-only owner metadata commit when the store is tracked, verifies both roots clean, and refuses --push pending an explicit distributed-push policy. Implement in scripts/work-helper.mjs with focused two-repository contract tests in scripts/test-work-helper-contract.mjs; preserve same-root behavior.",
+        "--note Implementation in progress.\nFiles changed: scripts/work-helper.mjs; scripts/test-work-helper-contract.mjs.\nVerification: node scripts/test-work-helper-contract.mjs -> FAIL at existing TASK-EMPTY assertion (line 230): command unexpectedly succeeds. Confirmed pre-existing by running temporary HEAD copies of helper/test; same failure.\nBlocker: required contract suite has an unrelated baseline review-gate inconsistency. Supervisor decision request timed out; user forbids creating child WorkItems. Need decision whether to add explicit independent-review handling or accept/document baseline failure.\nRemaining: finish focused cross-repository push/rollback fixtures and rerun verification after decision. --add-label wo:blocked --add-label wo:decision",
+        "Reviewer fixes applied: distinct-root finalization now refuses a changed execution-repository .ce-workflow/work-items.json before staging or commits; cross-root coded review handoffs identify the canonical execution repository and exact --execution-root retry option; distinct owner/execution mutation locks are acquired in sorted canonical-path order and released in reverse while same-root uses one lock. Files changed: scripts/work-helper.mjs, scripts/test-work-helper-contract.mjs. Verification: node scripts/test-work-helper-contract.mjs PASS (ok - work helper contract); node --check for both files PASS; git diff --check PASS. Remaining reviewer findings: none. wo:fix PASS",
+        "wo:review-scope [\"scripts/test-work-helper-contract.mjs\",\"scripts/work-helper.mjs\"]",
+        "wo:review PASS\nScope: [\"scripts/test-work-helper-contract.mjs\",\"scripts/work-helper.mjs\"]\nInitial independent review PASS. Targeted re-review validated execution-store refusal and cross-root handoff, then found one symlink-alias lock comparison defect. Residual fixed by canonical same-root comparison with regression coverage; node scripts/test-work-helper-contract.mjs PASS after formatting, primary LSP diagnostics clean. No further reviewer launched per review-cycle budget.",
+        "wo:verify-check FAIL\nCommand: npm run verify:quiet\n, then rerun the same finish-task command without --reviewed to regenerate this complete handoff; never handcraft a targeted re-review task. After that targeted re-review, fix and verify residuals and use --reviewed without launching a third reviewer.\\\\nReviewer liveness: use the coded async handoff; needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. Prefer no explicit timeout; otherwise use at least 10 minutes.\"\\n' +\r\n    '}\\n',\r\n  stderr: ''\r\n}\r\n\r\nNode.js v24.14.0\r\n\n",
+        "Full package gate follow-up: restored initiative guarded-close ordering before Git-root validation and preserved wo:planning store-only completion while sensitive non-planning store-only tasks still require review. Verification PASS: node \"C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js\" run verify:quiet -> ok - package checks passed. No further reviewer launched per review-cycle budget; wo:fix PASS.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs\nOutput: ok - work helper contract"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A roadmap in NexusConnectSDK owns cross-repository LPGSlim implementation phases, but `work-helper.mjs` resolves both the native w",
       "type": "task",
-      "updatedAt": "2026-08-18T00:16:35.407Z"
+      "updatedAt": "2026-08-18T06:19:08.098Z"
     },
     "work-2.report-6834863f-7e5e-47f1-9a57-7961f8cbafc4": {
       "createdAt": "2026-08-11T20:04:02.851Z",
@@ -5453,13 +5464,14 @@
         "self-improvement"
       ],
       "notes": [
-        "Atomic classification: already-fixed in current source by b779bb0. Native and CE-owned compaction now preserve active goal recovery and enqueue exactly one continuation; scripts/test-work-goal.mjs contains the matching aborted-operation lifecycle regression."
+        "Atomic classification: already-fixed in current source by b779bb0. Native and CE-owned compaction now preserve active goal recovery and enqueue exactly one continuation; scripts/test-work-goal.mjs contains the matching aborted-operation lifecycle regression.",
+        "Already fixed by b779bb0 (make compaction profile-aware and resumable). Verified current aborted-operation/compaction continuation matrix with: node scripts/test-work-goal.mjs -> ok - work-goal helpers."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: At 2026-08-18T00:28:00.005Z, immediately after successful parallel LSP/git results, the next assistant operation was recorded with",
       "type": "task",
-      "updatedAt": "2026-08-18T05:18:46.408Z"
+      "updatedAt": "2026-08-18T05:28:47.628Z"
     },
     "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
       "createdAt": "2026-08-12T16:54:19.072Z",
@@ -7682,7 +7694,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T05:28:20.463Z"
+    "updatedAt": "2026-08-18T06:19:08.098Z"
   },
   "schemaVersion": 1
 }
