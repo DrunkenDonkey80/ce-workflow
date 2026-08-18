@@ -675,6 +675,7 @@ async function finishTaskUnlocked() {
 	if (sensitivePaths.length)
 		reviewReasons.push(`sensitive paths: ${sensitivePaths.join(", ")}`);
 	if (
+		implementationFiles.length > 0 &&
 		/\b(?:auth(?:entication|orization)?|permission|credential|secret|payment|billing|migration|schema|database|destructive|production|deploy|release|breaking|concurren(?:cy|t)|race condition|thread safety|crypt|security|firmware flash)\b/i.test(
 			taskContractText,
 		)
@@ -707,6 +708,7 @@ async function finishTaskUnlocked() {
 	)
 		reviewReasons.push(`UI acceptance: ${uiFiles.join(", ")}`);
 	if (
+		implementationFiles.length > 0 &&
 		!evidenceOnly &&
 		/\b(?:hardware|firmware|device|live evidence|real[- ]world)\b/i.test(
 			taskContractText,

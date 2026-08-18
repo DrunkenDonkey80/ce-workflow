@@ -4656,6 +4656,9 @@
           "producer": "NexusConnectSDK-Android",
           "submittedAt": "2026-08-17T22:19:29.386Z",
           "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-5a46890b-cb60-4585-93ba-e22956cf2b4a",
@@ -4664,13 +4667,14 @@
         "self-improvement"
       ],
       "notes": [
-        "Atomic classification: related-distinct, locally-owned. One root cause: sensitive task-contract routing runs even when the only changed path is the native work store and the reviewer file scope is empty; planning-only store closure should use deterministic validation without code review."
+        "Atomic classification: related-distinct, locally-owned. One root cause: sensitive task-contract routing runs even when the only changed path is the native work store and the reviewer file scope is empty; planning-only store closure should use deterministic validation without code review.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: `finish-task` classifies planning-only items work-3.6 and work-3.8 as requiring independent sensitive review even though their onl",
       "type": "task",
-      "updatedAt": "2026-08-17T22:19:29.390Z"
+      "updatedAt": "2026-08-18T05:28:20.463Z"
     },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
@@ -7678,7 +7682,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T05:26:26.752Z"
+    "updatedAt": "2026-08-18T05:28:20.463Z"
   },
   "schemaVersion": 1
 }

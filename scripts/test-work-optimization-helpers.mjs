@@ -405,6 +405,13 @@ try {
 		description: "P0 firmware concurrency production change",
 		notes: ["Verification: tests passed"],
 	});
+	createWorkItem(finishStore, {
+		id: "TASK-PLANNING",
+		type: "task",
+		status: "open",
+		title: "Plan production security migration",
+		labels: ["wo:planning"],
+	});
 	saveStore(finishCwd, finishStore);
 	execFileSync("git", ["init"], { cwd: finishCwd, stdio: "ignore" });
 	execFileSync("git", ["config", "user.email", "test@example.com"], {
@@ -991,6 +998,44 @@ process.exit(result.status ?? 1);
 		firmwareReviewError.includes("sensitive task contract") &&
 			firmwareReviewError.includes("hardware/live-evidence contract"),
 		"implementation notes cannot suppress firmware review from the immutable task contract",
+	);
+	rmSync(path.join(finishCwd, "config.js"));
+
+	writeFileSync(path.join(finishCwd, ".gitignore"), "");
+	execFileSync(
+		"git",
+		["add", "-f", "--", ".gitignore", ".ce-workflow/work-items.json"],
+		{ cwd: finishCwd },
+	);
+	execFileSync("git", ["commit", "-m", "track planning store"], {
+		cwd: finishCwd,
+		stdio: "ignore",
+	});
+	const planningStore = loadStore(finishCwd);
+	planningStore.items["TASK-PLANNING"].notes.push("Created the next child slice");
+	saveStore(finishCwd, planningStore);
+	const planningFinished = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-PLANNING",
+				"--max-files",
+				"1",
+				"--message",
+				"close planning boundary",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		),
+	);
+	assert(
+		planningFinished.files.length === 1 &&
+			planningFinished.files[0] === ".ce-workflow/work-items.json" &&
+			loadStore(finishCwd).items["TASK-PLANNING"].status === "closed",
+		"planning-only work-store changes close deterministically without an empty reviewer handoff",
 	);
 
 	console.log("ok - workflow optimization helpers");
