@@ -22,9 +22,7 @@ const {
 	renderWorkResumeText,
 } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
 	).href
 );
 const {
@@ -112,8 +110,7 @@ const childrenByScenario = {
 			status: "open",
 			title: "Implement feature slice",
 			created_at: "2026-07-03T02:00:00Z",
-			notes:
-				"Large unrelated notes should not be copied into the handoff prompt.",
+			notes: "Large unrelated notes should not be copied into the handoff prompt.",
 		},
 	],
 	implementation: [
@@ -200,8 +197,7 @@ const childrenByScenario = {
 			status: "open",
 			title: "Executable idea child",
 			labels: ["wo:slice-planned"],
-			notes:
-				"wo:slice-plan\nplan-path: docs/plans/idea.md\nplanner: work-planner",
+			notes: "wo:slice-plan\nplan-path: docs/plans/idea.md\nplanner: work-planner",
 			created_at: "2026-07-03T02:00:00Z",
 		},
 	],
@@ -289,8 +285,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			acceptance: "Verification contract: run npm run verify before review",
-			notes:
-				"wo:execution-agent\nVerification command required: npm run verify",
+			notes: "wo:execution-agent\nVerification command required: npm run verify",
 		},
 	],
 	inProgressReviewFail: [
@@ -531,10 +526,7 @@ function sourcesForScenario(scenario = "default") {
 							...childrenByScenario.openReady,
 							...childrenByScenario.openBlocked,
 						]
-					: [
-							...childrenByScenario.openReady,
-							...childrenByScenario.openBlocked,
-						];
+					: [...childrenByScenario.openReady, ...childrenByScenario.openBlocked];
 		return [
 			...(scenario === "remembered-blocked" ? [epics[0]] : []),
 			epics[2],
@@ -630,10 +622,7 @@ try {
 		"idea records alone launch planning rather than implementation",
 	);
 	assert(state.counts.readyExecutable === 0, "idea records are not executable");
-	assert(
-		!state.selectedWorkItem,
-		"idea record is never selected as a workItem",
-	);
+	assert(!state.selectedWorkItem, "idea record is never selected as a workItem");
 
 	setScenario("plannedIdea");
 	state = buildWorkResumeState(cwd, "E-1");
@@ -689,8 +678,7 @@ try {
 		advisorState = buildWorkResumeState(advisorCwd, "E-1");
 		assert(
 			advisorState.action === "run-implementation" &&
-				directRoleHandoffParams(advisorState, advisorCwd)?.agent ===
-					"work-worker",
+				directRoleHandoffParams(advisorState, advisorCwd)?.agent === "work-worker",
 			"the exact durable advisor PASS releases implementation",
 		);
 
@@ -804,9 +792,7 @@ try {
 			reviewerHandoff.params.task.includes(
 				'Review only: "extensions/work-models.js", "scripts/file with space.js"',
 			) &&
-			reviewerHandoff.params.task.includes(
-				"durable `wo:review PASS|FAIL` note",
-			) &&
+			reviewerHandoff.params.task.includes("durable `wo:review PASS|FAIL` note") &&
 			reviewerHandoff.params.task.includes("at least 10 minutes") &&
 			reviewerHandoff.params.task.includes(
 				"needsAttentionAfterMs=30000 is an attention notification, not a hard timeout",
@@ -1078,8 +1064,7 @@ try {
 			},
 		},
 		{
-			sendUserMessage: async (message, options) =>
-				sent.push({ message, options }),
+			sendUserMessage: async (message, options) => sent.push({ message, options }),
 			events: {
 				on: (name, listener) => {
 					rpcListeners.set(name, listener);
@@ -1125,8 +1110,7 @@ try {
 			cwd: cwd,
 			mode: "rpc",
 			ui: { notify: (message, level) => notices.push({ message, level }) },
-			sendUserMessage: async (message, options) =>
-				sent.push({ message, options }),
+			sendUserMessage: async (message, options) => sent.push({ message, options }),
 		},
 		{ events: { on: () => () => {}, emit: () => {} } },
 	);
@@ -1163,8 +1147,7 @@ try {
 	await handleWorkResumeCommand("E-1", {
 		cwd: cwd,
 		ui: { notify: (message, level) => notices.push({ message, level }) },
-		sendUserMessage: async (message, options) =>
-			sent.push({ message, options }),
+		sendUserMessage: async (message, options) => sent.push({ message, options }),
 	});
 	assert(sent.length === 0, "blocked handler does not inject follow-up");
 	assert(
@@ -1177,8 +1160,7 @@ try {
 	await handleWorkResumeCommand("E-1", {
 		cwd: cwd,
 		ui: { notify: (message, level) => notices.push({ message, level }) },
-		sendUserMessage: async (message, options) =>
-			sent.push({ message, options }),
+		sendUserMessage: async (message, options) => sent.push({ message, options }),
 	});
 	assert(
 		notices.at(-1)?.message.includes("Required action:") &&
@@ -1201,8 +1183,7 @@ try {
 		const profileState = buildWorkResumeState(profileCwd, "E-1");
 		assert(
 			profileState.action === "run-implementation" &&
-				directRoleHandoffParams(profileState, profileCwd)?.agent ===
-					"work-worker",
+				directRoleHandoffParams(profileState, profileCwd)?.agent === "work-worker",
 			`${profile} routes coded inline plans directly to work-worker`,
 		);
 		rmSync(profileCwd, { recursive: true, force: true });
@@ -1350,7 +1331,9 @@ try {
 	);
 	assert(
 		triageNotices.some((notice) =>
-			notice.message.includes(`Verifier triage:\n- ${triageState.triage[0].claim.id}`),
+			notice.message.includes(
+				`Verifier triage:\n- ${triageState.triage[0].claim.id}`,
+			),
 		),
 		"exact-target Resume renders triage payload without roadmap fields",
 	);
@@ -1451,7 +1434,9 @@ try {
 	);
 	rmSync(triageCwd, { recursive: true, force: true });
 
-	const legacyCwd = mkdtempSync(path.join(tmpdir(), "work-resume-legacy-analysis-"));
+	const legacyCwd = mkdtempSync(
+		path.join(tmpdir(), "work-resume-legacy-analysis-"),
+	);
 	seedNativeStore(legacyCwd, [
 		...sourcesForScenario("implementation"),
 		{
@@ -1544,8 +1529,7 @@ try {
 	);
 	mutateVerifierStore(orphanTriageCwd, (store) =>
 		recordOperationResult(store, {
-			jobId: orphanJobs.find((job) => job.model === "anthropic/claude-opus-5")
-				.id,
+			jobId: orphanJobs.find((job) => job.model === "anthropic/claude-opus-5").id,
 			operation: "security",
 			outcome: "failed",
 			failure: "provider unavailable",
@@ -1575,8 +1559,7 @@ try {
 			).items,
 		).some(
 			(item) =>
-				item.id === orphanClaim.resumeTarget &&
-				item.labels?.includes("wo:misc"),
+				item.id === orphanClaim.resumeTarget && item.labels?.includes("wo:misc"),
 		),
 		"orphan triage claim targets the generated Misc roadmap",
 	);

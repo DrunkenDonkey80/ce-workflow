@@ -2001,9 +2001,7 @@ function recoverableTerminalOutputFailure(store, job) {
 function clearTerminalOutputFailure(store, jobId) {
 	const job = store.jobs[jobId];
 	for (const operation of terminalOutputFailureOperations(store, job)) {
-		delete store.reports[
-			terminalOutputFailureReport(store, job, operation).id
-		];
+		delete store.reports[terminalOutputFailureReport(store, job, operation).id];
 		job.operationStatus[operation] = "pending";
 	}
 	for (const quarantine of Object.values(store.quarantines))
