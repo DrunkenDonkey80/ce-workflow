@@ -445,7 +445,7 @@ async function finishTaskUnlocked() {
 	);
 	if (!id || !message || !Number.isInteger(maxFiles) || maxFiles < 1)
 		throw new Error(
-			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--evidence-file <docs/evidence/task-owned-file> ...] [--immediate-format] [--reviewed] [--push]",
+			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--implementation-file <task-owned-new-file> ...] [--evidence-file <docs/evidence/task-owned-file> ...] [--immediate-format] [--reviewed] [--push]",
 		);
 	const task = readWorkItem(id);
 	if (task?.initiative)
@@ -457,6 +457,32 @@ async function finishTaskUnlocked() {
 		/evidence[- ](?:only|capture)|\b(?:record|capture|probe|verify|test|try)\b/i.test(
 			taskContractText,
 		);
+	const declaredImplementationFiles = [
+		...new Set(
+			options("--implementation-file").map((file) =>
+				path.posix.normalize(file.replaceAll("\\", "/")),
+			),
+		),
+	];
+	for (const file of declaredImplementationFiles) {
+		const absolute = path.join(cwd, file);
+		if (
+			path.posix.isAbsolute(file) ||
+			file.startsWith("../") ||
+			file.startsWith(".ce-workflow/") ||
+			isRuntimePath(file) ||
+			!existsSync(absolute) ||
+			!statSync(absolute).isFile()
+		)
+			throw new Error(
+				`invalid implementation file ${file}: require an existing task-owned file inside the execution repository`,
+			);
+	}
+	const priorScope = reviewScope(task) ?? [];
+	const ownedImplementationFiles = new Set([
+		...declaredImplementationFiles,
+		...priorScope.map((file) => file.replaceAll("\\", "/")),
+	]);
 	const taskEvidencePrefix = `docs/evidence/${id}`;
 	const evidencePath = (file) =>
 		file.startsWith(`${taskEvidencePrefix}/`) ||
@@ -602,19 +628,31 @@ async function finishTaskUnlocked() {
 					}
 				: {}),
 		};
-	const tidy = tidyUntrackedFiles({ cwd, gitBin });
-	const unrecognized = tidy.unrecognized.filter(
-		(file) => !evidenceFileSet.has(file.replaceAll("\\", "/")),
-	);
+	const tidy = tidyUntrackedFiles({
+		cwd,
+		gitBin,
+		preserve: [...ownedImplementationFiles],
+	});
+	const unrecognized = tidy.unrecognized.filter((file) => {
+		const normalized = file.replaceAll("\\", "/");
+		return (
+			!evidenceFileSet.has(normalized) &&
+			!ownedImplementationFiles.has(normalized)
+		);
+	});
 	if (unrecognized.length)
 		throw new Error(
 			`untracked files need a decision before commit (add, gitignore, or remove):\n` +
 				unrecognized.map((file) => `  - ${file}`).join("\n") +
-				`\nTask-owned evidence under ${taskEvidencePrefix} is recognized automatically; resolve unrelated files, then re-run finish-task.`,
+				`\nFor each task-owned new implementation file, rerun with --implementation-file <path>; resolve unrelated files first. Task-owned evidence under ${taskEvidencePrefix} is recognized automatically.`,
 		);
-	const changed = gitStatusPaths().filter(
-		(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
-	);
+	const changed = gitStatusPaths().filter((file) => {
+		const normalized = file.replaceAll("\\", "/");
+		return (
+			ownedImplementationFiles.has(normalized) ||
+			(!isRuntimePath(file) && !isGeneratedBuildPath(file))
+		);
+	});
 	if (!changed.length) throw new Error("no related changes to commit");
 	const implementationFiles = changed.filter((file) => {
 		const normalized = file.replaceAll("\\", "/");
@@ -682,15 +720,15 @@ async function finishTaskUnlocked() {
 		reviewReasons.push("Review All policy: production diff");
 	if (reviewReasons.length) {
 		const reviewed = args.includes("--reviewed");
-		const priorScope = reviewScope(task);
+		const persistedReviewScope = reviewScope(task);
 		const accepted =
-			priorScope !== undefined &&
-			sameFiles(priorScope, implementationFiles) &&
+			persistedReviewScope !== undefined &&
+			sameFiles(persistedReviewScope, implementationFiles) &&
 			reviewDispositionSatisfied(task);
 		if (!accepted && !reviewed) {
 			if (
-				priorScope === undefined ||
-				!sameFiles(priorScope, implementationFiles)
+				persistedReviewScope === undefined ||
+				!sameFiles(persistedReviewScope, implementationFiles)
 			)
 				mutateStore(cwd, (store) =>
 					appendWorkNote(
@@ -701,11 +739,11 @@ async function finishTaskUnlocked() {
 				);
 			throw new Error(reviewerHandoff(id, implementationFiles, reviewReasons));
 		}
-		if (!priorScope)
+		if (!persistedReviewScope)
 			throw new Error(
 				"--reviewed requires a persisted wo:review-scope; rerun finish-task without --reviewed to generate the coded handoff",
 			);
-		if (!sameFiles(priorScope, implementationFiles))
+		if (!sameFiles(persistedReviewScope, implementationFiles))
 			throw new Error(
 				"review scope changed; rerun finish-task without --reviewed to regenerate the coded handoff",
 			);

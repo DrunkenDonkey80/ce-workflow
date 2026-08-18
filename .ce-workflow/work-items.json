@@ -4596,6 +4596,82 @@
       "type": "task",
       "updatedAt": "2026-08-11T16:29:36.294Z"
     },
+    "work-2.report-58390134-7183-4e92-bc36-53c45d95b337": {
+      "createdAt": "2026-08-17T21:57:03.567Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: `finish-task` rejected valid untracked implementation files in two consecutive slices (`third_party/maven/.../*.aar|*.pom` for work-3.3 and `tools/validation/nexus-candidate-consumer/*.gradle.kts` for work-3.5) as requiring an add/gitignore/remove decision, even though they were inside the reviewed task scope. The helper proceeded only after manually applying `git add -N` intent-to-add.\nExpected: After scope/review checks establish that an untracked path is task-owned, `finish-task` should safely include it itself (or provide a coded intent-to-add action) rather than requiring manual index manipulation that its own pre-staged guard otherwise discourages.\nImpact: Autonomous finalization stalls on ordinary new source, Maven fixture, and Gradle fixture files; agents must infer the undocumented `git add -N` workaround, creating avoidable index risk and repeated failed gates.\nSuggested improvement: Permit untracked files already covered by the persisted `wo:review-scope`/owned-path contract, or add a helper flag that records and stages explicitly listed new task files atomically.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/36d7bb08-695c-4f13-8573-fd087a2cb316",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 174633,
+              "file": "01-2026-08-17.jsonl",
+              "sha256": "5ba8a77c1165403c16e1ddb5c1b5e5c7045f95efa60a9c3777d2cae9c44582cb"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-08-17T21:57:03.564Z",
+          "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.report-58390134-7183-4e92-bc36-53c45d95b337",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic classification: locally-owned. One root cause: finish-task asks for an untracked-file decision before it has a coded way to declare task-owned new implementation paths; add an explicit bounded implementation-file contract and preserve those paths from hygiene classification.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: `finish-task` rejected valid untracked implementation files in two consecutive slices (`third_party/maven/.../*.aar|*.pom` for wor",
+      "type": "task",
+      "updatedAt": "2026-08-18T05:26:26.752Z"
+    },
+    "work-2.report-5a46890b-cb60-4585-93ba-e22956cf2b4a": {
+      "createdAt": "2026-08-17T22:19:29.390Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: `finish-task` classifies planning-only items work-3.6 and work-3.8 as requiring independent sensitive review even though their only changed file is the native `.ce-workflow/work-items.json`, then emits an unusable handoff with an empty `Review only:` list. Each deterministic one-slice planning boundary therefore requires a reviewer to infer and review the child WorkItem instead of any supplied file.\nExpected: For planning-only store mutations, the finalizer should either validate the created child contract deterministically without an independent code review, or generate a review handoff that explicitly identifies the planning work item/created child as the review target rather than an empty file scope.\nImpact: The autonomous roadmap loop launches redundant reviewers at every just-in-time planning boundary, adds minutes per slice, and violates the intent of the one-review-cycle budget while providing no explicit review artifact.\nSuggested improvement: Special-case `wo:planning` tasks whose diff is only the work-item store, or emit `Review work item: <child-id>` and persist that logical scope for `--reviewed`.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/5bbc69a9-945f-4361-b8d6-ad0355d9745c",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 214217,
+              "file": "01-2026-08-17.jsonl",
+              "sha256": "89e4e847dd1792795ff39831e3af906114a8603a4c288a6766b4a251d878e2c2"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-08-17T22:19:29.386Z",
+          "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        }
+      ],
+      "id": "work-2.report-5a46890b-cb60-4585-93ba-e22956cf2b4a",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic classification: related-distinct, locally-owned. One root cause: sensitive task-contract routing runs even when the only changed path is the native work store and the reviewer file scope is empty; planning-only store closure should use deterministic validation without code review."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: `finish-task` classifies planning-only items work-3.6 and work-3.8 as requiring independent sensitive review even though their onl",
+      "type": "task",
+      "updatedAt": "2026-08-17T22:19:29.390Z"
+    },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
       "dependencies": [
@@ -4744,6 +4820,42 @@
       "title": "Self-improvement report: The native roadmap epic work-2 became status=closed after closing the then-last executable child (work-2.19), even though the auth",
       "type": "task",
       "updatedAt": "2026-08-07T08:38:36.364Z"
+    },
+    "work-2.report-67c4d7c9-d110-42ac-9430-d5c518ea0c62": {
+      "createdAt": "2026-08-18T00:16:35.407Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A roadmap in NexusConnectSDK owns cross-repository LPGSlim implementation phases, but `work-helper.mjs` resolves both the native work store and Git finalization root from `process.cwd()`. Planner therefore had to create blocking decision work-3.20: from Nexus cwd it cannot commit LPG files; from LPG cwd it cannot update/close the Nexus-owned item.\nExpected: Support an explicit work-store root distinct from execution/finalization repository root, or a first-class companion-item/handoff mechanism whose completion evidence can close the owning roadmap item deterministically.\nImpact: Cross-repo roadmaps stall after same-repo phases even when both repositories and tests are locally available, forcing manual dual-store bookkeeping or branch/worktree workarounds.\nSuggested improvement: Add separate store/git root flags and persist companion commit hash plus repository identity in the owning work item before close.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/46d8a374-f101-42a7-bfe1-34892d826b3a",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 452758,
+              "file": "01-2026-08-17.jsonl",
+              "sha256": "e18ed89c32551bfbf6abbd4af5353d164d282d79a96ec0a425257d84f0cff0f6"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-08-18T00:16:35.403Z",
+          "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        }
+      ],
+      "id": "work-2.report-67c4d7c9-d110-42ac-9430-d5c518ea0c62",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic classification: locally-owned architectural gap. One root cause: work-helper binds store mutation and Git finalization to one cwd; cross-repository execution needs explicit, durable ownership and commit evidence rather than manual dual-store bookkeeping."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A roadmap in NexusConnectSDK owns cross-repository LPGSlim implementation phases, but `work-helper.mjs` resolves both the native w",
+      "type": "task",
+      "updatedAt": "2026-08-18T00:16:35.407Z"
     },
     "work-2.report-6834863f-7e5e-47f1-9a57-7961f8cbafc4": {
       "createdAt": "2026-08-11T20:04:02.851Z",
@@ -5308,6 +5420,42 @@
       "title": "Self-improvement report: The coded finish helper rejected four task-owned sanitized NDJSON evidence files as unrecognized untracked files, even though NDJS",
       "type": "task",
       "updatedAt": "2026-08-10T08:37:03.710Z"
+    },
+    "work-2.report-d16529ea-1917-4e39-8080-56a0720adb4e": {
+      "createdAt": "2026-08-18T05:18:46.408Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: At 2026-08-18T00:28:00.005Z, immediately after successful parallel LSP/git results, the next assistant operation was recorded with stopReason=error and errorMessage='This operation was aborted'. Two seconds later the autonomous-goal hook wrote durable state and forced a `work-orchestrator-instant` manual context compaction, but execution did not automatically resume until user intervention.\nExpected: When context-guard compaction aborts an in-flight autonomous-goal model call, the runtime should transparently resume from durable state after compaction or clearly label the abort as intentional compaction rather than a generic operation error.\nImpact: The roadmap loop stopped before the pending LPG finalizer/reviewer step despite clean verification and active durable goal state, requiring the user to notice and manually restart it.\nSuggested improvement: After hook-triggered compaction, enqueue an automatic continuation turn tied to the active work-goal; distinguish intentional context aborts in UI/logs.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/384a2dbd-67e6-4172-bd69-898cdc802b1b",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3699488,
+              "file": "01-2026-08-17T19-20-48-827Z_01a0112b-59bb-7656-839b-f4c1ae14d0e2.jsonl",
+              "sha256": "b22f17c649658ba0e200c1c17358b81aa28db521432f408cfadfd96f427e25bb"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-08-18T05:18:46.402Z",
+          "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        }
+      ],
+      "id": "work-2.report-d16529ea-1917-4e39-8080-56a0720adb4e",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic classification: already-fixed in current source by b779bb0. Native and CE-owned compaction now preserve active goal recovery and enqueue exactly one continuation; scripts/test-work-goal.mjs contains the matching aborted-operation lifecycle regression."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: At 2026-08-18T00:28:00.005Z, immediately after successful parallel LSP/git results, the next assistant operation was recorded with",
+      "type": "task",
+      "updatedAt": "2026-08-18T05:18:46.408Z"
     },
     "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
       "createdAt": "2026-08-12T16:54:19.072Z",
@@ -7530,7 +7678,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-17T18:02:12.407Z"
+    "updatedAt": "2026-08-18T05:26:26.752Z"
   },
   "schemaVersion": 1
 }

@@ -371,6 +371,7 @@ try {
 		"TASK-4",
 		"TASK-ROLLBACK",
 		"TASK-SHELL",
+		"TASK-UNTRACKED",
 	])
 		createWorkItem(finishStore, {
 			id,
@@ -773,10 +774,40 @@ process.exit(result.status ?? 1);
 		untrackedError = String(error.stdout ?? "");
 	}
 	assert(
-		untrackedError.includes("untracked files need a decision"),
-		"finish-task checks untracked files before persisting PASS evidence",
+		untrackedError.includes("untracked files need a decision") &&
+			untrackedError.includes("--implementation-file <path>"),
+		"finish-task checks untracked files and exposes the coded ownership action before persisting PASS evidence",
 	);
 	rmSync(path.join(finishCwd, "undecided.asset"));
+
+	writeFileSync(path.join(finishCwd, "owned.aar"), "task-owned binary fixture");
+	const ownedFinished = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-UNTRACKED",
+				"--max-files",
+				"1",
+				"--message",
+				"include task-owned file",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+				"--implementation-file",
+				"owned.aar",
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		),
+	);
+	assert(
+		ownedFinished.files.includes("owned.aar") &&
+			execFileSync("git", ["ls-files", "--", "owned.aar"], {
+				cwd: finishCwd,
+				encoding: "utf8",
+			}).trim() === "owned.aar",
+		"finish-task atomically includes an explicitly task-owned untracked implementation file",
+	);
 
 	for (const file of ["one.txt", "two.txt", "three.txt"])
 		writeFileSync(path.join(finishCwd, file), file);
