@@ -197,9 +197,7 @@ try {
 				timestamp: "2026-01-01T00:00:02.000Z",
 				usage: { input: 5, output: 2, cacheRead: 11, cost: 0.1 },
 				message: {
-					content: [
-						{ type: "toolCall", name: "read", arguments: { path: "x" } },
-					],
+					content: [{ type: "toolCall", name: "read", arguments: { path: "x" } }],
 				},
 			},
 			{ role: "toolResult", text: "pi tool output" },
@@ -285,7 +283,10 @@ try {
 		"<!-- BEGIN COMPOUND PI TOOL MAP -->\r\ngenerated\r\n<!-- END COMPOUND PI TOOL MAP -->\r\n";
 	const afterMarker = "suffix\n";
 	writeFileSync(cleanupFile, beforeMarker + managedBlock + afterMarker);
-	const cleanupPreview = cleanupCommand("legacy-instructions-preview", "AGENTS.md");
+	const cleanupPreview = cleanupCommand(
+		"legacy-instructions-preview",
+		"AGENTS.md",
+	);
 	assert(
 		cleanupPreview.status === "preview" &&
 			cleanupPreview.removed === managedBlock &&
@@ -296,7 +297,8 @@ try {
 	assert(
 		unconfirmed.status === "refused" &&
 			unconfirmed.reason === "confirmation-required" &&
-			readFileSync(cleanupFile, "utf8") === beforeMarker + managedBlock + afterMarker,
+			readFileSync(cleanupFile, "utf8") ===
+				beforeMarker + managedBlock + afterMarker,
 		"legacy instruction cleanup requires explicit confirmation",
 	);
 	const staleConfirmation = cleanupCommand(
@@ -307,7 +309,8 @@ try {
 	);
 	assert(
 		staleConfirmation.status === "refused" &&
-			readFileSync(cleanupFile, "utf8") === beforeMarker + managedBlock + afterMarker,
+			readFileSync(cleanupFile, "utf8") ===
+				beforeMarker + managedBlock + afterMarker,
 		"legacy instruction cleanup refuses a mismatched preview token",
 	);
 	const cleanupApplied = cleanupCommand(
@@ -322,13 +325,13 @@ try {
 		"confirmed legacy instruction cleanup preserves every surrounding byte",
 	);
 	assert(
-		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status === "no-op" &&
-			readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
+		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status ===
+			"no-op" && readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
 		"legacy instruction cleanup is a no-op when markers are absent",
 	);
 	assert(
-		cleanupCommand("legacy-instructions-preview", "--full", "AGENTS.md").status ===
-			"no-op",
+		cleanupCommand("legacy-instructions-preview", "--full", "AGENTS.md")
+			.status === "no-op",
 		"boolean flags do not swallow following positional arguments",
 	);
 	const refusedFixtures = [
@@ -342,7 +345,10 @@ try {
 			"duplicated",
 			"<!-- BEGIN COMPOUND PI TOOL MAP -->\na\n<!-- END COMPOUND PI TOOL MAP -->\n<!-- BEGIN COMPOUND PI TOOL MAP -->\nb\n<!-- END COMPOUND PI TOOL MAP -->\n",
 		],
-		["malformed", "prefix <!-- BEGIN COMPOUND PI TOOL MAP -->\nbody\n<!-- END COMPOUND PI TOOL MAP -->\n"],
+		[
+			"malformed",
+			"prefix <!-- BEGIN COMPOUND PI TOOL MAP -->\nbody\n<!-- END COMPOUND PI TOOL MAP -->\n",
+		],
 	];
 	for (const [name, content] of refusedFixtures) {
 		writeFileSync(cleanupFile, content);
@@ -353,7 +359,8 @@ try {
 			"not-used",
 		);
 		assert(
-			refused.status === "refused" && readFileSync(cleanupFile, "utf8") === content,
+			refused.status === "refused" &&
+				readFileSync(cleanupFile, "utf8") === content,
 			`legacy instruction cleanup refuses ${name} markers without mutation`,
 		);
 	}
@@ -365,8 +372,12 @@ try {
 	const outsideFile = path.join(cwd, "AGENTS.md");
 	writeFileSync(outsideFile, managedBlock);
 	assert(
-		cleanupCommand("legacy-instructions-apply", "../AGENTS.md", "--confirm", "ignored")
-			.reason === "outside-repository" &&
+		cleanupCommand(
+			"legacy-instructions-apply",
+			"../AGENTS.md",
+			"--confirm",
+			"ignored",
+		).reason === "outside-repository" &&
 			readFileSync(outsideFile, "utf8") === managedBlock,
 		"legacy instruction cleanup refuses parent-directory targets",
 	);
@@ -441,10 +452,7 @@ try {
 	});
 	execFileSync("git", ["config", "user.name", "Test"], { cwd: finishCwd });
 	writeFileSync(path.join(finishCwd, ".gitignore"), ".ce-workflow/\n");
-	writeFileSync(
-		path.join(finishCwd, "result.js"),
-		"const result = 'before';\n",
-	);
+	writeFileSync(path.join(finishCwd, "result.js"), "const result = 'before';\n");
 	execFileSync("git", ["add", "-A"], { cwd: finishCwd });
 	execFileSync("git", ["commit", "-m", "initial"], {
 		cwd: finishCwd,
@@ -537,11 +545,10 @@ try {
 	);
 	assert(
 		loadStore(finishCwd).items["TASK-1"].status === "closed" &&
-			!execFileSync(
-				"git",
-				["ls-files", "--", ".ce-workflow/work-items.json"],
-				{ cwd: finishCwd, encoding: "utf8" },
-			).trim(),
+			!execFileSync("git", ["ls-files", "--", ".ce-workflow/work-items.json"], {
+				cwd: finishCwd,
+				encoding: "utf8",
+			}).trim(),
 		"finish-task closes an intentionally ignored local WorkItem store",
 	);
 
@@ -646,8 +653,7 @@ try {
 	);
 	rmSync(path.join(finishCwd, "docs"), { recursive: true, force: true });
 
-	const evidenceFile =
-		"docs/evidence/TASK-EVIDENCE-pixel/terminal-state.png";
+	const evidenceFile = "docs/evidence/TASK-EVIDENCE-pixel/terminal-state.png";
 	mkdirSync(path.join(finishCwd, path.dirname(evidenceFile)), {
 		recursive: true,
 	});
@@ -688,7 +694,10 @@ try {
 	for (const file of automaticEvidenceFiles)
 		writeFileSync(path.join(finishCwd, file), `proof-${file}`);
 	const evidenceLog = `${automaticEvidenceDir}/capture.log`;
-	writeFileSync(path.join(finishCwd, evidenceLog), "sanitized capture metadata\n");
+	writeFileSync(
+		path.join(finishCwd, evidenceLog),
+		"sanitized capture metadata\n",
+	);
 	execFileSync("git", ["add", "--", automaticEvidenceDir], { cwd: finishCwd });
 	const automaticEvidenceFinished = JSON.parse(
 		execFileSync(
@@ -1092,7 +1101,9 @@ process.exit(result.status ?? 1);
 		stdio: "ignore",
 	});
 	const planningStore = loadStore(finishCwd);
-	planningStore.items["TASK-PLANNING"].notes.push("Created the next child slice");
+	planningStore.items["TASK-PLANNING"].notes.push(
+		"Created the next child slice",
+	);
 	saveStore(finishCwd, planningStore);
 	const planningFinished = JSON.parse(
 		execFileSync(

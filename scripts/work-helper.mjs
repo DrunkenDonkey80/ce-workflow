@@ -54,7 +54,9 @@ function run(bin, argv, options = {}) {
 		executable = process.execPath;
 		childArgs = [bin, ...argv];
 	} else if (process.platform === "win32" && /\.(?:cmd|bat)$/i.test(bin)) {
-		throw new Error(`refusing shell-backed executable ${bin}; use an .exe or Node script`);
+		throw new Error(
+			`refusing shell-backed executable ${bin}; use an .exe or Node script`,
+		);
 	}
 	return execFileSync(executable, childArgs, {
 		cwd,
@@ -167,7 +169,11 @@ function legacyInstructionsPreview(requestedFile = "AGENTS.md") {
 	if (!/(?:^|[/\\])AGENTS\.md$/i.test(file))
 		return { status: "refused", reason: "not-an-AGENTS-file", file };
 	const relative = path.relative(cwd, file);
-	if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+	if (
+		relative === ".." ||
+		relative.startsWith(`..${path.sep}`) ||
+		path.isAbsolute(relative)
+	)
 		return { status: "refused", reason: "outside-repository", file };
 	if (!existsSync(file)) return { status: "no-op", reason: "file-absent", file };
 	file = realpathSync(file);
@@ -341,7 +347,8 @@ function dispositionCovers(target, disposition) {
 
 function reviewDispositionSatisfied(task) {
 	const notes = notesOf(task);
-	const scopeIndex = [...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
+	const scopeIndex =
+		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
 	const reviews = [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)].filter(
 		(event) => event.index > scopeIndex,
 	);
@@ -384,12 +391,16 @@ function formatPendingFiles(root = cwd) {
 		packageFormatter ||
 		path.join(root, "node_modules", ".bin", "biome");
 	if (!existsSync(formatter)) return [];
-	run(packageFormatter === formatter ? process.execPath : formatter, [
-		...(packageFormatter === formatter ? [formatter] : []),
-		"format",
-		"--write",
-		...files,
-	], { cwd: root });
+	run(
+		packageFormatter === formatter ? process.execPath : formatter,
+		[
+			...(packageFormatter === formatter ? [formatter] : []),
+			"format",
+			"--write",
+			...files,
+		],
+		{ cwd: root },
+	);
 	return files;
 }
 
@@ -486,7 +497,9 @@ async function finishTaskUnlocked() {
 	const task = readWorkItem(id);
 	if (!task) throw new Error(`Work item not found: ${id}`);
 	const taskContractText = `${titleOf(task)}\n${field(task, "description") ?? ""}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
-	const evidenceOnly = /\bevidence[- ](?:only|capture)\b/i.test(taskContractText);
+	const evidenceOnly = /\bevidence[- ](?:only|capture)\b/i.test(
+		taskContractText,
+	);
 	const declaredImplementationFiles = [
 		...new Set(
 			options("--implementation-file").map((file) =>
@@ -605,7 +618,9 @@ async function finishTaskUnlocked() {
 			normalized.startsWith("../") ||
 			path.posix.isAbsolute(normalized)
 		)
-			throw new Error(`invalid verification shard output ${JSON.stringify(output)}`);
+			throw new Error(
+				`invalid verification shard output ${JSON.stringify(output)}`,
+			);
 	}
 	const absentShardOutputs = new Set(
 		shardOutputs.filter(
@@ -712,8 +727,7 @@ async function finishTaskUnlocked() {
 	const implementationFiles = changed.filter((file) => {
 		const normalized = file.replaceAll("\\", "/");
 		return (
-			!normalized.startsWith(".ce-workflow/") &&
-			!evidenceFileSet.has(normalized)
+			!normalized.startsWith(".ce-workflow/") && !evidenceFileSet.has(normalized)
 		);
 	});
 	if (implementationFiles.length > maxFiles)

@@ -59,17 +59,10 @@ const terminalEmojiExtraCells = new Map([
 ]);
 
 function cellWidth(segment) {
-	if (
-		/\p{Emoji_Presentation}/u.test(segment) ||
-		/[\uFE0F\u200D]/u.test(segment)
-	)
+	if (/\p{Emoji_Presentation}/u.test(segment) || /[\uFE0F\u200D]/u.test(segment))
 		return 2 + (terminalEmojiExtraCells.get(segment) ?? 0);
 	const code = segment.codePointAt(0) ?? 0;
-	if (
-		/^\p{Mark}+$/u.test(segment) ||
-		code < 32 ||
-		(code >= 0x7f && code < 0xa0)
-	)
+	if (/^\p{Mark}+$/u.test(segment) || code < 32 || (code >= 0x7f && code < 0xa0))
 		return 0;
 	return (code >= 0x1100 && code <= 0x115f) ||
 		(code >= 0x2e80 && code <= 0xa4cf) ||
@@ -148,9 +141,7 @@ function statsLine(theme, lines, index) {
 	for (let at = 1; at <= index; at += 1)
 		if (lines[at] && !lines[at].startsWith("-") && lines[at].endsWith(":"))
 			block += 1;
-	const color = ["success", "warning", "text", "accent"][
-		Math.max(0, block) % 4
-	];
+	const color = ["success", "warning", "text", "accent"][Math.max(0, block) % 4];
 	return theme.fg(color, line.endsWith(":") ? theme.bold(line) : line);
 }
 
@@ -274,9 +265,9 @@ export async function showListDialog(ctx, options) {
 		return nativeListDialog(ctx, { ...options, cursorKey });
 	if (typeof ctx.ui.custom !== "function")
 		return nativeListDialog(ctx, { ...options, cursorKey });
-	const subtitleLines = (
-		Array.isArray(subtitle) ? subtitle : [subtitle]
-	).filter(Boolean);
+	const subtitleLines = (Array.isArray(subtitle) ? subtitle : [subtitle]).filter(
+		Boolean,
+	);
 
 	return ctx.ui.custom(
 		(tui, theme, keybindings, done) => {
@@ -321,9 +312,7 @@ export async function showListDialog(ctx, options) {
 					ctx.ui.notify?.("Select at least one option", "warning");
 					return;
 				}
-				return close(
-					multi ? { action: "back", values: [...enabled] } : undefined,
-				);
+				return close(multi ? { action: "back", values: [...enabled] } : undefined);
 			};
 
 			let cachedKey;
@@ -376,9 +365,7 @@ export async function showListDialog(ctx, options) {
 						0,
 						Math.min(index - Math.floor(count / 2), visible.length - count),
 					);
-					const position = visible.length
-						? `${index + 1}/${visible.length}`
-						: "0/0";
+					const position = visible.length ? `${index + 1}/${visible.length}` : "0/0";
 					add(
 						sectionLine(
 							theme,
@@ -447,8 +434,7 @@ export async function showListDialog(ctx, options) {
 				handleInput(data) {
 					const selected = visible[index];
 					if (keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A")) {
-						if (visible.length)
-							index = (index - 1 + visible.length) % visible.length;
+						if (visible.length) index = (index - 1 + visible.length) % visible.length;
 					} else if (
 						keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
 					) {
@@ -517,12 +503,7 @@ export async function showListDialog(ctx, options) {
 						} else return back();
 					} else if (
 						filter &&
-						keyMatches(
-							keybindings,
-							data,
-							"tui.editor.deleteToLineStart",
-							"ctrl+u",
-						)
+						keyMatches(keybindings, data, "tui.editor.deleteToLineStart", "ctrl+u")
 					) {
 						query = "";
 						applyFilter();
@@ -536,9 +517,7 @@ export async function showListDialog(ctx, options) {
 						});
 						if (special) return close(special);
 						if (!filter) return;
-						const text = data
-							.replace(/^\x1b\[200~/, "")
-							.replace(/\x1b\[201~$/, "");
+						const text = data.replace(/^\x1b\[200~/, "").replace(/\x1b\[201~$/, "");
 						if (!text || /[\x00-\x1f\x7f]/u.test(text)) return;
 						query += text;
 						applyFilter();
@@ -563,10 +542,7 @@ function treeVisualStatus(row) {
 
 function treeStatusColor(row) {
 	const status = treeVisualStatus(row);
-	if (
-		row.attention ||
-		["blocked", "paused", "needs_attention"].includes(status)
-	)
+	if (row.attention || ["blocked", "paused", "needs_attention"].includes(status))
 		return "warning";
 	if (row.live || row.engaged || status === "in_progress") return "success";
 	if (status === "closed") return "dim";
@@ -601,8 +577,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		const roadmaps = frame?.roadmaps ?? [];
 		const seen = new Set();
 		const remember = (row) => {
-			if (seen.has(row.id))
-				throw new Error(`Duplicate work item ID: ${row.id}`);
+			if (seen.has(row.id)) throw new Error(`Duplicate work item ID: ${row.id}`);
 			seen.add(row.id);
 		};
 		const byParent = new Map();
@@ -614,8 +589,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		const appendTasks = (rows, task, depth) => {
 			remember(task);
 			rows.push({ ...task, depth, container: Boolean(task.children?.length) });
-			for (const child of task.children ?? [])
-				appendTasks(rows, child, depth + 1);
+			for (const child of task.children ?? []) appendTasks(rows, child, depth + 1);
 		};
 		const appendRoadmaps = (rows, parent = "", depth = 0) => {
 			for (const roadmap of byParent.get(parent) ?? []) {
@@ -627,8 +601,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						roadmap.tasks?.length || byParent.get(roadmap.id)?.length,
 					),
 				});
-				for (const task of roadmap.tasks ?? [])
-					appendTasks(rows, task, depth + 1);
+				for (const task of roadmap.tasks ?? []) appendTasks(rows, task, depth + 1);
 				appendRoadmaps(rows, roadmap.id, depth + 1);
 			}
 		};
@@ -742,7 +715,10 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}`;
 					if (cache === cachedKey) return cachedLines;
 					const selected = visible.find((row) => row.id === selectedId);
-					const stats = statsById.get(selected?.id) ?? ["Stats:", "- press s to show"];
+					const stats = statsById.get(selected?.id) ?? [
+						"Stats:",
+						"- press s to show",
+					];
 					const lines = [];
 					const add = (line = "") => lines.push(fitOverlayLine(line, width));
 					const header = [
@@ -755,10 +731,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						);
 					for (const line of header) add(line);
 					add(sectionLine(theme, "Work items", renderWidth));
-					const detailRows = Math.max(
-						0,
-						Math.min(6, height - lines.length - 4),
-					);
+					const detailRows = Math.max(0, Math.min(6, height - lines.length - 4));
 					const bodyRows = Math.max(0, height - lines.length - detailRows - 3);
 					const statsWidth =
 						renderWidth >= 24
@@ -781,21 +754,14 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					);
 					const start = Math.max(
 						0,
-						Math.min(
-							index - Math.floor(bodyRows / 2),
-							visible.length - bodyRows,
-						),
+						Math.min(index - Math.floor(bodyRows / 2), visible.length - bodyRows),
 					);
 					for (let offset = 0; offset < bodyRows; offset += 1) {
 						const row = visible[start + offset];
 						let tree = "";
 						if (row) {
 							const selected = row.id === selectedId;
-							const marker = row.container
-								? expanded(row)
-									? "[-]"
-									: "[+]"
-								: "   ";
+							const marker = row.container ? (expanded(row) ? "[-]" : "[+]") : "   ";
 							const progress =
 								row.role || row.tasks
 									? `${row.progress?.completed ?? 0}/${row.progress?.total ?? 0} `
@@ -906,13 +872,11 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 						keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A")
 					) {
 						if (visible.length)
-							selectedId =
-								visible[(index - 1 + visible.length) % visible.length].id;
+							selectedId = visible[(index - 1 + visible.length) % visible.length].id;
 					} else if (
 						keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
 					) {
-						if (visible.length)
-							selectedId = visible[(index + 1) % visible.length].id;
+						if (visible.length) selectedId = visible[(index + 1) % visible.length].id;
 					} else if (
 						keyMatches(
 							keybindings,
@@ -924,8 +888,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 							"\n",
 						)
 					) {
-						if (row)
-							return finish({ action: "select", value: row.id, item: row });
+						if (row) return finish({ action: "select", value: row.id, item: row });
 					} else if (
 						keyMatches(keybindings, data, "tui.select.cancel", "escape", "\x1b")
 					) {
@@ -949,9 +912,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 							rebuild();
 						} else return finish({ action: "back" });
 					} else if (filter) {
-						const text = data
-							.replace(/^\x1b\[200~/, "")
-							.replace(/\x1b\[201~$/, "");
+						const text = data.replace(/^\x1b\[200~/, "").replace(/\x1b\[201~$/, "");
 						if (text && !/[\x00-\x1f\x7f]/u.test(text)) {
 							query += text;
 							rebuild();

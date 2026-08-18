@@ -124,8 +124,7 @@ function relativePath(value, field = "path") {
 	return value;
 }
 function objectMap(value, field, file) {
-	if (!plainObject(value))
-		throw error("corrupt", `Invalid ${field} in ${file}`);
+	if (!plainObject(value)) throw error("corrupt", `Invalid ${field} in ${file}`);
 }
 function validateCheckpoint(
 	value,
@@ -199,10 +198,7 @@ function normalizeProfiles(profiles, options = {}) {
 			!nonempty(profile.model) ||
 			profile.model !== profile.model.trim()
 		)
-			throw error(
-				"invalid",
-				"Verifier profile has an invalid canonical model ID",
-			);
+			throw error("invalid", "Verifier profile has an invalid canonical model ID");
 		if (known && !known.has(profile.model))
 			throw error("invalid", `Unknown verifier model: ${profile.model}`);
 		if (models.has(profile.model))
@@ -229,9 +225,7 @@ function normalizeProfiles(profiles, options = {}) {
 			);
 		return { model: profile.model, operations, thinking: profile.thinking };
 	});
-	return normalized.sort((left, right) =>
-		left.model.localeCompare(right.model),
-	);
+	return normalized.sort((left, right) => left.model.localeCompare(right.model));
 }
 export function normalizeEffectiveProfiles(profiles, options = {}) {
 	return normalizeProfiles(profiles, options);
@@ -268,11 +262,9 @@ function writeDurable(file, content) {
 }
 function parseSnapshot(content, file) {
 	if (/^(<{7}|={7}|>{7})/m.test(content))
-		throw error(
-			"conflicted",
-			`Verifier store contains merge markers: ${file}`,
-			{ file },
-		);
+		throw error("conflicted", `Verifier store contains merge markers: ${file}`, {
+			file,
+		});
 	let store;
 	try {
 		store = JSON.parse(content);
@@ -350,11 +342,9 @@ export function saveVerifierStore(cwd = process.cwd(), store, options = {}) {
 		renameSync(candidate, target);
 	} catch (cause) {
 		if (!existsSync(target))
-			throw error(
-				"write",
-				`Unable to publish verifier store: ${cause.message}`,
-				{ cause },
-			);
+			throw error("write", `Unable to publish verifier store: ${cause.message}`, {
+				cause,
+			});
 		try {
 			rmSync(target);
 			renameSync(candidate, target);
@@ -394,11 +384,9 @@ export function acquireVerifierLock(cwd = process.cwd()) {
 		writeFileSync(fd, `${process.pid}\n`);
 	} catch (cause) {
 		if (cause?.code !== "EEXIST")
-			throw error(
-				"write",
-				`Unable to acquire verifier lock: ${cause.message}`,
-				{ cause },
-			);
+			throw error("write", `Unable to acquire verifier lock: ${cause.message}`, {
+				cause,
+			});
 		if (!lockOwnerIsDead(file))
 			throw error("locked", `Another verifier writer owns ${file}`, { file });
 		// ponytail: single-host PID lock; use an OS lock if multi-host writers matter.
@@ -436,10 +424,7 @@ export function initVerifierStore(cwd = process.cwd(), options = {}) {
 		try {
 			return loadVerifierStore(cwd);
 		} catch (cause) {
-			if (
-				!(cause instanceof VerifierStoreError) ||
-				cause.category !== "missing"
-			)
+			if (!(cause instanceof VerifierStoreError) || cause.category !== "missing")
 				throw cause;
 		}
 		const timestamp = now(options.now);
@@ -660,10 +645,7 @@ function customSnapshotPaths(cwd, snapshot, patterns = []) {
 function assertNoSnapshotSymlinks(cwd) {
 	const tracked = gitLines(cwd, ["ls-files", "-s"]);
 	if (tracked.some((line) => /^120000\s/.test(line)))
-		throw error(
-			"not-scheduled",
-			"Verifier snapshot contains a tracked symlink",
-		);
+		throw error("not-scheduled", "Verifier snapshot contains a tracked symlink");
 	const untracked = git(cwd, [
 		"ls-files",
 		"--others",
@@ -702,27 +684,18 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 			throw error("invalid", `Invalid verifier scope: ${scope}`);
 		const head = git(cwd, ["rev-parse", "HEAD"]);
 		if (gitLines(cwd, ["ls-files", "-u"]).length)
-			throw error(
-				"not-scheduled",
-				"Verifier snapshot has unresolved conflicts",
-			);
+			throw error("not-scheduled", "Verifier snapshot has unresolved conflicts");
 		assertNoSnapshotSymlinks(cwd);
 		const workingPaths = snapshotPaths(cwd, head, head, undefined, true);
 		const snapshotWorkingPaths =
 			scope === "project"
 				? workingPaths.filter((entry) =>
-						projectSourcePath(
-							entry,
-							input.operations?.includes("test-gap") ?? false,
-						),
+						projectSourcePath(entry, input.operations?.includes("test-gap") ?? false),
 					)
 				: workingPaths;
 		const dirty = snapshotWorkingPaths.length > 0;
 		if (scope === "changes" && !dirty)
-			throw error(
-				"not-scheduled",
-				"Verifier checkpoint has no current changes",
-			);
+			throw error("not-scheduled", "Verifier checkpoint has no current changes");
 		let snapshot = head;
 		if (dirty && scope !== "commit") {
 			temporaryIndex = path.join(
@@ -816,11 +789,7 @@ function ensureVerifierWorkspace(cwd, batch) {
 	);
 	let refCreated = false;
 	try {
-		git(cwd, [
-			"update-ref",
-			checkpointRef(batch.id),
-			batch.checkpoint.snapshot,
-		]);
+		git(cwd, ["update-ref", checkpointRef(batch.id), batch.checkpoint.snapshot]);
 		refCreated = true;
 		const projectScope = batch.checkpoint.scope === "project";
 		const archivedPaths = projectScope
@@ -915,10 +884,7 @@ function cleanupVerifierBatchRuntime(cwd, batchId) {
 			continue;
 		try {
 			const marker = JSON.parse(
-				readFileSync(
-					path.join(resolved, ".ce-verifier-workspace.json"),
-					"utf8",
-				),
+				readFileSync(path.join(resolved, ".ce-verifier-workspace.json"), "utf8"),
 			);
 			if (
 				marker.version === 1 &&
@@ -1025,10 +991,7 @@ export function recordVerifierLaunch(store, input = {}) {
 		delete launch.claimedAt;
 		delete launch.orphanedAt;
 		const identity = input.identity ?? {};
-		if (
-			input.ambiguous ||
-			(input.ok && !identity.runId && !identity.asyncDir)
-		) {
+		if (input.ambiguous || (input.ok && !identity.runId && !identity.asyncDir)) {
 			job.launch = {
 				...launch,
 				status: "orphaned",
@@ -1104,10 +1067,7 @@ export async function launchQueuedVerifierJobs(
 			);
 			claimed.push(job);
 		} catch (cause) {
-			if (
-				!(cause instanceof VerifierStoreError) ||
-				cause.category !== "invalid"
-			)
+			if (!(cause instanceof VerifierStoreError) || cause.category !== "invalid")
 				throw cause;
 		}
 	const spawn = async (job) => {
@@ -1350,10 +1310,7 @@ export function recordOperationResult(store, input = {}) {
 		const job = next.jobs[input.jobId];
 		if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
 		if (!job.operations.includes(input.operation))
-			throw error(
-				"invalid",
-				"Operation was not requested for this verifier job",
-			);
+			throw error("invalid", "Operation was not requested for this verifier job");
 		if (!OUTCOMES.has(input.outcome))
 			throw error("invalid", "Invalid verifier operation outcome");
 		if (
@@ -1364,15 +1321,9 @@ export function recordOperationResult(store, input = {}) {
 						typeof value !== "number" || !Number.isFinite(value) || value < 0,
 				))
 		)
-			throw error(
-				"invalid",
-				"Verifier usage must contain non-negative numbers",
-			);
+			throw error("invalid", "Verifier usage must contain non-negative numbers");
 		if (input.outcome === "failed" && !nonempty(input.failure))
-			throw error(
-				"invalid",
-				"Failed verifier operation needs a failure reason",
-			);
+			throw error("invalid", "Failed verifier operation needs a failure reason");
 		const id = stableId("report", {
 			jobId: job.id,
 			operation: input.operation,
@@ -1423,9 +1374,7 @@ export function recordOperationResult(store, input = {}) {
 				? {}
 				: { usage: structuredClone(input.usage) }),
 			...(input.failure === undefined ? {} : { failure: input.failure }),
-			...(artifact === undefined
-				? {}
-				: { artifact: structuredClone(artifact) }),
+			...(artifact === undefined ? {} : { artifact: structuredClone(artifact) }),
 			createdAt: now(input.now),
 		};
 		next.reports[id] = report;
@@ -1581,10 +1530,7 @@ function claimGroupIn(next, input = {}) {
 		Date.parse(existing.leaseUntil) > Date.parse(timestamp) &&
 		existing.ownerSession !== input.ownerSession
 	)
-		throw error(
-			"locked",
-			`Verifier group is already claimed: ${input.groupId}`,
-		);
+		throw error("locked", `Verifier group is already claimed: ${input.groupId}`);
 	if (existing) {
 		existing.ownerSession = input.ownerSession;
 		existing.leaseUntil = leaseUntil;
@@ -1618,8 +1564,7 @@ export function claimCompletedGroups(store, input = {}) {
 			)
 			.filter(
 				(group) =>
-					remainingFindings(next, group).length > 0 ||
-					group.status === "claimed",
+					remainingFindings(next, group).length > 0 || group.status === "claimed",
 			)
 			.sort((left, right) => left.id.localeCompare(right.id))
 			.slice(0, input.limit ?? Number.POSITIVE_INFINITY)
@@ -1730,10 +1675,7 @@ export function completeAcceptedFix(store, input = {}) {
 						"accepted" || next.findings[id].fixId,
 			)
 		)
-			throw error(
-				"invalid",
-				"Fix members must be unresolved accepted findings",
-			);
+			throw error("invalid", "Fix members must be unresolved accepted findings");
 		const id = stableId("fix", {
 			claimId: claim.id,
 			findingIds,
@@ -1805,8 +1747,7 @@ function jsonDepth(value) {
 		if (Array.isArray(current))
 			for (const entry of current) pending.push([entry, depth + 1]);
 		else if (plainObject(current))
-			for (const entry of Object.values(current))
-				pending.push([entry, depth + 1]);
+			for (const entry of Object.values(current)) pending.push([entry, depth + 1]);
 	}
 	return max;
 }
@@ -1823,8 +1764,7 @@ function validUsage(value) {
 		value === undefined ||
 		(plainObject(value) &&
 			Object.values(value).every(
-				(item) =>
-					typeof item === "number" && Number.isFinite(item) && item >= 0,
+				(item) => typeof item === "number" && Number.isFinite(item) && item >= 0,
 			))
 	);
 }
@@ -1832,10 +1772,7 @@ function artifactForJob(cwd, job) {
 	const file = job.launch?.request?.output;
 	const root = path.resolve(verifierRuntimeRoot(cwd));
 	if (!nonempty(file) || !path.resolve(file).startsWith(`${root}${path.sep}`))
-		throw error(
-			"artifact",
-			"Verifier output is not a private runtime artifact",
-		);
+		throw error("artifact", "Verifier output is not a private runtime artifact");
 	return file;
 }
 function validateFindingRange(job, batch, finding) {
@@ -1960,13 +1897,7 @@ function validateTerminalReport(job, batch, text) {
 	if (jsonDepth(report) > REPORT_MAX_DEPTH)
 		throw error("over-limit", "Verifier report exceeds the nesting limit");
 	if (
-		!exactKeys(report, [
-			"version",
-			"jobId",
-			"model",
-			"checkpoint",
-			"results",
-		]) ||
+		!exactKeys(report, ["version", "jobId", "model", "checkpoint", "results"]) ||
 		report.version !== 1 ||
 		report.jobId !== job.id ||
 		report.model !== job.model ||
@@ -1998,8 +1929,7 @@ function validateTerminalReport(job, batch, text) {
 		} catch (cause) {
 			rejected.push({
 				operation: result.operation,
-				reason:
-					cause instanceof VerifierStoreError ? cause.category : "invalid",
+				reason: cause instanceof VerifierStoreError ? cause.category : "invalid",
 			});
 		}
 	}
@@ -2108,8 +2038,7 @@ export function ingestVerifierReport(store, input = {}) {
 	);
 	groupValidatedFindings(store, { now: input.now });
 	return {
-		quarantined:
-			validated.rejected.length > 0 || validated.rejectedFindings > 0,
+		quarantined: validated.rejected.length > 0 || validated.rejectedFindings > 0,
 		omitted: validated.omitted,
 	};
 }
@@ -2355,10 +2284,7 @@ export function ingestAnalysisReview(store, input = {}) {
 	if (store.batches[input.batchId].purpose !== "analysis")
 		throw error("invalid", "Only Analyze batches may enter analysis review");
 	if (!Array.isArray(input.candidates) || input.candidates.length > 100)
-		throw error(
-			"invalid",
-			"Analysis review candidates must be a bounded array",
-		);
+		throw error("invalid", "Analysis review candidates must be a bounded array");
 	return edit(store, (next) => {
 		const timestamp = now(input.now);
 		const grouped = new Map();
@@ -2454,10 +2380,7 @@ export function ingestAnalysisReview(store, input = {}) {
 					next.analysisReviewGroups[terminalConflictId]?.state,
 				)
 			)
-				throw error(
-					"invalid",
-					`Invalid terminal conflict: ${terminalConflictId}`,
-				);
+				throw error("invalid", `Invalid terminal conflict: ${terminalConflictId}`);
 			const id = stableId("analysis-review", {
 				repository: next.batches[input.batchId].checkpoint.repository,
 				namespace: "analysis-review/v1",
@@ -2530,10 +2453,7 @@ export function claimAnalysisReview(store, input = {}) {
 			Date.parse(group.lease.until) > Date.parse(timestamp) &&
 			group.lease.ownerSession !== input.ownerSession
 		)
-			throw error(
-				"locked",
-				"Analysis review group is claimed by another session",
-			);
+			throw error("locked", "Analysis review group is claimed by another session");
 		const proposalReady = group.state === "proposal_ready";
 		group.state = proposalReady ? "proposal_ready" : "in_review";
 		group.lease = {
@@ -2558,10 +2478,7 @@ export function renewAnalysisReview(store, input = {}) {
 		if (!group || !["in_review", "proposal_ready"].includes(group.state))
 			throw error("stale", "Analysis review group is not renewable");
 		if (group.lease?.ownerSession !== input.ownerSession)
-			throw error(
-				"locked",
-				"Analysis review lease is not owned by this session",
-			);
+			throw error("locked", "Analysis review lease is not owned by this session");
 		if (Date.parse(group.lease.until) <= Date.parse(timestamp))
 			throw error("locked", "Analysis review lease expired");
 		if (
@@ -2679,8 +2596,7 @@ export function analysisReviewProjection(store) {
 	const failures = Object.values(store.batches)
 		.filter(
 			(batch) =>
-				batch.purpose === "analysis" &&
-				batch.analysisIngestionStatus === "failed",
+				batch.purpose === "analysis" && batch.analysisIngestionStatus === "failed",
 		)
 		.map((batch) => ({
 			id: `analysis-ingestion-failed:${batch.id}`,
@@ -2706,8 +2622,7 @@ export function analysisReviewProjection(store) {
 			readOnly: true,
 			batchId: store.jobs[entry.jobId].batchId,
 			governingDecision: `Quarantined analysis evidence: ${entry.reason}`,
-			statusMessage:
-				"Inspect the preserved artifact and retry the analysis run.",
+			statusMessage: "Inspect the preserved artifact and retry the analysis run.",
 			candidates: [],
 			allowedActions: ["inspect", "retry"],
 			createdAt: entry.createdAt,
@@ -2783,9 +2698,7 @@ export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 	if (
 		Object.values(store.findings).some((finding) => {
 			const report = store.reports[finding.reportId];
-			return (
-				batchIds.has(report?.batchId) && findingNeedsTriage(store, finding)
-			);
+			return batchIds.has(report?.batchId) && findingNeedsTriage(store, finding);
 		})
 	)
 		return "background verification has findings awaiting triage";
@@ -2821,8 +2734,7 @@ export function renderTriageClaim(store, claimId) {
 				const finding = store.findings[id];
 				return (
 					!finding.dispositionId ||
-					(store.dispositions[finding.dispositionId]?.disposition ===
-						"accepted" &&
+					(store.dispositions[finding.dispositionId]?.disposition === "accepted" &&
 						!finding.fixId)
 				);
 			})
@@ -2867,18 +2779,11 @@ export function verifierTelemetryEvents(store) {
 					for (const groupId of groupsByFinding.get(finding.id) ?? [])
 						groupIds.add(groupId);
 				const dispositions = findings
-					.map(
-						(finding) => store.dispositions[finding.dispositionId]?.disposition,
-					)
+					.map((finding) => store.dispositions[finding.dispositionId]?.disposition)
 					.filter(Boolean);
-				const started = Date.parse(
-					job.launch?.launchedAt ?? job.createdAt ?? "",
-				);
+				const started = Date.parse(job.launch?.launchedAt ?? job.createdAt ?? "");
 				const ended = Date.parse(
-					report?.createdAt ??
-						job.launch?.failedAt ??
-						job.launch?.orphanedAt ??
-						"",
+					report?.createdAt ?? job.launch?.failedAt ?? job.launch?.orphanedAt ?? "",
 				);
 				return {
 					id: `verifier-${job.id}-${operation}-${job.operationStatus[operation]}`,
@@ -2989,10 +2894,7 @@ export function validateVerifierStore(store, file = "verifier store") {
 			!nonempty(migration.sourceDigest) ||
 			!["pending", "completed", "blocked"].includes(migration.status)
 		)
-			throw error(
-				"corrupt",
-				`Invalid legacy analysis migration ${id} in ${file}`,
-			);
+			throw error("corrupt", `Invalid legacy analysis migration ${id} in ${file}`);
 	for (const [id, batch] of Object.entries(store.batches)) {
 		if (
 			!plainObject(batch) ||
@@ -3033,10 +2935,7 @@ export function validateVerifierStore(store, file = "verifier store") {
 			) ||
 			job.status !== jobStatus(job.operationStatus, job.launch)
 		)
-			throw error(
-				"corrupt",
-				`Invalid operation accounting for ${id} in ${file}`,
-			);
+			throw error("corrupt", `Invalid operation accounting for ${id} in ${file}`);
 		if (
 			job.launch !== undefined &&
 			(!plainObject(job.launch) ||
@@ -3181,8 +3080,7 @@ export function validateVerifierStore(store, file = "verifier store") {
 					const finding = store.findings[findingId];
 					return (
 						!finding.dispositionId ||
-						(store.dispositions[finding.dispositionId]?.disposition ===
-							"accepted" &&
+						(store.dispositions[finding.dispositionId]?.disposition === "accepted" &&
 							!finding.fixId)
 					);
 				})) ||

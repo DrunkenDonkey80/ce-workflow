@@ -149,9 +149,7 @@ export function appendGitignorePatterns(dir, patterns) {
 // whether to block on `unrecognized`. Idempotent: a second run finds no new
 // build/cache artifacts (already ignored) and returns an empty `ignored`.
 export function tidyUntrackedFiles({ cwd, gitBin = "git", preserve = [] }) {
-	const preserved = new Set(
-		preserve.map((file) => file.replaceAll("\\", "/")),
-	);
+	const preserved = new Set(preserve.map((file) => file.replaceAll("\\", "/")));
 	const scriptedGit = /\.[cm]?js$/i.test(gitBin);
 	const runGit = (argv) =>
 		execFileSync(

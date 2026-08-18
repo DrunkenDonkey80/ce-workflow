@@ -37,8 +37,7 @@ function terminalWidth(value, emojiWidth = 2) {
 
 function calibratedTerminalWidth(value) {
 	let width = terminalWidth(value);
-	for (const emoji of ["🧭", "🧱", "🌍"])
-		width += value.split(emoji).length - 1;
+	for (const emoji of ["🧭", "🧱", "🌍"]) width += value.split(emoji).length - 1;
 	return width;
 }
 
@@ -433,9 +432,7 @@ await drive(
 		const lines = component.render(70);
 		assert(lines.some((line) => line.includes("Choose a roadmap to inspect")));
 		assert(lines.some((line) => line.includes("├* Current [in progress]")));
-		assert(
-			lines.some((line) => line.includes("│  Work currently in progress")),
-		);
+		assert(lines.some((line) => line.includes("│  Work currently in progress")));
 		assert(lines.some((line) => line.includes("├─ ✅ Done [closed]")));
 		for (const line of lines)
 			assert.equal(
@@ -450,9 +447,7 @@ await drive(
 			"current rows are green",
 		);
 		assert(
-			colors.some(
-				(entry) => entry.color === "dim" && entry.text.includes("Done"),
-			),
+			colors.some((entry) => entry.color === "dim" && entry.text.includes("Done")),
 			"completed rows are gray",
 		);
 		component.handleInput("escape");
@@ -714,9 +709,7 @@ const treeRun = await driveTree(
 			"open containers default expanded",
 		);
 		assert(
-			lines.some((line) =>
-				line.includes("[-] ● 0/2 roadmap-open Open roadmap"),
-			),
+			lines.some((line) => line.includes("[-] ● 0/2 roadmap-open Open roadmap")),
 		);
 		assert(
 			lines.some((line) =>
@@ -730,9 +723,7 @@ const treeRun = await driveTree(
 			"live and durable active tasks show distinct status labels",
 		);
 		assert(
-			lines.some((line) =>
-				line.includes("complete selected roadmap description"),
-			),
+			lines.some((line) => line.includes("complete selected roadmap description")),
 		);
 		const initialSeparatorAt = lines.findIndex((line) =>
 			line.includes(" Work items "),
@@ -755,9 +746,7 @@ const treeRun = await driveTree(
 			"stats start below the Work items line in the right column",
 		);
 		assert(
-			lines[initialSeparatorAt + 3]
-				.trimEnd()
-				.endsWith("- selected roadmap-open"),
+			lines[initialSeparatorAt + 3].trimEnd().endsWith("- selected roadmap-open"),
 			"selection stats share the work-item body without overlap",
 		);
 		assert(
@@ -772,15 +761,9 @@ const treeRun = await driveTree(
 			narrowLines[narrowSeparatorAt + 1].trimEnd().endsWith("Stats:"),
 			"narrow workspaces retain stats below the separator",
 		);
-		const detailsAt = narrowLines.findIndex((line) =>
-			line.includes(" Details "),
-		);
+		const detailsAt = narrowLines.findIndex((line) => line.includes(" Details "));
 		const keysAt = narrowLines.findIndex((line) => line.includes(" Keys "));
-		assert.equal(
-			keysAt - detailsAt - 1,
-			6,
-			"six description rows are reserved",
-		);
+		assert.equal(keysAt - detailsAt - 1, 6, "six description rows are reserved");
 		assert(
 			narrowLines.slice(detailsAt + 1, keysAt).every((line) => line.trim()),
 			"all six reserved rows render wrapped selected description",
@@ -810,12 +793,8 @@ const treeRun = await driveTree(
 				`${color} status dot is colored independently`,
 			);
 		assert(
-			colors.some(
-				(call) => call.color === "success" && call.text === "Plan:",
-			) &&
-				colors.some(
-					(call) => call.color === "warning" && call.text === "Work:",
-				),
+			colors.some((call) => call.color === "success" && call.text === "Plan:") &&
+				colors.some((call) => call.color === "warning" && call.text === "Work:"),
 			"adjacent stats blocks use distinct colors",
 		);
 		assert(
@@ -893,9 +872,7 @@ const treeRun = await driveTree(
 		assert(component.render(70).some((line) => /❯.*Open roadmap/.test(line)));
 		component.handleInput("down");
 		assert(
-			component
-				.render(70)
-				.some((line) => /❯.*\[-\] ● task-a Task A/.test(line)),
+			component.render(70).some((line) => /❯.*\[-\] ● task-a Task A/.test(line)),
 		);
 		assert.equal(statsCalls.filter((id) => id === "roadmap-open").length, 1);
 		assert.equal(statsCalls.filter((id) => id === "task-a").length, 1);
@@ -920,11 +897,7 @@ const treeRun = await driveTree(
 		);
 		const beforeMalformed = state.renders;
 		await state.tick();
-		assert.equal(
-			state.renders,
-			beforeMalformed,
-			"duplicate refresh is rejected",
-		);
+		assert.equal(state.renders, beforeMalformed, "duplicate refresh is rejected");
 		await state.tick();
 		lines = component.render(70);
 		assert(
@@ -959,11 +932,15 @@ const failedStatsTree = await driveTree(
 		},
 	},
 	async (component) => {
-		assert(component.render(70).some((line) => line.includes("- press s to show")));
+		assert(
+			component.render(70).some((line) => line.includes("- press s to show")),
+		);
 		component.handleInput("s");
 		assert(component.render(70).some((line) => line.includes("- unknown")));
 		component.handleInput("down");
-		assert(component.render(70).some((line) => line.includes("- press s to show")));
+		assert(
+			component.render(70).some((line) => line.includes("- press s to show")),
+		);
 		component.handleInput("s");
 		assert(component.render(70).some((line) => line.includes("- unknown")));
 		component.handleInput("escape");
@@ -984,9 +961,15 @@ await driveTree(
 		},
 	},
 	async (component) => {
-		assert(component.render(70).some((line) => line.includes("- press s to show")));
+		assert(
+			component.render(70).some((line) => line.includes("- press s to show")),
+		);
 		component.handleInput("down");
-		assert.equal(explicitStatsCalls.length, 0, "navigation stays filesystem-free");
+		assert.equal(
+			explicitStatsCalls.length,
+			0,
+			"navigation stays filesystem-free",
+		);
 		component.handleInput("s");
 		component.handleInput("s");
 		assert.deepEqual(explicitStatsCalls, ["task-a"]);
