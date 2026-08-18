@@ -4175,6 +4175,9 @@
           "producer": "NexusConnectSDK-Android",
           "submittedAt": "2026-08-18T08:10:00.211Z",
           "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-0b6db163-27b9-476a-bcfc-8ac8b9b7ad35",
@@ -4182,12 +4185,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomic classification: locally-owned. One root cause: renderWorkResumeText assumes every ok state is a roadmap state even though verifier analysis/triage gates deliberately omit roadmap fields; render those gate states before the generic branch and cover direct command handling.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-resume.mjs\nOutput: ok - coded work-resume behavior"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: In NexusConnectSDK-Android, invoking `ORCHESTRATOR_RUN_V1 work-resume work-3` after a safe restart failed inside ce-workflow with ",
       "type": "task",
-      "updatedAt": "2026-08-18T08:10:00.217Z"
+      "updatedAt": "2026-08-18T08:17:55.089Z"
     },
     "work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55": {
       "createdAt": "2026-08-11T17:57:41.101Z",
@@ -5534,7 +5540,9 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomic classification: locally-owned, related-distinct. One root cause: terminal-success reconciliation permanently records placeholder failures before structured output finalization and never revisits those exact artifact-only failures; add grace plus idempotent recovery."
+      ],
       "parentId": "work-2",
       "status": "open",
       "title": "Self-improvement report: Background verifier reconciliation permanently marked four jobs failed with \"Verifier terminal output was unavailable or invalid\",",
@@ -7762,7 +7770,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T08:10:00.217Z"
+    "updatedAt": "2026-08-18T08:17:55.090Z"
   },
   "schemaVersion": 1
 }

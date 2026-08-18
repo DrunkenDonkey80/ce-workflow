@@ -1328,6 +1328,38 @@ try {
 		buildWorkResumeState(triageCwd, "E-1").action === "run-implementation",
 		"pure resume-state reads do not steal or enforce a triage lease",
 	);
+	const triageNotices = [];
+	const triageMessages = [];
+	const handledTriage = await handleWorkResumeCommand(
+		"E-1",
+		{
+			cwd: triageCwd,
+			mode: "tui",
+			sessionManager: { getSessionId: () => "resume-test" },
+			ui: {
+				notify: (message, level) => triageNotices.push({ message, level }),
+			},
+			sendUserMessage: async (message, options) =>
+				triageMessages.push({ message, options }),
+		},
+		{},
+	);
+	assert(
+		handledTriage.action === "triage-required",
+		"exact-target Resume returns the triage gate",
+	);
+	assert(
+		triageNotices.some((notice) =>
+			notice.message.includes(`Verifier triage:\n- ${triageState.triage[0].claim.id}`),
+		),
+		"exact-target Resume renders triage payload without roadmap fields",
+	);
+	assert(
+		triageMessages.length === 1 &&
+			triageMessages[0].message.includes(triageFinding.id) &&
+			handledTriage.autonomousGoalStarted === undefined,
+		"triage uses its coded handoff without autonomous fallback",
+	);
 	const analysisBatch = mutateVerifierStore(triageCwd, (store) =>
 		createBatch(store, {
 			checkpoint: triageCheckpoint,
@@ -1379,10 +1411,43 @@ try {
 			],
 		}),
 	);
+	const analysisState = buildWorkResumeState(triageCwd, "IMP-1");
 	assert(
-		buildWorkResumeState(triageCwd, "IMP-1").action ===
-			"review-analysis-required",
+		analysisState.action === "review-analysis-required",
 		"Review analysis blocks even an explicit Resume target",
+	);
+	const analysisNotices = [];
+	const messagesBeforeAnalysis = triageMessages.length;
+	const handledAnalysis = await handleWorkResumeCommand(
+		"IMP-1",
+		{
+			cwd: triageCwd,
+			mode: "tui",
+			sessionManager: { getSessionId: () => "resume-test" },
+			ui: {
+				notify: (message, level) => analysisNotices.push({ message, level }),
+			},
+			sendUserMessage: async (message, options) =>
+				triageMessages.push({ message, options }),
+		},
+		{},
+	);
+	assert(
+		handledAnalysis.action === "review-analysis-required",
+		"exact-target Resume returns the analysis-review gate",
+	);
+	assert(
+		analysisNotices.some(
+			(notice) =>
+				notice.message.includes("Action: review analysis required") &&
+				notice.message.includes(analysisState.review[0].id) &&
+				notice.message.includes("Open F7 → Review analysis"),
+		),
+		"exact-target Resume renders analysis payload and recommended action",
+	);
+	assert(
+		triageMessages.length === messagesBeforeAnalysis,
+		"analysis review stops without an autonomous or ordinary-model fallback",
 	);
 	rmSync(triageCwd, { recursive: true, force: true });
 

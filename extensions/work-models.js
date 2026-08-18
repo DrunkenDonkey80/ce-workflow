@@ -16706,6 +16706,40 @@ function renderResumeBlockedLines(state) {
 }
 
 function renderWorkResumeText(state) {
+	if (state.ok && state.action === "review-analysis-required")
+		return [
+			"Action: review analysis required",
+			`Reason: ${state.message}`,
+			"Review analysis:",
+			...(state.review?.length
+				? state.review.map(
+						(entry) =>
+							`- ${entry.id} [${entry.state ?? "pending"}] — ${entry.governingDecision ?? entry.statusMessage ?? "Human review required"}`,
+					)
+				: ["- none"]),
+			...(state.suggestedCommands?.length
+				? [
+						"Recommended actions:",
+						...state.suggestedCommands.map((action) => `- ${action}`),
+					]
+				: []),
+		].join("\n");
+	if (state.ok && state.action === "triage-required")
+		return [
+			"Action: verifier triage required",
+			`Reason: ${state.message}`,
+			"Verifier triage:",
+			...(state.triage?.length
+				? state.triage.map(
+						(entry) =>
+							`- ${entry.claim?.id ?? "unclaimed"} (${entry.claim?.groupId ?? "unknown group"}): ${entry.findings?.map((finding) => finding.id).join(", ") || "no unresolved findings"}`,
+					)
+				: ["- none"]),
+			...renderRecommendedActions(recommendedActions(state)),
+			state.handoffPrompt ? "Next: verifier triage handoff ready." : "",
+		]
+			.filter(Boolean)
+			.join("\n");
 	if (state.ok && state.action === "planning_starved")
 		return [
 			`Initiative: ${state.initiative.title} (${state.initiative.id})`,
@@ -20079,8 +20113,12 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		? directRoleHandoffParams(state, ctx.cwd, selectionNote)
 		: null;
 	const finishEntry = state.ok && state.action === "finish-ready";
+	const resumeGate = ["review-analysis-required", "triage-required"].includes(
+		state.action,
+	);
 	const startAutonomous = Boolean(
 		state.ok &&
+			!resumeGate &&
 			!["print", "json"].includes(ctx.mode) &&
 			!activeWorkGoalRunning &&
 			(handoff || state.handoffPrompt || finishEntry),
