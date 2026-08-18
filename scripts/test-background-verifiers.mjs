@@ -8,6 +8,7 @@ import {
 	readFileSync,
 	rmSync,
 	symlinkSync,
+	utimesSync,
 	writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -1730,10 +1731,40 @@ try {
 		loadVerifierStore(structuredCwd).jobs[structuredJob.id].status,
 		"orphaned",
 	);
+	const structuredStatus = path.join(structuredAsync, "status.json");
+	writeFileSync(structuredStatus, JSON.stringify({ state: "completed" }));
+	assert.deepEqual(
+		reconcileVerifierRuns(structuredCwd),
+		[],
+		"terminal success waits for structured output during artifact grace",
+	);
+	assert.equal(
+		loadVerifierStore(structuredCwd).jobs[structuredJob.id].status,
+		"orphaned",
+	);
+	const expiredStatusTime = new Date(Date.now() - 31_000);
+	utimesSync(structuredStatus, expiredStatusTime, expiredStatusTime);
+	assert.deepEqual(
+		reconcileVerifierRuns(structuredCwd),
+		[structuredJob.id],
+		"terminal success without output fails only after artifact grace",
+	);
+	const artifactFailedStore = loadVerifierStore(structuredCwd);
+	assert.equal(artifactFailedStore.jobs[structuredJob.id].status, "failed");
+	assert.equal(
+		artifactFailedStore.jobs[structuredJob.id].launch.status,
+		"failed",
+		"artifact-only failure remains eligible for reconciliation",
+	);
+	assert.deepEqual(
+		Object.values(artifactFailedStore.reports).map((report) => report.failure),
+		["Verifier terminal output was unavailable or invalid"],
+		"artifact-only failure retains its recoverable marker",
+	);
 	writeFileSync(
-		path.join(structuredAsync, "status.json"),
+		structuredStatus,
 		JSON.stringify({
-			state: "failed",
+			state: "completed",
 			workflow: {
 				value: {
 					structuredOutput: JSON.parse(
@@ -1744,18 +1775,26 @@ try {
 		}),
 	);
 	assert.deepEqual(
-		reconcileVerifierRuns(structuredCwd, {
-			now: new Date(structuredLaunchedAt + 32_000).toISOString(),
-		}),
+		reconcileVerifierRuns(structuredCwd),
 		[structuredJob.id],
-		"late inline schema-validated output recovers an orphaned launch",
+		"late schema-validated output recovers an artifact-only failure",
 	);
 	const structuredStore = loadVerifierStore(structuredCwd);
 	assert.equal(Object.keys(structuredStore.findings).length, 1);
 	assert.equal(
+		Object.keys(structuredStore.quarantines).length,
+		0,
+		"successful recovery removes stale artifact quarantine",
+	);
+	assert.equal(
 		verifierStatus(structuredStore),
 		"completed-awaiting-triage",
-		"a valid structured report survives a later non-reporting runner failure",
+		"a valid structured report supersedes the artifact-only failure",
+	);
+	assert.deepEqual(
+		reconcileVerifierRuns(structuredCwd),
+		[],
+		"recovered verifier output is ingested exactly once",
 	);
 
 	// Traversal, spoofing, depth, count, and size limits are quarantined and never actionable.

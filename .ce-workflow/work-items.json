@@ -5533,6 +5533,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-18T06:38:45.650Z",
           "workflowId": "01a010da-19e6-70b3-8a39-6102abd0510e"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-d3a44b03-1ac9-446d-b9e3-76cd0f0927ad",
@@ -5541,13 +5544,16 @@
         "self-improvement"
       ],
       "notes": [
-        "Atomic classification: locally-owned, related-distinct. One root cause: terminal-success reconciliation permanently records placeholder failures before structured output finalization and never revisits those exact artifact-only failures; add grace plus idempotent recovery."
+        "Atomic classification: locally-owned, related-distinct. One root cause: terminal-success reconciliation permanently records placeholder failures before structured output finalization and never revisits those exact artifact-only failures; add grace plus idempotent recovery.",
+        "wo:review-scope [\"extensions/background-verifiers.js\",\"scripts/test-background-verifiers.mjs\"]",
+        "wo:review PASS grace+idempotent recovery verified: 30s artifact grace preserves runtime on terminal-success artifact failure; artifact-only failures re-enter reconcile and ingest exactly once; node scripts/test-background-verifiers.mjs passed",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Background verifier reconciliation permanently marked four jobs failed with \"Verifier terminal output was unavailable or invalid\",",
       "type": "task",
-      "updatedAt": "2026-08-18T06:38:45.654Z"
+      "updatedAt": "2026-08-18T08:27:51.143Z"
     },
     "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
       "createdAt": "2026-08-12T16:54:19.072Z",
@@ -7770,7 +7776,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T08:17:55.090Z"
+    "updatedAt": "2026-08-18T08:27:51.143Z"
   },
   "schemaVersion": 1
 }

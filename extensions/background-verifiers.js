@@ -51,6 +51,8 @@ const REPORT_MAX_FINDINGS = 100;
 const REPORT_MAX_TEXT = 10_000;
 const REPORT_CATEGORIES = /^[a-z][a-z0-9-]{0,63}$/;
 const LAUNCH_STATUS_GRACE_MS = 30_000;
+const TERMINAL_OUTPUT_FAILURE =
+	"Verifier terminal output was unavailable or invalid";
 const TERMINAL_SUCCESS_STATES = new Set([
 	"complete",
 	"completed",
@@ -1964,10 +1966,62 @@ function recordTerminalFailures(store, jobId, operations, artifact, nowValue) {
 			jobId,
 			operation,
 			outcome: "failed",
-			failure: "Verifier terminal output was unavailable or invalid",
+			failure: TERMINAL_OUTPUT_FAILURE,
 			artifact,
 			now: nowValue,
 		});
+}
+function terminalOutputFailureReport(store, job, operation) {
+	return Object.values(store.reports).find(
+		(report) =>
+			report.jobId === job.id &&
+			report.operation === operation &&
+			report.outcome === "failed" &&
+			report.failure === TERMINAL_OUTPUT_FAILURE,
+	);
+}
+function terminalOutputFailureOperations(store, job) {
+	return job.operations.filter(
+		(operation) =>
+			job.operationStatus[operation] === "failed" &&
+			terminalOutputFailureReport(store, job, operation),
+	);
+}
+function recoverableTerminalOutputFailure(store, job) {
+	const failed = job.operations.filter(
+		(operation) => job.operationStatus[operation] === "failed",
+	);
+	const recoverable = terminalOutputFailureOperations(store, job);
+	return (
+		job.launch?.status === "failed" &&
+		failed.length > 0 &&
+		failed.length === recoverable.length
+	);
+}
+function clearTerminalOutputFailure(store, jobId) {
+	const job = store.jobs[jobId];
+	for (const operation of terminalOutputFailureOperations(store, job)) {
+		delete store.reports[
+			terminalOutputFailureReport(store, job, operation).id
+		];
+		job.operationStatus[operation] = "pending";
+	}
+	for (const quarantine of Object.values(store.quarantines))
+		if (quarantine.jobId === jobId) delete store.quarantines[quarantine.id];
+	job.launch.status = "running";
+	job.status = jobStatus(job.operationStatus, job.launch);
+	store.batches[job.batchId].status = "queued";
+	delete store.batches[job.batchId].presentationStatus;
+	delete store.batches[job.batchId].presentedAt;
+}
+function runtimeArtifactWithinGrace(currentTime, ...files) {
+	return files.filter(Boolean).some((file) => {
+		try {
+			return currentTime - lstatSync(file).mtimeMs < LAUNCH_STATUS_GRACE_MS;
+		} catch {
+			return false;
+		}
+	});
 }
 export function ingestVerifierReport(store, input = {}) {
 	const job = store.jobs?.[input.jobId];
@@ -2141,9 +2195,12 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 	}
 	const reconciled = [];
 	const currentTime = Date.parse(now(input.now));
-	for (const job of Object.values(store.jobs).filter((item) =>
-		["running", "orphaned"].includes(item.launch?.status),
+	for (const job of Object.values(store.jobs).filter(
+		(item) =>
+			["running", "orphaned"].includes(item.launch?.status) ||
+			recoverableTerminalOutputFailure(store, item),
 	)) {
+		const recovering = recoverableTerminalOutputFailure(store, job);
 		let state = "";
 		let runtimeStatus;
 		const statusFile = job.launch.asyncDir
@@ -2174,8 +2231,10 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 			!TERMINAL_FAILURE_STATES.has(state)
 		)
 			continue;
+		if (recovering && !TERMINAL_SUCCESS_STATES.has(state)) continue;
 
 		let artifact;
+		let preserveRuntime = false;
 		try {
 			let file = artifactForJob(cwd, job);
 			if (!existsSync(file))
@@ -2200,9 +2259,12 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 				if (!raw) throw error("artifact", "Verifier artifact is unavailable");
 				artifact = { path: statusFile, bytes: raw.bytes };
 			}
+			if (TERMINAL_SUCCESS_STATES.has(state))
+				validateTerminalReport(job, store.batches[job.batchId], raw.text);
 			mutateVerifierStore(
 				cwd,
 				(next) => {
+					if (recovering) clearTerminalOutputFailure(next, job.id);
 					const result = ingestVerifierReport(next, {
 						jobId: job.id,
 						artifact,
@@ -2217,7 +2279,12 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 				input,
 			);
 		} catch (cause) {
-			if (state === "orphaned" && !artifact) continue;
+			if (
+				TERMINAL_SUCCESS_STATES.has(state) &&
+				runtimeArtifactWithinGrace(currentTime, statusFile, artifact?.path)
+			)
+				continue;
+			if (recovering || (state === "orphaned" && !artifact)) continue;
 			const reason =
 				cause instanceof VerifierStoreError ? cause.category : "artifact";
 			mutateVerifierStore(
@@ -2243,8 +2310,9 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 				},
 				input,
 			);
+			preserveRuntime = TERMINAL_SUCCESS_STATES.has(state);
 		}
-		cleanupVerifierBatchRuntime(cwd, job.batchId);
+		if (!preserveRuntime) cleanupVerifierBatchRuntime(cwd, job.batchId);
 		reconciled.push(job.id);
 	}
 	return reconciled;
