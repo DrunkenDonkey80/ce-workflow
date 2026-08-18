@@ -636,12 +636,15 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		appendRoadmaps(rows);
 		return rows;
 	};
-	const nativeRows = rootsFor(initialFrame).map((row) => ({
-		value: row.id,
-		label: `${"  ".repeat(row.depth)}${row.title ?? row.label ?? row.id}`,
-		description: row.description,
-		preserveCase: true,
-	}));
+	const nativeRows = rootsFor(initialFrame).map((row) => {
+		const label = row.title ?? row.label;
+		return {
+			value: row.id,
+			label: `${"  ".repeat(row.depth)}${row.id}${label ? ` ${label}` : ""}`,
+			description: row.description,
+			preserveCase: true,
+		};
+	});
 	if (
 		ctx.ui.workDialogsNative === true ||
 		ctx.mode !== "tui" ||
@@ -802,13 +805,14 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 								treeStatusColor(row),
 								treeVisualStatus(row) === "closed" ? "✓" : "●",
 							);
+							const rowTitle = row.shortTitle ?? row.title ?? row.label;
 							const title = theme.fg(
 								selected
 									? "accent"
 									: treeVisualStatus(row) === "closed"
 										? "dim"
 										: "text",
-								`${progress}${row.shortTitle ?? row.title ?? row.label ?? row.id}`,
+								`${progress}${row.id}${rowTitle ? ` ${rowTitle}` : ""}`,
 							);
 							const activity = treeActivityLabel(row);
 							tree = `${prefix}${dot} ${title}${activity ? theme.fg("muted", ` [${activity}]`) : ""}`;

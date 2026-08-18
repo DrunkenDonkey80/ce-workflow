@@ -713,9 +713,17 @@ const treeRun = await driveTree(
 			lines.some((line) => line.includes("Task A")),
 			"open containers default expanded",
 		);
-		assert(lines.some((line) => line.includes("[-] ● 0/2 Open roadmap")));
-		assert(lines.some((line) => line.includes("[+] ✓ 1/1 Closed roadmap")));
-		assert(lines.some((line) => /\s{2}\[-\] ● Task A/.test(line)));
+		assert(
+			lines.some((line) =>
+				line.includes("[-] ● 0/2 roadmap-open Open roadmap"),
+			),
+		);
+		assert(
+			lines.some((line) =>
+				line.includes("[+] ✓ 1/1 roadmap-closed Closed roadmap"),
+			),
+		);
+		assert(lines.some((line) => /\s{2}\[-\] ● task-a Task A/.test(line)));
 		assert(
 			lines.some((line) => line.includes("Task A child [running]")) &&
 				lines.some((line) => line.includes("Task B [active]")),
@@ -785,7 +793,7 @@ const treeRun = await driveTree(
 		);
 		assert.equal(lines.filter((line) => line.includes("❯")).length, 1);
 		assert(
-			lines.some((line) => line.includes("Aggregate-open child")),
+			lines.some((line) => line.includes("task-aggregate-open")),
 			"aggregate-open native closed parents default expanded",
 		);
 		assert(
@@ -839,20 +847,26 @@ const treeRun = await driveTree(
 		component.handleInput("down");
 		const movedLines = component.render(70);
 		assertAutowrapSafeOverlayLines(movedLines, 70);
-		assert(movedLines.some((line) => /❯\s+● Task A child/.test(line)));
+		assert(
+			movedLines.some((line) => /❯\s+● task-a-child Task A child/.test(line)),
+		);
 		component.handleInput("cursor-left");
 		lines = component.render(70);
-		assert(lines.some((line) => /❯.*\[\+\] ● Task A/.test(line)));
+		assert(lines.some((line) => /❯.*\[\+\] ● task-a Task A/.test(line)));
 		assert(!lines.some((line) => line.includes("Task A child")));
 		component.handleInput("left");
 		lines = component.render(70);
-		assert(lines.some((line) => /❯.*\[\+\] ● 0\/2 Open roadmap/.test(line)));
+		assert(
+			lines.some((line) =>
+				/❯.*\[\+\] ● 0\/2 roadmap-open Open roadmap/.test(line),
+			),
+		);
 		assert(!lines.some((line) => line.includes("Task A")));
 		component.handleInput("right");
 		component.handleInput("down");
 		component.handleInput("right");
 		lines = component.render(70);
-		assert(lines.some((line) => /❯.*\[-\] ● Task A/.test(line)));
+		assert(lines.some((line) => /❯.*\[-\] ● task-a Task A/.test(line)));
 		assert(lines.some((line) => line.includes("- press s to show")));
 		component.handleInput("s");
 		lines = component.render(70);
@@ -878,7 +892,11 @@ const treeRun = await driveTree(
 		component.handleInput("up");
 		assert(component.render(70).some((line) => /❯.*Open roadmap/.test(line)));
 		component.handleInput("down");
-		assert(component.render(70).some((line) => /❯.*\[-\] ● Task A/.test(line)));
+		assert(
+			component
+				.render(70)
+				.some((line) => /❯.*\[-\] ● task-a Task A/.test(line)),
+		);
 		assert.equal(statsCalls.filter((id) => id === "roadmap-open").length, 1);
 		assert.equal(statsCalls.filter((id) => id === "task-a").length, 1);
 		assert.equal(
@@ -897,7 +915,7 @@ const treeRun = await driveTree(
 		);
 		lines = component.render(70);
 		assert(
-			lines.some((line) => /❯\s+● Task A/.test(line)),
+			lines.some((line) => /❯\s+● task-a Task A/.test(line)),
 			"cursor follows stable ID across reorder",
 		);
 		const beforeMalformed = state.renders;
@@ -1010,8 +1028,17 @@ assert.equal(backedTree.result.action, "back");
 assert.equal(backedTree.cleanups, 1, "back invokes cleanup");
 
 let nativeCleanup = 0;
+let nativeLabels;
 const nativeTree = await showTreeWorkspaceDialog(
-	{ mode: "rpc", ui: { select: async (_title, labels) => labels[0] } },
+	{
+		mode: "rpc",
+		ui: {
+			select: async (_title, labels) => {
+				nativeLabels = labels;
+				return labels[0];
+			},
+		},
+	},
 	{
 		title: "Native tree",
 		frame: treeFrames[0],
@@ -1021,6 +1048,10 @@ const nativeTree = await showTreeWorkspaceDialog(
 	},
 );
 assert.equal(nativeTree.value, "roadmap-open");
+assert(
+	nativeLabels.some((label) => label.includes("roadmap-open Open roadmap")),
+	"native fallback shows work item IDs",
+);
 assert.equal(nativeCleanup, 1, "native fallback invokes cleanup");
 
 process.stdout.write("ok - shared work dialogs\n");
