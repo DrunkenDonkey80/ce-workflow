@@ -14,8 +14,8 @@
   },
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "08f2af4fbcd771bb2a7b761b687b0ec94e0048aab58a8400f115302f9f87a6e4",
-    "version": 5,
+    "sha256": "f26cec70eaa91b8469b00de505f4b63c79c7a3de66e6ad26ef9d30397a6e430e",
+    "version": 6,
     "rules": [
       "verify-complete-u1-brainstorm-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",

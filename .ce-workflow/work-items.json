@@ -5551,6 +5551,47 @@
       "type": "task",
       "updatedAt": "2026-08-04T05:54:21.241Z"
     },
+    "work-2.report-bc2769f9-6838-4577-8ee0-1c7061093c37": {
+      "createdAt": "2026-08-18T21:02:39.837Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: In a verified private brainstorm launched from F7, the playbook says to ask exactly one focused clarification per turn. After each ask_user response, the assistant interpreted that as requiring it to end its assistant turn, so it emitted a status sentence and stopped. The user then had to send another message merely to continue; this happened after both the first-release-scope and authoritative-rules questions.\nExpected: A private brainstorm should proceed through its complete clarification workflow without requiring user-authored 'continue' messages. Each blocking ask_user interaction should count as the focused clarification boundary; after the user answers, the orchestrator should continue to the next required clarification, research, divergence, advisor review, and artifact creation. The generated playbook should explicitly distinguish one question per ask_user call from ending the overall assistant turn, or the extension should automatically resume the workflow after ask_user returns.\nImpact: The current wording makes a normal F7 brainstorm appear stalled or broken, causes repeated unnecessary user prompts, undermines trust that the workflow is still running, and prevents the promised end-to-end brainstorm flow from completing autonomously.\nSuggested improvement: Change the generated brainstorm dialogue contract from 'one focused clarification per turn' to unambiguous language such as 'one focused question per ask_user call; after each answer, continue the workflow unless the user cancels or a required answer remains unresolved.'",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/5e0e4cb4-b380-48be-b9d2-debc1d981f58",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 71831,
+              "file": "01-01a0169a-4ee2-730b-b0ef-a64e919a3dbe.jsonl",
+              "sha256": "4db81a78bea8c73e645de1e3364a10b8159299a1234e4fc0c086de3afae4c5c0"
+            },
+            {
+              "bytes": 84079,
+              "file": "02-2026-08-18T20-40-06-626Z_01a0169a-4ee2-730b-b0ef-a64e919a3dbe.jsonl",
+              "sha256": "56d226b3d0031d8bb89e45cdcb7a237c347e3f57cb2cab2202004821d801a662"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-18T21:02:39.833Z",
+          "workflowId": "01a0169a-4ee2-730b-b0ef-a64e919a3dbe"
+        }
+      ],
+      "id": "work-2.report-bc2769f9-6838-4577-8ee0-1c7061093c37",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:review PASS brainstorm.md/plan.md now say 'one focused question per ask_user call' + 'continue ... in the same assistant turn unless cancelled/unresolved'; translator v6, manifest/provenance sha256 recomputed and matching for all 9 playbooks + translator + provenance; no stale 'clarification per turn' wording remains; tests test-work-private-workflows.mjs (61 checks) and test-work-brainstorm.mjs PASS"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: In a verified private brainstorm launched from F7, the playbook says to ask exactly one focused clarification per turn. After each",
+      "type": "task",
+      "updatedAt": "2026-08-18T21:11:31.136Z"
+    },
     "work-2.report-c1b571e8-2545-47e6-ac98-078db3518c3d": {
       "createdAt": "2026-08-09T21:09:37.017Z",
       "dependencies": [],
@@ -5760,6 +5801,40 @@
       "title": "Self-improvement report: All three background verifiers for commit 4aae1a5 completed with structuredOutput visible in their pi-subagents results, but ce-wo",
       "type": "task",
       "updatedAt": "2026-08-11T18:39:13.488Z"
+    },
+    "work-2.report-e356300b-38cd-43ef-b927-c7d4729a3faa": {
+      "createdAt": "2026-08-18T21:11:13.018Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The work-reviewer for target work-1.19 appended its durable verdict via an unsupported `--body` option, producing a literal note beginning `--body wo:review PASS` instead of `wo:review PASS`. It also left an empty untracked `nul` file in the target checkout. `finish-task --reviewed` first blocked on the untracked file and then rejected the malformed PASS evidence. The same reviewer had to be resumed for a mechanical note correction.\nExpected: Reviewer handoffs/agent instructions should provide the exact supported command `work-note <id> --append-notes \"wo:review PASS|FAIL ...\"`, validate that notes_tail contains a line beginning exactly with the required marker, and prohibit cross-shell `> nul` redirection (use no redirection or OS-safe temp handling).\nImpact: A correct independent PASS required two extra finalizer attempts and a reviewer resume; an empty platform artifact blocked commit, and malformed evidence could leave work permanently unfinishable despite a completed review.\nSuggested improvement: Embed the exact `work-note --append-notes` command in reviewerHandoff(), add a reviewer-side postcondition that the marker is parser-recognized, and lint agent shell commands against `> nul`/`> NUL` when running under bash.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/eecd1333-9906-4647-b69d-146abeae1f78",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 84502,
+              "file": "01-work-items.json",
+              "sha256": "6b304547ff4a2e3609d56aa87331ba4c8e3b1009e9b0fed42fb1ae0970a2d2bc"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-18T21:11:13.013Z",
+          "workflowId": "01a01595-a8d8-721b-b447-eb7d10993f2e"
+        }
+      ],
+      "id": "work-2.report-e356300b-38cd-43ef-b927-c7d4729a3faa",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The work-reviewer for target work-1.19 appended its durable verdict via an unsupported `--body` option, producing a literal note b",
+      "type": "task",
+      "updatedAt": "2026-08-18T21:11:13.018Z"
     },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
@@ -7934,7 +8009,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T20:59:54.570Z"
+    "updatedAt": "2026-08-18T21:11:31.137Z"
   },
   "schemaVersion": 1
 }

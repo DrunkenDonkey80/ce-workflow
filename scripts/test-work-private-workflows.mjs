@@ -37,13 +37,23 @@ const check = (fn, label) => {
 };
 const rejects = (fn, expression, label) =>
 	check(() => assert.throws(fn, expression), label);
+const parseJson = (bytes, label) => {
+	try {
+		return JSON.parse(bytes);
+	} catch (error) {
+		throw new Error(`invalid ${label}: ${error.message}`, { cause: error });
+	}
+};
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 const extensionRoot = path.join(repositoryRoot, "extensions");
 const resourceRoot = path.join(extensionRoot, "private-workflows");
 const inventoryPath = path.join(extensionRoot, "work-compound-inventory.json");
 const packageZeroSurface = () => {
-	const packageManifest = JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8"));
+	const packageManifest = parseJson(
+		readFileSync(path.join(repositoryRoot, "package.json"), "utf8"),
+		"package manifest",
+	);
 	const extensionSource = readFileSync(path.join(extensionRoot, "work-models.js"), "utf8");
 	const privateName = /(?:^|[\\/-])(?:ce-|private-workflows?)/i;
 	const commands = [...extensionSource.matchAll(/registerCommand\(\s*["']([^"']+)/g)]
@@ -111,7 +121,9 @@ const restore = () => {
 
 const playbook = dispatchPrivateWorkflow("brainstorm", authority);
 check(() => {
-	assert.match(playbook, /Ask exactly one focused clarification per turn/);
+	assert.match(playbook, /one focused question per `ask_user` call/);
+	assert.match(playbook, /continue this workflow in the same assistant turn/);
+	assert.doesNotMatch(playbook, /clarification per turn/);
 	assert.match(playbook, /Brainstorm saved: <absolute path>/);
 }, "verified brainstorm resource dispatch");
 rejects(
@@ -135,7 +147,9 @@ check(() => {
 }, "verified learning resource preserves destination, deduplication, key, and skip contracts");
 const planPlaybook = dispatchPrivateWorkflow("plan", planAuthority);
 check(() => {
-	assert.match(planPlaybook, /Ask exactly one focused clarification per turn/);
+	assert.match(planPlaybook, /one focused question per `ask_user` call/);
+	assert.match(planPlaybook, /continue planning in the same assistant turn/);
+	assert.doesNotMatch(planPlaybook, /clarification per turn/);
 	assert.match(planPlaybook, /Requirement preservation and self-audit/);
 	assert.match(planPlaybook, /Open Question Gate/);
 	assert.match(planPlaybook, /Actor-visible handoff/);
@@ -173,7 +187,7 @@ check(() => {
 	assert.match(explainPlaybook, /never selects, changes, or softens the graded verdict/);
 	assert.notEqual(povPlaybook, explainPlaybook);
 }, "verified POV and conditional explain resources preserve candidate-review contracts");
-const parity = JSON.parse(inventoryBytes).parityIndex;
+const parity = parseJson(inventoryBytes, "compound inventory").parityIndex;
 check(() => {
 	assert.deepEqual(
 		Object.keys(parity).filter((name) =>
@@ -465,7 +479,7 @@ try {
 		() => assert.deepEqual(first, second),
 		"two offline translations from one verified closure are byte-identical",
 	);
-	const provenance = JSON.parse(first["provenance.json"]);
+	const provenance = parseJson(first["provenance.json"], "generated provenance");
 	check(() => {
 		assert.equal(provenance.release, policy.release);
 		for (const [source, bytes] of fixtureSources) {
@@ -473,7 +487,7 @@ try {
 			assert.equal(recorded?.sha256, sha256(bytes));
 		}
 		assert.equal(provenance.license.spdx, "MIT");
-		assert.equal(provenance.translator.version, 5);
+		assert.equal(provenance.translator.version, 6);
 		assert.match(first["debug.md"], /Failure and blocker evidence/);
 		assert.match(first["learning.md"], /Destination and deduplication/);
 		assert.match(first["plan.md"], /Open Question Gate/);
@@ -601,11 +615,14 @@ try {
 				{ name: "package-work-goal", status: "passed" },
 			]);
 			assert.ok(readFileSync(promoted.auditPath).equals(readFileSync(repeated.auditPath)));
-			const audit = JSON.parse(readFileSync(promoted.auditPath, "utf8"));
+			const audit = parseJson(
+				readFileSync(promoted.auditPath, "utf8"),
+				"promotion audit",
+			);
 			assert.deepEqual(audit.ownedOutputs, PRIVATE_WORKFLOW_OWNED_OUTPUTS);
 			assert.equal(audit.source.toRelease, evidence.release);
 			assert.equal(audit.provenance.license.spdx, "MIT");
-			assert.equal(audit.provenance.translator.version, 5);
+			assert.equal(audit.provenance.translator.version, 6);
 			assert.equal(audit.compatibility.parity.complete, true);
 			assert.equal(audit.compatibility.zeroEffectiveSurface, true);
 			assert.equal(audit.quarantineRemoved, true);
@@ -819,7 +836,10 @@ try {
 }
 
 check(() => {
-	const packageManifest = JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8"));
+	const packageManifest = parseJson(
+		readFileSync(path.join(repositoryRoot, "package.json"), "utf8"),
+		"package manifest",
+	);
 	assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
 	assert.deepEqual(packageManifest.pi.extensions, ["extensions/work-models.js"]);
 	assert.deepEqual(packageManifest.pi.skills, ["./skills"]);

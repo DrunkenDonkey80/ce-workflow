@@ -8,7 +8,7 @@ Convert the caller's source into an implementation-ready plan. Plan only: do not
 
 ## Clarification and depth
 
-1. Read every named source artifact and settled decision before planning. Ask exactly one focused clarification per turn when the input is broad, important, contradictory, or underspecified; never replace a required product or architecture decision with an assumption.
+1. Read every named source artifact and settled decision before planning. Ask exactly one focused question per `ask_user` call when the input is broad, important, contradictory, or underspecified. After each answer, continue planning in the same assistant turn unless the user cancels or a required answer remains unresolved; do not emit a status-only response or wait for a user-authored continuation. Never replace a required product or architecture decision with an assumption.
 2. Honor the caller-selected depth. Lightweight uses strong local patterns and skips flow analysis and external research. Standard adds repository flow analysis. Deep performs the full warranted research and deepening pass. Depth changes evidence effort, not requirement preservation or the final quality gate.
 3. Inspect the repository, history, project instructions, and available learnings only enough to identify the real architecture, affected files, reusable patterns, boundaries, and verification seams. Record requested-but-unavailable evidence rather than pretending it ran.
 

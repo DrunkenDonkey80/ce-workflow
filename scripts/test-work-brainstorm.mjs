@@ -287,10 +287,14 @@ try {
 	);
 	assert(
 		privateHandoff.includes("BEGIN VERIFIED PRIVATE BRAINSTORM PLAYBOOK") &&
-			privateHandoff.includes("Ask exactly one focused clarification per turn") &&
+			privateHandoff.includes("one focused question per `ask_user` call") &&
+			privateHandoff.includes(
+				"continue this workflow in the same assistant turn",
+			) &&
+			!privateHandoff.includes("clarification per turn") &&
 			privateHandoff.includes("Brainstorm saved: <absolute path>") &&
 			!privateHandoff.includes(`Run ${"ce-"}brainstorm`),
-		"F7 brainstorm loads only the verified private playbook and preserves clarification and saved-artifact contracts",
+		"F7 brainstorm loads only the verified private playbook and preserves continuous clarification and saved-artifact contracts",
 	);
 	const wideHandoff = brainstormHandoffPrompt(standalone, cwd, "wide");
 	assert(

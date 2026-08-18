@@ -3,17 +3,17 @@
   "verified": true,
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "08f2af4fbcd771bb2a7b761b687b0ec94e0048aab58a8400f115302f9f87a6e4",
-    "version": 5
+    "sha256": "f26cec70eaa91b8469b00de505f4b63c79c7a3de66e6ad26ef9d30397a6e430e",
+    "version": 6
   },
   "provenance": {
     "path": "provenance.json",
-    "sha256": "0f92923cbbe6324bb744e0fd8ad1c674906beea7fd52e2934f32c23fd5b9be92"
+    "sha256": "03df54644293806572c8ee3eb44f2c9fecf3673e6284ca6fc2b1c8c7949c7ee4"
   },
   "workflows": {
     "brainstorm": {
       "path": "brainstorm.md",
-      "sha256": "4924ec682e1d3d0756462c02b73ceb1fce9918e8f35b9ffd610d2abbd9338da1"
+      "sha256": "989f3a09f4666e5457433a043178f0ac368d8d0621a8e01c6d7e7713edcae8d8"
     },
     "browser": {
       "path": "browser.md",
@@ -33,7 +33,7 @@
     },
     "plan": {
       "path": "plan.md",
-      "sha256": "f74cd1f2d242c96e8b6f625c4e44d1d2e7823e7a4cab7a022dca8488664e3411"
+      "sha256": "f39078d34215bee5d5475392a9877e17ec3efc56501c3d74ce9687a85a09d510"
     },
     "pov": {
       "path": "pov.md",
@@ -48,5 +48,5 @@
       "sha256": "f1477b1bd8c91bbcb5b3db0d1168ca276dc1ae9a8067f4a5c7e25195e3a95b48"
     }
   },
-  "generationSha256": "2daa6a08b6968bfa118bff163085faa979b960769cab954f80557a130f33e848"
+  "generationSha256": "acd3477693b47ba501e27c3a8983be66416358518cafc5cff17538ad278dd225"
 }
