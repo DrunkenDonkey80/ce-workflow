@@ -817,8 +817,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 							const activity = treeActivityLabel(row);
 							tree = `${prefix}${dot} ${title}${activity ? theme.fg("muted", ` [${activity}]`) : ""}`;
 						}
-						if (!statsWidth) add(tree);
-						else {
+						if (statsWidth) {
 							const left = fit(tree, treeWidth);
 							const right = fit(
 								statsLine(theme, shownStats, offset),
@@ -827,7 +826,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 							add(
 								`${left}  ${" ".repeat(Math.max(0, statsWidth - visibleWidth(right)))}${right}`,
 							);
-						}
+						} else add(tree);
 					}
 					add(sectionLine(theme, "Details", renderWidth));
 					const details = detailRows
