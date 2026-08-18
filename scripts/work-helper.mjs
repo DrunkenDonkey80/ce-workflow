@@ -236,19 +236,20 @@ function reviewerHandoff(
 	distinctRoots,
 ) {
 	const helper = path.resolve(process.argv[1]);
+	const root = JSON.stringify(executionRoot);
 	const reviewOnly = implementationFiles
 		.map((file) => JSON.stringify(file.replaceAll("\\", "/")))
 		.join(", ");
 	return [
 		"independent review required",
 		`Work item: ${id}`,
+		`Execution repository: ${root}`,
+		`Repository preflight: git -C ${root} rev-parse --show-toplevel must resolve to this execution repository; stop BLOCKED before reading files or writing notes if it does not.`,
+		`Run every helper and file-inspection command with ${root} as the current working directory.`,
 		`Helper: ${JSON.stringify(helper)}`,
-		`Summary command: node ${JSON.stringify(helper)} work-summary ${id}`,
+		`Summary command (from execution repository): node ${JSON.stringify(helper)} work-summary ${id}`,
 		...(distinctRoots
-			? [
-					`Execution repository: ${JSON.stringify(executionRoot)}`,
-					`Finish retry option: --execution-root ${JSON.stringify(executionRoot)}`,
-				]
+			? [`Finish retry option: --execution-root ${root}`]
 			: []),
 		`Review only: ${reviewOnly}`,
 		`Review reasons: ${reviewReasons.join("; ")}`,

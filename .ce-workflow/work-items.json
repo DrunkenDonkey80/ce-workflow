@@ -5893,6 +5893,42 @@
       "type": "task",
       "updatedAt": "2026-08-08T08:49:20.867Z"
     },
+    "work-2.report-fa8e5119-cfa2-41f0-8f5c-04e64284a4df": {
+      "createdAt": "2026-08-18T20:56:46.122Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: `finish-task` generated a reviewer handoff for target repo C:\\SOFT\\git\\ipc\\LPGLibrarySDK-Android without stating the execution root. The exact `work-reviewer` was launched with that handoff and top-level subagent cwd set to the target, but it executed against C:\\SOFT\\git\\ce-workflow instead, resolved that repo's colliding `work-1.14`, and falsely reported `docs/hardware-manifest.md` missing.\nExpected: The coded reviewer handoff should include the canonical execution repository root and a fail-fast cwd assertion (or all helper/file commands should be explicitly rooted) so a reviewer cannot resolve a same-ID work item in another checkout. Subagent cwd should also be honored or verified before review.\nImpact: Hardware release review was blocked by a false missing-file/wrong-work-item result. In projects sharing native IDs, this can append review evidence to the wrong work store or approve the wrong diff.\nSuggested improvement: Add `Execution root: <canonical path>` plus a required `git -C <root> rev-parse --show-toplevel`/cwd check to reviewerHandoff(), and pass the root explicitly to work-summary/file inspection rather than relying on inherited cwd.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/a0c912fc-a4aa-46ad-99de-ed0169c1f2e5",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 76103,
+              "file": "01-work-items.json",
+              "sha256": "c93bd6f87c1bd36de7cc082b69945463ca558ace6e6f6d4302839b8d89221d9e"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-18T20:56:46.118Z",
+          "workflowId": "01a01595-a8d8-721b-b447-eb7d10993f2e"
+        }
+      ],
+      "id": "work-2.report-fa8e5119-cfa2-41f0-8f5c-04e64284a4df",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Implemented execution-root pinning for finish-task and direct reviewer handoffs. Every review task now states the canonical execution repository, requires a git -C root preflight, and requires helper/file commands to run from that root. Verified test-work-helper-contract, test-work-optimization-helpers, and test-work-resume."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: `finish-task` generated a reviewer handoff for target repo C:\\SOFT\\git\\ipc\\LPGLibrarySDK-Android without stating the execution roo",
+      "type": "task",
+      "updatedAt": "2026-08-18T20:59:54.569Z"
+    },
     "work-2.report-fd479507-4b17-4209-9d62-d87abba34cd7": {
       "createdAt": "2026-08-03T22:12:58.507Z",
       "dependencies": [],
@@ -7898,7 +7934,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T18:55:57.944Z"
+    "updatedAt": "2026-08-18T20:59:54.570Z"
   },
   "schemaVersion": 1
 }

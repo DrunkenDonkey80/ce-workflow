@@ -133,6 +133,15 @@ try {
 		handoff,
 		/Review only: "\.gitignore", "source\.js"|Review only: "source\.js", "\.gitignore"/,
 	);
+	const canonicalReviewRoot = JSON.stringify(realpathSync(cwd));
+	assert.ok(
+		handoff.includes(`Execution repository: ${canonicalReviewRoot}`) &&
+			handoff.includes(`git -C ${canonicalReviewRoot} rev-parse --show-toplevel`) &&
+			handoff.includes(
+				"Summary command (from execution repository):",
+			),
+		"same-root review handoffs pin and verify the execution repository",
+	);
 	assert.doesNotMatch(handoff, /work-runs/);
 	assert.match(
 		loadStore(cwd).items["TASK-1"].notes.join("\n"),

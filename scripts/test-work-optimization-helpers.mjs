@@ -949,12 +949,17 @@ process.exit(result.status ?? 1);
 	const absoluteHelper = realpathSync(
 		path.join(import.meta.dirname, "work-helper.mjs"),
 	);
+	const canonicalFinishRoot = JSON.stringify(realpathSync(finishCwd));
 	assert(
 		reviewMessage.includes("independent review required") &&
 			reviewMessage.includes("Work item: TASK-4") &&
+			reviewMessage.includes(`Execution repository: ${canonicalFinishRoot}`) &&
+			reviewMessage.includes(
+				`git -C ${canonicalFinishRoot} rev-parse --show-toplevel`,
+			) &&
 			reviewMessage.includes(`Helper: ${JSON.stringify(absoluteHelper)}`) &&
 			reviewMessage.includes(
-				`Summary command: node ${JSON.stringify(absoluteHelper)} work-summary TASK-4`,
+				`Summary command (from execution repository): node ${JSON.stringify(absoluteHelper)} work-summary TASK-4`,
 			) &&
 			reviewMessage.includes('Review only: "auth/policy file.js"') &&
 			reviewMessage.includes("Review reasons: sensitive paths") &&

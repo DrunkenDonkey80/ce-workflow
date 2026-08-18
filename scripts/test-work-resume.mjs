@@ -776,6 +776,7 @@ try {
 	const helper = JSON.stringify(
 		realpathSync(path.join(import.meta.dirname, "work-helper.mjs")),
 	);
+	const reviewerRoot = JSON.stringify(realpathSync(cwd));
 	assert(
 		reviewerHandoff.params.async === true &&
 			reviewerHandoff.params.control?.needsAttentionAfterMs === 30_000,
@@ -786,9 +787,15 @@ try {
 			!reviewerHandoff.params.task.includes(".pi-subagents/") &&
 			!reviewerHandoff.params.task.includes(".pi/work-runs/") &&
 			reviewerHandoff.params.task.includes("Work item: AUTH-1") &&
+			reviewerHandoff.params.task.includes(
+				`Execution repository: ${reviewerRoot}`,
+			) &&
+			reviewerHandoff.params.task.includes(
+				`git -C ${reviewerRoot} rev-parse --show-toplevel`,
+			) &&
 			reviewerHandoff.params.task.includes(`Helper: ${helper}`) &&
 			reviewerHandoff.params.task.includes(
-				`Summary command: node ${helper} work-summary AUTH-1`,
+				`Summary command (from execution repository): node ${helper} work-summary AUTH-1`,
 			) &&
 			reviewerHandoff.params.task.includes(
 				'Review only: "extensions/work-models.js", "scripts/file with space.js"',

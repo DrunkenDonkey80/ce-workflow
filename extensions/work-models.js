@@ -8318,17 +8318,21 @@ function roleModelRouting(cwd, agent) {
 	return { strategy, candidateKey: slot.key, candidates };
 }
 
-function reviewerHandoffLines(state) {
+function reviewerHandoffLines(state, cwd) {
 	const selected = state.selectedWorkItem;
 	if (!selected?.id) return [];
 	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
+	const root = JSON.stringify(realpathSync(cwd));
 	const reviewOnly = (selected.changedPaths ?? [])
 		.map((file) => JSON.stringify(normalizedRepoPath(file)))
 		.join(", ");
 	return [
 		`Work item: ${selected.id}`,
+		`Execution repository: ${root}`,
+		`Repository preflight: git -C ${root} rev-parse --show-toplevel must resolve to this execution repository; stop BLOCKED before reading files or writing notes if it does not.`,
+		`Run every helper and file-inspection command with ${root} as the current working directory.`,
 		`Helper: ${helper}`,
-		`Summary command: node ${helper} work-summary ${selected.id}`,
+		`Summary command (from execution repository): node ${helper} work-summary ${selected.id}`,
 		`Review only: ${reviewOnly}`,
 		`Review reasons: ${state.handoffReason ?? "coded independent review gate"}`,
 		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${selected.id}.`,
@@ -8395,7 +8399,7 @@ function directRoleTask(state, cwd) {
 				: `Known workflow-owned dirt: ${state.git.dirtyPaths.length} paths; avoid it and do not enumerate it again.`
 			: "Known dirt: none",
 		...(state.action === "run-review"
-			? reviewerHandoffLines(state)
+			? reviewerHandoffLines(state, cwd)
 			: [
 					selected?.id && existsSync(WORK_HELPER_SCRIPT)
 						? `Read the compact task first: node ${helper} work-summary ${selected.id}`
