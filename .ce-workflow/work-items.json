@@ -5126,6 +5126,40 @@
       "type": "task",
       "updatedAt": "2026-08-07T08:38:36.364Z"
     },
+    "work-2.report-64e61544-e82b-4d5c-bb60-356050d9b935": {
+      "createdAt": "2026-08-19T10:42:53.016Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: work_verifier_complete_fix created commit 4c67faa and only afterward returned \"Verifier claim lease expired\"; the accepted finding remained unresolved even though the repository change was committed.\nExpected: Validate or renew claim ownership/lease before staging and committing, or roll back the commit if verifier-store completion fails, so the Git commit and finding fix record are atomic.\nImpact: A transient/expired lease produces a misleading failed tool result, leaves an untracked fix commit, and makes the accepted finding impossible to complete without duplicate code changes.\nSuggested improvement: Move claim/group/lease validation before git add/commit and add rollback around post-commit store mutation failure.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/1b55d7e2-c8bf-40a1-91ff-ff3b6e554efa",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 680,
+              "file": "01-lease-expiry-evidence.log",
+              "sha256": "32a8ac5567c61c9d2f489eaa8df59e6a5109dcadb23e83171deec2c9979d87d2"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-19T10:42:53.011Z",
+          "workflowId": "workflow-mszxzeso-twendg"
+        }
+      ],
+      "id": "work-2.report-64e61544-e82b-4d5c-bb60-356050d9b935",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: work_verifier_complete_fix created commit 4c67faa and only afterward returned \"Verifier claim lease expired\"; the accepted finding",
+      "type": "task",
+      "updatedAt": "2026-08-19T10:42:53.016Z"
+    },
     "work-2.report-67c4d7c9-d110-42ac-9430-d5c518ea0c62": {
       "createdAt": "2026-08-18T00:16:35.407Z",
       "dependencies": [],
@@ -8315,7 +8349,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T10:40:22.194Z"
+    "updatedAt": "2026-08-19T10:42:53.016Z"
   },
   "schemaVersion": 1
 }
