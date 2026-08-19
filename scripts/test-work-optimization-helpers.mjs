@@ -419,6 +419,12 @@ try {
 		title: "Capture evidence-only screenshots and logs",
 	});
 	createWorkItem(finishStore, {
+		id: "TASK-EVIDENCE-IMPLEMENTATION",
+		type: "task",
+		status: "open",
+		title: "Routine implementation with an attached artifact",
+	});
+	createWorkItem(finishStore, {
 		id: "TASK-5",
 		type: "task",
 		status: "open",
@@ -683,6 +689,47 @@ try {
 		evidenceFinished.files.includes(evidenceFile) &&
 			loadStore(finishCwd).items["TASK-EVIDENCE"].status === "closed",
 		"finish-task accepts a bounded declared image under the task-owned evidence path",
+	);
+
+	const implementationEvidenceFile =
+		"docs/evidence/TASK-EVIDENCE-IMPLEMENTATION/device.png";
+	mkdirSync(path.join(finishCwd, path.dirname(implementationEvidenceFile)), {
+		recursive: true,
+	});
+	writeFileSync(path.join(finishCwd, implementationEvidenceFile), "screenshot");
+	const implementationFile = "evidence-implementation.js";
+	writeFileSync(path.join(finishCwd, implementationFile), "export default true;\n");
+	const implementationEvidenceFinished = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-EVIDENCE-IMPLEMENTATION",
+				"--max-files",
+				"1",
+				"--message",
+				"retain implementation evidence",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+				"--expect",
+				"ok",
+				"--implementation-file",
+				implementationFile,
+				"--evidence-file",
+				implementationEvidenceFile,
+			],
+			{ cwd: finishCwd, encoding: "utf8" },
+		),
+	);
+	assert(
+		implementationEvidenceFinished.files.includes(
+			implementationEvidenceFile,
+		) &&
+			implementationEvidenceFinished.files.includes(implementationFile) &&
+			loadStore(finishCwd).items["TASK-EVIDENCE-IMPLEMENTATION"].status ===
+				"closed",
+		"finish-task accepts explicit bounded evidence for an implementation task without counting it toward max-files",
 	);
 
 	const automaticEvidenceDir = "docs/evidence/TASK-EVIDENCE-AUTO";

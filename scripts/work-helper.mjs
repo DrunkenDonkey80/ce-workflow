@@ -561,7 +561,6 @@ async function finishTaskUnlocked() {
 		const absolute = path.join(executionRoot, file);
 		const stat = existsSync(absolute) ? statSync(absolute) : undefined;
 		if (
-			!evidenceOnly ||
 			path.posix.isAbsolute(file) ||
 			file.startsWith("../") ||
 			!evidencePath(file) ||
@@ -570,7 +569,7 @@ async function finishTaskUnlocked() {
 			stat.size > 10 * 1024 * 1024
 		)
 			throw new Error(
-				`invalid evidence file ${file}: require an existing image or sanitized .txt/.log/.json file up to 10 MiB under docs/evidence/${id}... for an evidence task`,
+				`invalid evidence file ${file}: require an existing image or sanitized .txt/.log/.json file up to 10 MiB under docs/evidence/${id}...`,
 			);
 		evidenceBytes += stat.size;
 	}
@@ -591,7 +590,7 @@ async function finishTaskUnlocked() {
 	});
 	if (unexpectedStaged.length)
 		throw new Error(
-			`refusing pre-staged files: ${unexpectedStaged.join(", ")}\nRun: git restore --staged -- ${unexpectedStaged.map((file) => JSON.stringify(file)).join(" ")}\nThen re-run finish-task; task-owned evidence under ${taskEvidencePrefix} is handled automatically.`,
+			`refusing pre-staged files: ${unexpectedStaged.join(", ")}\nRun: git restore --staged -- ${unexpectedStaged.map((file) => JSON.stringify(file)).join(" ")}\nThen re-run finish-task; declare task-owned evidence under ${taskEvidencePrefix} with --evidence-file.`,
 		);
 	if (stagedBefore.length)
 		git(["restore", "--staged", "--", ...stagedBefore], executionRoot);
@@ -727,7 +726,7 @@ async function finishTaskUnlocked() {
 		throw new Error(
 			`untracked files need a decision before commit (add, gitignore, or remove):\n` +
 				unrecognized.map((file) => `  - ${file}`).join("\n") +
-				`\nFor each task-owned new implementation file, rerun with --implementation-file <path>; resolve unrelated files first. Task-owned evidence under ${taskEvidencePrefix} is recognized automatically.`,
+				`\nFor each task-owned new implementation file, rerun with --implementation-file <path>; declare task-owned evidence under ${taskEvidencePrefix} with --evidence-file; resolve unrelated files first.`,
 		);
 	const changed = gitStatusPaths(executionRoot).filter((file) => {
 		const normalized = file.replaceAll("\\", "/");

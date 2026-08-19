@@ -4345,6 +4345,46 @@
       "type": "task",
       "updatedAt": "2026-08-11T18:42:24.048Z"
     },
+    "work-2.report-1e41739d-a5e4-434d-954f-7235e7fd07c5": {
+      "createdAt": "2026-08-19T09:29:15.735Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task rejects every --evidence-file on implementation work-1.20 because work-helper.mjs requires evidenceOnly=true, yet the task's acceptance explicitly requires screenshot-backed connected-device evidence and the independent reviewer blocked until those screenshots were attached. The helper simultaneously blocks the same untracked docs/evidence/work-1.20 PNGs as undecided files.\nExpected: Task-owned bounded evidence files under docs/evidence/<work-item-id>/ should be admissible for any work item whose acceptance/review requires them, while remaining excluded from implementation file-count limits and still subject to extension/size/path sanitization.\nImpact: The coded finish/review loop cannot close an implementation task with mandatory hardware screenshot evidence without deleting required artifacts, relabeling/rewriting the task contract, or bypassing the finisher.\nSuggested improvement: Allow explicit --evidence-file for non-evidence-only tasks when the path is task-owned and validated; keep automatic evidence discovery restricted to evidence-only tasks if desired.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/d569000f-6191-4740-bd18-ef6bbc053079",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 105747,
+              "file": "01-session.jsonl",
+              "sha256": "b54211c00118e838601450f8dd2af883f83cfb82a6593787f2feb206eb7ecdc9"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-19T09:29:15.726Z",
+          "workflowId": "01a0169a-4ee2-730b-b0ef-a64e919a3dbe"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.report-1e41739d-a5e4-434d-954f-7235e7fd07c5",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomization/classification: one locally-owned claim. It is related-distinct to closed work-2.74 (same bounded evidence boundary, but work-2.74 covered explicit evidence-only tasks and automatic discovery only); it duplicates accepted verifier finding finding-83595a64445a6b545a63cfeb. Current source still rejected explicit evidence on ordinary implementation tasks via the evidenceOnly guard, so it was not already fixed. Expected outcomes coexist and require no new canonical item because this report is atomic and is the execution item.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: finish-task rejects every --evidence-file on implementation work-1.20 because work-helper.mjs requires evidenceOnly=true, yet the ",
+      "type": "task",
+      "updatedAt": "2026-08-19T10:40:22.193Z"
+    },
     "work-2.report-2161af52-ac96-4b1d-8c22-5e4d16d82d8c": {
       "createdAt": "2026-08-08T13:36:08.061Z",
       "dependencies": [
@@ -8275,7 +8315,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T08:14:46.751Z"
+    "updatedAt": "2026-08-19T10:40:22.194Z"
   },
   "schemaVersion": 1
 }
