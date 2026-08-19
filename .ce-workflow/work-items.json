@@ -4044,6 +4044,53 @@
       "type": "bug",
       "updatedAt": "2026-08-12T17:26:35.294Z"
     },
+    "work-2.75": {
+      "acceptance": "Both coded reviewer handoff paths and the durable reviewer role name the exact supported command, reject --body, require an exact marker postcondition, and prohibit nul/NUL redirection; focused helper/resume/package tests pass.",
+      "createdAt": "2026-08-19T05:13:35.651Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Reviewer handoffs must give the supported work-note --append-notes syntax, verify an exact wo:review marker in notes_tail, and forbid bash redirection to Windows nul/NUL artifacts.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.75",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "classification: report e356 has one locally-owned reviewer-handoff outcome spanning malformed verdict syntax and cross-shell artifact creation; reuse this canonical bug.",
+        "Files changed: agents/work-reviewer.md, extensions/work-models.js, scripts/work-helper.mjs, scripts/test-work-helper-contract.mjs, scripts/test-work-resume.mjs, scripts/verify-package.mjs. Verification: PASS node scripts/test-work-helper-contract.mjs; PASS node scripts/test-work-resume.mjs; PASS reviewer helper-path contract; package verifier reached one isolated role-marker failure that was corrected and rechecked; no production diagnostics.",
+        "wo:review PASS both handoff builders (work-helper.mjs reviewerHandoff, work-models.js reviewerHandoffLines) emit exact work-note --append-notes command plus notes_tail marker postcondition and no --body/nul-NUL redirection; agents/work-reviewer.md and verify-package.mjs assert same; PASS test-work-helper-contract.mjs, test-work-resume.mjs, verify-package.mjs",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs && node scripts/test-work-resume.mjs\nOutput: ok - work helper contract\nok - coded work-resume behavior"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Make reviewer verdict persistence exact and shell-safe",
+      "type": "bug",
+      "updatedAt": "2026-08-19T05:22:39.095Z"
+    },
+    "work-2.76": {
+      "acceptance": "Worker role/handoff requires minimal diff evidence; post-dispatch formatter expansion deterministically routes one repair with pi-lens format/autofix guidance; focused resume and package tests pass.",
+      "createdAt": "2026-08-19T05:13:35.735Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Bounded worker handoffs must prohibit broad formatting and coded resume must compare settled raw versus whitespace-ignored numstat so agent-end autofix expansion routes to repair instead of review/finish.",
+      "evidence": [],
+      "id": "work-2.76",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "classification: reports b085 and 5aca share one locally-owned post-dispatch diff guard. The 5aca request to change ce-workflow-generated .pi-lens.json is insufficient-evidence/config-owned because ce-workflow has no .pi-lens.json writer and pi-lens documents format/autofix as separate project controls; do not invent a global config mutation."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Detect formatter-expanded worker diffs after dispatch",
+      "type": "bug",
+      "updatedAt": "2026-08-19T05:13:35.735Z"
+    },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
       "createdAt": "2026-07-20T09:59:01.555Z",
@@ -4799,6 +4846,47 @@
       "type": "task",
       "updatedAt": "2026-08-18T05:28:20.463Z"
     },
+    "work-2.report-5aca1f93-dff6-482c-9801-2600908fc824": {
+      "createdAt": "2026-08-18T21:50:09.291Z",
+      "dependencies": [
+        "work-2.76"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: Two successive work-worker attempts to make a tiny LineaProGS.kt lifecycle edit were silently rewritten by pi-lens ktlint autofix into ~455 added/~450 removed lines. The repository's generated `.pi-lens.json` disabled only `format.enabled`; ktlint ran through the separate `autofix.enabled` path. Even `git restore` was immediately mutated, blocking the worker. Parent had to add `autofix.enabled:false`, restore, and reapply the semantic hunk.\nExpected: ce-workflow's project bootstrap/configuration for deterministic bounded diffs should disable both pi-lens mutation paths (`format.enabled:false` and `autofix.enabled:false`), or child launch contracts should explicitly disable autofix. Workers must not report a minimal diffstat before confirming the post-dispatch file state.\nImpact: A 15-line correctness fix expanded to ~900 changed lines twice, the worker falsely reported a small diff, and implementation blocked for a supervisor decision. This creates severe review risk in large legacy Kotlin files.\nSuggested improvement: When ce-workflow writes `.pi-lens.json`, set both mutation controls false. Add a post-dispatch numstat check after the final tool result/agent-end mutation phase, not before it.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/a801fc61-ba53-4922-acdf-2def74d0798f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 104354,
+              "file": "01-work-items.json",
+              "sha256": "237eb246ba761c22ef512efcdfc4c0b7b9918c6ca9aca8f4e69e23633e5836fa"
+            },
+            {
+              "bytes": 72,
+              "file": "02-.pi-lens.json",
+              "sha256": "c4d588cb25b5b5066e402030a3d6e7a7232eb0cbbdc0bc3806b9e69ea46ada84"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-18T21:50:09.286Z",
+          "workflowId": "01a01595-a8d8-721b-b447-eb7d10993f2e"
+        }
+      ],
+      "id": "work-2.report-5aca1f93-dff6-482c-9801-2600908fc824",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Two successive work-worker attempts to make a tiny LineaProGS.kt lifecycle edit were silently rewritten by pi-lens ktlint autofix ",
+      "type": "task",
+      "updatedAt": "2026-08-19T05:13:46.262Z"
+    },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
       "dependencies": [
@@ -5505,6 +5593,42 @@
       "type": "task",
       "updatedAt": "2026-08-17T18:02:12.406Z"
     },
+    "work-2.report-b085e2c6-43c6-4e12-b79e-f1eb0da5c571": {
+      "createdAt": "2026-08-18T21:22:54.483Z",
+      "dependencies": [
+        "work-2.76"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: The work-worker implementing work-1.21 ran broad formatting on `LineaProGS.kt`, turning a two-line semantic guard into hundreds of unrelated import/layout/comment/when-branch changes. The same worker had to be resumed to restore both production files to HEAD and reapply only the import, guard, and membership function, reducing the final diff to 39 insertions/2 deletions across three files.\nExpected: For bounded tasks, workers should inspect `git diff --stat`/`git diff` before returning and automatically revert formatter-only changes outside the named symbols. Project-wide or whole-file formatting must not run unless the task explicitly requests formatting.\nImpact: The initial output obscured the safety-critical readiness change, expanded review surface by hundreds of lines, and required an extra worker cycle before independent review.\nSuggested improvement: Add a worker pre-return minimal-diff gate comparing changed hunks to task-named symbols and fail/auto-correct when a formatter changes unrelated lines; include a diffstat threshold warning for small/medium tasks.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/4ffd4577-6366-4bd4-8f29-89d9ba792f79",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 91199,
+              "file": "01-work-items.json",
+              "sha256": "c9d0e1a96e7a797c1e8296de0eaf742a2b29006d5241bff8c6a540911ed67764"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-18T21:22:54.478Z",
+          "workflowId": "01a01595-a8d8-721b-b447-eb7d10993f2e"
+        }
+      ],
+      "id": "work-2.report-b085e2c6-43c6-4e12-b79e-f1eb0da5c571",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The work-worker implementing work-1.21 ran broad formatting on `LineaProGS.kt`, turning a two-line semantic guard into hundreds of",
+      "type": "task",
+      "updatedAt": "2026-08-19T05:13:46.183Z"
+    },
     "work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25": {
       "createdAt": "2026-08-03T22:11:07.924Z",
       "dependencies": [
@@ -5804,7 +5928,9 @@
     },
     "work-2.report-e356300b-38cd-43ef-b927-c7d4729a3faa": {
       "createdAt": "2026-08-18T21:11:13.018Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.75"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The work-reviewer for target work-1.19 appended its durable verdict via an unsupported `--body` option, producing a literal note beginning `--body wo:review PASS` instead of `wo:review PASS`. It also left an empty untracked `nul` file in the target checkout. `finish-task --reviewed` first blocked on the untracked file and then rejected the malformed PASS evidence. The same reviewer had to be resumed for a mechanical note correction.\nExpected: Reviewer handoffs/agent instructions should provide the exact supported command `work-note <id> --append-notes \"wo:review PASS|FAIL ...\"`, validate that notes_tail contains a line beginning exactly with the required marker, and prohibit cross-shell `> nul` redirection (use no redirection or OS-safe temp handling).\nImpact: A correct independent PASS required two extra finalizer attempts and a reviewer resume; an empty platform artifact blocked commit, and malformed evidence could leave work permanently unfinishable despite a completed review.\nSuggested improvement: Embed the exact `work-note --append-notes` command in reviewerHandoff(), add a reviewer-side postcondition that the marker is parser-recognized, and lint agent shell commands against `> nul`/`> NUL` when running under bash.",
       "evidence": [
@@ -5834,7 +5960,7 @@
       "status": "open",
       "title": "Self-improvement report: The work-reviewer for target work-1.19 appended its durable verdict via an unsupported `--body` option, producing a literal note b",
       "type": "task",
-      "updatedAt": "2026-08-18T21:11:13.018Z"
+      "updatedAt": "2026-08-19T05:13:46.088Z"
     },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
@@ -8009,7 +8135,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-18T21:11:31.137Z"
+    "updatedAt": "2026-08-19T05:22:39.095Z"
   },
   "schemaVersion": 1
 }

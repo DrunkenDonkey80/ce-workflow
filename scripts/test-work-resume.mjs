@@ -801,6 +801,15 @@ try {
 				'Review only: "extensions/work-models.js", "scripts/file with space.js"',
 			) &&
 			reviewerHandoff.params.task.includes("durable `wo:review PASS|FAIL` note") &&
+			reviewerHandoff.params.task.includes(
+				'work-note "AUTH-1" --append-notes "wo:review PASS',
+			) &&
+			reviewerHandoff.params.task.includes(
+				'work-summary "AUTH-1" and confirm notes_tail',
+			) &&
+			reviewerHandoff.params.task.includes(
+				"Do not use --body or shell redirection to nul/NUL",
+			) &&
 			reviewerHandoff.params.task.includes("at least 10 minutes") &&
 			reviewerHandoff.params.task.includes(
 				"needsAttentionAfterMs=30000 is an attention notification, not a hard timeout",

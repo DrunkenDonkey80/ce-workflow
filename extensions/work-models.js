@@ -8336,6 +8336,9 @@ function reviewerHandoffLines(state, cwd) {
 		`Review only: ${reviewOnly}`,
 		`Review reasons: ${state.handoffReason ?? "coded independent review gate"}`,
 		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${selected.id}.`,
+		`Verdict command: node ${helper} work-note ${JSON.stringify(selected.id)} --append-notes "wo:review PASS <one-line evidence>" (replace PASS with the structured FAIL verdict when fixes are required).`,
+		`Verdict postcondition: rerun node ${helper} work-summary ${JSON.stringify(selected.id)} and confirm notes_tail contains a line beginning exactly with wo:review PASS or wo:review FAIL.`,
+		"Do not use --body or shell redirection to nul/NUL; read-only checks need no redirection.",
 		"Finish retry: rerun the same finish-task command with --reviewed only after durable PASS evidence.",
 		ROLE_TIMEOUT_GUIDANCE,
 	];

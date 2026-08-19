@@ -248,12 +248,13 @@ function reviewerHandoff(
 		`Run every helper and file-inspection command with ${root} as the current working directory.`,
 		`Helper: ${JSON.stringify(helper)}`,
 		`Summary command (from execution repository): node ${JSON.stringify(helper)} work-summary ${id}`,
-		...(distinctRoots
-			? [`Finish retry option: --execution-root ${root}`]
-			: []),
+		...(distinctRoots ? [`Finish retry option: --execution-root ${root}`] : []),
 		`Review only: ${reviewOnly}`,
 		`Review reasons: ${reviewReasons.join("; ")}`,
 		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${id}.`,
+		`Verdict command: node ${JSON.stringify(helper)} work-note ${JSON.stringify(id)} --append-notes "wo:review PASS <one-line evidence>" (replace PASS with the structured FAIL verdict when fixes are required).`,
+		`Verdict postcondition: rerun node ${JSON.stringify(helper)} work-summary ${JSON.stringify(id)} and confirm notes_tail contains a line beginning exactly with wo:review PASS or wo:review FAIL.`,
+		"Do not use --body or shell redirection to nul/NUL; read-only checks need no redirection.",
 		"Reviewer coordination: this handoff is complete. Do not contact the supervisor; return BLOCKED immediately if any supplied path or command is unusable.",
 		"Finish retry: rerun the same finish-task command with --reviewed after durable PASS evidence, or after fixing and verifying residual findings from the targeted re-review.",
 		"FAIL recovery: after the initial review, fix and verify findings, then rerun the same finish-task command without --reviewed to regenerate this complete handoff; never handcraft a targeted re-review task. After that targeted re-review, fix and verify residuals and use --reviewed without launching a third reviewer.",

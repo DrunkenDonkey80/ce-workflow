@@ -175,6 +175,10 @@ check(
 	"reviewer coordination gaps stay blocked, not failed",
 	reviewer.includes("Outcome: PASS|FAIL|BLOCKED") &&
 		reviewer.includes("Return `BLOCKED` immediately") &&
+		reviewer.includes("work-note <work-item-id> --append-notes") &&
+		reviewer.includes("notes_tail") &&
+		reviewer.includes("unsupported `--body`") &&
+		reviewer.includes("shell redirection to `nul`/`NUL`") &&
 		reviewer.includes("Do not guess or append `wo:review FAIL`") &&
 		reviewer.includes("not an implementation failure"),
 );

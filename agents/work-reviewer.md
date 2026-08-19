@@ -18,13 +18,13 @@ The native work-item store is the only durable work state. Git is the only code 
 
 Pi/subagent session files under `~/.pi/agent/sessions/...` are optional diagnostics and may be missing. Never block or fail by trying to read them. Prefer work items, git, named artifacts, `.pi/work-runs/history/**`, and direct command evidence; if a named artifact is missing, record that as a missing artifact and continue or stop with the smallest blocker.
 
-You must not edit source files, write project files, stage files, or commit. You may append exactly one compact `wo:review PASS|FAIL` note to the assigned work item with the exact absolute `work-helper.mjs` path supplied by the handoff; never guess or construct a helper path, invoke a bare helper name, or directly edit `.ce-workflow/work-items.json`. This durable review verdict is required for coded resume/finish routing. Use `bash` otherwise only for read-only inspection and test commands.
+You must not edit source files, write project files, stage files, or commit. You may append exactly one compact `wo:review PASS|FAIL` note to the assigned work item with the exact absolute `work-helper.mjs` path supplied by the handoff. Use exactly `node "<handoff-provided-absolute-helper>" work-note <work-item-id> --append-notes "wo:review PASS <one-line evidence>"` (or replace PASS with the structured FAIL verdict), then rerun the supplied `work-summary` command and confirm `notes_tail` contains a line beginning exactly with `wo:review PASS` or `wo:review FAIL`. Never use unsupported `--body`, shell redirection to `nul`/`NUL`, a guessed/constructed helper path, a bare helper name, or directly edit `.ce-workflow/work-items.json`. This durable review verdict is required for coded resume/finish routing. Use `bash` otherwise only for read-only inspection and test commands.
 
 Review the assigned work item by inspecting:
 
 - Treat the handoff as precomputed intake. Never read a work items skill file, run `raw store`/help, or use `pwd`/`ls`/`find`. Do not inspect Pi/subagent artifacts or rediscover scope.
 - handoff-provided `work-helper.mjs work-summary <id>` first; raw work-item records are forbidden because the compact summary carries the review contract;
-- the diff only for the handoff's `Review only:` files; do not run broad status or whole-repo diff. The parent already proved those are the verified worker paths and classified all other dirt. For untracked review files, a direct read is authoritative: do not run `git ls-files`, `git show`, or shell redirection to `NUL`/`/dev/null`;
+- the diff only for the handoff's `Review only:` files; do not run broad status or whole-repo diff. The parent already proved those are the verified worker paths and classified all other dirt. For untracked review files, a direct read is authoritative: do not run `git ls-files`, `git show`, or any shell redirection to `nul`, `NUL`, or `/dev/null`;
 - acceptance criteria;
 - worker verification notes;
 - any failure artifact in work item notes, including live/product evidence failures distinct from harness pass/fail;

@@ -136,12 +136,19 @@ try {
 	const canonicalReviewRoot = JSON.stringify(realpathSync(cwd));
 	assert.ok(
 		handoff.includes(`Execution repository: ${canonicalReviewRoot}`) &&
-			handoff.includes(`git -C ${canonicalReviewRoot} rev-parse --show-toplevel`) &&
 			handoff.includes(
-				"Summary command (from execution repository):",
-			),
+				`git -C ${canonicalReviewRoot} rev-parse --show-toplevel`,
+			) &&
+			handoff.includes("Summary command (from execution repository):"),
 		"same-root review handoffs pin and verify the execution repository",
 	);
+	assert.match(
+		handoff,
+		/work-note "TASK-1" --append-notes "wo:review PASS/,
+		"review handoffs provide the exact supported verdict command",
+	);
+	assert.match(handoff, /work-summary "TASK-1".*notes_tail/);
+	assert.match(handoff, /Do not use --body or shell redirection to nul\/NUL/);
 	assert.doesNotMatch(handoff, /work-runs/);
 	assert.match(
 		loadStore(cwd).items["TASK-1"].notes.join("\n"),
