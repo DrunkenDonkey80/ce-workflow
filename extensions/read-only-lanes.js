@@ -6,6 +6,7 @@ import {
 	fsyncSync,
 	mkdirSync,
 	openSync,
+	lstatSync,
 	readFileSync,
 	renameSync,
 	rmSync,
@@ -574,6 +575,40 @@ export function acquireRepositoryMutationLock(cwd = process.cwd()) {
 	}
 }
 
+const ASYNC_SUCCESS_STATES = new Set([
+	"complete",
+	"completed",
+	"success",
+	"succeeded",
+	"done",
+	"ok",
+	"passed",
+]);
+const ASYNC_FAILURE_STATES = new Set([
+	"failed",
+	"error",
+	"stopped",
+	"cancelled",
+	"canceled",
+	"timed_out",
+	"timeout",
+]);
+
+function prefetchAsyncStatus(lane) {
+	if (lane.laneKind !== "prefetch" || !text(lane.launch?.asyncDir)) return null;
+	const file = path.join(path.resolve(lane.launch.asyncDir), "status.json");
+	try {
+		const info = lstatSync(file);
+		if (!info.isFile() || info.isSymbolicLink() || info.size > 256 * 1024)
+			return null;
+		const status = JSON.parse(readFileSync(file, "utf8"));
+		const state = String(status?.state ?? status?.status ?? "").toLowerCase();
+		return plain(status) && text(state) ? { file, state } : null;
+	} catch {
+		return null;
+	}
+}
+
 export function reconcileReadOnlyLanes(cwd = process.cwd(), options = {}) {
 	if (!existsSync(laneStorePath(cwd))) return [];
 	const exists =
@@ -595,10 +630,28 @@ export function reconcileReadOnlyLanes(cwd = process.cwd(), options = {}) {
 		const reconciled = [];
 		for (const lane of Object.values(store.lanes)) {
 			if (
-				lane.state === "running" &&
-				lane.launch?.host === (options.host ?? os.hostname()) &&
-				!exists(lane.launch.pid)
-			) {
+				lane.state !== "running" ||
+				lane.launch?.host !== (options.host ?? os.hostname())
+			)
+				continue;
+			const runtime = prefetchAsyncStatus(lane);
+			if (ASYNC_SUCCESS_STATES.has(runtime?.state)) {
+				transitionIn(store, lane.id, "completed", {
+					now: options.now,
+					artifact: { statusFile: runtime.file },
+				});
+				reconciled.push(lane.id);
+				continue;
+			}
+			if (ASYNC_FAILURE_STATES.has(runtime?.state)) {
+				transitionIn(store, lane.id, "failed", {
+					now: options.now,
+					reason: `async ${runtime.state}`,
+				});
+				reconciled.push(lane.id);
+				continue;
+			}
+			if (!exists(lane.launch.pid)) {
 				transitionIn(store, lane.id, "orphaned", {
 					now: options.now,
 					reason: "dead-local-runner",

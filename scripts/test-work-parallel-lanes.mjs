@@ -48,10 +48,17 @@ function repository() {
 	git("commit", "-qm", "initial");
 	return { cwd, git };
 }
-function envelope(cwd, head, generation, suffix, resourceKeys = []) {
+function envelope(
+	cwd,
+	head,
+	generation,
+	suffix,
+	resourceKeys = [],
+	laneKind = "discovery",
+) {
 	return createLaneEnvelope({
 		repository: cwd,
-		laneKind: "discovery",
+		laneKind,
 		producer: "test-runner",
 		workItemId: `work-${suffix}`,
 		generation,
@@ -293,6 +300,48 @@ try {
 	{
 		const { cwd, git } = repository();
 		const head = git("rev-parse", "HEAD");
+		const terminal = [
+			...["complete", "completed", "success", "succeeded", "done", "ok", "passed"].map(
+				(status) => ({ status, expected: "completed" }),
+			),
+			...["failed", "error", "stopped", "cancelled", "canceled", "timed_out", "timeout"].map(
+				(status) => ({ status, expected: "failed" }),
+			),
+		].map((fixture) => ({
+			...fixture,
+			lane: envelope(cwd, head, 1, fixture.status, [], "prefetch"),
+		}));
+		for (const { lane, status } of terminal) {
+			const asyncDir = path.join(cwd, ".pi-subagents", lane.id);
+			mkdirSync(asyncDir, { recursive: true });
+			queueLane(cwd, lane);
+			transitionLane(cwd, lane.id, "running", {
+				launch: {
+					pid: process.pid,
+					host: os.hostname(),
+					runId: lane.id,
+					asyncDir,
+				},
+			});
+			writeFileSync(
+				path.join(asyncDir, "status.json"),
+				JSON.stringify({ status }),
+			);
+		}
+		assert.deepEqual(
+			reconcileReadOnlyLanes(cwd),
+			terminal.map(({ lane }) => lane.id).sort(),
+		);
+		const lanes = loadLaneStore(cwd).lanes;
+		for (const { lane, expected } of terminal)
+			assert.equal(lanes[lane.id].state, expected);
+		const mutation = acquireRepositoryMutationLock(cwd);
+		mutation.release();
+	}
+
+	{
+		const { cwd, git } = repository();
+		const head = git("rev-parse", "HEAD");
 		const exitedPid = Number(
 			execFileSync(
 				process.execPath,
@@ -389,6 +438,13 @@ try {
 		writeFileSync(
 			path.join(asyncDir, "status.json"),
 			JSON.stringify({ state: "completed" }),
+		);
+		assert.deepEqual(reconcileReadOnlyLanes(cwd), []);
+		assert.equal(
+			Object.values(loadLaneStore(cwd).lanes).find(
+				(lane) => lane.laneKind === "debug",
+			)?.state,
+			"running",
 		);
 		const reconciled = reconcileReadOnlyLaneRuns(cwd);
 		assert.equal(reconciled.reconciled.length, 1);
