@@ -462,6 +462,10 @@ const args = process.argv.slice(2);
 const dirty = process.env.WORK_RESUME_GIT_DIRTY || "clean";
 if (process.env.WORK_RESUME_GIT_FAIL === "1") process.exit(1);
 if (args[0] === "diff") {
+  if (dirty === "formatter-expanded" && args.includes("--numstat")) {
+    console.log(args.includes("--ignore-all-space") ? "8\\t2\\textensions/work-models.js" : "450\\t450\\textensions/work-models.js");
+    process.exit(0);
+  }
   if (dirty === "unknown" || dirty === "instruction-substantive") process.exit(1);
   if (dirty === "instruction-formatter" && !args.includes("--ignore-blank-lines")) {
     console.log(["diff --git a/AGENTS.md b/AGENTS.md", "--- a/AGENTS.md", "+++ b/AGENTS.md", "@@ -1 +1 @@", "-See https://example.com/docs for details.", "+See <https://example.com/docs> for details."].join("\\n"));
@@ -471,7 +475,7 @@ if (args[0] === "diff") {
   process.exit(0);
 }
 function printDirty() {
-  if (dirty === "unknown") console.log(" M extensions/work-models.js");
+  if (["unknown", "formatter-expanded"].includes(dirty)) console.log(" M extensions/work-models.js");
   if (["benign", "instruction-substantive", "instruction-formatter", "workflow"].includes(dirty)) console.log(" M AGENTS.md");
   if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
   if (dirty === "workflow") {
@@ -1012,6 +1016,17 @@ try {
 		state.action === "run-review" &&
 			state.selectedWorkItem.changedPaths.includes("extensions/work-models.js"),
 		"verified detached-writer files may cross the dirty gate into scoped review",
+	);
+	process.env.WORK_RESUME_GIT_DIRTY = "formatter-expanded";
+	state = buildWorkResumeState(cwd, "E-1");
+	const formatterRepair = directRoleHandoffParams(state, cwd);
+	assert(
+		state.action === "run-repair" &&
+			state.handoffReason.includes("post-dispatch numstat") &&
+			formatterRepair?.agent === "work-worker" &&
+			formatterRepair.params.task.includes("--ignore-all-space --numstat") &&
+			formatterRepair.params.task.includes("autofix.enabled: false"),
+		"settled formatter-expanded output routes one bounded repair before review",
 	);
 	setScenario("debug");
 

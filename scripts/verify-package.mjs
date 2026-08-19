@@ -440,6 +440,13 @@ check(
 		leadAgent.includes("diagnose architecture and plan constraints"),
 );
 check(
+	"worker bounds formatter and Pi Lens autofix expansion",
+	workerAgent.includes("git diff --ignore-all-space --numstat") &&
+		workerAgent.includes("formatter expansion") &&
+		workerAgent.includes("`autofix.enabled: false`") &&
+		workerAgent.includes("do not create project config"),
+);
+check(
 	"reviewers never block on supervisor coordination",
 	!reviewerAgent.match(/^tools:.*contact_supervisor/m) &&
 		reviewerAgent.includes(

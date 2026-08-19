@@ -237,7 +237,7 @@ const WORK_HELPER_SCRIPT = resolve(
 	"work-helper.mjs",
 );
 const NATIVE_EDIT_GUIDANCE =
-	"Use Pi's native edit tool for existing files and write tool for new files. Do not rewrite tracked files through Python, Node, or shell; if unavoidable, re-read immediately.";
+	"Use Pi's native edit tool for existing files and write tool for new files. Do not rewrite tracked files through Python, Node, or shell; if unavoidable, re-read immediately. Never run a whole-file/project formatter unless explicitly requested; final diff evidence must come after the last mutating or test tool.";
 const SUBAGENT_RPC_REQUEST_EVENT = "subagents:rpc:v1:request";
 const SUBAGENT_RPC_REPLY_EVENT_PREFIX = "subagents:rpc:v1:reply:";
 const VERIFIER_CHECKPOINT_TOOL_NAMES = [
@@ -8089,6 +8089,20 @@ function planResumeAction(state, cwd, options = {}) {
 		)
 			return missingReviewScope();
 		if (activeImplementation.verificationReady) {
+			if (hasFormatterExpandedDiff(cwd, activeImplementation.changedPaths))
+				return withHandoffPrompt(
+					{
+						...routed,
+						action: "run-repair",
+						handoffReason:
+							"post-dispatch numstat shows formatter-expanded output that must be repaired before review or finish",
+						handoffExtra: [
+							"Repair scope: compare `git diff --numstat` with `git diff --ignore-all-space --numstat` for the assigned paths, restore unrelated formatter hunks, and reapply only the semantic change.",
+							"Pi Lens format and autofix controls are separate. If an existing `.pi-lens.json` disables format but not autofix, add `autofix.enabled: false` before reapplying; do not create project config when the file is absent.",
+						],
+					},
+					cwd,
+				);
 			const finishSettings = workOrchSettings(cwd);
 			if (
 				finishSettings.codeReviewBeforeCommit === "full" &&
@@ -14873,9 +14887,15 @@ function hasFinishGateEvidence(issue, gate) {
 	).test(notesOf(issue));
 }
 
-function gitDiffChangeCount(cwd, files) {
+function gitDiffChangeCount(cwd, files, ignoreWhitespace = false) {
 	if (!files.length) return Number.POSITIVE_INFINITY;
-	const output = run(cwd, "git", ["diff", "--numstat", "--", ...files]);
+	const output = run(cwd, "git", [
+		"diff",
+		...(ignoreWhitespace ? ["--ignore-all-space"] : []),
+		"--numstat",
+		"--",
+		...files,
+	]);
 	return output
 		.split(/\r?\n/)
 		.filter(Boolean)
@@ -14884,6 +14904,17 @@ function gitDiffChangeCount(cwd, files) {
 			if (added === "-" || deleted === "-") return total + 10_000;
 			return total + Number(added || 0) + Number(deleted || 0);
 		}, 0);
+}
+
+function hasFormatterExpandedDiff(cwd, files) {
+	try {
+		const raw = gitDiffChangeCount(cwd, files);
+		if (raw <= 80) return false;
+		const semantic = gitDiffChangeCount(cwd, files, true);
+		return semantic <= 80 && raw >= semantic * 4;
+	} catch {
+		return false;
+	}
 }
 
 function isSmallDiff(cwd, files) {

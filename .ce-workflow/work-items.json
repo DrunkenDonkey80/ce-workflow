@@ -4077,19 +4077,26 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Bounded worker handoffs must prohibit broad formatting and coded resume must compare settled raw versus whitespace-ignored numstat so agent-end autofix expansion routes to repair instead of review/finish.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.76",
       "labels": [
         "self-improvement"
       ],
       "notes": [
-        "classification: reports b085 and 5aca share one locally-owned post-dispatch diff guard. The 5aca request to change ce-workflow-generated .pi-lens.json is insufficient-evidence/config-owned because ce-workflow has no .pi-lens.json writer and pi-lens documents format/autofix as separate project controls; do not invent a global config mutation."
+        "classification: reports b085 and 5aca share one locally-owned post-dispatch diff guard. The 5aca request to change ce-workflow-generated .pi-lens.json is insufficient-evidence/config-owned because ce-workflow has no .pi-lens.json writer and pi-lens documents format/autofix as separate project controls; do not invent a global config mutation.",
+        "Files changed: agents/work-worker.md, extensions/work-models.js, scripts/test-work-resume.mjs, scripts/verify-package.mjs. Verification: PASS node scripts/test-work-resume.mjs; PASS node scripts/verify-package.mjs (all package checks); no production diagnostics. Classification: shared post-dispatch formatter-expansion claim is locally-owned. The .pi-lens.json bootstrap suggestion is insufficient-evidence/config-owned because ce-workflow has no writer for that file; implemented the safe existing-config repair rule without inventing a global config mutation.",
+        "wo:review PASS resume routes run-repair on raw>80/semantic<=80/4x numstat gap with fail-closed try/catch; worker+handoff carry settled numstat and existing-only .pi-lens autofix rule; reviewer reran node scripts/test-work-resume.mjs (ok) and node scripts/verify-package.mjs (all package checks passed)",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-resume.mjs\nOutput: ok - coded work-resume behavior"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Detect formatter-expanded worker diffs after dispatch",
       "type": "bug",
-      "updatedAt": "2026-08-19T05:13:35.735Z"
+      "updatedAt": "2026-08-19T05:34:09.283Z"
     },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
@@ -5501,6 +5508,45 @@
       "title": "Self-improvement report: Required async specialist launches in project autopilot repeatedly fail before start with ENOENT because the async-run directory n",
       "type": "task",
       "updatedAt": "2026-08-09T08:47:52.928Z"
+    },
+    "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851": {
+      "createdAt": "2026-08-19T05:30:38.715Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A successor prefetch async run completed successfully and wrote its artifact, but its read-only lane remained state=running. finish-task then failed with 'Read-only lanes are using the repository'. reconcileReadOnlyLanes only detects a dead local PID; the recorded launcher PID remains alive after a child workflow completes, so completion is not reconciled.\nExpected: When a launched read-only lane's recorded async run reaches a terminal state, reconciliation should transition the lane out of running so repository mutation gates do not remain blocked if the parent misses the completion callback.\nImpact: Autonomous work cannot commit/close a completed task and may idle indefinitely behind a stale read lock despite the read-only run having finished.\nSuggested improvement: Extend reconciliation to inspect recorded async completion state or ensure the completion callback always terminalizes the lane; add a completed-run/still-live-launcher regression test.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/3e7c61f1-8746-4df7-9598-96a60c48ab64",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3124,
+              "file": "01-state.json",
+              "sha256": "61e8fbee719f0b8fc56b26209b4c257ed2e0362c8577040577a754a8d6f02be7"
+            },
+            {
+              "bytes": 4890,
+              "file": "02-lane-0bc775f9fac0b378ff26a0bd.json",
+              "sha256": "8adf9b6804e0f06927826314d8fb9286d3331379459987b0e13776f0129ae67e"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "NexusConnectSDK-Android",
+          "submittedAt": "2026-08-19T05:30:38.711Z",
+          "workflowId": "01a0112b-59bb-7656-839b-f4c1ae14d0e2"
+        }
+      ],
+      "id": "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A successor prefetch async run completed successfully and wrote its artifact, but its read-only lane remained state=running. finis",
+      "type": "task",
+      "updatedAt": "2026-08-19T05:30:38.715Z"
     },
     "work-2.report-aa8e8b6d-6848-42b9-8ebe-ccb67d9a0f05": {
       "createdAt": "2026-08-07T08:43:36.872Z",
@@ -8135,7 +8181,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T05:22:39.095Z"
+    "updatedAt": "2026-08-19T05:34:09.284Z"
   },
   "schemaVersion": 1
 }
