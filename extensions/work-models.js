@@ -7685,7 +7685,7 @@ function implementationExecutionPolicy(state, cwd) {
 		requestedAssurance: lead ? "high" : "normal",
 		assuranceReasons: assurance.reasons ?? [],
 		level,
-		maxFiles: level === "small" ? 2 : 8,
+		maxFiles: level === "small" ? 2 : FINISH_TASK_DEFAULT_MAX_FILES,
 		reason: lead
 			? "canonical high-assurance floor requires Lead ownership"
 			: highRiskImplementation(issue)
@@ -7709,7 +7709,8 @@ function implementationScopeLine(state) {
 	if (state?.action !== "run-implementation") return "";
 	const level = state.executionPolicy?.level ?? "medium";
 	const maxFiles =
-		state.executionPolicy?.maxFiles ?? (level === "small" ? 2 : 8);
+		state.executionPolicy?.maxFiles ??
+		(level === "small" ? 2 : FINISH_TASK_DEFAULT_MAX_FILES);
 	return `Implementation scope: ${level}; change at most ${maxFiles} implementation files unless the acceptance contract explicitly requires more.`;
 }
 
