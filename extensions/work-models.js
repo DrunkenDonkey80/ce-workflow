@@ -4326,7 +4326,7 @@ function slicePlanAdvisorGateState(cwd, state, issue) {
 					`slice plan for WorkItem ${issue.id}`,
 					workOrchSettings(cwd).advisorUsageForSlicePlans,
 				),
-				`Do not claim or implement this WorkItem yet. After every configured advisor returns CLEAN and any grounded plan fixes are applied, append the exact durable note with node ${JSON.stringify(WORK_HELPER_SCRIPT)} work-note ${issue.id} ${JSON.stringify(marker)}. If concerns remain, persist them with work-note and stop without the PASS marker. Resume only after the exact marker is present.`,
+				`Do not claim or implement this WorkItem yet. After every configured advisor returns CLEAN and any grounded plan fixes are applied, append the exact durable note with node ${shellQuote(WORK_HELPER_SCRIPT)} work-note ${issue.id} ${shellQuote(marker)}. If concerns remain, persist them with work-note and stop without the PASS marker. Resume only after the exact marker is present.`,
 			],
 			suggestedCommands: [],
 		},
@@ -8022,7 +8022,7 @@ function planResumeAction(state, cwd, options = {}) {
 			message:
 				"A ready planning WorkItem exists after executable children were created; close or update it before resuming.",
 			suggestedCommands: [
-				`node ${WORK_HELPER_SCRIPT} work-close ${state.readyPlanning[0].id}`,
+				`node ${shellQuote(WORK_HELPER_SCRIPT)} work-close ${state.readyPlanning[0].id}`,
 				`/work-resume ${state.epic.id}`,
 			],
 		};
@@ -8042,7 +8042,7 @@ function planResumeAction(state, cwd, options = {}) {
 			message:
 				"Independent review requires an exact implementation file list; record `Files changed:` in the WorkItem before retrying.",
 			suggestedCommands: [
-				`node ${JSON.stringify(WORK_HELPER_SCRIPT)} work-summary ${activeImplementation.id}`,
+				`node ${shellQuote(WORK_HELPER_SCRIPT)} work-summary ${activeImplementation.id}`,
 				`/work-report ${activeImplementation.id}`,
 			],
 		});
@@ -8344,7 +8344,7 @@ function roleModelRouting(cwd, agent) {
 	return { strategy, candidateKey: slot.key, candidates };
 }
 
-function shellQuote(value) {
+export function shellQuote(value) {
 	return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
@@ -8416,7 +8416,7 @@ function directRoleTask(state, cwd) {
 		selected?.changedPaths?.length;
 	return [
 		"Precomputed work-orchestrator handoff. Run this role directly; do not delegate or rediscover target selection.",
-		`Every shell command that invokes the helper must use the exact supplied absolute path shell-quoted as ${helper}, especially on Windows; never invoke it bare, unquoted, or from a target-local path.`,
+		`Every Bash-tool command that invokes the helper must use the exact supplied absolute path quoted for the Bash tool's POSIX shell as ${helper}; never invoke it bare, unquoted, or from a target-local path.`,
 		...workflowPromptMetadata(),
 		state.epic
 			? `Roadmap: ${state.epic.id} — ${state.epic.title}`
@@ -11438,7 +11438,7 @@ function currentCodeEvidence(cwd, finding, evidence) {
 
 function workflowHelperGuidance(cwd, state) {
 	if (!cwd || !existsSync(WORK_HELPER_SCRIPT)) return [];
-	const script = JSON.stringify(WORK_HELPER_SCRIPT);
+	const script = shellQuote(WORK_HELPER_SCRIPT);
 	const selectedId = state.selectedWorkItem?.id;
 	const epicId = state.epic?.id;
 	return [
@@ -12938,7 +12938,7 @@ function buildPlanningStartState(cwd, args = "", size = "med") {
 					size === "big"
 						? "Propagate the wo:big-work marker to every executable descendant so the coded post-completion learning-capture gate remains eligible."
 						: "",
-					`Planner must verify dependency direction once with node ${JSON.stringify(WORK_HELPER_SCRIPT)} work-ready-summary ${idOf(resolved.epic)}.`,
+					`Planner must verify dependency direction once with node ${shellQuote(WORK_HELPER_SCRIPT)} work-ready-summary ${idOf(resolved.epic)}.`,
 				],
 			},
 			cwd,
@@ -14903,6 +14903,18 @@ function hasFinishGateEvidence(issue, gate) {
 	).test(notesOf(issue));
 }
 
+function finishGateRequested(issue, gate) {
+	const contract = [
+		notesOf(issue),
+		field(issue, "description"),
+		field(issue, "acceptance", "acceptance_criteria", "acceptanceCriteria"),
+	].join("\n");
+	return (
+		new RegExp(`\\bwo:${gate}\\b`, "i").test(contract) ||
+		(gate === "browser" && /Browser gate:\s*pending parent/i.test(contract))
+	);
+}
+
 function gitDiffChangeCount(cwd, files, ignoreWhitespace = false) {
 	if (!files.length) return Number.POSITIVE_INFINITY;
 	const output = run(cwd, "git", [
@@ -15173,8 +15185,8 @@ function buildWorkFinishState(cwd, args = "") {
 				? simplifyBeforeReviewStep()
 				: "",
 			reviewBeforeCommit ? codeReviewBeforeCommitStep(reviewLevel) : "",
-			gates.browserTestsOnUiDiff &&
-			related.some(isUiPath) &&
+			(finishGateRequested(workItem, "browser") ||
+				(gates.browserTestsOnUiDiff && related.some(isUiPath))) &&
 			!hasFinishGateEvidence(workItem, "browser")
 				? browserTestsOnUiDiffStep()
 				: "",
@@ -15515,7 +15527,7 @@ function initiativeConversionPrompt(cwd, epic) {
 					"- none detected; inspect the roadmap notes and nearby docs/brainstorms or docs/plans, then stop if no authoritative source exists",
 				]),
 		"",
-		`Run node ${JSON.stringify(WORK_HELPER_SCRIPT)} initiative-summary to scan every existing roadmap, then use work-summary or work-children-summary only for relevant candidates. Reuse semantic matches; never duplicate them.`,
+		`Run node ${shellQuote(WORK_HELPER_SCRIPT)} initiative-summary to scan every existing roadmap, then use work-summary or work-children-summary only for relevant candidates. Reuse semantic matches; never duplicate them.`,
 		"Read the linked brainstorm/plan, this roadmap's descendants, and relevant existing roadmaps. Separate already-covered outcomes, worthwhile unfinished outcomes, rejected ideas, and explicit non-goals. Create only the smallest independently completable future roadmap groups; implementation tasks stay inside a roadmap.",
 		"Ask the user with ask_user exactly one focused question at a time only when an outcome's disposition or grouping is genuinely ambiguous. Do not ask for proposal files, JSON, paths, hashes, approval to start, or decisions the sources already answer.",
 		`When the mapping is resolved, call ${INITIATIVE_RECONCILE_TOOL} once with targetId ${epic.id}. Pass source paths, concise delivery groups, and each outcome's sourceId plus exact source text. Mark exactly one group selected so existing non-roadmap children have a home. Reuse an existing roadmap with roadmapId when it already owns an outcome.`,
@@ -16900,7 +16912,7 @@ function renderWorkImproveText(state) {
 }
 
 function buildWorkImproveObjective(state) {
-	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
+	const helper = shellQuote(WORK_HELPER_SCRIPT);
 	const evidenceWarnings = state.reports
 		.filter((report) => !report.evidence.valid)
 		.map((report) => `${report.id}: ${report.evidence.problems.join("; ")}`);
@@ -21744,7 +21756,7 @@ async function handleWorkRoadmapCommand(
 				`Source intent artifacts: ${sources.join(", ")}`,
 				privatePlanPlaybookBlock(),
 				"Before normal implementation, follow the verified private planning playbook on those sources. Ask its genuine clarification questions one at a time and write the complete master plan; do not replace discovery questions with assumptions.",
-				`After private planning writes the plan, run \`node ${JSON.stringify(WORK_HELPER_SCRIPT)} bootstrap-plan-roadmap <plan-path> --roadmap ${selected}\` to attach it to this existing roadmap and create its planning WorkItem. Then continue the normal \`/work-resume ${selected}\` golden path in this same project goal.`,
+				`After private planning writes the plan, run \`node ${shellQuote(WORK_HELPER_SCRIPT)} bootstrap-plan-roadmap <plan-path> --roadmap ${selected}\` to attach it to this existing roadmap and create its planning WorkItem. Then continue the normal \`/work-resume ${selected}\` golden path in this same project goal.`,
 			].join("\n\n");
 			await startWorkGoal("project", objective, pi, ctx);
 			return {

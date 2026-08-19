@@ -237,6 +237,17 @@ const scenarioChildren = {
 				"wo:simplify NOOP\nwo:review PASS\nwo:browser WAIVED user approved evidence-only waiver\nVerification: npm run verify passed\nFiles changed: src/components/App.tsx",
 		},
 	],
+	finishBrowserPending: [
+		{
+			id: "FIN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Browser-gated backend slice",
+			notes:
+				"Review: PASS\nVerification: npm run verify passed\nBrowser gate: pending parent\nFiles: extensions/work-models.js",
+		},
+	],
 };
 
 export function assert(ok, message) {

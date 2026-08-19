@@ -449,6 +449,12 @@ check(
 		workerAgent.includes("do not create project config"),
 );
 check(
+	"worker browser deferral remains parent-owned",
+	workerAgent.includes("browser-driven web acceptance") &&
+		workerAgent.includes("parent-owned finish gate") &&
+		workerAgent.includes("Browser gate: pending parent"),
+);
+check(
 	"reviewers never block on supervisor coordination",
 	!reviewerAgent.match(/^tools:.*contact_supervisor/m) &&
 		reviewerAgent.includes(

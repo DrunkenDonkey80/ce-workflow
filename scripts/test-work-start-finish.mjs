@@ -594,6 +594,16 @@ try {
 		"finish accepts numeric shorthand for active epic child workItem",
 	);
 
+	fixture.reset("finishBrowserPending", "unknown");
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		state.ok &&
+			state.handoffPrompt?.includes(
+				"BEGIN VERIFIED PRIVATE AFFECTED-UI BROWSER PLAYBOOK",
+			),
+		"worker-deferred browser acceptance remains a required parent finish gate even when profile browser checks are off",
+	);
+
 	fixture.reset("finishMissingReview", "unknown");
 	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(

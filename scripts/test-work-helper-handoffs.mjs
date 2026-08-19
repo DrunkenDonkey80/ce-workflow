@@ -6,25 +6,29 @@ import { pathToFileURL } from "node:url";
 
 const root = realpathSync(path.join(import.meta.dirname, ".."));
 const helperPath = path.join(root, "scripts", "work-helper.mjs");
-const shellQuote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
-const quotedHelper = shellQuote(helperPath);
-const { directRoleHandoffParams } = await import(
+const { directRoleHandoffParams, shellQuote } = await import(
 	pathToFileURL(path.join(root, "extensions", "work-models.js")).href
 );
+const quotedHelper = shellQuote(helperPath);
 
 function assertQuotedHelperCommands(text, expectedPath) {
-	const commands = [
-		...text.matchAll(
-			/\bnode\s+(.+?work-helper\.mjs['"]?)(?=\s+[a-z][a-z0-9-]*(?:\s|$))/g,
-		),
-	];
-	assert(commands.length > 0, "fixture must contain a helper command");
-	for (const command of commands)
+	let count = 0;
+	for (const match of text.matchAll(/work-helper\.mjs/g)) {
+		const lineStart = text.lastIndexOf("\n", match.index) + 1;
+		const before = text.slice(lineStart, match.index);
+		const nodeAt = before.lastIndexOf("node ");
+		if (nodeAt < 0) continue;
+		count += 1;
+		let end = match.index + match[0].length;
+		if (/['"]/.test(text[end] ?? "")) end += 1;
+		const commandPath = text.slice(lineStart + nodeAt + 5, end);
 		assert.equal(
-			command[1],
+			commandPath,
 			shellQuote(expectedPath),
-			`helper command is not absolute and shell-quoted: ${command[0]}`,
+			`helper command is not absolute and Bash-shell-quoted: ${text.slice(lineStart, end)}`,
 		);
+	}
+	assert(count > 0, "fixture must contain a helper command");
 }
 
 const states = [
@@ -62,25 +66,17 @@ const states = [
 for (const fixture of states) {
 	const handoff = directRoleHandoffParams(fixture.state, root);
 	assert.equal(handoff.agent, fixture.agent);
-	assert(handoff.params.task.includes(`shell-quoted as ${quotedHelper}`));
+	assert(handoff.params.task.includes(`POSIX shell as ${quotedHelper}`));
 	assertQuotedHelperCommands(handoff.params.task, helperPath);
 }
 
 const requiredContract =
-	"exact supplied absolute path shell-quoted, especially on Windows";
+	"exact supplied absolute path quoted for the Bash tool's POSIX shell";
 for (const role of ["work-planner.md", "work-worker.md"]) {
 	const contract = readFileSync(path.join(root, "agents", role), "utf8");
 	assert(contract.includes(requiredContract), `${role} requires quoted helper paths`);
 	assert(!/\bnode\s+"?(?:\.?[\\/])?scripts[\\/]work-helper\.mjs\b/.test(contract));
 }
-
-const workerContract = readFileSync(
-	path.join(root, "agents", "work-worker.md"),
-	"utf8",
-);
-assert.match(workerContract, /browser-driven web acceptance.*parent-owned finish gate/);
-assert.match(workerContract, /Browser gate: pending parent/);
-assert.match(workerContract, /do not contact the supervisor, create a blocker, or report verification failure/);
 
 const windowsHelper = String.raw`C:\Program Files\ce workflow\scripts\work-helper.mjs`;
 assertQuotedHelperCommands(
@@ -93,7 +89,7 @@ assert.throws(
 			String.raw`node C:\Program Files\ce workflow\scripts\work-helper.mjs work-summary work-1`,
 			windowsHelper,
 		),
-	/helper command is not absolute and shell-quoted/,
+	/helper command is not absolute and Bash-shell-quoted/,
 );
 
 process.stdout.write("work helper handoff fixtures passed\n");

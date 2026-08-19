@@ -4211,6 +4211,40 @@
       "type": "task",
       "updatedAt": "2026-08-09T08:43:55.719Z"
     },
+    "work-2.report-00758dd1-6276-42bd-993a-186064d22c85": {
+      "createdAt": "2026-08-19T06:05:50.590Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A configured GLM background verifier returned terminal structured output that reconciliation classified as one partially-failed job and one failed job, while the other configured verifier models completed. `verifierCompletionBlocker` treats any failed/partially-failed job created during the goal as a permanent blocker, but there is no coded retry, dismissal, or superseding-success path, so a transient/model-format infrastructure failure makes `work_goal_complete` impossible.\nExpected: Background verifier infrastructure failures should have a deterministic recovery path: retry the exact job, or durably acknowledge/dismiss the failed profile after adequate remaining verifier coverage, without erasing valid findings or permanently blocking an otherwise complete goal.\nImpact: The work-2 snapshot is implemented, reviewed, committed, and tested, but autonomous completion is rejected solely because verifier terminal output was invalid; repeated successful verification by other configured models cannot clear the blocker.\nSuggested improvement: Add a coded retry/supersede disposition for failed verifier jobs and make the completion blocker accept an explicitly acknowledged infrastructure failure when another configured verifier successfully covered the same checkpoint operations.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/fe8f8e04-0f7c-4bdf-becd-a63e8d98c227",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1104605,
+              "file": "01-state.json",
+              "sha256": "ab606c146358ccc2a1a41988a61c2290b18f36082752911a2721290be3fe9f2c"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-19T06:05:50.586Z",
+          "workflowId": "01a010da-19e6-70b3-8a39-6102abd0510e"
+        }
+      ],
+      "id": "work-2.report-00758dd1-6276-42bd-993a-186064d22c85",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A configured GLM background verifier returned terminal structured output that reconciliation classified as one partially-failed jo",
+      "type": "task",
+      "updatedAt": "2026-08-19T06:05:50.590Z"
+    },
     "work-2.report-0b6db163-27b9-476a-bcfc-8ac8b9b7ad35": {
       "createdAt": "2026-08-18T08:10:00.217Z",
       "dependencies": [],
@@ -8195,7 +8229,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T05:59:53.356Z"
+    "updatedAt": "2026-08-19T06:05:50.590Z"
   },
   "schemaVersion": 1
 }
