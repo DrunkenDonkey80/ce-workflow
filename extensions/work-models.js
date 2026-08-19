@@ -8944,7 +8944,7 @@ function parkWorkActionLease(cwd, lease, reason) {
 			leaseId: lease.leaseId,
 			operatorAction:
 				"clear the blocker label after resolving model availability or the recorded decision",
-			recoveryCommand: `node scripts/work-helper.mjs work-label ${lease.workItemId} --remove wo:blocked`,
+			recoveryCommand: `node ${shellQuote(WORK_HELPER_SCRIPT)} work-label ${lease.workItemId} --remove wo:blocked`,
 			resumeCommand: `/work-resume ${lease.roadmapId}`,
 		};
 		const line = `wo:operator-blocker ${JSON.stringify(evidence)}`;
@@ -14494,7 +14494,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 			detail,
 			{ bootstrapRoadmapId, ...extra } = {},
 		) => {
-			const bootstrapCommand = `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>${bootstrapRoadmapId ? ` --roadmap ${bootstrapRoadmapId}` : ""}`;
+			const bootstrapCommand = `node ${shellQuote(WORK_HELPER_SCRIPT)} bootstrap-plan-roadmap <plan-path>${bootstrapRoadmapId ? ` --roadmap ${bootstrapRoadmapId}` : ""}`;
 			return {
 				ok: true,
 				action: "handoff-plan",
@@ -14523,7 +14523,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				suggestedCommands: [],
 				nextAction: bootstrapRoadmapId
 					? `Next: after private planning writes the plan, attach it with \`${bootstrapCommand}\` and return to initiative preparation.`
-					: "Next: after private planning writes the plan, bootstrap the roadmap with `node scripts/work-helper.mjs bootstrap-plan-roadmap <plan-path>` (runs the Open Question Gate), then resume the roadmap.",
+					: `Next: after private planning writes the plan, bootstrap the roadmap with \`${bootstrapCommand}\` (runs the Open Question Gate), then resume the roadmap.`,
 			};
 		};
 		const planTarget = splitPlanTarget(input);
@@ -14654,7 +14654,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				message: `Reviewing ${first} before roadmap bootstrap.`,
 				handoffPrompt: [
 					advisorStep,
-					`After advisor fixes and any bounded first-advisor re-review, run \`node scripts/work-helper.mjs bootstrap-plan-roadmap ${first}\`. Do not bootstrap the roadmap before this review gate finishes.`,
+					`After advisor fixes and any bounded first-advisor re-review, run \`node ${shellQuote(WORK_HELPER_SCRIPT)} bootstrap-plan-roadmap ${first}\`. Do not bootstrap the roadmap before this review gate finishes.`,
 				].join("\n"),
 				git: masterGit,
 				warnings: masterGit.warnings,

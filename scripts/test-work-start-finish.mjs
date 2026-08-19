@@ -25,6 +25,7 @@ const {
 	cePlanSliceStep,
 	directRoleHandoffParams,
 	createPiSubagentsVerifierAdapter,
+	shellQuote,
 } = await import(
 	pathToFileURL(
 		realpathSync(
@@ -34,6 +35,9 @@ const {
 );
 
 const fixture = installWorkflowFixture({ native: true });
+const quotedHelper = shellQuote(
+	realpathSync(path.join(import.meta.dirname, "work-helper.mjs")),
+);
 try {
 	assert(
 		createPiSubagentsVerifierAdapter({}).enforcesReadOnlyBoundary,
@@ -369,9 +373,10 @@ try {
 	);
 	assert(fixture.logs().length === 0, "work-plan does not initialize bd");
 	assert(
-		state.nextAction.includes("bootstrap-plan-roadmap") &&
-			!state.nextAction.includes("/work-plan <plan-path>"),
-		"raw work-plan bootstraps the roadmap in-flow instead of asking to re-run /work-plan",
+		state.nextAction.includes(
+			`node ${quotedHelper} bootstrap-plan-roadmap <plan-path>`,
+		) && !state.nextAction.includes("/work-plan <plan-path>"),
+		"raw work-plan bootstraps the roadmap in-flow with the installed helper",
 	);
 	assert(
 		state.handoffPrompt.includes("BEGIN VERIFIED PRIVATE PLAN PLAYBOOK") &&
@@ -428,6 +433,12 @@ try {
 	assert(
 		state.ok && state.action === "review-plan-before-bootstrap",
 		"@ plan path runs advisors before bootstrap",
+	);
+	assert(
+		state.handoffPrompt.includes(
+			`node ${quotedHelper} bootstrap-plan-roadmap ${masterPlan}`,
+		),
+		"advisor bootstrap uses the installed helper",
 	);
 	state = bootstrapPlanEpic(fixture.cwd, masterPlan);
 	assert(
