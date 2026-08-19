@@ -4887,12 +4887,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Reconciliation: the post-dispatch stale diffstat/autofix expansion claim is duplicate/shared and locally-owned under canonical work-2.76, fixed at 075ae03. The proposed ce-workflow .pi-lens.json bootstrap change is insufficient-evidence because ce-workflow has no writer for that target-project config; Pi Lens format/autofix separation is upstream-owned documented behavior, not a ce-workflow defect. The safe local repair contract updates an existing mismatched config but never invents absent project config. Verified by test-work-resume, full verify-package, independent review PASS, and coded finish.",
+        "Covered by closed canonical work-2.76 at 075ae03; locally-owned outcome verified and non-local config suggestion durably classified."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Two successive work-worker attempts to make a tiny LineaProGS.kt lifecycle edit were silently rewritten by pi-lens ktlint autofix ",
       "type": "task",
-      "updatedAt": "2026-08-19T05:13:46.262Z"
+      "updatedAt": "2026-08-19T05:34:37.364Z"
     },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
@@ -5668,12 +5671,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Reconciliation: stale pre-dispatch minimal-diff reporting and whole-file formatter expansion are duplicate/shared locally-owned claims covered by canonical work-2.76. Fixed in commit 075ae03: work-worker requires settled raw versus whitespace-ignored numstat after the final tool, and coded resume routes formatter-expanded output to repair before review/finish. Verified by test-work-resume, full verify-package, independent review PASS, and coded finish.",
+        "Covered by closed canonical work-2.76 at 075ae03; all report outcomes verified."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The work-worker implementing work-1.21 ran broad formatting on `LineaProGS.kt`, turning a two-line semantic guard into hundreds of",
       "type": "task",
-      "updatedAt": "2026-08-19T05:13:46.183Z"
+      "updatedAt": "2026-08-19T05:34:37.196Z"
     },
     "work-2.report-b13a9094-bfcc-4dcd-b119-b17894b1fc25": {
       "createdAt": "2026-08-03T22:11:07.924Z",
@@ -6001,12 +6007,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Reconciliation: malformed reviewer verdict syntax and cross-shell nul/NUL artifact creation are two locally-owned atomic claims with one shared reviewer-handoff outcome, canonical work-2.75. Fixed in commit 66eb399: both coded handoffs and agents/work-reviewer.md now use exact work-note --append-notes syntax, forbid --body/redirection, and verify an exact notes_tail marker. Verified by test-work-helper-contract, test-work-resume, full verify-package, independent review PASS, and coded finish.",
+        "Covered by closed canonical work-2.75 at 66eb399; all report outcomes verified."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The work-reviewer for target work-1.19 appended its durable verdict via an unsupported `--body` option, producing a literal note b",
       "type": "task",
-      "updatedAt": "2026-08-19T05:13:46.088Z"
+      "updatedAt": "2026-08-19T05:34:37.023Z"
     },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
@@ -8181,7 +8190,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T05:34:09.284Z"
+    "updatedAt": "2026-08-19T05:34:37.365Z"
   },
   "schemaVersion": 1
 }
