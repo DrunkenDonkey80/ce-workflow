@@ -1448,6 +1448,32 @@ try {
 		1,
 		"direct-request policy is injected once",
 	);
+	const originalChildAgent = process.env.PI_SUBAGENT_CHILD_AGENT;
+	try {
+		process.env.PI_SUBAGENT_CHILD_AGENT = "work-background-verifier";
+		const managedChildPolicy = await tempHooks.before_agent_start(
+			{ prompt: "inspect the assigned checkpoint", systemPrompt: "base" },
+			ctx,
+		);
+		assert.match(managedChildPolicy.systemPrompt, /Review cycle budget/);
+		assert.doesNotMatch(managedChildPolicy.systemPrompt, /Direct request mode/);
+		assert.equal(
+			await tempHooks.tool_call(
+				{ toolName: "work_verifier_list", input: { path: null } },
+				ctx,
+			),
+			undefined,
+			"managed work subagents retain their workflow tools",
+		);
+	} finally {
+		if (originalChildAgent === undefined)
+			delete process.env.PI_SUBAGENT_CHILD_AGENT;
+		else process.env.PI_SUBAGENT_CHILD_AGENT = originalChildAgent;
+	}
+	await tempHooks.before_agent_start(
+		{ prompt: "continue ordinary chat", systemPrompt: "base" },
+		ctx,
+	);
 
 	await tempShortcuts.f8.handler({
 		...ctx,

@@ -5230,7 +5230,8 @@
       ],
       "notes": [
         "wo:classification locally-owned — one atomic claim: work_verifier_complete_fix can commit before discovering an expired verifier claim lease, leaving Git and verifier-store state inconsistent; implement pre-commit lease renewal/validation plus rollback on post-commit store failure.",
-        "wo:verify-check PASS\nCommand: node scripts/verify-package.mjs --quiet\nOutput: ok - package checks passed"
+        "wo:verify-check PASS\nCommand: node scripts/verify-package.mjs --quiet\nOutput: ok - package checks passed",
+        "wo:review PASS 4931bc4: lease revalidated pre-Git, reset --mixed rollback preserves worktree, persisted-fix probe retains commit, test-background-verifiers.mjs passes"
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -8491,7 +8492,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T21:36:22.137Z"
+    "updatedAt": "2026-08-19T21:41:02.723Z"
   },
   "schemaVersion": 1
 }

@@ -23859,8 +23859,14 @@ export default function workModelsExtension(pi) {
 			activeWorkGoal?.status === "needs_human" &&
 				/^clarify:/i.test(contentText(event.prompt).trim()),
 		);
+		const managedWorkSubagent = /^work-/i.test(
+			process.env.PI_SUBAGENT_CHILD_AGENT ?? "",
+		);
 		const workflowTurn =
-			matchingWorkGoalTurn || goalClarificationTurn || Boolean(meta);
+			matchingWorkGoalTurn ||
+			goalClarificationTurn ||
+			managedWorkSubagent ||
+			Boolean(meta);
 		workflowTurnAuthorized = workflowTurn;
 		const turnPolicy = workflowTurn
 			? REVIEW_CYCLE_BUDGET_PROMPT
