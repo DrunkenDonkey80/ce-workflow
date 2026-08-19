@@ -14755,9 +14755,11 @@ function reviewEvents(issue) {
 	const notes = notesOf(issue);
 	const scopeIndex =
 		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
-	return [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)].filter(
-		(event) => event.index > scopeIndex,
-	);
+	return [
+		...notes.matchAll(
+			/^(?:wo:review[ \t]+|review(?: result)?[ \t]*:[ \t]*)(PASS|FAIL)\b/gim,
+		),
+	].filter((event) => event.index > scopeIndex);
 }
 
 function latestReviewVerdict(issue) {
