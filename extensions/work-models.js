@@ -14752,11 +14752,12 @@ function buildWorkMigrateState(cwd, args = "") {
 }
 
 function reviewEvents(issue) {
-	return [
-		...notesOf(issue).matchAll(
-			/(?:wo:review|review(?: result)?):?\s*(PASS|FAIL)\b/gi,
-		),
-	];
+	const notes = notesOf(issue);
+	const scopeIndex =
+		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
+	return [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)].filter(
+		(event) => event.index > scopeIndex,
+	);
 }
 
 function latestReviewVerdict(issue) {

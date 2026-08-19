@@ -333,6 +333,28 @@ const childrenByScenario = {
 				"wo:execution-agent\nwo:verify-check PASS\nwo:review PASS - no blockers",
 		},
 	],
+	inProgressStaleReviewPass: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review PASS - old scope\nwo:review-scope ["extensions/work-models.js"]',
+		},
+	],
+	inProgressQuotedReviewPass: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				"wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - parser misreads prose mentioning review PASS handling",
+		},
+	],
 	inProgressMechanicalFix: [
 		{
 			id: "AUTH-1",
@@ -839,6 +861,20 @@ try {
 	assert(
 		state.action === "finish-ready" && !state.handoffPrompt,
 		"durable review PASS skips duplicate reviewer and writer agents",
+	);
+
+	setScenario("inProgressStaleReviewPass");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-review",
+		"a PASS before the latest review scope does not satisfy the new review",
+	);
+
+	setScenario("inProgressQuotedReviewPass");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-fix",
+		"review prose mentioning PASS does not override the anchored FAIL verdict",
 	);
 
 	setScenario("inProgressMechanicalFix");
