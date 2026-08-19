@@ -462,8 +462,14 @@ const args = process.argv.slice(2);
 const dirty = process.env.WORK_RESUME_GIT_DIRTY || "clean";
 if (process.env.WORK_RESUME_GIT_FAIL === "1") process.exit(1);
 if (args[0] === "diff") {
-  if (dirty === "formatter-expanded" && args.includes("--numstat")) {
-    console.log(args.includes("--ignore-all-space") ? "8\\t2\\textensions/work-models.js" : "450\\t450\\textensions/work-models.js");
+  if (dirty.startsWith("formatter-") && args.includes("--numstat")) {
+    if (dirty === "formatter-expanded-staged" && !args.includes("HEAD")) process.exit(0);
+    const counts = dirty === "formatter-semantic"
+      ? ["180\\t0\\textensions/work-models.js", "450\\t0\\textensions/work-models.js"]
+      : dirty === "formatter-ratio"
+        ? ["60\\t0\\textensions/work-models.js", "120\\t0\\textensions/work-models.js"]
+        : ["8\\t2\\textensions/work-models.js", "450\\t450\\textensions/work-models.js"];
+    console.log(counts[args.includes("--ignore-all-space") ? 0 : 1]);
     process.exit(0);
   }
   if (dirty === "unknown" || dirty === "instruction-substantive") process.exit(1);
@@ -475,7 +481,7 @@ if (args[0] === "diff") {
   process.exit(0);
 }
 function printDirty() {
-  if (["unknown", "formatter-expanded"].includes(dirty)) console.log(" M extensions/work-models.js");
+  if (["unknown", "formatter-expanded", "formatter-expanded-staged", "formatter-semantic", "formatter-ratio"].includes(dirty)) console.log(" M extensions/work-models.js");
   if (["benign", "instruction-substantive", "instruction-formatter", "workflow"].includes(dirty)) console.log(" M AGENTS.md");
   if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
   if (dirty === "workflow") {
@@ -777,10 +783,8 @@ try {
 		state.action === "run-review" && reviewerHandoff?.agent === "work-reviewer",
 		"verified fixer result routes directly to one scoped re-review",
 	);
-	const helper = JSON.stringify(
-		realpathSync(path.join(import.meta.dirname, "work-helper.mjs")),
-	);
-	const reviewerRoot = JSON.stringify(realpathSync(cwd));
+	const helper = `'${realpathSync(path.join(import.meta.dirname, "work-helper.mjs"))}'`;
+	const reviewerRoot = `'${realpathSync(cwd)}'`;
 	assert(
 		reviewerHandoff.params.async === true &&
 			reviewerHandoff.params.control?.needsAttentionAfterMs === 30_000,
@@ -1024,9 +1028,36 @@ try {
 		state.action === "run-repair" &&
 			state.handoffReason.includes("post-dispatch numstat") &&
 			formatterRepair?.agent === "work-worker" &&
-			formatterRepair.params.task.includes("--ignore-all-space --numstat") &&
-			formatterRepair.params.task.includes("autofix.enabled: false"),
+			formatterRepair.params.task.includes(
+				"Repair formatter-expanded output now",
+			),
 		"settled formatter-expanded output routes one bounded repair before review",
+	);
+	process.env.WORK_RESUME_GIT_DIRTY = "formatter-expanded-staged";
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-repair",
+		"formatter expansion includes staged changes against HEAD",
+	);
+	for (const scenario of ["formatter-semantic", "formatter-ratio"]) {
+		process.env.WORK_RESUME_GIT_DIRTY = scenario;
+		state = buildWorkResumeState(cwd, "E-1");
+		assert(
+			state.action === "run-review",
+			`${scenario} stays on the semantic review path`,
+		);
+	}
+	const leaseDir = path.join(cwd, ".ce-workflow", "work-runs", "direct");
+	mkdirSync(leaseDir, { recursive: true });
+	writeFileSync(
+		path.join(leaseDir, "pending-direct.jsonl"),
+		`${JSON.stringify({ version: 2, type: "lease", leaseId: "formatter-repair-1", workItemId: "IMP-BIG", action: "run-repair" })}\n`,
+	);
+	process.env.WORK_RESUME_GIT_DIRTY = "formatter-expanded";
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-review",
+		"formatter expansion does not re-dispatch after one repair attempt",
 	);
 	setScenario("debug");
 

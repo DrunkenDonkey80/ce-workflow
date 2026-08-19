@@ -441,7 +441,9 @@ check(
 );
 check(
 	"worker bounds formatter and Pi Lens autofix expansion",
-	workerAgent.includes("git diff --ignore-all-space --numstat") &&
+	workerAgent.includes("git diff HEAD --numstat") &&
+		workerAgent.includes("git diff HEAD --ignore-all-space --numstat") &&
+		workerAgent.includes("at least a 4× raw-to-semantic ratio") &&
 		workerAgent.includes("formatter expansion") &&
 		workerAgent.includes("`autofix.enabled: false`") &&
 		workerAgent.includes("do not create project config"),

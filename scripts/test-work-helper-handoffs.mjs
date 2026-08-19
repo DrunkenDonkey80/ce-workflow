@@ -6,7 +6,8 @@ import { pathToFileURL } from "node:url";
 
 const root = realpathSync(path.join(import.meta.dirname, ".."));
 const helperPath = path.join(root, "scripts", "work-helper.mjs");
-const quotedHelper = JSON.stringify(helperPath);
+const shellQuote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
+const quotedHelper = shellQuote(helperPath);
 const { directRoleHandoffParams } = await import(
 	pathToFileURL(path.join(root, "extensions", "work-models.js")).href
 );
@@ -14,14 +15,14 @@ const { directRoleHandoffParams } = await import(
 function assertQuotedHelperCommands(text, expectedPath) {
 	const commands = [
 		...text.matchAll(
-			/\bnode\s+(.+?work-helper\.mjs"?)(?=\s+[a-z][a-z0-9-]*(?:\s|$))/g,
+			/\bnode\s+(.+?work-helper\.mjs['"]?)(?=\s+[a-z][a-z0-9-]*(?:\s|$))/g,
 		),
 	];
 	assert(commands.length > 0, "fixture must contain a helper command");
 	for (const command of commands)
 		assert.equal(
 			command[1],
-			JSON.stringify(expectedPath),
+			shellQuote(expectedPath),
 			`helper command is not absolute and shell-quoted: ${command[0]}`,
 		);
 }
@@ -83,7 +84,7 @@ assert.match(workerContract, /do not contact the supervisor, create a blocker, o
 
 const windowsHelper = String.raw`C:\Program Files\ce workflow\scripts\work-helper.mjs`;
 assertQuotedHelperCommands(
-	`node ${JSON.stringify(windowsHelper)} work-summary work-1`,
+	`node ${shellQuote(windowsHelper)} work-summary work-1`,
 	windowsHelper,
 );
 assert.throws(

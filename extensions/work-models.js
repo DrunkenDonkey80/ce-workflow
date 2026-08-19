@@ -129,6 +129,7 @@ import {
 	currentWorkActionLeases,
 	fenceWorkActionLease,
 	recordWorkActionLeaseCandidate,
+	readWorkActionLeaseEvents,
 	reconcileWorkActionLeaseLiveness,
 	settleWorkActionLease,
 	workActionLeaseState,
@@ -7952,6 +7953,15 @@ function resumeBlockers(childState) {
 		);
 }
 
+function priorActionAttempt(cwd, workItemId, action) {
+	return readWorkActionLeaseEvents(cwd).some(
+		(event) =>
+			event.type === "lease" &&
+			event.workItemId === workItemId &&
+			event.action === action,
+	);
+}
+
 function planResumeAction(state, cwd, options = {}) {
 	if (!state.ok) return state;
 	const activeImplementation = state.inProgressExecutable?.[0];
@@ -8089,7 +8099,10 @@ function planResumeAction(state, cwd, options = {}) {
 		)
 			return missingReviewScope();
 		if (activeImplementation.verificationReady) {
-			if (hasFormatterExpandedDiff(cwd, activeImplementation.changedPaths))
+			if (
+				hasFormatterExpandedDiff(cwd, activeImplementation.changedPaths) &&
+				!priorActionAttempt(cwd, activeImplementation.id, "run-repair")
+			)
 				return withHandoffPrompt(
 					{
 						...routed,
@@ -8097,8 +8110,7 @@ function planResumeAction(state, cwd, options = {}) {
 						handoffReason:
 							"post-dispatch numstat shows formatter-expanded output that must be repaired before review or finish",
 						handoffExtra: [
-							"Repair scope: compare `git diff --numstat` with `git diff --ignore-all-space --numstat` for the assigned paths, restore unrelated formatter hunks, and reapply only the semantic change.",
-							"Pi Lens format and autofix controls are separate. If an existing `.pi-lens.json` disables format but not autofix, add `autofix.enabled: false` before reapplying; do not create project config when the file is absent.",
+							"Repair formatter-expanded output now; do not continue to review or finish.",
 						],
 					},
 					cwd,
@@ -8332,11 +8344,15 @@ function roleModelRouting(cwd, agent) {
 	return { strategy, candidateKey: slot.key, candidates };
 }
 
+function shellQuote(value) {
+	return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
 function reviewerHandoffLines(state, cwd) {
 	const selected = state.selectedWorkItem;
 	if (!selected?.id) return [];
-	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
-	const root = JSON.stringify(realpathSync(cwd));
+	const helper = shellQuote(WORK_HELPER_SCRIPT);
+	const root = shellQuote(realpathSync(cwd));
 	const reviewOnly = (selected.changedPaths ?? [])
 		.map((file) => JSON.stringify(normalizedRepoPath(file)))
 		.join(", ");
@@ -8392,7 +8408,7 @@ function plannerLaunchBaseline(cwd) {
 
 function directRoleTask(state, cwd) {
 	const selected = state.selectedWorkItem;
-	const helper = JSON.stringify(WORK_HELPER_SCRIPT);
+	const helper = shellQuote(WORK_HELPER_SCRIPT);
 	const plannerBaseline =
 		state.action === "run-planner" ? plannerLaunchBaseline(cwd) : undefined;
 	const expectedImplementationDiff =
@@ -14891,6 +14907,7 @@ function gitDiffChangeCount(cwd, files, ignoreWhitespace = false) {
 	if (!files.length) return Number.POSITIVE_INFINITY;
 	const output = run(cwd, "git", [
 		"diff",
+		"HEAD",
 		...(ignoreWhitespace ? ["--ignore-all-space"] : []),
 		"--numstat",
 		"--",
