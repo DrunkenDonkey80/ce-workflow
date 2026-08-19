@@ -30,9 +30,7 @@ import {
 
 const mod = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
 	).href
 );
 
@@ -340,7 +338,7 @@ const projectGoalProgress = mod.renderProjectGoalProgress({
 });
 assert.equal(
 	projectGoalProgress,
-	"Roadmap [██████░░░░░░] 3/6 units (3 left · 2 unsliced) · 2m 3s · F7 Orchestrator · F8 microcompact · F9 Fleet",
+	"Roadmap [██████░░░░░░] 3/6 units (3 left · 2 unsliced) · 2m 3s · /wf Orchestrator · F8 microcompact · F9 Fleet",
 );
 assert.doesNotMatch(
 	projectGoalProgress,
@@ -437,8 +435,10 @@ assert.deepEqual(
 	"all user-facing work slash commands are removed",
 );
 assert.ok(commands["__orchestrator-goal-continue"]);
-assert.ok(shortcuts.f7);
-assert.match(shortcuts.f7.description, /orchestrator/i);
+assert.ok(commands.wf);
+assert.match(commands.wf.description, /orchestrator/i);
+assert.equal(shortcuts.f7, undefined, "F7 is phased out");
+const openWorkflow = (ctx) => commands.wf.handler("", ctx);
 assert.match(shortcuts.f8.description, /microcompact/i);
 assert.match(shortcuts.f9.description, /fleet/i);
 let fleetNotice;
@@ -449,7 +449,7 @@ await shortcuts.f9.handler({
 });
 assert.ok(fleetNotice, "F9 opens the fleet view");
 let orchestratorLabels = [];
-await shortcuts.f7.handler({
+await openWorkflow({
 	cwd: process.cwd(),
 	mode: "print",
 	ui: {
@@ -498,14 +498,14 @@ for (const action of [
 	);
 assert(orchestratorLabels.every((label) => !label.includes("/work-")));
 assert(
-	orchestratorLabels.some((label) => /\p{Emoji_Presentation}/u.test(label)),
-	"F7 labels keep their workflow icons",
+	orchestratorLabels.every((label) => !/\p{Extended_Pictographic}/u.test(label)),
+	"/wf labels avoid ambiguous-width icons",
 );
-assert(orchestratorLabels.some((label) => label.includes("🌍 Roadmaps")));
-assert(orchestratorLabels.some((label) => label.includes("⏩ Resume work")));
-assert(orchestratorLabels.some((label) => label.includes("🧠 Context guard")));
+assert(orchestratorLabels.some((label) => label.includes("Roadmaps")));
+assert(orchestratorLabels.some((label) => label.includes("Resume work")));
+assert(orchestratorLabels.some((label) => label.includes("Context guard")));
 const orchestratorRenders = [];
-await shortcuts.f7.handler({
+await openWorkflow({
 	cwd: process.cwd(),
 	mode: "tui",
 	ui: {
@@ -535,20 +535,18 @@ assert(
 	orchestratorRenders[0].some((line) => line.includes("last open roadmap")),
 );
 assert(orchestratorRenders[2].some((line) => line.includes("Settings")));
-assert.deepEqual(
-	orchestratorRenders.map((render) => render.length),
-	[
-		orchestratorRenders[0].length,
-		orchestratorRenders[0].length,
-		orchestratorRenders[0].length,
-	],
-	"F7 Orchestrator stays fixed while navigating and filtering",
+assert(
+	orchestratorRenders.every((render) =>
+		render.every((line) => !line.endsWith("\r")),
+	),
+	"/wf uses normal TUI rendering without overlay control-character padding",
 );
 
 const editorMarker = "Idea or prompt:\n";
 const editorNotices = [];
 const editorCtx = (session, draft = "") => {
 	let editorText = draft;
+	const widgetUpdates = [];
 	return {
 		cwd: process.cwd(),
 		mode: "tui",
@@ -567,11 +565,13 @@ const editorCtx = (session, draft = "") => {
 			setEditorText: (text) => {
 				editorText = text;
 			},
+			setWidget: (key, value) => widgetUpdates.push({ key, value }),
 			notify: (message, level) => editorNotices.push({ message, level }),
 		},
 		get editorText() {
 			return editorText;
 		},
+		widgetUpdates,
 	};
 };
 const routedEditorActions = [];
@@ -585,7 +585,7 @@ for (const [selection, action] of [
 ]) {
 	editorCtx.selection = selection;
 	const actionCtx = editorCtx(`editor-${action}`);
-	await shortcuts.f7.handler(actionCtx);
+	await openWorkflow(actionCtx);
 	assert.equal(actionCtx.editorText, editorMarker, `${action} exact marker`);
 	const handled = await mod.consumePendingMainEditorAction(
 		{ source: "interactive", text: `${editorMarker}  Build useful thing  ` },
@@ -600,7 +600,67 @@ for (const [selection, action] of [
 		},
 	);
 	assert.equal(handled?.action, "handled", `${action} consumes once`);
+	assert(
+		actionCtx.widgetUpdates.some(
+			(update) =>
+				update.key === "work-operation-progress" &&
+				update.value?.[0] === `${selection}: starting…`,
+		),
+		`${action} shows native startup progress`,
+	);
+	assert.equal(
+		actionCtx.widgetUpdates.at(-1)?.value,
+		undefined,
+		`${action} clears native startup progress`,
+	);
+	assert(
+		editorNotices.some(({ message }) => message === `${selection} is starting.`),
+		`${action} emits a native startup notice`,
+	);
 }
+editorCtx.selection = "Brainstorm";
+const preflightEditorCtx = editorCtx("editor-brainstorm-preflight");
+const preflightOrder = [];
+const setPreflightEditorText = preflightEditorCtx.ui.setEditorText;
+const setPreflightWidget = preflightEditorCtx.ui.setWidget;
+preflightEditorCtx.model = { provider: "test", id: "control" };
+preflightEditorCtx.modelRegistry = {
+	find: (provider, id) => ({ provider, id }),
+	complete: async () => {
+		preflightOrder.push("probe");
+		return { stopReason: "stop", content: [{ type: "text", text: "HI" }] };
+	},
+};
+preflightEditorCtx.ui.setEditorText = (text) => {
+	preflightOrder.push("editor");
+	setPreflightEditorText(text);
+};
+preflightEditorCtx.ui.setWidget = (key, value) => {
+	if (key === "work-brainstorm-agent-health" && value)
+		preflightOrder.push("progress");
+	setPreflightWidget(key, value);
+};
+await openWorkflow(preflightEditorCtx);
+assert.equal(preflightEditorCtx.editorText, editorMarker);
+assert(
+	preflightOrder.includes("progress") &&
+		preflightOrder.includes("probe") &&
+		preflightOrder.indexOf("editor") > preflightOrder.indexOf("probe"),
+	"Brainstorm checks agents with live progress before opening the editor",
+);
+let preflightRoute;
+await mod.consumePendingMainEditorAction(
+	{ source: "interactive", text: `${editorMarker}Ready topic` },
+	preflightEditorCtx,
+	{
+		execute: async (command, args, _ctx, options) => {
+			preflightRoute = { command, args, options };
+		},
+	},
+);
+assert.equal(preflightRoute.command, "work-brainstorm");
+assert.equal(preflightRoute.options.brainstormHealth.checked, true);
+
 assert.deepEqual(
 	routedEditorActions,
 	[
@@ -620,7 +680,7 @@ assert.deepEqual(
 
 editorCtx.selection = "Brainstorm";
 const typoMarkerCtx = editorCtx("editor-brainstorm-typo-marker");
-await shortcuts.f7.handler(typoMarkerCtx);
+await openWorkflow(typoMarkerCtx);
 let typoMarkerRoute;
 await mod.consumePendingMainEditorAction(
 	{ source: "interactive", text: "Idea or promt:\nKeep this brainstorm" },
@@ -646,7 +706,7 @@ const clipboardPath =
 const clipboardBody = `First line\nSecond line\n${clipboardPath}`;
 editorCtx.selection = "Brainstorm";
 const clipboardCtx = editorCtx("editor-brainstorm-clipboard");
-await shortcuts.f7.handler(clipboardCtx);
+await openWorkflow(clipboardCtx);
 const clipboardRoutes = [];
 await mod.consumePendingMainEditorAction(
 	{ source: "interactive", text: `${editorMarker}${clipboardBody}` },
@@ -670,7 +730,7 @@ assert.deepEqual(
 
 const sourceImage = { type: "image", mimeType: "image/png", data: "cG5n" };
 const imageCtx = editorCtx("editor-brainstorm-image");
-await shortcuts.f7.handler(imageCtx);
+await openWorkflow(imageCtx);
 let materializedImages;
 let imageRoute;
 await mod.consumePendingMainEditorAction(
@@ -709,7 +769,7 @@ assert(
 assert.deepEqual(imageRoute.options, { explicitFreeform: true });
 
 const emptyImagesCtx = editorCtx("editor-brainstorm-empty-images");
-await shortcuts.f7.handler(emptyImagesCtx);
+await openWorkflow(emptyImagesCtx);
 let emptyMaterializerCalls = 0;
 let emptyRoutes = 0;
 await mod.consumePendingMainEditorAction(
@@ -724,7 +784,7 @@ assert.equal(emptyMaterializerCalls, 0, "empty images skip materialization");
 assert.equal(emptyRoutes, 1, "empty images still route once");
 
 const failedImageCtx = editorCtx("editor-brainstorm-failed-image");
-await shortcuts.f7.handler(failedImageCtx);
+await openWorkflow(failedImageCtx);
 const failedSubmission = `${editorMarker}${clipboardBody}`;
 let materializeAttempts = 0;
 let failedImageRoutes = 0;
@@ -768,7 +828,7 @@ assert.equal(failedImageRoutes, 1, "reattached image retries exactly once");
 
 editorCtx.selection = "Plan";
 const blankCtx = editorCtx("editor-blank");
-await shortcuts.f7.handler(blankCtx);
+await openWorkflow(blankCtx);
 assert.equal(
 	(
 		await mod.consumePendingMainEditorAction(
@@ -790,7 +850,7 @@ await mod.consumePendingMainEditorAction(
 assert.equal(blankRoutes, 1, "blank submission keeps pending action armed");
 
 const mismatchCtx = editorCtx("editor-mismatch");
-await shortcuts.f7.handler(mismatchCtx);
+await openWorkflow(mismatchCtx);
 assert.equal(
 	await mod.consumePendingMainEditorAction(
 		{ source: "interactive", text: "ordinary chat" },
@@ -809,7 +869,7 @@ assert.equal(
 );
 
 const staleCtx = editorCtx("editor-stale");
-await shortcuts.f7.handler(staleCtx);
+await openWorkflow(staleCtx);
 assert.equal(
 	await mod.consumePendingMainEditorAction(
 		{ source: "interactive", text: `${editorMarker}stale` },
@@ -823,7 +883,7 @@ assert.equal(
 );
 
 const sourceCtx = editorCtx("editor-sources");
-await shortcuts.f7.handler(sourceCtx);
+await openWorkflow(sourceCtx);
 for (const source of ["rpc", "extension"])
 	assert.equal(
 		await mod.consumePendingMainEditorAction(
@@ -842,7 +902,7 @@ await mod.consumePendingMainEditorAction(
 assert.equal(sourceRoutes, 1, "RPC and extension inputs do not clear pending");
 
 const draftCtx = editorCtx("editor-draft", "unrelated draft");
-await shortcuts.f7.handler(draftCtx);
+await openWorkflow(draftCtx);
 assert.equal(
 	draftCtx.editorText,
 	"unrelated draft",
@@ -859,7 +919,7 @@ assert.equal(
 );
 
 const sessionCtx = editorCtx("editor-session-clear");
-await shortcuts.f7.handler(sessionCtx);
+await openWorkflow(sessionCtx);
 hooks.session_start(
 	{},
 	{
@@ -885,7 +945,7 @@ assert.equal(
 	undefined,
 );
 sessionCtx.ui.setEditorText("");
-await shortcuts.f7.handler(sessionCtx);
+await openWorkflow(sessionCtx);
 await hooks.session_shutdown(
 	{},
 	{
@@ -904,7 +964,7 @@ assert.equal(
 
 let resumePrompted = 0;
 let resumeSelections = 0;
-await shortcuts.f7.handler({
+await openWorkflow({
 	cwd: process.cwd(),
 	mode: "tui",
 	ui: {
@@ -924,7 +984,7 @@ assert.equal(
 	1,
 	"unrelated menu actions retain argument dialogs",
 );
-assert.equal(Object.keys(tools).length, 13);
+assert.equal(Object.keys(tools).length, 14);
 const assertStrictSchema = (schema) => {
 	if (!schema || typeof schema !== "object") return;
 	if (schema.properties) {
@@ -1045,10 +1105,7 @@ try {
 				},
 			}),
 		);
-		writeFileSync(
-			path.join(verifierCwd, ".gitignore"),
-			".pi/\n.ce-workflow/\n",
-		);
+		writeFileSync(path.join(verifierCwd, ".gitignore"), ".pi/\n.ce-workflow/\n");
 		writeFileSync(path.join(verifierCwd, "tracked.txt"), "before\n");
 		execFileSync("git", ["add", ".gitignore", "tracked.txt"], {
 			cwd: verifierCwd,
@@ -1125,10 +1182,7 @@ try {
 	const oldAppData = process.env.APPDATA;
 	const baseline = JSON.parse(
 		readFileSync(
-			path.join(
-				import.meta.dirname,
-				"../extensions/work-catch-up-baseline.json",
-			),
+			path.join(import.meta.dirname, "../extensions/work-catch-up-baseline.json"),
 			"utf8",
 		),
 	);
@@ -1160,7 +1214,11 @@ try {
 	);
 	assert.equal(stableRelease?.status, "unknown");
 	assert.equal(stableRelease?.reason, "offline");
-	assert.equal(stableRelease?.changed, false, "unknown release state is never promotable or current");
+	assert.equal(
+		stableRelease?.changed,
+		false,
+		"unknown release state is never promotable or current",
+	);
 	assert.equal(
 		catchUpState.packages.find((pkg) => pkg.name === "@narumitw/pi-goal")
 			?.needsReview,
@@ -1181,7 +1239,10 @@ try {
 		catchUpObjective,
 		/VERIFIED PRIVATE CATCH-UP POV PLAYBOOK \(REQUIRED FOR EVERY ACTIONABLE CANDIDATE\)/,
 	);
-	assert.match(catchUpObjective, /Adopt, Trial, Hold, Reject, or Not-our-problem/);
+	assert.match(
+		catchUpObjective,
+		/Adopt, Trial, Hold, Reject, or Not-our-problem/,
+	);
 	assert.match(catchUpObjective, /actor-visible recommendation/);
 	assert.match(
 		catchUpObjective,
@@ -1189,7 +1250,10 @@ try {
 	);
 	assert.match(catchUpObjective, /never invoke explain for any other candidate/);
 	assert.match(catchUpObjective, /allowComment=true/);
-	assert.match(catchUpObjective, /Rank viable candidates, then handle one at a time/);
+	assert.match(
+		catchUpObjective,
+		/Rank viable candidates, then handle one at a time/,
+	);
 	assert.match(catchUpObjective, /Adopt now.*Defer.*Skip this release/);
 	assert.match(catchUpObjective, /record them as no-action/);
 	assert.match(catchUpObjective, /npm run verify:quiet/);
@@ -1318,7 +1382,7 @@ try {
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes(
-				"work-orchestrator loaded · F7 Orchestrator · F8 microcompact · F9 Fleet",
+				"work-orchestrator loaded · /wf Orchestrator · F8 microcompact · F9 Fleet",
 			),
 		),
 	);
@@ -1383,7 +1447,10 @@ try {
 	);
 	assert.equal(freeformCompaction.compaction.details.profile, "freeform");
 	assert.equal(freeformCompaction.compaction.details.triggerOwner, "native");
-	assert.match(freeformCompaction.compaction.summary, /Keep this freeform task active/);
+	assert.match(
+		freeformCompaction.compaction.summary,
+		/Keep this freeform task active/,
+	);
 	assert.match(freeformCompaction.compaction.summary, /src\/freeform\.js/);
 	assert.doesNotMatch(freeformCompaction.compaction.summary, /\/work-resume/);
 	await tempHooks.session_compact(
@@ -1392,15 +1459,21 @@ try {
 	);
 	compactions.length = 0;
 	notices.length = 0;
+	const abortsBeforeBusyCompact = aborts;
 	await tempShortcuts.f8.handler(ctx);
 	assert.equal(
 		compactions.length,
-		0,
-		"busy F8 does not disturb the active turn",
+		1,
+		"busy F8 starts microcompaction at a safe interruption boundary",
+	);
+	assert.equal(
+		aborts,
+		abortsBeforeBusyCompact + 1,
+		"busy F8 pauses the active turn so compaction cannot starve",
 	);
 	assert.ok(
-		notices.some((notice) => String(notice.message).includes("queued")),
-		"busy F8 reports the queued microcompaction",
+		notices.some((notice) => String(notice.message).includes("Pausing")),
+		"busy F8 reports the safe pause",
 	);
 	await tempHooks.turn_end(
 		{},
@@ -1409,7 +1482,7 @@ try {
 	assert.equal(
 		compactions.length,
 		1,
-		"queued F8 runs after the current turn and before the next one",
+		"turn end does not duplicate the completed F8 request",
 	);
 	assert.equal(sent.length, 1, "queued F8 resumes work after compaction");
 	assert.match(sent[0].message, /Continue from the compacted context/);
@@ -1697,10 +1770,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	const contextMentionClaim = workflowClaim(contextMentionId);
 	await tempHooks.before_agent_start(
 		{
-			prompt: inlineWorkflowPrompt.replace(
-				"wr-compact-resume",
-				contextMentionId,
-			),
+			prompt: inlineWorkflowPrompt.replace("wr-compact-resume", contextMentionId),
 			systemPrompt: "base",
 		},
 		ctx,
@@ -1711,9 +1781,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			messages: [
 				{
 					role: "assistant",
-					content: [
-						{ type: "text", text: "Documented context window behavior." },
-					],
+					content: [{ type: "text", text: "Documented context window behavior." }],
 				},
 			],
 		},
@@ -1985,6 +2053,16 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		ctx,
 	);
 	const compactionsBeforeStaleRecovery = compactions.length;
+	const abortsBeforeInFlightCompact = aborts;
+	await tempShortcuts.f8.handler(ctx);
+	assert.equal(
+		aborts,
+		abortsBeforeInFlightCompact + 1,
+		"busy F8 releases an already-queued compaction by pausing the turn",
+	);
+	assert(
+		notices.some((notice) => String(notice.message).includes("queued; pausing")),
+	);
 	const noticesBeforeStaleRecovery = notices.length;
 	await tempShortcuts.f8.handler({ ...ctx, isIdle: () => true });
 	assert.equal(
@@ -2015,34 +2093,25 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		...ctx,
 		compact: (options) => compactions.push(options),
 	};
-	await tempHooks.turn_end(
+	const abortsBeforeThreshold = aborts;
+	await tempHooks.tool_execution_end(
 		{
-			message: {
-				role: "assistant",
-				stopReason: "toolUse",
-				content: [
-					{
-						type: "toolCall",
-						name: "write",
-						arguments: { path: "browser-evidence.md" },
-					},
-				],
-			},
-			toolResults: [
-				{
-					role: "toolResult",
-					toolName: "write",
-					isError: false,
-					content: [{ type: "text", text: "Successfully wrote evidence" }],
-				},
-			],
+			toolCallId: "threshold-tool",
+			toolName: "write",
+			isError: false,
+			result: "Successfully wrote evidence",
 		},
 		{ ...proactiveCompactionCtx, getContextUsage: () => ({ tokens: 160_000 }) },
 	);
 	assert.equal(
 		compactions.length,
 		2,
-		"successful write crossing the active-goal threshold starts compaction",
+		"an active goal crossing the threshold compacts at the next tool boundary",
+	);
+	assert.equal(
+		aborts,
+		abortsBeforeThreshold + 1,
+		"threshold compaction pauses the turn before context can keep growing",
 	);
 	assert.match(compactions[1].customInstructions, /on-demand microcompact/);
 	assert.equal(
@@ -2150,7 +2219,8 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	const conversationalResult = await tempHooks.input?.(
 		{
 			source: "user",
-			text: "regarding com7, you made custom firmware that removed the blocker right",
+			text:
+				"regarding com7, you made custom firmware that removed the blocker right",
 		},
 		ctx,
 	);
@@ -2473,18 +2543,13 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		},
 		projectGoalCtx,
 	);
-	await tempHooks.agent_settled(
-		{},
-		{ ...projectGoalCtx, isIdle: () => true },
-	);
+	await tempHooks.agent_settled({}, { ...projectGoalCtx, isIdle: () => true });
 	assert.equal(
 		sent.length,
 		projectGoalSent,
 		"goal continuation waits for the in-flight compaction callback",
 	);
-	projectGoalCompactions[0].onError?.(
-		new Error("This operation was aborted"),
-	);
+	projectGoalCompactions[0].onError?.(new Error("This operation was aborted"));
 	projectGoalCompactions[0].onComplete?.();
 	await new Promise((resolve) => setImmediate(resolve));
 	assert.equal(
@@ -2967,7 +3032,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		notices
 			.slice(noticeCount)
 			.some((notice) =>
-				String(notice.message).includes("Running 1. F7 → Status"),
+				String(notice.message).includes("Running 1. /wf → Status"),
 			),
 		"numbered choice with trailing text runs the selected action",
 	);

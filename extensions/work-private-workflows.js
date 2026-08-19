@@ -3,10 +3,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeSourcePath, sha256 } from "./work-compound-source.js";
 
-const RESOURCE_ROOT = fileURLToPath(new URL("./private-workflows/", import.meta.url));
-const INVENTORY_PATH = fileURLToPath(new URL("./work-compound-inventory.json", import.meta.url));
-const WORK_MODELS_CALLER = fileURLToPath(new URL("./work-models.js", import.meta.url));
-const EVALUATION_CALLER = fileURLToPath(new URL("../scripts/workflow-evaluation.mjs", import.meta.url));
+const RESOURCE_ROOT = fileURLToPath(
+	new URL("./private-workflows/", import.meta.url),
+);
+const INVENTORY_PATH = fileURLToPath(
+	new URL("./work-compound-inventory.json", import.meta.url),
+);
+const WORK_MODELS_CALLER = fileURLToPath(
+	new URL("./work-models.js", import.meta.url),
+);
+const EVALUATION_CALLER = fileURLToPath(
+	new URL("../scripts/workflow-evaluation.mjs", import.meta.url),
+);
 const ALLOWLIST = new Map([
 	["brainstorm", "brainstorm.md"],
 	["browser", "browser.md"],
@@ -38,13 +46,34 @@ const PARITY_FIELDS = [
 	"actorVisibleOutcome",
 ];
 const AUTHORITIES = new Map([
-	["work-models:F7:brainstorm:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["brainstorm"]) }],
-	["work-models:debug:investigation:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["debug"]) }],
-	["work-models:finish:learning-capture:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["learning"]) }],
-	["work-models:finish:browser:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["browser"]) }],
-	["work-models:finish:review:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["review"]) }],
-	["work-models:finish:simplify:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["simplify"]) }],
-	["work-models:F7:plan:v1", { caller: WORK_MODELS_CALLER, workflows: new Set(["plan"]) }],
+	[
+		"work-models:wf:brainstorm:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["brainstorm"]) },
+	],
+	[
+		"work-models:debug:investigation:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["debug"]) },
+	],
+	[
+		"work-models:finish:learning-capture:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["learning"]) },
+	],
+	[
+		"work-models:finish:browser:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["browser"]) },
+	],
+	[
+		"work-models:finish:review:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["review"]) },
+	],
+	[
+		"work-models:finish:simplify:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["simplify"]) },
+	],
+	[
+		"work-models:wf:plan:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["plan"]) },
+	],
 	[
 		"work-models:catch-up:candidate-review:v1",
 		{ caller: WORK_MODELS_CALLER, workflows: new Set(["pov", "explain"]) },
@@ -68,13 +97,19 @@ function confinedFile(relativePath, resourceRoot = RESOURCE_ROOT) {
 	const root = realpathSync(resourceRoot);
 	const absolute = path.resolve(root, ...normalized.split("/"));
 	if (!absolute.startsWith(`${root}${path.sep}`))
-		throw new Error(`private workflow path escapes resource root: ${relativePath}`);
+		throw new Error(
+			`private workflow path escapes resource root: ${relativePath}`,
+		);
 	const stat = lstatSync(absolute);
 	if (!stat.isFile() || stat.isSymbolicLink())
-		throw new Error(`private workflow resource is not a regular file: ${relativePath}`);
+		throw new Error(
+			`private workflow resource is not a regular file: ${relativePath}`,
+		);
 	const real = realpathSync(absolute);
 	if (!real.startsWith(`${root}${path.sep}`))
-		throw new Error(`private workflow path resolves outside resource root: ${relativePath}`);
+		throw new Error(
+			`private workflow path resolves outside resource root: ${relativePath}`,
+		);
 	return { bytes: readFileSync(real), path: real };
 }
 
@@ -89,7 +124,14 @@ function parseJson(bytes, label) {
 function verifyManifest(manifest) {
 	exactKeys(
 		manifest,
-		["schemaVersion", "verified", "translator", "provenance", "workflows", "generationSha256"],
+		[
+			"schemaVersion",
+			"verified",
+			"translator",
+			"provenance",
+			"workflows",
+			"generationSha256",
+		],
 		"manifest",
 	);
 	if (manifest.schemaVersion !== 1 || manifest.verified !== true)
@@ -120,7 +162,9 @@ export function assertCompletePrivateWorkflowParity() {
 		exactKeys(parity[workflow], PARITY_FIELDS, `${workflow} parity row`);
 		for (const field of PARITY_FIELDS)
 			if (!String(parity[workflow][field] ?? "").trim())
-				throw new Error(`incomplete private workflow parity row: ${workflow}.${field}`);
+				throw new Error(
+					`incomplete private workflow parity row: ${workflow}.${field}`,
+				);
 	}
 	return true;
 }
@@ -177,7 +221,9 @@ function resolvePrivateWorkflow(workflow, authority) {
 }
 
 export function dispatchPrivateWorkflow(workflow, authority = {}) {
-	return resolvePrivateWorkflow(workflow, authority).resource.bytes.toString("utf8");
+	return resolvePrivateWorkflow(workflow, authority).resource.bytes.toString(
+		"utf8",
+	);
 }
 
 export function describePrivateWorkflowForEvaluation(workflow, authority = {}) {

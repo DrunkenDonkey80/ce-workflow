@@ -189,18 +189,15 @@ try {
 	assert.match(
 		roadmapPreviewText(currentRoadmap),
 		/Preserve visual parity/,
-		"F7 preview uses an existing stored roadmap description",
+		"/wf preview uses an existing stored roadmap description",
 	);
 	const openRoadmap = list.roadmaps.find((epic) => epic.id === "E-2");
 	assert.match(
 		roadmapPreviewText(openRoadmap),
 		/No saved summary yet/i,
-		"F7 preview reports a missing stored summary",
+		"/wf preview reports a missing stored summary",
 	);
-	const loaderMessages = [];
-	const narrowLoaderMessages = [];
-	let progressOverlayOptions;
-	let progressTeardowns = 0;
+	const widgetUpdates = [];
 	const selectRoadmap = async (id, complete, menus = [], provider) => {
 		const notices = [];
 		const names = {
@@ -232,28 +229,10 @@ try {
 						}
 						return labels.find((label) => /Show all roadmaps/.test(label));
 					},
-					custom: (factory, customOptions) =>
-						new Promise((done) => {
-							progressOverlayOptions = customOptions;
-							let component;
-							const tui = {
-								requestRender: () => {
-									loaderMessages.push(component.render(120).join("\n"));
-									narrowLoaderMessages.push(component.render(30).join("\n"));
-								},
-							};
-							component = factory(
-								tui,
-								{ fg: (_color, value) => value },
-								{},
-								(value) => {
-									progressTeardowns += 1;
-									done(value);
-								},
-							);
-							loaderMessages.push(component.render(120).join("\n"));
-							narrowLoaderMessages.push(component.render(30).join("\n"));
-						}),
+					custom: () => {
+						throw new Error("roadmap progress must not open custom UI");
+					},
+					setWidget: (key, value) => widgetUpdates.push({ key, value }),
 					notify: (message) => notices.push(message),
 				},
 			},
@@ -299,35 +278,33 @@ try {
 			"Refactor the RF compatibility API",
 		`placeholder roadmap display metadata is generated and stored: ${JSON.stringify(generatedNotices)}`,
 	);
-	const progressTotal = loaderMessages[0].match(/0\/(\d+)/)?.[1];
-	assert(progressTotal, "production progress starts at zero with a total");
-	assert.match(
-		loaderMessages[0],
-		/╭─+╮\n│.*Processing descriptions… 0\/\d+ \[░{12}\]/,
-	);
-	assert.match(
-		narrowLoaderMessages[0],
-		/│\[░{12}\] Processing/,
-		"narrow progress keeps the bar visible by truncating the label instead",
-	);
-	assert.match(
-		loaderMessages.at(-1),
-		new RegExp(
-			`Processing descriptions… ${progressTotal}/${progressTotal} \\[█{12}\\]`,
+	const progressTotal = widgetUpdates[0]?.value?.[0]?.match(/0\/(\d+)/)?.[1];
+	assert(progressTotal, "native progress starts at zero with a total");
+	assert(
+		widgetUpdates.some(
+			(update) =>
+				update.key === "work-roadmap-descriptions" &&
+				update.value?.[0] ===
+					`Processing roadmap descriptions: ${progressTotal}/${progressTotal}`,
 		),
+		"native widget reaches the completed total",
+	);
+	assert.equal(
+		widgetUpdates.at(-1)?.value,
+		undefined,
+		"completed native widget is cleared",
 	);
 	assert(
-		loaderMessages.length > 2,
-		"production custom progress renders initial, intermediate, and total states",
+		generatedNotices.some((message) =>
+			/Processing \d+ roadmap description/.test(message),
+		),
+		"processing starts with a native in-chat notice",
 	);
-	assert.deepEqual(progressOverlayOptions, {
-		overlay: true,
-		overlayOptions: { anchor: "center", width: 56, maxHeight: 3 },
-	});
-	assert.equal(
-		progressTeardowns,
-		1,
-		"completed progress overlay tears down once",
+	assert(
+		generatedNotices.some((message) =>
+			/Processed \d+ roadmap description/.test(message),
+		),
+		"processing finishes with a native in-chat notice",
 	);
 	assert(
 		roadmapMenus[0].labels.some((label) => /Closed roadmap/.test(label)),
@@ -350,8 +327,7 @@ try {
 							{ terminal: { rows: 30 }, requestRender() {} },
 							{ fg: (_color, value) => value, bold: (value) => value },
 							{
-								matches: (data, id) =>
-									data === "escape" && id === "tui.select.cancel",
+								matches: (data, id) => data === "escape" && id === "tui.select.cancel",
 							},
 							done,
 						);
@@ -391,8 +367,7 @@ try {
 							{ terminal: { rows: 30 }, requestRender() {} },
 							{ fg: (_color, value) => value, bold: (value) => value },
 							{
-								matches: (data, id) =>
-									data === "escape" && id === "tui.select.cancel",
+								matches: (data, id) => data === "escape" && id === "tui.select.cancel",
 							},
 							done,
 						);
@@ -442,9 +417,8 @@ try {
 		"valid synthesized display metadata is persisted per item",
 	);
 	assert.equal(
-		buildWorkRoadmapState(root, "list").roadmaps.find(
-			(item) => item.id === "E-4",
-		).shortTitle,
+		buildWorkRoadmapState(root, "list").roadmaps.find((item) => item.id === "E-4")
+			.shortTitle,
 		"Refactor the RF compatibility API",
 		"projection immediately prefers valid persisted display metadata",
 	);
@@ -597,11 +571,7 @@ try {
 			},
 		);
 		await new Promise((resolve) => setImmediate(resolve));
-		assert.equal(
-			starts.length,
-			8,
-			"only eight chunks start before one settles",
-		);
+		assert.equal(starts.length, 8, "only eight chunks start before one settles");
 		pending.shift()();
 		await new Promise((resolve) => setImmediate(resolve));
 		assert.equal(starts.length, 9, "the ninth chunk starts after a slot opens");
@@ -667,8 +637,7 @@ try {
 									items: [
 										{
 											id,
-											title:
-												id === "P-4" ? "# still invalid" : "Recovered title",
+											title: id === "P-4" ? "# still invalid" : "Recovered title",
 										},
 									],
 								}),
@@ -814,78 +783,6 @@ try {
 			undefined,
 			"deleted items are skipped safely",
 		);
-
-		seedNativeStore(testBackfillRoot, many);
-		const cancelPending = [];
-		const cancelSignals = [];
-		let cancelComponent;
-		let cancelStarts = 0;
-		let cancelTeardowns = 0;
-		let cancelOverlayOptions;
-		const cancelCtx = {
-			...ctx,
-			ui: {
-				custom: (factory, customOptions) =>
-					new Promise((done) => {
-						cancelOverlayOptions = customOptions;
-						cancelComponent = factory(
-							{
-								requestRender() {
-									cancelComponent.handleInput("\x1b");
-								},
-							},
-							{ fg: (_color, value) => value },
-							{},
-							(value) => {
-								cancelTeardowns += 1;
-								done(value);
-							},
-						);
-					}),
-				notify() {},
-			},
-		};
-		const cancelRun = backfillVisibleDisplayMetadata(
-			testBackfillRoot,
-			frame,
-			cancelCtx,
-			{
-				complete: (_model, request, options) => {
-					cancelStarts += 1;
-					cancelSignals.push(options.signal);
-					return new Promise((resolve) =>
-						cancelPending.push(() => resolve(responseFor(request))),
-					);
-				},
-			},
-		);
-		await new Promise((resolve) => setImmediate(resolve));
-		assert.equal(cancelStarts, 8);
-		cancelPending.shift()();
-		await new Promise((resolve) => setImmediate(resolve));
-		assert(loadStore(testBackfillRoot).items["R-1"].displayMetadata);
-		assert(
-			cancelSignals.every((signal) => signal.aborted),
-			"abort reaches in-flight requests",
-		);
-		while (cancelPending.length) cancelPending.shift()();
-		await cancelRun;
-		assert.equal(
-			cancelTeardowns,
-			1,
-			"cancelled progress overlay tears down once",
-		);
-		assert.equal(cancelOverlayOptions?.overlayOptions?.anchor, "center");
-		assert.equal(
-			cancelStarts,
-			8,
-			"cancellation prevents the ninth chunk from starting",
-		);
-		assert.equal(
-			loadStore(testBackfillRoot).items["R-41"].displayMetadata,
-			undefined,
-			"late post-abort results are not persisted",
-		);
 	} finally {
 		rmSync(testBackfillRoot, { recursive: true, force: true });
 	}
@@ -897,10 +794,7 @@ try {
 	);
 	const tasks = buildWorkRoadmapState(root, "tasks current");
 	assert.equal(tasks.epic?.id, "E-1", JSON.stringify(tasks));
-	console.assert(
-		tasks.tasks.blockers[0].id === "BUG-1",
-		"shows blockers first",
-	);
+	console.assert(tasks.tasks.blockers[0].id === "BUG-1", "shows blockers first");
 	console.assert(
 		renderWorkRoadmapText(tasks).includes("Blockers:"),
 		"renders task groups",
@@ -982,9 +876,7 @@ try {
 		"use the brainstorm and sketch docs/brainstorms/requirements.md docs/brainstorms/sketch.html",
 	);
 	console.assert(
-		rawPlan.handoffPrompt.includes(
-			"Source artifacts to read and cite verbatim",
-		),
+		rawPlan.handoffPrompt.includes("Source artifacts to read and cite verbatim"),
 		"raw work-plan prompt preserves multiple source artifacts",
 	);
 
@@ -1023,7 +915,10 @@ try {
 		{ initialized: false },
 		{ targetEpicId: planCreated.epic.id },
 	);
-	assert.notEqual(nextPlanning.selectedWorkItem.id, planCreated.selectedWorkItem.id);
+	assert.notEqual(
+		nextPlanning.selectedWorkItem.id,
+		planCreated.selectedWorkItem.id,
+	);
 	assert.equal(nextPlanning.selectedWorkItem.status, "open");
 	const repeatedNextPlanning = bootstrapPlanEpic(
 		root,
@@ -1225,8 +1120,7 @@ try {
 							{ requestRender: () => renders++ },
 							{ fg: (_color, text) => text, bold: (text) => text },
 							{
-								matches: (data, id) =>
-									data === "escape" && id === "tui.select.cancel",
+								matches: (data, id) => data === "escape" && id === "tui.select.cancel",
 							},
 							done,
 						);
@@ -1248,9 +1142,7 @@ try {
 		{},
 		"",
 		{
-			setIntervalFn: (callback, ms) => (
-				(poll = callback), (intervalMs = ms), 41
-			),
+			setIntervalFn: (callback, ms) => ((poll = callback), (intervalMs = ms), 41),
 			clearIntervalFn: (timer) => (cleared = timer),
 		},
 	);
@@ -1369,7 +1261,7 @@ try {
 			(roadmap) => roadmap.id === "I-1",
 		).preparation,
 		preparationBeforeCancel,
-		"cancelled F7 reconciliation leaves preparation unchanged",
+		"cancelled /wf reconciliation leaves preparation unchanged",
 	);
 	const reconciled = await runPreview(true);
 	assert.equal(reconciled.state.action, "initiative-reconciled");
@@ -1483,16 +1375,12 @@ try {
 	);
 	assert.equal(
 		Object.values(plannedStore.items).some(
-			(item) =>
-				item.parentId === "I-1.2" && item.notes?.includes("wo:planning"),
+			(item) => item.parentId === "I-1.2" && item.notes?.includes("wo:planning"),
 		),
 		false,
 		"initiative broad-plan bootstrap does not create slice-planning work",
 	);
-	const strengthenChild = buildWorkPlanState(
-		initiativeRoot,
-		"I-1.2 strengthen",
-	);
+	const strengthenChild = buildWorkPlanState(initiativeRoot, "I-1.2 strengthen");
 	assert.equal(strengthenChild.action, "handoff-plan");
 	assert.match(
 		strengthenChild.handoffPrompt,
@@ -1512,10 +1400,7 @@ try {
 		{ targetEpicId: "I-1.2" },
 	);
 	const repeatedPlanStore = loadStore(initiativeRoot);
-	assert.equal(
-		repeatedPlanStore.items["I-1.2"].description,
-		plannedDescription,
-	);
+	assert.equal(repeatedPlanStore.items["I-1.2"].description, plannedDescription);
 	assert.equal(
 		Object.values(repeatedPlanStore.items).filter(
 			(item) => item.parentId === "I-1.2",
@@ -1711,19 +1596,15 @@ try {
 								.digest("hex"),
 						},
 					],
-					coverage: [
-						"R-live",
-						"R-current",
-						"R-open",
-						"R-closed",
-						"R-empty",
-					].map((epicId) => ({
-						id: `outcome-${epicId}`,
-						provenance: `projection:${epicId}`,
-						contentHash: epicId,
-						disposition: "accepted",
-						epicId,
-					})),
+					coverage: ["R-live", "R-current", "R-open", "R-closed", "R-empty"].map(
+						(epicId) => ({
+							id: `outcome-${epicId}`,
+							provenance: `projection:${epicId}`,
+							contentHash: epicId,
+							disposition: "accepted",
+							epicId,
+						}),
+					),
 					evidence: [],
 				},
 			},
@@ -1931,11 +1812,7 @@ try {
 			}),
 		].join("\n"),
 	);
-	const storePath = path.join(
-		projectionRoot,
-		".ce-workflow",
-		"work-items.json",
-	);
+	const storePath = path.join(projectionRoot, ".ce-workflow", "work-items.json");
 	const storeBytes = readFileSync(storePath);
 	const projectionRuntime = {
 		now: Date.parse("2026-07-10T00:01:00Z"),
@@ -2018,13 +1895,9 @@ try {
 		projectedInitiative.progress.total -
 			projected.roadmaps
 				.filter(
-					(roadmap) =>
-						roadmap.parentId === "I-live" && roadmap.id !== "R-empty",
+					(roadmap) => roadmap.parentId === "I-live" && roadmap.id !== "R-empty",
 				)
-				.reduce(
-					(total, roadmap) => total + Math.max(1, roadmap.progress.total),
-					0,
-				),
+				.reduce((total, roadmap) => total + Math.max(1, roadmap.progress.total), 0),
 		1,
 		"a visible empty child roadmap contributes one open target",
 	);
@@ -2425,7 +2298,7 @@ try {
 	assert.equal(
 		resumePrompts,
 		1,
-		"F7 resume starts work before closing the menu",
+		"/wf resume starts work before closing the menu",
 	);
 } finally {
 	for (const target of [root, initiativeRoot, projectionRoot, deletionRoot])

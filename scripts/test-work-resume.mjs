@@ -1587,7 +1587,7 @@ try {
 			(notice) =>
 				notice.message.includes("Action: review analysis required") &&
 				notice.message.includes(analysisState.review[0].id) &&
-				notice.message.includes("Open F7 → Review analysis"),
+				notice.message.includes("Open /wf → Review analysis"),
 		),
 		"exact-target Resume renders analysis payload and recommended action",
 	);

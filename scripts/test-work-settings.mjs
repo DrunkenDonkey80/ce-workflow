@@ -155,8 +155,7 @@ try {
 	assert(
 		effective.subagents.agentOverrides["work-advisor-2"].model ===
 			"global-model" &&
-			effective.subagents.agentOverrides["work-advisor-2"].thinking ===
-				"medium",
+			effective.subagents.agentOverrides["work-advisor-2"].thinking === "medium",
 		"nested project model settings override only selected global fields",
 	);
 	writeSettings({});
@@ -184,11 +183,7 @@ try {
 		"pre-brainstorm advisor research defaults off",
 	);
 	const advisorResearchSettings = {};
-	mod.setWorkOrchBoolean(
-		advisorResearchSettings,
-		"preBrainstormAdvisors",
-		true,
-	);
+	mod.setWorkOrchBoolean(advisorResearchSettings, "preBrainstormAdvisors", true);
 	writeSettings(advisorResearchSettings);
 	assert(
 		mod.workOrchSettings(cwd).preBrainstormAdvisors === true,
@@ -498,8 +493,7 @@ try {
 					lines = component.render(140);
 					if (
 						lines.some(
-							(line) =>
-								line.includes("[accent]") && line.includes(action.target),
+							(line) => line.includes("[accent]") && line.includes(action.target),
 						)
 					)
 						break;
@@ -709,17 +703,14 @@ try {
 		]),
 	});
 	assert(
-		globalScopeRender.includes("*✓ on Coded task-vs-plan checklist") &&
-			projectScopeRender.includes("*○ off Coded task-vs-plan checklist"),
-		"local override marker is visible in both scopes",
+		/\[local\].* on Coded task-vs-plan checklist/s.test(globalScopeRender) &&
+			/\[local\].* off Coded task-vs-plan checklist/s.test(projectScopeRender),
+		"portable local override marker is visible in both scopes",
 	);
 	assert(
-		!inheritedScopeRender.includes("*✓ on Coded task-vs-plan checklist") &&
+		!/\[local\].* on Coded task-vs-plan checklist/s.test(inheritedScopeRender) &&
 			mod.workOrchSettings(cwd).advisorVerifyTask === true &&
-			!Object.hasOwn(
-				readSettings().workOrchestrator ?? {},
-				"advisorVerifyTask",
-			),
+			!Object.hasOwn(readSettings().workOrchestrator ?? {}, "advisorVerifyTask"),
 		"Backspace clears only the selected project override",
 	);
 	assert(
@@ -757,7 +748,7 @@ try {
 		),
 	});
 	assert(
-		globalUsageChoices?.[0]?.startsWith("●All"),
+		globalUsageChoices?.[0]?.startsWith("● All"),
 		`global enum picker opens on its persisted value: ${JSON.stringify(globalUsageChoices)}`,
 	);
 	assert(
@@ -788,7 +779,7 @@ try {
 		),
 	});
 	assert(
-		projectUsageChoices?.[0]?.startsWith("●First"),
+		projectUsageChoices?.[0]?.startsWith("● First"),
 		"project enum picker opens on its persisted override",
 	);
 	assert(
@@ -804,10 +795,7 @@ try {
 	});
 	assert(
 		readGlobalSettings().workOrchestrator.advisorVerifyTask === false &&
-			!Object.hasOwn(
-				readSettings().workOrchestrator ?? {},
-				"advisorVerifyTask",
-			),
+			!Object.hasOwn(readSettings().workOrchestrator ?? {}, "advisorVerifyTask"),
 		"global-first edits write only the global settings file",
 	);
 
@@ -1157,11 +1145,7 @@ try {
 	writeSettings(settings);
 	assert(
 		JSON.stringify(mod.divergentTaskModels(cwd)) ===
-			JSON.stringify([
-				"test/generator-a",
-				"test/generator-b",
-				"test/generator-c",
-			]),
+			JSON.stringify(["test/generator-a", "test/generator-b", "test/generator-c"]),
 		"divergent branches reuse the configured advisor models",
 	);
 	const creativeStep = mod.creativeSidecarStep(cwd, "brainstorm artifact");
@@ -1196,14 +1180,11 @@ try {
 	);
 	assert(
 		JSON.stringify(healthTargets.map((target) => target.model)) ===
-			JSON.stringify([
-				"test/generator-a",
-				"test/generator-b",
-				"test/generator-c",
-			]),
+			JSON.stringify(["test/generator-a", "test/generator-b", "test/generator-c"]),
 		"brainstorm health checks each configured advisor model once",
 	);
 	const healthNotices = [];
+	const healthWidgets = [];
 	const healthCtx = {
 		cwd,
 		hasUI: true,
@@ -1222,6 +1203,7 @@ try {
 		},
 		ui: {
 			notify: (message, level) => healthNotices.push({ message, level }),
+			setWidget: (key, value) => healthWidgets.push({ key, value }),
 			select: async (_title, labels) =>
 				labels.find((label) => label.includes("Continue without")),
 		},
@@ -1237,6 +1219,22 @@ try {
 					notice.message.includes("No API key or login is available"),
 			),
 		"brainstorm preflight reports login failures and can continue without them",
+	);
+	assert(
+		healthWidgets.some(
+			({ value }) => value?.[0] === "Checking agents... (0/3)",
+		) &&
+			healthWidgets.some(({ value }) =>
+				/^Checking agents\.\.\. \([1-3]\/3\)$/u.test(value?.[0] ?? ""),
+			) &&
+			healthWidgets.at(-1)?.value === undefined,
+		"brainstorm preflight shows and clears live per-agent progress",
+	);
+	assert(
+		healthNotices.some(
+			({ message }) => message === "Agent check complete (3/3).",
+		),
+		"brainstorm preflight reports completion before opening the prompt",
 	);
 	const secretResult = await mod.probeAgentModel(
 		{
@@ -1352,9 +1350,7 @@ try {
 		"all advisor slots set to none skip artifact review",
 	);
 	assert(
-		mod
-			.divergentTaskModels(cwd)
-			.every((model) => model === "__inherit_model__"),
+		mod.divergentTaskModels(cwd).every((model) => model === "__inherit_model__"),
 		"same-model fallback still produces all three isolated branches",
 	);
 	assert(
@@ -1442,7 +1438,11 @@ try {
 		useFooterCtx([
 			{ target: "Subscription footer (global only)", key: "enter" },
 			{ target: "Subscription footer", key: "enter" },
-			{ expectInitial: "Subscription footer", target: "Provider incident markers", key: "enter" },
+			{
+				expectInitial: "Subscription footer",
+				target: "Provider incident markers",
+				key: "enter",
+			},
 			{ expectInitial: "Provider incident markers", key: "escape" },
 			{ expectInitial: "Subscription footer (global only)", key: "escape" },
 		]),

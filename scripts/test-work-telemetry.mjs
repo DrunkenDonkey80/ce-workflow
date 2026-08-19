@@ -30,16 +30,15 @@ const {
 	withCommandTelemetry,
 } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
 	).href
 );
-const { installWorkflowFixture, seedNativeStore, workflowChildParams } = await import(
-	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
-	).href
-);
+const { installWorkflowFixture, seedNativeStore, workflowChildParams } =
+	await import(
+		pathToFileURL(
+			realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
+		).href
+	);
 
 function assert(ok, message) {
 	if (!ok) throw new Error(message);
@@ -195,8 +194,8 @@ try {
 		directEvents.some(
 			(event) => event.type === "agent" && event.activity === "benchmark",
 		) &&
-			directEvents.filter((event) => event.type === "workflow-complete")
-				.length === 1,
+			directEvents.filter((event) => event.type === "workflow-complete").length ===
+				1,
 		"direct-role reconciliation emits correlated agent and terminal records with activity",
 	);
 
@@ -469,9 +468,7 @@ try {
 		"phase summary includes commit agent",
 	);
 
-	const workItem = JSON.parse(
-		buildWorkTelemetry(cwd, "workItem TASK-1 --json"),
-	);
+	const workItem = JSON.parse(buildWorkTelemetry(cwd, "workItem TASK-1 --json"));
 	assert(workItem.events === 5, "workItem filter isolates one task");
 	assert(
 		workItem.byWorkItem[0].key === "TASK-1",
@@ -484,9 +481,7 @@ try {
 		"json reports compact tool summaries instead of full tool arrays",
 	);
 
-	const blockedCwd = mkdtempSync(
-		path.join(tmpdir(), "work-blocked-telemetry-"),
-	);
+	const blockedCwd = mkdtempSync(path.join(tmpdir(), "work-blocked-telemetry-"));
 	try {
 		const blockedEvent = {
 			timestamp: now,
@@ -619,8 +614,7 @@ try {
 	releaseFirst();
 	await secondCommand;
 	const secondEvent = telemetryEvents(cwd).find(
-		(event) =>
-			event.type === "command" && event.command === "concurrent-second",
+		(event) => event.type === "command" && event.command === "concurrent-second",
 	);
 	assert(
 		secondMeta.workflowRunId === secondEvent.workflowRunId,
@@ -653,8 +647,7 @@ try {
 			registerCommand: (name, config) => {
 				commands[name] = config;
 			},
-			sendUserMessage: async (message, options) =>
-				sent.push({ message, options }),
+			sendUserMessage: async (message, options) => sent.push({ message, options }),
 		};
 		workModelsExtension(pi);
 		const invoke = (name, args, ctx) =>
@@ -688,8 +681,7 @@ try {
 				onComplete();
 			},
 			isIdle: () => true,
-			sendUserMessage: async (message, options) =>
-				sent.push({ message, options }),
+			sendUserMessage: async (message, options) => sent.push({ message, options }),
 			ui: { notify: () => {} },
 		});
 		delete process.env.WORK_ORCH_ACTIVITY_MARKER;
@@ -735,13 +727,11 @@ try {
 			cwd,
 			mode: "print",
 			getContextUsage: () => ({ tokens: 0 }),
-			sendUserMessage: async (message, options) =>
-				sent.push({ message, options }),
+			sendUserMessage: async (message, options) => sent.push({ message, options }),
 			ui: { notify: () => {} },
 		});
 		assert(
-			fixture.logs().every((entry) => entry.op !== "create") &&
-				sent.length === 0,
+			fixture.logs().every((entry) => entry.op !== "create") && sent.length === 0,
 			"print mode fails safely before creating a queued or duplicate WorkItem",
 		);
 
@@ -754,7 +744,7 @@ try {
 		});
 		assert(
 			statusNotices[0]?.includes("blockers: 1") &&
-				statusNotices[0].includes("Next: Run F7 → Blocker report BLOCK-1"),
+				statusNotices[0].includes("Next: Run /wf → Blocker report BLOCK-1"),
 			"work-status reports blocked WorkItems instead of only active/ready state",
 		);
 		fixture.reset("active");
@@ -818,8 +808,8 @@ try {
 		assert(
 			correlated.some((event) => event.type === "command") &&
 				correlated.some((event) => event.type === "agent") &&
-				correlated.filter((event) => event.type === "workflow-complete")
-					.length === 1 &&
+				correlated.filter((event) => event.type === "workflow-complete").length ===
+					1 &&
 				correlated.every((event) => event.activity === "validation"),
 			"worker command and agent share one workflow identity, marker, and terminal event",
 		);
@@ -907,17 +897,16 @@ try {
 		);
 		assert(
 			historyLines.some((line) => line.event.truncated) &&
-			readFileSync(historyFile, "utf8")
-				.split(/\r?\n/)
-				.every((line) => line.length < 12_000),
+				readFileSync(historyFile, "utf8")
+					.split(/\r?\n/)
+					.every((line) => line.length < 12_000),
 			"self-improving history bounds large lifecycle payloads",
 		);
 		assert(
 			!fixture
 				.logs()
 				.some(
-					(entry) =>
-						entry.op === "update" && entry.notes.includes("telemetry:"),
+					(entry) => entry.op === "update" && entry.notes.includes("telemetry:"),
 				),
 			"instrumented command keeps telemetry in .pi/work-runs by default",
 		);

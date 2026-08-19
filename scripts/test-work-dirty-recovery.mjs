@@ -254,8 +254,7 @@ try {
 	);
 	assert.ok(
 		Object.values(fixture.store().items).some(
-			(item) =>
-				item.title === "Recover safely" && item.status === "in_progress",
+			(item) => item.title === "Recover safely" && item.status === "in_progress",
 		),
 		"requeued clean command reaches normal work startup",
 	);
@@ -264,7 +263,7 @@ try {
 	sent.length = 0;
 	await invoke("work-resume", "E-1", ctx);
 	assert.match(sent[0]?.message ?? "", /WO_DIRTY_RECOVERY_V1/);
-	assert.ok(sent[0]?.message.includes("F7 → Resume work E-1"));
+	assert.ok(sent[0]?.message.includes("/wf → Resume work E-1"));
 
 	process.stdout.write("dirty recovery: PASS\n");
 } finally {

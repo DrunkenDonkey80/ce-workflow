@@ -5,8 +5,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const quiet =
-	process.argv.includes("--quiet") ||
-	process.env.WORK_ORCH_VERIFY_QUIET === "1";
+	process.argv.includes("--quiet") || process.env.WORK_ORCH_VERIFY_QUIET === "1";
 const failures = [];
 const check = (label, ok, detail = "") => {
 	if (ok) {
@@ -382,12 +381,12 @@ check(
 	].every((status) => verifierStore.includes(`"${status}"`)),
 );
 check(
-	"orchestrator has F7/F8/F9 shortcuts and no work slash commands",
+	"orchestrator has /wf plus F8/F9 and no legacy work slash commands",
 	!existsSync(path.join(root, "prompts")) &&
 		!models.match(/registerCommand\(["'`]work-/) &&
-		["f7", "f8", "f9"].every((key) =>
-			models.includes(`registerShortcut?.("${key}"`),
-		) &&
+		models.includes('registerCommand("wf"') &&
+		!models.includes('registerShortcut?.("f7"') &&
+		["f8", "f9"].every((key) => models.includes(`registerShortcut?.("${key}"`)) &&
 		models.includes('title: "Orchestrator"'),
 );
 const helper = read("scripts/work-helper.mjs");
@@ -457,9 +456,7 @@ check(
 check(
 	"reviewers never block on supervisor coordination",
 	!reviewerAgent.match(/^tools:.*contact_supervisor/m) &&
-		reviewerAgent.includes(
-			"Reviewers do not open blocking supervisor requests",
-		),
+		reviewerAgent.includes("Reviewers do not open blocking supervisor requests"),
 );
 check(
 	"legacy migration remains available from Orchestrator",
@@ -508,8 +505,8 @@ const tests = [
 ];
 check(
 	"background verifier test is discovered exactly once",
-	tests.filter((script) => script === "test-background-verifiers.mjs")
-		.length === 1,
+	tests.filter((script) => script === "test-background-verifiers.mjs").length ===
+		1,
 );
 const gitConfigCount = Number(process.env.GIT_CONFIG_COUNT ?? 0);
 const testEnvironment = {

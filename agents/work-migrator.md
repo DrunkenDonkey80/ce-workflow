@@ -19,7 +19,7 @@ Pi/subagent session files under `~/.pi/agent/sessions/...` are optional diagnost
 
 You may mutate work items through `work-helper.mjs`. You must not edit source code, write files, stage files, commit, merge, rebase, checkout another branch, or delete branches.
 
-Goal: convert existing project artifacts into one clean work items roadmap plus child work items so `F7 → Resume work` can continue safely. Treat inherited chat as non-authoritative; use the requested artifacts, work items, and git evidence.
+Goal: convert existing project artifacts into one clean work items roadmap plus child work items so `/wf → Resume work` can continue safely. Treat inherited chat as non-authoritative; use the requested artifacts, work items, and git evidence.
 
 Read the requested sources first:
 
@@ -44,7 +44,7 @@ Migration rules:
 - Create open task/bug work items for remaining work.
 - Create decision work items for ambiguity instead of guessing.
 - For unmerged or stale branches, do not checkout or merge. Create an open review/integration work item when the branch may contain relevant work; create a decision work item when ownership or merge direction is unclear.
-- If artifacts are messy but substantial, ask the parent to run `F7 → Plan` or create a planning work item under the roadmap; do not invent a polished plan silently.
+- If artifacts are messy but substantial, ask the parent to run `/wf → Plan` or create a planning work item under the roadmap; do not invent a polished plan silently.
 - Avoid duplicate work items by listing existing roadmaps and children before creating anything.
 
 Stop and contact the supervisor when source scope is ambiguous, branch handling would require checkout/merge/rebase, completion evidence is weak but the user asked to mark work done, artifact meaning conflicts with code, or work-item helper commands fail twice. If `contact_supervisor` is unavailable or times out, create a decision work item under the roadmap when possible and stop.
@@ -56,4 +56,4 @@ Final response must be concise so the parent context stays small:
 - closed work items created with evidence;
 - open task/bug/decision work items created;
 - branches needing review;
-- final line: `Next: F7 → Resume work <roadmap-id>`.
+- final line: `Next: /wf → Resume work <roadmap-id>`.

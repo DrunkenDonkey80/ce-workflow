@@ -174,7 +174,7 @@ const TELEMETRY_DIR_NAME = "work-runs";
 const HISTORY_DIR_NAME = "history";
 const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
-const WORK_SHORTCUT_STATUS = "F7 Orchestrator · F8 microcompact · F9 Fleet";
+const WORK_SHORTCUT_STATUS = "/wf Orchestrator · F8 microcompact · F9 Fleet";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
 const DEFAULT_THINKING = "__default_thinking__";
@@ -699,6 +699,7 @@ const pendingRichTaskComposers = new Map();
 const pendingMainEditorActions = new Map();
 const commandWorkflowStorage = new AsyncLocalStorage();
 const activeRoadmapMenuSessions = new WeakMap();
+const activeOperationProgress = new WeakSet();
 let activeHistoryTask = null;
 let activeWorkAgent = null;
 const finishHelperStarts = new Map();
@@ -2231,6 +2232,7 @@ function summarizeToolResult(event, started) {
 const ORCHESTRATOR_ACTION_LABELS = {
 	"work-add": "Add work",
 	"work-analyze": "Analyze",
+	"work-agent-health": "Agent health",
 	"work-auto": "Auto-route task",
 	"work-big": "Large task",
 	"work-brainstorm": "Brainstorm",
@@ -2269,7 +2271,7 @@ function roadmapTerminology(value) {
 		.replace(
 			/(^|[\s"'`(])\/(work-[\w-]+)/gm,
 			(_match, prefix, command) =>
-				`${prefix}F7 → ${ORCHESTRATOR_ACTION_LABELS[command] ?? command}`,
+				`${prefix}/wf → ${ORCHESTRATOR_ACTION_LABELS[command] ?? command}`,
 		)
 		.replace(
 			/((?:--type[=\s]+|type\s*[:=]\s*["'`]?))epic\b/gi,
@@ -2286,6 +2288,39 @@ function notify(ctx, message, level = "info") {
 	const text = roadmapTerminology(message);
 	ctx.ui.notify(text, level);
 	if (ctx.mode === "print" || ctx.hasUI === false) console.log(text);
+}
+
+const LONG_ORCHESTRATOR_ACTIONS = new Set([
+	"work-agent-health",
+	"work-big",
+	"work-brainstorm",
+	"work-catch-up",
+	"work-debug",
+	"work-finish",
+	"work-goal",
+	"work-improve",
+	"work-master",
+	"work-med",
+	"work-migrate",
+	"work-plan",
+	"work-remove-beads",
+	"work-research",
+	"work-resume",
+	"work-resume-goal",
+	"work-small",
+]);
+
+async function withOperationProgress(ctx, label, operation) {
+	if (activeOperationProgress.has(ctx)) return operation();
+	activeOperationProgress.add(ctx);
+	notify(ctx, `${label} is starting.`, "info");
+	ctx.ui?.setWidget?.("work-operation-progress", [`${label}: starting…`]);
+	try {
+		return await operation();
+	} finally {
+		ctx.ui?.setWidget?.("work-operation-progress", undefined);
+		activeOperationProgress.delete(ctx);
+	}
 }
 
 export function privateWorkflowActivationWarning(activation) {
@@ -4143,7 +4178,7 @@ function researchHandoffPrompt(cwd, question) {
 				? `Challenge that draft with one parallel fresh-context advisor pass using ${advisors.join(", ")}. Give every advisor the same draft, evidence, and source URLs; assign distinct charters in order: evidence/assumption auditor, feasibility/operator critic, adversarial simplifier. Advisors are read-only, must not launch subagents, and unavailable advisors are recorded without retry.`
 				: `Challenge that draft with separate fresh-context single-agent calls, one at a time, using ${advisors.join(", ")}. Wait for each before starting the next. Give every advisor the same draft, evidence, and source URLs; assign distinct charters in order: evidence/assumption auditor, feasibility/operator critic, adversarial simplifier. Advisors are read-only, must not launch subagents, and unavailable advisors are recorded without retry.`
 			: "No advisors are configured; perform one concise evidence, feasibility, and simplicity self-critique instead.",
-		"Return a concise but complete answer with: direct answer; evidence and citations; materially different options and trade-offs; advisor disagreements/challenges; confidence and unknowns; and one refined prompt suitable for F7 → Brainstorm or F7 → Large task.",
+		"Return a concise but complete answer with: direct answer; evidence and citations; materially different options and trade-offs; advisor disagreements/challenges; confidence and unknowns; and one refined prompt suitable for /wf → Brainstorm or /wf → Large task.",
 		"Do not create project or research artifacts, work items, roadmaps, commits, or settings. Do not automatically start Brainstorm or Large task.",
 		ROLE_TIMEOUT_GUIDANCE,
 	].join("\n");
@@ -4406,7 +4441,7 @@ function applyInlineSlicePlan(cwd, state, issue) {
 
 function privatePlanPlaybookBlock() {
 	const playbook = dispatchPrivateWorkflow("plan", {
-		actionToken: "work-models:F7:plan:v1",
+		actionToken: "work-models:wf:plan:v1",
 		callerUrl: import.meta.url,
 	});
 	return `--- BEGIN VERIFIED PRIVATE PLAN PLAYBOOK ---\n${playbook}--- END VERIFIED PRIVATE PLAN PLAYBOOK ---`;
@@ -4704,14 +4739,21 @@ async function probeAgentModel(
 	}
 }
 
-async function checkAgentHealth(ctx, scope = "all", timeoutMs) {
+async function checkAgentHealth(ctx, scope = "all", timeoutMs, onProgress) {
 	const targets = selectedAgentHealthTargets(
 		ctx.cwd,
 		currentModelId(ctx),
 		scope,
 	);
+	let complete = 0;
+	onProgress?.(complete, targets.length);
 	return Promise.all(
-		targets.map((target) => probeAgentModel(ctx, target, timeoutMs)),
+		targets.map(async (target) => {
+			const result = await probeAgentModel(ctx, target, timeoutMs);
+			complete += 1;
+			onProgress?.(complete, targets.length);
+			return result;
+		}),
 	);
 }
 
@@ -4737,14 +4779,38 @@ async function runAgentHealthMenu(ctx) {
 }
 
 async function brainstormAgentHealthPreflight(ctx) {
-	if (!ctx.modelRegistry?.complete) return { proceed: true, offlineModels: [] };
-	ctx.ui.notify("Checking brainstorm agent models...", "info");
-	const results = await checkAgentHealth(ctx, "brainstorm");
+	if (!ctx.modelRegistry?.complete)
+		return { proceed: true, offlineModels: [], checked: false };
+	const progressKey = "work-brainstorm-agent-health";
+	let results;
+	try {
+		results = await checkAgentHealth(
+			ctx,
+			"brainstorm",
+			undefined,
+			(complete, total) => {
+				const message = `Checking agents... (${complete}/${total})`;
+				ctx.ui?.setWidget?.(progressKey, [message]);
+				if (complete === 0) ctx.ui.notify(message, "info");
+			},
+		);
+	} finally {
+		ctx.ui?.setWidget?.(progressKey, undefined);
+	}
+	ctx.ui.notify(
+		`Agent check complete (${results.length}/${results.length}).`,
+		"info",
+	);
 	const offline = results.filter((result) => !result.ok);
-	if (!offline.length) return { proceed: true, offlineModels: [] };
+	if (!offline.length)
+		return { proceed: true, offlineModels: [], checked: true };
 	ctx.ui.notify(renderAgentHealth(results), "warning");
 	if (!ctx.hasUI && ctx.mode !== "tui")
-		return { proceed: false, offlineModels: offline.map((item) => item.model) };
+		return {
+			proceed: false,
+			offlineModels: offline.map((item) => item.model),
+			checked: true,
+		};
 	const selected = await showListDialog(ctx, {
 		title: "Brainstorm agent health",
 		purpose:
@@ -4772,6 +4838,7 @@ async function brainstormAgentHealthPreflight(ctx) {
 	return {
 		proceed: selected?.value === "continue",
 		offlineModels: offline.map((item) => item.model),
+		checked: true,
 	};
 }
 
@@ -5610,7 +5677,7 @@ function maybeCompact(ctx, settings) {
 	return requestManualMicrocompact(ctx);
 }
 
-function runManualMicrocompact(ctx) {
+function runManualMicrocompact(ctx, interruptActive = false) {
 	if (typeof ctx.compact !== "function") {
 		manualMicrocompactPending = false;
 		manualMicrocompactResumePrompt = null;
@@ -5665,6 +5732,7 @@ function runManualMicrocompact(ctx) {
 			),
 		);
 	};
+	if (interruptActive) ctx.abort?.();
 	ctx.ui.notify("Microcompaction started", "info");
 	try {
 		ctx.compact({
@@ -5698,6 +5766,14 @@ function runManualMicrocompact(ctx) {
 function requestManualMicrocompact(ctx) {
 	if (typeof ctx.compact !== "function") return runManualMicrocompact(ctx);
 	if (contextCompactState.inFlight) {
+		if (ctx.isIdle?.() === false) {
+			ctx.ui.notify(
+				"Microcompaction is queued; pausing the current turn now",
+				"info",
+			);
+			ctx.abort?.();
+			return true;
+		}
 		ctx.ui.notify("Microcompaction is already in progress", "info");
 		return false;
 	}
@@ -5706,8 +5782,8 @@ function requestManualMicrocompact(ctx) {
 	const workflow = activeWorkAgent ?? pendingWorkPrompt;
 	manualMicrocompactResumePrompt = workflow?.prompt ?? null;
 	manualMicrocompactWorkflowRunId = workflow?.meta?.workflowRunId ?? null;
-	ctx.ui.notify("Microcompaction queued for the next idle boundary", "info");
-	return true;
+	ctx.ui.notify("Pausing the current turn for microcompaction", "info");
+	return runManualMicrocompact(ctx, true);
 }
 
 function nodeScript(value) {
@@ -10369,7 +10445,7 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 		});
 		ctx.ui.notify(
 			scheduled.status === "queued"
-				? `Analysis queued as ${scheduled.batch.id}. Inspect with F7 → Status; triage with F7 → Resume work.`
+				? `Analysis queued as ${scheduled.batch.id}. Inspect with /wf → Status; triage with /wf → Resume work.`
 				: `Analysis ${scheduled.status}: ${scheduled.reason ?? "not scheduled"}${scheduled.batch?.id ? ` (${scheduled.batch.id})` : ""}`,
 			scheduled.status === "queued" ? "info" : "warning",
 		);
@@ -11687,7 +11763,7 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 				reason: "review-analysis-required",
 				message: `${review.length} analysis review entr${review.length === 1 ? "y requires" : "ies require"} human resolution before work resumes.`,
 				review,
-				suggestedCommands: ["Open F7 → Review analysis"],
+				suggestedCommands: ["Open /wf → Review analysis"],
 				warnings: [],
 			};
 		let resolved = resolveResumeTarget(cwd, target);
@@ -14235,7 +14311,7 @@ function brainstormHandoffPrompt(
 	const privatePlaybook = artifact
 		? ""
 		: dispatchPrivateWorkflow("brainstorm", {
-				actionToken: "work-models:F7:brainstorm:v1",
+				actionToken: "work-models:wf:brainstorm:v1",
 				callerUrl: import.meta.url,
 			});
 	return [
@@ -17721,7 +17797,7 @@ function workGoalSummary(goal = activeWorkGoal) {
 		goal.decision
 			? `Human decision: ${formatWorkGoalDecision(goal.decision)}`
 			: "",
-		"Commands: autonomous goal pause|resume|clear|status|edit <objective>; autonomous goal --tokens 100k <objective>; F7 → Stop safely for a clean stop",
+		"Commands: autonomous goal pause|resume|clear|status|edit <objective>; autonomous goal --tokens 100k <objective>; /wf → Stop safely for a clean stop",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -18579,10 +18655,10 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 	if (working) ctx.abort();
 	ctx.ui.notify(
 		working
-			? "F7 → Stop safely: current turn stopped; completed changes were preserved."
+			? "/wf → Stop safely: current turn stopped; completed changes were preserved."
 			: activeWorkGoal
-				? "F7 → Stop safely: work stopped. Open F7 → Resume work to continue."
-				: "F7 → Stop safely: nothing active to stop.",
+				? "/wf → Stop safely: work stopped. Open /wf → Resume work to continue."
+				: "/wf → Stop safely: nothing active to stop.",
 		working || activeWorkGoal ? "info" : "warning",
 	);
 }
@@ -18714,7 +18790,7 @@ function mainEditorActionKey(ctx) {
 	return `${resolve(ctx?.cwd ?? process.cwd())}\u0000${ctx?.sessionManager?.getSessionId?.() ?? `process-${process.pid}`}`;
 }
 
-function prepareMainEditorAction(command, ctx) {
+async function prepareMainEditorAction(command, ctx) {
 	if (
 		ctx.mode !== "tui" ||
 		typeof ctx.ui?.getEditorText !== "function" ||
@@ -18729,11 +18805,17 @@ function prepareMainEditorAction(command, ctx) {
 		);
 		return true;
 	}
+	const brainstormHealth =
+		command === "work-brainstorm"
+			? await brainstormAgentHealthPreflight(ctx)
+			: undefined;
+	if (brainstormHealth && !brainstormHealth.proceed) return true;
 	ctx.ui.setEditorText(MAIN_EDITOR_ACTION_MARKER);
 	pendingMainEditorActions.set(mainEditorActionKey(ctx), {
 		action: command,
 		marker: MAIN_EDITOR_ACTION_MARKER,
 		createdAt: Date.now(),
+		...(brainstormHealth?.checked ? { brainstormHealth } : {}),
 	});
 	return true;
 }
@@ -18787,11 +18869,19 @@ export async function consumePendingMainEditorAction(event, ctx, runtime = {}) {
 		}
 	}
 	pendingMainEditorActions.delete(mainEditorActionKey(ctx));
-	if (explicitFreeform)
-		await runtime.execute(pending.action, body, ctx, {
-			explicitFreeform: true,
-		});
-	else await runtime.execute(pending.action, body, ctx);
+	await withOperationProgress(
+		ctx,
+		ORCHESTRATOR_ACTION_LABELS[pending.action] ?? "Workflow action",
+		() =>
+			explicitFreeform
+				? runtime.execute(pending.action, body, ctx, {
+						explicitFreeform: true,
+						...(pending.brainstormHealth
+							? { brainstormHealth: pending.brainstormHealth }
+							: {}),
+					})
+				: runtime.execute(pending.action, body, ctx),
+	);
 	return { action: "handled" };
 }
 
@@ -19249,7 +19339,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 			readPrivateWorkflowActivationState(WORKFLOW_REPO_DIR)?.status,
 		);
 	} catch {
-		// Invalid activation state is reported during startup, not while rendering F7.
+		// Invalid activation state is reported during startup, not while rendering /wf.
 	}
 	const items = [
 		{
@@ -19573,7 +19663,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		const item = selected.item;
 		if (
 			MAIN_EDITOR_ACTIONS.has(selected.value) &&
-			prepareMainEditorAction(selected.value, ctx)
+			(await prepareMainEditorAction(selected.value, ctx))
 		)
 			return;
 		let args = "";
@@ -19683,7 +19773,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("Resume stopped. Open F7 → Resume work to continue.", "info");
+		ctx.ui.notify("Resume stopped. Open /wf → Resume work to continue.", "info");
 		finishWarpWork(ctx, workWarpMode(goal.mode, goal), "stopped");
 		return;
 	}
@@ -20942,52 +21032,23 @@ function parseDisplayMetadataBatch(value, items) {
 	return { valid, retry };
 }
 
-function displayMetadataProgress(tui, theme, keybindings, total, done) {
+function displayMetadataProgress(ctx, total) {
 	const controller = new AbortController();
 	let completed = 0;
-	let finished = false;
+	const update = () =>
+		ctx.ui.setWidget?.("work-roadmap-descriptions", [
+			`Processing roadmap descriptions: ${completed}/${total}`,
+		]);
+	update();
 	return {
 		signal: controller.signal,
 		advance(count = 1) {
 			completed = Math.min(total, completed + count);
-			tui.requestRender?.();
+			update();
 		},
-		finish(value) {
-			if (finished) return;
-			finished = true;
-			done(value);
+		clear() {
+			ctx.ui.setWidget?.("work-roadmap-descriptions", undefined);
 		},
-		render(width) {
-			const boxWidth = Math.min(54, Math.max(12, width));
-			const innerWidth = boxWidth - 2;
-			const status = `Processing descriptions… ${completed}/${total}`;
-			const bar = progressBar(
-				completed,
-				total,
-				Math.min(12, Math.max(1, innerWidth - 2)),
-			);
-			const message = truncate(
-				status.length + bar.length < innerWidth
-					? `${status} ${bar}`
-					: `${bar} ${status}`,
-				Math.max(1, innerWidth - 1),
-			);
-			const content = `${message}${" ".repeat(Math.max(0, innerWidth - message.length))}`;
-			const border =
-				theme.fg?.("border", `─`.repeat(innerWidth)) ?? `─`.repeat(innerWidth);
-			return [
-				`╭${border}╮`,
-				`│${theme.fg?.("accent", content) ?? content}│`,
-				`╰${border}╯`,
-			];
-		},
-		handleInput(data) {
-			if (data === "\x1b" || keybindings.matches?.(data, "tui.select.cancel")) {
-				controller.abort();
-				this.finish(null);
-			}
-		},
-		invalidate() {},
 	};
 }
 
@@ -21029,7 +21090,7 @@ export async function backfillVisibleDisplayMetadata(
 	ctx,
 	runtime = {},
 ) {
-	if (ctx.mode !== "tui") return;
+	if (ctx.mode !== "tui" && !ctx.hasUI) return;
 	const missing = visibleRoadmapItems(cwd, frame).filter(
 		(item) => !validDisplayMetadata(item),
 	);
@@ -21040,133 +21101,108 @@ export async function backfillVisibleDisplayMetadata(
 	}
 	const runKey = resolve(storePath(cwd));
 	if (displayMetadataRuns.has(runKey)) return displayMetadataRuns.get(runKey);
-	let background;
-	const uiRun = ctx.ui.custom(
-		(tui, theme, keybindings, done) => {
-			const progress = displayMetadataProgress(
-				tui,
-				theme,
-				keybindings,
-				missing.length,
-				done,
-			);
-			background = (async () => {
+	const progress = displayMetadataProgress(ctx, missing.length);
+	notify(ctx, `Processing ${missing.length} roadmap description(s).`, "info");
+	const run = (async () => {
+		if (progress.signal.aborted) return;
+		const completeModel =
+			runtime.complete ?? ctx.modelRegistry.complete?.bind(ctx.modelRegistry);
+		if (!completeModel)
+			throw new Error("Pi model runtime completion is unavailable.");
+		const options = { signal: progress.signal };
+		const fingerprints = new Map(
+			missing.map((item) => [idOf(item), displayMetadataFingerprint(item)]),
+		);
+		const failures = new Map();
+		const persist = async (entries) => {
+			if (progress.signal.aborted || !entries.length) return;
+			await withFileMutationQueue(storePath(cwd), async () => {
 				if (progress.signal.aborted) return;
-				const completeModel =
-					runtime.complete ?? ctx.modelRegistry.complete?.bind(ctx.modelRegistry);
-				if (!completeModel)
-					throw new Error("Pi model runtime completion is unavailable.");
-				const options = { signal: progress.signal };
-				const fingerprints = new Map(
-					missing.map((item) => [idOf(item), displayMetadataFingerprint(item)]),
-				);
-				const failures = new Map();
-				const persist = async (entries) => {
-					if (progress.signal.aborted || !entries.length) return;
-					await withFileMutationQueue(storePath(cwd), async () => {
+				mutateStore(cwd, (store) => {
+					for (const entry of entries) {
 						if (progress.signal.aborted) return;
-						mutateStore(cwd, (store) => {
-							for (const entry of entries) {
-								if (progress.signal.aborted) return;
-								const previous = store.items[entry.id];
-								if (
-									!previous ||
-									validDisplayMetadata(previous) ||
-									displayMetadataFingerprint(previous) !== fingerprints.get(entry.id)
-								)
-									continue;
-								updateWorkItem(store, entry.id, {
-									displayMetadata: {
-										schemaVersion: DISPLAY_METADATA_SCHEMA_VERSION,
-										title: entry.title,
-									},
-									...(entry.description
-										? { description: entry.description }
-										: { updatedAt: previous.updatedAt }),
-								});
-							}
+						const previous = store.items[entry.id];
+						if (
+							!previous ||
+							validDisplayMetadata(previous) ||
+							displayMetadataFingerprint(previous) !== fingerprints.get(entry.id)
+						)
+							continue;
+						updateWorkItem(store, entry.id, {
+							displayMetadata: {
+								schemaVersion: DISPLAY_METADATA_SCHEMA_VERSION,
+								title: entry.title,
+							},
+							...(entry.description
+								? { description: entry.description }
+								: { updatedAt: previous.updatedAt }),
 						});
-					});
-				};
-				const complete = async (items) => {
-					if (progress.signal.aborted) return;
-					let response;
-					try {
-						response = await completeModel(
-							ctx.model,
-							displayMetadataRequest(items),
-							options,
-						);
-					} catch {
-						if (progress.signal.aborted) return;
-						return {
-							valid: [],
-							retry: new Map(items.map((item) => [idOf(item), "request failed"])),
-						};
-					}
-					if (progress.signal.aborted) return;
-					if (!response || response.stopReason === "error")
-						return {
-							valid: [],
-							retry: new Map(items.map((item) => [idOf(item), "request failed"])),
-						};
-					if (response.stopReason === "aborted") return;
-					const text = (response.content ?? [])
-						.filter((part) => part.type === "text")
-						.map((part) => part.text)
-						.join("\n");
-					if (progress.signal.aborted) return;
-					return parseDisplayMetadataBatch(text, items);
-				};
-				const retryItems = [];
-				const chunks = [];
-				for (
-					let offset = 0;
-					offset < missing.length;
-					offset += DISPLAY_METADATA_BATCH_SIZE
-				)
-					chunks.push(missing.slice(offset, offset + DISPLAY_METADATA_BATCH_SIZE));
-				await runDisplayMetadataJobs(chunks, progress.signal, async (items) => {
-					const parsed = await complete(items);
-					if (progress.signal.aborted || !parsed) return;
-					await persist(parsed.valid);
-					if (progress.signal.aborted) return;
-					for (const _entry of parsed.valid) progress.advance();
-					for (const item of items) {
-						const reason = parsed.retry.get(idOf(item));
-						if (reason) retryItems.push(item);
 					}
 				});
-				if (progress.signal.aborted) return;
-				await runDisplayMetadataJobs(retryItems, progress.signal, async (item) => {
-					const parsed = await complete([item]);
-					if (progress.signal.aborted || !parsed) return;
-					await persist(parsed.valid);
-					if (progress.signal.aborted) return;
-					const id = idOf(item);
-					if (parsed.retry.has(id)) failures.set(id, parsed.retry.get(id));
-					progress.advance();
-				});
-				if (progress.signal.aborted) return;
-				const result = { failures };
-				progress.finish(result);
-				return result;
-			})().catch((error) => {
-				const result = { error };
-				progress.finish(result);
-				return result;
 			});
-			return progress;
-		},
-		{
-			overlay: true,
-			overlayOptions: { anchor: "center", width: 56, maxHeight: 3 },
-		},
-	);
-	const run = Promise.resolve(uiRun).then(async (result) => {
-		await background;
-		return result;
-	});
+		};
+		const complete = async (items) => {
+			if (progress.signal.aborted) return;
+			let response;
+			try {
+				response = await completeModel(
+					ctx.model,
+					displayMetadataRequest(items),
+					options,
+				);
+			} catch {
+				if (progress.signal.aborted) return;
+				return {
+					valid: [],
+					retry: new Map(items.map((item) => [idOf(item), "request failed"])),
+				};
+			}
+			if (progress.signal.aborted) return;
+			if (!response || response.stopReason === "error")
+				return {
+					valid: [],
+					retry: new Map(items.map((item) => [idOf(item), "request failed"])),
+				};
+			if (response.stopReason === "aborted") return;
+			const text = (response.content ?? [])
+				.filter((part) => part.type === "text")
+				.map((part) => part.text)
+				.join("\n");
+			if (progress.signal.aborted) return;
+			return parseDisplayMetadataBatch(text, items);
+		};
+		const retryItems = [];
+		const chunks = [];
+		for (
+			let offset = 0;
+			offset < missing.length;
+			offset += DISPLAY_METADATA_BATCH_SIZE
+		)
+			chunks.push(missing.slice(offset, offset + DISPLAY_METADATA_BATCH_SIZE));
+		await runDisplayMetadataJobs(chunks, progress.signal, async (items) => {
+			const parsed = await complete(items);
+			if (progress.signal.aborted || !parsed) return;
+			await persist(parsed.valid);
+			if (progress.signal.aborted) return;
+			for (const _entry of parsed.valid) progress.advance();
+			for (const item of items) {
+				const reason = parsed.retry.get(idOf(item));
+				if (reason) retryItems.push(item);
+			}
+		});
+		if (progress.signal.aborted) return;
+		await runDisplayMetadataJobs(retryItems, progress.signal, async (item) => {
+			const parsed = await complete([item]);
+			if (progress.signal.aborted || !parsed) return;
+			await persist(parsed.valid);
+			if (progress.signal.aborted) return;
+			const id = idOf(item);
+			if (parsed.retry.has(id)) failures.set(id, parsed.retry.get(id));
+			progress.advance();
+		});
+		if (progress.signal.aborted) return;
+		return { failures };
+	})().catch((error) => ({ error }));
 	displayMetadataRuns.set(runKey, run);
 	try {
 		const result = await run;
@@ -21189,14 +21225,17 @@ export async function backfillVisibleDisplayMetadata(
 				`Could not process descriptions for ${result.failures.size} work item(s): ${reasons}.`,
 				"warning",
 			);
+		} else {
+			notify(ctx, `Processed ${missing.length} roadmap description(s).`, "info");
 		}
 	} finally {
+		progress.clear();
 		displayMetadataRuns.delete(runKey);
 	}
 }
 
 async function backfillOpenRoadmapMetadata(cwd, roadmaps, ctx, runtime = {}) {
-	if (ctx.mode !== "tui") return;
+	if (ctx.mode !== "tui" && !ctx.hasUI) return;
 	const missing = roadmaps.filter(
 		(item) => roadmapIsOpen(item) && roadmapNeedsGeneratedMetadata(item),
 	);
@@ -22714,6 +22753,17 @@ async function executeOrchestratorAction(
 ) {
 	const name = String(command ?? "").replace(/^\//, "");
 	const text = String(args ?? "");
+	if (
+		LONG_ORCHESTRATOR_ACTIONS.has(name) &&
+		(ctx.mode === "tui" || ctx.hasUI) &&
+		!activeOperationProgress.has(ctx)
+	)
+		return withOperationProgress(
+			ctx,
+			ORCHESTRATOR_ACTION_LABELS[name] ?? "Workflow action",
+			() =>
+				executeOrchestratorAction(command, args, ctx, pi, selectionNote, options),
+		);
 	const builders = {
 		"work-init": buildWorkInitState,
 		"work-pause": buildWorkPauseState,
@@ -22760,7 +22810,7 @@ async function executeOrchestratorAction(
 		if (action) {
 			notify(
 				ctx,
-				"Use F7 to start, or type “scout status”, “scout review”, or “stop scout”.",
+				"Use /wf to start, or type “scout status”, “scout review”, or “stop scout”.",
 				"warning",
 			);
 			return { ok: false, error: "invalid extension scout action" };
@@ -22833,7 +22883,8 @@ async function executeOrchestratorAction(
 	if (name === "work-brainstorm")
 		return withCommandTelemetry(name, text, ctx, async () => {
 			cleanupBenignInstructionDirt(ctx.cwd);
-			const health = await brainstormAgentHealthPreflight(ctx);
+			const health =
+				options.brainstormHealth ?? (await brainstormAgentHealthPreflight(ctx));
 			if (!health.proceed) {
 				const state = {
 					ok: false,
@@ -23199,7 +23250,7 @@ export default function workModelsExtension(pi) {
 			name: INITIATIVE_RECONCILE_TOOL,
 			label: "Convert roadmap to initiative",
 			description:
-				"Finish an F7-selected roadmap conversion after source analysis and any necessary ask_user decisions. Computes hashes, previews, confirms once, and applies atomically.",
+				"Finish a /wf-selected roadmap conversion after source analysis and any necessary ask_user decisions. Computes hashes, previews, confirms once, and applies atomically.",
 			parameters: {
 				type: "object",
 				properties: {
@@ -23269,7 +23320,7 @@ export default function workModelsExtension(pi) {
 					pending.targetId !== String(params.targetId ?? "").trim()
 				)
 					throw new Error(
-						"No matching F7 initiative conversion is active. Select the roadmap and choose Convert to initiative first.",
+						"No matching /wf initiative conversion is active. Select the roadmap and choose Convert to initiative first.",
 					);
 				const proposal = initiativeProposalFromTool(cwd, params);
 				const preview = previewInitiativeReconciliation(cwd, proposal);
@@ -23839,6 +23890,16 @@ export default function workModelsExtension(pi) {
 				event.result,
 			);
 		updateWorkGoalProgress(ctx);
+		if (
+			activeWorkGoal?.status === "active" &&
+			!manualMicrocompactPending &&
+			!contextCompactState.inFlight
+		)
+			try {
+				maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
+			} catch {
+				maybeCompact(ctx, {});
+			}
 		const helper = finishHelperStarts.get(event.toolCallId);
 		finishHelperStarts.delete(event.toolCallId);
 		try {
@@ -24291,9 +24352,9 @@ export default function workModelsExtension(pi) {
 		},
 	});
 
-	pi.registerShortcut?.("f7", {
-		description: "Open Orchestrator",
-		handler: async (ctx) => {
+	pi.registerCommand("wf", {
+		description: "Open workflow orchestrator",
+		handler: async (_args, ctx) => {
 			await handleWorkMenuCommand(ctx, pi);
 		},
 	});

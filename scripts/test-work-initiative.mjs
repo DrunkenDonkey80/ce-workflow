@@ -287,9 +287,7 @@ try {
 	const partialPrefix = buildWorkResumeState(dir, "initiative-1");
 	assert.notEqual(partialPrefix.action, "planning_starved");
 	assert.equal(partialPrefix.epic.id, "initiative-1.1");
-	assert.deepEqual(partialPrefix.preparation.preparedPrefix, [
-		"initiative-1.1",
-	]);
+	assert.deepEqual(partialPrefix.preparation.preparedPrefix, ["initiative-1.1"]);
 	assert.equal(
 		buildWorkResumeState(dir, "initiative-1.1").epic.id,
 		"initiative-1.1",
@@ -335,7 +333,7 @@ try {
 			}),
 		),
 		buildInitiativeProjection(dir),
-		"helper hierarchy must equal the shared F7 projection",
+		"helper hierarchy must equal the shared /wf projection",
 	);
 	const staleInitiative = loadStore(dir);
 	for (const child of Object.values(staleInitiative.items).filter(
@@ -353,9 +351,7 @@ try {
 	rmSync(path.join(dir, "docs", "brainstorms", "i.md"));
 	const missingClose = buildWorkRoadmapState(dir, "close initiative-1 --force");
 	assert.equal(missingClose.action, "initiative-close-blocked");
-	assert(
-		missingClose.blockers.includes("missing_source:docs/brainstorms/i.md"),
-	);
+	assert(missingClose.blockers.includes("missing_source:docs/brainstorms/i.md"));
 
 	// Preview is pure; apply is identity-preserving, stale-safe, and idempotent.
 	const promotionStore = initStore(promotionDir, { now: timestamp });
@@ -651,10 +647,7 @@ try {
 	writeFileSync(storePath(recoveryDir), beforePreview);
 	mkdirSync(path.join(recoveryDir, "docs", "brainstorms"), { recursive: true });
 	writeFileSync(path.join(recoveryDir, sourcePath), sourceText);
-	const recoveryPreview = previewInitiativeReconciliation(
-		recoveryDir,
-		proposal,
-	);
+	const recoveryPreview = previewInitiativeReconciliation(recoveryDir, proposal);
 	assert.throws(() =>
 		applyApproved(recoveryDir, proposal, recoveryPreview.token, {
 			interruptAt: "candidate",

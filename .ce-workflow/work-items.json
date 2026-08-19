@@ -3914,6 +3914,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim for work-2.report-6f4c69c0-3367-4afa-b5ec-9313899e1480: finish-task passes a parsed but non-array wo:review-scope value into sameFiles, producing the opaque internal error 'left is not iterable' after otherwise valid evidence-only changes.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Validate persisted review scopes before finalization"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3939,6 +3943,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical shared claim for snapshot reports work-2.report-80bf598b-4278-49aa-ace4-e9c57bfbddb8 and work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55: BetterWright browser_evidence must permit a new task-scoped checklist after the prior checklist audits ready while retaining prior proof artifacts.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Allow sequential browser evidence journeys in one session"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3969,6 +3977,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical local claim split from multi-claim report work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55: after a successful browser/browser_evidence result or compaction, an active autonomous goal must proceed through deterministic verification, commit, close, and push gates without a user prompt.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Continue autonomous goals after browser acceptance turns"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -3995,6 +4007,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Independent review of commit a56b9de found that reconcileVerifierRuns only reads status.json while launch.status is running. Once a missing status marks the launch orphaned, later workflow.value.structuredOutput can never be recovered.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Recover verifier output after launch orphaning"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -4024,6 +4040,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical for work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777 atomic claims: recognize bounded task-owned evidence under docs/evidence/<work-id>, accept safe screenshot and sanitized text/log metadata evidence, replace the fixed 20-file declaration ceiling with a bounded directory/manifest path, and give exact recovery for untracked or pre-staged evidence without weakening unrelated-file gates.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make finish-task evidence recovery bounded and actionable"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -4050,6 +4070,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Reviewer handoffs must give the supported work-note --append-notes syntax, verify an exact wo:review marker in notes_tail, and forbid bash redirection to Windows nul/NUL artifacts.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make reviewer verdict persistence exact and shell-safe"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -4077,6 +4101,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Bounded worker handoffs must prohibit broad formatting and coded resume must compare settled raw versus whitespace-ignored numstat so agent-end autofix expansion routes to repair instead of review/finish.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Detect formatter-expanded worker diffs after dispatch"
+      },
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
@@ -4216,6 +4244,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: A configured GLM background verifier returned terminal structured output that reconciliation classified as one partially-failed job and one failed job, while the other configured verifier models completed. `verifierCompletionBlocker` treats any failed/partially-failed job created during the goal as a permanent blocker, but there is no coded retry, dismissal, or superseding-success path, so a transient/model-format infrastructure failure makes `work_goal_complete` impossible.\nExpected: Background verifier infrastructure failures should have a deterministic recovery path: retry the exact job, or durably acknowledge/dismiss the failed profile after adequate remaining verifier coverage, without erasing valid findings or permanently blocking an otherwise complete goal.\nImpact: The work-2 snapshot is implemented, reviewed, committed, and tested, but autonomous completion is rejected solely because verifier terminal output was invalid; repeated successful verification by other configured models cannot clear the blocker.\nSuggested improvement: Add a coded retry/supersede disposition for failed verifier jobs and make the completion blocker accept an explicitly acknowledged infrastructure failure when another configured verifier successfully covered the same checkpoint operations.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Allow recovery from failed background verifier jobs"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/fe8f8e04-0f7c-4bdf-becd-a63e8d98c227",
@@ -4256,6 +4288,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: In NexusConnectSDK-Android, invoking `ORCHESTRATOR_RUN_V1 work-resume work-3` after a safe restart failed inside ce-workflow with `Cannot read properties of undefined (reading 'title')` at `renderWorkResumeText` (`extensions/work-models.js:16734`) via `handleWorkResumeCommand` (`:20097`). Source inspection confirms `buildWorkResumeState` can return `ok: true` special states such as `action: \"review-analysis-required\"` and `action: \"triage-required\"` without `epic`, `counts`, or `git`, while `renderWorkResumeText` only special-cases `planning_starved` before unconditionally dereferencing `state\nExpected: `work-resume` must render every valid `ok: true` state without throwing. Verifier review/triage states should have explicit render branches (or a total validated action-state renderer), and a rendering/state-shape exception must stop safely rather than permitting ordinary autonomous fallback. Regression tests should cover exact-target resume with pending verifier analysis and pending verifier triage.\nImpact: Exact roadmap resume became unusable at a restart boundary, bypassed deterministic target selection/coded orchestration, and required external abort and safe-stop to prevent unsupervised project mutation. Any project with verifier review or triage state may encounter the same failure.\nSuggested improvement: Handle `review-analysis-required` and `triage-required` before the generic roadmap branch in `renderWorkResumeText`, rendering their message, review/triage payload, and recommended actions without assuming `epic`, `counts`, or `git`. Add end-to-end `handleWorkResumeCommand` regression cases proving no throw, no autonomous start, and no ordinary-model fallback.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Render verifier review states safely during work resume"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/8ac7084c-fe35-45b5-ad93-bac605000896",
@@ -4299,6 +4335,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: During autonomous resume of work-3.62, browser tools were available and the browser journey reached a successful VALID PACK-ONLY export, but the parent loop ended its turn after a browser evidence/screenshot operation instead of automatically continuing to the deterministic finish gates (verification, commit, close, push). The user had to prompt the session again. An already-initialized browser_evidence checklist from a prior journey also collided with initialization, increasing the chance of an early return.\nExpected: After any successful browser/browser_evidence tool result—or after context compaction—the active autonomous goal should re-enter the coded continuation point and proceed through remaining finish gates without requiring user intervention. Browser evidence state should either be journey-scoped or allow an explicit reset/new checklist so prior evidence cannot derail a later acceptance journey.\nImpact: Autopilot appeared to stop even though required tools were healthy and the target work item remained open. This undermines run-to-completion behavior, confuses browser availability with orchestration failure, and leaves implemented work uncommitted/unclosed until the user notices.\nSuggested improvement: Persist a mandatory next-phase continuation marker around browser calls and compaction, then schedule immediate autonomous continuation until the work item is closed or a real blocker exists; make browser evidence checklists explicitly journey-scoped/resettable.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resume autonomous goals after browser evidence work"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/4c6b1394-e21d-4304-ace7-03fb87a098af",
@@ -4350,6 +4390,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: finish-task rejects every --evidence-file on implementation work-1.20 because work-helper.mjs requires evidenceOnly=true, yet the task's acceptance explicitly requires screenshot-backed connected-device evidence and the independent reviewer blocked until those screenshots were attached. The helper simultaneously blocks the same untracked docs/evidence/work-1.20 PNGs as undecided files.\nExpected: Task-owned bounded evidence files under docs/evidence/<work-item-id>/ should be admissible for any work item whose acceptance/review requires them, while remaining excluded from implementation file-count limits and still subject to extension/size/path sanitization.\nImpact: The coded finish/review loop cannot close an implementation task with mandatory hardware screenshot evidence without deleting required artifacts, relabeling/rewriting the task contract, or bypassing the finisher.\nSuggested improvement: Allow explicit --evidence-file for non-evidence-only tasks when the path is task-owned and validated; keep automatic evidence discovery restricted to evidence-only tasks if desired.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Allow required evidence files on implementation tasks"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/d569000f-6191-4740-bd18-ef6bbc053079",
@@ -4620,6 +4664,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: Current durable NexusConnectSDK-Android state contains a permanently blocked legacy analysis migration for `work-1.4`. The native work item is now `closed` and carries two `wo:review PASS` notes, a passing focused verification note, and commit/push evidence, but `.ce-workflow/work-runs/verifiers/state.json` still has `analysisLegacyMigrations[\"work-1.4\"].status = \"blocked\"` with an `in_progress` snapshot and no completion timestamp. Source inspection confirms `reconcileLegacyAnalysisTasks` first filters out every closed analysis item, creates `blocked` migrations for in-progress items, and the\nExpected: Reconciliation must revisit existing blocked legacy migrations even after their source work items close. When current durable state proves the source item closed, it should deterministically resolve the migration according to its evidence/policy (or expose an actionable accept/reject disposition that persists the user's decision), clear the migration-blocked gate, and preserve an audit record. Review analysis must not present a permanently read-only blocker with no disposition path.\nImpact: The stale migration blocks `work-resume work-3` despite completed, reviewed, verified, and committed product work. A user-approved rejection cannot be recorded, leaving the roadmap permanently unresumable without direct state mutation. The defect can affect any legacy analysis task that was first reconciled while in progress and later closed.\nSuggested improvement: Separate discovery of new legacy analysis tasks from reconciliation of existing migrations. Iterate existing `analysisLegacyMigrations` first (including blocked entries whose live source item is now closed), transition them to a terminal auditable state or create a disposable review entry, and ensure the Review analysis UI offers a persisted rejection action. Add regression coverage for: in_progre",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resolve blocked legacy analysis after source work closes"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/024238fb-ef66-4d77-8701-12d21017625a",
@@ -4772,6 +4820,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: A work-worker implementing HelpBuddy work-3.60 completed production tests and build but contacted the supervisor and caused the autonomous flow to appear stopped because the work item also required BetterWright evidence and the worker's strict tool allowlist excludes browser/browser_evidence.\nExpected: Browser acceptance should remain a parent-owned coded finish gate. A work-worker without browser tools should complete deterministic implementation verification, record browser evidence as pending, return immediately, and let the parent automatically execute the private browser playbook with its available BetterWright tools instead of pausing for a supervisor decision.\nImpact: Web-development resume flows can pause after otherwise successful implementation, requiring manual intervention despite BetterWright being installed and available in the parent session.\nSuggested improvement: Clarify the work-worker contract and orchestrator policy that browser acceptance is deferred to the parent finish gate; add a focused handoff test preventing supervisor escalation solely for unavailable browser tools.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Defer browser acceptance from workers to the parent gate"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/77e81ec1-79d6-48ec-9911-54e0be3ffe86",
@@ -4819,6 +4871,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: `finish-task` rejected valid untracked implementation files in two consecutive slices (`third_party/maven/.../*.aar|*.pom` for work-3.3 and `tools/validation/nexus-candidate-consumer/*.gradle.kts` for work-3.5) as requiring an add/gitignore/remove decision, even though they were inside the reviewed task scope. The helper proceeded only after manually applying `git add -N` intent-to-add.\nExpected: After scope/review checks establish that an untracked path is task-owned, `finish-task` should safely include it itself (or provide a coded intent-to-add action) rather than requiring manual index manipulation that its own pre-staged guard otherwise discourages.\nImpact: Autonomous finalization stalls on ordinary new source, Maven fixture, and Gradle fixture files; agents must infer the undocumented `git add -N` workaround, creating avoidable index risk and repeated failed gates.\nSuggested improvement: Permit untracked files already covered by the persisted `wo:review-scope`/owned-path contract, or add a helper flag that records and stages explicitly listed new task files atomically.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Allow task-owned untracked files during finalization"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/36d7bb08-695c-4f13-8573-fd087a2cb316",
@@ -4859,6 +4915,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: A transient overloaded work-reviewer workflow failed. subagent_wait explicitly required resume-first because a persisted child session existed, but action=resume on that exact workflow ID then failed with `missing its required run fan-out recovery identity. Start a new run instead.`\nExpected: Either retain the fan-out recovery identity so the mandated resume succeeds, or have subagent_wait classify the run as non-resumable and authorize a replacement immediately.\nImpact: The contradictory recovery guidance blocks the coded reviewer path, forces a duplicate reviewer launch, and can consume the project's bounded review-cycle budget without producing a verdict.\nSuggested improvement: Persist or reconstruct the workflow child recovery identity before emitting resume-first guidance; otherwise mark the run non-resumable.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make failed reviewer run recovery guidance consistent"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/c188060e-2e70-4159-80f5-e8adb3aa2bc3",
@@ -4898,6 +4958,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: `finish-task` classifies planning-only items work-3.6 and work-3.8 as requiring independent sensitive review even though their only changed file is the native `.ce-workflow/work-items.json`, then emits an unusable handoff with an empty `Review only:` list. Each deterministic one-slice planning boundary therefore requires a reviewer to infer and review the child WorkItem instead of any supplied file.\nExpected: For planning-only store mutations, the finalizer should either validate the created child contract deterministically without an independent code review, or generate a review handoff that explicitly identifies the planning work item/created child as the review target rather than an empty file scope.\nImpact: The autonomous roadmap loop launches redundant reviewers at every just-in-time planning boundary, adds minutes per slice, and violates the intent of the one-review-cycle budget while providing no explicit review artifact.\nSuggested improvement: Special-case `wo:planning` tasks whose diff is only the work-item store, or emit `Review work item: <child-id>` and persist that logical scope for `--reviewed`.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Avoid empty code reviews for planning-only work"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/5bbc69a9-945f-4361-b8d6-ad0355d9745c",
@@ -4940,6 +5004,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: Two successive work-worker attempts to make a tiny LineaProGS.kt lifecycle edit were silently rewritten by pi-lens ktlint autofix into ~455 added/~450 removed lines. The repository's generated `.pi-lens.json` disabled only `format.enabled`; ktlint ran through the separate `autofix.enabled` path. Even `git restore` was immediately mutated, blocking the worker. Parent had to add `autofix.enabled:false`, restore, and reapply the semantic hunk.\nExpected: ce-workflow's project bootstrap/configuration for deterministic bounded diffs should disable both pi-lens mutation paths (`format.enabled:false` and `autofix.enabled:false`), or child launch contracts should explicitly disable autofix. Workers must not report a minimal diffstat before confirming the post-dispatch file state.\nImpact: A 15-line correctness fix expanded to ~900 changed lines twice, the worker falsely reported a small diff, and implementation blocked for a supervisor decision. This creates severe review risk in large legacy Kotlin files.\nSuggested improvement: When ce-workflow writes `.pi-lens.json`, set both mutation controls false. Add a post-dispatch numstat check after the final tool result/agent-end mutation phase, not before it.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Detect formatter-expanded diffs after worker completion"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/a801fc61-ba53-4922-acdf-2def74d0798f",
@@ -5131,6 +5199,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: work_verifier_complete_fix created commit 4c67faa and only afterward returned \"Verifier claim lease expired\"; the accepted finding remained unresolved even though the repository change was committed.\nExpected: Validate or renew claim ownership/lease before staging and committing, or roll back the commit if verifier-store completion fails, so the Git commit and finding fix record are atomic.\nImpact: A transient/expired lease produces a misleading failed tool result, leaves an untracked fix commit, and makes the accepted finding impossible to complete without duplicate code changes.\nSuggested improvement: Move claim/group/lease validation before git add/commit and add rollback around post-commit store mutation failure.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Make verifier fix commits and lease completion atomic"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/1b55d7e2-c8bf-40a1-91ff-ff3b6e554efa",
@@ -5165,6 +5237,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: A roadmap in NexusConnectSDK owns cross-repository LPGSlim implementation phases, but `work-helper.mjs` resolves both the native work store and Git finalization root from `process.cwd()`. Planner therefore had to create blocking decision work-3.20: from Nexus cwd it cannot commit LPG files; from LPG cwd it cannot update/close the Nexus-owned item.\nExpected: Support an explicit work-store root distinct from execution/finalization repository root, or a first-class companion-item/handoff mechanism whose completion evidence can close the owning roadmap item deterministically.\nImpact: Cross-repo roadmaps stall after same-repo phases even when both repositories and tests are locally available, forcing manual dual-store bookkeeping or branch/worktree workarounds.\nSuggested improvement: Add separate store/git root flags and persist companion commit hash plus repository identity in the owning work item before close.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Support cross-repository roadmap finalization"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/46d8a374-f101-42a7-bfe1-34892d826b3a",
@@ -5212,6 +5288,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: In active autonomous-goal mode, the user selected “Pause as externally blocked” through ask_user after an upstream-only work item could not be completed locally. The goal nevertheless emitted repeated automatic continuation prompts (#3 and #4). Calling work_goal_human_decision to durably pause was rejected because ask_user was available, even though ask_user had already returned the explicit pause decision.\nExpected: An explicit ask_user response choosing to pause should durably pause the active goal immediately, or a dedicated non-question pause operation should accept that decision. The continuation scheduler must not keep reactivating an externally blocked goal after the user selected pause.\nImpact: The goal enters an unsatisfiable loop: completion is forbidden while the snapshot remains open, upstream implementation is forbidden by the user, repeated questioning is forbidden, and the only durable pause tool rejects the state. This wastes turns and can pressure an agent into violating either the user decision or completion contract.\nSuggested improvement: Persist a paused goal state when ask_user returns a pause/block outcome, or allow work_goal_human_decision to accept an already-collected ask_user receipt without presenting another decision.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Persist explicit pauses for autonomous goals"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/35d74127-7b10-4019-ae8e-cd9a30328fa1",
@@ -5315,6 +5395,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The coded finish helper fails work-3.54 with the opaque error `left is not iterable` after a reviewed evidence-only task renamed one retained ignored `.log` artifact to `.txt`. The helper had previously rejected the ignored `.log` as needing an add/gitignore/remove decision and then rejected pre-staging it, forcing the rename workaround.\nExpected: finish-task should either accept a task-owned reviewed ignored evidence file through an explicit deterministic path, or produce a structured actionable diagnostic naming the malformed value/path. After the file is renamed to a normal tracked extension and manifest/review evidence are valid, finish-task should verify, stage, commit, close, and report push status without an internal iterable error.\nImpact: The work item has passing verification and review but cannot be finalized, leaving target git/work-item state incomplete and forcing manual debugging of ce-workflow internals.\nSuggested improvement: Validate parsed review-scope/diff set operands before spreading them and include the operand source in errors; add a contract test for an evidence-only task containing an ignored artifact that is renamed before finalization.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Report malformed review scopes clearly during finalization"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/226f7e4a-7e2e-432b-8679-94a763d5aea2",
@@ -5365,6 +5449,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: The just-in-time planner created executable slice work-1.4 with 23 implementation files, but the coded finish helper rejects any scope above the documented 8-file maximum. The task was fully implemented and verified before this incompatibility surfaced.\nExpected: Planning should enforce the same file-scope contract as finish-task, either slicing bootstrap work into finishable <=8-file tasks or explicitly issuing a supported larger-scope/review contract before implementation starts.\nImpact: Autonomous resume reaches a verified implementation that cannot pass the coded commit/close gate, forcing replanning or policy bypass after work is already done.\nSuggested improvement: Have the planning boundary estimate/count required implementation files and reject or split any executable task above the configured finish-task max-files cap.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Align planner file limits with finalization limits"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/8d9d8274-0d67-405f-ab2e-4a43a3d1f78b",
@@ -5448,6 +5536,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: During an autonomous roadmap loop, browser_evidence retained the completed work-3.60 checklist and rejected initialize for the next distinct browser-gated work item work-3.62 with `browser_evidence is already initialized; prove or audit the existing checklist.` There is no reset/new-checklist operation, so sequential browser acceptance tasks in one session cannot each have requirement-linked evidence.\nExpected: browser_evidence should support starting a new named checklist after the current checklist audits ready, or automatically scope checklists by work item/journey so work-3.62 can initialize its own atomic requirements without discarding work-3.60 evidence.\nImpact: The autonomous loop cannot comply literally with initialize-before-browser and capture task-specific proof for subsequent roadmap slices; reusing old IDs would misattribute evidence, while skipping initialization weakens the acceptance contract.\nSuggested improvement: Add browser_evidence operation `reset`/`new` with a checklist name or allow initialize after audit-ready while retaining prior checklist artifacts.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Support sequential browser evidence checklists"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/11d5d752-3c9d-4f6b-8418-c5d9e8d5ecb9",
@@ -5587,6 +5679,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: In NexusConnectSDK session 01a0112b-59bb-7656-839b-f4c1ae14d0e2, an active project autonomous goal entered automatic microcompaction at iteration 1. The transcript ended with `Microcompaction completed`, persisted `work-goal-state.status=active`, and then remained idle/done for over 30 seconds with no `__orchestrator-goal-continue` prompt. The previous compaction in the same goal did emit `Microcompaction completed; resuming work`, so this is not an intentional pause. A coded pause/resume was required to restart the goal.\nExpected: Every completed automatic work-goal microcompaction must enqueue exactly one continuation prompt (or durably record a recoverable pending continuation) before becoming idle, so an active project goal cannot stall between iterations.\nImpact: Autonomous `F7 Roadmap -> Resume work` can silently stop while its progress widget still says active. An unattended workflow never reaches remaining verifier triage, roadmap slices, or genuine decision gates.\nSuggested improvement: Make the compaction completion callback persist and deliver one idempotent continuation token before clearing pending state; add a regression where compaction completes after an aborted turn and agent_settled observes an active goal.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resume autonomous goals after automatic microcompaction"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/e44376ff-30fa-487a-bc8e-22074e329893",
@@ -5671,6 +5767,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: A successor prefetch async run completed successfully and wrote its artifact, but its read-only lane remained state=running. finish-task then failed with 'Read-only lanes are using the repository'. reconcileReadOnlyLanes only detects a dead local PID; the recorded launcher PID remains alive after a child workflow completes, so completion is not reconciled.\nExpected: When a launched read-only lane's recorded async run reaches a terminal state, reconciliation should transition the lane out of running so repository mutation gates do not remain blocked if the parent misses the completion callback.\nImpact: Autonomous work cannot commit/close a completed task and may idle indefinitely behind a stale read lock despite the read-only run having finished.\nSuggested improvement: Extend reconciliation to inspect recorded async completion state or ensure the completion callback always terminalizes the lane; add a completed-run/still-live-launcher regression test.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Release stale read-only lanes after async completion"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/3e7c61f1-8746-4df7-9598-96a60c48ab64",
@@ -5761,6 +5861,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: On every agent_settled hook, reconcileBackgroundVerifierRuns calls reconcileVerifierRuns. For job-08176e4795dcd554bb3a0277, all operationStatus values are terminal findings and job.status is completed, but launch.status remains running and its temporary status.json is gone. markVerifierOrphaned changes launch.status to orphaned and unconditionally sets job.status to orphaned; validateVerifierStore then recomputes completed from the terminal operations and throws \"Invalid operation accounting\". The same stale launch shape exists for 16 jobs in this verifier store.\nExpected: Missing runtime status should orphan only the launch evidence while preserving/recomputing the aggregate job status from operationStatus, e.g. job.status = jobStatus(job.operationStatus, job.launch). Completed/failed jobs must remain valid and agent_settled must not emit an extension error.\nImpact: The work-models extension logs an uncaught error after every settled turn, verifier reconciliation aborts at the first stale completed launch, and later verifier jobs are never reconciled. The Git operation itself succeeds and the store is not mutated because validation rejects the clone.\nSuggested improvement: In extensions/background-verifiers.js markVerifierOrphaned, replace the unconditional job.status = \"orphaned\" with job.status = jobStatus(job.operationStatus, job.launch), and add a regression test for a terminal job whose launch still says running after its runtime directory is deleted.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Preserve terminal verifier status when launches become stale"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/66a85aa6-0331-4c96-bb5d-9834271de80f",
@@ -5808,6 +5912,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The work-worker implementing work-1.21 ran broad formatting on `LineaProGS.kt`, turning a two-line semantic guard into hundreds of unrelated import/layout/comment/when-branch changes. The same worker had to be resumed to restore both production files to HEAD and reapply only the import, guard, and membership function, reducing the final diff to 39 insertions/2 deletions across three files.\nExpected: For bounded tasks, workers should inspect `git diff --stat`/`git diff` before returning and automatically revert formatter-only changes outside the named symbols. Project-wide or whole-file formatting must not run unless the task explicitly requests formatting.\nImpact: The initial output obscured the safety-critical readiness change, expanded review surface by hundreds of lines, and required an extra worker cycle before independent review.\nSuggested improvement: Add a worker pre-return minimal-diff gate comparing changed hunks to task-named symbols and fail/auto-correct when a formatter changes unrelated lines; include a diffstat threshold warning for small/medium tasks.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Prevent broad formatter changes in bounded worker tasks"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/4ffd4577-6366-4bd4-8f29-89d9ba792f79",
@@ -5891,6 +5999,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: In a verified private brainstorm launched from F7, the playbook says to ask exactly one focused clarification per turn. After each ask_user response, the assistant interpreted that as requiring it to end its assistant turn, so it emitted a status sentence and stopped. The user then had to send another message merely to continue; this happened after both the first-release-scope and authoritative-rules questions.\nExpected: A private brainstorm should proceed through its complete clarification workflow without requiring user-authored 'continue' messages. Each blocking ask_user interaction should count as the focused clarification boundary; after the user answers, the orchestrator should continue to the next required clarification, research, divergence, advisor review, and artifact creation. The generated playbook should explicitly distinguish one question per ask_user call from ending the overall assistant turn, or the extension should automatically resume the workflow after ask_user returns.\nImpact: The current wording makes a normal F7 brainstorm appear stalled or broken, causes repeated unnecessary user prompts, undermines trust that the workflow is still running, and prevents the promised end-to-end brainstorm flow from completing autonomously.\nSuggested improvement: Change the generated brainstorm dialogue contract from 'one focused clarification per turn' to unambiguous language such as 'one focused question per ask_user call; after each answer, continue the workflow unless the user cancels or a required answer remains unresolved.'",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Continue private brainstorms after each clarification"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/5e0e4cb4-b380-48be-b9d2-debc1d981f58",
@@ -5979,6 +6091,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: At 2026-08-18T00:28:00.005Z, immediately after successful parallel LSP/git results, the next assistant operation was recorded with stopReason=error and errorMessage='This operation was aborted'. Two seconds later the autonomous-goal hook wrote durable state and forced a `work-orchestrator-instant` manual context compaction, but execution did not automatically resume until user intervention.\nExpected: When context-guard compaction aborts an in-flight autonomous-goal model call, the runtime should transparently resume from durable state after compaction or clearly label the abort as intentional compaction rather than a generic operation error.\nImpact: The roadmap loop stopped before the pending LPG finalizer/reviewer step despite clean verification and active durable goal state, requiring the user to notice and manually restart it.\nSuggested improvement: After hook-triggered compaction, enqueue an automatic continuation turn tied to the active work-goal; distinguish intentional context aborts in UI/logs.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resume autonomous goals after context compaction aborts"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/384a2dbd-67e6-4172-bd69-898cdc802b1b",
@@ -6016,6 +6132,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: Background verifier reconciliation permanently marked four jobs failed with \"Verifier terminal output was unavailable or invalid\", although their retained run status later contained valid schema-validated structured output. Failed jobs are excluded from later reconcileVerifierRuns passes, so work_goal_complete remained blocked.\nExpected: A terminal-success run should receive an artifact-finalization grace window and/or artifact-only failed jobs should be rechecked when valid structured output later appears, then ingested exactly once.\nImpact: Autonomous goal completion deadlocked despite completed verifier runs and valid retained evidence; deterministic manual recovery through the verifier store API was required.\nSuggested improvement: Delay artifact-only terminal failure for the existing grace period and permit safe recovery when a valid structured output appears later.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Recover verifier jobs when structured output arrives late"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/b2ae0901-b796-46f3-874a-9dad08b0465b",
@@ -6060,6 +6180,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: finish-task supports declared evidence images via repeated --evidence-file, but an evidence task with many task-owned screenshots plus a log gets a generic 'untracked files need a decision' error when declarations are omitted. The message does not identify --evidence-file as the intended resolution; declarations are capped at 20; .log cannot be declared. A natural `git add` recovery then hits 'refusing pre-staged files', creating an avoidable loop and delaying the user answer.\nExpected: For evidence tasks, finish-task should recognize safe bounded files under docs/evidence/<work-id> automatically or emit a directly runnable corrected command with declarations. It should support a bounded evidence manifest/directory and sanitized metadata/log types. For task-owned pre-staged evidence, explain the precise unstage/declaration recovery or safely handle it. Autonomous cleanup should still return a concise resumable status when finalization fails.\nImpact: Repeated failed finalizer attempts caused an aborted response, user confusion, and unnecessary staging/reset operations despite valid reviewed evidence.\nSuggested improvement: Add task-owned evidence auto-recognition or actionable remediation text; use a bounded manifest/directory declaration; test unstaged and accidentally pre-staged evidence flows; preserve a user-facing progress response on gate failure.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Improve recovery for large evidence task finalization"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/e239e178-a2f2-4e9d-90e1-34782c249cce",
@@ -6102,6 +6226,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: All three background verifiers for commit 4aae1a5 completed with structuredOutput visible in their pi-subagents results, but ce-workflow quarantined each as artifact bytes=0/path=private and recorded every operation as `Verifier terminal output was unavailable or invalid`. work_goal_complete then rejected the otherwise fully verified snapshot as failed/orphaned.\nExpected: Background verifier reconciliation should consume the validated structuredOutput returned by pi-subagents (or persist the configured file-only artifact reliably), produce normal findings/no-findings, and allow goal completion when reviewers completed successfully.\nImpact: A fully implemented, independently reviewed, focused-test-passing, pushed self-improvement snapshot cannot complete autonomously; three successful model reviews are discarded and the workflow remains blocked.\nSuggested improvement: In background verifier terminal reconciliation, fall back to the run result's validated structuredOutput when outputMode=file-only yields no readable artifact, and add a focused contract test for completed children whose structuredOutput exists while artifactPath is private/empty.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Use validated inline output when verifier artifacts are absent"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/c75ea9ee-5d2b-469e-a5a3-b9db3a23f0b9",
@@ -6144,6 +6272,10 @@
       ],
       "dependencyEdges": [],
       "description": "Observed: The work-reviewer for target work-1.19 appended its durable verdict via an unsupported `--body` option, producing a literal note beginning `--body wo:review PASS` instead of `wo:review PASS`. It also left an empty untracked `nul` file in the target checkout. `finish-task --reviewed` first blocked on the untracked file and then rejected the malformed PASS evidence. The same reviewer had to be resumed for a mechanical note correction.\nExpected: Reviewer handoffs/agent instructions should provide the exact supported command `work-note <id> --append-notes \"wo:review PASS|FAIL ...\"`, validate that notes_tail contains a line beginning exactly with the required marker, and prohibit cross-shell `> nul` redirection (use no redirection or OS-safe temp handling).\nImpact: A correct independent PASS required two extra finalizer attempts and a reviewer resume; an empty platform artifact blocked commit, and malformed evidence could leave work permanently unfinishable despite a completed review.\nSuggested improvement: Embed the exact `work-note --append-notes` command in reviewerHandoff(), add a reviewer-side postcondition that the marker is parser-recognized, and lint agent shell commands against `> nul`/`> NUL` when running under bash.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Persist reviewer verdicts with safe supported commands"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/eecd1333-9906-4647-b69d-146abeae1f78",
@@ -6313,6 +6445,10 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Observed: `finish-task` generated a reviewer handoff for target repo C:\\SOFT\\git\\ipc\\LPGLibrarySDK-Android without stating the execution root. The exact `work-reviewer` was launched with that handoff and top-level subagent cwd set to the target, but it executed against C:\\SOFT\\git\\ce-workflow instead, resolved that repo's colliding `work-1.14`, and falsely reported `docs/hardware-manifest.md` missing.\nExpected: The coded reviewer handoff should include the canonical execution repository root and a fail-fast cwd assertion (or all helper/file commands should be explicitly rooted) so a reviewer cannot resolve a same-ID work item in another checkout. Subagent cwd should also be honored or verified before review.\nImpact: Hardware release review was blocked by a false missing-file/wrong-work-item result. In projects sharing native IDs, this can append review evidence to the wrong work store or approve the wrong diff.\nSuggested improvement: Add `Execution root: <canonical path>` plus a required `git -C <root> rev-parse --show-toplevel`/cwd check to reviewerHandoff(), and pass the root explicitly to work-summary/file inspection rather than relying on inherited cwd.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Pin reviewer handoffs to the execution repository"
+      },
       "evidence": [
         {
           "bundle": ".pi/self-improvement-reports/a0c912fc-a4aa-46ad-99de-ed0169c1f2e5",
@@ -8349,7 +8485,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T11:23:13.909Z"
+    "updatedAt": "2026-08-19T13:21:40.262Z"
   },
   "schemaVersion": 1
 }

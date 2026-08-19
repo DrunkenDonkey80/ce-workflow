@@ -54,17 +54,28 @@ const packageZeroSurface = () => {
 		readFileSync(path.join(repositoryRoot, "package.json"), "utf8"),
 		"package manifest",
 	);
-	const extensionSource = readFileSync(path.join(extensionRoot, "work-models.js"), "utf8");
+	const extensionSource = readFileSync(
+		path.join(extensionRoot, "work-models.js"),
+		"utf8",
+	);
 	const privateName = /(?:^|[\\/-])(?:ce-|private-workflows?)/i;
-	const commands = [...extensionSource.matchAll(/registerCommand\(\s*["']([^"']+)/g)]
+	const commands = [
+		...extensionSource.matchAll(/registerCommand\(\s*["']([^"']+)/g),
+	]
 		.map((match) => match[1])
 		.filter((name) => name.startsWith("ce-"));
-	const skillDescriptions = readdirSync(path.join(repositoryRoot, "skills"), { withFileTypes: true })
+	const skillDescriptions = readdirSync(path.join(repositoryRoot, "skills"), {
+		withFileTypes: true,
+	})
 		.filter((entry) => entry.isDirectory() && entry.name.startsWith("ce-"))
 		.map((entry) => entry.name);
-	const extensionHooks = packageManifest.pi.extensions.filter((entry) => privateName.test(entry));
-	const resourceRoots = [...packageManifest.pi.extensions, ...packageManifest.pi.skills]
-		.filter((entry) => privateName.test(entry));
+	const extensionHooks = packageManifest.pi.extensions.filter((entry) =>
+		privateName.test(entry),
+	);
+	const resourceRoots = [
+		...packageManifest.pi.extensions,
+		...packageManifest.pi.skills,
+	].filter((entry) => privateName.test(entry));
 	return {
 		commands,
 		skillDescriptions,
@@ -84,15 +95,30 @@ const expectedZeroSurface = {
 	modelInvocableEntries: [],
 };
 const authority = {
-	actionToken: "work-models:F7:brainstorm:v1",
+	actionToken: "work-models:wf:brainstorm:v1",
 	callerUrl: pathToFileURL(path.join(extensionRoot, "work-models.js")).href,
 };
-const debugAuthority = { ...authority, actionToken: "work-models:debug:investigation:v1" };
-const learningAuthority = { ...authority, actionToken: "work-models:finish:learning-capture:v1" };
-const planAuthority = { ...authority, actionToken: "work-models:F7:plan:v1" };
-const reviewAuthority = { ...authority, actionToken: "work-models:finish:review:v1" };
-const simplifyAuthority = { ...authority, actionToken: "work-models:finish:simplify:v1" };
-const browserAuthority = { ...authority, actionToken: "work-models:finish:browser:v1" };
+const debugAuthority = {
+	...authority,
+	actionToken: "work-models:debug:investigation:v1",
+};
+const learningAuthority = {
+	...authority,
+	actionToken: "work-models:finish:learning-capture:v1",
+};
+const planAuthority = { ...authority, actionToken: "work-models:wf:plan:v1" };
+const reviewAuthority = {
+	...authority,
+	actionToken: "work-models:finish:review:v1",
+};
+const simplifyAuthority = {
+	...authority,
+	actionToken: "work-models:finish:simplify:v1",
+};
+const browserAuthority = {
+	...authority,
+	actionToken: "work-models:finish:browser:v1",
+};
 const catchUpAuthority = {
 	...authority,
 	actionToken: "work-models:catch-up:candidate-review:v1",
@@ -127,7 +153,11 @@ check(() => {
 	assert.match(playbook, /Brainstorm saved: <absolute path>/);
 }, "verified brainstorm resource dispatch");
 rejects(
-	() => dispatchPrivateWorkflow("brainstorm", { ...authority, callerUrl: import.meta.url }),
+	() =>
+		dispatchPrivateWorkflow("brainstorm", {
+			...authority,
+			callerUrl: import.meta.url,
+		}),
 	/external private workflow caller rejected/,
 	"external caller rejection",
 );
@@ -184,7 +214,10 @@ check(() => {
 	assert.match(povPlaybook, /Adopt, Trial, Hold, Reject, or Not-our-problem/);
 	assert.match(povPlaybook, /actor-visible recommendation/);
 	assert.match(explainPlaybook, /intentionally too-technical/);
-	assert.match(explainPlaybook, /never selects, changes, or softens the graded verdict/);
+	assert.match(
+		explainPlaybook,
+		/never selects, changes, or softens the graded verdict/,
+	);
 	assert.notEqual(povPlaybook, explainPlaybook);
 }, "verified POV and conditional explain resources preserve candidate-review contracts");
 const parity = parseJson(inventoryBytes, "compound inventory").parityIndex;
@@ -215,7 +248,14 @@ check(() => {
 			"ce-compound",
 		],
 	);
-	for (const field of ["trigger", "decisions", "toolBoundary", "artifacts", "failure", "actorVisibleOutcome"])
+	for (const field of [
+		"trigger",
+		"decisions",
+		"toolBoundary",
+		"artifacts",
+		"failure",
+		"actorVisibleOutcome",
+	])
 		for (const name of [
 			"ce-brainstorm",
 			"ce-code-review",
@@ -226,7 +266,8 @@ check(() => {
 			"ce-explain",
 			"ce-simplify-code",
 			"ce-test-browser",
-		]) assert.ok(parity[name][field]);
+		])
+			assert.ok(parity[name][field]);
 	assert.match(playbook, /stop without inventing it/i);
 	assert.match(debugPlaybook, /do not guess or report success/i);
 	assert.match(learningPlaybook, /Skipping is a successful gate outcome/i);
@@ -266,7 +307,10 @@ rejects(
 try {
 	const manifest = JSON.parse(generated["manifest.json"]);
 	manifest.workflows.brainstorm.path = "../escape.md";
-	writeFileSync(path.join(resourceRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+	writeFileSync(
+		path.join(resourceRoot, "manifest.json"),
+		`${JSON.stringify(manifest, null, 2)}\n`,
+	);
 	rejects(
 		() => dispatchPrivateWorkflow("brainstorm", authority),
 		/escapes quarantine/,
@@ -314,7 +358,10 @@ try {
 		restore();
 	}
 
-	writeFileSync(path.join(resourceRoot, "brainstorm.md"), `${playbook}\nmutated\n`);
+	writeFileSync(
+		path.join(resourceRoot, "brainstorm.md"),
+		`${playbook}\nmutated\n`,
+	);
 	rejects(
 		() => dispatchPrivateWorkflow("brainstorm", authority),
 		/resource changed/,
@@ -322,7 +369,10 @@ try {
 	);
 	restore();
 
-	writeFileSync(path.join(resourceRoot, "debug.md"), `${debugPlaybook}\nmutated\n`);
+	writeFileSync(
+		path.join(resourceRoot, "debug.md"),
+		`${debugPlaybook}\nmutated\n`,
+	);
 	rejects(
 		() => dispatchPrivateWorkflow("debug", debugAuthority),
 		/resource changed: debug/,
@@ -330,7 +380,10 @@ try {
 	);
 	restore();
 
-	writeFileSync(path.join(resourceRoot, "learning.md"), `${learningPlaybook}\nmutated\n`);
+	writeFileSync(
+		path.join(resourceRoot, "learning.md"),
+		`${learningPlaybook}\nmutated\n`,
+	);
 	rejects(
 		() => dispatchPrivateWorkflow("learning", learningAuthority),
 		/resource changed: learning/,
@@ -338,7 +391,10 @@ try {
 	);
 	restore();
 
-	writeFileSync(path.join(resourceRoot, "plan.md"), `${planPlaybook}\nmutated\n`);
+	writeFileSync(
+		path.join(resourceRoot, "plan.md"),
+		`${planPlaybook}\nmutated\n`,
+	);
 	rejects(
 		() => dispatchPrivateWorkflow("plan", planAuthority),
 		/resource changed: plan/,
@@ -353,7 +409,10 @@ try {
 		["pov", catchUpAuthority, povPlaybook],
 		["explain", catchUpAuthority, explainPlaybook],
 	]) {
-		writeFileSync(path.join(resourceRoot, `${workflow}.md`), `${workflowPlaybook}\nmutated\n`);
+		writeFileSync(
+			path.join(resourceRoot, `${workflow}.md`),
+			`${workflowPlaybook}\nmutated\n`,
+		);
 		rejects(
 			() => dispatchPrivateWorkflow(workflow, workflowAuthority),
 			new RegExp(`resource changed: ${workflow}`),
@@ -364,7 +423,10 @@ try {
 
 	const unverified = JSON.parse(generated["manifest.json"]);
 	unverified.verified = false;
-	writeFileSync(path.join(resourceRoot, "manifest.json"), `${JSON.stringify(unverified, null, 2)}\n`);
+	writeFileSync(
+		path.join(resourceRoot, "manifest.json"),
+		`${JSON.stringify(unverified, null, 2)}\n`,
+	);
 	rejects(
 		() => dispatchPrivateWorkflow("brainstorm", authority),
 		/unverified private workflow generation/,
@@ -384,26 +446,46 @@ try {
 	restore();
 }
 
-const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "private-workflow-translation-"));
+const fixtureRoot = mkdtempSync(
+	path.join(os.tmpdir(), "private-workflow-translation-"),
+);
 try {
 	const sourcePath = "skills/ce-brainstorm/SKILL.md";
-	const sourceBytes = Buffer.from("---\nname: source-brainstorm\n---\nAsk one question.\n");
+	const sourceBytes = Buffer.from(
+		"---\nname: source-brainstorm\n---\nAsk one question.\n",
+	);
 	const debugSourcePath = "skills/ce-debug/SKILL.md";
-	const debugSourceBytes = Buffer.from("---\nname: source-debug\n---\nReproduce and trace.\n");
+	const debugSourceBytes = Buffer.from(
+		"---\nname: source-debug\n---\nReproduce and trace.\n",
+	);
 	const learningSourcePath = "skills/ce-compound/SKILL.md";
-	const learningSourceBytes = Buffer.from("---\nname: source-compound\n---\nCapture learning.\n");
+	const learningSourceBytes = Buffer.from(
+		"---\nname: source-compound\n---\nCapture learning.\n",
+	);
 	const planSourcePath = "skills/ce-plan/SKILL.md";
-	const planSourceBytes = Buffer.from("---\nname: source-plan\n---\nPreserve and plan.\n");
+	const planSourceBytes = Buffer.from(
+		"---\nname: source-plan\n---\nPreserve and plan.\n",
+	);
 	const reviewSourcePath = "skills/ce-code-review/SKILL.md";
-	const reviewSourceBytes = Buffer.from("---\nname: source-review\n---\nReview the scoped diff.\n");
+	const reviewSourceBytes = Buffer.from(
+		"---\nname: source-review\n---\nReview the scoped diff.\n",
+	);
 	const simplifySourcePath = "skills/ce-simplify-code/SKILL.md";
-	const simplifySourceBytes = Buffer.from("---\nname: source-simplify\n---\nSimplify equivalently.\n");
+	const simplifySourceBytes = Buffer.from(
+		"---\nname: source-simplify\n---\nSimplify equivalently.\n",
+	);
 	const browserSourcePath = "skills/ce-test-browser/SKILL.md";
-	const browserSourceBytes = Buffer.from("---\nname: source-browser\n---\nTest affected pages.\n");
+	const browserSourceBytes = Buffer.from(
+		"---\nname: source-browser\n---\nTest affected pages.\n",
+	);
 	const povSourcePath = "skills/ce-pov/SKILL.md";
-	const povSourceBytes = Buffer.from("---\nname: source-pov\n---\nForm a graded verdict.\n");
+	const povSourceBytes = Buffer.from(
+		"---\nname: source-pov\n---\nForm a graded verdict.\n",
+	);
 	const explainSourcePath = "skills/ce-explain/SKILL.md";
-	const explainSourceBytes = Buffer.from("---\nname: source-explain\n---\nTeach the technical subject.\n");
+	const explainSourceBytes = Buffer.from(
+		"---\nname: source-explain\n---\nTeach the technical subject.\n",
+	);
 	const fixtureSources = [
 		[sourcePath, sourceBytes],
 		[debugSourcePath, debugSourceBytes],
@@ -443,36 +525,77 @@ try {
 		inventory: {
 			resourceClosures: {
 				"ce-brainstorm": [
-					{ path: sourcePath, bytes: sourceBytes.length, sha256: sha256(sourceBytes) },
+					{
+						path: sourcePath,
+						bytes: sourceBytes.length,
+						sha256: sha256(sourceBytes),
+					},
 				],
 				"ce-debug": [
-					{ path: debugSourcePath, bytes: debugSourceBytes.length, sha256: sha256(debugSourceBytes) },
+					{
+						path: debugSourcePath,
+						bytes: debugSourceBytes.length,
+						sha256: sha256(debugSourceBytes),
+					},
 				],
 				"ce-compound": [
-					{ path: learningSourcePath, bytes: learningSourceBytes.length, sha256: sha256(learningSourceBytes) },
+					{
+						path: learningSourcePath,
+						bytes: learningSourceBytes.length,
+						sha256: sha256(learningSourceBytes),
+					},
 				],
 				"ce-plan": [
-					{ path: planSourcePath, bytes: planSourceBytes.length, sha256: sha256(planSourceBytes) },
+					{
+						path: planSourcePath,
+						bytes: planSourceBytes.length,
+						sha256: sha256(planSourceBytes),
+					},
 				],
 				"ce-code-review": [
-					{ path: reviewSourcePath, bytes: reviewSourceBytes.length, sha256: sha256(reviewSourceBytes) },
+					{
+						path: reviewSourcePath,
+						bytes: reviewSourceBytes.length,
+						sha256: sha256(reviewSourceBytes),
+					},
 				],
 				"ce-simplify-code": [
-					{ path: simplifySourcePath, bytes: simplifySourceBytes.length, sha256: sha256(simplifySourceBytes) },
+					{
+						path: simplifySourcePath,
+						bytes: simplifySourceBytes.length,
+						sha256: sha256(simplifySourceBytes),
+					},
 				],
 				"ce-test-browser": [
-					{ path: browserSourcePath, bytes: browserSourceBytes.length, sha256: sha256(browserSourceBytes) },
+					{
+						path: browserSourcePath,
+						bytes: browserSourceBytes.length,
+						sha256: sha256(browserSourceBytes),
+					},
 				],
 				"ce-pov": [
-					{ path: povSourcePath, bytes: povSourceBytes.length, sha256: sha256(povSourceBytes) },
+					{
+						path: povSourcePath,
+						bytes: povSourceBytes.length,
+						sha256: sha256(povSourceBytes),
+					},
 				],
 				"ce-explain": [
-					{ path: explainSourcePath, bytes: explainSourceBytes.length, sha256: sha256(explainSourceBytes) },
+					{
+						path: explainSourcePath,
+						bytes: explainSourceBytes.length,
+						sha256: sha256(explainSourceBytes),
+					},
 				],
 			},
 		},
 	};
-	const args = { sourceRoot: fixtureRoot, evidence, policy, translatorBytes: "translator" };
+	const args = {
+		sourceRoot: fixtureRoot,
+		evidence,
+		policy,
+		translatorBytes: "translator",
+	};
 	const first = translateVerifiedWorkflows(args);
 	const second = translateVerifiedWorkflows(args);
 	check(
@@ -505,7 +628,10 @@ try {
 				status,
 			);
 		assert.equal(
-			classifyPrivateWorkflowRelease({ resolution: { status: "update" }, writable: false }).status,
+			classifyPrivateWorkflowRelease({
+				resolution: { status: "update" },
+				writable: false,
+			}).status,
 			"non-writable",
 		);
 		assert.equal(
@@ -518,7 +644,10 @@ try {
 		assert.equal(
 			classifyPrivateWorkflowRelease({
 				resolution: { status: "update" },
-				dirtyPaths: [".ce-workflow/work-items.json", ...PRIVATE_WORKFLOW_OWNED_OUTPUTS],
+				dirtyPaths: [
+					".ce-workflow/work-items.json",
+					...PRIVATE_WORKFLOW_OWNED_OUTPUTS,
+				],
 			}).status,
 			"update",
 		);
@@ -531,12 +660,13 @@ try {
 				version: "3.21.0",
 			},
 			{
-				execFileSync: () => [
-					`${"a".repeat(40)}\trefs/tags/compound-engineering-v3.21.0`,
-					`${"b".repeat(40)}\trefs/tags/compound-engineering-v3.22.0`,
-					`${"c".repeat(40)}\trefs/tags/compound-engineering-v3.22.0^{}`,
-					`${"d".repeat(40)}\trefs/tags/compound-engineering-v3.23.0-rc.1`,
-				].join("\n"),
+				execFileSync: () =>
+					[
+						`${"a".repeat(40)}\trefs/tags/compound-engineering-v3.21.0`,
+						`${"b".repeat(40)}\trefs/tags/compound-engineering-v3.22.0`,
+						`${"c".repeat(40)}\trefs/tags/compound-engineering-v3.22.0^{}`,
+						`${"d".repeat(40)}\trefs/tags/compound-engineering-v3.23.0-rc.1`,
+					].join("\n"),
 			},
 		);
 		assert.deepEqual(resolution, {
@@ -547,24 +677,36 @@ try {
 		});
 	}, "official resolver selects the highest stable tag and peeled commit");
 
-	const releaseFixtureRoot = mkdtempSync(path.join(os.tmpdir(), "private-workflow-release-"));
+	const releaseFixtureRoot = mkdtempSync(
+		path.join(os.tmpdir(), "private-workflow-release-"),
+	);
 	const makeRepository = (name) => {
 		const root = path.join(releaseFixtureRoot, name);
 		const canonical = path.join(root, "extensions", "private-workflows");
 		mkdirSync(canonical, { recursive: true });
-		for (const [file, bytes] of Object.entries(generated)) writeFileSync(path.join(canonical, file), bytes);
+		for (const [file, bytes] of Object.entries(generated))
+			writeFileSync(path.join(canonical, file), bytes);
 		return root;
 	};
-	const canonicalBytes = (root) => Object.fromEntries(
-		PRIVATE_WORKFLOW_OWNED_OUTPUTS.map((relativePath) => [
-			relativePath,
-			readFileSync(path.join(root, ...relativePath.split("/"))),
-		]),
-	);
+	const canonicalBytes = (root) =>
+		Object.fromEntries(
+			PRIVATE_WORKFLOW_OWNED_OUTPUTS.map((relativePath) => [
+				relativePath,
+				readFileSync(path.join(root, ...relativePath.split("/"))),
+			]),
+		);
 	const assertCanonicalBytes = (root, before) => {
 		for (const [relativePath, bytes] of Object.entries(before))
-			assert.ok(readFileSync(path.join(root, ...relativePath.split("/"))).equals(bytes), relativePath);
-		const artifactRoot = path.join(root, ".ce-workflow", "work-runs", "compound-releases");
+			assert.ok(
+				readFileSync(path.join(root, ...relativePath.split("/"))).equals(bytes),
+				relativePath,
+			);
+		const artifactRoot = path.join(
+			root,
+			".ce-workflow",
+			"work-runs",
+			"compound-releases",
+		);
 		if (existsSync(artifactRoot))
 			assert.equal(
 				readdirSync(artifactRoot).some((name) => name.startsWith("quarantine-")),
@@ -598,12 +740,21 @@ try {
 		const firstBefore = canonicalBytes(firstRoot);
 		const secondBefore = canonicalBytes(secondRoot);
 		assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
-		const promoted = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(firstRoot));
-		const repeated = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(secondRoot));
+		const promoted = await promoteVerifiedPrivateWorkflowRelease(
+			releaseOptions(firstRoot),
+		);
+		const repeated = await promoteVerifiedPrivateWorkflowRelease(
+			releaseOptions(secondRoot),
+		);
 		const candidateBytes = Object.fromEntries(
 			PRIVATE_WORKFLOW_OWNED_OUTPUTS.map((relativePath) => [
 				relativePath,
-				readFileSync(path.join(promoted.pendingGenerationPath, path.posix.basename(relativePath))),
+				readFileSync(
+					path.join(
+						promoted.pendingGenerationPath,
+						path.posix.basename(relativePath),
+					),
+				),
 			]),
 		);
 		check(() => {
@@ -614,7 +765,9 @@ try {
 				{ name: "u4-private-workflow-parity", status: "passed" },
 				{ name: "package-work-goal", status: "passed" },
 			]);
-			assert.ok(readFileSync(promoted.auditPath).equals(readFileSync(repeated.auditPath)));
+			assert.ok(
+				readFileSync(promoted.auditPath).equals(readFileSync(repeated.auditPath)),
+			);
 			const audit = parseJson(
 				readFileSync(promoted.auditPath, "utf8"),
 				"promotion audit",
@@ -628,12 +781,22 @@ try {
 			assert.equal(audit.quarantineRemoved, true);
 			assertCanonicalBytes(firstRoot, firstBefore);
 			assertCanonicalBytes(secondRoot, secondBefore);
-			assert.equal(readPrivateWorkflowActivationState(firstRoot).status, "pending");
-			assert.equal(readPrivateWorkflowActivationState(secondRoot).status, "pending");
+			assert.equal(
+				readPrivateWorkflowActivationState(firstRoot).status,
+				"pending",
+			);
+			assert.equal(
+				readPrivateWorkflowActivationState(secondRoot).status,
+				"pending",
+			);
 			assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
 			for (const [relativePath, bytes] of Object.entries(firstBefore)) {
 				const name = path.posix.basename(relativePath);
-				assert.ok(readFileSync(path.join(promoted.retainedGenerationPath, name)).equals(bytes));
+				assert.ok(
+					readFileSync(path.join(promoted.retainedGenerationPath, name)).equals(
+						bytes,
+					),
+				);
 			}
 		}, "promotion persists pending B and retained A while complete A remains active with zero CE surface");
 
@@ -645,11 +808,14 @@ try {
 		const cleanAgentDir = path.join(releaseFixtureRoot, "clean-agent");
 		const independentBefore = {
 			playbook: dispatchPrivateWorkflow("brainstorm", authority),
-			catchUp: readFileSync(path.join(extensionRoot, "work-catch-up-baseline.json")),
+			catchUp: readFileSync(
+				path.join(extensionRoot, "work-catch-up-baseline.json"),
+			),
 			surface: packageZeroSurface(),
 		};
 		const activated = activatePendingPrivateWorkflowRelease(firstRoot);
-		const activatedWithoutLegacy = activatePendingPrivateWorkflowRelease(secondRoot);
+		const activatedWithoutLegacy =
+			activatePendingPrivateWorkflowRelease(secondRoot);
 		check(() => {
 			assert.equal(
 				legacyCompoundRemovalRecommendation(legacyAgentDir),
@@ -661,11 +827,16 @@ try {
 			assertCanonicalBytes(firstRoot, candidateBytes);
 			assertCanonicalBytes(secondRoot, candidateBytes);
 			assert.equal(readPrivateWorkflowActivationState(firstRoot).status, "active");
-			assert.equal(readPrivateWorkflowActivationState(secondRoot).status, "active");
+			assert.equal(
+				readPrivateWorkflowActivationState(secondRoot).status,
+				"active",
+			);
 			assert.deepEqual(
 				{
 					playbook: dispatchPrivateWorkflow("brainstorm", authority),
-					catchUp: readFileSync(path.join(extensionRoot, "work-catch-up-baseline.json")),
+					catchUp: readFileSync(
+						path.join(extensionRoot, "work-catch-up-baseline.json"),
+					),
 					surface: packageZeroSurface(),
 				},
 				independentBefore,
@@ -680,7 +851,11 @@ try {
 					code: rolledBack.code,
 					automatic: rolledBack.automatic,
 				},
-				{ status: "rolled-back", code: "private-workflow-rollback", automatic: false },
+				{
+					status: "rolled-back",
+					code: "private-workflow-rollback",
+					automatic: false,
+				},
 			);
 			assert.deepEqual(
 				{
@@ -696,8 +871,14 @@ try {
 			);
 			assertCanonicalBytes(firstRoot, firstBefore);
 			assertCanonicalBytes(secondRoot, secondBefore);
-			assert.equal(readPrivateWorkflowActivationState(firstRoot).status, "rolled-back");
-			assert.equal(readPrivateWorkflowActivationState(secondRoot).status, "rolled-back");
+			assert.equal(
+				readPrivateWorkflowActivationState(firstRoot).status,
+				"rolled-back",
+			);
+			assert.equal(
+				readPrivateWorkflowActivationState(secondRoot).status,
+				"rolled-back",
+			);
 			assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
 		}, "coded rollback is identical with the legacy package present or absent");
 		const persistedRollback = activatePendingPrivateWorkflowRelease(firstRoot);
@@ -714,17 +895,57 @@ try {
 		}, "persisted rollback stays quiet while fresh coded rollback remains actor-visible");
 
 		const failureCases = [
-			["acquisition failure", { acquireCandidate: async () => { throw new Error("network failed"); } }],
-			["failing gate", { runGate: async (gate) => gate.name !== "package-work-goal" }],
-			["incomplete parity", { parityCheck: () => { throw new Error("incomplete parity"); } }],
-			["interrupted quarantine", { interrupt: (phase) => { if (phase === "after-gates") throw new Error("interrupted"); } }],
-			["interrupted prior retention", { interrupt: (phase) => { if (phase === "after-prior-retention") throw new Error("interrupted"); } }],
-			["interrupted pending retention", { interrupt: (phase) => { if (phase === "after-pending-retention") throw new Error("interrupted"); } }],
+			[
+				"acquisition failure",
+				{
+					acquireCandidate: async () => {
+						throw new Error("network failed");
+					},
+				},
+			],
+			[
+				"failing gate",
+				{ runGate: async (gate) => gate.name !== "package-work-goal" },
+			],
+			[
+				"incomplete parity",
+				{
+					parityCheck: () => {
+						throw new Error("incomplete parity");
+					},
+				},
+			],
+			[
+				"interrupted quarantine",
+				{
+					interrupt: (phase) => {
+						if (phase === "after-gates") throw new Error("interrupted");
+					},
+				},
+			],
+			[
+				"interrupted prior retention",
+				{
+					interrupt: (phase) => {
+						if (phase === "after-prior-retention") throw new Error("interrupted");
+					},
+				},
+			],
+			[
+				"interrupted pending retention",
+				{
+					interrupt: (phase) => {
+						if (phase === "after-pending-retention") throw new Error("interrupted");
+					},
+				},
+			],
 		];
 		for (const [label, overrides] of failureCases) {
 			const root = makeRepository(label.replaceAll(" ", "-"));
 			const before = canonicalBytes(root);
-			const result = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(root, overrides));
+			const result = await promoteVerifiedPrivateWorkflowRelease(
+				releaseOptions(root, overrides),
+			);
 			check(() => {
 				assert.notEqual(result.status, "promoted");
 				assertCanonicalBytes(root, before);
@@ -735,11 +956,14 @@ try {
 		const mutatedSourceBefore = canonicalBytes(mutatedSourceRoot);
 		const sourceFile = path.join(fixtureRoot, ...sourcePath.split("/"));
 		const sourceOriginal = readFileSync(sourceFile);
-		const mutatedSource = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(mutatedSourceRoot, {
-			interrupt: (phase) => {
-				if (phase === "after-first-generation") writeFileSync(sourceFile, "mutated\n");
-			},
-		}));
+		const mutatedSource = await promoteVerifiedPrivateWorkflowRelease(
+			releaseOptions(mutatedSourceRoot, {
+				interrupt: (phase) => {
+					if (phase === "after-first-generation")
+						writeFileSync(sourceFile, "mutated\n");
+				},
+			}),
+		);
 		writeFileSync(sourceFile, sourceOriginal);
 		check(() => {
 			assert.equal(mutatedSource.status, "blocked");
@@ -766,7 +990,10 @@ try {
 			const root = makeRepository(`rollback-${phase}`);
 			const before = canonicalBytes(root);
 			await promoteVerifiedPrivateWorkflowRelease(releaseOptions(root));
-			assert.equal(activatePendingPrivateWorkflowRelease(root).status, "activated");
+			assert.equal(
+				activatePendingPrivateWorkflowRelease(root).status,
+				"activated",
+			);
 			const result = rollbackPrivateWorkflowRelease(root, {
 				interrupt: (current) => {
 					if (current === phase) throw new Error(`interrupted ${phase}`);
@@ -779,18 +1006,31 @@ try {
 			}, `${phase} rollback interruption restores complete A without mixed outputs`);
 		}
 
-		for (const failure of ["missing-retained", "mutated-retained", "failed-verification"]) {
+		for (const failure of [
+			"missing-retained",
+			"mutated-retained",
+			"failed-verification",
+		]) {
 			const root = makeRepository(failure);
 			const before = canonicalBytes(root);
-			const result = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(root));
+			const result = await promoteVerifiedPrivateWorkflowRelease(
+				releaseOptions(root),
+			);
 			if (failure === "missing-retained")
 				rmSync(result.retainedGenerationPath, { recursive: true, force: true });
 			if (failure === "mutated-retained")
-				writeFileSync(path.join(result.retainedGenerationPath, "brainstorm.md"), "mutated\n");
+				writeFileSync(
+					path.join(result.retainedGenerationPath, "brainstorm.md"),
+					"mutated\n",
+				);
 			const activation = activatePendingPrivateWorkflowRelease(
 				root,
 				failure === "failed-verification"
-					? { verify: () => { throw new Error("simulated next-start verification failure"); } }
+					? {
+							verify: () => {
+								throw new Error("simulated next-start verification failure");
+							},
+						}
 					: {},
 			);
 			check(() => {
@@ -802,15 +1042,22 @@ try {
 
 		const mutatedCanonicalRoot = makeRepository("mutated-canonical");
 		const mutatedCanonicalBefore = canonicalBytes(mutatedCanonicalRoot);
-		const mutatedCanonical = await promoteVerifiedPrivateWorkflowRelease(releaseOptions(mutatedCanonicalRoot, {
-			interrupt: (phase) => {
-				if (phase === "after-gates")
-					writeFileSync(
-						path.join(mutatedCanonicalRoot, "extensions", "private-workflows", "brainstorm.md"),
-						"mutated\n",
-					);
-			},
-		}));
+		const mutatedCanonical = await promoteVerifiedPrivateWorkflowRelease(
+			releaseOptions(mutatedCanonicalRoot, {
+				interrupt: (phase) => {
+					if (phase === "after-gates")
+						writeFileSync(
+							path.join(
+								mutatedCanonicalRoot,
+								"extensions",
+								"private-workflows",
+								"brainstorm.md",
+							),
+							"mutated\n",
+						);
+				},
+			}),
+		);
 		check(() => {
 			assert.equal(mutatedCanonical.status, "blocked");
 			assertCanonicalBytes(mutatedCanonicalRoot, mutatedCanonicalBefore);
@@ -819,7 +1066,10 @@ try {
 		rmSync(releaseFixtureRoot, { recursive: true, force: true });
 	}
 
-	writeFileSync(path.join(fixtureRoot, ...planSourcePath.split("/")), "changed\n");
+	writeFileSync(
+		path.join(fixtureRoot, ...planSourcePath.split("/")),
+		"changed\n",
+	);
 	rejects(
 		() => translateVerifiedWorkflows(args),
 		/verified source resource changed/,
@@ -843,7 +1093,12 @@ check(() => {
 	assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
 	assert.deepEqual(packageManifest.pi.extensions, ["extensions/work-models.js"]);
 	assert.deepEqual(packageManifest.pi.skills, ["./skills"]);
-	assert.equal(packageManifest.peerDependencies["pi-compound-engineering"], undefined);
+	assert.equal(
+		packageManifest.peerDependencies["pi-compound-engineering"],
+		undefined,
+	);
 }, "clean package runtime exposes zero private or CE surface");
 
-console.log(`PASS test-work-private-workflows (${checks} offline checks) zeroSurface=true`);
+console.log(
+	`PASS test-work-private-workflows (${checks} offline checks) zeroSurface=true`,
+);

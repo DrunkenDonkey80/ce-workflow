@@ -78,8 +78,7 @@ mutateStore(root, (store) => {
 		parentId: "SI-1",
 		title: "Self-improvement report: formatter touched runtime state",
 		labels: ["report", "self-improvement"],
-		description:
-			"Observed formatter failure. Expected runtime state exclusion.",
+		description: "Observed formatter failure. Expected runtime state exclusion.",
 		evidence: [
 			{
 				kind: "self-improvement-report",
@@ -226,6 +225,9 @@ const pi = {
 	sendUserMessage: async () => {},
 };
 workModelsExtension(pi);
+assert.equal(shortcuts.f7, undefined, "F7 is phased out");
+assert.ok(commands.wf, "/wf opens the orchestrator");
+const openWorkflow = (ctx) => commands.wf.handler("", ctx);
 const notices = [];
 const hookCtx = {
 	cwd: root,
@@ -253,7 +255,7 @@ assert(
 // Keep the menu deterministic regardless of whether cswap is on PATH here.
 process.env.WORK_ORCH_CSWAP_BIN = path.join(root, "no-such-cswap");
 const menuLabels = [];
-await shortcuts.f7.handler({
+await openWorkflow({
 	cwd: root,
 	mode: "print",
 	ui: {
@@ -291,7 +293,7 @@ assert(
 	"completed improvements show a short result summary",
 );
 const emptyMenuLabels = [];
-await shortcuts.f7.handler({
+await openWorkflow({
 	cwd: root,
 	mode: "print",
 	ui: {

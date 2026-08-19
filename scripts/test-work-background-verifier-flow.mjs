@@ -185,8 +185,7 @@ try {
 		"verifier instructions reject textual pseudo-tool calls",
 	);
 	assert(
-		fixtureLaunch?.output === undefined &&
-			fixtureLaunch.outputMode === undefined,
+		fixtureLaunch?.output === undefined && fixtureLaunch.outputMode === undefined,
 		"structured verifier output does not request an impossible agent-side file write",
 	);
 	assert(
@@ -298,10 +297,7 @@ try {
 		".runtime",
 		`run-${launches.indexOf(opusLaunch) + 1}`,
 	);
-	const opusStructuredOutput = path.join(
-		opusAsyncDir,
-		"structured-output.json",
-	);
+	const opusStructuredOutput = path.join(opusAsyncDir, "structured-output.json");
 	writeFileSync(
 		opusStructuredOutput,
 		JSON.stringify({
@@ -338,8 +334,7 @@ try {
 	assert(
 		aborts === 1 &&
 			followUps.length === 0 &&
-			loadVerifierStore(cwd).batches[job.batchId].presentationStatus ===
-				"pending",
+			loadVerifierStore(cwd).batches[job.batchId].presentationStatus === "pending",
 		"the verifier wake turn is aborted before synthesis is queued",
 	);
 	const hiddenWakeAbort = await hooks.message_end(
@@ -362,8 +357,7 @@ try {
 	assert(
 		followUps.length === 0 &&
 			loadVerifierStore(cwd).batches[job.batchId].purpose === "verification" &&
-			loadVerifierStore(cwd).batches[job.batchId].presentationStatus ===
-				"pending",
+			loadVerifierStore(cwd).batches[job.batchId].presentationStatus === "pending",
 		"ordinary completion verification remains in raw triage and never enters Analyze synthesis",
 	);
 	if (followUps.length) {
@@ -441,7 +435,8 @@ try {
 					content: [
 						{
 							type: "text",
-							text: "# Background analysis\n\n## Actionable items\n\n### 1. Fix the race\n\n- **Priority:** P1\n- **Source:** `feature.js:1`\n- **Root cause:** The update is not serialized.\n- **Evidence:** Concurrent calls overlap.\n- **Recommendation:** Serialize the update.\n\n### 2. Clean up state\n\n- **Priority:** P2\n- **Source:** `feature.js:1`\n- **Root cause:** Cleanup is incomplete.\n- **Evidence:** State remains set.\n- **Recommendation:** Reset state in finally.\n",
+							text:
+								"# Background analysis\n\n## Actionable items\n\n### 1. Fix the race\n\n- **Priority:** P1\n- **Source:** `feature.js:1`\n- **Root cause:** The update is not serialized.\n- **Evidence:** Concurrent calls overlap.\n- **Recommendation:** Serialize the update.\n\n### 2. Clean up state\n\n- **Priority:** P2\n- **Source:** `feature.js:1`\n- **Root cause:** Cleanup is incomplete.\n- **Evidence:** State remains set.\n- **Recommendation:** Reset state in finally.\n",
 						},
 					],
 					stopReason: "stop",
@@ -473,15 +468,14 @@ try {
 						(statSync(reportPath).mode & 0o077) === 0)) &&
 				readFileSync(reportPath, "utf8").includes("## Actionable items") &&
 				synthesizedText.includes("2 synthesized items") &&
-				synthesizedText.includes("F7 → Resume work") &&
+				synthesizedText.includes("/wf → Resume work") &&
 				!synthesizedText.includes("Feed this file") &&
 				synthesizedItems.some((item) => item.labels?.includes("wo:misc")) &&
 				synthesizedTasks.length === 2 &&
 				raceTask.labels.includes("wo:analysis") &&
 				raceTask.labels.includes("wo:debug") &&
 				cleanupTask.dependencies.includes(raceTask.id) &&
-				loadVerifierStore(cwd).batches[job.batchId].presentationStatus ===
-					"queued",
+				loadVerifierStore(cwd).batches[job.batchId].presentationStatus === "queued",
 			"completed synthesis persists its report and materializes its merged items under Misc",
 		);
 		assert(
@@ -519,15 +513,12 @@ ${requiredItemFields}`;
 		assert(
 			newerMaterialization.count === 1 &&
 				repeatedItems.filter(
-					(item) =>
-						item.status === "open" && item.labels?.includes("wo:analysis"),
+					(item) => item.status === "open" && item.labels?.includes("wo:analysis"),
 				).length === 1 &&
 				repeatedItems.filter((item) => item.labels?.includes("wo:analysis"))
 					.length === 3 &&
 				repeatedItems
-					.filter(
-						(item) => item.title !== "Fix the newest race" && item.parentId,
-					)
+					.filter((item) => item.title !== "Fix the newest race" && item.parentId)
 					.every((item) => item.status === "closed") &&
 				verifierStatus(loadVerifierStore(cwd)) === "fully-triaged",
 			"a newer synthesis supersedes prior active tasks, is idempotent, and suppresses covered raw findings",
@@ -537,10 +528,7 @@ ${requiredItemFields}`;
 		assert(
 			Object.values(
 				JSON.parse(
-					readFileSync(
-						path.join(cwd, ".ce-workflow", "work-items.json"),
-						"utf8",
-					),
+					readFileSync(path.join(cwd, ".ce-workflow", "work-items.json"), "utf8"),
 				).items,
 			).filter((item) => item.parentId && item.labels?.includes("wo:analysis"))
 				.length === 1,
@@ -558,14 +546,10 @@ ${requiredItemFields}`;
 		assert(
 			Object.values(
 				JSON.parse(
-					readFileSync(
-						path.join(cwd, ".ce-workflow", "work-items.json"),
-						"utf8",
-					),
+					readFileSync(path.join(cwd, ".ce-workflow", "work-items.json"), "utf8"),
 				).items,
 			).every(
-				(item) =>
-					item.status !== "open" || !item.labels?.includes("wo:analysis"),
+				(item) => item.status !== "open" || !item.labels?.includes("wo:analysis"),
 			),
 			"an empty latest synthesis closes previously active analysis tasks",
 		);

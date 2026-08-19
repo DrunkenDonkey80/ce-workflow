@@ -30,9 +30,7 @@ const {
 	renderWorkBrainstormText,
 } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
 	).href
 );
 const { mutateStore } = await import(
@@ -264,8 +262,7 @@ try {
 	fixture.reset("ideas");
 	assert(
 		menuBrainstormArgs("Idea IDEA-2") === "Idea IDEA-2" &&
-			menuBrainstormArgs("idea for offline mode") ===
-				"new idea for offline mode",
+			menuBrainstormArgs("idea for offline mode") === "new idea for offline mode",
 		"menu routing distinguishes an idea ID from a natural-language topic",
 	);
 	const standalone = buildWorkBrainstormState(
@@ -294,7 +291,7 @@ try {
 			!privateHandoff.includes("clarification per turn") &&
 			privateHandoff.includes("Brainstorm saved: <absolute path>") &&
 			!privateHandoff.includes(`Run ${"ce-"}brainstorm`),
-		"F7 brainstorm loads only the verified private playbook and preserves continuous clarification and saved-artifact contracts",
+		"/wf brainstorm loads only the verified private playbook and preserves continuous clarification and saved-artifact contracts",
 	);
 	const wideHandoff = brainstormHandoffPrompt(standalone, cwd, "wide");
 	assert(
@@ -302,9 +299,7 @@ try {
 			(wideHandoff.match(/work-divergent/g) ?? []).length === 3 &&
 			wideHandoff.indexOf("Creative sidecar gate") <
 				wideHandoff.indexOf("Advisor critic gate") &&
-			!brainstormHandoffPrompt(standalone, cwd).includes(
-				"Creative sidecar gate",
-			),
+			!brainstormHandoffPrompt(standalone, cwd).includes("Creative sidecar gate"),
 		"wide brainstorm merges three isolated branches before configured critics",
 	);
 	writeFileSync(
@@ -315,7 +310,9 @@ try {
 	assert(
 		researchedHandoff.includes("Optional pre-brainstorm research gate") &&
 			researchedHandoff.includes("work-advisor") &&
-			researchedHandoff.includes("feed that synthesis into the main private brainstorm") &&
+			researchedHandoff.includes(
+				"feed that synthesis into the main private brainstorm",
+			) &&
 			researchedHandoff.indexOf("Optional pre-brainstorm research gate") <
 				researchedHandoff.indexOf("Advisor critic gate"),
 		"optional configured advisors research the clarified request before the main brainstorm artifact",
@@ -348,9 +345,7 @@ try {
 	);
 	const telemetryText = readdirSync(path.join(cwd, ".pi", "work-runs"))
 		.filter((file) => file.endsWith(".jsonl"))
-		.map((file) =>
-			readFileSync(path.join(cwd, ".pi", "work-runs", file), "utf8"),
-		)
+		.map((file) => readFileSync(path.join(cwd, ".pi", "work-runs", file), "utf8"))
 		.join("\n");
 	const telemetryEvents = telemetryText
 		.split(/\r?\n/)
@@ -679,8 +674,7 @@ try {
 	);
 	assert(
 		plannedStore.items[state.selectedWorkItem.id].parentId === "E-1" &&
-			plannedStore.items["E-1"].documentLinks.design ===
-				"docs/plans/idea-plan.md",
+			plannedStore.items["E-1"].documentLinks.design === "docs/plans/idea-plan.md",
 		"master plan and planning work stay under the brainstorm epic",
 	);
 	assert(

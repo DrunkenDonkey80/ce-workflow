@@ -4,8 +4,21 @@ function sentenceCase(value) {
 	return String(value).replace(/^([a-z])/, (letter) => letter.toUpperCase());
 }
 
+function plainLabel(value) {
+	const raw = String(value);
+	const label = raw
+		.replace(/\p{Extended_Pictographic}/gu, (symbol) =>
+			symbol === "✔" ? symbol : "",
+		)
+		.replace(/[\uFE0F\u200D]/gu, "")
+		.trimEnd();
+	return /^\s*\p{Extended_Pictographic}/u.test(raw) ? label.trimStart() : label;
+}
+
 function itemLabel(item) {
-	return item.preserveCase ? String(item.label) : sentenceCase(item.label);
+	const raw = String(item.label);
+	const label = plainLabel(raw);
+	return item.preserveCase || !/^[a-z]/.test(raw) ? label : sentenceCase(label);
 }
 
 function labelFor(item) {
@@ -16,24 +29,14 @@ function labelFor(item) {
 function itemIndicator(item, { checked, currentValue, multi } = {}) {
 	if (multi) return checked ? "✓" : "○";
 	if (item.value === currentValue) return "●";
-	if (item.local) return "*";
-	return " ";
+	if (item.local) return "[local]";
+	return "";
 }
 
-function indicatedPrefix(item, options, align = true) {
-	const indicator = itemIndicator(item, options);
-	if (!align) return indicator === " " ? "" : indicator;
-	return `${options?.selected ? "❯" : " "} ${indicator}`;
-}
-
-function indicatedLabel(item, options, align = true) {
-	return `${indicatedPrefix(item, options, align)}${itemLabel(item)}`;
-}
-
-function styledLabel(theme, item, options, color) {
-	return `${theme.fg(color, indicatedPrefix(item, options))}${item.labelSegments
-		.map((segment) => theme.fg(segment.color ?? color, segment.text))
-		.join("")}`;
+function indicatedLabel(item, options = {}) {
+	return [itemIndicator(item, options), itemLabel(item)]
+		.filter(Boolean)
+		.join(" ");
 }
 
 function keyMatches(keybindings, data, id, ...fallbacks) {
@@ -46,21 +49,9 @@ function stripAnsi(value) {
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-// ponytail: calibrated for packaged icons on Windows Terminal; update with icons.
-const terminalEmojiExtraCells = new Map([
-	["🧱", 1],
-	["🧭", 1],
-	["🧹", 1],
-	["🌍", 1],
-	["🟢", 1],
-	["🟡", 1],
-	["🪲", 1],
-	["🧽", 1],
-]);
-
 function cellWidth(segment) {
 	if (/\p{Emoji_Presentation}/u.test(segment) || /[\uFE0F\u200D]/u.test(segment))
-		return 2 + (terminalEmojiExtraCells.get(segment) ?? 0);
+		return 2;
 	const code = segment.codePointAt(0) ?? 0;
 	if (/^\p{Mark}+$/u.test(segment) || code < 32 || (code >= 0x7f && code < 0xa0))
 		return 0;
@@ -84,11 +75,10 @@ function visibleWidth(value) {
 	return width;
 }
 
-function fit(value, width) {
-	const text = String(value);
+function truncate(value, width) {
+	const text = String(value ?? "");
 	const safeWidth = Math.max(1, width);
-	const visible = visibleWidth(text);
-	if (visible <= safeWidth) return `${text}${" ".repeat(safeWidth - visible)}`;
+	if (visibleWidth(text) <= safeWidth) return text;
 	let result = "";
 	let used = 0;
 	for (const { segment } of graphemes.segment(stripAnsi(text))) {
@@ -97,8 +87,7 @@ function fit(value, width) {
 		result += segment;
 		used += next;
 	}
-	result += "…";
-	return `${result}${" ".repeat(Math.max(0, safeWidth - used - 1))}`;
+	return `${result}…`;
 }
 
 function wrapText(value, width, maxLines) {
@@ -111,57 +100,24 @@ function wrapText(value, width, maxLines) {
 			line = candidate;
 			continue;
 		}
-		if (line) lines.push(fit(line, width).trimEnd());
+		if (line) lines.push(truncate(line, width));
 		line = words[index];
 		if (lines.length === maxLines - 1) {
-			lines.push(
-				fit([line, ...words.slice(index + 1)].join(" "), width).trimEnd(),
-			);
+			lines.push(truncate([line, ...words.slice(index + 1)].join(" "), width));
 			return lines;
 		}
 	}
-	if (line) lines.push(fit(line, width).trimEnd());
+	if (line) lines.push(truncate(line, width));
 	return lines;
 }
 
 function sectionLine(theme, title, width) {
-	const label = ` ${title} `;
+	const label = `-- ${title} `;
 	return theme.fg(
 		"border",
-		`${label}${"─".repeat(Math.max(0, width - visibleWidth(label)))}`,
+		`${label}${"-".repeat(Math.max(0, width - visibleWidth(label)))}`,
 	);
 }
-
-function statsLine(theme, lines, index) {
-	const line = lines[index] ?? "";
-	if (!line) return "";
-	if (line === "Stats:" || line.startsWith("Total:"))
-		return theme.fg("accent", theme.bold(line));
-	let block = -1;
-	for (let at = 1; at <= index; at += 1)
-		if (lines[at] && !lines[at].startsWith("-") && lines[at].endsWith(":"))
-			block += 1;
-	const color = ["success", "warning", "text", "accent"][Math.max(0, block) % 4];
-	return theme.fg(color, line.endsWith(":") ? theme.bold(line) : line);
-}
-
-function workspaceHeight(tui) {
-	return Math.max(1, (tui.terminal?.rows ?? 24) - 2);
-}
-
-function fitOverlayLine(value, width) {
-	if (width <= 1) return "";
-	return ` ${width > 2 ? fit(value || "\u00a0", width - 2) : ""}\r`;
-}
-
-// Vertical margins prevent scrolling; the leading cell + CR prevent exact-width
-// compositor padding from leaving Windows terminals at the autowrap boundary.
-const workspaceOverlayOptions = {
-	anchor: "top-left",
-	width: "100%",
-	maxHeight: "100%",
-	margin: { top: 1, bottom: 1 },
-};
 
 function initialIndex(items, { cursorKey, currentValue, selectedIndex }) {
 	if (Number.isInteger(selectedIndex))
@@ -207,19 +163,13 @@ async function nativeListDialog(ctx, options) {
 		...items.filter((item) => item.value === active),
 		...items.filter((item) => item.value !== active),
 		...(tabAction
-			? [
-					{
-						value: "__dialog_tab__",
-						label: tabAction.label,
-						preserveCase: true,
-					},
-				]
+			? [{ value: "__dialog_tab__", label: tabAction.label, preserveCase: true }]
 			: []),
 	];
 	const labels = choices.map((item) =>
 		labelFor({
 			...item,
-			label: indicatedLabel(item, { currentValue: active }, false),
+			label: indicatedLabel(item, { currentValue: active }),
 			preserveCase: true,
 		}),
 	);
@@ -256,284 +206,229 @@ export async function showListDialog(ctx, options) {
 		tabAction,
 		onInput,
 		forceCustom = false,
+		maxVisible = 10,
 	} = options;
-	if (
-		ctx.ui.workDialogsNative === true ||
-		(ctx.mode !== "tui" &&
-			!(forceCustom && !ctx.mode && typeof ctx.ui.custom === "function"))
-	)
-		return nativeListDialog(ctx, { ...options, cursorKey });
-	if (typeof ctx.ui.custom !== "function")
+	const canUseCustom =
+		typeof ctx.ui.custom === "function" &&
+		(ctx.mode === "tui" || (forceCustom && !ctx.mode));
+	if (ctx.ui.workDialogsNative === true || !canUseCustom)
 		return nativeListDialog(ctx, { ...options, cursorKey });
 	const subtitleLines = (Array.isArray(subtitle) ? subtitle : [subtitle]).filter(
 		Boolean,
 	);
 
-	return ctx.ui.custom(
-		(tui, theme, keybindings, done) => {
-			const enabled = new Set(multi?.selected ?? []);
-			let source = [...items];
-			let purpose = initialPurpose;
-			let help = initialHelp;
-			let query = "";
-			let visible = source.map((item, index) => ({ item, index }));
-			let index = initialIndex(source, {
-				cursorKey,
-				currentValue,
-				selectedIndex,
-			});
+	return ctx.ui.custom((tui, theme, keybindings, done) => {
+		const enabled = new Set(multi?.selected ?? []);
+		let source = [...items];
+		let purpose = initialPurpose;
+		let help = initialHelp;
+		let query = "";
+		let visible = source.map((item, index) => ({ item, index }));
+		let index = initialIndex(source, { cursorKey, currentValue, selectedIndex });
 
-			const remember = () => {
-				const selected = visible[index]?.item;
-				if (selected) dialogCursors.set(cursorKey, selected.value);
-			};
-			const applyFilter = () => {
-				const selectedValue = visible[index]?.item.value;
-				const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-				visible = source
-					.map((item, sourceIndex) => ({ item, index: sourceIndex }))
-					.filter(({ item }) => {
-						const haystack =
-							`${item.label} ${item.value} ${item.description ?? ""}`.toLowerCase();
-						return terms.every((term) => haystack.includes(term));
-					});
-				const retained = visible.findIndex(
-					({ item }) => item.value === selectedValue,
+		const remember = () => {
+			const selected = visible[index]?.item;
+			if (selected) dialogCursors.set(cursorKey, selected.value);
+		};
+		const applyFilter = () => {
+			const selectedValue = visible[index]?.item.value;
+			const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+			visible = source
+				.map((item, sourceIndex) => ({ item, index: sourceIndex }))
+				.filter(({ item }) => {
+					const haystack =
+						`${item.label} ${item.value} ${item.description ?? ""}`.toLowerCase();
+					return terms.every((term) => haystack.includes(term));
+				});
+			const retained = visible.findIndex(
+				({ item }) => item.value === selectedValue,
+			);
+			index = retained >= 0 ? retained : 0;
+			remember();
+		};
+		const close = (result) => {
+			remember();
+			done(result);
+		};
+		const back = () => {
+			if (multi?.requireOne && !enabled.size) {
+				ctx.ui.notify?.("Select at least one option", "warning");
+				return;
+			}
+			close(multi ? { action: "back", values: [...enabled] } : undefined);
+		};
+
+		const component = {
+			render(width) {
+				const safeWidth = Math.max(1, width - 2);
+				const lines = [];
+				const add = (line = "") => lines.push(truncate(line, safeWidth));
+				add(
+					`${theme.fg("accent", theme.bold(title))}  ${theme.fg(
+						"dim",
+						`${visible.length}/${source.length}${multi ? ` · ${enabled.size} selected` : ""}`,
+					)}`,
 				);
-				index = Math.max(0, retained);
-				remember();
-			};
-			const close = (result) => {
-				remember();
-				done(result);
-			};
-			const back = () => {
-				if (multi?.requireOne && !enabled.size) {
-					ctx.ui.notify?.("Select at least one option", "warning");
-					return;
+				add(theme.fg("muted", purpose));
+				for (const line of subtitleLines) add(theme.fg("dim", line));
+				if (filter)
+					add(`${theme.fg("muted", "Filter:")} ${theme.fg("text", query)}`);
+				add(sectionLine(theme, multi ? "Checklist" : "Options", safeWidth));
+
+				const count = Math.max(1, Math.min(maxVisible, visible.length || 1));
+				const start = Math.max(
+					0,
+					Math.min(index - Math.floor(count / 2), visible.length - count),
+				);
+				if (!visible.length) add(theme.fg("warning", "  No matches"));
+				for (let row = start; row < start + count && visible[row]; row += 1) {
+					const item = visible[row].item;
+					const selected = row === index;
+					const state = {
+						checked: enabled.has(item.value),
+						currentValue,
+						multi: Boolean(multi),
+					};
+					let color = item.color ?? "text";
+					if (selected && !item.color) color = "accent";
+					else if (multi) color = enabled.has(item.value) ? "success" : "dim";
+					else if (item.enabled === true) color = "success";
+					else if (item.enabled === false) color = "dim";
+					else if (item.value === currentValue) color = "success";
+					const indicator = itemIndicator(item, state);
+					const prefix = `${selected ? ">" : " "} ${indicator ? `${indicator} ` : ""}`;
+					const label = item.labelSegments
+						? item.labelSegments
+								.map((segment) =>
+									theme.fg(segment.color ?? color, plainLabel(segment.text)),
+								)
+								.join("")
+						: theme.fg(color, itemLabel(item));
+					add(`${theme.fg(color, prefix)}${label}`);
 				}
-				return close(multi ? { action: "back", values: [...enabled] } : undefined);
-			};
 
-			let cachedKey;
-			let cachedLines;
-			const component = {
-				focused: false,
-				render(width) {
-					const height = workspaceHeight(tui);
-					const renderWidth = Math.max(1, width - 2);
-					const cacheKey = `${renderWidth}:${height}:${component.focused}`;
-					if (cacheKey === cachedKey) return cachedLines;
-					const lines = [];
-					const add = (line = "") => lines.push(fitOverlayLine(line, width));
-					const inline = source.some((item) => item.inlineDescription);
-					const detailRows = inline
-						? 0
-						: Math.max(descriptionMinLines, descriptionMaxLines);
-					const shownSubtitles = subtitleLines.slice(
-						0,
-						Math.max(0, height - detailRows - 8),
+				const selected = visible[index]?.item;
+				const detailRows = Math.max(
+					descriptionMinLines,
+					selected?.description ? descriptionMaxLines : 0,
+				);
+				if (detailRows) {
+					add(sectionLine(theme, "Details", safeWidth));
+					const details = wrapText(
+						selected?.description ?? "No description.",
+						safeWidth,
+						detailRows,
 					);
+					for (const line of details) add(theme.fg("muted", line));
+				}
 
-					add(
-						`${theme.fg("accent", theme.bold(title))}  ${theme.fg(
-							"dim",
-							`${visible.length}/${source.length}${multi ? ` · ${enabled.size} selected` : ""}`,
-						)}`,
-					);
-					add(theme.fg("muted", purpose));
-					for (const line of shownSubtitles) add(theme.fg("dim", line));
-					if (filter) {
-						const cursor = component.focused ? "▌" : "";
-						add(
-							`${theme.fg("muted", "Filter:")} ${theme.fg("text", `${query}${cursor}`)}`,
-						);
-					}
-
-					const detailBlockRows = detailRows ? detailRows + 1 : 0;
-					const footerRows = 2;
-					const listRows = Math.max(
-						1,
-						height - lines.length - detailBlockRows - footerRows - 1,
-					);
-					const itemRows = inline ? 2 : 1;
-					const count = Math.max(
-						1,
-						Math.min(visible.length, Math.floor(listRows / itemRows)),
-					);
-					const start = Math.max(
-						0,
-						Math.min(index - Math.floor(count / 2), visible.length - count),
-					);
-					const position = visible.length ? `${index + 1}/${visible.length}` : "0/0";
-					add(
-						sectionLine(
-							theme,
-							multi ? `Checklist · ${position}` : `Options · ${position}`,
-							renderWidth,
-						),
-					);
-
-					const body = [];
-					if (!visible.length) body.push(theme.fg("warning", " No matches"));
-					for (let row = start; row < start + count && visible[row]; row += 1) {
-						const item = visible[row].item;
-						const state = {
-							checked: enabled.has(item.value),
-							currentValue,
-							multi: Boolean(multi),
-							selected: row === index,
-						};
-						let color = item.color ?? "text";
-						if (row === index && !item.color) color = "accent";
-						else if (multi) color = enabled.has(item.value) ? "success" : "dim";
-						else if (item.enabled === true) color = "success";
-						else if (item.enabled === false) color = "dim";
-						else if (item.value === currentValue) color = "success";
-						body.push(
-							item.labelSegments
-								? styledLabel(theme, item, state, color)
-								: theme.fg(color, indicatedLabel(item, state)),
-						);
-						if (item.inlineDescription)
-							body.push(
-								theme.fg(
-									"muted",
-									`${item.descriptionPrefix ?? "   "}${item.description ?? "No short description yet."}`,
-								),
-							);
-					}
-					while (body.length < listRows) body.push("\u00a0");
-					for (const line of body.slice(0, listRows)) add(line);
-
-					if (detailRows) {
-						add(sectionLine(theme, "Details", width));
-						const selected = visible[index]?.item;
-						const details = wrapText(
-							selected?.description ?? "No description.",
-							Math.max(8, renderWidth - 2),
-							detailRows,
-						);
-						while (details.length < detailRows) details.push("");
-						for (const line of details.slice(0, detailRows))
-							add(theme.fg("muted", line));
-					}
-
-					let defaultHelp = "↑↓ navigate · Enter select · Esc/Backspace back";
-					if (multi)
-						defaultHelp =
-							"↑↓ navigate · Enter/Space toggle · Esc/Backspace save and go back";
-					if (filter) defaultHelp = `Type to filter · ${defaultHelp}`;
-					add(sectionLine(theme, "Keys", renderWidth));
-					add(theme.fg("dim", help ?? defaultHelp));
-					while (lines.length < height) add();
-					cachedKey = cacheKey;
-					cachedLines = lines.slice(0, height);
-					return cachedLines;
-				},
-				handleInput(data) {
-					const selected = visible[index];
-					if (keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A")) {
-						if (visible.length) index = (index - 1 + visible.length) % visible.length;
-					} else if (
-						keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
-					) {
-						if (visible.length) index = (index + 1) % visible.length;
-					} else if (
-						tabAction &&
-						keyMatches(keybindings, data, "tui.input.tab", "tab", "\t")
-					) {
-						const next = tabAction.toggle?.();
-						if (!next) return close({ action: "tab" });
-						source = [...next.items];
-						purpose = next.purpose ?? purpose;
-						help = next.help ?? help;
-						query = "";
-						visible = source.map((item, sourceIndex) => ({
-							item,
-							index: sourceIndex,
-						}));
-						index = initialIndex(source, { cursorKey, currentValue });
-					} else if (
-						keyMatches(keybindings, data, "tui.select.cancel", "escape", "\x1b")
-					) {
-						if (filter && query) {
-							query = "";
-							applyFilter();
-						} else return back();
-					} else if (
-						keyMatches(
-							keybindings,
-							data,
-							"tui.select.confirm",
-							"enter",
-							"return",
-							"\r",
-							"\n",
-						) ||
-						((multi || selectOnSpace) && data === " ")
-					) {
-						const item = visible[index]?.item;
-						if (!item) return;
-						if (multi) {
-							if (enabled.has(item.value)) enabled.delete(item.value);
-							else enabled.add(item.value);
-						} else {
-							return close({
-								action: "select",
-								value: item.value,
-								item,
-								index: visible[index].index,
-							});
-						}
-					} else if (
-						filter &&
-						keyMatches(
-							keybindings,
-							data,
-							"tui.editor.deleteCharBackward",
-							"backspace",
-							"\b",
-							"\x7f",
-						)
-					) {
-						if (query) {
-							query = [...query].slice(0, -1).join("");
-							applyFilter();
-						} else return back();
-					} else if (
-						filter &&
-						keyMatches(keybindings, data, "tui.editor.deleteToLineStart", "ctrl+u")
-					) {
+				let defaultHelp = "Up/Down to navigate · Enter to select · Esc to cancel";
+				if (multi)
+					defaultHelp =
+						"Up/Down to navigate · Enter/Space to toggle · Esc to save and go back";
+				if (filter) defaultHelp = `Type to filter · ${defaultHelp}`;
+				add(sectionLine(theme, "Keys", safeWidth));
+				add(theme.fg("dim", help ?? defaultHelp));
+				return lines;
+			},
+			handleInput(data) {
+				const selected = visible[index];
+				if (keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A")) {
+					if (visible.length) index = (index - 1 + visible.length) % visible.length;
+				} else if (
+					keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
+				) {
+					if (visible.length) index = (index + 1) % visible.length;
+				} else if (
+					tabAction &&
+					keyMatches(keybindings, data, "tui.input.tab", "tab", "\t")
+				) {
+					const next = tabAction.toggle?.();
+					if (!next) return close({ action: "tab" });
+					source = [...next.items];
+					purpose = next.purpose ?? purpose;
+					help = next.help ?? help;
+					query = "";
+					visible = source.map((item, sourceIndex) => ({
+						item,
+						index: sourceIndex,
+					}));
+					index = initialIndex(source, { cursorKey, currentValue });
+				} else if (
+					keyMatches(keybindings, data, "tui.select.cancel", "escape", "\x1b")
+				) {
+					if (filter && query) {
 						query = "";
 						applyFilter();
+					} else return back();
+				} else if (
+					keyMatches(
+						keybindings,
+						data,
+						"tui.select.confirm",
+						"enter",
+						"return",
+						"\r",
+						"\n",
+					) ||
+					((multi || selectOnSpace) && data === " ")
+				) {
+					const item = visible[index]?.item;
+					if (!item) return;
+					if (multi) {
+						if (enabled.has(item.value)) enabled.delete(item.value);
+						else enabled.add(item.value);
 					} else {
-						const special = onInput?.({
-							data,
-							keybindings,
-							item: selected?.item,
-							index: selected?.index ?? index,
-							query,
+						return close({
+							action: "select",
+							value: item.value,
+							item,
+							index: visible[index].index,
 						});
-						if (special) return close(special);
-						if (!filter) return;
-						const text = data.replace(/^\x1b\[200~/, "").replace(/\x1b\[201~$/, "");
-						if (!text || /[\x00-\x1f\x7f]/u.test(text)) return;
-						query += text;
-						applyFilter();
 					}
-					remember();
-					cachedKey = undefined;
-					tui.requestRender();
-				},
-				invalidate() {
-					cachedKey = undefined;
-				},
-			};
-			return component;
-		},
-		{ overlay: true, overlayOptions: workspaceOverlayOptions },
-	);
+				} else if (
+					filter &&
+					keyMatches(
+						keybindings,
+						data,
+						"tui.editor.deleteCharBackward",
+						"backspace",
+						"\b",
+						"\x7f",
+					)
+				) {
+					if (query) {
+						query = [...query].slice(0, -1).join("");
+						applyFilter();
+					} else return back();
+				} else if (
+					filter &&
+					keyMatches(keybindings, data, "tui.editor.deleteToLineStart", "ctrl+u")
+				) {
+					query = "";
+					applyFilter();
+				} else {
+					const special = onInput?.({
+						data,
+						keybindings,
+						item: selected?.item,
+						index: selected?.index ?? index,
+						query,
+					});
+					if (special) return close(special);
+					if (!filter) return;
+					const text = data.replace(/^\x1b\[200~/, "").replace(/\x1b\[201~$/, "");
+					if (!text || /[\x00-\x1f\x7f]/u.test(text)) return;
+					query += text;
+					applyFilter();
+				}
+				remember();
+				tui.requestRender();
+			},
+			invalidate() {},
+		};
+		return component;
+	});
 }
 
 function treeVisualStatus(row) {
@@ -559,6 +454,12 @@ function treeActivityLabel(row) {
 	return "";
 }
 
+function treeStatusLabel(row) {
+	const activity = treeActivityLabel(row);
+	if (activity) return `[${activity}]`;
+	return treeVisualStatus(row) === "closed" ? "[done]" : "[open]";
+}
+
 export async function showTreeWorkspaceDialog(ctx, options) {
 	const {
 		title,
@@ -572,6 +473,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		cursorKey = title,
 		filter = true,
 		resolveStats,
+		maxVisible = 12,
 	} = options;
 	const rootsFor = (frame) => {
 		const roadmaps = frame?.roadmaps ?? [];
@@ -634,302 +536,246 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 		}
 	}
 
-	return ctx.ui.custom(
-		(tui, theme, keybindings, done) => {
-			let frame = initialFrame;
-			let rows = rootsFor(frame);
-			let query = "";
-			let visible = [];
-			const expansion = new Map();
-			let selectedId =
-				frame?.selectedId ?? dialogCursors.get(cursorKey) ?? rows[0]?.id;
-			let closed = false;
-			let timer;
-			let cachedKey;
-			let cachedLines;
-			const statsById = new Map();
+	return ctx.ui.custom((tui, theme, keybindings, done) => {
+		let frame = initialFrame;
+		let rows = rootsFor(frame);
+		let query = "";
+		let visible = [];
+		const expansion = new Map();
+		let selectedId =
+			frame?.selectedId ?? dialogCursors.get(cursorKey) ?? rows[0]?.id;
+		let closed = false;
+		let timer;
+		const statsById = new Map();
 
-			const expanded = (row) =>
-				expansion.has(row.id)
-					? expansion.get(row.id)
-					: treeVisualStatus(row) !== "closed";
-			const rebuild = () => {
-				const hiddenDepths = [];
-				const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-				visible = rows.filter((row) => {
-					while (
-						hiddenDepths.length &&
-						hiddenDepths[hiddenDepths.length - 1] >= row.depth
-					)
-						hiddenDepths.pop();
-					const hidden = hiddenDepths.length > 0;
-					if (row.container && !expanded(row)) hiddenDepths.push(row.depth);
-					const haystack =
-						`${row.title ?? row.label ?? ""} ${row.id} ${row.description ?? ""}`.toLowerCase();
-					return (
-						(!hidden || terms.length > 0) &&
-						terms.every((term) => haystack.includes(term))
-					);
-				});
-				if (!visible.some((row) => row.id === selectedId))
-					selectedId = visible[0]?.id;
-				cachedKey = undefined;
-			};
-			const finish = (result) => {
-				if (closed) return;
-				closed = true;
-				if (timer !== undefined) clearIntervalFn(timer);
-				cleanup?.();
-				if (selectedId) dialogCursors.set(cursorKey, selectedId);
-				done(result);
-			};
-			const poll = async () => {
-				try {
-					const next = await refresh?.();
-					if (!next?.ok || next.signature === frame?.signature) return;
-					const nextRows = rootsFor(next);
-					frame = next;
-					rows = nextRows;
-					rebuild();
-					tui.requestRender();
-				} catch {
-					// Projection errors deliberately retain the last good frame.
-				}
-			};
-			rebuild();
-			if (refresh) timer = setIntervalFn(poll, refreshIntervalMs);
-			const showStats = (id) => {
-				if (!id || statsById.has(id)) return;
-				try {
-					statsById.set(id, resolveStats?.(id) ?? ["Stats:", "- unknown"]);
-				} catch {
-					statsById.set(id, ["Stats:", "- unknown"]);
-				}
-			};
+		const expanded = (row) =>
+			expansion.has(row.id)
+				? expansion.get(row.id)
+				: treeVisualStatus(row) !== "closed";
+		const rebuild = () => {
+			const hiddenDepths = [];
+			const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+			visible = rows.filter((row) => {
+				while (
+					hiddenDepths.length &&
+					hiddenDepths[hiddenDepths.length - 1] >= row.depth
+				)
+					hiddenDepths.pop();
+				const hidden = hiddenDepths.length > 0;
+				if (row.container && !expanded(row)) hiddenDepths.push(row.depth);
+				const haystack =
+					`${row.title ?? row.label ?? ""} ${row.id} ${row.description ?? ""}`.toLowerCase();
+				return (
+					(!hidden || terms.length > 0) &&
+					terms.every((term) => haystack.includes(term))
+				);
+			});
+			if (!visible.some((row) => row.id === selectedId))
+				selectedId = visible[0]?.id;
+		};
+		const finish = (result) => {
+			if (closed) return;
+			closed = true;
+			if (timer !== undefined) clearIntervalFn(timer);
+			cleanup?.();
+			if (selectedId) dialogCursors.set(cursorKey, selectedId);
+			done(result);
+		};
+		const poll = async () => {
+			try {
+				const next = await refresh?.();
+				if (!next?.ok || next.signature === frame?.signature) return;
+				const nextRows = rootsFor(next);
+				frame = next;
+				rows = nextRows;
+				rebuild();
+				tui.requestRender();
+			} catch {
+				// Projection errors deliberately retain the last good frame.
+			}
+		};
+		const showStats = (id) => {
+			if (!id || statsById.has(id)) return;
+			try {
+				statsById.set(id, resolveStats?.(id) ?? ["Stats:", "- unknown"]);
+			} catch {
+				statsById.set(id, ["Stats:", "- unknown"]);
+			}
+		};
+		rebuild();
+		if (refresh) timer = setIntervalFn(poll, refreshIntervalMs);
 
-			const component = {
-				focused: false,
-				render(width) {
-					const height = workspaceHeight(tui);
-					const renderWidth = Math.max(1, width - 2);
-					const cache = `${renderWidth}:${height}:${component.focused}:${query}:${frame?.signature}:${selectedId}:${[...expansion]}`;
-					if (cache === cachedKey) return cachedLines;
-					const selected = visible.find((row) => row.id === selectedId);
-					const stats = statsById.get(selected?.id) ?? [
-						"Stats:",
-						"- press s to show",
-					];
-					const lines = [];
-					const add = (line = "") => lines.push(fitOverlayLine(line, width));
-					const header = [
-						`${theme.fg("accent", theme.bold(title))}  ${theme.fg("dim", `${visible.length}/${rows.length}`)}`,
-						theme.fg("muted", purpose),
-					];
-					if (filter)
-						header.push(
-							`${theme.fg("muted", "Filter:")} ${theme.fg("text", `${query}${component.focused ? "▌" : ""}`)}`,
-						);
-					for (const line of header) add(line);
-					add(sectionLine(theme, "Work items", renderWidth));
-					const detailRows = Math.max(0, Math.min(6, height - lines.length - 4));
-					const bodyRows = Math.max(0, height - lines.length - detailRows - 3);
-					const statsWidth =
-						renderWidth >= 24
-							? Math.min(
-									Math.floor((renderWidth - 2) / 2),
-									Math.max(1, ...stats.map((line) => visibleWidth(line))),
-								)
-							: 0;
-					const treeWidth = renderWidth - (statsWidth ? statsWidth + 2 : 0);
-					const shownStats =
-						stats.length > bodyRows
-							? [
-									...stats.slice(0, Math.max(0, bodyRows - 1)),
-									`… ${stats.length - bodyRows + 1} more`,
-								]
-							: stats;
-					const index = Math.max(
-						0,
-						visible.findIndex((row) => row.id === selectedId),
+		return {
+			render(width) {
+				const safeWidth = Math.max(1, width - 2);
+				const selected = visible.find((row) => row.id === selectedId);
+				const lines = [];
+				const add = (line = "") => lines.push(truncate(line, safeWidth));
+				add(
+					`${theme.fg("accent", theme.bold(title))}  ${theme.fg("dim", `${visible.length}/${rows.length}`)}`,
+				);
+				add(theme.fg("muted", purpose));
+				if (filter)
+					add(`${theme.fg("muted", "Filter:")} ${theme.fg("text", query)}`);
+				add(sectionLine(theme, "Work items", safeWidth));
+
+				const index = Math.max(
+					0,
+					visible.findIndex((row) => row.id === selectedId),
+				);
+				const count = Math.max(1, Math.min(maxVisible, visible.length || 1));
+				const start = Math.max(
+					0,
+					Math.min(index - Math.floor(count / 2), visible.length - count),
+				);
+				if (!visible.length) add(theme.fg("warning", "  No matches"));
+				for (let at = start; at < start + count && visible[at]; at += 1) {
+					const row = visible[at];
+					const marker = row.container ? (expanded(row) ? "[-]" : "[+]") : "   ";
+					const progress =
+						row.role || row.tasks
+							? `${row.progress?.completed ?? 0}/${row.progress?.total ?? 0} `
+							: "";
+					const rowTitle = plainLabel(
+						row.shortTitle ?? row.title ?? row.label ?? "",
 					);
-					const start = Math.max(
-						0,
-						Math.min(index - Math.floor(bodyRows / 2), visible.length - bodyRows),
-					);
-					for (let offset = 0; offset < bodyRows; offset += 1) {
-						const row = visible[start + offset];
-						let tree = "";
-						if (row) {
-							const selected = row.id === selectedId;
-							const marker = row.container ? (expanded(row) ? "[-]" : "[+]") : "   ";
-							const progress =
-								row.role || row.tasks
-									? `${row.progress?.completed ?? 0}/${row.progress?.total ?? 0} `
-									: "";
-							const prefix = `${theme.fg(selected ? "accent" : "text", selected ? "❯" : " ")} ${"  ".repeat(row.depth)}${marker} `;
-							const dot = theme.fg(
-								treeStatusColor(row),
-								treeVisualStatus(row) === "closed" ? "✓" : "●",
-							);
-							const rowTitle = row.shortTitle ?? row.title ?? row.label;
-							const title = theme.fg(
-								selected
-									? "accent"
-									: treeVisualStatus(row) === "closed"
-										? "dim"
-										: "text",
-								`${progress}${row.id}${rowTitle ? ` ${rowTitle}` : ""}`,
-							);
-							const activity = treeActivityLabel(row);
-							tree = `${prefix}${dot} ${title}${activity ? theme.fg("muted", ` [${activity}]`) : ""}`;
-						}
-						if (statsWidth) {
-							const left = fit(tree, treeWidth);
-							const right = fit(
-								statsLine(theme, shownStats, offset),
-								statsWidth,
-							).trimEnd();
-							add(
-								`${left}  ${" ".repeat(Math.max(0, statsWidth - visibleWidth(right)))}${right}`,
-							);
-						} else add(tree);
-					}
-					add(sectionLine(theme, "Details", renderWidth));
-					const details = detailRows
-						? wrapText(
-								selected?.description || "No description.",
-								renderWidth,
-								detailRows,
-							)
-						: [];
-					for (const line of details) add(theme.fg("text", line));
-					while (lines.length < height - 2) add();
-					add(sectionLine(theme, "Keys", renderWidth));
+					const text = `${row.id}${rowTitle ? ` ${rowTitle}` : ""}`;
+					const prefix = `${row.id === selectedId ? ">" : " "} ${"  ".repeat(row.depth)}${marker}`;
 					add(
 						theme.fg(
-							"dim",
-							`${filter ? "Type to filter · " : ""}s stats · ↑↓ navigate · Space/←/→ expand · Enter select · Esc back`,
+							row.id === selectedId ? "accent" : treeStatusColor(row),
+							`${prefix} ${treeStatusLabel(row)} ${progress}${text}`,
 						),
 					);
-					while (lines.length < height) add();
-					cachedKey = cache;
-					cachedLines = lines.slice(0, height);
-					return cachedLines;
-				},
-				handleInput(data) {
-					const index = Math.max(
-						0,
-						visible.findIndex((row) => row.id === selectedId),
-					);
-					const row = visible[index];
-					if (data === "s") {
-						showStats(row?.id);
-					} else if (
-						keyMatches(
-							keybindings,
-							data,
-							"tui.editor.cursorLeft",
-							"left",
-							"\x1b[D",
-							"\x1bOD",
+				}
+
+				add(sectionLine(theme, "Details", safeWidth));
+				for (const line of wrapText(
+					selected?.description || "No description.",
+					safeWidth,
+					4,
+				))
+					add(theme.fg("muted", line));
+				const stats = statsById.get(selected?.id);
+				if (stats) {
+					add(sectionLine(theme, "Stats", safeWidth));
+					for (const line of stats.slice(0, 10)) add(theme.fg("muted", line));
+				}
+				add(sectionLine(theme, "Keys", safeWidth));
+				add(
+					theme.fg(
+						"dim",
+						`${filter ? "Type to filter · " : ""}S to show stats · Up/Down to navigate · Space/Left/Right to expand · Enter to select · Esc to cancel`,
+					),
+				);
+				return lines;
+			},
+			handleInput(data) {
+				const index = Math.max(
+					0,
+					visible.findIndex((row) => row.id === selectedId),
+				);
+				const row = visible[index];
+				if (data.toLowerCase?.() === "s") {
+					showStats(row?.id);
+				} else if (
+					keyMatches(
+						keybindings,
+						data,
+						"tui.editor.cursorLeft",
+						"left",
+						"\x1b[D",
+						"\x1bOD",
+					)
+				) {
+					let parent = row?.container && expanded(row) ? row : undefined;
+					for (let at = index - 1; !parent && at >= 0; at -= 1) {
+						const candidate = visible[at];
+						if (
+							candidate.depth < (row?.depth ?? 0) &&
+							candidate.container &&
+							expanded(candidate)
 						)
-					) {
-						let parent = row?.container && expanded(row) ? row : undefined;
-						for (let at = index - 1; !parent && at >= 0; at -= 1) {
-							const candidate = visible[at];
-							if (
-								candidate.depth < (row?.depth ?? 0) &&
-								candidate.container &&
-								expanded(candidate)
-							)
-								parent = candidate;
-						}
-						if (parent) {
-							selectedId = parent.id;
-							expansion.set(parent.id, false);
-							rebuild();
-						}
-					} else if (
-						keyMatches(
-							keybindings,
-							data,
-							"tui.editor.cursorRight",
-							"right",
-							"\x1b[C",
-							"\x1bOC",
-						)
-					) {
-						if (row?.container) {
-							expansion.set(row.id, true);
-							rebuild();
-						}
-					} else if (data === " ") {
-						if (row?.container) {
-							expansion.set(row.id, !expanded(row));
-							rebuild();
-						}
-					} else if (
-						keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A")
-					) {
-						if (visible.length)
-							selectedId = visible[(index - 1 + visible.length) % visible.length].id;
-					} else if (
-						keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
-					) {
-						if (visible.length) selectedId = visible[(index + 1) % visible.length].id;
-					} else if (
-						keyMatches(
-							keybindings,
-							data,
-							"tui.select.confirm",
-							"enter",
-							"return",
-							"\r",
-							"\n",
-						)
-					) {
-						if (row) return finish({ action: "select", value: row.id, item: row });
-					} else if (
-						keyMatches(keybindings, data, "tui.select.cancel", "escape", "\x1b")
-					) {
-						if (filter && query) {
-							query = "";
-							rebuild();
-						} else return finish({ action: "back" });
-					} else if (
-						filter &&
-						keyMatches(
-							keybindings,
-							data,
-							"tui.editor.deleteCharBackward",
-							"backspace",
-							"\b",
-							"\x7f",
-						)
-					) {
-						if (query) {
-							query = [...query].slice(0, -1).join("");
-							rebuild();
-						} else return finish({ action: "back" });
-					} else if (filter) {
-						const text = data.replace(/^\x1b\[200~/, "").replace(/\x1b\[201~$/, "");
-						if (text && !/[\x00-\x1f\x7f]/u.test(text)) {
-							query += text;
-							rebuild();
-						}
+							parent = candidate;
 					}
-					if (selectedId) dialogCursors.set(cursorKey, selectedId);
-					cachedKey = undefined;
-					tui.requestRender();
-				},
-				invalidate() {
-					cachedKey = undefined;
-				},
-			};
-			return component;
-		},
-		{ overlay: true, overlayOptions: workspaceOverlayOptions },
-	);
+					if (parent) {
+						selectedId = parent.id;
+						expansion.set(parent.id, false);
+						rebuild();
+					}
+				} else if (
+					keyMatches(
+						keybindings,
+						data,
+						"tui.editor.cursorRight",
+						"right",
+						"\x1b[C",
+						"\x1bOC",
+					)
+				) {
+					if (row?.container) {
+						expansion.set(row.id, true);
+						rebuild();
+					}
+				} else if (data === " ") {
+					if (row?.container) {
+						expansion.set(row.id, !expanded(row));
+						rebuild();
+					}
+				} else if (keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A")) {
+					if (visible.length)
+						selectedId = visible[(index - 1 + visible.length) % visible.length].id;
+				} else if (
+					keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
+				) {
+					if (visible.length) selectedId = visible[(index + 1) % visible.length].id;
+				} else if (
+					keyMatches(
+						keybindings,
+						data,
+						"tui.select.confirm",
+						"enter",
+						"return",
+						"\r",
+						"\n",
+					)
+				) {
+					if (row) return finish({ action: "select", value: row.id, item: row });
+				} else if (
+					keyMatches(keybindings, data, "tui.select.cancel", "escape", "\x1b")
+				) {
+					if (filter && query) {
+						query = "";
+						rebuild();
+					} else return finish({ action: "back" });
+				} else if (
+					filter &&
+					keyMatches(
+						keybindings,
+						data,
+						"tui.editor.deleteCharBackward",
+						"backspace",
+						"\b",
+						"\x7f",
+					)
+				) {
+					if (query) {
+						query = [...query].slice(0, -1).join("");
+						rebuild();
+					} else return finish({ action: "back" });
+				} else if (filter) {
+					const text = data.replace(/^\x1b\[200~/, "").replace(/\x1b\[201~$/, "");
+					if (text && !/[\x00-\x1f\x7f]/u.test(text)) {
+						query += text;
+						rebuild();
+					}
+				}
+				if (selectedId) dialogCursors.set(cursorKey, selectedId);
+				tui.requestRender();
+			},
+			invalidate() {},
+		};
+	});
 }
 
 export function resetDialogStateForTest() {
