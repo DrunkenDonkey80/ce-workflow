@@ -698,7 +698,10 @@ try {
 	});
 	writeFileSync(path.join(finishCwd, implementationEvidenceFile), "screenshot");
 	const implementationFile = "evidence-implementation.js";
-	writeFileSync(path.join(finishCwd, implementationFile), "export default true;\n");
+	writeFileSync(
+		path.join(finishCwd, implementationFile),
+		"export default true;\n",
+	);
 	const implementationEvidenceFinished = JSON.parse(
 		execFileSync(
 			process.execPath,
@@ -723,9 +726,7 @@ try {
 		),
 	);
 	assert(
-		implementationEvidenceFinished.files.includes(
-			implementationEvidenceFile,
-		) &&
+		implementationEvidenceFinished.files.includes(implementationEvidenceFile) &&
 			implementationEvidenceFinished.files.includes(implementationFile) &&
 			loadStore(finishCwd).items["TASK-EVIDENCE-IMPLEMENTATION"].status ===
 				"closed",

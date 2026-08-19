@@ -2717,7 +2717,8 @@ const successfulVerifierOutcomes = new Set(["findings", "no-findings"]);
 
 function verifierFailureOperations(job) {
 	return job.operations.filter(
-		(operation) => !successfulVerifierOutcomes.has(job.operationStatus[operation]),
+		(operation) =>
+			!successfulVerifierOutcomes.has(job.operationStatus[operation]),
 	);
 }
 
@@ -2749,7 +2750,10 @@ export function acknowledgeVerifierFailure(store, input = {}) {
 		if (!nonempty(input.reason) || input.reason.length > 1000)
 			throw error("invalid", "Verifier failure acknowledgement needs a reason");
 		if (!new Set(["failed", "orphaned", "partially-failed"]).has(job.status))
-			throw error("invalid", "Only a terminal failed verifier job can be acknowledged");
+			throw error(
+				"invalid",
+				"Only a terminal failed verifier job can be acknowledged",
+			);
 		if (job.failureAcknowledgement) return job.failureAcknowledgement;
 		const coveredBy = Object.values(next.jobs)
 			.filter(
@@ -3068,14 +3072,13 @@ export function validateVerifierStore(store, file = "verifier store") {
 			(!plainObject(job.failureAcknowledgement) ||
 				!nonempty(job.failureAcknowledgement.reason) ||
 				job.failureAcknowledgement.reason.length > 1000 ||
-				Number.isNaN(
-					Date.parse(job.failureAcknowledgement.acknowledgedAt),
-				) ||
+				Number.isNaN(Date.parse(job.failureAcknowledgement.acknowledgedAt)) ||
 				!Array.isArray(job.failureAcknowledgement.coveredBy) ||
 				!job.failureAcknowledgement.coveredBy.length ||
-				!same(job.failureAcknowledgement.coveredBy, [
-					...new Set(job.failureAcknowledgement.coveredBy),
-				].sort()) ||
+				!same(
+					job.failureAcknowledgement.coveredBy,
+					[...new Set(job.failureAcknowledgement.coveredBy)].sort(),
+				) ||
 				!acknowledgedVerifierFailure(store, job))
 		)
 			throw error(

@@ -8187,8 +8187,7 @@ function planResumeAction(state, cwd, options = {}) {
 	);
 	if (implementation) {
 		if (
-			(implementation.changedPaths?.length ?? 0) >
-			FINISH_TASK_DEFAULT_MAX_FILES
+			(implementation.changedPaths?.length ?? 0) > FINISH_TASK_DEFAULT_MAX_FILES
 		)
 			return withHandoffPrompt(
 				{

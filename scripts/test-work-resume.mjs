@@ -1093,9 +1093,7 @@ try {
 		state.action === "run-repair" &&
 			state.handoffReason.includes("post-dispatch numstat") &&
 			formatterRepair?.agent === "work-worker" &&
-			formatterRepair.params.task.includes(
-				"Repair formatter-expanded output now",
-			),
+			formatterRepair.params.task.includes("Repair formatter-expanded output now"),
 		"settled formatter-expanded output routes one bounded repair before review",
 	);
 	process.env.WORK_RESUME_GIT_DIRTY = "formatter-expanded-staged";
