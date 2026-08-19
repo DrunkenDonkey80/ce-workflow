@@ -4242,7 +4242,8 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed",
+        "Reconciliation: one atomic locally-owned claim—terminal verifier infrastructure failures had no durable recovery and permanently blocked completion. Fixed in b5d9a55: work_verifier_acknowledge_failure records a durable acknowledgement only when another configured verifier successfully covered every failed operation; findings remain intact and unacknowledged failures still block. Verified by node scripts/test-background-verifiers.mjs and coded finish."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -5316,7 +5317,8 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:verify-check PASS\nCommand: node scripts/test-work-resume.mjs\nOutput: ok - coded work-resume behavior"
+        "wo:verify-check PASS\nCommand: node scripts/test-work-resume.mjs\nOutput: ok - coded work-resume behavior",
+        "Reconciliation: one atomic locally-owned claim—the planner and finish-task file-scope contracts diverged. Fixed in 43e5224: planner-created executable tasks must declare at most 8 implementation files, and coded resume routes oversized declared scopes back to the planner for re-cutting before implementation. Verified by node scripts/test-work-resume.mjs and coded finish."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -8273,7 +8275,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T08:14:31.281Z"
+    "updatedAt": "2026-08-19T08:14:46.751Z"
   },
   "schemaVersion": 1
 }
