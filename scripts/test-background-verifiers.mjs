@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import {
 	VerifierStoreError,
+	acknowledgeVerifierFailure,
 	addFinding,
 	addGroup,
 	analysisReviewProjection,
@@ -352,16 +353,24 @@ try {
 
 	const failedCwd = repo();
 	initVerifierStore(failedCwd);
+	const failedProfiles = profiles.map((profile) => ({
+		...profile,
+		operations: ["security"],
+	}));
 	const failedBatch = mutateVerifierStore(failedCwd, (state) =>
 		createBatch(state, {
 			checkpoint,
-			profiles: [profiles[1]],
+			profiles: failedProfiles,
 			...options,
 			now: "2026-07-21T00:00:04.000Z",
 		}),
 	);
-	const failedJob = Object.values(loadVerifierStore(failedCwd).jobs).find(
+	const failedJobs = Object.values(loadVerifierStore(failedCwd).jobs).filter(
 		(job) => job.batchId === failedBatch.id,
+	);
+	const failedJob = failedJobs.find((job) => job.model === "openai/gpt-5");
+	const coveringJob = failedJobs.find(
+		(job) => job.model === "anthropic/claude-4",
 	);
 	mutateVerifierStore(failedCwd, (state) =>
 		recordOperationResult(state, {
@@ -371,12 +380,46 @@ try {
 			failure: "provider unavailable",
 		}),
 	);
+	throwsCategory(
+		() =>
+			mutateVerifierStore(failedCwd, (state) =>
+				acknowledgeVerifierFailure(state, {
+					jobId: failedJob.id,
+					reason: "provider format failure",
+				}),
+			),
+		"invalid",
+	);
+	mutateVerifierStore(failedCwd, (state) =>
+		recordOperationResult(state, {
+			jobId: coveringJob.id,
+			operation: "security",
+			outcome: "no-findings",
+		}),
+	);
 	assert.match(
 		verifierCompletionBlocker(
 			loadVerifierStore(failedCwd),
 			"2026-07-21T00:00:03.000Z",
 		),
-		/failed or became orphaned/,
+		new RegExp(`failed or became orphaned: ${failedJob.id}`),
+	);
+	const acknowledgement = mutateVerifierStore(failedCwd, (state) =>
+		acknowledgeVerifierFailure(state, {
+			jobId: failedJob.id,
+			reason: "provider format failure; equivalent security coverage passed",
+			now: "2026-07-21T00:00:05.000Z",
+		}),
+	);
+	assert.deepEqual(acknowledgement.coveredBy, [coveringJob.id]);
+	assert.equal(verifierStatus(loadVerifierStore(failedCwd)), "fully-triaged");
+	assert.equal(
+		verifierCompletionBlocker(
+			loadVerifierStore(failedCwd),
+			"2026-07-21T00:00:03.000Z",
+		),
+		undefined,
+		"a durably acknowledged infrastructure failure with equivalent coverage does not block completion",
 	);
 	assert.equal(
 		verifierCompletionBlocker(

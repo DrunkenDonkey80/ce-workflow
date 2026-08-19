@@ -64,6 +64,7 @@ import {
 	projectInitiativeHierarchy,
 } from "./work-initiatives.js";
 import {
+	acknowledgeVerifierFailure,
 	captureVerifierCheckpoint,
 	analysisReviewProjection,
 	claimAnalysisReview,
@@ -9754,6 +9755,27 @@ function registerVerifierTools(pi) {
 		});
 }
 function registerVerifierTriageTools(pi) {
+	registerConstrainedTool(pi, {
+		name: "work_verifier_acknowledge_failure",
+		label: "Acknowledge verifier infrastructure failure",
+		description:
+			"Durably acknowledge one failed verifier job after another configured verifier covered every failed operation.",
+		parameters: {
+			type: "object",
+			properties: {
+				jobId: { type: "string", minLength: 1 },
+				reason: { type: "string", minLength: 1, maxLength: 1000 },
+			},
+			required: ["jobId", "reason"],
+			additionalProperties: false,
+		},
+		async execute(_id, params, _signal, _update, ctx) {
+			const result = mutateVerifierStore(ctx.cwd, (store) =>
+				acknowledgeVerifierFailure(store, params),
+			);
+			return verifierToolResult({ jobId: params.jobId, ...result });
+		},
+	});
 	registerConstrainedTool(pi, {
 		name: "work_verifier_inbox",
 		label: "Verifier triage inbox",

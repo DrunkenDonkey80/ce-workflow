@@ -2712,6 +2712,69 @@ export function analysisReviewProjection(store) {
 	);
 }
 
+const successfulVerifierOutcomes = new Set(["findings", "no-findings"]);
+
+function verifierFailureOperations(job) {
+	return job.operations.filter(
+		(operation) => !successfulVerifierOutcomes.has(job.operationStatus[operation]),
+	);
+}
+
+function verifierFailureCovered(store, job, coveredBy) {
+	return verifierFailureOperations(job).every((operation) =>
+		coveredBy.some((jobId) => {
+			const candidate = store.jobs[jobId];
+			return (
+				candidate?.batchId === job.batchId &&
+				candidate.id !== job.id &&
+				successfulVerifierOutcomes.has(candidate.operationStatus[operation])
+			);
+		}),
+	);
+}
+
+function acknowledgedVerifierFailure(store, job) {
+	return (
+		["failed", "orphaned", "partially-failed"].includes(job.status) &&
+		plainObject(job.failureAcknowledgement) &&
+		verifierFailureCovered(store, job, job.failureAcknowledgement.coveredBy)
+	);
+}
+
+export function acknowledgeVerifierFailure(store, input = {}) {
+	return edit(store, (next) => {
+		const job = next.jobs[input.jobId];
+		if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
+		if (!nonempty(input.reason) || input.reason.length > 1000)
+			throw error("invalid", "Verifier failure acknowledgement needs a reason");
+		if (!new Set(["failed", "orphaned", "partially-failed"]).has(job.status))
+			throw error("invalid", "Only a terminal failed verifier job can be acknowledged");
+		if (job.failureAcknowledgement) return job.failureAcknowledgement;
+		const coveredBy = Object.values(next.jobs)
+			.filter(
+				(candidate) =>
+					candidate.batchId === job.batchId &&
+					candidate.id !== job.id &&
+					verifierFailureOperations(job).some((operation) =>
+						successfulVerifierOutcomes.has(candidate.operationStatus[operation]),
+					),
+			)
+			.map((candidate) => candidate.id)
+			.sort();
+		if (!coveredBy.length || !verifierFailureCovered(next, job, coveredBy))
+			throw error(
+				"invalid",
+				"Another configured verifier must successfully cover every failed operation",
+			);
+		job.failureAcknowledgement = {
+			reason: input.reason.trim(),
+			acknowledgedAt: now(input.now),
+			coveredBy,
+		};
+		return job.failureAcknowledgement;
+	});
+}
+
 export function verifierStatus(store, configured = undefined) {
 	if (!store) return configured?.length ? "queued/running" : "not-configured";
 	validateVerifierStore(store);
@@ -2719,8 +2782,10 @@ export function verifierStatus(store, configured = undefined) {
 	if (!jobs.length)
 		return configured?.length ? "queued/running" : "not-configured";
 	if (
-		jobs.some((job) =>
-			["failed", "orphaned", "partially-failed"].includes(job.status),
+		jobs.some(
+			(job) =>
+				["failed", "orphaned", "partially-failed"].includes(job.status) &&
+				!acknowledgedVerifierFailure(store, job),
 		)
 	)
 		return "failed/orphaned";
@@ -2755,12 +2820,15 @@ export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 	);
 	if (jobs.some((job) => ["queued", "running"].includes(job.status)))
 		return "background verification is still queued or running";
-	if (
-		jobs.some((job) =>
-			["failed", "orphaned", "partially-failed"].includes(job.status),
-		)
-	)
-		return "background verification failed or became orphaned";
+	const failed = jobs.filter(
+		(job) =>
+			["failed", "orphaned", "partially-failed"].includes(job.status) &&
+			!acknowledgedVerifierFailure(store, job),
+	);
+	if (failed.length)
+		return `background verification failed or became orphaned: ${failed
+			.map((job) => job.id)
+			.join(", ")}`;
 	if (
 		Object.values(store.findings).some((finding) => {
 			const report = store.reports[finding.reportId];
@@ -2994,6 +3062,25 @@ export function validateVerifierStore(store, file = "verifier store") {
 			!plainObject(job.operationStatus)
 		)
 			throw error("corrupt", `Invalid job profile ${id} in ${file}`);
+		if (
+			job.failureAcknowledgement !== undefined &&
+			(!plainObject(job.failureAcknowledgement) ||
+				!nonempty(job.failureAcknowledgement.reason) ||
+				job.failureAcknowledgement.reason.length > 1000 ||
+				Number.isNaN(
+					Date.parse(job.failureAcknowledgement.acknowledgedAt),
+				) ||
+				!Array.isArray(job.failureAcknowledgement.coveredBy) ||
+				!job.failureAcknowledgement.coveredBy.length ||
+				!same(job.failureAcknowledgement.coveredBy, [
+					...new Set(job.failureAcknowledgement.coveredBy),
+				].sort()) ||
+				!acknowledgedVerifierFailure(store, job))
+		)
+			throw error(
+				"corrupt",
+				`Invalid verifier failure acknowledgement ${id} in ${file}`,
+			);
 		if (
 			!same(Object.keys(job.operationStatus).sort(), job.operations) ||
 			Object.values(job.operationStatus).some(
