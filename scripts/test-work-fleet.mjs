@@ -172,7 +172,11 @@ try {
 } finally {
 	globalThis.clearTimeout = clearTimeoutOriginal;
 }
-assert.equal(unsubscribeCalls, 1, "emit failures unsubscribe the reply listener");
+assert.equal(
+	unsubscribeCalls,
+	1,
+	"emit failures unsubscribe the reply listener",
+);
 assert.equal(clearedTimers, 1, "emit failures clear the RPC timeout");
 
 const fleetDir = mkdtempSync(join(tmpdir(), "work-fleet-"));
@@ -453,7 +457,11 @@ assert.equal(component.selected, 1, "Kitty arrow keys navigate Fleet");
 component.handleInput("\x1b[57419u");
 assert.equal(component.selected, 0, "Kitty arrow keys navigate back");
 component.handleInput("\x1b[120u");
-assert.equal(component.expandedTools, true, "Kitty printable keys toggle tools");
+assert.equal(
+	component.expandedTools,
+	true,
+	"Kitty printable keys toggle tools",
+);
 component.handleInput("\x1b[13u");
 assert.ok(component.editor, "Kitty Enter opens the message editor");
 component.handleEditorInput("\x1b[122u");
@@ -462,7 +470,11 @@ component.editor.text = "ab";
 component.handleEditorInput("\x1b[127u");
 assert.equal(component.editor.text, "a", "Kitty Backspace edits the message");
 component.handleEditorInput("\x1b[27u");
-assert.equal(component.editor, undefined, "Kitty Escape closes the message editor");
+assert.equal(
+	component.editor,
+	undefined,
+	"Kitty Escape closes the message editor",
+);
 component.handleInput("\x1b[27u");
 assert.equal(fleetClosed, 1, "Kitty Escape closes Fleet");
 component.dispose();
@@ -484,9 +496,17 @@ const legacyComponent = new WorkFleetComponent(
 );
 legacyComponent.snapshot = { tasks, rows: tasks[0].agents };
 legacyComponent.handleInput("\x1b[B");
-assert.equal(legacyComponent.selected, 1, "legacy arrow keys still navigate Fleet");
+assert.equal(
+	legacyComponent.selected,
+	1,
+	"legacy arrow keys still navigate Fleet",
+);
 legacyComponent.handleInput("X");
-assert.equal(legacyComponent.expandedTools, true, "legacy uppercase shortcuts still work");
+assert.equal(
+	legacyComponent.expandedTools,
+	true,
+	"legacy uppercase shortcuts still work",
+);
 legacyComponent.handleInput("\x1b");
 assert.equal(legacyClosed, 1, "legacy Escape still closes Fleet");
 legacyComponent.dispose();
@@ -500,7 +520,11 @@ await openWorkFleet(
 			custom(factory) {
 				openedComponent = factory(
 					{ terminal: { rows: 24 }, requestRender() {} },
-					{ fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text },
+					{
+						fg: (_color, text) => text,
+						bg: (_color, text) => text,
+						bold: (text) => text,
+					},
 					undefined,
 					() => {},
 				);
@@ -508,17 +532,15 @@ await openWorkFleet(
 		},
 	},
 	{},
-	{
-		refreshMs: 60_000,
-		tuiKeys: {
-			matchesKey: (data, key) => tuiKeyInputs[key]?.includes(data) ?? data === key,
-			decodeKittyPrintable: (data) => (data === "\x1b[122u" ? "z" : undefined),
-		},
-	},
+	{ refreshMs: 60_000 },
 );
 openedComponent.snapshot = { tasks, rows: tasks[0].agents };
-openedComponent.handleInput("\x1b[57420u");
-assert.equal(openedComponent.selected, 1, "Fleet opener injects Pi TUI key helpers");
+openedComponent.handleInput("\x1b[B");
+assert.equal(
+	openedComponent.selected,
+	1,
+	"Fleet opener works without a standalone pi-tui package",
+);
 openedComponent.dispose();
 
 process.stdout.write("ok - work fleet fixtures pass\n");

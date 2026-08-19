@@ -755,6 +755,12 @@ Use one initial review cycle, batch its actionable fixes, and run at most one ta
 
 ## Verification budget
 During iteration, run only the smallest focused test that covers the changed behavior. Select it from the feature or nearby test names; a monolithic implementation file does not make every test relevant. Run the full package or regression suite once, at the final handoff, only when the acceptance contract requires it or the change is genuinely cross-cutting. Reuse valid full-suite evidence unless production or package-surface files changed afterward. Reviewers and fixers must not rerun an expensive gate when supplied evidence is adequate.`;
+const DIRECT_REQUEST_PROMPT = `## Direct request mode
+This is an ordinary user request, not a ce-workflow run.
+- Work directly in the current agent. Do not create, select, finish, close, or resume work items or autonomous goals.
+- Do not invoke work_* tools, work-* subagents, background verifiers, or ce-workflow helper commands.
+- For routine or mechanical changes, run only the smallest relevant check and do not launch an independent review.
+- ce-workflow orchestration is authorized only by a tagged prompt emitted from an explicit /wf action such as Small/Medium/Large task, Resume work, or Autonomous goal.`;
 
 const IMPROVEMENT_REPORT_TOOL_SCHEMA = {
 	type: "object",
@@ -23189,6 +23195,23 @@ export default function workModelsExtension(pi) {
 		readGlobalSettings,
 	});
 	exposeBundledSubagentAgents();
+	const workflowOnlyTools = new Set([
+		"work_goal_complete",
+		"work_goal_human_decision",
+		"work_report_improvement",
+		"work_dirty_continue",
+		"work_initiative_reconcile",
+		"work_verifier_read",
+		"work_verifier_list",
+		"work_verifier_find",
+		"work_verifier_grep",
+		"work_verifier_acknowledge_failure",
+		"work_verifier_inbox",
+		"work_verifier_dispose",
+		"work_verifier_complete_fix",
+		"work_verifier_reopen",
+	]);
+	let workflowTurnAuthorized = false;
 
 	if (typeof pi.registerTool === "function") {
 		registerVerifierTools(pi);
@@ -23490,6 +23513,21 @@ export default function workModelsExtension(pi) {
 				reason:
 					"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
 			};
+		if (!workflowTurnAuthorized) {
+			const workSubagent =
+				event.toolName === "subagent" &&
+				(/^work-/i.test(String(event.input?.agent ?? "")) ||
+					/agent\s*:\s*["']work-/i.test(String(event.input?.workflowScript ?? "")));
+			const workHelper =
+				event.toolName === "bash" &&
+				/work-helper\.mjs/i.test(String(event.input?.command ?? ""));
+			if (workflowOnlyTools.has(event.toolName) || workSubagent || workHelper)
+				return {
+					block: true,
+					reason:
+						"Direct request mode does not authorize ce-workflow orchestration. Use /wf to start or resume managed work.",
+				};
+		}
 	});
 
 	pi.on("tool_result", (event, ctx) => pauseWorkGoalFromAskUser(event, ctx, pi));
@@ -23757,11 +23795,6 @@ export default function workModelsExtension(pi) {
 		}
 		pendingPromptBackedAgentStart = true;
 		const baseSystemPrompt = String(event.systemPrompt ?? "");
-		const boundedSystemPrompt = baseSystemPrompt.includes(
-			"## Review cycle budget",
-		)
-			? baseSystemPrompt
-			: `${baseSystemPrompt}\n\n${REVIEW_CYCLE_BUDGET_PROMPT}`.trim();
 		markWorkGoalContinuationDelivered(event.prompt);
 		const marker = extractWorkGoalContinuationMarker(event.prompt);
 		const matchingWorkGoalTurn = Boolean(
@@ -23771,6 +23804,22 @@ export default function workModelsExtension(pi) {
 			matchingWorkGoalTurn && activeWorkGoal?.status === "active";
 		blockedWorkGoalTurn = matchingWorkGoalTurn && !pendingWorkGoalTurn;
 		const meta = parseWorkPromptMeta(event.prompt);
+		const goalClarificationTurn = Boolean(
+			activeWorkGoal?.status === "needs_human" &&
+				/^clarify:/i.test(contentText(event.prompt).trim()),
+		);
+		const workflowTurn =
+			matchingWorkGoalTurn || goalClarificationTurn || Boolean(meta);
+		workflowTurnAuthorized = workflowTurn;
+		const turnPolicy = workflowTurn
+			? REVIEW_CYCLE_BUDGET_PROMPT
+			: DIRECT_REQUEST_PROMPT;
+		const policyHeading = workflowTurn
+			? "## Review cycle budget"
+			: "## Direct request mode";
+		const boundedSystemPrompt = baseSystemPrompt.includes(policyHeading)
+			? baseSystemPrompt
+			: `${baseSystemPrompt}\n\n${turnPolicy}`.trim();
 		if (meta?.workflowRunId === manualMicrocompactWorkflowRunId)
 			manualMicrocompactWorkflowRunId = null;
 		pendingWorkPrompt = meta
@@ -23785,7 +23834,10 @@ export default function workModelsExtension(pi) {
 			: null;
 		recordSelfImprovementHistory(ctx, "before_agent_start", event);
 		if (!activeWorkGoal) return { systemPrompt: boundedSystemPrompt };
-		if (activeWorkGoal.status === "needs_human") {
+		if (
+			activeWorkGoal.status === "needs_human" &&
+			(matchingWorkGoalTurn || goalClarificationTurn)
+		) {
 			return {
 				systemPrompt: `${boundedSystemPrompt}\n\n${buildWorkGoalPausedPrompt(activeWorkGoal)}`,
 			};

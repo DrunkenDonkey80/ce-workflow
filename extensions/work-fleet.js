@@ -240,7 +240,8 @@ function supportRuns(
 					workflowRunId: lane.id,
 					workItemId: lane.workItemId,
 					agent: lane.producer,
-					label: lane.laneKind === "successor-prefetch" ? "work-prefetch" : lane.producer,
+					label:
+						lane.laneKind === "successor-prefetch" ? "work-prefetch" : lane.producer,
 					runId: lane.launch?.runId,
 					asyncDir: lane.launch?.asyncDir,
 					state: lane.state,
@@ -322,15 +323,10 @@ function orchestratorRoot(orchestrator, tasks, store) {
 			if (belongsToTarget(store, task.id, orchestrator.targetId))
 				taskAgents = task.agents;
 			else if (task.id === "background")
-				taskAgents = task.agents.filter((agent) =>
-					ACTIVE_STATES.has(agent.state),
-				);
+				taskAgents = task.agents.filter((agent) => ACTIVE_STATES.has(agent.state));
 			return taskAgents.map((agent) => ({
 				...agent,
-				name:
-					task.id === "background"
-						? agent.name
-						: `${task.id} · ${agent.name}`,
+				name: task.id === "background" ? agent.name : `${task.id} · ${agent.name}`,
 			}));
 		})
 		.sort(byActiveThenRecent);
@@ -352,12 +348,7 @@ function orchestratorRoot(orchestrator, tasks, store) {
 
 export function collectWorkFleet(
 	cwd,
-	{
-		readFile = readFileSync,
-		orchestrator,
-		loadLanes,
-		loadVerifiers,
-	} = {},
+	{ readFile = readFileSync, orchestrator, loadLanes, loadVerifiers } = {},
 ) {
 	let store = { items: {} };
 	let error;
@@ -579,8 +570,7 @@ export function transcriptEvents(
 			.filter(Boolean)
 			.some(
 				(root) =>
-					resolve(root) !== resolve(row.asyncDir) &&
-					pathWithin(root, row.asyncDir),
+					resolve(root) !== resolve(row.asyncDir) && pathWithin(root, row.asyncDir),
 			)
 			? row.asyncDir
 			: undefined;
@@ -643,8 +633,7 @@ export function transcriptEvents(
 			const tool = tools.get(record.toolCallId ?? message.toolCallId);
 			if (tool) {
 				tool.output = text;
-				tool.status =
-					record.isError || message.isError ? "failed" : "completed";
+				tool.status = record.isError || message.isError ? "failed" : "completed";
 			}
 		} else if (
 			["assistant", "user"].includes(role) &&
@@ -700,9 +689,7 @@ function renderTranscript(row, width, theme, expandedTools) {
 			lines.push(`${theme.fg("borderMuted", "│")} ${line}`);
 		lines.push(theme.fg("borderMuted", "│"));
 	}
-	return lines.length
-		? lines
-		: [theme.fg("dim", "No transcript activity yet.")];
+	return lines.length ? lines : [theme.fg("dim", "No transcript activity yet.")];
 }
 
 function activityLine(row) {
@@ -856,8 +843,10 @@ export class WorkFleetComponent {
 			return this.done();
 		if (this.matchesKey(data, "shift+k")) return this.scroll(-1);
 		if (this.matchesKey(data, "shift+j")) return this.scroll(1);
-		if (this.matchesKey(data, "up") || this.matchesKey(data, "k")) return this.move(-1);
-		if (this.matchesKey(data, "down") || this.matchesKey(data, "j")) return this.move(1);
+		if (this.matchesKey(data, "up") || this.matchesKey(data, "k"))
+			return this.move(-1);
+		if (this.matchesKey(data, "down") || this.matchesKey(data, "j"))
+			return this.move(1);
 		if (this.matchesKey(data, "pageUp"))
 			return this.scroll(-this.detailViewportHeight);
 		if (this.matchesKey(data, "pageDown"))
@@ -924,19 +913,11 @@ export class WorkFleetComponent {
 
 	render(width) {
 		if (width < 50)
-			return [
-				truncate(
-					"Fleet needs at least 50 columns. Esc closes.",
-					width,
-				),
-			];
+			return [truncate("Fleet needs at least 50 columns. Esc closes.", width)];
 		const inner = width - 2;
 		const height = Math.max(10, (this.tui.terminal?.rows ?? 24) - 1);
 		const bodyHeight = Math.max(3, height - 7 - (this.editor ? 1 : 0));
-		const leftWidth = Math.max(
-			18,
-			Math.min(32, Math.floor((inner - 1) * 0.26)),
-		);
+		const leftWidth = Math.max(18, Math.min(32, Math.floor((inner - 1) * 0.26)));
 		const rightWidth = inner - leftWidth - 1;
 		const roster = rosterLines(
 			this.snapshot,
@@ -956,10 +937,7 @@ export class WorkFleetComponent {
 		const detailHeader = detail.header.slice(0, Math.max(0, bodyHeight - 1));
 		this.detailViewportHeight = Math.max(1, bodyHeight - detailHeader.length);
 		this.detailLineCount = detail.body.length;
-		const maxScroll = Math.max(
-			0,
-			detail.body.length - this.detailViewportHeight,
-		);
+		const maxScroll = Math.max(0, detail.body.length - this.detailViewportHeight);
 		if (this.autoFollow) this.detailScroll = maxScroll;
 		else this.detailScroll = Math.min(this.detailScroll, maxScroll);
 		const visibleDetail = [
@@ -1046,15 +1024,9 @@ export async function openWorkFleet(ctx, pi, options = {}) {
 		);
 		return;
 	}
-	const tuiKeys = options.tuiKeys ?? (await import("@earendil-works/pi-tui"));
 	await ctx.ui.custom(
 		(tui, theme, _keybindings, done) =>
-			new WorkFleetComponent(tui, theme, ctx.cwd, pi, done, {
-				...options,
-				matchesKey: options.matchesKey ?? tuiKeys.matchesKey,
-				decodeKittyPrintable:
-					options.decodeKittyPrintable ?? tuiKeys.decodeKittyPrintable,
-			}),
+			new WorkFleetComponent(tui, theme, ctx.cwd, pi, done, options),
 		{
 			overlay: true,
 			overlayOptions: {

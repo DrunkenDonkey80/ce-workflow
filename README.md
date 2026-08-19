@@ -15,6 +15,8 @@ pi install npm:pi-ask-user
 
 No tracker CLI is required for normal operation. Run **`/wf`** or press **F7** to open **Orchestrator**, then type to filter its actions. **Roadmaps** is first and initially selected; its picker remembers the last open roadmap or initiative. Press **F8** to microcompact immediately when idle or at the next safe boundary.
 
+Ordinary chat requests stay direct: they do not create work items, launch managed work roles, or schedule workflow verifiers. ce-workflow orchestration starts only from an explicit `/wf` action such as Small/Medium/Large task, Resume work, or Autonomous goal.
+
 If startup prints `pi remove npm:pi-compound-engineering`, the retired legacy package is still installed. Run that recommendation yourself; ce-workflow never invokes a package manager for legacy removal. To remove its old managed block from an `AGENTS.md`, first run `node scripts/work-helper.mjs legacy-instructions-preview AGENTS.md`, inspect the exact `removed` and `result` bytes, then explicitly apply the returned token with `node scripts/work-helper.mjs legacy-instructions-apply AGENTS.md --confirm <token>`. Missing or malformed marker pairs never mutate the file.
 
 ## Orchestrator actions

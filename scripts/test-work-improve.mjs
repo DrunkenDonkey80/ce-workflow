@@ -225,7 +225,7 @@ const pi = {
 	sendUserMessage: async () => {},
 };
 workModelsExtension(pi);
-assert.equal(shortcuts.f7, undefined, "F7 is phased out");
+assert.match(shortcuts.f7.description, /orchestrator/i);
 assert.ok(commands.wf, "/wf opens the orchestrator");
 const openWorkflow = (ctx) => commands.wf.handler("", ctx);
 const notices = [];

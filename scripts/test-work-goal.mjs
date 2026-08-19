@@ -1044,9 +1044,10 @@ assert.deepEqual(
 			"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
 	},
 );
-assert.equal(
-	hooks.tool_call({ toolName: "work_goal_human_decision" }, { hasUI: false }),
-	undefined,
+assert.match(
+	hooks.tool_call({ toolName: "work_goal_human_decision" }, { hasUI: false })
+		?.reason ?? "",
+	/Direct request mode/,
 );
 assert.ok(hooks.tool_result);
 
@@ -1402,33 +1403,50 @@ try {
 		{ prompt: "make a small code fix", systemPrompt: "base" },
 		ctx,
 	);
-	assert.match(ordinaryPolicy.systemPrompt, /Review cycle budget/);
-	assert.match(ordinaryPolicy.systemPrompt, /one initial review cycle/);
+	assert.match(ordinaryPolicy.systemPrompt, /Direct request mode/);
 	assert.match(
 		ordinaryPolicy.systemPrompt,
-		/Do not launch a third review cycle/,
+		/Work directly in the current agent/,
 	);
-	assert.match(ordinaryPolicy.systemPrompt, /Verification budget/);
+	assert.match(ordinaryPolicy.systemPrompt, /Do not invoke work_\* tools/);
+	assert.match(ordinaryPolicy.systemPrompt, /smallest relevant check/);
+	assert.doesNotMatch(ordinaryPolicy.systemPrompt, /Review cycle budget/);
 	assert.match(
-		ordinaryPolicy.systemPrompt,
-		/run only the smallest focused test/,
+		(
+			await tempHooks.tool_call(
+				{ toolName: "subagent", input: { agent: "work-worker" } },
+				ctx,
+			)
+		)?.reason ?? "",
+		/Direct request mode/,
 	);
 	assert.match(
-		ordinaryPolicy.systemPrompt,
-		/full package or regression suite once, at the final handoff/,
+		(
+			await tempHooks.tool_call(
+				{
+					toolName: "bash",
+					input: { command: "node scripts/work-helper.mjs work-create test" },
+				},
+				ctx,
+			)
+		)?.reason ?? "",
+		/Direct request mode/,
 	);
-	assert.match(
-		ordinaryPolicy.systemPrompt,
-		/monolithic implementation file does not make every test relevant/,
+	assert.equal(
+		await tempHooks.tool_call(
+			{ toolName: "edit", input: { path: "src/app.js" } },
+			ctx,
+		),
+		undefined,
 	);
 	const repeatedPolicy = await tempHooks.before_agent_start(
 		{ prompt: "continue", systemPrompt: ordinaryPolicy.systemPrompt },
 		ctx,
 	);
 	assert.equal(
-		repeatedPolicy.systemPrompt.match(/## Review cycle budget/g)?.length,
+		repeatedPolicy.systemPrompt.match(/## Direct request mode/g)?.length,
 		1,
-		"review budget is injected once",
+		"direct-request policy is injected once",
 	);
 
 	await tempShortcuts.f8.handler({
@@ -1962,6 +1980,16 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		ctx,
 	);
 	assert.match(before.systemPrompt, /Active autonomous goal/);
+	assert.match(before.systemPrompt, /Review cycle budget/);
+	assert.doesNotMatch(before.systemPrompt, /Direct request mode/);
+	assert.equal(
+		await tempHooks.tool_call(
+			{ toolName: "subagent", input: { agent: "work-worker" } },
+			ctx,
+		),
+		undefined,
+		"tagged workflow turns may use managed work roles",
+	);
 	assert.match(before.systemPrompt, /work_goal_human_decision/);
 	await tempHooks.agent_start({}, ctx);
 
@@ -2966,7 +2994,8 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		{ prompt: "regarding com7, is it fixed right", systemPrompt: "base" },
 		ctx,
 	);
-	assert.match(ordinaryBefore.systemPrompt, /Review cycle budget/);
+	assert.match(ordinaryBefore.systemPrompt, /Direct request mode/);
+	assert.doesNotMatch(ordinaryBefore.systemPrompt, /Review cycle budget/);
 	assert.doesNotMatch(ordinaryBefore.systemPrompt, /Active autonomous goal/);
 	await tempHooks.agent_start({}, ctx);
 	await tempHooks.agent_end(
