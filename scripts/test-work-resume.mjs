@@ -125,6 +125,18 @@ const childrenByScenario = {
 			acceptance: "npm run verify passes",
 		},
 	],
+	oversizedImplementation: [
+		{
+			id: "IMP-WIDE",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "open",
+			title: "Implement oversized bootstrap slice",
+			created_at: "2026-07-03T02:00:00Z",
+			notes:
+				"Files changed: src/1.js, src/2.js, src/3.js, src/4.js, src/5.js, src/6.js, src/7.js, src/8.js, src/9.js",
+		},
+	],
 	implementationAgent: [
 		{
 			id: "IMP-BIG",
@@ -637,6 +649,23 @@ try {
 			state.handoffPrompt.includes("Implement feature slice") &&
 			!state.handoffPrompt.includes("[object Object]"),
 		"worker slice-plan target stays compact and readable",
+	);
+
+	setScenario("oversizedImplementation");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-planner" &&
+			state.selectedWorkItem.id === "IMP-WIDE" &&
+			state.handoffPrompt.includes("at most 8 declared implementation files") &&
+			!state.handoffPrompt.includes("Implementation scope: medium"),
+		"oversized executable scope is re-cut before implementation starts",
+	);
+	assert(
+		readFileSync(
+			path.join(import.meta.dirname, "../agents/work-planner.md"),
+			"utf8",
+		).includes("contain at most 8 such files"),
+		"planner contract records the same finish-task file cap",
 	);
 
 	setScenario("implementationAgent");

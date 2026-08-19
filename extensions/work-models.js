@@ -186,6 +186,7 @@ const DISPLAY_METADATA_SCHEMA_VERSION = 1;
 const DISPLAY_TITLE_MAX = 72;
 const DISPLAY_METADATA_BATCH_SIZE = 40;
 const DISPLAY_METADATA_CONCURRENCY = 8;
+const FINISH_TASK_DEFAULT_MAX_FILES = 8;
 const displayMetadataRuns = new Map();
 const TASK_IMAGE_MIME_EXTENSIONS = new Map([
 	["image/png", ".png"],
@@ -8184,6 +8185,24 @@ function planResumeAction(state, cwd, options = {}) {
 		(issue) => !isPlanningIssue(issue),
 	);
 	if (implementation) {
+		if (
+			(implementation.changedPaths?.length ?? 0) >
+			FINISH_TASK_DEFAULT_MAX_FILES
+		)
+			return withHandoffPrompt(
+				{
+					...state,
+					action: "run-planner",
+					selectedWorkItem: implementation,
+					message: `Executable scope declares ${implementation.changedPaths.length} implementation files; re-cut it before implementation because finish-task accepts at most ${FINISH_TASK_DEFAULT_MAX_FILES}.`,
+					handoffReason:
+						"the executable slice exceeds the coded finish-task file cap",
+					handoffExtra: [
+						`Do not claim or implement this target. Re-cut it into independently verifiable sibling tasks with at most ${FINISH_TASK_DEFAULT_MAX_FILES} declared implementation files each, preserve required dependencies, then close the oversized target as superseded.`,
+					],
+				},
+				cwd,
+			);
 		const settings = workOrchSettings(cwd);
 		if (settings.slicePlanBeforeWork && !hasSlicePlan(implementation)) {
 			if (settings.slicePlanWithCePlan && needsPlannerAgent(implementation, state))
