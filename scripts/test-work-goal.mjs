@@ -437,7 +437,7 @@ assert.deepEqual(
 assert.ok(commands["__orchestrator-goal-continue"]);
 assert.ok(commands.wf);
 assert.match(commands.wf.description, /orchestrator/i);
-assert.equal(shortcuts.f7, undefined, "F7 is phased out");
+assert.match(shortcuts.f7.description, /orchestrator/i);
 const openWorkflow = (ctx) => commands.wf.handler("", ctx);
 assert.match(shortcuts.f8.description, /microcompact/i);
 assert.match(shortcuts.f9.description, /fleet/i);
@@ -461,6 +461,18 @@ await openWorkflow({
 	},
 });
 assert.match(orchestratorLabels[0], /Roadmaps/);
+let f7Title;
+await shortcuts.f7.handler({
+	cwd: process.cwd(),
+	mode: "print",
+	ui: {
+		select: async (title) => {
+			f7Title = title;
+			return undefined;
+		},
+	},
+});
+assert.equal(f7Title, "Orchestrator", "F7 opens the same /wf menu");
 for (const action of [
 	"Roadmaps",
 	"Status",

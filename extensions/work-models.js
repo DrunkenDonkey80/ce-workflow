@@ -24358,6 +24358,12 @@ export default function workModelsExtension(pi) {
 			await handleWorkMenuCommand(ctx, pi);
 		},
 	});
+	pi.registerShortcut?.("f7", {
+		description: "Open workflow orchestrator",
+		handler: async (ctx) => {
+			await handleWorkMenuCommand(ctx, pi);
+		},
+	});
 	pi.registerShortcut?.("f8", {
 		description: "Microcompact work context",
 		handler: async (ctx) => {
