@@ -5280,6 +5280,40 @@
       "type": "task",
       "updatedAt": "2026-08-11T16:27:42.421Z"
     },
+    "work-2.report-74df0d15-f508-42ec-99c5-0792c7cb12c9": {
+      "createdAt": "2026-08-19T06:28:56.217Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The just-in-time planner created executable slice work-1.4 with 23 implementation files, but the coded finish helper rejects any scope above the documented 8-file maximum. The task was fully implemented and verified before this incompatibility surfaced.\nExpected: Planning should enforce the same file-scope contract as finish-task, either slicing bootstrap work into finishable <=8-file tasks or explicitly issuing a supported larger-scope/review contract before implementation starts.\nImpact: Autonomous resume reaches a verified implementation that cannot pass the coded commit/close gate, forcing replanning or policy bypass after work is already done.\nSuggested improvement: Have the planning boundary estimate/count required implementation files and reject or split any executable task above the configured finish-task max-files cap.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/8d9d8274-0d67-405f-ab2e-4a43a3d1f78b",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 895,
+              "file": "01-workflow-friction-work-1.4.log",
+              "sha256": "a2968151b4ee7e78d1c5c10b3b3e9bfcdbc1bee5b92100a73444d10e4f5f0749"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-19T06:28:56.213Z",
+          "workflowId": "01a0169a-4ee2-730b-b0ef-a64e919a3dbe"
+        }
+      ],
+      "id": "work-2.report-74df0d15-f508-42ec-99c5-0792c7cb12c9",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The just-in-time planner created executable slice work-1.4 with 23 implementation files, but the coded finish helper rejects any s",
+      "type": "task",
+      "updatedAt": "2026-08-19T06:28:56.217Z"
+    },
     "work-2.report-77cca2ef-12e6-44dc-9749-4dfa30b2c8bb": {
       "createdAt": "2026-08-09T07:10:03.901Z",
       "dependencies": [],
@@ -8229,7 +8263,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T06:05:50.590Z"
+    "updatedAt": "2026-08-19T06:38:19.597Z"
   },
   "schemaVersion": 1
 }
