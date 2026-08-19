@@ -6,8 +6,12 @@ import {
 	showTreeWorkspaceDialog,
 } from "../extensions/work-dialogs.js";
 
+const colorCalls = [];
 const theme = {
-	fg: (_color, text) => text,
+	fg: (color, text) => {
+		colorCalls.push({ color, text });
+		return text;
+	},
 	bold: (text) => text,
 };
 const keybindings = {
@@ -76,6 +80,7 @@ const picked = await drive(
 );
 assert.equal(picked.value, "beta");
 
+colorCalls.length = 0;
 await drive(
 	{
 		title: "Root",
@@ -85,7 +90,26 @@ await drive(
 	},
 	(component) => {
 		const lines = component.render(70);
-		assert(lines.some((line) => line.includes("Choose an option to continue.")));
+		const purposeLine = lines.findIndex((line) =>
+			line.includes("Choose an option to continue."),
+		);
+		assert.equal(purposeLine >= 0, true);
+		assert(lines[purposeLine + 1].includes("Type to filter"));
+		assert(!lines.some((line) => line.includes("-- Keys")));
+		assert.match(lines.at(-1), /^─+$/u);
+		assert(
+			colorCalls.some(
+				({ color, text }) => color === "border" && /^─+$/u.test(text),
+			),
+			"replacement menus retain a footer divider",
+		);
+		assert(
+			colorCalls.some(
+				({ color, text }) =>
+					color === "text" && text === "Choose an option to continue.",
+			),
+			"menu descriptions use the normal foreground shade",
+		);
 		assert(
 			lines.some((line) => line.includes("> Beta")),
 			"parent cursor is remembered",
@@ -390,8 +414,23 @@ async function driveTree(interact, overrides = {}) {
 	return { result, renders, cleanups, cleared };
 }
 
+colorCalls.length = 0;
 const tree = await driveTree(async (component, state) => {
-	let output = component.render(70).join("\n");
+	let lines = component.render(70);
+	let output = lines.join("\n");
+	const purposeLine = lines.findIndex((line) =>
+		line.includes("Inspect projected work"),
+	);
+	assert.equal(purposeLine >= 0, true);
+	assert(lines[purposeLine + 1].includes("Type to filter"));
+	assert(!output.includes("-- Keys"));
+	assert.match(lines.at(-1), /^─+$/u);
+	assert(
+		colorCalls.some(
+			({ color, text }) => color === "text" && text.includes("task-a Task A"),
+		),
+		"open unselected work uses the normal foreground color",
+	);
 	assert(output.includes("Inspect projected work"));
 	assert(output.includes("> [-] [open] 0/2 roadmap-open Open roadmap"));
 	assert(output.includes("task-a Task A"));

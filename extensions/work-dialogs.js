@@ -269,7 +269,13 @@ export async function showListDialog(ctx, options) {
 						`${visible.length}/${source.length}${multi ? ` · ${enabled.size} selected` : ""}`,
 					)}`,
 				);
-				add(theme.fg("muted", purpose));
+				add(theme.fg("text", purpose));
+				let defaultHelp = "Up/Down to navigate · Enter to select · Esc to cancel";
+				if (multi)
+					defaultHelp =
+						"Up/Down to navigate · Enter/Space to toggle · Esc to save and go back";
+				if (filter) defaultHelp = `Type to filter · ${defaultHelp}`;
+				add(theme.fg("dim", help ?? defaultHelp));
 				for (const line of subtitleLines) add(theme.fg("dim", line));
 				if (filter)
 					add(`${theme.fg("muted", "Filter:")} ${theme.fg("text", query)}`);
@@ -322,13 +328,7 @@ export async function showListDialog(ctx, options) {
 					for (const line of details) add(theme.fg("muted", line));
 				}
 
-				let defaultHelp = "Up/Down to navigate · Enter to select · Esc to cancel";
-				if (multi)
-					defaultHelp =
-						"Up/Down to navigate · Enter/Space to toggle · Esc to save and go back";
-				if (filter) defaultHelp = `Type to filter · ${defaultHelp}`;
-				add(sectionLine(theme, "Keys", safeWidth));
-				add(theme.fg("dim", help ?? defaultHelp));
+				add(theme.fg("border", "─".repeat(safeWidth)));
 				return lines;
 			},
 			handleInput(data) {
@@ -441,7 +441,7 @@ function treeStatusColor(row) {
 		return "warning";
 	if (row.live || row.engaged || status === "in_progress") return "success";
 	if (status === "closed") return "dim";
-	return "muted";
+	return "text";
 }
 
 function treeActivityLabel(row) {
@@ -614,7 +614,13 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 				add(
 					`${theme.fg("accent", theme.bold(title))}  ${theme.fg("dim", `${visible.length}/${rows.length}`)}`,
 				);
-				add(theme.fg("muted", purpose));
+				add(theme.fg("text", purpose));
+				add(
+					theme.fg(
+						"dim",
+						`${filter ? "Type to filter · " : ""}S to show stats · Up/Down to navigate · Space/Left/Right to expand · Enter to select · Esc to cancel`,
+					),
+				);
 				if (filter)
 					add(`${theme.fg("muted", "Filter:")} ${theme.fg("text", query)}`);
 				add(sectionLine(theme, "Work items", safeWidth));
@@ -661,13 +667,7 @@ export async function showTreeWorkspaceDialog(ctx, options) {
 					add(sectionLine(theme, "Stats", safeWidth));
 					for (const line of stats.slice(0, 10)) add(theme.fg("muted", line));
 				}
-				add(sectionLine(theme, "Keys", safeWidth));
-				add(
-					theme.fg(
-						"dim",
-						`${filter ? "Type to filter · " : ""}S to show stats · Up/Down to navigate · Space/Left/Right to expand · Enter to select · Esc to cancel`,
-					),
-				);
+				add(theme.fg("border", "─".repeat(safeWidth)));
 				return lines;
 			},
 			handleInput(data) {
