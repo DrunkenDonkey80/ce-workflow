@@ -5218,6 +5218,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-19T10:42:53.011Z",
           "workflowId": "workflow-mszxzeso-twendg"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-64e61544-e82b-4d5c-bb60-356050d9b935",
@@ -5225,12 +5228,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:classification locally-owned — one atomic claim: work_verifier_complete_fix can commit before discovering an expired verifier claim lease, leaving Git and verifier-store state inconsistent; implement pre-commit lease renewal/validation plus rollback on post-commit store failure.",
+        "wo:verify-check PASS\nCommand: node scripts/verify-package.mjs --quiet\nOutput: ok - package checks passed"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_complete_fix created commit 4c67faa and only afterward returned \"Verifier claim lease expired\"; the accepted finding",
       "type": "task",
-      "updatedAt": "2026-08-19T10:42:53.016Z"
+      "updatedAt": "2026-08-19T21:36:22.136Z"
     },
     "work-2.report-67c4d7c9-d110-42ac-9430-d5c518ea0c62": {
       "createdAt": "2026-08-18T00:16:35.407Z",
@@ -8485,7 +8491,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T13:21:40.262Z"
+    "updatedAt": "2026-08-19T21:36:22.137Z"
   },
   "schemaVersion": 1
 }

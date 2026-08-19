@@ -79,6 +79,7 @@ import {
 	normalizeEffectiveProfiles,
 	reconcileVerifierRuns,
 	recordTriageDisposition,
+	renewAcceptedFixClaim,
 	renderTriageClaim,
 	renderVerifierFinding,
 	reopenGroup,
@@ -10015,19 +10016,69 @@ function registerVerifierTriageTools(pi) {
 				throw new Error(
 					`Accepted fix dirty scope must be exact; found ${dirty.join(", ") || "none"}.`,
 				);
-			run(cwd, "git", ["add", "--", ...paths]);
-			ensureOnlyStaged(cwd, paths);
-			run(cwd, "git", ["commit", "-m", "fix(verifier): apply accepted findings"]);
-			const commit = run(cwd, "git", ["rev-parse", "HEAD"]);
-			const result = mutateVerifierStore(cwd, (state) =>
-				completeAcceptedFix(state, {
+			const ownerSession = verifierTriageOwner(ctx);
+			mutateVerifierStore(cwd, (state) =>
+				renewAcceptedFixClaim(state, {
 					claimId: params.claimId,
-					ownerSession: verifierTriageOwner(ctx),
+					ownerSession,
 					findingIds,
-					commit,
 					verification: params.verification,
 				}),
 			);
+			const base = run(cwd, "git", ["rev-parse", "HEAD"]);
+			let commit;
+			try {
+				run(cwd, "git", ["add", "--", ...paths]);
+				ensureOnlyStaged(cwd, paths);
+				run(cwd, "git", [
+					"commit",
+					"-m",
+					"fix(verifier): apply accepted findings",
+				]);
+				commit = run(cwd, "git", ["rev-parse", "HEAD"]);
+			} catch (failure) {
+				run(cwd, "git", ["reset", "--mixed", base]);
+				throw failure;
+			}
+			let result;
+			try {
+				result = mutateVerifierStore(cwd, (state) =>
+					completeAcceptedFix(state, {
+						claimId: params.claimId,
+						ownerSession,
+						findingIds,
+						commit,
+						verification: params.verification,
+					}),
+				);
+			} catch (failure) {
+				let persisted;
+				try {
+					persisted = Object.values(loadVerifierStore(cwd).fixes).find(
+						(fix) =>
+							fix.claimId === params.claimId &&
+							fix.commit === commit &&
+							fix.findingIds.join("\0") === findingIds.join("\0"),
+					);
+				} catch {}
+				if (persisted) result = persisted;
+				else {
+					if (run(cwd, "git", ["rev-parse", "HEAD"]) !== commit)
+						throw new Error(
+							`Verifier store completion failed after commit ${commit}, and HEAD moved before rollback.`,
+							{ cause: failure },
+						);
+					try {
+						run(cwd, "git", ["reset", "--mixed", base]);
+					} catch (rollbackFailure) {
+						throw new AggregateError(
+							[failure, rollbackFailure],
+							`Verifier store completion failed after commit ${commit}, and commit rollback also failed.`,
+						);
+					}
+					throw failure;
+				}
+			}
 			const resumeTarget = completedVerifierResumeTarget(
 				loadVerifierStore(cwd),
 				verifierTriageOwner(ctx),

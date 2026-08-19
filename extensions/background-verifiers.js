@@ -1652,32 +1652,45 @@ export function recordTriageDisposition(store, input = {}) {
 		return disposition;
 	});
 }
+function acceptedFixContext(next, input) {
+	const claim = ownedClaim(next, input);
+	const group = next.groups[claim.groupId];
+	const findingIds = [...new Set(input.findingIds ?? [])].sort();
+	if (
+		!findingIds.length ||
+		findingIds.some((id) => !group.findingIds.includes(id))
+	)
+		throw error("invalid", "Fix must name accepted members of this claim");
+	if (
+		!Array.isArray(input.verification) ||
+		!input.verification.length ||
+		input.verification.some((entry) => !nonempty(entry))
+	)
+		throw error("invalid", "Fix needs verification evidence");
+	if (
+		findingIds.some(
+			(id) =>
+				next.dispositions[next.findings[id].dispositionId]?.disposition !==
+					"accepted" || next.findings[id].fixId,
+		)
+	)
+		throw error("invalid", "Fix members must be unresolved accepted findings");
+	return { claim, group, findingIds };
+}
+
+export function renewAcceptedFixClaim(store, input = {}) {
+	return edit(store, (next) => {
+		const { claim } = acceptedFixContext(next, input);
+		renewClaim(claim, input);
+		return claim;
+	});
+}
+
 export function completeAcceptedFix(store, input = {}) {
 	return edit(store, (next) => {
-		const claim = ownedClaim(next, input);
-		const group = next.groups[claim.groupId];
-		const findingIds = [...new Set(input.findingIds ?? [])].sort();
-		if (
-			!findingIds.length ||
-			findingIds.some((id) => !group.findingIds.includes(id))
-		)
-			throw error("invalid", "Fix must name accepted members of this claim");
-		if (
-			!nonempty(input.commit) ||
-			!/^[0-9a-f]{7,64}$/i.test(input.commit) ||
-			!Array.isArray(input.verification) ||
-			!input.verification.length ||
-			input.verification.some((entry) => !nonempty(entry))
-		)
-			throw error("invalid", "Fix needs commit and verification evidence");
-		if (
-			findingIds.some(
-				(id) =>
-					next.dispositions[next.findings[id].dispositionId]?.disposition !==
-						"accepted" || next.findings[id].fixId,
-			)
-		)
-			throw error("invalid", "Fix members must be unresolved accepted findings");
+		const { claim, group, findingIds } = acceptedFixContext(next, input);
+		if (!nonempty(input.commit) || !/^[0-9a-f]{7,64}$/i.test(input.commit))
+			throw error("invalid", "Fix needs commit evidence");
 		const id = stableId("fix", {
 			claimId: claim.id,
 			findingIds,

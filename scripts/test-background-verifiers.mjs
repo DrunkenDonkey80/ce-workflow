@@ -32,6 +32,7 @@ import {
 	normalizeEffectiveProfiles,
 	recordDisposition,
 	recordOperationResult,
+	renewAcceptedFixClaim,
 	recordTriageDisposition,
 	renewAnalysisReview,
 	reopenGroup,
@@ -2052,6 +2053,31 @@ try {
 		loadVerifierStore(reconcileCwd).groups[triageGroup.id].status,
 		"claimed",
 		"accepted finding blocks routing until fixed",
+	);
+	throwsCategory(
+		() =>
+			renewAcceptedFixClaim(loadVerifierStore(reconcileCwd), {
+				claimId: triageClaims[0].id,
+				ownerSession: triageOwner,
+				findingIds: [acceptedFinding],
+				verification: ["node test"],
+				now: "2026-07-21T04:00:00.000Z",
+			}),
+		"locked",
+	);
+	const renewedFixClaim = mutateVerifierStore(reconcileCwd, (state) =>
+		renewAcceptedFixClaim(state, {
+			claimId: triageClaims[0].id,
+			ownerSession: triageOwner,
+			findingIds: [acceptedFinding],
+			verification: ["node test"],
+			now: "2026-07-21T03:03:30.000Z",
+		}),
+	);
+	assert.equal(
+		renewedFixClaim.leaseUntil,
+		"2026-07-21T03:33:30.000Z",
+		"accepted fixes renew and validate their claim before Git mutation",
 	);
 	mutateVerifierStore(reconcileCwd, (state) =>
 		completeAcceptedFix(state, {
