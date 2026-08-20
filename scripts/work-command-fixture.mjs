@@ -169,7 +169,7 @@ const scenarioChildren = {
 			status: "in_progress",
 			title: "Finishable slice",
 			notes:
-				"Review: PASS\nVerification: npm run verify passed\nFiles: extensions/work-models.js",
+				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.js",
 		},
 	],
 	finishDebugReady: [
@@ -180,7 +180,7 @@ const scenarioChildren = {
 			status: "in_progress",
 			title: "Verified root-cause fix",
 			notes:
-				"Review: PASS\nVerification: npm run verify passed\nFiles: extensions/work-models.js",
+				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.js",
 		},
 	],
 	finishBigReady: [
@@ -192,7 +192,7 @@ const scenarioChildren = {
 			title: "Verified big-work slice",
 			labels: ["wo:big-work"],
 			notes:
-				"Review: PASS\nVerification: npm run verify passed\nFiles: extensions/work-models.js",
+				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.js",
 		},
 	],
 	finishMissingReview: [
@@ -203,7 +203,7 @@ const scenarioChildren = {
 			status: "in_progress",
 			title: "Unreviewed slice",
 			notes:
-				"Verification: npm run verify passed\nFiles: extensions/work-models.js",
+				"wo:verify-check PASS\nFiles: extensions/work-models.js",
 		},
 	],
 	finishMissingVerification: [
@@ -213,7 +213,7 @@ const scenarioChildren = {
 			issue_type: "task",
 			status: "in_progress",
 			title: "Unverified slice",
-			notes: "Review: PASS\nFiles: extensions/work-models.js",
+			notes: "wo:review PASS fixture approval\nFiles: extensions/work-models.js",
 		},
 	],
 	finishUiMissingReview: [
@@ -223,7 +223,7 @@ const scenarioChildren = {
 			issue_type: "task",
 			status: "in_progress",
 			title: "Unreviewed UI slice",
-			notes: "Verification: npm run verify passed\nFiles changed: src/components/App.tsx",
+			notes: "wo:verify-check PASS\nFiles changed: src/components/App.tsx",
 		},
 	],
 	finishUiWaived: [
@@ -234,7 +234,7 @@ const scenarioChildren = {
 			status: "in_progress",
 			title: "Gated UI slice",
 			notes:
-				"wo:simplify NOOP\nwo:review PASS\nwo:browser WAIVED user approved evidence-only waiver\nVerification: npm run verify passed\nFiles changed: src/components/App.tsx",
+				"wo:simplify NOOP\nwo:review PASS\nwo:browser WAIVED user approved evidence-only waiver\nwo:verify-check PASS\nFiles changed: src/components/App.tsx",
 		},
 	],
 	finishBrowserPending: [
@@ -245,7 +245,7 @@ const scenarioChildren = {
 			status: "in_progress",
 			title: "Browser-gated backend slice",
 			notes:
-				"Review: PASS\nVerification: npm run verify passed\nBrowser gate: pending parent\nFiles: extensions/work-models.js",
+				"wo:review PASS fixture approval\nwo:verify-check PASS\nBrowser gate: pending parent\nFiles: extensions/work-models.js",
 		},
 	],
 };

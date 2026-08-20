@@ -1676,6 +1676,16 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	assert.equal(workCompaction.compaction.details.profile, "work-resume");
 	assert.equal(workCompaction.compaction.details.triggerOwner, "native");
+	assert.equal(
+		workCompaction.compaction.details.workflowAuthorization?.marker,
+		"work-orchestrator",
+		"compaction metadata preserves managed-work authorization",
+	);
+	assert.equal(
+		workCompaction.compaction.details.workflowAuthorization?.workflowRunId,
+		"wr-compact-resume",
+		"compaction metadata preserves workflow identity",
+	);
 	assert.equal(workCompaction.compaction.details.durableStateAvailable, true);
 	assert.match(workCompaction.compaction.summary, /work-7\.1/);
 	assert.match(
@@ -1686,6 +1696,40 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.doesNotMatch(workCompaction.compaction.summary, /work-8\.1/);
 	await tempHooks.session_compact(
 		{ compactionEntry: { details: workCompaction.compaction.details } },
+		ctx,
+	);
+	const compactResumePolicy = await tempHooks.before_agent_start(
+		{
+			prompt:
+				"Compaction is complete. Resume the parent task now; background subagent results will arrive separately when ready.",
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	assert.match(compactResumePolicy.systemPrompt, /Review cycle budget/);
+	assert.doesNotMatch(compactResumePolicy.systemPrompt, /Direct request mode/);
+	assert.equal(
+		await tempHooks.tool_call(
+			{
+				toolName: "bash",
+				input: { command: "node scripts/work-helper.mjs work-summary work-7.1" },
+			},
+			ctx,
+		),
+		undefined,
+		"the runtime compaction-resume turn retains helper authorization",
+	);
+	const postCompactionOrdinaryPolicy = await tempHooks.before_agent_start(
+		{ prompt: "explain the latest change", systemPrompt: "base" },
+		ctx,
+	);
+	assert.match(postCompactionOrdinaryPolicy.systemPrompt, /Direct request mode/);
+	assert.doesNotMatch(
+		postCompactionOrdinaryPolicy.systemPrompt,
+		/Review cycle budget/,
+	);
+	await tempHooks.before_agent_start(
+		{ prompt: inlineWorkflowPrompt, systemPrompt: "base" },
 		ctx,
 	);
 	await tempShortcuts.f8.handler(ctx);
@@ -2158,6 +2202,23 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		sent.length,
 		sentBeforeGoalRecovery + 1,
 		"repeated native compact event cannot duplicate continuation",
+	);
+	const staleCompactionResumePolicy = await tempHooks.before_agent_start(
+		{
+			prompt:
+				"Compaction is complete. Resume the parent task now; background subagent results will arrive separately when ready.",
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	assert.match(
+		staleCompactionResumePolicy.systemPrompt,
+		/Direct request mode/,
+		"stale compaction metadata cannot reauthorize a later resume prompt",
+	);
+	assert.doesNotMatch(
+		staleCompactionResumePolicy.systemPrompt,
+		/Review cycle budget/,
 	);
 
 	await tempHooks.session_before_compact(

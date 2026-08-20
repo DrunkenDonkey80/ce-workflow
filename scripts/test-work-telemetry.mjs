@@ -27,6 +27,7 @@ const {
 	recordGoalSubagentLaunch,
 	recordSpawnedDirectRun,
 	recordWorkTelemetry,
+	sendWorkflowFollowUp,
 	withCommandTelemetry,
 } = await import(
 	pathToFileURL(
@@ -91,6 +92,10 @@ try {
 		parsedMarker.workflowRunId === "wf-marker" &&
 			parsedMarker.activity === "validation",
 		"workflow identity and activity marker survive prompt parsing",
+	);
+	assert(
+		parseWorkPromptMeta("Workflow Run ID: untrusted") === undefined,
+		"a run ID without the work-orchestrator marker is not authorization",
 	);
 	completeWorkflowOnce(cwd, {
 		workflowRunId: "wf-once",
@@ -546,6 +551,28 @@ try {
 			changedPaths: ["extensions/work-models.js"],
 		},
 	};
+	let metadataFollowUp = "";
+	await withCommandTelemetry("metadata-follow-up", "", commandCtx, async () => {
+		const current = parseWorkPromptMeta(
+			directRoleHandoffParams(reviewHandoffState, cwd).params.task,
+		);
+		await sendWorkflowFollowUp(
+			{ ...commandCtx, mode: "tui" },
+			`Workflow Run ID: ${current.workflowRunId}\nActivity: ${current.activity}`,
+			{
+				sendUserMessage: async (message) => {
+					metadataFollowUp = message;
+				},
+			},
+			{ inlineWork: false },
+		);
+		return { ok: true };
+	});
+	assert(
+		metadataFollowUp.includes("work-orchestrator") &&
+			parseWorkPromptMeta(metadataFollowUp)?.workflowRunId,
+		"follow-ups with a preexisting run ID still receive workflow authorization",
+	);
 	await withCommandTelemetry("ambiguous-tracking", "", commandCtx, async () => {
 		const direct = directRoleHandoffParams(reviewHandoffState, cwd);
 		assert(

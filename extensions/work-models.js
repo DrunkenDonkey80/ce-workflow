@@ -682,11 +682,13 @@ const contextCompactState = {
 	requested: false,
 	owner: null,
 	targetId: null,
+	workflowAuthorization: null,
 };
 let manualMicrocompactPending = false;
 let manualMicrocompactGoalResume = null;
 let manualMicrocompactResumePrompt = null;
 let manualMicrocompactWorkflowRunId = null;
+let pendingCompactionWorkflowAuthorization = null;
 let pendingWorkPrompt = null;
 let pendingPromptBackedAgentStart = false;
 let activePromptBackedAgent = false;
@@ -1352,6 +1354,7 @@ function workflowPromptMetadata() {
 	const workflow = currentCommandWorkflow();
 	if (!workflow?.workflowRunId) return [];
 	return [
+		"work-orchestrator",
 		`Workflow Run ID: ${workflow.workflowRunId}`,
 		workflow.activity ? `Activity: ${workflow.activity}` : "",
 	].filter(Boolean);
@@ -5630,11 +5633,21 @@ function contextStatus(ctx, settings) {
 
 function beginContextCompaction(targetId = null, owner = "ce-workflow") {
 	manualMicrocompactPending = false;
+	const workflow = currentCommandWorkflow();
 	contextCompactState.generation += 1;
 	contextCompactState.inFlight = true;
 	contextCompactState.requested = owner === "ce-workflow";
 	contextCompactState.owner = owner;
 	contextCompactState.targetId = targetId || null;
+	contextCompactState.workflowAuthorization = workflow?.workflowRunId
+		? {
+				marker: "work-orchestrator",
+				workflowRunId: workflow.workflowRunId,
+				activity: workflow.activity,
+				mode: workflow.command ?? workflow.mode,
+				workItemId: targetId || undefined,
+			}
+		: null;
 	return contextCompactState.generation;
 }
 
@@ -5648,6 +5661,7 @@ function finishContextCompaction(generation) {
 	contextCompactState.requested = false;
 	contextCompactState.owner = null;
 	contextCompactState.targetId = null;
+	contextCompactState.workflowAuthorization = null;
 	return true;
 }
 
@@ -5657,7 +5671,9 @@ function resetContextCompaction() {
 	contextCompactState.requested = false;
 	contextCompactState.owner = null;
 	contextCompactState.targetId = null;
+	contextCompactState.workflowAuthorization = null;
 	manualMicrocompactGoalResume = null;
+	pendingCompactionWorkflowAuthorization = null;
 	workGoalCompactionResume = null;
 }
 
@@ -5733,7 +5749,7 @@ function runManualMicrocompact(ctx, interruptActive = false) {
 		if (!resumeAfter) return;
 		const message = workflowPrompt
 			? `Continue the active work-orchestrator turn after compaction. Resume from current native work-item store and git state; do not repeat completed steps. The original self-contained handoff follows:\n\n${workflowPrompt}`
-			: "Continue from the compacted context and finish the current task.";
+			: "Continue from the compacted context and finish the current work-orchestrator task.";
 		void sendFollowUp(ctx, message, workExtensionPi).catch((error) =>
 			ctx.ui.notify(
 				`Could not resume after microcompaction: ${formatError(error)}`,
@@ -20071,9 +20087,11 @@ function unsupportedPrintWorkflow(ctx) {
 }
 
 async function sendWorkflowFollowUp(ctx, message, pi, state) {
-	const metadata = workflowPromptMetadata();
-	if (metadata.length && !String(message).includes("Workflow Run ID:"))
-		message = `${message}\n${metadata.join("\n")}`;
+	const missingMetadata = workflowPromptMetadata().filter(
+		(item) => !String(message).includes(item),
+	);
+	if (missingMetadata.length)
+		message = `${message}\n${missingMetadata.join("\n")}`;
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
 	let compactEnabled = true;
 	try {
@@ -23266,6 +23284,7 @@ export {
 	workGoalConfirmationLabel,
 	completeWorkflowOnce,
 	withCommandTelemetry,
+	sendWorkflowFollowUp,
 	parseWorkPromptMeta,
 	reconcilePendingDirectRuns,
 	recordPendingDirectRun,
@@ -23925,6 +23944,14 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
+		const compactionResumePrompt =
+			/^Compaction is complete\. Resume the parent task now\b/.test(
+				contentText(event.prompt).trim(),
+			);
+		const compactionAuthorization = compactionResumePrompt
+			? pendingCompactionWorkflowAuthorization
+			: null;
+		pendingCompactionWorkflowAuthorization = null;
 		if (
 			pendingVerifierSynthesis &&
 			contentText(event.prompt).includes(pendingVerifierSynthesis.marker)
@@ -23937,7 +23964,9 @@ export default function workModelsExtension(pi) {
 		markWorkGoalContinuationDelivered(event.prompt);
 		const marker = extractWorkGoalContinuationMarker(event.prompt);
 		const matchingWorkGoalTurn = Boolean(
-			activeWorkGoal && marker?.startsWith(`${activeWorkGoal.id}:`),
+			activeWorkGoal &&
+				(marker?.startsWith(`${activeWorkGoal.id}:`) ||
+					compactionAuthorization?.goalId === activeWorkGoal.id),
 		);
 		pendingWorkGoalTurn =
 			matchingWorkGoalTurn && activeWorkGoal?.status === "active";
@@ -23954,7 +23983,8 @@ export default function workModelsExtension(pi) {
 			matchingWorkGoalTurn ||
 			goalClarificationTurn ||
 			managedWorkSubagent ||
-			Boolean(meta);
+			Boolean(meta) ||
+			Boolean(compactionAuthorization);
 		workflowTurnAuthorized = workflowTurn;
 		const turnPolicy = workflowTurn
 			? REVIEW_CYCLE_BUDGET_PROMPT
@@ -24338,6 +24368,24 @@ export default function workModelsExtension(pi) {
 			ctx,
 			current,
 		);
+		const workflowMeta = activeWorkAgent?.meta ?? pendingWorkPrompt?.meta ?? {};
+		const workflowAuthorization =
+			contextCompactState.workflowAuthorization ??
+			(workflowTurnAuthorized || activeWorkGoalRunning || workflowMeta.workflowRunId
+				? {
+						marker: "work-orchestrator",
+						goalId:
+							activeWorkGoalRunning && activeWorkGoal?.status === "active"
+								? activeWorkGoal.id
+								: undefined,
+						workflowRunId: workflowMeta.workflowRunId,
+						activity: workflowMeta.activity,
+						mode: workflowMeta.mode,
+						epicId: workflowMeta.epicId,
+						workItemId:
+							workflowMeta.workItemId ?? compactionTargetId(activeWorkGoal),
+					}
+				: null);
 		return {
 			compaction: {
 				summary: compacted.summary,
@@ -24349,6 +24397,7 @@ export default function workModelsExtension(pi) {
 					reason: event.reason,
 					triggerOwner: triggeredByCe ? "ce-workflow" : "native",
 					profile: compacted.profile,
+					workflowAuthorization,
 					durableStateAvailable: compacted.durable?.available ?? null,
 					files: filesFromOps(preparation.fileOps),
 				},
@@ -24359,6 +24408,15 @@ export default function workModelsExtension(pi) {
 	pi.on("session_compact", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "session_compact", event);
 		const details = event.compactionEntry?.details;
+		const currentCompactionEntry =
+			contextCompactState.inFlight &&
+			Number.isInteger(details?.generation) &&
+			details.generation === contextCompactState.generation;
+		pendingCompactionWorkflowAuthorization =
+			currentCompactionEntry &&
+			details?.workflowAuthorization?.marker === "work-orchestrator"
+				? details.workflowAuthorization
+				: null;
 		const triggeredByCe = details?.triggerOwner
 			? details.triggerOwner === "ce-workflow"
 			: contextCompactState.owner === "ce-workflow" ||

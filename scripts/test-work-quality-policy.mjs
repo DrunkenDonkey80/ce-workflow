@@ -58,7 +58,7 @@ function fixture(name, changedFile = "src/a.js") {
 		parentId: "E-1",
 		title: "Narrow verified change",
 		acceptance: "focused check passes",
-		notes: [`Files changed: ${changedFile}\nVerification: focused check PASS`],
+		notes: [`Files changed: ${changedFile}\nwo:verify-check PASS`],
 	});
 	saveStore(cwd, store);
 	git(cwd, "add", ".gitignore", changedFile, ".ce-workflow/work-items.json");
@@ -118,7 +118,7 @@ try {
 		mutateStore(cwd, (store) =>
 			updateWorkItem(store, "W-1", {
 				notes: [
-					"Files changed: src/a.js\nVerification: focused check PASS\nwo:review PASS independent",
+					"Files changed: src/a.js\nwo:verify-check PASS\nwo:review PASS independent",
 				],
 			}),
 		);
@@ -188,7 +188,7 @@ try {
 		mutateStore(cwd, (store) =>
 			updateWorkItem(store, "W-1", {
 				notes: [
-					"Files changed: src/a.js\nVerification: focused check PASS\nwo:review PASS independent",
+					"Files changed: src/a.js\nwo:verify-check PASS\nwo:review PASS independent",
 				],
 			}),
 		);
