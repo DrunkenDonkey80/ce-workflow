@@ -6091,6 +6091,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-20T12:44:19.909Z",
           "workflowId": "workflow-mt1fzpf7-67ecou"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-9efd8b88-f2ea-4cc0-bfe0-3a4461d3bfde",
@@ -6098,12 +6101,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomic claim classification and coverage: locally-owned work-2.80 (shared-group terminal reconciliation), commit 65883bc, verified by node scripts/test-background-verifiers.mjs; locally-owned work-2.81 (clean-tree exact ancestor fix reconciliation), commit 96d789a, verified by node scripts/test-work-goal.mjs. Both required outcomes coexist and are now covered.",
+        "wo:verify-check FAIL\nCommand: node scripts/test-background-verifiers.mjs && node scripts/test-work-goal.mjs\nexpected \"ok - work-goal helpers\", got \"background verifier domain tests passed\\nok - work-goal helpers\"",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs && node scripts/test-work-goal.mjs\nOutput: background verifier domain tests passed\nok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Verifier triage became unrecoverable after accepted fixes had already been committed by the coded finish path: work_verifier_compl",
       "type": "task",
-      "updatedAt": "2026-08-20T15:22:21.143Z"
+      "updatedAt": "2026-08-20T15:32:34.075Z"
     },
     "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851": {
       "createdAt": "2026-08-19T05:30:38.715Z",
@@ -8875,7 +8882,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T15:31:20.798Z"
+    "updatedAt": "2026-08-20T15:32:34.075Z"
   },
   "schemaVersion": 1
 }
