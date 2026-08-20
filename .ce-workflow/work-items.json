@@ -4261,17 +4261,23 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Atomic claim from work-2.report-9efd8b88-f2ea-4cc0-bfe0-3a4461d3bfde: work_verifier_complete_fix must safely record an accepted fix already committed by the coded finish path when the tree is clean.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.81",
       "labels": [
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Reconcile already-committed accepted verifier fixes",
       "type": "bug",
-      "updatedAt": "2026-08-20T15:22:14.439Z"
+      "updatedAt": "2026-08-20T15:27:46.086Z"
     },
     "work-2.9": {
       "createdAt": "2026-07-20T11:50:30.982Z",
@@ -8864,7 +8870,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T15:24:11.463Z"
+    "updatedAt": "2026-08-20T15:27:46.087Z"
   },
   "schemaVersion": 1
 }

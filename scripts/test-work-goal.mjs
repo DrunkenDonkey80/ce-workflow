@@ -15,11 +15,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+	addFinding,
+	addGroup,
+	claimGroup,
 	createBatch,
 	initVerifierStore,
 	loadVerifierStore,
 	mutateVerifierStore,
 	recordOperationResult,
+	recordTriageDisposition,
 } from "../extensions/background-verifiers.js";
 import {
 	createWorkItem,
@@ -1427,6 +1431,150 @@ try {
 	else process.env.APPDATA = oldAppData;
 
 	mod.default(pi);
+	const committedFixCwd = mkdtempSync(
+		path.join(tmpdir(), "ce-work-goal-committed-fix-"),
+	);
+	try {
+		execFileSync("git", ["init"], { cwd: committedFixCwd, stdio: "ignore" });
+		execFileSync("git", ["config", "user.name", "Test"], {
+			cwd: committedFixCwd,
+		});
+		execFileSync("git", ["config", "user.email", "test@example.com"], {
+			cwd: committedFixCwd,
+		});
+		writeFileSync(
+			path.join(committedFixCwd, ".gitignore"),
+			".ce-workflow/\n",
+		);
+		writeFileSync(path.join(committedFixCwd, "fix.js"), "before\n");
+		writeFileSync(path.join(committedFixCwd, "untouched.js"), "before\n");
+		execFileSync("git", ["add", "."], { cwd: committedFixCwd });
+		execFileSync("git", ["commit", "-m", "checkpoint"], {
+			cwd: committedFixCwd,
+		});
+		const checkpoint = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: committedFixCwd,
+			encoding: "utf8",
+		}).trim();
+		initVerifierStore(committedFixCwd);
+		const batch = mutateVerifierStore(committedFixCwd, (store) =>
+			createBatch(store, {
+				checkpoint: {
+					repository: "committed-fix-test",
+					base: "a".repeat(40),
+					snapshot: checkpoint,
+					paths: ["fix.js", "untouched.js"],
+					patchHash: "c".repeat(64),
+				},
+				profiles: [
+					{
+						model: "test/verifier",
+						operations: ["correctness"],
+						thinking: "low",
+					},
+				],
+			}),
+		);
+		const job = Object.values(loadVerifierStore(committedFixCwd).jobs).find(
+			(candidate) => candidate.batchId === batch.id,
+		);
+		const report = mutateVerifierStore(committedFixCwd, (store) =>
+			recordOperationResult(store, {
+				jobId: job.id,
+				operation: "correctness",
+				outcome: "findings",
+			}),
+		);
+		const findings = ["fix.js", "untouched.js"].map((file) =>
+			mutateVerifierStore(committedFixCwd, (store) =>
+				addFinding(store, {
+					reportId: report.id,
+					operation: report.operation,
+					model: report.model,
+					checkpoint: report.checkpoint,
+					path: file,
+					startLine: 1,
+					endLine: 1,
+					category: "correctness",
+					severity: "medium",
+					rationale: "reproduced",
+					evidence: "line 1",
+					suggestedAction: "fix it",
+				}),
+			),
+		);
+		const ownerSession = "fix-session";
+		const claims = findings.map((finding) => {
+			const group = mutateVerifierStore(committedFixCwd, (store) =>
+				addGroup(store, { findingIds: [finding.id] }),
+			);
+			const claim = mutateVerifierStore(committedFixCwd, (store) =>
+				claimGroup(store, { groupId: group.id, ownerSession }),
+			);
+			mutateVerifierStore(committedFixCwd, (store) =>
+				recordTriageDisposition(store, {
+					claimId: claim.id,
+					ownerSession,
+					findingId: finding.id,
+					disposition: "accepted",
+					reason: "reproduced",
+				}),
+			);
+			return claim;
+		});
+		writeFileSync(path.join(committedFixCwd, "fix.js"), "fixed\n");
+		execFileSync("git", ["commit", "-am", "coded finish"], {
+			cwd: committedFixCwd,
+		});
+		const committedHead = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: committedFixCwd,
+			encoding: "utf8",
+		}).trim();
+		const fixResult = await tempTools.work_verifier_complete_fix.execute(
+			"committed-fix",
+			{
+				claimId: claims[0].id,
+				findingIds: [findings[0].id],
+				verification: ["node focused-test"],
+			},
+			null,
+			null,
+			{
+				...ctx,
+				cwd: committedFixCwd,
+				sessionManager: { getSessionId: () => ownerSession },
+			},
+		);
+		assert.equal(fixResult.details.commit, committedHead);
+		assert.equal(
+			execFileSync("git", ["rev-parse", "HEAD"], {
+				cwd: committedFixCwd,
+				encoding: "utf8",
+			}).trim(),
+			committedHead,
+			"clean reconciliation does not create or rewrite a commit",
+		);
+		await assert.rejects(
+			tempTools.work_verifier_complete_fix.execute(
+				"missing-committed-fix",
+				{
+					claimId: claims[1].id,
+					findingIds: [findings[1].id],
+					verification: ["node focused-test"],
+				},
+				null,
+				null,
+				{
+					...ctx,
+					cwd: committedFixCwd,
+					sessionManager: { getSessionId: () => ownerSession },
+				},
+			),
+			/no exact ancestor commit/,
+		);
+	} finally {
+		rmSync(committedFixCwd, { recursive: true, force: true });
+	}
 	const invoke = (name, args, commandCtx = ctx) =>
 		mod.executeOrchestratorAction(name, args, commandCtx, pi);
 	tempHooks.session_start?.({}, ctx);

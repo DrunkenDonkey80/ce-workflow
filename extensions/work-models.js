@@ -10024,7 +10024,7 @@ function registerVerifierTriageTools(pi) {
 		name: "work_verifier_complete_fix",
 		label: "Complete accepted verifier fix",
 		description:
-			"Commit exactly the accepted finding paths after the main agent has edited and verified them; this never schedules background verification.",
+			"Commit exactly the accepted finding paths, or reconcile an exact ancestor commit, after the main agent has verified them; this never schedules background verification.",
 		parameters: {
 			type: "object",
 			properties: {
@@ -10062,9 +10062,20 @@ function registerVerifierTriageTools(pi) {
 			const dirty = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
 				normalizedRepoPath(item.path),
 			);
-			if (!samePathSet(dirty, paths))
+			let commit = "";
+			if (!dirty.length)
+				commit = committedAcceptedFix(
+					cwd,
+					findingIds.map((id) => store.findings[id]),
+					paths,
+				);
+			else if (!samePathSet(dirty, paths))
 				throw new Error(
-					`Accepted fix dirty scope must be exact; found ${dirty.join(", ") || "none"}.`,
+					`Accepted fix dirty scope must be exact; found ${dirty.join(", ")}.`,
+				);
+			if (!dirty.length && !commit)
+				throw new Error(
+					"Accepted fix has no exact ancestor commit after its verifier checkpoint.",
 				);
 			const ownerSession = verifierTriageOwner(ctx);
 			mutateVerifierStore(cwd, (state) =>
@@ -10076,16 +10087,22 @@ function registerVerifierTriageTools(pi) {
 				}),
 			);
 			const base = run(cwd, "git", ["rev-parse", "HEAD"]);
-			let commit;
-			try {
-				run(cwd, "git", ["add", "--", ...paths]);
-				ensureOnlyStaged(cwd, paths);
-				run(cwd, "git", ["commit", "-m", "fix(verifier): apply accepted findings"]);
-				commit = run(cwd, "git", ["rev-parse", "HEAD"]);
-			} catch (failure) {
-				run(cwd, "git", ["reset", "--mixed", base]);
-				throw failure;
-			}
+			let createdCommit = false;
+			if (dirty.length)
+				try {
+					run(cwd, "git", ["add", "--", ...paths]);
+					ensureOnlyStaged(cwd, paths);
+					run(cwd, "git", [
+						"commit",
+						"-m",
+						"fix(verifier): apply accepted findings",
+					]);
+					commit = run(cwd, "git", ["rev-parse", "HEAD"]);
+					createdCommit = true;
+				} catch (failure) {
+					run(cwd, "git", ["reset", "--mixed", base]);
+					throw failure;
+				}
 			let result;
 			try {
 				result = mutateVerifierStore(cwd, (state) =>
@@ -10109,6 +10126,7 @@ function registerVerifierTriageTools(pi) {
 				} catch {}
 				if (persisted) result = persisted;
 				else {
+					if (!createdCommit) throw failure;
 					if (run(cwd, "git", ["rev-parse", "HEAD"]) !== commit)
 						throw new Error(
 							`Verifier store completion failed after commit ${commit}, and HEAD moved before rollback.`,
@@ -15224,6 +15242,42 @@ function samePathSet(left = [], right = []) {
 	const a = normalizedPathSet(left);
 	const b = normalizedPathSet(right);
 	return a.size === b.size && [...a].every((item) => b.has(item));
+}
+
+function committedAcceptedFix(cwd, findings, paths) {
+	const snapshots = [
+		...new Set(findings.map((finding) => finding?.checkpoint?.snapshot)),
+	];
+	if (snapshots.length !== 1 || !/^[0-9a-f]{40,64}$/i.test(snapshots[0] ?? ""))
+		return "";
+	try {
+		run(cwd, "git", ["merge-base", "--is-ancestor", snapshots[0], "HEAD"]);
+		const commits = run(cwd, "git", [
+			"log",
+			"--format=%H",
+			`${snapshots[0]}..HEAD`,
+			"--",
+			...paths,
+		])
+			.split(/\r?\n/)
+			.filter(Boolean);
+		return (
+			commits.find((commit) => {
+				const changed = run(cwd, "git", [
+					"diff-tree",
+					"--no-commit-id",
+					"--name-only",
+					"-r",
+					commit,
+				])
+					.split(/\r?\n/)
+					.filter((path) => path && !isWorkStorePath(path));
+				return samePathSet(changed, paths);
+			}) ?? ""
+		);
+	} catch {
+		return "";
+	}
 }
 
 function ensureOnlyStaged(cwd, files) {
