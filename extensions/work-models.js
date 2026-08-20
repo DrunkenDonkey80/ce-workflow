@@ -10030,11 +10030,7 @@ function registerVerifierTriageTools(pi) {
 			try {
 				run(cwd, "git", ["add", "--", ...paths]);
 				ensureOnlyStaged(cwd, paths);
-				run(cwd, "git", [
-					"commit",
-					"-m",
-					"fix(verifier): apply accepted findings",
-				]);
+				run(cwd, "git", ["commit", "-m", "fix(verifier): apply accepted findings"]);
 				commit = run(cwd, "git", ["rev-parse", "HEAD"]);
 			} catch (failure) {
 				run(cwd, "git", ["reset", "--mixed", base]);
