@@ -3253,6 +3253,35 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	tempHooks.session_start?.({}, ctx);
 	assert.match(statuses["work-goal"], /active #2/);
+	await tempHooks.before_agent_start(
+		{
+			prompt:
+				"Continue the roadmap.\n\n<!-- work-goal-continuation:wg-reset:2:test -->",
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	const beforeResetContinuationSent = sent.length;
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Continue the roadmap." }],
+				},
+			],
+		},
+		ctx,
+	);
+	await settle();
+	assert.equal(sent.length, beforeResetContinuationSent + 1);
+	assert.match(sent.at(-1).message, /^\/__orchestrator-goal-continue wg-reset /);
+	assert.equal(
+		sent.at(-1).options?.expandPromptTemplates,
+		true,
+		"automatic fresh-session continuations dispatch their internal command",
+	);
 	const beforeFallbackCompactions = compactions.length;
 	const beforeFallbackSent = sent.length;
 	await tempCommands["__orchestrator-goal-continue"].handler(
@@ -3292,7 +3321,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	entries.length = 0;
 	entries.push(handoffEntry);
 	tempHooks.session_start?.({}, ctx);
-	assert.match(statuses["work-goal"], /active #2/);
+	assert.match(statuses["work-goal"], /active #3/);
 	await invoke("work-goal", "clear", ctx);
 
 	writeFileSync(

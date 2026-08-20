@@ -18208,7 +18208,7 @@ function workGoalHasPendingMessages(ctx) {
 	return ctx.hasPendingMessages?.() ?? false;
 }
 
-async function sendWorkGoalPrompt(pi, ctx, prompt) {
+async function sendWorkGoalPrompt(pi, ctx, prompt, options) {
 	try {
 		const send =
 			ctx.mode === "tui" && typeof pi?.sendUserMessage === "function"
@@ -18217,8 +18217,12 @@ async function sendWorkGoalPrompt(pi, ctx, prompt) {
 					? ctx.sendUserMessage.bind(ctx)
 					: pi?.sendUserMessage?.bind(pi);
 		if (!send) return false;
-		if (ctx.isIdle?.()) await send(roadmapTerminology(prompt));
-		else await send(roadmapTerminology(prompt), { deliverAs: "followUp" });
+		if (ctx.isIdle?.()) await send(roadmapTerminology(prompt), options);
+		else
+			await send(roadmapTerminology(prompt), {
+				...options,
+				deliverAs: "followUp",
+			});
 		return true;
 	} catch (error) {
 		ctx.ui.notify(
@@ -18304,6 +18308,7 @@ async function sendWorkGoalContinuation(
 			pi,
 			ctx,
 			`/${ORCHESTRATOR_GOAL_CONTINUE_COMMAND} ${goal.id} ${marker}`,
+			{ expandPromptTemplates: true },
 		);
 		if (!queued && workGoalContinuationPending?.marker === marker)
 			workGoalContinuationPending = null;
