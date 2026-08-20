@@ -9,6 +9,7 @@ import {
 	truncateSync,
 	writeFileSync,
 } from "node:fs";
+
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -136,6 +137,10 @@ assert(
 	"arbitrary JARs are NOT recognized",
 );
 assert(!isRecognizedSource("dump.bin", noGit), ".bin is NOT recognized");
+assert(
+	!isRecognizedSource("src/blob.dat", () => "src/old.py\n"),
+	"directory inference requires an explicit repository root",
+);
 assert(isRuntimePath(".pi/work-runs/run.json"), ".pi runtime is recognized");
 assert(
 	isRuntimePath(".pi-subagents\\artifacts\\review.md"),
