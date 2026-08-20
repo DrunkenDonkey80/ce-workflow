@@ -18191,6 +18191,15 @@ function buildWorkGoalContinuePrompt(goal, marker, note = "") {
 	return `Continue the active autonomous goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. If the human answer asked you to perform an action, do that action first before unrelated work. Do not ask the same question again unless the answer is impossible to act on. Use ask_user for real human-decision blockers; use work_goal_human_decision only if ask_user is unavailable or cancelled. Otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
 }
 
+function buildClaimedWorkGoalContinuePrompt(goal, marker, note, ctx, cwd) {
+	const triage = verifierTriageState(cwd, verifierTriageOwner(ctx));
+	return buildWorkGoalContinuePrompt(
+		goal,
+		marker,
+		[note, triage?.handoffPrompt ?? triage?.message].filter(Boolean).join("\n\n"),
+	);
+}
+
 function buildWorkGoalCompactInstructions(goal) {
 	return `work-context work-goal microcompact: preserve the active autonomous goal objective, human decisions, native work-item store/git state, files changed/read, blockers, verification evidence, and next step. Omit old reasoning and full tool logs. Objective: ${truncate(goal.objective, 1_200)}`;
 }
@@ -18281,7 +18290,6 @@ async function sendWorkGoalContinuation(
 	applyWorkGoalThinking(pi, goal, ctx);
 	if (!manualResume && workGoalHasPendingMessages(ctx)) return false;
 	const marker = workGoalContinuationMarker(goal);
-	const prompt = buildWorkGoalContinuePrompt(goal, marker, note);
 	workGoalContinuationPending = {
 		goalId: goal.id,
 		marker,
@@ -18301,6 +18309,13 @@ async function sendWorkGoalContinuation(
 			workGoalContinuationPending = null;
 		return queued;
 	}
+	const prompt = buildClaimedWorkGoalContinuePrompt(
+		goal,
+		marker,
+		note,
+		ctx,
+		activeWorkGoalCwd ?? ctx.cwd,
+	);
 	const sent =
 		manualResume || alreadyCompacted
 			? await sendWorkGoalPrompt(pi, ctx, prompt)
@@ -18323,7 +18338,13 @@ async function sendWorkGoalAnswerContinuation(pi, ctx, goal, note = "") {
 	if (workGoalContinuationPending?.goalId === goal.id) return false;
 	applyWorkGoalThinking(pi, goal, ctx);
 	const marker = workGoalContinuationMarker(goal);
-	const prompt = buildWorkGoalContinuePrompt(goal, marker, note);
+	const prompt = buildClaimedWorkGoalContinuePrompt(
+		goal,
+		marker,
+		note,
+		ctx,
+		activeWorkGoalCwd ?? ctx.cwd,
+	);
 	workGoalContinuationPending = {
 		goalId: goal.id,
 		marker,
@@ -19893,19 +19914,16 @@ async function handleWorkGoalResetCommand(args, ctx, pi) {
 			pi,
 			ctx,
 			goal,
-			buildWorkGoalContinuePrompt(
+			buildClaimedWorkGoalContinuePrompt(
 				goal,
 				marker || workGoalContinuationMarker(goal),
 				"Fresh-session reset was unavailable; continued after a work-context microcompact.",
+				ctx,
+				cwd,
 			),
 		);
 	};
 	if (typeof ctx.newSession !== "function") return fallback("API unavailable");
-	const prompt = buildWorkGoalContinuePrompt(
-		goal,
-		marker || workGoalContinuationMarker(goal),
-		"Started in a fresh session; resume from native work-item store/git and avoid relying on prior chat.",
-	);
 	const parentSession = ctx.sessionManager?.getSessionFile?.();
 	try {
 		const result = await ctx.newSession({
@@ -19916,7 +19934,15 @@ async function handleWorkGoalResetCommand(args, ctx, pi) {
 				});
 			},
 			withSession: async (nextCtx) => {
-				await nextCtx.sendUserMessage(prompt);
+				await nextCtx.sendUserMessage(
+					buildClaimedWorkGoalContinuePrompt(
+						goal,
+						marker || workGoalContinuationMarker(goal),
+						"Started in a fresh session; resume from native work-item store/git and avoid relying on prior chat.",
+						nextCtx,
+						cwd,
+					),
+				);
 			},
 		});
 		if (result?.cancelled) return fallback("reset cancelled");

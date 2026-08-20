@@ -4626,6 +4626,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-20T11:51:52.408Z",
           "workflowId": "workflow-mt1fzpf7-67ecou"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-246e1b7b-2692-4324-9980-3e8d7ad67cf6",
@@ -4633,12 +4636,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After background verifier reports were ingested, work_goal_complete correctly blocked on pending findings, but the automatic conti",
       "type": "task",
-      "updatedAt": "2026-08-20T11:51:52.412Z"
+      "updatedAt": "2026-08-20T15:31:20.798Z"
     },
     "work-2.report-2cdd87c5-81e8-444e-8075-85ef78e8d3aa": {
       "createdAt": "2026-08-20T06:01:26.367Z",
@@ -8870,7 +8875,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T15:27:46.087Z"
+    "updatedAt": "2026-08-20T15:31:20.798Z"
   },
   "schemaVersion": 1
 }

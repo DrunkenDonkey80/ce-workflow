@@ -2643,6 +2643,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		{ prompt: sent[5].message, systemPrompt: "base" },
 		ctx,
 	);
+	await tempHooks.agent_start({}, ctx);
 	initVerifierStore(cwd);
 	const completionBatch = mutateVerifierStore(cwd, (store) =>
 		createBatch(store, {
@@ -2672,15 +2673,80 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	assert.equal(blockedCompletion.completed, false);
 	assert.match(blockedCompletion.content[0].text, /still queued or running/);
-	assert.equal(statuses["work-goal"], "active #2");
+	assert.equal(statuses["work-goal"], "working #2");
 	const completionJob = Object.values(loadVerifierStore(cwd).jobs).find(
 		(job) => job.batchId === completionBatch.id,
 	);
-	mutateVerifierStore(cwd, (store) =>
+	const completionReport = mutateVerifierStore(cwd, (store) =>
 		recordOperationResult(store, {
 			jobId: completionJob.id,
 			operation: "correctness",
-			outcome: "no-findings",
+			outcome: "findings",
+		}),
+	);
+	const completionFinding = mutateVerifierStore(cwd, (store) =>
+		addFinding(store, {
+			reportId: completionReport.id,
+			operation: completionReport.operation,
+			model: completionReport.model,
+			checkpoint: completionReport.checkpoint,
+			path: "tracked.txt",
+			startLine: 1,
+			endLine: 1,
+			category: "correctness",
+			severity: "medium",
+			rationale: "goal continuation must expose this finding",
+			evidence: "line 1",
+			suggestedAction: "triage it",
+		}),
+	);
+	mutateVerifierStore(cwd, (store) =>
+		addGroup(store, { findingIds: [completionFinding.id] }),
+	);
+	const awaitingTriage = await tempTools.work_goal_complete.execute(
+		"t-verifier-triage",
+		{ summary: "verification finding triaged" },
+		null,
+		null,
+		ctx,
+	);
+	assert.match(awaitingTriage.content[0].text, /findings awaiting triage/);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Verifier triage remains." }],
+				},
+			],
+		},
+		ctx,
+	);
+	await settle();
+	assert.match(
+		sent.at(-1).message,
+		/Verifier triage is mandatory/,
+		"automatic continuation includes the claimed verifier handoff",
+	);
+	const verifierInbox = await tempTools.work_verifier_inbox.execute(
+		"goal-verifier-inbox",
+		{},
+		null,
+		null,
+		ctx,
+	);
+	assert.equal(
+		verifierInbox.details.claims[0].findings[0].id,
+		completionFinding.id,
+		"automatic continuation claims completed verifier findings before prompting",
+	);
+	mutateVerifierStore(cwd, (store) =>
+		recordTriageDisposition(store, {
+			claimId: verifierInbox.details.claims[0].claim.id,
+			ownerSession: `process-${process.pid}`,
+			findingId: completionFinding.id,
+			disposition: "rejected",
+			reason: "goal continuation claim path verified",
 		}),
 	);
 	const completionResult = await tempTools.work_goal_complete.execute(
