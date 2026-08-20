@@ -42,8 +42,7 @@ assert(
 	"dist artifacts map to their exact directory",
 );
 assert(
-	ignorePatternForBuildArtifact("pkg/__pycache__/m.pyc") ===
-		"/pkg/__pycache__/",
+	ignorePatternForBuildArtifact("pkg/__pycache__/m.pyc") === "/pkg/__pycache__/",
 	"__pycache__ maps to its exact directory",
 );
 assert(

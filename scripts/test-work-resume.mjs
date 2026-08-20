@@ -928,7 +928,8 @@ try {
 	setScenario("inProgressFixStaleVerification");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
-		state.action === "in-progress-agent" && !state.selectedWorkItem.verificationReady,
+		state.action === "in-progress-agent" &&
+			!state.selectedWorkItem.verificationReady,
 		"a verification PASS before a later production fix cannot launch re-review",
 	);
 

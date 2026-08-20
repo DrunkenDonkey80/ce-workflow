@@ -202,8 +202,7 @@ const scenarioChildren = {
 			issue_type: "task",
 			status: "in_progress",
 			title: "Unreviewed slice",
-			notes:
-				"wo:verify-check PASS\nFiles: extensions/work-models.js",
+			notes: "wo:verify-check PASS\nFiles: extensions/work-models.js",
 		},
 	],
 	finishMissingVerification: [
@@ -314,9 +313,7 @@ export function seedNativeStore(cwd, sources) {
 		updateWorkItem(store, source.id, {
 			...(parentId ? { parentId } : {}),
 			dependencies: edges
-				.filter(
-					(edge) => /^blocks?$/i.test(edge.type) && edge.toId !== parentId,
-				)
+				.filter((edge) => /^blocks?$/i.test(edge.type) && edge.toId !== parentId)
 				.map((edge) => edge.toId),
 			dependencyEdges: edges,
 		});
