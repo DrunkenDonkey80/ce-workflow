@@ -2012,6 +2012,19 @@ try {
 	);
 	const triageOwner = "triage-b";
 	const [acceptedFinding, rejectedFinding] = triageGroup.findingIds;
+	const sharedGroup = mutateVerifierStore(reconcileCwd, (state) =>
+		addGroup(state, {
+			findingIds: [acceptedFinding],
+			now: "2026-07-21T03:01:15.000Z",
+		}),
+	);
+	mutateVerifierStore(reconcileCwd, (state) =>
+		claimGroup(state, {
+			groupId: sharedGroup.id,
+			ownerSession: triageOwner,
+			now: "2026-07-21T03:01:30.000Z",
+		}),
+	);
 	throwsCategory(
 		() =>
 			mutateVerifierStore(reconcileCwd, (state) =>
@@ -2104,6 +2117,15 @@ try {
 		0,
 		"fully triaged findings stay absent from later resumes",
 	);
+	assert.equal(
+		loadVerifierStore(reconcileCwd).groups[sharedGroup.id].status,
+		"triaged",
+		"shared groups become terminal instead of leaving empty claims",
+	);
+	mutateVerifierStore(reconcileCwd, (state) => {
+		delete state.claims[state.groups[sharedGroup.id].claimId];
+		delete state.groups[sharedGroup.id];
+	});
 	mutateVerifierStore(reconcileCwd, (state) =>
 		reopenGroup(state, {
 			groupId: triageGroup.id,

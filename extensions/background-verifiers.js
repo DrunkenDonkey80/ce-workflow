@@ -1559,19 +1559,17 @@ export function claimGroup(store, input = {}) {
 	return edit(store, (next) => claimGroupIn(next, input));
 }
 export function claimCompletedGroups(store, input = {}) {
-	return edit(store, (next) =>
-		Object.values(next.groups)
-			.filter(
-				(group) => group.status === "completed" || group.status === "claimed",
-			)
-			.filter(
-				(group) =>
-					remainingFindings(next, group).length > 0 || group.status === "claimed",
-			)
+	return edit(store, (next) => {
+		const groups = Object.values(next.groups).filter(
+			(group) => group.status === "completed" || group.status === "claimed",
+		);
+		for (const group of groups) updateGroupTriage(next, group);
+		return groups
+			.filter((group) => remainingFindings(next, group).length > 0)
 			.sort((left, right) => left.id.localeCompare(right.id))
 			.slice(0, input.limit ?? Number.POSITIVE_INFINITY)
-			.map((group) => claimGroupIn(next, { ...input, groupId: group.id })),
-	);
+			.map((group) => claimGroupIn(next, { ...input, groupId: group.id }));
+	});
 }
 function ownedClaim(next, input) {
 	const claim = next.claims[input.claimId];

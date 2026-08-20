@@ -4231,6 +4231,48 @@
       "type": "bug",
       "updatedAt": "2026-07-22T13:06:10.411Z"
     },
+    "work-2.80": {
+      "acceptance": "claimCompletedGroups updates fully resolved completed/claimed groups to triaged before selecting claims; a regression test covers overlapping groups that share dispositioned/fixed findings.",
+      "createdAt": "2026-08-20T15:22:14.349Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Atomic claim from work-2.report-9efd8b88-f2ea-4cc0-bfe0-3a4461d3bfde: fully resolved groups sharing already-dispositioned findings must transition to triaged and never be re-claimed with an empty inbox.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.80",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Reconcile fully resolved shared verifier groups before claiming",
+      "type": "bug",
+      "updatedAt": "2026-08-20T15:24:11.463Z"
+    },
+    "work-2.81": {
+      "acceptance": "On a clean tree, complete-fix locates an ancestor commit after the finding checkpoint whose changed paths exactly equal accepted paths, records the fix without rewriting Git history, and rejects missing or non-exact evidence; tests cover success and rejection.",
+      "createdAt": "2026-08-20T15:22:14.439Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Atomic claim from work-2.report-9efd8b88-f2ea-4cc0-bfe0-3a4461d3bfde: work_verifier_complete_fix must safely record an accepted fix already committed by the coded finish path when the tree is clean.",
+      "evidence": [],
+      "id": "work-2.81",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Reconcile already-committed accepted verifier fixes",
+      "type": "bug",
+      "updatedAt": "2026-08-20T15:22:14.439Z"
+    },
     "work-2.9": {
       "createdAt": "2026-07-20T11:50:30.982Z",
       "dependencies": [],
@@ -6017,7 +6059,10 @@
     },
     "work-2.report-9efd8b88-f2ea-4cc0-bfe0-3a4461d3bfde": {
       "createdAt": "2026-08-20T12:44:19.913Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.80",
+        "work-2.81"
+      ],
       "dependencyEdges": [],
       "description": "Observed: Verifier triage became unrecoverable after accepted fixes had already been committed by the coded finish path: work_verifier_complete_fix rejected the clean tree with 'Accepted fix dirty scope must be exact; found none.' In addition, claimCompletedGroups re-claimed eight groups whose shared findings were already fully dispositioned/fixed, leaving empty claimed groups that required deterministic store reconciliation.\nExpected: The verifier flow should either complete accepted findings before coded finish commits, or safely reconcile an already-committed exact fix; fully resolved shared-finding groups must transition to triaged and must not be re-claimed with an empty inbox.\nImpact: Autonomous improvement completion can deadlock after valid fixes and tests, forcing internal store reconciliation instead of the constrained verifier tools.\nSuggested improvement: Have claimCompletedGroups call/update triage state for fully resolved shared groups before filtering; add a constrained complete-fix reconciliation path that verifies an ancestor commit and exact accepted paths when the working tree is clean.",
       "evidence": [
@@ -6047,7 +6092,7 @@
       "status": "open",
       "title": "Self-improvement report: Verifier triage became unrecoverable after accepted fixes had already been committed by the coded finish path: work_verifier_compl",
       "type": "task",
-      "updatedAt": "2026-08-20T12:44:19.913Z"
+      "updatedAt": "2026-08-20T15:22:21.143Z"
     },
     "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851": {
       "createdAt": "2026-08-19T05:30:38.715Z",
@@ -8819,7 +8864,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T12:44:19.913Z"
+    "updatedAt": "2026-08-20T15:24:11.463Z"
   },
   "schemaVersion": 1
 }
