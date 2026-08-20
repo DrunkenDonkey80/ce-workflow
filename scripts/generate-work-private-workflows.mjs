@@ -104,10 +104,10 @@ function assertVerifiedEvidence(evidence, policy) {
 		evidence?.schemaVersion !== 1 ||
 		evidence.release !== policy.release ||
 		evidence.peeledCommitSha !== policy.peeledCommitSha ||
-		evidence.archive?.sha256 !== policy.archive.sha256 ||
-		evidence.licenseEvidence?.path !== policy.license.path ||
-		evidence.licenseEvidence?.sha256 !== policy.license.sha256 ||
-		evidence.licenseEvidence?.spdx !== policy.license.spdx ||
+		evidence.archive?.sha256 !== policy.archive?.sha256 ||
+		evidence.licenseEvidence?.path !== policy.license?.path ||
+		evidence.licenseEvidence?.sha256 !== policy.license?.sha256 ||
+		evidence.licenseEvidence?.spdx !== policy.license?.spdx ||
 		evidence.licenseEvidence?.permissionTextPresent !== true ||
 		evidence.runtimeProbe?.zeroEffectiveSurface !== true ||
 		(evidence.containment?.quarantineRemoved !== true &&
@@ -195,7 +195,15 @@ export function translateVerifiedWorkflows({
 	workflows = ["brainstorm", "browser", "debug", "explain", "learning", "plan", "pov", "review", "simplify"],
 }) {
 	assertVerifiedEvidence(evidence, policy);
-	if (!workflows.length || workflows.some((workflow) => !WORKFLOW_SOURCES[workflow]))
+	if (
+		!workflows.length ||
+		workflows.some(
+			(workflow) =>
+				!WORKFLOW_SOURCES[workflow] ||
+				!WORKFLOW_RULES[workflow] ||
+				!PLAYBOOKS[workflow],
+		)
+	)
 		throw new Error("unknown private workflow translation request");
 	const selected = [...new Set(workflows)].sort();
 	const closures = Object.fromEntries(
@@ -267,11 +275,13 @@ export function writePrivateWorkflowGeneration(outputRoot, files) {
 
 function argumentsFrom(argv) {
 	const values = {};
+	const allowed = new Set(["--source", "--evidence", "--output"]);
 	for (let index = 0; index < argv.length; index += 2) {
 		const name = argv[index];
-		if (!name?.startsWith("--") || argv[index + 1] === undefined)
+		const value = argv[index + 1];
+		if (!allowed.has(name) || value === undefined || value.startsWith("--"))
 			throw new Error(`invalid argument: ${name ?? "missing"}`);
-		values[name.slice(2)] = argv[index + 1];
+		values[name.slice(2)] = value;
 	}
 	return values;
 }

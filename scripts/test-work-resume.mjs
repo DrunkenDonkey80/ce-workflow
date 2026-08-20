@@ -287,7 +287,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Verified isolated implementation",
 			notes:
-				"wo:execution-agent\nFiles changed: extensions/work-models.js.\nVerification: npm run verify — passed.",
+				"wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nCommand: npm run verify",
 		},
 	],
 	inProgressSensitiveContract: [
@@ -320,7 +320,18 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				"wo:execution-agent\nFiles changed: extensions/work-models.js, `scripts/file with space.js`, .ce-workflow/work-items.json, .pi-subagents/artifacts/review.md, .pi/work-runs/run.json.\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed and tests passed",
+				"wo:execution-agent\nFiles changed: extensions/work-models.js, `scripts/file with space.js`, .ce-workflow/work-items.json, .pi-subagents/artifacts/review.md, .pi/work-runs/run.json.\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed\nwo:verify-check PASS",
+		},
+	],
+	inProgressFixStaleVerification: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				"wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed",
 		},
 	],
 	inProgressFixReadyNoPaths: [
@@ -331,7 +342,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed and tests passed",
+				"wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed\nwo:verify-check PASS",
 		},
 	],
 	inProgressReviewPass: [
@@ -375,7 +386,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				'wo:execution-agent\nFiles changed: docs/auth.md.\nwo:verify-check PASS\nwo:review FAIL - source comment date is missing\nwo:fix PASS - comment fixed\nwo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added source date","evidence":"documentation check passed"}]}',
+				'wo:execution-agent\nFiles changed: docs/auth.md.\nwo:verify-check PASS\nwo:review FAIL - source comment date is missing\nwo:fix PASS - comment fixed\nwo:verify-check PASS\nwo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added source date","evidence":"documentation check passed"}]}',
 		},
 	],
 	inProgressProductionMechanicalClaim: [
@@ -386,7 +397,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - permission guard is missing\nwo:fix PASS - guard added\nwo:mechanical-fix PASS {"dispositions":[{"finding":"permission guard is missing","fix":"guard added","evidence":"focused test passed"}]}',
+				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - permission guard is missing\nwo:fix PASS - guard added\nwo:verify-check PASS\nwo:mechanical-fix PASS {"dispositions":[{"finding":"permission guard is missing","fix":"guard added","evidence":"focused test passed"}]}',
 		},
 	],
 	inProgressReviewCap: [
@@ -397,7 +408,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				'wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL {"findings":["residual A","residual B"]}\nwo:fix PASS - generic residual summary\nwo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"only one fix","evidence":"one test"}]}',
+				'wo:execution-agent\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL {"findings":["residual A","residual B"]}\nwo:fix PASS - generic residual summary\nwo:verify-check PASS\nwo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"only one fix","evidence":"one test"}]}',
 		},
 	],
 	inProgressResidualFix: [
@@ -408,7 +419,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL {"findings":["residual A","residual B"]}\nwo:fix PASS - both residuals fixed; tests passed\nwo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"bounded guard","evidence":"focused test A passed"},{"finding":"residual B","fix":"scope guard","evidence":"focused test B passed"}]}',
+				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL {"findings":["residual A","residual B"]}\nwo:fix PASS - both residuals fixed\nwo:verify-check PASS\nwo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"bounded guard","evidence":"focused test A passed"},{"finding":"residual B","fix":"scope guard","evidence":"focused test B passed"}]}',
 		},
 	],
 	blocked: [
@@ -887,6 +898,13 @@ try {
 		"direct reviewer launch carries the complete bounded handoff and liveness contract",
 	);
 
+	setScenario("inProgressFixStaleVerification");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "in-progress-agent" && !state.selectedWorkItem.verificationReady,
+		"a verification PASS before a later production fix cannot launch re-review",
+	);
+
 	setScenario("inProgressFixReadyNoPaths");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
@@ -906,8 +924,9 @@ try {
 	setScenario("inProgressStaleReviewPass");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
-		state.action === "run-review",
-		"a PASS before the latest review scope does not satisfy the new review",
+		state.action === "in-progress-agent" &&
+			!state.selectedWorkItem.verificationReady,
+		"a PASS before the latest review scope requires fresh verification",
 	);
 
 	setScenario("inProgressQuotedReviewPass");

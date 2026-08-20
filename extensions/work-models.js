@@ -6071,8 +6071,9 @@ function runTempCheck(cwd, name, script, inputs = {}, options = {}) {
 	const dir = join(telemetryDir(cwd), "checks");
 	mkdirSync(dir, { recursive: true });
 	const prefix = safeHistoryPathPart(name);
-	const scriptPath = join(dir, `${prefix}-${telemetryId("check")}.mjs`);
-	const inputPath = join(dir, `${prefix}-inputs.json`);
+	const runId = telemetryId("check");
+	const scriptPath = join(dir, `${prefix}-${runId}.mjs`);
+	const inputPath = join(dir, `${prefix}-${runId}-inputs.json`);
 	writeFileSync(scriptPath, script);
 	writeFileSync(inputPath, JSON.stringify(inputs, null, "\t"));
 	const result = runBounded(cwd, process.execPath, [scriptPath, inputPath], {
@@ -6080,19 +6081,31 @@ function runTempCheck(cwd, name, script, inputs = {}, options = {}) {
 		cap: options.cap ?? 4_000,
 	});
 	let parsed;
+	let parseError = false;
 	try {
-		parsed = JSON.parse(result.stdout_summary);
+		parsed = JSON.parse(readFileSync(result.full_stdout_path, "utf8"));
+		if (
+			!parsed ||
+			typeof parsed !== "object" ||
+			Array.isArray(parsed) ||
+			!["PASS", "FAIL"].includes(parsed.status)
+		)
+			throw new Error("invalid check result");
 	} catch {
+		parseError = true;
 		parsed = { summary: result.stdout_summary };
 	}
 	return {
 		name,
-		status: result.exit_code === 0 ? (parsed.status ?? "PASS") : "FAIL",
+		status:
+			result.exit_code === 0 && !parseError ? (parsed.status ?? "PASS") : "FAIL",
 		exit_code: result.exit_code,
 		duration_ms: result.duration_ms,
 		summary: parsed.summary ?? result.stderr_summary,
 		key_values: parsed.key_values ?? {},
-		failed_assertions: parsed.failed_assertions ?? [],
+		failed_assertions: parseError
+			? ["check output was not valid JSON"]
+			: (parsed.failed_assertions ?? []),
 		full_log_path: result.full_stdout_path,
 		script_path: scriptPath,
 	};
@@ -8135,9 +8148,10 @@ function planResumeAction(state, cwd, options = {}) {
 			],
 		});
 		if (
-			activeImplementation.reviewPassed ||
-			activeImplementation.mechanicalFixAccepted ||
-			activeImplementation.residualFixAccepted
+			activeImplementation.verificationReady &&
+			(activeImplementation.reviewPassed ||
+				activeImplementation.mechanicalFixAccepted ||
+				activeImplementation.residualFixAccepted)
 		)
 			return {
 				...routed,
@@ -8162,7 +8176,14 @@ function planResumeAction(state, cwd, options = {}) {
 			!activeImplementation.changedPaths?.length
 		)
 			return missingReviewScope();
-		if (activeImplementation.fixReadyForReview)
+		if (activeImplementation.fixReadyForReview) {
+			if (!activeImplementation.verificationReady)
+				return {
+					...routed,
+					action: "in-progress-agent",
+					message:
+						"The recorded fix needs fresh structured verification before re-review.",
+				};
 			return withHandoffPrompt(
 				{
 					...routed,
@@ -8172,6 +8193,7 @@ function planResumeAction(state, cwd, options = {}) {
 				},
 				cwd,
 			);
+		}
 		if (activeImplementation.reviewFailed)
 			return withHandoffPrompt(
 				{
@@ -15069,8 +15091,15 @@ function mechanicalFixAccepted(issue) {
 }
 
 function hasVerificationEvidence(issue) {
-	return /wo:verify-check\s+PASS|\bverification(?:\s+(?:result|status))?\s*[:=-][^\n]*(?:PASS|passed|success|ok)\b|\btests?\s+(?:PASS|passed|succeeded)\b|\b(?:npm run|pytest|ctest)[^\n]*(?:PASS|passed|exit(?:ed)?\s*0|ok\b)/i.test(
-		notesOf(issue),
+	const notes = notesOf(issue);
+	const verifiedAt = [...notes.matchAll(/^wo:verify-check[ \t]+PASS\b/gim)].at(
+		-1,
+	)?.index;
+	const lower = notes.toLowerCase();
+	return (
+		verifiedAt !== undefined &&
+		verifiedAt >
+			Math.max(lower.lastIndexOf("wo:fix pass"), lower.lastIndexOf("wo:review-scope "))
 	);
 }
 

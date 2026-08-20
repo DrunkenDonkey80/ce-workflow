@@ -627,6 +627,9 @@ async function finishTaskUnlocked() {
 			throw new Error(`--verify-shard ${index + 1} must be valid JSON`);
 		}
 	});
+	const expected = option("--expect");
+	if (shardDeclarations.length && expected !== undefined)
+		throw new Error("--expect cannot be combined with --verify-shard");
 	const shardOutputs = shardDeclarations.flatMap((shard) =>
 		Array.isArray(shard.outputs) ? shard.outputs : [],
 	);
@@ -652,6 +655,8 @@ async function finishTaskUnlocked() {
 		),
 	);
 	const jsonFile = option("--json");
+	if (shardDeclarations.length && !verify)
+		throw new Error("--verify-shard requires --verify");
 	if (!verify && !jsonFile)
 		throw new Error("finish-task requires --verify or --json");
 	let verificationResult;
@@ -673,7 +678,6 @@ async function finishTaskUnlocked() {
 			);
 			output = verification.output.trim();
 			verificationManifest = verification.manifest;
-			const expected = option("--expect");
 			if (expected !== undefined && output !== expected)
 				throw new Error(
 					`expected ${JSON.stringify(expected)}, got ${JSON.stringify(output)}`,
@@ -1401,11 +1405,15 @@ try {
 		const [id] = args;
 		const noteArgs = args.slice(args[1] === "--append-notes" ? 2 : 1);
 		if (!id || !noteArgs.length)
-			throw new Error("usage: work-note <work-item-id> [--append-notes] <note>");
-		const note =
-			noteArgs.length === 1 && existsSync(noteArgs[0])
-				? readFileSync(noteArgs[0], "utf8")
-				: noteArgs.join(" ");
+			throw new Error(
+				"usage: work-note <work-item-id> [--append-notes] <note>|--note-file <path>",
+			);
+		let note;
+		if (noteArgs[0] === "--note-file") {
+			if (noteArgs.length !== 2 || statSync(noteArgs[1]).size > 1024 * 1024)
+				throw new Error("--note-file requires one file up to 1 MiB");
+			note = readFileSync(noteArgs[1], "utf8");
+		} else note = noteArgs.join(" ");
 		print(
 			summary(
 				updateNativeWorkItem(id, (current) => ({
@@ -1555,7 +1563,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-roadmap|json-assert> ...",
+			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-roadmap|bootstrap-plan-epic|legacy-instructions-preview|legacy-instructions-apply|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}

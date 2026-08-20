@@ -96,6 +96,7 @@ try {
 			ready.length === 1 && ready[0].id === "TASK-123" && !ready[0].notes_tail,
 			"native ready helper returns compact execution fields without bd",
 		);
+		writeFileSync(path.join(cwd, "direct note"), "file contents must not replace the note");
 		execFileSync(
 			process.execPath,
 			[helper, "work-note", "TASK-123", "direct note"],
@@ -109,8 +110,9 @@ try {
 		const notes = loadStore(cwd).items["TASK-123"].notes;
 		assert(
 			notes.at(-2) === "direct note" && notes.at(-1) === "flagged note",
-			"work-note accepts direct and --append-notes forms without persisting the flag",
+			"work-note treats notes as literal text even when they match a local filename",
 		);
+		rmSync(path.join(cwd, "direct note"));
 		execFileSync(
 			process.execPath,
 			[helper, "work-close", "TASK-123", "--reason", "verified closure"],
@@ -147,6 +149,25 @@ try {
 	assert(
 		check.status === "PASS" && check.key_values.checked === 1,
 		"temp check returns compact pass JSON",
+	);
+	const largeCheck = mod.runTempCheck(
+		cwd,
+		"large-fields",
+		`console.log(JSON.stringify({ status: "FAIL", summary: "x".repeat(5000), failed_assertions: ["oversized failure"] }));`,
+	);
+	assert(
+		largeCheck.status === "FAIL" &&
+			largeCheck.failed_assertions[0] === "oversized failure",
+		"temp checks parse the full JSON artifact instead of truncated stdout",
+	);
+	const invalidCheck = mod.runTempCheck(
+		cwd,
+		"invalid-fields",
+		`console.log("[]");`,
+	);
+	assert(
+		invalidCheck.status === "FAIL" && invalidCheck.failed_assertions.length === 1,
+		"temp checks reject JSON without an explicit PASS or FAIL status",
 	);
 
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });

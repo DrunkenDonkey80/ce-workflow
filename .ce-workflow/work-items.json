@@ -6015,6 +6015,40 @@
       "type": "task",
       "updatedAt": "2026-08-20T11:42:53.540Z"
     },
+    "work-2.report-9efd8b88-f2ea-4cc0-bfe0-3a4461d3bfde": {
+      "createdAt": "2026-08-20T12:44:19.913Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Verifier triage became unrecoverable after accepted fixes had already been committed by the coded finish path: work_verifier_complete_fix rejected the clean tree with 'Accepted fix dirty scope must be exact; found none.' In addition, claimCompletedGroups re-claimed eight groups whose shared findings were already fully dispositioned/fixed, leaving empty claimed groups that required deterministic store reconciliation.\nExpected: The verifier flow should either complete accepted findings before coded finish commits, or safely reconcile an already-committed exact fix; fully resolved shared-finding groups must transition to triaged and must not be re-claimed with an empty inbox.\nImpact: Autonomous improvement completion can deadlock after valid fixes and tests, forcing internal store reconciliation instead of the constrained verifier tools.\nSuggested improvement: Have claimCompletedGroups call/update triage state for fully resolved shared groups before filtering; add a constrained complete-fix reconciliation path that verifies an ancestor commit and exact accepted paths when the working tree is clean.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/3ebdcb69-5c1e-481f-9c09-2715b93ad6d5",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 526,
+              "file": "01-verifier-reconciliation.log",
+              "sha256": "0b7f85b5b24d0ab1db2965a4ec90daadd59940dde5966083be57dd6e8a9ab698"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-20T12:44:19.909Z",
+          "workflowId": "workflow-mt1fzpf7-67ecou"
+        }
+      ],
+      "id": "work-2.report-9efd8b88-f2ea-4cc0-bfe0-3a4461d3bfde",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Verifier triage became unrecoverable after accepted fixes had already been committed by the coded finish path: work_verifier_compl",
+      "type": "task",
+      "updatedAt": "2026-08-20T12:44:19.913Z"
+    },
     "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851": {
       "createdAt": "2026-08-19T05:30:38.715Z",
       "dependencies": [],
@@ -8785,7 +8819,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T12:12:53.239Z"
+    "updatedAt": "2026-08-20T12:44:19.913Z"
   },
   "schemaVersion": 1
 }

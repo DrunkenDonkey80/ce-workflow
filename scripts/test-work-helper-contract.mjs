@@ -466,6 +466,40 @@ try {
 	);
 	const shardA = `${JSON.stringify(process.execPath)} -e "require('fs').mkdirSync('build-shard',{recursive:true});require('fs').appendFileSync('build-shard/order.txt','a\\n')"`;
 	const shardB = `${JSON.stringify(process.execPath)} -e "require('fs').appendFileSync('build-shard/order.txt','b\\n')"`;
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-4",
+			"--max-files",
+			"1",
+			"--message",
+			"reject ignored shards",
+			"--json",
+			"missing.json",
+			"--verify-shard",
+			JSON.stringify({ id: "a", command: shardA }),
+		),
+		/--verify-shard requires --verify/,
+		"shard declarations cannot be ignored by JSON-only verification",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-4",
+			"--max-files",
+			"1",
+			"--message",
+			"reject ambiguous expectation",
+			"--verify",
+			shardA,
+			"--verify-shard",
+			JSON.stringify({ id: "a", command: shardA }),
+			"--expect",
+			"ok",
+		),
+		/--expect cannot be combined with --verify-shard/,
+		"sharded verification rejects the scalar stdout expectation",
+	);
 	const shardedFinished = JSON.parse(
 		run(
 			"finish-task",

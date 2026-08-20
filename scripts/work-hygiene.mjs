@@ -4,7 +4,7 @@
 // decision. Pure + dir-aware so it is unit-testable against a temp git repo.
 
 import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const RUNTIME_PREFIXES = [
@@ -158,6 +158,7 @@ export function appendLocalExcludePatterns(dir, patterns, runGit) {
 	if (!fresh.length) return false;
 	const sep = existing && !existing.endsWith("\n") ? "\n" : "";
 	const block = `${sep}\n# ce-workflow: locally ignored build/cache artifacts\n${fresh.join("\n")}\n`;
+	mkdirSync(path.dirname(exclude), { recursive: true });
 	writeFileSync(exclude, existing + block, "utf8");
 	return true;
 }
