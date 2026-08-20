@@ -175,7 +175,7 @@ const TELEMETRY_DIR_NAME = "work-runs";
 const HISTORY_DIR_NAME = "history";
 const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
-const WORK_SHORTCUT_STATUS = "/wf Orchestrator · F8 microcompact · F9 Fleet";
+const WORK_SHORTCUT_STATUS = "/wo Orchestrator · F8 microcompact · F9 Fleet";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
 const DEFAULT_THINKING = "__default_thinking__";
@@ -734,6 +734,8 @@ const WORK_GOAL_STATE_ENTRY_TYPE = "work-goal-state";
 const WORK_GOAL_TOOL_NAMES = ["work_goal_complete", "work_goal_human_decision"];
 const ORCHESTRATOR_GOAL_CONTINUE_COMMAND = "__orchestrator-goal-continue";
 const ORCHESTRATOR_AUTOMATION_PREFIX = "ORCHESTRATOR_RUN_V1";
+const ORCHESTRATOR_INPUT_HELP =
+	"Try: orchestrator list roadmaps | roadmaps | status | resume [last|<id>] | compact | pause | stop | report [id] | scout status | 1";
 const WORK_GOAL_STATUS_KEY = "work-goal";
 const WORK_GOAL_PROGRESS_WIDGET_KEY = "work-goal-progress";
 const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
@@ -761,7 +763,7 @@ This is an ordinary user request, not a ce-workflow run.
 - Work directly in the current agent. Do not create, select, finish, close, or resume work items or autonomous goals.
 - Do not invoke work_* tools, work-* subagents, background verifiers, or ce-workflow helper commands.
 - For routine or mechanical changes, run only the smallest relevant check and do not launch an independent review.
-- ce-workflow orchestration is authorized only by a tagged prompt emitted from an explicit /wf action such as Small/Medium/Large task, Resume work, or Autonomous goal.`;
+- ce-workflow orchestration is authorized only by a tagged prompt emitted from an explicit /wo action or user-origin orchestrator command.`;
 
 const IMPROVEMENT_REPORT_TOOL_SCHEMA = {
 	type: "object",
@@ -2278,7 +2280,7 @@ function roadmapTerminology(value) {
 		.replace(
 			/(^|[\s"'`(])\/(work-[\w-]+)/gm,
 			(_match, prefix, command) =>
-				`${prefix}/wf → ${ORCHESTRATOR_ACTION_LABELS[command] ?? command}`,
+				`${prefix}/wo → ${ORCHESTRATOR_ACTION_LABELS[command] ?? command}`,
 		)
 		.replace(
 			/((?:--type[=\s]+|type\s*[:=]\s*["'`]?))epic\b/gi,
@@ -4185,7 +4187,7 @@ function researchHandoffPrompt(cwd, question) {
 				? `Challenge that draft with one parallel fresh-context advisor pass using ${advisors.join(", ")}. Give every advisor the same draft, evidence, and source URLs; assign distinct charters in order: evidence/assumption auditor, feasibility/operator critic, adversarial simplifier. Advisors are read-only, must not launch subagents, and unavailable advisors are recorded without retry.`
 				: `Challenge that draft with separate fresh-context single-agent calls, one at a time, using ${advisors.join(", ")}. Wait for each before starting the next. Give every advisor the same draft, evidence, and source URLs; assign distinct charters in order: evidence/assumption auditor, feasibility/operator critic, adversarial simplifier. Advisors are read-only, must not launch subagents, and unavailable advisors are recorded without retry.`
 			: "No advisors are configured; perform one concise evidence, feasibility, and simplicity self-critique instead.",
-		"Return a concise but complete answer with: direct answer; evidence and citations; materially different options and trade-offs; advisor disagreements/challenges; confidence and unknowns; and one refined prompt suitable for /wf → Brainstorm or /wf → Large task.",
+		"Return a concise but complete answer with: direct answer; evidence and citations; materially different options and trade-offs; advisor disagreements/challenges; confidence and unknowns; and one refined prompt suitable for /wo → Brainstorm or /wo → Large task.",
 		"Do not create project or research artifacts, work items, roadmaps, commits, or settings. Do not automatically start Brainstorm or Large task.",
 		ROLE_TIMEOUT_GUIDANCE,
 	].join("\n");
@@ -5414,7 +5416,7 @@ function renderRecommendedActions(actions) {
 	return [
 		"Recommended actions:",
 		...actions.map((action, index) => `${index + 1}. ${action}`),
-		"Type a number to run one.",
+		"Say “orchestrator 1” to run one.",
 	];
 }
 
@@ -10498,7 +10500,7 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 		});
 		ctx.ui.notify(
 			scheduled.status === "queued"
-				? `Analysis queued as ${scheduled.batch.id}. Inspect with /wf → Status; triage with /wf → Resume work.`
+				? `Analysis queued as ${scheduled.batch.id}. Inspect with /wo → Status; triage with /wo → Resume work.`
 				: `Analysis ${scheduled.status}: ${scheduled.reason ?? "not scheduled"}${scheduled.batch?.id ? ` (${scheduled.batch.id})` : ""}`,
 			scheduled.status === "queued" ? "info" : "warning",
 		);
@@ -11816,7 +11818,7 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 				reason: "review-analysis-required",
 				message: `${review.length} analysis review entr${review.length === 1 ? "y requires" : "ies require"} human resolution before work resumes.`,
 				review,
-				suggestedCommands: ["Open /wf → Review analysis"],
+				suggestedCommands: ["Open /wo → Review analysis"],
 				warnings: [],
 			};
 		let resolved = resolveResumeTarget(cwd, target);
@@ -17850,7 +17852,7 @@ function workGoalSummary(goal = activeWorkGoal) {
 		goal.decision
 			? `Human decision: ${formatWorkGoalDecision(goal.decision)}`
 			: "",
-		"Commands: autonomous goal pause|resume|clear|status|edit <objective>; autonomous goal --tokens 100k <objective>; /wf → Stop safely for a clean stop",
+		"Commands: autonomous goal pause|resume|clear|status|edit <objective>; autonomous goal --tokens 100k <objective>; /wo → Stop safely for a clean stop",
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -18371,6 +18373,19 @@ function workGoalTargetId(goal) {
 	return explicit ?? (isNativeWorkItemId(legacy) ? legacy : undefined);
 }
 
+function workGoalConfirmationLabel(goal, cwd) {
+	const target = workGoalTargetId(goal);
+	if (target && cwd)
+		try {
+			const item = readWorkItem(cwd, target);
+			return item ? `${target} — ${titleOf(item)}` : target;
+		} catch {
+			return target;
+		}
+	if (target) return target;
+	return truncate(String(goal?.objective ?? "autonomous goal").trim(), 120);
+}
+
 function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	const improveBlocker = workImproveCompletionBlocker(goal, cwd);
 	if (improveBlocker) return improveBlocker;
@@ -18484,8 +18499,8 @@ async function startWorkGoal(
 	}
 	if (activeWorkGoal && activeWorkGoal.status !== "complete") {
 		const replace = await ctx.ui.confirm(
-			"Replace autonomous goal?",
-			`Current: ${activeWorkGoal.objective}\n\nNew: ${text}`,
+			"Replace active goal?",
+			`Replace “${workGoalConfirmationLabel(activeWorkGoal, ctx.cwd)}” with “${workGoalConfirmationLabel({ objective: text }, ctx.cwd)}”?`,
 		);
 		if (!replace) return;
 		restoreWorkGoalThinking(pi, activeWorkGoal);
@@ -18708,10 +18723,10 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 	if (working) ctx.abort();
 	ctx.ui.notify(
 		working
-			? "/wf → Stop safely: current turn stopped; completed changes were preserved."
+			? "/wo → Stop safely: current turn stopped; completed changes were preserved."
 			: activeWorkGoal
-				? "/wf → Stop safely: work stopped. Open /wf → Resume work to continue."
-				: "/wf → Stop safely: nothing active to stop.",
+				? "/wo → Stop safely: work stopped. Open /wo → Resume work to continue."
+				: "/wo → Stop safely: nothing active to stop.",
 		working || activeWorkGoal ? "info" : "warning",
 	);
 }
@@ -19392,7 +19407,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 			readPrivateWorkflowActivationState(WORKFLOW_REPO_DIR)?.status,
 		);
 	} catch {
-		// Invalid activation state is reported during startup, not while rendering /wf.
+		// Invalid activation state is reported during startup, not while rendering /wo.
 	}
 	const items = [
 		{
@@ -19826,7 +19841,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("Resume stopped. Open /wf → Resume work to continue.", "info");
+		ctx.ui.notify("Resume stopped. Open /wo → Resume work to continue.", "info");
 		finishWarpWork(ctx, workWarpMode(goal.mode, goal), "stopped");
 		return;
 	}
@@ -21663,7 +21678,14 @@ async function handleWorkRoadmapCommand(
 				pi,
 			);
 		const state = buildWorkRoadmapState(ctx.cwd, text);
-		notify(ctx, renderWorkRoadmapText(state), state.ok ? "info" : "warning");
+		const message =
+			parsed.command === "list" && state.ok
+				? renderWorkRoadmapText({
+						...state,
+						roadmaps: state.roadmaps.filter((roadmap) => roadmap.status !== "closed"),
+					})
+				: renderWorkRoadmapText(state);
+		notify(ctx, message, state.ok ? "info" : "warning");
 		return stateTelemetry(state);
 	}
 	const list = buildWorkRoadmapState(ctx.cwd, "list");
@@ -22068,20 +22090,10 @@ async function handleWorkRoadmapCommand(
 	return stateTelemetry(state);
 }
 
-function parseNumberedWorkActionInput(text) {
-	const value = String(text ?? "").trim();
-	let match = value.match(/^(\d+)$/);
-	if (match) return { number: Number(match[1]), note: "" };
-	match =
-		value.match(/^(\d+)\s*[).,:-]\s*(.*)$/) ?? value.match(/^(\d+)\s+(.+)$/);
-	if (!match) return null;
-	return { number: Number(match[1]), note: String(match[2] ?? "").trim() };
-}
-
 function withSelectionNote(prompt, note) {
 	const text = String(note ?? "").trim();
 	return text
-		? `${prompt}\n\nHuman note from numbered selection:\n${truncate(text, 2_000)}`
+		? `${prompt}\n\nHuman note from orchestrator selection:\n${truncate(text, 2_000)}`
 		: prompt;
 }
 
@@ -22796,6 +22808,55 @@ function startExtensionScout(ctx, options = {}) {
 	return { ok: true, background: true };
 }
 
+function parseOrchestratorInput(event = {}) {
+	if (!["interactive", "user"].includes(event.source)) return;
+	const match = /^orchestrator(?:\s*[:,;-]\s*|\s+|$)([\s\S]*)$/i.exec(
+		String(event.text ?? "").trim(),
+	);
+	if (!match) return;
+	const body = String(match[1] ?? "")
+		.trim()
+		.replace(/[.!?]+$/, "")
+		.replace(/\s+/g, " ");
+	const lower = body.toLowerCase();
+	if (!body || ["menu", "open"].includes(lower))
+		return { command: "work-menu", args: "" };
+	if (["help", "?"].includes(lower)) return { help: ORCHESTRATOR_INPUT_HELP };
+	if (/^list roadmaps?$/.test(lower))
+		return { command: "work-roadmap", args: "list" };
+	if (/^roadmaps?$/.test(lower)) return { command: "work-roadmap", args: "" };
+	if (lower === "status") return { command: "work-status", args: "" };
+	if (["compact", "microcompact"].includes(lower))
+		return { command: "work-context", args: "compact" };
+	if (lower === "pause") return { command: "work-goal", args: "pause" };
+	if (lower === "stop") return { command: "work-stop", args: "" };
+	if (lower === "stop scout")
+		return { command: "work-extension-scout", args: "stop" };
+	const numbered = /^(\d+)$/.exec(body) ?? /^(\d+)\s*[).,:-]\s*(.+)$/.exec(body);
+	if (numbered) {
+		const number = Number(numbered[1]);
+		return Number.isSafeInteger(number) && number > 0
+			? { number, note: String(numbered[2] ?? "").trim() }
+			: {
+					error: "Orchestrator choices start at 1.",
+					help: ORCHESTRATOR_INPUT_HELP,
+				};
+	}
+	const routed = /^(resume|report|scout)(?:\s+(.+))?$/i.exec(body);
+	if (routed) {
+		const command = {
+			resume: "work-resume",
+			report: "work-report",
+			scout: "work-extension-scout",
+		}[routed[1].toLowerCase()];
+		return { command, args: routed[2] ?? "" };
+	}
+	return {
+		error: `Unknown orchestrator command: ${body}`,
+		help: ORCHESTRATOR_INPUT_HELP,
+	};
+}
+
 async function executeOrchestratorAction(
 	command,
 	args,
@@ -22863,7 +22924,7 @@ async function executeOrchestratorAction(
 		if (action) {
 			notify(
 				ctx,
-				"Use /wf to start, or type “scout status”, “scout review”, or “stop scout”.",
+				"Use /wo to start, or type “scout status”, “scout review”, or “stop scout”.",
 				"warning",
 			);
 			return { ok: false, error: "invalid extension scout action" };
@@ -23079,17 +23140,6 @@ async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
 	);
 }
 
-async function maybeRunNumberedWorkAction(event, ctx, pi) {
-	if (event.source === "extension") return false;
-	if (activeWorkGoal?.status === "needs_human") return false;
-	const parsed = parseNumberedWorkActionInput(event.text);
-	if (!parsed) return false;
-	const action = recentNumberedWorkAction(ctx.cwd, parsed.number);
-	if (!action) return false;
-	notify(ctx, `Running ${parsed.number}. ${action}`, "info");
-	return executeNumberedWorkAction(action, ctx, pi, parsed.note);
-}
-
 export {
 	buildWorkAddState,
 	buildWorkAutoState,
@@ -23158,6 +23208,8 @@ export {
 	directRoleHandoffParams,
 	executeNumberedWorkAction,
 	executeOrchestratorAction,
+	parseOrchestratorInput,
+	workGoalConfirmationLabel,
 	completeWorkflowOnce,
 	withCommandTelemetry,
 	parseWorkPromptMeta,
@@ -23320,7 +23372,7 @@ export default function workModelsExtension(pi) {
 			name: INITIATIVE_RECONCILE_TOOL,
 			label: "Convert roadmap to initiative",
 			description:
-				"Finish a /wf-selected roadmap conversion after source analysis and any necessary ask_user decisions. Computes hashes, previews, confirms once, and applies atomically.",
+				"Finish a /wo-selected roadmap conversion after source analysis and any necessary ask_user decisions. Computes hashes, previews, confirms once, and applies atomically.",
 			parameters: {
 				type: "object",
 				properties: {
@@ -23390,7 +23442,7 @@ export default function workModelsExtension(pi) {
 					pending.targetId !== String(params.targetId ?? "").trim()
 				)
 					throw new Error(
-						"No matching /wf initiative conversion is active. Select the roadmap and choose Convert to initiative first.",
+						"No matching /wo initiative conversion is active. Select the roadmap and choose Convert to initiative first.",
 					);
 				const proposal = initiativeProposalFromTool(cwd, params);
 				const preview = previewInitiativeReconciliation(cwd, proposal);
@@ -23572,7 +23624,7 @@ export default function workModelsExtension(pi) {
 				return {
 					block: true,
 					reason:
-						"Direct request mode does not authorize ce-workflow orchestration. Use /wf to start or resume managed work.",
+						"Direct request mode does not authorize ce-workflow orchestration. Use /wo or a user-origin orchestrator command to start or resume managed work.",
 				};
 		}
 	});
@@ -23741,42 +23793,33 @@ export default function workModelsExtension(pi) {
 		const sanitizedEvent = richTaskTransform
 			? { ...event, text: richTaskTransform.text, images: [] }
 			: event;
-		if (
-			/^(?:stop|cancel)(?:\s+(?:the\s+)?)?(?:extension\s+)?scout[.!]?$/i.test(
-				String(sanitizedEvent.text ?? "").trim(),
-			)
-		) {
-			stopExtensionScout(ctx);
-			return { action: "handled" };
-		}
-		if (
-			/^(?:extension\s+)?scout\s+status[.!]?$/i.test(
-				String(sanitizedEvent.text ?? "").trim(),
-			)
-		) {
-			await executeOrchestratorAction("work-extension-scout", "status", ctx, pi);
-			return { action: "handled" };
-		}
-		const scoutReview = String(sanitizedEvent.text ?? "")
-			.trim()
-			.match(/^(?:extension\s+)?scout\s+(re-?review|review)(?:\s+(.+?))?[.!]?$/i);
-		if (scoutReview) {
-			await executeOrchestratorAction(
-				"work-extension-scout",
-				`${scoutReview[1]}${scoutReview[2] ? ` ${scoutReview[2]}` : ""}`,
-				ctx,
-				pi,
-			);
-			return { action: "handled" };
-		}
-		if (
-			sanitizedEvent.source === "user" &&
-			String(sanitizedEvent.text ?? "")
-				.trim()
-				.toLowerCase() === "pause" &&
-			activeWorkGoal?.status === "active"
-		) {
-			await handleWorkGoalCommand("pause", activeWorkGoal.mode, pi, ctx);
+		const orchestratorInput = parseOrchestratorInput(sanitizedEvent);
+		if (orchestratorInput) {
+			if (Number.isInteger(orchestratorInput.number)) {
+				const action = recentNumberedWorkAction(ctx.cwd, orchestratorInput.number);
+				if (action) {
+					notify(ctx, `Running ${orchestratorInput.number}. ${action}`, "info");
+					await executeNumberedWorkAction(action, ctx, pi, orchestratorInput.note);
+				} else
+					notify(
+						ctx,
+						"That orchestrator choice is unavailable or expired.",
+						"warning",
+					);
+			} else if (orchestratorInput.error)
+				notify(
+					ctx,
+					`${orchestratorInput.error}\n${orchestratorInput.help}`,
+					"warning",
+				);
+			else if (orchestratorInput.help) notify(ctx, orchestratorInput.help, "info");
+			else
+				await executeOrchestratorAction(
+					orchestratorInput.command,
+					orchestratorInput.args,
+					ctx,
+					pi,
+				);
 			return { action: "handled" };
 		}
 		const pendingRuns = readPendingDirectEvents(ctx.cwd).filter(
@@ -23823,11 +23866,6 @@ export default function workModelsExtension(pi) {
 		if (automated) {
 			await executeOrchestratorAction(automated[1], automated[2] ?? "", ctx, pi);
 			return { action: "handled" };
-		}
-		const parsed = parseNumberedWorkActionInput(sanitizedEvent.text);
-		if (parsed && recentNumberedWorkAction(ctx.cwd, parsed.number)) {
-			if (await maybeRunNumberedWorkAction(sanitizedEvent, ctx, pi))
-				return { action: "handled" };
 		}
 		return richTaskTransform;
 	});
@@ -24457,8 +24495,8 @@ export default function workModelsExtension(pi) {
 		},
 	});
 
-	pi.registerCommand("wf", {
-		description: "Open workflow orchestrator",
+	pi.registerCommand("wo", {
+		description: "Open work orchestrator",
 		handler: async (_args, ctx) => {
 			await handleWorkMenuCommand(ctx, pi);
 		},

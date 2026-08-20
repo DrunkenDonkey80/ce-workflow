@@ -333,7 +333,7 @@ try {
 			}),
 		),
 		buildInitiativeProjection(dir),
-		"helper hierarchy must equal the shared /wf projection",
+		"helper hierarchy must equal the shared /wo projection",
 	);
 	const staleInitiative = loadStore(dir);
 	for (const child of Object.values(staleInitiative.items).filter(

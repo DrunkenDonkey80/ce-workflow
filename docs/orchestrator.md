@@ -4,14 +4,14 @@ The work orchestrator persists durable workflow state in `.ce-workflow/work-item
 
 ## Native loop
 
-1. Run `/wf → Status <roadmap-id>` or `/wf → Resume work <roadmap-id>`.
+1. Run `/wo → Status <roadmap-id>` or `/wo → Resume work <roadmap-id>`.
 2. Select one ready native work item.
 3. A planner creates executable work items and real blocker edges only.
 4. A worker implements one work item, records changed files and verification evidence, and leaves final closure to the finish gate.
 5. A reviewer reports PASS or FAIL. A fixer addresses only concrete findings.
-6. `/wf → Finish work item <work-item-id>` verifies, commits when configured, and closes only after durable evidence exists.
+6. `/wo → Finish work item <work-item-id>` verifies, commits when configured, and closes only after durable evidence exists.
 
-Use `/wf → Checkpoint and pause` to record the active item, git state, verification, failures, and next step. Resume from native state with `/wf → Resume work`; manual edits are classified before writers run.
+Use `/wo → Checkpoint and pause` to record the active item, git state, verification, failures, and next step. Resume from native state with `/wo → Resume work`; manual edits are classified before writers run.
 
 ## Boundaries
 
@@ -23,4 +23,4 @@ Use `/wf → Checkpoint and pause` to record the active item, git state, verific
 
 ## Legacy repositories
 
-A repository containing the retired tracker workspace must run `/wf → Migrate legacy workspace` before normal workflow commands. That one-way migration validates parity, retains an ignored backup, migrates role settings, and is the sole legacy-export boundary.
+A repository containing the retired tracker workspace must run `/wo → Migrate legacy workspace` before normal workflow commands. That one-way migration validates parity, retains an ignored backup, migrates role settings, and is the sole legacy-export boundary.

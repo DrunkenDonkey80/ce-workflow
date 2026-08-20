@@ -37,6 +37,59 @@ const mod = await import(
 assert.equal(mod.parseWorkGoalCommand("").kind, "status");
 assert.deepEqual(mod.parseWorkGoalCommand("pause"), { kind: "pause" });
 assert.deepEqual(mod.parseWorkGoalCommand("stop"), { kind: "stop" });
+assert.deepEqual(
+	mod.parseOrchestratorInput({
+		source: "interactive",
+		text: "Orchestrator, list roadmaps.",
+	}),
+	{ command: "work-roadmap", args: "list" },
+);
+assert.deepEqual(
+	mod.parseOrchestratorInput({
+		source: "user",
+		text: "orchestrator resume work-3",
+	}),
+	{ command: "work-resume", args: "work-3" },
+);
+assert.deepEqual(
+	mod.parseOrchestratorInput({
+		source: "interactive",
+		text: "orchestrator compact",
+	}),
+	{ command: "work-context", args: "compact" },
+);
+assert.deepEqual(
+	mod.parseOrchestratorInput({
+		source: "interactive",
+		text: "orchestrator 2, use the newer evidence",
+	}),
+	{ number: 2, note: "use the newer evidence" },
+);
+assert.equal(
+	mod.parseOrchestratorInput({
+		source: "extension",
+		text: "orchestrator resume work-3",
+	}),
+	undefined,
+	"extension-authored text cannot invoke user voice commands",
+);
+assert.match(
+	mod.parseOrchestratorInput({
+		source: "interactive",
+		text: "orchestrator invent something",
+	}).error,
+	/Unknown orchestrator command/,
+);
+assert.equal(
+	mod.workGoalConfirmationLabel({
+		objective: "Target work item or roadmap ID: work-3",
+	}),
+	"work-3",
+);
+assert.ok(
+	mod.workGoalConfirmationLabel({ objective: "x".repeat(500) }).length <= 121,
+	"goal replacement labels stay compact",
+);
 assert.deepEqual(mod.parseWorkGoalCommand("resume use repo A"), {
 	kind: "resume",
 	answer: "use repo A",
@@ -338,7 +391,7 @@ const projectGoalProgress = mod.renderProjectGoalProgress({
 });
 assert.equal(
 	projectGoalProgress,
-	"Roadmap [██████░░░░░░] 3/6 units (3 left · 2 unsliced) · 2m 3s · /wf Orchestrator · F8 microcompact · F9 Fleet",
+	"Roadmap [██████░░░░░░] 3/6 units (3 left · 2 unsliced) · 2m 3s · /wo Orchestrator · F8 microcompact · F9 Fleet",
 );
 assert.doesNotMatch(
 	projectGoalProgress,
@@ -435,10 +488,11 @@ assert.deepEqual(
 	"all user-facing work slash commands are removed",
 );
 assert.ok(commands["__orchestrator-goal-continue"]);
-assert.ok(commands.wf);
-assert.match(commands.wf.description, /orchestrator/i);
+assert.ok(commands.wo);
+assert.equal(commands.wf, undefined);
+assert.match(commands.wo.description, /orchestrator/i);
 assert.match(shortcuts.f7.description, /orchestrator/i);
-const openWorkflow = (ctx) => commands.wf.handler("", ctx);
+const openWorkflow = (ctx) => commands.wo.handler("", ctx);
 assert.match(shortcuts.f8.description, /microcompact/i);
 assert.match(shortcuts.f9.description, /fleet/i);
 let fleetNotice;
@@ -472,7 +526,7 @@ await shortcuts.f7.handler({
 		},
 	},
 });
-assert.equal(f7Title, "Orchestrator", "F7 opens the same /wf menu");
+assert.equal(f7Title, "Orchestrator", "F7 opens the same /wo menu");
 for (const action of [
 	"Roadmaps",
 	"Status",
@@ -511,7 +565,7 @@ for (const action of [
 assert(orchestratorLabels.every((label) => !label.includes("/work-")));
 assert(
 	orchestratorLabels.every((label) => !/\p{Extended_Pictographic}/u.test(label)),
-	"/wf labels avoid ambiguous-width icons",
+	"/wo labels avoid ambiguous-width icons",
 );
 assert(orchestratorLabels.some((label) => label.includes("Roadmaps")));
 assert(orchestratorLabels.some((label) => label.includes("Resume work")));
@@ -551,7 +605,7 @@ assert(
 	orchestratorRenders.every((render) =>
 		render.every((line) => !line.endsWith("\r")),
 	),
-	"/wf uses normal TUI rendering without overlay control-character padding",
+	"/wo uses normal TUI rendering without overlay control-character padding",
 );
 
 const editorMarker = "Idea or prompt:\n";
@@ -1395,7 +1449,7 @@ try {
 	assert.ok(
 		notices.some((notice) =>
 			String(notice.message).includes(
-				"work-orchestrator loaded · /wf Orchestrator · F8 microcompact · F9 Fleet",
+				"work-orchestrator loaded · /wo Orchestrator · F8 microcompact · F9 Fleet",
 			),
 		),
 	);
@@ -3071,12 +3125,18 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		{ source: "user", text: "pause" },
 		ctx,
 	);
-	assert.deepEqual(plainPauseResult, { action: "handled" });
+	assert.equal(plainPauseResult, undefined);
+	assert.match(statuses["work-goal"], /active/);
+	const prefixedPauseResult = await tempHooks.input?.(
+		{ source: "user", text: "orchestrator pause" },
+		ctx,
+	);
+	assert.deepEqual(prefixedPauseResult, { action: "handled" });
 	assert.equal(statuses["work-goal"], "paused");
 	assert.equal(
 		sent.length,
 		sentBeforePlainPause,
-		"plain pause does not queue another autonomous continuation",
+		"prefixed pause does not queue another autonomous continuation",
 	);
 
 	writeFileSync(
@@ -3094,14 +3154,32 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		{ source: "user", text: "1, but show current status" },
 		ctx,
 	);
-	assert.deepEqual(numberedResult, { action: "handled" });
+	assert.equal(numberedResult, undefined);
+	assert.equal(
+		notices
+			.slice(noticeCount)
+			.some((notice) => String(notice.message).includes("Running 1.")),
+		false,
+		"unprefixed numbered chat never invokes workflow actions",
+	);
+	assert.deepEqual(
+		await tempHooks.input?.(
+			{ source: "user", text: "orchestrator 1, show current status" },
+			ctx,
+		),
+		{ action: "handled" },
+	);
 	assert.ok(
 		notices
 			.slice(noticeCount)
 			.some((notice) =>
-				String(notice.message).includes("Running 1. /wf → Status"),
+				String(notice.message).includes("Running 1. /wo → Status"),
 			),
-		"numbered choice with trailing text runs the selected action",
+		"prefixed numbered choice runs the selected action",
+	);
+	assert.deepEqual(
+		await tempHooks.input?.({ source: "user", text: "orchestrator status" }, ctx),
+		{ action: "handled" },
 	);
 
 	await invoke("work-goal", "format decision notice", ctx);

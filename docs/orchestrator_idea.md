@@ -12,10 +12,10 @@ This package is a small Pi workflow layer for driving software work without repe
 
 ## Command shape
 
-`/wf → Small task`, `/wf → Medium task`, `/wf → Large task`, and `/wf → Auto-route task` create correctly scoped work. `/wf → Resume work` starts the extension-owned autonomous loop and advances one ready item at a time until the selected scope completes or needs a real decision. `/wf → Add work`, `/wf → Debug`, and `/wf → Checkpoint and pause` preserve the same graph through interruptions. `/wf → Status` and `/wf → Blocker report` are cheap deterministic projections; `F9 → Fleet` shows the main-chat orchestrator as the root above its direct, prefetch, and verifier agents.
+`/wo → Small task`, `/wo → Medium task`, `/wo → Large task`, and `/wo → Auto-route task` create correctly scoped work. `/wo → Resume work` starts the extension-owned autonomous loop and advances one ready item at a time until the selected scope completes or needs a real decision. `/wo → Add work`, `/wo → Debug`, and `/wo → Checkpoint and pause` preserve the same graph through interruptions. `/wo → Status` and `/wo → Blocker report` are cheap deterministic projections; `F9 → Fleet` shows the main-chat orchestrator as the root above its direct, prefetch, and verifier agents.
 
 Use role agents named `work-planner`, `work-worker`, `work-reviewer`, `work-fixer`, `work-debugger`, and `work-committer` only where their distinct judgment is needed. Routine bounded work stays in the current session.
 
 ## Migration boundary
 
-New repositories need no tracker installation. Existing legacy workspaces are explicitly migrated with `/wf → Migrate legacy workspace`; it is the only legacy boundary and normal native commands do not fall back to it.
+New repositories need no tracker installation. Existing legacy workspaces are explicitly migrated with `/wo → Migrate legacy workspace`; it is the only legacy boundary and normal native commands do not fall back to it.

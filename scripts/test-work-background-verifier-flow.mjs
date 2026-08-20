@@ -468,7 +468,7 @@ try {
 						(statSync(reportPath).mode & 0o077) === 0)) &&
 				readFileSync(reportPath, "utf8").includes("## Actionable items") &&
 				synthesizedText.includes("2 synthesized items") &&
-				synthesizedText.includes("/wf → Resume work") &&
+				synthesizedText.includes("/wo → Resume work") &&
 				!synthesizedText.includes("Feed this file") &&
 				synthesizedItems.some((item) => item.labels?.includes("wo:misc")) &&
 				synthesizedTasks.length === 2 &&

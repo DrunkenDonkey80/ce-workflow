@@ -263,7 +263,7 @@ try {
 	sent.length = 0;
 	await invoke("work-resume", "E-1", ctx);
 	assert.match(sent[0]?.message ?? "", /WO_DIRTY_RECOVERY_V1/);
-	assert.ok(sent[0]?.message.includes("/wf → Resume work E-1"));
+	assert.ok(sent[0]?.message.includes("/wo → Resume work E-1"));
 
 	process.stdout.write("dirty recovery: PASS\n");
 } finally {

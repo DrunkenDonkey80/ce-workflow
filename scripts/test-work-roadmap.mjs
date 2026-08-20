@@ -179,6 +179,24 @@ try {
 		list.ok && list.roadmaps.length === 4,
 		"lists all roadmap statuses",
 	);
+	const listNotices = [];
+	await handleWorkRoadmapCommand(
+		"list",
+		{
+			cwd: root,
+			mode: "tui",
+			ui: {
+				notify: (message, level) => listNotices.push({ message, level }),
+			},
+		},
+		{},
+	);
+	const openListText = listNotices.at(-1)?.message ?? "";
+	assert.match(openListText, /🗺️ Roadmaps:/);
+	assert.match(openListText, /E-1 \[🔵 in_progress\].*Current roadmap/);
+	assert.match(openListText, /E-2 \[🟢 open\].*Open roadmap/);
+	assert.match(openListText, /E-4 \[🟢 open\].*Brainstorm:/);
+	assert.doesNotMatch(openListText, /E-3|✅ closed|\x1b/);
 	const currentRoadmap = list.roadmaps.find((epic) => epic.id === "E-1");
 	console.assert(currentRoadmap?.current, "marks current roadmap");
 	assert.equal(
@@ -189,13 +207,13 @@ try {
 	assert.match(
 		roadmapPreviewText(currentRoadmap),
 		/Preserve visual parity/,
-		"/wf preview uses an existing stored roadmap description",
+		"/wo preview uses an existing stored roadmap description",
 	);
 	const openRoadmap = list.roadmaps.find((epic) => epic.id === "E-2");
 	assert.match(
 		roadmapPreviewText(openRoadmap),
 		/No saved summary yet/i,
-		"/wf preview reports a missing stored summary",
+		"/wo preview reports a missing stored summary",
 	);
 	const widgetUpdates = [];
 	const selectRoadmap = async (id, complete, menus = [], provider) => {
@@ -1261,7 +1279,7 @@ try {
 			(roadmap) => roadmap.id === "I-1",
 		).preparation,
 		preparationBeforeCancel,
-		"cancelled /wf reconciliation leaves preparation unchanged",
+		"cancelled /wo reconciliation leaves preparation unchanged",
 	);
 	const reconciled = await runPreview(true);
 	assert.equal(reconciled.state.action, "initiative-reconciled");
@@ -2298,7 +2316,7 @@ try {
 	assert.equal(
 		resumePrompts,
 		1,
-		"/wf resume starts work before closing the menu",
+		"/wo resume starts work before closing the menu",
 	);
 } finally {
 	for (const target of [root, initiativeRoot, projectionRoot, deletionRoot])

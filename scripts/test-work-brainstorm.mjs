@@ -291,7 +291,7 @@ try {
 			!privateHandoff.includes("clarification per turn") &&
 			privateHandoff.includes("Brainstorm saved: <absolute path>") &&
 			!privateHandoff.includes(`Run ${"ce-"}brainstorm`),
-		"/wf brainstorm loads only the verified private playbook and preserves continuous clarification and saved-artifact contracts",
+		"/wo brainstorm loads only the verified private playbook and preserves continuous clarification and saved-artifact contracts",
 	);
 	const wideHandoff = brainstormHandoffPrompt(standalone, cwd, "wide");
 	assert(

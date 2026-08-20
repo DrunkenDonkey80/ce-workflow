@@ -4472,6 +4472,44 @@
       "type": "task",
       "updatedAt": "2026-08-08T17:50:32.619Z"
     },
+    "work-2.report-2cdd87c5-81e8-444e-8075-85ef78e8d3aa": {
+      "createdAt": "2026-08-20T06:01:26.367Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task mangled a quoted `cmd.exe /d /s /c \"npm --prefix server test -- --run test/retention.test.ts ...\"` verification command; durable output became `'etention.test.ts' is not recognized`, while the exact command had passed when invoked directly by the worker.\nExpected: The finalizer should pass a supplied verification command to the selected shell without re-tokenizing or corrupting nested Windows quoting, or provide a structured argv form for cross-platform commands.\nImpact: A passing native server gate is recorded as FAIL, adding false durable evidence and forcing use of an implementation-specific direct Vitest path instead of the task's exact npm command.\nSuggested improvement: Execute verification through a cross-platform spawn API with explicit shell/argv handling and add regression coverage for cmd.exe /c commands containing quoted npm arguments.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Preserve quoted Windows verification commands"
+      },
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e67ba32e-8981-4beb-8422-3316abd33af8",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 177615,
+              "file": "01-work-items.json",
+              "sha256": "d48ea3dfdb22178c09e975e1de4fb6c3f6acb611b5e87afd58b0523a79bc1621"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-20T06:01:26.362Z",
+          "workflowId": "01a01dae-0aff-7c74-a353-5ac88a0c9b39"
+        }
+      ],
+      "id": "work-2.report-2cdd87c5-81e8-444e-8075-85ef78e8d3aa",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: finish-task mangled a quoted `cmd.exe /d /s /c \"npm --prefix server test -- --run test/retention.test.ts ...\"` verification comman",
+      "type": "task",
+      "updatedAt": "2026-08-20T06:01:26.367Z"
+    },
     "work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8": {
       "createdAt": "2026-08-08T17:28:28.534Z",
       "dependencies": [
@@ -5093,6 +5131,44 @@
       "title": "Self-improvement report: The mandatory exact `work-worker` launch for LPG work-9.1 started, then remained activity-silent and exposed `No API key found for",
       "type": "task",
       "updatedAt": "2026-08-04T05:54:06.748Z"
+    },
+    "work-2.report-5e0dec37-d699-41a6-8358-a85df1b113a4": {
+      "createdAt": "2026-08-20T05:46:51.737Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task verification could not execute the repository's checked-in Windows Gradle wrapper when given `gradlew.bat ...`; it recorded `bash: line 1: gradlew.bat: command not found`, even though the same wrapper command was the native focused gate and had passed through the worker environment.\nExpected: The coded finalizer should resolve a checked-in repository wrapper (`gradlew.bat`/`gradlew`) from the project root, or clearly normalize/document it as `./gradlew.bat`, so a valid native verification command does not fail due only to shell PATH semantics.\nImpact: A verified task remains open and emits a misleading failed verification note, forcing a manual retry with shell-specific syntax and adding noise to durable work evidence.\nSuggested improvement: Normalize a leading bare Gradle wrapper token to the project-local executable before invoking the verification shell.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Resolve checked-in Windows Gradle wrappers"
+      },
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/4237549c-7e0c-4cca-8c13-85a50b85bff7",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 171794,
+              "file": "01-work-items.json",
+              "sha256": "0813ff2b5cb5da5af15a9a82ea153be9003a7e369703fe19ad64e69765138c71"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-20T05:46:51.733Z",
+          "workflowId": "01a01dae-0aff-7c74-a353-5ac88a0c9b39"
+        }
+      ],
+      "id": "work-2.report-5e0dec37-d699-41a6-8358-a85df1b113a4",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: finish-task verification could not execute the repository's checked-in Windows Gradle wrapper when given `gradlew.bat ...`; it rec",
+      "type": "task",
+      "updatedAt": "2026-08-20T05:46:51.737Z"
     },
     "work-2.report-60ff67ad-d2d8-46de-a7a4-b5b4d918e984": {
       "createdAt": "2026-08-07T06:29:07.173Z",
@@ -5769,6 +5845,40 @@
       "type": "task",
       "updatedAt": "2026-08-09T08:47:52.928Z"
     },
+    "work-2.report-9ed01f48-b0f9-48ff-9310-ac5b50701fb3": {
+      "createdAt": "2026-08-20T08:20:26.937Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: `finish-task work-1.41 --max-files 4` inserted a tracked `.gitignore` block for `__pycache__/` and then rejected its own mutation as a fifth implementation file (`scope exceeds 4 implementation files`).\nExpected: The coded finalizer should avoid mutating tracked scope for transient Python caches, or exclude its own deterministic ignore-file mutation from implementation-file scope validation; a four-file task should reach the review gate without self-created dirt.\nImpact: The autonomous finish gate blocked valid work, required manual `.gitignore` cleanup, and could repeatedly fail or accidentally include unrelated workflow-generated changes in a product commit.\nSuggested improvement: Perform generated/cache ignore handling before the clean baseline or ignore only in local exclude files, and never count finalizer-created ignore entries against `--max-files`.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/3f33a4f4-d8e4-41a4-a30a-96ccaa3245f6",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 726193,
+              "file": "01-2026-08-20T07-41-38-565Z_01a01e1e-5185-76cd-8686-f64ebe0bcfc4.jsonl",
+              "sha256": "57bfcbe572db62aec8012787959492eb40bf77f3c2cf2239e02b93a4bce9c257"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-20T08:20:26.931Z",
+          "workflowId": "01a01e1e-5185-76cd-8686-f64ebe0bcfc4"
+        }
+      ],
+      "id": "work-2.report-9ed01f48-b0f9-48ff-9310-ac5b50701fb3",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: `finish-task work-1.41 --max-files 4` inserted a tracked `.gitignore` block for `__pycache__/` and then rejected its own mutation ",
+      "type": "task",
+      "updatedAt": "2026-08-20T08:20:26.937Z"
+    },
     "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851": {
       "createdAt": "2026-08-19T05:30:38.715Z",
       "dependencies": [],
@@ -5911,6 +6021,49 @@
       "title": "Self-improvement report: On every agent_settled hook, reconcileBackgroundVerifierRuns calls reconcileVerifierRuns. For job-08176e4795dcd554bb3a0277, all op",
       "type": "task",
       "updatedAt": "2026-08-17T18:02:12.406Z"
+    },
+    "work-2.report-aefe20c8-eff4-48e2-86c8-ede1795db7c5": {
+      "createdAt": "2026-08-20T06:02:05.587Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Calling work_report_improvement from the producer project unexpectedly edited the tracked target file `.gitignore`, appending a global `node_modules/` rule, even though improvement reporting is documented as evidence capture that does not change the producer project.\nExpected: Improvement reporting should write only ignored local report artifacts/native workflow state and must not mutate tracked producer-project source/configuration files.\nImpact: The unrelated `.gitignore` change expanded implementation scope, caused finish-task to reject the task's five-file cap, and required manual cleanup before finalization.\nSuggested improvement: Create any report artifact directory under an already-ignored workflow path without editing the producer repository's tracked ignore file; add a regression asserting git diff paths are unchanged except native work state.",
+      "displayMetadata": {
+        "schemaVersion": 1,
+        "title": "Avoid tracked file changes during improvement reporting"
+      },
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/48bba75b-33f2-40a1-b6d7-5b61316cb651",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 178355,
+              "file": "01-work-items.json",
+              "sha256": "7431c48c2e94336669b333eb16b91d5118e794909f711974554330617aae89c6"
+            },
+            {
+              "bytes": 215,
+              "file": "02-.gitignore",
+              "sha256": "ba8ca26aee9dc325ba2b8a417bd6e534f41c0753016a31f7ac3eecc29cf36f61"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-20T06:02:05.581Z",
+          "workflowId": "01a01dae-0aff-7c74-a353-5ac88a0c9b39"
+        }
+      ],
+      "id": "work-2.report-aefe20c8-eff4-48e2-86c8-ede1795db7c5",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Calling work_report_improvement from the producer project unexpectedly edited the tracked target file `.gitignore`, appending a gl",
+      "type": "task",
+      "updatedAt": "2026-08-20T06:02:05.587Z"
     },
     "work-2.report-b085e2c6-43c6-4e12-b79e-f1eb0da5c571": {
       "createdAt": "2026-08-18T21:22:54.483Z",
@@ -8492,7 +8645,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-19T21:41:02.723Z"
+    "updatedAt": "2026-08-20T10:37:47.217Z"
   },
   "schemaVersion": 1
 }

@@ -744,7 +744,7 @@ try {
 		});
 		assert(
 			statusNotices[0]?.includes("blockers: 1") &&
-				statusNotices[0].includes("Next: Run /wf → Blocker report BLOCK-1"),
+				statusNotices[0].includes("Next: Run /wo → Blocker report BLOCK-1"),
 			"work-status reports blocked WorkItems instead of only active/ready state",
 		);
 		fixture.reset("active");

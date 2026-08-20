@@ -1058,7 +1058,7 @@ try {
 			notifications.some((message) =>
 				message.includes("pi.dev returned HTTP 503"),
 			),
-		"enabled /wf scout action is exposed and dispatches through the background scout flow",
+		"enabled /wo scout action is exposed and dispatches through the background scout flow",
 	);
 	assert(
 		notifications.some((message) =>

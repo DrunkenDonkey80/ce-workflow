@@ -381,10 +381,11 @@ check(
 	].every((status) => verifierStore.includes(`"${status}"`)),
 );
 check(
-	"orchestrator has /wf plus F7/F8/F9 and no legacy work slash commands",
+	"orchestrator has /wo plus F7/F8/F9 and no legacy work slash commands",
 	!existsSync(path.join(root, "prompts")) &&
 		!models.match(/registerCommand\(["'`]work-/) &&
-		models.includes('registerCommand("wf"') &&
+		models.includes('registerCommand("wo"') &&
+		!models.includes('registerCommand("wf"') &&
 		["f7", "f8", "f9"].every((key) =>
 			models.includes(`registerShortcut?.("${key}"`),
 		) &&

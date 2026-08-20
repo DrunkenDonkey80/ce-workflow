@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-17",
+  "capturedAt": "2026-08-20",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
@@ -67,38 +67,31 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.50.0",
-      "reviewedAt": "2026-08-17",
-      "reviewedVersion": "0.50.0",
+      "version": "0.52.0",
+      "reviewedAt": "2026-08-20",
+      "reviewedVersion": "0.52.0",
       "decisions": [
         {
-          "version": "0.50.0",
-          "title": "Managed-run control, recovery, and supervisor safety release",
+          "version": "0.52.0",
+          "title": "Async workflow reliability and control release",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 (package rollback/baseline-only record). Bottom line: adopt the already-installed 0.50.0 release with no ce-workflow runtime shim. Verified project fit: ce-workflow launches exact async role runs through the shared RPC wrapper, persists run IDs, and reconciles terminal status; its child roles already use contact_supervisor and durable work-item fallback rather than the removed generic-intercom fallback. Verified upstream evidence: the 0.49.0→0.50.0 changelog/diff adds retained-run resumability checks, safer follow-up/steer behavior, async snapshot/status improvements, child-safe supervisor handling, live-control/watchdog fixes, and external-run APIs. Benefit: safer recovery and control of the same managed runs ce-workflow already uses. Cost/risk: ordinary upstream regression exposure; adding local external-run/Fleet integration would duplicate ce-workflow’s own Fleet and is therefore excluded. Confidence: high. Recommendation: Adopt now and record package-owned verification; no source shim.",
-          "verification": "Installed pi-subagents package manifest is 0.50.0; node scripts/test-work-start-finish.mjs passed against ce-workflow's shared async RPC and reconciliation path"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 (package rollback and one baseline record). Bottom line: adopt the already-installed 0.52.0 release with no ce-workflow runtime shim. Verified project fit: ce-workflow already uses supported async workflowScript launches, pi-subagents steering RPC, durable status files, contact_supervisor, and session-scoped transcript artifacts; repository searches found no removed chain/checkpoint/prompts.render API usage. Verified upstream evidence: the 0.50.0→0.52.0 artifact and installed CHANGELOG add stable-key runs.steer, safer Windows status persistence, correct paused-child/supervisor reconciliation, idle-parent attention wakes, model/context fixes, and bounded host inspection. The new inspection command is RPC-only, while ce-workflow Fleet is a TUI reading trusted local artifacts, so replacing Fleet would not fit. Benefit: safer recovery and control on ce-workflow’s current paths. Cost/risk: ordinary upstream regression exposure; no source change beyond the catch-up ledger. Confidence: high. Recommendation: Adopt now, verify the existing Fleet/subagent integration, and record 0.52.0.",
+          "verification": "Installed pi-subagents package manifest is 0.52.0; node scripts/test-work-fleet.mjs passed"
         },
         {
-          "version": "0.50.0",
-          "title": "Register ce-workflow state as package external runs",
+          "version": "0.52.0",
+          "title": "Replace TUI Fleet transcript reads with host inspection RPC",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not mirror ce-workflow work items, verifier lanes, or extension jobs into pi-subagents external-run state. Verified project fit: `extensions/work-fleet.js` already groups native work items with exact managed child runs, while `extensions/work-models.js` owns durable leases and terminal reconciliation. Upstream evidence: 0.50.0 exports external-run registration for work owned outside pi-subagents and displays it in package Fleet. Benefit: avoids duplicate rows, status translation, and two lifecycle owners. Cost/risk: users keep two intentionally different Fleet views. Confidence: high. Recommendation: retain ce-workflow Fleet as the domain view and use package Fleet for package-owned runs."
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: keep ce-workflow Fleet's bounded trusted-file transcript reader. Verified project fit: `extensions/work-fleet.js` renders live transcript events inside Pi's TUI and already validates artifact roots. Verified upstream evidence: `/subagents-inspect-rpc` emits its bounded reply only on RPC surfaces and explicitly directs interactive TUI users to package-native status/transcript views. Benefit: avoids adding an RPC host bridge that cannot serve the current TUI surface. Cost/risk: the small local transcript adapter remains. Confidence: high. Recommendation: do not replace Fleet with this RPC-only protocol."
         },
         {
-          "version": "0.50.0",
-          "title": "Replace native run reconciliation with async snapshots or retained-run follow-ups",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: retain ce-workflow's status-file reconciliation and exact RPC spawn contract. Verified project fit: pending runs survive restart through `.pi/work-runs` events, action leases, and terminal `status.json` evidence; follow-up work is selected from the native work-item store rather than an old chat session. Upstream evidence: 0.50.0 adds async snapshots and validates whether retained child sessions are resumable before follow-up. Benefit: preserves deterministic durable ownership while inheriting safer package controls. Cost/risk: one small reconciliation adapter remains. Confidence: high. Recommendation: do not substitute package session resumability for native work-item resumability."
-        },
-        {
-          "version": "0.50.0",
-          "title": "Package-owned schemas, guides, UI, watchdog, and model/runtime fixes",
+          "version": "0.52.0",
+          "title": "Package-owned runner, model, storage, UI, and lifecycle fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit 0.50.0's control-channel, supervisor, skill, model-provider, Fleet, guide, watchdog, and project-pane fixes without local adapters. Verified project fit: ce-workflow consumes the public subagent tool/RPC boundary and does not duplicate these package internals. Upstream evidence: the reviewed changelog, public exports, tool schema, skills, and diff place these fixes inside pi-subagents. Benefit: keeps ce-workflow smaller and avoids shadow implementations. Cost/risk: normal package regression exposure. Confidence: high. Recommendation: no local action."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit stable-key workflow steering, external-job providers, status-write resilience, attention wakes, model resolution, storage cleanup, Fleet, and supervisor lifecycle fixes without local adapters. Verified project fit: ce-workflow consumes public workflowScript, RPC steering, status, and artifact boundaries and does not use the removed legacy chain or checkpoint surfaces. Verified upstream evidence: the reviewed 0.51.0 and 0.52.0 changelogs, public docs, tool schema, and captured diff place these behaviors inside pi-subagents. Benefit: keeps ce-workflow smaller while receiving upstream reliability fixes. Cost/risk: normal package regression exposure. Confidence: high. Recommendation: inherit with no local source change."
         }
       ]
     },
@@ -126,67 +119,53 @@
     },
     {
       "name": "pi-intercom",
-      "version": "0.10.1",
-      "reviewedAt": "2026-08-14",
-      "reviewedVersion": "0.10.1",
+      "version": "0.11.0",
+      "reviewedAt": "2026-08-20",
+      "reviewedVersion": "0.11.0",
       "decisions": [
         {
-          "version": "0.10.1",
-          "title": "Installed broker reliability release",
+          "version": "0.11.0",
+          "title": "Exact delivery and durable supervisor coordination release",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1—revert one catch-up ledger entry or package version. Bottom line: the installed package is already 0.10.1 while the baseline still recorded 0.10.0; record a baseline-only adoption with no production or policy change. Project fit: `package.json` keeps intercom optional and the existing explicit pending/reply policy remains compatible. Upstream evidence: the installed package is 0.10.1 and the captured artifact adds flat-store `tsx` resolution with package regression coverage. Benefit: avoids a false repeat catch-up and inherits safer broker startup. Cost/risk: low; no ce-workflow runtime surface changes. Confidence: high. Recommendation: adopt as baseline bookkeeping only.",
-          "verification": "Installed pi-intercom is 0.10.1; package-owned broker resolution and startup diagnostic tests are present in the reviewed release artifact"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 (package rollback and one baseline record). Bottom line: adopt the already-installed 0.11.0 release with no ce-workflow runtime shim. Verified project fit: ce-workflow’s autonomous-role policy already requires exact session IDs for trust-sensitive replies, checks pending asks plus run/work-item state, treats timeout as non-cancellation, and uses explicit supersedes/retryOf semantics. Verified upstream evidence: the 0.10.1→0.11.0 artifact and installed public schema add endpoint epochs and exact-send negotiation, durable pending-ask records, idempotent delivery replay, structured delivery outcomes, tmux-pane presence, and broker-owned cancellation/supersession diagnostics. The public intercom tool performs exact target resolution internally, so ce-workflow needs no new targeting adapter. Benefit: prevents stale-name/rebound delivery and makes delayed supervisor coordination safer. Cost/risk: ordinary upstream regression exposure; no source change beyond the catch-up ledger. Confidence: high. Recommendation: Adopt now, verify ce-workflow’s existing supervisor policy, and record 0.11.0.",
+          "verification": "Installed pi-intercom package manifest is 0.11.0; focused buildWorkGoalSystemPrompt supervisor-policy assertions passed"
         },
         {
-          "version": "0.10.1",
-          "title": "Attachment-based supervisor reply convention",
+          "version": "0.11.0",
+          "title": "Automated intercom retries or a local exact-send wrapper",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1. Bottom line: do not add an attachment-based supervisor-reply convention. Verified project fit: ce-workflow has no attachment-bearing intercom call site and uses durable work items rather than chat attachments for coordination evidence. Upstream evidence: 0.10.1 fixes attachment forwarding in reply while the public attachment schema already existed. Benefit: preserves concise, durable handoffs. Cost/risk: rich replies would duplicate evidence into disposable context. Confidence: high. Recommendation: reject local adoption and continue using paths plus concise text."
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not add an automatic retry or endpoint-epoch wrapper around the public intercom tool. Verified project fit: ce-workflow coordinates through agent-visible tool calls and already requires a new authored retry, exact pending-state checks, and explicit cancellation/supersession semantics. Verified upstream evidence: 0.11.0 resolves exact endpoints inside the public tool client, returns outcomeKnown/retryable delivery details, and deliberately never retries authored messages automatically. Benefit: avoids duplicate supervisor instructions and a second delivery owner. Cost/risk: agents must continue making explicit retry decisions. Confidence: high. Recommendation: retain the current policy and consume package-owned exact delivery."
         },
         {
-          "version": "0.10.1",
-          "title": "Broker startup stderr diagnostics",
+          "version": "0.11.0",
+          "title": "Broker persistence, receipts, presence, and UI details",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit bounded startup stderr diagnostics and flat package-store resolution without a ce-workflow wrapper. Verified project fit: ce-workflow only declares the optional peer and never launches the broker. Upstream evidence: broker/spawn.ts owns the resolution and stderr capture with package tests. Benefit: better package startup errors. Cost/risk: local duplication would create an unsupported second broker path. Confidence: high. Recommendation: no local action."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit pending-ask persistence, delivery replay records, endpoint epochs, tmux-pane presence, and receipt rendering without ce-workflow adapters. Verified project fit: ce-workflow declares intercom as an optional peer and owns policy text, not broker storage, routing, presence, or tool rendering. Verified upstream evidence: the captured diff and installed public implementation place these behaviors in pi-intercom's broker, client, types, and tool surface. Benefit: safer coordination without duplicate infrastructure. Cost/risk: normal package regression exposure. Confidence: high. Recommendation: no local action."
         }
       ]
     },
     {
       "name": "@narumitw/pi-goal",
-      "version": "0.51.0",
-      "reviewedAt": "2026-08-14",
-      "reviewedVersion": "0.51.0",
+      "version": "0.52.1",
+      "reviewedAt": "2026-08-20",
+      "reviewedVersion": "0.52.1",
       "decisions": [
         {
-          "version": "0.51.0",
-          "title": "Dynamic Goal-tool ownership",
-          "pov": "Trial",
-          "status": "skipped",
-          "rationale": "Grade: Trial. Reversibility: Tier 2—highly reversible when isolated behind `syncWorkGoalTools()` and focused tests. Bottom line: trial only if restrictive active-tool policies are observed; do not copy upstream’s default change wholesale. Project fit: `extensions/work-models.js` unconditionally adds/removes local goal tools and active-only visibility is covered by focused tests. Upstream evidence: pi-goal 0.51.0 tracks only tools it hid, waits for idle before schema changes, and rolls back failed activation; the release changes the default to `after-first-goal` and documents restrictive-policy coexistence. Benefit: avoid overriding another extension’s restrictive allowlist or changing tools mid-turn. Cost/risk: local tools are intentionally visible only while active; ownership snapshots and busy-state tests add lifecycle complexity. Confidence: medium. Recommendation: reproduce a conflicting active-tool policy first; then trial ownership tracking without changing current active-only behavior."
+          "version": "0.52.1",
+          "title": "Removal of the experimental ordered-goal queue",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit pi-goal's removal of its experimental ordered-goal queue without ce-workflow migration code. Verified project fit: repository-wide searches find no pi-goal command, queue setting, event-channel, or tool call site; ce-workflow sequencing is owned by native work items, action leases, and one autonomous objective. Verified upstream evidence: the 0.51.0→0.52.1 artifact and installed README remove queue commands/state/UI, retain inert legacy-state warnings, and keep the package's single-goal tools and managed-run protocol. Benefit: no local compatibility burden and no duplicate queue owner. Cost/risk: none beyond normal package regression exposure for users who independently load pi-goal. Confidence: high. Recommendation: record no local action."
         },
         {
-          "version": "0.51.0",
-          "title": "General external wait state and tool",
-          "pov": "Hold",
-          "status": "skipped",
-          "rationale": "Grade: Hold. Reversibility: Tier 2—a new persisted status, timer, lifecycle hooks, and tool schema would touch the autonomous engine. Bottom line: the pattern is useful, but upstream wake semantics are too broad for ce-workflow today. Project fit: ce-workflow already has a narrow persisted timer for provider limits, while external human dependencies deliberately use ask_user and durable decisions. Upstream evidence: pi-goal 0.51.0 validates and terminates `goal_wait`, persists and restores deadlines, and explicitly treats any non-Goal extension message as a wake because sender identity is unavailable. Benefit: could prevent wasteful continuations while a verifier or asynchronous monitor is pending. Cost/risk: ce-workflow emits substantial extension-driven automation and broad wake semantics can cause premature resumes. Confidence: high. Recommendation: hold until a named monitor can emit an authenticated/owned completion event; reuse the usage-limit timer pattern rather than porting `goal_wait` directly."
-        },
-        {
-          "version": "0.51.0",
-          "title": "Managed-run RPC bridge",
-          "pov": "Hold",
-          "status": "skipped",
-          "rationale": "Grade: Hold. Reversibility: Tier 2—adding public event channels creates a compatibility contract. Bottom line: no local caller requires this protocol, and it would create a second owner for the same lifecycle. Project fit: ce-workflow persists its own goal state and the settled lifecycle already drives leases plus goal finalization. Upstream evidence: pi-goal exposes default-off start/cancel/state events and documents them as trusted-extension cooperation rather than a security boundary. Benefit: a future sibling extension could start/cancel one isolated goal. Cost/risk: duplicate goal ownership, session-local run identities, and a public API to maintain. Confidence: high. Recommendation: retain local lease orchestration; revisit only when a concrete sibling extension needs a supported cross-extension run API."
-        },
-        {
-          "version": "0.51.0",
+          "version": "0.52.1",
           "title": "Replace ce-workflow autonomous goals with pi-goal",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 3 after state and command migration. Bottom line: pi-goal is not a substitute for ce-workflow work-item, lease, compaction, and completion-gate behavior. Verified project fit: local completion validates verifier, catch-up, and project state and exposes distinct work_goal tools. Upstream evidence: 0.51.0 adds generic waiting, visibility, and prompt ownership to the generic /goal extension, not ce-workflow integration. Benefit: none beyond deleting code while losing required behavior. Cost/risk: high migration and correctness risk. Confidence: high. Recommendation: reject replacement and borrow only proven narrow patterns."
+          "rationale": "Grade: Reject. Reversibility: Tier 3 after state and command migration. Bottom line: pi-goal 0.52.1 is a single-objective loop, not a substitute for ce-workflow's work-item, lease, verifier, compaction, catch-up, and completion-gate behavior. Verified project fit: `extensions/work-models.js` validates native target state before completion and exposes distinct `work_goal_complete` and `work_goal_human_decision` tools; package.json does not depend on pi-goal. Verified upstream evidence: the installed 0.52.1 manifest and README expose generic `/goal`, `goal_complete`, `goal_blocked`, `goal_wait`, and a default-off session-local managed-run protocol. Benefit: avoids deleting required domain gates for superficial code reduction. Cost/risk: the existing purpose-built autonomous engine remains. Confidence: high. Recommendation: do not replace ce-workflow goals with pi-goal."
         }
       ]
     },
