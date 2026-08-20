@@ -378,6 +378,17 @@ const childrenByScenario = {
 				'wo:execution-agent\nFiles changed: docs/auth.md.\nwo:verify-check PASS\nwo:review FAIL - source comment date is missing\nwo:fix PASS - comment fixed\nwo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added source date","evidence":"documentation check passed"}]}',
 		},
 	],
+	inProgressProductionMechanicalClaim: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - permission guard is missing\nwo:fix PASS - guard added\nwo:mechanical-fix PASS {"dispositions":[{"finding":"permission guard is missing","fix":"guard added","evidence":"focused test passed"}]}',
+		},
+	],
 	inProgressReviewCap: [
 		{
 			id: "AUTH-1",
@@ -913,6 +924,14 @@ try {
 			state.selectedWorkItem.mechanicalFixAccepted &&
 			!state.handoffPrompt,
 		"verified mechanical fixes finish after one review without a redundant re-review",
+	);
+
+	setScenario("inProgressProductionMechanicalClaim");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-review" &&
+			!state.selectedWorkItem.mechanicalFixAccepted,
+		"production fixes cannot self-classify as mechanical to bypass re-review",
 	);
 
 	setScenario("inProgressReviewCap");

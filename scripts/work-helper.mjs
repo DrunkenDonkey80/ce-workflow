@@ -359,7 +359,7 @@ function dispositionCovers(target, disposition) {
 	);
 }
 
-function reviewDispositionSatisfied(task) {
+function reviewDispositionSatisfied(task, implementationFiles) {
 	const notes = notesOf(task);
 	const scopeIndex =
 		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
@@ -372,7 +372,8 @@ function reviewDispositionSatisfied(task) {
 	).length;
 	const target = targetedReviewFindings(task);
 	return failures === 1
-		? dispositionCovers(target, dispositionNote(task, "mechanical-fix"))
+		? !hasProductionDiff(implementationFiles) &&
+				dispositionCovers(target, dispositionNote(task, "mechanical-fix"))
 		: failures >= 2 &&
 				dispositionCovers(target, dispositionNote(task, "residual-fix"));
 }
@@ -403,8 +404,10 @@ function formatPendingFiles(root = cwd) {
 	const formatter =
 		process.env.WORK_ORCH_FORMATTER_BIN ||
 		packageFormatter ||
-		path.join(root, "node_modules", ".bin", "biome");
-	if (!existsSync(formatter)) return [];
+		(process.platform === "win32"
+			? undefined
+			: path.join(root, "node_modules", ".bin", "biome"));
+	if (!formatter || !existsSync(formatter)) return [];
 	run(
 		packageFormatter === formatter ? process.execPath : formatter,
 		[
@@ -773,10 +776,9 @@ async function finishTaskUnlocked() {
 		)
 	)
 		reviewReasons.push("sensitive task contract");
-	const numstat = git(
-		["diff", "--numstat", "--", ...implementationFiles],
-		executionRoot,
-	);
+	const numstat = implementationFiles.length
+		? git(["diff", "--numstat", "--", ...implementationFiles], executionRoot)
+		: "";
 	let changedLines = numstat
 		.split(/\r?\n/)
 		.filter(Boolean)
@@ -789,11 +791,14 @@ async function finishTaskUnlocked() {
 			.split(/\r?\n/)
 			.filter(Boolean),
 	);
-	for (const file of implementationFiles.filter((item) => untracked.has(item)))
-		if (existsSync(path.join(executionRoot, file)))
-			changedLines += readFileSync(path.join(executionRoot, file), "utf8").split(
-				/\r?\n/,
-			).length;
+	for (const file of implementationFiles.filter((item) => untracked.has(item))) {
+		const absolute = path.join(executionRoot, file);
+		if (!existsSync(absolute)) continue;
+		changedLines +=
+			statSync(absolute).size > 10 * 1024 * 1024
+				? 301
+				: readFileSync(absolute, "utf8").split(/\r?\n/).length;
+	}
 	if (changedLines > 300)
 		reviewReasons.push(`large diff: ${changedLines} lines`);
 	const uiFiles = implementationFiles.filter((file) =>
@@ -823,7 +828,7 @@ async function finishTaskUnlocked() {
 		const accepted =
 			persistedReviewScope !== undefined &&
 			sameFiles(persistedReviewScope, implementationFiles) &&
-			reviewDispositionSatisfied(task);
+			reviewDispositionSatisfied(task, implementationFiles);
 		if (!accepted && !reviewed) {
 			if (
 				persistedReviewScope === undefined ||
@@ -1195,6 +1200,10 @@ function jsonAssertionFailures(file, root = cwd) {
 			if (String(jsonPath(data, key)) !== expected)
 				failures.push(`${key} != ${expected}`);
 		} else if (args[i] === "--forbid-string") {
+			if (i + 1 >= args.length) {
+				failures.push("missing --forbid-string value");
+				continue;
+			}
 			const forbidden = args[++i];
 			if (JSON.stringify(data).includes(forbidden))
 				failures.push(`forbidden string ${forbidden}`);

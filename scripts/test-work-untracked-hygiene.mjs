@@ -21,11 +21,12 @@ const {
 	appendLocalExcludePatterns,
 	ignorePatternForBuildArtifact,
 	isRecognizedSource,
+	isRuntimePath,
+	isWorkflowManaged,
 	tidyUntrackedFiles,
 } = await import(
-	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "work-hygiene.mjs")),
-	).href
+	pathToFileURL(realpathSync(path.join(import.meta.dirname, "work-hygiene.mjs")))
+		.href
 );
 
 // --- pure classification by stack ---
@@ -69,7 +70,15 @@ assert(
 );
 assert(
 	ignorePatternForBuildArtifact("foo/bar.egg-info/PKG-INFO") === "*.egg-info/",
-	".egg-info maps to *.egg-info/",
+	".egg-info directories map to *.egg-info/",
+);
+assert(
+	ignorePatternForBuildArtifact("bar.egg-info") === "*.egg-info",
+	".egg-info files map to a file pattern",
+);
+assert(
+	ignorePatternForBuildArtifact("bar.egg-info.json") === "*.egg-info.json",
+	".egg-info.json files map to a file pattern",
 );
 assert(
 	ignorePatternForBuildArtifact(".DS_Store") === ".DS_Store",
@@ -127,6 +136,19 @@ assert(
 	"arbitrary JARs are NOT recognized",
 );
 assert(!isRecognizedSource("dump.bin", noGit), ".bin is NOT recognized");
+assert(isRuntimePath(".pi/work-runs/run.json"), ".pi runtime is recognized");
+assert(
+	isRuntimePath(".pi-subagents\\artifacts\\review.md"),
+	"Windows runtime separators are normalized",
+);
+assert(
+	isWorkflowManaged(".ce-workflow/work-items.json"),
+	"canonical work state is workflow-managed",
+);
+assert(
+	!isWorkflowManaged(".ce-workflow/roadmap.md"),
+	"ordinary workflow documents remain implementation files",
+);
 
 // --- local exclude writer dedups and does not rewrite when nothing new ---
 const tmpA = mkdtempSync(path.join(tmpdir(), "wo-gi-"));
@@ -156,7 +178,12 @@ assert(dupCount === 1, "existing __pycache__/ pattern is not duplicated");
 assert(gi2.includes("node_modules/"), "new node_modules/ pattern appended");
 const written3 = appendLocalExcludePatterns(tmpA, ["__pycache__/", "build/"]);
 assert(!written3, "no new patterns -> no rewrite");
-assert(!readFileSync(path.join(tmpA, ".git", "info", "exclude"), "utf8").includes("auto-ignored"), "tracked ignore marker is not used");
+assert(
+	!readFileSync(path.join(tmpA, ".git", "info", "exclude"), "utf8").includes(
+		"auto-ignored",
+	),
+	"tracked ignore marker is not used",
+);
 rmSync(tmpA, { recursive: true, force: true });
 
 // --- end-to-end against a real temp git repo ---
@@ -182,7 +209,12 @@ mkdirSync(path.join(repo, "__pycache__"));
 writeFileSync(path.join(repo, "__pycache__", "m.pyc"), "x");
 writeFileSync(path.join(repo, "src", "new.py"), "y = 2\n");
 writeFileSync(path.join(repo, "src", "m.pyc"), "x");
+writeFileSync(path.join(repo, "src", "blob.dat"), "bounded inferred source\n");
+writeFileSync(path.join(repo, "src", "huge.dat"), "");
+truncateSync(path.join(repo, "src", "huge.dat"), 10 * 1024 * 1024 + 1);
 writeFileSync(path.join(repo, "mystery.dat"), "x");
+writeFileSync(path.join(repo, "package.egg-info"), "x");
+writeFileSync(path.join(repo, "symbols.pdb"), "x");
 writeFileSync(path.join(repo, "data.bin"), "x");
 writeFileSync(path.join(repo, "events.ndjson"), '{"event":"start"}\n');
 writeFileSync(path.join(repo, "server.jsonl"), '{"status":200}\n');
@@ -221,17 +253,25 @@ assert(
 			"build-work-*/",
 			"__pycache__/",
 			"*.py[cod]",
+			"*.egg-info",
+			"*.pdb",
 			"node_modules/",
 		]).join(","),
 	"build/cache artifacts collected as canonical patterns",
 );
 assert(
 	sorted(tidy.unrecognized).join(",") ===
-		sorted(["mystery.dat", "data.bin", "too-large.ndjson"]).join(","),
-	"only unknown or oversized evidence files are escalated",
+		sorted([
+			"mystery.dat",
+			"data.bin",
+			"src/huge.dat",
+			"too-large.ndjson",
+		]).join(","),
+	"only unknown or oversized files are escalated",
 );
 assert(
 	!tidy.unrecognized.includes("src/new.py") &&
+		!tidy.unrecognized.includes("src/blob.dat") &&
 		!tidy.unrecognized.includes("events.ndjson") &&
 		!tidy.unrecognized.includes("server.jsonl") &&
 		!tidy.unrecognized.some((file) => file.startsWith("android/")),
@@ -242,13 +282,21 @@ assert(
 	"canonical workflow state is preserved",
 );
 assert(tidy.excludeWritten, "local exclude was written");
-assert(!readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8").includes("auto-ignored"), "tracked ignore marker is absent");
+assert(
+	!readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8").includes(
+		"auto-ignored",
+	),
+	"tracked ignore marker is absent",
+);
 const gi = readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8");
 assert(
 	gi.includes("*.py[cod]") && gi.includes("node_modules/"),
 	"patterns landed in the local exclude",
 );
-assert(!g(["status", "--short"]).includes(".gitignore"), "tracked .gitignore is unchanged");
+assert(
+	!g(["status", "--short"]).includes(".gitignore"),
+	"tracked .gitignore is unchanged",
+);
 
 // idempotent: a second run finds no new build/cache (already ignored) and does not rewrite.
 const tidy2 = tidyUntrackedFiles({ cwd: repo });
@@ -256,13 +304,18 @@ assert(tidy2.ignored.length === 0, "second run collects no new artifacts");
 assert(!tidy2.excludeWritten, "second run does not rewrite the local exclude");
 assert(
 	sorted(tidy2.unrecognized).join(",") ===
-		sorted(["mystery.dat", "data.bin", "too-large.ndjson"]).join(","),
+		sorted([
+			"mystery.dat",
+			"data.bin",
+			"src/huge.dat",
+			"too-large.ndjson",
+		]).join(","),
 	"unknown and oversized files remain escalated on the second run",
 );
 
 // once every unknown is resolved (tracked as legit source, or gitignored),
 // a run is clean.
-g(["add", "mystery.dat", "too-large.ndjson"]);
+g(["add", "mystery.dat", "src/huge.dat", "too-large.ndjson"]);
 appendLocalExcludePatterns(repo, ["*.bin"]);
 const tidy3 = tidyUntrackedFiles({ cwd: repo });
 assert(

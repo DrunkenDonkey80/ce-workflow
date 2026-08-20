@@ -7,6 +7,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	truncateSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -447,6 +448,12 @@ try {
 		title: "Test hardware device behavior",
 	});
 	createWorkItem(finishStore, {
+		id: "TASK-LARGE",
+		type: "task",
+		status: "open",
+		title: "Add generated source snapshot",
+	});
+	createWorkItem(finishStore, {
 		id: "TASK-PLANNING",
 		type: "task",
 		status: "open",
@@ -544,6 +551,38 @@ try {
 			finished.clean,
 		"finish-task closes and leaves git clean",
 	);
+	writeFileSync(path.join(finishCwd, "large.js"), "");
+	truncateSync(path.join(finishCwd, "large.js"), 10 * 1024 * 1024 + 1);
+	let largeSourceError = "";
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-LARGE",
+				"--max-files",
+				"1",
+				"--message",
+				"bound untracked source",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+			],
+			{
+				cwd: finishCwd,
+				encoding: "utf8",
+				env: { ...process.env, WORK_ORCH_BD_BIN: fakeBdScript },
+			},
+		);
+	} catch (error) {
+		largeSourceError = String(error.stdout ?? "");
+	}
+	assert(
+		largeSourceError.includes("large diff: 301 lines"),
+		"untracked source larger than the read cap is treated as a large diff without decoding it",
+	);
+	rmSync(path.join(finishCwd, "large.js"));
+
 	assert(
 		execFileSync("git", ["log", "-1", "--pretty=%s"], {
 			cwd: finishCwd,
@@ -1110,6 +1149,41 @@ process.exit(result.status ?? 1);
 	assert(
 		forgedReviewError.includes("durable wo:review PASS evidence"),
 		"finish-task rejects a forged reviewed flag without WorkItems evidence",
+	);
+	const forgedDispositionStore = loadStore(finishCwd);
+	forgedDispositionStore.items["TASK-4"].notes.push(
+		'wo:review FAIL {"findings":["auth/policy file.js: production guard missing"]}',
+		'wo:mechanical-fix PASS {"dispositions":[{"finding":"auth/policy file.js: production guard missing","fix":"guard added","evidence":"focused test passed"}]}',
+	);
+	saveStore(finishCwd, forgedDispositionStore);
+	let productionDispositionError = "";
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				path.join(import.meta.dirname, "work-helper.mjs"),
+				"finish-task",
+				"TASK-4",
+				"--max-files",
+				"2",
+				"--message",
+				"auth policy",
+				"--verify",
+				`"${process.execPath}" -e "process.stdout.write('ok')"`,
+				"--reviewed",
+			],
+			{
+				cwd: finishCwd,
+				encoding: "utf8",
+				env: { ...process.env, WORK_ORCH_BD_BIN: fakeBdScript },
+			},
+		);
+	} catch (error) {
+		productionDispositionError = String(error.stdout ?? "");
+	}
+	assert(
+		productionDispositionError.includes("durable wo:review PASS evidence"),
+		"a mechanical disposition cannot bypass review for production files",
 	);
 	rmSync(path.join(finishCwd, "auth"), { recursive: true, force: true });
 	writeFileSync(path.join(finishCwd, "config.js"), "export default true;\n");

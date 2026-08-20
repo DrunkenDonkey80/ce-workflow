@@ -4178,6 +4178,35 @@
       "type": "bug",
       "updatedAt": "2026-08-20T11:42:18.688Z"
     },
+    "work-2.79": {
+      "acceptance": "Focused helper, hygiene, reporting, and resume tests pass; an independent review approves the production changes.",
+      "createdAt": "2026-08-20T12:07:43.481Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Apply accepted correctness, resource-boundary, Windows, and regression findings from the completed snapshot checkpoint.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.79",
+      "labels": [
+        "wo:verification-followup"
+      ],
+      "notes": [
+        "Verifier checkpoint e79e97e01c1225a72a62f08e3b47ce7824eb5d0a accepted findings.",
+        "Files changed: extensions/work-models.js, scripts/work-helper.mjs, scripts/work-hygiene.mjs, scripts/test-work-helper-contract.mjs, scripts/test-work-improvement-reporting.mjs, scripts/test-work-optimization-helpers.mjs, scripts/test-work-resume.mjs, scripts/test-work-untracked-hygiene.mjs.\\nVerification: node scripts/test-work-untracked-hygiene.mjs PASS; node scripts/test-work-improvement-reporting.mjs PASS; node scripts/test-work-resume.mjs PASS; node scripts/test-work-helper-contract.mjs PASS; node scripts/test-work-optimization-helpers.mjs PASS.\\nwo:verify-check PASS focused checkpoint regressions passed",
+        "Security review required: validate the production review-gate and untracked-file trust-boundary fixes before commit.",
+        "wo:review-scope [\"extensions/work-models.js\",\"scripts/test-work-helper-contract.mjs\",\"scripts/test-work-improvement-reporting.mjs\",\"scripts/test-work-optimization-helpers.mjs\",\"scripts/test-work-resume.mjs\",\"scripts/test-work-untracked-hygiene.mjs\",\"scripts/work-helper.mjs\",\"scripts/work-hygiene.mjs\"]",
+        "wo:review PASS production review-gate now blocks mechanical/residual self-clearing on production diffs, untracked-source reads are size-bounded, egg-info file vs dir ignore patterns fixed; regression tests cover each and recorded focused suites passed",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Address background-verifier findings for snapshot fixes",
+      "type": "task",
+      "updatedAt": "2026-08-20T12:12:53.239Z"
+    },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
       "createdAt": "2026-07-20T09:59:01.555Z",
@@ -4523,6 +4552,45 @@
       "title": "Self-improvement report: Launching the exact required async work-planner via pi-subagents fails before startup on Windows because the generated async-run d",
       "type": "task",
       "updatedAt": "2026-08-08T17:50:32.619Z"
+    },
+    "work-2.report-246e1b7b-2692-4324-9980-3e8d7ad67cf6": {
+      "createdAt": "2026-08-20T11:51:52.412Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After background verifier reports were ingested, work_goal_complete correctly blocked on pending findings, but the automatic continuation did not claim any completed verifier group. work_verifier_inbox therefore returned [] while completion remained blocked, leaving no claimId available to the supported disposition tools.\nExpected: Automatic continuation should call the verifier triage claim path before prompting the agent, so work_verifier_inbox exposes at least one owned claim whenever verifierCompletionBlocker reports findings awaiting triage.\nImpact: The autonomous goal deadlocks: completion is rejected, but the only public triage tools cannot act without claim IDs. Recovery currently requires invoking the canonical verifier-store API manually.\nSuggested improvement: Ensure work-goal continuation runs verifierTriageState after reconciliation and before emitting the continuation prompt, including when findings arrive between the final tool call and turn end.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/1a5e117b-bec4-45ff-994f-1ad380c4fa34",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1139185,
+              "file": "01-2026-08-20T10-37-44-593Z_01a01ebf-8b11-784d-a02d-29904cf317c5.jsonl",
+              "sha256": "e130cb7a58ac5d16a0ddfab4d823792ab6fea58691ea68a41d889b8000d8f4d8"
+            },
+            {
+              "bytes": 3367439,
+              "file": "02-01a01ebf-8b11-784d-a02d-29904cf317c5.jsonl",
+              "sha256": "de6265764d321bd363f75abf19f7a669614b4006f9d1ae4d49653f9a81f6f910"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-20T11:51:52.408Z",
+          "workflowId": "workflow-mt1fzpf7-67ecou"
+        }
+      ],
+      "id": "work-2.report-246e1b7b-2692-4324-9980-3e8d7ad67cf6",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After background verifier reports were ingested, work_goal_complete correctly blocked on pending findings, but the automatic conti",
+      "type": "task",
+      "updatedAt": "2026-08-20T11:51:52.412Z"
     },
     "work-2.report-2cdd87c5-81e8-444e-8075-85ef78e8d3aa": {
       "createdAt": "2026-08-20T06:01:26.367Z",
@@ -8717,7 +8785,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T11:42:53.541Z"
+    "updatedAt": "2026-08-20T12:12:53.239Z"
   },
   "schemaVersion": 1
 }

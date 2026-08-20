@@ -86,6 +86,19 @@ try {
 		["TASK-1"],
 		"ready summaries include executable grandchildren",
 	);
+	writeFileSync(path.join(cwd, "assertion.json"), '{"status":"ok"}\n');
+	let missingForbidValue;
+	try {
+		run("json-assert", "assertion.json", "--forbid-string");
+	} catch (error) {
+		missingForbidValue = JSON.parse(String(error.stdout));
+	}
+	assert.deepEqual(
+		missingForbidValue?.failed_assertions,
+		["missing --forbid-string value"],
+		"json-assert rejects a missing --forbid-string value",
+	);
+	rmSync(path.join(cwd, "assertion.json"));
 
 	execFileSync("git", ["init"], { cwd, stdio: "ignore" });
 	execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });

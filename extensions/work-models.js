@@ -15055,7 +15055,10 @@ function residualFixAccepted(issue) {
 }
 
 function mechanicalFixAccepted(issue) {
+	const files = implementationPathsFromNotes(issue);
 	return (
+		files.length > 0 &&
+		!hasProductionDiff(files) &&
 		reviewFailureCount(issue) === 1 &&
 		dispositionCovers(
 			targetedReviewFindings(issue),

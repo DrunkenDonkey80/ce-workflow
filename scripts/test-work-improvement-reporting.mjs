@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	statSync,
@@ -52,11 +53,16 @@ if (process.platform === "win32") {
 			? character.toUpperCase()
 			: character.toLowerCase(),
 	);
-	resolveReportingSource({
+	const resolved = resolveReportingSource({
 		cwd: consumer,
 		packageRoot: source,
 		settings: { workImprovement: { sourceCheckout: alternateCaseSource } },
 	});
+	assert(
+		resolved.source === "setting" &&
+			resolved.sourceCwd.toLowerCase() === realpathSync(source).toLowerCase(),
+		"alternate-case Windows source paths resolve to the configured checkout",
+	);
 }
 const log = path.join(consumer, ".pi", "work-runs", "run.jsonl");
 const secondLog = path.join(consumer, ".pi", "work-runs", "tool.jsonl");
@@ -82,8 +88,7 @@ try {
 		"report returns durable task and bundle",
 	);
 	assert(
-		readFileSync(path.join(consumer, ".gitignore"), "utf8") ===
-			consumerGitignore,
+		readFileSync(path.join(consumer, ".gitignore"), "utf8") === consumerGitignore,
 		"reporting leaves the producer .gitignore unchanged",
 	);
 	const mirror = path.join(root, "mirror");
@@ -123,9 +128,7 @@ try {
 		"tracked task excludes absolute source path",
 	);
 	assert(
-		!JSON.stringify(store.items[result.taskId]).includes(
-			"SECRET_RAW_LOG_MARKER",
-		),
+		!JSON.stringify(store.items[result.taskId]).includes("SECRET_RAW_LOG_MARKER"),
 		"tracked task excludes raw log content",
 	);
 	const manifest = JSON.parse(
@@ -136,17 +139,13 @@ try {
 		"manifest retains complete source provenance",
 	);
 	assert(
-		readFileSync(
-			path.join(result.bundlePath, manifest.files[0].file),
-			"utf8",
-		) === readFileSync(log, "utf8"),
+		readFileSync(path.join(result.bundlePath, manifest.files[0].file), "utf8") ===
+			readFileSync(log, "utf8"),
 		"first log is copied completely",
 	);
 	assert(
-		readFileSync(
-			path.join(result.bundlePath, manifest.files[1].file),
-			"utf8",
-		) === readFileSync(secondLog, "utf8"),
+		readFileSync(path.join(result.bundlePath, manifest.files[1].file), "utf8") ===
+			readFileSync(secondLog, "utf8"),
 		"second log is copied completely",
 	);
 	if (process.platform !== "win32") {
@@ -178,10 +177,7 @@ try {
 			...extra,
 		});
 	const second = await submit({ ...report, observation: "Same report" });
-	assert(
-		second.taskId !== result.taskId,
-		"each call creates one distinct task",
-	);
+	assert(second.taskId !== result.taskId, "each call creates one distinct task");
 	const relative = await submit({
 		...report,
 		observation: "Relative log",
@@ -202,8 +198,7 @@ try {
 	const boundedTask = loadStore(source).items[boundedResult.taskId];
 	const provenance = boundedTask.evidence[0];
 	assert(
-		boundedTask.title.length <= 155 &&
-			!/[\x00\t]/.test(boundedTask.description),
+		boundedTask.title.length <= 155 && !/[\x00\t]/.test(boundedTask.description),
 		"tracked report text is bounded and sanitized",
 	);
 	assert(
@@ -275,9 +270,8 @@ try {
 		"concurrent submissions create one active epic",
 	);
 	assert(
-		Object.values(loadStore(source).items).filter(
-			(item) => item.type === "epic",
-		).length === 1,
+		Object.values(loadStore(source).items).filter((item) => item.type === "epic")
+			.length === 1,
 		"parallel first submissions create exactly one epic",
 	);
 	const cleanupFailure = await submit(
@@ -298,10 +292,7 @@ try {
 	).length;
 	writeFileSync(path.join(root, "outside.log"), "outside\n");
 	for (const [candidate, message] of [
-		[
-			path.join(consumer, ".pi", "work-runs", "missing.log"),
-			"missing evidence",
-		],
+		[path.join(consumer, ".pi", "work-runs", "missing.log"), "missing evidence"],
 		[path.join(consumer, ".pi", "work-runs"), "directory evidence"],
 	]) {
 		await submit({ ...report, logs: [candidate] }).then(
@@ -328,12 +319,7 @@ try {
 		process.platform === "win32" ? "junction" : "dir",
 	);
 	if (process.platform !== "win32") {
-		const linkedFile = path.join(
-			consumer,
-			".pi",
-			"work-runs",
-			"linked-file.log",
-		);
+		const linkedFile = path.join(consumer, ".pi", "work-runs", "linked-file.log");
 		symlinkSync(log, linkedFile, "file");
 		await submit({ ...report, logs: [linkedFile] }).then(
 			() => assert(false, "direct symlink evidence must fail"),
@@ -369,10 +355,7 @@ try {
 	} catch (error) {
 		descriptorClosed = error?.code === "EBADF";
 	}
-	assert(
-		descriptorClosed,
-		"setup failure closes accepted evidence descriptors",
-	);
+	assert(descriptorClosed, "setup failure closes accepted evidence descriptors");
 	const oversized = path.join(consumer, ".pi", "work-runs", "oversized.log");
 	writeFileSync(oversized, Buffer.alloc(4 * 1024 * 1024 + 1));
 	await submit({ ...report, logs: [oversized] }).then(
@@ -475,9 +458,8 @@ try {
 			),
 	);
 	assert(
-		Object.values(loadStore(source).items).filter(
-			(item) => item.type === "task",
-		).length === beforeFailures,
+		Object.values(loadStore(source).items).filter((item) => item.type === "task")
+			.length === beforeFailures,
 		"failed submissions do not create tasks",
 	);
 

@@ -12,6 +12,7 @@ const RUNTIME_PREFIXES = [
 	/^\.ce-workflow\/work-runs\//,
 	/^work-[^/]+-(?:workItem-small|workItem-worker)\.md$/,
 ];
+const MAX_INFERRED_SOURCE_BYTES = 10 * 1024 * 1024;
 
 // dir segment -> canonical .gitignore pattern
 const DIR_PATTERNS = {
@@ -87,7 +88,8 @@ export function ignorePatternForBuildArtifact(file) {
 	if (/\.py[cod]$/i.test(base)) return "*.py[cod]";
 	if (/\.pdb$/i.test(base)) return "*.pdb";
 	if (/\.ilk$/i.test(base)) return "*.ilk";
-	if (/\.egg-info(?:\.json)?$/i.test(base)) return "*.egg-info/";
+	if (/\.egg-info$/i.test(base)) return "*.egg-info";
+	if (/\.egg-info\.json$/i.test(base)) return "*.egg-info.json";
 	if (base === ".DS_Store") return ".DS_Store";
 	return null;
 }
@@ -96,7 +98,7 @@ export function isGeneratedBuildPath(file) {
 	return ignorePatternForBuildArtifact(file) !== null;
 }
 
-export function isRecognizedSource(file, runGit) {
+export function isRecognizedSource(file, runGit, root) {
 	const norm = file.replaceAll("\\", "/");
 	const base = norm.split("/").pop();
 	if (SOURCE_BASENAMES.has(base)) return true;
@@ -104,14 +106,21 @@ export function isRecognizedSource(file, runGit) {
 	const dot = base.lastIndexOf(".");
 	const ext = dot >= 0 ? base.slice(dot + 1).toLowerCase() : "";
 	if (ext && SOURCE_EXTS.has(ext)) return true;
-	// Inside a subdir that already contains tracked files: assume part of the work.
-	if (norm.includes("/")) {
+	// Unknown extensions inherit source intent only from a tracked directory and
+	// only when the candidate is a bounded regular file.
+	if (root && norm.includes("/")) {
 		const slash = norm.lastIndexOf("/");
 		const dir = norm.slice(0, slash + 1);
 		try {
-			if (String(runGit(["ls-files", "--", dir])).trim()) return true;
+			const stat = lstatSync(path.join(root, file));
+			if (
+				stat.isFile() &&
+				stat.size <= MAX_INFERRED_SOURCE_BYTES &&
+				String(runGit(["ls-files", "--", dir])).trim()
+			)
+				return true;
 		} catch {
-			/* git unavailable -> fall through to unrecognized */
+			/* git/stat unavailable -> fall through to unrecognized */
 		}
 	}
 	return false;
@@ -187,11 +196,11 @@ export function tidyUntrackedFiles({ cwd, gitBin = "git", preserve = [] }) {
 			toIgnore.add(pattern);
 			continue;
 		}
-		if (isRecognizedSource(file, runGit)) {
+		if (isRecognizedSource(file, runGit, cwd)) {
 			if (/\.(?:ndjson|jsonl)$/i.test(file)) {
 				try {
 					const stat = lstatSync(path.join(cwd, file));
-					if (!stat.isFile() || stat.size > 10 * 1024 * 1024) {
+					if (!stat.isFile() || stat.size > MAX_INFERRED_SOURCE_BYTES) {
 						unrecognized.push(file);
 					}
 				} catch {
