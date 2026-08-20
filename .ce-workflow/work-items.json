@@ -4158,19 +4158,25 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Workflow reporting/finalization must not add transient cache or dependency patterns to tracked producer .gitignore files.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.78",
       "labels": [
         "self-improvement"
       ],
       "notes": [
-        "Atomic claims: reports aefe20c8 and 9ed01f48 share tracked-ignore mutation outcome; current reporting path is already non-mutating, while finish-task work-hygiene is locally owned and still mutates .gitignore."
+        "Atomic claims: reports aefe20c8 and 9ed01f48 share tracked-ignore mutation outcome; current reporting path is already non-mutating, while finish-task work-hygiene is locally owned and still mutates .gitignore.",
+        "Related-distinct from verification-shell claim; locally owned finish-task hygiene and already-correct reporting behavior are covered by shared commit e79e97e. Verification in work-2.77: optimization helpers, untracked hygiene, and improvement reporting fixtures PASS.",
+        "wo:verify-check PASS\nCommand: git merge-base --is-ancestor e79e97e01c1225a72a62f08e3b47ce7824eb5d0a HEAD\nOutput: "
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Keep workflow-generated ignores out of tracked project files",
       "type": "bug",
-      "updatedAt": "2026-08-20T11:38:03.250Z"
+      "updatedAt": "2026-08-20T11:42:18.688Z"
     },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
@@ -8699,7 +8705,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T11:41:54.635Z"
+    "updatedAt": "2026-08-20T11:42:18.689Z"
   },
   "schemaVersion": 1
 }
