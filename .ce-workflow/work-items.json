@@ -4557,12 +4557,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned duplicate consolidated in canonical work-2.77. Commit e79e97e routes explicit cmd.exe commands around MSYS re-tokenization; node scripts/test-work-optimization-helpers.mjs PASS proves quoted test/retention.test.ts remains intact."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: finish-task mangled a quoted `cmd.exe /d /s /c \"npm --prefix server test -- --run test/retention.test.ts ...\"` verification comman",
       "type": "task",
-      "updatedAt": "2026-08-20T11:38:10.780Z"
+      "updatedAt": "2026-08-20T11:42:46.140Z"
     },
     "work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8": {
       "createdAt": "2026-08-08T17:28:28.534Z",
@@ -5219,12 +5221,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned duplicate consolidated in canonical work-2.77. Commit e79e97e normalizes bare repository Gradle wrappers under Git Bash; node scripts/test-work-optimization-helpers.mjs PASS proves the reported gradlew.bat path."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: finish-task verification could not execute the repository's checked-in Windows Gradle wrapper when given `gradlew.bat ...`; it rec",
       "type": "task",
-      "updatedAt": "2026-08-20T11:38:10.679Z"
+      "updatedAt": "2026-08-20T11:42:46.044Z"
     },
     "work-2.report-60ff67ad-d2d8-46de-a7a4-b5b4d918e984": {
       "createdAt": "2026-08-07T06:29:07.173Z",
@@ -5923,6 +5927,9 @@
           "producer": "belot",
           "submittedAt": "2026-08-20T08:20:26.931Z",
           "workflowId": "01a01e1e-5185-76cd-8686-f64ebe0bcfc4"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-9ed01f48-b0f9-48ff-9310-ac5b50701fb3",
@@ -5930,12 +5937,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: locally-owned claim consolidated in canonical work-2.78. Commit e79e97e writes transient artifact patterns to Git local exclude instead of tracked .gitignore; untracked hygiene fixtures PASS and work-2.78 closed in commit 8b225fc.",
+        "wo:verify-check PASS\nCommand: git merge-base --is-ancestor e79e97e01c1225a72a62f08e3b47ce7824eb5d0a HEAD\nOutput: "
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: `finish-task work-1.41 --max-files 4` inserted a tracked `.gitignore` block for `__pycache__/` and then rejected its own mutation ",
       "type": "task",
-      "updatedAt": "2026-08-20T11:38:10.976Z"
+      "updatedAt": "2026-08-20T11:42:53.540Z"
     },
     "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851": {
       "createdAt": "2026-08-19T05:30:38.715Z",
@@ -6118,12 +6128,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Classification: already-fixed reporting path, related-distinct from canonical work-2.78 finalizer hygiene claim. Commit e79e97e adds proof that submitImprovementReport leaves producer .gitignore unchanged; improvement reporting fixtures PASS."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Calling work_report_improvement from the producer project unexpectedly edited the tracked target file `.gitignore`, appending a gl",
       "type": "task",
-      "updatedAt": "2026-08-20T11:38:10.879Z"
+      "updatedAt": "2026-08-20T11:42:46.230Z"
     },
     "work-2.report-b085e2c6-43c6-4e12-b79e-f1eb0da5c571": {
       "createdAt": "2026-08-18T21:22:54.483Z",
@@ -8705,7 +8717,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T11:42:18.689Z"
+    "updatedAt": "2026-08-20T11:42:53.541Z"
   },
   "schemaVersion": 1
 }
