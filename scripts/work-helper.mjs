@@ -423,10 +423,18 @@ async function runVerificationCommand(command, root = cwd) {
 	const shell =
 		process.env.WORK_ORCH_VERIFY_SHELL ||
 		(process.platform === "win32" && process.env.MSYSTEM ? "bash" : "");
+	const windowsCommand =
+		process.platform === "win32" && /^\s*cmd(?:\.exe)?(?:\s|$)/i.test(command);
+	const wrapper = command.match(/^(\s*)(gradlew(?:\.bat)?)(?=\s|$)/i);
+	const normalized =
+		shell && wrapper && existsSync(path.join(root, wrapper[2]))
+			? command.replace(wrapper[0], `${wrapper[1]}./${wrapper[2]}`)
+			: command;
 	try {
-		const result = shell
-			? await execFileAsync(shell, ["-c", command], options)
-			: await execAsync(command, options);
+		const result =
+			!windowsCommand && shell
+				? await execFileAsync(shell, ["-c", normalized], options)
+				: await execAsync(normalized, options);
 		return { exitStatus: 0, stdout: result.stdout, stderr: result.stderr };
 	} catch (error) {
 		if (error instanceof Error) throw error;

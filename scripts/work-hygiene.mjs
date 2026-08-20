@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Pre-commit untracked-file hygiene: classify untracked files by stack, write
-// build/cache artifacts to .gitignore, and surface anything that needs a human
+// Pre-commit untracked-file hygiene: classify untracked files by stack, ignore
+// build/cache artifacts locally, and surface anything that needs a human
 // decision. Pure + dir-aware so it is unit-testable against a temp git repo.
 
 import { execFileSync } from "node:child_process";
@@ -117,16 +117,25 @@ export function isRecognizedSource(file, runGit) {
 	return false;
 }
 
-export function appendGitignorePatterns(dir, patterns) {
+export function appendLocalExcludePatterns(dir, patterns, runGit) {
 	if (!patterns.length) return false;
-	const gi = path.join(dir, ".gitignore");
+	const git =
+		runGit ??
+		((argv) =>
+			execFileSync("git", argv, {
+				cwd: dir,
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "pipe"],
+			}));
+	const exclude = path.resolve(
+		dir,
+		String(git(["rev-parse", "--git-path", "info/exclude"])).trim(),
+	);
 	let existing = "";
-	let hadFile = false;
 	try {
-		existing = readFileSync(gi, "utf8");
-		hadFile = true;
+		existing = readFileSync(exclude, "utf8");
 	} catch {
-		/* no existing .gitignore */
+		/* Git creates this file lazily. */
 	}
 	const present = new Set(
 		existing
@@ -138,14 +147,14 @@ export function appendGitignorePatterns(dir, patterns) {
 		(pattern) => !present.has(pattern),
 	);
 	if (!fresh.length) return false;
-	const sep = hadFile && existing && !existing.endsWith("\n") ? "\n" : "";
-	const block = `${sep}\n# ce-workflow: auto-ignored build/cache artifacts\n${fresh.join("\n")}\n`;
-	writeFileSync(gi, existing + block, "utf8");
+	const sep = existing && !existing.endsWith("\n") ? "\n" : "";
+	const block = `${sep}\n# ce-workflow: locally ignored build/cache artifacts\n${fresh.join("\n")}\n`;
+	writeFileSync(exclude, existing + block, "utf8");
 	return true;
 }
 
-// Scan untracked files, write build/cache artifacts to .gitignore, and return
-// the set that needs a human decision. Does NOT throw; the caller decides
+// Scan untracked files, write build/cache artifacts to Git's local exclude, and
+// return the set that needs a human decision. Does NOT throw; the caller decides
 // whether to block on `unrecognized`. Idempotent: a second run finds no new
 // build/cache artifacts (already ignored) and returns an empty `ignored`.
 export function tidyUntrackedFiles({ cwd, gitBin = "git", preserve = [] }) {
@@ -193,6 +202,6 @@ export function tidyUntrackedFiles({ cwd, gitBin = "git", preserve = [] }) {
 		}
 		unrecognized.push(file);
 	}
-	const gitignoreWritten = appendGitignorePatterns(cwd, [...toIgnore]);
-	return { ignored: [...toIgnore], unrecognized, gitignoreWritten };
+	const excludeWritten = appendLocalExcludePatterns(cwd, [...toIgnore], runGit);
+	return { ignored: [...toIgnore], unrecognized, excludeWritten };
 }

@@ -398,6 +398,8 @@ try {
 		"TASK-ROLLBACK",
 		"TASK-SHARD",
 		"TASK-SHELL",
+		"TASK-CMD",
+		"TASK-GRADLE",
 		"TASK-UNTRACKED",
 	])
 		createWorkItem(finishStore, {
@@ -591,6 +593,61 @@ try {
 		shellFinished.verification?.output === "checked",
 		"finish-task verification avoids login profiles while honoring POSIX environment syntax",
 	);
+
+	if (process.platform === "win32") {
+		writeFileSync(path.join(finishCwd, "cmd.js"), "export default true;\n");
+		const cmdFinished = JSON.parse(
+			execFileSync(
+				process.execPath,
+				[
+					path.join(import.meta.dirname, "work-helper.mjs"),
+					"finish-task",
+					"TASK-CMD",
+					"--max-files",
+					"1",
+					"--message",
+					"preserve cmd quoting",
+					"--verify",
+					'cmd.exe /d /s /c "echo test/retention.test.ts"',
+					"--expect",
+					"test/retention.test.ts",
+				],
+				{ cwd: finishCwd, encoding: "utf8", env: shellEnv },
+			),
+		);
+		assert(
+			cmdFinished.verification?.output === "test/retention.test.ts",
+			"finish-task preserves quoted cmd.exe arguments under Git Bash",
+		);
+
+		writeFileSync(
+			path.join(finishCwd, "gradlew.bat"),
+			"@echo off\r\necho checked\r\n",
+		);
+		const gradleFinished = JSON.parse(
+			execFileSync(
+				process.execPath,
+				[
+					path.join(import.meta.dirname, "work-helper.mjs"),
+					"finish-task",
+					"TASK-GRADLE",
+					"--max-files",
+					"1",
+					"--message",
+					"resolve repository wrapper",
+					"--verify",
+					"gradlew.bat",
+					"--expect",
+					"checked",
+				],
+				{ cwd: finishCwd, encoding: "utf8", env: shellEnv },
+			),
+		);
+		assert(
+			gradleFinished.verification?.output === "checked",
+			"finish-task resolves a bare repository Gradle wrapper",
+		);
+	}
 
 	writeFileSync(
 		path.join(finishCwd, "status.json"),

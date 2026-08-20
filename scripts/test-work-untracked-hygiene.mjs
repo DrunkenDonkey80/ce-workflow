@@ -18,7 +18,7 @@ const { assert } = await import(
 	).href
 );
 const {
-	appendGitignorePatterns,
+	appendLocalExcludePatterns,
 	ignorePatternForBuildArtifact,
 	isRecognizedSource,
 	tidyUntrackedFiles,
@@ -128,32 +128,35 @@ assert(
 );
 assert(!isRecognizedSource("dump.bin", noGit), ".bin is NOT recognized");
 
-// --- .gitignore writer dedups and does not rewrite when nothing new ---
+// --- local exclude writer dedups and does not rewrite when nothing new ---
 const tmpA = mkdtempSync(path.join(tmpdir(), "wo-gi-"));
-const written1 = appendGitignorePatterns(tmpA, [
+execFileSync("git", ["init", "-q"], { cwd: tmpA });
+const written1 = appendLocalExcludePatterns(tmpA, [
 	"__pycache__/",
 	"*.py[cod]",
 	"build/",
 ]);
-const gi1 = readFileSync(path.join(tmpA, ".gitignore"), "utf8");
+const excludePath = path.join(tmpA, ".git", "info", "exclude");
+const gi1 = readFileSync(excludePath, "utf8");
 assert(written1, "first write reports a change");
 assert(
 	gi1.includes("__pycache__/") &&
 		gi1.includes("*.py[cod]") &&
-		gi1.includes("ce-workflow: auto-ignored"),
+		gi1.includes("ce-workflow: locally ignored"),
 	"patterns + header written",
 );
-const written2 = appendGitignorePatterns(tmpA, [
+const written2 = appendLocalExcludePatterns(tmpA, [
 	"__pycache__/",
 	"node_modules/",
 ]);
-const gi2 = readFileSync(path.join(tmpA, ".gitignore"), "utf8");
+const gi2 = readFileSync(excludePath, "utf8");
 assert(written2, "new node_modules/ pattern is a change");
 const dupCount = (gi2.match(/__pycache__/g) || []).length;
 assert(dupCount === 1, "existing __pycache__/ pattern is not duplicated");
 assert(gi2.includes("node_modules/"), "new node_modules/ pattern appended");
-const written3 = appendGitignorePatterns(tmpA, ["__pycache__/", "build/"]);
+const written3 = appendLocalExcludePatterns(tmpA, ["__pycache__/", "build/"]);
 assert(!written3, "no new patterns -> no rewrite");
+assert(!readFileSync(path.join(tmpA, ".git", "info", "exclude"), "utf8").includes("auto-ignored"), "tracked ignore marker is not used");
 rmSync(tmpA, { recursive: true, force: true });
 
 // --- end-to-end against a real temp git repo ---
@@ -238,17 +241,19 @@ assert(
 	!tidy.unrecognized.includes(".ce-workflow/work-items.json"),
 	"canonical workflow state is preserved",
 );
-assert(tidy.gitignoreWritten, ".gitignore was written");
-const gi = readFileSync(path.join(repo, ".gitignore"), "utf8");
+assert(tidy.excludeWritten, "local exclude was written");
+assert(!readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8").includes("auto-ignored"), "tracked ignore marker is absent");
+const gi = readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8");
 assert(
 	gi.includes("*.py[cod]") && gi.includes("node_modules/"),
-	"patterns landed in .gitignore",
+	"patterns landed in the local exclude",
 );
+assert(!g(["status", "--short"]).includes(".gitignore"), "tracked .gitignore is unchanged");
 
 // idempotent: a second run finds no new build/cache (already ignored) and does not rewrite.
 const tidy2 = tidyUntrackedFiles({ cwd: repo });
 assert(tidy2.ignored.length === 0, "second run collects no new artifacts");
-assert(!tidy2.gitignoreWritten, "second run does not rewrite .gitignore");
+assert(!tidy2.excludeWritten, "second run does not rewrite the local exclude");
 assert(
 	sorted(tidy2.unrecognized).join(",") ===
 		sorted(["mystery.dat", "data.bin", "too-large.ndjson"]).join(","),
@@ -258,7 +263,7 @@ assert(
 // once every unknown is resolved (tracked as legit source, or gitignored),
 // a run is clean.
 g(["add", "mystery.dat", "too-large.ndjson"]);
-appendGitignorePatterns(repo, ["*.bin"]);
+appendLocalExcludePatterns(repo, ["*.bin"]);
 const tidy3 = tidyUntrackedFiles({ cwd: repo });
 assert(
 	tidy3.unrecognized.length === 0,

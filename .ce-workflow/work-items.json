@@ -4126,6 +4126,52 @@
       "type": "bug",
       "updatedAt": "2026-08-19T05:34:09.283Z"
     },
+    "work-2.77": {
+      "acceptance": "Bare gradlew.bat resolves from the execution root; quoted cmd.exe /c arguments are preserved; focused regression tests pass.",
+      "createdAt": "2026-08-20T11:38:03.157Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "finish-task must run bare repository Gradle wrappers and explicit quoted cmd.exe commands without PATH or MSYS argument corruption.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.77",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic claims: reports 5e0dec37 and 2cdd87c5 are duplicates with one shared runVerificationCommand root cause; locally owned.",
+        "wo:verify-check FAIL\nCommand: node scripts/test-work-optimization-helpers.mjs && node scripts/test-work-untracked-hygiene.mjs && node scripts/test-work-improvement-reporting.mjs\nexpected \"ok - workflow optimization helpers\\\\nuntracked hygiene: PASS\\\\nok - work improvement reporting fixtures pass\", got \"ok - workflow optimization helpers\\nuntracked hygiene: PASS\\nok - work improvement reporting fixtures pass\"",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs && node scripts/test-work-untracked-hygiene.mjs && node scripts/test-work-improvement-reporting.mjs\nOutput: ok - workflow optimization helpers\nuntracked hygiene: PASS\nok - work improvement reporting fixtures pass"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Preserve native verification commands across Windows shells",
+      "type": "bug",
+      "updatedAt": "2026-08-20T11:41:54.635Z"
+    },
+    "work-2.78": {
+      "acceptance": "Generated artifact patterns use repository-local excludes; reporting leaves producer .gitignore unchanged; focused regressions pass.",
+      "createdAt": "2026-08-20T11:38:03.250Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Workflow reporting/finalization must not add transient cache or dependency patterns to tracked producer .gitignore files.",
+      "evidence": [],
+      "id": "work-2.78",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "Atomic claims: reports aefe20c8 and 9ed01f48 share tracked-ignore mutation outcome; current reporting path is already non-mutating, while finish-task work-hygiene is locally owned and still mutates .gitignore."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Keep workflow-generated ignores out of tracked project files",
+      "type": "bug",
+      "updatedAt": "2026-08-20T11:38:03.250Z"
+    },
     "work-2.8": {
       "acceptance": "Close only after an installed pi-subagents release proves supervisor requests reach/wake the owning parent and timed-out async single runs with inferred acceptance resume without descriptor validation errors.",
       "createdAt": "2026-07-20T09:59:01.555Z",
@@ -4474,7 +4520,9 @@
     },
     "work-2.report-2cdd87c5-81e8-444e-8075-85ef78e8d3aa": {
       "createdAt": "2026-08-20T06:01:26.367Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.77"
+      ],
       "dependencyEdges": [],
       "description": "Observed: finish-task mangled a quoted `cmd.exe /d /s /c \"npm --prefix server test -- --run test/retention.test.ts ...\"` verification command; durable output became `'etention.test.ts' is not recognized`, while the exact command had passed when invoked directly by the worker.\nExpected: The finalizer should pass a supplied verification command to the selected shell without re-tokenizing or corrupting nested Windows quoting, or provide a structured argv form for cross-platform commands.\nImpact: A passing native server gate is recorded as FAIL, adding false durable evidence and forcing use of an implementation-specific direct Vitest path instead of the task's exact npm command.\nSuggested improvement: Execute verification through a cross-platform spawn API with explicit shell/argv handling and add regression coverage for cmd.exe /c commands containing quoted npm arguments.",
       "displayMetadata": {
@@ -4508,7 +4556,7 @@
       "status": "open",
       "title": "Self-improvement report: finish-task mangled a quoted `cmd.exe /d /s /c \"npm --prefix server test -- --run test/retention.test.ts ...\"` verification comman",
       "type": "task",
-      "updatedAt": "2026-08-20T06:01:26.367Z"
+      "updatedAt": "2026-08-20T11:38:10.780Z"
     },
     "work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8": {
       "createdAt": "2026-08-08T17:28:28.534Z",
@@ -5134,7 +5182,9 @@
     },
     "work-2.report-5e0dec37-d699-41a6-8358-a85df1b113a4": {
       "createdAt": "2026-08-20T05:46:51.737Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.77"
+      ],
       "dependencyEdges": [],
       "description": "Observed: finish-task verification could not execute the repository's checked-in Windows Gradle wrapper when given `gradlew.bat ...`; it recorded `bash: line 1: gradlew.bat: command not found`, even though the same wrapper command was the native focused gate and had passed through the worker environment.\nExpected: The coded finalizer should resolve a checked-in repository wrapper (`gradlew.bat`/`gradlew`) from the project root, or clearly normalize/document it as `./gradlew.bat`, so a valid native verification command does not fail due only to shell PATH semantics.\nImpact: A verified task remains open and emits a misleading failed verification note, forcing a manual retry with shell-specific syntax and adding noise to durable work evidence.\nSuggested improvement: Normalize a leading bare Gradle wrapper token to the project-local executable before invoking the verification shell.",
       "displayMetadata": {
@@ -5168,7 +5218,7 @@
       "status": "open",
       "title": "Self-improvement report: finish-task verification could not execute the repository's checked-in Windows Gradle wrapper when given `gradlew.bat ...`; it rec",
       "type": "task",
-      "updatedAt": "2026-08-20T05:46:51.737Z"
+      "updatedAt": "2026-08-20T11:38:10.679Z"
     },
     "work-2.report-60ff67ad-d2d8-46de-a7a4-b5b4d918e984": {
       "createdAt": "2026-08-07T06:29:07.173Z",
@@ -5847,7 +5897,9 @@
     },
     "work-2.report-9ed01f48-b0f9-48ff-9310-ac5b50701fb3": {
       "createdAt": "2026-08-20T08:20:26.937Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.78"
+      ],
       "dependencyEdges": [],
       "description": "Observed: `finish-task work-1.41 --max-files 4` inserted a tracked `.gitignore` block for `__pycache__/` and then rejected its own mutation as a fifth implementation file (`scope exceeds 4 implementation files`).\nExpected: The coded finalizer should avoid mutating tracked scope for transient Python caches, or exclude its own deterministic ignore-file mutation from implementation-file scope validation; a four-file task should reach the review gate without self-created dirt.\nImpact: The autonomous finish gate blocked valid work, required manual `.gitignore` cleanup, and could repeatedly fail or accidentally include unrelated workflow-generated changes in a product commit.\nSuggested improvement: Perform generated/cache ignore handling before the clean baseline or ignore only in local exclude files, and never count finalizer-created ignore entries against `--max-files`.",
       "evidence": [
@@ -5877,7 +5929,7 @@
       "status": "open",
       "title": "Self-improvement report: `finish-task work-1.41 --max-files 4` inserted a tracked `.gitignore` block for `__pycache__/` and then rejected its own mutation ",
       "type": "task",
-      "updatedAt": "2026-08-20T08:20:26.937Z"
+      "updatedAt": "2026-08-20T11:38:10.976Z"
     },
     "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851": {
       "createdAt": "2026-08-19T05:30:38.715Z",
@@ -6024,7 +6076,9 @@
     },
     "work-2.report-aefe20c8-eff4-48e2-86c8-ede1795db7c5": {
       "createdAt": "2026-08-20T06:02:05.587Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.78"
+      ],
       "dependencyEdges": [],
       "description": "Observed: Calling work_report_improvement from the producer project unexpectedly edited the tracked target file `.gitignore`, appending a global `node_modules/` rule, even though improvement reporting is documented as evidence capture that does not change the producer project.\nExpected: Improvement reporting should write only ignored local report artifacts/native workflow state and must not mutate tracked producer-project source/configuration files.\nImpact: The unrelated `.gitignore` change expanded implementation scope, caused finish-task to reject the task's five-file cap, and required manual cleanup before finalization.\nSuggested improvement: Create any report artifact directory under an already-ignored workflow path without editing the producer repository's tracked ignore file; add a regression asserting git diff paths are unchanged except native work state.",
       "displayMetadata": {
@@ -6063,7 +6117,7 @@
       "status": "open",
       "title": "Self-improvement report: Calling work_report_improvement from the producer project unexpectedly edited the tracked target file `.gitignore`, appending a gl",
       "type": "task",
-      "updatedAt": "2026-08-20T06:02:05.587Z"
+      "updatedAt": "2026-08-20T11:38:10.879Z"
     },
     "work-2.report-b085e2c6-43c6-4e12-b79e-f1eb0da5c571": {
       "createdAt": "2026-08-18T21:22:54.483Z",
@@ -8645,7 +8699,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T10:37:47.217Z"
+    "updatedAt": "2026-08-20T11:41:54.635Z"
   },
   "schemaVersion": 1
 }

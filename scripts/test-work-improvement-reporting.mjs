@@ -33,6 +33,8 @@ const source = path.join(root, "source");
 const consumer = path.join(root, "consumer");
 mkdirSync(path.join(source, "extensions"), { recursive: true });
 mkdirSync(path.join(consumer, ".pi", "work-runs"), { recursive: true });
+const consumerGitignore = ".pi/\nserver/node_modules/\n";
+writeFileSync(path.join(consumer, ".gitignore"), consumerGitignore);
 execFileSync("git", ["init", "--quiet"], { cwd: source });
 writeFileSync(path.join(source, ".gitignore"), ".pi/\n.pi-subagents/\n");
 writeFileSync(
@@ -78,6 +80,11 @@ try {
 	assert(
 		result.taskId && result.epicId && existsSync(result.bundlePath),
 		"report returns durable task and bundle",
+	);
+	assert(
+		readFileSync(path.join(consumer, ".gitignore"), "utf8") ===
+			consumerGitignore,
+		"reporting leaves the producer .gitignore unchanged",
 	);
 	const mirror = path.join(root, "mirror");
 	mkdirSync(path.join(mirror, "extensions"), { recursive: true });
