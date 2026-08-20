@@ -160,6 +160,15 @@ try {
 			largeCheck.failed_assertions[0] === "oversized failure",
 		"temp checks parse the full JSON artifact instead of truncated stdout",
 	);
+	const megabyteCheck = mod.runTempCheck(
+		cwd,
+		"megabyte-fields",
+		`console.log(JSON.stringify({ status: "PASS", summary: "x".repeat(1_200_000), failed_assertions: [] }));`,
+	);
+	assert(
+		megabyteCheck.status === "PASS",
+		"temp checks preserve valid JSON above Node's default buffer limit",
+	);
 	const invalidCheck = mod.runTempCheck(
 		cwd,
 		"invalid-fields",

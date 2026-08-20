@@ -76,6 +76,25 @@ try {
 		evidence: [{ kind: "worker", result: "focused tests passed" }],
 	});
 	saveStore(cwd, store);
+	writeFileSync(path.join(cwd, "note.txt"), "bounded note file\n");
+	assert.match(
+		JSON.parse(run("work-note", "TASK-1", "--note-file", "note.txt")).notes_tail,
+		/bounded note file/,
+		"work-note reads a repository-contained note file",
+	);
+	assert.match(
+		failure("work-note", "TASK-1", "--note-file", path.join(cwd, "note.txt")),
+		/repository-contained file up to 1 MiB/,
+		"work-note rejects absolute note-file paths",
+	);
+	writeFileSync(path.join(cwd, "oversized-note.txt"), "x".repeat(1024 * 1024 + 1));
+	assert.match(
+		failure("work-note", "TASK-1", "--note-file", "oversized-note.txt"),
+		/repository-contained file up to 1 MiB/,
+		"work-note rejects oversized note files",
+	);
+	rmSync(path.join(cwd, "note.txt"));
+	rmSync(path.join(cwd, "oversized-note.txt"));
 
 	const summary = JSON.parse(run("work-summary", "TASK-1"));
 	assert.equal(summary.description, "Review the implementation contract.");
@@ -174,7 +193,7 @@ try {
 		note.startsWith("wo:review-scope "),
 	);
 	reviewed.items["TASK-1"].notes = reviewed.items["TASK-1"].notes.map((note) =>
-		note === scopeNote ? 'wo:review-scope {"files":["source.js"]}' : note,
+		note === scopeNote ? 'wo:review-scope {"files":"source.js"}' : note,
 	);
 	saveStore(cwd, reviewed);
 	const malformedScope = failure(
@@ -189,7 +208,7 @@ try {
 	);
 	assert.match(
 		malformedScope,
-		/invalid persisted wo:review-scope .*expected a JSON array/,
+		/invalid persisted wo:review-scope .*expected files and fingerprint/,
 	);
 	assert.doesNotMatch(malformedScope, /iterable/);
 	reviewed.items["TASK-1"].notes = reviewed.items["TASK-1"].notes.filter(
@@ -232,6 +251,22 @@ try {
 		"wo:review PASS - latest scoped diff approved",
 	);
 	saveStore(cwd, freshlyReviewed);
+	writeFileSync(path.join(cwd, "source.js"), "export default 'changed after review';\n");
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-1",
+			"--max-files",
+			"2",
+			"--message",
+			"scope finalization",
+			...verifyArgs,
+			"--reviewed",
+		),
+		/reviewed file content changed/,
+		"same-path content changes invalidate prior review",
+	);
+	writeFileSync(path.join(cwd, "source.js"), "export default true;\n");
 	writeFileSync(path.join(cwd, "extra.js"), "export default true;\n");
 	assert.match(
 		failure(
@@ -307,8 +342,12 @@ try {
 		"store-only review emits a coded handoff despite preexisting PASS",
 	);
 	assert.ok(
-		loadStore(cwd).items["TASK-EMPTY"].notes.includes("wo:review-scope []"),
-		"store-only handoff persists an explicit empty review scope",
+		loadStore(cwd).items["TASK-EMPTY"].notes.some((note) =>
+			/^wo:review-scope \{"files":\[\],"fingerprint":"[a-f0-9]{64}"\}$/.test(
+				note,
+			),
+		),
+		"store-only handoff persists an explicit empty content-bound review scope",
 	);
 	const reviewedStoreOnly = loadStore(cwd);
 	reviewedStoreOnly.items["TASK-EMPTY"].notes.push(

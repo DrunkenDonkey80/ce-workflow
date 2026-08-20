@@ -5859,15 +5859,18 @@ function runBounded(cwd, command, args = [], options = {}) {
 	let stdout = "";
 	let stderr = "";
 	let exitCode = 0;
+	let bufferOverflow = false;
 	const started = Date.now();
 	try {
 		stdout = execFileSync(actualCommand, actualArgs, {
 			cwd,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "pipe"],
+			maxBuffer: Number(options.maxBuffer ?? 10 * 1024 * 1024),
 		});
 	} catch (error) {
 		exitCode = Number(error.status ?? 1);
+		bufferOverflow = error.code === "ENOBUFS";
 		stdout = String(error.stdout ?? "");
 		stderr = String(error.stderr ?? error.message ?? "");
 	}
@@ -5896,6 +5899,7 @@ function runBounded(cwd, command, args = [], options = {}) {
 		stdout_summary: textHeadTail(stdout, cap),
 		stderr_summary: textHeadTail(stderr, cap),
 		truncated: stdout.length > cap || stderr.length > cap,
+		buffer_overflow: bufferOverflow,
 		full_stdout_path: fullStdoutPath,
 		full_stderr_path: fullStderrPath,
 	};
@@ -7070,6 +7074,9 @@ function issueSummary(issue) {
 		summary.reviewFailures = reviewFailureCount(issue);
 		summary.fixReadyForReview = fixReadyForReview(issue);
 		summary.mechanicalFixAccepted = mechanicalFixAccepted(issue);
+		summary.residualFixAttempted = /^wo:residual-fix PASS /im.test(
+			notesOf(issue),
+		);
 		summary.residualFixAccepted = residualFixAccepted(issue);
 	}
 	return summary;
@@ -8163,12 +8170,15 @@ function planResumeAction(state, cwd, options = {}) {
 						: "Targeted re-review residuals are fixed and verified; finish without a third reviewer.",
 				suggestedCommands: [`/work-finish ${activeImplementation.id}`],
 			};
-		if ((activeImplementation.reviewFailures ?? 0) >= 2)
+		if (
+			(activeImplementation.reviewFailures ?? 0) >= 2 &&
+			activeImplementation.residualFixAttempted
+		)
 			return {
 				...routed,
 				action: "review-blocked",
 				message:
-					"The initial review and one re-review both failed; stop the loop and inspect the durable findings.",
+					"The bounded residual-fix attempt is incomplete; stop the loop and inspect the durable findings.",
 				suggestedCommands: [`/work-report ${activeImplementation.id}`],
 			};
 		if (
@@ -14950,9 +14960,7 @@ function reviewEvents(issue) {
 	const scopeIndex =
 		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
 	return [
-		...notes.matchAll(
-			/^(?:wo:review[ \t]+|review(?: result)?[ \t]*:[ \t]*)(PASS|FAIL)\b/gim,
-		),
+		...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim),
 	].filter((event) => event.index > scopeIndex);
 }
 
@@ -15132,14 +15140,28 @@ function gitDiffChangeCount(cwd, files, ignoreWhitespace = false) {
 		"--",
 		...files,
 	]);
-	return output
+	let total = output
 		.split(/\r?\n/)
 		.filter(Boolean)
-		.reduce((total, line) => {
+		.reduce((sum, line) => {
 			const [added, deleted] = line.split(/\s+/);
-			if (added === "-" || deleted === "-") return total + 10_000;
-			return total + Number(added || 0) + Number(deleted || 0);
+			if (added === "-" || deleted === "-") return sum + 10_000;
+			return sum + Number(added || 0) + Number(deleted || 0);
 		}, 0);
+	const untracked = new Set(
+		run(cwd, "git", ["ls-files", "--others", "--exclude-standard"])
+			.split(/\r?\n/)
+			.filter(Boolean),
+	);
+	for (const file of files.filter((item) => untracked.has(item))) {
+		const absolute = path.join(cwd, file);
+		if (!existsSync(absolute)) continue;
+		total +=
+			statSync(absolute).size > 10 * 1024 * 1024
+				? 10_000
+				: readFileSync(absolute, "utf8").split(/\r?\n/).length;
+	}
+	return total;
 }
 
 function hasFormatterExpandedDiff(cwd, files) {

@@ -76,14 +76,17 @@ export function isWorkflowManaged(file) {
 
 export function ignorePatternForBuildArtifact(file) {
 	const segs = file.replaceAll("\\", "/").split("/");
-	const dirs = new Set(segs.slice(0, -1));
+	const dirs = segs.slice(0, -1);
 	const base = segs[segs.length - 1];
-	for (const dir of Object.keys(DIR_PATTERNS))
-		if (dirs.has(dir)) return DIR_PATTERNS[dir];
-	for (const dir of dirs) {
-		if (/^build-work-[^/]+$/i.test(dir)) return "build-work-*/";
-		if (/\.egg-info$/i.test(dir)) return "*.egg-info/";
-		if (/\.dist-info$/i.test(dir)) return "*.dist-info/";
+	const scopedDirectory = (index) => `/${segs.slice(0, index + 1).join("/")}/`;
+	for (const dir of Object.keys(DIR_PATTERNS)) {
+		const index = dirs.indexOf(dir);
+		if (index >= 0) return scopedDirectory(index);
+	}
+	for (const [index, dir] of dirs.entries()) {
+		if (/^build-work-[^/]+$/i.test(dir)) return scopedDirectory(index);
+		if (/\.egg-info$/i.test(dir)) return scopedDirectory(index);
+		if (/\.dist-info$/i.test(dir)) return scopedDirectory(index);
 	}
 	if (/\.py[cod]$/i.test(base)) return "*.py[cod]";
 	if (/\.pdb$/i.test(base)) return "*.pdb";

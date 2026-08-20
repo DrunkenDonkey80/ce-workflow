@@ -33,17 +33,18 @@ const {
 // --- pure classification by stack ---
 assert(
 	ignorePatternForBuildArtifact("tools/x/build/pkg/Analysis-00.toc") ===
-		"build/",
-	"build/ dir maps to build/",
+		"/tools/x/build/",
+	"build artifacts map to their exact directory",
 );
 assert(
 	ignorePatternForBuildArtifact("tools/x/dist/barcode-display-gui.exe") ===
-		"dist/",
-	"dist/ dir maps to dist/",
+		"/tools/x/dist/",
+	"dist artifacts map to their exact directory",
 );
 assert(
-	ignorePatternForBuildArtifact("pkg/__pycache__/m.pyc") === "__pycache__/",
-	"__pycache__ maps to __pycache__/",
+	ignorePatternForBuildArtifact("pkg/__pycache__/m.pyc") ===
+		"/pkg/__pycache__/",
+	"__pycache__ maps to its exact directory",
 );
 assert(
 	ignorePatternForBuildArtifact("src/m.pyc") === "*.py[cod]",
@@ -61,17 +62,18 @@ assert(
 );
 assert(
 	ignorePatternForBuildArtifact("rf-lib/build-work-9-4/CMakeCache.txt") ===
-		"build-work-*/",
-	"task-specific CMake trees map to one bounded ignore pattern",
+		"/rf-lib/build-work-9-4/",
+	"task-specific CMake trees map to their exact directory",
 );
 assert(
 	ignorePatternForBuildArtifact("a/b/node_modules/lib/index.js") ===
-		"node_modules/",
-	"node_modules maps to node_modules/",
+		"/a/b/node_modules/",
+	"node_modules maps to its exact directory",
 );
 assert(
-	ignorePatternForBuildArtifact("foo/bar.egg-info/PKG-INFO") === "*.egg-info/",
-	".egg-info directories map to *.egg-info/",
+	ignorePatternForBuildArtifact("foo/bar.egg-info/PKG-INFO") ===
+		"/foo/bar.egg-info/",
+	".egg-info directories map to their exact directory",
 );
 assert(
 	ignorePatternForBuildArtifact("bar.egg-info") === "*.egg-info",
@@ -255,16 +257,16 @@ const sorted = (arr) => [...arr].sort();
 assert(
 	sorted(tidy.ignored).join(",") ===
 		sorted([
-			"build/",
-			"build-work-*/",
-			"__pycache__/",
+			"/build/",
+			"/rf-lib/build-work-9-4/",
+			"/__pycache__/",
 			"*.py[cod]",
 			"*.egg-info",
 			"*.egg-info.json",
 			"*.pdb",
-			"node_modules/",
+			"/node_modules/",
 		]).join(","),
-	"build/cache artifacts collected as canonical patterns",
+	"build/cache artifacts are scoped to observed directories",
 );
 assert(
 	sorted(tidy.unrecognized).join(",") ===
@@ -294,7 +296,7 @@ assert(
 );
 const gi = readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8");
 assert(
-	gi.includes("*.py[cod]") && gi.includes("node_modules/"),
+	gi.includes("*.py[cod]") && gi.includes("/node_modules/"),
 	"patterns landed in the local exclude",
 );
 assert(

@@ -100,14 +100,25 @@ function readJson(file, label) {
 }
 
 function assertVerifiedEvidence(evidence, policy) {
+	const required = [
+		evidence?.archive?.sha256,
+		policy?.archive?.sha256,
+		evidence?.licenseEvidence?.path,
+		policy?.license?.path,
+		evidence?.licenseEvidence?.sha256,
+		policy?.license?.sha256,
+		evidence?.licenseEvidence?.spdx,
+		policy?.license?.spdx,
+	];
 	if (
+		required.some((value) => typeof value !== "string" || !value.trim()) ||
 		evidence?.schemaVersion !== 1 ||
 		evidence.release !== policy.release ||
 		evidence.peeledCommitSha !== policy.peeledCommitSha ||
-		evidence.archive?.sha256 !== policy.archive?.sha256 ||
-		evidence.licenseEvidence?.path !== policy.license?.path ||
-		evidence.licenseEvidence?.sha256 !== policy.license?.sha256 ||
-		evidence.licenseEvidence?.spdx !== policy.license?.spdx ||
+		evidence.archive.sha256 !== policy.archive.sha256 ||
+		evidence.licenseEvidence.path !== policy.license.path ||
+		evidence.licenseEvidence.sha256 !== policy.license.sha256 ||
+		evidence.licenseEvidence.spdx !== policy.license.spdx ||
 		evidence.licenseEvidence?.permissionTextPresent !== true ||
 		evidence.runtimeProbe?.zeroEffectiveSurface !== true ||
 		(evidence.containment?.quarantineRemoved !== true &&

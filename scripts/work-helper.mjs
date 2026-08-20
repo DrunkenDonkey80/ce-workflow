@@ -278,6 +278,18 @@ function sameFiles(left = [], right = []) {
 	return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
 
+function reviewFingerprint(cwd, files) {
+	const hash = createHash("sha256");
+	for (const file of [...files].sort()) {
+		const absolute = path.join(cwd, file);
+		hash.update(file).update("\0");
+		if (existsSync(absolute)) hash.update(readFileSync(absolute));
+		else hash.update("<missing>");
+		hash.update("\0");
+	}
+	return hash.digest("hex");
+}
+
 function reviewScope(task) {
 	const matches = [...notesOf(task).matchAll(/^wo:review-scope (.+)$/gim)];
 	if (!matches.length) return undefined;
@@ -287,15 +299,20 @@ function reviewScope(task) {
 		scope = JSON.parse(raw);
 	} catch {
 		throw new Error(
-			`invalid persisted wo:review-scope ${JSON.stringify(raw)}: expected a JSON array of file paths`,
+			`invalid persisted wo:review-scope ${JSON.stringify(raw)}: expected files and fingerprint`,
 		);
 	}
+	if (Array.isArray(scope)) scope = { files: scope };
 	if (
-		!Array.isArray(scope) ||
-		scope.some((file) => typeof file !== "string" || !file.trim())
+		!scope ||
+		typeof scope !== "object" ||
+		!Array.isArray(scope.files) ||
+		scope.files.some((file) => typeof file !== "string" || !file.trim()) ||
+		(scope.fingerprint !== undefined &&
+			!/^\p{ASCII_Hex_Digit}{64}$/u.test(scope.fingerprint))
 	)
 		throw new Error(
-			`invalid persisted wo:review-scope ${JSON.stringify(scope)}: expected a JSON array of file paths`,
+			`invalid persisted wo:review-scope ${JSON.stringify(scope)}: expected files and fingerprint`,
 		);
 	return scope;
 }
@@ -357,6 +374,16 @@ function dispositionCovers(target, disposition) {
 					.length === 1,
 		)
 	);
+}
+
+function directReviewPassed(task) {
+	const notes = notesOf(task);
+	const scopeIndex =
+		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
+	const reviews = [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)].filter(
+		(event) => event.index > scopeIndex,
+	);
+	return reviews.at(-1)?.[1]?.toUpperCase() === "PASS";
 }
 
 function reviewDispositionSatisfied(task, implementationFiles) {
@@ -546,7 +573,7 @@ async function finishTaskUnlocked() {
 				`invalid implementation file ${file}: require an existing task-owned file inside the execution repository`,
 			);
 	}
-	const priorScope = reviewScope(task) ?? [];
+	const priorScope = reviewScope(task)?.files ?? [];
 	const ownedImplementationFiles = new Set([
 		...declaredImplementationFiles,
 		...priorScope.map((file) => file.replaceAll("\\", "/")),
@@ -829,20 +856,29 @@ async function finishTaskUnlocked() {
 	if (reviewReasons.length) {
 		const reviewed = args.includes("--reviewed");
 		const persistedReviewScope = reviewScope(task);
+		const currentReviewFingerprint = reviewFingerprint(
+			executionRoot,
+			implementationFiles,
+		);
+		const sameReviewFiles = sameFiles(
+			persistedReviewScope?.files,
+			implementationFiles,
+		);
+		const freshReviewScope =
+			sameReviewFiles &&
+			persistedReviewScope?.fingerprint === currentReviewFingerprint;
+		const directReviewAccepted = directReviewPassed(task);
 		const accepted =
-			persistedReviewScope !== undefined &&
-			sameFiles(persistedReviewScope, implementationFiles) &&
-			reviewDispositionSatisfied(task, implementationFiles);
+			sameReviewFiles &&
+			reviewDispositionSatisfied(task, implementationFiles) &&
+			(!directReviewAccepted || freshReviewScope);
 		if (!accepted && !reviewed) {
-			if (
-				persistedReviewScope === undefined ||
-				!sameFiles(persistedReviewScope, implementationFiles)
-			)
+			if (!freshReviewScope)
 				mutateStore(cwd, (store) =>
 					appendWorkNote(
 						store,
 						id,
-						`wo:review-scope ${JSON.stringify(implementationFiles)}`,
+						`wo:review-scope ${JSON.stringify({ files: implementationFiles, fingerprint: currentReviewFingerprint })}`,
 					),
 				);
 			throw new Error(
@@ -860,9 +896,13 @@ async function finishTaskUnlocked() {
 			throw new Error(
 				"--reviewed requires a persisted wo:review-scope; rerun finish-task without --reviewed to generate the coded handoff",
 			);
-		if (!sameFiles(persistedReviewScope, implementationFiles))
+		if (!sameReviewFiles)
 			throw new Error(
 				"review scope changed; rerun finish-task without --reviewed to regenerate the coded handoff",
+			);
+		if (directReviewAccepted && !freshReviewScope)
+			throw new Error(
+				"reviewed file content changed; rerun finish-task without --reviewed to regenerate the coded handoff",
 			);
 		if (!accepted)
 			throw new Error(
@@ -1296,7 +1336,7 @@ try {
 			raw = run("rg", rgArgs);
 		} catch (error) {
 			raw = String(error.stdout ?? "");
-			exitCode = Number(error.status ?? 1);
+			exitCode = Number.isInteger(error.status) ? error.status : 2;
 		}
 		const fullLogPath =
 			raw.length > bytes ? artifact(command, "txt", raw) : undefined;
@@ -1307,9 +1347,9 @@ try {
 			byFile[file] = (byFile[file] ?? 0) + 1;
 		}
 		const capped = capText(raw, bytes);
-		let status = "PASS";
-		if (lines.length) status = "found";
-		else if (command === "scan-capability") status = "missing";
+		let status = exitCode > 1 ? "ERROR" : "PASS";
+		if (exitCode <= 1 && lines.length) status = "found";
+		else if (exitCode <= 1 && command === "scan-capability") status = "missing";
 		print({
 			status,
 			exit_code: exitCode,
@@ -1410,9 +1450,26 @@ try {
 			);
 		let note;
 		if (noteArgs[0] === "--note-file") {
-			if (noteArgs.length !== 2 || statSync(noteArgs[1]).size > 1024 * 1024)
-				throw new Error("--note-file requires one file up to 1 MiB");
-			note = readFileSync(noteArgs[1], "utf8");
+			const requested = noteArgs[1];
+			const file = requested ? path.resolve(cwd, requested) : "";
+			const relative = file ? path.relative(cwd, file) : "";
+			if (
+				noteArgs.length !== 2 ||
+				path.isAbsolute(requested) ||
+				!relative ||
+				relative === ".." ||
+				relative.startsWith(`..${path.sep}`) ||
+				!existsSync(file) ||
+				!statSync(file).isFile() ||
+				statSync(file).size > 1024 * 1024 ||
+				["..", `..${path.sep}`].some((prefix) =>
+					path.relative(realpathSync(cwd), realpathSync(file)).startsWith(prefix),
+				)
+			)
+				throw new Error(
+					"--note-file requires one repository-contained file up to 1 MiB",
+				);
+			note = readFileSync(file, "utf8");
 		} else note = noteArgs.join(" ");
 		print(
 			summary(

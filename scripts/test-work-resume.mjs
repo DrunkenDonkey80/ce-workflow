@@ -400,6 +400,28 @@ const childrenByScenario = {
 				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - permission guard is missing\nwo:fix PASS - guard added\nwo:verify-check PASS\nwo:mechanical-fix PASS {"dispositions":[{"finding":"permission guard is missing","fix":"guard added","evidence":"focused test passed"}]}',
 		},
 	],
+	inProgressSecondReviewFail: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Update authentication permission checks",
+			notes:
+				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - first finding\nwo:fix PASS\nwo:verify-check PASS\nwo:review FAIL {"findings":["residual A"]}',
+		},
+	],
+	inProgressLargeUntracked: [
+		{
+			id: "AUTH-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "in_progress",
+			title: "Add authentication permission checks",
+			notes:
+				"wo:execution-agent\nFiles changed: new-large.js.\nwo:verify-check PASS",
+		},
+	],
 	inProgressReviewCap: [
 		{
 			id: "AUTH-1",
@@ -517,6 +539,10 @@ function installFakeCommands() {
 const args = process.argv.slice(2);
 const dirty = process.env.WORK_RESUME_GIT_DIRTY || "clean";
 if (process.env.WORK_RESUME_GIT_FAIL === "1") process.exit(1);
+if (args[0] === "ls-files" && process.env.WORK_RESUME_UNTRACKED === "1") {
+  console.log("new-large.js");
+  process.exit(0);
+}
 if (args[0] === "diff") {
   if (dirty.startsWith("formatter-") && args.includes("--numstat")) {
     if (dirty === "formatter-expanded-staged" && !args.includes("HEAD")) process.exit(0);
@@ -564,6 +590,7 @@ const oldEnv = {
 	scenario: process.env.WORK_RESUME_SCENARIO,
 	dirty: process.env.WORK_RESUME_GIT_DIRTY,
 	gitFail: process.env.WORK_RESUME_GIT_FAIL,
+	untracked: process.env.WORK_RESUME_UNTRACKED,
 };
 process.env.PI_CODING_AGENT_DIR = globalDir;
 process.env.WORK_ORCH_GIT_BIN = path.join(bin, "fake-git.mjs");
@@ -952,6 +979,24 @@ try {
 			!state.selectedWorkItem.mechanicalFixAccepted,
 		"production fixes cannot self-classify as mechanical to bypass re-review",
 	);
+
+	setScenario("inProgressSecondReviewFail");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-fix" && state.handoffPrompt,
+		"the second review FAIL launches one bounded residual fixer",
+	);
+
+	writeFileSync(path.join(cwd, "new-large.js"), "line\n".repeat(301));
+	process.env.WORK_RESUME_UNTRACKED = "1";
+	setScenario("inProgressLargeUntracked");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-review",
+		"large untracked implementation files cannot enter the small-diff finish path",
+	);
+	delete process.env.WORK_RESUME_UNTRACKED;
+	rmSync(path.join(cwd, "new-large.js"));
 
 	setScenario("inProgressReviewCap");
 	state = buildWorkResumeState(cwd, "E-1");
@@ -1776,6 +1821,8 @@ try {
 	else process.env.WORK_RESUME_GIT_DIRTY = oldEnv.dirty;
 	if (oldEnv.gitFail === undefined) delete process.env.WORK_RESUME_GIT_FAIL;
 	else process.env.WORK_RESUME_GIT_FAIL = oldEnv.gitFail;
+	if (oldEnv.untracked === undefined) delete process.env.WORK_RESUME_UNTRACKED;
+	else process.env.WORK_RESUME_UNTRACKED = oldEnv.untracked;
 	rmSync(bin, { recursive: true, force: true });
 	rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalDir, { recursive: true, force: true });
