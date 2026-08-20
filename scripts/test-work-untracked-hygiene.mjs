@@ -219,6 +219,7 @@ writeFileSync(path.join(repo, "src", "huge.dat"), "");
 truncateSync(path.join(repo, "src", "huge.dat"), 10 * 1024 * 1024 + 1);
 writeFileSync(path.join(repo, "mystery.dat"), "x");
 writeFileSync(path.join(repo, "package.egg-info"), "x");
+writeFileSync(path.join(repo, "metadata.egg-info.json"), "x");
 writeFileSync(path.join(repo, "symbols.pdb"), "x");
 writeFileSync(path.join(repo, "data.bin"), "x");
 writeFileSync(path.join(repo, "events.ndjson"), '{"event":"start"}\n');
@@ -259,6 +260,7 @@ assert(
 			"__pycache__/",
 			"*.py[cod]",
 			"*.egg-info",
+			"*.egg-info.json",
 			"*.pdb",
 			"node_modules/",
 		]).join(","),
@@ -266,12 +268,9 @@ assert(
 );
 assert(
 	sorted(tidy.unrecognized).join(",") ===
-		sorted([
-			"mystery.dat",
-			"data.bin",
-			"src/huge.dat",
-			"too-large.ndjson",
-		]).join(","),
+		sorted(["mystery.dat", "data.bin", "src/huge.dat", "too-large.ndjson"]).join(
+			",",
+		),
 	"only unknown or oversized files are escalated",
 );
 assert(
@@ -309,12 +308,9 @@ assert(tidy2.ignored.length === 0, "second run collects no new artifacts");
 assert(!tidy2.excludeWritten, "second run does not rewrite the local exclude");
 assert(
 	sorted(tidy2.unrecognized).join(",") ===
-		sorted([
-			"mystery.dat",
-			"data.bin",
-			"src/huge.dat",
-			"too-large.ndjson",
-		]).join(","),
+		sorted(["mystery.dat", "data.bin", "src/huge.dat", "too-large.ndjson"]).join(
+			",",
+		),
 	"unknown and oversized files remain escalated on the second run",
 );
 
