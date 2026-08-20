@@ -43,7 +43,10 @@ function fixture(name, changedFile = "src/a.js") {
 	git(cwd, "config", "user.name", "Fixture");
 	mkdirSync(path.join(cwd, path.dirname(changedFile)), { recursive: true });
 	writeFileSync(path.join(cwd, changedFile), "export const value = 1;\n");
-	writeFileSync(path.join(cwd, ".gitignore"), ".pi/\n.ce-workflow/work-runs/\n.pi-subagents/\n");
+	writeFileSync(
+		path.join(cwd, ".gitignore"),
+		".pi/\n.ce-workflow/work-runs/\n.pi-subagents/\n",
+	);
 	const store = initStore(cwd);
 	createWorkItem(store, {
 		id: "E-1",
@@ -258,10 +261,7 @@ try {
 	);
 	mutateStore(cwd, (store) =>
 		updateWorkItem(store, "W-1", {
-			notes: [
-				...store.items["W-1"].notes,
-				"wo:review PASS independent",
-			],
+			notes: [...store.items["W-1"].notes, "wo:review PASS independent"],
 		}),
 	);
 	helperRun = runHelper();
@@ -272,7 +272,9 @@ try {
 		"accepted direct-helper evidence is reused and reaches the fake finish boundary exactly once without a real commit",
 	);
 
-	process.stdout.write("ok - native quality policy and autonomous finish fixtures\n");
+	process.stdout.write(
+		"ok - native quality policy and autonomous finish fixtures\n",
+	);
 } finally {
 	for (const cwd of roots) rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalDir, { recursive: true, force: true });

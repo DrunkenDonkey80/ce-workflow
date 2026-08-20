@@ -96,7 +96,10 @@ try {
 			ready.length === 1 && ready[0].id === "TASK-123" && !ready[0].notes_tail,
 			"native ready helper returns compact execution fields without bd",
 		);
-		writeFileSync(path.join(cwd, "direct note"), "file contents must not replace the note");
+		writeFileSync(
+			path.join(cwd, "direct note"),
+			"file contents must not replace the note",
+		);
 		execFileSync(
 			process.execPath,
 			[helper, "work-note", "TASK-123", "direct note"],

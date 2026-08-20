@@ -14975,9 +14975,9 @@ function reviewEvents(issue) {
 	const notes = notesOf(issue);
 	const scopeIndex =
 		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
-	return [
-		...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim),
-	].filter((event) => event.index > scopeIndex);
+	return [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)].filter(
+		(event) => event.index > scopeIndex,
+	);
 }
 
 function latestReviewVerdict(issue) {
@@ -15123,7 +15123,10 @@ function hasVerificationEvidence(issue) {
 	return (
 		verifiedAt !== undefined &&
 		verifiedAt >
-			Math.max(lower.lastIndexOf("wo:fix pass"), lower.lastIndexOf("wo:review-scope "))
+			Math.max(
+				lower.lastIndexOf("wo:fix pass"),
+				lower.lastIndexOf("wo:review-scope "),
+			)
 	);
 }
 
@@ -24371,7 +24374,9 @@ export default function workModelsExtension(pi) {
 		const workflowMeta = activeWorkAgent?.meta ?? pendingWorkPrompt?.meta ?? {};
 		const workflowAuthorization =
 			contextCompactState.workflowAuthorization ??
-			(workflowTurnAuthorized || activeWorkGoalRunning || workflowMeta.workflowRunId
+			(workflowTurnAuthorized ||
+			activeWorkGoalRunning ||
+			workflowMeta.workflowRunId
 				? {
 						marker: "work-orchestrator",
 						goalId:
@@ -24382,8 +24387,7 @@ export default function workModelsExtension(pi) {
 						activity: workflowMeta.activity,
 						mode: workflowMeta.mode,
 						epicId: workflowMeta.epicId,
-						workItemId:
-							workflowMeta.workItemId ?? compactionTargetId(activeWorkGoal),
+						workItemId: workflowMeta.workItemId ?? compactionTargetId(activeWorkGoal),
 					}
 				: null);
 		return {
