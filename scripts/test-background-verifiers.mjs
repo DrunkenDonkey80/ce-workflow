@@ -47,6 +47,7 @@ import {
 	reconcileVerifierRuns,
 	verifierCompletionBlocker,
 	verifierStatus,
+	renderTriageClaim,
 	renderVerifierFinding,
 	verifierTelemetryEvents,
 } from "../extensions/background-verifiers.js";
@@ -350,6 +351,37 @@ try {
 			"2026-07-21T00:00:03.000Z",
 		),
 		undefined,
+	);
+	const acceptedCompletionFinding = mutateVerifierStore(triageCwd, (state) =>
+		addFinding(state, {
+			reportId: triageReport.id,
+			operation: "security",
+			model: triageJob.model,
+			checkpoint: triageBatch.checkpoint,
+			path: "extensions/work-models.js",
+			startLine: 1,
+			endLine: 1,
+			category: "lease-recovery",
+			severity: "medium",
+			rationale: "accepted work still needs fix evidence",
+			evidence: "fix is pending",
+			suggestedAction: "complete it",
+		}),
+	);
+	mutateVerifierStore(triageCwd, (state) =>
+		recordDisposition(state, {
+			findingId: acceptedCompletionFinding.id,
+			disposition: "accepted",
+			reason: "verified",
+		}),
+	);
+	assert.match(
+		verifierCompletionBlocker(
+			loadVerifierStore(triageCwd),
+			"2026-07-21T00:00:03.000Z",
+		),
+		/accepted findings awaiting fix completion/,
+		"completion names accepted fixes instead of calling them untriaged",
 	);
 
 	const failedCwd = repo();
@@ -2066,6 +2098,14 @@ try {
 			now: "2026-07-21T03:02:00.000Z",
 		}),
 	);
+	assert.equal(
+		renderTriageClaim(
+			loadVerifierStore(reconcileCwd),
+			triageClaims[0].id,
+		).findings[0].disposition,
+		"accepted",
+		"pending fixes are rendered as already accepted instead of fresh triage",
+	);
 	mutateVerifierStore(reconcileCwd, (state) =>
 		recordTriageDisposition(state, {
 			claimId: triageClaims[0].id,
@@ -2081,39 +2121,53 @@ try {
 		"claimed",
 		"accepted finding blocks routing until fixed",
 	);
-	throwsCategory(
-		() =>
-			renewAcceptedFixClaim(loadVerifierStore(reconcileCwd), {
-				claimId: triageClaims[0].id,
-				ownerSession: triageOwner,
-				findingIds: [acceptedFinding],
-				verification: ["node test"],
-				now: "2026-07-21T04:00:00.000Z",
-			}),
-		"locked",
-	);
-	const renewedFixClaim = mutateVerifierStore(reconcileCwd, (state) =>
+	const expiredRenewal = mutateVerifierStore(reconcileCwd, (state) =>
 		renewAcceptedFixClaim(state, {
 			claimId: triageClaims[0].id,
 			ownerSession: triageOwner,
 			findingIds: [acceptedFinding],
 			verification: ["node test"],
-			now: "2026-07-21T03:03:30.000Z",
+			now: "2026-07-21T04:00:00.000Z",
+		}),
+	);
+	assert.equal(
+		expiredRenewal.leaseUntil,
+		"2026-07-21T04:30:00.000Z",
+		"the current owner can resume an accepted fix after its lease expires",
+	);
+	const fixOwner = "triage-d";
+	const recoveredFixClaims = mutateVerifierStore(reconcileCwd, (state) =>
+		claimCompletedGroups(state, {
+			ownerSession: fixOwner,
+			now: "2026-07-21T05:00:00.000Z",
+		}),
+	);
+	assert(
+		recoveredFixClaims.some((claim) => claim.id === triageClaims[0].id),
+		"expired accepted fixes return to later continuations",
+	);
+	const renewedFixClaim = mutateVerifierStore(reconcileCwd, (state) =>
+		renewAcceptedFixClaim(state, {
+			claimId: triageClaims[0].id,
+			ownerSession: fixOwner,
+			findingIds: [acceptedFinding],
+			verification: ["node test"],
+			now: "2026-07-21T05:01:00.000Z",
 		}),
 	);
 	assert.equal(
 		renewedFixClaim.leaseUntil,
-		"2026-07-21T03:33:30.000Z",
+		"2026-07-21T05:31:00.000Z",
 		"accepted fixes renew and validate their claim before Git mutation",
 	);
 	mutateVerifierStore(reconcileCwd, (state) =>
 		completeAcceptedFix(state, {
 			claimId: triageClaims[0].id,
-			ownerSession: triageOwner,
+			ownerSession: fixOwner,
 			findingIds: [acceptedFinding],
 			commit: "a".repeat(40),
 			verification: ["node test"],
-			now: "2026-07-21T03:04:00.000Z",
+			now: "2026-07-21T05:02:00.000Z",
 		}),
 	);
 	assert.equal(
@@ -2124,8 +2178,8 @@ try {
 	assert.equal(
 		mutateVerifierStore(reconcileCwd, (state) =>
 			claimCompletedGroups(state, {
-				ownerSession: "triage-c",
-				now: "2026-07-21T03:04:30.000Z",
+				ownerSession: fixOwner,
+				now: "2026-07-21T05:03:00.000Z",
 			}),
 		).length,
 		0,
@@ -2143,14 +2197,14 @@ try {
 	mutateVerifierStore(reconcileCwd, (state) =>
 		reopenGroup(state, {
 			groupId: triageGroup.id,
-			now: "2026-07-21T03:05:00.000Z",
+			now: "2026-07-21T05:04:00.000Z",
 		}),
 	);
 	assert.equal(
 		mutateVerifierStore(reconcileCwd, (state) =>
 			claimCompletedGroups(state, {
 				ownerSession: triageOwner,
-				now: "2026-07-21T03:06:00.000Z",
+				now: "2026-07-21T05:05:00.000Z",
 			}),
 		).length,
 		1,

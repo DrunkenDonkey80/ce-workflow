@@ -1495,10 +1495,17 @@ function findingNeedsTriage(store, finding) {
 		!batch?.analysisMaterializedAt
 	);
 }
-function remainingFindings(next, group) {
-	return group.findingIds.filter((id) =>
-		findingNeedsTriage(next, next.findings[id]),
+function findingNeedsFix(store, finding) {
+	return (
+		store.dispositions[finding.dispositionId]?.disposition === "accepted" &&
+		!finding.fixId
 	);
+}
+function remainingFindings(next, group) {
+	return group.findingIds.filter((id) => {
+		const finding = next.findings[id];
+		return findingNeedsTriage(next, finding) || findingNeedsFix(next, finding);
+	});
 }
 function updateGroupTriage(next, group) {
 	const members = group.findingIds.map((id) => next.findings[id]);
@@ -1574,11 +1581,14 @@ export function claimCompletedGroups(store, input = {}) {
 			.map((group) => claimGroupIn(next, { ...input, groupId: group.id }));
 	});
 }
-function ownedClaim(next, input) {
+function ownedClaim(next, input, options = {}) {
 	const claim = next.claims[input.claimId];
 	if (!claim || claim.ownerSession !== input.ownerSession)
 		throw error("locked", "Verifier claim is not owned by this session");
-	if (Date.parse(claim.leaseUntil) <= Date.parse(now(input.now)))
+	if (
+		!options.allowExpired &&
+		Date.parse(claim.leaseUntil) <= Date.parse(now(input.now))
+	)
 		throw error("locked", "Verifier claim lease expired");
 	return claim;
 }
@@ -1653,8 +1663,8 @@ export function recordTriageDisposition(store, input = {}) {
 		return disposition;
 	});
 }
-function acceptedFixContext(next, input) {
-	const claim = ownedClaim(next, input);
+function acceptedFixContext(next, input, options) {
+	const claim = ownedClaim(next, input, options);
 	const group = next.groups[claim.groupId];
 	const findingIds = [...new Set(input.findingIds ?? [])].sort();
 	if (
@@ -1681,7 +1691,9 @@ function acceptedFixContext(next, input) {
 
 export function renewAcceptedFixClaim(store, input = {}) {
 	return edit(store, (next) => {
-		const { claim } = acceptedFixContext(next, input);
+		const { claim } = acceptedFixContext(next, input, {
+			allowExpired: true,
+		});
 		renewClaim(claim, input);
 		return claim;
 	});
@@ -2839,13 +2851,14 @@ export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 	);
 	if (jobs.some((job) => ["queued", "running"].includes(job.status)))
 		return "background verification is still queued or running";
-	if (
-		Object.values(store.findings).some((finding) => {
-			const report = store.reports[finding.reportId];
-			return batchIds.has(report?.batchId) && findingNeedsTriage(store, finding);
-		})
-	)
+	const findings = Object.values(store.findings).filter((finding) => {
+		const report = store.reports[finding.reportId];
+		return batchIds.has(report?.batchId);
+	});
+	if (findings.some((finding) => findingNeedsTriage(store, finding)))
 		return "background verification has findings awaiting triage";
+	if (findings.some((finding) => findingNeedsFix(store, finding)))
+		return "background verification has accepted findings awaiting fix completion";
 }
 function quoted(value, limit = 500) {
 	return JSON.stringify(String(value).slice(0, limit));

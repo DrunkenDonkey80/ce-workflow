@@ -1128,7 +1128,7 @@ try {
 			.split(/\r?\n/)
 			.filter((line) => line && !line.includes(".pi/"))
 			.map((line) => line.trim()),
-			["M .gradle/cache.bin"],
+		["M .gradle/cache.bin"],
 		"tracked generated dirt remains unstaged and does not block close",
 	);
 	assert.doesNotMatch(

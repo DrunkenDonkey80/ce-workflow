@@ -18,6 +18,7 @@ import {
 	addFinding,
 	addGroup,
 	claimGroup,
+	completeAcceptedFix,
 	createBatch,
 	initVerifierStore,
 	loadVerifierStore,
@@ -2767,6 +2768,11 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		/Verifier triage is mandatory/,
 		"automatic continuation includes the claimed verifier handoff",
 	);
+	await tempHooks.before_agent_start(
+		{ prompt: sent.at(-1).message, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
 	const verifierInbox = await tempTools.work_verifier_inbox.execute(
 		"goal-verifier-inbox",
 		{},
@@ -2784,8 +2790,34 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			claimId: verifierInbox.details.claims[0].claim.id,
 			ownerSession: `process-${process.pid}`,
 			findingId: completionFinding.id,
-			disposition: "rejected",
+			disposition: "accepted",
 			reason: "goal continuation claim path verified",
+		}),
+	);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Accepted verifier fix remains." }],
+				},
+			],
+		},
+		ctx,
+	);
+	await settle();
+	assert.match(
+		sent.at(-1).message,
+		/already accepted; fix completion pending/,
+		"accepted findings resume as fix work rather than fresh triage",
+	);
+	mutateVerifierStore(cwd, (store) =>
+		completeAcceptedFix(store, {
+			claimId: verifierInbox.details.claims[0].claim.id,
+			ownerSession: `process-${process.pid}`,
+			findingIds: [completionFinding.id],
+			commit: "d".repeat(40),
+			verification: ["fixture verification"],
 		}),
 	);
 	const completionResult = await tempTools.work_goal_complete.execute(
