@@ -267,8 +267,14 @@ function supportRuns(
 	} = {},
 ) {
 	const runs = [];
+	let lanes = [];
 	try {
-		for (const lane of Object.values(loadLanes(cwd).lanes ?? {}))
+		lanes = Object.values(loadLanes(cwd).lanes ?? {});
+	} catch {
+		// Optional lane state must not hide direct runs.
+	}
+	for (const lane of lanes) {
+		try {
 			runs.push(
 				runRecord(cwd, {
 					workflowRunId: lane.id,
@@ -283,12 +289,18 @@ function supportRuns(
 					timestamp: lane.timestamps?.updatedAt,
 				}),
 			);
-	} catch {
-		// Optional lane state must not hide direct runs.
+		} catch {
+			// Skip only the malformed optional lane.
+		}
 	}
+	let verifierStore;
 	try {
-		const verifierStore = loadVerifiers(cwd);
-		for (const job of Object.values(verifierStore.jobs ?? {})) {
+		verifierStore = loadVerifiers(cwd);
+	} catch {
+		// A missing verifier store is normal.
+	}
+	for (const job of Object.values(verifierStore?.jobs ?? {})) {
+		try {
 			const batch = verifierStore.batches?.[job.batchId];
 			const launch = job.launch ?? {};
 			runs.push(
@@ -309,9 +321,9 @@ function supportRuns(
 						job.createdAt,
 				}),
 			);
+		} catch {
+			// Skip only the malformed optional verifier record.
 		}
-	} catch {
-		// A missing verifier store is normal.
 	}
 	return runs;
 }
@@ -530,8 +542,12 @@ function wrap(value, width) {
 }
 
 function pathWithin(base, candidate) {
-	const root = resolve(base);
-	const file = resolve(candidate);
+	let root = resolve(base);
+	let file = resolve(candidate);
+	if (process.platform === "win32") {
+		root = root.toLowerCase();
+		file = file.toLowerCase();
+	}
 	return file === root || file.startsWith(`${root}${sep}`);
 }
 
@@ -588,7 +604,7 @@ function contentText(value) {
 
 export function transcriptEvents(
 	row,
-	{ readFile = readFileSync, sessionFile = process.env.PI_SESSION_FILE } = {},
+	{ readTail = tailLines, sessionFile = process.env.PI_SESSION_FILE } = {},
 ) {
 	const step = row.step ?? {};
 	const projectRoots = [
@@ -627,7 +643,10 @@ export function transcriptEvents(
 		);
 		if (!output) return [];
 		try {
-			return [{ kind: "assistant", text: readFile(output, "utf8") }];
+			const lines = readTail(output);
+			return lines.length
+				? [{ kind: "assistant", text: lines.filter(Boolean).join("\n") }]
+				: [];
 		} catch {
 			return [];
 		}
