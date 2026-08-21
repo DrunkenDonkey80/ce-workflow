@@ -1033,6 +1033,8 @@ function normalizedShard(input, index) {
 		fail("invalid", `Verification shard ${index + 1} has an invalid id`);
 	if (!text(input.command))
 		fail("invalid", `Verification shard ${id} needs a command`);
+	if (input.required === false)
+		fail("invalid", `Verification shard ${id} cannot be optional`);
 	return {
 		id,
 		command: input.command,
@@ -1041,7 +1043,6 @@ function normalizedShard(input, index) {
 		outputs: sortedStrings(input.outputs ?? [], "outputs").map(
 			verificationOutputPath,
 		),
-		required: input.required !== false,
 	};
 }
 export function normalizeVerificationShards(shards) {
@@ -1228,7 +1229,7 @@ export async function runVerificationShardBatch(
 						outputs: shard.outputs,
 						baseHead,
 						sourceFingerprint: sourceFingerprint.digest,
-						required: shard.required,
+						required: true,
 					});
 					if (exitStatus !== 0 && options.failFast !== false) stopped = true;
 					active.delete(shard.id);
@@ -1263,7 +1264,7 @@ export async function runVerificationShardBatch(
 						outputs: shard.outputs,
 						baseHead,
 						sourceFingerprint: sourceFingerprint.digest,
-						required: shard.required,
+						required: true,
 					});
 				}
 				resolveBatch();
@@ -1302,7 +1303,7 @@ export async function runVerificationShardBatch(
 		metrics,
 		status:
 			fingerprintsEqual(sourceFingerprint, currentFingerprint) &&
-			ordered.every((result) => !result.required || result.status === "PASS")
+			ordered.every((result) => result.status === "PASS")
 				? "PASS"
 				: "FAIL",
 	};
@@ -1425,15 +1426,12 @@ export function admitVerificationManifest(manifest, expected = {}) {
 			JSON.stringify(result.resourceKeys) !==
 				JSON.stringify(declaration.resourceKeys) ||
 			JSON.stringify(result.outputs) !== JSON.stringify(declaration.outputs) ||
-			result.required !== declaration.required
+			result.required !== true
 		)
 			reject(
 				`Verification shard ${declaration.id} does not match its declaration`,
 			);
-		if (
-			declaration.required &&
-			(result.status !== "PASS" || result.exitStatus !== 0)
-		)
+		if (result.status !== "PASS" || result.exitStatus !== 0)
 			reject(`Required verification shard ${declaration.id} did not pass`);
 		if (
 			!/^[0-9a-f]{64}$/.test(result.outputHash) ||

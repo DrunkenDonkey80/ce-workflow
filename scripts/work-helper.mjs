@@ -390,8 +390,7 @@ function reviewEvents(task) {
 	return {
 		postScope: all.filter((event) => event.index > scopeIndex),
 		priorFailures: all.filter(
-			(event) =>
-				event.index < scopeIndex && event[1]?.toUpperCase() === "FAIL",
+			(event) => event.index < scopeIndex && event[1]?.toUpperCase() === "FAIL",
 		).length,
 	};
 }
@@ -407,11 +406,12 @@ function reviewDispositionSatisfied(task) {
 		(event) => event[1]?.toUpperCase() === "FAIL",
 	).length;
 	const target = targetedReviewFindings(task);
-	const kind = failures >= 2 || (failures === 1 && priorFailures)
-		? "residual-fix"
-		: failures === 1
-			? "mechanical-fix"
-			: undefined;
+	const kind =
+		failures >= 2 || (failures === 1 && priorFailures)
+			? "residual-fix"
+			: failures === 1
+				? "mechanical-fix"
+				: undefined;
 	return kind && dispositionCovers(target, dispositionNote(task, kind));
 }
 
@@ -678,9 +678,7 @@ async function finishTaskUnlocked() {
 			...options("--evidence-file").map((file) =>
 				path.posix.normalize(file.replaceAll("\\", "/")),
 			),
-			...(evidenceOnly
-				? gitStatusPaths(executionRoot).filter(evidencePath)
-				: []),
+			...(evidenceOnly ? gitStatusPaths(executionRoot).filter(evidencePath) : []),
 		]),
 	];
 	let evidenceBytes = 0;
@@ -847,8 +845,7 @@ async function finishTaskUnlocked() {
 	);
 	if (!changed.length) throw new Error("no related changes to commit");
 	const implementationFiles = changed.filter(
-		(file) =>
-			!file.startsWith(".ce-workflow/") && !evidenceFileSet.has(file),
+		(file) => !file.startsWith(".ce-workflow/") && !evidenceFileSet.has(file),
 	);
 	if (implementationFiles.length > maxFiles)
 		throw new Error(
@@ -856,7 +853,9 @@ async function finishTaskUnlocked() {
 		);
 	const reviewReasons = [];
 	const sensitivePaths = implementationFiles.filter((file) =>
-		/(?:^|\/)(?:migrations?|schema|auth|security|permissions?|payments?|billing|secrets?|deploy|infra)(?:\/|\.|$)|\.github\/workflows\//i.test(file),
+		/(?:^|\/)(?:migrations?|schema|auth|security|permissions?|payments?|billing|secrets?|deploy|infra)(?:\/|\.|$)|\.github\/workflows\//i.test(
+			file,
+		),
 	);
 	if (sensitivePaths.length)
 		reviewReasons.push(`sensitive paths: ${sensitivePaths.join(", ")}`);
@@ -1024,9 +1023,7 @@ async function finishTaskUnlocked() {
 			}),
 		);
 		const ownerChanges = relevantChanges(ownerRepositoryRoot);
-		if (
-			ownerChanges.some((file) => file !== ".ce-workflow/work-items.json")
-		)
+		if (ownerChanges.some((file) => file !== ".ce-workflow/work-items.json"))
 			throw new Error(
 				`non-work-store files changed during close: ${ownerChanges.join(", ")}`,
 			);
@@ -1120,9 +1117,7 @@ async function finishTask() {
 	);
 	const ownerRoot = canonicalGitRoot(cwd, "owner root");
 	const lockRoots =
-		executionRoot === ownerRoot
-			? [ownerRoot]
-			: [ownerRoot, executionRoot].sort();
+		executionRoot === ownerRoot ? [ownerRoot] : [ownerRoot, executionRoot].sort();
 	const mutations = [];
 	try {
 		for (const root of lockRoots)

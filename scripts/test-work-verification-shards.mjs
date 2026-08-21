@@ -13,6 +13,7 @@ import path from "node:path";
 import {
 	acquireRepositoryMutationLock,
 	admitVerificationManifest,
+	normalizeVerificationShards,
 	runVerificationShardBatch,
 	VERIFICATION_GATE_VERSION,
 } from "../extensions/read-only-lanes.js";
@@ -73,6 +74,15 @@ function rejected(manifest, facts, message) {
 }
 
 try {
+	assert.throws(
+		() =>
+			normalizeVerificationShards([
+				{ id: "advisory", command: "lint", required: false },
+			]),
+		/cannot be optional/,
+		"all declared verification shards are required",
+	);
+
 	{
 		const { cwd } = repository();
 		const shards = [
@@ -188,11 +198,7 @@ try {
 		]) {
 			const forged = clone(batch.manifest);
 			forge(forged);
-			rejected(
-				forged,
-				expected(batch, input),
-				`${label} manifest fails closed`,
-			);
+			rejected(forged, expected(batch, input), `${label} manifest fails closed`);
 		}
 		const late = clone(batch.manifest);
 		rejected(
