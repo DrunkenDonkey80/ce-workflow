@@ -269,6 +269,24 @@ try {
 	}
 
 	{
+		const { cwd } = repository();
+		const lock = acquireRepositoryMutationLock(cwd);
+		try {
+			assert.throws(
+				() => acquireRepositoryMutationLock(cwd),
+				(error) =>
+					error.category === "locked" &&
+					new RegExp(
+						`owner pid ${process.pid}, command test-work-parallel-lanes\\.mjs, age \\d+ms`,
+					).test(error.message),
+				"lock contention identifies the live owner command and age",
+			);
+		} finally {
+			lock.release();
+		}
+	}
+
+	{
 		const { cwd, git } = repository();
 		const head = git("rev-parse", "HEAD");
 		const dead = envelope(cwd, head, 1, "dead");

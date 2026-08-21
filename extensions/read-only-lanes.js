@@ -218,6 +218,13 @@ function repositoryAdmissionLockPath(cwd) {
 		"repository-admission.lock",
 	);
 }
+function lockOwner(file) {
+	try {
+		return JSON.parse(readFileSync(file, "utf8"));
+	} catch {
+		return undefined;
+	}
+}
 function ownerDead(
 	file,
 	processExists = (pid) => {
@@ -229,12 +236,8 @@ function ownerDead(
 		}
 	},
 ) {
-	try {
-		const owner = JSON.parse(readFileSync(file, "utf8"));
-		return owner.host === os.hostname() && !processExists(owner.pid);
-	} catch {
-		return false;
-	}
+	const owner = lockOwner(file);
+	return owner?.host === os.hostname() && !processExists(owner.pid);
 }
 function acquireFileLock(file, category) {
 	mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
@@ -243,14 +246,32 @@ function acquireFileLock(file, category) {
 		descriptor = openSync(file, "wx", 0o600);
 		writeFileSync(
 			descriptor,
-			`${JSON.stringify({ pid: process.pid, host: os.hostname(), acquiredAt: new Date().toISOString() })}\n`,
+			`${JSON.stringify({
+				pid: process.pid,
+				host: os.hostname(),
+				acquiredAt: new Date().toISOString(),
+				command: [
+					path.basename(process.argv[1] ?? process.execPath),
+					...process.argv.slice(2, 4),
+				].join(" "),
+			})}\n`,
 		);
 	} catch (error) {
 		if (error?.code === "EEXIST" && ownerDead(file)) {
 			unlinkSync(file);
 			return acquireFileLock(file, category);
 		}
-		if (error?.code === "EEXIST") fail("locked", category, { file });
+		if (error?.code === "EEXIST") {
+			const owner = lockOwner(file);
+			const acquiredAt = Date.parse(owner?.acquiredAt);
+			const age = Number.isFinite(acquiredAt)
+				? `${Math.max(0, Date.now() - acquiredAt)}ms`
+				: "unknown";
+			const ownerSummary = owner
+				? `; owner pid ${owner.pid ?? "unknown"}, command ${owner.command ?? "unknown"}, age ${age}`
+				: "";
+			fail("locked", `${category}${ownerSummary}`, { file, owner });
+		}
 		throw error;
 	}
 	let released = false;

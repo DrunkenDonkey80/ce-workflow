@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { exec, execFile, execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	existsSync,
@@ -13,7 +13,6 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { promisify } from "node:util";
 import {
 	acquireRepositoryMutationLock,
 	admitVerificationManifest,
@@ -44,8 +43,6 @@ import {
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
 const gitBin = process.env.WORK_ORCH_GIT_BIN || "git";
-const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 function run(bin, argv, options = {}) {
 	let executable = bin;
@@ -448,7 +445,93 @@ function formatPendingFiles(root = cwd) {
 	return files;
 }
 
+function verificationTimeoutMs() {
+	const value = Number(process.env.WORK_ORCH_VERIFY_TIMEOUT_MS ?? 30 * 60 * 1000);
+	if (!Number.isInteger(value) || value < 1)
+		throw new Error("WORK_ORCH_VERIFY_TIMEOUT_MS must be a positive integer");
+	return value;
+}
+
+function validateVerificationCommand(command) {
+	const value = command?.trim();
+	if (!value) throw new Error("--verify requires a non-empty command");
+	let quote = "";
+	let escaped = false;
+	for (const character of value) {
+		if (escaped) {
+			escaped = false;
+			continue;
+		}
+		if (character === "\\" && quote !== "'") {
+			escaped = true;
+			continue;
+		}
+		if (quote) {
+			if (character === quote) quote = "";
+		} else if (character === '"' || character === "'") quote = character;
+	}
+	if (quote)
+		throw new Error("malformed --verify command: unmatched shell quote");
+	if (
+		/^(?:["'])?(?:ba|z|k)?sh(?:["'])?$|^(?:["'])?(?:cmd|powershell|pwsh)(?:\.exe)?(?:["'])?$/i.test(
+			value,
+		)
+	)
+		throw new Error("malformed --verify command: bare interactive shell");
+}
+
+function terminateVerificationTree(child) {
+	if (!child.pid) return;
+	try {
+		if (process.platform === "win32")
+			execFileSync("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"], {
+				stdio: "ignore",
+			});
+		else process.kill(-child.pid, "SIGKILL");
+	} catch {
+		child.kill("SIGKILL");
+	}
+}
+
+function execVerification(executable, childArgs, options, timeoutMs) {
+	return new Promise((resolve, reject) => {
+		let timedOut = false;
+		let timer;
+		const child = execFile(
+			executable,
+			childArgs,
+			{
+				...options,
+				detached: process.platform !== "win32",
+				windowsHide: true,
+			},
+			(error, stdout, stderr) => {
+				clearTimeout(timer);
+				if (timedOut) {
+					const timeoutError = new Error(
+						`verification timed out after ${timeoutMs}ms`,
+					);
+					timeoutError.code = "ETIMEDOUT";
+					timeoutError.stdout = stdout;
+					timeoutError.stderr = stderr || timeoutError.message;
+					reject(timeoutError);
+				} else if (error) {
+					error.stdout = stdout;
+					error.stderr = stderr || error.message;
+					reject(error);
+				} else resolve({ stdout, stderr });
+			},
+		);
+		child.stdin?.end();
+		timer = setTimeout(() => {
+			timedOut = true;
+			terminateVerificationTree(child);
+		}, timeoutMs);
+	});
+}
+
 async function runVerificationCommand(command, root = cwd) {
+	validateVerificationCommand(command);
 	const options = { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 };
 	const shell =
 		process.env.WORK_ORCH_VERIFY_SHELL ||
@@ -460,16 +543,25 @@ async function runVerificationCommand(command, root = cwd) {
 		shell && wrapper && existsSync(path.join(root, wrapper[2]))
 			? command.replace(wrapper[0], `${wrapper[1]}./${wrapper[2]}`)
 			: command;
-	try {
-		const result =
-			!windowsCommand && shell
-				? await execFileAsync(shell, ["-c", normalized], options)
-				: await execAsync(normalized, options);
-		return { exitStatus: 0, stdout: result.stdout, stderr: result.stderr };
-	} catch (error) {
-		if (error instanceof Error) throw error;
-		throw new Error(String(error));
+	let executable;
+	let childArgs;
+	if (!windowsCommand && shell) {
+		executable = shell;
+		childArgs = ["-c", normalized];
+	} else if (process.platform === "win32") {
+		executable = process.env.ComSpec || "cmd.exe";
+		childArgs = ["/d", "/s", "/c", normalized];
+	} else {
+		executable = process.env.SHELL || "/bin/sh";
+		childArgs = ["-c", normalized];
 	}
+	const result = await execVerification(
+		executable,
+		childArgs,
+		options,
+		verificationTimeoutMs(),
+	);
+	return { exitStatus: 0, stdout: result.stdout, stderr: result.stderr };
 }
 
 async function runVerification(command, shards = [], root = cwd) {
@@ -711,6 +803,9 @@ async function finishTaskUnlocked() {
 				);
 		}
 	} catch (error) {
+		const verificationError = String(error.stderr || error.message || error).slice(
+			-500,
+		);
 		if (shardDeclarations.length) {
 			if (canonicalBeforeVerification === null)
 				rmSync(canonicalBeforeVerificationPath, { force: true });
@@ -721,11 +816,13 @@ async function finishTaskUnlocked() {
 				appendWorkNote(
 					store,
 					id,
-					`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${String(error.stderr ?? error.message ?? error).slice(-500)}`,
+					`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${verificationError}`,
 				),
 			);
 		}
-		throw new Error(`verification failed: ${verificationCommand}`);
+		throw new Error(
+			`verification failed: ${verificationCommand}\n${verificationError}`,
+		);
 	}
 	for (const outputPath of absentShardOutputs)
 		if (
@@ -1052,6 +1149,11 @@ async function finishTaskUnlocked() {
 
 async function finishTask() {
 	const id = args[0];
+	const verificationCommand = option("--verify");
+	if (verificationCommand !== undefined) {
+		validateVerificationCommand(verificationCommand);
+		verificationTimeoutMs();
+	}
 	if (readWorkItem(id)?.initiative)
 		throw new Error(
 			`Initiative ${id} must be closed through /work-roadmap guarded close.`,

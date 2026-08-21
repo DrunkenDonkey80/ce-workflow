@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	realpathSync,
@@ -135,6 +136,54 @@ try {
 	writeFileSync(
 		path.join(cwd, ".ce-workflow", "work-runs", "verifiers", "state.json"),
 		"{}\n",
+	);
+	const mutationLock = path.join(
+		cwd,
+		".ce-workflow",
+		"work-runs",
+		"repository-mutation.lock",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-1",
+			"--max-files",
+			"2",
+			"--message",
+			"reject malformed verifier",
+			"--verify",
+			'"bash',
+		),
+		/unmatched shell quote/,
+		"malformed verifier commands fail before taking the repository lock",
+	);
+	assert.equal(existsSync(mutationLock), false);
+	const previousTimeout = process.env.WORK_ORCH_VERIFY_TIMEOUT_MS;
+	try {
+		process.env.WORK_ORCH_VERIFY_TIMEOUT_MS = "100";
+		assert.match(
+			failure(
+				"finish-task",
+				"TASK-1",
+				"--max-files",
+				"2",
+				"--message",
+				"bound hanging verifier",
+				"--verify",
+				`"${process.execPath}" -e "setInterval(() => {}, 1000)"`,
+			),
+			/verification timed out after 100ms/,
+			"hanging verifier commands are terminated at the configured timeout",
+		);
+	} finally {
+		if (previousTimeout === undefined)
+			delete process.env.WORK_ORCH_VERIFY_TIMEOUT_MS;
+		else process.env.WORK_ORCH_VERIFY_TIMEOUT_MS = previousTimeout;
+	}
+	assert.equal(
+		existsSync(mutationLock),
+		false,
+		"timed-out verification releases the repository lock",
 	);
 	assert.match(
 		failure(

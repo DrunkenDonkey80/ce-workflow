@@ -4321,6 +4321,31 @@
       "type": "bug",
       "updatedAt": "2026-08-21T11:12:19.702Z"
     },
+    "work-2.84": {
+      "acceptance": "A malformed quoted verification command fails before repository lock acquisition; a hanging verification is terminated at the configured timeout and releases the lock; lock contention identifies the live owner and age; focused helper and lane tests pass.",
+      "createdAt": "2026-08-21T17:35:09.054Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Reject malformed or bare interactive verification shell commands before taking MUTATE_REPO, run verification with closed stdin and a configurable timeout that terminates the process tree, and include lock owner command and age in contention errors.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.84",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:review PASS validation+timeout precede mutation lock (work-helper.mjs:1150-1176), stdin closed/tree-kill in execVerification, lock owner pid+command+age in read-only-lanes.js:246-277; focused tests cover all three",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs && node scripts/test-work-parallel-lanes.mjs\nOutput: ok - work helper contract\nread-only parallel lane tests passed"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Bound finish-task verification and expose mutation-lock owners",
+      "type": "bug",
+      "updatedAt": "2026-08-21T17:43:25.031Z"
+    },
     "work-2.9": {
       "createdAt": "2026-07-20T11:50:30.982Z",
       "dependencies": [],
@@ -6922,6 +6947,42 @@
       "type": "task",
       "updatedAt": "2026-08-10T08:37:03.710Z"
     },
+    "work-2.report-c43e965e-49aa-45e5-b502-a2a4ef23b70a": {
+      "createdAt": "2026-08-21T13:29:44.004Z",
+      "dependencies": [
+        "work-2.84"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: A prior `work-helper.mjs finish-task work-1.99` process held `.ce-workflow/work-runs/repository-mutation.lock` from 15:52:30 for more than 30 minutes. Its process tree ended in an argument-less interactive `bash` child because the recorded `--verify` command line was malformed (`--verify \"\\\"bash\" \"...work-1.99-verify.sh\\\"\"`). A new coded finalizer failed with `Another job owns MUTATE_REPO(repository)` until the stale process tree was inspected and terminated.\nExpected: `finish-task` should reject malformed verification command quoting before acquiring the repository mutation lease, or execute verification with a bounded non-interactive child and always release the lease on timeout/abnormal child state. Resume should not be indefinitely blocked by an interactive verifier shell.\nImpact: Autonomous roadmap progress was blocked with no actionable owner details, and the repository mutation lease remained live indefinitely despite verification doing no work. Recovery required manual process-tree inspection and termination, risking duplicate finalization attempts.\nSuggested improvement: Run verifier commands with stdin closed and a timeout, include lock owner command/age in the contention error, and reject a bare interactive shell command produced by broken quoting.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/2ad5868e-f80b-498f-a8d2-e4e1a059c8bb",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 352090,
+              "file": "01-2026-08-21T13-20-30-612Z_01a0247a-eb94-7a3a-91fe-aa2e670ead5f.jsonl",
+              "sha256": "58fdc27e5cfd9bf4b18eb5b37788623ffa7f50275949d32f8538ce7a64a38925"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T13:29:44.000Z",
+          "workflowId": "01a0247a-eb94-7a3a-91fe-aa2e670ead5f"
+        }
+      ],
+      "id": "work-2.report-c43e965e-49aa-45e5-b502-a2a4ef23b70a",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A prior `work-helper.mjs finish-task work-1.99` process held `.ce-workflow/work-runs/repository-mutation.lock` from 15:52:30 for m",
+      "type": "task",
+      "updatedAt": "2026-08-21T17:35:14.676Z"
+    },
     "work-2.report-d16529ea-1917-4e39-8080-56a0720adb4e": {
       "createdAt": "2026-08-18T05:18:46.408Z",
       "dependencies": [],
@@ -6962,6 +7023,45 @@
       "title": "Self-improvement report: At 2026-08-18T00:28:00.005Z, immediately after successful parallel LSP/git results, the next assistant operation was recorded with",
       "type": "task",
       "updatedAt": "2026-08-18T05:28:47.628Z"
+    },
+    "work-2.report-d33ed5c8-dc61-4f45-bd56-a2cf6d7c6865": {
+      "createdAt": "2026-08-21T14:17:38.395Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The coded finish helper required independent review for store-only work item work-1.112 because the acceptance text said 'no production behavior changes'; it emitted an empty `Review only:` scope. Two exact work-reviewer launches then failed at provider startup with 429 rate-limit errors.\nExpected: Store-only closure for an already committed verifier fix should not trigger sensitive-contract review from a negated phrase, and any required reviewer handoff should contain a non-empty bounded review scope (for example the committed verifier diff).\nImpact: The roadmap cannot close the in-progress verifier work item or resume the next ready slice even though the documentation-only change is already committed and verified; the empty scope also gives an independent reviewer nothing deterministic to inspect.\nSuggested improvement: Ignore negated sensitive phrases such as 'no production behavior changes' for review routing, or populate store-only review scope from the referenced verifier commit/path.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/b90eb9e9-3b81-49d3-b13a-18008e4051b3",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 586,
+              "file": "01-c23ce890-80bb-405b-93da-40ec62077a88_work-reviewer_0_output.md",
+              "sha256": "67b4dcd989e146a2fe53372ecee69a4ac6d30380960831a506fe0208aa055fe8"
+            },
+            {
+              "bytes": 586,
+              "file": "02-d187b91e-6b24-4222-9240-d2e35f4c2c47_work-reviewer_0_output.md",
+              "sha256": "ef64dff9e6b2ad23104bf1e2ea165d1ccfe3ec92ee6f436f08e334f3c4b6e5ff"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T14:17:38.391Z",
+          "workflowId": "01a024ab-9eae-72f4-83cf-1d316bf35d29"
+        }
+      ],
+      "id": "work-2.report-d33ed5c8-dc61-4f45-bd56-a2cf6d7c6865",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The coded finish helper required independent review for store-only work item work-1.112 because the acceptance text said 'no produ",
+      "type": "task",
+      "updatedAt": "2026-08-21T14:17:38.395Z"
     },
     "work-2.report-d3a44b03-1ac9-446d-b9e3-76cd0f0927ad": {
       "createdAt": "2026-08-18T06:38:45.654Z",
@@ -7008,6 +7108,45 @@
       "title": "Self-improvement report: Background verifier reconciliation permanently marked four jobs failed with \"Verifier terminal output was unavailable or invalid\",",
       "type": "task",
       "updatedAt": "2026-08-18T08:27:51.143Z"
+    },
+    "work-2.report-da06c6e6-abcd-4ea0-87af-2540c4497918": {
+      "createdAt": "2026-08-21T12:18:57.393Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: work_verifier_complete_fix defaulted fix scope to the finding's production path and rejected the valid test-only fix because the dirty path was a new test file. The extension implementation supports a fixPaths parameter, but the registered tool exposed to this session omits fixPaths, so the agent cannot complete this test-coverage finding.\nExpected: The registered work_verifier_complete_fix tool schema should expose optional fixPaths, and test-coverage findings should permit the verified test path while retaining scope checks.\nImpact: Mandatory verifier triage is blocked after accepting and passing the requested regression test; /work-resume cannot continue and the valid fix cannot be committed through the required completion tool.\nSuggested improvement: Expose fixPaths in the generated tool registration schema and allow callers to include the finding path plus test path; alternatively permit test-only fix scope for test-coverage findings.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/935228a4-db74-4e8b-9b2a-d5e9907a04c2",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 744,
+              "file": "01-claim-44c5379f1f1ecc8f820139d0-completion-error.log",
+              "sha256": "c7d4103b3e29663eb868c1b5da06ee29ea3ea3a340811977af3a11f97663e94b"
+            },
+            {
+              "bytes": 1813358,
+              "file": "02-state.json",
+              "sha256": "ff8df4396e4e25141b932e2a96eb702c26ed3c4d08de3f23864a6a1b7ba33e0d"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T12:18:57.388Z",
+          "workflowId": "01a0243b-ef09-76f5-9dbd-142a0cf18ad2"
+        }
+      ],
+      "id": "work-2.report-da06c6e6-abcd-4ea0-87af-2540c4497918",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: work_verifier_complete_fix defaulted fix scope to the finding's production path and rejected the valid test-only fix because the d",
+      "type": "task",
+      "updatedAt": "2026-08-21T12:18:57.393Z"
     },
     "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
       "createdAt": "2026-08-12T16:54:19.072Z",
@@ -9321,7 +9460,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-21T11:12:57.614Z"
+    "updatedAt": "2026-08-21T17:43:25.032Z"
   },
   "schemaVersion": 1
 }
