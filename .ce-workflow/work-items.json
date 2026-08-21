@@ -4279,6 +4279,48 @@
       "type": "bug",
       "updatedAt": "2026-08-20T15:27:46.086Z"
     },
+    "work-2.82": {
+      "acceptance": "Exact reported-path behavior remains the default; a bounded valid superset commits or reconciles exactly those paths; unrelated dirt and invalid paths remain rejected.",
+      "createdAt": "2026-08-21T11:03:35.727Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Allow work_verifier_complete_fix to accept a small explicit fixPaths superset that includes every accepted finding path, and use that exact set for dirty and ancestor-commit checks.",
+      "evidence": [],
+      "id": "work-2.82",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "locally-owned canonical fix: commit 884ea69 adds bounded fixPaths supersets with path and scope validation plus exact dirty and ancestor commit checks. Verified by test-work-goal cross-file fixture, focused tests, LSP, and verify-package.",
+        "Implemented and verified in 884ea69."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Allow bounded verifier fix path supersets",
+      "type": "bug",
+      "updatedAt": "2026-08-21T11:12:19.512Z"
+    },
+    "work-2.83": {
+      "acceptance": "A focused finish-task fixture closes and commits task files while leaving pre-existing tracked .gradle dirt unstaged; unrelated source dirt still rolls finalization back.",
+      "createdAt": "2026-08-21T11:03:35.839Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Apply generated-build exclusions consistently in finish-task post-close owner and remaining-dirt guards so tracked Gradle/build cache changes are preserved but not committed.",
+      "evidence": [],
+      "id": "work-2.83",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "locally-owned canonical fix: commit 884ea69 applies generated-build exclusions to post-close owner and execution guards while preserving tracked .gradle dirt unstaged. Verified by test-work-helper-contract and full package check.",
+        "Implemented and verified in 884ea69."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Ignore generated build dirt consistently during finish",
+      "type": "bug",
+      "updatedAt": "2026-08-21T11:12:19.702Z"
+    },
     "work-2.9": {
       "createdAt": "2026-07-20T11:50:30.982Z",
       "dependencies": [],
@@ -4411,6 +4453,85 @@
       "title": "Self-improvement report: A configured GLM background verifier returned terminal structured output that reconciliation classified as one partially-failed jo",
       "type": "task",
       "updatedAt": "2026-08-19T08:10:42.736Z"
+    },
+    "work-2.report-0601d56b-2f80-4ed8-90b4-8e69bd952f26": {
+      "createdAt": "2026-08-21T00:40:09.520Z",
+      "dependencies": [
+        "work-2.73",
+        "work-2.report-00758dd1-6276-42bd-993a-186064d22c85"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: Background verifier runs 1a828009-954e-4883-a202-269537118fd7 and 64fe4e3b-dc7b-4103-bf4c-9035abe8f9ba are terminal according to subagent status (complete and failed with 429), but .ce-workflow/work-runs/verifiers/state.json still marks jobs job-05aed27b44a3a2b0d5e11f06 and job-44de2143cb5c1a352ba0f26c as running. work_goal_complete remains blocked as queued/running, work_verifier_inbox is empty, subagent_wait reports no registered provider work, and work_verifier_acknowledge_failure rejects the failed job as non-terminal.\nExpected: The verifier provider should reconcile terminal subagent results into verifier state even when the continuation begins in a fresh assistant turn/session context, surface any completed findings, and permit acknowledgement of a rate-limited job when another verifier covered all operations.\nImpact: The exact target roadmap work-1 is closed and its verifier finding is triaged, but autonomous completion cannot be recorded because stale provider state indefinitely reports background verification as running.\nSuggested improvement: On work_verifier_inbox/work_goal_complete, resolve stored launch.runId values through subagent status/result artifacts and atomically update job/batch status before checking completion blockers.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/c9420bf5-660e-421c-9b2c-128dea28c084",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2234161,
+              "file": "01-state.json",
+              "sha256": "7cbea9706200abdca431d024552012ff08eae150f37253469a6aa0158649d446"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-21T00:40:09.516Z",
+          "workflowId": "01a021bd-98cd-79b0-947b-9b6768234e44"
+        }
+      ],
+      "id": "work-2.report-0601d56b-2f80-4ed8-90b4-8e69bd952f26",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "already-fixed multi-claim report after atomization: work-2.73 and commits a56b9de, 1eee1a7, and 958268e reconcile terminal async status and late artifacts from persisted asyncDir state in a fresh session; report work-2.report-00758dd1-6276-42bd-993a-186064d22c85 and commit b5d9a55 provide durable acknowledgment for covered rate-limit infrastructure failures. Current background-verifier domain and full package tests passed.",
+        "Both atomic outcomes are verified already current via linked canonical items and tests."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: Background verifier runs 1a828009-954e-4883-a202-269537118fd7 and 64fe4e3b-dc7b-4103-bf4c-9035abe8f9ba are terminal according to s",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:57.428Z"
+    },
+    "work-2.report-086e25a0-c0b9-4f1c-8014-e9fb0e7f7363": {
+      "createdAt": "2026-08-21T06:41:47.695Z",
+      "dependencies": [
+        "work-2.83"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task verified work-1.47 successfully and created its temporary commit, then rolled finalization back because the post-close ownerChanges guard treated pre-existing tracked `.gradle/**` cache dirt as forbidden non-work-store changes. Earlier scope calculation already excluded those files as generated build paths, so the final guard used inconsistent filtering.\nExpected: finish-task should apply the same runtime/generated-build-path exclusions at its post-close cleanliness guard that it applies when selecting task-owned changes, preserving unrelated pre-existing generated cache dirt while committing and closing only the work store and task files.\nImpact: A fully verified two-file change could not be committed or closed; the helper performed verification and a temporary commit, then rolled back, forcing manual recovery or repeated expensive tests. Autonomous work is blocked whenever tracked Gradle caches are already dirty.\nSuggested improvement: Filter `ownerChanges`, `executionRemaining`, and `ownerRemaining` with both `!isRuntimePath(file)` and `!isGeneratedBuildPath(file)`, while still requiring task-owned non-generated files to be clean.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/5fc643d2-f08a-4b49-a24f-fd9cd0d08bfd",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1291,
+              "file": "01-finish-work-1.47-failure.log",
+              "sha256": "665ffe88d596a4af9298a5561ec9f725f2d0263f1c754b9a5e1e2be8a65ed676"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T06:41:47.682Z",
+          "workflowId": "01a022fe-cac8-7ff5-bb31-5509f67604ef"
+        }
+      ],
+      "id": "work-2.report-086e25a0-c0b9-4f1c-8014-e9fb0e7f7363",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "duplicate of canonical work-2.83 after atomization. Shared outcome is preserving generated Gradle dirt through all finish guards. Commit 884ea69 and the tracked .gradle regression fixture verify this report while unrelated source dirt remains guarded.",
+        "Covered by canonical work-2.83, commit 884ea69, and focused/full verification."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: finish-task verified work-1.47 successfully and created its temporary commit, then rolled finalization back because the post-close",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:37.933Z"
     },
     "work-2.report-0b6db163-27b9-476a-bcfc-8ac8b9b7ad35": {
       "createdAt": "2026-08-18T08:10:00.217Z",
@@ -4687,6 +4808,128 @@
       "type": "task",
       "updatedAt": "2026-08-20T11:42:46.140Z"
     },
+    "work-2.report-32be7dcf-3e04-42d4-b9e3-7752de496409": {
+      "createdAt": "2026-08-21T10:40:50.647Z",
+      "dependencies": [
+        "work-2.82"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: A verifier finding reported only DiagnosticSnapshot.kt but explicitly required removing a conversion in MainActivity.kt and updating its focused test. work_verifier_complete_fix rejected the correct three-file remediation because it derives the allowed dirty scope solely from each finding's single path. The fix had to retain a compatibility typealias so completion could be exact-path.\nExpected: Verifier findings that necessarily span callers/tests should either carry all required paths or work_verifier_complete_fix should accept a verified, explicitly bounded dependent-path set while still rejecting unrelated dirt.\nImpact: Cross-file verifier fixes cannot be completed as reported without partial remediation, awkward extra commits, or rejecting a valid finding; this weakens fix quality and wastes worker/test cycles.\nSuggested improvement: Add a validated relatedPaths array to findings or complete_fix, included in the exact-scope check and commit.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/1611bd5a-9ace-483f-bbb8-27e477e82f99",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1242630,
+              "file": "01-state.json",
+              "sha256": "c8549abd5ea9fe1ea0aa42693169362d92a263cad0cecaa231b09f1664f95398"
+            },
+            {
+              "bytes": 101246,
+              "file": "02-session.jsonl",
+              "sha256": "93526ca3d29b82d5f55f2afbaa17ae6a1d84a725d89b7defa920abdc889f16f1"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T10:40:50.641Z",
+          "workflowId": "01a023e1-e11e-7b0b-ad79-76ebdaa2e4d4"
+        }
+      ],
+      "id": "work-2.report-32be7dcf-3e04-42d4-b9e3-7752de496409",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "duplicate of canonical work-2.82 after atomization. Shared required outcome is a bounded declared cross-file verifier fix scope; verified for this report by commit 884ea69 and the exact two-path test-work-goal fixture.",
+        "Covered by canonical work-2.82, commit 884ea69, and focused/full verification."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: A verifier finding reported only DiagnosticSnapshot.kt but explicitly required removing a conversion in MainActivity.kt and updati",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:37.746Z"
+    },
+    "work-2.report-3a5dfdb2-c74e-4290-bdb9-0ab39a1f8e2b": {
+      "createdAt": "2026-08-21T07:43:59.237Z",
+      "dependencies": [
+        "work-2.61"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: The mandated work-worker rejected a valid bounded implementation handoff without inspecting code because it required an absolute work-helper.mjs path and explicit work-claim command; the work-orchestrator skill's worker handoff guidance does not state that prerequisite.\nExpected: Coded resume handoffs should always inject the resolved absolute helper path and claim command, or work-worker should resolve the configured helper path from its target project before blocking.\nImpact: Autonomous resume spent an agent launch with zero tool calls or edits and required manual transcript inspection/re-dispatch.\nSuggested improvement: Have the coded worker-handoff builder include C:\\soft\\git\\ce-workflow\\scripts\\work-helper.mjs and the exact work-claim invocation automatically.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/669f734f-0e11-4052-9629-1f332c185dcb",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 14377,
+              "file": "01-session.jsonl",
+              "sha256": "941dea38e6c3d34fbcbbc446660e1f9cf8e0bfff90676817d16b58a0ab9c4332"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T07:43:59.233Z",
+          "workflowId": "01a02345-086e-78ad-8323-8d90f67aff94"
+        }
+      ],
+      "id": "work-2.report-3a5dfdb2-c74e-4290-bdb9-0ab39a1f8e2b",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "duplicate and already-fixed after atomization: canonical work-2.61 plus commits 0e20dab and 0bb2a59 supply the exact quoted absolute helper command, while directRoleTask already supplied the exact worker work-claim command. Commit 884ea69 regression coverage now verifies the complete planner and worker handoff outcome; full package check passed.",
+        "Verified current behavior against canonical work-2.61 and regression commit 884ea69."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The mandated work-worker rejected a valid bounded implementation handoff without inspecting code because it required an absolute w",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:57.241Z"
+    },
+    "work-2.report-3ee81e7d-548e-45a3-88dc-899ce90acdd1": {
+      "createdAt": "2026-08-21T01:03:08.097Z",
+      "dependencies": [
+        "work-2.73"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: work_goal_complete blocks a closed, fully triaged target on 60 historical verifier failures/orphans from many already-terminal batches, including old batches whose failed operations cannot now satisfy work_verifier_acknowledge_failure because no alternate job covered every operation. One current background verifier completion also remained marked running until a later completion attempt reconciled it.\nExpected: Goal completion should scope failed-job blocking to the current verification lineage/action lease, or automatically retire superseded historical failures after later accepted fixes/closed batches. Successful detached verifier runs should reconcile promptly in a fresh continuation session.\nImpact: The autonomous goal cannot complete despite work-1 being closed, no open children, and passing focused checks. The only exposed remediation tool correctly forbids acknowledging failures without complete alternate verifier coverage, leaving a durable deadlock.\nSuggested improvement: Track failure acknowledgements/terminal gating per active batch or checkpoint ancestry and expose a coded rerun/recovery action for uncovered operations rather than surfacing all historical failed jobs at goal completion.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/f025455a-c6ba-451b-9277-739f4ca9cb39",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2389394,
+              "file": "01-state.json",
+              "sha256": "b198a308651cc426cb21ad2a781bef7df9827ff09d69b98968878848024c67e6"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-21T01:03:08.092Z",
+          "workflowId": "01a021d2-7bfc-7af3-898c-ecf0a87e5204"
+        }
+      ],
+      "id": "work-2.report-3ee81e7d-548e-45a3-88dc-899ce90acdd1",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "already-fixed multi-claim report after atomization: linked work-2.73 covers fresh-session persisted terminal reconciliation; commit 023c67e makes current-goal completion ignore historical failed or orphaned jobs and gates only queued or running jobs plus pending findings from current verification batches. Focused background-verifier tests and full package verification passed.",
+        "Both atomic outcomes are verified already current in work-2.73 and 023c67e."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: work_goal_complete blocks a closed, fully triaged target on 60 historical verifier failures/orphans from many already-terminal bat",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:57.613Z"
+    },
     "work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8": {
       "createdAt": "2026-08-08T17:28:28.534Z",
       "dependencies": [
@@ -4734,6 +4977,85 @@
       "title": "Self-improvement report: A native work-item acceptance required a Playwright trace archive when a browser failure occurred. BetterWright exposed a guarded ",
       "type": "task",
       "updatedAt": "2026-08-08T17:54:52.875Z"
+    },
+    "work-2.report-41834307-7bd4-4ab8-9acf-eb2bc9ceb40a": {
+      "createdAt": "2026-08-21T08:43:47.950Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: work-planner attempted unsupported `work-start work-1.70` despite receiving the resolved helper path, then stopped without claiming or planning.\nExpected: Planner handoffs should inject the exact supported claim command `node <helper> work-claim <id>` and planner policy should not invent helper aliases.\nImpact: Autonomous roadmap continuation spent a planner launch and left work-1.70 open with no child.\nSuggested improvement: Generate the exact work-claim invocation in coded planner handoffs and reject unsupported helper commands before launching the model.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/8ae8c393-6225-4375-9182-6e40070a85dd",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 30882,
+              "file": "01-session.jsonl",
+              "sha256": "d9a86dbb28bd32c3f7cbc41c7b2c3f70ac016fe91f5fb772ee7e7020863de9be"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T08:43:47.946Z",
+          "workflowId": "01a02345-086e-78ad-8323-8d90f67aff94"
+        }
+      ],
+      "id": "work-2.report-41834307-7bd4-4ab8-9acf-eb2bc9ceb40a",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "locally-owned atomic claim: commit 884ea69 adds the exact absolute work-claim command to planner handoffs as well as implementation handoffs. Regression coverage verifies both roles; full package check passed.",
+        "Implemented and verified in 884ea69."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: work-planner attempted unsupported `work-start work-1.70` despite receiving the resolved helper path, then stopped without claimin",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:19.886Z"
+    },
+    "work-2.report-4a81a49d-a04d-4270-bc55-637331d67eab": {
+      "createdAt": "2026-08-21T10:23:12.916Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: An accepted verifier finding remained fixed but uncompleted after automatic continuation moved to a fresh Pi session. The prior claim claim-028eec27d7bcd5535a82b958 is owned by dead session 01a023cd-f94d-7ff8-b276-537469254c05 until 2026-08-21T10:42:04.821Z; this fresh session independently verified the existing fix, but work_verifier_complete_fix rejected it as not owned. The pending fix shares EX10Controller.kt with the newly assigned claim, so safely completing the new finding would otherwise bundle an older accepted fix or require waiting for lease expiry.\nExpected: Fresh-session autonomous continuation should transfer or recover accepted verifier claims (or expose a safe coded claim-release/adoption operation) so already-fixed accepted findings can be verified and completed before the next claim, without waiting up to the full lease or manually altering verifier state.\nImpact: Mandatory verifier triage and roadmap resume are blocked despite passing code and tests; overlapping accepted paths cannot be safely committed under the new claim, and the autonomous loop wastes a continuation/lease window.\nSuggested improvement: On continuation startup, detect claims owned by a non-live predecessor session for the same autonomous goal and atomically adopt them, preserving dispositions and lease/fix state.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/82ae4f71-d130-4fd9-b496-711531cadb52",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1185793,
+              "file": "01-state.json",
+              "sha256": "2120a341731e4233e9071d7e54bfabaa378e7939f698c3e4b5ffe886bda84f59"
+            },
+            {
+              "bytes": 1185444,
+              "file": "02-.state.recovery.json",
+              "sha256": "9f7811c493f0d829a2900010f935d021d09e07ea1dd18c31e163f24bcdc7c998"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T10:23:12.911Z",
+          "workflowId": "01a023d5-ea47-7598-ab01-858d5338c548"
+        }
+      ],
+      "id": "work-2.report-4a81a49d-a04d-4270-bc55-637331d67eab",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "locally-owned atomic claim: commit 884ea69 lets a fresh session in the same coded resume lineage adopt the live predecessor verifier claim while preserving unrelated-owner locking and expiry takeover. Domain tests and full package check passed.",
+        "Implemented and verified in 884ea69."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: An accepted verifier finding remained fixed but uncompleted after automatic continuation moved to a fresh Pi session. The prior cl",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:20.080Z"
     },
     "work-2.report-4ca95de9-d319-413b-a538-af6b8ef98c6f": {
       "createdAt": "2026-08-08T22:04:02.473Z",
@@ -5938,6 +6260,45 @@
       "type": "task",
       "updatedAt": "2026-08-02T17:29:11.312Z"
     },
+    "work-2.report-8ea1a49a-5ab9-4da4-9466-911025073b87": {
+      "createdAt": "2026-08-21T07:49:35.586Z",
+      "dependencies": [
+        "work-2.83"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: finish-task ran the configured Gradle verification successfully but then rolled back before close because Gradle updated already-tracked project .gradle cache files during verification; it classified those verification side effects as forbidden non-work-store changes.\nExpected: finish-task should isolate Gradle's project cache for verification, or snapshot/restore known generated cache paths so a successful check can close without touching unrelated pre-existing cache dirt.\nImpact: A passing reviewed work item could not finalize even though production/test scope was valid; the workflow now needs a manually adjusted verification command with --project-cache-dir and another full finish attempt.\nSuggested improvement: For Gradle commands, inject a temporary --project-cache-dir outside the checkout or ignore only files proven to be generated by that verification subprocess.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/a4ffc4b1-6490-4e63-a9c2-327aed6182ac",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 244309,
+              "file": "01-2026-08-21T07-42-01-838Z_01a02345-086e-78ad-8323-8d90f67aff94.jsonl",
+              "sha256": "3c5a988cac03b4bb0fe8d9c74f5b1e0b777ffafa3ce5e70fd9efad72d56bfcdf"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T07:49:35.579Z",
+          "workflowId": "01a02345-086e-78ad-8323-8d90f67aff94"
+        }
+      ],
+      "id": "work-2.report-8ea1a49a-5ab9-4da4-9466-911025073b87",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "duplicate of canonical work-2.83 after atomization. Shared outcome is preserving generated Gradle dirt through all finish guards. Commit 884ea69 and the tracked .gradle regression fixture verify this report while unrelated source dirt remains guarded.",
+        "Covered by canonical work-2.83, commit 884ea69, and focused/full verification."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: finish-task ran the configured Gradle verification successfully but then rolled back before close because Gradle updated already-t",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:38.117Z"
+    },
     "work-2.report-92d3e6d4-7a3f-453c-b171-845dc257eb4c": {
       "createdAt": "2026-08-18T15:18:15.935Z",
       "dependencies": [],
@@ -6111,6 +6472,84 @@
       "title": "Self-improvement report: Verifier triage became unrecoverable after accepted fixes had already been committed by the coded finish path: work_verifier_compl",
       "type": "task",
       "updatedAt": "2026-08-20T15:32:34.075Z"
+    },
+    "work-2.report-a1115297-55fa-44aa-9e19-506ab5e7be8d": {
+      "createdAt": "2026-08-20T21:54:22.324Z",
+      "dependencies": [
+        "work-2.82"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: work_verifier_complete_fix rejects a valid accepted-finding fix whenever the root-cause change or regression test must touch paths other than the verifier-reported path. For finding-8701afe6357f49da724bfd92, the reported unit-test path cannot instantiate MainActivity; the correct fix necessarily changes MainActivity.kt and adds an androidTest file, but the tool hard-fails because dirty paths must exactly equal the single finding path.\nExpected: Allow a bounded, explicitly verified fix path set that includes the reported path and necessary production/new-test paths, while still rejecting unrelated dirt; alternatively record a manually created bounded fix commit whose changed paths are an approved superset tied to the finding.\nImpact: Mandatory verifier triage cannot complete a correct cross-file root-cause fix without artificial commits or moving unsuitable tests into the reported source set, blocking /work-resume despite passing lifecycle instrumentation evidence.\nSuggested improvement: Add an optional fixPaths field to work_verifier_complete_fix, validated as a small bounded superset of accepted finding paths, and use that exact set for dirty/staged/ancestor-commit checks.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/4001cf44-ad6b-4d1e-a7be-dc0b1d27f2a9",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1135802,
+              "file": "01-state.json",
+              "sha256": "9f9ac735d175ad6b350403f54a00b8b9e8f1810617ba42011061eeb64e82efb7"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-20T21:54:22.320Z",
+          "workflowId": "01a02122-6dd8-7c66-af7a-b6fadce67dc0"
+        }
+      ],
+      "id": "work-2.report-a1115297-55fa-44aa-9e19-506ab5e7be8d",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "duplicate of canonical work-2.82 after atomization. Shared required outcome is a bounded declared cross-file verifier fix scope; verified for this report by commit 884ea69 and the exact two-path test-work-goal fixture.",
+        "Covered by canonical work-2.82, commit 884ea69, and focused/full verification."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: work_verifier_complete_fix rejects a valid accepted-finding fix whenever the root-cause change or regression test must touch paths",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:37.558Z"
+    },
+    "work-2.report-a1f794d5-dfef-4b3c-9c49-9fe80d9babac": {
+      "createdAt": "2026-08-21T06:34:15.014Z",
+      "dependencies": [
+        "work-2.61"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: The configured work-worker rejected an implementation handoff before reading code because the prompt did not repeat the absolute work-helper.mjs path or a compact helper-generated summary, even though the current session had already claimed work-1.47 with the coded helper and supplied its description, acceptance, scope, and verification requirements.\nExpected: The coded resume/worker handoff should automatically include the resolved helper path and compact work-item summary, or the worker should accept an already in_progress item when the handoff contains equivalent bounded task details instead of requiring a redundant claim.\nImpact: One worker launch produced no implementation and consumed time/tokens; autonomous resume cannot progress reliably when the parent performs the coded claim but the worker independently refuses work over omitted boilerplate.\nSuggested improvement: Centralize exact worker handoff generation in the resume helper and make claim idempotent for already in_progress items.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/1e442f75-8c07-4242-a25e-4739f5818296",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1797,
+              "file": "01-worker-work-1.47.md",
+              "sha256": "3c7396ab448d2adf0fb4664566321d2adf37820464a18f45e3940ae2bef9e11f"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T06:34:15.009Z",
+          "workflowId": "01a022fe-cac8-7ff5-bb31-5509f67604ef"
+        }
+      ],
+      "id": "work-2.report-a1f794d5-dfef-4b3c-9c49-9fe80d9babac",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "duplicate and already-fixed after atomization: canonical work-2.61 plus commits 0e20dab and 0bb2a59 supply the exact quoted absolute helper command, while directRoleTask already supplied the exact worker work-claim command. Commit 884ea69 regression coverage now verifies the complete planner and worker handoff outcome; full package check passed.",
+        "Verified current behavior against canonical work-2.61 and regression commit 884ea69."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Self-improvement report: The configured work-worker rejected an implementation handoff before reading code because the prompt did not repeat the absolute w",
+      "type": "task",
+      "updatedAt": "2026-08-21T11:12:57.055Z"
     },
     "work-2.report-a7f5e6ed-68d2-46b8-b4f4-05e92de94851": {
       "createdAt": "2026-08-19T05:30:38.715Z",
@@ -8882,7 +9321,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-20T15:32:34.075Z"
+    "updatedAt": "2026-08-21T11:12:57.614Z"
   },
   "schemaVersion": 1
 }
