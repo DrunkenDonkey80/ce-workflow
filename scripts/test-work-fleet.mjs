@@ -512,6 +512,7 @@ assert.equal(legacyClosed, 1, "legacy Escape still closes Fleet");
 legacyComponent.dispose();
 
 let openedComponent;
+let openedClosed = 0;
 await openWorkFleet(
 	{
 		cwd: process.cwd(),
@@ -525,8 +526,14 @@ await openWorkFleet(
 						bg: (_color, text) => text,
 						bold: (text) => text,
 					},
-					undefined,
-					() => {},
+					{
+						matches: (data, id) =>
+							(id === "tui.select.down" && data === "\x1b[57420u") ||
+							(id === "tui.select.cancel" && data === "\x1b[27u"),
+					},
+					() => {
+						openedClosed += 1;
+					},
 				);
 			},
 		},
@@ -535,12 +542,20 @@ await openWorkFleet(
 	{ refreshMs: 60_000 },
 );
 openedComponent.snapshot = { tasks, rows: tasks[0].agents };
-openedComponent.handleInput("\x1b[B");
+openedComponent.handleInput("\x1b[57420u");
 assert.equal(
 	openedComponent.selected,
 	1,
-	"Fleet opener works without a standalone pi-tui package",
+	"Fleet opener uses Pi keybindings without a standalone pi-tui package",
 );
+openedComponent.handleInput("\x1b[120u");
+assert.equal(
+	openedComponent.expandedTools,
+	true,
+	"Fleet decodes Kitty shortcuts",
+);
+openedComponent.handleInput("\x1b[27u");
+assert.equal(openedClosed, 1, "Fleet opener closes on Kitty Escape");
 openedComponent.dispose();
 
 process.stdout.write("ok - work fleet fixtures pass\n");

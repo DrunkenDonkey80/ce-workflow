@@ -29,6 +29,32 @@ const STATUS_SYMBOLS = Object.freeze({
 	failed: "✗",
 });
 
+const FLEET_KEYBINDINGS = Object.freeze({
+	escape: "tui.select.cancel",
+	"ctrl+c": "tui.select.cancel",
+	"ctrl+o": "app.tools.expand",
+	"ctrl+u": "tui.editor.deleteToLineStart",
+	enter: "tui.select.confirm",
+	backspace: "tui.editor.deleteCharBackward",
+	up: "tui.select.up",
+	down: "tui.select.down",
+	pageUp: "tui.select.pageUp",
+	pageDown: "tui.select.pageDown",
+});
+
+function decodeKittyPrintable(data) {
+	const match = /^\x1b\[([\d:]+)(?:;([\d:]+))?(?:;[\d:]+)?u$/u.exec(data);
+	if (!match) return undefined;
+	const codepoints = match[1].split(":").map(Number);
+	const modifiers = (Number(match[2]?.split(":")[0] ?? 1) - 1) & ~(64 | 128);
+	if (modifiers & ~1) return undefined;
+	const codepoint =
+		modifiers & 1 ? (codepoints[1] ?? codepoints[0]) : codepoints[0];
+	return codepoint >= 32 && codepoint !== 127 && codepoint <= 0x10ffff
+		? String.fromCodePoint(codepoint)
+		: undefined;
+}
+
 function legacyMatchesKey(data, key) {
 	const aliases = {
 		escape: ["escape", "\x1b"],
@@ -47,6 +73,14 @@ function legacyMatchesKey(data, key) {
 		x: ["x", "X"],
 	};
 	return aliases[key]?.includes(data) ?? data === key;
+}
+
+function fleetMatchesKey(keybindings, data, key) {
+	const id = FLEET_KEYBINDINGS[key];
+	return (
+		Boolean(id && keybindings?.matches?.(data, id)) ||
+		legacyMatchesKey(decodeKittyPrintable(data) ?? data, key)
+	);
 }
 
 export function normalizeFleetState(value) {
@@ -779,8 +813,11 @@ export class WorkFleetComponent {
 		this.cwd = cwd;
 		this.pi = pi;
 		this.done = done;
-		this.matchesKey = options.matchesKey ?? legacyMatchesKey;
-		this.decodeKittyPrintable = options.decodeKittyPrintable ?? (() => undefined);
+		this.matchesKey =
+			options.matchesKey ??
+			((data, key) => fleetMatchesKey(options.keybindings, data, key));
+		this.decodeKittyPrintable =
+			options.decodeKittyPrintable ?? decodeKittyPrintable;
 		this.refreshMs = options.refreshMs ?? REFRESH_MS;
 		this.getOrchestrator = options.getOrchestrator;
 		this.orchestrator = options.orchestrator;
@@ -1025,8 +1062,11 @@ export async function openWorkFleet(ctx, pi, options = {}) {
 		return;
 	}
 	await ctx.ui.custom(
-		(tui, theme, _keybindings, done) =>
-			new WorkFleetComponent(tui, theme, ctx.cwd, pi, done, options),
+		(tui, theme, keybindings, done) =>
+			new WorkFleetComponent(tui, theme, ctx.cwd, pi, done, {
+				...options,
+				keybindings,
+			}),
 		{
 			overlay: true,
 			overlayOptions: {
