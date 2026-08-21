@@ -358,51 +358,10 @@ try {
 		id: "TASK-EMPTY",
 		type: "task",
 		status: "open",
-		title: "Close authentication tracking",
-		acceptance: "Store-only completion requires independent review.",
-		notes: ["wo:review PASS - store-only scope approved"],
+		title: "Close already committed verifier tracking",
+		acceptance: "Store-only completion; no production behavior changes.",
 	});
 	saveStore(cwd, storeOnly);
-	assert.match(
-		failure(
-			"finish-task",
-			"TASK-EMPTY",
-			"--max-files",
-			"1",
-			"--message",
-			"finish store-only tracking",
-			...verifyArgs,
-			"--reviewed",
-		),
-		/requires a persisted wo:review-scope/,
-		"reviewed store-only completion cannot bypass the coded handoff",
-	);
-	assert.match(
-		failure(
-			"finish-task",
-			"TASK-EMPTY",
-			"--max-files",
-			"1",
-			"--message",
-			"finish store-only tracking",
-			...verifyArgs,
-		),
-		/Review only:\s*\n/,
-		"store-only review emits a coded handoff despite preexisting PASS",
-	);
-	assert.ok(
-		loadStore(cwd).items["TASK-EMPTY"].notes.some((note) =>
-			/^wo:review-scope \{"files":\[\],"fingerprint":"[a-f0-9]{64}"\}$/.test(
-				note,
-			),
-		),
-		"store-only handoff persists an explicit empty content-bound review scope",
-	);
-	const reviewedStoreOnly = loadStore(cwd);
-	reviewedStoreOnly.items["TASK-EMPTY"].notes.push(
-		"wo:review PASS - empty scope approved",
-	);
-	saveStore(cwd, reviewedStoreOnly);
 	const storeOnlyFinished = JSON.parse(
 		run(
 			"finish-task",
@@ -412,11 +371,16 @@ try {
 			"--message",
 			"finish store-only tracking",
 			...verifyArgs,
-			"--reviewed",
 		),
 	);
 	assert.equal(storeOnlyFinished.status, "PASS");
-	assert.equal(loadStore(cwd).items["TASK-EMPTY"].status, "closed");
+	const closedStoreOnly = loadStore(cwd).items["TASK-EMPTY"];
+	assert.equal(closedStoreOnly.status, "closed");
+	assert.equal(
+		closedStoreOnly.notes.some((note) => note.startsWith("wo:review-scope ")),
+		false,
+		"store-only completion never emits an empty review scope",
+	);
 
 	writeFileSync(path.join(cwd, "residual.js"), "export default false;\n");
 	const residualStore = loadStore(cwd);

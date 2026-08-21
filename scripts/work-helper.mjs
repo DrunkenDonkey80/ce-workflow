@@ -894,11 +894,8 @@ async function finishTaskUnlocked() {
 	);
 	if (sensitivePaths.length)
 		reviewReasons.push(`sensitive paths: ${sensitivePaths.join(", ")}`);
-	const planningOnly =
-		implementationFiles.length === 0 &&
-		arr(field(task, "labels")).includes("wo:planning");
 	if (
-		!planningOnly &&
+		implementationFiles.length > 0 &&
 		/\b(?:auth(?:entication|orization)?|permission|credential|secret|payment|billing|migration|schema|database|destructive|production|deploy|release|breaking|concurren(?:cy|t)|race condition|thread safety|crypt|security|firmware flash)\b/i.test(
 			taskContractText,
 		)

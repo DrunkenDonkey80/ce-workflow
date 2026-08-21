@@ -6976,12 +6976,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomized classification: malformed verifier quoting, unbounded/interactive verifier execution, and opaque repository-lock contention were locally owned distinct claims unified by canonical bug work-2.84. Fixed in commit 7fa3ddc; focused helper and parallel-lane contract tests passed; independent work-reviewer PASS.",
+        "Covered by canonical work-2.84 commit 7fa3ddc: pre-lock command validation, closed stdin plus bounded process-tree timeout, and owner command/age lock diagnostics; focused tests and independent review passed."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A prior `work-helper.mjs finish-task work-1.99` process held `.ce-workflow/work-runs/repository-mutation.lock` from 15:52:30 for m",
       "type": "task",
-      "updatedAt": "2026-08-21T17:35:14.676Z"
+      "updatedAt": "2026-08-21T17:43:42.702Z"
     },
     "work-2.report-d16529ea-1917-4e39-8080-56a0720adb4e": {
       "createdAt": "2026-08-18T05:18:46.408Z",
@@ -7049,6 +7052,9 @@
           "producer": "LPGLibrarySDK-Android",
           "submittedAt": "2026-08-21T14:17:38.391Z",
           "workflowId": "01a024ab-9eae-72f4-83cf-1d316bf35d29"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-d33ed5c8-dc61-4f45-bd56-a2cf6d7c6865",
@@ -7056,12 +7062,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:review-scope {\"files\":[\"scripts/test-work-helper-contract.mjs\",\"scripts/work-helper.mjs\"],\"fingerprint\":\"7cd117b6806de78ef9669d649530f640b9a8335cc6d1023b69ba8667ee6d8914\"}",
+        "wo:review PASS store-only finish gated on implementationFiles>0 (work-helper.mjs:897), no empty Review only scope reachable, production sensitive review retained (contract test:215), node scripts/test-work-helper-contract.mjs ok",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs\nOutput: ok - work helper contract"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The coded finish helper required independent review for store-only work item work-1.112 because the acceptance text said 'no produ",
       "type": "task",
-      "updatedAt": "2026-08-21T14:17:38.395Z"
+      "updatedAt": "2026-08-21T17:46:35.958Z"
     },
     "work-2.report-d3a44b03-1ac9-446d-b9e3-76cd0f0927ad": {
       "createdAt": "2026-08-18T06:38:45.654Z",
@@ -9460,7 +9470,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-21T17:43:25.032Z"
+    "updatedAt": "2026-08-21T17:46:35.961Z"
   },
   "schemaVersion": 1
 }
