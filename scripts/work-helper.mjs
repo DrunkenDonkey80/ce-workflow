@@ -16,6 +16,7 @@ import { pathToFileURL } from "node:url";
 import {
 	acquireRepositoryMutationLock,
 	admitVerificationManifest,
+	normalizeVerificationShards,
 	runVerificationShardBatch,
 	VERIFICATION_GATE_VERSION,
 } from "../extensions/read-only-lanes.js";
@@ -133,7 +134,15 @@ function gitStatusPaths(root = cwd) {
 		paths.push(record.slice(3));
 		if (/[RC]/.test(code) && records[i + 1]) paths.push(records[++i]);
 	}
-	return [...new Set(paths)].filter(Boolean);
+	return [...new Set(paths)]
+		.filter(Boolean)
+		.map((file) => file.replaceAll("\\", "/"));
+}
+
+function relevantChanges(root) {
+	return gitStatusPaths(root).filter(
+		(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
+	);
 }
 
 const LEGACY_INSTRUCTIONS_BEGIN = "<!-- BEGIN COMPOUND PI TOOL MAP -->";
@@ -373,33 +382,37 @@ function dispositionCovers(target, disposition) {
 	);
 }
 
-function directReviewPassed(task) {
+function reviewEvents(task) {
 	const notes = notesOf(task);
 	const scopeIndex =
 		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
-	const reviews = [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)].filter(
-		(event) => event.index > scopeIndex,
-	);
-	return reviews.at(-1)?.[1]?.toUpperCase() === "PASS";
+	const all = [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)];
+	return {
+		postScope: all.filter((event) => event.index > scopeIndex),
+		priorFailures: all.filter(
+			(event) =>
+				event.index < scopeIndex && event[1]?.toUpperCase() === "FAIL",
+		).length,
+	};
 }
 
-function reviewDispositionSatisfied(task, implementationFiles) {
-	const notes = notesOf(task);
-	const scopeIndex =
-		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
-	const reviews = [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)].filter(
-		(event) => event.index > scopeIndex,
-	);
-	if (reviews.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
-	const failures = reviews.filter(
+function directReviewPassed(task) {
+	return reviewEvents(task).postScope.at(-1)?.[1]?.toUpperCase() === "PASS";
+}
+
+function reviewDispositionSatisfied(task) {
+	const { postScope, priorFailures } = reviewEvents(task);
+	if (postScope.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
+	const failures = postScope.filter(
 		(event) => event[1]?.toUpperCase() === "FAIL",
 	).length;
 	const target = targetedReviewFindings(task);
-	return failures === 1
-		? !hasProductionDiff(implementationFiles) &&
-				dispositionCovers(target, dispositionNote(task, "mechanical-fix"))
-		: failures >= 2 &&
-				dispositionCovers(target, dispositionNote(task, "residual-fix"));
+	const kind = failures >= 2 || (failures === 1 && priorFailures)
+		? "residual-fix"
+		: failures === 1
+			? "mechanical-fix"
+			: undefined;
+	return kind && dispositionCovers(target, dispositionNote(task, kind));
 }
 
 function formatPendingFiles(root = cwd) {
@@ -587,13 +600,10 @@ async function runVerification(command, shards = [], root = cwd) {
 	);
 	admitVerificationManifest(batch.manifest, {
 		shards: batch.declarations,
-		invocationId: batch.manifest.invocationId,
+		...batch.admission,
 		authoritativeCommand,
-		baseHead: batch.manifest.baseHead,
-		sourceFingerprint: batch.manifest.sourceFingerprint,
 		currentFingerprint: batch.currentFingerprint,
 		gateVersion: VERIFICATION_GATE_VERSION,
-		reviews: batch.manifest.reviews,
 	});
 	return {
 		output: batch.manifest.shards
@@ -669,9 +679,7 @@ async function finishTaskUnlocked() {
 				path.posix.normalize(file.replaceAll("\\", "/")),
 			),
 			...(evidenceOnly
-				? gitStatusPaths(executionRoot)
-						.map((file) => file.replaceAll("\\", "/"))
-						.filter(evidencePath)
+				? gitStatusPaths(executionRoot).filter(evidencePath)
 				: []),
 		]),
 	];
@@ -715,9 +723,7 @@ async function finishTaskUnlocked() {
 		git(["restore", "--staged", "--", ...stagedBefore], executionRoot);
 	if (
 		distinctRoots &&
-		gitStatusPaths(executionRoot).some(
-			(file) => file.replaceAll("\\", "/") === ".ce-workflow/work-items.json",
-		)
+		gitStatusPaths(executionRoot).includes(".ce-workflow/work-items.json")
 	)
 		throw new Error(
 			"refusing changed .ce-workflow/work-items.json in distinct execution repository",
@@ -734,30 +740,21 @@ async function finishTaskUnlocked() {
 	const expected = option("--expect");
 	if (shardDeclarations.length && expected !== undefined)
 		throw new Error("--expect cannot be combined with --verify-shard");
-	const shardOutputs = shardDeclarations.flatMap((shard) =>
-		Array.isArray(shard.outputs) ? shard.outputs : [],
+	const normalizedShardDeclarations = shardDeclarations.length
+		? normalizeVerificationShards(shardDeclarations)
+		: [];
+	const shardOutputs = normalizedShardDeclarations.flatMap(
+		(shard) => shard.outputs,
 	);
-	for (const output of shardOutputs) {
-		const normalized =
-			typeof output === "string"
-				? path.posix.normalize(output.replaceAll("\\", "/"))
-				: "";
-		if (
-			!normalized ||
-			normalized === "." ||
-			normalized === ".." ||
-			normalized.startsWith("../") ||
-			path.posix.isAbsolute(normalized)
-		)
-			throw new Error(
-				`invalid verification shard output ${JSON.stringify(output)}`,
-			);
-	}
 	const absentShardOutputs = new Set(
 		shardOutputs.filter(
 			(output) => !existsSync(path.join(executionRoot, output)),
 		),
 	);
+	const preserveShardOutput = (output) =>
+		[...ownedImplementationFiles, ...evidenceFileSet].some(
+			(file) => file === output || file.startsWith(`${output}/`),
+		);
 	const jsonFile = option("--json");
 	if (shardDeclarations.length && !verify)
 		throw new Error("--verify-shard requires --verify");
@@ -777,7 +774,7 @@ async function finishTaskUnlocked() {
 			verificationCommand = verify;
 			const verification = await runVerification(
 				verify,
-				shardDeclarations,
+				normalizedShardDeclarations,
 				executionRoot,
 			);
 			output = verification.output.trim();
@@ -803,10 +800,11 @@ async function finishTaskUnlocked() {
 		);
 	} finally {
 		for (const outputPath of absentShardOutputs)
-			rmSync(path.join(executionRoot, outputPath), {
-				recursive: true,
-				force: true,
-			});
+			if (!preserveShardOutput(outputPath))
+				rmSync(path.join(executionRoot, outputPath), {
+					recursive: true,
+					force: true,
+				});
 	}
 	if (verificationCommand)
 		verificationResult = {
@@ -841,30 +839,24 @@ async function finishTaskUnlocked() {
 				unrecognized.map((file) => `  - ${file}`).join("\n") +
 				`\nFor each task-owned new implementation file, rerun with --implementation-file <path>; declare task-owned evidence under ${taskEvidencePrefix} with --evidence-file; resolve unrelated files first.`,
 		);
-	const changed = gitStatusPaths(executionRoot).filter((file) => {
-		const normalized = file.replaceAll("\\", "/");
-		return (
-			!(distinctRoots && normalized === ".ce-workflow/work-items.json") &&
-			(ownedImplementationFiles.has(normalized) ||
-				(!isRuntimePath(file) && !isGeneratedBuildPath(file)))
-		);
-	});
+	const changed = gitStatusPaths(executionRoot).filter(
+		(file) =>
+			!(distinctRoots && file === ".ce-workflow/work-items.json") &&
+			(ownedImplementationFiles.has(file) ||
+				(!isRuntimePath(file) && !isGeneratedBuildPath(file))),
+	);
 	if (!changed.length) throw new Error("no related changes to commit");
-	const implementationFiles = changed.filter((file) => {
-		const normalized = file.replaceAll("\\", "/");
-		return (
-			!normalized.startsWith(".ce-workflow/") && !evidenceFileSet.has(normalized)
-		);
-	});
+	const implementationFiles = changed.filter(
+		(file) =>
+			!file.startsWith(".ce-workflow/") && !evidenceFileSet.has(file),
+	);
 	if (implementationFiles.length > maxFiles)
 		throw new Error(
 			`scope exceeds ${maxFiles} implementation files: ${implementationFiles.join(", ")}`,
 		);
 	const reviewReasons = [];
 	const sensitivePaths = implementationFiles.filter((file) =>
-		/(?:^|\/)(?:migrations?|schema|auth|security|permissions?|payments?|billing|secrets?|deploy|infra)(?:\/|\.|$)|\.github\/workflows\//i.test(
-			file.replaceAll("\\", "/"),
-		),
+		/(?:^|\/)(?:migrations?|schema|auth|security|permissions?|payments?|billing|secrets?|deploy|infra)(?:\/|\.|$)|\.github\/workflows\//i.test(file),
 	);
 	if (sensitivePaths.length)
 		reviewReasons.push(`sensitive paths: ${sensitivePaths.join(", ")}`);
@@ -938,7 +930,7 @@ async function finishTaskUnlocked() {
 		const directReviewAccepted = directReviewPassed(task);
 		const accepted =
 			sameReviewFiles &&
-			reviewDispositionSatisfied(task, implementationFiles) &&
+			reviewDispositionSatisfied(task) &&
 			(!directReviewAccepted || freshReviewScope);
 		if (!accepted && !reviewed) {
 			if (!freshReviewScope)
@@ -1031,13 +1023,9 @@ async function finishTaskUnlocked() {
 				],
 			}),
 		);
-		const ownerChanges = gitStatusPaths(ownerRepositoryRoot).filter(
-			(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
-		);
+		const ownerChanges = relevantChanges(ownerRepositoryRoot);
 		if (
-			ownerChanges.some(
-				(file) => file.replaceAll("\\", "/") !== ".ce-workflow/work-items.json",
-			)
+			ownerChanges.some((file) => file !== ".ce-workflow/work-items.json")
 		)
 			throw new Error(
 				`non-work-store files changed during close: ${ownerChanges.join(", ")}`,
@@ -1061,13 +1049,9 @@ async function finishTaskUnlocked() {
 		ownerCommit = storeTracked
 			? git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim()
 			: null;
-		const executionRemaining = gitStatusPaths(executionRoot).filter(
-			(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
-		);
+		const executionRemaining = relevantChanges(executionRoot);
 		const ownerRemaining = distinctRoots
-			? gitStatusPaths(ownerRepositoryRoot).filter(
-					(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
-				)
+			? relevantChanges(ownerRepositoryRoot)
 			: executionRemaining;
 		if (executionRemaining.length || ownerRemaining.length)
 			throw new Error(
@@ -1252,15 +1236,6 @@ function capText(text, bytes = 10000) {
 	};
 }
 
-function options(name) {
-	return args.flatMap((arg, index) =>
-		arg === name && index + 1 < args.length ? [args[index + 1]] : [],
-	);
-}
-function option(name, fallback = undefined) {
-	return options(name)[0] ?? fallback;
-}
-
 const BOOLEAN_OPTIONS = new Set([
 	"--allow-work-store",
 	"--append-notes",
@@ -1270,26 +1245,39 @@ const BOOLEAN_OPTIONS = new Set([
 	"--reviewed",
 ]);
 
-function parsedPositionalsAndFlags() {
+function parsedArguments() {
 	const positionals = [];
 	const flags = new Set();
+	const values = new Map();
 	for (let i = 0; i < args.length; i += 1) {
-		if (args[i].startsWith("--")) {
-			if (BOOLEAN_OPTIONS.has(args[i])) flags.add(args[i]);
-			else i += 1;
+		const arg = args[i];
+		if (!arg.startsWith("--")) {
+			positionals.push(arg);
 			continue;
 		}
-		positionals.push(args[i]);
+		if (BOOLEAN_OPTIONS.has(arg)) flags.add(arg);
+		else if (i + 1 < args.length) {
+			values.set(arg, [...(values.get(arg) ?? []), args[i + 1]]);
+			i += 1;
+		}
 	}
-	return { positionals, flags };
+	return { positionals, flags, values };
+}
+
+function options(name) {
+	return parsedArguments().values.get(name) ?? [];
+}
+
+function option(name, fallback = undefined) {
+	return options(name)[0] ?? fallback;
 }
 
 function flag(name) {
-	return parsedPositionalsAndFlags().flags.has(name);
+	return parsedArguments().flags.has(name);
 }
 
 function positional() {
-	return parsedPositionalsAndFlags().positionals;
+	return parsedArguments().positionals;
 }
 
 function termScore(issue, terms) {
@@ -1475,9 +1463,7 @@ try {
 			throw new Error(
 				"usage: work-create <title> [--parent <id>] [--type <type>] [--description <text>] [--acceptance <text>] [--note <text>] [--label <label>]",
 			);
-		const labels = args.flatMap((arg, index) =>
-			arg === "--label" && args[index + 1] ? [args[index + 1]] : [],
-		);
+		const labels = options("--label");
 		const created = mutateStore(cwd, (store) =>
 			createWorkItem(store, {
 				title,
@@ -1538,6 +1524,10 @@ try {
 			const requested = noteArgs[1];
 			const file = requested ? path.resolve(cwd, requested) : "";
 			const relative = file ? path.relative(cwd, file) : "";
+			const canonicalRelative =
+				file && existsSync(file)
+					? path.relative(realpathSync(cwd), realpathSync(file))
+					: "";
 			if (
 				noteArgs.length !== 2 ||
 				path.isAbsolute(requested) ||
@@ -1547,9 +1537,9 @@ try {
 				!existsSync(file) ||
 				!statSync(file).isFile() ||
 				statSync(file).size > 1024 * 1024 ||
-				["..", `..${path.sep}`].some((prefix) =>
-					path.relative(realpathSync(cwd), realpathSync(file)).startsWith(prefix),
-				)
+				canonicalRelative === ".." ||
+				canonicalRelative.startsWith(`..${path.sep}`) ||
+				path.isAbsolute(canonicalRelative)
 			)
 				throw new Error(
 					"--note-file requires one repository-contained file up to 1 MiB",

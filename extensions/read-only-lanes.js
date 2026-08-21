@@ -262,7 +262,10 @@ function acquireFileLock(file, category, reclaiming = false) {
 		descriptor = openSync(file, "wx", 0o600);
 		writeFileSync(descriptor, `${JSON.stringify(owner)}\n`);
 	} catch (error) {
-		if (error?.code === "EEXIST") {
+		if (
+			error?.code === "EEXIST" ||
+			(error?.code === "EPERM" && existsSync(file))
+		) {
 			const staleOwner = lockOwner(file);
 			if (ownerDead(file)) {
 				try {
@@ -424,11 +427,20 @@ export function saveLaneStore(cwd = process.cwd(), store) {
 	}
 	return store;
 }
+function acquireLaneStoreLock(cwd, waitMs = 250) {
+	const deadline = Date.now() + waitMs;
+	while (true) {
+		try {
+			return acquireFileLock(storeLockPath(cwd), "Another lane writer is active");
+		} catch (error) {
+			if (error?.category !== "locked" || Date.now() >= deadline) throw error;
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+		}
+	}
+}
+
 export function mutateLaneStore(cwd = process.cwd(), mutate, options = {}) {
-	const lock = acquireFileLock(
-		storeLockPath(cwd),
-		"Another lane writer is active",
-	);
+	const lock = acquireLaneStoreLock(cwd);
 	try {
 		const store = loadLaneStore(cwd);
 		const result = mutate(store);
@@ -987,7 +999,14 @@ function exactKeys(value, keys) {
 	);
 }
 function verificationOutputPath(value) {
-	const output = relativePath(value);
+	if (
+		!text(value) ||
+		value.includes("\\") ||
+		path.posix.isAbsolute(value) ||
+		path.win32.isAbsolute(value)
+	)
+		fail("invalid", `Invalid verification output path: ${value}`);
+	const output = relativePath(path.posix.normalize(value));
 	if (/^(?:\.git|\.ce-workflow|\.pi)(?:\/|$)/.test(output))
 		fail(
 			"invalid",
@@ -1262,6 +1281,12 @@ export async function runVerificationShardBatch(
 	const currentFingerprint = captureRepositoryFingerprint(cwd, {
 		excludeOutputs: outputs,
 	});
+	const admission = {
+		invocationId,
+		baseHead,
+		sourceFingerprint: structuredClone(sourceFingerprint),
+		reviews: Array.isArray(input.reviews) ? structuredClone(input.reviews) : [],
+	};
 	const manifest = {
 		schemaVersion: VERIFICATION_MANIFEST_VERSION,
 		gateVersion: input.gateVersion ?? VERIFICATION_GATE_VERSION,
@@ -1273,7 +1298,7 @@ export async function runVerificationShardBatch(
 		startedAt,
 		finishedAt: timestamp(options.now?.()),
 		shards: ordered,
-		reviews: Array.isArray(input.reviews) ? structuredClone(input.reviews) : [],
+		reviews: structuredClone(admission.reviews),
 		metrics,
 		status:
 			fingerprintsEqual(sourceFingerprint, currentFingerprint) &&
@@ -1283,6 +1308,7 @@ export async function runVerificationShardBatch(
 	};
 	return {
 		manifest,
+		admission,
 		declarations: shards,
 		currentFingerprint,
 		serial,

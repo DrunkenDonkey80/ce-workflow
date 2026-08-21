@@ -83,6 +83,13 @@ try {
 		/bounded note file/,
 		"work-note reads a repository-contained note file",
 	);
+	writeFileSync(path.join(cwd, "..notes.txt"), "dot-prefixed note file\n");
+	assert.match(
+		JSON.parse(run("work-note", "TASK-1", "--note-file", "..notes.txt"))
+			.notes_tail,
+		/dot-prefixed note file/,
+		"work-note accepts a contained basename beginning with two dots",
+	);
 	assert.match(
 		failure("work-note", "TASK-1", "--note-file", path.join(cwd, "note.txt")),
 		/repository-contained file up to 1 MiB/,
@@ -98,6 +105,7 @@ try {
 		"work-note rejects oversized note files",
 	);
 	rmSync(path.join(cwd, "note.txt"));
+	rmSync(path.join(cwd, "..notes.txt"));
 	rmSync(path.join(cwd, "oversized-note.txt"));
 
 	const summary = JSON.parse(run("work-summary", "TASK-1"));
@@ -159,6 +167,21 @@ try {
 		),
 		/unmatched shell quote/,
 		"malformed verifier commands fail before taking the repository lock",
+	);
+	assert.equal(existsSync(mutationLock), false);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-1",
+			"--max-files",
+			"2",
+			"--message",
+			"reject interactive verifier",
+			"--verify",
+			"bash",
+		),
+		/bare interactive shell/,
+		"bare interactive verifier shells fail before taking the repository lock",
 	);
 	assert.equal(existsSync(mutationLock), false);
 	const previousTimeout = process.env.WORK_ORCH_VERIFY_TIMEOUT_MS;
@@ -399,6 +422,7 @@ try {
 			'wo:review-scope ["residual.js"]',
 			"wo:review FAIL - first",
 			"wo:fix PASS - first fix",
+			'wo:review-scope ["residual.js"]',
 			'wo:review FAIL {"findings":["residual A","residual B"]}',
 			"wo:fix PASS - generic residual summary",
 		],
@@ -445,28 +469,28 @@ try {
 	);
 	assert.equal(residualFinished.status, "PASS");
 
-	writeFileSync(path.join(cwd, "mechanical.md"), "old wording\n");
+	writeFileSync(path.join(cwd, "mechanical.js"), "// old wording\n");
 	const mechanicalStore = loadStore(cwd);
 	createWorkItem(mechanicalStore, {
 		id: "TASK-3",
 		type: "task",
 		status: "open",
-		title: "Update authentication documentation",
+		title: "Update an authentication source comment",
 		notes: [
-			'wo:review-scope ["mechanical.md"]',
+			'wo:review-scope ["mechanical.js"]',
 			"wo:review FAIL - source comment date is missing",
 			"wo:fix PASS - comment corrected and docs check passed",
 		],
 	});
 	saveStore(cwd, mechanicalStore);
-	execFileSync("git", ["add", "mechanical.md", ".ce-workflow/work-items.json"], {
+	execFileSync("git", ["add", "mechanical.js", ".ce-workflow/work-items.json"], {
 		cwd,
 	});
 	execFileSync("git", ["commit", "-m", "mechanical baseline"], {
 		cwd,
 		stdio: "ignore",
 	});
-	writeFileSync(path.join(cwd, "mechanical.md"), "dated wording\n");
+	writeFileSync(path.join(cwd, "mechanical.js"), "// dated wording\n");
 	assert.match(
 		failure(
 			"finish-task",
@@ -479,6 +503,19 @@ try {
 		),
 		/independent review required/,
 		"a boolean-looking option value cannot activate the review flag",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-3",
+			"--max-files",
+			"1",
+			"--message",
+			"--verify",
+			...verifyArgs,
+		),
+		/independent review required/,
+		"an option-looking value cannot shadow the real verification option",
 	);
 	saveStore(cwd, mechanicalStore);
 	const mechanicalDispositionStore = loadStore(cwd);
@@ -558,7 +595,7 @@ try {
 		/--expect cannot be combined with --verify-shard/,
 		"sharded verification rejects the scalar stdout expectation",
 	);
-	const failedShardOutput = "build-shard/failed.txt";
+	const failedShardOutput = "./build-shard/failed.txt";
 	const failingShard = `${JSON.stringify(process.execPath)} ${JSON.stringify(helper)} work-note TASK-4 --append-notes "note written during failed shard" && ${JSON.stringify(process.execPath)} -e "require('fs').mkdirSync('build-shard',{recursive:true});require('fs').writeFileSync('${failedShardOutput}','failed');process.exit(1)"`;
 	assert.match(
 		failure(
@@ -1088,10 +1125,10 @@ try {
 			cwd: generatedRoot,
 			encoding: "utf8",
 		})
-			.trim()
 			.split(/\r?\n/)
-			.filter((line) => !line.includes(".pi/")),
-		["M .gradle/cache.bin"],
+			.filter((line) => line && !line.includes(".pi/"))
+			.map((line) => line.trim()),
+			["M .gradle/cache.bin"],
 		"tracked generated dirt remains unstaged and does not block close",
 	);
 	assert.doesNotMatch(

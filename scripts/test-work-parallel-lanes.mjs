@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -87,6 +87,29 @@ try {
 			false,
 			"absent lane reconciliation does not create workflow state",
 		);
+	}
+
+	{
+		const { cwd, git } = repository();
+		const laneLock = path.join(path.dirname(laneStorePath(cwd)), "mutation.lock");
+		mkdirSync(path.dirname(laneLock), { recursive: true });
+		const holder = spawn(
+			process.execPath,
+			[
+				"-e",
+				`const fs=require("fs"),os=require("os");fs.writeFileSync(${JSON.stringify(laneLock)},JSON.stringify({pid:process.pid,host:os.hostname(),acquiredAt:new Date().toISOString()})+"\\n");setTimeout(()=>fs.rmSync(${JSON.stringify(laneLock)},{force:true}),100)`,
+			],
+			{ stdio: "ignore" },
+		);
+		for (let attempts = 0; attempts < 50 && !existsSync(laneLock); attempts += 1)
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+		assert.equal(existsSync(laneLock), true, "fixture holds the lane store lock");
+		assert.doesNotThrow(
+			() => queueLane(cwd, envelope(cwd, git("rev-parse", "HEAD"), 1, "retry")),
+			"a brief live-writer collision is retried",
+		);
+		if (holder.exitCode === null)
+			await new Promise((resolve) => holder.once("exit", resolve));
 	}
 
 	{

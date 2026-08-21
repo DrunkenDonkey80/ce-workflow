@@ -54,13 +54,10 @@ async function runLocked(cwd, input, runner, options = {}) {
 function expected(batch, input, extra = {}) {
 	return {
 		shards: batch.declarations,
-		invocationId: batch.manifest.invocationId,
+		...batch.admission,
 		authoritativeCommand: input.authoritativeCommand,
-		baseHead: batch.manifest.baseHead,
-		sourceFingerprint: batch.manifest.sourceFingerprint,
 		currentFingerprint: batch.currentFingerprint,
 		gateVersion: VERIFICATION_GATE_VERSION,
-		reviews: input.reviews ?? [],
 		...extra,
 	};
 }
