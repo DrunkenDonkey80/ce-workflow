@@ -486,6 +486,26 @@ const childrenByScenario = {
 		},
 	],
 	plannerGap: [],
+	finiteBacklogComplete: [
+		{
+			id: "PLAN-FINITE",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "closed",
+			title: "Plan executable backlog for Active epic",
+			labels: ["wo:planning"],
+			notes: "wo:planning\nwo:finite-backlog",
+			created_at: "2026-07-03T01:00:00Z",
+		},
+		{
+			id: "DONE-FINITE",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "closed",
+			title: "Implement finite planned slice",
+			created_at: "2026-07-03T02:00:00Z",
+		},
+	],
 	openReady: [
 		{
 			id: "OPEN-READY",
@@ -1046,6 +1066,22 @@ try {
 	assert(
 		state.handoffPrompt.includes("Target work item: none"),
 		"planner gap has no selected workItem",
+	);
+	assert(
+		state.handoffPrompt.includes("Create one finite backlog") &&
+			state.handoffPrompt.includes("generic gap-finding is forbidden"),
+		"planner handoff freezes one finite backlog instead of serial gap discovery",
+	);
+
+	setScenario("finiteBacklogComplete");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "done-candidate" && !state.handoffPrompt,
+		"an exhausted finite backlog stops instead of relaunching the planner",
+	);
+	assert(
+		state.message.includes("Do not launch another gap-finding pass"),
+		"finite backlog stop explains how later work must enter",
 	);
 
 	setScenario("open-ready");

@@ -210,6 +210,7 @@ const SELF_IMPROVEMENT_EPIC_TITLE = "Self-improving";
 const SELF_IMPROVEMENT_REPORT_LABEL = "self-improvement";
 const MISC_ROADMAP_TITLE = "Misc";
 const MISC_ROADMAP_LABEL = "wo:misc";
+const FINITE_BACKLOG_MARKER = "wo:finite-backlog";
 const MISC_ROADMAP_CHOICE = "__misc_roadmap__";
 const VERIFIER_RPC_TIMEOUT_MS = 30_000;
 const PREFETCH_RPC_TIMEOUT_MS = 2_000;
@@ -7890,8 +7891,15 @@ function buildEpicChildState(cwd, epic) {
 			depsOf(issue).some((id) => statusOf(byId.get(id)) !== "closed")
 		);
 	});
+	const finiteBacklogPlanned = workItems.some(
+		(issue) =>
+			isPlanningIssue(issue) &&
+			statusOf(issue) === "closed" &&
+			notesOf(issue).includes(FINITE_BACKLOG_MARKER),
+	);
 	return {
 		epicId,
+		finiteBacklogPlanned,
 		children,
 		slices,
 		closed,
@@ -8407,6 +8415,15 @@ function planResumeAction(state, cwd, options = {}) {
 			message: "Misc has no ready work.",
 			suggestedCommands: [],
 		};
+	if (state.finiteBacklogPlanned)
+		return {
+			...state,
+			action: "done-candidate",
+			message:
+				"The finite planned backlog is exhausted. Do not launch another gap-finding pass; add only an explicit failing bug or close the roadmap.",
+			suggestedCommands: [`/work-report ${state.epic.id}`],
+			nextAction: `Next: review and explicitly close roadmap ${state.epic.id}, or add a concrete failing bug.`,
+		};
 	return withHandoffPrompt(
 		{
 			...state,
@@ -8600,7 +8617,7 @@ function directRoleTask(state, cwd) {
 			? `For child state use: node ${helper} work-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
-			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence). Open decisions are only for unresolved human, product, or architectural authority; record a technical winner otherwise. Verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning item, then stop. Planner parent launch baseline: ${JSON.stringify(plannerBaseline)}; predeclared paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. If launchSafe is false, stop BLOCKED; new paths fail closed. A new unstaged tracked instruction path is tolerable only when its whitespace-ignored diff is empty. Additionally, only when managedAgentsOverlayEligible is true, a new unstaged tracked AGENTS.md modification may be treated as a transient managed startup overlay even when substantive; never modify, stage, or revert it. Staged/untracked AGENTS, a baseline AGENTS entry, or unrelated dirt always blocks. Before finishing, require AGENTS.md to hash to agentsWorktree and agentsHead and reject every final undeclared mutation outside the native store, workflow runtime, or requested dated plan.`
+			? `Use compact native summaries; no raw store JSON or broad discovery. Freeze one finite backlog: batch same-surface defects, cite an original requirement plus failing evidence, create external blockers, and mark the planning item ${FINITE_BACKLOG_MARKER}. Once exhausted, later work needs an explicit failing bug or user-added scope. Open decisions are only for unresolved human, product, or architectural authority; record a technical winner otherwise. Verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning item, then stop. Planner parent launch baseline: ${JSON.stringify(plannerBaseline)}; predeclared paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. If launchSafe is false, stop BLOCKED; new paths fail closed. A new unstaged tracked instruction path is tolerable only when its whitespace-ignored diff is empty. Additionally, only when managedAgentsOverlayEligible is true, a new unstaged tracked AGENTS.md modification may be treated as a transient managed startup overlay even when substantive; never modify, stage, or revert it. Staged/untracked AGENTS, a baseline AGENTS entry, or unrelated dirt always blocks. Before finishing, require AGENTS.md to hash to agentsWorktree and agentsHead and reject every final undeclared mutation outside the native store, workflow runtime, or requested dated plan.`
 			: "",
 		["run-planner", "run-implementation"].includes(state.action) && selected?.id
 			? `Claim exactly with: node ${helper} work-claim ${selected.id}`
@@ -11776,6 +11793,7 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 		state.action === "run-planner"
 			? [
 					"Planner efficiency: do not run raw raw store JSON; project roadmaps can contain full plans. Use compact helper projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
+					`Create one finite backlog of all currently known local work, batch same-surface defects, create durable external blockers, and mark the planning item ${FINITE_BACKLOG_MARKER}. Every executable item needs original requirement/acceptance traceability plus concrete failing evidence. Once that backlog is exhausted, generic gap-finding is forbidden; later work requires an explicit failing bug or user-added scope.`,
 				]
 			: [];
 	const settings = cwd ? workOrchSettings(cwd) : null;
@@ -12047,6 +12065,7 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 				: {}),
 			git,
 			planPath,
+			finiteBacklogPlanned: childState.finiteBacklogPlanned,
 			suggestedCommands: [`/work-resume ${childState.epicId}`],
 			warnings: git.warnings,
 		};
@@ -13624,7 +13643,8 @@ export function bootstrapPlanEpic(
 				const notes = workflowWorkItemNotes(command, epic.title, [
 					"wo:planning",
 					`source plan: ${rel}`,
-					"create one executable slice by default",
+					FINITE_BACKLOG_MARKER,
+					"create the finite backlog of known local work and external blockers",
 				]);
 				planning = createWorkItem(store, {
 					title: compactWorkItemTitle(title),
@@ -13772,7 +13792,8 @@ export function bootstrapPlanEpic(
 			"wo:planning",
 			`source plan: ${rel}`,
 			fields.ideaId ? `idea-id=${fields.ideaId}` : "",
-			"create one executable slice by default",
+			FINITE_BACKLOG_MARKER,
+			"create the finite backlog of known local work and external blockers",
 		]),
 	});
 	if (idea) {
@@ -17788,8 +17809,18 @@ function loadWorkGoalFromSession(ctx) {
 				item.type === "custom" && item.customType === WORK_GOAL_STATE_ENTRY_TYPE,
 		)
 		.pop();
-	const goal = entry?.data?.goal ?? readWorkState(ctx?.cwd).workGoal;
-	return isWorkGoal(goal) && goal.status !== "complete" ? goal : null;
+	const sessionGoal = entry?.data?.goal;
+	const durableGoal = readWorkState(ctx?.cwd).workGoal;
+	const goal = [sessionGoal, durableGoal]
+		.filter(isWorkGoal)
+		.reduce((latest, candidate) => {
+			const candidateUpdated =
+				Number(candidate.updatedAt) || Date.parse(candidate.updatedAt) || 0;
+			const latestUpdated =
+				Number(latest?.updatedAt) || Date.parse(latest?.updatedAt) || 0;
+			return !latest || candidateUpdated > latestUpdated ? candidate : latest;
+		}, null);
+	return goal?.status === "complete" ? null : goal;
 }
 
 function persistWorkGoal(pi, goal = activeWorkGoal, cwd = activeWorkGoalCwd) {
@@ -20005,16 +20036,21 @@ async function handleWorkGoalResetCommand(args, ctx, pi) {
 		);
 	};
 	if (typeof ctx.newSession !== "function") return fallback("API unavailable");
+	if (activeWorkGoal?.id !== goal.id || activeWorkGoal.status !== "active")
+		return;
 	const parentSession = ctx.sessionManager?.getSessionFile?.();
 	try {
 		const result = await ctx.newSession({
 			parentSession,
 			setup: (sessionManager) => {
-				sessionManager.appendCustomEntry(WORK_GOAL_STATE_ENTRY_TYPE, {
-					goal: { ...goal, resumeOnSessionStart: true },
-				});
+				if (activeWorkGoal?.id === goal.id && activeWorkGoal.status === "active")
+					sessionManager.appendCustomEntry(WORK_GOAL_STATE_ENTRY_TYPE, {
+						goal: { ...goal, resumeOnSessionStart: true },
+					});
 			},
 			withSession: async (nextCtx) => {
+				if (activeWorkGoal?.id !== goal.id || activeWorkGoal.status !== "active")
+					return;
 				await nextCtx.sendUserMessage(
 					buildClaimedWorkGoalContinuePrompt(
 						goal,
@@ -20299,17 +20335,22 @@ async function sendWorkflowFollowUp(ctx, message, pi, state) {
 	});
 }
 
-function pauseAutonomousGoalAfterError(reason, pi, ctx) {
+function pauseActiveWorkGoal(reason, pi, ctx, level = "warning") {
 	if (!activeWorkGoal) return;
+	restoreWorkGoalThinking(pi, activeWorkGoal);
 	activeWorkGoal = {
 		...activeWorkGoal,
 		status: "paused",
 		stopReason: reason,
 		updatedAt: Date.now(),
 	};
+	workGoalContinuationPending = null;
+	workGoalContinuationRetry = null;
+	clearWorkGoalRecovery();
+	clearWorkGoalUsageLimitTimer();
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
-	notify(ctx, `Autonomous orchestrator paused: ${reason}`, "warning");
+	notify(ctx, `Autonomous orchestrator paused: ${reason}`, level);
 }
 
 async function prepareAutonomousResumeEntry(cwd, state, target, currentModel) {
@@ -20447,7 +20488,7 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 			currentModelId(ctx),
 		);
 		if (!prepared.ok) {
-			pauseAutonomousGoalAfterError(prepared.reason, pi, ctx);
+			pauseActiveWorkGoal(prepared.reason, pi, ctx);
 			return {
 				...prepared.state,
 				autonomousGoalId: goal.id,
@@ -20504,7 +20545,7 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 			launched.spawned,
 		).runId;
 		if (!launched.spawned.ok && !launched.spawned.ambiguous) {
-			pauseAutonomousGoalAfterError(
+			pauseActiveWorkGoal(
 				`${launchHandoff.agent} could not start: ${launched.spawned.message}`,
 				pi,
 				ctx,
@@ -20681,6 +20722,8 @@ async function handleWorkflowAction(
 			};
 	}
 	state = await withCreativeSidecar(builder, args, state, ctx);
+	if (builder === buildWorkPauseState && state.ok && activeWorkGoal)
+		pauseActiveWorkGoal("checkpoint requested", pi, ctx, "info");
 	if (
 		builder === buildWorkPauseState &&
 		state.ok &&

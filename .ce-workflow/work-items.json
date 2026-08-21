@@ -4666,6 +4666,45 @@
       "type": "task",
       "updatedAt": "2026-08-11T18:42:24.048Z"
     },
+    "work-2.report-190164eb-603a-44b8-ab03-c9c2af85f26c": {
+      "createdAt": "2026-08-21T19:17:16.910Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: work_verifier_complete_fix rejected a declared two-path relocation (accepted finding path app/src/main/java/com/ipc/lpglibrary/EX10TestSuite.kt plus fixPath app/src/debug/java/com/ipc/lpglibrary/EX10TestSuite.kt) as `Unexpected staged files: app/src/debug/...`. Manual staging shows Git reports the change as `R098 old new`, while `git diff --cached --name-only` emits only the destination path.\nExpected: A relocation should be accepted when both the accepted finding source path and destination fixPath are explicitly supplied; rename detection must normalize both sides of R/C statuses rather than classify the destination as unexpected.\nImpact: Verifier triage cannot be completed atomically for a legitimate move, blocking mandatory /work-resume until the main agent uses the supported ancestor-commit reconciliation workaround.\nSuggested improvement: Parse `git diff --cached --name-status -z` and authorize both source and destination for R/C entries against the declared accepted/fix path set.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/067bac6a-962a-4ce8-8465-f9dd5ffa36a4",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3072092,
+              "file": "01-.state.recovery.json",
+              "sha256": "a63d407d69660b813f69d6fc10917041789907bf845bfc231501bbd59ad1b886"
+            },
+            {
+              "bytes": 412255,
+              "file": "02-session.jsonl",
+              "sha256": "609047b98548063dc879001b86dc771fb299d9f40a99c470bbb5d878cebd6cf8"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T19:17:16.904Z",
+          "workflowId": "01a025ba-6ead-7746-b917-def3899862ab"
+        }
+      ],
+      "id": "work-2.report-190164eb-603a-44b8-ab03-c9c2af85f26c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: work_verifier_complete_fix rejected a declared two-path relocation (accepted finding path app/src/main/java/com/ipc/lpglibrary/EX1",
+      "type": "task",
+      "updatedAt": "2026-08-21T19:17:16.910Z"
+    },
     "work-2.report-1e41739d-a5e4-434d-954f-7235e7fd07c5": {
       "createdAt": "2026-08-19T09:29:15.735Z",
       "dependencies": [],
@@ -5273,6 +5312,40 @@
       "type": "task",
       "updatedAt": "2026-08-18T10:19:24.338Z"
     },
+    "work-2.report-52aee41a-f985-4d4a-80c6-8ce324bcaa1c": {
+      "createdAt": "2026-08-21T19:17:07.303Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: On Windows, work-planner received the absolute work-helper.mjs path but invoked the .mjs file directly instead of through Node, failed with platform execution error, and aborted before preflight.\nExpected: The coded planner handoff should provide the complete platform-safe helper invocation (`node <absolute-work-helper.mjs>`) or the planner contract should always invoke .mjs helpers through process.execPath.\nImpact: Autonomous resume required another duplicate planner launch even though the helper path and repository were valid.\nSuggested improvement: Encode helperCommand as an argv tuple using process.execPath rather than supplying only helperPath.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/51e04796-692b-423c-948e-d570fed37d47",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 18565,
+              "file": "01-session.jsonl",
+              "sha256": "df148d583ae92b41cb9bb6bd6f00f9bdcb1da51cbc944b5bd7e2aa2bf1b72150"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-21T19:17:07.299Z",
+          "workflowId": "01a021d2-7bfc-7af3-898c-ecf0a87e5204"
+        }
+      ],
+      "id": "work-2.report-52aee41a-f985-4d4a-80c6-8ce324bcaa1c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: On Windows, work-planner received the absolute work-helper.mjs path but invoked the .mjs file directly instead of through Node, fa",
+      "type": "task",
+      "updatedAt": "2026-08-21T19:17:07.303Z"
+    },
     "work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63": {
       "createdAt": "2026-08-10T12:58:04.547Z",
       "dependencies": [
@@ -5754,6 +5827,40 @@
       "type": "task",
       "updatedAt": "2026-08-07T08:26:23.305Z"
     },
+    "work-2.report-61fcc1ed-15f1-42a1-89cb-159d9be7c95c": {
+      "createdAt": "2026-08-21T19:24:38.078Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The work-planner handoff named C:/soft/git/ce-workflow/scripts/work-helper.mjs without a Node launcher, so the planner invoked the .mjs directly on Windows, got 'not a valid application for this OS platform', and abandoned work-1.130 before reading native state or the plan.\nExpected: Windows specialist handoffs should provide or normalize `node C:/soft/git/ce-workflow/scripts/work-helper.mjs ...` so deterministic work-item helpers execute correctly.\nImpact: Autonomous roadmap continuation stalled and required parent recovery even though the helper itself is healthy.\nSuggested improvement: Include the Node executable prefix in generated specialist contracts on Windows.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/315bc55c-aef9-447a-9ec4-12490d629c7c",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3369,
+              "file": "01-work-1.130-planner.md",
+              "sha256": "1ee8b1d4f7f0700f8c9703a88e6a730997d427f29475ddede66d9e86de816388"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T19:24:38.073Z",
+          "workflowId": "01a025c1-d3ef-73df-927e-370f70398a59"
+        }
+      ],
+      "id": "work-2.report-61fcc1ed-15f1-42a1-89cb-159d9be7c95c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The work-planner handoff named C:/soft/git/ce-workflow/scripts/work-helper.mjs without a Node launcher, so the planner invoked the",
+      "type": "task",
+      "updatedAt": "2026-08-21T19:24:38.078Z"
+    },
     "work-2.report-62fb9577-ee2e-4536-aa72-fcf4d1d25ce6": {
       "createdAt": "2026-08-05T08:07:27.045Z",
       "dependencies": [],
@@ -6004,6 +6111,40 @@
       "title": "Self-improvement report: The roadmap projection for closed work-1 returns `aggregateStatus: needs_attention`, progress 12/12, with work-1.6 and work-1.11 m",
       "type": "task",
       "updatedAt": "2026-08-08T08:43:45.147Z"
+    },
+    "work-2.report-6ea35cdc-2683-4c4c-9b0b-6b4b7eae07de": {
+      "createdAt": "2026-08-21T19:35:22.763Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The work-worker role refused a bounded implementation handoff before using any tools because the absolute work-helper.mjs path was not included, even though the handoff explicitly said not to edit work-item state and already supplied the native work-item ID, owned file, and acceptance.\nExpected: A bounded implementation worker that is told not to mutate native state should inspect and edit its owned source directly; if the role contract always needs the helper, generated/custom handoffs should inject `C:/soft/git/ce-workflow/scripts/work-helper.mjs` automatically.\nImpact: The autonomous loop consumed a worker launch and stalled without inspecting code, editing, or validating, requiring a duplicate recovery launch.\nSuggested improvement: Make the worker helper path optional for source-only implementation or automatically include the resolved absolute helper path in work-worker contracts.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/8a74931c-7663-4184-9245-96c2a03b9b6c",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 469,
+              "file": "01-work-1.133-worker-blocked.md",
+              "sha256": "1225729fbb3622090a9a4973feb5fdea9f118679d3ff58ad3525864d5243ad30"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-21T19:35:22.758Z",
+          "workflowId": "01a025c1-d3ef-73df-927e-370f70398a59"
+        }
+      ],
+      "id": "work-2.report-6ea35cdc-2683-4c4c-9b0b-6b4b7eae07de",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The work-worker role refused a bounded implementation handoff before using any tools because the absolute work-helper.mjs path was",
+      "type": "task",
+      "updatedAt": "2026-08-21T19:35:22.763Z"
     },
     "work-2.report-6f4c69c0-3367-4afa-b5ec-9313899e1480": {
       "createdAt": "2026-08-10T20:11:22.271Z",
@@ -6329,6 +6470,40 @@
       "title": "Self-improvement report: finish-task ran the configured Gradle verification successfully but then rolled back before close because Gradle updated already-t",
       "type": "task",
       "updatedAt": "2026-08-21T11:12:38.117Z"
+    },
+    "work-2.report-909f1645-efbb-4b6e-bddf-f614c8ca0e50": {
+      "createdAt": "2026-08-21T20:19:20.687Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Verifier/runtime state was generated under `.ce-workflow/work-runs/`, but the target repository's `.gitignore` does not ignore that directory. After `finish-task` returned `clean: true`, plain `git status --short` still reported `?? .ce-workflow/work-runs/`.\nExpected: ce-workflow initialization or the runtime producer should ensure `.ce-workflow/work-runs/` is ignored, so coded finalization's clean result agrees with ordinary Git status without requiring manual cleanup.\nImpact: The mismatch leaves completed projects visibly dirty, obscures unrelated untracked files, and can make operators doubt the finalizer's cleanliness guarantee.\nSuggested improvement: Ensure the runtime ignore entry is installed idempotently when `.ce-workflow/work-runs/` is first used or during workflow initialization.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/10d89b4d-1a97-415b-919d-e1f325db1db4",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3249702,
+              "file": "01-state.json",
+              "sha256": "083d4b1eb8b38d9d85b429404021e7b17efde9aa9db9f4354e4d22c62582b7dd"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-21T20:19:20.683Z",
+          "workflowId": "01a025f8-81b1-79dd-abe5-e1dd98b4bd37"
+        }
+      ],
+      "id": "work-2.report-909f1645-efbb-4b6e-bddf-f614c8ca0e50",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Verifier/runtime state was generated under `.ce-workflow/work-runs/`, but the target repository's `.gitignore` does not ignore tha",
+      "type": "task",
+      "updatedAt": "2026-08-21T20:19:20.687Z"
     },
     "work-2.report-92d3e6d4-7a3f-453c-b171-845dc257eb4c": {
       "createdAt": "2026-08-18T15:18:15.935Z",
@@ -7394,6 +7569,40 @@
       "title": "Self-improvement report: An async pi-subagents workflow failed before launch because its generated Windows async-run directory embedded the provider call i",
       "type": "task",
       "updatedAt": "2026-08-07T21:50:27.863Z"
+    },
+    "work-2.report-ee75a07e-2208-42f2-8a3c-ade7c4ca3376": {
+      "createdAt": "2026-08-21T18:58:24.235Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The work-planner rejected a resume-planning handoff before reading project state because the parent prompt did not repeat the absolute work-helper.mjs path and launch HEAD, even though both are deterministic from the active project and ce-workflow installation.\nExpected: The coded resume/planner handoff should inject the canonical helper path and launch baseline automatically, or the planner runtime should derive and validate them from cwd without requiring handcrafted prompt metadata.\nImpact: Autonomous resume stalled and required a duplicate planner launch with manually reconstructed metadata, adding latency and risking inconsistent handoffs.\nSuggested improvement: Have the action lease/coded planner handoff always include executionRepositoryRoot, absolute helper path, and launch HEAD.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/08ec0368-5f7f-4f6c-86e6-d7d97d5cc072",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 8970,
+              "file": "01-session.jsonl",
+              "sha256": "4a1c8eb8736c5cdd8d58ea2a2db141822a2cc5dc98bc79141ac1b09f6783c4ea"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-21T18:58:24.230Z",
+          "workflowId": "01a021d2-7bfc-7af3-898c-ecf0a87e5204"
+        }
+      ],
+      "id": "work-2.report-ee75a07e-2208-42f2-8a3c-ade7c4ca3376",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The work-planner rejected a resume-planning handoff before reading project state because the parent prompt did not repeat the abso",
+      "type": "task",
+      "updatedAt": "2026-08-21T18:58:24.235Z"
     },
     "work-2.report-f7d1e813-e0ae-49bf-b188-8477e9fbe685": {
       "createdAt": "2026-08-08T08:27:18.043Z",
@@ -9487,7 +9696,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-21T17:53:25.079Z"
+    "updatedAt": "2026-08-21T20:19:20.688Z"
   },
   "schemaVersion": 1
 }

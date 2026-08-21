@@ -1617,6 +1617,51 @@ try {
 	}
 	const invoke = (name, args, commandCtx = ctx) =>
 		mod.executeOrchestratorAction(name, args, commandCtx, pi);
+	const staleHandoffCwd = mkdtempSync(
+		path.join(tmpdir(), "ce-work-goal-stale-handoff-"),
+	);
+	mkdirSync(path.join(staleHandoffCwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(staleHandoffCwd, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({
+			workGoal: {
+				id: "wg-stale-handoff",
+				objective: "stay paused",
+				status: "paused",
+				updatedAt: 200,
+			},
+		}),
+	);
+	tempHooks.session_start?.(
+		{},
+		{
+			...ctx,
+			cwd: staleHandoffCwd,
+			sessionManager: {
+				getBranch: () => [
+					{
+						type: "custom",
+						customType: "work-goal-state",
+						data: {
+							goal: {
+								id: "wg-stale-handoff",
+								objective: "stale active handoff",
+								status: "active",
+								resumeOnSessionStart: true,
+								updatedAt: 100,
+							},
+						},
+					},
+				],
+			},
+		},
+	);
+	assert.equal(
+		statuses["work-goal"],
+		"paused",
+		"newer durable pause overrides a stale active fresh-session handoff",
+	);
+	rmSync(staleHandoffCwd, { recursive: true, force: true });
 	tempHooks.session_start?.({}, ctx);
 	assert.ok(activeTools.includes("ask_user"));
 	assert.ok(activeTools.includes("work_report_improvement"));
@@ -3265,7 +3310,46 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.equal(statuses["work-goal"], undefined);
 
 	await invoke("work-goal", "retain a goal during ordinary chat", ctx);
-	await invoke("work-goal", "pause", ctx);
+	const pauseCwd = mkdtempSync(path.join(tmpdir(), "ce-work-pause-goal-"));
+	execFileSync("git", ["init"], { cwd: pauseCwd, stdio: "ignore" });
+	initStore(pauseCwd);
+	mutateStore(pauseCwd, (store) => {
+		createWorkItem(store, {
+			id: "pause-roadmap",
+			type: "epic",
+			title: "Pause roadmap",
+		});
+		createWorkItem(store, {
+			id: "pause-task",
+			parentId: "pause-roadmap",
+			status: "in_progress",
+			title: "Pause task",
+		});
+	});
+	mod.rememberWorkflowEpicForHelper(pauseCwd, {
+		id: "pause-roadmap",
+		type: "epic",
+		status: "open",
+		title: "Pause roadmap",
+	});
+	const sentBeforeCheckpointPause = sent.length;
+	const checkpointPause = await invoke(
+		"work-pause",
+		"operator requested checkpoint",
+		{ ...ctx, cwd: pauseCwd },
+	);
+	assert.equal(checkpointPause.ok, true, checkpointPause.message);
+	assert.equal(
+		statuses["work-goal"],
+		"paused",
+		"Checkpoint and pause persists the autonomous goal as paused",
+	);
+	assert.equal(
+		sent.length,
+		sentBeforeCheckpointPause,
+		"Checkpoint and pause cannot queue a fresh-session continuation",
+	);
+	rmSync(pauseCwd, { recursive: true, force: true });
 	await tempHooks.before_agent_start(
 		{ prompt: "ordinary chat while goal is paused", systemPrompt: "base" },
 		ctx,

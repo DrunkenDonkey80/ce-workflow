@@ -2099,10 +2099,8 @@ try {
 		}),
 	);
 	assert.equal(
-		renderTriageClaim(
-			loadVerifierStore(reconcileCwd),
-			triageClaims[0].id,
-		).findings[0].disposition,
+		renderTriageClaim(loadVerifierStore(reconcileCwd), triageClaims[0].id)
+			.findings[0].disposition,
 		"accepted",
 		"pending fixes are rendered as already accepted instead of fresh triage",
 	);
