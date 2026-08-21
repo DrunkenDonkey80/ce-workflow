@@ -494,7 +494,11 @@ assert.deepEqual(
 assert.ok(commands["__orchestrator-goal-continue"]);
 assert.ok(commands.wo);
 assert.equal(commands.wf, undefined);
-assert.match(commands.wo.description, /orchestrator/i);
+assert.match(commands.wo.description, /\/wo resume/);
+assert.deepEqual(
+	commands.wo.getArgumentCompletions("res")?.[0]?.value,
+	"resume",
+);
 assert.match(shortcuts.f7.description, /orchestrator/i);
 const openWorkflow = (ctx) => commands.wo.handler("", ctx);
 assert.match(shortcuts.f8.description, /microcompact/i);
@@ -2598,12 +2602,12 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.equal(statuses["work-goal"], "needs human");
 	assert.equal(sent.length, 4);
 
-	await invoke(
-		"work-goal",
+	await tempCommands.wo.handler(
 		"resume 2, but use the AI-Wedge connected proof and add a connect button.",
 		ctx,
 	);
 	assert.equal(statuses["work-goal"], "active #2");
+	assert.match(sent.at(-1).message, /Retry only abnormal, retryable failures/);
 	assert.ok(activeTools.includes("work_goal_complete"));
 	assert.ok(activeTools.includes("work_goal_human_decision"));
 	assert.equal(thinkingLevel, "medium");

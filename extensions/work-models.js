@@ -18710,6 +18710,36 @@ async function startWorkGoal(
 	return activeWorkGoal;
 }
 
+async function recoverInterruptedWork(ctx, pi) {
+	const runtime = {
+		pi,
+		mode: ctx.mode,
+		session: ctx.sessionManager?.getSessionId?.(),
+		currentSession: () => ctx.sessionManager?.getSessionId?.(),
+		goalStatus: () => activeWorkGoal?.status,
+		modelRegistry: ctx.modelRegistry,
+		notify: (state) =>
+			notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning"),
+	};
+	try {
+		reconcilePendingDirectRuns(ctx.cwd, runtime);
+		reconcileBackgroundVerifierRuns(ctx.cwd, pi);
+		const resumed = await resumePausedWorkActionLease(ctx.cwd, pi, "", runtime);
+		if (resumed) notify(ctx, resumed.message, resumed.ok ? "info" : "warning");
+		const leases = await driveWorkActionLeases(ctx.cwd, runtime);
+		return [
+			...(resumed?.ok ? [resumed.message] : []),
+			...leases
+				.filter((lease) => lease.launched)
+				.map((lease) => `Launched ${lease.action}.`),
+		];
+	} catch (error) {
+		const message = `Interrupted specialist recovery needs inspection: ${formatError(error)}`;
+		notify(ctx, message, "warning");
+		return [message];
+	}
+}
+
 async function handleWorkGoalCommand(args, mode, pi, ctx) {
 	const command = parseWorkGoalCommand(args);
 	if (command.error) {
@@ -18761,17 +18791,26 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		return;
 	}
 	if (command.kind === "resume") {
+		const alreadyActive = activeWorkGoal?.status === "active";
 		if (
 			!activeWorkGoal ||
-			![
-				"paused",
-				"budget_limited",
-				"needs_human",
-				"stopped",
-				"waiting_usage_limit",
-			].includes(activeWorkGoal.status)
+			(!alreadyActive &&
+				![
+					"paused",
+					"budget_limited",
+					"needs_human",
+					"stopped",
+					"waiting_usage_limit",
+				].includes(activeWorkGoal.status))
 		) {
-			ctx.ui.notify("No paused autonomous goal to resume.", "warning");
+			ctx.ui.notify("No interrupted autonomous goal to resume.", "warning");
+			return;
+		}
+		if (
+			alreadyActive &&
+			(activeWorkGoalRunning || workGoalHasPendingMessages(ctx))
+		) {
+			ctx.ui.notify("Autonomous goal is already running.", "info");
 			return;
 		}
 		clearWorkGoalRecovery();
@@ -18785,15 +18824,23 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		applyWorkGoalThinking(pi, activeWorkGoal, ctx);
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
+		const recovered = await recoverInterruptedWork(ctx, pi);
+		const note = [
+			command.answer
+				? `User resumed the goal with this answer:\n\n${truncate(command.answer, 2_000)}`
+				: "User resumed the goal.",
+			"Before unrelated work, reconcile interrupted specialist runs from durable status. Retry only abnormal, retryable failures after checking current work state; never duplicate live, ambiguous, or completed runs.",
+			recovered.length ? `Coded recovery: ${recovered.join(" ")}` : "",
+		]
+			.filter(Boolean)
+			.join("\n\n");
 		await sendWorkGoalPrompt(
 			pi,
 			ctx,
 			buildWorkGoalContinuePrompt(
 				activeWorkGoal,
 				workGoalContinuationMarker(activeWorkGoal),
-				command.answer
-					? `User resumed the goal with this answer:\n\n${truncate(command.answer, 2_000)}`
-					: "User resumed the goal.",
+				note,
 			),
 		);
 		return;
@@ -18907,7 +18954,7 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 		working
 			? "/wo → Stop safely: current turn stopped; completed changes were preserved."
 			: activeWorkGoal
-				? "/wo → Stop safely: work stopped. Open /wo → Resume work to continue."
+				? "/wo → Stop safely: work stopped. Run /wo resume to continue."
 				: "/wo → Stop safely: nothing active to stop.",
 		working || activeWorkGoal ? "info" : "warning",
 	);
@@ -20000,7 +20047,7 @@ ${escapeXmlText(goal.objective)}
 Pending decision:
 ${formatWorkGoalDecision(goal.decision)}
 
-Answer the user's clarification only. Ordinary chat never resumes this goal; only \`autonomous goal resume <answer>\` does.`;
+Answer the user's clarification only. Ordinary chat never resumes this goal; use \`/wo resume <answer>\`.`;
 }
 
 async function flushWorkGoalContinuationRetry(ctx, pi) {
@@ -20028,7 +20075,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("Resume stopped. Open /wo → Resume work to continue.", "info");
+		ctx.ui.notify("Resume stopped. Run /wo resume to continue.", "info");
 		finishWarpWork(ctx, workWarpMode(goal.mode, goal), "stopped");
 		return;
 	}
@@ -20091,7 +20138,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 				persistWorkGoal(pi);
 				updateWorkGoalStatus(ctx);
 				ctx.ui.notify(
-					"autonomous goal paused after repeated transient errors. Run autonomous goal resume to retry.",
+					"autonomous goal paused after repeated transient errors. Run /wo resume to retry.",
 					"warning",
 				);
 				return;
@@ -20116,7 +20163,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 			persistWorkGoal(pi);
 			updateWorkGoalStatus(ctx);
 			ctx.ui.notify(
-				"autonomous goal paused after interruption. Run autonomous goal resume to continue.",
+				"autonomous goal paused after interruption. Run /wo resume to continue.",
 				"warning",
 			);
 			return;
@@ -20147,7 +20194,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 		persistWorkGoal(pi);
 		updateWorkGoalStatus(ctx);
 		ctx.ui.notify(
-			`autonomous goal token budget reached: ${formatWorkGoalBudget(activeWorkGoal)}. Run autonomous goal resume to continue over budget or autonomous goal edit --tokens <N> <objective> to raise it.`,
+			`autonomous goal token budget reached: ${formatWorkGoalBudget(activeWorkGoal)}. Run /wo resume to continue over budget or use Autonomous goal → edit --tokens <N> <objective> to raise it.`,
 			"warning",
 		);
 		return;
@@ -24726,9 +24773,32 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("wo", {
-		description: "Open work orchestrator",
-		handler: async (_args, ctx) => {
-			await handleWorkMenuCommand(ctx, pi);
+		description: "Open work orchestrator, or resume with /wo resume",
+		getArgumentCompletions: (prefix) =>
+			"resume".startsWith(String(prefix ?? "").trim())
+				? [
+						{
+							value: "resume",
+							label: "resume",
+							description: "Recover interrupted agents and continue work",
+						},
+					]
+				: null,
+		handler: async (args, ctx) => {
+			const [action, rest] = splitFirstWord(args);
+			if (!action) return handleWorkMenuCommand(ctx, pi);
+			if (action !== "resume") {
+				notify(ctx, "Usage: /wo or /wo resume [target or answer]", "warning");
+				return;
+			}
+			if (activeWorkGoal && activeWorkGoal.status !== "complete")
+				return handleWorkGoalCommand(
+					`resume${rest ? ` ${rest}` : ""}`,
+					activeWorkGoal.mode,
+					pi,
+					ctx,
+				);
+			return executeOrchestratorAction("work-resume", rest, ctx, pi);
 		},
 	});
 	pi.registerShortcut?.("f7", {
