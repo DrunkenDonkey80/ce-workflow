@@ -666,7 +666,8 @@ function prefetchAsyncStatus(lane) {
 }
 
 export function reconcileReadOnlyLanes(cwd = process.cwd(), options = {}) {
-	if (!existsSync(laneStorePath(cwd))) return [];
+	if (!existsSync(laneStorePath(cwd)) && !existsSync(recoveryPath(cwd)))
+		return [];
 	const exists =
 		options.processExists ??
 		((pid) => {

@@ -186,6 +186,28 @@ try {
 	{
 		const { cwd, git } = repository();
 		const head = git("rev-parse", "HEAD");
+		const lane = envelope(cwd, head, 1, "recovery-only");
+		queueLane(cwd, lane);
+		transitionLane(cwd, lane.id, "running", {
+			launch: { pid: 2147483647, host: os.hostname() },
+		});
+		saveLaneStore(cwd, loadLaneStore(cwd));
+		rmSync(laneStorePath(cwd));
+		assert.deepEqual(
+			reconcileReadOnlyLanes(cwd, { processExists: () => false }),
+			[lane.id],
+			"recovery-only running lane is reconciled",
+		);
+		assert.equal(
+			loadLaneStore(cwd).lanes[lane.id].state,
+			"orphaned",
+			"dead recovery-only lane becomes orphaned",
+		);
+	}
+
+	{
+		const { cwd, git } = repository();
+		const head = git("rev-parse", "HEAD");
 		const lanes = [
 			envelope(cwd, head, 1, "a1", ["device:a"]),
 			envelope(cwd, head, 1, "b", ["device:b"]),
