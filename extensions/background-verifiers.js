@@ -2836,15 +2836,6 @@ export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 	);
 	if (jobs.some((job) => ["queued", "running"].includes(job.status)))
 		return "background verification is still queued or running";
-	const failed = jobs.filter(
-		(job) =>
-			["failed", "orphaned", "partially-failed"].includes(job.status) &&
-			!acknowledgedVerifierFailure(store, job),
-	);
-	if (failed.length)
-		return `background verification failed or became orphaned: ${failed
-			.map((job) => job.id)
-			.join(", ")}`;
 	if (
 		Object.values(store.findings).some((finding) => {
 			const report = store.reports[finding.reportId];

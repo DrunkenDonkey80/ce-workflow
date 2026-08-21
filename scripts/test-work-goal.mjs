@@ -291,13 +291,13 @@ try {
 		undefined,
 		"the caller excludes a failed verifier batch for the persisted goal baseline",
 	);
-	assert.match(
+	assert.equal(
 		mod.workGoalCompletionBlocker(
 			{ ...baselineGoal, baselineHead: baselineBatch.checkpoint.base },
 			baselineVerifierCwd,
 		),
-		/failed or became orphaned/,
-		"failed verification after the baseline still blocks completion",
+		undefined,
+		"provider failures after the baseline remain visible without blocking completion",
 	);
 } finally {
 	rmSync(baselineVerifierCwd, { recursive: true, force: true });

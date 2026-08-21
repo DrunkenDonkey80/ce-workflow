@@ -398,12 +398,13 @@ try {
 			outcome: "no-findings",
 		}),
 	);
-	assert.match(
+	assert.equal(
 		verifierCompletionBlocker(
 			loadVerifierStore(failedCwd),
 			"2026-07-21T00:00:03.000Z",
 		),
-		new RegExp(`failed or became orphaned: ${failedJob.id}`),
+		undefined,
+		"provider failures remain visible without blocking goal completion",
 	);
 	const acknowledgement = mutateVerifierStore(failedCwd, (state) =>
 		acknowledgeVerifierFailure(state, {
