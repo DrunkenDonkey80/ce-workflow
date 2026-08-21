@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFile, execFileSync } from "node:child_process";
+import { exec, execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	existsSync,
@@ -493,35 +493,34 @@ function terminateVerificationTree(child) {
 	}
 }
 
-function execVerification(executable, childArgs, options, timeoutMs) {
+function execVerification(command, shell, options, timeoutMs) {
 	return new Promise((resolve, reject) => {
 		let timedOut = false;
 		let timer;
-		const child = execFile(
-			executable,
-			childArgs,
-			{
-				...options,
-				detached: process.platform !== "win32",
-				windowsHide: true,
-			},
-			(error, stdout, stderr) => {
-				clearTimeout(timer);
-				if (timedOut) {
-					const timeoutError = new Error(
-						`verification timed out after ${timeoutMs}ms`,
-					);
-					timeoutError.code = "ETIMEDOUT";
-					timeoutError.stdout = stdout;
-					timeoutError.stderr = stderr || timeoutError.message;
-					reject(timeoutError);
-				} else if (error) {
-					error.stdout = stdout;
-					error.stderr = stderr || error.message;
-					reject(error);
-				} else resolve({ stdout, stderr });
-			},
-		);
+		const childOptions = {
+			...options,
+			detached: process.platform !== "win32",
+			windowsHide: true,
+		};
+		const callback = (error, stdout, stderr) => {
+			clearTimeout(timer);
+			if (timedOut) {
+				const timeoutError = new Error(
+					`verification timed out after ${timeoutMs}ms`,
+				);
+				timeoutError.code = "ETIMEDOUT";
+				timeoutError.stdout = stdout;
+				timeoutError.stderr = stderr || timeoutError.message;
+				reject(timeoutError);
+			} else if (error) {
+				error.stdout = stdout;
+				error.stderr = stderr || error.message;
+				reject(error);
+			} else resolve({ stdout, stderr });
+		};
+		const child = shell
+			? execFile(shell, ["-c", command], childOptions, callback)
+			: exec(command, childOptions, callback);
 		child.stdin?.end();
 		timer = setTimeout(() => {
 			timedOut = true;
@@ -543,21 +542,9 @@ async function runVerificationCommand(command, root = cwd) {
 		shell && wrapper && existsSync(path.join(root, wrapper[2]))
 			? command.replace(wrapper[0], `${wrapper[1]}./${wrapper[2]}`)
 			: command;
-	let executable;
-	let childArgs;
-	if (!windowsCommand && shell) {
-		executable = shell;
-		childArgs = ["-c", normalized];
-	} else if (process.platform === "win32") {
-		executable = process.env.ComSpec || "cmd.exe";
-		childArgs = ["/d", "/s", "/c", normalized];
-	} else {
-		executable = process.env.SHELL || "/bin/sh";
-		childArgs = ["-c", normalized];
-	}
 	const result = await execVerification(
-		executable,
-		childArgs,
+		normalized,
+		!windowsCommand && shell ? shell : "",
 		options,
 		verificationTimeoutMs(),
 	);

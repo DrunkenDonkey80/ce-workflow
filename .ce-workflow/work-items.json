@@ -4330,6 +4330,9 @@
       "evidence": [
         {
           "closeEvidence": "Completed by coded inline work path"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.84",
@@ -4338,13 +4341,16 @@
       ],
       "notes": [
         "wo:review PASS validation+timeout precede mutation lock (work-helper.mjs:1150-1176), stdin closed/tree-kill in execVerification, lock owner pid+command+age in read-only-lanes.js:246-277; focused tests cover all three",
-        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs && node scripts/test-work-parallel-lanes.mjs\nOutput: ok - work helper contract\nread-only parallel lane tests passed"
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs && node scripts/test-work-parallel-lanes.mjs\nOutput: ok - work helper contract\nread-only parallel lane tests passed",
+        "Final package verification exposed a Windows regression in the first fix: direct execFile(cmd.exe, ['/d','/s','/c', fullCommand]) double-quoted nested cmd.exe verification strings. Reopened to preserve the prior exec shell semantics while retaining closed stdin and timeout/tree termination.",
+        "wo:review PASS re-review of exec-restore delta: execVerification branches shell?execFile(shell,-c):exec(command) (work-helper.mjs:521-523) restoring pre-fix ComSpec verbatim semantics while keeping stdin.end, timer, tree-kill; test-work-optimization-helpers.mjs PASS incl. Windows quoted cmd.exe case",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs && node scripts/test-work-helper-contract.mjs && node scripts/test-work-parallel-lanes.mjs\nOutput: ok - workflow optimization helpers\nok - work helper contract\nread-only parallel lane tests passed"
       ],
       "parentId": "work-2",
       "status": "closed",
       "title": "Bound finish-task verification and expose mutation-lock owners",
       "type": "bug",
-      "updatedAt": "2026-08-21T17:43:25.031Z"
+      "updatedAt": "2026-08-21T17:52:59.836Z"
     },
     "work-2.9": {
       "createdAt": "2026-07-20T11:50:30.982Z",
@@ -9476,7 +9482,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-21T17:47:06.380Z"
+    "updatedAt": "2026-08-21T17:52:59.837Z"
   },
   "schemaVersion": 1
 }
