@@ -403,7 +403,7 @@ function reviewDispositionSatisfied(task, implementationFiles) {
 }
 
 function formatPendingFiles(root = cwd) {
-	if (!args.includes("--immediate-format")) return [];
+	if (!flag("--immediate-format")) return [];
 	const files = gitStatusPaths(root).filter(
 		(file) =>
 			!isWorkflowManaged(file) &&
@@ -446,7 +446,9 @@ function formatPendingFiles(root = cwd) {
 }
 
 function verificationTimeoutMs() {
-	const value = Number(process.env.WORK_ORCH_VERIFY_TIMEOUT_MS ?? 30 * 60 * 1000);
+	const value = Number(
+		process.env.WORK_ORCH_VERIFY_TIMEOUT_MS ?? 30 * 60 * 1000,
+	);
 	if (!Number.isInteger(value) || value < 1)
 		throw new Error("WORK_ORCH_VERIFY_TIMEOUT_MS must be a positive integer");
 	return value;
@@ -621,7 +623,7 @@ async function finishTaskUnlocked() {
 	);
 	const executionRoot = requestedExecutionRoot ? canonicalExecutionRoot : cwd;
 	const distinctRoots = canonicalExecutionRoot !== ownerRepositoryRoot;
-	if (distinctRoots && args.includes("--push"))
+	if (distinctRoots && flag("--push"))
 		throw new Error(
 			"distinct-root --push is not supported; push each repository explicitly after finalization",
 		);
@@ -721,10 +723,6 @@ async function finishTaskUnlocked() {
 			"refusing changed .ce-workflow/work-items.json in distinct execution repository",
 		);
 
-	const canonicalBeforeVerificationPath = storePath(cwd);
-	const canonicalBeforeVerification = existsSync(canonicalBeforeVerificationPath)
-		? readFileSync(canonicalBeforeVerificationPath, "utf8")
-		: null;
 	const verify = option("--verify");
 	const shardDeclarations = options("--verify-shard").map((value, index) => {
 		try {
@@ -790,37 +788,26 @@ async function finishTaskUnlocked() {
 				);
 		}
 	} catch (error) {
-		const verificationError = String(error.stderr || error.message || error).slice(
-			-500,
+		const verificationError = String(
+			error.stderr || error.message || error,
+		).slice(-500);
+		mutateStore(cwd, (store) =>
+			appendWorkNote(
+				store,
+				id,
+				`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${verificationError}`,
+			),
 		);
-		if (shardDeclarations.length) {
-			if (canonicalBeforeVerification === null)
-				rmSync(canonicalBeforeVerificationPath, { force: true });
-			else
-				writeFileSync(canonicalBeforeVerificationPath, canonicalBeforeVerification);
-		} else {
-			mutateStore(cwd, (store) =>
-				appendWorkNote(
-					store,
-					id,
-					`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${verificationError}`,
-				),
-			);
-		}
 		throw new Error(
 			`verification failed: ${verificationCommand}\n${verificationError}`,
 		);
-	}
-	for (const outputPath of absentShardOutputs)
-		if (
-			verificationManifest?.shards.some((shard) =>
-				shard.outputs.includes(outputPath),
-			)
-		)
+	} finally {
+		for (const outputPath of absentShardOutputs)
 			rmSync(path.join(executionRoot, outputPath), {
 				recursive: true,
 				force: true,
 			});
+	}
 	if (verificationCommand)
 		verificationResult = {
 			command: verificationCommand,
@@ -935,7 +922,7 @@ async function finishTaskUnlocked() {
 	)
 		reviewReasons.push("Review All policy: production diff");
 	if (reviewReasons.length) {
-		const reviewed = args.includes("--reviewed");
+		const reviewed = flag("--reviewed");
 		const persistedReviewScope = reviewScope(task);
 		const currentReviewFingerprint = reviewFingerprint(
 			executionRoot,
@@ -1089,7 +1076,7 @@ async function finishTaskUnlocked() {
 					...ownerRemaining,
 				].join(", ")}`,
 			);
-		if (args.includes("--push")) {
+		if (flag("--push")) {
 			try {
 				git(
 					["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
@@ -1150,7 +1137,7 @@ async function finishTask() {
 	const ownerRoot = canonicalGitRoot(cwd, "owner root");
 	const lockRoots =
 		executionRoot === ownerRoot
-			? [requestedExecutionRoot ? ownerRoot : cwd]
+			? [ownerRoot]
 			: [ownerRoot, executionRoot].sort();
 	const mutations = [];
 	try {
@@ -1283,16 +1270,26 @@ const BOOLEAN_OPTIONS = new Set([
 	"--reviewed",
 ]);
 
-function positional() {
-	const out = [];
+function parsedPositionalsAndFlags() {
+	const positionals = [];
+	const flags = new Set();
 	for (let i = 0; i < args.length; i += 1) {
 		if (args[i].startsWith("--")) {
-			if (!BOOLEAN_OPTIONS.has(args[i])) i += 1;
+			if (BOOLEAN_OPTIONS.has(args[i])) flags.add(args[i]);
+			else i += 1;
 			continue;
 		}
-		out.push(args[i]);
+		positionals.push(args[i]);
 	}
-	return out;
+	return { positionals, flags };
+}
+
+function flag(name) {
+	return parsedPositionalsAndFlags().flags.has(name);
+}
+
+function positional() {
+	return parsedPositionalsAndFlags().positionals;
 }
 
 function termScore(issue, terms) {
@@ -1349,7 +1346,7 @@ try {
 		const issue = readWorkItem(args[0]);
 		print(summary(issue));
 	} else if (command === "work-children-summary") {
-		const full = args.includes("--full");
+		const full = flag("--full");
 		const status = option("--status");
 		const children = childWorkItems(args[0]).filter(
 			(issue) => !status || statusOf(issue) === status,
@@ -1456,7 +1453,7 @@ try {
 	} else if (command === "legacy-instructions-apply") {
 		print(applyLegacyInstructionsCleanup(positional()[0], option("--confirm")));
 	} else if (command === "ensure-no-staged") {
-		const allowWorkStore = args.includes("--allow-work-store");
+		const allowWorkStore = flag("--allow-work-store");
 		const staged = git(["diff", "--cached", "--name-only"])
 			.split(/\r?\n/)
 			.filter(Boolean);

@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import {
 	acknowledgeLaneLaunch,
+	acquireRepositoryAdmissionLock,
 	acquireRepositoryMutationLock,
 	captureRepositoryFingerprint,
 	createLaneEnvelope,
@@ -24,6 +25,7 @@ import {
 	queueLane,
 	reconcileReadOnlyLanes,
 	runReadOnlyLaneBatch,
+	saveLaneStore,
 	transitionLane,
 } from "../extensions/read-only-lanes.js";
 import workModelsExtension, {
@@ -77,9 +79,7 @@ function envelope(
 
 try {
 	{
-		const cwd = mkdtempSync(
-			path.join(os.tmpdir(), "ce-read-only-lanes-absent-"),
-		);
+		const cwd = mkdtempSync(path.join(os.tmpdir(), "ce-read-only-lanes-absent-"));
 		roots.push(cwd);
 		assert.deepEqual(reconcileReadOnlyLanes(cwd), []);
 		assert.equal(
@@ -87,6 +87,38 @@ try {
 			false,
 			"absent lane reconciliation does not create workflow state",
 		);
+	}
+
+	{
+		const { cwd } = repository();
+		const admissionPath = path.join(
+			cwd,
+			".ce-workflow",
+			"work-runs",
+			"repository-admission.lock",
+		);
+		mkdirSync(path.dirname(admissionPath), { recursive: true });
+		writeFileSync(
+			admissionPath,
+			`${JSON.stringify({ pid: 2147483647, host: os.hostname(), acquiredAt: new Date(0).toISOString() })}\n`,
+		);
+		const reclaimed = acquireRepositoryAdmissionLock(cwd);
+		reclaimed.release();
+		assert.equal(existsSync(admissionPath), false, "a dead lock is reclaimed");
+
+		const owned = acquireRepositoryAdmissionLock(cwd);
+		rmSync(admissionPath);
+		writeFileSync(
+			admissionPath,
+			`${JSON.stringify({ token: "replacement", pid: process.pid, host: os.hostname() })}\n`,
+		);
+		owned.release();
+		assert.equal(
+			existsSync(admissionPath),
+			true,
+			"release does not unlink a replacement owner's lock",
+		);
+		rmSync(admissionPath);
 	}
 
 	{
@@ -197,6 +229,23 @@ try {
 			failed.results.map(({ state }) => state),
 			["failed", "discarded", "discarded"],
 		);
+
+		const recoveryLane = envelope(cwd, head, 2, "recovery-error");
+		const recoveryFailure = await runReadOnlyLaneBatch(
+			cwd,
+			[recoveryLane],
+			async (lane) => {
+				const store = loadLaneStore(cwd);
+				delete store.lanes[lane.id];
+				saveLaneStore(cwd, store);
+				throw new Error("fixture recovery failure");
+			},
+		);
+		assert.equal(
+			recoveryFailure.results[0].state,
+			"failed",
+			"recovery-path errors settle the batch instead of escaping the lane task",
+		);
 	}
 
 	{
@@ -254,6 +303,20 @@ try {
 			},
 		);
 		assert.equal(mutationResult.results[0].state, "failed");
+		git("checkout", "--", "source.js");
+		const cancelledMutation = await runReadOnlyLaneBatch(
+			cwd,
+			[envelope(cwd, head, 2, "cancelled-mutation")],
+			async () => {
+				writeFileSync(path.join(cwd, "source.js"), "export const value = 4;\n");
+				return { status: "cancelled" };
+			},
+		);
+		assert.equal(
+			cancelledMutation.results[0].state,
+			"failed",
+			"cancellation cannot bypass the read-only fingerprint check",
+		);
 		git("checkout", "--", "source.js");
 		const lock = acquireRepositoryMutationLock(cwd);
 		try {
@@ -319,12 +382,24 @@ try {
 		const { cwd, git } = repository();
 		const head = git("rev-parse", "HEAD");
 		const terminal = [
-			...["complete", "completed", "success", "succeeded", "done", "ok", "passed"].map(
-				(status) => ({ status, expected: "completed" }),
-			),
-			...["failed", "error", "stopped", "cancelled", "canceled", "timed_out", "timeout"].map(
-				(status) => ({ status, expected: "failed" }),
-			),
+			...[
+				"complete",
+				"completed",
+				"success",
+				"succeeded",
+				"done",
+				"ok",
+				"passed",
+			].map((status) => ({ status, expected: "completed" })),
+			...[
+				"failed",
+				"error",
+				"stopped",
+				"cancelled",
+				"canceled",
+				"timed_out",
+				"timeout",
+			].map((status) => ({ status, expected: "failed" })),
 		].map((fixture) => ({
 			...fixture,
 			lane: envelope(cwd, head, 1, fixture.status, [], "prefetch"),
@@ -506,10 +581,7 @@ try {
 				setWidget() {},
 			},
 		};
-		const laneLock = path.join(
-			path.dirname(laneStorePath(cwd)),
-			"mutation.lock",
-		);
+		const laneLock = path.join(path.dirname(laneStorePath(cwd)), "mutation.lock");
 		writeFileSync(
 			laneLock,
 			`${JSON.stringify({ pid: process.pid, host: os.hostname() })}\n`,

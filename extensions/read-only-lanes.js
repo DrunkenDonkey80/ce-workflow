@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
 	closeSync,
@@ -6,6 +6,7 @@ import {
 	fsyncSync,
 	mkdirSync,
 	openSync,
+	linkSync,
 	lstatSync,
 	readFileSync,
 	renameSync,
@@ -66,9 +67,7 @@ function canonical(value) {
 }
 function hash(value, length = 24) {
 	return createHash("sha256")
-		.update(
-			typeof value === "string" ? value : JSON.stringify(canonical(value)),
-		)
+		.update(typeof value === "string" ? value : JSON.stringify(canonical(value)))
 		.digest("hex")
 		.slice(0, length);
 }
@@ -109,10 +108,9 @@ export function createLaneEnvelope(input = {}) {
 		checkpoint: input.checkpoint,
 		workItemHash: input.workItemHash,
 		selectionHash: input.selectionHash,
-		relevantPaths: sortedStrings(
-			input.relevantPaths ?? [],
-			"relevantPaths",
-		).map(relativePath),
+		relevantPaths: sortedStrings(input.relevantPaths ?? [], "relevantPaths").map(
+			relativePath,
+		),
 		resourceKeys: sortedStrings(input.resourceKeys ?? [], "resourceKeys"),
 		gateVersion: input.gateVersion,
 		settingsVersion: input.settingsVersion,
@@ -203,12 +201,7 @@ function recoveryPath(cwd) {
 	return path.join(runtimeDir(cwd), ".state.recovery.json");
 }
 function repositoryLockPath(cwd) {
-	return path.join(
-		cwd,
-		".ce-workflow",
-		"work-runs",
-		"repository-mutation.lock",
-	);
+	return path.join(cwd, ".ce-workflow", "work-runs", "repository-mutation.lock");
 }
 function repositoryAdmissionLockPath(cwd) {
 	return path.join(
@@ -239,38 +232,67 @@ function ownerDead(
 	const owner = lockOwner(file);
 	return owner?.host === os.hostname() && !processExists(owner.pid);
 }
-function acquireFileLock(file, category) {
+function sameLockOwner(left, right) {
+	if (!left || !right) return false;
+	if (left.token || right.token) return left.token === right.token;
+	return (
+		left.pid === right.pid &&
+		left.host === right.host &&
+		left.acquiredAt === right.acquiredAt
+	);
+}
+
+function acquireFileLock(file, category, reclaiming = false) {
 	mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+	const reclaim = `${file}.reclaim`;
+	if (!reclaiming && existsSync(reclaim))
+		fail("locked", `${category}; stale-lock reclamation is active`, { file });
+	const owner = {
+		token: randomUUID(),
+		pid: process.pid,
+		host: os.hostname(),
+		acquiredAt: new Date().toISOString(),
+		command: [
+			path.basename(process.argv[1] ?? process.execPath),
+			...process.argv.slice(2, 4),
+		].join(" "),
+	};
 	let descriptor;
 	try {
 		descriptor = openSync(file, "wx", 0o600);
-		writeFileSync(
-			descriptor,
-			`${JSON.stringify({
-				pid: process.pid,
-				host: os.hostname(),
-				acquiredAt: new Date().toISOString(),
-				command: [
-					path.basename(process.argv[1] ?? process.execPath),
-					...process.argv.slice(2, 4),
-				].join(" "),
-			})}\n`,
-		);
+		writeFileSync(descriptor, `${JSON.stringify(owner)}\n`);
 	} catch (error) {
-		if (error?.code === "EEXIST" && ownerDead(file)) {
-			unlinkSync(file);
-			return acquireFileLock(file, category);
-		}
 		if (error?.code === "EEXIST") {
-			const owner = lockOwner(file);
-			const acquiredAt = Date.parse(owner?.acquiredAt);
+			const staleOwner = lockOwner(file);
+			if (ownerDead(file)) {
+				try {
+					linkSync(file, reclaim);
+				} catch (claimError) {
+					if (["EEXIST", "ENOENT"].includes(claimError?.code))
+						fail("locked", `${category}; stale-lock reclamation raced`, {
+							file,
+						});
+					throw claimError;
+				}
+				try {
+					if (!sameLockOwner(staleOwner, lockOwner(reclaim)))
+						fail("locked", `${category}; lock owner changed during reclamation`, {
+							file,
+						});
+					unlinkSync(file);
+					return acquireFileLock(file, category, true);
+				} finally {
+					rmSync(reclaim, { force: true });
+				}
+			}
+			const acquiredAt = Date.parse(staleOwner?.acquiredAt);
 			const age = Number.isFinite(acquiredAt)
 				? `${Math.max(0, Date.now() - acquiredAt)}ms`
 				: "unknown";
-			const ownerSummary = owner
-				? `; owner pid ${owner.pid ?? "unknown"}, command ${owner.command ?? "unknown"}, age ${age}`
+			const ownerSummary = staleOwner
+				? `; owner pid ${staleOwner.pid ?? "unknown"}, command ${staleOwner.command ?? "unknown"}, age ${age}`
 				: "";
-			fail("locked", `${category}${ownerSummary}`, { file, owner });
+			fail("locked", `${category}${ownerSummary}`, { file, owner: staleOwner });
 		}
 		throw error;
 	}
@@ -281,11 +303,7 @@ function acquireFileLock(file, category) {
 			if (released) return;
 			released = true;
 			closeSync(descriptor);
-			try {
-				unlinkSync(file);
-			} catch (error) {
-				if (error?.code !== "ENOENT") throw error;
-			}
+			if (sameLockOwner(owner, lockOwner(file))) rmSync(file, { force: true });
 		},
 	};
 }
@@ -317,7 +335,14 @@ function mutableActionLeaseOccupied(cwd) {
 		}
 	}
 	return [...leases.values()].some((state) =>
-		["queued", "claimed", "acknowledged", "ambiguous", "live", "orphaned"].includes(state),
+		[
+			"queued",
+			"claimed",
+			"acknowledged",
+			"ambiguous",
+			"live",
+			"orphaned",
+		].includes(state),
 	);
 }
 
@@ -469,9 +494,7 @@ export function acknowledgeLaneLaunch(cwd, id, acknowledgement = {}) {
 }
 export function laneCanLaunch(lane) {
 	validateLaneEnvelope(lane);
-	return (
-		lane.state === "queued" && lane.launch?.acknowledgement !== "ambiguous"
-	);
+	return lane.state === "queued" && lane.launch?.acknowledgement !== "ambiguous";
 }
 export function promoteLane(cwd, id, owner, options = {}) {
 	return mutateLaneStore(
@@ -715,8 +738,7 @@ function virtualMetrics(lanes, durations, limit) {
 	])
 		maxConcurrency = Math.max(
 			maxConcurrency,
-			intervals.filter(({ start, end }) => start <= point && point < end)
-				.length,
+			intervals.filter(({ start, end }) => start <= point && point < end).length,
 		);
 	return {
 		criticalPathMs: Math.max(0, ...intervals.map(({ end }) => end)),
@@ -734,8 +756,7 @@ export async function runReadOnlyLaneBatch(
 	if (!Array.isArray(envelopes) || typeof runner !== "function")
 		fail("invalid", "Lane batch requires envelopes and a runner");
 	const lanes = envelopes.map((lane) => queueLane(cwd, lane));
-	const serial =
-		options.serial === true || process.env.WORK_ORCH_SERIAL === "1";
+	const serial = options.serial === true || process.env.WORK_ORCH_SERIAL === "1";
 	const limit = serial ? 1 : Math.max(1, Number(options.maxConcurrency) || 2);
 	const results = Array(lanes.length);
 	const durations = Array(lanes.length).fill(0);
@@ -823,6 +844,12 @@ export async function runReadOnlyLaneBatch(
 							results[index] = { laneId: lane.id, state: "running" };
 							return;
 						}
+						const after = captureRepositoryFingerprint(cwd);
+						if (!fingerprintsEqual(before, after))
+							fail(
+								"mutation",
+								"Read-only lane mutated source, WorkItem state, or HEAD",
+							);
 						if (["cancelled", "canceled", "stale"].includes(output.status)) {
 							const reason =
 								output.status === "stale" ? "stale-artifact" : "cancelled";
@@ -830,12 +857,6 @@ export async function runReadOnlyLaneBatch(
 							results[index] = { laneId: lane.id, state: "discarded", reason };
 							return;
 						}
-						const after = captureRepositoryFingerprint(cwd);
-						if (!fingerprintsEqual(before, after))
-							fail(
-								"mutation",
-								"Read-only lane mutated source, WorkItem state, or HEAD",
-							);
 						const artifact = plain(output.artifact)
 							? output.artifact
 							: { value: output.artifact ?? output.result ?? null };
@@ -856,30 +877,45 @@ export async function runReadOnlyLaneBatch(
 							artifact,
 						};
 					} catch (error) {
-						const current = loadLaneStore(cwd).lanes[lane.id];
-						if (!TERMINAL.has(current.state))
-							transitionLane(cwd, lane.id, "failed", {
-								reason: `${error.category ?? "runner"}: ${error.message}`,
-							});
-						results[index] = {
-							laneId: lane.id,
-							state: "failed",
-							reason: error.message,
-						};
+						let reason = error.message;
+						try {
+							const current = loadLaneStore(cwd).lanes[lane.id];
+							if (current && !TERMINAL.has(current.state))
+								transitionLane(cwd, lane.id, "failed", {
+									reason: `${error.category ?? "runner"}: ${reason}`,
+								});
+						} catch (recoveryError) {
+							reason += `; recovery failed: ${recoveryError.message}`;
+						}
+						results[index] = { laneId: lane.id, state: "failed", reason };
 						if (options.failFast !== false) stopped = true;
 					} finally {
 						active.delete(index);
 						if (results[index]?.state !== "running")
 							for (const key of lane.resourceKeys) resources.delete(key);
 						settleQueued();
-						if (
-							results.filter(Boolean).length === lanes.length &&
-							active.size === 0
-						)
+						if (results.filter(Boolean).length === lanes.length && active.size === 0)
 							resolveBatch();
 						else pump();
 					}
-				})();
+				})().catch((error) => {
+					active.delete(index);
+					for (const key of lane.resourceKeys) resources.delete(key);
+					results[index] ??= {
+						laneId: lane.id,
+						state: "failed",
+						reason: `batch recovery failed: ${error.message}`,
+					};
+					stopped = true;
+					for (let pending = 0; pending < lanes.length; pending += 1)
+						if (!results[pending] && !active.has(pending))
+							results[pending] = {
+								laneId: lanes[pending].id,
+								state: "discarded",
+								reason: "batch-recovery-failed",
+							};
+					if (active.size === 0) resolveBatch();
+				});
 			}
 			if (!launched && active.size === 0) {
 				for (let index = 0; index < lanes.length; index += 1)
@@ -903,11 +939,14 @@ export async function runReadOnlyLaneBatch(
 		),
 	};
 	mutateLaneStore(cwd, (store) => {
-		for (const lane of lanes)
-			store.lanes[lane.id].metrics = {
-				...(store.lanes[lane.id].metrics ?? {}),
-				...metrics,
-			};
+		for (const lane of lanes) {
+			const current = store.lanes[lane.id];
+			if (current)
+				current.metrics = {
+					...(current.metrics ?? {}),
+					...metrics,
+				};
+		}
 	});
 	return { serial, results, ...metrics };
 }
@@ -944,8 +983,7 @@ export function laneTelemetryEvents(cwd = process.cwd()) {
 function exactKeys(value, keys) {
 	return (
 		plain(value) &&
-		JSON.stringify(Object.keys(value).sort()) ===
-			JSON.stringify([...keys].sort())
+		JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort())
 	);
 }
 function verificationOutputPath(value) {
@@ -959,9 +997,7 @@ function verificationOutputPath(value) {
 }
 function outputClaimsConflict(left, right) {
 	return left.some((a) =>
-		right.some(
-			(b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`),
-		),
+		right.some((b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`)),
 	);
 }
 function shardClaimsConflict(left, right) {
@@ -1000,18 +1036,14 @@ export function normalizeVerificationShards(shards) {
 		if (shard.dependsOn.includes(shard.id))
 			fail("invalid", `Verification shard ${shard.id} depends on itself`);
 		if (shard.dependsOn.some((id) => !ids.has(id)))
-			fail(
-				"invalid",
-				`Verification shard ${shard.id} has a missing dependency`,
-			);
+			fail("invalid", `Verification shard ${shard.id} has a missing dependency`);
 	}
 	const pending = new Set(ids);
 	const complete = new Set();
 	while (pending.size) {
 		const ready = normalized.filter(
 			(shard) =>
-				pending.has(shard.id) &&
-				shard.dependsOn.every((id) => complete.has(id)),
+				pending.has(shard.id) && shard.dependsOn.every((id) => complete.has(id)),
 		);
 		if (!ready.length)
 			fail("invalid", "Verification shard dependencies contain a cycle");
@@ -1048,9 +1080,7 @@ function verificationMetrics(shards, durations, limit) {
 		const claimReady = Math.max(
 			0,
 			...shards
-				.filter(
-					(other) => ends.has(other.id) && shardClaimsConflict(shard, other),
-				)
+				.filter((other) => ends.has(other.id) && shardClaimsConflict(shard, other))
 				.map((other) => claims.get(other.id) ?? 0),
 		);
 		let slot = 0;
@@ -1073,8 +1103,7 @@ function verificationMetrics(shards, durations, limit) {
 	))
 		maxConcurrency = Math.max(
 			maxConcurrency,
-			intervals.filter(({ start, end }) => start <= point && point < end)
-				.length,
+			intervals.filter(({ start, end }) => start <= point && point < end).length,
 		);
 	return {
 		criticalPathMs: Math.max(0, ...ends.values()),
@@ -1097,8 +1126,7 @@ export async function runVerificationShardBatch(
 			"Verification shards require the repository mutation-lock owner",
 		);
 	const shards = normalizeVerificationShards(input?.shards);
-	const serial =
-		options.serial === true || process.env.WORK_ORCH_SERIAL === "1";
+	const serial = options.serial === true || process.env.WORK_ORCH_SERIAL === "1";
 	const limit = serial ? 1 : Math.max(1, Number(options.maxConcurrency) || 2);
 	const baseHead = input.baseHead ?? git(cwd, ["rev-parse", "HEAD"]);
 	const outputs = [...new Set(shards.flatMap((shard) => shard.outputs))].sort();
@@ -1367,8 +1395,7 @@ export function admitVerificationManifest(manifest, expected = {}) {
 			result.command !== declaration.command ||
 			result.baseHead !== expected.baseHead ||
 			result.sourceFingerprint !== expected.sourceFingerprint.digest ||
-			JSON.stringify(result.dependsOn) !==
-				JSON.stringify(declaration.dependsOn) ||
+			JSON.stringify(result.dependsOn) !== JSON.stringify(declaration.dependsOn) ||
 			JSON.stringify(result.resourceKeys) !==
 				JSON.stringify(declaration.resourceKeys) ||
 			JSON.stringify(result.outputs) !== JSON.stringify(declaration.outputs) ||

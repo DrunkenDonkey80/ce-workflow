@@ -80,8 +80,13 @@ const requiredContract =
 	"exact supplied absolute path quoted for the Bash tool's POSIX shell";
 for (const role of ["work-planner.md", "work-worker.md"]) {
 	const contract = readFileSync(path.join(root, "agents", role), "utf8");
-	assert(contract.includes(requiredContract), `${role} requires quoted helper paths`);
-	assert(!/\bnode\s+"?(?:\.?[\\/])?scripts[\\/]work-helper\.mjs\b/.test(contract));
+	assert(
+		contract.includes(requiredContract),
+		`${role} requires quoted helper paths`,
+	);
+	assert(
+		!/\bnode\s+"?(?:\.?[\\/])?scripts[\\/]work-helper\.mjs\b/.test(contract),
+	);
 }
 
 const windowsHelper = String.raw`C:\Program Files\ce workflow\scripts\work-helper.mjs`;

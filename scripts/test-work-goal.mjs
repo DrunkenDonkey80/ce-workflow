@@ -693,18 +693,22 @@ for (const [selection, action] of [
 	);
 }
 editorCtx.selection = "Brainstorm";
-const preflightEditorCtx = editorCtx("editor-brainstorm-preflight");
 const preflightOrder = [];
+const preflightEditorCtx = Object.assign(
+	editorCtx("editor-brainstorm-preflight"),
+	{
+		model: { provider: "test", id: "control" },
+		modelRegistry: {
+			find: (provider, id) => ({ provider, id }),
+			complete: async () => {
+				preflightOrder.push("probe");
+				return { stopReason: "stop", content: [{ type: "text", text: "HI" }] };
+			},
+		},
+	},
+);
 const setPreflightEditorText = preflightEditorCtx.ui.setEditorText;
 const setPreflightWidget = preflightEditorCtx.ui.setWidget;
-preflightEditorCtx.model = { provider: "test", id: "control" };
-preflightEditorCtx.modelRegistry = {
-	find: (provider, id) => ({ provider, id }),
-	complete: async () => {
-		preflightOrder.push("probe");
-		return { stopReason: "stop", content: [{ type: "text", text: "HI" }] };
-	},
-};
 preflightEditorCtx.ui.setEditorText = (text) => {
 	preflightOrder.push("editor");
 	setPreflightEditorText(text);
@@ -1446,10 +1450,7 @@ try {
 		execFileSync("git", ["config", "user.email", "test@example.com"], {
 			cwd: committedFixCwd,
 		});
-		writeFileSync(
-			path.join(committedFixCwd, ".gitignore"),
-			".ce-workflow/\n",
-		);
+		writeFileSync(path.join(committedFixCwd, ".gitignore"), ".ce-workflow/\n");
 		writeFileSync(path.join(committedFixCwd, "fix.js"), "before\n");
 		writeFileSync(path.join(committedFixCwd, "untouched.js"), "before\n");
 		writeFileSync(path.join(committedFixCwd, "support.js"), "before\n");
@@ -1596,10 +1597,14 @@ try {
 			},
 		);
 		assert.deepEqual(
-			execFileSync("git", ["show", "--pretty=", "--name-only", multiPathResult.details.commit], {
-				cwd: committedFixCwd,
-				encoding: "utf8",
-			})
+			execFileSync(
+				"git",
+				["show", "--pretty=", "--name-only", multiPathResult.details.commit],
+				{
+					cwd: committedFixCwd,
+					encoding: "utf8",
+				},
+			)
 				.trim()
 				.split(/\r?\n/)
 				.sort(),

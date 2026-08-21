@@ -88,7 +88,10 @@ try {
 		/repository-contained file up to 1 MiB/,
 		"work-note rejects absolute note-file paths",
 	);
-	writeFileSync(path.join(cwd, "oversized-note.txt"), "x".repeat(1024 * 1024 + 1));
+	writeFileSync(
+		path.join(cwd, "oversized-note.txt"),
+		"x".repeat(1024 * 1024 + 1),
+	);
 	assert.match(
 		failure("work-note", "TASK-1", "--note-file", "oversized-note.txt"),
 		/repository-contained file up to 1 MiB/,
@@ -300,7 +303,10 @@ try {
 		"wo:review PASS - latest scoped diff approved",
 	);
 	saveStore(cwd, freshlyReviewed);
-	writeFileSync(path.join(cwd, "source.js"), "export default 'changed after review';\n");
+	writeFileSync(
+		path.join(cwd, "source.js"),
+		"export default 'changed after review';\n",
+	);
 	assert.match(
 		failure(
 			"finish-task",
@@ -468,13 +474,13 @@ try {
 			"--max-files",
 			"1",
 			"--message",
-			"finish mechanical fix",
-			...verifyArgs,
 			"--reviewed",
+			...verifyArgs,
 		),
-		/durable wo:review PASS evidence/,
-		"generic fixer PASS cannot bypass the initial review",
+		/independent review required/,
+		"a boolean-looking option value cannot activate the review flag",
 	);
+	saveStore(cwd, mechanicalStore);
 	const mechanicalDispositionStore = loadStore(cwd);
 	mechanicalDispositionStore.items["TASK-3"].notes.push(
 		'wo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added the required date","evidence":"documentation check passed"}]}',
@@ -552,6 +558,39 @@ try {
 		/--expect cannot be combined with --verify-shard/,
 		"sharded verification rejects the scalar stdout expectation",
 	);
+	const failedShardOutput = "build-shard/failed.txt";
+	const failingShard = `${JSON.stringify(process.execPath)} ${JSON.stringify(helper)} work-note TASK-4 --append-notes "note written during failed shard" && ${JSON.stringify(process.execPath)} -e "require('fs').mkdirSync('build-shard',{recursive:true});require('fs').writeFileSync('${failedShardOutput}','failed');process.exit(1)"`;
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-4",
+			"--max-files",
+			"1",
+			"--message",
+			"reject failed shard",
+			"--verify",
+			failingShard,
+			"--verify-shard",
+			JSON.stringify({
+				id: "failing",
+				command: failingShard,
+				outputs: [failedShardOutput],
+			}),
+		),
+		/verification failed/,
+	);
+	const failedShardNotes = loadStore(cwd).items["TASK-4"].notes;
+	assert(failedShardNotes.includes("note written during failed shard"));
+	assert(
+		failedShardNotes.some((note) => note.startsWith("wo:verify-check FAIL")),
+		"failed shards leave durable verification evidence",
+	);
+	assert.equal(
+		existsSync(path.join(cwd, failedShardOutput)),
+		false,
+		"failed shard outputs absent before launch are removed",
+	);
+
 	const shardedFinished = JSON.parse(
 		run(
 			"finish-task",
@@ -1040,7 +1079,10 @@ try {
 		),
 	);
 	assert.equal(generatedFinished.clean, true);
-	assert.equal(loadStore(generatedRoot).items["GENERATED-DIRT"].status, "closed");
+	assert.equal(
+		loadStore(generatedRoot).items["GENERATED-DIRT"].status,
+		"closed",
+	);
 	assert.deepEqual(
 		execFileSync("git", ["status", "--short"], {
 			cwd: generatedRoot,
