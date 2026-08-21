@@ -212,6 +212,7 @@ try {
 		},
 		loadLanes: () => ({
 			lanes: {
+				broken: null,
 				prefetch: {
 					id: "prefetch",
 					workItemId: "Task-4",
@@ -228,6 +229,7 @@ try {
 				background: { id: "background" },
 			},
 			jobs: {
+				broken: null,
 				verifier: {
 					id: "verifier",
 					batchId: "batch",
@@ -354,6 +356,21 @@ try {
 		[{ kind: "assistant", text: "session artifact", model: undefined }],
 		"Fleet trusts transcripts in the current session-scoped pi-subagents artifact root",
 	);
+	if (process.platform === "win32") {
+		assert.deepEqual(
+			transcriptEvents(
+				{
+					asyncDir: join(fleetDir, ".pi", "subagents", "async", "session-run"),
+					cwd: fleetDir,
+					index: 0,
+					step: { transcriptPath: sessionTranscript.toUpperCase() },
+				},
+				{ sessionFile: join(sessionRoot, "parent-session.jsonl") },
+			),
+			[{ kind: "assistant", text: "session artifact", model: undefined }],
+			"Fleet containment accepts legitimate Windows path casing differences",
+		);
+	}
 	const outsideDir = join(fleetDir, "forged-async-root");
 	const outsideTranscript = join(outsideDir, "outside.jsonl");
 	mkdirSync(outsideDir, { recursive: true });
@@ -375,15 +392,43 @@ try {
 		"Fleet does not turn a persisted arbitrary asyncDir into a transcript trust root",
 	);
 
-	const output = join(fleetDir, "output-0.log");
+	const fallbackDir = join(
+		fleetDir,
+		".pi",
+		"subagents",
+		"async",
+		"fallback-run",
+	);
+	mkdirSync(fallbackDir, { recursive: true });
+	const output = join(fallbackDir, "output-0.log");
+	const outputLines = Array.from({ length: 300 }, (_, index) => `line-${index}`);
+	writeFileSync(
+		output,
+		`${"x".repeat(2 * 1024 * 1024 + 128)}\n${outputLines.join("\n")}`,
+	);
+	const boundedFallback = transcriptEvents({
+		asyncDir: fallbackDir,
+		cwd: fleetDir,
+		index: 0,
+		step: {},
+	});
+	assert.equal(boundedFallback.length, 1);
+	assert.equal(boundedFallback[0].text.split("\n").length, 240);
+	assert.match(boundedFallback[0].text, /^line-60\n/);
+	assert.match(boundedFallback[0].text, /line-299$/);
+	assert.doesNotMatch(
+		boundedFallback[0].text,
+		/line-0(?:\n|$)/,
+		"Fleet bounds fallback output by bytes and rendered lines",
+	);
 	writeFileSync(output, "still running");
 	assert.deepEqual(
 		transcriptEvents(
-			{ asyncDir: fleetDir, cwd: fleetDir, index: 0, step: {} },
+			{ asyncDir: fallbackDir, cwd: fleetDir, index: 0, step: {} },
 			{
-				readFile(file, encoding) {
+				readTail(file) {
 					if (file === output) unlinkSync(file);
-					return readFileSync(file, encoding);
+					return [];
 				},
 			},
 		),
