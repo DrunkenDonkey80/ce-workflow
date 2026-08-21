@@ -985,11 +985,75 @@ try {
 		ignoredOwnerHead,
 		"ignored owner store remains durable without a metadata commit",
 	);
+
+	const generatedRoot = mkdtempSync(
+		path.join(tmpdir(), "work-helper-generated-dirt-"),
+	);
+	execFileSync("git", ["init"], { cwd: generatedRoot, stdio: "ignore" });
+	execFileSync("git", ["config", "user.email", "test@example.com"], {
+		cwd: generatedRoot,
+	});
+	execFileSync("git", ["config", "user.name", "Test"], {
+		cwd: generatedRoot,
+	});
+	mkdirSync(path.join(generatedRoot, ".gradle"), { recursive: true });
+	writeFileSync(path.join(generatedRoot, ".gradle", "cache.bin"), "before\n");
+	writeFileSync(path.join(generatedRoot, "source.js"), "before\n");
+	const generatedStore = initStore(generatedRoot);
+	createWorkItem(generatedStore, {
+		id: "GENERATED-DIRT",
+		type: "task",
+		status: "open",
+		title: "Preserve generated dirt",
+	});
+	saveStore(generatedRoot, generatedStore);
+	execFileSync("git", ["add", "."], { cwd: generatedRoot });
+	execFileSync("git", ["commit", "-m", "generated baseline"], {
+		cwd: generatedRoot,
+		stdio: "ignore",
+	});
+	writeFileSync(path.join(generatedRoot, ".gradle", "cache.bin"), "after\n");
+	writeFileSync(path.join(generatedRoot, "source.js"), "after\n");
+	const generatedFinished = JSON.parse(
+		runFrom(
+			generatedRoot,
+			"finish-task",
+			"GENERATED-DIRT",
+			"--max-files",
+			"1",
+			"--message",
+			"preserve generated dirt",
+			...verifyArgs,
+		),
+	);
+	assert.equal(generatedFinished.clean, true);
+	assert.equal(loadStore(generatedRoot).items["GENERATED-DIRT"].status, "closed");
+	assert.deepEqual(
+		execFileSync("git", ["status", "--short"], {
+			cwd: generatedRoot,
+			encoding: "utf8",
+		})
+			.trim()
+			.split(/\r?\n/)
+			.filter((line) => !line.includes(".pi/")),
+		["M .gradle/cache.bin"],
+		"tracked generated dirt remains unstaged and does not block close",
+	);
+	assert.doesNotMatch(
+		execFileSync("git", ["show", "--pretty=", "--name-only", "HEAD"], {
+			cwd: generatedRoot,
+			encoding: "utf8",
+		}),
+		/\.gradle/,
+		"generated dirt is not included in the task commit",
+	);
+
 	for (const root of [
 		ownerRoot,
 		executionRoot,
 		ignoredOwnerRoot,
 		ignoredExecutionRoot,
+		generatedRoot,
 	])
 		rmSync(root, { recursive: true, force: true });
 

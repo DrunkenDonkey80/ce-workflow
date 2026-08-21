@@ -1527,10 +1527,13 @@ function claimGroupIn(next, input = {}) {
 	const timestamp = now(input.now);
 	const leaseUntil = leaseExpiry(input);
 	const existing = groupClaim(next, group);
+	const sameContinuation =
+		nonempty(input.resumeTarget) && input.resumeTarget === existing?.resumeTarget;
 	if (
 		existing &&
 		Date.parse(existing.leaseUntil) > Date.parse(timestamp) &&
-		existing.ownerSession !== input.ownerSession
+		existing.ownerSession !== input.ownerSession &&
+		!sameContinuation
 	)
 		throw error("locked", `Verifier group is already claimed: ${input.groupId}`);
 	if (existing) {

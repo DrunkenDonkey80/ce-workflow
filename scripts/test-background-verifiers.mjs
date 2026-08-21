@@ -1999,19 +1999,32 @@ try {
 			),
 		"locked",
 	);
-	const takeover = mutateVerifierStore(reconcileCwd, (state) =>
+	const continuationTakeover = mutateVerifierStore(reconcileCwd, (state) =>
 		claimGroup(state, {
 			groupId: triageGroup.id,
 			ownerSession: "triage-b",
+			resumeTarget: "E-1",
+			now: "2026-07-21T03:01:00.000Z",
+		}),
+	);
+	assert.equal(
+		continuationTakeover.ownerSession,
+		"triage-b",
+		"the same resume lineage can adopt a live predecessor claim",
+	);
+	const takeover = mutateVerifierStore(reconcileCwd, (state) =>
+		claimGroup(state, {
+			groupId: triageGroup.id,
+			ownerSession: "triage-c",
 			now: "2026-07-21T03:31:00.000Z",
 		}),
 	);
 	assert.equal(
 		takeover.ownerSession,
-		"triage-b",
+		"triage-c",
 		"expired triage lease can be atomically taken over",
 	);
-	const triageOwner = "triage-b";
+	const triageOwner = "triage-c";
 	const [acceptedFinding, rejectedFinding] = triageGroup.findingIds;
 	const sharedGroup = mutateVerifierStore(reconcileCwd, (state) =>
 		addGroup(state, {
@@ -2136,7 +2149,7 @@ try {
 	assert.equal(
 		mutateVerifierStore(reconcileCwd, (state) =>
 			claimCompletedGroups(state, {
-				ownerSession: "triage-b",
+				ownerSession: triageOwner,
 				now: "2026-07-21T03:06:00.000Z",
 			}),
 		).length,

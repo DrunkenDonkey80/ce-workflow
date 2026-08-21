@@ -1448,6 +1448,7 @@ try {
 		);
 		writeFileSync(path.join(committedFixCwd, "fix.js"), "before\n");
 		writeFileSync(path.join(committedFixCwd, "untouched.js"), "before\n");
+		writeFileSync(path.join(committedFixCwd, "support.js"), "before\n");
 		execFileSync("git", ["add", "."], { cwd: committedFixCwd });
 		execFileSync("git", ["commit", "-m", "checkpoint"], {
 			cwd: committedFixCwd,
@@ -1463,7 +1464,7 @@ try {
 					repository: "committed-fix-test",
 					base: "a".repeat(40),
 					snapshot: checkpoint,
-					paths: ["fix.js", "untouched.js"],
+					paths: ["fix.js", "untouched.js", "support.js"],
 					patchHash: "c".repeat(64),
 				},
 				profiles: [
@@ -1571,6 +1572,35 @@ try {
 				},
 			),
 			/no exact ancestor commit/,
+		);
+		writeFileSync(path.join(committedFixCwd, "untouched.js"), "fixed\n");
+		writeFileSync(path.join(committedFixCwd, "support.js"), "support fix\n");
+		const multiPathResult = await tempTools.work_verifier_complete_fix.execute(
+			"multi-path-fix",
+			{
+				claimId: claims[1].id,
+				findingIds: [findings[1].id],
+				fixPaths: ["untouched.js", "support.js"],
+				verification: ["node focused-test"],
+			},
+			null,
+			null,
+			{
+				...ctx,
+				cwd: committedFixCwd,
+				sessionManager: { getSessionId: () => ownerSession },
+			},
+		);
+		assert.deepEqual(
+			execFileSync("git", ["show", "--pretty=", "--name-only", multiPathResult.details.commit], {
+				cwd: committedFixCwd,
+				encoding: "utf8",
+			})
+				.trim()
+				.split(/\r?\n/)
+				.sort(),
+			["support.js", "untouched.js"],
+			"an explicit bounded fixPaths superset commits the exact cross-file fix",
 		);
 	} finally {
 		rmSync(committedFixCwd, { recursive: true, force: true });

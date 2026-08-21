@@ -17,7 +17,7 @@ function assertQuotedHelperCommands(text, expectedPath) {
 		const lineStart = text.lastIndexOf("\n", match.index) + 1;
 		const before = text.slice(lineStart, match.index);
 		const nodeAt = before.lastIndexOf("node ");
-		if (nodeAt < 0) continue;
+		if (nodeAt < 0 || before.slice(nodeAt).includes("work-helper.mjs")) continue;
 		count += 1;
 		let end = match.index + match[0].length;
 		if (/['"]/.test(text[end] ?? "")) end += 1;
@@ -67,6 +67,12 @@ for (const fixture of states) {
 	const handoff = directRoleHandoffParams(fixture.state, root);
 	assert.equal(handoff.agent, fixture.agent);
 	assert(handoff.params.task.includes(`POSIX shell as ${quotedHelper}`));
+	assert(
+		handoff.params.task.includes(
+			`Claim exactly with: node ${quotedHelper} work-claim ${fixture.state.selectedWorkItem.id}`,
+		),
+		`${fixture.agent} claims its selected WorkItem before mutating it`,
+	);
 	assertQuotedHelperCommands(handoff.params.task, helperPath);
 }
 

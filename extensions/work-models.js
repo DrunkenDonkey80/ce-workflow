@@ -8602,7 +8602,7 @@ function directRoleTask(state, cwd) {
 		state.action === "run-planner"
 			? `Use only native helper summaries plus targeted project files; never use raw store JSON or broad discovery. Create the minimum executable work items required by the stated posture (one by default, at most three for an obvious sequence). Open decisions are only for unresolved human, product, or architectural authority; record a technical winner otherwise. Verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning item, then stop. Planner parent launch baseline: ${JSON.stringify(plannerBaseline)}; predeclared paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. If launchSafe is false, stop BLOCKED; new paths fail closed. A new unstaged tracked instruction path is tolerable only when its whitespace-ignored diff is empty. Additionally, only when managedAgentsOverlayEligible is true, a new unstaged tracked AGENTS.md modification may be treated as a transient managed startup overlay even when substantive; never modify, stage, or revert it. Staged/untracked AGENTS, a baseline AGENTS entry, or unrelated dirt always blocks. Before finishing, require AGENTS.md to hash to agentsWorktree and agentsHead and reject every final undeclared mutation outside the native store, workflow runtime, or requested dated plan.`
 			: "",
-		state.action === "run-implementation" && selected?.id
+		["run-planner", "run-implementation"].includes(state.action) && selected?.id
 			? `Claim exactly with: node ${helper} work-claim ${selected.id}`
 			: "",
 		implementationScopeLine(state),
@@ -10024,12 +10024,18 @@ function registerVerifierTriageTools(pi) {
 		name: "work_verifier_complete_fix",
 		label: "Complete accepted verifier fix",
 		description:
-			"Commit exactly the accepted finding paths, or reconcile an exact ancestor commit, after the main agent has verified them; this never schedules background verification.",
+			"Commit the accepted finding paths plus an optional bounded fixPaths superset, or reconcile an exact ancestor commit, after the main agent has verified them; this never schedules background verification.",
 		parameters: {
 			type: "object",
 			properties: {
 				claimId: { type: "string" },
 				findingIds: { type: "array", minItems: 1, items: { type: "string" } },
+				fixPaths: {
+					type: "array",
+					minItems: 1,
+					maxItems: 20,
+					items: { type: "string", minLength: 1, maxLength: 500 },
+				},
 				verification: {
 					type: "array",
 					minItems: 1,
@@ -10047,10 +10053,12 @@ function registerVerifierTriageTools(pi) {
 				throw new Error("Verifier claim is not owned by this session.");
 			const group = store.groups[claim.groupId];
 			const findingIds = [...new Set(params.findingIds)].sort();
-			const paths = [...new Set(findingIds.map((id) => store.findings[id]?.path))];
+			const findingPaths = [
+				...new Set(findingIds.map((id) => store.findings[id]?.path)),
+			];
 			if (
-				!paths.length ||
-				paths.includes(undefined) ||
+				!findingPaths.length ||
+				findingPaths.includes(undefined) ||
 				findingIds.some(
 					(id) =>
 						!group.findingIds.includes(id) ||
@@ -10059,6 +10067,27 @@ function registerVerifierTriageTools(pi) {
 				)
 			)
 				throw new Error("Only accepted members of this claim can be completed.");
+			const requestedPaths = params.fixPaths ?? findingPaths;
+			const paths = requestedPaths.map((file) =>
+				posix.normalize(normalizedRepoPath(file)),
+			);
+			if (
+				requestedPaths.length > 20 ||
+				new Set(paths).size !== paths.length ||
+				paths.some(
+					(file) =>
+						!file ||
+						file === "." ||
+						file === ".." ||
+						file.startsWith("../") ||
+						isAbsolute(file) ||
+						/^(?:\.pi(?:-subagents)?|\.ce-workflow)(?:\/|$)/.test(file),
+				) ||
+				findingPaths.some((file) => !paths.includes(normalizedRepoPath(file)))
+			)
+				throw new Error(
+					"fixPaths must be unique repository-relative paths including every accepted finding path.",
+				);
 			const dirty = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
 				normalizedRepoPath(item.path),
 			);

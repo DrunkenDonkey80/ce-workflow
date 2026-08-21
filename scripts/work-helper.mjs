@@ -964,7 +964,7 @@ async function finishTaskUnlocked() {
 			}),
 		);
 		const ownerChanges = gitStatusPaths(ownerRepositoryRoot).filter(
-			(file) => !isRuntimePath(file),
+			(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
 		);
 		if (
 			ownerChanges.some(
@@ -994,10 +994,12 @@ async function finishTaskUnlocked() {
 			? git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim()
 			: null;
 		const executionRemaining = gitStatusPaths(executionRoot).filter(
-			(file) => !isRuntimePath(file),
+			(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
 		);
 		const ownerRemaining = distinctRoots
-			? gitStatusPaths(ownerRepositoryRoot).filter((file) => !isRuntimePath(file))
+			? gitStatusPaths(ownerRepositoryRoot).filter(
+					(file) => !isRuntimePath(file) && !isGeneratedBuildPath(file),
+				)
 			: executionRemaining;
 		if (executionRemaining.length || ownerRemaining.length)
 			throw new Error(
