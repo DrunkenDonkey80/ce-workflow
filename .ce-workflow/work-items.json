@@ -7144,6 +7144,9 @@
           "producer": "LPGLibrarySDK-Android",
           "submittedAt": "2026-08-21T12:18:57.388Z",
           "workflowId": "01a0243b-ef09-76f5-9dbd-142a0cf18ad2"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-da06c6e6-abcd-4ea0-87af-2540c4497918",
@@ -7151,12 +7154,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Atomic claim classification: already-fixed by commit 884ea69 (fix: close workflow finalization gaps), which exposed optional bounded fixPaths in the registered work_verifier_complete_fix schema, requires the accepted finding path within the superset, and added an exact multi-path completion regression. Current source still contains the schema and guarded superset logic; node scripts/test-work-goal.mjs passed.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_complete_fix defaulted fix scope to the finding's production path and rejected the valid test-only fix because the d",
       "type": "task",
-      "updatedAt": "2026-08-21T12:18:57.393Z"
+      "updatedAt": "2026-08-21T17:47:06.380Z"
     },
     "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
       "createdAt": "2026-08-12T16:54:19.072Z",
@@ -9470,7 +9476,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-21T17:46:35.961Z"
+    "updatedAt": "2026-08-21T17:47:06.380Z"
   },
   "schemaVersion": 1
 }
