@@ -8,6 +8,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	realpathSync,
+	renameSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -1455,6 +1456,7 @@ try {
 		writeFileSync(path.join(committedFixCwd, "fix.js"), "before\n");
 		writeFileSync(path.join(committedFixCwd, "untouched.js"), "before\n");
 		writeFileSync(path.join(committedFixCwd, "support.js"), "before\n");
+		writeFileSync(path.join(committedFixCwd, "rename-source.js"), "move me\n");
 		execFileSync("git", ["add", "."], { cwd: committedFixCwd });
 		execFileSync("git", ["commit", "-m", "checkpoint"], {
 			cwd: committedFixCwd,
@@ -1470,7 +1472,12 @@ try {
 					repository: "committed-fix-test",
 					base: "a".repeat(40),
 					snapshot: checkpoint,
-					paths: ["fix.js", "untouched.js", "support.js"],
+					paths: [
+						"fix.js",
+						"untouched.js",
+						"support.js",
+						"rename-source.js",
+					],
 					patchHash: "c".repeat(64),
 				},
 				profiles: [
@@ -1492,7 +1499,8 @@ try {
 				outcome: "findings",
 			}),
 		);
-		const findings = ["fix.js", "untouched.js"].map((file) =>
+		const findings = ["fix.js", "untouched.js", "rename-source.js"].map(
+			(file) =>
 			mutateVerifierStore(committedFixCwd, (store) =>
 				addFinding(store, {
 					reportId: report.id,
@@ -1611,6 +1619,44 @@ try {
 				.sort(),
 			["support.js", "untouched.js"],
 			"an explicit bounded fixPaths superset commits the exact cross-file fix",
+		);
+		execFileSync("git", ["config", "status.renames", "false"], {
+			cwd: committedFixCwd,
+		});
+		renameSync(
+			path.join(committedFixCwd, "rename-source.js"),
+			path.join(committedFixCwd, "rename-destination.js"),
+		);
+		const renameResult = await tempTools.work_verifier_complete_fix.execute(
+			"rename-fix",
+			{
+				claimId: claims[2].id,
+				findingIds: [findings[2].id],
+				fixPaths: ["rename-source.js", "rename-destination.js"],
+				verification: ["node focused-test"],
+			},
+			null,
+			null,
+			{
+				...ctx,
+				cwd: committedFixCwd,
+				sessionManager: { getSessionId: () => ownerSession },
+			},
+		);
+		assert.match(
+			execFileSync(
+				"git",
+				[
+					"show",
+					"--pretty=",
+					"--name-status",
+					"--find-renames",
+					renameResult.details.commit,
+				],
+				{ cwd: committedFixCwd, encoding: "utf8" },
+			).trim(),
+			/^R\d+\s+rename-source\.js\s+rename-destination\.js$/,
+			"an explicitly declared relocation authorizes both rename paths",
 		);
 	} finally {
 		rmSync(committedFixCwd, { recursive: true, force: true });

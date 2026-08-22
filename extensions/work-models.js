@@ -15332,9 +15332,20 @@ function committedAcceptedFix(cwd, findings, paths) {
 }
 
 function ensureOnlyStaged(cwd, files) {
-	const staged = run(cwd, "git", ["diff", "--cached", "--name-only"])
-		.split(/\r?\n/)
-		.filter(Boolean);
+	const fields = run(cwd, "git", [
+		"diff",
+		"--cached",
+		"--name-status",
+		"-z",
+		"--find-renames",
+		"--find-copies",
+	]).split("\0");
+	const staged = [];
+	for (let index = 0; fields[index]; ) {
+		const status = fields[index++];
+		staged.push(fields[index++]);
+		if (/^[RC]/.test(status)) staged.push(fields[index++]);
+	}
 	if (!samePathSet(staged, files))
 		throw new Error(`Unexpected staged files: ${staged.join(", ") || "none"}`);
 }
@@ -17347,10 +17358,7 @@ function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
 			const disposition = improvementSafetyDisposition(readWorkItem(cwd, id));
 			return (
 				disposition !== "SAFE" &&
-				!(
-					disposition === "APPROVED" &&
-					goal.improvementApprovedIds?.includes(id)
-				)
+				!(disposition === "APPROVED" && goal.improvementApprovedIds?.includes(id))
 			);
 		} catch {
 			return true;
@@ -17401,10 +17409,7 @@ function workImproveCompletionBlocker(goal, cwd) {
 			const safety = improvementSafetyDisposition(issue);
 			if (!["SAFE", "APPROVED"].includes(safety))
 				return `${id} lacks a final wo:improvement-safety SAFE or APPROVED assessment`;
-			if (
-				safety === "APPROVED" &&
-				!goal.improvementApprovedIds?.includes(id)
-			)
+			if (safety === "APPROVED" && !goal.improvementApprovedIds?.includes(id))
 				return `${id} has APPROVED risk without a recorded ask_user approval`;
 		}
 	} catch (error) {
@@ -18687,10 +18692,7 @@ function recordImprovementApprovalFromAskUser(event, ctx, pi) {
 		...activeWorkGoal,
 		improvementApprovalAt: Date.now(),
 		improvementApprovedIds: Array.from(
-			new Set([
-				...(activeWorkGoal.improvementApprovedIds ?? []),
-				...approvedIds,
-			]),
+			new Set([...(activeWorkGoal.improvementApprovedIds ?? []), ...approvedIds]),
 		),
 		improvementApproval: {
 			question: String(event.details?.question ?? "").trim(),

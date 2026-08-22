@@ -4352,6 +4352,48 @@
       "type": "bug",
       "updatedAt": "2026-08-21T17:52:59.836Z"
     },
+    "work-2.85": {
+      "acceptance": "Both reports are covered by one current handoff implementation and a focused Windows-path fixture.",
+      "createdAt": "2026-08-22T06:37:40.674Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical duplicate root cause for snapshot reports work-2.report-52aee41a-f985-4d4a-80c6-8ce324bcaa1c and work-2.report-61fcc1ed-15f1-42a1-89cb-159d9be7c95c: generated planner commands must invoke the quoted absolute work-helper.mjs through Node on Windows.",
+      "evidence": [],
+      "id": "work-2.85",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:verify-check PASS node scripts/test-work-helper-handoffs.mjs; current coverage is commits bb1a66c and 0e20dab, which generate Node-prefixed quoted absolute planner helper commands on Windows.",
+        "Already fixed by bb1a66c/0e20dab and verified by node scripts/test-work-helper-handoffs.mjs."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Verify platform-safe planner helper handoffs",
+      "type": "bug",
+      "updatedAt": "2026-08-22T06:38:31.346Z"
+    },
+    "work-2.86": {
+      "acceptance": "Both reports are covered by one current handoff implementation and a focused worker handoff fixture.",
+      "createdAt": "2026-08-22T06:37:52.047Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical duplicate root cause for snapshot reports work-2.report-6ea35cdc-2683-4c4c-9b0b-6b4b7eae07de and work-2.report-efc8dbf7-81b5-4241-b009-f372dc019f94: generated worker handoffs must include the quoted absolute Node helper command and compact task contract.",
+      "evidence": [],
+      "id": "work-2.86",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:verify-check PASS node scripts/test-work-helper-handoffs.mjs; current coverage is commits bb1a66c and 0e20dab, which inject the quoted absolute Node helper command and compact summary/claim contract into worker handoffs.",
+        "Already fixed by bb1a66c/0e20dab and verified by node scripts/test-work-helper-handoffs.mjs."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Verify worker helper handoff completeness",
+      "type": "bug",
+      "updatedAt": "2026-08-22T06:38:42.503Z"
+    },
     "work-2.9": {
       "createdAt": "2026-07-20T11:50:30.982Z",
       "dependencies": [],
@@ -4691,6 +4733,9 @@
           "producer": "LPGLibrarySDK-Android",
           "submittedAt": "2026-08-21T19:17:16.904Z",
           "workflowId": "01a025ba-6ead-7746-b917-def3899862ab"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-190164eb-603a-44b8-ab03-c9c2af85f26c",
@@ -4698,12 +4743,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety BLOCKED locally-owned rename handling would loosen a staged-file protection in verifier commit automation and could authorize an unintended path; blast radius is accepted-fix commits, with rollback by reverting the scoped parser change.",
+        "wo:improvement-safety APPROVED staged-file protection relaxation approved explicitly for declared rename source and destination paths only; decision is to implement the scoped parser, and rollback is reverting its commit.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_complete_fix rejected a declared two-path relocation (accepted finding path app/src/main/java/com/ipc/lpglibrary/EX1",
       "type": "task",
-      "updatedAt": "2026-08-21T19:17:16.910Z"
+      "updatedAt": "2026-08-22T06:43:20.091Z"
     },
     "work-2.report-1e41739d-a5e4-434d-954f-7235e7fd07c5": {
       "createdAt": "2026-08-19T09:29:15.735Z",
@@ -5314,7 +5363,9 @@
     },
     "work-2.report-52aee41a-f985-4d4a-80c6-8ce324bcaa1c": {
       "createdAt": "2026-08-21T19:17:07.303Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.85"
+      ],
       "dependencyEdges": [],
       "description": "Observed: On Windows, work-planner received the absolute work-helper.mjs path but invoked the .mjs file directly instead of through Node, failed with platform execution error, and aborted before preflight.\nExpected: The coded planner handoff should provide the complete platform-safe helper invocation (`node <absolute-work-helper.mjs>`) or the planner contract should always invoke .mjs helpers through process.execPath.\nImpact: Autonomous resume required another duplicate planner launch even though the helper path and repository were valid.\nSuggested improvement: Encode helperCommand as an argv tuple using process.execPath rather than supplying only helperPath.",
       "evidence": [
@@ -5339,12 +5390,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of the already-fixed Windows planner helper invocation; current handoffs use node plus the quoted absolute helper path, blast radius is planner startup only, and rollback is reverting the handoff fix.",
+        "Canonical WorkItem work-2.85 closed; commits bb1a66c and 0e20dab cover the reported Windows Node invocation, verified PASS by node scripts/test-work-helper-handoffs.mjs.",
+        "Duplicate root cause verified through canonical work-2.85."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: On Windows, work-planner received the absolute work-helper.mjs path but invoked the .mjs file directly instead of through Node, fa",
       "type": "task",
-      "updatedAt": "2026-08-21T19:17:07.303Z"
+      "updatedAt": "2026-08-22T06:38:55.664Z"
     },
     "work-2.report-54162966-eef0-439e-bf68-8b4627cf7f63": {
       "createdAt": "2026-08-10T12:58:04.547Z",
@@ -5829,7 +5884,9 @@
     },
     "work-2.report-61fcc1ed-15f1-42a1-89cb-159d9be7c95c": {
       "createdAt": "2026-08-21T19:24:38.078Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.85"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The work-planner handoff named C:/soft/git/ce-workflow/scripts/work-helper.mjs without a Node launcher, so the planner invoked the .mjs directly on Windows, got 'not a valid application for this OS platform', and abandoned work-1.130 before reading native state or the plan.\nExpected: Windows specialist handoffs should provide or normalize `node C:/soft/git/ce-workflow/scripts/work-helper.mjs ...` so deterministic work-item helpers execute correctly.\nImpact: Autonomous roadmap continuation stalled and required parent recovery even though the helper itself is healthy.\nSuggested improvement: Include the Node executable prefix in generated specialist contracts on Windows.",
       "evidence": [
@@ -5854,12 +5911,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of work-2.report-52aee41a-f985-4d4a-80c6-8ce324bcaa1c and already fixed by Node-prefixed quoted helper commands; blast radius is Windows planner startup and rollback is reverting that handoff change.",
+        "Canonical WorkItem work-2.85 closed; commits bb1a66c and 0e20dab cover the reported Windows Node invocation, verified PASS by node scripts/test-work-helper-handoffs.mjs.",
+        "Duplicate root cause verified through canonical work-2.85."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The work-planner handoff named C:/soft/git/ce-workflow/scripts/work-helper.mjs without a Node launcher, so the planner invoked the",
       "type": "task",
-      "updatedAt": "2026-08-21T19:24:38.078Z"
+      "updatedAt": "2026-08-22T06:39:01.588Z"
     },
     "work-2.report-62fb9577-ee2e-4536-aa72-fcf4d1d25ce6": {
       "createdAt": "2026-08-05T08:07:27.045Z",
@@ -6112,9 +6173,53 @@
       "type": "task",
       "updatedAt": "2026-08-08T08:43:45.147Z"
     },
+    "work-2.report-6c3fd546-4eff-40ef-aa46-8c27ba288d89": {
+      "createdAt": "2026-08-22T06:28:10.878Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: work_verifier_complete_fix rejected a valid accepted test-gap remediation unless the unchanged production finding path was included in fixPaths, then rejected that inclusion because dirty scope contained only the new test. The accepted finding was against LocalGameRepository.kt but the requested and correct remediation was test-only in LocalGameRepositoryTest.kt.\nExpected: For accepted test-gap findings, complete_fix should allow a verified dirty fixPaths superset containing the test while treating the unchanged finding path as inspected/covered, or otherwise reconcile the checkpoint without forcing a meaningless production-file edit.\nImpact: The current exact-scope rules make a test-only fix impossible to complete without touching production code solely to satisfy workflow bookkeeping, increasing diff noise and encouraging artificial changes.\nSuggested improvement: Permit accepted finding paths to be clean when all dirty files are an explicit verified fixPaths superset and the finding path hash still matches the accepted disposition/checkpoint.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/6d8ee778-9c9b-48e9-ab04-25ca7bb9b5a0",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 391470,
+              "file": "01-2026-08-22T06-13-46-787Z_01a0281a-98a3-7822-9a4f-024f14a898df.jsonl",
+              "sha256": "207afe95d84172c3f30affe738aecc74cefe871e6dd537c7d8171840e3c3cfde"
+            },
+            {
+              "bytes": 3499980,
+              "file": "02-state.json",
+              "sha256": "f961f376393b4246d1056ae65afde2a4ce3661c1bd7a75b778428ff89c146db8"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-22T06:28:10.871Z",
+          "workflowId": "01a0281a-98a3-7822-9a4f-024f14a898df"
+        }
+      ],
+      "id": "work-2.report-6c3fd546-4eff-40ef-aa46-8c27ba288d89",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety BLOCKED locally-owned test-only completion would relax the exact accepted-path validation before automated commits and could hide an unfixed production finding; blast radius is verifier fix reconciliation, with rollback by reverting the validation change.",
+        "wo:improvement-safety APPROVED exact-path validation relaxation approved explicitly for verified test-only fixes with unchanged finding-path hash protection; decision is to implement that narrow case, and rollback is reverting its commit."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: work_verifier_complete_fix rejected a valid accepted test-gap remediation unless the unchanged production finding path was include",
+      "type": "task",
+      "updatedAt": "2026-08-22T06:28:10.878Z"
+    },
     "work-2.report-6ea35cdc-2683-4c4c-9b0b-6b4b7eae07de": {
       "createdAt": "2026-08-21T19:35:22.763Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.86"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The work-worker role refused a bounded implementation handoff before using any tools because the absolute work-helper.mjs path was not included, even though the handoff explicitly said not to edit work-item state and already supplied the native work-item ID, owned file, and acceptance.\nExpected: A bounded implementation worker that is told not to mutate native state should inspect and edit its owned source directly; if the role contract always needs the helper, generated/custom handoffs should inject `C:/soft/git/ce-workflow/scripts/work-helper.mjs` automatically.\nImpact: The autonomous loop consumed a worker launch and stalled without inspecting code, editing, or validating, requiring a duplicate recovery launch.\nSuggested improvement: Make the worker helper path optional for source-only implementation or automatically include the resolved absolute helper path in work-worker contracts.",
       "evidence": [
@@ -6139,12 +6244,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE already-fixed locally-owned worker handoff now injects the quoted absolute Node helper command and compact task contract; blast radius is bounded worker startup, and rollback is reverting the handoff fix.",
+        "Canonical WorkItem work-2.86 closed; commits bb1a66c and 0e20dab cover the worker helper and compact claim/read contract, verified PASS by node scripts/test-work-helper-handoffs.mjs.",
+        "Duplicate root cause verified through canonical work-2.86."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The work-worker role refused a bounded implementation handoff before using any tools because the absolute work-helper.mjs path was",
       "type": "task",
-      "updatedAt": "2026-08-21T19:35:22.763Z"
+      "updatedAt": "2026-08-22T06:39:07.490Z"
     },
     "work-2.report-6f4c69c0-3367-4afa-b5ec-9313899e1480": {
       "createdAt": "2026-08-10T20:11:22.271Z",
@@ -6498,7 +6607,10 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety BLOCKED locally-owned runtime ignore fix would broaden initialization defaults by editing consumer .gitignore files automatically; blast radius is all initialized repositories, with rollback by reverting the added ignore entry and removing it manually where unwanted.",
+        "wo:improvement-safety APPROVED consumer .gitignore default edit approved explicitly to add only .ce-workflow/work-runs/ idempotently; decision is to align ordinary Git cleanliness with the finalizer, and rollback is removing the entry or reverting its commit."
+      ],
       "parentId": "work-2",
       "status": "open",
       "title": "Self-improvement report: Verifier/runtime state was generated under `.ce-workflow/work-runs/`, but the target repository's `.gitignore` does not ignore tha",
@@ -7597,16 +7709,23 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "\"wo:improvement-safety SAFE already-fixed locally-owned planner handoff now injects the absolute Node helper command and a launch baseline; no source mutation is needed, blast radius is read-only specialist startup metadata, and rollback is the existing handoff commit if verification regresses.\"",
+        "wo:improvement-safety SAFE already-fixed locally-owned planner handoff now injects the absolute Node helper command and launch baseline; no source mutation is needed, blast radius is specialist startup metadata, and rollback is reverting the existing handoff fix.",
+        "Already current: commit 17dd946 provides the planner launch baseline and 0e20dab provides the quoted absolute Node helper command; verified PASS by node scripts/test-work-start-finish.mjs and node scripts/test-work-helper-handoffs.mjs.",
+        "Both atomic handoff metadata outcomes are already implemented and verified."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The work-planner rejected a resume-planning handoff before reading project state because the parent prompt did not repeat the abso",
       "type": "task",
-      "updatedAt": "2026-08-21T18:58:24.235Z"
+      "updatedAt": "2026-08-22T06:39:19.630Z"
     },
     "work-2.report-efc8dbf7-81b5-4241-b009-f372dc019f94": {
       "createdAt": "2026-08-21T21:51:13.767Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.86"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The coded implementation handoff for work-1.99 omitted the exact absolute work-helper.mjs path. The configured work-worker refused to claim/read the native item and exited without edits, even though the parent session had already resolved the helper path.\nExpected: Every ce-workflow handoff to work-worker should include the resolved absolute helper path (here C:\\soft\\git\\ce-workflow\\scripts\\work-helper.mjs) and the exact claim/read command or precomputed task contract so the worker can begin without guessing or reading raw state.\nImpact: An otherwise executable bounded slice incurred a failed agent run, no implementation progress, and an avoidable retry/resume.\nSuggested improvement: Have the coded action lease inject helperPath and a precomputed work-item summary into every execution-agent handoff.",
       "evidence": [
@@ -7636,12 +7755,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of work-2.report-6ea35cdc-2683-4c4c-9b0b-6b4b7eae07de and already fixed by the generated worker helper/task handoff; blast radius is worker startup and rollback is reverting that handoff change.",
+        "Canonical WorkItem work-2.86 closed; commits bb1a66c and 0e20dab cover the worker helper and compact claim/read contract, verified PASS by node scripts/test-work-helper-handoffs.mjs.",
+        "Duplicate root cause verified through canonical work-2.86."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The coded implementation handoff for work-1.99 omitted the exact absolute work-helper.mjs path. The configured work-worker refused",
       "type": "task",
-      "updatedAt": "2026-08-21T21:51:13.767Z"
+      "updatedAt": "2026-08-22T06:39:12.828Z"
     },
     "work-2.report-f7d1e813-e0ae-49bf-b188-8477e9fbe685": {
       "createdAt": "2026-08-08T08:27:18.043Z",
@@ -9735,7 +9858,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-22T06:09:02.152Z"
+    "updatedAt": "2026-08-22T06:43:20.091Z"
   },
   "schemaVersion": 1
 }
