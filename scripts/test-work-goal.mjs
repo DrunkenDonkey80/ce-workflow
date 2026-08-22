@@ -1457,6 +1457,7 @@ try {
 		writeFileSync(path.join(committedFixCwd, "untouched.js"), "before\n");
 		writeFileSync(path.join(committedFixCwd, "support.js"), "before\n");
 		writeFileSync(path.join(committedFixCwd, "rename-source.js"), "move me\n");
+		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "production\n");
 		execFileSync("git", ["add", "."], { cwd: committedFixCwd });
 		execFileSync("git", ["commit", "-m", "checkpoint"], {
 			cwd: committedFixCwd,
@@ -1477,6 +1478,7 @@ try {
 						"untouched.js",
 						"support.js",
 						"rename-source.js",
+						"test-gap.js",
 					],
 					patchHash: "c".repeat(64),
 				},
@@ -1499,8 +1501,12 @@ try {
 				outcome: "findings",
 			}),
 		);
-		const findings = ["fix.js", "untouched.js", "rename-source.js"].map(
-			(file) =>
+		const findings = [
+			"fix.js",
+			"untouched.js",
+			"rename-source.js",
+			"test-gap.js",
+		].map((file) =>
 			mutateVerifierStore(committedFixCwd, (store) =>
 				addFinding(store, {
 					reportId: report.id,
@@ -1657,6 +1663,53 @@ try {
 			).trim(),
 			/^R\d+\s+rename-source\.js\s+rename-destination\.js$/,
 			"an explicitly declared relocation authorizes both rename paths",
+		);
+		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "changed\n");
+		writeFileSync(path.join(committedFixCwd, "test-gap.test.js"), "covered\n");
+		await assert.rejects(
+			tempTools.work_verifier_complete_fix.execute(
+				"changed-test-gap-fix",
+				{
+					claimId: claims[3].id,
+					findingIds: [findings[3].id],
+					fixPaths: ["test-gap.test.js"],
+					verification: ["node focused-test"],
+				},
+				null,
+				null,
+				{
+					...ctx,
+					cwd: committedFixCwd,
+					sessionManager: { getSessionId: () => ownerSession },
+				},
+			),
+			/omitted accepted finding paths must remain unchanged/,
+		);
+		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "production\n");
+		const testOnlyResult = await tempTools.work_verifier_complete_fix.execute(
+			"test-only-fix",
+			{
+				claimId: claims[3].id,
+				findingIds: [findings[3].id],
+				fixPaths: ["test-gap.test.js"],
+				verification: ["node focused-test"],
+			},
+			null,
+			null,
+			{
+				...ctx,
+				cwd: committedFixCwd,
+				sessionManager: { getSessionId: () => ownerSession },
+			},
+		);
+		assert.equal(
+			execFileSync(
+				"git",
+				["show", "--pretty=", "--name-only", testOnlyResult.details.commit],
+				{ cwd: committedFixCwd, encoding: "utf8" },
+			).trim(),
+			"test-gap.test.js",
+			"a test-only fix commits only the declared test path",
 		);
 	} finally {
 		rmSync(committedFixCwd, { recursive: true, force: true });

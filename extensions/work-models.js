@@ -10089,6 +10089,11 @@ function registerVerifierTriageTools(pi) {
 			const paths = requestedPaths.map((file) =>
 				posix.normalize(normalizedRepoPath(file)),
 			);
+			const omittedFindings = findingIds
+				.map((id) => store.findings[id])
+				.filter(
+					(finding) => !paths.includes(normalizedRepoPath(finding.path)),
+				);
 			if (
 				requestedPaths.length > 20 ||
 				new Set(paths).size !== paths.length ||
@@ -10101,10 +10106,12 @@ function registerVerifierTriageTools(pi) {
 						isAbsolute(file) ||
 						/^(?:\.pi(?:-subagents)?|\.ce-workflow)(?:\/|$)/.test(file),
 				) ||
-				findingPaths.some((file) => !paths.includes(normalizedRepoPath(file)))
+				omittedFindings.some(
+					(finding) => !findingPathMatchesCheckpoint(cwd, finding),
+				)
 			)
 				throw new Error(
-					"fixPaths must be unique repository-relative paths including every accepted finding path.",
+					"fixPaths must be unique repository-relative paths; omitted accepted finding paths must remain unchanged from their verifier checkpoint.",
 				);
 			const dirty = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
 				normalizedRepoPath(item.path),
@@ -15293,6 +15300,18 @@ function samePathSet(left = [], right = []) {
 	const a = normalizedPathSet(left);
 	const b = normalizedPathSet(right);
 	return a.size === b.size && [...a].every((item) => b.has(item));
+}
+
+function findingPathMatchesCheckpoint(cwd, finding) {
+	const snapshot = finding?.checkpoint?.snapshot;
+	const file = normalizedRepoPath(finding?.path);
+	if (!file || !/^[0-9a-f]{40,64}$/i.test(snapshot ?? "")) return false;
+	try {
+		run(cwd, "git", ["diff", "--quiet", snapshot, "--", file]);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 function committedAcceptedFix(cwd, findings, paths) {

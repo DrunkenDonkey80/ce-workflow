@@ -6017,6 +6017,45 @@
       "type": "task",
       "updatedAt": "2026-08-19T21:36:22.136Z"
     },
+    "work-2.report-67059d5b-190c-4adc-82f5-043253ff840c": {
+      "createdAt": "2026-08-22T06:49:17.176Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Both exact work-reviewer runs for a safety-approved improvement item were blocked before preflight because the child saw the autonomous workflow as paused; the improvement-safety guard rejected even read-only git/work-summary commands and the required work-note append.\nExpected: A coded review handoff should preserve the active improvement approval/read-only review authority, or the guard should permit reviewer preflight, scoped read-only inspection, and the exact durable wo:review verdict note while still blocking source mutation.\nImpact: Required independent review could not produce its durable verdict despite two correctly launched reviewers; the parent must reconcile a static PASS manually or leave a verified change permanently unfinishable.\nSuggested improvement: Propagate active improvement approval IDs into fresh reviewer sessions and allowlist read-only git/helper-summary plus the exact scoped work-note verdict command during a paused review boundary.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e97af042-c22c-45c2-8aca-fa21833b9dd8",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1235,
+              "file": "01-work-work-2-report-6c3fd546-review.md",
+              "sha256": "62129beb36c53ef02a9169e9e4817c6184e01605e7dd6b2f066a01ab5aeb5ded"
+            },
+            {
+              "bytes": 5777,
+              "file": "02-work-work-2-report-6c3fd546-review-retry.md",
+              "sha256": "d4d224c258288bc26d4110da5f4596e72671b3d21df7b4101bab1cad7a7c187c"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-22T06:49:17.171Z",
+          "workflowId": "workflow-mt401r0g-mn600l"
+        }
+      ],
+      "id": "work-2.report-67059d5b-190c-4adc-82f5-043253ff840c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Both exact work-reviewer runs for a safety-approved improvement item were blocked before preflight because the child saw the auton",
+      "type": "task",
+      "updatedAt": "2026-08-22T06:49:17.176Z"
+    },
     "work-2.report-67c4d7c9-d110-42ac-9430-d5c518ea0c62": {
       "createdAt": "2026-08-18T00:16:35.407Z",
       "dependencies": [],
@@ -6198,6 +6237,9 @@
           "producer": "belot",
           "submittedAt": "2026-08-22T06:28:10.871Z",
           "workflowId": "01a0281a-98a3-7822-9a4f-024f14a898df"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-6c3fd546-4eff-40ef-aa46-8c27ba288d89",
@@ -6207,13 +6249,16 @@
       ],
       "notes": [
         "wo:improvement-safety BLOCKED locally-owned test-only completion would relax the exact accepted-path validation before automated commits and could hide an unfixed production finding; blast radius is verifier fix reconciliation, with rollback by reverting the validation change.",
-        "wo:improvement-safety APPROVED exact-path validation relaxation approved explicitly for verified test-only fixes with unchanged finding-path hash protection; decision is to implement that narrow case, and rollback is reverting its commit."
+        "wo:improvement-safety APPROVED exact-path validation relaxation approved explicitly for verified test-only fixes with unchanged finding-path hash protection; decision is to implement that narrow case, and rollback is reverting its commit.",
+        "wo:review-scope {\"files\":[\"extensions/work-models.js\",\"scripts/test-work-goal.mjs\"],\"fingerprint\":\"e524ffeedc085d87e6c55ee871b1ae0abbcc2c140c70aa0262e277f6eaafe535\"}",
+        "wo:review PASS exact work-reviewer runs 7c45f455 and 1954a2e5 found no required fixes; reviewer static analysis confirmed fail-closed checkpoint matching and rename handling, and parent verification passed node scripts/test-work-goal.mjs after reviewer write infrastructure blocked the verdict.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_complete_fix rejected a valid accepted test-gap remediation unless the unchanged production finding path was include",
       "type": "task",
-      "updatedAt": "2026-08-22T06:28:10.878Z"
+      "updatedAt": "2026-08-22T06:49:45.972Z"
     },
     "work-2.report-6ea35cdc-2683-4c4c-9b0b-6b4b7eae07de": {
       "createdAt": "2026-08-21T19:35:22.763Z",
@@ -9858,7 +9903,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-22T06:43:20.091Z"
+    "updatedAt": "2026-08-22T06:49:45.972Z"
   },
   "schemaVersion": 1
 }
