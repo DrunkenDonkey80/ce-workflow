@@ -407,6 +407,8 @@ if (args[0] === "diff" && args.includes("--numstat")) {
   if (dirty === "related-plus-unrelated") console.log("12\t3\textensions/work-models.js\\n1\t0\tunrelated.txt");
   if (dirty === "large") console.log("90\t40\textensions/work-models.js");
   if (dirty === "large-ui") console.log("90\t40\tsrc/components/App.tsx");
+} else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-status")) {
+  if (state.gitStaged) process.stdout.write("M\\0extensions/work-models.js\\0M\\0.ce-workflow/work-items.json\\0");
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-only")) {
   if (state.gitStaged) console.log("extensions/work-models.js\\n.ce-workflow/work-items.json");
 } else if (args[0] === "diff") process.exit(dirty === "benign" ? 0 : 1);

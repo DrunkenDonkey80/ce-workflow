@@ -10091,9 +10091,7 @@ function registerVerifierTriageTools(pi) {
 			);
 			const omittedFindings = findingIds
 				.map((id) => store.findings[id])
-				.filter(
-					(finding) => !paths.includes(normalizedRepoPath(finding.path)),
-				);
+				.filter((finding) => !paths.includes(normalizedRepoPath(finding.path)));
 			if (
 				requestedPaths.length > 20 ||
 				new Set(paths).size !== paths.length ||
@@ -12317,7 +12315,7 @@ function ensureWorkflowGitignore(cwd) {
 			? readFileSync(gitignorePath, "utf8")
 			: "";
 		const lines = new Set(existing.split(/\r?\n/).map((line) => line.trim()));
-		const missing = [".pi/", ".pi-subagents/"].filter(
+		const missing = [".pi/", ".pi-subagents/", ".ce-workflow/work-runs/"].filter(
 			(entry) => !lines.has(entry),
 		);
 		if (!missing.length) return;

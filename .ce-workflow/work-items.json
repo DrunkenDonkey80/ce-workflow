@@ -5134,6 +5134,45 @@
       "type": "task",
       "updatedAt": "2026-08-21T11:12:19.886Z"
     },
+    "work-2.report-48460ef0-da77-4692-8c3c-7759664ed541": {
+      "createdAt": "2026-08-22T06:51:52.862Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After all background verifier jobs for snapshot 256e75c terminated, work_goal_complete reports 'background verification has findings awaiting triage', but work_verifier_inbox returns an empty list. The verifier state contains 15 findings for that snapshot but zero groups, claims, or dispositions, leaving no claimId accepted by work_verifier_dispose and no supported triage path.\nExpected: Completed verifier findings should be grouped and claimed for the owning session so work_verifier_inbox exposes them, or completion should not block when no triageable claims exist. Failed model jobs should also be reconcilable through the supported verifier tools.\nImpact: A fully implemented, tested, reviewed, committed, and closed work goal cannot complete because the coded completion gate demands triage that the public tools make impossible.\nSuggested improvement: Atomically materialize groups/claims before setting completion-blocking findings state, and make work_verifier_inbox surface or recover orphaned findings for the current session.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/a6dfaa6b-e76b-4d1d-914e-896b7df27e92",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3511504,
+              "file": "01-state.json",
+              "sha256": "bf4fc04a3611fa5bdd5c19ec9b47b73fc88063b7dbcd4fac00529cbee592fa31"
+            },
+            {
+              "bytes": 492283,
+              "file": "02-2026-08-22T06-31-13-353Z_01a0282a-90c9-76fd-8ea0-a74c0cd09ca4.jsonl",
+              "sha256": "5f552d91af2da2c7aeceeb4d3a998ef8f019ef5607a941f2440aa89e5c00818f"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-22T06:51:52.856Z",
+          "workflowId": "01a0282a-90c9-76fd-8ea0-a74c0cd09ca4"
+        }
+      ],
+      "id": "work-2.report-48460ef0-da77-4692-8c3c-7759664ed541",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After all background verifier jobs for snapshot 256e75c terminated, work_goal_complete reports 'background verification has findin",
+      "type": "task",
+      "updatedAt": "2026-08-22T06:51:52.862Z"
+    },
     "work-2.report-4a81a49d-a04d-4270-bc55-637331d67eab": {
       "createdAt": "2026-08-21T10:23:12.916Z",
       "dependencies": [],
@@ -6645,6 +6684,9 @@
           "producer": "belot",
           "submittedAt": "2026-08-21T20:19:20.683Z",
           "workflowId": "01a025f8-81b1-79dd-abe5-e1dd98b4bd37"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-909f1645-efbb-4b6e-bddf-f614c8ca0e50",
@@ -6654,13 +6696,15 @@
       ],
       "notes": [
         "wo:improvement-safety BLOCKED locally-owned runtime ignore fix would broaden initialization defaults by editing consumer .gitignore files automatically; blast radius is all initialized repositories, with rollback by reverting the added ignore entry and removing it manually where unwanted.",
-        "wo:improvement-safety APPROVED consumer .gitignore default edit approved explicitly to add only .ce-workflow/work-runs/ idempotently; decision is to align ordinary Git cleanliness with the finalizer, and rollback is removing the entry or reverting its commit."
+        "wo:improvement-safety APPROVED consumer .gitignore default edit approved explicitly to add only .ce-workflow/work-runs/ idempotently; decision is to align ordinary Git cleanliness with the finalizer, and rollback is removing the entry or reverting its commit.",
+        "wo:verify-check FAIL node scripts/test-work-start-finish.mjs still fails at 'routine finish commits and closes without a committer or learning-capture handoff' after the focused implementation and one cleanup correction; leaving the item open per the bounded-attempt circuit breaker.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-start-finish.mjs\nOutput: ok - coded work start/finish behavior"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Verifier/runtime state was generated under `.ce-workflow/work-runs/`, but the target repository's `.gitignore` does not ignore tha",
       "type": "task",
-      "updatedAt": "2026-08-21T20:19:20.687Z"
+      "updatedAt": "2026-08-22T06:53:29.472Z"
     },
     "work-2.report-92d3e6d4-7a3f-453c-b171-845dc257eb4c": {
       "createdAt": "2026-08-18T15:18:15.935Z",
@@ -9903,7 +9947,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-22T06:49:45.972Z"
+    "updatedAt": "2026-08-22T06:53:29.472Z"
   },
   "schemaVersion": 1
 }

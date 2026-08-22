@@ -1,5 +1,11 @@
 #!/usr/bin/env node
-import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 const { assert, installWorkflowFixture, workflowChildParams } = await import(
@@ -28,9 +34,7 @@ const {
 	shellQuote,
 } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
 	).href
 );
 
@@ -187,10 +191,7 @@ try {
 		state.ok && state.selectedWorkItem.id === "IMP-1",
 		"small explicit WorkItem reuses target",
 	);
-	assert(
-		fixture.logs().length === 0,
-		"small explicit WorkItem creates nothing",
-	);
+	assert(fixture.logs().length === 0, "small explicit WorkItem creates nothing");
 
 	state = buildWorkSmallState(fixture.cwd, "");
 	assert(!state.ok && state.reason === "usage", "small empty task stops");
@@ -295,9 +296,7 @@ try {
 			bigDirect.params.task.includes('"agentsHead":"agents111"') &&
 			bigDirect.params.task.includes('"agentsWorktree":"agents111"') &&
 			bigDirect.params.task.includes('"launchSafe":true') &&
-			bigDirect.params.task.includes(
-				'"managedAgentsOverlayEligible":true',
-			) &&
+			bigDirect.params.task.includes('"managedAgentsOverlayEligible":true') &&
 			bigDirect.params.task.includes(
 				"a new unstaged tracked AGENTS.md modification may be treated as a transient managed startup overlay",
 			) &&
@@ -315,7 +314,8 @@ try {
 	);
 
 	process.env.WORK_FLOW_GIT_DIRTY = "instruction-substantive";
-	const changedAtHandoff = directRoleHandoffParams(state, fixture.cwd)?.params.task;
+	const changedAtHandoff = directRoleHandoffParams(state, fixture.cwd)?.params
+		.task;
 	assert(
 		changedAtHandoff?.includes('"launchSafe":false') &&
 			changedAtHandoff.includes('"launchBlockedPaths":["AGENTS.md"]') &&
@@ -331,7 +331,10 @@ try {
 	);
 
 	fixture.reset("active", "benign");
-	state = buildWorkBigState(fixture.cwd, "Design with formatter-only instructions");
+	state = buildWorkBigState(
+		fixture.cwd,
+		"Design with formatter-only instructions",
+	);
 	assert(
 		state.ok &&
 			directRoleHandoffParams(state, fixture.cwd)?.params.task.includes(
@@ -364,6 +367,13 @@ try {
 		"work-init uses native store",
 	);
 	assert(fixture.logs().length === 0, "work-init does not run bd");
+	assert(
+		readFileSync(path.join(fixture.cwd, ".gitignore"), "utf8")
+			.split(/\r?\n/)
+			.includes(".ce-workflow/work-runs/"),
+		"work-init ignores native workflow runtime artifacts",
+	);
+	rmSync(path.join(fixture.cwd, ".gitignore"), { force: true });
 
 	fixture.reset("no-store");
 	state = buildWorkPlanState(fixture.cwd, "raw product idea");
@@ -579,7 +589,9 @@ try {
 		assert(
 			state.ok &&
 				state.action === "finish-committed" &&
-				state.handoffPrompt.includes("BEGIN VERIFIED PRIVATE LEARNING-CAPTURE PLAYBOOK") &&
+				state.handoffPrompt.includes(
+					"BEGIN VERIFIED PRIVATE LEARNING-CAPTURE PLAYBOOK",
+				) &&
 				state.handoffPrompt.includes("Destination and deduplication") &&
 				state.handoffPrompt.includes("wo:learning:<key>=<artifact>") &&
 				!state.handoffPrompt.includes("PRIVATE DEBUG PLAYBOOK"),
