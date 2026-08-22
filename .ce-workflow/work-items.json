@@ -7604,6 +7604,45 @@
       "type": "task",
       "updatedAt": "2026-08-21T18:58:24.235Z"
     },
+    "work-2.report-efc8dbf7-81b5-4241-b009-f372dc019f94": {
+      "createdAt": "2026-08-21T21:51:13.767Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The coded implementation handoff for work-1.99 omitted the exact absolute work-helper.mjs path. The configured work-worker refused to claim/read the native item and exited without edits, even though the parent session had already resolved the helper path.\nExpected: Every ce-workflow handoff to work-worker should include the resolved absolute helper path (here C:\\soft\\git\\ce-workflow\\scripts\\work-helper.mjs) and the exact claim/read command or precomputed task contract so the worker can begin without guessing or reading raw state.\nImpact: An otherwise executable bounded slice incurred a failed agent run, no implementation progress, and an avoidable retry/resume.\nSuggested improvement: Have the coded action lease inject helperPath and a precomputed work-item summary into every execution-agent handoff.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/37b6f18a-394c-4caa-83f2-959cb3359dbd",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1954,
+              "file": "01-work-work-1.99-work-worker.md",
+              "sha256": "309b371d2343607b46a298fa416fc92ce06f802827e716f21a584e972b7bda77"
+            },
+            {
+              "bytes": 24124,
+              "file": "02-session.jsonl",
+              "sha256": "ef6960bf5046ad95ad1fa088511d7e3a1989aecffdddb7d08b9f2a9a7ec22cb2"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-21T21:51:13.761Z",
+          "workflowId": "01a02614-8f31-741a-b4d7-b1a5924f14e8"
+        }
+      ],
+      "id": "work-2.report-efc8dbf7-81b5-4241-b009-f372dc019f94",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The coded implementation handoff for work-1.99 omitted the exact absolute work-helper.mjs path. The configured work-worker refused",
+      "type": "task",
+      "updatedAt": "2026-08-21T21:51:13.767Z"
+    },
     "work-2.report-f7d1e813-e0ae-49bf-b188-8477e9fbe685": {
       "createdAt": "2026-08-08T08:27:18.043Z",
       "dependencies": [
@@ -9696,7 +9735,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-21T20:19:20.688Z"
+    "updatedAt": "2026-08-22T06:09:02.152Z"
   },
   "schemaVersion": 1
 }
