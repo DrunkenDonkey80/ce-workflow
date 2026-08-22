@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
+	appendWorkNote,
 	createWorkItem,
 	initStore,
 	mutateStore,
@@ -133,6 +134,11 @@ assert.match(
 	objective,
 	/Do not close a duplicate merely because it is similar/,
 );
+assert.match(objective, /read-only necessity and safety pass/);
+assert.match(objective, /potentially destructive/);
+assert.match(objective, /wo:improvement-safety SAFE/);
+assert.match(objective, /explicit approval/);
+assert.match(objective, /no-progress circuit breaker/);
 assert.match(objective, /Summarize what was done in 1-3 short sentences/);
 for (const id of ["SI-CLOSED", "SI-DEFERRED"])
 	assert.equal(
@@ -145,6 +151,17 @@ assert.match(
 );
 mutateStore(root, (store) =>
 	updateWorkItem(store, "SI-1.1", { status: "closed" }),
+);
+assert.match(
+	workGoalCompletionBlocker({ mode: "improvement", objective }, root),
+	/lacks a final wo:improvement-safety SAFE or APPROVED assessment/,
+);
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety SAFE local test-only fix; rollback by reverting commit",
+	),
 );
 assert.equal(
 	workGoalCompletionBlocker({ mode: "improvement", objective }, root),
@@ -271,7 +288,69 @@ assert(
 	!menuLabels.some((label) => label.includes("Claude account switcher")),
 	"cswap entry hidden when the binary is absent",
 );
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety BLOCKED broad automation behavior may change",
+	),
+);
 await executeOrchestratorAction("work-improve", "SI-1", hookCtx, pi);
+assert.match(
+	hooks.tool_call(
+		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		hookCtx,
+	).reason,
+	/Improvement safety preflight blocks edit/,
+	"source mutation is coded-blocked while destructive risk is unapproved",
+);
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety APPROVED user accepted automation change; rollback by reverting commit",
+	),
+);
+assert.match(
+	hooks.tool_call(
+		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		hookCtx,
+	).reason,
+	/need a final wo:improvement-safety/,
+	"an agent-authored APPROVED note cannot fake user approval",
+);
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety BLOCKED broad automation behavior still needs approval",
+	),
+);
+hooks.tool_result(
+	{
+		toolName: "ask_user",
+		details: {
+			question: "Allow the broad automation behavior change?",
+			response: { selections: ["Approve with documented rollback"] },
+		},
+	},
+	hookCtx,
+);
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety APPROVED recorded user decision; rollback by reverting commit",
+	),
+);
+assert.equal(
+	hooks.tool_call(
+		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		hookCtx,
+	),
+	undefined,
+	"recorded explicit approval unlocks source mutation",
+);
 mutateStore(root, (store) =>
 	updateWorkItem(store, "SI-1.1", { status: "closed" }),
 );

@@ -3552,6 +3552,58 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.equal(sent.length, beforeOrdinaryChat);
 
 	entries.length = 0;
+	writeFileSync(
+		path.join(cwd, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({
+			workGoal: {
+				id: "wg-improvement-stall",
+				mode: "improvement",
+				objective:
+					"Work-improvement snapshot IDs: work-7.1\nDo bounded improvement work.",
+				status: "active",
+				iteration: 0,
+				resumeOnSessionStart: true,
+				updatedAt: Date.now() + 1_000,
+			},
+		}),
+	);
+	tempHooks.session_start?.({}, ctx);
+	assert.match(statuses["work-goal"], /active/);
+	for (let turn = 0; turn < 3; turn += 1) {
+		await tempHooks.before_agent_start(
+			{
+				prompt: `Continue safely.\n\n<!-- work-goal-continuation:wg-improvement-stall:${turn}:stall -->`,
+				systemPrompt: "base",
+			},
+			ctx,
+		);
+		await tempHooks.agent_start({}, ctx);
+		await tempHooks.agent_end(
+			{
+				messages: [
+					{
+						role: "assistant",
+						content: [{ type: "text", text: "No durable progress yet." }],
+					},
+				],
+			},
+			ctx,
+		);
+		await settle();
+	}
+	assert.equal(
+		statuses["work-goal"],
+		"paused",
+		"improvement goals pause after two unchanged continuations",
+	);
+	assert.ok(
+		notices.some((notice) =>
+			String(notice.message).includes("no durable improvement progress"),
+		),
+	);
+	await invoke("work-goal", "clear", ctx);
+
+	entries.length = 0;
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
 		path.join(cwd, ".pi", "work-orchestrator-state.json"),

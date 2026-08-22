@@ -745,6 +745,7 @@ const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
 const WORK_GOAL_DECISION_MARKER = "WORK_GOAL_NEEDS_HUMAN_DECISION";
 const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
 const WORK_GOAL_MAX_RETRIES = 4;
+const WORK_IMPROVE_MAX_STALLED_TURNS = 2;
 const WORK_GOAL_USAGE_LIMIT_RETRY_MS = 10 * 60 * 1000;
 const WORK_GOAL_USAGE_LIMIT_RE =
 	/usage[_\s-]*(?:limit|reached)|\b429\b|too many requests|rate limit|访问量过大|使用上限|限额将在/i;
@@ -17263,6 +17264,102 @@ function renderWorkImproveText(state) {
 	].join("\n");
 }
 
+function improvementSafetyDisposition(issue) {
+	const matches = notesOf(issue).matchAll(
+		/^wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^\r\n]*$/gim,
+	);
+	return Array.from(matches, (match) => match[1].toUpperCase()).at(-1);
+}
+
+function workImproveSnapshotIds(goal) {
+	return /^Work-improvement snapshot IDs:\s*(.+)$/m
+		.exec(String(goal?.objective ?? ""))?.[1]
+		?.split(",")
+		.map((id) => id.trim())
+		.filter(Boolean);
+}
+
+function workImproveProgressFingerprint(goal, cwd) {
+	if (goal?.mode !== "improvement") return;
+	const ids = workImproveSnapshotIds(goal) ?? [];
+	const snapshot = ids.map((id) => {
+		const issue = readWorkItem(cwd, id);
+		return [id, statusOf(issue), improvementSafetyDisposition(issue) ?? ""];
+	});
+	const source = [
+		JSON.stringify(snapshot),
+		safeRun(cwd, "git", ["rev-parse", "--verify", "HEAD"]),
+		safeRun(cwd, "git", ["status", "--porcelain=v1"]),
+		safeRun(cwd, "git", ["diff", "--no-ext-diff", "--binary", "HEAD"]),
+	].join("\0");
+	return createHash("sha256").update(source).digest("hex");
+}
+
+function hasUnquotedShellControl(text) {
+	let quote = "";
+	for (let index = 0; index < text.length; index += 1) {
+		const char = text[index];
+		if (
+			char === "`" ||
+			char === "\r" ||
+			char === "\n" ||
+			(char === "$" && text[index + 1] === "(")
+		)
+			return true;
+		if (quote) {
+			if (char === quote) quote = "";
+			else if (char === "\\" && quote === '"') index += 1;
+			continue;
+		}
+		if (char === '"' || char === "'") quote = char;
+		else if ([";", "&", "|", "<", ">"].includes(char)) return true;
+	}
+	return Boolean(quote);
+}
+
+function improvementSafetyShellAllowed(command) {
+	const text = String(command ?? "").trim();
+	if (!text || hasUnquotedShellControl(text)) return false;
+	if (
+		/work-helper\.mjs["']?\s+work-(?:summary|children-summary|ready-summary|note|create|block)\b/i.test(
+			text,
+		)
+	)
+		return true;
+	return /^(?:git\s+(?:status|diff|log|show|rev-parse)|rg\b|grep\b|find\b)/i.test(
+		text,
+	);
+}
+
+function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
+	if (goal?.mode !== "improvement") return;
+	const tool = String(event?.toolName ?? "");
+	const mutating =
+		["edit", "write", "ast_grep_replace", "subagent"].includes(tool) ||
+		/(?:complete_fix|reconcile|dirty_continue)$/i.test(tool) ||
+		(["bash", "hypa_shell"].includes(tool) &&
+			!improvementSafetyShellAllowed(event?.input?.command));
+	if (!mutating) return;
+	if (goal.status !== "active")
+		return `Improvement safety blocks ${tool}: the workflow is ${goal.status}. Resume it explicitly before any source mutation.`;
+	const pending = (workImproveSnapshotIds(goal) ?? []).filter((id) => {
+		try {
+			const disposition = improvementSafetyDisposition(readWorkItem(cwd, id));
+			return (
+				disposition !== "SAFE" &&
+				!(
+					disposition === "APPROVED" &&
+					goal.improvementApprovedIds?.includes(id)
+				)
+			);
+		} catch {
+			return true;
+		}
+	});
+	if (!pending.length) return;
+	return `Improvement safety preflight blocks ${tool}: ${pending.join(", ")} need a final wo:improvement-safety SAFE or APPROVED note. Analyze necessity, blast radius, rollback, and destructive risk first; ask the user before replacing BLOCKED with APPROVED.`;
+}
+
 function buildWorkImproveObjective(state) {
 	const helper = shellQuote(WORK_HELPER_SCRIPT);
 	const evidenceWarnings = state.reports
@@ -17278,29 +17375,37 @@ ${evidenceWarnings.length ? `Preflight evidence warnings:\n${evidenceWarnings.jo
 Execution contract:
 - The roadmap in the native work-item store is the queue; .pi/self-improvement-reports is evidence only. Process exactly the snapshot IDs above. Work arriving later belongs to the next invocation.
 - Use compact reads through node ${helper} work-summary <id> and work-children-summary ${state.epic.id}; never dump or directly edit .ce-workflow/work-items.json.
+- Start with a read-only necessity and safety pass. Do not edit source, run mutating commands, close work, commit, push, publish, or trigger external side effects until every atomic claim is classified and each snapshot item has a durable safety note.
 - Execute existing canonical work items directly. Atomize each report before deduplicating because one report may contain several root causes. Compare expected outcomes, current source/tests, git history, and ownership; suggested fixes alone do not define equivalence.
-- Classify every atomic claim as duplicate, related-distinct, conflicting, already-fixed, locally-owned, upstream-owned, or insufficient-evidence. Different implementation suggestions are not conflicts unless their required outcomes cannot coexist.
+- For every claim, first challenge whether any change is needed. Prefer already-current behavior, deletion, reuse, or the smallest reversible fix over speculative flexibility. Classify it as duplicate, related-distinct, conflicting, already-fixed, locally-owned, upstream-owned, or insufficient-evidence.
+- Assess blast radius, reversibility, rollback, and failure mode. Treat data deletion/overwrite, migrations or persistent-format changes, security/privacy/auth weakening, public API/protocol/schema changes, history rewrites, releases/publishing, external services/credentials/hardware, removal of validation/recovery/tests, and broad automation/default changes as potentially destructive.
+- For a non-destructive snapshot item append exactly one \`wo:improvement-safety SAFE <reason and rollback>\` note with node ${helper} work-note <id> --append-notes "...". If any covered claim is potentially destructive, append \`wo:improvement-safety BLOCKED <risk>\` and use ask_user before mutation with an approval option whose title begins \`Approve\`. Only that recorded explicit approval may replace it with \`wo:improvement-safety APPROVED <risk; decision; rollback>\`; cancellation or unavailable approval leaves it open and pauses the goal.
 - Reuse an atomic report as its execution item. When a report contains multiple claims or several reports share one claim, create or reuse one canonical bug/decision WorkItem under ${state.epic.id} with node ${helper} work-create, and link reports with node ${helper} work-block.
 - Do not close a duplicate merely because it is similar. First verify the shared fix or already-current behavior against every covered report, then note the canonical WorkItem, commit, and verification on each report before closing it.
 - Execute locally owned canonical work through the normal work-orchestrator path: smallest correct implementation, focused proof, required review, coded finish/commit, then report reconciliation. Route genuine upstream ownership durably; do not invent a local workaround unless it is the smallest verified project fix.
-- If expected outcomes conflict or evidence cannot support a safe decision, use ask_user once; if unavailable or cancelled, call work_goal_human_decision. Do not ask for routine implementation approval.
-- Leave unresolved work open. Close each snapshot item only after verified coverage. New work does not block this snapshot.
+- If expected outcomes conflict, evidence cannot support a safe decision, or a change is potentially destructive, use ask_user once; if unavailable or cancelled, call work_goal_human_decision. Do not ask for routine low-risk implementation approval.
+- Make one focused implementation attempt and at most one correction from concrete failing evidence. If that still fails, leave the item open and pause rather than widening scope or looping. A coded no-progress circuit breaker also pauses this workflow after two unchanged continuations.
+- Leave unresolved work open. Close each snapshot item only after verified coverage and a final SAFE or APPROVED safety note. New work does not block this snapshot.
 - Call work_goal_complete only when every snapshot ID is closed and git/work-item state is verified. Summarize what was done in 1-3 short sentences, naming the fixes and verification.`;
 }
 
 function workImproveCompletionBlocker(goal, cwd) {
 	if (goal?.mode !== "improvement") return;
-	const ids = /^Work-improvement snapshot IDs:\s*(.+)$/m
-		.exec(String(goal.objective ?? ""))?.[1]
-		?.split(",")
-		.map((id) => id.trim())
-		.filter(Boolean);
+	const ids = workImproveSnapshotIds(goal);
 	if (!ids?.length) return "work-improvement snapshot IDs are missing";
 	try {
 		for (const id of ids) {
 			const issue = readWorkItem(cwd, id);
 			if (!issue) return `${id} was not found`;
 			if (statusOf(issue) !== "closed") return `${id} is still ${statusOf(issue)}`;
+			const safety = improvementSafetyDisposition(issue);
+			if (!["SAFE", "APPROVED"].includes(safety))
+				return `${id} lacks a final wo:improvement-safety SAFE or APPROVED assessment`;
+			if (
+				safety === "APPROVED" &&
+				!goal.improvementApprovedIds?.includes(id)
+			)
+				return `${id} has APPROVED risk without a recorded ask_user approval`;
 		}
 	} catch (error) {
 		return `work-improvement snapshot could not be verified: ${commandErrorText(error)}`;
@@ -18551,6 +18656,51 @@ function askUserPauseSelection(event) {
 			/^\s*(?:pause|wait)\b/i.test(String(selection)),
 		) ?? ""
 	);
+}
+
+function recordImprovementApprovalFromAskUser(event, ctx, pi) {
+	if (
+		event.toolName !== "ask_user" ||
+		event.isError ||
+		event.details?.cancelled ||
+		activeWorkGoal?.mode !== "improvement" ||
+		activeWorkGoal.status !== "active"
+	)
+		return;
+	const selection = event.details?.response?.selections?.find((value) =>
+		/^\s*approve\b/i.test(String(value)),
+	);
+	if (!selection) return;
+	const approvedIds = (workImproveSnapshotIds(activeWorkGoal) ?? []).filter(
+		(id) => {
+			try {
+				return (
+					improvementSafetyDisposition(readWorkItem(ctx.cwd, id)) === "BLOCKED"
+				);
+			} catch {
+				return false;
+			}
+		},
+	);
+	if (!approvedIds.length) return;
+	activeWorkGoal = {
+		...activeWorkGoal,
+		improvementApprovalAt: Date.now(),
+		improvementApprovedIds: Array.from(
+			new Set([
+				...(activeWorkGoal.improvementApprovedIds ?? []),
+				...approvedIds,
+			]),
+		),
+		improvementApproval: {
+			question: String(event.details?.question ?? "").trim(),
+			answer: String(selection),
+			ids: approvedIds,
+		},
+		updatedAt: Date.now(),
+	};
+	persistWorkGoal(pi);
+	updateWorkGoalStatus(ctx);
 }
 
 function pauseWorkGoalFromAskUser(event, ctx, pi) {
@@ -20207,10 +20357,34 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	} else {
 		clearWorkGoalRecovery();
 	}
+	const improvementProgress = retrying
+		? undefined
+		: workImproveProgressFingerprint(goal, ctx.cwd);
+	const improvementStalledTurns = improvementProgress
+		? improvementProgress === goal.improvementProgress
+			? (goal.improvementStalledTurns ?? 0) + 1
+			: 0
+		: undefined;
+	if (improvementStalledTurns >= WORK_IMPROVE_MAX_STALLED_TURNS) {
+		activeWorkGoal = {
+			...goal,
+			improvementProgress,
+			improvementStalledTurns,
+		};
+		pauseActiveWorkGoal(
+			`no durable improvement progress across ${WORK_IMPROVE_MAX_STALLED_TURNS} continuations`,
+			pi,
+			ctx,
+		);
+		return;
+	}
 	activeWorkGoal = {
 		...goal,
 		iteration: (goal.iteration ?? 0) + 1,
 		retries: retrying ? (goal.retries ?? 0) + (compactionInterrupted ? 0 : 1) : 0,
+		...(improvementProgress
+			? { improvementProgress, improvementStalledTurns }
+			: {}),
 		updatedAt: Date.now(),
 	};
 	updateWorkGoalUsage(activeWorkGoal, ctx);
@@ -23881,6 +24055,12 @@ export default function workModelsExtension(pi) {
 
 	pi.on("tool_call", (event, ctx) => {
 		if (event.toolName === "ask_user") recordDirtyRecoveryAskCall(event);
+		const improvementSafetyBlock = improvementMutationBlockReason(
+			event,
+			ctx?.cwd ?? activeWorkGoalCwd,
+		);
+		if (improvementSafetyBlock)
+			return { block: true, reason: improvementSafetyBlock };
 		if (
 			event.toolName === "work_goal_human_decision" &&
 			ctx.hasUI &&
@@ -23909,7 +24089,10 @@ export default function workModelsExtension(pi) {
 		}
 	});
 
-	pi.on("tool_result", (event, ctx) => pauseWorkGoalFromAskUser(event, ctx, pi));
+	pi.on("tool_result", (event, ctx) => {
+		recordImprovementApprovalFromAskUser(event, ctx, pi);
+		pauseWorkGoalFromAskUser(event, ctx, pi);
+	});
 
 	pi.on("session_start", (_event, ctx) => {
 		try {
