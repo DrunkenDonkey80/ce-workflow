@@ -5095,13 +5095,14 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE duplicate expired-claim failure is already-fixed by atomic takeover for same resume lineage or elapsed lease; regression proof covers scale and rollback is the existing fix commit revert"
+        "wo:improvement-safety SAFE duplicate expired-claim failure is already-fixed by atomic takeover for same resume lineage or elapsed lease; regression proof covers scale and rollback is the existing fix commit revert",
+        "Verified duplicate coverage: closed work-2.90 / 884ea69 reassigns same-lineage live claims or any expired claim atomically; node scripts/test-background-verifiers.mjs PASS."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Autonomous work-1 completion is blocked by 38 verifier findings in 37 groups whose claims belong to compacted/ended sessions. The ",
       "type": "task",
-      "updatedAt": "2026-08-24T13:32:25.419Z"
+      "updatedAt": "2026-08-24T13:54:44.570Z"
     },
     "work-2.report-3a5dfdb2-c74e-4290-bdb9-0ab39a1f8e2b": {
       "createdAt": "2026-08-21T07:43:59.237Z",
@@ -5302,13 +5303,14 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE atomic report ingestion now materializes groups and completion reconciliation handles terminal jobs; verification is read-only and rollback is unnecessary unless current regression tests fail"
+        "wo:improvement-safety SAFE atomic report ingestion now materializes groups and completion reconciliation handles terminal jobs; verification is read-only and rollback is unnecessary unless current regression tests fail",
+        "Verified coverage: closed work-2.87 and work-2.88 use ca0695d atomic grouping plus terminal artifact reconciliation; node scripts/test-background-verifiers.mjs PASS."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After all background verifier jobs for snapshot 256e75c terminated, work_goal_complete reports 'background verification has findin",
       "type": "task",
-      "updatedAt": "2026-08-24T13:31:45.101Z"
+      "updatedAt": "2026-08-24T13:54:01.505Z"
     },
     "work-2.report-4a81a49d-a04d-4270-bc55-637331d67eab": {
       "createdAt": "2026-08-21T10:23:12.916Z",
@@ -7574,13 +7576,14 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE already-fixed by same-lineage and expired-lease atomic claim takeover; behavior is covered by verifier claim tests and rollback is the existing fix commit revert"
+        "wo:improvement-safety SAFE already-fixed by same-lineage and expired-lease atomic claim takeover; behavior is covered by verifier claim tests and rollback is the existing fix commit revert",
+        "Verified coverage: closed work-2.90 uses 884ea69 atomic same-lineage or expired-lease claim takeover while preserving live unrelated-owner locks; node scripts/test-background-verifiers.mjs PASS."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_goal_complete rejects completed target work-3 because verifier group group-0575e91bdd40b215941b7363 remains status=claimed af",
       "type": "task",
-      "updatedAt": "2026-08-24T13:32:15.246Z"
+      "updatedAt": "2026-08-24T13:54:36.954Z"
     },
     "work-2.report-bc2769f9-6838-4577-8ee0-1c7061093c37": {
       "createdAt": "2026-08-18T21:02:39.837Z",
@@ -8205,13 +8208,14 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE duplicate rename-disposition claim can share a deterministic Git-lineage resolver and current SHA-256 validation; rollback is commit revert and invalid evidence remains rejected"
+        "wo:improvement-safety SAFE duplicate rename-disposition claim can share a deterministic Git-lineage resolver and current SHA-256 validation; rollback is commit revert and invalid evidence remains rejected",
+        "Verified duplicate coverage: closed work-2.89 commit 70979a3 resolves only exact Git-detected checkpoint renames and hashes the live replacement; node scripts/test-work-goal.mjs PASS."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Verifier triage cannot record a disposition after a finding target was renamed between checkpoint and current HEAD. finding-e2d625",
       "type": "task",
-      "updatedAt": "2026-08-24T13:32:07.159Z"
+      "updatedAt": "2026-08-24T13:54:27.833Z"
     },
     "work-2.report-e921e98e-b763-4824-b3f2-b0a46387f8cd": {
       "createdAt": "2026-08-22T09:05:44.495Z",
@@ -8248,13 +8252,14 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE already-fixed by completion-time durable async result reconciliation and atomic report ingestion; verification is regression-only and rollback is the existing reconciliation commit revert"
+        "wo:improvement-safety SAFE already-fixed by completion-time durable async result reconciliation and atomic report ingestion; verification is regression-only and rollback is the existing reconciliation commit revert",
+        "Verified coverage: closed work-2.88 uses ca0695d reconcileVerifierRuns to ingest persisted terminal async artifacts without the owner session; node scripts/test-background-verifiers.mjs PASS."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Background verifier batch batch-fbe8b3b04468725abaf24a77 remained `queued` with two jobs marked `running` in durable verifier stat",
       "type": "task",
-      "updatedAt": "2026-08-24T13:31:52.940Z"
+      "updatedAt": "2026-08-24T13:54:12.902Z"
     },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
@@ -8632,13 +8637,14 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE locally-owned rename-aware disposition evidence can require Git-proven checkpoint-to-HEAD lineage plus the live SHA-256; scope is verifier triage only and rollback is commit revert"
+        "wo:improvement-safety SAFE locally-owned rename-aware disposition evidence can require Git-proven checkpoint-to-HEAD lineage plus the live SHA-256; scope is verifier triage only and rollback is commit revert",
+        "Verified coverage: closed work-2.89 commit 70979a3 accepts only Git-proven checkpoint-to-HEAD rename targets and validates the live SHA-256; node scripts/test-work-goal.mjs PASS."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose rejects a stale finding whose checkpoint path was renamed from app/src/... to android/src/... because curren",
       "type": "task",
-      "updatedAt": "2026-08-24T13:31:59.165Z"
+      "updatedAt": "2026-08-24T13:54:18.577Z"
     },
     "work-3": {
       "createdAt": "2026-07-25T07:42:39.407Z",
@@ -10594,7 +10600,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-24T13:53:48.428Z"
+    "updatedAt": "2026-08-24T13:54:44.571Z"
   },
   "schemaVersion": 1
 }
