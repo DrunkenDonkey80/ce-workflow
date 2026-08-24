@@ -10105,7 +10105,7 @@ function registerVerifierTriageTools(pi) {
 						/^(?:\.pi(?:-subagents)?|\.ce-workflow)(?:\/|$)/.test(file),
 				) ||
 				omittedFindings.some(
-					(finding) => !findingPathMatchesCheckpoint(cwd, finding),
+					(finding) => !findingPathMatchesCheckpoint(cwd, finding, paths),
 				)
 			)
 				throw new Error(
@@ -15340,7 +15340,7 @@ function samePathSet(left = [], right = []) {
 	return a.size === b.size && [...a].every((item) => b.has(item));
 }
 
-function findingPathMatchesCheckpoint(cwd, finding) {
+function findingPathMatchesCheckpoint(cwd, finding, candidates = []) {
 	const snapshot = finding?.checkpoint?.snapshot;
 	const file = normalizedRepoPath(finding?.path);
 	if (!file || !/^[0-9a-f]{40,64}$/i.test(snapshot ?? "")) return false;
@@ -15348,7 +15348,9 @@ function findingPathMatchesCheckpoint(cwd, finding) {
 		run(cwd, "git", ["diff", "--quiet", snapshot, "--", file]);
 		return true;
 	} catch {
-		return false;
+		return candidates.some((candidate) =>
+			checkpointRenameTarget(cwd, finding, candidate),
+		);
 	}
 }
 

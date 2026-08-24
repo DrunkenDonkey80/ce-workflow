@@ -4405,12 +4405,14 @@
       "labels": [
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Already-current in ca0695d: ingestVerifierReport atomically calls groupValidatedFindings after validated findings are added. Verification: node scripts/test-background-verifiers.mjs PASS."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Materialize verifier finding groups before completion gating",
       "type": "bug",
-      "updatedAt": "2026-08-24T13:31:18.084Z"
+      "updatedAt": "2026-08-24T13:52:05.866Z"
     },
     "work-2.88": {
       "acceptance": "Completion reconciliation ingests terminal artifacts, finalizes jobs and groups findings; regression tests pass.",
@@ -4423,12 +4425,14 @@
       "labels": [
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Already-current in ca0695d: reconcileVerifierRuns reads terminal persisted async status/artifacts, ingests results, finalizes launch state, and groups findings without the owner session. Verification: node scripts/test-background-verifiers.mjs PASS."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Reconcile terminal background verifier runs without the owner session",
       "type": "bug",
-      "updatedAt": "2026-08-24T13:31:23.032Z"
+      "updatedAt": "2026-08-24T13:52:11.478Z"
     },
     "work-2.89": {
       "acceptance": "Disposition accepts only a Git-proven rename target with its exact current SHA-256; invalid paths and hashes still fail.",
@@ -4508,12 +4512,14 @@
       "labels": [
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "Already-current in 884ea69: claimGroupIn atomically transfers a claim after lease expiry or within the same resumeTarget lineage while preserving live unrelated-owner locks. Verification: node scripts/test-background-verifiers.mjs PASS."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Recover verifier claims across autonomous continuations",
       "type": "bug",
-      "updatedAt": "2026-08-24T13:31:33.599Z"
+      "updatedAt": "2026-08-24T13:52:16.484Z"
     },
     "work-2.report-004a4a47-7ce7-4de6-ad15-4d3d9c59efbe": {
       "createdAt": "2026-08-09T06:53:59.357Z",
@@ -6597,6 +6603,9 @@
           "producer": "belot",
           "submittedAt": "2026-08-22T09:50:24.633Z",
           "workflowId": "01a028bf-e257-745d-99a4-12d7a43a7aaf"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-6f8cc4b3-32de-4dc4-8626-9d84394574ee",
@@ -6605,13 +6614,15 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE locally-owned relocation completion can reuse strict Git-proven checkpoint rename resolution and exact fix scope; rollback is commit revert with no persistent-format change"
+        "wo:improvement-safety SAFE locally-owned relocation completion can reuse strict Git-proven checkpoint rename resolution and exact fix scope; rollback is commit revert with no persistent-format change",
+        "wo:verify-check PASS node scripts/test-work-goal.mjs — ok - work-goal helpers",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After adopting the expired verifier claim with the exported claimGroup helper, work_verifier_complete_fix still cannot represent t",
       "type": "task",
-      "updatedAt": "2026-08-22T09:50:24.638Z"
+      "updatedAt": "2026-08-24T13:53:48.428Z"
     },
     "work-2.report-70383aee-109a-4200-9ac0-fe18319e3798": {
       "createdAt": "2026-08-24T13:25:09.341Z",
@@ -7000,6 +7011,45 @@
       "title": "Self-improvement report: In NexusConnectSDK session 01a0112b-59bb-7656-839b-f4c1ae14d0e2, an active project autonomous goal entered automatic microcompacti",
       "type": "task",
       "updatedAt": "2026-08-18T15:24:34.190Z"
+    },
+    "work-2.report-95697025-6b6b-4bd6-889a-6ce7ea27e8cf": {
+      "createdAt": "2026-08-24T13:51:40.866Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A fresh autonomous continuation for belot work-1 cannot complete because verifier group group-13e17025f230f4546ec5cf0f remains claimed by disconnected session 01a033ef-5c6f-7b06-9cde-b305f26e9f2b until 2026-08-24T14:15:42.505Z. intercom confirms that exact owner is not connected, work_verifier_inbox returns no claims, and work_goal_complete rejects with findings awaiting triage.\nExpected: When an autonomous continuation replaces/disconnects the prior owner session, coded resume should transfer or promptly expire that owner's verifier claim, or completion should expose a deterministic reclaim action rather than forcing the new continuation to wait for a stale 30-minute lease.\nImpact: The target work item is closed, has no open children, and HEAD is pushed, but autonomous completion is stalled for up to the full lease despite no live triager; repeated continuations waste time and cannot safely act on the finding.\nSuggested improvement: On fresh work-goal continuation, detect disconnected prior owner sessions and atomically reassign their active resumeTarget claim to the current session, preserving claim identity and audit history.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/ae0f1b5e-f756-44e2-a101-b2626f042dbf",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3632508,
+              "file": "01-state.json",
+              "sha256": "55f31f3e906be1dbc264fc0e93af4a34519cf5b8257420559e9c5c60a7933831"
+            },
+            {
+              "bytes": 3630499,
+              "file": "02-.state.recovery.json",
+              "sha256": "09b6b0cabda96714402ba75749840271461ed518610e788528d075aa27b1ab46"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-24T13:51:40.859Z",
+          "workflowId": "01a03405-c6fb-78d6-ab50-169eee10672d"
+        }
+      ],
+      "id": "work-2.report-95697025-6b6b-4bd6-889a-6ce7ea27e8cf",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A fresh autonomous continuation for belot work-1 cannot complete because verifier group group-13e17025f230f4546ec5cf0f remains cla",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:51:40.866Z"
     },
     "work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98": {
       "createdAt": "2026-08-08T19:55:34.274Z",
@@ -7891,7 +7941,9 @@
     },
     "work-2.report-d7f3ef07-5d8b-4980-8e42-f1315464067d": {
       "createdAt": "2026-08-22T09:17:53.420Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.90"
+      ],
       "dependencyEdges": [],
       "description": "Observed: The verifier-triage owner session exited after accepting claim-527cc8c069ec278f9e1a9ebf and its work-worker completed a verified fix, but the claim remains owned/leased until 2026-08-22T09:43:20.523Z. A successor session cannot call work_verifier_complete_fix (`Verifier claim is not owned by this session`) and inbox remains empty, leaving verified uncommitted changes stranded until lease expiry.\nExpected: On owner-session exit, a triaged verifier claim with completed worker output should either be finalized automatically or released immediately for takeover, preserving the existing disposition and worker evidence.\nImpact: Autonomous completion is blocked for roughly 30 minutes despite finished, passing remediation; shared-worktree changes remain uncommitted and goal completion is rejected for awaiting triage.\nSuggested improvement: Release claimed verifier leases when the owning session disconnects, or allow a successor to adopt a dead owner's claim when no live session matches ownerSession and the completed worker report exists.",
       "evidence": [
@@ -7927,13 +7979,16 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE already-fixed by same-resume-lineage live claim adoption and expired accepted-fix renewal; scope is verifier ownership only and rollback is the existing fix commit revert"
+        "wo:improvement-safety SAFE already-fixed by same-resume-lineage live claim adoption and expired accepted-fix renewal; scope is verifier ownership only and rollback is the existing fix commit revert",
+        "wo:review-scope {\"files\":[\"extensions/work-models.js\",\"scripts/test-work-goal.mjs\"],\"fingerprint\":\"5024490f7f9509753facebb6e160c2f36c2fd60feea806d24bf289ba2c5408af\"}",
+        "wo:verify-check PASS node scripts/test-work-goal.mjs — ok - work-goal helpers",
+        "Clarification: the preceding wo:review-scope and wo:verify-check were misattached relocation-work metadata and are not this report's coverage. Already-current owner-loss recovery is covered by work-2.90 / 884ea69 claim takeover; node scripts/test-background-verifiers.mjs PASS."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The verifier-triage owner session exited after accepting claim-527cc8c069ec278f9e1a9ebf and its work-worker completed a verified f",
       "type": "task",
-      "updatedAt": "2026-08-22T09:17:53.420Z"
+      "updatedAt": "2026-08-24T13:53:34.702Z"
     },
     "work-2.report-da06c6e6-abcd-4ea0-87af-2540c4497918": {
       "createdAt": "2026-08-21T12:18:57.393Z",
@@ -10539,7 +10594,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-24T13:42:38.514Z"
+    "updatedAt": "2026-08-24T13:53:48.428Z"
   },
   "schemaVersion": 1
 }

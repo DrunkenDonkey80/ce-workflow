@@ -1459,6 +1459,7 @@ try {
 		writeFileSync(path.join(committedFixCwd, "rename-source.js"), "move me\n");
 		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "production\n");
 		writeFileSync(path.join(committedFixCwd, "dispose-source.js"), "current\n");
+		writeFileSync(path.join(committedFixCwd, "relocated-source.js"), "before\n");
 		execFileSync("git", ["add", "."], { cwd: committedFixCwd });
 		execFileSync("git", ["commit", "-m", "checkpoint"], {
 			cwd: committedFixCwd,
@@ -1481,6 +1482,7 @@ try {
 						"rename-source.js",
 						"test-gap.js",
 						"dispose-source.js",
+						"relocated-source.js",
 					],
 					patchHash: "c".repeat(64),
 				},
@@ -1509,6 +1511,7 @@ try {
 			"rename-source.js",
 			"test-gap.js",
 			"dispose-source.js",
+			"relocated-source.js",
 		].map((file) =>
 			mutateVerifierStore(committedFixCwd, (store) =>
 				addFinding(store, {
@@ -1535,7 +1538,7 @@ try {
 			const claim = mutateVerifierStore(committedFixCwd, (store) =>
 				claimGroup(store, { groupId: group.id, ownerSession }),
 			);
-			if (index < 4)
+			if (index !== 4)
 				mutateVerifierStore(committedFixCwd, (store) =>
 					recordTriageDisposition(store, {
 						claimId: claim.id,
@@ -1721,6 +1724,43 @@ try {
 				cwd: committedFixCwd,
 				sessionManager: { getSessionId: () => ownerSession },
 			},
+		);
+		renameSync(
+			path.join(committedFixCwd, "relocated-source.js"),
+			path.join(committedFixCwd, "relocated-destination.js"),
+		);
+		execFileSync("git", ["add", "-A"], { cwd: committedFixCwd });
+		execFileSync("git", ["commit", "-m", "historical relocation"], {
+			cwd: committedFixCwd,
+		});
+		writeFileSync(
+			path.join(committedFixCwd, "relocated-destination.js"),
+			"fixed after relocation\n",
+		);
+		const relocatedResult = await tempTools.work_verifier_complete_fix.execute(
+			"relocated-fix",
+			{
+				claimId: claims[5].id,
+				findingIds: [findings[5].id],
+				fixPaths: ["relocated-destination.js"],
+				verification: ["node focused-test"],
+			},
+			null,
+			null,
+			{
+				...ctx,
+				cwd: committedFixCwd,
+				sessionManager: { getSessionId: () => ownerSession },
+			},
+		);
+		assert.equal(
+			execFileSync(
+				"git",
+				["show", "--pretty=", "--name-only", relocatedResult.details.commit],
+				{ cwd: committedFixCwd, encoding: "utf8" },
+			).trim(),
+			"relocated-destination.js",
+			"a Git-proven historical relocation may replace an obsolete finding path",
 		);
 		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "changed\n");
 		writeFileSync(path.join(committedFixCwd, "test-gap.test.js"), "covered\n");
