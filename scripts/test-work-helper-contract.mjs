@@ -420,11 +420,11 @@ try {
 		title: "Update authentication residual",
 		notes: [
 			'wo:review-scope ["residual.js"]',
-			"wo:review FAIL - first",
-			"wo:fix PASS - first fix",
-			'wo:review-scope ["residual.js"]',
 			'wo:review FAIL {"findings":["residual A","residual B"]}',
-			"wo:fix PASS - generic residual summary",
+			"wo:fix PASS - targeted fixes",
+			"wo:review PASS - targeted re-review",
+			'wo:review-scope ["residual.js"]',
+			"wo:fix PASS - residual ownership fix",
 		],
 	});
 	saveStore(cwd, residualStore);

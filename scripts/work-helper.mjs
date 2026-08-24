@@ -392,6 +392,9 @@ function reviewEvents(task) {
 		priorFailures: all.filter(
 			(event) => event.index < scopeIndex && event[1]?.toUpperCase() === "FAIL",
 		).length,
+		priorPasses: all.filter(
+			(event) => event.index < scopeIndex && event[1]?.toUpperCase() === "PASS",
+		).length,
 	};
 }
 
@@ -400,14 +403,16 @@ function directReviewPassed(task) {
 }
 
 function reviewDispositionSatisfied(task) {
-	const { postScope, priorFailures } = reviewEvents(task);
+	const { postScope, priorFailures, priorPasses } = reviewEvents(task);
 	if (postScope.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
 	const failures = postScope.filter(
 		(event) => event[1]?.toUpperCase() === "FAIL",
 	).length;
 	const target = targetedReviewFindings(task);
 	const kind =
-		failures >= 2 || (failures === 1 && priorFailures)
+		failures >= 2 ||
+		(failures === 1 && priorFailures) ||
+		(failures === 0 && priorFailures && priorPasses)
 			? "residual-fix"
 			: failures === 1
 				? "mechanical-fix"

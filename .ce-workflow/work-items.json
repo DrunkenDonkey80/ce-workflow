@@ -7687,6 +7687,9 @@
           "producer": "LPGLibrarySDK-Android",
           "submittedAt": "2026-08-22T07:06:03.749Z",
           "workflowId": "01a0282a-90c9-76fd-8ea0-a74c0cd09ca4"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-cb8b8f92-fb41-4e25-a867-94050378e06f",
@@ -7696,13 +7699,17 @@
       ],
       "notes": [
         "wo:improvement-safety BLOCKED locally-owned residual-fix support relaxes the independent-review finalizer gate after its allowed review budget; require exact findings, bounded changed scope, and fresh verification, with rollback by reverting its commit",
-        "wo:improvement-safety APPROVED residual review-gate relaxation; user approved exact finding-specific disposition after the two-cycle review budget with fresh verification and bounded scope; rollback by reverting its commit"
+        "wo:improvement-safety APPROVED residual review-gate relaxation; user approved exact finding-specific disposition after the two-cycle review budget with fresh verification and bounded scope; rollback by reverting its commit",
+        "wo:review-scope {\"files\":[\"scripts/test-work-helper-contract.mjs\",\"scripts/work-helper.mjs\"],\"fingerprint\":\"5b3037a59e30463771b1162e98a6342d6956357671fa18a0f6611f309a771128\"}",
+        "wo:review PASS scripts/work-helper.mjs reviewEvents/reviewDispositionSatisfied add priorPasses so failures==0 with prior FAIL+PASS routes to residual-fix disposition (still requires exact findings coverage, sameReviewFiles, verification); contract test scenario updated; contract test not executable here (improvement-safety bash guard) so finish-task --verify must run it",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs\nOutput: ok - work helper contract",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-helper-contract.mjs\nOutput: ok - work helper contract"
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The coded finish-task gate cannot complete a policy-compliant residual fix made after the one allowed targeted re-review returned ",
       "type": "task",
-      "updatedAt": "2026-08-22T07:06:03.754Z"
+      "updatedAt": "2026-08-24T13:42:21.702Z"
     },
     "work-2.report-cfb7c57b-f515-4ec4-889e-ffd4c8e7b5db": {
       "createdAt": "2026-08-24T13:30:07.016Z",
@@ -10526,7 +10533,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-24T13:35:10.948Z"
+    "updatedAt": "2026-08-24T13:42:21.702Z"
   },
   "schemaVersion": 1
 }
