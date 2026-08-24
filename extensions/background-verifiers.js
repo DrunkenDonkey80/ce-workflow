@@ -708,7 +708,11 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 			);
 			const env = { ...process.env, GIT_INDEX_FILE: temporaryIndex };
 			git(cwd, ["read-tree", head], { env });
-			git(cwd, ["add", "-A", "--", ...snapshotWorkingPaths], { env });
+			git(
+				cwd,
+				["--literal-pathspecs", "add", "-A", "--", ...snapshotWorkingPaths],
+				{ env },
+			);
 			const tree = git(cwd, ["write-tree"], { env });
 			snapshot = git(cwd, ["commit-tree", tree, "-p", head], {
 				env: verifierCommitEnv(env),
@@ -1823,9 +1827,11 @@ function validateFindingRange(job, batch, finding) {
 	const relative = relativePath(finding.path);
 	let lineCount;
 	try {
-		lineCount = readFileSync(path.join(workspace, relative), "utf8").split(
+		const lines = readFileSync(path.join(workspace, relative), "utf8").split(
 			/\r\n|[\n\r]/,
-		).length;
+		);
+		if (lines.at(-1) === "") lines.pop();
+		lineCount = lines.length;
 	} catch {
 		throw error("invalid", "Verifier finding source path is unavailable");
 	}

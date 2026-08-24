@@ -787,6 +787,8 @@ try {
 	git("add", "tracked.txt");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
 	writeFileSync(path.join(gitCwd, "untracked.txt"), "untracked\n");
+	const magicPath = process.platform === "win32" ? undefined : ":(glob)literal.txt";
+	if (magicPath) writeFileSync(path.join(gitCwd, magicPath), "literal\n");
 	writeFileSync(path.join(gitCwd, "a-binary.so"), Buffer.alloc(32_001, 1));
 	writeFileSync(
 		path.join(gitCwd, "large.txt"),
@@ -873,6 +875,7 @@ try {
 	);
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
 	assert.deepEqual(requests[0].paths.sort(), [
+		...(magicPath ? [magicPath] : []),
 		"a-binary.so",
 		"large.txt",
 		"tracked.txt",
@@ -1905,7 +1908,7 @@ try {
 	mkdirSync(path.join(malformedWorkspace, "extensions"), { recursive: true });
 	writeFileSync(
 		path.join(malformedWorkspace, "extensions", "work-models.js"),
-		"only one line",
+		"only one line\n",
 	);
 	writeFileSync(
 		path.join(malformedWorkspace, ".ce-verifier-workspace.json"),
@@ -1946,7 +1949,11 @@ try {
 				{
 					...JSON.parse(reportPayload(malformedJob, findingPayload(999, 999)))
 						.results[0],
-					findings: [findingPayload(999, 999), findingPayload(1, 1)],
+					findings: [
+						findingPayload(999, 999),
+						findingPayload(2, 2),
+						findingPayload(1, 1),
+					],
 				},
 				{
 					jobId: malformedJob.id,
