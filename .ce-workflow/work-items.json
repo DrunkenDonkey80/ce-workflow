@@ -8261,6 +8261,45 @@
       "type": "task",
       "updatedAt": "2026-08-24T13:54:12.902Z"
     },
+    "work-2.report-eb1f7ff8-3ec5-49f5-8450-ab86226ab4a6": {
+      "createdAt": "2026-08-24T14:00:13.095Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The real package verifier fails in scripts/test-work-optimization-helpers.mjs because its shard-traversal assertion still expects the obsolete text `invalid verification shard output`, while extensions/read-only-lanes.js now emits `Invalid verification output path: ../outside`. Git blame shows the producer wording changed in aa1c820b after the test expectation from 2ffe2bd9, so the failure predates this snapshot's changes.\nExpected: The optimization-helper contract should assert the current stable validation category/message (or a less brittle semantic fragment), and `node scripts/verify-package.mjs` should pass on a clean checkout.\nImpact: The package's canonical verification command reports one failure despite all snapshot-focused tests passing, obscuring real regressions and preventing a fully green release gate.\nSuggested improvement: Update the stale assertion to match the current `Invalid verification output path` failure and keep the dedicated shard-boundary test authoritative.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/32741f70-5623-4c6e-bea0-476b76830480",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 38822,
+              "file": "01-test-work-optimization-helpers.mjs",
+              "sha256": "3e44f1db585851af234148f734a0b0c464567ab3967b72a18d6eb82edbc289cb"
+            },
+            {
+              "bytes": 44030,
+              "file": "02-read-only-lanes.js",
+              "sha256": "5e128e88c538a02a330a6610062788e2d2dff1adc38acc5d3feac63ee1d18c02"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-24T14:00:13.090Z",
+          "workflowId": "workflow-mt79m0b8-2dgn64"
+        }
+      ],
+      "id": "work-2.report-eb1f7ff8-3ec5-49f5-8450-ab86226ab4a6",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The real package verifier fails in scripts/test-work-optimization-helpers.mjs because its shard-traversal assertion still expects ",
+      "type": "task",
+      "updatedAt": "2026-08-24T14:00:13.095Z"
+    },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
       "dependencies": [
@@ -10600,7 +10639,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-24T13:54:44.571Z"
+    "updatedAt": "2026-08-24T14:00:13.096Z"
   },
   "schemaVersion": 1
 }
