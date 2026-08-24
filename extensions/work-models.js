@@ -11711,15 +11711,55 @@ function verifierFindingChanged(cwd, finding) {
 		return true;
 	}
 }
-function currentCodeEvidence(cwd, finding, evidence) {
+function checkpointRenameTarget(cwd, finding, candidate) {
+	const snapshot = finding?.checkpoint?.snapshot;
+	const source = normalizedRepoPath(finding?.path);
+	const target = normalizedRepoPath(candidate);
 	if (
-		!evidence ||
-		evidence.path !== finding.path ||
-		!/^[0-9a-f]{64}$/i.test(evidence.sha256 ?? "")
+		!source ||
+		!target ||
+		target === source ||
+		isAbsolute(target) ||
+		target === ".." ||
+		target.startsWith("../") ||
+		!/^[0-9a-f]{40,64}$/i.test(snapshot ?? "")
 	)
 		return false;
 	try {
-		const bytes = readFileSync(join(cwd, finding.path));
+		const fields = run(cwd, "git", [
+			"diff",
+			"--name-status",
+			"-z",
+			"--find-renames",
+			snapshot,
+			"HEAD",
+			"--",
+			source,
+			target,
+		]).split("\0");
+		for (let index = 0; fields[index]; ) {
+			const status = fields[index++];
+			const first = normalizedRepoPath(fields[index++]);
+			if (/^R\d+$/.test(status)) {
+				const second = normalizedRepoPath(fields[index++]);
+				if (first === source && second === target) return true;
+			}
+		}
+	} catch {}
+	return false;
+}
+
+function currentCodeEvidence(cwd, finding, evidence) {
+	if (!evidence || !/^[0-9a-f]{64}$/i.test(evidence.sha256 ?? ""))
+		return false;
+	const file = normalizedRepoPath(evidence.path);
+	if (
+		file !== normalizedRepoPath(finding.path) &&
+		!checkpointRenameTarget(cwd, finding, file)
+	)
+		return false;
+	try {
+		const bytes = readFileSync(join(cwd, file));
 		return createHash("sha256").update(bytes).digest("hex") === evidence.sha256;
 	} catch {
 		return false;

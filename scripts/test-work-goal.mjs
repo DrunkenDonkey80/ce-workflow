@@ -1458,6 +1458,7 @@ try {
 		writeFileSync(path.join(committedFixCwd, "support.js"), "before\n");
 		writeFileSync(path.join(committedFixCwd, "rename-source.js"), "move me\n");
 		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "production\n");
+		writeFileSync(path.join(committedFixCwd, "dispose-source.js"), "current\n");
 		execFileSync("git", ["add", "."], { cwd: committedFixCwd });
 		execFileSync("git", ["commit", "-m", "checkpoint"], {
 			cwd: committedFixCwd,
@@ -1479,6 +1480,7 @@ try {
 						"support.js",
 						"rename-source.js",
 						"test-gap.js",
+						"dispose-source.js",
 					],
 					patchHash: "c".repeat(64),
 				},
@@ -1506,6 +1508,7 @@ try {
 			"untouched.js",
 			"rename-source.js",
 			"test-gap.js",
+			"dispose-source.js",
 		].map((file) =>
 			mutateVerifierStore(committedFixCwd, (store) =>
 				addFinding(store, {
@@ -1525,22 +1528,23 @@ try {
 			),
 		);
 		const ownerSession = "fix-session";
-		const claims = findings.map((finding) => {
+		const claims = findings.map((finding, index) => {
 			const group = mutateVerifierStore(committedFixCwd, (store) =>
 				addGroup(store, { findingIds: [finding.id] }),
 			);
 			const claim = mutateVerifierStore(committedFixCwd, (store) =>
 				claimGroup(store, { groupId: group.id, ownerSession }),
 			);
-			mutateVerifierStore(committedFixCwd, (store) =>
-				recordTriageDisposition(store, {
-					claimId: claim.id,
-					ownerSession,
-					findingId: finding.id,
-					disposition: "accepted",
-					reason: "reproduced",
-				}),
-			);
+			if (index < 4)
+				mutateVerifierStore(committedFixCwd, (store) =>
+					recordTriageDisposition(store, {
+						claimId: claim.id,
+						ownerSession,
+						findingId: finding.id,
+						disposition: "accepted",
+						reason: "reproduced",
+					}),
+				);
 			return claim;
 		});
 		writeFileSync(path.join(committedFixCwd, "fix.js"), "fixed\n");
@@ -1663,6 +1667,60 @@ try {
 			).trim(),
 			/^R\d+\s+rename-source\.js\s+rename-destination\.js$/,
 			"an explicitly declared relocation authorizes both rename paths",
+		);
+		renameSync(
+			path.join(committedFixCwd, "dispose-source.js"),
+			path.join(committedFixCwd, "dispose-destination.js"),
+		);
+		execFileSync("git", ["add", "-A"], { cwd: committedFixCwd });
+		execFileSync("git", ["commit", "-m", "relocate disposition target"], {
+			cwd: committedFixCwd,
+		});
+		const disposeBytes = readFileSync(
+			path.join(committedFixCwd, "dispose-destination.js"),
+		);
+		await assert.rejects(
+			tempTools.work_verifier_dispose.execute(
+				"renamed-disposition-bad-hash",
+				{
+					claimId: claims[4].id,
+					findingId: findings[4].id,
+					disposition: "stale",
+					reason: "renamed target inspected",
+					currentCode: {
+						path: "dispose-destination.js",
+						sha256: "0".repeat(64),
+					},
+				},
+				null,
+				null,
+				{
+					...ctx,
+					cwd: committedFixCwd,
+					sessionManager: { getSessionId: () => ownerSession },
+				},
+			),
+			/Changed target requires matching current-code/,
+		);
+		await tempTools.work_verifier_dispose.execute(
+			"renamed-disposition",
+			{
+				claimId: claims[4].id,
+				findingId: findings[4].id,
+				disposition: "stale",
+				reason: "renamed target inspected",
+				currentCode: {
+					path: "dispose-destination.js",
+					sha256: createHash("sha256").update(disposeBytes).digest("hex"),
+				},
+			},
+			null,
+			null,
+			{
+				...ctx,
+				cwd: committedFixCwd,
+				sessionManager: { getSessionId: () => ownerSession },
+			},
 		);
 		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "changed\n");
 		writeFileSync(path.join(committedFixCwd, "test-gap.test.js"), "covered\n");

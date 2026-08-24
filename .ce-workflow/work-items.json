@@ -4436,17 +4436,23 @@
       "dependencies": [],
       "dependencyEdges": [],
       "description": "Canonical claim for duplicate disposition failures when a checkpoint finding path was renamed at HEAD.",
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-2.89",
       "labels": [
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Resolve verifier finding paths through Git renames",
       "type": "bug",
-      "updatedAt": "2026-08-24T13:31:28.429Z"
+      "updatedAt": "2026-08-24T13:42:38.513Z"
     },
     "work-2.9": {
       "createdAt": "2026-07-20T11:50:30.982Z",
@@ -10533,7 +10539,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-24T13:42:21.702Z"
+    "updatedAt": "2026-08-24T13:42:38.514Z"
   },
   "schemaVersion": 1
 }
