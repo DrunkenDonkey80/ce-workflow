@@ -304,6 +304,32 @@ assert.match(
 	/Improvement safety preflight blocks edit/,
 	"source mutation is coded-blocked while destructive risk is unapproved",
 );
+assert.doesNotMatch(
+	hooks.tool_call(
+		{
+			toolName: "bash",
+			input: {
+				command: `git -C "${root}" rev-parse --show-toplevel`,
+			},
+		},
+		hookCtx,
+	)?.reason ?? "",
+	/Improvement safety/,
+	"reviewer preflight may inspect the approved repository without mutation",
+);
+assert.doesNotMatch(
+	hooks.tool_call(
+		{
+			toolName: "bash",
+			input: {
+				command: `node "${path.join(root, "scripts", "work-helper.mjs")}" work-summary SI-1.1`,
+			},
+		},
+		hookCtx,
+	)?.reason ?? "",
+	/Improvement safety/,
+	"reviewers may read the scoped work item before safety approval",
+);
 mutateStore(root, (store) =>
 	appendWorkNote(
 		store,

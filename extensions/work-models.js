@@ -17354,7 +17354,7 @@ function improvementSafetyShellAllowed(command) {
 		)
 	)
 		return true;
-	return /^(?:git\s+(?:status|diff|log|show|rev-parse)|rg\b|grep\b|find\b)/i.test(
+	return /^(?:git(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+(?:status|diff|log|show|rev-parse)|rg\b|grep\b|find\b)/i.test(
 		text,
 	);
 }

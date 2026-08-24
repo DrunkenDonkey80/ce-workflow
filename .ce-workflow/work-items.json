@@ -4394,6 +4394,60 @@
       "type": "bug",
       "updatedAt": "2026-08-22T06:38:42.503Z"
     },
+    "work-2.87": {
+      "acceptance": "Ingested verifier findings atomically create claimable groups; current regression tests pass.",
+      "createdAt": "2026-08-24T13:31:18.084Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical claim for orphan findings that existed without triage groups or claims.",
+      "evidence": [],
+      "id": "work-2.87",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Materialize verifier finding groups before completion gating",
+      "type": "bug",
+      "updatedAt": "2026-08-24T13:31:18.084Z"
+    },
+    "work-2.88": {
+      "acceptance": "Completion reconciliation ingests terminal artifacts, finalizes jobs and groups findings; regression tests pass.",
+      "createdAt": "2026-08-24T13:31:23.032Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical claim for durable async verifier runs whose terminal artifacts were not ingested after the originating session ended.",
+      "evidence": [],
+      "id": "work-2.88",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Reconcile terminal background verifier runs without the owner session",
+      "type": "bug",
+      "updatedAt": "2026-08-24T13:31:23.032Z"
+    },
+    "work-2.89": {
+      "acceptance": "Disposition accepts only a Git-proven rename target with its exact current SHA-256; invalid paths and hashes still fail.",
+      "createdAt": "2026-08-24T13:31:28.429Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical claim for duplicate disposition failures when a checkpoint finding path was renamed at HEAD.",
+      "evidence": [],
+      "id": "work-2.89",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Resolve verifier finding paths through Git renames",
+      "type": "bug",
+      "updatedAt": "2026-08-24T13:31:28.429Z"
+    },
     "work-2.9": {
       "createdAt": "2026-07-20T11:50:30.982Z",
       "dependencies": [],
@@ -4436,6 +4490,24 @@
       "title": "Self-improvement report: `work-helper.mjs work-close work-4.2 --reason \"...\"` changed the decision status to closed but did not persist the supplied closur",
       "type": "task",
       "updatedAt": "2026-07-20T14:41:04.347Z"
+    },
+    "work-2.90": {
+      "acceptance": "The same resume lineage can adopt a live predecessor claim and any continuation can take an expired claim atomically; regression tests pass.",
+      "createdAt": "2026-08-24T13:31:33.599Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Canonical claim for duplicate stale claimed groups after owner compaction or lease expiry.",
+      "evidence": [],
+      "id": "work-2.90",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Recover verifier claims across autonomous continuations",
+      "type": "bug",
+      "updatedAt": "2026-08-24T13:31:33.599Z"
     },
     "work-2.report-004a4a47-7ce7-4de6-ad15-4d3d9c59efbe": {
       "createdAt": "2026-08-09T06:53:59.357Z",
@@ -4971,6 +5043,54 @@
       "type": "task",
       "updatedAt": "2026-08-21T11:12:37.746Z"
     },
+    "work-2.report-38f67638-a4b7-4a36-a376-992e38e4c026": {
+      "createdAt": "2026-08-22T10:33:49.892Z",
+      "dependencies": [
+        "work-2.90"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: Autonomous work-1 completion is blocked by 38 verifier findings in 37 groups whose claims belong to compacted/ended sessions. The newest lease (claim-1df7c3ee29a1cfb29b22fa76, owner 01a028bf-e257-745d-99a4-12d7a43a7aaf) expired at 2026-08-22T10:32:24Z; verifier metadata has not advanced since 10:02:46Z. In this fresh continuation, work_verifier_inbox returns [], no peer/session is active in the project, and work_goal_complete rejects because findings await triage.\nExpected: When a verifier-triage owner session compacts/ends or its lease expires, the pending group should be released/reassigned to the current autonomous continuation (or the completion gate should trigger recovery), so work_verifier_inbox can expose the claim and the goal can make progress without repeated no-op continuations.\nImpact: The roadmap and all children are closed and pushed, but the autonomous goal loops indefinitely with no available operation that can triage or release the stale verifier claims.\nSuggested improvement: Add lease-expiry/owner-session termination recovery that atomically reopens stale claimed groups before assigning the next verifier inbox claim.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/a808d1a2-577d-4f26-9a34-04613058290f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3620103,
+              "file": "01-state.json",
+              "sha256": "9ae936240cb6f5e189cb2de3214622b9f89cd34d5e4bb0c675510ca93f1ad912"
+            },
+            {
+              "bytes": 10138,
+              "file": "02-01a028bf-e257-745d-99a4-12d7a43a7aaf.jsonl",
+              "sha256": "b4b0517088200a7dce4d454d204fe27464b9255759ec0d9aadec0343a1983a7f"
+            },
+            {
+              "bytes": 1011842,
+              "file": "03-01a028ec-4746-7104-ad4c-8a055f9138ff.jsonl",
+              "sha256": "f0683ed2021dfb34e82d7a217abbd57f5f4933edc2bab00e8d145d5f8e82890f"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-22T10:33:49.887Z",
+          "workflowId": "01a02901-19de-7d41-933d-e3f5119e2fe1"
+        }
+      ],
+      "id": "work-2.report-38f67638-a4b7-4a36-a376-992e38e4c026",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate expired-claim failure is already-fixed by atomic takeover for same resume lineage or elapsed lease; regression proof covers scale and rollback is the existing fix commit revert"
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Autonomous work-1 completion is blocked by 38 verifier findings in 37 groups whose claims belong to compacted/ended sessions. The ",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:32:25.419Z"
+    },
     "work-2.report-3a5dfdb2-c74e-4290-bdb9-0ab39a1f8e2b": {
       "createdAt": "2026-08-21T07:43:59.237Z",
       "dependencies": [
@@ -5136,7 +5256,10 @@
     },
     "work-2.report-48460ef0-da77-4692-8c3c-7759664ed541": {
       "createdAt": "2026-08-22T06:51:52.862Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.87",
+        "work-2.88"
+      ],
       "dependencyEdges": [],
       "description": "Observed: After all background verifier jobs for snapshot 256e75c terminated, work_goal_complete reports 'background verification has findings awaiting triage', but work_verifier_inbox returns an empty list. The verifier state contains 15 findings for that snapshot but zero groups, claims, or dispositions, leaving no claimId accepted by work_verifier_dispose and no supported triage path.\nExpected: Completed verifier findings should be grouped and claimed for the owning session so work_verifier_inbox exposes them, or completion should not block when no triageable claims exist. Failed model jobs should also be reconcilable through the supported verifier tools.\nImpact: A fully implemented, tested, reviewed, committed, and closed work goal cannot complete because the coded completion gate demands triage that the public tools make impossible.\nSuggested improvement: Atomically materialize groups/claims before setting completion-blocking findings state, and make work_verifier_inbox surface or recover orphaned findings for the current session.",
       "evidence": [
@@ -5166,12 +5289,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE atomic report ingestion now materializes groups and completion reconciliation handles terminal jobs; verification is read-only and rollback is unnecessary unless current regression tests fail"
+      ],
       "parentId": "work-2",
       "status": "open",
       "title": "Self-improvement report: After all background verifier jobs for snapshot 256e75c terminated, work_goal_complete reports 'background verification has findin",
       "type": "task",
-      "updatedAt": "2026-08-22T06:51:52.862Z"
+      "updatedAt": "2026-08-24T13:31:45.101Z"
     },
     "work-2.report-4a81a49d-a04d-4270-bc55-637331d67eab": {
       "createdAt": "2026-08-21T10:23:12.916Z",
@@ -6081,6 +6206,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-22T06:49:17.171Z",
           "workflowId": "workflow-mt401r0g-mn600l"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-67059d5b-190c-4adc-82f5-043253ff840c",
@@ -6088,12 +6216,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety BLOCKED locally-owned reviewer-authority fix relaxes an improvement mutation guard; constrain authority to read-only preflight and one scoped verdict note, and rollback by reverting its commit",
+        "wo:improvement-safety APPROVED reviewer authority guard relaxation; user approved bounded read-only preflight plus one scoped verdict-note capability; rollback by reverting its commit",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-improve.mjs\nOutput: "
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Both exact work-reviewer runs for a safety-approved improvement item were blocked before preflight because the child saw the auton",
       "type": "task",
-      "updatedAt": "2026-08-22T06:49:17.176Z"
+      "updatedAt": "2026-08-24T13:35:10.947Z"
     },
     "work-2.report-67c4d7c9-d110-42ac-9430-d5c518ea0c62": {
       "createdAt": "2026-08-18T00:16:35.407Z",
@@ -6189,6 +6321,45 @@
       "title": "Self-improvement report: In active autonomous-goal mode, the user selected “Pause as externally blocked” through ask_user after an upstream-only work item ",
       "type": "task",
       "updatedAt": "2026-08-12T17:19:55.793Z"
+    },
+    "work-2.report-695e3705-5f87-4767-883a-c5f7a52636aa": {
+      "createdAt": "2026-08-24T13:33:42.674Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Configured work-worker/reviewer/fixer runs wrote runtime handoff artifacts under .ce-workflow/work-runs/, but that directory is neither tracked nor ignored, so the repository remains dirty after the coded work item close/commit path.\nExpected: ce-workflow should keep run artifacts in an ignored runtime location or deterministically add .ce-workflow/work-runs/ to a local/project ignore before launching specialists, so successful finish leaves git clean.\nImpact: Autonomous completion and cleanliness gates require manual cleanup or a local exclude even though product work and native work-item state are already committed and closed.\nSuggested improvement: Have workspace initialization or specialist handoff setup ensure .ce-workflow/work-runs/ is ignored, preferably via .git/info/exclude to avoid product-repo churn.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/fec8215d-f518-46fd-8595-c022c56846d3",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3559,
+              "file": "01-work-3.2-worker.md",
+              "sha256": "9d7fb35fafa42efe2c0113997d5b98beffbd4f0a8112e3854b455fe468bd58a5"
+            },
+            {
+              "bytes": 4823,
+              "file": "02-work-3.3-fixer.md",
+              "sha256": "c8f7ba0a711c0bdd77dd954cd147cf01828b9d9213577507d25fca64b0383b08"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-24T13:33:42.667Z",
+          "workflowId": "01a033f7-a333-7e22-8ba0-53cafe483d83"
+        }
+      ],
+      "id": "work-2.report-695e3705-5f87-4767-883a-c5f7a52636aa",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Configured work-worker/reviewer/fixer runs wrote runtime handoff artifacts under .ce-workflow/work-runs/, but that directory is ne",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:33:42.674Z"
     },
     "work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169": {
       "createdAt": "2026-08-08T08:21:15.842Z",
@@ -6394,6 +6565,81 @@
       "title": "Self-improvement report: The coded finish helper fails work-3.54 with the opaque error `left is not iterable` after a reviewed evidence-only task renamed o",
       "type": "task",
       "updatedAt": "2026-08-11T16:27:42.421Z"
+    },
+    "work-2.report-6f8cc4b3-32de-4dc4-8626-9d84394574ee": {
+      "createdAt": "2026-08-22T09:50:24.638Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After adopting the expired verifier claim with the exported claimGroup helper, work_verifier_complete_fix still cannot represent this valid relocation fix: the finding path is the obsolete `app/src/androidTest/.../OfflineIsolationTest.kt`, removed by an earlier app→android module relocation, while the verified fix correctly changes `android/src/androidTest/.../OfflineIsolationTest.kt` plus `android/src/debug/AndroidManifest.xml`. Omitting the old path fails findingPathMatchesCheckpoint; including it cannot satisfy exact dirty scope because its deletion is already historical.\nExpected: Complete-fix should support a validated relocated target: allow an accepted finding path that was deleted by an ancestor relocation when fixPaths names the canonical replacement and verification records the mapping, without requiring a temporary reintroduction of the obsolete file.\nImpact: The coded finalizer cannot commit/resolve an otherwise verified fix; the only current choices are to pollute history by temporarily restoring an obsolete duplicate or invoke lower-level verifier-store completion logic manually.\nSuggested improvement: Add an explicit movedFrom/movedTo mapping or allow omitted historical finding paths when the checkpoint path is absent at HEAD and a bounded canonical replacement is included in fixPaths with current-code evidence.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/91709300-7270-46f4-9d6e-b7c612cc08ca",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 4982,
+              "file": "01-verifier-claim-527c-worker.network-isolation-fix.md",
+              "sha256": "e1cea12cfa1a8fe7697fc4c136289fe238d90fe90441527b9aae57c1a9a11d09"
+            },
+            {
+              "bytes": 3610345,
+              "file": "02-state.json",
+              "sha256": "5573a1e231f2d62dc29a34bb3648329eed4e9632e0ad5e273f96b8a566b16a09"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-22T09:50:24.633Z",
+          "workflowId": "01a028bf-e257-745d-99a4-12d7a43a7aaf"
+        }
+      ],
+      "id": "work-2.report-6f8cc4b3-32de-4dc4-8626-9d84394574ee",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE locally-owned relocation completion can reuse strict Git-proven checkpoint rename resolution and exact fix scope; rollback is commit revert with no persistent-format change"
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After adopting the expired verifier claim with the exported claimGroup helper, work_verifier_complete_fix still cannot represent t",
+      "type": "task",
+      "updatedAt": "2026-08-22T09:50:24.638Z"
+    },
+    "work-2.report-70383aee-109a-4200-9ac0-fe18319e3798": {
+      "createdAt": "2026-08-24T13:25:09.341Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: work_verifier_dispose rejected valid current-code evidence after the finding's checkpoint path moved from app/... to android/..., because currentCodeEvidence requires evidence.path === finding.path and then reads only that historical path. The current production file was inspected and hashed, but the tool emitted 'Changed target requires matching current-code SHA-256 evidence.' A temporary mirror at the historical path was required to record the disposition.\nExpected: Verifier disposition should accept current-code SHA evidence for a verified rename/move, or expose a coded renamed-path field/check that validates the current tracked target without requiring the stale historical path to exist.\nImpact: Roadmap continuation is blocked after legitimate module/path renames, forcing an artificial temporary file workaround and making verifier triage brittle.\nSuggested improvement: Allow currentCode.path to differ when git history or identical blob/content establishes a rename from finding.path, while retaining SHA-256 validation of the supplied current file.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/80d6c829-a124-4d7d-8601-6ebbbff0663c",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3621184,
+              "file": "01-state.json",
+              "sha256": "7da7e8ca499ca7ae1f83baf3ffc1b60e8a19ec1c43810b8b365444138877d9ef"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-24T13:25:09.336Z",
+          "workflowId": "01a033ef-5c6f-7b06-9cde-b305f26e9f2b"
+        }
+      ],
+      "id": "work-2.report-70383aee-109a-4200-9ac0-fe18319e3798",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: work_verifier_dispose rejected valid current-code evidence after the finding's checkpoint path moved from app/... to android/..., ",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:25:09.341Z"
     },
     "work-2.report-74df0d15-f508-42ec-99c5-0792c7cb12c9": {
       "createdAt": "2026-08-19T06:28:56.217Z",
@@ -7237,6 +7483,49 @@
       "type": "task",
       "updatedAt": "2026-08-04T05:54:21.241Z"
     },
+    "work-2.report-b4957d2f-ec8a-4800-8f8f-3d7bbab6124b": {
+      "createdAt": "2026-08-22T07:46:08.433Z",
+      "dependencies": [
+        "work-2.90"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: work_goal_complete rejects completed target work-3 because verifier group group-0575e91bdd40b215941b7363 remains status=claimed after its owner session 01a0282a-90c9-76fd-8ea0-a74c0cd09ca4 disappeared and leaseUntil 2026-08-22T07:45:27.614Z expired. work_verifier_inbox returns empty for the current session, so the orphaned claim cannot be triaged or reclaimed here.\nExpected: On completion, expired verifier claims whose owner session is no longer active should be deterministically released/requeued or made claimable by the current resume session; stale claimed groups should not indefinitely block work_goal_complete.\nImpact: A fully closed and verified roadmap cannot complete autonomously. The loop can only wait or require manual intervention even though the claim lease expired and no owning session is active.\nSuggested improvement: Have work_goal_complete reconcile expired claims before checking awaiting-triage groups, or expose a lease-safe reclaim path that populates work_verifier_inbox for the current resumed goal session.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/f9d2a725-dc0b-4922-93e4-604d7ebb1571",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3516194,
+              "file": "01-state.json",
+              "sha256": "2de407382eba01d4bc6705c933c6810f0715aafc9a9156d09a36aeb868a97315"
+            },
+            {
+              "bytes": 4525,
+              "file": "02-verifier-finding-4a463d-fixer.md",
+              "sha256": "8f217ae35d62f9c583dedc6bf92d3545082f666765f6e7fad4e85fa8c87d44ac"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-22T07:46:08.427Z",
+          "workflowId": "01a02853-4c89-7174-a708-e5f303e6e5f0"
+        }
+      ],
+      "id": "work-2.report-b4957d2f-ec8a-4800-8f8f-3d7bbab6124b",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE already-fixed by same-lineage and expired-lease atomic claim takeover; behavior is covered by verifier claim tests and rollback is the existing fix commit revert"
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: work_goal_complete rejects completed target work-3 because verifier group group-0575e91bdd40b215941b7363 remains status=claimed af",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:32:15.246Z"
+    },
     "work-2.report-bc2769f9-6838-4577-8ee0-1c7061093c37": {
       "createdAt": "2026-08-18T21:02:39.837Z",
       "dependencies": [],
@@ -7373,6 +7662,87 @@
       "type": "task",
       "updatedAt": "2026-08-21T17:53:25.078Z"
     },
+    "work-2.report-cb8b8f92-fb41-4e25-a867-94050378e06f": {
+      "createdAt": "2026-08-22T07:06:03.754Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The coded finish-task gate cannot complete a policy-compliant residual fix made after the one allowed targeted re-review returned PASS. After the parent found and work-fixer corrected a residual ownership race, `finish-task --reviewed` rejected the changed fingerprint and demanded rerunning without --reviewed to launch another reviewer. The review policy explicitly forbids a third review cycle and says to fix/report residuals after targeted re-review without launching another reviewer.\nExpected: After one initial review and one targeted re-review, finish-task should accept a verified, finding-specific `wo:residual-fix PASS` disposition for a bounded residual production fix even when the targeted re-review's durable verdict was PASS, without requiring a third reviewer or falsified FAIL note.\nImpact: A verified correctness fix cannot pass the normal coded finalizer without violating the review-cycle budget, so the session must either over-review, falsify review state, or use lower-level coded close/commit steps.\nSuggested improvement: Teach reviewDispositionSatisfied/finish-task to accept a validated residual-fix disposition after a fresh targeted PASS when review budget is exhausted, while requiring exact changed-file scope and passing verification.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/448a70cd-4b51-4ded-b4bc-72145da354f4",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 4823,
+              "file": "01-work-3.3-fixer.md",
+              "sha256": "c8f7ba0a711c0bdd77dd954cd147cf01828b9d9213577507d25fca64b0383b08"
+            },
+            {
+              "bytes": 647627,
+              "file": "02-2026-08-22T06-31-13-353Z_01a0282a-90c9-76fd-8ea0-a74c0cd09ca4.jsonl",
+              "sha256": "4e487ba9784232f77c7c5061b716a7bcf3e1b97990533a47dc73e6e563133873"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGLibrarySDK-Android",
+          "submittedAt": "2026-08-22T07:06:03.749Z",
+          "workflowId": "01a0282a-90c9-76fd-8ea0-a74c0cd09ca4"
+        }
+      ],
+      "id": "work-2.report-cb8b8f92-fb41-4e25-a867-94050378e06f",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety BLOCKED locally-owned residual-fix support relaxes the independent-review finalizer gate after its allowed review budget; require exact findings, bounded changed scope, and fresh verification, with rollback by reverting its commit",
+        "wo:improvement-safety APPROVED residual review-gate relaxation; user approved exact finding-specific disposition after the two-cycle review budget with fresh verification and bounded scope; rollback by reverting its commit"
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The coded finish-task gate cannot complete a policy-compliant residual fix made after the one allowed targeted re-review returned ",
+      "type": "task",
+      "updatedAt": "2026-08-22T07:06:03.754Z"
+    },
+    "work-2.report-cfb7c57b-f515-4ec4-889e-ffd4c8e7b5db": {
+      "createdAt": "2026-08-24T13:30:07.016Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After accepting a verifier finding whose checkpoint path moved from app/... to android/..., work_verifier_complete_fix rejected the four exact current dirty remediation paths with 'fixPaths must be unique repository-relative paths including every accepted finding path.' Including the historical app path would either fail exact dirty-scope enforcement or commit an obsolete duplicate source file.\nExpected: Accepted-fix completion should support a bounded current-path superset for verified renames/moves and commit the exact current dirty scope without requiring a removed historical path.\nImpact: A verified, passing accepted fix cannot be committed/completed, so verifier triage blocks an already-closed roadmap despite exact tests and exact dirty scope.\nSuggested improvement: Resolve finding paths through Git rename history or allow a validated oldPath-to-currentPath mapping; use mapped current paths for inclusion and exact dirty-scope checks.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/53738562-e810-4f0b-ad54-5e6c1b4a144a",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 744,
+              "file": "01-verifier-claim-1df7-worker.md",
+              "sha256": "174c81d165737685a212f29b376bbeee2bf52a0272ba3f0cd2675ede0ba645cb"
+            },
+            {
+              "bytes": 3621184,
+              "file": "02-state.json",
+              "sha256": "7da7e8ca499ca7ae1f83baf3ffc1b60e8a19ec1c43810b8b365444138877d9ef"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-24T13:30:06.999Z",
+          "workflowId": "01a033ef-5c6f-7b06-9cde-b305f26e9f2b"
+        }
+      ],
+      "id": "work-2.report-cfb7c57b-f515-4ec4-889e-ffd4c8e7b5db",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After accepting a verifier finding whose checkpoint path moved from app/... to android/..., work_verifier_complete_fix rejected th",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:30:07.016Z"
+    },
     "work-2.report-d16529ea-1917-4e39-8080-56a0720adb4e": {
       "createdAt": "2026-08-18T05:18:46.408Z",
       "dependencies": [],
@@ -7505,6 +7875,52 @@
       "title": "Self-improvement report: Background verifier reconciliation permanently marked four jobs failed with \"Verifier terminal output was unavailable or invalid\",",
       "type": "task",
       "updatedAt": "2026-08-18T08:27:51.143Z"
+    },
+    "work-2.report-d7f3ef07-5d8b-4980-8e42-f1315464067d": {
+      "createdAt": "2026-08-22T09:17:53.420Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The verifier-triage owner session exited after accepting claim-527cc8c069ec278f9e1a9ebf and its work-worker completed a verified fix, but the claim remains owned/leased until 2026-08-22T09:43:20.523Z. A successor session cannot call work_verifier_complete_fix (`Verifier claim is not owned by this session`) and inbox remains empty, leaving verified uncommitted changes stranded until lease expiry.\nExpected: On owner-session exit, a triaged verifier claim with completed worker output should either be finalized automatically or released immediately for takeover, preserving the existing disposition and worker evidence.\nImpact: Autonomous completion is blocked for roughly 30 minutes despite finished, passing remediation; shared-worktree changes remain uncommitted and goal completion is rejected for awaiting triage.\nSuggested improvement: Release claimed verifier leases when the owning session disconnects, or allow a successor to adopt a dead owner's claim when no live session matches ownerSession and the completed worker report exists.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/3bd075dc-383a-4512-9f64-8deea6cf84d4",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1067,
+              "file": "01-verifier-claim-527c-worker.md",
+              "sha256": "ca34022db8dc00c4413956d0b7acab22c5ce36e3ef647590e142fab8fe4bee94"
+            },
+            {
+              "bytes": 4982,
+              "file": "02-verifier-claim-527c-worker.network-isolation-fix.md",
+              "sha256": "e1cea12cfa1a8fe7697fc4c136289fe238d90fe90441527b9aae57c1a9a11d09"
+            },
+            {
+              "bytes": 3610345,
+              "file": "03-state.json",
+              "sha256": "b4adf3b995057b9b2f0cc164ef3b54cc529b2b00ede365deab2cd34bfe78b820"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-22T09:17:53.414Z",
+          "workflowId": "01a028bf-e257-745d-99a4-12d7a43a7aaf"
+        }
+      ],
+      "id": "work-2.report-d7f3ef07-5d8b-4980-8e42-f1315464067d",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE already-fixed by same-resume-lineage live claim adoption and expired accepted-fix renewal; scope is verifier ownership only and rollback is the existing fix commit revert"
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The verifier-triage owner session exited after accepting claim-527cc8c069ec278f9e1a9ebf and its work-worker completed a verified f",
+      "type": "task",
+      "updatedAt": "2026-08-22T09:17:53.420Z"
     },
     "work-2.report-da06c6e6-abcd-4ea0-87af-2540c4497918": {
       "createdAt": "2026-08-21T12:18:57.393Z",
@@ -7686,6 +8102,92 @@
       "type": "task",
       "updatedAt": "2026-08-19T05:34:37.023Z"
     },
+    "work-2.report-e7f8d69a-5288-4f04-b526-6e9734b3b5d2": {
+      "createdAt": "2026-08-22T10:39:45.429Z",
+      "dependencies": [
+        "work-2.89"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: Verifier triage cannot record a disposition after a finding target was renamed between checkpoint and current HEAD. finding-e2d62586f16f097a4f3d0b44 targets app/src/main/kotlin/bg/belot/app/profile/ProfilePersistence.kt at checkpoint 094fadff, but current tracked path is android/src/main/kotlin/bg/belot/app/profile/ProfilePersistence.kt. work_verifier_dispose rejected valid current-code hashes for the renamed path with 'Changed target requires matching current-code SHA-256 evidence.' Source inspection shows currentCodeEvidence requires evidence.path === finding.path and then reads only that ob\nExpected: Disposition evidence should accept a verified current rename target (preferably resolved deterministically through git rename detection) and hash that live file, or permit an explicit stale/deleted target disposition when the checkpoint path no longer exists.\nImpact: Mandatory verifier triage is blocked even after the finding was implemented and both focused unit and Android-test compilation checks passed, so /work-resume and completion cannot proceed without an unsafe temporary-path workaround.\nSuggested improvement: Resolve finding.path from checkpoint to HEAD with git diff --find-renames (or accept evidence.path when its blob lineage matches), then hash that resolved current path.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/249e82dc-df9b-4a9a-94a9-c26b0b583dda",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3620150,
+              "file": "01-state.json",
+              "sha256": "44dc0f16bb59b0b704f373c4836a5d3d115404a667b29ebb742834f97b242375"
+            },
+            {
+              "bytes": 2550,
+              "file": "02-64204989-2b37-4290-b1c1-a23f17ed1ebe_work-worker_0_output.md",
+              "sha256": "6d216baf9e8fc3024d07212c6c1ac26fa1676a6ea888bf49280fc5a7b46e3663"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-22T10:39:45.424Z",
+          "workflowId": "01a02909-112a-7c96-95b4-37e0b2de5b28"
+        }
+      ],
+      "id": "work-2.report-e7f8d69a-5288-4f04-b526-6e9734b3b5d2",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate rename-disposition claim can share a deterministic Git-lineage resolver and current SHA-256 validation; rollback is commit revert and invalid evidence remains rejected"
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Verifier triage cannot record a disposition after a finding target was renamed between checkpoint and current HEAD. finding-e2d625",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:32:07.159Z"
+    },
+    "work-2.report-e921e98e-b763-4824-b3f2-b0a46387f8cd": {
+      "createdAt": "2026-08-22T09:05:44.495Z",
+      "dependencies": [
+        "work-2.88"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: Background verifier batch batch-fbe8b3b04468725abaf24a77 remained `queued` with two jobs marked `running` in durable verifier state more than four minutes after both persisted async runs reported `complete`; the originating Pi session was no longer live, so reconciliation did not advance and work_goal_complete remained blocked.\nExpected: Durable verifier reconciliation should ingest terminal async result artifacts independently of the originating interactive session, mark successful jobs complete, finalize the batch, and expose findings for normal triage.\nImpact: Autonomous completion is blocked despite terminal verifier runs, findings are not delivered through work_verifier_inbox, and a fresh continuation cannot safely proceed without bypassing or manually editing verifier state.\nSuggested improvement: On verifier state load or work_goal_complete, reconcile durable running jobs against persisted async result artifacts even when the owner session has exited.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/053e0414-e672-46ea-95a6-5b9c46967700",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3558241,
+              "file": "01-state.json",
+              "sha256": "9b7c38adef2f72940aa4984ad460db3578a36d53abeb0a1f0596c751ba93c032"
+            },
+            {
+              "bytes": 686,
+              "file": "02-workflow-friction-work-1.9.log",
+              "sha256": "b61d459d0a7d09b4a64ced02253f2c6f54f87baaae101b037489c1785eb9eb8f"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-22T09:05:44.488Z",
+          "workflowId": "01a028af-9ddf-735e-aaf8-cea8b29c2ca5"
+        }
+      ],
+      "id": "work-2.report-e921e98e-b763-4824-b3f2-b0a46387f8cd",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE already-fixed by completion-time durable async result reconciliation and atomic report ingestion; verification is regression-only and rollback is the existing reconciliation commit revert"
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Background verifier batch batch-fbe8b3b04468725abaf24a77 remained `queued` with two jobs marked `running` in durable verifier stat",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:31:52.940Z"
+    },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
       "dependencies": [
@@ -7855,6 +8357,45 @@
       "type": "task",
       "updatedAt": "2026-08-22T06:39:12.828Z"
     },
+    "work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01": {
+      "createdAt": "2026-08-24T13:21:49.123Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The verifier claim lease expired while the mandatory accepted-finding remediation was actively running. The work-worker completed the code change, focused Gradle checks passed, and the user answered the required renamed-path workaround decision, but work_verifier_dispose then rejected the still-visible owned inbox claim with 'Verifier claim lease expired.'\nExpected: Active verifier triage should renew its claim lease during subagent work, verification, and ask_user waits, or provide a coded reclaim/renew operation in the continuation without requiring a fresh /work-resume turn.\nImpact: Correct, verified remediation cannot be disposed or completed in the same autonomous run; the project is left with intentional code changes and must wait for another continuation solely to reacquire a lease.\nSuggested improvement: Renew the lease on verifier inbox/tool activity and around ask_user/subagent waits, or add an idempotent work_verifier_renew_claim tool.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/62a294af-d337-4ee9-b2de-8eb379fbc0bd",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3620150,
+              "file": "01-state.json",
+              "sha256": "44dc0f16bb59b0b704f373c4836a5d3d115404a667b29ebb742834f97b242375"
+            },
+            {
+              "bytes": 2550,
+              "file": "02-64204989-2b37-4290-b1c1-a23f17ed1ebe_work-worker_0_output.md",
+              "sha256": "6d216baf9e8fc3024d07212c6c1ac26fa1676a6ea888bf49280fc5a7b46e3663"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-24T13:21:49.118Z",
+          "workflowId": "01a02909-112a-7c96-95b4-37e0b2de5b28"
+        }
+      ],
+      "id": "work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The verifier claim lease expired while the mandatory accepted-finding remediation was actively running. The work-worker completed ",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:21:49.123Z"
+    },
     "work-2.report-f7d1e813-e0ae-49bf-b188-8477e9fbe685": {
       "createdAt": "2026-08-08T08:27:18.043Z",
       "dependencies": [
@@ -7992,6 +8533,44 @@
       "title": "Self-improvement report: Fresh work-planner runs transiently observe `AGENTS.md` as modified during agent startup even though the parent verifies its worki",
       "type": "task",
       "updatedAt": "2026-08-04T05:52:03.401Z"
+    },
+    "work-2.report-ff62d288-fd4b-45f7-b57d-c23dcf34539c": {
+      "createdAt": "2026-08-22T07:37:21.497Z",
+      "dependencies": [
+        "work-2.89"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: work_verifier_dispose rejects a stale finding whose checkpoint path was renamed from app/src/... to android/src/... because currentCodeEvidence requires evidence.path === finding.path and reads only the obsolete path. Supplying the inspected current android/src path and SHA-256, or null for the missing old path, both fail with 'Changed target requires matching current-code SHA-256 evidence.'\nExpected: Verifier triage should accept rename-aware current-code evidence (for example, resolve git renames from the checkpoint to HEAD) or allow a missing-target stale disposition with explicit inspected replacement-path evidence.\nImpact: Mandatory verifier triage cannot complete after a repository path rename even when the exact current implementation was inspected and the finding is demonstrably stale, blocking /work-resume.\nSuggested improvement: Permit currentCode.path to differ when git can prove a rename from finding.path, then hash the current path; alternatively support old-path-missing stale dispositions with a replacement path and hash.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/ff38ad9e-7008-4b2f-ab48-6d561e95e29c",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3516719,
+              "file": "01-state.json",
+              "sha256": "9c6d5027762b75f41e378a092e5662479785dcbce4ad6904f74534f12add5a03"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-08-22T07:37:21.492Z",
+          "workflowId": "01a0285c-43b1-7bb8-9e98-d1d18e35c5bf"
+        }
+      ],
+      "id": "work-2.report-ff62d288-fd4b-45f7-b57d-c23dcf34539c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE locally-owned rename-aware disposition evidence can require Git-proven checkpoint-to-HEAD lineage plus the live SHA-256; scope is verifier triage only and rollback is commit revert"
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: work_verifier_dispose rejects a stale finding whose checkpoint path was renamed from app/src/... to android/src/... because curren",
+      "type": "task",
+      "updatedAt": "2026-08-24T13:31:59.165Z"
     },
     "work-3": {
       "createdAt": "2026-07-25T07:42:39.407Z",
@@ -9947,7 +10526,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-22T06:53:29.472Z"
+    "updatedAt": "2026-08-24T13:35:10.948Z"
   },
   "schemaVersion": 1
 }
