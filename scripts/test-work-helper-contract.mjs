@@ -443,6 +443,19 @@ try {
 			"--max-files",
 			"1",
 			"--message",
+			"refresh residual review scope",
+			...verifyArgs,
+		),
+		/Review only:/,
+		"legacy review scope is refreshed with a content fingerprint",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-2",
+			"--max-files",
+			"1",
+			"--message",
 			"finish residual fixes",
 			...verifyArgs,
 			"--reviewed",
@@ -451,10 +464,27 @@ try {
 		"generic fixer PASS does not disposition targeted re-review findings",
 	);
 	const dispositionStore = loadStore(cwd);
-	dispositionStore.items["TASK-2"].notes.push(
-		'wo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"guard added","evidence":"focused test A passed"},{"finding":"residual B","fix":"scope check added","evidence":"focused test B passed"}]}',
-	);
+	const residualDisposition =
+		'wo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"guard added","evidence":"focused test A passed"},{"finding":"residual B","fix":"scope check added","evidence":"focused test B passed"}]}';
+	dispositionStore.items["TASK-2"].notes.push(residualDisposition);
 	saveStore(cwd, dispositionStore);
+	writeFileSync(path.join(cwd, "residual.js"), "export default 2;\n");
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-2",
+			"--max-files",
+			"1",
+			"--message",
+			"reject stale residual disposition",
+			...verifyArgs,
+		),
+		/Review only:/,
+		"same-path content changes invalidate a residual disposition",
+	);
+	const refreshedResidualStore = loadStore(cwd);
+	refreshedResidualStore.items["TASK-2"].notes.push(residualDisposition);
+	saveStore(cwd, refreshedResidualStore);
 	const residualFinished = JSON.parse(
 		run(
 			"finish-task",
@@ -519,10 +549,27 @@ try {
 	);
 	saveStore(cwd, mechanicalStore);
 	const mechanicalDispositionStore = loadStore(cwd);
-	mechanicalDispositionStore.items["TASK-3"].notes.push(
-		'wo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added the required date","evidence":"documentation check passed"}]}',
-	);
+	const mechanicalDisposition =
+		'wo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added the required date","evidence":"documentation check passed"}]}';
+	mechanicalDispositionStore.items["TASK-3"].notes.push(mechanicalDisposition);
 	saveStore(cwd, mechanicalDispositionStore);
+	writeFileSync(path.join(cwd, "mechanical.js"), "// changed after disposition\n");
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-3",
+			"--max-files",
+			"1",
+			"--message",
+			"reject stale mechanical disposition",
+			...verifyArgs,
+		),
+		/Review only:/,
+		"same-path content changes invalidate a mechanical disposition",
+	);
+	const refreshedMechanicalStore = loadStore(cwd);
+	refreshedMechanicalStore.items["TASK-3"].notes.push(mechanicalDisposition);
+	saveStore(cwd, refreshedMechanicalStore);
 	const mechanicalFinished = JSON.parse(
 		run(
 			"finish-task",

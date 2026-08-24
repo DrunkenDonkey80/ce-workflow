@@ -388,6 +388,7 @@ function reviewEvents(task) {
 		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
 	const all = [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)];
 	return {
+		scopeIndex,
 		postScope: all.filter((event) => event.index > scopeIndex),
 		priorFailures: all.filter(
 			(event) => event.index < scopeIndex && event[1]?.toUpperCase() === "FAIL",
@@ -398,26 +399,27 @@ function reviewEvents(task) {
 	};
 }
 
-function directReviewPassed(task) {
-	return reviewEvents(task).postScope.at(-1)?.[1]?.toUpperCase() === "PASS";
-}
-
 function reviewDispositionSatisfied(task) {
-	const { postScope, priorFailures, priorPasses } = reviewEvents(task);
+	const { scopeIndex, postScope, priorFailures, priorPasses } =
+		reviewEvents(task);
 	if (postScope.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
 	const failures = postScope.filter(
 		(event) => event[1]?.toUpperCase() === "FAIL",
 	).length;
 	const target = targetedReviewFindings(task);
-	const kind =
+	let kind;
+	if (
 		failures >= 2 ||
 		(failures === 1 && priorFailures) ||
 		(failures === 0 && priorFailures && priorPasses)
-			? "residual-fix"
-			: failures === 1
-				? "mechanical-fix"
-				: undefined;
-	return kind && dispositionCovers(target, dispositionNote(task, kind));
+	)
+		kind = "residual-fix";
+	else if (failures === 1 || (failures === 0 && priorFailures))
+		kind = "mechanical-fix";
+	const disposition = kind && dispositionNote(task, kind);
+	return (
+		disposition?.index > scopeIndex && dispositionCovers(target, disposition)
+	);
 }
 
 function formatPendingFiles(root = cwd) {
@@ -931,11 +933,8 @@ async function finishTaskUnlocked() {
 		const freshReviewScope =
 			sameReviewFiles &&
 			persistedReviewScope?.fingerprint === currentReviewFingerprint;
-		const directReviewAccepted = directReviewPassed(task);
 		const accepted =
-			sameReviewFiles &&
-			reviewDispositionSatisfied(task) &&
-			(!directReviewAccepted || freshReviewScope);
+			freshReviewScope && reviewDispositionSatisfied(task);
 		if (!accepted && !reviewed) {
 			if (!freshReviewScope)
 				mutateStore(cwd, (store) =>
@@ -964,7 +963,7 @@ async function finishTaskUnlocked() {
 			throw new Error(
 				"review scope changed; rerun finish-task without --reviewed to regenerate the coded handoff",
 			);
-		if (directReviewAccepted && !freshReviewScope)
+		if (!freshReviewScope)
 			throw new Error(
 				"reviewed file content changed; rerun finish-task without --reviewed to regenerate the coded handoff",
 			);
