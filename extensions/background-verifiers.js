@@ -525,12 +525,14 @@ function emptyVerifierBase(cwd) {
 function snapshotPaths(cwd, base, snapshot, paths, allowEmpty = false) {
 	const changed = new Set(
 		[
-			...gitLines(
+			...git(
 				cwd,
 				snapshot === base
-					? ["diff", "--name-only", base]
-					: ["diff", "--name-only", base, snapshot],
-			),
+					? ["diff", "--name-only", "-z", base]
+					: ["diff", "--name-only", "-z", base, snapshot],
+			)
+				.split("\0")
+				.filter(Boolean),
 			...git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"])
 				.split("\0")
 				.filter(Boolean),
@@ -796,15 +798,18 @@ function ensureVerifierWorkspace(cwd, batch) {
 		const projectScope = batch.checkpoint.scope === "project";
 		const archivedPaths = projectScope
 			? batch.checkpoint.paths
-			: gitLines(cwd, [
+			: git(cwd, [
 					"--literal-pathspecs",
 					"ls-tree",
 					"-r",
 					"--name-only",
+					"-z",
 					batch.checkpoint.snapshot,
 					"--",
 					...batch.checkpoint.paths,
-				]);
+				])
+					.split("\0")
+					.filter(Boolean);
 		if (archivedPaths.length) {
 			const archive = path.join(workspace, ".snapshot.tar");
 			execFileSync(

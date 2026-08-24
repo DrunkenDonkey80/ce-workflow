@@ -10362,10 +10362,11 @@ export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
 	const paths = run(cwd, "git", [
 		"diff",
 		"--name-only",
+		"-z",
 		`${input.before}..${input.after}`,
 		"--",
 	])
-		.split(/\r?\n/)
+		.split("\0")
 		.map(normalizedRepoPath)
 		.filter(
 			(file) =>

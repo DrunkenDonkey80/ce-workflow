@@ -1187,8 +1187,9 @@ try {
 			}),
 		);
 		writeFileSync(path.join(verifierCwd, ".gitignore"), ".pi/\n.ce-workflow/\n");
-		writeFileSync(path.join(verifierCwd, "tracked.txt"), "before\n");
-		execFileSync("git", ["add", ".gitignore", "tracked.txt"], {
+		const quotedPath = "träcked.txt";
+		writeFileSync(path.join(verifierCwd, quotedPath), "before\n");
+		execFileSync("git", ["add", ".gitignore", quotedPath], {
 			cwd: verifierCwd,
 		});
 		execFileSync("git", ["commit", "-m", "before"], { cwd: verifierCwd });
@@ -1196,8 +1197,8 @@ try {
 			cwd: verifierCwd,
 			encoding: "utf8",
 		}).trim();
-		writeFileSync(path.join(verifierCwd, "tracked.txt"), "after\n");
-		execFileSync("git", ["add", "tracked.txt"], { cwd: verifierCwd });
+		writeFileSync(path.join(verifierCwd, quotedPath), "after\n");
+		execFileSync("git", ["add", quotedPath], { cwd: verifierCwd });
 		execFileSync("git", ["commit", "-m", "after"], { cwd: verifierCwd });
 		const after = execFileSync("git", ["rev-parse", "HEAD"], {
 			cwd: verifierCwd,
@@ -1209,6 +1210,10 @@ try {
 		});
 		assert.equal(scheduled.status, "queued", scheduled.reason);
 		await scheduled.launch;
+		const [scheduledBatch] = Object.values(
+			loadVerifierStore(verifierCwd).batches,
+		);
+		assert.deepEqual(scheduledBatch.checkpoint.paths, [quotedPath]);
 		assert(
 			existsSync(
 				path.join(
