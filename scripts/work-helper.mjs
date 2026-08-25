@@ -933,8 +933,7 @@ async function finishTaskUnlocked() {
 		const freshReviewScope =
 			sameReviewFiles &&
 			persistedReviewScope?.fingerprint === currentReviewFingerprint;
-		const accepted =
-			freshReviewScope && reviewDispositionSatisfied(task);
+		const accepted = freshReviewScope && reviewDispositionSatisfied(task);
 		if (!accepted && !reviewed) {
 			if (!freshReviewScope)
 				mutateStore(cwd, (store) =>

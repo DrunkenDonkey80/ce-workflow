@@ -11751,8 +11751,7 @@ function checkpointRenameTarget(cwd, finding, candidate) {
 }
 
 function currentCodeEvidence(cwd, finding, evidence) {
-	if (!evidence || !/^[0-9a-f]{64}$/i.test(evidence.sha256 ?? ""))
-		return false;
+	if (!evidence || !/^[0-9a-f]{64}$/i.test(evidence.sha256 ?? "")) return false;
 	const file = normalizedRepoPath(evidence.path);
 	if (
 		file !== normalizedRepoPath(finding.path) &&

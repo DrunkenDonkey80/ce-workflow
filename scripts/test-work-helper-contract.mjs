@@ -553,7 +553,10 @@ try {
 		'wo:mechanical-fix PASS {"dispositions":[{"finding":"source comment date is missing","fix":"added the required date","evidence":"documentation check passed"}]}';
 	mechanicalDispositionStore.items["TASK-3"].notes.push(mechanicalDisposition);
 	saveStore(cwd, mechanicalDispositionStore);
-	writeFileSync(path.join(cwd, "mechanical.js"), "// changed after disposition\n");
+	writeFileSync(
+		path.join(cwd, "mechanical.js"),
+		"// changed after disposition\n",
+	);
 	assert.match(
 		failure(
 			"finish-task",

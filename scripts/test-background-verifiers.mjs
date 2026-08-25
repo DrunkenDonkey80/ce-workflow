@@ -787,7 +787,8 @@ try {
 	git("add", "tracked.txt");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
 	writeFileSync(path.join(gitCwd, "untracked.txt"), "untracked\n");
-	const magicPath = process.platform === "win32" ? undefined : ":(glob)literal.txt";
+	const magicPath =
+		process.platform === "win32" ? undefined : ":(glob)literal.txt";
 	if (magicPath) writeFileSync(path.join(gitCwd, magicPath), "literal\n");
 	writeFileSync(path.join(gitCwd, "a-binary.so"), Buffer.alloc(32_001, 1));
 	writeFileSync(
