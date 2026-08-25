@@ -271,17 +271,6 @@ try {
 			now: "2026-08-09T08:35:00.000Z",
 		}),
 	);
-	const baselineJob = Object.values(
-		loadVerifierStore(baselineVerifierCwd).jobs,
-	)[0];
-	mutateVerifierStore(baselineVerifierCwd, (store) =>
-		recordOperationResult(store, {
-			jobId: baselineJob.id,
-			operation: "correctness",
-			outcome: "failed",
-			failure: "prior goal provider failure",
-		}),
-	);
 	const baselineGoal = {
 		mode: "generic",
 		objective: "unrelated next goal",
@@ -291,73 +280,25 @@ try {
 	assert.equal(
 		mod.workGoalCompletionBlocker(baselineGoal, baselineVerifierCwd),
 		undefined,
-		"the caller excludes a failed verifier batch for the persisted goal baseline",
+		"the persisted baseline excludes its verifier batch",
 	);
 	assert.equal(
 		mod.workGoalCompletionBlocker(
 			{ ...baselineGoal, baselineHead: baselineBatch.checkpoint.base },
 			baselineVerifierCwd,
 		),
-		undefined,
-		"provider failures after the baseline remain visible without blocking completion",
+		"background verification is still queued or running",
+		"a different baseline keeps the queued verifier visible",
 	);
 } finally {
 	rmSync(baselineVerifierCwd, { recursive: true, force: true });
 }
 
-const legacyBaselineCwd = mkdtempSync(
-	path.join(tmpdir(), "ce-work-goal-legacy-baseline-"),
+assert.equal(
+	mod.workGoalBaselineHead({ startedAt: Date.now() }),
+	undefined,
+	"legacy goals do not infer a baseline from untrusted commit timestamps",
 );
-try {
-	execFileSync("git", ["init"], { cwd: legacyBaselineCwd, stdio: "ignore" });
-	execFileSync("git", ["config", "user.name", "Test"], {
-		cwd: legacyBaselineCwd,
-	});
-	execFileSync("git", ["config", "user.email", "test@example.com"], {
-		cwd: legacyBaselineCwd,
-	});
-	writeFileSync(path.join(legacyBaselineCwd, "tracked.txt"), "before\n");
-	execFileSync("git", ["add", "tracked.txt"], { cwd: legacyBaselineCwd });
-	execFileSync("git", ["commit", "-m", "before"], {
-		cwd: legacyBaselineCwd,
-		env: {
-			...process.env,
-			GIT_AUTHOR_DATE: "2026-08-09T08:30:00Z",
-			GIT_COMMITTER_DATE: "2026-08-09T08:30:00Z",
-		},
-	});
-	const legacyBaseline = execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: legacyBaselineCwd,
-		encoding: "utf8",
-	}).trim();
-	writeFileSync(path.join(legacyBaselineCwd, "tracked.txt"), "after\n");
-	execFileSync("git", ["commit", "-am", "after"], {
-		cwd: legacyBaselineCwd,
-		env: {
-			...process.env,
-			GIT_AUTHOR_DATE: "2026-08-09T08:40:00Z",
-			GIT_COMMITTER_DATE: "2026-08-09T08:40:00Z",
-		},
-	});
-	assert.equal(
-		mod.workGoalBaselineHead(
-			{ startedAt: Date.parse("2026-08-09T08:35:00Z") },
-			legacyBaselineCwd,
-		),
-		legacyBaseline,
-		"legacy goals derive the HEAD that existed when they started",
-	);
-	assert.equal(mod.workGoalBaselineHead({}, legacyBaselineCwd), undefined);
-	assert.equal(
-		mod.workGoalBaselineHead(
-			{ startedAt: Date.parse("2026-08-09T08:35:00Z") },
-			path.join(legacyBaselineCwd, "missing"),
-		),
-		undefined,
-	);
-} finally {
-	rmSync(legacyBaselineCwd, { recursive: true, force: true });
-}
 assert.deepEqual(
 	mod.parseWorkProjectGoalInput("C:/soft/git/AI-Wedge task 19"),
 	{

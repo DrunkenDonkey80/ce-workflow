@@ -18223,21 +18223,9 @@ function currentWorkGoalBaselineHead(cwd) {
 	}
 }
 
-function workGoalBaselineHead(goal, cwd = activeWorkGoalCwd) {
+function workGoalBaselineHead(goal) {
 	if (/^[0-9a-f]{40,64}$/i.test(String(goal?.baselineHead ?? "")))
 		return goal.baselineHead;
-	const startedAt = Number(goal?.startedAt);
-	if (!Number.isFinite(startedAt)) return;
-	try {
-		return run(cwd, "git", [
-			"rev-list",
-			"-1",
-			`--before=${new Date(startedAt).toISOString()}`,
-			"HEAD",
-		]);
-	} catch {
-		return;
-	}
 }
 
 function createWorkGoal(
