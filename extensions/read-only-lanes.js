@@ -262,10 +262,7 @@ function acquireFileLock(file, category, reclaiming = false) {
 		descriptor = openSync(file, "wx", 0o600);
 		writeFileSync(descriptor, `${JSON.stringify(owner)}\n`);
 	} catch (error) {
-		if (
-			error?.code === "EEXIST" ||
-			(error?.code === "EPERM" && existsSync(file))
-		) {
+		if (error?.code === "EEXIST" || error?.code === "EPERM") {
 			const staleOwner = lockOwner(file);
 			if (ownerDead(file)) {
 				try {
