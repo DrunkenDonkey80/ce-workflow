@@ -4761,12 +4761,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE locally-owned rename-lineage evidence fix: accept only repository-contained Git-proven successor paths with exact SHA-256 bytes; invalid paths and hashes remain rejected. No external or persistent-format change; rollback by reverting the focused commit.",
+        "wo:reconciliation PASS locally-owned fix committed in 58612cc: current-code evidence follows Git-proven rename edges commit-by-commit when direct checkpoint-to-HEAD similarity is too low, then still requires an exact SHA-256 match. node scripts/test-work-goal.mjs passed the renamed-then-substantially-rewritten regression."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose rejects valid current-code SHA evidence when a finding's checkpoint path was renamed and substantially edite",
       "type": "task",
-      "updatedAt": "2026-08-25T01:38:30.091Z"
+      "updatedAt": "2026-08-26T06:36:01.053Z"
     },
     "work-2.report-0c2dea4b-60f9-453f-b9b2-b9b9133efd55": {
       "createdAt": "2026-08-11T17:57:41.101Z",
@@ -4858,12 +4861,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE already current: roleHandoffPrompt and workflowHelperGuidance include the exact helper path, compact commands, selected work-item target, and infrastructure-BLOCKED fallback. No source change needed; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A coded /work-resume verifier-triage handoff launched work-worker without the absolute work-helper.mjs path or native work-item ID",
       "type": "task",
-      "updatedAt": "2026-08-24T15:01:12.679Z"
+      "updatedAt": "2026-08-26T06:02:33.316Z"
     },
     "work-2.report-0ea575dc-dceb-4a33-999f-ba4ffd1f41a5": {
       "createdAt": "2026-08-24T21:22:07.906Z",
@@ -4892,12 +4897,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose cannot disposition finding-6c19ce3f8a0e4ef94f8aea00 after its checkpoint file was renamed. The current track",
       "type": "task",
-      "updatedAt": "2026-08-24T21:22:07.906Z"
+      "updatedAt": "2026-08-26T06:00:31.644Z"
     },
     "work-2.report-1632c6a2-77eb-4420-aae4-c2a2280c0229": {
       "createdAt": "2026-08-24T15:19:33.445Z",
@@ -4931,12 +4938,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose rejects valid current-code evidence for a finding whose checkpoint path was renamed from app/src/main/res/va",
       "type": "task",
-      "updatedAt": "2026-08-24T15:19:33.445Z"
+      "updatedAt": "2026-08-26T06:00:31.742Z"
     },
     "work-2.report-190164eb-603a-44b8-ab03-c9c2af85f26c": {
       "createdAt": "2026-08-21T19:17:16.910Z",
@@ -5021,12 +5030,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE already fixed by 0b67313: accepted finding paths may resolve to a Git-proven relocation while exact dirty-scope validation remains enforced; focused regression coverage exists. Closure only; rollback by reopening the report or reverting 0b67313.",
+        "wo:reconciliation PASS already-fixed by 0b67313: accepted finding paths may resolve to a Git-proven relocation while exact dirty-scope validation remains enforced. scripts/test-work-goal.mjs relocation regression passed under commit 58612cc; no new source change required."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_complete_fix cannot complete an already accepted verifier finding after the Android module's repository path moved f",
       "type": "task",
-      "updatedAt": "2026-08-25T02:27:44.423Z"
+      "updatedAt": "2026-08-26T06:35:34.818Z"
     },
     "work-2.report-1b99aab8-1916-4247-959e-2a1db95d63fe": {
       "createdAt": "2026-08-25T01:07:42.246Z",
@@ -5060,12 +5072,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: An autonomous-goal automatic continuation moved from session 01a0364f-8012-74db-a59c-4df272640b7d to fresh session 01a0366e-6968-7",
       "type": "task",
-      "updatedAt": "2026-08-25T01:07:42.246Z"
+      "updatedAt": "2026-08-26T06:02:30.988Z"
     },
     "work-2.report-1e41739d-a5e4-434d-954f-7235e7fd07c5": {
       "createdAt": "2026-08-19T09:29:15.735Z",
@@ -5186,12 +5200,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Automatic work-goal continuation started session 01a0357e after predecessor 01a03561 stopped, but 32 verifier groups remain claime",
       "type": "task",
-      "updatedAt": "2026-08-24T20:48:07.237Z"
+      "updatedAt": "2026-08-26T06:02:31.079Z"
     },
     "work-2.report-246e1b7b-2692-4324-9980-3e8d7ad67cf6": {
       "createdAt": "2026-08-20T11:51:52.412Z",
@@ -5269,12 +5285,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_goal_complete rejected a fully closed/pushed work-1 because verifier findings await triage, while the only current active cla",
       "type": "task",
-      "updatedAt": "2026-08-24T23:15:45.320Z"
+      "updatedAt": "2026-08-26T06:02:31.176Z"
     },
     "work-2.report-2cdd87c5-81e8-444e-8075-85ef78e8d3aa": {
       "createdAt": "2026-08-20T06:01:26.367Z",
@@ -5345,12 +5363,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE already fixed by 884ea69: the same resume lineage can atomically adopt a live predecessor claim while unrelated live owners remain locked, and expired claims remain reclaimable. Closure only; rollback by reopening the report or reverting 884ea69.",
+        "wo:reconciliation PASS already-fixed by 884ea69: resume-lineage ownership can adopt a predecessor claim while unrelated live owners remain protected and expired claims remain reclaimable. Existing focused verifier claim tests pass; no new source change required."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A verifier-triage owner session aborted immediately after its work-worker completed and left claim claim-0b0e2d1deafc268009ecbf27 ",
       "type": "task",
-      "updatedAt": "2026-08-25T00:25:50.060Z"
+      "updatedAt": "2026-08-26T06:35:28.713Z"
     },
     "work-2.report-31731feb-2501-42a7-91d8-753863b4356b": {
       "createdAt": "2026-08-24T23:49:46.079Z",
@@ -5384,12 +5405,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose rejects valid current-code evidence for a verifier finding whose checkpoint path app/src/.../MainActivity.kt",
       "type": "task",
-      "updatedAt": "2026-08-24T23:49:46.079Z"
+      "updatedAt": "2026-08-26T06:00:31.837Z"
     },
     "work-2.report-32be7dcf-3e04-42d4-b9e3-7752de496409": {
       "createdAt": "2026-08-21T10:40:50.647Z",
@@ -5435,6 +5458,42 @@
       "type": "task",
       "updatedAt": "2026-08-21T11:12:37.746Z"
     },
+    "work-2.report-35fa7696-393d-4a14-8074-9f7d0df535d5": {
+      "createdAt": "2026-08-26T06:34:38.961Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After correcting the snapshot's obsolete shard-traversal assertion, `node scripts/test-work-optimization-helpers.mjs` advanced to line 1217 and failed the later assertion `a mechanical disposition cannot bypass review for production files`; the captured helper stdout no longer contained the expected durable-review wording.\nExpected: The optimization-helper regression suite should assert the current stable review-gate contract at every negative case and complete successfully; a corrected earlier assertion should not merely expose another obsolete message expectation later in the same suite.\nImpact: The canonical optimization-helper test remains red after the snapshot-specific assertion is fixed, so package verification cannot be fully green and future regressions are obscured. This is distinct work discovered after the bounded snapshot attempt and should be handled in the next improvement invocation.\nSuggested improvement: Inspect the actual finish-task JSON error for TASK-4 and update the later assertion to a stable semantic fragment or category, with a focused regression that distinguishes production review requirements from mechanical-only dispositions.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/1849ebc0-3749-4ad8-9bfa-903e41db44b5",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 38818,
+              "file": "01-test-work-optimization-helpers.mjs",
+              "sha256": "c9485433668ad820e6abe73818b76f03c7eabb71989bebdd975cc349515b2d71"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-26T06:34:38.954Z",
+          "workflowId": "workflow-mt9owhz5-8l24ul"
+        }
+      ],
+      "id": "work-2.report-35fa7696-393d-4a14-8074-9f7d0df535d5",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE related-distinct stale test-contract investigation; production behavior remains unchanged and any fix is a reversible focused test update. Rollback by reverting the eventual test commit; leave open for the next snapshot."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After correcting the snapshot's obsolete shard-traversal assertion, `node scripts/test-work-optimization-helpers.mjs` advanced to ",
+      "type": "task",
+      "updatedAt": "2026-08-26T06:34:38.961Z"
+    },
     "work-2.report-379146f1-797f-4fae-adc5-37e711eddd90": {
       "createdAt": "2026-08-24T21:18:01.707Z",
       "dependencies": [],
@@ -5460,6 +5519,9 @@
           "producer": "belot",
           "submittedAt": "2026-08-24T21:18:01.702Z",
           "workflowId": "01a0359d-5616-74a1-ade5-c27688b74b60"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-379146f1-797f-4fae-adc5-37e711eddd90",
@@ -5467,12 +5529,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE locally-owned exact-scope staging defect; retain bounded path validation, empty-index requirement, atomic commit, and reset-on-failure rollback. No persistent format or external side effect; rollback by reverting the focused commit.",
+        "wo:review PASS independent work-reviewer: ensureOnlyStaged uses NUL-delimited --name-only --no-renames so rename/copy similarity cannot collapse or invent authorized scope paths; both callers pass the validated exact set. Parent verification node scripts/test-work-goal.mjs passed. Residual pre-existing behavior: requested-but-unchanged paths remain rejected by exact two-way set matching.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_complete_fix could not complete an accepted finding in a working tree containing the accumulated verifier remediatio",
       "type": "task",
-      "updatedAt": "2026-08-24T21:18:01.707Z"
+      "updatedAt": "2026-08-26T06:36:56.344Z"
     },
     "work-2.report-38f67638-a4b7-4a36-a376-992e38e4c026": {
       "createdAt": "2026-08-22T10:33:49.892Z",
@@ -5594,12 +5660,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After automatic continuation into a fresh Pi session, work-1 was closed and pushed, but work_goal_complete remained blocked by ver",
       "type": "task",
-      "updatedAt": "2026-08-24T22:13:35.321Z"
+      "updatedAt": "2026-08-26T06:02:31.267Z"
     },
     "work-2.report-3e9fadf5-7e10-4469-9e04-fdb6a5479ce6": {
       "createdAt": "2026-08-24T14:53:27.845Z",
@@ -5633,12 +5701,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A verifier finding claim remains `claimed` until its 30-minute lease expires after the owning session disconnects. The exact owner",
       "type": "task",
-      "updatedAt": "2026-08-24T14:53:27.845Z"
+      "updatedAt": "2026-08-26T06:02:31.360Z"
     },
     "work-2.report-3ee81e7d-548e-45a3-88dc-899ce90acdd1": {
       "createdAt": "2026-08-21T01:03:08.097Z",
@@ -5706,12 +5776,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose cannot record a disposition for a finding whose checkpoint path was relocated and then changed enough that G",
       "type": "task",
-      "updatedAt": "2026-08-24T16:46:45.515Z"
+      "updatedAt": "2026-08-26T06:00:31.936Z"
     },
     "work-2.report-3fb035e4-c39d-489c-bfcd-2d1fc55547c8": {
       "createdAt": "2026-08-08T17:28:28.534Z",
@@ -6097,12 +6169,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Verifier triage cannot record a disposition after a finding's checkpoint path moved and the file changed enough that Git's default",
       "type": "task",
-      "updatedAt": "2026-08-24T14:26:47.421Z"
+      "updatedAt": "2026-08-26T06:00:32.028Z"
     },
     "work-2.report-52aee41a-f985-4d4a-80c6-8ce324bcaa1c": {
       "createdAt": "2026-08-21T19:17:07.303Z",
@@ -6286,12 +6360,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A verifier claim remains leased to a prior autonomous continuation session after its work-worker finished successfully. Claim clai",
       "type": "task",
-      "updatedAt": "2026-08-24T18:17:31.061Z"
+      "updatedAt": "2026-08-26T06:02:31.457Z"
     },
     "work-2.report-54b01336-7496-4100-9b35-18842ed57de5": {
       "createdAt": "2026-08-24T16:37:02.290Z",
@@ -6320,12 +6396,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Automatic continuation #23 reported that completed verifier findings were actively triaged by another session, but intercom showed",
       "type": "task",
-      "updatedAt": "2026-08-24T16:37:02.290Z"
+      "updatedAt": "2026-08-26T06:02:31.554Z"
     },
     "work-2.report-54bf40d5-13f2-4f0e-a43d-d84cd2009241": {
       "createdAt": "2026-08-11T16:12:46.609Z",
@@ -6410,12 +6488,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A fresh continuation cannot adopt verifier claim claim-3f69e1a6f331864ca671dfa1 after owner session 01a03726-3caf-7734-8610-5e5e83",
       "type": "task",
-      "updatedAt": "2026-08-25T05:01:43.218Z"
+      "updatedAt": "2026-08-26T06:02:31.647Z"
     },
     "work-2.report-58390134-7183-4e92-bc36-53c45d95b337": {
       "createdAt": "2026-08-17T21:57:03.567Z",
@@ -6623,12 +6703,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose cannot triage a stale finding when the checkpoint target was moved and substantially rewritten, because curr",
       "type": "task",
-      "updatedAt": "2026-08-25T05:28:42.019Z"
+      "updatedAt": "2026-08-26T06:00:32.125Z"
     },
     "work-2.report-5b7de951-5b4f-496e-850c-cb879e29c4c6": {
       "createdAt": "2026-08-03T13:21:32.961Z",
@@ -6711,12 +6793,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Verifier claim claim-fe6187a9e6c16db038777f42 remains in claimed state with an accepted disposition and completed worker artifact,",
       "type": "task",
-      "updatedAt": "2026-08-24T16:32:07.071Z"
+      "updatedAt": "2026-08-26T06:02:31.754Z"
     },
     "work-2.report-5e0dec37-d699-41a6-8358-a85df1b113a4": {
       "createdAt": "2026-08-20T05:46:51.737Z",
@@ -6792,12 +6876,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE already current: ensureWorkflowGitignore includes .ce-workflow/work-runs/; duplicate runtime-ignore report requires no source change. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Verifier runtime state/artifacts were created under .ce-workflow/work-runs/ in the target project, but the initialized .gitignore ",
       "type": "task",
-      "updatedAt": "2026-08-25T00:16:24.922Z"
+      "updatedAt": "2026-08-26T06:02:33.119Z"
     },
     "work-2.report-60ff67ad-d2d8-46de-a7a4-b5b4d918e984": {
       "createdAt": "2026-08-07T06:29:07.173Z",
@@ -7157,12 +7243,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE already current: ensureWorkflowGitignore includes .ce-workflow/work-runs/; duplicate runtime-ignore report requires no source change. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Configured work-worker/reviewer/fixer runs wrote runtime handoff artifacts under .ce-workflow/work-runs/, but that directory is ne",
       "type": "task",
-      "updatedAt": "2026-08-24T13:33:42.674Z"
+      "updatedAt": "2026-08-26T06:02:33.214Z"
     },
     "work-2.report-6c00a02a-768d-4a43-ae0a-f51563b70169": {
       "createdAt": "2026-08-08T08:21:15.842Z",
@@ -7442,12 +7530,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose rejected valid current-code evidence after the finding's checkpoint path moved from app/... to android/..., ",
       "type": "task",
-      "updatedAt": "2026-08-24T13:25:09.341Z"
+      "updatedAt": "2026-08-26T06:00:32.230Z"
     },
     "work-2.report-73b84a6b-b3c4-40f9-beab-0f8ce469508d": {
       "createdAt": "2026-08-25T03:56:37.218Z",
@@ -7481,12 +7571,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A verifier-triage specialist accepted finding-7bac7a94a7e33e943ced9d93, launched and verified the work-worker fix, then aborted be",
       "type": "task",
-      "updatedAt": "2026-08-25T03:56:37.218Z"
+      "updatedAt": "2026-08-26T06:02:31.860Z"
     },
     "work-2.report-74df0d15-f508-42ec-99c5-0792c7cb12c9": {
       "createdAt": "2026-08-19T06:28:56.217Z",
@@ -7605,12 +7697,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE locally-owned completion-gate accounting fix limited to findings already covered by a durably triaged group; unresolved groups and accepted fixes still block. No data mutation; rollback by reverting the focused commit.",
+        "wo:reconciliation PASS insufficient-evidence/no-change: the submitted state contains 68 findings without dispositions, of which 54 belong only to status=completed groups and 14 to status=claimed groups. In the current schema completed means ready for triage (claimCompletedGroups claims it), while only status=triaged is terminal and validation requires every member disposition/fix. Treating completed groups as triaged would weaken the mandatory gate; current code is correct and rollback is reopening this report if reproducible evidence identifies a distinct claiming bug."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_goal_complete is blocked by \"background verification has findings awaiting triage\" even though many counted findings belong t",
       "type": "task",
-      "updatedAt": "2026-08-24T23:21:22.012Z"
+      "updatedAt": "2026-08-26T06:36:09.605Z"
     },
     "work-2.report-80bf598b-4278-49aa-ace4-e9c57bfbddb8": {
       "createdAt": "2026-08-11T17:49:02.188Z",
@@ -7693,12 +7788,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: An accepted verifier finding remained stuck in group status `claimed` after its foreign owner session stopped heartbeating and the",
       "type": "task",
-      "updatedAt": "2026-08-24T18:42:30.099Z"
+      "updatedAt": "2026-08-26T06:02:31.957Z"
     },
     "work-2.report-84ee2c23-cb86-43cb-952f-eebe972e7299": {
       "createdAt": "2026-08-24T23:37:13.614Z",
@@ -7732,12 +7829,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE already fixed by b66ff89 with unchanged-production checkpoint validation and exact dirty test scope; focused regression coverage exists. Closure only; rollback by reopening the report or reverting b66ff89.",
+        "wo:reconciliation PASS already-fixed by b66ff89: test-gap completion permits exact dirty test scope only when the omitted production finding path still matches its checkpoint. Focused regression coverage in scripts/test-work-goal.mjs passed under commit 58612cc; no new source change required."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_complete_fix cannot complete an accepted missing-test finding when the finding points at production code but the cor",
       "type": "task",
-      "updatedAt": "2026-08-24T23:37:13.614Z"
+      "updatedAt": "2026-08-26T06:35:20.941Z"
     },
     "work-2.report-8521b172-ec61-4623-8af9-06bbda5846d9": {
       "createdAt": "2026-08-24T21:53:48.525Z",
@@ -7766,12 +7866,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose rejects valid current-code SHA-256 evidence for finding-f47dead5845a20755221fd22 after its target file moved",
       "type": "task",
-      "updatedAt": "2026-08-24T21:53:48.525Z"
+      "updatedAt": "2026-08-26T06:00:32.323Z"
     },
     "work-2.report-8687048c-ef65-40aa-8a38-3836e4f406a5": {
       "createdAt": "2026-08-09T14:29:03.493Z",
@@ -7860,12 +7962,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A verifier claim accepted in a prior/disconnected Pi session remained status=claimed after its lease expired. In this fresh autono",
       "type": "task",
-      "updatedAt": "2026-08-25T00:40:14.686Z"
+      "updatedAt": "2026-08-26T06:02:32.063Z"
     },
     "work-2.report-8ad63054-a156-4655-982b-a5c3082d6c2b": {
       "createdAt": "2026-08-01T09:15:12.789Z",
@@ -8064,12 +8168,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A fresh autonomous continuation for belot work-1 cannot complete because verifier group group-13e17025f230f4546ec5cf0f remains cla",
       "type": "task",
-      "updatedAt": "2026-08-24T13:51:40.866Z"
+      "updatedAt": "2026-08-26T06:02:32.172Z"
     },
     "work-2.report-95f458f8-d33c-4048-8b52-97c8ea8bca98": {
       "createdAt": "2026-08-08T19:55:34.274Z",
@@ -8148,12 +8254,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose rejects valid current-code evidence for finding-c1e4bf3452197451ec23a0f5 after MainActivity moved from app/s",
       "type": "task",
-      "updatedAt": "2026-08-25T04:33:41.082Z"
+      "updatedAt": "2026-08-26T06:00:32.430Z"
     },
     "work-2.report-9ed01f48-b0f9-48ff-9310-ac5b50701fb3": {
       "createdAt": "2026-08-20T08:20:26.937Z",
@@ -8273,12 +8381,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A verifier claim remained owned by disconnected session 01a0349e-803e-7ace-bd04-0b27c5cb743f after its worker left a verified acce",
       "type": "task",
-      "updatedAt": "2026-08-24T17:03:10.833Z"
+      "updatedAt": "2026-08-26T06:02:32.266Z"
     },
     "work-2.report-a1115297-55fa-44aa-9e19-506ab5e7be8d": {
       "createdAt": "2026-08-20T21:54:22.324Z",
@@ -8533,12 +8643,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Verifier groups remain status=claimed after their claim leases expired days ago (for example group-f17ccdf45154f9da39c62d32 / clai",
       "type": "task",
-      "updatedAt": "2026-08-24T23:21:51.279Z"
+      "updatedAt": "2026-08-26T06:02:32.362Z"
     },
     "work-2.report-aefe20c8-eff4-48e2-86c8-ede1795db7c5": {
       "createdAt": "2026-08-20T06:02:05.587Z",
@@ -8747,12 +8859,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_goal_complete rejected completion because a verifier finding awaited triage, while work_verifier_inbox returned empty because",
       "type": "task",
-      "updatedAt": "2026-08-25T04:54:25.997Z"
+      "updatedAt": "2026-08-26T06:02:32.457Z"
     },
     "work-2.report-bc2769f9-6838-4577-8ee0-1c7061093c37": {
       "createdAt": "2026-08-18T21:02:39.837Z",
@@ -8917,12 +9031,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose cannot triage a finding whose checkpoint path was git-renamed. The current equivalent file was inspected and",
       "type": "task",
-      "updatedAt": "2026-08-25T03:40:32.880Z"
+      "updatedAt": "2026-08-26T06:00:32.528Z"
     },
     "work-2.report-cb8b8f92-fb41-4e25-a867-94050378e06f": {
       "createdAt": "2026-08-22T07:06:03.754Z",
@@ -9000,12 +9116,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-19def14b-a058-44b0-99f5-bf5f06ee690c: same accepted-finding completion failure after path relocation; canonical remains open. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After accepting renamed finding finding-f47dead5845a20755221fd22, work_verifier_complete_fix cannot commit its valid fix. With onl",
       "type": "task",
-      "updatedAt": "2026-08-24T22:02:30.905Z"
+      "updatedAt": "2026-08-26T06:02:30.797Z"
     },
     "work-2.report-cfb7c57b-f515-4ec4-889e-ffd4c8e7b5db": {
       "createdAt": "2026-08-24T13:30:07.016Z",
@@ -9039,12 +9157,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-19def14b-a058-44b0-99f5-bf5f06ee690c: same accepted-finding completion failure after path relocation; canonical remains open. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After accepting a verifier finding whose checkpoint path moved from app/... to android/..., work_verifier_complete_fix rejected th",
       "type": "task",
-      "updatedAt": "2026-08-24T13:30:07.016Z"
+      "updatedAt": "2026-08-26T06:02:30.892Z"
     },
     "work-2.report-d16529ea-1917-4e39-8080-56a0720adb4e": {
       "createdAt": "2026-08-18T05:18:46.408Z",
@@ -9355,12 +9475,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After an autonomous goal continued into a fresh Pi session, background-verifier claim claim-f1851e29fc6a44cae32a97be remained leas",
       "type": "task",
-      "updatedAt": "2026-08-24T21:51:47.919Z"
+      "updatedAt": "2026-08-26T06:02:32.555Z"
     },
     "work-2.report-dff442bc-b480-4e4a-83c3-7445c23dffef": {
       "createdAt": "2026-08-24T15:57:24.173Z",
@@ -9394,12 +9516,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Autonomous goal completion is blocked by verifier findings whose active claim is owned by another session, while work_verifier_inb",
       "type": "task",
-      "updatedAt": "2026-08-24T15:57:24.173Z"
+      "updatedAt": "2026-08-26T06:02:32.648Z"
     },
     "work-2.report-e1bfdebd-c352-4c9d-95e1-c2c1690358a3": {
       "createdAt": "2026-08-11T16:36:58.409Z",
@@ -9608,12 +9732,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE locally-owned stale test expectation; production behavior is unchanged and the current validation category remains authoritative. Rollback by reverting the one-line test commit.",
+        "\"wo:reconciliation"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The real package verifier fails in scripts/test-work-optimization-helpers.mjs because its shard-traversal assertion still expects ",
       "type": "task",
-      "updatedAt": "2026-08-24T14:00:13.095Z"
+      "updatedAt": "2026-08-26T06:35:50.589Z"
     },
     "work-2.report-eb249504-b7ba-4c4a-b1a2-19c619f53eb2": {
       "createdAt": "2026-08-09T19:21:08.278Z",
@@ -9690,12 +9817,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work_verifier_dispose cannot record a stale/rejected disposition when a checkpoint path moved and later diverged enough that Git's",
       "type": "task",
-      "updatedAt": "2026-08-25T00:55:31.231Z"
+      "updatedAt": "2026-08-26T06:00:32.626Z"
     },
     "work-2.report-ec289716-ad4f-4177-919a-47e4ed6b750e": {
       "createdAt": "2026-08-07T09:46:23.611Z",
@@ -9766,12 +9895,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate of canonical work-2.report-0bfecadb-950b-4cc4-9aef-800066ca6e76: same substantially-edited renamed-path disposition limitation; canonical remains open because work-2.89 covers only direct Git-detected renames. Closure only; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Verifier triage cannot record a disposition after a checkpointed file was reorganized and substantially edited. finding-678482afa5",
       "type": "task",
-      "updatedAt": "2026-08-24T23:00:34.428Z"
+      "updatedAt": "2026-08-26T06:00:32.719Z"
     },
     "work-2.report-edd05587-1fc3-4050-9a30-70aa8f78cbb6": {
       "createdAt": "2026-08-25T03:06:03.368Z",
@@ -9805,12 +9936,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: A verifier claim was reported to this continuation as being actively triaged by another session, but the owning session terminated",
       "type": "task",
-      "updatedAt": "2026-08-25T03:06:03.368Z"
+      "updatedAt": "2026-08-26T06:02:32.741Z"
     },
     "work-2.report-ee4b6502-7f6c-4e77-9c06-78e7075e132c": {
       "createdAt": "2026-08-25T05:21:13.711Z",
@@ -9844,12 +9977,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: An expired verifier claim owned by a disconnected prior continuation session remains in status=claimed and blocks work_goal_comple",
       "type": "task",
-      "updatedAt": "2026-08-25T05:21:13.711Z"
+      "updatedAt": "2026-08-26T06:02:32.834Z"
     },
     "work-2.report-ee75a07e-2208-42f2-8a3c-ade7c4ca3376": {
       "createdAt": "2026-08-21T18:58:24.235Z",
@@ -9967,12 +10102,15 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE locally-owned narrow lease-continuity fix: preserve owner/session checks and renew only the still-owned claim at disposition/fix activity; no external state or protection removal. Failure is bounded to verifier routing; rollback by reverting the focused commit.",
+        "wo:reconciliation PASS locally-owned fix committed in 58612cc: disposition activity now renews a still-owned claim even after lease expiry while preserving owner/session checks; later accepted-fix activity renews again. node scripts/test-background-verifiers.mjs passed, including expired-owner disposition and renewal coverage."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The verifier claim lease expired while the mandatory accepted-finding remediation was actively running. The work-worker completed ",
       "type": "task",
-      "updatedAt": "2026-08-24T13:21:49.123Z"
+      "updatedAt": "2026-08-26T06:35:42.172Z"
     },
     "work-2.report-f5647a4a-7945-43f3-a31a-16ea013a2bdd": {
       "createdAt": "2026-08-24T19:54:59.411Z",
@@ -10011,12 +10149,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: An accepted verifier finding claim completed its work-worker remediation and wrote `.ce-workflow/work-runs/verifier-claim-2e2c-wor",
       "type": "task",
-      "updatedAt": "2026-08-24T19:54:59.411Z"
+      "updatedAt": "2026-08-26T06:02:32.926Z"
     },
     "work-2.report-f7d1e813-e0ae-49bf-b188-8477e9fbe685": {
       "createdAt": "2026-08-08T08:27:18.043Z",
@@ -10102,12 +10242,14 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE duplicate/already-covered verifier claim lifecycle report: expired or same-lineage takeover is current in work-2.90; immediate dead-owner adoption remains tracked by work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86 and active lease renewal by work-2.report-f0953c9d-b51b-454a-9e33-a80d48e7fc01. No distinct outcome remains; rollback by reopening."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: work-1 is closed with no open children and HEAD is synchronized, but work_goal_complete is blocked by verifier finding finding-2df",
       "type": "task",
-      "updatedAt": "2026-08-24T17:29:51.251Z"
+      "updatedAt": "2026-08-26T06:02:33.023Z"
     },
     "work-2.report-fa8e5119-cfa2-41f0-8f5c-04e64284a4df": {
       "createdAt": "2026-08-18T20:56:46.122Z",
@@ -12193,7 +12335,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-25T05:28:42.019Z"
+    "updatedAt": "2026-08-26T06:36:56.344Z"
   },
   "schemaVersion": 1
 }

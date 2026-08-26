@@ -15425,20 +15425,15 @@ function committedAcceptedFix(cwd, findings, paths) {
 }
 
 function ensureOnlyStaged(cwd, files) {
-	const fields = run(cwd, "git", [
+	const staged = run(cwd, "git", [
 		"diff",
 		"--cached",
-		"--name-status",
+		"--name-only",
 		"-z",
-		"--find-renames",
-		"--find-copies",
-	]).split("\0");
-	const staged = [];
-	for (let index = 0; fields[index]; ) {
-		const status = fields[index++];
-		staged.push(fields[index++]);
-		if (/^[RC]/.test(status)) staged.push(fields[index++]);
-	}
+		"--no-renames",
+	])
+		.split("\0")
+		.filter(Boolean);
 	if (!samePathSet(staged, files))
 		throw new Error(`Unexpected staged files: ${staged.join(", ") || "none"}`);
 }
