@@ -464,6 +464,65 @@ try {
 		undefined,
 		"a failed verifier for the active goal baseline does not block that goal",
 	);
+	const lateOutput = path.join(
+		failedCwd,
+		".ce-workflow",
+		"work-runs",
+		"verifiers",
+		"runtime",
+		"late-valid-report.md",
+	);
+	mkdirSync(path.dirname(lateOutput), { recursive: true });
+	mutateVerifierStore(failedCwd, (state) => {
+		for (const [id, report] of Object.entries(state.reports))
+			if (report.jobId === failedJob.id) delete state.reports[id];
+		const job = state.jobs[failedJob.id];
+		job.operationStatus.security = "pending";
+		job.launch = {
+			logicalJobId: job.id,
+			status: "orphaned",
+			request: { logicalJobId: job.id, model: job.model, output: lateOutput },
+		};
+		job.status = "orphaned";
+	});
+	writeFileSync(
+		lateOutput,
+		`\`\`\`json\n${JSON.stringify({
+			version: 1,
+			jobId: failedJob.id,
+			model: failedJob.model,
+			checkpoint: failedBatch.checkpoint,
+			results: [
+				{
+					jobId: failedJob.id,
+					model: failedJob.model,
+					checkpoint: failedBatch.checkpoint,
+					operation: "security",
+					outcome: "no-findings",
+				},
+			],
+		})}\n\`\`\``,
+	);
+	assert.deepEqual(
+		reconcileVerifierRuns(failedCwd, {
+			now: new Date(Date.now() + 60_000).toISOString(),
+		}),
+		[failedJob.id],
+		"late valid output supersedes an acknowledged orphan",
+	);
+	const recoveredAcknowledgement = loadVerifierStore(failedCwd);
+	assert.equal(
+		recoveredAcknowledgement.jobs[failedJob.id].failureAcknowledgement,
+		undefined,
+		"a recovered report clears its obsolete failure acknowledgement",
+	);
+	assert.equal(
+		Object.values(recoveredAcknowledgement.reports).find(
+			(report) => report.jobId === failedJob.id,
+		).outcome,
+		"no-findings",
+		"the recovered report remains authoritative",
+	);
 
 	// Analysis candidates remain advisory until a revision-fenced human review.
 	const reviewCwd = repo();

@@ -2301,6 +2301,7 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 				cwd,
 				(next) => {
 					if (recovering) clearTerminalOutputFailure(next, job.id);
+					else delete next.jobs[job.id].failureAcknowledgement;
 					const result = ingestVerifierReport(next, {
 						jobId: job.id,
 						artifact,
