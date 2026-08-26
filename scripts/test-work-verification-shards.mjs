@@ -97,12 +97,17 @@ try {
 				{ ...validShard, id: "b", dependsOn: ["a"] },
 			],
 		],
-		...["../escape", "/abs", "build\\output", ".git/config", ".ce-workflow/state", ".pi/state"].map(
-			(output) => [
-				`invalid output ${output}`,
-				[{ ...validShard, outputs: [output] }],
-			],
-		),
+		...[
+			"../escape",
+			"/abs",
+			"build\\output",
+			".git/config",
+			".ce-workflow/state",
+			".pi/state",
+		].map((output) => [
+			`invalid output ${output}`,
+			[{ ...validShard, outputs: [output] }],
+		]),
 	];
 	for (const [message, shards] of invalidShards)
 		assert.throws(

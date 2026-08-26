@@ -811,9 +811,7 @@ export async function runReadOnlyLaneBatch(
 					try {
 						let before;
 						const primaryCheckout = lane.resourceKeys.includes("repo:read");
-						const admission = primaryCheckout
-							? acquireRepositoryAdmissionLock(cwd)
-							: null;
+						const admission = acquireRepositoryAdmissionLock(cwd);
 						try {
 							if (!laneCanLaunch(loadLaneStore(cwd).lanes[lane.id]))
 								fail("acknowledgement", `Lane launch is ambiguous: ${lane.id}`);

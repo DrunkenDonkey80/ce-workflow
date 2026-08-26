@@ -11762,8 +11762,7 @@ function checkpointRenameTarget(cwd, finding, candidate) {
 		return "";
 	};
 	try {
-		if (renamedPath(checkpoint, "HEAD", source, [target]) === target)
-			return true;
+		if (renamedPath(checkpoint, "HEAD", source, [target]) === target) return true;
 		// ponytail: linear history walk; persist rename edges if old checkpoints make this hot.
 		const commits = run(cwd, "git", [
 			"rev-list",

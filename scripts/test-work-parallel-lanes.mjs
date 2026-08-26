@@ -113,7 +113,7 @@ try {
 	}
 
 	{
-		const { cwd } = repository();
+		const { cwd, git } = repository();
 		const admissionPath = path.join(
 			cwd,
 			".ce-workflow",
@@ -142,6 +142,22 @@ try {
 			"release does not unlink a replacement owner's lock",
 		);
 		rmSync(admissionPath);
+
+		const lane = envelope(cwd, git("rev-parse", "HEAD"), 1, "debug-admission", [
+			"repo:debug",
+		]);
+		let started = false;
+		const held = acquireRepositoryAdmissionLock(cwd);
+		try {
+			const blocked = await runReadOnlyLaneBatch(cwd, [lane], async () => {
+				started = true;
+				return { artifact: { unexpected: true } };
+			});
+			assert.equal(blocked.results[0].state, "failed");
+			assert.equal(started, false, "every checkout lane waits for admission");
+		} finally {
+			held.release();
+		}
 	}
 
 	{
