@@ -9734,7 +9734,8 @@
       ],
       "notes": [
         "wo:improvement-safety SAFE locally-owned stale test expectation; production behavior is unchanged and the current validation category remains authoritative. Rollback by reverting the one-line test commit.",
-        "\"wo:reconciliation"
+        "\"wo:reconciliation",
+        "wo:reconciliation PASS locally-owned snapshot root fixed in 58612cc: the obsolete shard-traversal expectation now matches the current producer error Invalid lane path for ../outside. The suite advanced beyond this assertion; later related-distinct review-gate work is routed to next-snapshot report work-2.report-35fa7696-393d-4a14-8074-9f7d0df535d5."
       ],
       "parentId": "work-2",
       "status": "closed",
@@ -12335,7 +12336,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-26T06:36:56.344Z"
+    "updatedAt": "2026-08-26T06:37:28.518Z"
   },
   "schemaVersion": 1
 }
