@@ -110,10 +110,14 @@ try {
 	);
 	assert(
 		verifierChild.agent === "work-background-verifier" &&
+			verifierChild.model === verifierRequest.model &&
+			verifierChild.thinking === verifierRequest.thinking &&
+			verifierChild.output === verifierRequest.output &&
+			verifierChild.outputMode === verifierRequest.outputMode &&
 			!verifierChild.tools.includes("project_report") &&
 			verifierChild.agentContract?.version === 1 &&
 			verifierChild.acceptance === false,
-		"verifiers use checkpoint-only tools without a conflicting acceptance contract",
+		"verifiers forward launch routing and preserve the checkpoint-only contract",
 	);
 	projectReportAvailable = true;
 	const secondVerifierLaunch = await verifierAdapter.spawn(verifierRequest);
