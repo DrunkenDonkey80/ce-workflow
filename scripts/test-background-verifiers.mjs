@@ -2057,6 +2057,7 @@ try {
 			groupId: triageGroup.id,
 			ownerSession: "triage-c",
 			now: "2026-07-21T03:31:00.000Z",
+			leaseMs: 1_000,
 		}),
 	);
 	assert.equal(
@@ -2103,7 +2104,7 @@ try {
 			reason: "reproduced",
 			changedTarget: true,
 			currentCodeEvidence: "extensions/work-models.js:sha",
-			now: "2026-07-21T03:02:00.000Z",
+			now: "2026-07-21T03:32:00.000Z",
 		}),
 	);
 	assert.equal(
@@ -2119,7 +2120,7 @@ try {
 			findingId: rejectedFinding,
 			disposition: "stale",
 			reason: "already corrected",
-			now: "2026-07-21T03:03:00.000Z",
+			now: "2026-07-21T03:33:00.000Z",
 		}),
 	);
 	assert.equal(
@@ -2133,12 +2134,12 @@ try {
 			ownerSession: triageOwner,
 			findingIds: [acceptedFinding],
 			verification: ["node test"],
-			now: "2026-07-21T04:00:00.000Z",
+			now: "2026-07-21T04:04:00.000Z",
 		}),
 	);
 	assert.equal(
 		expiredRenewal.leaseUntil,
-		"2026-07-21T04:30:00.000Z",
+		"2026-07-21T04:34:00.000Z",
 		"the current owner can resume an accepted fix after its lease expires",
 	);
 	const fixOwner = "triage-d";

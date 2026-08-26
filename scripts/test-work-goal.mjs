@@ -1625,6 +1625,13 @@ try {
 		execFileSync("git", ["commit", "-m", "relocate disposition target"], {
 			cwd: committedFixCwd,
 		});
+		writeFileSync(
+			path.join(committedFixCwd, "dispose-destination.js"),
+			Array.from({ length: 20 }, (_, index) => `rewritten ${index}\n`).join(""),
+		);
+		execFileSync("git", ["commit", "-am", "rewrite disposition target"], {
+			cwd: committedFixCwd,
+		});
 		const disposeBytes = readFileSync(
 			path.join(committedFixCwd, "dispose-destination.js"),
 		);

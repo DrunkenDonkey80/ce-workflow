@@ -82,6 +82,34 @@ try {
 		/cannot be optional/,
 		"all declared verification shards are required",
 	);
+	const validShard = { id: "valid", command: "test" };
+	const invalidShards = [
+		["empty", []],
+		["invalid id", [{ ...validShard, id: "bad id" }]],
+		["missing command", [{ id: "valid" }]],
+		["duplicate ids", [validShard, validShard]],
+		["self dependency", [{ ...validShard, dependsOn: ["valid"] }]],
+		["missing dependency", [{ ...validShard, dependsOn: ["missing"] }]],
+		[
+			"dependency cycle",
+			[
+				{ ...validShard, id: "a", dependsOn: ["b"] },
+				{ ...validShard, id: "b", dependsOn: ["a"] },
+			],
+		],
+		...["../escape", "/abs", "build\\output", ".git/config", ".ce-workflow/state", ".pi/state"].map(
+			(output) => [
+				`invalid output ${output}`,
+				[{ ...validShard, outputs: [output] }],
+			],
+		),
+	];
+	for (const [message, shards] of invalidShards)
+		assert.throws(
+			() => normalizeVerificationShards(shards),
+			(error) => error?.category === "invalid",
+			message,
+		);
 
 	{
 		const { cwd } = repository();

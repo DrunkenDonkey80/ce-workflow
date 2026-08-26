@@ -11713,7 +11713,6 @@ function verifierFindingChanged(cwd, finding) {
 	}
 }
 function checkpointRenameTarget(cwd, finding, candidate) {
-	const snapshot = finding?.checkpoint?.snapshot;
 	const source = normalizedRepoPath(finding?.path);
 	const target = normalizedRepoPath(candidate);
 	if (
@@ -11722,32 +11721,68 @@ function checkpointRenameTarget(cwd, finding, candidate) {
 		target === source ||
 		isAbsolute(target) ||
 		target === ".." ||
-		target.startsWith("../") ||
-		!/^[0-9a-f]{40,64}$/i.test(snapshot ?? "")
+		target.startsWith("../")
 	)
 		return false;
-	try {
+	let checkpoint = "";
+	for (const revision of [
+		finding?.checkpoint?.snapshot,
+		finding?.checkpoint?.base,
+	]) {
+		if (!/^[0-9a-f]{40,64}$/i.test(revision ?? "")) continue;
+		try {
+			checkpoint = run(cwd, "git", [
+				"rev-parse",
+				"--verify",
+				`${revision}^{commit}`,
+			]);
+			break;
+		} catch {}
+	}
+	if (!checkpoint) return false;
+	const renamedPath = (from, to, path, extra = []) => {
+		const pathspec = extra === null ? [] : ["--", path, ...extra];
 		const fields = run(cwd, "git", [
 			"diff",
 			"--name-status",
 			"-z",
 			"--find-renames",
-			snapshot,
-			"HEAD",
-			"--",
-			source,
-			target,
+			from,
+			to,
+			...pathspec,
 		]).split("\0");
 		for (let index = 0; fields[index]; ) {
 			const status = fields[index++];
 			const first = normalizedRepoPath(fields[index++]);
 			if (/^R\d+$/.test(status)) {
 				const second = normalizedRepoPath(fields[index++]);
-				if (first === source && second === target) return true;
+				if (first === path) return second;
 			}
 		}
-	} catch {}
-	return false;
+		return "";
+	};
+	try {
+		if (renamedPath(checkpoint, "HEAD", source, [target]) === target)
+			return true;
+		// ponytail: linear history walk; persist rename edges if old checkpoints make this hot.
+		const commits = run(cwd, "git", [
+			"rev-list",
+			"--ancestry-path",
+			"--reverse",
+			`${checkpoint}..HEAD`,
+		])
+			.split(/\r?\n/)
+			.filter(Boolean);
+		let current = source;
+		let previous = checkpoint;
+		for (const commit of commits) {
+			current = renamedPath(previous, commit, current, null) || current;
+			previous = commit;
+		}
+		return current === target;
+	} catch {
+		return false;
+	}
 }
 
 function currentCodeEvidence(cwd, finding, evidence) {

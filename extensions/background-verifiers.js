@@ -1637,7 +1637,7 @@ export function recordDisposition(store, input = {}) {
 }
 export function recordTriageDisposition(store, input = {}) {
 	return edit(store, (next) => {
-		const claim = ownedClaim(next, input);
+		const claim = ownedClaim(next, input, { allowExpired: true });
 		const group = next.groups[claim.groupId];
 		if (!group.findingIds.includes(input.findingId))
 			throw error("invalid", "Finding is outside this verifier claim");

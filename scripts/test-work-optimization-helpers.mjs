@@ -543,7 +543,7 @@ try {
 		shardTraversalError = String(error.stdout ?? "");
 	}
 	assert(
-		shardTraversalError.includes("invalid verification shard output"),
+		shardTraversalError.includes("Invalid lane path: ../outside"),
 		"finish-task rejects shard outputs outside the execution repository",
 	);
 	const finished = JSON.parse(
