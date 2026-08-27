@@ -378,6 +378,7 @@ try {
 			"failed",
 			"cancellation cannot bypass the read-only fingerprint check",
 		);
+		assert.match(cancelledMutation.results[0].reason, /mutated source/);
 		git("checkout", "--", "source.js");
 		const lock = acquireRepositoryMutationLock(cwd);
 		try {

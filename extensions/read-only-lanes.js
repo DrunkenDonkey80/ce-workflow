@@ -842,22 +842,16 @@ export async function runReadOnlyLaneBatch(
 							results[index] = { laneId: lane.id, state: current.state };
 							return;
 						}
-						if (["queued", "running", "pending"].includes(output.status)) {
-							const after = captureRepositoryFingerprint(cwd);
-							if (!fingerprintsEqual(before, after))
-								fail(
-									"mutation",
-									"Read-only lane mutated source, WorkItem state, or HEAD",
-								);
-							results[index] = { laneId: lane.id, state: "running" };
-							return;
-						}
 						const after = captureRepositoryFingerprint(cwd);
 						if (!fingerprintsEqual(before, after))
 							fail(
 								"mutation",
 								"Read-only lane mutated source, WorkItem state, or HEAD",
 							);
+						if (["queued", "running", "pending"].includes(output.status)) {
+							results[index] = { laneId: lane.id, state: "running" };
+							return;
+						}
 						if (["cancelled", "canceled", "stale"].includes(output.status)) {
 							const reason =
 								output.status === "stale" ? "stale-artifact" : "cancelled";
