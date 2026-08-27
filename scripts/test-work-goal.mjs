@@ -234,6 +234,17 @@ try {
 			project: true,
 		}),
 	};
+	assert.equal(
+		mod.workGoalConfirmationLabel(targetGoal, targetCwd),
+		"work-2 — Target epic",
+	);
+	assert.equal(
+		mod.workGoalConfirmationLabel(
+			{ objective: "Target work item or roadmap ID: work-2" },
+			path.join(targetCwd, "missing"),
+		),
+		"work-2",
+	);
 	assert.match(
 		mod.workGoalCompletionBlocker(targetGoal, targetCwd),
 		/target work-2 is still open/,
