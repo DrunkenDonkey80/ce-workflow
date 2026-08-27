@@ -9780,7 +9780,9 @@ function verifierFiles(cwd, requested) {
 		return [verifierPath(root, requested)];
 	const prefix = requested && requested !== "." ? `${requested}/` : "";
 	return [...paths]
-		.filter((entry) => entry.startsWith(prefix))
+		.filter(
+			(entry) => entry.startsWith(prefix) && existsSync(join(root, entry)),
+		)
 		.map((entry) => verifierPath(root, entry));
 }
 export function executeVerifierFind(cwd, params = {}) {

@@ -117,7 +117,22 @@ try {
 		["TASK-1"],
 		"ready summaries include executable grandchildren",
 	);
-	writeFileSync(path.join(cwd, "assertion.json"), '{"status":"ok"}\n');
+	writeFileSync(
+		path.join(cwd, "assertion.json"),
+		'{"status":"ok","--forbid-string":"present"}\n',
+	);
+	assert.equal(
+		JSON.parse(
+			run(
+				"json-assert",
+				"assertion.json",
+				"--required",
+				"--forbid-string",
+			),
+		).status,
+		"PASS",
+		"an option-looking value is not reinterpreted as an assertion",
+	);
 	let missingForbidValue;
 	try {
 		run("json-assert", "assertion.json", "--forbid-string");

@@ -864,8 +864,10 @@ try {
 	git("config", "user.name", "Test");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "base\n");
 	writeFileSync(path.join(gitCwd, "other.txt"), "unrelated\n");
-	git("add", "tracked.txt", "other.txt");
+	writeFileSync(path.join(gitCwd, "deleted.txt"), "removed\n");
+	git("add", "tracked.txt", "other.txt", "deleted.txt");
 	git("commit", "-qm", "base");
+	rmSync(path.join(gitCwd, "deleted.txt"));
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "staged\n");
 	git("add", "tracked.txt");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
@@ -963,6 +965,7 @@ try {
 	assert.deepEqual(requests[0].paths.sort(), [
 		...(magicPath ? [magicPath] : []),
 		"a-binary.so",
+		"deleted.txt",
 		"large.txt",
 		"nested/inside.txt",
 		"tracked.txt",
@@ -991,6 +994,11 @@ try {
 		executeVerifierFind(requests[0].cwd, { query: "untracked" }).matches,
 		["untracked.txt"],
 	);
+	assert.deepEqual(
+		executeVerifierFind(requests[0].cwd, { query: "deleted" }).matches,
+		[],
+		"broad find skips paths deleted from the checkpoint",
+	);
 	assert.equal(
 		executeVerifierGrep(requests[0].cwd, { query: "unstaged" }).matches[0].path,
 		"tracked.txt",
@@ -1017,7 +1025,11 @@ try {
 	);
 	const rootEntries = executeVerifierList(requests[0].cwd).entries;
 	assert(rootEntries.includes("nested"));
-	assert(!rootEntries.includes("other.txt"), "list hides paths outside the checkpoint");
+	assert(
+		!rootEntries.includes("other.txt"),
+		"list hides paths outside the checkpoint",
+	);
+	assert(!rootEntries.includes("deleted.txt"), "list skips deleted paths");
 	assert(!rootEntries.includes("escape-link"), "list hides symbolic links");
 	assert.deepEqual(
 		executeVerifierList(requests[0].cwd, { path: "nested" }).entries,

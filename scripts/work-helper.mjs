@@ -1251,6 +1251,7 @@ function parsedArguments() {
 	const positionals = [];
 	const flags = new Set();
 	const values = new Map();
+	const missingValues = new Set();
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (!arg.startsWith("--")) {
@@ -1261,9 +1262,9 @@ function parsedArguments() {
 		else if (i + 1 < args.length) {
 			values.set(arg, [...(values.get(arg) ?? []), args[i + 1]]);
 			i += 1;
-		}
+		} else missingValues.add(arg);
 	}
-	return { positionals, flags, values };
+	return { positionals, flags, values, missingValues };
 }
 
 const parsed = parsedArguments();
@@ -1308,27 +1309,22 @@ function jsonAssertionFailures(file, root = cwd) {
 		const value = jsonPath(data, key);
 		if (value === null || value === undefined) failures.push(`missing ${key}`);
 	}
-	for (let i = 1; i < args.length; i += 1) {
-		if (args[i] === "--equals") {
-			const assertion = String(args[++i]);
-			const separator = assertion.indexOf("=");
-			if (separator < 0) {
-				failures.push(`invalid --equals ${assertion}`);
-				continue;
-			}
-			const key = assertion.slice(0, separator);
-			const expected = assertion.slice(separator + 1);
-			if (String(jsonPath(data, key)) !== expected)
-				failures.push(`${key} != ${expected}`);
-		} else if (args[i] === "--forbid-string") {
-			if (i + 1 >= args.length) {
-				failures.push("missing --forbid-string value");
-				continue;
-			}
-			const forbidden = args[++i];
-			if (JSON.stringify(data).includes(forbidden))
-				failures.push(`forbidden string ${forbidden}`);
+	for (const assertion of options("--equals")) {
+		const separator = assertion.indexOf("=");
+		if (separator < 0) {
+			failures.push(`invalid --equals ${assertion}`);
+			continue;
 		}
+		const key = assertion.slice(0, separator);
+		const expected = assertion.slice(separator + 1);
+		if (String(jsonPath(data, key)) !== expected)
+			failures.push(`${key} != ${expected}`);
+	}
+	if (parsed.missingValues.has("--forbid-string"))
+		failures.push("missing --forbid-string value");
+	for (const forbidden of options("--forbid-string")) {
+		if (JSON.stringify(data).includes(forbidden))
+			failures.push(`forbidden string ${forbidden}`);
 	}
 	return failures;
 }
