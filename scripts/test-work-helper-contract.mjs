@@ -1178,8 +1178,8 @@ try {
 			encoding: "utf8",
 		})
 			.split(/\r?\n/)
-			.filter((line) => line && !line.includes(".pi/"))
-			.map((line) => line.trim()),
+			.map((line) => line.trim())
+			.filter((line) => line && !line.includes(".pi/")),
 		["M .gradle/cache.bin"],
 		"tracked generated dirt remains unstaged and does not block close",
 	);
