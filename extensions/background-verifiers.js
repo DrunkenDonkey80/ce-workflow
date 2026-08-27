@@ -1222,17 +1222,28 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 			};
 			requests[job.id] = verifierRequest(cwd, provisional, job, workspace);
 		}
-		const batch = mutateVerifierStore(cwd, (store) =>
-			createBatch(store, {
+		let usesWorkspace;
+		const batch = mutateVerifierStore(cwd, (store) => {
+			const persisted = createBatch(store, {
 				checkpoint,
 				profiles,
 				requests,
 				purpose,
 				now: input.now,
-			}),
-		);
+			});
+			usesWorkspace = profiles.every(
+				(profile) =>
+					store.jobs[expectedJobId(batchId, profile.model)]?.launch?.request
+						?.cwd === workspace,
+			);
+			return persisted;
+		});
+		if (!usesWorkspace) {
+			rmSync(workspace, { recursive: true, force: true });
+			workspace = undefined;
+		}
 		return {
-			status: "queued",
+			status: batch.status,
 			batch,
 			launch: launchQueuedVerifierJobs(cwd, input.adapter, {
 				serial: input.serial === true,
