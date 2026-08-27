@@ -17070,8 +17070,6 @@ function parseWorkGoalCommand(args = "") {
 			};
 	}
 	const [command, rest] = splitFirstWord(trimmed);
-	const attach = (result) =>
-		tokenBudget === undefined ? result : { ...result, tokenBudget };
 	if (command === "edit") {
 		let editObjective = rest.trim();
 		let editBudget = tokenBudget;
@@ -17098,7 +17096,11 @@ function parseWorkGoalCommand(args = "") {
 	if (command === "resume") return { kind: "resume", answer: rest.trim() };
 	if (command === "clear") return { kind: "clear" };
 	if (command === "stop") return { kind: "stop" };
-	return attach({ kind: "start", objective: trimmed });
+	return {
+		kind: "start",
+		objective: trimmed,
+		...(tokenBudget === undefined ? {} : { tokenBudget }),
+	};
 }
 
 function workGoalSelfImprovingAppendix() {
