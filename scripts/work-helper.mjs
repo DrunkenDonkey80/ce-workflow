@@ -1240,6 +1240,41 @@ const BOOLEAN_OPTIONS = new Set([
 	"--push",
 	"--reviewed",
 ]);
+const VALUE_OPTIONS = new Set([
+	"--acceptance",
+	"--add",
+	"--approval",
+	"--by",
+	"--bytes",
+	"--confirm",
+	"--description",
+	"--epic",
+	"--equals",
+	"--evidence-file",
+	"--execution-root",
+	"--expect",
+	"--forbid-string",
+	"--implementation-file",
+	"--json",
+	"--label",
+	"--limit",
+	"--max",
+	"--max-files",
+	"--message",
+	"--note",
+	"--note-file",
+	"--parent",
+	"--proposal-json",
+	"--reason",
+	"--remove",
+	"--required",
+	"--roadmap",
+	"--status",
+	"--token",
+	"--type",
+	"--verify",
+	"--verify-shard",
+]);
 
 function parsedArguments() {
 	const positionals = [];
@@ -1253,6 +1288,7 @@ function parsedArguments() {
 			continue;
 		}
 		if (BOOLEAN_OPTIONS.has(arg)) flags.add(arg);
+		else if (!VALUE_OPTIONS.has(arg)) throw new Error(`unknown option: ${arg}`);
 		else if (i + 1 < args.length) {
 			values.set(arg, [...(values.get(arg) ?? []), args[i + 1]]);
 			i += 1;

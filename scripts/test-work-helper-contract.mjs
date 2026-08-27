@@ -78,6 +78,11 @@ try {
 	});
 	saveStore(cwd, store);
 	writeFileSync(path.join(cwd, "note.txt"), "bounded note file\n");
+	assert.throws(
+		() => run("work-summary", "TASK-1", "--reviewedd", "--full"),
+		/unknown option: --reviewedd/,
+		"unknown options cannot consume a following flag",
+	);
 	assert.match(
 		JSON.parse(run("work-note", "TASK-1", "--note-file", "note.txt")).notes_tail,
 		/bounded note file/,
