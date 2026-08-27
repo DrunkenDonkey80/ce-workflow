@@ -761,9 +761,13 @@ try {
 	});
 	writeFileSync(path.join(cwd, "subdirectory.md"), "before\n");
 	saveStore(cwd, subdirectoryStore);
-	execFileSync("git", ["add", "subdirectory.md", ".ce-workflow/work-items.json"], {
-		cwd,
-	});
+	execFileSync(
+		"git",
+		["add", "subdirectory.md", ".ce-workflow/work-items.json"],
+		{
+			cwd,
+		},
+	);
 	execFileSync("git", ["commit", "-m", "subdirectory baseline"], {
 		cwd,
 		stdio: "ignore",
