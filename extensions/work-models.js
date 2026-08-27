@@ -16726,11 +16726,11 @@ function buildWorkRoadmapState(cwd, args = "", runtime = {}) {
 
 function errorState(reason, message, extra = {}) {
 	return {
+		...extra,
 		ok: false,
 		reason,
 		message,
-		warnings: [],
-		...extra,
+		warnings: extra.warnings ?? [],
 	};
 }
 

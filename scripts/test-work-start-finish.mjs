@@ -585,6 +585,18 @@ try {
 		"finish stages work, closes native state, and amends one commit without bd",
 	);
 
+	fixture.reset("finishReady", "extra-staged");
+	state = executeWorkFinishState(
+		finishCwd,
+		buildWorkFinishState(finishCwd, "FIN-1"),
+	);
+	assert(
+		!state.ok &&
+			state.reason === "finish-execute-failed" &&
+			fixture.store().items["FIN-1"].status !== "closed",
+		"finish rejects an unrelated staged file without closing the work item",
+	);
+
 	for (const scenario of ["finishDebugReady", "finishBigReady"]) {
 		fixture.reset(scenario, "unknown");
 		state = executeWorkFinishState(

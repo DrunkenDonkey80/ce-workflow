@@ -1332,6 +1332,11 @@ try {
 		scope: "commit",
 	});
 	assert.equal(commitCheckpoint.scope, "commit");
+	assert.deepEqual(
+		commitCheckpoint.paths,
+		["tracked.txt"],
+		"last-commit scope excludes untracked worktree files absent from its snapshot",
+	);
 	assert.equal(
 		committedGit("show", `${commitCheckpoint.snapshot}:tracked.txt`),
 		"committed",

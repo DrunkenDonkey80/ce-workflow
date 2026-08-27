@@ -532,7 +532,14 @@ function emptyVerifierBase(cwd) {
 		env: verifierCommitEnv(),
 	});
 }
-function snapshotPaths(cwd, base, snapshot, paths, allowEmpty = false) {
+function snapshotPaths(
+	cwd,
+	base,
+	snapshot,
+	paths,
+	allowEmpty = false,
+	includeUntracked = true,
+) {
 	const changed = new Set(
 		[
 			...git(
@@ -543,9 +550,11 @@ function snapshotPaths(cwd, base, snapshot, paths, allowEmpty = false) {
 			)
 				.split("\0")
 				.filter(Boolean),
-			...git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"])
-				.split("\0")
-				.filter(Boolean),
+			...(includeUntracked
+				? git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"])
+						.split("\0")
+						.filter(Boolean)
+				: []),
 		].filter((entry) => !entry.startsWith(".ce-workflow/work-runs/verifiers/")),
 	);
 	const scoped = paths === undefined ? [...changed].sort() : [...paths].sort();
@@ -749,7 +758,7 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 				: scope === "custom"
 					? customSnapshotPaths(cwd, snapshot, input.patterns ?? input.paths)
 					: scope === "commit"
-						? snapshotPaths(cwd, parent, snapshot, input.paths)
+						? snapshotPaths(cwd, parent, snapshot, input.paths, false, false)
 						: dirty
 							? input.paths
 								? snapshotPaths(cwd, head, snapshot, input.paths)

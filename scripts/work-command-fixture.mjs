@@ -392,7 +392,7 @@ function save() { writeFileSync(statePath, JSON.stringify(state, null, "\t")); }
 function log(value) { appendFileSync(logPath, JSON.stringify({ tool: "git", args, ...value }) + "\\n"); }
 function dirtyLines() {
   if (state.gitCommitted) return [];
-  if (dirty === "unknown" || dirty === "large") return [" M extensions/work-models.js"];
+  if (["unknown", "large", "extra-staged"].includes(dirty)) return [" M extensions/work-models.js"];
   if (dirty === "related-plus-unrelated") return [" M extensions/work-models.js", " M unrelated.txt"];
   if (dirty === "large-ui") return [" M src/components/App.tsx"];
   if (dirty === "benign" || dirty === "instruction-substantive") return [" M AGENTS.md"];
@@ -403,14 +403,14 @@ function dirtyLines() {
   return [];
 }
 if (args[0] === "diff" && args.includes("--numstat")) {
-  if (dirty === "unknown") console.log("12\t3\textensions/work-models.js");
+  if (dirty === "unknown" || dirty === "extra-staged") console.log("12\t3\textensions/work-models.js");
   if (dirty === "related-plus-unrelated") console.log("12\t3\textensions/work-models.js\\n1\t0\tunrelated.txt");
   if (dirty === "large") console.log("90\t40\textensions/work-models.js");
   if (dirty === "large-ui") console.log("90\t40\tsrc/components/App.tsx");
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-status")) {
   if (state.gitStaged) process.stdout.write("M\\0extensions/work-models.js\\0M\\0.ce-workflow/work-items.json\\0");
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-only")) {
-  if (state.gitStaged) process.stdout.write("extensions/work-models.js\\0.ce-workflow/work-items.json\\0");
+  if (state.gitStaged) process.stdout.write("extensions/work-models.js\\0.ce-workflow/work-items.json\\0" + (dirty === "extra-staged" ? "unrelated.txt\\0" : ""));
 } else if (args[0] === "diff") process.exit(dirty === "benign" ? 0 : 1);
 else if (args[0] === "add") { state.gitStaged = true; save(); log({ op: "add" }); }
 else if (args[0] === "commit") {
