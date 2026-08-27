@@ -330,6 +330,16 @@ assert.doesNotMatch(
 	/Improvement safety/,
 	"reviewers may read the scoped work item before safety approval",
 );
+for (const command of [
+	`node "${path.join(root, "scripts", "work-helper.mjs")}" work-note SI-1.1 --append-notes unsafe`,
+	`git -C "${root}" rev-parse --show-toplevel && echo unsafe`,
+	`git -C "${root}" diff --output=unsafe.patch`,
+])
+	assert.match(
+		hooks.tool_call({ toolName: "bash", input: { command } }, hookCtx).reason,
+		/Improvement safety preflight blocks bash/,
+		`preflight rejects non-allowlisted shell command: ${command}`,
+	);
 mutateStore(root, (store) =>
 	appendWorkNote(
 		store,

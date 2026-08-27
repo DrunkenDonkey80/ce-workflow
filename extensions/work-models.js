@@ -17367,40 +17367,33 @@ function workImproveProgressFingerprint(goal, cwd) {
 	return createHash("sha256").update(source).digest("hex");
 }
 
-function hasUnquotedShellControl(text) {
-	let quote = "";
-	for (let index = 0; index < text.length; index += 1) {
-		const char = text[index];
-		if (
-			char === "`" ||
-			char === "\r" ||
-			char === "\n" ||
-			(char === "$" && text[index + 1] === "(")
-		)
-			return true;
-		if (quote) {
-			if (char === quote) quote = "";
-			else if (char === "\\" && quote === '"') index += 1;
-			continue;
-		}
-		if (char === '"' || char === "'") quote = char;
-		else if ([";", "&", "|", "<", ">"].includes(char)) return true;
-	}
-	return Boolean(quote);
-}
-
 function improvementSafetyShellAllowed(command) {
 	const text = String(command ?? "").trim();
-	if (!text || hasUnquotedShellControl(text)) return false;
-	if (
-		/work-helper\.mjs["']?\s+work-(?:summary|children-summary|ready-summary|note|create|block)\b/i.test(
-			text,
-		)
-	)
-		return true;
-	return /^(?:git(?:\s+-C\s+(?:"[^"]+"|'[^']+'|\S+))?\s+(?:status|diff|log|show|rev-parse)|rg\b|grep\b|find\b)/i.test(
-		text,
-	);
+	const cwd = String.raw`(?:"[^"$\x60\r\n]+"|'[^'$\x60\r\n]+'|[\w./:\\-]+)`;
+	const git = String.raw`git(?:\s+-C\s+${cwd})?\s+`;
+	return [
+		new RegExp(
+			String.raw`^node(?:\.exe)?\s+${cwd}\s+work-(?:summary|children-summary|ready-summary)\s+[\w.:-]+$`,
+			"i",
+		),
+		new RegExp(
+			String.raw`^${git}status(?:\s+--(?:short|branch|porcelain(?:=v1)?))*$`,
+			"i",
+		),
+		new RegExp(
+			String.raw`^${git}diff(?:\s+--(?:cached|staged|stat|name-only|name-status|no-ext-diff|binary))*(?:\s+HEAD)?$`,
+			"i",
+		),
+		new RegExp(
+			String.raw`^${git}log(?:\s+--oneline)?(?:\s+-n\s+[1-9]\d{0,2})?$`,
+			"i",
+		),
+		new RegExp(String.raw`^${git}show(?:\s+--stat)?\s+[\da-f]{4,64}$`, "i"),
+		new RegExp(
+			String.raw`^${git}rev-parse\s+(?:--show-toplevel|--verify\s+HEAD|--abbrev-ref\s+HEAD)$`,
+			"i",
+		),
+	].some((pattern) => pattern.test(text));
 }
 
 function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
