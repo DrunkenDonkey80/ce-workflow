@@ -410,7 +410,7 @@ if (args[0] === "diff" && args.includes("--numstat")) {
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-status")) {
   if (state.gitStaged) process.stdout.write("M\\0extensions/work-models.js\\0M\\0.ce-workflow/work-items.json\\0");
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-only")) {
-  if (state.gitStaged) console.log("extensions/work-models.js\\n.ce-workflow/work-items.json");
+  if (state.gitStaged) process.stdout.write("extensions/work-models.js\\0.ce-workflow/work-items.json\\0");
 } else if (args[0] === "diff") process.exit(dirty === "benign" ? 0 : 1);
 else if (args[0] === "add") { state.gitStaged = true; save(); log({ op: "add" }); }
 else if (args[0] === "commit") {

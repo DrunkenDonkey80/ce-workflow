@@ -38,7 +38,7 @@ const {
 	).href
 );
 
-const fixture = installWorkflowFixture({ native: true });
+const fixture = installWorkflowFixture();
 const quotedHelper = shellQuote(
 	realpathSync(path.join(import.meta.dirname, "work-helper.mjs")),
 );
