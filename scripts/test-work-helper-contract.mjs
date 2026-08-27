@@ -514,7 +514,8 @@ try {
 	);
 	assert.equal(residualFinished.status, "PASS");
 
-	writeFileSync(path.join(cwd, "mechanical.js"), "// old wording\n");
+	mkdirSync(path.join(cwd, "docs"), { recursive: true });
+	writeFileSync(path.join(cwd, "docs", "mechanical.js"), "// old wording\n");
 	const mechanicalStore = loadStore(cwd);
 	createWorkItem(mechanicalStore, {
 		id: "TASK-3",
@@ -522,21 +523,25 @@ try {
 		status: "open",
 		title: "Update an authentication source comment",
 		notes: [
-			'wo:review-scope ["mechanical.js"]',
+			'wo:review-scope ["docs/mechanical.js"]',
 			"wo:review FAIL - source comment date is missing",
 			"wo:fix PASS - comment corrected and docs check passed",
 			"ordinary prose note\nwo:review PASS - embedded marker",
 		],
 	});
 	saveStore(cwd, mechanicalStore);
-	execFileSync("git", ["add", "mechanical.js", ".ce-workflow/work-items.json"], {
-		cwd,
-	});
+	execFileSync(
+		"git",
+		["add", "docs/mechanical.js", ".ce-workflow/work-items.json"],
+		{
+			cwd,
+		},
+	);
 	execFileSync("git", ["commit", "-m", "mechanical baseline"], {
 		cwd,
 		stdio: "ignore",
 	});
-	writeFileSync(path.join(cwd, "mechanical.js"), "// dated wording\n");
+	writeFileSync(path.join(cwd, "docs", "mechanical.js"), "// dated wording\n");
 	assert.match(
 		failure(
 			"finish-task",
@@ -584,7 +589,7 @@ try {
 	mechanicalDispositionStore.items["TASK-3"].notes.push(mechanicalDisposition);
 	saveStore(cwd, mechanicalDispositionStore);
 	writeFileSync(
-		path.join(cwd, "mechanical.js"),
+		path.join(cwd, "docs", "mechanical.js"),
 		"// changed after disposition\n",
 	);
 	assert.match(

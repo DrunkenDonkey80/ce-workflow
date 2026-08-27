@@ -410,7 +410,7 @@ function reviewEvents(task) {
 	};
 }
 
-function reviewDispositionSatisfied(task) {
+function reviewDispositionSatisfied(task, productionFiles) {
 	const { scopeIndex, postScope, priorFailures, priorPasses } =
 		reviewEvents(task);
 	if (postScope.at(-1)?.status === "PASS") return true;
@@ -425,6 +425,7 @@ function reviewDispositionSatisfied(task) {
 		kind = "residual-fix";
 	else if (failures === 1 || (failures === 0 && priorFailures))
 		kind = "mechanical-fix";
+	if (kind === "mechanical-fix" && productionFiles) return false;
 	const disposition = kind && dispositionNote(task, kind);
 	return (
 		disposition?.index > scopeIndex && dispositionCovers(target, disposition)
@@ -928,7 +929,9 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		const freshReviewScope =
 			sameReviewFiles &&
 			persistedReviewScope?.fingerprint === currentReviewFingerprint;
-		const accepted = freshReviewScope && reviewDispositionSatisfied(task);
+		const accepted =
+			freshReviewScope &&
+			reviewDispositionSatisfied(task, hasProductionDiff(implementationFiles));
 		if (!accepted && !reviewed) {
 			if (!freshReviewScope)
 				mutateStore(cwd, (store) =>
@@ -1238,6 +1241,7 @@ function capText(text, bytes = 10000) {
 const BOOLEAN_OPTIONS = new Set([
 	"--allow-work-store",
 	"--append-notes",
+	"--approved",
 	"--full",
 	"--immediate-format",
 	"--push",

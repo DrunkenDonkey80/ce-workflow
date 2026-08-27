@@ -130,8 +130,8 @@ try {
 			verifierChild.model ===
 				`${verifierRequest.model}:${verifierRequest.thinking}` &&
 			verifierChild.thinking === undefined &&
-			verifierChild.output === verifierRequest.output &&
-			verifierChild.outputMode === verifierRequest.outputMode &&
+			verifierChild.output === undefined &&
+			verifierChild.outputMode === undefined &&
 			!verifierChild.tools.includes("project_report") &&
 			verifierChild.agentContract?.version === 1 &&
 			verifierChild.acceptance === false,

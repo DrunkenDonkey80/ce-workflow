@@ -10278,8 +10278,6 @@ function createPiSubagentsVerifierAdapter(pi) {
 					cwd: request.cwd,
 					async: request.async,
 					clarify: false,
-					output: request.output,
-					outputMode: request.outputMode,
 					agentContract: { version: 1 },
 					acceptance: false,
 					tools,
@@ -24265,7 +24263,7 @@ export default function workModelsExtension(pi) {
 	pi.on("tool_call", (event, ctx) => {
 		if (event.toolName === "ask_user") {
 			recordDirtyRecoveryAskCall(event);
-			recordImprovementApprovalAskCall(event, ctx.cwd);
+			recordImprovementApprovalAskCall(event, ctx?.cwd ?? activeWorkGoalCwd);
 		}
 		const improvementSafetyBlock = improvementMutationBlockReason(
 			event,

@@ -1842,8 +1842,9 @@ function validFindingShape(finding) {
 }
 function artifactForJob(cwd, job) {
 	const file = job.launch?.request?.output;
+	if (!nonempty(file)) return "";
 	const root = path.resolve(verifierRuntimeRoot(cwd));
-	if (!nonempty(file) || !path.resolve(file).startsWith(`${root}${path.sep}`))
+	if (!path.resolve(file).startsWith(`${root}${path.sep}`))
 		throw error("artifact", "Verifier output is not a private runtime artifact");
 	return file;
 }
