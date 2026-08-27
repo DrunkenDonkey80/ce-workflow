@@ -1150,8 +1150,7 @@ export async function runVerificationShardBatch(
 		`verify-${hash(`${Date.now()}-${process.pid}-${Math.random()}`, 32)}`;
 	const startedAt = timestamp(options.now?.());
 	const results = new Map();
-	const running = new Map();
-	const active = new Set();
+	const running = new Set();
 	let stopped = false;
 	await new Promise((resolveBatch) => {
 		const pump = () => {
@@ -1161,7 +1160,7 @@ export async function runVerificationShardBatch(
 						!results.has(item.id) &&
 						!running.has(item.id) &&
 						item.dependsOn.every((id) => results.get(id)?.status === "PASS") &&
-						[...active].every(
+						[...running].every(
 							(id) =>
 								!shardClaimsConflict(
 									item,
@@ -1170,8 +1169,7 @@ export async function runVerificationShardBatch(
 						),
 				);
 				if (!shard) break;
-				running.set(shard.id, true);
-				active.add(shard.id);
+				running.add(shard.id);
 				void (async () => {
 					const realStarted = Date.now();
 					const shardStartedAt = timestamp(options.now?.());
@@ -1222,7 +1220,6 @@ export async function runVerificationShardBatch(
 						required: true,
 					});
 					if (exitStatus !== 0 && options.failFast !== false) stopped = true;
-					active.delete(shard.id);
 					running.delete(shard.id);
 					pump();
 				})();
