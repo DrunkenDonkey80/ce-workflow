@@ -631,11 +631,7 @@ async function runVerification(command, shards = [], root = cwd) {
 	};
 }
 
-async function finishTaskUnlocked(
-	ownerRepositoryRoot,
-	canonicalExecutionRoot,
-	requestedExecutionRoot,
-) {
+async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	const id = args[0];
 	const message = option("--message");
 	const maxFiles = Number(
@@ -645,7 +641,7 @@ async function finishTaskUnlocked(
 		throw new Error(
 			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--execution-root <git-path>] [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--implementation-file <task-owned-new-file> ...] [--evidence-file <docs/evidence/task-owned-file> ...] [--immediate-format] [--reviewed] [--push]",
 		);
-	const executionRoot = requestedExecutionRoot ? canonicalExecutionRoot : cwd;
+	const executionRoot = canonicalExecutionRoot;
 	const distinctRoots = canonicalExecutionRoot !== ownerRepositoryRoot;
 	if (distinctRoots && flag("--push"))
 		throw new Error(
@@ -1121,11 +1117,7 @@ async function finishTask() {
 	try {
 		for (const root of lockRoots)
 			mutations.push(acquireRepositoryMutationLock(root));
-		return await finishTaskUnlocked(
-			ownerRoot,
-			executionRoot,
-			requestedExecutionRoot,
-		);
+		return await finishTaskUnlocked(ownerRoot, executionRoot);
 	} finally {
 		for (const mutation of mutations.reverse()) mutation.release();
 	}

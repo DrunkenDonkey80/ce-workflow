@@ -751,6 +751,49 @@ try {
 	);
 	assert.equal(loadStore(cwd).items["TASK-4"].status, "closed");
 
+	const subdirectoryStore = loadStore(cwd);
+	createWorkItem(subdirectoryStore, {
+		id: "TASK-SUBDIR",
+		type: "task",
+		status: "open",
+		title: "Update subdirectory documentation",
+		acceptance: "Documentation-only completion.",
+	});
+	writeFileSync(path.join(cwd, "subdirectory.md"), "before\n");
+	saveStore(cwd, subdirectoryStore);
+	execFileSync("git", ["add", "subdirectory.md", ".ce-workflow/work-items.json"], {
+		cwd,
+	});
+	execFileSync("git", ["commit", "-m", "subdirectory baseline"], {
+		cwd,
+		stdio: "ignore",
+	});
+	writeFileSync(path.join(cwd, "subdirectory.md"), "after\n");
+	const nestedCwd = path.join(cwd, "nested-cwd");
+	mkdirSync(nestedCwd);
+	writeFileSync(path.join(cwd, ".git", "info", "exclude"), "nested-cwd/\n");
+	symlinkSync(
+		path.join(cwd, ".ce-workflow"),
+		path.join(nestedCwd, ".ce-workflow"),
+		process.platform === "win32" ? "junction" : "dir",
+	);
+	const subdirectoryFinished = JSON.parse(
+		runFrom(
+			nestedCwd,
+			"finish-small",
+			"TASK-SUBDIR",
+			"--message",
+			"finish from a repository subdirectory",
+			...verifyArgs,
+		),
+	);
+	assert.equal(subdirectoryFinished.status, "PASS");
+	assert.equal(
+		subdirectoryFinished.executionRepositoryRoot,
+		realpathSync(cwd),
+		"finish resolves repository-relative paths from the canonical Git root",
+	);
+
 	const cwdAlias = `${cwd}-alias`;
 	symlinkSync(cwd, cwdAlias, process.platform === "win32" ? "junction" : "dir");
 	assert.match(
