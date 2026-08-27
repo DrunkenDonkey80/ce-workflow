@@ -18257,14 +18257,51 @@ function workGoalBaselineHead(goal) {
 		return goal.baselineHead;
 }
 
+function requestedWorkItemClosureLimit(objective) {
+	const instruction = /^User instruction for the target project:\s*(.+)$/m.exec(
+		String(objective ?? ""),
+	)?.[1];
+	const value = instruction?.match(
+		/\b(?:exactly\s+)?(one|\d+)\s+(?:executable\s+)?(?:tasks?|work\s*items?)\b/i,
+	)?.[1];
+	if (!value) return;
+	const limit = value.toLowerCase() === "one" ? 1 : Number(value);
+	if (Number.isSafeInteger(limit) && limit > 0) return limit;
+}
+
+function executableWorkItemStates(cwd) {
+	return Object.fromEntries(
+		Object.values(loadStore(cwd).items)
+			.filter((item) => !["epic", "idea"].includes(item.type))
+			.map((item) => [idOf(item), statusOf(item)]),
+	);
+}
+
 function createWorkGoal(
 	mode,
 	objective,
 	tokenBudget,
 	baselineTokens = 0,
 	baselineHead,
+	cwd,
 ) {
 	const now = Date.now();
+	const closureLimit =
+		mode === "project" ? requestedWorkItemClosureLimit(objective) : undefined;
+	let closureBaseline;
+	if (closureLimit)
+		try {
+			const project = /^Target project:\s*(.+)$/m.exec(String(objective))?.[1]?.trim();
+			closureBaseline = executableWorkItemStates(
+				project
+					? isAbsolute(project)
+						? project
+						: resolve(cwd ?? process.cwd(), project)
+					: cwd,
+			);
+		} catch {
+			closureBaseline = {};
+		}
 	return {
 		id: telemetryId("wg"),
 		mode,
@@ -18277,6 +18314,9 @@ function createWorkGoal(
 		tokensUsed: 0,
 		baselineTokens,
 		...(baselineHead ? { baselineHead } : {}),
+		...(closureLimit
+			? { requestedClosureLimit: closureLimit, closureBaseline }
+			: {}),
 		retries: 0,
 	};
 }
@@ -18906,13 +18946,27 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	if (goal?.mode !== "project") return;
 	const objective = String(goal.objective ?? "");
 	const project = /^Target project:\s*(.+)$/m.exec(objective)?.[1]?.trim();
+	if (!project) return;
+	const projectCwd = isAbsolute(project)
+		? project
+		: resolve(cwd ?? process.cwd(), project);
+	if (goal.requestedClosureLimit) {
+		try {
+			const current = executableWorkItemStates(projectCwd);
+			const newlyClosed = Object.entries(current).filter(
+				([id, status]) =>
+					status === "closed" && goal.closureBaseline?.[id] !== "closed",
+			).length;
+			if (newlyClosed !== goal.requestedClosureLimit)
+				return `requested exactly ${goal.requestedClosureLimit} executable WorkItem closure${goal.requestedClosureLimit === 1 ? "" : "s"}; observed ${newlyClosed}`;
+		} catch (error) {
+			return `requested closure scope could not be verified: ${commandErrorText(error)}`;
+		}
+	}
 	const id = workGoalTargetId(goal);
-	if (!project || !id) return;
+	if (!id) return;
 	try {
-		const item = readWorkItem(
-			isAbsolute(project) ? project : resolve(cwd ?? process.cwd(), project),
-			id,
-		);
+		const item = readWorkItem(projectCwd, id);
 		if (!item) return `target ${id} was not found`;
 		if (statusOf(item) !== "closed")
 			return `target ${id} is still ${statusOf(item)}`;
@@ -19036,6 +19090,7 @@ async function startWorkGoal(
 		tokenBudget,
 		workGoalTokenTotal(ctx),
 		currentWorkGoalBaselineHead(ctx.cwd),
+		ctx.cwd,
 	);
 	activeWorkGoalCwd = ctx.cwd;
 	applyWorkGoalThinking(pi, activeWorkGoal, ctx);
@@ -23846,6 +23901,7 @@ export {
 	isWorkGoalContextOverflow,
 	isWorkGoalUsageLimit,
 	parseWorkProjectGoalInput,
+	createWorkGoal,
 	workGoalCompletionBlocker,
 	workGoalBaselineHead,
 	planResumeAction,

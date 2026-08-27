@@ -268,6 +268,48 @@ try {
 		updateWorkItem(store, "work-2", { status: "closed" }),
 	);
 	assert.equal(mod.workGoalCompletionBlocker(targetGoal, targetCwd), undefined);
+	mutateStore(targetCwd, (store) => {
+		createWorkItem(store, {
+			id: "scope-task-1",
+			type: "task",
+			title: "First scoped task",
+		});
+		createWorkItem(store, {
+			id: "scope-task-2",
+			type: "task",
+			title: "Second scoped task",
+		});
+	});
+	const scopedGoal = mod.createWorkGoal(
+		"project",
+		mod.buildWorkSelfImprovingObjective(
+			`${targetCwd} -- one task only: finish scoped work`,
+			{ project: true },
+		),
+		undefined,
+		0,
+		undefined,
+		targetCwd,
+	);
+	assert.equal(scopedGoal.requestedClosureLimit, 1);
+	assert.equal(scopedGoal.closureBaseline["scope-task-1"], "open");
+	assert.match(
+		mod.workGoalCompletionBlocker(scopedGoal, targetCwd),
+		/observed 0/,
+		"guidance goals cannot complete before the requested work-item count closes",
+	);
+	mutateStore(targetCwd, (store) =>
+		updateWorkItem(store, "scope-task-1", { status: "closed" }),
+	);
+	assert.equal(mod.workGoalCompletionBlocker(scopedGoal, targetCwd), undefined);
+	mutateStore(targetCwd, (store) =>
+		updateWorkItem(store, "scope-task-2", { status: "closed" }),
+	);
+	assert.match(
+		mod.workGoalCompletionBlocker(scopedGoal, targetCwd),
+		/observed 2/,
+		"guidance goals cannot overrun the persisted closure limit",
+	);
 } finally {
 	rmSync(targetCwd, { recursive: true, force: true });
 }
