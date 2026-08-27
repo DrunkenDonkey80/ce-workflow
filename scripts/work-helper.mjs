@@ -120,6 +120,10 @@ function canonicalGitRoot(candidate, label) {
 	return realpathSync(root);
 }
 
+function normalizeRepositoryPath(file) {
+	return path.posix.normalize(file.replaceAll("\\", "/"));
+}
+
 function gitStatusPaths(root = cwd) {
 	const records = git(
 		["status", "--porcelain=v1", "-z", "--untracked-files=all"],
@@ -134,9 +138,7 @@ function gitStatusPaths(root = cwd) {
 		paths.push(record.slice(3));
 		if (/[RC]/.test(code) && records[i + 1]) paths.push(records[++i]);
 	}
-	return [...new Set(paths)]
-		.filter(Boolean)
-		.map((file) => file.replaceAll("\\", "/"));
+	return [...new Set(paths)].filter(Boolean).map(normalizeRepositoryPath);
 }
 
 function relevantChanges(root) {
@@ -715,7 +717,7 @@ async function finishTaskUnlocked() {
 		.split(/\r?\n/)
 		.filter(Boolean);
 	const unexpectedStaged = stagedBefore.filter((file) => {
-		const normalized = file.replaceAll("\\", "/");
+		const normalized = normalizeRepositoryPath(file);
 		return (
 			!normalized.startsWith(".ce-workflow/") && !evidenceFileSet.has(normalized)
 		);
@@ -830,7 +832,7 @@ async function finishTaskUnlocked() {
 		preserve: [...ownedImplementationFiles],
 	});
 	const unrecognized = tidy.unrecognized.filter((file) => {
-		const normalized = file.replaceAll("\\", "/");
+		const normalized = normalizeRepositoryPath(file);
 		return (
 			!evidenceFileSet.has(normalized) && !ownedImplementationFiles.has(normalized)
 		);
