@@ -10291,9 +10291,8 @@ function createPiSubagentsVerifierAdapter(pi) {
 }
 
 function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
-	const profiles = runnableBackgroundVerifierProfiles(cwd, input.currentModel);
 	return scheduleVerifierBatch(cwd, {
-		profiles,
+		profiles: runnableBackgroundVerifierProfiles(cwd, input.currentModel),
 		origin: input.origin ?? "normal",
 		paths: input.paths,
 		scope: input.scope,
