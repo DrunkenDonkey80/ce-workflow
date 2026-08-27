@@ -17,8 +17,6 @@ import {
 	runVerificationShardBatch,
 	VERIFICATION_GATE_VERSION,
 } from "../extensions/read-only-lanes.js";
-import { runFrozenCandidateVerification } from "../extensions/work-models.js";
-
 const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
 const globalSettingsDir = mkdtempSync(
 	path.join(os.tmpdir(), "ce-verification-settings-"),
@@ -115,6 +113,27 @@ try {
 			(error) => error?.category === "invalid",
 			message,
 		);
+
+	{
+		const { cwd } = repository();
+		const input = { shards: [validShard] };
+		const runner = async () => ({ exitStatus: 0 });
+		await assert.rejects(
+			runVerificationShardBatch(cwd, input, runner),
+			(error) => error?.category === "locked",
+			"verification requires the repository mutation lock",
+		);
+		const mutation = acquireRepositoryMutationLock(cwd);
+		try {
+			await assert.rejects(
+				runVerificationShardBatch(cwd, input, runner),
+				(error) => error?.category === "locked",
+				"verification requires explicit mutation ownership",
+			);
+		} finally {
+			mutation.release();
+		}
+	}
 
 	{
 		const { cwd } = repository();
@@ -374,45 +393,6 @@ try {
 			readFileSync(storeFile, "utf8"),
 			storeBefore,
 			"mutation does not change WorkItems",
-		);
-	}
-
-	{
-		const { cwd } = repository();
-		writeFileSync(path.join(cwd, "source.js"), "export const value = 3;\n");
-		const frozen = await runFrozenCandidateVerification(
-			cwd,
-			{
-				shards: [
-					{ id: "test-a", command: "test-a" },
-					{ id: "test-b", command: "test-b" },
-				],
-				authoritativeCommand: "test-a && test-b",
-				profiles: [
-					{
-						model: "fixture/reviewer",
-						operations: ["correctness"],
-						thinking: "low",
-					},
-				],
-			},
-			async () => ({ exitStatus: 0, stdout: "ok", virtualDurationMs: 5 }),
-		);
-		assert.match(frozen.checkpoint.snapshot, /^[0-9a-f]{40}$/);
-		assert.equal(frozen.verifier.status, "queued");
-		assert.deepEqual(frozen.manifest.reviews, [
-			{
-				batchId: frozen.verifier.batch.id,
-				checkpoint: frozen.checkpoint.snapshot,
-				model: "fixture/reviewer",
-				status: "queued",
-			},
-		]);
-		assert.equal(frozen.manifest.status, "PASS");
-		assert.equal(
-			frozen.manifest.metrics.maxConcurrency,
-			1,
-			"frozen verification defaults to sequential shards",
 		);
 	}
 

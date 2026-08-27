@@ -94,7 +94,6 @@ import {
 import {
 	acknowledgeLaneLaunch,
 	acquireRepositoryMutationLock,
-	admitVerificationManifest,
 	captureRepositoryFingerprint,
 	createLaneEnvelope,
 	fingerprintsEqual,
@@ -105,7 +104,6 @@ import {
 	queueLane,
 	reconcileReadOnlyLanes,
 	runReadOnlyLaneBatch,
-	runVerificationShardBatch,
 	transitionLane,
 } from "./read-only-lanes.js";
 import {
@@ -10304,61 +10302,6 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 	});
 }
 
-export async function runFrozenCandidateVerification(
-	cwd,
-	input,
-	runner,
-	options = {},
-) {
-	const mutation = acquireRepositoryMutationLock(cwd);
-	try {
-		const checkpoint = captureVerifierCheckpoint(cwd, {
-			scope: input.scope ?? "changes",
-			paths: input.paths,
-		});
-		const verifier = scheduleVerifierBatch(cwd, {
-			profiles: input.profiles ?? [],
-			checkpoint,
-			origin: input.origin ?? "normal",
-			serial: !workPerformanceSettings(cwd).parallelBackgroundVerifiers,
-			adapter: input.adapter,
-		});
-		const reviews = verifier.batch
-			? (verifier.batch.profiles ?? []).map((profile) => ({
-					batchId: verifier.batch.id,
-					checkpoint: checkpoint.snapshot,
-					model: profile.model,
-					status: verifier.status,
-				}))
-			: [];
-		const batch = await runVerificationShardBatch(
-			cwd,
-			{ ...input, reviews },
-			runner,
-			{
-				...options,
-				mutationOwner: true,
-				serial:
-					options.serial === true ||
-					!workPerformanceSettings(cwd).parallelVerification,
-			},
-		);
-		admitVerificationManifest(batch.manifest, {
-			shards: batch.declarations,
-			invocationId: batch.manifest.invocationId,
-			authoritativeCommand: input.authoritativeCommand,
-			baseHead: batch.manifest.baseHead,
-			sourceFingerprint: batch.manifest.sourceFingerprint,
-			currentFingerprint: batch.currentFingerprint,
-			gateVersion: input.gateVersion,
-			reviews,
-		});
-		return { ...batch, checkpoint, verifier };
-	} finally {
-		mutation.release();
-	}
-}
-
 export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
 	if (!input.before || !input.after || input.before === input.after) return null;
 	const paths = run(cwd, "git", [
@@ -18934,7 +18877,7 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 		const verifierBlocker = verifierCompletionBlocker(
 			loadVerifierStore(cwd),
 			goal?.startedAt,
-			workGoalBaselineHead(goal, cwd),
+			workGoalBaselineHead(goal),
 		);
 		if (verifierBlocker) return verifierBlocker;
 	} catch (error) {

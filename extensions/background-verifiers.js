@@ -1156,6 +1156,14 @@ export async function launchQueuedVerifierJobs(
 function recordNotScheduledBatch(cwd, profiles, reason, input) {
 	const base = createHash("sha1").update(path.resolve(cwd)).digest("hex");
 	const snapshot = createHash("sha1").update(reason).digest("hex");
+	const paths = [];
+	for (const entry of input.paths ?? []) {
+		try {
+			paths.push(relativePath(entry, "checkpoint path"));
+		} catch {
+			// The scheduling reason already records why the caller's scope was invalid.
+		}
+	}
 	const checkpoint = {
 		repository: path.resolve(cwd),
 		base,
@@ -1163,7 +1171,7 @@ function recordNotScheduledBatch(cwd, profiles, reason, input) {
 			snapshot === base
 				? `${snapshot.slice(0, -1)}${snapshot.endsWith("0") ? "1" : "0"}`
 				: snapshot,
-		paths: input.paths?.length ? [...input.paths].sort() : [".ce-workflow"],
+		paths: paths.length ? paths.sort() : [".ce-workflow"],
 		patchHash: createHash("sha256").update(reason).digest("hex"),
 	};
 	initVerifierStore(cwd);

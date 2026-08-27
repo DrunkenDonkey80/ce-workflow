@@ -1381,6 +1381,16 @@ try {
 	committedGit("commit", "-qm", "base");
 	writeFileSync(path.join(committedCwd, "tracked.txt"), "committed\n");
 	committedGit("commit", "-qam", "change");
+	const invalidPathSchedule = scheduleVerifierBatch(committedCwd, {
+		profiles: [profiles[0]],
+		paths: ["../outside.js"],
+	});
+	assert.equal(
+		invalidPathSchedule.status,
+		"not-scheduled",
+		"invalid paths produce a graceful not-scheduled result",
+	);
+	assert.deepEqual(invalidPathSchedule.batch.checkpoint.paths, [".ce-workflow"]);
 	const committedRequests = [];
 	const committedSchedule = scheduleVerifierBatch(committedCwd, {
 		profiles: [profiles[0]],

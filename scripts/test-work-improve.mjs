@@ -146,6 +146,13 @@ for (const id of ["SI-CLOSED", "SI-DEFERRED"])
 		buildWorkImproveState(root, id).reason,
 		"self-improvement-roadmap-missing",
 	);
+assert.equal(
+	workGoalCompletionBlocker(
+		{ mode: "improvement", objective: "Do bounded improvement work." },
+		root,
+	),
+	"work-improvement snapshot IDs are missing",
+);
 assert.match(
 	workGoalCompletionBlocker({ mode: "improvement", objective }, root),
 	/SI-1\.1 is still open/,
@@ -156,6 +163,17 @@ mutateStore(root, (store) =>
 assert.match(
 	workGoalCompletionBlocker({ mode: "improvement", objective }, root),
 	/lacks a final wo:improvement-safety SAFE or APPROVED assessment/,
+);
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety APPROVED agent-authored note without user approval",
+	),
+);
+assert.match(
+	workGoalCompletionBlocker({ mode: "improvement", objective }, root),
+	/APPROVED risk without a matching ask_user approval/,
 );
 mutateStore(root, (store) =>
 	appendWorkNote(
