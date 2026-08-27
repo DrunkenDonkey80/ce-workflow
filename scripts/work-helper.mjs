@@ -1103,6 +1103,8 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 async function finishTask() {
 	const id = args[0];
 	const verificationCommand = option("--verify");
+	if (verificationCommand !== undefined && option("--json") !== undefined)
+		throw new Error("--verify cannot be combined with --json");
 	if (verificationCommand !== undefined) {
 		validateVerificationCommand(verificationCommand);
 		verificationTimeoutMs();

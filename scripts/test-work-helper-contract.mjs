@@ -191,6 +191,29 @@ try {
 			"--max-files",
 			"2",
 			"--message",
+			"reject competing verification modes",
+			"--verify",
+			verifyArgs[1],
+			"--verify-shard",
+			JSON.stringify({ id: "only", command: verifyArgs[1] }),
+			"--json",
+			"missing.json",
+		),
+		/--verify cannot be combined with --json/,
+		"command and JSON verification cannot bypass one another",
+	);
+	assert.equal(
+		existsSync(mutationLock),
+		false,
+		"competing verification modes fail before taking the repository lock",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-1",
+			"--max-files",
+			"2",
+			"--message",
 			"reject interactive verifier",
 			"--verify",
 			"bash",
