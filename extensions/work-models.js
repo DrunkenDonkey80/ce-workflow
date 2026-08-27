@@ -17343,10 +17343,17 @@ function renderWorkImproveText(state) {
 }
 
 function improvementSafetyDisposition(issue) {
-	const matches = notesOf(issue).matchAll(
-		/^wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^\r\n]*$/gim,
+	const values = Array.from(
+		notesOf(issue).matchAll(
+			/^wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^\r\n]*$/gim,
+		),
+		(match) => match[1].toUpperCase(),
 	);
-	return Array.from(matches, (match) => match[1].toUpperCase()).at(-1);
+	const blockedAt = values.lastIndexOf("BLOCKED");
+	if (blockedAt < 0) return values.at(-1);
+	return values.slice(blockedAt + 1).includes("APPROVED")
+		? "APPROVED"
+		: "BLOCKED";
 }
 
 function workImproveSnapshotIds(goal) {

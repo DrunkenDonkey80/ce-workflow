@@ -304,6 +304,21 @@ assert.match(
 	/Improvement safety preflight blocks edit/,
 	"source mutation is coded-blocked while destructive risk is unapproved",
 );
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety SAFE attempted downgrade after blocked risk",
+	),
+);
+assert.match(
+	hooks.tool_call(
+		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		hookCtx,
+	).reason,
+	/Improvement safety preflight blocks edit/,
+	"a later SAFE note cannot downgrade a BLOCKED assessment",
+);
 assert.doesNotMatch(
 	hooks.tool_call(
 		{
