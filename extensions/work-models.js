@@ -18784,15 +18784,14 @@ function workGoalTargetId(goal) {
 
 function workGoalConfirmationLabel(goal, cwd) {
 	const target = workGoalTargetId(goal);
-	if (target && cwd)
-		try {
-			const item = readWorkItem(cwd, target);
-			return item ? `${target} — ${titleOf(item)}` : target;
-		} catch {
-			return target;
-		}
-	if (target) return target;
-	return truncate(String(goal?.objective ?? "autonomous goal").trim(), 120);
+	if (!target)
+		return truncate(String(goal?.objective ?? "autonomous goal").trim(), 120);
+	try {
+		const item = cwd && readWorkItem(cwd, target);
+		return item ? `${target} — ${titleOf(item)}` : target;
+	} catch {
+		return target;
+	}
 }
 
 function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
