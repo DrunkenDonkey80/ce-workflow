@@ -299,9 +299,11 @@ function reviewFingerprint(cwd, files) {
 }
 
 function reviewScope(task) {
-	const matches = [...notesOf(task).matchAll(/^wo:review-scope (.+)$/gim)];
-	if (!matches.length) return undefined;
-	const raw = matches.at(-1)[1];
+	const note = noteEntriesOf(task)
+		.filter((entry) => /^wo:review-scope /i.test(entry))
+		.at(-1);
+	if (!note) return undefined;
+	const raw = note.slice("wo:review-scope ".length);
 	let scope;
 	try {
 		scope = JSON.parse(raw);
@@ -326,12 +328,14 @@ function reviewScope(task) {
 }
 
 function targetedReviewFindings(task) {
-	const matches = [
-		...notesOf(task).matchAll(/^wo:review FAIL(?:\s*-\s*|\s+)(.+)$/gim),
-	];
-	const match = matches.at(-1);
-	if (!match) return undefined;
-	const payload = match[1].trim();
+	const notes = noteEntriesOf(task);
+	const index = notes.findLastIndex((note) =>
+		/^wo:review FAIL(?:\s*-\s*|\s+)/i.test(note),
+	);
+	if (index < 0) return undefined;
+	const payload = notes[index]
+		.replace(/^wo:review FAIL(?:\s*-\s*|\s+)/i, "")
+		.trim();
 	try {
 		const value = JSON.parse(payload);
 		if (Array.isArray(value.findings)) {
@@ -339,19 +343,21 @@ function targetedReviewFindings(task) {
 				(item) => typeof item === "string" && item.trim(),
 			);
 			if (findings.length === value.findings.length && findings.length)
-				return { index: match.index, findings };
+				return { index, findings };
 		}
 	} catch {
 		// Legacy compact reviewer notes carry one finding after the FAIL marker.
 	}
-	return payload ? { index: match.index, findings: [payload] } : undefined;
+	return payload ? { index, findings: [payload] } : undefined;
 }
 
 function dispositionNote(task, kind) {
-	const matches = [
-		...notesOf(task).matchAll(new RegExp(`^wo:${kind} PASS (\\{.*\\})$`, "gim")),
-	];
-	for (const match of matches.reverse()) {
+	const notes = noteEntriesOf(task);
+	for (let index = notes.length - 1; index >= 0; index -= 1) {
+		const match = new RegExp(`^wo:${kind} PASS (\\{.*\\})$`, "i").exec(
+			notes[index],
+		);
+		if (!match) continue;
 		try {
 			const value = JSON.parse(match[1]);
 			if (
@@ -363,7 +369,7 @@ function dispositionNote(task, kind) {
 					),
 				)
 			)
-				return { index: match.index, dispositions: value.dispositions };
+				return { index, dispositions: value.dispositions };
 		} catch {
 			// Ignore malformed disposition notes and require a valid one.
 		}
@@ -385,18 +391,22 @@ function dispositionCovers(target, disposition) {
 }
 
 function reviewEvents(task) {
-	const notes = notesOf(task);
-	const scopeIndex =
-		[...notes.matchAll(/^wo:review-scope /gim)].at(-1)?.index ?? -1;
-	const all = [...notes.matchAll(/^wo:review[ \t]+(PASS|FAIL)\b/gim)];
+	const notes = noteEntriesOf(task);
+	const scopeIndex = notes.findLastIndex((note) =>
+		/^wo:review-scope /i.test(note),
+	);
+	const all = notes.flatMap((note, index) => {
+		const match = /^wo:review[ \t]+(PASS|FAIL)\b/i.exec(note);
+		return match ? [{ index, status: match[1].toUpperCase() }] : [];
+	});
 	return {
 		scopeIndex,
 		postScope: all.filter((event) => event.index > scopeIndex),
 		priorFailures: all.filter(
-			(event) => event.index < scopeIndex && event[1]?.toUpperCase() === "FAIL",
+			(event) => event.index < scopeIndex && event.status === "FAIL",
 		).length,
 		priorPasses: all.filter(
-			(event) => event.index < scopeIndex && event[1]?.toUpperCase() === "PASS",
+			(event) => event.index < scopeIndex && event.status === "PASS",
 		).length,
 	};
 }
@@ -404,10 +414,8 @@ function reviewEvents(task) {
 function reviewDispositionSatisfied(task) {
 	const { scopeIndex, postScope, priorFailures, priorPasses } =
 		reviewEvents(task);
-	if (postScope.at(-1)?.[1]?.toUpperCase() === "PASS") return true;
-	const failures = postScope.filter(
-		(event) => event[1]?.toUpperCase() === "FAIL",
-	).length;
+	if (postScope.at(-1)?.status === "PASS") return true;
+	const failures = postScope.filter((event) => event.status === "FAIL").length;
 	const target = targetedReviewFindings(task);
 	let kind;
 	if (
@@ -790,9 +798,7 @@ async function finishTaskUnlocked() {
 			error.stderr || error.message || error,
 		).slice(-500);
 		const verificationFailure = `wo:verify-check FAIL\nCommand: ${verificationCommand ?? "unknown verification"}\n${verificationError}`;
-		mutateStore(cwd, (store) =>
-			appendWorkNote(store, id, verificationFailure),
-		);
+		mutateStore(cwd, (store) => appendWorkNote(store, id, verificationFailure));
 		throw new Error(
 			`verification failed: ${verificationCommand}\n${verificationError}`,
 		);
@@ -1158,10 +1164,16 @@ function parentOf(issue) {
 	return field(issue, "parentId", "parent", "parent_id", "epic_id") ?? "";
 }
 
-function notesOf(issue) {
+function noteEntriesOf(issue) {
 	const notes = field(issue, "notes", "description", "body") ?? "";
-	if (Array.isArray(notes)) return notes.join("\n");
-	return typeof notes === "string" ? notes : JSON.stringify(notes ?? "");
+	if (Array.isArray(notes)) return notes.map((note) => String(note));
+	return (typeof notes === "string" ? notes : JSON.stringify(notes ?? "")).split(
+		/\r?\n/,
+	);
+}
+
+function notesOf(issue) {
+	return noteEntriesOf(issue).join("\n");
 }
 
 function depsOf(issue) {

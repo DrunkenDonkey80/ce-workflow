@@ -510,6 +510,7 @@ try {
 			'wo:review-scope ["mechanical.js"]',
 			"wo:review FAIL - source comment date is missing",
 			"wo:fix PASS - comment corrected and docs check passed",
+			"ordinary prose note\nwo:review PASS - embedded marker",
 		],
 	});
 	saveStore(cwd, mechanicalStore);
@@ -546,6 +547,20 @@ try {
 		),
 		/independent review required/,
 		"an option-looking value cannot shadow the real verification option",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-3",
+			"--max-files",
+			"1",
+			"--message",
+			"reject embedded review marker",
+			...verifyArgs,
+			"--reviewed",
+		),
+		/requires durable wo:review PASS/,
+		"review protocol markers embedded in multiline notes are ignored",
 	);
 	saveStore(cwd, mechanicalStore);
 	const mechanicalDispositionStore = loadStore(cwd);
