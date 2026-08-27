@@ -374,6 +374,9 @@ for (const command of [
 	`node "${path.join(root, "scripts", "work-helper.mjs")}" work-note SI-1.1 --append-notes unsafe`,
 	`git -C "${root}" rev-parse --show-toplevel && echo unsafe`,
 	`git -C "${root}" diff --output=unsafe.patch`,
+	`git -C "${root}" commit -am unsafe`,
+	"rm -rf generated",
+	"find . -delete",
 ])
 	assert.match(
 		hooks.tool_call({ toolName: "bash", input: { command } }, hookCtx).reason,
