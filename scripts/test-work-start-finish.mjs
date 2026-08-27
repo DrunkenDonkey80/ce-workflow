@@ -87,17 +87,17 @@ try {
 			cwdConfinedReadTools: true,
 			credentialsIsolated: true,
 			toolAllowlist: [
-				"work_verifier_read",
-				"work_verifier_list",
-				"work_verifier_find",
-				"work_verifier_grep",
 				"project_report",
+				"work_verifier_grep",
+				"work_verifier_find",
+				"work_verifier_list",
+				"work_verifier_read",
 			],
 		},
 	};
 	assert(
 		(await verifierAdapter.spawn(verifierRequest)).ok,
-		"adapter launches without fictional provider capabilities",
+		"adapter accepts the canonical allowlist independent of order",
 	);
 	let verifierChild = workflowChildParams(verifierRpcParams);
 	assert(
@@ -110,8 +110,9 @@ try {
 	);
 	assert(
 		verifierChild.agent === "work-background-verifier" &&
-			verifierChild.model === verifierRequest.model &&
-			verifierChild.thinking === verifierRequest.thinking &&
+			verifierChild.model ===
+				`${verifierRequest.model}:${verifierRequest.thinking}` &&
+			verifierChild.thinking === undefined &&
 			verifierChild.output === verifierRequest.output &&
 			verifierChild.outputMode === verifierRequest.outputMode &&
 			!verifierChild.tools.includes("project_report") &&

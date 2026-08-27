@@ -30,6 +30,16 @@ export const VERIFIER_OPERATIONS = [
 	"test-gap",
 	"performance",
 ];
+export const VERIFIER_CHECKPOINT_TOOL_NAMES = [
+	"work_verifier_read",
+	"work_verifier_list",
+	"work_verifier_find",
+	"work_verifier_grep",
+];
+export const VERIFIER_TOOL_NAMES = [
+	...VERIFIER_CHECKPOINT_TOOL_NAMES,
+	"project_report",
+];
 export const THINKING_EFFORTS = [
 	"off",
 	"minimal",
@@ -935,13 +945,7 @@ function verifierRequest(cwd, batch, job, workspace) {
 		output: path.join(outputDir, `${job.id}.json`),
 		outputMode: "file-only",
 		boundary: {
-			toolAllowlist: [
-				"work_verifier_read",
-				"work_verifier_list",
-				"work_verifier_find",
-				"work_verifier_grep",
-				"project_report",
-			],
+			toolAllowlist: [...VERIFIER_TOOL_NAMES],
 			deny: ["write", "edit", "bash", "process", "network"],
 			readOnlyWorkspace: true,
 			cwdConfinedReadTools: true,

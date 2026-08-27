@@ -87,7 +87,9 @@ import {
 	verifierCompletionBlocker,
 	verifierStatus,
 	verifierTelemetryEvents,
+	VERIFIER_CHECKPOINT_TOOL_NAMES,
 	VERIFIER_OPERATIONS,
+	VERIFIER_TOOL_NAMES,
 } from "./background-verifiers.js";
 import {
 	acknowledgeLaneLaunch,
@@ -245,16 +247,6 @@ const NATIVE_EDIT_GUIDANCE =
 	"Use Pi's native edit tool for existing files and write tool for new files. Do not rewrite tracked files through Python, Node, or shell; if unavoidable, re-read immediately. Never run a whole-file/project formatter unless explicitly requested; final diff evidence must come after the last mutating or test tool.";
 const SUBAGENT_RPC_REQUEST_EVENT = "subagents:rpc:v1:request";
 const SUBAGENT_RPC_REPLY_EVENT_PREFIX = "subagents:rpc:v1:reply:";
-const VERIFIER_CHECKPOINT_TOOL_NAMES = [
-	"work_verifier_read",
-	"work_verifier_list",
-	"work_verifier_find",
-	"work_verifier_grep",
-];
-const VERIFIER_TOOL_NAMES = [
-	...VERIFIER_CHECKPOINT_TOOL_NAMES,
-	"project_report",
-];
 const VERIFIER_WORKSPACE_MARKER = ".ce-verifier-workspace.json";
 const VERIFIER_MAX_BYTES = 32_000;
 const VERIFIER_MAX_LINES = 200;
@@ -891,8 +883,10 @@ function syncImprovementReportTool(pi, ctx) {
 function syncWorkGoalTools(pi, goal = activeWorkGoal) {
 	if (!pi?.getActiveTools || !pi?.setActiveTools) return;
 	const active = new Set(Array.from(pi.getActiveTools() ?? []));
-	for (const name of WORK_GOAL_TOOL_NAMES)
-		goal?.status === "active" ? active.add(name) : active.delete(name);
+	for (const name of WORK_GOAL_TOOL_NAMES) {
+		if (goal?.status === "active") active.add(name);
+		else active.delete(name);
+	}
 	pi.setActiveTools([...active]);
 }
 
@@ -10235,6 +10229,7 @@ function createPiSubagentsVerifierAdapter(pi) {
 		// The only verifier tools are project-owned, marker-checked executors.
 		enforcesReadOnlyBoundary: true,
 		async spawn(request) {
+			const requestedTools = request?.boundary?.toolAllowlist;
 			if (
 				request?.version !== 1 ||
 				request?.agent !== "work-background-verifier" ||
@@ -10243,7 +10238,9 @@ function createPiSubagentsVerifierAdapter(pi) {
 				request?.boundary?.readOnlyWorkspace !== true ||
 				request?.boundary?.cwdConfinedReadTools !== true ||
 				request?.boundary?.credentialsIsolated !== true ||
-				request.boundary.toolAllowlist?.join(",") !== VERIFIER_TOOL_NAMES.join(",")
+				!Array.isArray(requestedTools) ||
+				[...requestedTools].sort().join(",") !==
+					[...VERIFIER_TOOL_NAMES].sort().join(",")
 			)
 				return {
 					ok: false,
