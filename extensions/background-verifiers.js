@@ -1467,18 +1467,7 @@ export function addFinding(store, input = {}) {
 		)
 			throw error("invalid", "Finding identity does not match its report");
 		relativePath(input.path);
-		if (
-			!nonempty(input.category) ||
-			!REPORT_CATEGORIES.test(input.category) ||
-			!SEVERITIES.has(input.severity) ||
-			!Number.isInteger(input.startLine) ||
-			!Number.isInteger(input.endLine) ||
-			input.startLine < 1 ||
-			input.endLine < input.startLine ||
-			![input.rationale, input.evidence, input.suggestedAction].every(
-				(value) => nonempty(value) && value.length <= REPORT_MAX_TEXT,
-			)
-		)
+		if (!validFindingShape(input))
 			throw error("invalid", "Finding is missing required attribution");
 		if (!next.batches[report.batchId].checkpoint.paths.includes(input.path))
 			throw error("invalid", "Finding path is outside the reviewed checkpoint");
@@ -1858,6 +1847,20 @@ function validUsage(value) {
 			))
 	);
 }
+function validFindingShape(finding) {
+	return (
+		nonempty(finding.category) &&
+		REPORT_CATEGORIES.test(finding.category) &&
+		SEVERITIES.has(finding.severity) &&
+		Number.isInteger(finding.startLine) &&
+		Number.isInteger(finding.endLine) &&
+		finding.startLine >= 1 &&
+		finding.endLine >= finding.startLine &&
+		[finding.rationale, finding.evidence, finding.suggestedAction].every(
+			(value) => nonempty(value) && value.length <= REPORT_MAX_TEXT,
+		)
+	);
+}
 function artifactForJob(cwd, job) {
 	const file = job.launch?.request?.output;
 	const root = path.resolve(verifierRuntimeRoot(cwd));
@@ -1943,12 +1946,10 @@ function validateResult(job, batch, result) {
 					"evidence",
 					"suggestion",
 				]) ||
-				!nonempty(finding.category) ||
-				!REPORT_CATEGORIES.test(finding.category) ||
-				!SEVERITIES.has(finding.severity) ||
-				![finding.rationale, finding.evidence, finding.suggestion].every(
-					(value) => nonempty(value) && value.length <= REPORT_MAX_TEXT,
-				)
+				!validFindingShape({
+					...finding,
+					suggestedAction: finding.suggestion,
+				})
 			)
 				throw error("invalid", "Verifier finding has an invalid schema");
 			const endLine = validateFindingRange(job, batch, finding);
@@ -3287,16 +3288,7 @@ export function validateVerifierStore(store, file = "verifier store") {
 			finding.operation !== report.operation ||
 			finding.model !== report.model ||
 			!same(finding.checkpoint, report.checkpoint) ||
-			!nonempty(finding.category) ||
-			!REPORT_CATEGORIES.test(finding.category) ||
-			!SEVERITIES.has(finding.severity) ||
-			!Number.isInteger(finding.startLine) ||
-			!Number.isInteger(finding.endLine) ||
-			finding.startLine < 1 ||
-			finding.endLine < finding.startLine ||
-			![finding.rationale, finding.evidence, finding.suggestedAction].every(
-				(value) => nonempty(value) && value.length <= REPORT_MAX_TEXT,
-			) ||
+			!validFindingShape(finding) ||
 			!store.batches[report.batchId].checkpoint.paths.includes(finding.path)
 		)
 			throw error("corrupt", `Invalid finding ${id} in ${file}`);
