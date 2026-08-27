@@ -3991,6 +3991,56 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	await invoke("work-goal", "clear", ctx);
 
+	writeFileSync(
+		improvementStatePath,
+		JSON.stringify({
+			workGoal: {
+				id: "wg-catch-up-limit",
+				mode: "self-improving",
+				objective: "WO_CATCH_UP_V2\nBound runaway catch-up work.",
+				status: "active",
+				iteration: 19,
+				resumeOnSessionStart: true,
+				updatedAt: Date.now() + 3_000,
+			},
+		}),
+	);
+	tempHooks.session_start?.({}, ctx);
+	await tempHooks.before_agent_start(
+		{
+			prompt:
+				"Continue safely.\n\n<!-- work-goal-continuation:wg-catch-up-limit:19:limit -->",
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "More catch-up work remains." }],
+				},
+			],
+		},
+		ctx,
+	);
+	await settle();
+	assert.equal(
+		JSON.parse(readFileSync(improvementStatePath, "utf8")).workGoal.status,
+		"paused",
+		"catch-up pauses after twenty automatic continuations",
+	);
+	assert.ok(
+		notices.some((notice) =>
+			String(notice.message).includes(
+				"catch-up reached 20 automatic continuations",
+			),
+		),
+	);
+	await invoke("work-goal", "clear", ctx);
+
 	entries.length = 0;
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
@@ -4278,6 +4328,40 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			Object.keys(loadVerifierStore(lifecycleVerifierCwd).batches).length,
 			1,
 			"completion and settlement share one committed-run verifier batch",
+		);
+		await tempHooks.before_agent_start(
+			{ prompt: sent.at(-1).message, systemPrompt: "base" },
+			lifecycleCtx,
+		);
+		await tempHooks.agent_start({}, lifecycleCtx);
+		writeFileSync(path.join(lifecycleVerifierCwd, "source.js"), "verifier fix\n");
+		execFileSync("git", ["commit", "-am", "fix(verifier): test"], {
+			cwd: lifecycleVerifierCwd,
+			stdio: "ignore",
+		});
+		await tempHooks.tool_execution_end(
+			{
+				toolName: "work_verifier_complete_fix",
+				result: { details: { origin: "verifier-fix" } },
+			},
+			lifecycleCtx,
+		);
+		await tempHooks.agent_end(
+			{
+				messages: [
+					{
+						role: "assistant",
+						content: [{ type: "text", text: "Verifier fix committed." }],
+					},
+				],
+			},
+			lifecycleCtx,
+		);
+		await settle(lifecycleCtx);
+		assert.equal(
+			Object.keys(loadVerifierStore(lifecycleVerifierCwd).batches).length,
+			1,
+			"accepted verifier fixes do not recursively schedule verifier batches",
 		);
 		await invoke("work-goal", "clear", lifecycleCtx);
 		delete pi.events;

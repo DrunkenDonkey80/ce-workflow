@@ -702,6 +702,7 @@ let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
 let activeWorkGoalRunning = false;
 let activeWorkGoalGitBefore = null;
+let activeWorkGoalVerifierFixCommitted = false;
 let pendingWorkGoalTurn = false;
 let blockedWorkGoalTurn = false;
 let workGoalContinuationPending = null;
@@ -737,6 +738,7 @@ const WORK_GOAL_DECISION_MARKER = "WORK_GOAL_NEEDS_HUMAN_DECISION";
 const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
 const WORK_GOAL_MAX_RETRIES = 4;
 const WORK_IMPROVE_MAX_STALLED_TURNS = 2;
+const WORK_CATCH_UP_MAX_CONTINUATIONS = 20;
 const WORK_GOAL_USAGE_LIMIT_RETRY_MS = 10 * 60 * 1000;
 const WORK_GOAL_USAGE_LIMIT_RE =
 	/usage[_\s-]*(?:limit|reached)|(?:^|(?:status|http|error|code)[^0-9]{0,8})429\b|too many requests|rate limit|访问量过大|使用上限|限额将在/i;
@@ -17761,9 +17763,13 @@ function buildWorkCatchUpObjective(state, args = "") {
 		.join("\n\n");
 }
 
+function isCatchUpGoal(goal) {
+	return String(goal?.objective ?? "").includes("WO_CATCH_UP_V2");
+}
+
 function catchUpCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	const objective = String(goal?.objective ?? "");
-	if (!objective.includes("WO_CATCH_UP_V2")) return;
+	if (!isCatchUpGoal(goal)) return;
 	const targetsText = /^Catch-up (?:review|changed) targets:\s*(.+)$/m.exec(
 		objective,
 	)?.[1];
@@ -18947,7 +18953,13 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 
 function scheduleActiveWorkGoalTurnVerifiers(ctx, pi) {
 	const started = activeWorkGoalGitBefore;
-	if (!started || started.cwd !== ctx.cwd || !started.head) return null;
+	if (
+		activeWorkGoalVerifierFixCommitted ||
+		!started ||
+		started.cwd !== ctx.cwd ||
+		!started.head
+	)
+		return null;
 	const after = gitSnapshot(ctx.cwd).head;
 	if (!after || after === started.head) return null;
 	const verifier = scheduleCommittedRunVerifiers(ctx.cwd, pi, {
@@ -19182,6 +19194,9 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 			...activeWorkGoal,
 			status: "active",
 			decision: undefined,
+			continuationWindowStart: isCatchUpGoal(activeWorkGoal)
+				? (activeWorkGoal.iteration ?? 0)
+				: activeWorkGoal.continuationWindowStart,
 			updatedAt: Date.now(),
 		};
 		applyWorkGoalThinking(pi, activeWorkGoal, ctx);
@@ -20571,6 +20586,19 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	updateWorkGoalUsage(activeWorkGoal, ctx);
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
+	if (
+		isCatchUpGoal(activeWorkGoal) &&
+		(activeWorkGoal.iteration ?? 0) -
+			(activeWorkGoal.continuationWindowStart ?? 0) >=
+			WORK_CATCH_UP_MAX_CONTINUATIONS
+	) {
+		pauseActiveWorkGoal(
+			`catch-up reached ${WORK_CATCH_UP_MAX_CONTINUATIONS} automatic continuations; review progress before explicitly resuming`,
+			pi,
+			ctx,
+		);
+		return;
+	}
 	if (
 		activeWorkGoal.tokenBudget !== undefined &&
 		activeWorkGoal.tokensUsed >= activeWorkGoal.tokenBudget
@@ -24614,7 +24642,10 @@ export default function workModelsExtension(pi) {
 			ctx.abort();
 			return;
 		}
-		if (pendingWorkGoalTurn) activeWorkGoalRunning = true;
+		if (pendingWorkGoalTurn) {
+			activeWorkGoalRunning = true;
+			activeWorkGoalVerifierFixCommitted = false;
+		}
 		pendingWorkGoalTurn = false;
 		if (!pendingWorkPrompt) {
 			if (
@@ -24685,6 +24716,12 @@ export default function workModelsExtension(pi) {
 
 	pi.on("tool_execution_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "tool_execution_end", event);
+		if (
+			activeWorkGoalRunning &&
+			event.toolName === "work_verifier_complete_fix" &&
+			event.result?.details?.origin === "verifier-fix"
+		)
+			activeWorkGoalVerifierFixCommitted = true;
 		const goalSubagent = goalSubagentStarts.get(event.toolCallId);
 		goalSubagentStarts.delete(event.toolCallId);
 		if (goalSubagent)
@@ -24739,6 +24776,7 @@ export default function workModelsExtension(pi) {
 				}
 				activeWorkGoalGitBefore = null;
 				await handleWorkGoalAgentEnd(event, ctx, pi);
+				activeWorkGoalVerifierFixCommitted = false;
 			}
 			activeHistoryTask = null;
 			if (!hadWorkGoal) resetWarpTitle(ctx);
