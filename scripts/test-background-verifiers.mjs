@@ -1022,9 +1022,10 @@ try {
 		"tracked.txt",
 		"untracked.txt",
 	]);
-	assert.equal(
-		executeVerifierRead(requests[0].cwd, { path: "tracked.txt" }).lines[0],
-		"unstaged",
+	assert.deepEqual(
+		executeVerifierRead(requests[0].cwd, { path: "tracked.txt" }).lines,
+		["unstaged"],
+		"newline-terminated files have no phantom trailing line",
 	);
 	assert.match(
 		executeVerifierRead(requests[0].cwd, {
@@ -1547,11 +1548,16 @@ try {
 	singleGit("config", "user.email", "test@example.test");
 	singleGit("config", "user.name", "Test");
 	writeFileSync(path.join(singleCommitCwd, "only.txt"), "only\n");
-	singleGit("add", "only.txt");
+	mkdirSync(path.join(singleCommitCwd, "nested"));
+	writeFileSync(path.join(singleCommitCwd, "nested", "inside.txt"), "nested\n");
+	mkdirSync(path.join(singleCommitCwd, "a", "deep"), { recursive: true });
+	writeFileSync(path.join(singleCommitCwd, "a", "b"), "direct\n");
+	writeFileSync(path.join(singleCommitCwd, "a", "deep", "b"), "deep\n");
+	singleGit("add", ".");
 	singleGit("commit", "-qm", "initial");
 	assert.deepEqual(
 		captureVerifierCheckpoint(singleCommitCwd, { scope: "project" }).paths,
-		["only.txt"],
+		["a/b", "a/deep/b", "nested/inside.txt", "only.txt"],
 		"whole-project scope supports a single-commit repository",
 	);
 	assert.deepEqual(
@@ -1561,6 +1567,22 @@ try {
 		}).paths,
 		["only.txt"],
 		"custom scope supports a single-commit repository",
+	);
+	assert.deepEqual(
+		captureVerifierCheckpoint(singleCommitCwd, {
+			scope: "custom",
+			patterns: ["**/*.txt"],
+		}).paths,
+		["nested/inside.txt", "only.txt"],
+		"a leading globstar includes root-level files",
+	);
+	assert.deepEqual(
+		captureVerifierCheckpoint(singleCommitCwd, {
+			scope: "custom",
+			patterns: ["a/**/b"],
+		}).paths,
+		["a/b", "a/deep/b"],
+		"a middle globstar matches zero or more directories",
 	);
 	const largeCwd = repo();
 	const largeGit = (...args) =>

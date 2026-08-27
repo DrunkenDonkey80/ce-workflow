@@ -9716,7 +9716,7 @@ function* verifierLines(file) {
 		pending += decoder.end();
 		if (Buffer.byteLength(pending) > VERIFIER_MAX_BYTES)
 			throw new Error("Verifier line exceeds the read limit.");
-		yield pending;
+		if (pending) yield pending;
 	} finally {
 		closeSync(descriptor);
 	}
