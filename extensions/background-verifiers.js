@@ -758,7 +758,14 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 				: scope === "custom"
 					? customSnapshotPaths(cwd, snapshot, input.patterns ?? input.paths)
 					: scope === "commit"
-						? snapshotPaths(cwd, parent, snapshot, input.paths, false, false)
+						? snapshotPaths(
+								cwd,
+								parent,
+								snapshot,
+								input.paths,
+								false,
+								false, // Untracked files do not exist in a commit snapshot.
+							)
 						: dirty
 							? input.paths
 								? snapshotPaths(cwd, head, snapshot, input.paths)

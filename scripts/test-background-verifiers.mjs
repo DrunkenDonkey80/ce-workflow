@@ -1342,6 +1342,10 @@ try {
 		"committed",
 		"last-commit scope ignores current worktree bytes",
 	);
+	assert.throws(
+		() => committedGit("cat-file", "-e", `${commitCheckpoint.snapshot}:untracked.txt`),
+		"last-commit snapshot cannot advertise an untracked file it does not contain",
+	);
 	const changesCheckpoint = captureVerifierCheckpoint(committedCwd, {
 		scope: "changes",
 	});
