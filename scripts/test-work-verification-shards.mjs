@@ -243,6 +243,29 @@ try {
 
 	{
 		const { cwd } = repository();
+		const realNow = Date.now;
+		Date.now = () => 1_000;
+		try {
+			const batch = await runLocked(
+				cwd,
+				{
+					shards: [{ id: "instant", command: "instant" }],
+					authoritativeCommand: "instant",
+				},
+				async () => ({ exitStatus: 0 }),
+				{ maxConcurrency: 1 },
+			);
+			assert.equal(batch.manifest.shards[0].virtualDurationMs, 1);
+			assert.equal(batch.manifest.metrics.maxConcurrency, 1);
+			assert.equal(batch.manifest.metrics.criticalPathMs, 1);
+			assert.equal(batch.manifest.metrics.sumShardMs, 1);
+		} finally {
+			Date.now = realNow;
+		}
+	}
+
+	{
+		const { cwd } = repository();
 		const shards = [
 			{ id: "left", command: "left", outputs: ["build/shared"] },
 			{ id: "right", command: "right", outputs: ["build/shared/nested"] },

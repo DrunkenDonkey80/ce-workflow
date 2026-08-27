@@ -1199,7 +1199,7 @@ export async function runVerificationShardBatch(
 							: 0;
 					const durationMs = Math.max(0, Date.now() - realStarted);
 					const virtualDurationMs = Math.max(
-						0,
+						1,
 						Number(output.virtualDurationMs ?? output.durationMs) || durationMs,
 					);
 					const bounded = verificationOutput(
