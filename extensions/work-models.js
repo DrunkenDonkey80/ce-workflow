@@ -17211,6 +17211,7 @@ function validateImprovementEvidence(cwd, issue) {
 	);
 	if (!records.length) problems.push("missing self-improvement report evidence");
 	const root = resolve(cwd, ...SELF_IMPROVEMENT_REPORT_ROOT);
+	let canonicalRoot;
 	for (const record of records) {
 		const bundle = resolve(cwd, String(record.bundle ?? ""));
 		if (!containedImprovementPath(root, bundle)) {
@@ -17219,8 +17220,9 @@ function validateImprovementEvidence(cwd, issue) {
 		}
 		let manifest;
 		try {
+			canonicalRoot ??= realpathSync(root);
 			const manifestFile = realpathSync(resolve(bundle, "manifest.json"));
-			if (!containedImprovementPath(realpathSync(root), manifestFile))
+			if (!containedImprovementPath(canonicalRoot, manifestFile))
 				throw new Error("manifest escapes report root");
 			manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
 		} catch (error) {
@@ -17245,7 +17247,7 @@ function validateImprovementEvidence(cwd, issue) {
 			}
 			try {
 				const file = realpathSync(resolve(bundle, name));
-				if (!containedImprovementPath(realpathSync(root), file))
+				if (!containedImprovementPath(canonicalRoot, file))
 					throw new Error("evidence escapes report root");
 				const bytes = statSync(file).size;
 				const sha256 = createHash("sha256")
