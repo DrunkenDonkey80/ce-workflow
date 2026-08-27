@@ -1352,8 +1352,7 @@ export function listJobs(store, filter = {}) {
 		)
 		.sort((left, right) => left.id.localeCompare(right.id));
 }
-export function recordOperationResult(store, input = {}) {
-	return edit(store, (next) => {
+function recordOperationResultIn(next, input = {}) {
 		const job = next.jobs[input.jobId];
 		if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
 		if (!job.operations.includes(input.operation))
@@ -1436,10 +1435,11 @@ export function recordOperationResult(store, input = {}) {
 			next.batches[job.batchId].presentationStatus ??= "pending";
 		}
 		return report;
-	});
 }
-export function addFinding(store, input = {}) {
-	return edit(store, (next) => {
+export function recordOperationResult(store, input = {}) {
+	return edit(store, (next) => recordOperationResultIn(next, input));
+}
+function addFindingIn(next, input = {}) {
 		const report = next.reports[input.reportId];
 		if (!report || report.outcome !== "findings")
 			throw error("invalid", "Finding must belong to a findings report");
@@ -1483,7 +1483,9 @@ export function addFinding(store, input = {}) {
 		};
 		next.findings[id] = finding;
 		return finding;
-	});
+}
+export function addFinding(store, input = {}) {
+	return edit(store, (next) => addFindingIn(next, input));
 }
 export function addGroup(store, input = {}) {
 	return edit(store, (next) => {
@@ -2016,8 +2018,7 @@ function validateTerminalReport(job, batch, text) {
 		omitted: job.operations.filter((operation) => !operations.has(operation)),
 	};
 }
-function quarantineVerifierReport(store, input = {}) {
-	return edit(store, (next) => {
+function quarantineVerifierReportIn(next, input = {}) {
 		const job = next.jobs[input.jobId];
 		if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
 		const id = stableId("quarantine", {
@@ -2032,11 +2033,13 @@ function quarantineVerifierReport(store, input = {}) {
 			reason: input.reason,
 			createdAt: now(input.now),
 		});
-	});
 }
-function recordTerminalFailures(store, jobId, operations, artifact, nowValue) {
+function quarantineVerifierReport(store, input = {}) {
+	return edit(store, (next) => quarantineVerifierReportIn(next, input));
+}
+function recordTerminalFailuresIn(next, jobId, operations, artifact, nowValue) {
 	for (const operation of operations)
-		recordOperationResult(store, {
+		recordOperationResultIn(next, {
 			jobId,
 			operation,
 			outcome: "failed",
@@ -2044,6 +2047,11 @@ function recordTerminalFailures(store, jobId, operations, artifact, nowValue) {
 			artifact,
 			now: nowValue,
 		});
+}
+function recordTerminalFailures(store, jobId, operations, artifact, nowValue) {
+	return edit(store, (next) =>
+		recordTerminalFailuresIn(next, jobId, operations, artifact, nowValue),
+	);
 }
 function terminalOutputFailureReport(store, job, operation) {
 	return Object.values(store.reports).find(
@@ -2097,83 +2105,85 @@ function runtimeArtifactWithinGrace(currentTime, ...files) {
 	});
 }
 export function ingestVerifierReport(store, input = {}) {
-	const job = store.jobs?.[input.jobId];
-	if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
-	const batch = store.batches[job.batchId];
-	const artifact = input.artifact;
-	let validated;
-	try {
-		validated = validateTerminalReport(job, batch, input.text);
-	} catch (cause) {
-		const reason =
-			cause instanceof VerifierStoreError ? cause.category : "invalid";
-		quarantineVerifierReport(store, {
-			jobId: job.id,
-			artifact,
-			reason,
-			now: input.now,
-		});
-		recordTerminalFailures(
-			store,
+	return edit(store, (next) => {
+		const job = next.jobs?.[input.jobId];
+		if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
+		const batch = next.batches[job.batchId];
+		const artifact = input.artifact;
+		let validated;
+		try {
+			validated = validateTerminalReport(job, batch, input.text);
+		} catch (cause) {
+			const reason =
+				cause instanceof VerifierStoreError ? cause.category : "invalid";
+			quarantineVerifierReportIn(next, {
+				jobId: job.id,
+				artifact,
+				reason,
+				now: input.now,
+			});
+			recordTerminalFailuresIn(
+				next,
+				job.id,
+				job.operations.filter(
+					(operation) => job.operationStatus[operation] === "pending",
+				),
+				artifact,
+				input.now,
+			);
+			return { quarantined: true, reason };
+		}
+		if (validated.rejected.length || validated.rejectedFindings)
+			quarantineVerifierReportIn(next, {
+				jobId: job.id,
+				artifact,
+				reason: validated.rejected[0]?.reason ?? "invalid",
+				now: input.now,
+			});
+		for (const result of validated.results) {
+			const report = recordOperationResultIn(next, {
+				jobId: job.id,
+				operation: result.operation,
+				outcome: result.outcome,
+				...(result.usage === undefined ? {} : { usage: result.usage }),
+				...(result.outcome === "failed"
+					? { failure: "Verifier reported an operation failure" }
+					: {}),
+				artifact,
+				now: input.now,
+			});
+			for (const finding of result.findings ?? [])
+				addFindingIn(next, {
+					reportId: report.id,
+					operation: result.operation,
+					model: job.model,
+					checkpoint: batch.checkpoint,
+					...finding,
+					now: input.now,
+				});
+		}
+		recordTerminalFailuresIn(
+			next,
 			job.id,
-			job.operations.filter(
-				(operation) => job.operationStatus[operation] === "pending",
-			),
+			[
+				...validated.rejected.map((result) => result.operation),
+				...validated.omitted,
+			],
 			artifact,
 			input.now,
 		);
-		return { quarantined: true, reason };
-	}
-	if (validated.rejected.length || validated.rejectedFindings)
-		quarantineVerifierReport(store, {
-			jobId: job.id,
-			artifact,
-			reason: validated.rejected[0]?.reason ?? "invalid",
-			now: input.now,
-		});
-	for (const result of validated.results) {
-		const report = recordOperationResult(store, {
-			jobId: job.id,
-			operation: result.operation,
-			outcome: result.outcome,
-			...(result.usage === undefined ? {} : { usage: result.usage }),
-			...(result.outcome === "failed"
-				? { failure: "Verifier reported an operation failure" }
-				: {}),
-			artifact,
-			now: input.now,
-		});
-		for (const finding of result.findings ?? [])
-			addFinding(store, {
-				reportId: report.id,
-				operation: result.operation,
-				model: job.model,
-				checkpoint: batch.checkpoint,
-				...finding,
-				now: input.now,
-			});
-	}
-	recordTerminalFailures(
-		store,
-		job.id,
-		[
-			...validated.rejected.map((result) => result.operation),
-			...validated.omitted,
-		],
-		artifact,
-		input.now,
-	);
-	groupValidatedFindings(store, { now: input.now });
-	return {
-		quarantined: validated.rejected.length > 0 || validated.rejectedFindings > 0,
-		omitted: validated.omitted,
-	};
+		groupValidatedFindingsIn(next, { now: input.now });
+		return {
+			quarantined:
+				validated.rejected.length > 0 || validated.rejectedFindings > 0,
+			omitted: validated.omitted,
+		};
+	});
 }
 function rangesOverlap(left, right) {
 	return left.startLine <= right.endLine && right.startLine <= left.endLine;
 }
-export function groupValidatedFindings(store, input = {}) {
-	return edit(store, (next) => {
+function groupValidatedFindingsIn(next, input = {}) {
 		for (const [id, group] of Object.entries(next.groups))
 			if (
 				group.generated &&
@@ -2213,7 +2223,9 @@ export function groupValidatedFindings(store, input = {}) {
 			}
 		}
 		return groups.sort((left, right) => left.id.localeCompare(right.id));
-	});
+}
+export function groupValidatedFindings(store, input = {}) {
+	return edit(store, (next) => groupValidatedFindingsIn(next, input));
 }
 function terminalState(status) {
 	return String(status?.state ?? status?.status ?? "").toLowerCase();

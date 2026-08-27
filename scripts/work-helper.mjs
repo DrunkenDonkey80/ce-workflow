@@ -753,10 +753,6 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 			(output) => !existsSync(path.join(executionRoot, output)),
 		),
 	);
-	const preserveShardOutput = (output) =>
-		[...ownedImplementationFiles, ...evidenceFileSet].some(
-			(file) => file === output || file.startsWith(`${output}/`),
-		);
 	const jsonFile = option("--json");
 	if (shardDeclarations.length && !verify)
 		throw new Error("--verify-shard requires --verify");
@@ -797,11 +793,10 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		);
 	} finally {
 		for (const outputPath of absentShardOutputs)
-			if (!preserveShardOutput(outputPath))
-				rmSync(path.join(executionRoot, outputPath), {
-					recursive: true,
-					force: true,
-				});
+			rmSync(path.join(executionRoot, outputPath), {
+				recursive: true,
+				force: true,
+			});
 	}
 	if (verificationCommand)
 		verificationResult = {

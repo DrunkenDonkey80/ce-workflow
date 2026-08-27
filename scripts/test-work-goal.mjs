@@ -64,6 +64,14 @@ assert.deepEqual(
 	}),
 	{ command: "work-context", args: "compact" },
 );
+assert.match(
+	mod.parseOrchestratorInput({
+		source: "interactive",
+		text: "orchestrator ?",
+	}).help,
+	/Try:/,
+	"standalone question-mark alias opens orchestrator help",
+);
 assert.deepEqual(
 	mod.parseOrchestratorInput({
 		source: "interactive",

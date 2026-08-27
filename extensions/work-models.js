@@ -20464,7 +20464,6 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 			activeWorkGoal = {
 				...goal,
 				status: "waiting_usage_limit",
-				usageLimitRetries: (goal.usageLimitRetries ?? 0) + 1,
 				nextRetryAt,
 				updatedAt: Date.now(),
 			};
@@ -23439,10 +23438,9 @@ function parseOrchestratorInput(event = {}) {
 		String(event.text ?? "").trim(),
 	);
 	if (!match) return;
-	const body = String(match[1] ?? "")
-		.trim()
-		.replace(/[.!?]+$/, "")
-		.replace(/\s+/g, " ");
+	const rawBody = String(match[1] ?? "").trim();
+	if (rawBody === "?") return { help: ORCHESTRATOR_INPUT_HELP };
+	const body = rawBody.replace(/[.!?]+$/, "").replace(/\s+/g, " ");
 	const lower = body.toLowerCase();
 	if (!body || ["menu", "open"].includes(lower))
 		return { command: "work-menu", args: "" };

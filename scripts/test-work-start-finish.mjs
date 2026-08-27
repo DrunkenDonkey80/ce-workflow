@@ -96,6 +96,27 @@ try {
 		(await verifierAdapter.spawn(verifierRequest)).ok,
 		"adapter accepts the canonical allowlist independent of order",
 	);
+	const invalidVerifierRequests = [
+		{ version: 2 },
+		{ agent: "reviewer" },
+		{ context: "fork" },
+		{ async: false },
+		{ boundary: { ...verifierRequest.boundary, readOnlyWorkspace: false } },
+		{ boundary: { ...verifierRequest.boundary, cwdConfinedReadTools: false } },
+		{ boundary: { ...verifierRequest.boundary, credentialsIsolated: false } },
+		{ boundary: { ...verifierRequest.boundary, toolAllowlist: [] } },
+	];
+	for (const mutation of invalidVerifierRequests) {
+		const rejected = await verifierAdapter.spawn({
+			...verifierRequest,
+			...mutation,
+		});
+		assert(
+			rejected.ok === false &&
+				rejected.message === "Verifier read-only boundary cannot be enforced",
+			"adapter rejects every malformed read-only boundary field",
+		);
+	}
 	let verifierChild = workflowChildParams(verifierRpcParams);
 	assert(
 		verifierRpcParams.async === true &&
