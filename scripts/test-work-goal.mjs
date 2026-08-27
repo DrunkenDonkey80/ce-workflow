@@ -122,6 +122,14 @@ assert.match(
 	mod.parseWorkGoalCommand("edit --tokens nope ship it").error,
 	/Invalid token budget/,
 );
+assert.deepEqual(mod.parseWorkGoalCommand("--tokens 100k status"), {
+	kind: "status",
+	error: "--tokens only applies to start/edit",
+});
+assert.deepEqual(mod.parseWorkGoalCommand("--tokens 100k pause"), {
+	kind: "pause",
+	error: "--tokens only applies to start/edit",
+});
 for (const command of [
 	"status",
 	"show",
@@ -187,6 +195,16 @@ assert.equal(
 	true,
 );
 assert.equal(mod.isContradictoryWorkGoalCompletion("tests still fail"), true);
+assert.equal(
+	mod.isContradictoryWorkGoalCompletion("Work remains blocked on credentials."),
+	true,
+);
+assert.equal(
+	mod.isContradictoryWorkGoalCompletion(
+		"Fixed the blocked lease path; the failing tests now pass.",
+	),
+	false,
+);
 
 const objective = mod.buildWorkSelfImprovingObjective("C:/soft/git/AI-Wedge", {
 	project: true,
@@ -412,6 +430,9 @@ assert.equal(
 );
 assert.equal(mod.workWarpTitle("brainstorm", "C:/soft/git/demo"), "✦ - demo");
 assert.equal(mod.progressBar(3, 6), "[██████░░░░░░]");
+assert.equal(mod.progressBar(0, 0), "[░░░░░░░░░░░░]");
+assert.equal(mod.progressBar(9, 6), "[████████████]");
+assert.equal(mod.progressBar(Number.NaN, 6), "[░░░░░░░░░░░░]");
 assert.deepEqual(
 	mod.extractImplementationUnits(
 		`## Implementation Units\n\n### U1. First slice\n\n### U2. Second slice\n\n## Done`,
@@ -3554,6 +3575,56 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await invoke("work-goal", "clear", ctx);
 	assert.equal(statuses["work-goal"], undefined);
 
+	writeFileSync(
+		path.join(cwd, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({
+			workGoal: {
+				id: "wg-project-stop-race",
+				mode: "project",
+				objective: "Cancel a transitional project stop.",
+				status: "active",
+				iteration: 0,
+				resumeOnSessionStart: true,
+				updatedAt: Date.now() + 1_000,
+			},
+		}),
+	);
+	tempHooks.session_start?.({}, ctx);
+	await tempHooks.before_agent_start(
+		{
+			prompt:
+				"Continue.\n\n<!-- work-goal-continuation:wg-project-stop-race:0:race -->",
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await invoke("work-stop", "test transitional resume", ctx);
+	assert.match(statuses["work-goal"], /stopping/);
+	const sentBeforeStopResume = sent.length;
+	await tempCommands.wo.handler("resume", ctx);
+	assert.equal(statuses["work-goal"], "working #0");
+	assert.equal(
+		sent.length,
+		sentBeforeStopResume,
+		"unified resume cancels a project stop without a duplicate continuation",
+	);
+	await invoke("work-goal", "clear", ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					stopReason: "aborted",
+					errorMessage: "Request aborted",
+					content: [],
+				},
+			],
+		},
+		ctx,
+	);
+	await settle();
+
 	await invoke("work-goal", "retain a goal during ordinary chat", ctx);
 	const pauseCwd = mkdtempSync(path.join(tmpdir(), "ce-work-pause-goal-"));
 	execFileSync("git", ["init"], { cwd: pauseCwd, stdio: "ignore" });
@@ -3844,7 +3915,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	tempHooks.session_start?.({}, ctx);
 	assert.match(statuses["work-goal"], /active/);
-	for (let turn = 0; turn < 3; turn += 1) {
+	const settleImprovementTurn = async (turn) => {
 		await tempHooks.before_agent_start(
 			{
 				prompt: `Continue safely.\n\n<!-- work-goal-continuation:wg-improvement-stall:${turn}:stall -->`,
@@ -3865,7 +3936,21 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			ctx,
 		);
 		await settle();
-	}
+	};
+	await settleImprovementTurn(0);
+	await settleImprovementTurn(1);
+	mutateStore(cwd, (store) =>
+		updateWorkItem(store, "work-7.1", { status: "open" }),
+	);
+	await settleImprovementTurn(2);
+	assert.equal(
+		JSON.parse(readFileSync(improvementStatePath, "utf8")).workGoal
+			.improvementStalledTurns,
+		0,
+		"durable work-item progress resets the no-progress counter",
+	);
+	await settleImprovementTurn(3);
+	await settleImprovementTurn(4);
 	assert.equal(
 		statuses["work-goal"],
 		"paused",
@@ -4095,6 +4180,41 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 				});
 			},
 		};
+		await invoke("work-goal", "verify committed goal turns", lifecycleCtx);
+		const lifecycleBaselineHead = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: lifecycleVerifierCwd,
+			encoding: "utf8",
+		}).trim();
+		assert.equal(
+			JSON.parse(
+				readFileSync(
+					path.join(
+						lifecycleVerifierCwd,
+						".pi",
+						"work-orchestrator-state.json",
+					),
+					"utf8",
+				),
+			).workGoal.baselineHead,
+			lifecycleBaselineHead,
+			"goal startup persists the committed repository baseline",
+		);
+		tempHooks.session_start?.({}, lifecycleCtx);
+		assert.equal(
+			JSON.parse(
+				readFileSync(
+					path.join(
+						lifecycleVerifierCwd,
+						".pi",
+						"work-orchestrator-state.json",
+					),
+					"utf8",
+				),
+			).workGoal.baselineHead,
+			lifecycleBaselineHead,
+			"goal reload retains the committed repository baseline",
+		);
+		await invoke("work-goal", "clear", lifecycleCtx);
 		await invoke("work-goal", "verify committed goal turns", lifecycleCtx);
 		await tempHooks.before_agent_start(
 			{ prompt: sent.at(-1).message, systemPrompt: "base" },

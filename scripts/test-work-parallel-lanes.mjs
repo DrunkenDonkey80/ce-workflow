@@ -197,6 +197,12 @@ try {
 			Object.keys(loadLaneStore(cwd).lanes).length > 0,
 			"corrupt primary lane state falls back to the durable recovery copy",
 		);
+		const healed = queueLane(cwd, envelope(cwd, head, 2, "healed"));
+		assert.equal(
+			loadLaneStore(cwd).lanes[healed.id].state,
+			"queued",
+			"the next mutation replaces a corrupt primary from valid recovery state",
+		);
 	}
 
 	{

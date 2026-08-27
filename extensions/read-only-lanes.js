@@ -411,9 +411,14 @@ export function saveLaneStore(cwd = process.cwd(), store) {
 	mkdirSync(runtimeDir(cwd), { recursive: true, mode: 0o700 });
 	if (existsSync(target)) {
 		const prior = readFileSync(target, "utf8");
-		readStore(target);
-		durableWrite(recovery, prior);
-		readStore(recovery);
+		try {
+			readStore(target);
+			durableWrite(recovery, prior);
+			readStore(recovery);
+		} catch (primaryError) {
+			if (!existsSync(recovery)) throw primaryError;
+			readStore(recovery);
+		}
 	}
 	durableWrite(candidate, `${JSON.stringify(canonical(store), null, 2)}\n`);
 	try {

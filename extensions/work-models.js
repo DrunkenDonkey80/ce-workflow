@@ -750,7 +750,7 @@ const WORK_GOAL_RETRYABLE_RE =
 const WORK_GOAL_CONTEXT_OVERFLOW_RE =
 	/context[_\s-]*length|context window|input exceeds|prompt is too long|maximum context length/i;
 const WORK_GOAL_CONTRADICTORY_COMPLETION_RE =
-	/(?<!could\s)\bnot\s+(?:yet\s+)?(?:complete|completed|done|finished)\b|\bstill\s+(?:incomplete|failing|failing\s+tests?|fails?)\b|\btests?\s+(?:still\s+)?fail(?:ing)?\b|\bblocked\b|\bnot\s+verified\b/i;
+	/(?<!could\s)\bnot\s+(?:yet\s+)?(?:complete|completed|done|finished)\b|\bstill\s+(?:incomplete|failing|failing\s+tests?|fails?)\b|\btests?\s+still\s+fail(?:ing)?\b|\b(?:is|are|remain(?:s)?|still)\s+blocked\b|\bblocked\s+(?:by|on|due\s+to)\b|\bnot\s+verified\b/i;
 const REVIEW_CYCLE_BUDGET_PROMPT = `## Review cycle budget
 Use one initial review cycle, batch its actionable fixes, and run at most one targeted re-review only when those fixes materially changed production behavior. Skip re-review for test-only, documentation, formatting, traceability, or other mechanical fixes. A simplification pass is not another correctness review. After the targeted re-review, fix and report any residual findings without launching another reviewer. Do not launch a third review cycle unless the user explicitly requests it.
 
@@ -25252,13 +25252,16 @@ export default function workModelsExtension(pi) {
 				notify(ctx, "Usage: /wo or /wo resume [target or answer]", "warning");
 				return;
 			}
-			if (activeWorkGoal && activeWorkGoal.status !== "complete")
+			if (activeWorkGoal && activeWorkGoal.status !== "complete") {
+				if (!rest && activeWorkGoal.mode === "project")
+					return handleWorkResumeGoalCommand("", pi, ctx);
 				return handleWorkGoalCommand(
 					`resume${rest ? ` ${rest}` : ""}`,
 					activeWorkGoal.mode,
 					pi,
 					ctx,
 				);
+			}
 			return executeOrchestratorAction("work-resume", rest, ctx, pi);
 		},
 	});
