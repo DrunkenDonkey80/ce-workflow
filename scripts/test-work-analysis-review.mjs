@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+	acquireVerifierLock,
 	addFinding,
 	analysisReviewProjection,
 	claimAnalysisReview,
@@ -14,6 +15,7 @@ import {
 	saveAnalysisReviewProposal,
 } from "../extensions/background-verifiers.js";
 import {
+	materializeVerifierAnalysis,
 	reconcileAnalysisFinalizations,
 	reconcileLegacyAnalysisTasks,
 	validateAnalysisFinalizationInput,
@@ -105,6 +107,25 @@ try {
 			verdict === "accepted" ? "Use a private key." : "Change equality.",
 		decisionKey: "tag-identity",
 	}));
+	const contention = acquireVerifierLock(cwd);
+	try {
+		assert.throws(
+			() =>
+				materializeVerifierAnalysis(cwd, {
+					batchIds: [batch.id],
+					markdown: JSON.stringify({ candidates }),
+					reportPath: path.join(cwd, "analysis.md"),
+				}),
+			(error) => error?.category === "locked",
+		);
+	} finally {
+		contention.release();
+	}
+	assert.notEqual(
+		loadVerifierStore(cwd).batches[batch.id].analysisIngestionStatus,
+		"failed",
+		"lock contention remains retryable instead of being classified as malformed synthesis",
+	);
 	const first = mutateVerifierStore(cwd, (store) =>
 		ingestAnalysisReview(store, {
 			batchId: batch.id,
