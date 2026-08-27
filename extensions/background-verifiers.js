@@ -118,6 +118,22 @@ function stableId(prefix, value) {
 function same(left, right) {
 	return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 }
+function sameCommitHash(left, right) {
+	return (
+		/^[0-9a-f]{7,64}$/i.test(String(left ?? "")) &&
+		/^[0-9a-f]{7,64}$/i.test(String(right ?? "")) &&
+		(String(left).startsWith(String(right)) || String(right).startsWith(String(left)))
+	);
+}
+function batchIsVerifierFixCommit(store, batch) {
+	return Object.values(store.fixes).some((fix) =>
+		sameCommitHash(batch?.checkpoint?.snapshot, fix.commit),
+	);
+}
+function findingFromVerifierFixCommit(store, finding) {
+	const report = store.reports[finding.reportId];
+	return batchIsVerifierFixCommit(store, store.batches[report?.batchId]);
+}
 function relativePath(value, field = "path") {
 	if (
 		!nonempty(value) ||
@@ -1520,6 +1536,7 @@ function findingNeedsTriage(store, finding) {
 	const report = store.reports[finding.reportId];
 	const batch = report ? store.batches[report.batchId] : undefined;
 	return (
+		!findingFromVerifierFixCommit(store, finding) &&
 		!finding.dispositionId &&
 		(batch?.purpose ?? "verification") !== "analysis" &&
 		!batch?.analysisMaterializedAt
@@ -1527,6 +1544,7 @@ function findingNeedsTriage(store, finding) {
 }
 function findingNeedsFix(store, finding) {
 	return (
+		!findingFromVerifierFixCommit(store, finding) &&
 		store.dispositions[finding.dispositionId]?.disposition === "accepted" &&
 		!finding.fixId
 	);
@@ -2897,6 +2915,7 @@ export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 			.filter(
 				(batch) =>
 					batch.purpose === "verification" &&
+					!batchIsVerifierFixCommit(store, batch) &&
 					batch.checkpoint.snapshot !== baseline &&
 					Date.parse(batch.createdAt) >= startedAt,
 			)

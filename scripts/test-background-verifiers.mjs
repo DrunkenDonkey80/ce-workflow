@@ -2512,12 +2512,13 @@ try {
 		"2026-07-21T05:31:00.000Z",
 		"accepted fixes renew and validate their claim before Git mutation",
 	);
+	const verifierFixCommit = "d".repeat(40);
 	mutateVerifierStore(reconcileCwd, (state) =>
 		completeAcceptedFix(state, {
 			claimId: triageClaims[0].id,
 			ownerSession: fixOwner,
 			findingIds: [acceptedFinding],
-			commit: "a".repeat(40),
+			commit: verifierFixCommit,
 			verification: ["node test"],
 			now: "2026-07-21T05:02:00.000Z",
 		}),
@@ -2527,6 +2528,55 @@ try {
 		"triaged",
 		"mixed dispositions become terminal only after accepted fix evidence",
 	);
+	const historicalFixProfile = { ...profiles[0], operations: ["security"] };
+	const historicalFixBatch = mutateVerifierStore(reconcileCwd, (state) =>
+		createBatch(state, {
+			checkpoint: { ...checkpoint, snapshot: verifierFixCommit },
+			profiles: [historicalFixProfile],
+			...options,
+			now: "2026-07-21T05:02:10.000Z",
+		}),
+	);
+	const historicalFixJob = Object.values(
+		loadVerifierStore(reconcileCwd).jobs,
+	).find((job) => job.batchId === historicalFixBatch.id);
+	const historicalFixReport = mutateVerifierStore(reconcileCwd, (state) =>
+		recordOperationResult(state, {
+			jobId: historicalFixJob.id,
+			operation: "security",
+			outcome: "findings",
+		}),
+	);
+	const historicalFixFinding = mutateVerifierStore(reconcileCwd, (state) =>
+		addFinding(state, {
+			reportId: historicalFixReport.id,
+			operation: "security",
+			model: historicalFixJob.model,
+			checkpoint: historicalFixBatch.checkpoint,
+			path: "extensions/work-models.js",
+			startLine: 1,
+			endLine: 1,
+			category: "legacy-verifier-fix",
+			severity: "low",
+			rationale: "legacy runtime verified a verifier-fix commit",
+			evidence: "this batch should have been suppressed",
+			suggestedAction: "ignore the recursive batch",
+		}),
+	);
+	const historicalFixGroup = mutateVerifierStore(reconcileCwd, (state) =>
+		addGroup(state, {
+			findingIds: [historicalFixFinding.id],
+			now: "2026-07-21T05:02:15.000Z",
+		}),
+	);
+	assert.equal(
+		verifierCompletionBlocker(
+			loadVerifierStore(reconcileCwd),
+			"2026-07-21T05:02:05.000Z",
+		),
+		undefined,
+		"historical batches at verifier-fix commits do not block completion",
+	);
 	assert.equal(
 		mutateVerifierStore(reconcileCwd, (state) =>
 			claimCompletedGroups(state, {
@@ -2535,7 +2585,12 @@ try {
 			}),
 		).length,
 		0,
-		"fully triaged findings stay absent from later resumes",
+		"verifier-fix batches and fully triaged findings stay absent from later resumes",
+	);
+	assert.equal(
+		loadVerifierStore(reconcileCwd).groups[historicalFixGroup.id].status,
+		"completed",
+		"historical verifier-fix groups remain durable but never enter manual triage",
 	);
 	assert.equal(
 		loadVerifierStore(reconcileCwd).groups[sharedGroup.id].status,
