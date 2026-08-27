@@ -70,6 +70,7 @@ const TERMINAL_SUCCESS_STATES = new Set([
 	"ok",
 	"passed",
 ]);
+// Failure status does not discard valid reports; reconciliation retains their artifacts.
 const TERMINAL_FAILURE_STATES = new Set([
 	"failed",
 	"error",

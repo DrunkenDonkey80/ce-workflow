@@ -508,7 +508,15 @@ try {
 			request: { logicalJobId: job.id, model: job.model, output: lateOutput },
 		};
 		job.status = "orphaned";
+		delete job.failureAcknowledgement;
 	});
+	const orphanAcknowledgement = mutateVerifierStore(failedCwd, (state) =>
+		acknowledgeVerifierFailure(state, {
+			jobId: failedJob.id,
+			reason: "orphaned launch has equivalent security coverage",
+		}),
+	);
+	assert.deepEqual(orphanAcknowledgement.coveredBy, [coveringJob.id]);
 	writeFileSync(
 		lateOutput,
 		`\`\`\`json\n${JSON.stringify({
@@ -854,6 +862,49 @@ try {
 		loadVerifierStore(recoveryCwd).metadata.updatedAt,
 		"2026-07-21T00:00:00.000Z",
 	);
+	const recoveryDir = path.dirname(verifierStorePath(recoveryCwd));
+	const candidateFile = path.join(recoveryDir, ".state.candidate.json");
+	rmSync(candidateFile, { force: true });
+	const recoveryInterrupted = structuredClone(recoveryStore);
+	recoveryInterrupted.metadata.updatedAt = "2026-07-21T00:00:02.000Z";
+	throwsCategory(
+		() =>
+			saveVerifierStore(recoveryCwd, recoveryInterrupted, {
+				interruptAt: "recovery",
+			}),
+		"interrupted",
+	);
+	assert.equal(
+		loadVerifierStore(recoveryCwd).metadata.updatedAt,
+		"2026-07-21T00:00:00.000Z",
+		"recovery interruption leaves the published store untouched",
+	);
+	assert.equal(existsSync(candidateFile), false);
+	const replaced = structuredClone(recoveryStore);
+	replaced.metadata.updatedAt = "2026-07-21T00:00:03.000Z";
+	throwsCategory(
+		() => saveVerifierStore(recoveryCwd, replaced, { interruptAt: "replace" }),
+		"interrupted",
+	);
+	assert.equal(
+		loadVerifierStore(recoveryCwd).metadata.updatedAt,
+		"2026-07-21T00:00:03.000Z",
+		"post-replace interruption leaves the validated replacement published",
+	);
+	assert.equal(existsSync(candidateFile), false);
+	writeFileSync(verifierStorePath(recoveryCwd), "{");
+	assert.equal(
+		loadVerifierStore(recoveryCwd).metadata.updatedAt,
+		"2026-07-21T00:00:00.000Z",
+		"a corrupt primary store falls back to the validated recovery snapshot",
+	);
+	const conflictedCwd = repo();
+	initVerifierStore(conflictedCwd);
+	writeFileSync(
+		verifierStorePath(conflictedCwd),
+		"<<<<<<< ours\n{}\n=======\n{}\n>>>>>>> theirs\n",
+	);
+	throwsCategory(() => loadVerifierStore(conflictedCwd), "conflicted");
 
 	// U3: checkpoint capture preserves the live checkout and launches once per model.
 	const gitCwd = repo();
@@ -1861,6 +1912,105 @@ try {
 		existsSync(path.join(runtimeOutput, `${reportJobA.id}.json`)),
 		"raw private artifact is retained",
 	);
+
+	const terminalCwd = repo();
+	initVerifierStore(terminalCwd);
+	const terminalBatch = mutateVerifierStore(terminalCwd, (state) =>
+		createBatch(state, { checkpoint, profiles: reportProfiles, ...options }),
+	);
+	const terminalJobs = Object.values(loadVerifierStore(terminalCwd).jobs);
+	const terminalWorkspace = mkdtempSync(
+		path.join(os.tmpdir(), "ce-verifier-terminal-workspace-"),
+	);
+	mkdirSync(path.join(terminalWorkspace, "extensions"), { recursive: true });
+	mkdirSync(path.join(terminalWorkspace, "scripts"), { recursive: true });
+	writeFileSync(
+		path.join(terminalWorkspace, "extensions", "work-models.js"),
+		"export const value = 1;\n",
+	);
+	writeFileSync(
+		path.join(terminalWorkspace, "scripts", "test-work-settings.mjs"),
+		"export const value = 1;\n",
+	);
+	writeFileSync(
+		path.join(terminalWorkspace, ".ce-verifier-workspace.json"),
+		JSON.stringify({ version: 1, paths: checkpoint.paths }),
+	);
+	const terminalOutputDir = path.join(
+		path.dirname(verifierStorePath(terminalCwd)),
+		"runtime",
+		"outputs",
+	);
+	mkdirSync(terminalOutputDir, { recursive: true });
+	const terminalRequests = {};
+	const terminalAsyncDirs = {};
+	for (const [index, job] of terminalJobs.entries()) {
+		const output = path.join(terminalOutputDir, `${job.id}.json`);
+		const asyncDir = path.join(terminalCwd, `.terminal-${index}`);
+		mkdirSync(asyncDir);
+		terminalAsyncDirs[job.id] = asyncDir;
+		terminalRequests[job.id] = {
+			logicalJobId: job.id,
+			model: job.model,
+			cwd: terminalWorkspace,
+			output,
+		};
+		writeFileSync(
+			path.join(asyncDir, "status.json"),
+			JSON.stringify({ state: index ? "timed_out" : "cancelled" }),
+		);
+		writeFileSync(
+			output,
+			JSON.stringify({
+				version: 1,
+				jobId: job.id,
+				model: job.model,
+				checkpoint,
+				results: job.operations.map((operation) => ({
+					jobId: job.id,
+					model: job.model,
+					checkpoint,
+					operation,
+					outcome: "no-findings",
+				})),
+			}),
+		);
+	}
+	mutateVerifierStore(terminalCwd, (state) =>
+		queueVerifierJobs(state, {
+			batchId: terminalBatch.id,
+			requests: terminalRequests,
+		}),
+	);
+	for (const [index, job] of terminalJobs.entries())
+		mutateVerifierStore(terminalCwd, (state) =>
+			recordVerifierLaunch(state, {
+				jobId: job.id,
+				ok: true,
+				identity: {
+					runId: `terminal-${index}`,
+					asyncDir: terminalAsyncDirs[job.id],
+				},
+			}),
+		);
+	assert.deepEqual(
+		reconcileVerifierRuns(terminalCwd).sort(),
+		terminalJobs.map((job) => job.id).sort(),
+	);
+	const terminalStore = loadVerifierStore(terminalCwd);
+	for (const job of terminalJobs) {
+		assert.equal(terminalStore.jobs[job.id].launch.status, "failed");
+		assert.ok(
+			Object.values(terminalStore.reports).some(
+				(report) => report.jobId === job.id && report.outcome === "no-findings",
+			),
+			"terminal failures still ingest a valid report",
+		);
+		assert.ok(
+			existsSync(terminalRequests[job.id].output),
+			"terminal failure artifacts remain available for diagnosis",
+		);
+	}
 
 	// Pi-subagents persists schema-validated output in status.workflow.value, even when file-only output is absent.
 	const structuredCwd = repo();
