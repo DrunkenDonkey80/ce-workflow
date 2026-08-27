@@ -18262,7 +18262,7 @@ function parseTokenBudget(value) {
 function formatTokenCount(value) {
 	const n = Number(value ?? 0);
 	if (n < 1_000) return `${n}`;
-	if (n < 1_000_000)
+	if (n < 999_950)
 		return `${Number.isInteger(n / 1_000) ? n / 1_000 : (n / 1_000).toFixed(1)}k`;
 	return `${Number.isInteger(n / 1_000_000) ? n / 1_000_000 : (n / 1_000_000).toFixed(1)}m`;
 }

@@ -124,6 +124,8 @@ assert.match(
 );
 assert.equal(mod.parseTokenBudget("42"), 42);
 assert.equal(mod.formatTokenCount(1500), "1.5k");
+assert.equal(mod.formatTokenCount(999_949), "999.9k");
+assert.equal(mod.formatTokenCount(999_950), "1.0m");
 assert.equal(
 	mod.isRetryableWorkGoalInterruption({
 		stopReason: "error",
