@@ -6795,7 +6795,7 @@ function labelsOf(issue) {
 		.map(String);
 }
 
-function notesOf(issue) {
+function noteTextsOf(issue) {
 	return asArray(field(issue, "notes", "comments", "comment"))
 		.map((note) =>
 			String(
@@ -6804,8 +6804,11 @@ function notesOf(issue) {
 					: note,
 			),
 		)
-		.filter(Boolean)
-		.join("\n");
+		.filter(Boolean);
+}
+
+function notesOf(issue) {
+	return noteTextsOf(issue).join("\n");
 }
 
 function objectMetadata(value) {
@@ -17285,12 +17288,19 @@ function renderWorkImproveText(state) {
 	].join("\n");
 }
 
+function improvementSafetyNotes(issue) {
+	return noteTextsOf(issue)
+		.map((note) =>
+			note.match(
+				/^\s*wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^\r\n]*\s*$/i,
+			),
+		)
+		.filter(Boolean);
+}
+
 function improvementSafetyDisposition(issue) {
-	const values = Array.from(
-		notesOf(issue).matchAll(
-			/^wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^\r\n]*$/gim,
-		),
-		(match) => match[1].toUpperCase(),
+	const values = improvementSafetyNotes(issue).map((match) =>
+		match[1].toUpperCase(),
 	);
 	const blockedAt = values.lastIndexOf("BLOCKED");
 	if (blockedAt < 0) return values.at(-1);
@@ -17300,10 +17310,10 @@ function improvementSafetyDisposition(issue) {
 }
 
 function improvementSafetyFingerprint(issue) {
-	const blocked = Array.from(
-		notesOf(issue).matchAll(/^wo:improvement-safety\s+BLOCKED\b[^\r\n]*$/gim),
-		(match) => match[0].trim(),
-	).at(-1);
+	const blocked = improvementSafetyNotes(issue)
+		.filter((match) => match[1].toUpperCase() === "BLOCKED")
+		.map((match) => match[0].trim())
+		.at(-1);
 	return blocked ? createHash("sha256").update(blocked).digest("hex") : "";
 }
 
