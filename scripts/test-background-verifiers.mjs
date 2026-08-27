@@ -1471,6 +1471,22 @@ try {
 		["test.js", "tests/tracked.test.js", "tracked.txt", "untracked.txt"],
 		"whole-project analysis includes tests only for test coverage",
 	);
+	const profileOperationSchedule = scheduleVerifierBatch(committedCwd, {
+		scope: "project",
+		profiles: [profiles[0]],
+		adapter: {
+			enforcesReadOnlyBoundary: true,
+			async spawn() {
+				return { ok: false, message: "test terminal" };
+			},
+		},
+	});
+	assert.deepEqual(
+		profileOperationSchedule.batch.checkpoint.paths,
+		["test.js", "tests/tracked.test.js", "tracked.txt", "untracked.txt"],
+		"project schedules derive test inclusion from normalized profile operations",
+	);
+	await profileOperationSchedule.launch;
 	const projectSchedule = scheduleVerifierBatch(committedCwd, {
 		profiles: [profiles[1]],
 		checkpoint: projectCheckpoint,

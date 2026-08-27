@@ -1177,11 +1177,12 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 	const profiles = normalizeProfiles(input.profiles ?? [], input);
 	if (!profiles.length)
 		return { status: "not-configured", launch: Promise.resolve([]) };
+	const operations = [...new Set(profiles.flatMap((profile) => profile.operations))];
 	let checkpoint;
 	try {
 		checkpoint = input.checkpoint
 			? validateCheckpoint(input.checkpoint, "verifier checkpoint", "invalid")
-			: captureVerifierCheckpoint(cwd, input);
+			: captureVerifierCheckpoint(cwd, { ...input, operations });
 	} catch (cause) {
 		const batch = recordNotScheduledBatch(cwd, profiles, cause.message, input);
 		return {
