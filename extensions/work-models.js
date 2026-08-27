@@ -19032,8 +19032,6 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 		};
 	}
 	restoreWorkGoalThinking(pi, goal);
-	activeWorkGoal = { ...goal, status: "complete", updatedAt: Date.now() };
-	persistWorkGoal(pi, activeWorkGoal);
 	activeWorkGoal = null;
 	activeWorkGoalRunning = false;
 	workGoalContinuationPending = null;
