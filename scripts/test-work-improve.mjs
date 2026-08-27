@@ -137,7 +137,8 @@ assert.match(
 assert.match(objective, /read-only necessity and safety pass/);
 assert.match(objective, /potentially destructive/);
 assert.match(objective, /wo:improvement-safety SAFE/);
-assert.match(objective, /explicit approval/);
+assert.match(objective, /Improvement safety approval IDs/);
+assert.match(objective, /scoped recorded approval/);
 assert.match(objective, /no-progress circuit breaker/);
 assert.match(objective, /Summarize what was done in 1-3 short sentences/);
 for (const id of ["SI-CLOSED", "SI-DEFERRED"])
@@ -379,14 +380,40 @@ mutateStore(root, (store) =>
 );
 hooks.tool_result(
 	{
+		toolCallId: "unscoped-approval",
 		toolName: "ask_user",
 		details: {
-			question: "Allow the broad automation behavior change?",
-			response: { selections: ["Approve with documented rollback"] },
+			question: "Approve an unrelated planning choice?",
+			response: { selections: ["Approve"] },
 		},
 	},
 	hookCtx,
 );
+const approveRisk = (toolCallId) => {
+	const input = {
+		question: "Allow the broad automation behavior change?",
+		context: "Improvement safety approval IDs: SI-1.1",
+		options: [
+			{ title: "Approve with documented rollback" },
+			{ title: "Keep blocked" },
+		],
+		allowMultiple: false,
+		allowFreeform: false,
+	};
+	hooks.tool_call({ toolCallId, toolName: "ask_user", input }, hookCtx);
+	hooks.tool_result(
+		{
+			toolCallId,
+			toolName: "ask_user",
+			details: {
+				question: input.question,
+				response: { selections: ["Approve with documented rollback"] },
+			},
+		},
+		hookCtx,
+	);
+};
+approveRisk("scoped-approval");
 mutateStore(root, (store) =>
 	appendWorkNote(
 		store,
@@ -400,7 +427,38 @@ assert.equal(
 		hookCtx,
 	),
 	undefined,
-	"recorded explicit approval unlocks source mutation",
+	"the matching scoped approval unlocks source mutation",
+);
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety BLOCKED changed risk now includes persistent data",
+	),
+);
+assert.match(
+	hooks.tool_call(
+		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		hookCtx,
+	).reason,
+	/need a final wo:improvement-safety/,
+	"a changed BLOCKED assessment invalidates the prior approval",
+);
+approveRisk("changed-risk-approval");
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.1",
+		"wo:improvement-safety APPROVED new decision covers changed risk",
+	),
+);
+assert.equal(
+	hooks.tool_call(
+		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		hookCtx,
+	),
+	undefined,
+	"a new scoped decision covers the changed risk",
 );
 mutateStore(root, (store) =>
 	updateWorkItem(store, "SI-1.1", { status: "closed" }),

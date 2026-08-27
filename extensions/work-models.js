@@ -690,6 +690,7 @@ let pendingVerifierSynthesis = null;
 let activeVerifierSynthesis = null;
 let pendingSettledAgentEnd = null;
 const pendingDirtyRecoveries = new Map();
+const pendingImprovementApprovals = new Map();
 const pendingInitiativeConversions = new Map();
 const pendingRichTaskComposers = new Map();
 const pendingMainEditorActions = new Map();
@@ -9781,9 +9782,7 @@ function verifierFiles(cwd, requested) {
 		return [verifierPath(root, requested)];
 	const prefix = requested && requested !== "." ? `${requested}/` : "";
 	return [...paths]
-		.filter(
-			(entry) => entry.startsWith(prefix) && existsSync(join(root, entry)),
-		)
+		.filter((entry) => entry.startsWith(prefix) && existsSync(join(root, entry)))
 		.map((entry) => verifierPath(root, entry));
 }
 export function executeVerifierFind(cwd, params = {}) {
@@ -17358,6 +17357,23 @@ function improvementSafetyDisposition(issue) {
 		: "BLOCKED";
 }
 
+function improvementSafetyFingerprint(issue) {
+	const blocked = Array.from(
+		notesOf(issue).matchAll(
+			/^wo:improvement-safety\s+BLOCKED\b[^\r\n]*$/gim,
+		),
+		(match) => match[0].trim(),
+	).at(-1);
+	return blocked ? createHash("sha256").update(blocked).digest("hex") : "";
+}
+
+function improvementApprovalMatches(goal, issue, id) {
+	const fingerprint = improvementSafetyFingerprint(issue);
+	return Boolean(
+		fingerprint && goal?.improvementApprovalFingerprints?.[id] === fingerprint,
+	);
+}
+
 function workImproveSnapshotIds(goal) {
 	return /^Work-improvement snapshot IDs:\s*(.+)$/m
 		.exec(String(goal?.objective ?? ""))?.[1]
@@ -17427,10 +17443,11 @@ function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
 		return `Improvement safety preflight blocks ${tool}: work-improvement snapshot IDs are missing.`;
 	const pending = ids.filter((id) => {
 		try {
-			const disposition = improvementSafetyDisposition(readWorkItem(cwd, id));
+			const issue = readWorkItem(cwd, id);
+			const disposition = improvementSafetyDisposition(issue);
 			return (
 				disposition !== "SAFE" &&
-				!(disposition === "APPROVED" && goal.improvementApprovedIds?.includes(id))
+				!(disposition === "APPROVED" && improvementApprovalMatches(goal, issue, id))
 			);
 		} catch {
 			return true;
@@ -17459,7 +17476,7 @@ Execution contract:
 - Execute existing canonical work items directly. Atomize each report before deduplicating because one report may contain several root causes. Compare expected outcomes, current source/tests, git history, and ownership; suggested fixes alone do not define equivalence.
 - For every claim, first challenge whether any change is needed. Prefer already-current behavior, deletion, reuse, or the smallest reversible fix over speculative flexibility. Classify it as duplicate, related-distinct, conflicting, already-fixed, locally-owned, upstream-owned, or insufficient-evidence.
 - Assess blast radius, reversibility, rollback, and failure mode. Treat data deletion/overwrite, migrations or persistent-format changes, security/privacy/auth weakening, public API/protocol/schema changes, history rewrites, releases/publishing, external services/credentials/hardware, removal of validation/recovery/tests, and broad automation/default changes as potentially destructive.
-- For a non-destructive snapshot item append exactly one \`wo:improvement-safety SAFE <reason and rollback>\` note with node ${helper} work-note <id> --append-notes "...". If any covered claim is potentially destructive, append \`wo:improvement-safety BLOCKED <risk>\` and use ask_user before mutation with an approval option whose title begins \`Approve\`. Only that recorded explicit approval may replace it with \`wo:improvement-safety APPROVED <risk; decision; rollback>\`; cancellation or unavailable approval leaves it open and pauses the goal.
+- For a non-destructive snapshot item append exactly one \`wo:improvement-safety SAFE <reason and rollback>\` note with node ${helper} work-note <id> --append-notes "...". If any covered claim is potentially destructive, append \`wo:improvement-safety BLOCKED <risk>\` and use ask_user before mutation with an approval option whose title begins \`Approve\`; set allowMultiple=false and allowFreeform=false, and include one exact context line \`Improvement safety approval IDs: <comma-separated blocked snapshot IDs>\`. Only that scoped recorded approval may replace it with \`wo:improvement-safety APPROVED <risk; decision; rollback>\`; cancellation, unavailable approval, or a changed BLOCKED assessment leaves it open and requires a new decision.
 - Reuse an atomic report as its execution item. When a report contains multiple claims or several reports share one claim, create or reuse one canonical bug/decision WorkItem under ${state.epic.id} with node ${helper} work-create, and link reports with node ${helper} work-block.
 - Do not close a duplicate merely because it is similar. First verify the shared fix or already-current behavior against every covered report, then note the canonical WorkItem, commit, and verification on each report before closing it.
 - Execute locally owned canonical work through the normal work-orchestrator path: smallest correct implementation, focused proof, required review, coded finish/commit, then report reconciliation. Route genuine upstream ownership durably; do not invent a local workaround unless it is the smallest verified project fix.
@@ -17481,8 +17498,8 @@ function workImproveCompletionBlocker(goal, cwd) {
 			const safety = improvementSafetyDisposition(issue);
 			if (!["SAFE", "APPROVED"].includes(safety))
 				return `${id} lacks a final wo:improvement-safety SAFE or APPROVED assessment`;
-			if (safety === "APPROVED" && !goal.improvementApprovedIds?.includes(id))
-				return `${id} has APPROVED risk without a recorded ask_user approval`;
+			if (safety === "APPROVED" && !improvementApprovalMatches(goal, issue, id))
+				return `${id} has APPROVED risk without a matching ask_user approval`;
 		}
 	} catch (error) {
 		return `work-improvement snapshot could not be verified: ${commandErrorText(error)}`;
@@ -18723,41 +18740,98 @@ function askUserPauseSelection(event) {
 	);
 }
 
-function recordImprovementApprovalFromAskUser(event, ctx, pi) {
+function recordImprovementApprovalAskCall(event, cwd) {
 	if (
 		event.toolName !== "ask_user" ||
-		event.isError ||
-		event.details?.cancelled ||
 		activeWorkGoal?.mode !== "improvement" ||
 		activeWorkGoal.status !== "active"
+	)
+		return;
+	const input = event?.input ?? event?.params ?? {};
+	const toolCallId = String(event?.toolCallId ?? "");
+	const options = Array.isArray(input.options) ? input.options : [];
+	const marker = `${input.question ?? ""}\n${input.context ?? ""}`.match(
+		/^Improvement safety approval IDs:\s*(.+)$/m,
+	)?.[1];
+	const ids = marker
+		?.split(",")
+		.map((id) => id.trim())
+		.filter(Boolean);
+	const snapshot = new Set(workImproveSnapshotIds(activeWorkGoal) ?? []);
+	if (
+		!toolCallId ||
+		input.allowMultiple !== false ||
+		input.allowFreeform !== false ||
+		!options.some((option) => /^\s*approve\b/i.test(String(option?.title))) ||
+		!ids?.length ||
+		new Set(ids).size !== ids.length ||
+		!ids.every((id) => snapshot.has(id))
+	)
+		return;
+	const fingerprints = {};
+	for (const id of ids) {
+		try {
+			const issue = readWorkItem(cwd, id);
+			if (improvementSafetyDisposition(issue) !== "BLOCKED") return;
+			fingerprints[id] = improvementSafetyFingerprint(issue);
+			if (!fingerprints[id]) return;
+		} catch {
+			return;
+		}
+	}
+	pendingImprovementApprovals.set(toolCallId, {
+		goalId: activeWorkGoal.id,
+		cwd: resolve(cwd),
+		ids,
+		fingerprints,
+		question: String(input.question ?? "").trim(),
+	});
+}
+
+function recordImprovementApprovalFromAskUser(event, ctx, pi) {
+	if (event.toolName !== "ask_user") return;
+	const toolCallId = String(event?.toolCallId ?? "");
+	const request = pendingImprovementApprovals.get(toolCallId);
+	pendingImprovementApprovals.delete(toolCallId);
+	if (
+		!request ||
+		event.isError ||
+		event.details?.cancelled ||
+		activeWorkGoal?.id !== request.goalId ||
+		activeWorkGoal.status !== "active" ||
+		resolve(ctx.cwd) !== request.cwd
 	)
 		return;
 	const selection = event.details?.response?.selections?.find((value) =>
 		/^\s*approve\b/i.test(String(value)),
 	);
 	if (!selection) return;
-	const approvedIds = (workImproveSnapshotIds(activeWorkGoal) ?? []).filter(
-		(id) => {
-			try {
-				return (
-					improvementSafetyDisposition(readWorkItem(ctx.cwd, id)) === "BLOCKED"
-				);
-			} catch {
-				return false;
-			}
-		},
-	);
-	if (!approvedIds.length) return;
+	for (const id of request.ids) {
+		try {
+			const issue = readWorkItem(ctx.cwd, id);
+			if (
+				improvementSafetyDisposition(issue) !== "BLOCKED" ||
+				improvementSafetyFingerprint(issue) !== request.fingerprints[id]
+			)
+				return;
+		} catch {
+			return;
+		}
+	}
 	activeWorkGoal = {
 		...activeWorkGoal,
 		improvementApprovalAt: Date.now(),
 		improvementApprovedIds: Array.from(
-			new Set([...(activeWorkGoal.improvementApprovedIds ?? []), ...approvedIds]),
+			new Set([...(activeWorkGoal.improvementApprovedIds ?? []), ...request.ids]),
 		),
+		improvementApprovalFingerprints: {
+			...(activeWorkGoal.improvementApprovalFingerprints ?? {}),
+			...request.fingerprints,
+		},
 		improvementApproval: {
-			question: String(event.details?.question ?? "").trim(),
+			question: request.question,
 			answer: String(selection),
-			ids: approvedIds,
+			ids: request.ids,
 		},
 		updatedAt: Date.now(),
 	};
@@ -18856,9 +18930,7 @@ function scheduleActiveWorkGoalTurnVerifiers(ctx, pi) {
 		before: started.head,
 		after,
 		origin: "normal",
-		currentModel: ctx.model
-			? `${ctx.model.provider}/${ctx.model.id}`
-			: undefined,
+		currentModel: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
 	});
 	activeWorkGoalGitBefore = { cwd: ctx.cwd, head: after };
 	return verifier;
@@ -24141,7 +24213,10 @@ export default function workModelsExtension(pi) {
 	}
 
 	pi.on("tool_call", (event, ctx) => {
-		if (event.toolName === "ask_user") recordDirtyRecoveryAskCall(event);
+		if (event.toolName === "ask_user") {
+			recordDirtyRecoveryAskCall(event);
+			recordImprovementApprovalAskCall(event, ctx.cwd);
+		}
 		const improvementSafetyBlock = improvementMutationBlockReason(
 			event,
 			ctx?.cwd ?? activeWorkGoalCwd,
@@ -24312,6 +24387,7 @@ export default function workModelsExtension(pi) {
 		finishHelperStarts.clear();
 		goalSubagentStarts.clear();
 		pendingDirtyRecoveries.clear();
+		pendingImprovementApprovals.clear();
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
 		pendingMainEditorActions.clear();
