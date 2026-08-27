@@ -222,6 +222,7 @@ const commands = {};
 const hooks = {};
 const shortcuts = {};
 const tools = {};
+const sent = [];
 let activeTools = [];
 const pi = {
 	on: (name, handler) => {
@@ -240,20 +241,25 @@ const pi = {
 	setActiveTools: (tools) => {
 		activeTools = tools;
 	},
-	sendUserMessage: async () => {},
+	sendUserMessage: async (message, options) => {
+		sent.push({ message, options });
+	},
 };
 workModelsExtension(pi);
 assert.match(shortcuts.f7.description, /orchestrator/i);
 assert.ok(commands.wo, "/wo opens the orchestrator");
 const openWorkflow = (ctx) => commands.wo.handler("", ctx);
 const notices = [];
+let goalStatus = "";
 const hookCtx = {
 	cwd: root,
 	mode: "interactive",
 	sessionManager: { getSessionId: () => "work-improve-test" },
 	ui: {
 		notify: (message) => notices.push(message),
-		setStatus: () => {},
+		setStatus: (key, value) => {
+			if (key === "work-goal") goalStatus = value ?? "";
+		},
 		setWidget: () => {},
 		setTitle: () => {},
 	},
@@ -495,4 +501,58 @@ assert(
 	emptyMenuLabels.every((label) => !label.includes("Improve project")),
 	"Improve project is hidden when no tasks are available",
 );
+
+mutateStore(root, (store) =>
+	createWorkItem(store, {
+		id: "SI-1.3",
+		type: "task",
+		status: "open",
+		parentId: "SI-1",
+		title: "Exercise no-progress circuit breaker",
+	}),
+);
+await executeOrchestratorAction("work-improve", "SI-1", hookCtx, pi);
+const unfinishedTurn = {
+	messages: [
+		{
+			role: "assistant",
+			stopReason: "stop",
+			content: [{ type: "text", text: "Continuing the improvement work." }],
+		},
+	],
+};
+const settleUnfinishedTurn = async () => {
+	await hooks.before_agent_start(
+		{ prompt: sent.at(-1).message, systemPrompt: "base" },
+		hookCtx,
+	);
+	await hooks.agent_start({}, hookCtx);
+	await hooks.agent_end(unfinishedTurn, hookCtx);
+	await hooks.agent_settled({}, hookCtx);
+};
+await settleUnfinishedTurn();
+await settleUnfinishedTurn();
+assert.doesNotMatch(goalStatus, /paused/);
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.3",
+		"wo:improvement-safety SAFE focused test-only change",
+	),
+);
+await settleUnfinishedTurn();
+assert.doesNotMatch(
+	goalStatus,
+	/paused/,
+	"durable work-item progress resets the stall counter",
+);
+await settleUnfinishedTurn();
+await settleUnfinishedTurn();
+assert.match(goalStatus, /paused/);
+assert(
+	notices.some((message) =>
+		String(message).includes("no durable improvement progress"),
+	),
+);
+
 await hooks.session_shutdown({}, hookCtx);
