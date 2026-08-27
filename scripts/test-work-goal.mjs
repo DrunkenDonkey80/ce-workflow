@@ -130,14 +130,14 @@ assert.match(
 	mod.parseWorkGoalCommand("edit --tokens nope ship it").error,
 	/Invalid token budget/,
 );
-assert.match(
-	mod.parseWorkGoalCommand("--tokens nope ship it").error,
-	/Invalid token budget/,
-);
-assert.match(
-	mod.parseWorkGoalCommand("--tokens 100k").error,
-	/Usage: autonomous goal/,
-);
+assert.deepEqual(mod.parseWorkGoalCommand("--tokens nope ship it"), {
+	kind: "status",
+	error: "Invalid token budget: nope",
+});
+assert.deepEqual(mod.parseWorkGoalCommand("--tokens 100k"), {
+	kind: "status",
+	error: "Usage: autonomous goal --tokens 100k <objective>",
+});
 assert.deepEqual(mod.parseWorkGoalCommand("--tokens 100k status"), {
 	kind: "status",
 	error: "--tokens only applies to start/edit",
