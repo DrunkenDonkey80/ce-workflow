@@ -1259,8 +1259,10 @@ function parsedArguments() {
 	return { positionals, flags, values };
 }
 
+const parsed = parsedArguments();
+
 function options(name) {
-	return parsedArguments().values.get(name) ?? [];
+	return parsed.values.get(name) ?? [];
 }
 
 function option(name, fallback = undefined) {
@@ -1268,11 +1270,11 @@ function option(name, fallback = undefined) {
 }
 
 function flag(name) {
-	return parsedArguments().flags.has(name);
+	return parsed.flags.has(name);
 }
 
 function positional() {
-	return parsedArguments().positionals;
+	return parsed.positionals;
 }
 
 function termScore(issue, terms) {
