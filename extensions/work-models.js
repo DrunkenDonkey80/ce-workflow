@@ -703,6 +703,7 @@ const goalSubagentStarts = new Map();
 let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
 let activeWorkGoalRunning = false;
+let activeWorkGoalGitBefore = null;
 let pendingWorkGoalTurn = false;
 let blockedWorkGoalTurn = false;
 let workGoalContinuationPending = null;
@@ -18846,6 +18847,23 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 	}
 }
 
+function scheduleActiveWorkGoalTurnVerifiers(ctx, pi) {
+	const started = activeWorkGoalGitBefore;
+	if (!started || started.cwd !== ctx.cwd || !started.head) return null;
+	const after = gitSnapshot(ctx.cwd).head;
+	if (!after || after === started.head) return null;
+	const verifier = scheduleCommittedRunVerifiers(ctx.cwd, pi, {
+		before: started.head,
+		after,
+		origin: "normal",
+		currentModel: ctx.model
+			? `${ctx.model.provider}/${ctx.model.id}`
+			: undefined,
+	});
+	activeWorkGoalGitBefore = { cwd: ctx.cwd, head: after };
+	return verifier;
+}
+
 function completeActiveWorkGoal(summary, ctx, pi) {
 	const goal = activeWorkGoal;
 	if (!goal) {
@@ -18860,7 +18878,14 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	if (!trimmed) rejection = "summary is empty";
 	else if (isContradictoryWorkGoalCompletion(trimmed))
 		rejection = "summary says the goal is not complete";
-	else rejection = workGoalCompletionBlocker(goal);
+	else {
+		try {
+			scheduleActiveWorkGoalTurnVerifiers(ctx, pi);
+		} catch (error) {
+			rejection = `background verification could not be queued: ${commandErrorText(error)}`;
+		}
+		if (!rejection) rejection = workGoalCompletionBlocker(goal);
+	}
 	if (rejection) {
 		updateWorkGoalUsage(goal, ctx);
 		persistWorkGoal(pi);
@@ -24498,6 +24523,10 @@ export default function workModelsExtension(pi) {
 				activeWorkGoalRunning &&
 				["active", "stopping"].includes(activeWorkGoal?.status)
 			) {
+				activeWorkGoalGitBefore = {
+					cwd: ctx.cwd,
+					head: gitSnapshot(ctx.cwd).head,
+				};
 				startWarpWork(
 					ctx,
 					workWarpMode(activeWorkGoal.mode, activeWorkGoal),
@@ -24601,7 +24630,18 @@ export default function workModelsExtension(pi) {
 			const wasWorkGoalTurn = activeWorkGoalRunning;
 			activeWorkGoalRunning = false;
 			const hadWorkGoal = Boolean(activeWorkGoal);
-			if (wasWorkGoalTurn) await handleWorkGoalAgentEnd(event, ctx, pi);
+			if (wasWorkGoalTurn) {
+				try {
+					scheduleActiveWorkGoalTurnVerifiers(ctx, pi);
+				} catch (error) {
+					ctx.ui?.notify?.(
+						`Background verification failed to queue: ${commandErrorText(error)}`,
+						"warning",
+					);
+				}
+				activeWorkGoalGitBefore = null;
+				await handleWorkGoalAgentEnd(event, ctx, pi);
+			}
 			activeHistoryTask = null;
 			if (!hadWorkGoal) resetWarpTitle(ctx);
 			return;

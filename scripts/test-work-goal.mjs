@@ -3979,6 +3979,131 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	if (oldUsageDelay === undefined)
 		delete process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS;
 	else process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = oldUsageDelay;
+	await invoke("work-goal", "clear", ctx);
+
+	const lifecycleVerifierCwd = mkdtempSync(
+		path.join(tmpdir(), "ce-work-goal-verifier-lifecycle-"),
+	);
+	try {
+		execFileSync("git", ["init"], {
+			cwd: lifecycleVerifierCwd,
+			stdio: "ignore",
+		});
+		execFileSync("git", ["config", "user.name", "Test"], {
+			cwd: lifecycleVerifierCwd,
+		});
+		execFileSync("git", ["config", "user.email", "test@example.com"], {
+			cwd: lifecycleVerifierCwd,
+		});
+		mkdirSync(path.join(lifecycleVerifierCwd, ".pi"), { recursive: true });
+		writeFileSync(
+			path.join(lifecycleVerifierCwd, ".pi", "settings.json"),
+			JSON.stringify({
+				workOrchestrator: {
+					backgroundVerifiers: {
+						"test/verifier": {
+							operations: ["correctness"],
+							thinking: "low",
+						},
+					},
+				},
+			}),
+		);
+		writeFileSync(
+			path.join(lifecycleVerifierCwd, ".gitignore"),
+			".pi/\n.ce-workflow/\n",
+		);
+		writeFileSync(path.join(lifecycleVerifierCwd, "source.js"), "before\n");
+		execFileSync("git", ["add", "."], { cwd: lifecycleVerifierCwd });
+		execFileSync("git", ["commit", "-m", "before"], {
+			cwd: lifecycleVerifierCwd,
+			stdio: "ignore",
+		});
+		const lifecycleCtx = { ...ctx, cwd: lifecycleVerifierCwd };
+		const rpcHandlers = new Map();
+		let rpcRun = 0;
+		pi.events = {
+			on(name, handler) {
+				rpcHandlers.set(name, handler);
+				return () => rpcHandlers.delete(name);
+			},
+			emit(name, request) {
+				if (name !== "subagents:rpc:v1:request") return;
+				rpcRun += 1;
+				const asyncDir = path.join(
+					lifecycleVerifierCwd,
+					".pi",
+					`verifier-run-${rpcRun}`,
+				);
+				mkdirSync(asyncDir, { recursive: true });
+				writeFileSync(
+					path.join(asyncDir, "status.json"),
+					JSON.stringify({ state: "running" }),
+				);
+				rpcHandlers.get(
+					`subagents:rpc:v1:reply:${request.requestId}`,
+				)?.({
+					success: true,
+					data: {
+						details: {
+							asyncId: `verifier-run-${rpcRun}`,
+							asyncDir,
+						},
+					},
+				});
+			},
+		};
+		await invoke("work-goal", "verify committed goal turns", lifecycleCtx);
+		await tempHooks.before_agent_start(
+			{ prompt: sent.at(-1).message, systemPrompt: "base" },
+			lifecycleCtx,
+		);
+		await tempHooks.agent_start({}, lifecycleCtx);
+		writeFileSync(path.join(lifecycleVerifierCwd, "source.js"), "after\n");
+		execFileSync("git", ["commit", "-am", "after"], {
+			cwd: lifecycleVerifierCwd,
+			stdio: "ignore",
+		});
+		const prematureCompletion = await tempTools.work_goal_complete.execute(
+			"goal-verifier-lifecycle",
+			{ summary: "committed goal turn verified" },
+			null,
+			null,
+			lifecycleCtx,
+		);
+		assert.equal(
+			prematureCompletion.completed,
+			false,
+			"completion waits for the just-queued verifier batch",
+		);
+		assert.match(
+			prematureCompletion.content[0].text,
+			/still queued or running/,
+			"completion queues committed goal-turn verification before settlement",
+		);
+		await tempHooks.agent_end(
+			{
+				messages: [
+					{
+						role: "assistant",
+						content: [{ type: "text", text: "Verifier is still running." }],
+					},
+				],
+			},
+			lifecycleCtx,
+		);
+		await settle(lifecycleCtx);
+		assert.equal(
+			Object.keys(loadVerifierStore(lifecycleVerifierCwd).batches).length,
+			1,
+			"completion and settlement share one committed-run verifier batch",
+		);
+		await invoke("work-goal", "clear", lifecycleCtx);
+		delete pi.events;
+	} finally {
+		delete pi.events;
+		rmSync(lifecycleVerifierCwd, { recursive: true, force: true });
+	}
 } finally {
 	rmSync(path.join(cwd, ".git"), { recursive: true, force: true });
 	rmSync(path.join(cwd, ".pi"), { recursive: true, force: true });

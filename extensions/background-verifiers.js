@@ -2892,7 +2892,15 @@ export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 	const jobs = Object.values(store.jobs).filter((job) =>
 		batchIds.has(job.batchId),
 	);
-	if (jobs.some((job) => ["queued", "running"].includes(job.status)))
+	if (
+		jobs.some(
+			(job) =>
+				["queued", "running"].includes(job.status) ||
+				(job.launch?.status === "orphaned" &&
+					job.launch.claimedAt &&
+					!job.launch.orphanedAt),
+		)
+	)
 		return "background verification is still queued or running";
 	const findings = Object.values(store.findings).filter((finding) => {
 		const report = store.reports[finding.reportId];
