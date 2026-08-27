@@ -16,6 +16,7 @@ import path from "node:path";
 import {
 	VerifierStoreError,
 	acknowledgeVerifierFailure,
+	acquireVerifierLock,
 	addFinding,
 	addGroup,
 	analysisReviewProjection,
@@ -106,6 +107,28 @@ const checkpoint = {
 };
 
 try {
+	{
+		const lockCwd = repo();
+		const lockFile = path.join(
+			path.dirname(verifierStorePath(lockCwd)),
+			"mutation.lock",
+		);
+		mkdirSync(path.dirname(lockFile), { recursive: true });
+		writeFileSync(lockFile, `${process.pid}\n`);
+		throwsCategory(() => acquireVerifierLock(lockCwd), "locked");
+		const exitedPid = execFileSync(
+			process.execPath,
+			["-e", "process.stdout.write(String(process.pid))"],
+			{ encoding: "utf8" },
+		);
+		writeFileSync(lockFile, `${exitedPid}\n`);
+		const lock = acquireVerifierLock(lockCwd);
+		assert.equal(readFileSync(lockFile, "utf8").trim(), String(process.pid));
+		rmSync(lockFile);
+		assert.doesNotThrow(() => lock.release());
+		assert.doesNotThrow(() => lock.release());
+	}
+
 	// Profiles are canonical, unique, and carry only enabled work.
 	assert.deepEqual(
 		normalizeEffectiveProfiles(profiles, options),
