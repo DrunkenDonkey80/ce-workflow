@@ -4104,7 +4104,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempHooks.agent_end(
 		{
 			messages: [
-					{
+				{
 					role: "assistant",
 					stopReason: "error",
 					content: [

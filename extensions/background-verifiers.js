@@ -1353,136 +1353,134 @@ export function listJobs(store, filter = {}) {
 		.sort((left, right) => left.id.localeCompare(right.id));
 }
 function recordOperationResultIn(next, input = {}) {
-		const job = next.jobs[input.jobId];
-		if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
-		if (!job.operations.includes(input.operation))
-			throw error("invalid", "Operation was not requested for this verifier job");
-		if (!OUTCOMES.has(input.outcome))
-			throw error("invalid", "Invalid verifier operation outcome");
+	const job = next.jobs[input.jobId];
+	if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
+	if (!job.operations.includes(input.operation))
+		throw error("invalid", "Operation was not requested for this verifier job");
+	if (!OUTCOMES.has(input.outcome))
+		throw error("invalid", "Invalid verifier operation outcome");
+	if (
+		input.usage !== undefined &&
+		(!plainObject(input.usage) ||
+			Object.values(input.usage).some(
+				(value) =>
+					typeof value !== "number" || !Number.isFinite(value) || value < 0,
+			))
+	)
+		throw error("invalid", "Verifier usage must contain non-negative numbers");
+	if (input.outcome === "failed" && !nonempty(input.failure))
+		throw error("invalid", "Failed verifier operation needs a failure reason");
+	const id = stableId("report", {
+		jobId: job.id,
+		operation: input.operation,
+	});
+	const existing = next.reports[id];
+	const artifact = input.artifact;
+	if (
+		artifact !== undefined &&
+		(!plainObject(artifact) ||
+			!nonempty(artifact.path) ||
+			!Number.isInteger(artifact.bytes) ||
+			artifact.bytes < 0)
+	)
+		throw error("invalid", "Invalid verifier report artifact");
+	const comparable = {
+		outcome: input.outcome,
+		usage: input.usage,
+		failure: input.failure,
+		artifact,
+	};
+	if (existing) {
 		if (
-			input.usage !== undefined &&
-			(!plainObject(input.usage) ||
-				Object.values(input.usage).some(
-					(value) =>
-						typeof value !== "number" || !Number.isFinite(value) || value < 0,
-				))
-		)
-			throw error("invalid", "Verifier usage must contain non-negative numbers");
-		if (input.outcome === "failed" && !nonempty(input.failure))
-			throw error("invalid", "Failed verifier operation needs a failure reason");
-		const id = stableId("report", {
-			jobId: job.id,
-			operation: input.operation,
-		});
-		const existing = next.reports[id];
-		const artifact = input.artifact;
-		if (
-			artifact !== undefined &&
-			(!plainObject(artifact) ||
-				!nonempty(artifact.path) ||
-				!Number.isInteger(artifact.bytes) ||
-				artifact.bytes < 0)
-		)
-			throw error("invalid", "Invalid verifier report artifact");
-		const comparable = {
-			outcome: input.outcome,
-			usage: input.usage,
-			failure: input.failure,
-			artifact,
-		};
-		if (existing) {
-			if (
-				!same(
-					{
-						outcome: existing.outcome,
-						usage: existing.usage,
-						failure: existing.failure,
-						artifact: existing.artifact,
-					},
-					comparable,
-				)
+			!same(
+				{
+					outcome: existing.outcome,
+					usage: existing.usage,
+					failure: existing.failure,
+					artifact: existing.artifact,
+				},
+				comparable,
 			)
-				throw error(
-					"conflict",
-					`Conflicting terminal result for ${job.id}/${input.operation}`,
-				);
-			return existing;
-		}
-		const report = {
-			id,
-			batchId: job.batchId,
-			jobId: job.id,
-			model: job.model,
-			operation: input.operation,
-			checkpoint: structuredClone(next.batches[job.batchId].checkpoint),
-			outcome: input.outcome,
-			...(input.usage === undefined
-				? {}
-				: { usage: structuredClone(input.usage) }),
-			...(input.failure === undefined ? {} : { failure: input.failure }),
-			...(artifact === undefined ? {} : { artifact: structuredClone(artifact) }),
-			createdAt: now(input.now),
-		};
-		next.reports[id] = report;
-		job.operationStatus[input.operation] = input.outcome;
-		job.status = jobStatus(job.operationStatus, job.launch);
-		if (
-			Object.values(next.jobs)
-				.filter((candidate) => candidate.batchId === job.batchId)
-				.every((candidate) => !["queued", "running"].includes(candidate.status))
-		) {
-			next.batches[job.batchId].status = "terminal";
-			next.batches[job.batchId].presentationStatus ??= "pending";
-		}
-		return report;
+		)
+			throw error(
+				"conflict",
+				`Conflicting terminal result for ${job.id}/${input.operation}`,
+			);
+		return existing;
+	}
+	const report = {
+		id,
+		batchId: job.batchId,
+		jobId: job.id,
+		model: job.model,
+		operation: input.operation,
+		checkpoint: structuredClone(next.batches[job.batchId].checkpoint),
+		outcome: input.outcome,
+		...(input.usage === undefined ? {} : { usage: structuredClone(input.usage) }),
+		...(input.failure === undefined ? {} : { failure: input.failure }),
+		...(artifact === undefined ? {} : { artifact: structuredClone(artifact) }),
+		createdAt: now(input.now),
+	};
+	next.reports[id] = report;
+	job.operationStatus[input.operation] = input.outcome;
+	job.status = jobStatus(job.operationStatus, job.launch);
+	if (
+		Object.values(next.jobs)
+			.filter((candidate) => candidate.batchId === job.batchId)
+			.every((candidate) => !["queued", "running"].includes(candidate.status))
+	) {
+		next.batches[job.batchId].status = "terminal";
+		next.batches[job.batchId].presentationStatus ??= "pending";
+	}
+	return report;
 }
 export function recordOperationResult(store, input = {}) {
 	return edit(store, (next) => recordOperationResultIn(next, input));
 }
 function addFindingIn(next, input = {}) {
-		const report = next.reports[input.reportId];
-		if (!report || report.outcome !== "findings")
-			throw error("invalid", "Finding must belong to a findings report");
-		if (
-			input.operation !== report.operation ||
-			input.model !== report.model ||
-			!same(input.checkpoint, report.checkpoint)
-		)
-			throw error("invalid", "Finding identity does not match its report");
-		relativePath(input.path);
-		if (!validFindingShape(input))
-			throw error("invalid", "Finding is missing required attribution");
-		if (!next.batches[report.batchId].checkpoint.paths.includes(input.path))
-			throw error("invalid", "Finding path is outside the reviewed checkpoint");
-		const identity = {
-			reportId: report.id,
-			path: input.path,
-			startLine: input.startLine,
-			endLine: input.endLine,
-			category: input.category,
-			severity: input.severity,
-			rationale: input.rationale,
-			evidence: input.evidence,
-			suggestedAction: input.suggestedAction,
-		};
-		const id = stableId("finding", identity);
-		if (input.id !== undefined && input.id !== id)
-			throw error("invalid", "Finding ID does not match its stable identity");
-		if (next.findings[id]) {
-			if (!same(next.findings[id], { ...next.findings[id], ...identity, id }))
-				throw error("conflict", `Conflicting finding: ${id}`);
-			return next.findings[id];
-		}
-		const finding = {
-			id,
-			...identity,
-			operation: report.operation,
-			model: report.model,
-			checkpoint: structuredClone(report.checkpoint),
-			createdAt: now(input.now),
-		};
-		next.findings[id] = finding;
-		return finding;
+	const report = next.reports[input.reportId];
+	if (!report || report.outcome !== "findings")
+		throw error("invalid", "Finding must belong to a findings report");
+	if (
+		input.operation !== report.operation ||
+		input.model !== report.model ||
+		!same(input.checkpoint, report.checkpoint)
+	)
+		throw error("invalid", "Finding identity does not match its report");
+	relativePath(input.path);
+	if (!validFindingShape(input))
+		throw error("invalid", "Finding is missing required attribution");
+	if (!next.batches[report.batchId].checkpoint.paths.includes(input.path))
+		throw error("invalid", "Finding path is outside the reviewed checkpoint");
+	const identity = {
+		reportId: report.id,
+		path: input.path,
+		startLine: input.startLine,
+		endLine: input.endLine,
+		category: input.category,
+		severity: input.severity,
+		rationale: input.rationale,
+		evidence: input.evidence,
+		suggestedAction: input.suggestedAction,
+	};
+	const id = stableId("finding", identity);
+	if (input.id !== undefined && input.id !== id)
+		throw error("invalid", "Finding ID does not match its stable identity");
+	if (next.findings[id]) {
+		if (!same(next.findings[id], { ...next.findings[id], ...identity, id }))
+			throw error("conflict", `Conflicting finding: ${id}`);
+		return next.findings[id];
+	}
+	const finding = {
+		id,
+		...identity,
+		operation: report.operation,
+		model: report.model,
+		checkpoint: structuredClone(report.checkpoint),
+		createdAt: now(input.now),
+	};
+	next.findings[id] = finding;
+	return finding;
 }
 export function addFinding(store, input = {}) {
 	return edit(store, (next) => addFindingIn(next, input));
@@ -2019,20 +2017,20 @@ function validateTerminalReport(job, batch, text) {
 	};
 }
 function quarantineVerifierReportIn(next, input = {}) {
-		const job = next.jobs[input.jobId];
-		if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
-		const id = stableId("quarantine", {
-			jobId: job.id,
-			artifact: input.artifact,
-			reason: input.reason,
-		});
-		return (next.quarantines[id] ??= {
-			id,
-			jobId: job.id,
-			artifact: structuredClone(input.artifact),
-			reason: input.reason,
-			createdAt: now(input.now),
-		});
+	const job = next.jobs[input.jobId];
+	if (!job) throw error("missing", `Verifier job is missing: ${input.jobId}`);
+	const id = stableId("quarantine", {
+		jobId: job.id,
+		artifact: input.artifact,
+		reason: input.reason,
+	});
+	return (next.quarantines[id] ??= {
+		id,
+		jobId: job.id,
+		artifact: structuredClone(input.artifact),
+		reason: input.reason,
+		createdAt: now(input.now),
+	});
 }
 function quarantineVerifierReport(store, input = {}) {
 	return edit(store, (next) => quarantineVerifierReportIn(next, input));
@@ -2174,8 +2172,7 @@ export function ingestVerifierReport(store, input = {}) {
 		);
 		groupValidatedFindingsIn(next, { now: input.now });
 		return {
-			quarantined:
-				validated.rejected.length > 0 || validated.rejectedFindings > 0,
+			quarantined: validated.rejected.length > 0 || validated.rejectedFindings > 0,
 			omitted: validated.omitted,
 		};
 	});
@@ -2184,45 +2181,45 @@ function rangesOverlap(left, right) {
 	return left.startLine <= right.endLine && right.startLine <= left.endLine;
 }
 function groupValidatedFindingsIn(next, input = {}) {
-		for (const [id, group] of Object.entries(next.groups))
-			if (
-				group.generated &&
-				!Object.values(next.claims).some((claim) => claim.groupId === id)
-			)
-				delete next.groups[id];
-		const buckets = new Map();
-		for (const finding of Object.values(next.findings)) {
-			const key = `${finding.path}\u001f${finding.category}`;
-			(buckets.get(key) ?? buckets.set(key, []).get(key)).push(finding);
-		}
-		const groups = [];
-		for (const findings of buckets.values()) {
-			const pending = [...findings].sort(
-				(a, b) =>
-					a.startLine - b.startLine ||
-					a.endLine - b.endLine ||
-					a.id.localeCompare(b.id),
-			);
-			while (pending.length) {
-				const component = [pending.shift()];
-				for (let index = 0; index < pending.length; ) {
-					if (component.some((member) => rangesOverlap(member, pending[index])))
-						component.push(pending.splice(index, 1)[0]);
-					else index += 1;
-				}
-				const findingIds = component.map((finding) => finding.id).sort();
-				const id = stableId("group", { findingIds });
-				next.groups[id] = next.groups[id] ?? {
-					id,
-					findingIds,
-					status: "completed",
-					generated: true,
-					createdAt: now(input.now),
-				};
-				groups.push(next.groups[id]);
+	for (const [id, group] of Object.entries(next.groups))
+		if (
+			group.generated &&
+			!Object.values(next.claims).some((claim) => claim.groupId === id)
+		)
+			delete next.groups[id];
+	const buckets = new Map();
+	for (const finding of Object.values(next.findings)) {
+		const key = `${finding.path}\u001f${finding.category}`;
+		(buckets.get(key) ?? buckets.set(key, []).get(key)).push(finding);
+	}
+	const groups = [];
+	for (const findings of buckets.values()) {
+		const pending = [...findings].sort(
+			(a, b) =>
+				a.startLine - b.startLine ||
+				a.endLine - b.endLine ||
+				a.id.localeCompare(b.id),
+		);
+		while (pending.length) {
+			const component = [pending.shift()];
+			for (let index = 0; index < pending.length; ) {
+				if (component.some((member) => rangesOverlap(member, pending[index])))
+					component.push(pending.splice(index, 1)[0]);
+				else index += 1;
 			}
+			const findingIds = component.map((finding) => finding.id).sort();
+			const id = stableId("group", { findingIds });
+			next.groups[id] = next.groups[id] ?? {
+				id,
+				findingIds,
+				status: "completed",
+				generated: true,
+				createdAt: now(input.now),
+			};
+			groups.push(next.groups[id]);
 		}
-		return groups.sort((left, right) => left.id.localeCompare(right.id));
+	}
+	return groups.sort((left, right) => left.id.localeCompare(right.id));
 }
 export function groupValidatedFindings(store, input = {}) {
 	return edit(store, (next) => groupValidatedFindingsIn(next, input));
