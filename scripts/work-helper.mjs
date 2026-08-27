@@ -679,10 +679,18 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	const evidencePath = (file) =>
 		file.startsWith(`${taskEvidencePrefix}/`) ||
 		file.startsWith(`${taskEvidencePrefix}-`);
+	const declaredEvidenceFiles = options("--evidence-file").map(
+		normalizeRepositoryPath,
+	);
+	const automaticEvidenceFiles = evidenceOnly
+		? gitStatusPaths(executionRoot).filter(evidencePath)
+		: [];
 	const evidenceFiles = [
 		...new Set([
-			...options("--evidence-file").map(normalizeRepositoryPath),
-			...(evidenceOnly ? gitStatusPaths(executionRoot).filter(evidencePath) : []),
+			...declaredEvidenceFiles,
+			...automaticEvidenceFiles.filter((file) =>
+				existsSync(path.join(executionRoot, file)),
+			),
 		]),
 	];
 	let evidenceBytes = 0;
@@ -706,7 +714,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		throw new Error(
 			"task-owned evidence is limited to 100 files and 100 MiB per finish-task run",
 		);
-	const evidenceFileSet = new Set(evidenceFiles);
+	const evidenceFileSet = new Set([...evidenceFiles, ...automaticEvidenceFiles]);
 	const formatted = formatPendingFiles(executionRoot);
 	const stagedBefore = git(["diff", "--cached", "--name-only"], executionRoot)
 		.split(/\r?\n/)

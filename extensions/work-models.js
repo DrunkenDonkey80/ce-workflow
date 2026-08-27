@@ -17348,10 +17348,7 @@ function workImproveSnapshotIds(goal) {
 function workImproveProgressFingerprint(goal, cwd) {
 	if (goal?.mode !== "improvement") return;
 	const ids = workImproveSnapshotIds(goal) ?? [];
-	const snapshot = ids.map((id) => {
-		const issue = readWorkItem(cwd, id);
-		return [id, statusOf(issue), improvementSafetyDisposition(issue) ?? ""];
-	});
+	const snapshot = ids.map((id) => [id, readWorkItem(cwd, id)]);
 	const source = [
 		JSON.stringify(snapshot),
 		safeRun(cwd, "git", ["rev-parse", "--verify", "HEAD"]),

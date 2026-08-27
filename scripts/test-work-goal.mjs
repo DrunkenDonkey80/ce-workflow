@@ -3966,9 +3966,10 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	};
 	await settleImprovementTurn(0);
 	await settleImprovementTurn(1);
-	mutateStore(cwd, (store) =>
-		updateWorkItem(store, "work-7.1", { status: "open" }),
-	);
+	mutateStore(cwd, (store) => {
+		store.items["work-7.1"].notes ??= [];
+		store.items["work-7.1"].notes.push("Recorded durable analysis progress.");
+	});
 	await settleImprovementTurn(2);
 	assert.equal(
 		JSON.parse(readFileSync(improvementStatePath, "utf8")).workGoal

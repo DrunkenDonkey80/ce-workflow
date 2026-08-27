@@ -197,6 +197,13 @@ try {
 			Object.keys(loadLaneStore(cwd).lanes).length > 0,
 			"corrupt primary lane state falls back to the durable recovery copy",
 		);
+		const afterRecovery = envelope(cwd, head, 1, "after-recovery");
+		queueLane(cwd, afterRecovery);
+		const recoveredStore = loadLaneStore(cwd);
+		assert(
+			recoveredStore.lanes[lane.id] && recoveredStore.lanes[afterRecovery.id],
+			"the next mutation heals the primary while preserving recovered lanes",
+		);
 		const healed = queueLane(cwd, envelope(cwd, head, 2, "healed"));
 		assert.equal(
 			loadLaneStore(cwd).lanes[healed.id].state,

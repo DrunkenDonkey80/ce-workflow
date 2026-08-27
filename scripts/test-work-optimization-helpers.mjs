@@ -2,6 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -501,6 +502,15 @@ try {
 	execFileSync("git", ["config", "user.name", "Test"], { cwd: finishCwd });
 	writeFileSync(path.join(finishCwd, ".gitignore"), ".ce-workflow/\n");
 	writeFileSync(path.join(finishCwd, "result.js"), "const result = 'before';\n");
+	const deletedAutomaticEvidenceFile =
+		"docs/evidence/TASK-EVIDENCE-AUTO/obsolete.png";
+	mkdirSync(path.join(finishCwd, path.dirname(deletedAutomaticEvidenceFile)), {
+		recursive: true,
+	});
+	writeFileSync(
+		path.join(finishCwd, deletedAutomaticEvidenceFile),
+		"obsolete evidence",
+	);
 	execFileSync("git", ["add", "-A"], { cwd: finishCwd });
 	execFileSync("git", ["commit", "-m", "initial"], {
 		cwd: finishCwd,
@@ -786,7 +796,10 @@ try {
 		evidencePathError.includes("invalid evidence file"),
 		"finish-task rejects evidence outside the task-owned path",
 	);
-	rmSync(path.join(finishCwd, "docs"), { recursive: true, force: true });
+	rmSync(path.join(finishCwd, path.dirname(rejectedEvidenceFile)), {
+		recursive: true,
+		force: true,
+	});
 
 	const evidenceFile = "docs/evidence/TASK-EVIDENCE-pixel/terminal-state.png";
 	mkdirSync(path.join(finishCwd, path.dirname(evidenceFile)), {
@@ -863,7 +876,7 @@ try {
 	);
 
 	const automaticEvidenceDir = "docs/evidence/TASK-EVIDENCE-AUTO";
-	mkdirSync(path.join(finishCwd, automaticEvidenceDir), { recursive: true });
+	rmSync(path.join(finishCwd, deletedAutomaticEvidenceFile));
 	const automaticEvidenceFiles = Array.from(
 		{ length: 21 },
 		(_, index) => `${automaticEvidenceDir}/proof-${index + 1}.png`,
@@ -900,8 +913,9 @@ try {
 			automaticEvidenceFinished.files.includes(file),
 		) &&
 			automaticEvidenceFinished.files.includes(evidenceLog) &&
+			!existsSync(path.join(finishCwd, deletedAutomaticEvidenceFile)) &&
 			loadStore(finishCwd).items["TASK-EVIDENCE-AUTO"].status === "closed",
-		"finish-task automatically accepts more than 20 bounded pre-staged task-owned screenshots and logs",
+		"finish-task accepts current automatic evidence while committing stale evidence deletion",
 	);
 
 	writeFileSync(path.join(finishCwd, "unrelated-staged.txt"), "unrelated\n");
