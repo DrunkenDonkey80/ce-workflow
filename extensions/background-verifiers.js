@@ -634,10 +634,7 @@ function globPattern(pattern) {
 	let source = "";
 	for (let index = 0; index < pattern.length; index += 1) {
 		const character = pattern[index];
-		if (
-			character === "/" &&
-			pattern.slice(index + 1) === "**"
-		) {
+		if (character === "/" && pattern.slice(index + 1) === "**") {
 			source += "(?:/.*)?";
 			index += 2;
 		} else if (
@@ -1190,7 +1187,9 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 	const profiles = normalizeProfiles(input.profiles ?? [], input);
 	if (!profiles.length)
 		return { status: "not-configured", launch: Promise.resolve([]) };
-	const operations = [...new Set(profiles.flatMap((profile) => profile.operations))];
+	const operations = [
+		...new Set(profiles.flatMap((profile) => profile.operations)),
+	];
 	let checkpoint;
 	try {
 		checkpoint = input.checkpoint
@@ -1248,8 +1247,8 @@ export function scheduleVerifierBatch(cwd = process.cwd(), input = {}) {
 			});
 			usesWorkspace = profiles.every(
 				(profile) =>
-					store.jobs[expectedJobId(batchId, profile.model)]?.launch?.request
-						?.cwd === workspace,
+					store.jobs[expectedJobId(batchId, profile.model)]?.launch?.request?.cwd ===
+					workspace,
 			);
 			return persisted;
 		});

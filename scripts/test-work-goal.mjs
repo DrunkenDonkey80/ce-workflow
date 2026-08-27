@@ -4167,9 +4167,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 					path.join(asyncDir, "status.json"),
 					JSON.stringify({ state: "running" }),
 				);
-				rpcHandlers.get(
-					`subagents:rpc:v1:reply:${request.requestId}`,
-				)?.({
+				rpcHandlers.get(`subagents:rpc:v1:reply:${request.requestId}`)?.({
 					success: true,
 					data: {
 						details: {
@@ -4188,11 +4186,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		assert.equal(
 			JSON.parse(
 				readFileSync(
-					path.join(
-						lifecycleVerifierCwd,
-						".pi",
-						"work-orchestrator-state.json",
-					),
+					path.join(lifecycleVerifierCwd, ".pi", "work-orchestrator-state.json"),
 					"utf8",
 				),
 			).workGoal.baselineHead,
@@ -4203,11 +4197,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		assert.equal(
 			JSON.parse(
 				readFileSync(
-					path.join(
-						lifecycleVerifierCwd,
-						".pi",
-						"work-orchestrator-state.json",
-					),
+					path.join(lifecycleVerifierCwd, ".pi", "work-orchestrator-state.json"),
 					"utf8",
 				),
 			).workGoal.baselineHead,

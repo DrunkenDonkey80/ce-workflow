@@ -17359,9 +17359,7 @@ function improvementSafetyDisposition(issue) {
 
 function improvementSafetyFingerprint(issue) {
 	const blocked = Array.from(
-		notesOf(issue).matchAll(
-			/^wo:improvement-safety\s+BLOCKED\b[^\r\n]*$/gim,
-		),
+		notesOf(issue).matchAll(/^wo:improvement-safety\s+BLOCKED\b[^\r\n]*$/gim),
 		(match) => match[0].trim(),
 	).at(-1);
 	return blocked ? createHash("sha256").update(blocked).digest("hex") : "";
@@ -18291,7 +18289,9 @@ function createWorkGoal(
 	let closureBaseline;
 	if (closureLimit)
 		try {
-			const project = /^Target project:\s*(.+)$/m.exec(String(objective))?.[1]?.trim();
+			const project = /^Target project:\s*(.+)$/m
+				.exec(String(objective))?.[1]
+				?.trim();
 			closureBaseline = executableWorkItemStates(
 				project
 					? isAbsolute(project)

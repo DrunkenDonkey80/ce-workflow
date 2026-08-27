@@ -91,7 +91,10 @@ try {
 			},
 			ctx,
 		);
-		writeFileSync(path.join(cwd, file), `export const id = ${JSON.stringify(workItemId)};\n`);
+		writeFileSync(
+			path.join(cwd, file),
+			`export const id = ${JSON.stringify(workItemId)};\n`,
+		);
 		git("add", file);
 		git("commit", "-qm", `complete ${workItemId}`);
 		const commit = git("rev-parse", "HEAD");
@@ -122,7 +125,10 @@ try {
 	const first = await finish("finish-1", "TASK-1", "first.js");
 	const second = await finish("finish-2", "TASK-2", "second.js");
 	const batches = Object.values(loadVerifierStore(cwd).batches);
-	assert(batches.length === 2, "each nested finish ToolResult creates one batch");
+	assert(
+		batches.length === 2,
+		"each nested finish ToolResult creates one batch",
+	);
 	assert(
 		batches.some(
 			(batch) =>

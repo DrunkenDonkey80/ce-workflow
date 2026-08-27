@@ -123,12 +123,7 @@ try {
 	);
 	assert.equal(
 		JSON.parse(
-			run(
-				"json-assert",
-				"assertion.json",
-				"--required",
-				"--forbid-string",
-			),
+			run("json-assert", "assertion.json", "--required", "--forbid-string"),
 		).status,
 		"PASS",
 		"an option-looking value is not reinterpreted as an assertion",

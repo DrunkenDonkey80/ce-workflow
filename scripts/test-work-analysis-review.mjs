@@ -305,7 +305,10 @@ try {
 		}),
 	)[0];
 	assert.equal(repeatedTerminal.id, saved.id);
-	assert.deepEqual(repeatedTerminal.batchIds, [batch.id, repeatedSource.batch.id].sort());
+	assert.deepEqual(
+		repeatedTerminal.batchIds,
+		[batch.id, repeatedSource.batch.id].sort(),
+	);
 	const conflictSource = addAnalysisSource(
 		"fixture/conflict-model",
 		"2026-01-01T00:00:07.300Z",
@@ -381,9 +384,7 @@ try {
 	for (const item of Object.values(migratedWork.items).filter(
 		(item) =>
 			item.labels?.includes("wo:analysis") &&
-			!item.labels.some((label) =>
-				label.startsWith("wo:analysis-finalization:"),
-			),
+			!item.labels.some((label) => label.startsWith("wo:analysis-finalization:")),
 	)) {
 		assert.ok(migrations[item.id].snapshot);
 		assert.equal(
