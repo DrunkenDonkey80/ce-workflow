@@ -18812,8 +18812,10 @@ function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 		);
 		if (verifierBlocker) return verifierBlocker;
 	} catch (error) {
-		if (error?.category !== "missing")
-			return `background verification could not be reconciled: ${commandErrorText(error)}`;
+		if (error?.category !== "missing") {
+			const kind = error?.category ?? error?.name;
+			return `background verification could not be reconciled${kind ? ` (${kind})` : ""}: ${commandErrorText(error)}`;
+		}
 	}
 	if (goal?.mode !== "project") return;
 	const objective = String(goal.objective ?? "");

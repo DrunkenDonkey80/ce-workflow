@@ -122,7 +122,15 @@ assert.match(
 	mod.parseWorkGoalCommand("edit --tokens nope ship it").error,
 	/Invalid token budget/,
 );
-for (const command of ["status", "show", "help", "pause", "resume", "clear", "stop"])
+for (const command of [
+	"status",
+	"show",
+	"help",
+	"pause",
+	"resume",
+	"clear",
+	"stop",
+])
 	assert.equal(
 		mod.parseWorkGoalCommand(`--tokens 100k ${command}`).error,
 		"--tokens only applies to start/edit",
@@ -310,6 +318,33 @@ try {
 	);
 } finally {
 	rmSync(baselineVerifierCwd, { recursive: true, force: true });
+}
+
+const corruptVerifierCwd = mkdtempSync(
+	path.join(tmpdir(), "ce-work-goal-corrupt-verifier-"),
+);
+try {
+	initVerifierStore(corruptVerifierCwd);
+	writeFileSync(
+		path.join(
+			corruptVerifierCwd,
+			".ce-workflow",
+			"work-runs",
+			"verifiers",
+			"state.json",
+		),
+		"{",
+	);
+	assert.match(
+		mod.workGoalCompletionBlocker(
+			{ mode: "generic", objective: "verify error diagnostics" },
+			corruptVerifierCwd,
+		),
+		/background verification could not be reconciled \(corrupt\)/,
+		"verifier reconciliation blockers identify their error kind",
+	);
+} finally {
+	rmSync(corruptVerifierCwd, { recursive: true, force: true });
 }
 
 assert.equal(
