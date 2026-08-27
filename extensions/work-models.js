@@ -17085,10 +17085,17 @@ function parseWorkGoalCommand(args = "") {
 			tokenBudget: editBudget ?? tokenBudget,
 		};
 	}
-	if (["status", "show", "help"].includes(command))
-		return tokenBudget === undefined
-			? { kind: "status" }
-			: { kind: "status", error: "--tokens only applies to start/edit" };
+	if (
+		tokenBudget !== undefined &&
+		["status", "show", "help", "pause", "resume", "clear", "stop"].includes(
+			command,
+		)
+	)
+		return {
+			kind: ["show", "help"].includes(command) ? "status" : command,
+			error: "--tokens only applies to start/edit",
+		};
+	if (["status", "show", "help"].includes(command)) return { kind: "status" };
 	if (command === "pause") return { kind: "pause" };
 	if (command === "resume") return { kind: "resume", answer: rest.trim() };
 	if (command === "clear") return { kind: "clear" };

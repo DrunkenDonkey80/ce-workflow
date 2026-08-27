@@ -122,6 +122,11 @@ assert.match(
 	mod.parseWorkGoalCommand("edit --tokens nope ship it").error,
 	/Invalid token budget/,
 );
+for (const command of ["status", "show", "help", "pause", "resume", "clear", "stop"])
+	assert.equal(
+		mod.parseWorkGoalCommand(`--tokens 100k ${command}`).error,
+		"--tokens only applies to start/edit",
+	);
 assert.equal(mod.parseTokenBudget("42"), 42);
 assert.equal(mod.formatTokenCount(1500), "1.5k");
 assert.equal(mod.formatTokenCount(999_949), "999.9k");
