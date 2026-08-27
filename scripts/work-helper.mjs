@@ -249,7 +249,7 @@ function reviewerHandoff(
 	const ownerRoot = JSON.stringify(ownerRepositoryRoot);
 	const helperPrefix = distinctRoots ? `cd ${ownerRoot} && ` : "";
 	const reviewOnly = implementationFiles
-		.map((file) => JSON.stringify(file.replaceAll("\\", "/")))
+		.map((file) => JSON.stringify(normalizeRepositoryPath(file)))
 		.join(", ");
 	return [
 		"independent review required",
@@ -653,11 +653,7 @@ async function finishTaskUnlocked() {
 		taskContractText,
 	);
 	const declaredImplementationFiles = [
-		...new Set(
-			options("--implementation-file").map((file) =>
-				path.posix.normalize(file.replaceAll("\\", "/")),
-			),
-		),
+		...new Set(options("--implementation-file").map(normalizeRepositoryPath)),
 	];
 	for (const file of declaredImplementationFiles) {
 		const absolute = path.join(executionRoot, file);
@@ -676,7 +672,7 @@ async function finishTaskUnlocked() {
 	const priorScope = reviewScope(task)?.files ?? [];
 	const ownedImplementationFiles = new Set([
 		...declaredImplementationFiles,
-		...priorScope.map((file) => file.replaceAll("\\", "/")),
+		...priorScope.map(normalizeRepositoryPath),
 	]);
 	const taskEvidencePrefix = `docs/evidence/${id}`;
 	const evidencePath = (file) =>
@@ -684,9 +680,7 @@ async function finishTaskUnlocked() {
 		file.startsWith(`${taskEvidencePrefix}-`);
 	const evidenceFiles = [
 		...new Set([
-			...options("--evidence-file").map((file) =>
-				path.posix.normalize(file.replaceAll("\\", "/")),
-			),
+			...options("--evidence-file").map(normalizeRepositoryPath),
 			...(evidenceOnly ? gitStatusPaths(executionRoot).filter(evidencePath) : []),
 		]),
 	];
