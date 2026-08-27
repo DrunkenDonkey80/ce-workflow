@@ -17419,7 +17419,10 @@ function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
 	if (!mutating) return;
 	if (goal.status !== "active")
 		return `Improvement safety blocks ${tool}: the workflow is ${goal.status}. Resume it explicitly before any source mutation.`;
-	const pending = (workImproveSnapshotIds(goal) ?? []).filter((id) => {
+	const ids = workImproveSnapshotIds(goal);
+	if (!ids?.length)
+		return `Improvement safety preflight blocks ${tool}: work-improvement snapshot IDs are missing.`;
+	const pending = ids.filter((id) => {
 		try {
 			const disposition = improvementSafetyDisposition(readWorkItem(cwd, id));
 			return (

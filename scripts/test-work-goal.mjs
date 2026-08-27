@@ -3755,8 +3755,38 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.equal(sent.length, beforeOrdinaryChat);
 
 	entries.length = 0;
+	const improvementStatePath = path.join(
+		cwd,
+		".pi",
+		"work-orchestrator-state.json",
+	);
 	writeFileSync(
-		path.join(cwd, ".pi", "work-orchestrator-state.json"),
+		improvementStatePath,
+		JSON.stringify({
+			workGoal: {
+				id: "wg-improvement-missing-snapshots",
+				mode: "improvement",
+				objective: "Do bounded improvement work.",
+				status: "active",
+				iteration: 0,
+				resumeOnSessionStart: true,
+				updatedAt: Date.now() + 1_000,
+			},
+		}),
+	);
+	tempHooks.session_start?.({}, ctx);
+	assert.match(
+		(
+			await tempHooks.tool_call(
+				{ toolName: "edit", input: { path: "source.js" } },
+				ctx,
+			)
+		)?.reason ?? "",
+		/snapshot IDs are missing/,
+		"improvement mutation fails closed when snapshot IDs are missing",
+	);
+	writeFileSync(
+		improvementStatePath,
 		JSON.stringify({
 			workGoal: {
 				id: "wg-improvement-stall",
@@ -3766,7 +3796,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 				status: "active",
 				iteration: 0,
 				resumeOnSessionStart: true,
-				updatedAt: Date.now() + 1_000,
+				updatedAt: Date.now() + 2_000,
 			},
 		}),
 	);
