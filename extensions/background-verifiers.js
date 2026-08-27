@@ -676,30 +676,9 @@ function customSnapshotPaths(cwd, snapshot, patterns = []) {
 		throw error("not-scheduled", "Verifier checkpoint has no custom paths");
 	return [...selected].sort();
 }
-function assertNoSnapshotSymlinks(cwd) {
-	const tracked = gitLines(cwd, ["ls-files", "-s"]);
-	if (tracked.some((line) => /^120000\s/.test(line)))
+function assertNoSnapshotSymlinks(cwd, snapshot) {
+	if (gitLines(cwd, ["ls-tree", "-r", snapshot]).some((line) => /^120000\s/.test(line)))
 		throw error("not-scheduled", "Verifier snapshot contains a tracked symlink");
-	const untracked = git(cwd, [
-		"ls-files",
-		"--others",
-		"--exclude-standard",
-		"-z",
-	])
-		.split("\0")
-		.filter(Boolean);
-	for (const entry of untracked) {
-		try {
-			if (lstatSync(path.join(cwd, entry)).isSymbolicLink())
-				throw error(
-					"not-scheduled",
-					"Verifier snapshot contains an untracked symlink",
-				);
-		} catch (cause) {
-			if (cause instanceof VerifierStoreError) throw cause;
-			throw error("not-scheduled", `Verifier snapshot cannot read ${entry}`);
-		}
-	}
 }
 function verifierRuntimeRoot(cwd) {
 	return path.join(runtimeDir(cwd), "runtime");
@@ -719,7 +698,6 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 		const head = git(cwd, ["rev-parse", "HEAD"]);
 		if (gitLines(cwd, ["ls-files", "-u"]).length)
 			throw error("not-scheduled", "Verifier snapshot has unresolved conflicts");
-		assertNoSnapshotSymlinks(cwd);
 		const workingPaths = snapshotPaths(cwd, head, head, undefined, true);
 		const snapshotWorkingPaths =
 			scope === "project"
@@ -748,6 +726,7 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 				env: verifierCommitEnv(env),
 			});
 		}
+		assertNoSnapshotSymlinks(cwd, snapshot);
 		const parent =
 			dirty && scope !== "commit"
 				? head

@@ -1359,13 +1359,36 @@ try {
 		"completed",
 		"orphaning stale launch evidence preserves terminal operation status",
 	);
-	const linkBlob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
-		cwd: gitCwd,
+	const stagedDeleteSymlinkCwd = repo();
+	const stagedDeleteGit = (...args) =>
+		execFileSync("git", args, {
+			cwd: stagedDeleteSymlinkCwd,
+			encoding: "utf8",
+		}).trim();
+	stagedDeleteGit("init", "-q");
+	stagedDeleteGit("config", "user.email", "test@example.test");
+	stagedDeleteGit("config", "user.name", "Test");
+	writeFileSync(path.join(stagedDeleteSymlinkCwd, "tracked.txt"), "base\n");
+	stagedDeleteGit("add", "tracked.txt");
+	stagedDeleteGit("commit", "-qm", "base");
+	const committedLinkBlob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+		cwd: stagedDeleteSymlinkCwd,
 		input: "outside",
 		encoding: "utf8",
 	}).trim();
-	git("update-index", "--add", "--cacheinfo", `120000,${linkBlob},unsafe-link`);
-	throwsCategory(() => captureVerifierCheckpoint(gitCwd), "not-scheduled");
+	stagedDeleteGit(
+		"update-index",
+		"--add",
+		"--cacheinfo",
+		`120000,${committedLinkBlob},unsafe-link`,
+	);
+	stagedDeleteGit("commit", "-qm", "symlink");
+	stagedDeleteGit("rm", "--cached", "unsafe-link");
+	throwsCategory(
+		() =>
+			captureVerifierCheckpoint(stagedDeleteSymlinkCwd, { scope: "commit" }),
+		"not-scheduled",
+	);
 
 	const committedCwd = repo();
 	const committedGit = (...args) =>
