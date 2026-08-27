@@ -285,10 +285,10 @@ function sameFiles(left = [], right = []) {
 	return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
 
-function reviewFingerprint(cwd, files) {
+function reviewFingerprint(root, files) {
 	const hash = createHash("sha256");
 	for (const file of [...files].sort()) {
-		const absolute = path.join(cwd, file);
+		const absolute = path.join(root, file);
 		hash.update(file).update("\0");
 		if (existsSync(absolute)) hash.update(readFileSync(absolute));
 		else hash.update("<missing>");
