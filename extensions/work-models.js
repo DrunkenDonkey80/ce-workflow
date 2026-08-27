@@ -17078,12 +17078,10 @@ function parseWorkGoalCommand(args = "") {
 				return { kind: "status", error: `Invalid token budget: ${rawBudget}` };
 			editObjective = editRest.join(" ").trim();
 		}
-		if (editBudget === undefined && tokenBudget === undefined)
-			return { kind: "edit", objective: editObjective };
 		return {
 			kind: "edit",
 			objective: editObjective,
-			tokenBudget: editBudget ?? tokenBudget,
+			...(editBudget === undefined ? {} : { tokenBudget: editBudget }),
 		};
 	}
 	if (
