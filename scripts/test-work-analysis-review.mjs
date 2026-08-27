@@ -19,7 +19,6 @@ import {
 	reconcileAnalysisFinalizations,
 	reconcileLegacyAnalysisTasks,
 	validateAnalysisFinalizationInput,
-	validateAnalysisSourceEvidence,
 } from "../extensions/work-models.js";
 import {
 	createWorkItem,
@@ -97,6 +96,45 @@ try {
 			now: "2026-01-01T00:00:02.000Z",
 		}),
 	);
+	const addAnalysisSource = (model, timestamp) => {
+		const sourceBatch = mutateVerifierStore(cwd, (store) =>
+			createBatch(store, {
+				checkpoint,
+				purpose: "analysis",
+				profiles: [{ model, operations: ["correctness"], thinking: "low" }],
+				now: timestamp,
+			}),
+		);
+		const sourceJob = Object.values(loadVerifierStore(cwd).jobs).find(
+			(value) => value.batchId === sourceBatch.id,
+		);
+		const sourceReport = mutateVerifierStore(cwd, (store) =>
+			recordOperationResult(store, {
+				jobId: sourceJob.id,
+				operation: "correctness",
+				outcome: "findings",
+				now: timestamp,
+			}),
+		);
+		const sourceFinding = mutateVerifierStore(cwd, (store) =>
+			addFinding(store, {
+				reportId: sourceReport.id,
+				operation: "correctness",
+				model,
+				checkpoint,
+				path: "src/a.js",
+				startLine: 1,
+				endLine: 1,
+				category: "correctness",
+				severity: "high",
+				rationale: "Identity is ambiguous.",
+				evidence: "src/a.js:1",
+				suggestedAction: "Choose identity semantics.",
+				now: timestamp,
+			}),
+		);
+		return { batch: sourceBatch, finding: sourceFinding };
+	};
 	const candidates = ["accepted", "rejected"].map((verdict) => ({
 		sourceFindingId: finding.id,
 		verdict,
@@ -252,6 +290,40 @@ try {
 		finalStore.analysisFinalizations[finalizationId].taskIds.length,
 		2,
 	);
+	const repeatedSource = addAnalysisSource(
+		"fixture/repeated-model",
+		"2026-01-01T00:00:07.100Z",
+	);
+	const repeatedTerminal = mutateVerifierStore(cwd, (store) =>
+		ingestAnalysisReview(store, {
+			batchId: repeatedSource.batch.id,
+			candidates: candidates.map((candidate) => ({
+				...candidate,
+				sourceFindingId: repeatedSource.finding.id,
+			})),
+			now: "2026-01-01T00:00:07.200Z",
+		}),
+	)[0];
+	assert.equal(repeatedTerminal.id, saved.id);
+	assert.deepEqual(repeatedTerminal.batchIds, [batch.id, repeatedSource.batch.id].sort());
+	const conflictSource = addAnalysisSource(
+		"fixture/conflict-model",
+		"2026-01-01T00:00:07.300Z",
+	);
+	const explicitConflict = mutateVerifierStore(cwd, (store) =>
+		ingestAnalysisReview(store, {
+			batchId: conflictSource.batch.id,
+			candidates: candidates.map((candidate) => ({
+				...candidate,
+				sourceFindingId: conflictSource.finding.id,
+				title: `Revised ${candidate.title}`,
+			})),
+			conflicts: { "tag-identity": saved.id },
+			now: "2026-01-01T00:00:07.400Z",
+		}),
+	)[0];
+	assert.equal(explicitConflict.state, "revisit_pending");
+	assert.equal(explicitConflict.terminalConflictId, saved.id);
 	let finalizedTasks = Object.values(loadStore(cwd).items).filter((item) =>
 		item.labels?.includes(`wo:analysis-finalization:${finalizationId}`),
 	);

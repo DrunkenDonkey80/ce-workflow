@@ -2502,6 +2502,7 @@ export function ingestAnalysisReview(store, input = {}) {
 					material,
 				),
 			);
+			// Identical terminal candidates extend provenance without reopening decided work.
 			if (repeatedTerminal) {
 				repeatedTerminal.batchIds = [
 					...new Set([...repeatedTerminal.batchIds, input.batchId]),
