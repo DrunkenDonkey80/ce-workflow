@@ -18343,7 +18343,15 @@ function workGoalAssistantErrorText(assistant) {
 }
 
 function isWorkGoalUsageLimit(assistant) {
-	return WORK_GOAL_USAGE_LIMIT_RE.test(workGoalAssistantErrorText(assistant));
+	const providerError = [assistant?.errorMessage, assistant?.message]
+		.filter(Boolean)
+		.map(String)
+		.join("\n");
+	if (WORK_GOAL_USAGE_LIMIT_RE.test(providerError)) return true;
+	return (
+		assistant?.stopReason === "error" &&
+		WORK_GOAL_USAGE_LIMIT_RE.test(assistantVisibleText(assistant))
+	);
 }
 
 function workGoalUsageLimitRetryDelayMs() {

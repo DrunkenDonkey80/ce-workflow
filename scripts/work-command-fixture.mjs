@@ -392,7 +392,7 @@ function save() { writeFileSync(statePath, JSON.stringify(state, null, "\t")); }
 function log(value) { appendFileSync(logPath, JSON.stringify({ tool: "git", args, ...value }) + "\\n"); }
 function dirtyLines() {
   if (state.gitCommitted) return [];
-  if (["unknown", "large", "extra-staged"].includes(dirty)) return [" M extensions/work-models.js"];
+  if (["unknown", "large", "extra-staged", "commit-fails"].includes(dirty)) return [" M extensions/work-models.js"];
   if (dirty === "related-plus-unrelated") return [" M extensions/work-models.js", " M unrelated.txt"];
   if (dirty === "large-ui") return [" M src/components/App.tsx"];
   if (dirty === "benign" || dirty === "instruction-substantive") return [" M AGENTS.md"];
@@ -403,7 +403,7 @@ function dirtyLines() {
   return [];
 }
 if (args[0] === "diff" && args.includes("--numstat")) {
-  if (dirty === "unknown" || dirty === "extra-staged") console.log("12\t3\textensions/work-models.js");
+  if (["unknown", "extra-staged", "commit-fails"].includes(dirty)) console.log("12\t3\textensions/work-models.js");
   if (dirty === "related-plus-unrelated") console.log("12\t3\textensions/work-models.js\\n1\t0\tunrelated.txt");
   if (dirty === "large") console.log("90\t40\textensions/work-models.js");
   if (dirty === "large-ui") console.log("90\t40\tsrc/components/App.tsx");
@@ -414,11 +414,13 @@ if (args[0] === "diff" && args.includes("--numstat")) {
 } else if (args[0] === "diff") process.exit(dirty === "benign" ? 0 : 1);
 else if (args[0] === "add") { state.gitStaged = true; save(); log({ op: "add" }); }
 else if (args[0] === "commit") {
+  if (dirty === "commit-fails") { log({ op: "commit-failed" }); process.exit(1); }
   if (args.includes("--amend")) state.closeCommitted = true;
   else state.gitCommitted = true;
   state.gitStaged = false;
   save(); log({ op: args.includes("--amend") ? "amend" : "commit" });
 }
+else if (args[0] === "reset") { state.gitStaged = false; save(); log({ op: "reset" }); }
 else if (args[0] === "rev-parse") {
   if (args[1] === "HEAD:AGENTS.md") console.log("agents111");
   else console.log(state.closeCommitted ? "feed123" : "c0ffee1");

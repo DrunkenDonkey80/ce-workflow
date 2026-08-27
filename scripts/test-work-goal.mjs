@@ -189,6 +189,7 @@ assert.equal(
 );
 assert.equal(
 	mod.isWorkGoalUsageLimit({
+		stopReason: "error",
 		content: [
 			{
 				type: "text",
@@ -197,6 +198,13 @@ assert.equal(
 		],
 	}),
 	true,
+);
+assert.equal(
+	mod.isWorkGoalUsageLimit({
+		stopReason: "stop",
+		content: [{ type: "text", text: "Implemented the requested rate limit." }],
+	}),
+	false,
 );
 assert.equal(mod.isContradictoryWorkGoalCompletion("tests still fail"), true);
 assert.equal(
@@ -4088,8 +4096,9 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempHooks.agent_end(
 		{
 			messages: [
-				{
+					{
 					role: "assistant",
+					stopReason: "error",
 					content: [
 						{
 							type: "text",

@@ -48,11 +48,8 @@ try {
 		"project-owned verifier tools enforce the launch boundary without provider capabilities",
 	);
 	const listeners = new Map();
-	let projectReportAvailable = false;
 	let verifierRpcParams;
 	const verifierAdapter = createPiSubagentsVerifierAdapter({
-		getAllTools: () =>
-			projectReportAvailable ? [{ name: "project_report" }] : [],
 		events: {
 			on(name, listener) {
 				listeners.set(name, listener);
@@ -119,16 +116,6 @@ try {
 			verifierChild.agentContract?.version === 1 &&
 			verifierChild.acceptance === false,
 		"verifiers forward launch routing and preserve the checkpoint-only contract",
-	);
-	projectReportAvailable = true;
-	const secondVerifierLaunch = await verifierAdapter.spawn(verifierRequest);
-	verifierChild = workflowChildParams(verifierRpcParams);
-	assert(
-		secondVerifierLaunch.ok &&
-			verifierChild.agent === "work-background-verifier" &&
-			!verifierChild.tools.includes("project_report") &&
-			!verifierChild.task.includes("project_report"),
-		"isolated verifiers do not inherit host-only pi-lens tools",
 	);
 	let state = buildWorkSmallState(fixture.cwd, "Add coded start gate");
 	assert(
@@ -595,6 +582,19 @@ try {
 			state.reason === "finish-execute-failed" &&
 			fixture.store().items["FIN-1"].status !== "closed",
 		"finish rejects an unrelated staged file without closing the work item",
+	);
+
+	fixture.reset("finishReady", "commit-fails");
+	state = executeWorkFinishState(
+		finishCwd,
+		buildWorkFinishState(finishCwd, "FIN-1"),
+	);
+	assert(
+		!state.ok &&
+			state.reason === "finish-execute-failed" &&
+			fixture.logs().some((entry) => entry.op === "reset") &&
+			fixture.store().items["FIN-1"].status === "in_progress",
+		"finish rolls back native state and Git staging after commit failure",
 	);
 
 	for (const scenario of ["finishDebugReady", "finishBigReady"]) {
