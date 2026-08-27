@@ -68,6 +68,7 @@ const {
 	executeVerifierFind,
 	reconcileBackgroundVerifierRuns,
 	executeVerifierGrep,
+	executeVerifierList,
 	executeVerifierRead,
 } = workModels;
 
@@ -869,6 +870,8 @@ try {
 	git("add", "tracked.txt");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
 	writeFileSync(path.join(gitCwd, "untracked.txt"), "untracked\n");
+	mkdirSync(path.join(gitCwd, "nested"));
+	writeFileSync(path.join(gitCwd, "nested", "inside.txt"), "nested\n");
 	const magicPath =
 		process.platform === "win32" ? undefined : ":(glob)literal.txt";
 	if (magicPath) writeFileSync(path.join(gitCwd, magicPath), "literal\n");
@@ -961,6 +964,7 @@ try {
 		...(magicPath ? [magicPath] : []),
 		"a-binary.so",
 		"large.txt",
+		"nested/inside.txt",
 		"tracked.txt",
 		"untracked.txt",
 	]);
@@ -1010,6 +1014,19 @@ try {
 	symlinkSync("tracked.txt", path.join(requests[0].cwd, "escape-link"));
 	assert.throws(() =>
 		executeVerifierRead(requests[0].cwd, { path: "escape-link" }),
+	);
+	const rootEntries = executeVerifierList(requests[0].cwd).entries;
+	assert(rootEntries.includes("nested"));
+	assert(!rootEntries.includes("other.txt"), "list hides paths outside the checkpoint");
+	assert(!rootEntries.includes("escape-link"), "list hides symbolic links");
+	assert.deepEqual(
+		executeVerifierList(requests[0].cwd, { path: "nested" }).entries,
+		["nested/inside.txt"],
+	);
+	assert.equal(
+		executeVerifierList(requests[0].cwd, { maxResults: 1 }).entries.length,
+		1,
+		"list honors the result bound",
 	);
 	const duplicate = scheduleVerifierBatch(gitCwd, {
 		profiles,
@@ -1343,7 +1360,8 @@ try {
 		"last-commit scope ignores current worktree bytes",
 	);
 	assert.throws(
-		() => committedGit("cat-file", "-e", `${commitCheckpoint.snapshot}:untracked.txt`),
+		() =>
+			committedGit("cat-file", "-e", `${commitCheckpoint.snapshot}:untracked.txt`),
 		"last-commit snapshot cannot advertise an untracked file it does not contain",
 	);
 	const changesCheckpoint = captureVerifierCheckpoint(committedCwd, {

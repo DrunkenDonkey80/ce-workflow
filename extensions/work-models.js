@@ -9770,6 +9770,7 @@ export function executeVerifierList(cwd, params = {}) {
 				(allowed) => allowed === entry || allowed.startsWith(`${entry}/`),
 			),
 		)
+		.sort()
 		.slice(0, maxResults);
 	return { path: directory, entries };
 }
