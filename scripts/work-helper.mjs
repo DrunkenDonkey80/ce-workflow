@@ -172,25 +172,24 @@ function markerOccurrences(text, marker) {
 	return occurrences;
 }
 
+function pathEscapes(root, file) {
+	const relative = path.relative(root, file);
+	return (
+		relative === ".." ||
+		relative.startsWith(`..${path.sep}`) ||
+		path.isAbsolute(relative)
+	);
+}
+
 function legacyInstructionsPreview(requestedFile = "AGENTS.md") {
 	let file = path.resolve(cwd, requestedFile);
 	if (!/(?:^|[/\\])AGENTS\.md$/i.test(file))
 		return { status: "refused", reason: "not-an-AGENTS-file", file };
-	const relative = path.relative(cwd, file);
-	if (
-		relative === ".." ||
-		relative.startsWith(`..${path.sep}`) ||
-		path.isAbsolute(relative)
-	)
+	if (pathEscapes(cwd, file))
 		return { status: "refused", reason: "outside-repository", file };
 	if (!existsSync(file)) return { status: "no-op", reason: "file-absent", file };
 	file = realpathSync(file);
-	const canonicalRelative = path.relative(realpathSync(cwd), file);
-	if (
-		canonicalRelative === ".." ||
-		canonicalRelative.startsWith(`..${path.sep}`) ||
-		path.isAbsolute(canonicalRelative)
-	)
+	if (pathEscapes(realpathSync(cwd), file))
 		return { status: "refused", reason: "outside-repository", file };
 	const text = readFileSync(file, "utf8");
 	const begins = markerOccurrences(text, LEGACY_INSTRUCTIONS_BEGIN);
@@ -1528,23 +1527,16 @@ try {
 		if (noteArgs[0] === "--note-file") {
 			const requested = noteArgs[1];
 			const file = requested ? path.resolve(cwd, requested) : "";
-			const relative = file ? path.relative(cwd, file) : "";
-			const canonicalRelative =
-				file && existsSync(file)
-					? path.relative(realpathSync(cwd), realpathSync(file))
-					: "";
+			const fileInfo = file && existsSync(file) ? statSync(file) : undefined;
+			const canonicalFile = fileInfo ? realpathSync(file) : "";
 			if (
 				noteArgs.length !== 2 ||
 				path.isAbsolute(requested) ||
-				!relative ||
-				relative === ".." ||
-				relative.startsWith(`..${path.sep}`) ||
-				!existsSync(file) ||
-				!statSync(file).isFile() ||
-				statSync(file).size > 1024 * 1024 ||
-				canonicalRelative === ".." ||
-				canonicalRelative.startsWith(`..${path.sep}`) ||
-				path.isAbsolute(canonicalRelative)
+				!file ||
+				pathEscapes(cwd, file) ||
+				!fileInfo?.isFile() ||
+				fileInfo.size > 1024 * 1024 ||
+				pathEscapes(realpathSync(cwd), canonicalFile)
 			)
 				throw new Error(
 					"--note-file requires one repository-contained file up to 1 MiB",
