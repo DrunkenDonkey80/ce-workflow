@@ -793,12 +793,9 @@ async function finishTaskUnlocked() {
 		const verificationError = String(
 			error.stderr || error.message || error,
 		).slice(-500);
+		const verificationFailure = `wo:verify-check FAIL\nCommand: ${verificationCommand ?? "unknown verification"}\n${verificationError}`;
 		mutateStore(cwd, (store) =>
-			appendWorkNote(
-				store,
-				id,
-				`wo:verify-check FAIL\nCommand: ${verificationCommand}\n${verificationError}`,
-			),
+			appendWorkNote(store, id, verificationFailure),
 		);
 		throw new Error(
 			`verification failed: ${verificationCommand}\n${verificationError}`,

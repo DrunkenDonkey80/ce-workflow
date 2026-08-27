@@ -668,9 +668,11 @@ try {
 	);
 	const failedShardNotes = loadStore(cwd).items["TASK-4"].notes;
 	assert(failedShardNotes.includes("note written during failed shard"));
-	assert(
-		failedShardNotes.some((note) => note.startsWith("wo:verify-check FAIL")),
-		"failed shards leave durable verification evidence",
+	assert.equal(
+		failedShardNotes.filter((note) => note.startsWith("wo:verify-check FAIL"))
+			.length,
+		1,
+		"failed shards leave one durable verification record",
 	);
 	assert.equal(
 		existsSync(path.join(cwd, failedShardOutput)),
