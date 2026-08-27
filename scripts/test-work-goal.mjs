@@ -184,6 +184,10 @@ assert.equal(
 );
 assert.equal(mod.isWorkGoalUsageLimit({ errorMessage: "usage reached" }), true);
 assert.equal(
+	mod.isWorkGoalUsageLimit({ errorMessage: "parser failed near line 429" }),
+	false,
+);
+assert.equal(
 	mod.isWorkGoalUsageLimit({
 		content: [
 			{

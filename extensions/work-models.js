@@ -740,7 +740,7 @@ const WORK_GOAL_MAX_RETRIES = 4;
 const WORK_IMPROVE_MAX_STALLED_TURNS = 2;
 const WORK_GOAL_USAGE_LIMIT_RETRY_MS = 10 * 60 * 1000;
 const WORK_GOAL_USAGE_LIMIT_RE =
-	/usage[_\s-]*(?:limit|reached)|\b429\b|too many requests|rate limit|访问量过大|使用上限|限额将在/i;
+	/usage[_\s-]*(?:limit|reached)|(?:^|(?:status|http|error|code)[^0-9]{0,8})429\b|too many requests|rate limit|访问量过大|使用上限|限额将在/i;
 const WORK_GOAL_NON_RETRYABLE_RE =
 	/multi-auth rotation failed|credentials tried|unauthori[sz]ed|invalid api key/i;
 const WORK_GOAL_RETRYABLE_RE =
