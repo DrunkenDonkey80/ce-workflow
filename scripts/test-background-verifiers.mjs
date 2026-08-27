@@ -1371,11 +1371,15 @@ try {
 	writeFileSync(path.join(stagedDeleteSymlinkCwd, "tracked.txt"), "base\n");
 	stagedDeleteGit("add", "tracked.txt");
 	stagedDeleteGit("commit", "-qm", "base");
-	const committedLinkBlob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
-		cwd: stagedDeleteSymlinkCwd,
-		input: "outside",
-		encoding: "utf8",
-	}).trim();
+	const committedLinkBlob = execFileSync(
+		"git",
+		["hash-object", "-w", "--stdin"],
+		{
+			cwd: stagedDeleteSymlinkCwd,
+			input: "outside",
+			encoding: "utf8",
+		},
+	).trim();
 	stagedDeleteGit(
 		"update-index",
 		"--add",
@@ -1385,8 +1389,7 @@ try {
 	stagedDeleteGit("commit", "-qm", "symlink");
 	stagedDeleteGit("rm", "--cached", "unsafe-link");
 	throwsCategory(
-		() =>
-			captureVerifierCheckpoint(stagedDeleteSymlinkCwd, { scope: "commit" }),
+		() => captureVerifierCheckpoint(stagedDeleteSymlinkCwd, { scope: "commit" }),
 		"not-scheduled",
 	);
 

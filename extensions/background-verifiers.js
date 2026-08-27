@@ -677,7 +677,11 @@ function customSnapshotPaths(cwd, snapshot, patterns = []) {
 	return [...selected].sort();
 }
 function assertNoSnapshotSymlinks(cwd, snapshot) {
-	if (gitLines(cwd, ["ls-tree", "-r", snapshot]).some((line) => /^120000\s/.test(line)))
+	if (
+		gitLines(cwd, ["ls-tree", "-r", snapshot]).some((line) =>
+			/^120000\s/.test(line),
+		)
+	)
 		throw error("not-scheduled", "Verifier snapshot contains a tracked symlink");
 }
 function verifierRuntimeRoot(cwd) {
