@@ -89,7 +89,6 @@ import {
 	verifierTelemetryEvents,
 	VERIFIER_CHECKPOINT_TOOL_NAMES,
 	VERIFIER_OPERATIONS,
-	VERIFIER_TOOL_NAMES,
 } from "./background-verifiers.js";
 import {
 	acknowledgeLaneLaunch,
@@ -10244,7 +10243,7 @@ function createPiSubagentsVerifierAdapter(pi) {
 				request?.boundary?.credentialsIsolated !== true ||
 				!Array.isArray(requestedTools) ||
 				[...requestedTools].sort().join(",") !==
-					[...VERIFIER_TOOL_NAMES].sort().join(",")
+					[...VERIFIER_CHECKPOINT_TOOL_NAMES].sort().join(",")
 			)
 				return {
 					ok: false,
@@ -15384,6 +15383,7 @@ function executeWorkFinishStateUnlocked(cwd, state, currentModel) {
 		);
 	let headBefore;
 	let canonicalBefore;
+	let commitHash;
 	try {
 		const files = state.relatedFiles ?? [];
 		const canonical = ".ce-workflow/work-items.json";
@@ -15402,34 +15402,7 @@ function executeWorkFinishStateUnlocked(cwd, state, currentModel) {
 			throw new Error("Work-item close changed other files");
 		run(cwd, "git", ["add", "--", canonical]);
 		run(cwd, "git", ["commit", "--amend", "--no-edit"]);
-		const commitHash = run(cwd, "git", ["rev-parse", "--short", "HEAD"]);
-		const verifier = scheduleVerifierBatch(cwd, {
-			profiles: runnableBackgroundVerifierProfiles(cwd, currentModel),
-			origin: state.origin ?? "normal",
-			paths: state.relatedFiles,
-			scope: "commit",
-			serial: !workPerformanceSettings(cwd).parallelBackgroundVerifiers,
-		});
-		if (verifier.batch?.id)
-			recordWorkTelemetry(cwd, {
-				id: `verifier-scope-${verifier.batch.id}`,
-				type: "verifier-scope",
-				epicId: state.epic?.id,
-				workItemId: state.selectedWorkItem?.id ?? state.workItem?.id,
-				payoff: { backgroundVerifier: { batchId: verifier.batch.id } },
-			});
-		return {
-			...state,
-			verifier,
-			action: "finish-committed",
-			commitHash,
-			message: "Committed related files and closed the WorkItem.",
-			note: `Commit: ${commitHash} ${state.commitMessage}`,
-			nextAction: `Next: /work-resume ${state.epic.id}`,
-			handoffPrompt: state.learningCaptureEligible
-				? learningCaptureHandoff(state, commitHash)
-				: undefined,
-		};
+		commitHash = run(cwd, "git", ["rev-parse", "--short", "HEAD"]);
 	} catch (error) {
 		// ponytail: only the canonical state needs restoring; Git reset restores the commit.
 		try {
@@ -15447,6 +15420,46 @@ function executeWorkFinishStateUnlocked(cwd, state, currentModel) {
 			{ ...state, action: "finish-stop" },
 		);
 	}
+
+	let verifier;
+	try {
+		verifier = scheduleVerifierBatch(cwd, {
+			profiles: runnableBackgroundVerifierProfiles(cwd, currentModel),
+			origin: state.origin ?? "normal",
+			paths: state.relatedFiles,
+			scope: "commit",
+			serial: !workPerformanceSettings(cwd).parallelBackgroundVerifiers,
+		});
+	} catch (error) {
+		verifier = {
+			status: "unscheduled",
+			reason: commandErrorText(error) || error.message,
+		};
+	}
+	if (verifier.batch?.id)
+		try {
+			recordWorkTelemetry(cwd, {
+				id: `verifier-scope-${verifier.batch.id}`,
+				type: "verifier-scope",
+				epicId: state.epic?.id,
+				workItemId: state.selectedWorkItem?.id ?? state.workItem?.id,
+				payoff: { backgroundVerifier: { batchId: verifier.batch.id } },
+			});
+		} catch {
+			// Telemetry is best-effort after commit.
+		}
+	return {
+		...state,
+		verifier,
+		action: "finish-committed",
+		commitHash,
+		message: "Committed related files and closed the WorkItem.",
+		note: `Commit: ${commitHash} ${state.commitMessage}`,
+		nextAction: `Next: /work-resume ${state.epic.id}`,
+		handoffPrompt: state.learningCaptureEligible
+			? learningCaptureHandoff(state, commitHash)
+			: undefined,
+	};
 }
 
 function executeWorkFinishState(cwd, state, currentModel) {

@@ -995,7 +995,7 @@ try {
 		requests.every(
 			(request) =>
 				request.boundary.toolAllowlist.join(",") ===
-				"work_verifier_read,work_verifier_list,work_verifier_find,work_verifier_grep,project_report",
+				"work_verifier_read,work_verifier_list,work_verifier_find,work_verifier_grep",
 		),
 	);
 	assert(

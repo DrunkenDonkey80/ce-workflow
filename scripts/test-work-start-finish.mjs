@@ -84,7 +84,6 @@ try {
 			cwdConfinedReadTools: true,
 			credentialsIsolated: true,
 			toolAllowlist: [
-				"project_report",
 				"work_verifier_grep",
 				"work_verifier_find",
 				"work_verifier_list",
@@ -591,6 +590,49 @@ try {
 			fixture.store().items["FIN-1"].status === "closed" &&
 			!fixture.logs().some((entry) => entry.op === "close"),
 		"finish stages work, closes native state, and amends one commit without bd",
+	);
+
+	writeFileSync(
+		path.join(finishCwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workOrchestrator: {
+				backgroundVerifiers: {
+					__inherit_model__: {
+						operations: ["correctness"],
+						thinking: "low",
+					},
+				},
+			},
+		}),
+	);
+	fixture.reset("finishReady", "unknown");
+	state = executeWorkFinishState(
+		finishCwd,
+		buildWorkFinishState(finishCwd, "FIN-1"),
+		" invalid model ",
+	);
+	assert(
+		state.ok &&
+			state.action === "finish-committed" &&
+			state.verifier?.status === "unscheduled" &&
+			fixture.store().items["FIN-1"].status === "closed" &&
+			!fixture.logs().some((entry) => entry.op === "reset"),
+		"optional verifier scheduling failure cannot roll back a committed close",
+	);
+	writeFileSync(
+		path.join(finishCwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workOrchestrator: {
+				browserTestsOnUiDiff: false,
+				codeReviewBeforeCommit: "off",
+				backgroundVerifiers: {
+					"openai/gpt-5": {
+						operations: ["correctness"],
+						thinking: "low",
+					},
+				},
+			},
+		}),
 	);
 
 	fixture.reset("finishReady", "extra-staged");
