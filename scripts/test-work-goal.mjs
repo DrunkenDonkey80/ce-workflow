@@ -199,12 +199,10 @@ assert.equal(
 	mod.isContradictoryWorkGoalCompletion("Work remains blocked on credentials."),
 	true,
 );
-assert.equal(
-	mod.isContradictoryWorkGoalCompletion(
-		"Fixed the blocked lease path; the failing tests now pass.",
-	),
-	false,
-);
+for (const summary of [
+	"All tests pass and the work is verified.",
+	"Fixed the blocked lease path; the failing tests now pass.",
+]) assert.equal(mod.isContradictoryWorkGoalCompletion(summary), false);
 
 const objective = mod.buildWorkSelfImprovingObjective("C:/soft/git/AI-Wedge", {
 	project: true,
