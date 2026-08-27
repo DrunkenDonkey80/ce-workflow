@@ -325,6 +325,38 @@ try {
 			title: "Second scoped task",
 		});
 	});
+	for (const instruction of [
+		"at least one task: finish scoped work",
+		"more than one task: finish scoped work",
+	]) {
+		const nonExactGoal = mod.createWorkGoal(
+			"project",
+			mod.buildWorkSelfImprovingObjective(`${targetCwd} -- ${instruction}`, {
+				project: true,
+			}),
+			undefined,
+			0,
+			undefined,
+			targetCwd,
+		);
+		assert.equal(
+			nonExactGoal.requestedClosureLimit,
+			undefined,
+			`${instruction} is not reinterpreted as an exact closure limit`,
+		);
+	}
+	const exactGoal = mod.createWorkGoal(
+		"project",
+		mod.buildWorkSelfImprovingObjective(
+			`${targetCwd} -- exactly 2 tasks: finish scoped work`,
+			{ project: true },
+		),
+		undefined,
+		0,
+		undefined,
+		targetCwd,
+	);
+	assert.equal(exactGoal.requestedClosureLimit, 2);
 	const scopedGoal = mod.createWorkGoal(
 		"project",
 		mod.buildWorkSelfImprovingObjective(

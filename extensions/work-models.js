@@ -18225,10 +18225,18 @@ function requestedWorkItemClosureLimit(objective) {
 	const instruction = /^User instruction for the target project:\s*(.+)$/m.exec(
 		String(objective ?? ""),
 	)?.[1];
-	const value = instruction?.match(
+	const match = instruction?.match(
 		/\b(?:exactly\s+)?(one|\d+)\s+(?:executable\s+)?(?:tasks?|work\s*items?)\b/i,
-	)?.[1];
-	if (!value) return;
+	);
+	if (!match) return;
+	const prefix = instruction.slice(0, match.index).trimEnd();
+	if (
+		/\b(?:at\s+(?:least|most)|more\s+than|less\s+than|fewer\s+than|no\s+(?:more|fewer)\s+than|up\s+to|not)\s*$/i.test(
+			prefix,
+		)
+	)
+		return;
+	const value = match[1];
 	const limit = value.toLowerCase() === "one" ? 1 : Number(value);
 	if (Number.isSafeInteger(limit) && limit > 0) return limit;
 }
