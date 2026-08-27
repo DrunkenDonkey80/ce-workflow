@@ -141,8 +141,23 @@ try {
 		),
 		"the second finish creates a distinct later checkpoint",
 	);
+
+	await hooks.before_agent_start(
+		{
+			prompt:
+				"work-orchestrator\nWorkflow Run ID: tracked-finish\nActivity: implementation",
+			systemPrompt: "",
+		},
+		ctx,
+	);
+	await hooks.agent_start({}, ctx);
+	await finish("finish-3", "TASK-3", "third.js");
+	assert(
+		Object.keys(loadVerifierStore(cwd).batches).length === 2,
+		"a finish inside a tracked agent waits for settlement verification",
+	);
 	process.stdout.write(
-		"ok - nested finish ToolResults create one immutable verifier batch per commit\n",
+		"ok - finish ToolResults queue standalone commits and defer tracked-agent commits\n",
 	);
 } finally {
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;

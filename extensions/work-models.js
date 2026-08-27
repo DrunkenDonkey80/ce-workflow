@@ -24564,14 +24564,15 @@ export default function workModelsExtension(pi) {
 			}
 		const helper = finishHelperStarts.get(event.toolCallId);
 		finishHelperStarts.delete(event.toolCallId);
-		try {
-			scheduleFinishedHelperVerifiers(ctx.cwd, pi, ctx, helper, event);
-		} catch (error) {
-			ctx.ui?.notify?.(
-				`Background verification failed to queue: ${error instanceof Error ? error.message : String(error)}`,
-				"warning",
-			);
-		}
+		if (!activeWorkAgent)
+			try {
+				scheduleFinishedHelperVerifiers(ctx.cwd, pi, ctx, helper, event);
+			} catch (error) {
+				ctx.ui?.notify?.(
+					`Background verification failed to queue: ${error instanceof Error ? error.message : String(error)}`,
+					"warning",
+				);
+			}
 		if (!activeWorkAgent) return;
 		const started = activeWorkAgent.toolStarts.get(event.toolCallId);
 		activeWorkAgent.tools.push(summarizeToolResult(event, started));
