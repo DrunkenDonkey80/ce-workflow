@@ -4410,22 +4410,26 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 					suggestedAction: "keep the fix",
 				}),
 		);
-		const lifecycleFixGroup = mutateVerifierStore(
-			lifecycleVerifierCwd,
-			(store) => addGroup(store, { findingIds: [lifecycleFixFinding.id] }),
+		const lifecycleFixGroup = mutateVerifierStore(lifecycleVerifierCwd, (store) =>
+			addGroup(store, { findingIds: [lifecycleFixFinding.id] }),
 		);
-		const lifecycleFixClaim = mutateVerifierStore(
-			lifecycleVerifierCwd,
-			(store) =>
-				claimGroup(store, {
-					groupId: lifecycleFixGroup.id,
-					ownerSession: "lifecycle-session",
-				}),
+		await invoke("work-goal", "pause", lifecycleCtx);
+		const beforeVerifierResume = sent.length;
+		await invoke("work-goal", "resume", lifecycleCtx);
+		assert.equal(sent.length, beforeVerifierResume + 1);
+		assert.match(
+			sent.at(-1).message,
+			/Verifier triage is mandatory/,
+			"manual goal resume claims and injects pending verifier triage",
 		);
+		const lifecycleFixClaim = Object.values(
+			loadVerifierStore(lifecycleVerifierCwd).claims,
+		).find((claim) => claim.groupId === lifecycleFixGroup.id);
+		assert.ok(lifecycleFixClaim);
 		mutateVerifierStore(lifecycleVerifierCwd, (store) =>
 			recordTriageDisposition(store, {
 				claimId: lifecycleFixClaim.id,
-				ownerSession: "lifecycle-session",
+				ownerSession: lifecycleFixClaim.ownerSession,
 				findingId: lifecycleFixFinding.id,
 				disposition: "accepted",
 				reason: "fixture accepted verifier fix",
@@ -4434,7 +4438,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		mutateVerifierStore(lifecycleVerifierCwd, (store) =>
 			completeAcceptedFix(store, {
 				claimId: lifecycleFixClaim.id,
-				ownerSession: "lifecycle-session",
+				ownerSession: lifecycleFixClaim.ownerSession,
 				findingIds: [lifecycleFixFinding.id],
 				commit: lifecycleVerifierFixCommit,
 				verification: ["fixture verification"],

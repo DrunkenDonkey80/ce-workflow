@@ -19227,10 +19227,12 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		await sendWorkGoalPrompt(
 			pi,
 			ctx,
-			buildWorkGoalContinuePrompt(
+			buildClaimedWorkGoalContinuePrompt(
 				activeWorkGoal,
 				workGoalContinuationMarker(activeWorkGoal),
 				note,
+				ctx,
+				activeWorkGoalCwd ?? ctx.cwd,
 			),
 		);
 		return;
