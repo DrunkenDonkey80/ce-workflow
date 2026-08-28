@@ -59,7 +59,7 @@ const REPORT_CATEGORIES = /^[a-z][a-z0-9-]{0,63}$/;
 const LAUNCH_STATUS_GRACE_MS = 30_000;
 const TERMINAL_OUTPUT_FAILURE =
 	"Verifier terminal output was unavailable or invalid";
-const TERMINAL_SUCCESS_STATES = new Set([
+export const TERMINAL_SUCCESS_STATES = new Set([
 	"complete",
 	"completed",
 	"success",
@@ -67,7 +67,7 @@ const TERMINAL_SUCCESS_STATES = new Set([
 	"passed",
 ]);
 // Failure status does not discard valid reports; reconciliation retains their artifacts.
-const TERMINAL_FAILURE_STATES = new Set([
+export const TERMINAL_FAILURE_STATES = new Set([
 	"failed",
 	"error",
 	"cancelled",

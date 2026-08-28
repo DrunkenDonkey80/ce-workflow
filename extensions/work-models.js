@@ -87,6 +87,8 @@ import {
 	verifierCompletionBlocker,
 	verifierStatus,
 	verifierTelemetryEvents,
+	TERMINAL_FAILURE_STATES,
+	TERMINAL_SUCCESS_STATES,
 	VERIFIER_CHECKPOINT_TOOL_NAMES,
 	VERIFIER_OPERATIONS,
 } from "./background-verifiers.js";
@@ -1455,21 +1457,10 @@ function recordGoalSubagentLaunch(cwd, goal, toolCallId, args, result) {
 	});
 }
 
-const DIRECT_SUCCESS_STATES = new Set([
-	"complete",
-	"completed",
-	"success",
-	"ok",
-	"passed",
-]);
+const DIRECT_SUCCESS_STATES = TERMINAL_SUCCESS_STATES;
 const DIRECT_TERMINAL_STATES = new Set([
-	...DIRECT_SUCCESS_STATES,
-	"failed",
-	"error",
-	"cancelled",
-	"canceled",
-	"timed_out",
-	"timeout",
+	...TERMINAL_SUCCESS_STATES,
+	...TERMINAL_FAILURE_STATES,
 ]);
 
 function directStatusState(status) {
