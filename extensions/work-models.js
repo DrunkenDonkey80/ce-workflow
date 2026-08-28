@@ -18043,11 +18043,6 @@ function updateWorkGoalStatus(ctx, goal = activeWorkGoal) {
 	ctx?.ui?.setStatus?.(WORK_GOAL_STATUS_KEY, formatWorkGoalStatus(goal));
 }
 
-function isFailedIssue(issue) {
-	const labels = labelsOf(issue);
-	return statusOf(issue) === "failed" || labels.includes("wo:failed");
-}
-
 function progressBar(complete, total, width = 12) {
 	const safeTotal = Math.max(0, Number(total) || 0);
 	const safeComplete = Math.max(0, Math.min(safeTotal, Number(complete) || 0));
