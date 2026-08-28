@@ -1100,10 +1100,11 @@ export async function launchQueuedVerifierJobs(
 	const claimed = [];
 	for (const job of jobs)
 		try {
-			mutateVerifierStore(cwd, (state) =>
-				claimVerifierLaunch(state, { jobId: job.id }),
+			claimed.push(
+				mutateVerifierStore(cwd, (state) =>
+					claimVerifierLaunch(state, { jobId: job.id }),
+				),
 			);
-			claimed.push(job);
 		} catch (cause) {
 			if (!(cause instanceof VerifierStoreError) || cause.category !== "invalid")
 				throw cause;
