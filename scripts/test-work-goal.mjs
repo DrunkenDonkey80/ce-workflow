@@ -514,8 +514,6 @@ const projectGoalProgress = mod.renderProjectGoalProgress({
 	complete: 3,
 	total: 6,
 	unsliced: 2,
-	failed: 1,
-	blocked: 2,
 	elapsedMs: 123_000,
 });
 assert.equal(

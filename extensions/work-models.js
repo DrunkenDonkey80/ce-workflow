@@ -18165,15 +18165,9 @@ function projectGoalProgressState(cwd, goal = activeWorkGoal) {
 		unsliced: 0,
 	};
 	const progress = planProgressForEpic(cwd, epic, childState) ?? fallback;
-	const failed = childState.slices.filter(isFailedIssue).length;
-	const blocked = childState.slices.filter(
-		(issue) => statusOf(issue) !== "closed" && isBlockedIssue(issue),
-	).length;
 	return {
 		title: titleOf(epic),
 		...progress,
-		failed,
-		blocked,
 		elapsedMs: Date.now() - (goal.startedAt ?? Date.now()),
 	};
 }
