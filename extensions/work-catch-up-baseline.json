@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-27",
+  "capturedAt": "2026-08-28",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
@@ -60,38 +60,45 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.58.0",
-      "reviewedAt": "2026-08-27",
-      "reviewedVersion": "0.58.0",
+      "version": "0.59.0",
+      "reviewedAt": "2026-08-28",
+      "reviewedVersion": "0.59.0",
       "decisions": [
         {
-          "version": "0.58.0",
-          "title": "Workflow reliability, recovery, and smaller child context release",
+          "version": "0.59.0",
+          "title": "Exact-settlement, recovery, and lifecycle reliability release",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 baseline-only record and package rollback. Bottom line: record installed 0.58.0 with no ce-workflow source change. Verified project fit: ce-workflow agents use replacement prompts plus explicit project-context settings, so the new default of not inheriting the operator's global context does not remove their contracts; existing inline workflowScript and RPC paths remain supported. Verified upstream evidence: the installed 0.53.0-to-0.58.0 changelog, public extension API, and captured artifact document the release. Benefit: inherit safer recovery, model and fast-mode handling, workflow validation, MCP support, diagnostics, and smaller child context. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: adopt now and advance only this package's baseline.",
-          "verification": "Installed pi-subagents changelog reports 0.58.0; agent frontmatter inspection confirms explicit replacement prompts and project-context policy; captured 0.52.0-to-0.58.0 artifact reviewed"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 package rollback and baseline-only edit. Bottom line: adopt installed 0.59.0 without ce-workflow source changes. Verified project fit: ce-workflow agents already omit removed turnBudget fields, nested fanout remains intentionally disabled, and current async workflowScript and RPC launches remain supported. Verified upstream evidence: the installed 0.59.0 changelog, public tool schema, type surface, and captured 0.58.0-to-0.59.0 artifact document the release. Benefit: inherit exact-child settlement, provider-abort recovery, global concurrency enforcement, Windows output locking fixes, clearer status, and lower-noise lifecycle behavior. Cost/risk: ordinary upstream regression exposure; no migration cost. Confidence: high. Recommendation: adopt now and advance only this package's reviewed baseline.",
+          "verification": "Installed pi-subagents changelog and public schema report 0.59.0; repository search confirms no turnBudget use and intentional nested-subagent denial; captured 0.58.0-to-0.59.0 artifact reviewed"
         },
         {
-          "version": "0.58.0",
-          "title": "Replace packaged agent discovery with runtime registration",
+          "version": "0.59.0",
+          "title": "Replace durable role and checkpoint orchestration with workflow helpers",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: retain the small packaged-agent directory exposure. Verified project fit: ce-workflow ships many file-backed agents with frontmatter, skills, and prompts; the current helper adds one directory once. Verified upstream evidence: runtime registration accepts programmatic definitions and is process-local. Benefit: no meaningful deletion because ce-workflow would need to parse and register every definition plus cleanup. Cost/risk: replacing the current path would add lifecycle code and duplicate package parsing. Confidence: high. Recommendation: no local change."
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: retain ce-workflow's durable role router and checkpoint lanes instead of moving ownership to runs.host, runs.lanes, preflight, or display-only lane metadata. Verified project fit: role decisions persist across commands while checkpoint lanes enforce immutable claims, evidence, and merge accounting; the helpers are scoped to one workflow run and lane metadata is explicitly non-authoritative. Verified upstream evidence: the 0.59.0 public tool schema and workflow runtime define these helpers as workflow-local composition and display surfaces. Benefit: avoids a second source of truth and preserves resumability. Cost/risk: adopting them as replacements would require migration and weaken durable invariants. Confidence: high. Recommendation: no local change."
         },
         {
-          "version": "0.58.0",
-          "title": "Move current workflows to workflowScriptPath",
+          "version": "0.59.0",
+          "title": "Enable nested subagent fanout",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1. Bottom line: keep generated inline workflow scripts for dynamic role orchestration. Verified project fit: repository call sites build bounded scripts from current runtime state and have no reusable static workflow file. Verified upstream evidence: workflowScriptPath is additive and intended for reusable script files. Benefit: avoids creating files that would merely mirror dynamic strings. Cost/risk: none until a stable repeated script exists. Confidence: high. Recommendation: do not add scaffolding."
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: keep nested fanout disabled. Verified project fit: ce-workflow's supervisor owns bounded role selection and current agent contracts explicitly deny subagent launch authority. Verified upstream evidence: 0.59.0 adds stricter global concurrency and exact-settlement handling but does not make nested ownership free or necessary. Benefit: retaining one owner prevents duplicate launches and simplifies accounting. Cost/risk: enabling nesting would add concurrency and coordination paths without a current capability gap. Confidence: high. Recommendation: no local change."
         },
         {
-          "version": "0.58.0",
-          "title": "Package-owned runner, MCP, model, recovery, and UI changes",
+          "version": "0.59.0",
+          "title": "Automate managed-worktree cleanup",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not add cleanup automation around the plan-only worktree.cleanup action. Verified project fit: ce-workflow already treats destructive cleanup as an explicit operator boundary. Verified upstream evidence: the 0.59.0 public schema supports cleanup planning but apply/removal remains unavailable. Benefit: avoids scaffolding around an incomplete lifecycle. Cost/risk: automation would still need separate destructive execution and safety policy. Confidence: high. Recommendation: reconsider only when a safe apply surface exists."
+        },
+        {
+          "version": "0.59.0",
+          "title": "Package-owned status, steering, recovery, concurrency, and runner changes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit external runners, MCP resolution, fast mode, model exclusions, recovery handoffs, status, Fleet, and context-isolation behavior without adapters. Verified project fit: ce-workflow consumes the public subagent tool and RPC boundaries rather than package internals. Benefit: keeps one lifecycle owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local source change."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit provider recovery, settlement, global caps, external-runner and output-lock fixes, status rendering, and steering behavior without adapters. Verified project fit: ce-workflow consumes the public subagent tool and RPC boundaries rather than package internals. Benefit: keeps one lifecycle owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local source change."
         }
       ]
     },
@@ -200,38 +207,45 @@
     },
     {
       "name": "pi-lens",
-      "version": "4.1.2",
-      "reviewedAt": "2026-08-27",
-      "reviewedVersion": "4.1.2",
+      "version": "4.1.3",
+      "reviewedAt": "2026-08-28",
+      "reviewedVersion": "4.1.3",
       "decisions": [
         {
-          "version": "4.1.2",
-          "title": "Diagnostics, read-guard, graph, and observability release",
+          "version": "4.1.3",
+          "title": "Memory-bounded graph, diagnostics, and lifecycle reliability release",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 baseline-only record and package rollback. Bottom line: record installed 4.1.2 and inherit its diagnostics, read-guard, opaque-write, LSP, graph, parser, and telemetry fixes without changing ce-workflow's optional integration boundary. Verified project fit: ce-workflow only availability-gates project_report for its isolated verifier and does not programmatically invoke pi-lens schemas; immutable checkpoint verification remains on work_verifier tools rather than live symbol tools. Verified upstream evidence: the installed 4.1.2 changelog and captured 4.0.1-to-4.1.2 artifact document the release. Benefit: safer and more observable code intelligence automatically. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: adopt now with no local source change.",
-          "verification": "Installed pi-lens changelog reports 4.1.2; captured 4.0.1-to-4.1.2 artifact reviewed; repository integration remains availability-gated"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 package rollback and baseline-only edit. Bottom line: adopt installed 4.1.3 without ce-workflow source changes. Verified project fit: ce-workflow's only dedicated integration is the isolated verifier's optional read-only project_report call with compact view; immutable evidence still comes from checkpoint-scoped tools, and other durable role allowlists remain independent of this ambient extension. Verified upstream evidence: installed package metadata reports 4.1.3, and the changelog plus captured 4.1.2-to-4.1.3 artifact document the release. Benefit: inherit memory-bounded graph architecture, compact report plumbing, exact work counters, read-guard and opaque-write hardening, diagnostics bus pinning, LSP and server lifecycle fixes, and cache isolation. Cost/risk: ordinary upstream regression exposure; no migration cost. Confidence: high. Recommendation: adopt now and advance only this package's reviewed baseline.",
+          "verification": "Installed pi-lens package metadata and changelog report 4.1.3; captured 4.1.2-to-4.1.3 artifact reviewed; repository search confirms the optional project_report boundary and checkpoint-scoped evidence tools"
         },
         {
-          "version": "4.1.2",
+          "version": "4.1.3",
           "title": "Add optional pi-lens tools to every durable role allowlist",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not make durable roles depend on an optional ambient extension. Verified project fit: explicit role allowlists must remain launchable without pi-lens, while the lens verifier is selected only after a coded availability check. Verified upstream evidence: 4.1.2 improves package tools and runners but does not change ce-workflow's optional dependency boundary. Benefit: preserves role availability. Cost/risk: roles continue using native targeted reads unless pi-lens is present. Confidence: high. Recommendation: retain the current boundary."
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not make durable roles depend on an optional ambient extension. Verified project fit: explicit role allowlists must remain launchable without pi-lens, while the lens verifier is selected only after a coded availability check. Verified upstream evidence: 4.1.3 improves package tool internals and report plumbing but does not change ce-workflow's optional dependency boundary. Benefit: preserves role availability. Cost/risk: roles continue using native targeted reads unless pi-lens is present. Confidence: high. Recommendation: retain the current boundary."
         },
         {
-          "version": "4.1.2",
-          "title": "Use live symbol tools inside immutable checkpoint verification",
+          "version": "4.1.3",
+          "title": "Use live graph and symbol tools as immutable checkpoint evidence",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: keep immutable findings on checkpoint-scoped verifier tools. Verified project fit: module_report and read_symbol inspect the live workspace, while verifier findings must bind to a recorded snapshot. Verified upstream evidence: 4.1.2 strengthens live read guards and graph freshness but does not make these tools checkpoint readers. Benefit: avoids time-of-check/time-of-use drift. Cost/risk: checkpoint reads remain deliberately bounded. Confidence: high. Recommendation: no verifier expansion."
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: keep immutable findings on checkpoint-scoped verifier tools. Verified project fit: project_report supplies optional orientation, while module_report and read_symbol inspect the live workspace and cannot bind findings to a recorded checkpoint. Verified upstream evidence: 4.1.3 bounds graph memory and strengthens read guards but does not make live tools checkpoint readers. Benefit: avoids time-of-check/time-of-use drift. Cost/risk: checkpoint reads remain deliberately bounded. Confidence: high. Recommendation: no verifier expansion."
         },
         {
-          "version": "4.1.2",
-          "title": "Package-owned scanners, parsers, LSP, graph, cache, and runtime fixes",
+          "version": "4.1.3",
+          "title": "Add a ce-workflow diagnostics-bus adapter",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not duplicate pi-lens diagnostics lifecycle ownership. Verified project fit: ce-workflow has no diagnostics event consumer and receives bounded findings through public tool results; adding an adapter would create a second warning and persistence path. Verified upstream evidence: 4.1.3 pins the package's pilens:diagnostics publisher and subscriber surface but does not require downstream mediation. Benefit: retaining the package boundary avoids duplicate notifications and state. Cost/risk: an adapter would add event lifecycle and deduplication code without a current gap. Confidence: high. Recommendation: no local change."
+        },
+        {
+          "version": "4.1.3",
+          "title": "Package-owned scanners, parsers, LSP, graph, cache, telemetry, and runtime fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit opaque-write recovery, parser hardening, late auxiliary findings, freshness, graph, LSP, cache, telemetry, and lifecycle fixes without adapters. Verified project fit: these are implemented behind pi-lens's public tool results and diagnostics pipeline. Benefit: avoids duplicating package internals. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit opaque-write recovery, read-guard hardening, parser and LSP lifecycle fixes, graph compaction and eviction, cache work counters, telemetry, test isolation, and diagnostics bus governance without adapters. Verified project fit: these are implemented behind pi-lens's public tool results and diagnostics pipeline. Benefit: avoids duplicating package internals. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code."
         }
       ]
     }

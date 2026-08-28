@@ -9745,6 +9745,40 @@
       "type": "task",
       "updatedAt": "2026-08-24T13:54:12.902Z"
     },
+    "work-2.report-ea7e10ff-aafb-40db-b92e-a1001377bb16": {
+      "createdAt": "2026-08-28T21:50:54.706Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: `npm run verify:quiet` exercised `scripts/test-work-private-workflows.mjs`, which writes and restores tracked `extensions/private-workflows/*` resources in place. Pi Lens emitted BLIND WRITE warnings for those tracked files, and the verification window coincided with the directory being left regenerated from compound-engineering v3.23.4 instead of the reviewed v3.21.4 baseline. Separately, invoking `npm` through the current compressed bash launcher split `C:\\Program Files\\nodejs\\npm` at the space (`'C:\\Program' is not recognized`); direct `node .../npm-cli.js run verify:quiet` succeeded.\nExpected: The package verification suite should be read-only against tracked resources: private-workflow tamper tests should use a temporary copied resource root or injected fixture path, so verification cannot race with activation or leave generated files changed. The command launcher should preserve quoted executable paths containing spaces, or ce-workflow should invoke npm through a deterministic Node/npm-cli path on Windows.\nImpact: A required final verification can create unrelated tracked diffs, trigger diagnostics warnings, and potentially mix an unreviewed private-workflow release into a Pi/plugin catch-up. The npm launcher failure also makes the documented verification command fail despite a healthy repository.\nSuggested improvement: Inject a temporary resource root into dispatchPrivateWorkflow tests instead of mutating extensions/private-workflows, and fix the compressed command launcher path quoting (or normalize npm execution through process.execPath plus npm-cli.js).",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/41618f0e-ee8f-432d-8cbe-d91f42f17e33",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1771352,
+              "file": "01-2026-08-28T21-34-58-652Z_01a04a4c-225c-7ab6-9f26-fb2b2194622b.jsonl",
+              "sha256": "82e07907ac06c1955ff2e2650a5b553b619eca48c69b3795da2cf8f35d78de8d"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-28T21:50:54.701Z",
+          "workflowId": "01a04a4c-225c-7ab6-9f26-fb2b2194622b"
+        }
+      ],
+      "id": "work-2.report-ea7e10ff-aafb-40db-b92e-a1001377bb16",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: `npm run verify:quiet` exercised `scripts/test-work-private-workflows.mjs`, which writes and restores tracked `extensions/private-",
+      "type": "task",
+      "updatedAt": "2026-08-28T21:50:54.706Z"
+    },
     "work-2.report-eb1f7ff8-3ec5-49f5-8450-ab86226ab4a6": {
       "createdAt": "2026-08-24T14:00:13.095Z",
       "dependencies": [],
@@ -12381,7 +12415,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-28T21:31:57.633Z"
+    "updatedAt": "2026-08-28T21:50:54.707Z"
   },
   "schemaVersion": 1
 }
