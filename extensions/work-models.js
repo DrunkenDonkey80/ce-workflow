@@ -18244,14 +18244,8 @@ function executableWorkItemStates(cwd) {
 	);
 }
 
-function createWorkGoal(
-	mode,
-	objective,
-	tokenBudget,
-	baselineTokens = 0,
-	baselineHead,
-	cwd,
-) {
+function createWorkGoal(mode, objective, tokenBudget, options = {}) {
+	const { baselineTokens = 0, baselineHead, cwd } = options;
 	const now = Date.now();
 	const closureLimit =
 		mode === "project" ? requestedWorkItemClosureLimit(objective) : undefined;
@@ -19065,14 +19059,11 @@ async function startWorkGoal(
 	workGoalContinuationPending = null;
 	clearWorkGoalRecovery();
 	clearWorkGoalUsageLimitTimer();
-	activeWorkGoal = createWorkGoal(
-		mode,
-		text,
-		tokenBudget,
-		workGoalTokenTotal(ctx),
-		currentWorkGoalBaselineHead(ctx.cwd),
-		ctx.cwd,
-	);
+	activeWorkGoal = createWorkGoal(mode, text, tokenBudget, {
+		baselineTokens: workGoalTokenTotal(ctx),
+		baselineHead: currentWorkGoalBaselineHead(ctx.cwd),
+		cwd: ctx.cwd,
+	});
 	activeWorkGoalCwd = ctx.cwd;
 	applyWorkGoalThinking(pi, activeWorkGoal, ctx);
 	persistWorkGoal(pi);

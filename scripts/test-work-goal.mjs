@@ -335,9 +335,7 @@ try {
 				project: true,
 			}),
 			undefined,
-			0,
-			undefined,
-			targetCwd,
+			{ cwd: targetCwd },
 		);
 		assert.equal(
 			nonExactGoal.requestedClosureLimit,
@@ -352,9 +350,7 @@ try {
 			{ project: true },
 		),
 		undefined,
-		0,
-		undefined,
-		targetCwd,
+		{ cwd: targetCwd },
 	);
 	assert.equal(exactGoal.requestedClosureLimit, 2);
 	const scopedGoal = mod.createWorkGoal(
@@ -364,9 +360,7 @@ try {
 			{ project: true },
 		),
 		undefined,
-		0,
-		undefined,
-		targetCwd,
+		{ cwd: targetCwd },
 	);
 	assert.equal(scopedGoal.requestedClosureLimit, 1);
 	assert.equal(scopedGoal.closureBaseline["scope-task-1"], "open");
@@ -471,8 +465,14 @@ assert.equal(
 	undefined,
 	"legacy goals do not infer a baseline from untrusted commit timestamps",
 );
-assert.equal(mod.workGoalBaselineHead({ baselineHead: "a".repeat(40) }), "a".repeat(40));
-assert.equal(mod.workGoalBaselineHead({ baselineHead: "b".repeat(64) }), "b".repeat(64));
+assert.equal(
+	mod.workGoalBaselineHead({ baselineHead: "a".repeat(40) }),
+	"a".repeat(40),
+);
+assert.equal(
+	mod.workGoalBaselineHead({ baselineHead: "b".repeat(64) }),
+	"b".repeat(64),
+);
 assert.equal(
 	mod.workGoalBaselineHead({ baselineHead: "c".repeat(41) }),
 	undefined,
