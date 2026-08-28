@@ -7756,6 +7756,45 @@
       "type": "task",
       "updatedAt": "2026-08-11T18:41:00.508Z"
     },
+    "work-2.report-81427536-2020-4d7d-a887-0953cbc2144b": {
+      "createdAt": "2026-08-28T14:25:19.140Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After work_goal_complete materialized verifier groups for the active catch-up snapshot, it rejected completion with findings awaiting triage, but repeated work_verifier_inbox calls returned [] because the newly generated groups remained status=completed with no claim. The autonomous continuation did not run verifierTriageState/claimCompletedGroups before exposing the inbox.\nExpected: When completion detects untriaged findings during an active autonomous goal, the continuation path should atomically claim at least one generated group for the current session before work_verifier_inbox is presented, or work_goal_complete should return a coded claim/inbox handoff. The public inbox must not remain empty while the completion gate says triage is required.\nImpact: The goal cannot complete and the only public disposition tool requires a claimId that no exposed tool can create, causing repeated autonomous continuations and empty-inbox deadlock despite all package work and verification passing.\nSuggested improvement: In the active-goal completion-rejection/continuation path, call existing verifierTriageState (or claimCompletedGroups under mutateVerifierStore) before projecting work_verifier_inbox; add a regression where work_goal_complete first materializes generated completed groups and the next continuation receives a claim.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/3330a0dc-c857-4335-8a11-40697887a6b7",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3903948,
+              "file": "01-state.json",
+              "sha256": "35720a50127b5c1f698199ba48abc8dd4e20dee7cce45f3e99b533acf4c10257"
+            },
+            {
+              "bytes": 8157,
+              "file": "02-work-orchestrator-state.json",
+              "sha256": "67e59d6f7133c3459eacb591e173121a9021ce1a1e8f0340171daafa82a3b83d"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-28T14:25:19.133Z",
+          "workflowId": "01a048bb-0a60-7206-b0f1-7507677f8b81"
+        }
+      ],
+      "id": "work-2.report-81427536-2020-4d7d-a887-0953cbc2144b",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After work_goal_complete materialized verifier groups for the active catch-up snapshot, it rejected completion with findings await",
+      "type": "task",
+      "updatedAt": "2026-08-28T14:25:19.140Z"
+    },
     "work-2.report-84823a57-09e1-4180-a7a5-d34657792d31": {
       "createdAt": "2026-08-24T18:42:30.099Z",
       "dependencies": [],
@@ -12336,7 +12375,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-26T06:37:28.518Z"
+    "updatedAt": "2026-08-28T15:12:17.006Z"
   },
   "schemaVersion": 1
 }
