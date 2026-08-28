@@ -201,6 +201,7 @@ try {
 	execFileSync("git", ["config", "user.name", "Test"], { cwd });
 	writeFileSync(path.join(cwd, "source.js"), "export default false;\n");
 	writeFileSync(path.join(cwd, ".gitignore"), "node_modules/\n");
+	writeFileSync(path.join(cwd, "format"), "process.exit(0);\n");
 	execFileSync("git", ["add", "-A"], { cwd });
 	execFileSync("git", ["commit", "-m", "initial"], { cwd, stdio: "ignore" });
 
@@ -333,6 +334,7 @@ try {
 	const previousTimeout = process.env.WORK_ORCH_VERIFY_TIMEOUT_MS;
 	try {
 		process.env.WORK_ORCH_VERIFY_TIMEOUT_MS = "100";
+		const hangingVerification = `"${process.execPath}" -e "setInterval(() => {}, 1000)"`;
 		assert.match(
 			failure(
 				"finish-task",
@@ -342,10 +344,31 @@ try {
 				"--message",
 				"bound hanging verifier",
 				"--verify",
-				`"${process.execPath}" -e "setInterval(() => {}, 1000)"`,
+				hangingVerification,
 			),
 			/verification timed out after 100ms/,
 			"hanging verifier commands are terminated at the configured timeout",
+		);
+		const shardStartedAt = Date.now();
+		assert.match(
+			failure(
+				"finish-task",
+				"TASK-1",
+				"--max-files",
+				"2",
+				"--message",
+				"bound hanging verifier shard",
+				"--verify",
+				hangingVerification,
+				"--verify-shard",
+				JSON.stringify({ id: "hanging", command: hangingVerification }),
+			),
+			/Required verification shard hanging did not pass/,
+			"a timed-out required shard blocks finalization",
+		);
+		assert.ok(
+			Date.now() - shardStartedAt < 5_000,
+			"the hanging shard returns within the configured timeout budget",
 		);
 	} finally {
 		if (previousTimeout === undefined)
@@ -506,19 +529,34 @@ try {
 		/review scope changed/,
 	);
 	rmSync(path.join(cwd, "extra.js"));
-	const finished = JSON.parse(
-		run(
-			"finish-task",
-			"TASK-1",
-			"--max-files",
-			"2",
-			"--message",
-			"scope finalization",
-			...verifyArgs,
-			"--reviewed",
-		),
-	);
+	const previousFormatter = process.env.WORK_ORCH_FORMATTER_BIN;
+	let finished;
+	try {
+		process.env.WORK_ORCH_FORMATTER_BIN = process.execPath;
+		finished = JSON.parse(
+			run(
+				"finish-task",
+				"TASK-1",
+				"--max-files",
+				"2",
+				"--message",
+				"scope finalization",
+				...verifyArgs,
+				"--immediate-format",
+				"--reviewed",
+			),
+		);
+	} finally {
+		if (previousFormatter === undefined)
+			delete process.env.WORK_ORCH_FORMATTER_BIN;
+		else process.env.WORK_ORCH_FORMATTER_BIN = previousFormatter;
+	}
 	assert.equal(finished.status, "PASS");
+	assert.deepEqual(
+		finished.formatted.sort(),
+		["source.js"],
+		"immediate-format reports the formatter-eligible changed files",
+	);
 	assert.doesNotMatch(
 		execFileSync("git", ["show", "--pretty=", "--name-only", "HEAD"], {
 			cwd,
@@ -579,9 +617,15 @@ try {
 			"--message",
 			"finish store-only tracking",
 			...verifyArgs,
+			"--push",
 		),
 	);
 	assert.equal(storeOnlyFinished.status, "PASS");
+	assert.equal(
+		storeOnlyFinished.push,
+		"skipped-no-upstream",
+		"same-root push skips cleanly when no upstream is configured",
+	);
 	const closedStoreOnly = loadStore(cwd).items["TASK-EMPTY"];
 	assert.equal(closedStoreOnly.status, "closed");
 	assert.equal(
@@ -589,6 +633,57 @@ try {
 		false,
 		"store-only completion never emits an empty review scope",
 	);
+
+	const pushRemote = mkdtempSync(path.join(tmpdir(), "work-helper-push-"));
+	try {
+		execFileSync("git", ["init", "--bare", "-q"], { cwd: pushRemote });
+		execFileSync("git", ["remote", "add", "origin", pushRemote], { cwd });
+		const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+			cwd,
+			encoding: "utf8",
+		}).trim();
+		execFileSync(
+			"git",
+			["push", "-u", "origin", `HEAD:refs/heads/${branch}`],
+			{ cwd, stdio: "ignore" },
+		);
+		const pushStore = loadStore(cwd);
+		createWorkItem(pushStore, {
+			id: "TASK-PUSH",
+			type: "task",
+			status: "open",
+			title: "Push finalized metadata",
+			acceptance: "The finalized commit reaches the configured upstream.",
+		});
+		saveStore(cwd, pushStore);
+		const pushed = JSON.parse(
+			run(
+				"finish-task",
+				"TASK-PUSH",
+				"--max-files",
+				"1",
+				"--message",
+				"push finalized metadata",
+				...verifyArgs,
+				"--push",
+			),
+		);
+		assert.equal(pushed.push, "passed");
+		assert.equal(
+			execFileSync("git", ["rev-parse", `refs/heads/${branch}`], {
+				cwd: pushRemote,
+				encoding: "utf8",
+			}).trim(),
+			execFileSync("git", ["rev-parse", "HEAD"], {
+				cwd,
+				encoding: "utf8",
+			}).trim(),
+			"same-root push updates the configured upstream",
+		);
+		execFileSync("git", ["remote", "remove", "origin"], { cwd });
+	} finally {
+		rmSync(pushRemote, { recursive: true, force: true });
+	}
 
 	writeFileSync(path.join(cwd, "residual.js"), "export default false;\n");
 	const residualStore = loadStore(cwd);
