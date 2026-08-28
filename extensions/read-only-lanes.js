@@ -657,8 +657,7 @@ function prefetchAsyncStatus(lane) {
 	const file = path.join(path.resolve(lane.launch.asyncDir), "status.json");
 	try {
 		const info = lstatSync(file);
-		if (!info.isFile() || info.size > 256 * 1024)
-			return null;
+		if (!info.isFile() || info.size > 256 * 1024) return null;
 		const status = JSON.parse(readFileSync(file, "utf8"));
 		const state = String(status?.state ?? status?.status ?? "").toLowerCase();
 		return plain(status) && text(state) ? { file, state } : null;
