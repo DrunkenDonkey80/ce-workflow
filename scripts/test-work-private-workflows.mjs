@@ -16,7 +16,10 @@ import {
 	legacyCompoundRemovalRecommendation,
 	privateWorkflowActivationWarning,
 } from "../extensions/work-models.js";
-import { dispatchPrivateWorkflow } from "../extensions/work-private-workflows.js";
+import {
+	dispatchPrivateWorkflow,
+	verifyPrivateWorkflowGeneration,
+} from "../extensions/work-private-workflows.js";
 import {
 	activatePendingPrivateWorkflowRelease,
 	classifyPrivateWorkflowRelease,
@@ -139,11 +142,6 @@ const generated = Object.fromEntries(
 	].map((name) => [name, readFileSync(path.join(resourceRoot, name))]),
 );
 const inventoryBytes = readFileSync(inventoryPath);
-const restore = () => {
-	for (const [name, bytes] of Object.entries(generated))
-		writeFileSync(path.join(resourceRoot, name), bytes);
-	writeFileSync(inventoryPath, inventoryBytes);
-};
 
 const playbook = dispatchPrivateWorkflow("brainstorm", authority);
 check(() => {
@@ -304,146 +302,107 @@ rejects(
 	"plan authority cannot load catch-up POV resource",
 );
 
+const tamperRoot = mkdtempSync(path.join(os.tmpdir(), "private-workflow-tamper-"));
+const tamperResourceRoot = path.join(tamperRoot, "private-workflows");
+const tamperInventoryPath = path.join(tamperRoot, "work-compound-inventory.json");
+const restoreTamperFixture = () => {
+	mkdirSync(tamperResourceRoot, { recursive: true });
+	for (const [name, bytes] of Object.entries(generated))
+		writeFileSync(path.join(tamperResourceRoot, name), bytes);
+	writeFileSync(tamperInventoryPath, inventoryBytes);
+};
+const verifyTamperFixture = () =>
+	verifyPrivateWorkflowGeneration(tamperResourceRoot, tamperInventoryPath);
+restoreTamperFixture();
 try {
 	const manifest = JSON.parse(generated["manifest.json"]);
 	manifest.workflows.brainstorm.path = "../escape.md";
 	writeFileSync(
-		path.join(resourceRoot, "manifest.json"),
+		path.join(tamperResourceRoot, "manifest.json"),
 		`${JSON.stringify(manifest, null, 2)}\n`,
 	);
 	rejects(
-		() => dispatchPrivateWorkflow("brainstorm", authority),
+		verifyTamperFixture,
 		/escapes quarantine/,
 		"manifest path escape rejection",
 	);
-	restore();
+	restoreTamperFixture();
 
-	rmSync(path.join(resourceRoot, "brainstorm.md"));
-	rejects(
-		() => dispatchPrivateWorkflow("brainstorm", authority),
-		/ENOENT/,
-		"missing resource rejection",
-	);
-	restore();
+	rmSync(path.join(tamperResourceRoot, "brainstorm.md"));
+	rejects(verifyTamperFixture, /ENOENT/, "missing resource rejection");
+	restoreTamperFixture();
 
-	rmSync(path.join(resourceRoot, "debug.md"));
-	rejects(
-		() => dispatchPrivateWorkflow("debug", debugAuthority),
-		/ENOENT/,
-		"missing debug resource rejection",
-	);
-	restore();
-
-	rmSync(path.join(resourceRoot, "learning.md"));
-	rejects(
-		() => dispatchPrivateWorkflow("learning", learningAuthority),
-		/ENOENT/,
-		"missing learning resource rejection",
-	);
-	restore();
-
-	for (const [workflow, workflowAuthority] of [
-		["review", reviewAuthority],
-		["simplify", simplifyAuthority],
-		["browser", browserAuthority],
-		["pov", catchUpAuthority],
-		["explain", catchUpAuthority],
+	for (const workflow of [
+		"debug",
+		"learning",
+		"review",
+		"simplify",
+		"browser",
+		"pov",
+		"explain",
 	]) {
-		rmSync(path.join(resourceRoot, `${workflow}.md`));
+		rmSync(path.join(tamperResourceRoot, `${workflow}.md`));
 		rejects(
-			() => dispatchPrivateWorkflow(workflow, workflowAuthority),
+			verifyTamperFixture,
 			/ENOENT/,
 			`missing ${workflow} resource rejection`,
 		);
-		restore();
+		restoreTamperFixture();
 	}
 
-	writeFileSync(
-		path.join(resourceRoot, "brainstorm.md"),
-		`${playbook}\nmutated\n`,
-	);
-	rejects(
-		() => dispatchPrivateWorkflow("brainstorm", authority),
-		/resource changed/,
-		"mutated resource rejection",
-	);
-	restore();
-
-	writeFileSync(
-		path.join(resourceRoot, "debug.md"),
-		`${debugPlaybook}\nmutated\n`,
-	);
-	rejects(
-		() => dispatchPrivateWorkflow("debug", debugAuthority),
-		/resource changed: debug/,
-		"mutated debug resource rejection",
-	);
-	restore();
-
-	writeFileSync(
-		path.join(resourceRoot, "learning.md"),
-		`${learningPlaybook}\nmutated\n`,
-	);
-	rejects(
-		() => dispatchPrivateWorkflow("learning", learningAuthority),
-		/resource changed: learning/,
-		"mutated learning resource rejection",
-	);
-	restore();
-
-	writeFileSync(
-		path.join(resourceRoot, "plan.md"),
-		`${planPlaybook}\nmutated\n`,
-	);
-	rejects(
-		() => dispatchPrivateWorkflow("plan", planAuthority),
-		/resource changed: plan/,
-		"mutated plan resource rejection",
-	);
-	restore();
-
-	for (const [workflow, workflowAuthority, workflowPlaybook] of [
-		["review", reviewAuthority, reviewPlaybook],
-		["simplify", simplifyAuthority, simplifyPlaybook],
-		["browser", browserAuthority, browserPlaybook],
-		["pov", catchUpAuthority, povPlaybook],
-		["explain", catchUpAuthority, explainPlaybook],
+	for (const [workflow, workflowPlaybook] of [
+		["brainstorm", playbook],
+		["debug", debugPlaybook],
+		["learning", learningPlaybook],
+		["plan", planPlaybook],
+		["review", reviewPlaybook],
+		["simplify", simplifyPlaybook],
+		["browser", browserPlaybook],
+		["pov", povPlaybook],
+		["explain", explainPlaybook],
 	]) {
 		writeFileSync(
-			path.join(resourceRoot, `${workflow}.md`),
+			path.join(tamperResourceRoot, `${workflow}.md`),
 			`${workflowPlaybook}\nmutated\n`,
 		);
 		rejects(
-			() => dispatchPrivateWorkflow(workflow, workflowAuthority),
-			new RegExp(`resource changed: ${workflow}`),
+			verifyTamperFixture,
+			new RegExp(
+				workflow === "brainstorm"
+					? "resource changed"
+					: `resource changed: ${workflow}`,
+			),
 			`mutated ${workflow} resource rejection`,
 		);
-		restore();
+		restoreTamperFixture();
 	}
 
 	const unverified = JSON.parse(generated["manifest.json"]);
 	unverified.verified = false;
 	writeFileSync(
-		path.join(resourceRoot, "manifest.json"),
+		path.join(tamperResourceRoot, "manifest.json"),
 		`${JSON.stringify(unverified, null, 2)}\n`,
 	);
 	rejects(
-		() => dispatchPrivateWorkflow("brainstorm", authority),
+		verifyTamperFixture,
 		/unverified private workflow generation/,
 		"unverified generation rejection",
 	);
-	restore();
+	restoreTamperFixture();
 
 	const incompleteParity = JSON.parse(inventoryBytes);
 	delete incompleteParity.parityIndex["ce-pov"].actorVisibleOutcome;
-	writeFileSync(inventoryPath, `${JSON.stringify(incompleteParity, null, 2)}\n`);
+	writeFileSync(
+		tamperInventoryPath,
+		`${JSON.stringify(incompleteParity, null, 2)}\n`,
+	);
 	rejects(
-		() => dispatchPrivateWorkflow("pov", catchUpAuthority),
+		verifyTamperFixture,
 		/unknown private workflow ce-pov parity row surface/,
 		"incomplete U4 parity row rejection",
 	);
 } finally {
-	restore();
+	rmSync(tamperRoot, { recursive: true, force: true });
 }
 
 const fixtureRoot = mkdtempSync(

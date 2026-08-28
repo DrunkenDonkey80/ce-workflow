@@ -154,8 +154,10 @@ function verifyManifest(manifest) {
 		throw new Error("unverified private workflow generation");
 }
 
-export function assertCompletePrivateWorkflowParity() {
-	const inventory = parseJson(readFileSync(INVENTORY_PATH), "parity inventory");
+export function assertCompletePrivateWorkflowParity(
+	inventoryPath = INVENTORY_PATH,
+) {
+	const inventory = parseJson(readFileSync(inventoryPath), "parity inventory");
 	const parity = inventory.parityIndex;
 	exactKeys(parity, PARITY_WORKFLOWS, "parity rows");
 	for (const workflow of PARITY_WORKFLOWS) {
@@ -180,8 +182,11 @@ function verifyAuthority(workflow, authority) {
 		throw new Error("external private workflow caller rejected");
 }
 
-export function verifyPrivateWorkflowGeneration(resourceRoot = RESOURCE_ROOT) {
-	assertCompletePrivateWorkflowParity();
+export function verifyPrivateWorkflowGeneration(
+	resourceRoot = RESOURCE_ROOT,
+	inventoryPath = INVENTORY_PATH,
+) {
+	assertCompletePrivateWorkflowParity(inventoryPath);
 	const manifestFile = confinedFile("manifest.json", resourceRoot);
 	const manifest = parseJson(manifestFile.bytes, "manifest");
 	verifyManifest(manifest);
