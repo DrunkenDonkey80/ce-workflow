@@ -5,6 +5,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	symlinkSync,
@@ -145,6 +146,55 @@ try {
 		"json-assert rejects a missing --forbid-string value",
 	);
 	rmSync(path.join(cwd, "assertion.json"));
+
+	const agentsFile = path.join(cwd, "AGENTS.md");
+	const beginMarker = "<!-- BEGIN COMPOUND PI TOOL MAP -->";
+	const endMarker = "<!-- END COMPOUND PI TOOL MAP -->";
+	const validInstructions = `before\n${beginMarker}\nlegacy\n${endMarker}\nafter\n`;
+	writeFileSync(agentsFile, validInstructions);
+	const legacyPreview = JSON.parse(run("legacy-instructions-preview", "AGENTS.md"));
+	assert.equal(legacyPreview.status, "preview");
+	assert.equal(legacyPreview.result, "before\nafter\n");
+	assert.equal(
+		JSON.parse(
+			run(
+				"legacy-instructions-apply",
+				"AGENTS.md",
+				"--confirm",
+				"stale",
+			),
+		).reason,
+		"confirmation-mismatch",
+	);
+	assert.equal(
+		readFileSync(agentsFile, "utf8"),
+		validInstructions,
+		"a stale confirmation leaves AGENTS.md unchanged",
+	);
+	assert.equal(
+		JSON.parse(
+			run(
+				"legacy-instructions-apply",
+				"AGENTS.md",
+				"--confirm",
+				legacyPreview.confirmation,
+			),
+		).status,
+		"applied",
+	);
+	assert.equal(readFileSync(agentsFile, "utf8"), "before\nafter\n");
+	for (const [text, reason] of [
+		[`prefix ${beginMarker}\n${endMarker}\n`, "malformed-markers"],
+		[`${beginMarker}\n${endMarker}\n${beginMarker}\n${endMarker}\n`, "duplicated-markers"],
+		[`${endMarker}\n${beginMarker}\n`, "reversed-markers"],
+	]) {
+		writeFileSync(agentsFile, text);
+		assert.equal(
+			JSON.parse(run("legacy-instructions-preview", "AGENTS.md")).reason,
+			reason,
+		);
+	}
+	rmSync(agentsFile);
 
 	execFileSync("git", ["init"], { cwd, stdio: "ignore" });
 	execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
