@@ -210,6 +210,31 @@ try {
 	execFileSync("git", ["add", "-A"], { cwd });
 	execFileSync("git", ["commit", "-m", "initial"], { cwd, stdio: "ignore" });
 
+	const stagedStoreFile = path.join(cwd, ".ce-workflow", "guard.json");
+	const stagedSourceFile = path.join(cwd, "guard-source.js");
+	writeFileSync(stagedStoreFile, "{}\n");
+	writeFileSync(stagedSourceFile, "export {};\n");
+	execFileSync("git", ["add", ".ce-workflow/guard.json", "guard-source.js"], {
+		cwd,
+	});
+	assert.deepEqual(
+		JSON.parse(run("ensure-no-staged", "--allow-work-store")),
+		{
+			status: "FAIL",
+			unstaged: [".ce-workflow/guard.json"],
+			remaining_staged: ["guard-source.js"],
+		},
+		"ensure-no-staged unstages only work-store files",
+	);
+	execFileSync("git", ["reset", "--", "guard-source.js"], { cwd });
+	rmSync(stagedStoreFile);
+	rmSync(stagedSourceFile);
+	assert.equal(
+		JSON.parse(run("ensure-no-staged", "--allow-work-store")).status,
+		"PASS",
+		"ensure-no-staged passes after allowed and source paths are clear",
+	);
+
 	writeFileSync(path.join(cwd, "source.js"), "export default true;\n");
 	writeFileSync(path.join(cwd, ".gitignore"), "node_modules/\nlocal-cache/\n");
 	mkdirSync(path.join(cwd, ".ce-workflow", "work-runs", "verifiers"), {
