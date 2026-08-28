@@ -471,6 +471,13 @@ assert.equal(
 	undefined,
 	"legacy goals do not infer a baseline from untrusted commit timestamps",
 );
+assert.equal(mod.workGoalBaselineHead({ baselineHead: "a".repeat(40) }), "a".repeat(40));
+assert.equal(mod.workGoalBaselineHead({ baselineHead: "b".repeat(64) }), "b".repeat(64));
+assert.equal(
+	mod.workGoalBaselineHead({ baselineHead: "c".repeat(41) }),
+	undefined,
+	"intermediate-length hexadecimal values are not valid git object ids",
+);
 assert.deepEqual(
 	mod.parseWorkProjectGoalInput("C:/soft/git/AI-Wedge task 19"),
 	{

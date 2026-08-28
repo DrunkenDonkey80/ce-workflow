@@ -18212,7 +18212,7 @@ function currentWorkGoalBaselineHead(cwd) {
 }
 
 function workGoalBaselineHead(goal) {
-	if (/^[0-9a-f]{40,64}$/i.test(String(goal?.baselineHead ?? "")))
+	if (/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(String(goal?.baselineHead ?? "")))
 		return goal.baselineHead;
 }
 
