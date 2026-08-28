@@ -17380,14 +17380,47 @@ function improvementSafetyShellAllowed(command) {
 	].some((pattern) => pattern.test(text));
 }
 
+const IMPROVEMENT_READ_ONLY_TOOLS = new Set([
+	"ask_user",
+	"ast_grep_dump",
+	"ast_grep_outline",
+	"ast_grep_search",
+	"fetch_content",
+	"get_search_content",
+	"hypa_find",
+	"hypa_grep",
+	"hypa_ls",
+	"hypa_read",
+	"lens_diagnostics",
+	"lsp_diagnostics",
+	"module_report",
+	"pi_lens_activate_tools",
+	"project_report",
+	"query-docs",
+	"read",
+	"read_enclosing",
+	"read_symbol",
+	"resolve-library-id",
+	"source_check",
+	"subagent_wait",
+	"symbol_search",
+	"web_search",
+	"work_goal_human_decision",
+	"work_verifier_acknowledge_failure",
+	"work_verifier_dispose",
+	"work_verifier_find",
+	"work_verifier_grep",
+	"work_verifier_inbox",
+	"work_verifier_list",
+	"work_verifier_read",
+]);
+
 function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
 	if (goal?.mode !== "improvement") return;
 	const tool = String(event?.toolName ?? "");
-	const mutating =
-		["edit", "write", "ast_grep_replace", "subagent"].includes(tool) ||
-		/(?:complete_fix|reconcile|dirty_continue)$/i.test(tool) ||
-		(["bash", "hypa_shell"].includes(tool) &&
-			!improvementSafetyShellAllowed(event?.input?.command));
+	const mutating = ["bash", "hypa_shell"].includes(tool)
+		? !improvementSafetyShellAllowed(event?.input?.command)
+		: !IMPROVEMENT_READ_ONLY_TOOLS.has(tool);
 	if (!mutating) return;
 	if (goal.status !== "active")
 		return `Improvement safety blocks ${tool}: the workflow is ${goal.status}. Resume it explicitly before any source mutation.`;

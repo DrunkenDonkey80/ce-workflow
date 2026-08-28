@@ -341,6 +341,22 @@ assert.match(
 	/Improvement safety preflight blocks edit/,
 	"source mutation is coded-blocked while destructive risk is unapproved",
 );
+assert.equal(
+	hooks.tool_call(
+		{ toolName: "read", input: { path: "extensions/work-models.js" } },
+		hookCtx,
+	),
+	undefined,
+	"named read-only tools remain available during safety preflight",
+);
+assert.match(
+	hooks.tool_call(
+		{ toolName: "new_project_writer", input: { path: "generated.txt" } },
+		hookCtx,
+	).reason,
+	/Improvement safety preflight blocks new_project_writer/,
+	"unknown tools default to mutating so newly registered writers cannot bypass preflight",
+);
 mutateStore(root, (store) =>
 	appendWorkNote(
 		store,
