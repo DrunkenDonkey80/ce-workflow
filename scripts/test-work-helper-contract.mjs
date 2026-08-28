@@ -150,6 +150,20 @@ try {
 		["missing --forbid-string value"],
 		"json-assert rejects a missing --forbid-string value",
 	);
+	for (const [args, expected] of [
+		[["--required", "missing"], "missing missing"],
+		[["--equals", "status=NO"], "status != NO"],
+		[["--equals", "status"], "invalid --equals status"],
+		[["--forbid-string", "ok"], "forbidden string ok"],
+	]) {
+		let failure;
+		try {
+			run("json-assert", "assertion.json", ...args);
+		} catch (error) {
+			failure = JSON.parse(String(error.stdout));
+		}
+		assert.deepEqual(failure?.failed_assertions, [expected]);
+	}
 	rmSync(path.join(cwd, "assertion.json"));
 
 	const agentsFile = path.join(cwd, "AGENTS.md");
