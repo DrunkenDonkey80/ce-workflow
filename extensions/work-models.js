@@ -20505,10 +20505,7 @@ async function handleWorkGoalAgentEnd(event, ctx, pi) {
 	}
 	let retrying = false;
 	let compactionInterrupted = false;
-	if (
-		["aborted", "error"].includes(String(assistant?.stopReason ?? "")) ||
-		isWorkGoalUsageLimit(assistant)
-	) {
+	if (["aborted", "error"].includes(String(assistant?.stopReason ?? ""))) {
 		if (isWorkGoalUsageLimit(assistant)) {
 			restoreWorkGoalThinking(pi, goal);
 			const nextRetryAt = Date.now() + workGoalUsageLimitRetryDelayMs();

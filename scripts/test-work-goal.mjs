@@ -4196,6 +4196,29 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	try {
 		process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = "1";
 		await invoke("work-goal", "survive usage windows", ctx);
+		await tempHooks.before_agent_start(
+			{ prompt: sent.at(-1).message, systemPrompt: "base" },
+			ctx,
+		);
+		await tempHooks.agent_start({}, ctx);
+		await tempHooks.agent_end(
+			{
+				messages: [
+					{
+						role: "assistant",
+						stopReason: "stop",
+						message: "The usage limit has been reached",
+						content: [{ type: "text", text: "Continuing work." }],
+					},
+				],
+			},
+			ctx,
+		);
+		assert.doesNotMatch(
+			statuses["work-goal"],
+			/usage wait/,
+			"normal assistant turns cannot trigger usage-limit waiting",
+		);
 		const beforeUsageRetry = sent.length;
 		await tempHooks.before_agent_start(
 			{ prompt: sent.at(-1).message, systemPrompt: "base" },
