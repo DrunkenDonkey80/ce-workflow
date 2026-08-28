@@ -1911,13 +1911,16 @@ try {
 			),
 			/omitted accepted finding paths must remain unchanged/,
 		);
-		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "production\n");
+		execFileSync("git", ["add", "test-gap.js"], { cwd: committedFixCwd });
+		execFileSync("git", ["commit", "-m", "intervening source change"], {
+			cwd: committedFixCwd,
+		});
 		const testOnlyResult = await tempTools.work_verifier_complete_fix.execute(
 			"test-only-fix",
 			{
 				claimId: claims[3].id,
 				findingIds: [findings[3].id],
-				fixPaths: ["test-gap.test.js"],
+				fixPaths: ["test-gap.js", "test-gap.test.js"],
 				verification: ["node focused-test"],
 			},
 			null,

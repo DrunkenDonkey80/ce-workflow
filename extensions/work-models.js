@@ -10120,9 +10120,9 @@ function registerVerifierTriageTools(pi) {
 					findingIds.map((id) => store.findings[id]),
 					paths,
 				);
-			else if (!samePathSet(dirty, paths))
+			else if (dirty.some((file) => !paths.includes(file)))
 				throw new Error(
-					`Accepted fix dirty scope must be exact; found ${dirty.join(", ")}.`,
+					`Accepted fix dirty scope exceeds declared paths; found ${dirty.join(", ")}.`,
 				);
 			if (!dirty.length && !commit)
 				throw new Error(
@@ -10142,7 +10142,7 @@ function registerVerifierTriageTools(pi) {
 			if (dirty.length)
 				try {
 					run(cwd, "git", ["add", "--", ...paths]);
-					ensureOnlyStaged(cwd, paths);
+					ensureOnlyStaged(cwd, dirty);
 					run(cwd, "git", [
 						"commit",
 						"-m",
