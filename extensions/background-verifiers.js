@@ -689,9 +689,9 @@ function customSnapshotPaths(cwd, snapshot, patterns = []) {
 		throw error("not-scheduled", "Verifier checkpoint has no custom paths");
 	return [...selected].sort();
 }
-function assertNoSnapshotSymlinks(cwd, snapshot) {
+function assertNoSnapshotSymlinks(cwd, snapshot, paths) {
 	if (
-		gitLines(cwd, ["ls-tree", "-r", snapshot]).some((line) =>
+		gitLines(cwd, ["ls-tree", "-r", snapshot, "--", ...paths]).some((line) =>
 			/^120000\s/.test(line),
 		)
 	)
@@ -743,7 +743,6 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 				env: verifierCommitEnv(env),
 			});
 		}
-		assertNoSnapshotSymlinks(cwd, snapshot);
 		const parent =
 			dirty && scope !== "commit"
 				? head
@@ -780,6 +779,7 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 							: snapshotPaths(cwd, parent, snapshot, input.paths);
 		if (!paths.length)
 			throw error("not-scheduled", "Verifier checkpoint has no project files");
+		assertNoSnapshotSymlinks(cwd, snapshot, paths);
 		const patchHash = createHash("sha256")
 			.update(`${parent}\0${snapshot}`)
 			.digest("hex");

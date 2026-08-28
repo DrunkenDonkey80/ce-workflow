@@ -1387,6 +1387,14 @@ try {
 		`120000,${committedLinkBlob},unsafe-link`,
 	);
 	stagedDeleteGit("commit", "-qm", "symlink");
+	assert.deepEqual(
+		captureVerifierCheckpoint(stagedDeleteSymlinkCwd, {
+			scope: "custom",
+			paths: ["tracked.txt"],
+		}).paths,
+		["tracked.txt"],
+		"an unrelated tracked symlink does not block a scoped checkpoint",
+	);
 	stagedDeleteGit("rm", "--cached", "unsafe-link");
 	throwsCategory(
 		() => captureVerifierCheckpoint(stagedDeleteSymlinkCwd, { scope: "commit" }),
