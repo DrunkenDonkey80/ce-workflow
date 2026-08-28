@@ -18,6 +18,10 @@ import {
 	driveWorkActionLeases,
 } from "../extensions/work-models.js";
 import {
+	loadVerifierStore,
+	scheduleVerifierBatch,
+} from "../extensions/background-verifiers.js";
+import {
 	createWorkItem,
 	initStore,
 	loadStore,
@@ -75,6 +79,25 @@ function settings(cwd, reviewPolicy) {
 		path.join(cwd, ".pi", "settings.json"),
 		JSON.stringify({ workOrchestrator: { reviewPolicy } }),
 	);
+}
+function acknowledgedVerifierPi() {
+	const listeners = new Set();
+	return {
+		events: {
+			on: (_event, listener) => {
+				listeners.add(listener);
+				return () => listeners.delete(listener);
+			},
+			emit: (_event, request) =>
+				queueMicrotask(() => {
+					for (const listener of listeners)
+						listener({
+							success: true,
+							data: { runId: `verifier-${request.requestId}` },
+						});
+				}),
+		},
+	};
 }
 
 const globalDir = mkdtempSync(path.join(tmpdir(), "work-quality-global-"));
@@ -145,8 +168,10 @@ try {
 			asyncDir: statusDir,
 		});
 		let finishes = 0;
+		let verifierBatch;
 		const result = await driveWorkActionLeases(cwd, {
 			mode,
+			pi: mode === "autonomous" ? acknowledgedVerifierPi() : undefined,
 			session: "same-session",
 			goalStatus: () => "active",
 			targetId: mode === "autonomous" ? "W-1" : undefined,
@@ -155,8 +180,26 @@ try {
 				mutateStore(cwd, (store) =>
 					updateWorkItem(store, "W-1", { status: "closed" }),
 				);
-				git(cwd, "restore", "--", "src/a.js");
-				return { ...state, ok: true, action: "finish-committed" };
+				git(cwd, "add", "src/a.js", ".ce-workflow/work-items.json");
+				git(cwd, "commit", "-qm", "finish fixture");
+				const verifier = scheduleVerifierBatch(cwd, {
+					profiles: [
+						{
+							model: "openai/gpt-5",
+							operations: ["correctness"],
+							thinking: "low",
+						},
+					],
+					paths: ["src/a.js"],
+					scope: "commit",
+				});
+				verifierBatch = verifier.batch?.id;
+				return {
+					...state,
+					ok: true,
+					action: "finish-committed",
+					verifier,
+				};
 			},
 		});
 		assert(
@@ -168,11 +211,22 @@ try {
 				(mode !== "autonomous" || result[0].action === "done-candidate"),
 			`${mode}: settlement rebuilds at most one deterministic resume state (${JSON.stringify(result)})`,
 		);
-		if (mode === "autonomous")
+		if (mode === "autonomous") {
 			assert(
 				loadStore(cwd).items["E-1"].status === "in_progress",
 				"an explicit task target stops without closing or advancing its roadmap",
 			);
+			const verifierJobs = Object.values(loadVerifierStore(cwd).jobs).filter(
+				(job) => job.batchId === verifierBatch,
+			);
+			assert(
+				verifierJobs.length === 1 &&
+					verifierJobs.every(
+						(job) => job.status === "running" && job.launch.status === "running",
+					),
+				"autonomous coded finish launches its queued parallel verifier batch",
+			);
+		}
 	}
 
 	for (const [name, runtime] of [

@@ -9230,6 +9230,7 @@ async function autonomouslyFinishAndResume(cwd, lease, runtime = {}) {
 			reason: finished?.reason ?? "coded-finish-failed",
 			finishState: finished,
 		};
+	await launchFinishVerifierJobs(cwd, finished, runtime.pi);
 	const postFinishFence = autonomousContinuationFence(cwd, lease, runtime);
 	if (postFinishFence)
 		return {
@@ -15466,6 +15467,20 @@ function executeWorkFinishState(cwd, state, currentModel) {
 	}
 }
 
+function launchFinishVerifierJobs(cwd, state, pi) {
+	if (
+		state.verifier?.status !== "queued" ||
+		!pi?.events?.on ||
+		!pi?.events?.emit
+	)
+		return Promise.resolve([]);
+	const serial = !workPerformanceSettings(cwd).parallelBackgroundVerifiers;
+	return launchQueuedVerifierJobs(cwd, createPiSubagentsVerifierAdapter(pi), {
+		serial,
+		initialBatchId: serial ? state.verifier.batch?.id : undefined,
+	}).catch(() => []);
+}
+
 function buildWorkFinishState(cwd, args = "") {
 	let target = String(args).trim();
 	if (!target)
@@ -20747,7 +20762,13 @@ function pauseActiveWorkGoal(reason, pi, ctx, level = "warning") {
 	notify(ctx, `Autonomous orchestrator paused: ${reason}`, level);
 }
 
-async function prepareAutonomousResumeEntry(cwd, state, target, currentModel) {
+async function prepareAutonomousResumeEntry(
+	cwd,
+	state,
+	target,
+	currentModel,
+	pi,
+) {
 	if (state.action !== "finish-ready") return { ok: true, state };
 	const ready = buildWorkFinishState(cwd, state.selectedWorkItem?.id);
 	if (!ready.ok) return { ok: false, state: ready, reason: ready.reason };
@@ -20769,6 +20790,7 @@ async function prepareAutonomousResumeEntry(cwd, state, target, currentModel) {
 			state: finished ?? ready,
 			reason: finished?.reason ?? "coded finish failed",
 		};
+	await launchFinishVerifierJobs(cwd, finished, pi);
 	return {
 		ok: true,
 		state: buildWorkResumeState(cwd, target),
@@ -20880,6 +20902,7 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 			state,
 			target,
 			currentModelId(ctx),
+			pi,
 		);
 		if (!prepared.ok) {
 			pauseActiveWorkGoal(prepared.reason, pi, ctx);
@@ -23722,18 +23745,7 @@ async function executeOrchestratorAction(
 						state,
 						ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
 					);
-				if (state.verifier?.status === "queued") {
-					const serial = !workPerformanceSettings(ctx.cwd)
-						.parallelBackgroundVerifiers;
-					void launchQueuedVerifierJobs(
-						ctx.cwd,
-						createPiSubagentsVerifierAdapter(pi),
-						{
-							serial,
-							initialBatchId: serial ? state.verifier.batch?.id : undefined,
-						},
-					);
-				}
+				void launchFinishVerifierJobs(ctx.cwd, state, pi);
 				rememberRecommendedActions(
 					ctx.cwd,
 					recommendedActions(state),
