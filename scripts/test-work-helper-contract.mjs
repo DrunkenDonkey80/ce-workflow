@@ -33,6 +33,11 @@ const runFrom = (root, ...args) =>
 		encoding: "utf8",
 	});
 const run = (...args) => runFrom(cwd, ...args);
+const head = (root) =>
+	execFileSync("git", ["rev-parse", "HEAD"], {
+		cwd: root,
+		encoding: "utf8",
+	}).trim();
 const failureFrom = (root, ...args) => {
 	try {
 		runFrom(root, ...args);
@@ -642,11 +647,10 @@ try {
 			cwd,
 			encoding: "utf8",
 		}).trim();
-		execFileSync(
-			"git",
-			["push", "-u", "origin", `HEAD:refs/heads/${branch}`],
-			{ cwd, stdio: "ignore" },
-		);
+		execFileSync("git", ["push", "-u", "origin", `HEAD:refs/heads/${branch}`], {
+			cwd,
+			stdio: "ignore",
+		});
 		const pushStore = loadStore(cwd);
 		createWorkItem(pushStore, {
 			id: "TASK-PUSH",
@@ -674,10 +678,7 @@ try {
 				cwd: pushRemote,
 				encoding: "utf8",
 			}).trim(),
-			execFileSync("git", ["rev-parse", "HEAD"], {
-				cwd,
-				encoding: "utf8",
-			}).trim(),
+			head(cwd),
 			"same-root push updates the configured upstream",
 		);
 		execFileSync("git", ["remote", "remove", "origin"], { cwd });
@@ -1148,14 +1149,8 @@ try {
 	});
 	saveStore(ownerRoot, reviewStore);
 	writeFileSync(path.join(executionRoot, "source.js"), "review these bytes\n");
-	const ownerBeforeReview = execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: ownerRoot,
-		encoding: "utf8",
-	}).trim();
-	const executionBeforeReview = execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: executionRoot,
-		encoding: "utf8",
-	}).trim();
+	const ownerBeforeReview = head(ownerRoot);
+	const executionBeforeReview = head(executionRoot);
 	const crossReviewHandoff = failureFrom(
 		ownerRoot,
 		"finish-small",
@@ -1209,18 +1204,12 @@ try {
 		),
 	);
 	assert.equal(
-		execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: ownerRoot,
-			encoding: "utf8",
-		}).trim(),
+		head(ownerRoot),
 		ownerBeforeReview,
 		"review handoff does not commit the owner repository",
 	);
 	assert.equal(
-		execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: executionRoot,
-			encoding: "utf8",
-		}).trim(),
+		head(executionRoot),
 		executionBeforeReview,
 		"review handoff does not commit the execution repository",
 	);
@@ -1253,15 +1242,8 @@ try {
 	const changedExecutionStore = loadStore(executionRoot);
 	changedExecutionStore.items["OTHER-STORE"].title = "Changed execution work";
 	saveStore(executionRoot, changedExecutionStore);
-	const ownerBeforeForeignStore = execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: ownerRoot,
-		encoding: "utf8",
-	}).trim();
-	const executionBeforeForeignStore = execFileSync(
-		"git",
-		["rev-parse", "HEAD"],
-		{ cwd: executionRoot, encoding: "utf8" },
-	).trim();
+	const ownerBeforeForeignStore = head(ownerRoot);
+	const executionBeforeForeignStore = head(executionRoot);
 	assert.match(
 		failureFrom(
 			ownerRoot,
@@ -1276,18 +1258,12 @@ try {
 		/refusing changed \.ce-workflow\/work-items\.json in distinct execution repository/,
 	);
 	assert.equal(
-		execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: ownerRoot,
-			encoding: "utf8",
-		}).trim(),
+		head(ownerRoot),
 		ownerBeforeForeignStore,
 		"foreign store refusal does not commit the owner repository",
 	);
 	assert.equal(
-		execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: executionRoot,
-			encoding: "utf8",
-		}).trim(),
+		head(executionRoot),
 		executionBeforeForeignStore,
 		"foreign store refusal does not commit the execution repository",
 	);
@@ -1307,14 +1283,8 @@ try {
 		path.join(executionRoot, "source.js"),
 		"push must not commit;\n",
 	);
-	const ownerBeforePush = execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: ownerRoot,
-		encoding: "utf8",
-	}).trim();
-	const executionBeforePush = execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: executionRoot,
-		encoding: "utf8",
-	}).trim();
+	const ownerBeforePush = head(ownerRoot);
+	const executionBeforePush = head(executionRoot);
 	assert.match(
 		failureFrom(
 			ownerRoot,
@@ -1330,18 +1300,12 @@ try {
 		/distinct-root --push is not supported/,
 	);
 	assert.equal(
-		execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: ownerRoot,
-			encoding: "utf8",
-		}).trim(),
+		head(ownerRoot),
 		ownerBeforePush,
 		"push refusal occurs before an owner commit",
 	);
 	assert.equal(
-		execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: executionRoot,
-			encoding: "utf8",
-		}).trim(),
+		head(executionRoot),
 		executionBeforePush,
 		"push refusal occurs before an execution commit",
 	);
@@ -1358,10 +1322,7 @@ try {
 	saveStore(ownerRoot, rollbackStore);
 	writeFileSync(path.join(ownerRoot, "unrelated.txt"), "owner dirt\n");
 	writeFileSync(path.join(executionRoot, "source.js"), "retryable bytes\n");
-	const executionBeforeRollback = execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: executionRoot,
-		encoding: "utf8",
-	}).trim();
+	const executionBeforeRollback = head(executionRoot);
 	assert.match(
 		failureFrom(
 			ownerRoot,
@@ -1376,10 +1337,7 @@ try {
 		/finalization rolled back before close: non-work-store files changed during close/,
 	);
 	assert.equal(
-		execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: executionRoot,
-			encoding: "utf8",
-		}).trim(),
+		head(executionRoot),
 		executionBeforeRollback,
 		"post-execution failure restores the execution HEAD",
 	);
@@ -1436,10 +1394,7 @@ try {
 		stdio: "ignore",
 	});
 	writeFileSync(path.join(ignoredExecutionRoot, "source.js"), "after\n");
-	const ignoredOwnerHead = execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: ignoredOwnerRoot,
-		encoding: "utf8",
-	}).trim();
+	const ignoredOwnerHead = head(ignoredOwnerRoot);
 	const ignoredFinished = JSON.parse(
 		runFrom(
 			ignoredOwnerRoot,
@@ -1460,10 +1415,7 @@ try {
 		"closed",
 	);
 	assert.equal(
-		execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: ignoredOwnerRoot,
-			encoding: "utf8",
-		}).trim(),
+		head(ignoredOwnerRoot),
 		ignoredOwnerHead,
 		"ignored owner store remains durable without a metadata commit",
 	);
