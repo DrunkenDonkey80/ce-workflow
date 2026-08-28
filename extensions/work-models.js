@@ -17006,37 +17006,35 @@ function splitFirstWord(value) {
 	return [match?.[1] ?? "", match?.[2] ?? ""];
 }
 
+function stripWorkGoalTokenFlag(value, budget) {
+	const text = String(value ?? "").trim();
+	if (!text.startsWith("--tokens ")) return { text, budget };
+	const [, rawBudget, ...rest] = text.split(/\s+/);
+	const parsed = parseTokenBudget(rawBudget);
+	return parsed === undefined
+		? { text, budget, error: `Invalid token budget: ${rawBudget}` }
+		: { text: rest.join(" ").trim(), budget: parsed };
+}
+
 function parseWorkGoalCommand(args = "") {
-	let trimmed = String(args ?? "").trim();
-	if (!trimmed) return { kind: "status" };
-	let tokenBudget;
-	if (trimmed.startsWith("--tokens ")) {
-		const [, rawBudget, ...rest] = trimmed.split(/\s+/);
-		tokenBudget = parseTokenBudget(rawBudget);
-		if (tokenBudget === undefined)
-			return { kind: "status", error: `Invalid token budget: ${rawBudget}` };
-		trimmed = rest.join(" ").trim();
-		if (!trimmed)
-			return {
-				kind: "status",
-				error: "Usage: autonomous goal --tokens 100k <objective>",
-			};
-	}
+	const leading = stripWorkGoalTokenFlag(args);
+	const trimmed = leading.text;
+	if (!trimmed && leading.budget === undefined) return { kind: "status" };
+	if (leading.error) return { kind: "status", error: leading.error };
+	const tokenBudget = leading.budget;
+	if (!trimmed)
+		return {
+			kind: "status",
+			error: "Usage: autonomous goal --tokens 100k <objective>",
+		};
 	const [command, rest] = splitFirstWord(trimmed);
 	if (command === "edit") {
-		let editObjective = rest.trim();
-		let editBudget = tokenBudget;
-		if (editObjective.startsWith("--tokens ")) {
-			const [, rawBudget, ...editRest] = editObjective.split(/\s+/);
-			editBudget = parseTokenBudget(rawBudget);
-			if (editBudget === undefined)
-				return { kind: "status", error: `Invalid token budget: ${rawBudget}` };
-			editObjective = editRest.join(" ").trim();
-		}
+		const edit = stripWorkGoalTokenFlag(rest, tokenBudget);
+		if (edit.error) return { kind: "status", error: edit.error };
 		return {
 			kind: "edit",
-			objective: editObjective,
-			...(editBudget === undefined ? {} : { tokenBudget: editBudget }),
+			objective: edit.text,
+			...(edit.budget === undefined ? {} : { tokenBudget: edit.budget }),
 		};
 	}
 	if (
