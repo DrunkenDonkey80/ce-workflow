@@ -302,9 +302,7 @@ mutateStore(root, (store) =>
 			{
 				kind: "self-improvement-report",
 				bundle: ".pi/self-improvement-reports/linked-evidence",
-				files: [
-					{ file: "linked/01-log.txt", bytes: log.length, sha256: hash },
-				],
+				files: [{ file: "linked/01-log.txt", bytes: log.length, sha256: hash }],
 			},
 		],
 	}),
@@ -413,13 +411,25 @@ assert(
 	!menuLabels.some((label) => label.includes("Claude account switcher")),
 	"cswap entry hidden when the binary is absent",
 );
-mutateStore(root, (store) =>
+mutateStore(root, (store) => {
 	appendWorkNote(
 		store,
 		"SI-1.1",
 		"wo:improvement-safety BLOCKED broad automation behavior may change",
-	),
-);
+	);
+	createWorkItem(store, {
+		id: "SI-1.4",
+		type: "task",
+		status: "open",
+		parentId: "SI-1",
+		title: "Second safety-scoped improvement",
+	});
+	appendWorkNote(
+		store,
+		"SI-1.4",
+		"wo:improvement-safety BLOCKED separate persistent-data risk",
+	);
+});
 await executeOrchestratorAction("work-improve", "SI-1", hookCtx, pi);
 assert.match(
 	hooks.tool_call(
@@ -532,10 +542,10 @@ hooks.tool_result(
 	},
 	hookCtx,
 );
-const approveRisk = (toolCallId) => {
+const approveRisk = (toolCallId, ids = "SI-1.1") => {
 	const input = {
 		question: "Allow the broad automation behavior change?",
-		context: "Improvement safety approval IDs: SI-1.1",
+		context: `Improvement safety approval IDs: ${ids}`,
 		options: [
 			{ title: "Approve with documented rollback" },
 			{ title: "Keep blocked" },
@@ -564,13 +574,29 @@ mutateStore(root, (store) =>
 		"wo:improvement-safety APPROVED recorded user decision; rollback by reverting commit",
 	),
 );
+assert.match(
+	hooks.tool_call(
+		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		hookCtx,
+	).reason,
+	/SI-1\.4/,
+	"approval for one explicitly named risk cannot authorize another snapshot item",
+);
+approveRisk("second-scoped-approval", "SI-1.4");
+mutateStore(root, (store) =>
+	appendWorkNote(
+		store,
+		"SI-1.4",
+		"wo:improvement-safety APPROVED separate risk and rollback",
+	),
+);
 assert.equal(
 	hooks.tool_call(
 		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
 		hookCtx,
 	),
 	undefined,
-	"the matching scoped approval unlocks source mutation",
+	"all snapshot items require their own safe or approved disposition",
 );
 mutateStore(root, (store) =>
 	appendWorkNote(
@@ -603,9 +629,10 @@ assert.equal(
 	undefined,
 	"a new scoped decision covers the changed risk",
 );
-mutateStore(root, (store) =>
-	updateWorkItem(store, "SI-1.1", { status: "closed" }),
-);
+mutateStore(root, (store) => {
+	updateWorkItem(store, "SI-1.1", { status: "closed" });
+	updateWorkItem(store, "SI-1.4", { status: "closed" });
+});
 await tools.work_goal_complete.execute(
 	"improvement-complete",
 	{
