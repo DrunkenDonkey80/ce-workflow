@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -56,6 +56,14 @@ try {
 			compact[0].description === undefined &&
 			compact[0].dependencies,
 		"default child summaries keep planning identity while bounding output",
+	);
+
+	const searchTarget = path.join(fixture.cwd, "search-target.txt");
+	writeFileSync(searchTarget, "unique-attribution-token\n");
+	const search = run("search-summary", "unique-attribution-token", searchTarget);
+	assert(
+		search.matches_by_file[searchTarget] === 1 && !search.summary.includes("\0"),
+		"search summaries preserve absolute filenames and readable evidence",
 	);
 
 	const targeted = run("work-children-summary", "E-1", "--status", "closed");

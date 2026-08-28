@@ -1439,6 +1439,8 @@ try {
 			"-i",
 			"-m",
 			max,
+			"--with-filename",
+			"--field-match-separator=\\x00",
 			query,
 			...(paths.length ? paths : ["."]),
 		];
@@ -1450,14 +1452,17 @@ try {
 			raw = String(error.stdout ?? "");
 			exitCode = Number.isInteger(error.status) ? error.status : 2;
 		}
+		const encodedLines = raw.split(/\r?\n/).filter(Boolean);
+		const byFile = {};
+		for (const line of encodedLines) {
+			const separator = line.indexOf("\0");
+			const file = separator < 0 ? "<unknown>" : line.slice(0, separator);
+			byFile[file] = (byFile[file] ?? 0) + 1;
+		}
+		raw = raw.replaceAll("\0", ":");
 		const fullLogPath =
 			raw.length > bytes ? artifact(command, "txt", raw) : undefined;
 		const lines = raw.split(/\r?\n/).filter(Boolean);
-		const byFile = {};
-		for (const line of lines) {
-			const file = line.split(":", 1)[0] || "<unknown>";
-			byFile[file] = (byFile[file] ?? 0) + 1;
-		}
 		const capped = capText(raw, bytes);
 		let status = exitCode > 1 ? "ERROR" : "PASS";
 		if (exitCode <= 1 && lines.length) status = "found";
