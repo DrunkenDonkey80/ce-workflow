@@ -2684,8 +2684,9 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 				},
 			],
 		},
-		ctx,
+		{ ...ctx, hasPendingMessages: () => true },
 	);
+	assert.equal(sent.length, 1, "pending messages defer goal continuation");
 	await settle();
 	assert.equal(compactions.length, 1, "work-goal compacts before continuing");
 	assert.match(compactions[0].customInstructions, /work-goal microcompact/);

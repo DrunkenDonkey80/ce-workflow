@@ -25104,6 +25104,7 @@ export default function workModelsExtension(pi) {
 		}
 		reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 		await presentPendingVerifierBatches(ctx.cwd, ctx, pi);
+		await flushWorkGoalContinuationRetry(ctx, pi);
 		const manualMicrocompactStarted =
 			manualMicrocompactPending &&
 			ctx.isIdle?.() !== false &&

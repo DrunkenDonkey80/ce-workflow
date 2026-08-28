@@ -122,7 +122,8 @@ function sameCommitHash(left, right) {
 	return (
 		/^[0-9a-f]{7,64}$/i.test(String(left ?? "")) &&
 		/^[0-9a-f]{7,64}$/i.test(String(right ?? "")) &&
-		(String(left).startsWith(String(right)) || String(right).startsWith(String(left)))
+		(String(left).startsWith(String(right)) ||
+			String(right).startsWith(String(left)))
 	);
 }
 function batchIsVerifierFixCommit(store, batch) {
