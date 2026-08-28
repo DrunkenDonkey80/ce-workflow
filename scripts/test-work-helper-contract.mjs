@@ -219,6 +219,64 @@ try {
 		"work-runs",
 		"repository-mutation.lock",
 	);
+	const invalidFinishFile = (option, file) =>
+		failure(
+			"finish-task",
+			"TASK-1",
+			"--max-files",
+			"2",
+			"--message",
+			"reject undeclared path",
+			...verifyArgs,
+			option,
+			file,
+		);
+	assert.match(
+		invalidFinishFile("--implementation-file", path.join(cwd, "source.js")),
+		/invalid implementation file/,
+		"absolute implementation paths are rejected",
+	);
+	const outsideImplementation = path.join(
+		path.dirname(cwd),
+		`${path.basename(cwd)}-outside.js`,
+	);
+	try {
+		writeFileSync(outsideImplementation, "export default 'outside';\n");
+		assert.match(
+			invalidFinishFile(
+				"--implementation-file",
+				`../${path.basename(outsideImplementation)}`,
+			),
+			/invalid implementation file/,
+			"parent escapes are rejected even when the target exists",
+		);
+	} finally {
+		rmSync(outsideImplementation, { force: true });
+	}
+	assert.match(
+		invalidFinishFile(
+			"--implementation-file",
+			".ce-workflow/work-runs/verifiers/state.json",
+		),
+		/invalid implementation file/,
+		"workflow runtime paths cannot be declared as implementation files",
+	);
+	mkdirSync(path.join(cwd, "docs", "evidence", "TASK-1"), {
+		recursive: true,
+	});
+	const wrongEvidence = "docs/evidence/TASK-1/unsafe.js";
+	writeFileSync(path.join(cwd, wrongEvidence), "export default true;\n");
+	assert.match(
+		invalidFinishFile("--evidence-file", wrongEvidence),
+		/invalid evidence file/,
+		"evidence files reject executable extensions",
+	);
+	rmSync(path.join(cwd, wrongEvidence));
+	assert.match(
+		invalidFinishFile("--evidence-file", "source.js"),
+		/invalid evidence file/,
+		"evidence files must stay under the task-owned evidence prefix",
+	);
 	assert.match(
 		failure(
 			"finish-task",
@@ -468,6 +526,39 @@ try {
 		}),
 		/work-runs/,
 		"workflow runtime files never enter the task commit",
+	);
+
+	const ownedFileStore = loadStore(cwd);
+	createWorkItem(ownedFileStore, {
+		id: "TASK-OWNED",
+		type: "task",
+		status: "open",
+		title: "Commit a declared implementation file",
+		acceptance: "The declared task-owned file is reviewed and committed.",
+	});
+	saveStore(cwd, ownedFileStore);
+	writeFileSync(path.join(cwd, "owned-new.js"), "export default 'owned';\n");
+	const ownedFinished = JSON.parse(
+		run(
+			"finish-task",
+			"TASK-OWNED",
+			"--max-files",
+			"1",
+			"--message",
+			"commit declared implementation",
+			...verifyArgs,
+			"--implementation-file",
+			"owned-new.js",
+		),
+	);
+	assert.equal(ownedFinished.status, "PASS");
+	assert.match(
+		execFileSync("git", ["show", "--pretty=", "--name-only", "HEAD"], {
+			cwd,
+			encoding: "utf8",
+		}),
+		/^owned-new\.js$/m,
+		"the accepted declared implementation file is committed",
 	);
 
 	const storeOnly = loadStore(cwd);
