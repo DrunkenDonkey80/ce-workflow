@@ -853,6 +853,12 @@ try {
 		/independent review required/,
 		"an option-looking value cannot shadow the real verification option",
 	);
+	const multilineReviewStore = loadStore(cwd);
+	multilineReviewStore.items["TASK-3"].notes.push(
+		"wo:review FAIL\nunrelated text",
+		'wo:residual-fix PASS {"dispositions":[{"finding":"unrelated text","fix":"not applicable","evidence":"not applicable"}]}',
+	);
+	saveStore(cwd, multilineReviewStore);
 	assert.match(
 		failure(
 			"finish-task",
@@ -865,7 +871,7 @@ try {
 			"--reviewed",
 		),
 		/requires durable wo:review PASS/,
-		"review protocol markers embedded in multiline notes are ignored",
+		"review protocol markers and FAIL payloads embedded in multiline notes are ignored",
 	);
 	saveStore(cwd, mechanicalStore);
 	const mechanicalDispositionStore = loadStore(cwd);

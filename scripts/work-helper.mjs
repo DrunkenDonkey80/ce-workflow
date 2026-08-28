@@ -329,11 +329,11 @@ function reviewScope(task) {
 function targetedReviewFindings(task) {
 	const notes = noteEntriesOf(task);
 	const index = notes.findLastIndex((note) =>
-		/^wo:review FAIL(?:\s*-\s*|\s+)/i.test(note),
+		/^wo:review FAIL(?:[ \t]*-[ \t]*|[ \t]+)/i.test(note),
 	);
 	if (index < 0) return undefined;
 	const payload = notes[index]
-		.replace(/^wo:review FAIL(?:\s*-\s*|\s+)/i, "")
+		.replace(/^wo:review FAIL(?:[ \t]*-[ \t]*|[ \t]+)/i, "")
 		.trim();
 	try {
 		const value = JSON.parse(payload);
