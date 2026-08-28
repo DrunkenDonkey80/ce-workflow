@@ -10290,6 +10290,16 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 
 export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
 	if (!input.before || !input.after || input.before === input.after) return null;
+	try {
+		if (
+			Object.values(loadVerifierStore(cwd).fixes).some(
+				(fix) => fix.commit === input.after,
+			)
+		)
+			return null;
+	} catch (error) {
+		if (error?.category !== "missing") throw error;
+	}
 	const paths = run(cwd, "git", [
 		"diff",
 		"--name-only",
@@ -18953,18 +18963,6 @@ function scheduleActiveWorkGoalTurnVerifiers(ctx, pi) {
 		return null;
 	const after = gitSnapshot(ctx.cwd).head;
 	if (!after || after === started.head) return null;
-	try {
-		if (
-			Object.values(loadVerifierStore(ctx.cwd).fixes).some(
-				(fix) => fix.commit === after,
-			)
-		) {
-			activeWorkGoalGitBefore = { cwd: ctx.cwd, head: after };
-			return null;
-		}
-	} catch (error) {
-		if (error?.category !== "missing") throw error;
-	}
 	const verifier = scheduleCommittedRunVerifiers(ctx.cwd, pi, {
 		before: started.head,
 		after,
