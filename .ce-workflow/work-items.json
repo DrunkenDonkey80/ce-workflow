@@ -5486,13 +5486,15 @@
         "self-improvement"
       ],
       "notes": [
-        "wo:improvement-safety SAFE related-distinct stale test-contract investigation; production behavior remains unchanged and any fix is a reversible focused test update. Rollback by reverting the eventual test commit; leave open for the next snapshot."
+        "wo:improvement-safety SAFE related-distinct stale test-contract investigation; production behavior remains unchanged and any fix is a reversible focused test update. Rollback by reverting the eventual test commit; leave open for the next snapshot.",
+        "wo:improvement-reconciliation canonical work-2.report-35fa7696-393d-4a14-8074-9f7d0df535d5; already fixed by commit 893041f (production review dispositions cannot bypass review); verified node scripts/test-work-optimization-helpers.mjs PASS at 5889e52.",
+        "Closed after verified coverage by canonical commit 893041f; optimization-helper regression passes."
       ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After correcting the snapshot's obsolete shard-traversal assertion, `node scripts/test-work-optimization-helpers.mjs` advanced to ",
       "type": "task",
-      "updatedAt": "2026-08-26T06:34:38.961Z"
+      "updatedAt": "2026-08-28T21:31:52.857Z"
     },
     "work-2.report-379146f1-797f-4fae-adc5-37e711eddd90": {
       "createdAt": "2026-08-24T21:18:01.707Z",
@@ -7788,12 +7790,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE already-current coded continuation claim path; processing only verifies existing behavior and reconciles this report, with no source, API, schema, or automation-default mutation. Rollback by reopening the work item and reverting only its reconciliation commit.",
+        "wo:improvement-reconciliation canonical work-2.report-81427536-2020-4d7d-a887-0953cbc2144b; already fixed by commit c52b4d4 (goal resume claims verifier triage before continuation); verified node scripts/test-work-goal.mjs PASS at 5889e52.",
+        "Closed after verified coverage by canonical commit c52b4d4; work-goal regression passes."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: After work_goal_complete materialized verifier groups for the active catch-up snapshot, it rejected completion with findings await",
       "type": "task",
-      "updatedAt": "2026-08-28T14:25:19.140Z"
+      "updatedAt": "2026-08-28T21:31:57.632Z"
     },
     "work-2.report-84823a57-09e1-4180-a7a5-d34657792d31": {
       "createdAt": "2026-08-24T18:42:30.099Z",
@@ -12375,7 +12381,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-28T15:12:17.006Z"
+    "updatedAt": "2026-08-28T21:31:57.633Z"
   },
   "schemaVersion": 1
 }
