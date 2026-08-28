@@ -17223,7 +17223,7 @@ function validateImprovementEvidence(cwd, issue) {
 	return { valid: problems.length === 0, problems, bundles: records.length };
 }
 
-function buildWorkImproveState(cwd, target = "", options = {}) {
+function resolveWorkImproveTarget(cwd, target = "", options = {}) {
 	const settings = options.settings ?? readEffectiveSettings(cwd);
 	if (!workResumeSettings(cwd, settings).selfImproving)
 		return errorState(
@@ -17253,6 +17253,13 @@ function buildWorkImproveState(cwd, target = "", options = {}) {
 				? `${target} is not the active ${SELF_IMPROVEMENT_EPIC_TITLE} roadmap.`
 				: `No unique active ${SELF_IMPROVEMENT_EPIC_TITLE} roadmap exists.`,
 		);
+	return { ok: true, sourceCwd, epic };
+}
+
+function buildWorkImproveState(cwd, target = "", options = {}) {
+	const resolved = resolveWorkImproveTarget(cwd, target, options);
+	if (!resolved.ok) return resolved;
+	const { sourceCwd, epic } = resolved;
 	const reports = improvementWorkItems(cwd, epic.id).map((issue) => ({
 		...issueSummary(issue),
 		description: String(issue.description ?? ""),
@@ -17508,18 +17515,8 @@ async function handleWorkImproveCommand(args, pi, ctx, selected = "") {
 
 function workImproveCount(cwd, target = "") {
 	try {
-		const settings = readEffectiveSettings(cwd);
-		const source = resolveReportingSource({
-			cwd,
-			packageRoot: WORKFLOW_REPO_DIR,
-			settings,
-		}).sourceCwd;
-		const epic = selfImprovementRoadmap(cwd, target);
-		return workResumeSettings(cwd, settings).selfImproving &&
-			sameCheckout(cwd, source) &&
-			epic
-			? improvementWorkItems(cwd, epic.id).length
-			: 0;
+		const resolved = resolveWorkImproveTarget(cwd, target);
+		return resolved.ok ? improvementWorkItems(cwd, resolved.epic.id).length : 0;
 	} catch {
 		return 0;
 	}
