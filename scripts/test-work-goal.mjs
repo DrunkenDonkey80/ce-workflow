@@ -4195,39 +4195,42 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 
 	const oldUsageDelay = process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS;
-	process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = "1";
-	await invoke("work-goal", "survive usage windows", ctx);
-	const beforeUsageRetry = sent.length;
-	await tempHooks.before_agent_start(
-		{ prompt: sent.at(-1).message, systemPrompt: "base" },
-		ctx,
-	);
-	await tempHooks.agent_start({}, ctx);
-	await tempHooks.agent_end(
-		{
-			messages: [
-				{
-					role: "assistant",
-					stopReason: "error",
-					content: [
-						{
-							type: "text",
-							text: "Error: Codex error: The usage limit has been reached",
-						},
-					],
-				},
-			],
-		},
-		ctx,
-	);
-	await settle();
-	assert.equal(statuses["work-goal"], "usage wait #0");
-	await new Promise((resolve) => setTimeout(resolve, 20));
-	assert.equal(sent.length, beforeUsageRetry + 1);
-	assert.match(sent.at(-1).message, /usage\/rate limit/);
-	if (oldUsageDelay === undefined)
-		delete process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS;
-	else process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = oldUsageDelay;
+	try {
+		process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = "1";
+		await invoke("work-goal", "survive usage windows", ctx);
+		const beforeUsageRetry = sent.length;
+		await tempHooks.before_agent_start(
+			{ prompt: sent.at(-1).message, systemPrompt: "base" },
+			ctx,
+		);
+		await tempHooks.agent_start({}, ctx);
+		await tempHooks.agent_end(
+			{
+				messages: [
+					{
+						role: "assistant",
+						stopReason: "error",
+						content: [
+							{
+								type: "text",
+								text: "Error: Codex error: The usage limit has been reached",
+							},
+						],
+					},
+				],
+			},
+			ctx,
+		);
+		await settle();
+		assert.equal(statuses["work-goal"], "usage wait #0");
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		assert.equal(sent.length, beforeUsageRetry + 1);
+		assert.match(sent.at(-1).message, /usage\/rate limit/);
+	} finally {
+		if (oldUsageDelay === undefined)
+			delete process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS;
+		else process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS = oldUsageDelay;
+	}
 	await invoke("work-goal", "clear", ctx);
 
 	const lifecycleVerifierCwd = mkdtempSync(
