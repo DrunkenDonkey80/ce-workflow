@@ -2412,12 +2412,7 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 			if (note && state?.handoffPrompt)
 				appendTelemetryNote(ctx.cwd, summary.workItemId, event, file);
 			const awaitingAgent =
-				Boolean(state?.handoffPrompt) &&
-				!state?.handoffFailed &&
-				(Boolean(state?.inlineWork) ||
-					Boolean(state?.directHandoff) ||
-					Boolean(state?.handoffPending) ||
-					(!state?.directHandoff && !state?.handoffFailed));
+				Boolean(state?.handoffPrompt) && !state?.handoffFailed;
 			if (!awaitingAgent)
 				completeWorkflowOnce(
 					ctx.cwd,
