@@ -4375,12 +4375,70 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			cwd: lifecycleVerifierCwd,
 			stdio: "ignore",
 		});
-		await tempHooks.tool_execution_end(
-			{
-				toolName: "work_verifier_complete_fix",
-				result: { details: { origin: "verifier-fix" } },
-			},
-			lifecycleCtx,
+		const lifecycleVerifierFixCommit = execFileSync(
+			"git",
+			["rev-parse", "HEAD"],
+			{ cwd: lifecycleVerifierCwd, encoding: "utf8" },
+		).trim();
+		const lifecycleJob = Object.values(
+			loadVerifierStore(lifecycleVerifierCwd).jobs,
+		)[0];
+		const lifecycleFixReport = mutateVerifierStore(
+			lifecycleVerifierCwd,
+			(store) =>
+				recordOperationResult(store, {
+					jobId: lifecycleJob.id,
+					operation: "correctness",
+					outcome: "findings",
+				}),
+		);
+		const lifecycleFixFinding = mutateVerifierStore(
+			lifecycleVerifierCwd,
+			(store) =>
+				addFinding(store, {
+					reportId: lifecycleFixReport.id,
+					operation: lifecycleFixReport.operation,
+					model: lifecycleFixReport.model,
+					checkpoint: lifecycleFixReport.checkpoint,
+					path: "source.js",
+					startLine: 1,
+					endLine: 1,
+					category: "correctness",
+					severity: "medium",
+					rationale: "fixture verifier fix",
+					evidence: "source.js changed",
+					suggestedAction: "keep the fix",
+				}),
+		);
+		const lifecycleFixGroup = mutateVerifierStore(
+			lifecycleVerifierCwd,
+			(store) => addGroup(store, { findingIds: [lifecycleFixFinding.id] }),
+		);
+		const lifecycleFixClaim = mutateVerifierStore(
+			lifecycleVerifierCwd,
+			(store) =>
+				claimGroup(store, {
+					groupId: lifecycleFixGroup.id,
+					ownerSession: "lifecycle-session",
+				}),
+		);
+		mutateVerifierStore(lifecycleVerifierCwd, (store) =>
+			recordTriageDisposition(store, {
+				claimId: lifecycleFixClaim.id,
+				ownerSession: "lifecycle-session",
+				findingId: lifecycleFixFinding.id,
+				disposition: "accepted",
+				reason: "fixture accepted verifier fix",
+			}),
+		);
+		mutateVerifierStore(lifecycleVerifierCwd, (store) =>
+			completeAcceptedFix(store, {
+				claimId: lifecycleFixClaim.id,
+				ownerSession: "lifecycle-session",
+				findingIds: [lifecycleFixFinding.id],
+				commit: lifecycleVerifierFixCommit,
+				verification: ["fixture verification"],
+			}),
 		);
 		await tempHooks.agent_end(
 			{

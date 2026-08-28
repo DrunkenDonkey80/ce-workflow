@@ -2411,8 +2411,7 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 			const file = recordWorkTelemetry(ctx.cwd, event);
 			if (note && state?.handoffPrompt)
 				appendTelemetryNote(ctx.cwd, summary.workItemId, event, file);
-			const awaitingAgent =
-				Boolean(state?.handoffPrompt) && !state?.handoffFailed;
+			const awaitingAgent = Boolean(state?.handoffPrompt) && !state?.handoffFailed;
 			if (!awaitingAgent)
 				completeWorkflowOnce(
 					ctx.cwd,
@@ -18963,6 +18962,18 @@ function scheduleActiveWorkGoalTurnVerifiers(ctx, pi) {
 		return null;
 	const after = gitSnapshot(ctx.cwd).head;
 	if (!after || after === started.head) return null;
+	try {
+		if (
+			Object.values(loadVerifierStore(ctx.cwd).fixes).some(
+				(fix) => fix.commit === after,
+			)
+		) {
+			activeWorkGoalGitBefore = { cwd: ctx.cwd, head: after };
+			return null;
+		}
+	} catch (error) {
+		if (error?.category !== "missing") throw error;
+	}
 	const verifier = scheduleCommittedRunVerifiers(ctx.cwd, pi, {
 		before: started.head,
 		after,
