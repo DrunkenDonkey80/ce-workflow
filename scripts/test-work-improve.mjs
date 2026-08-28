@@ -2,7 +2,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -227,6 +233,88 @@ const tampered = buildWorkImproveState(root, "SI-1", options);
 assert.equal(tampered.ok, true);
 assert.equal(tampered.reports[0].evidence.valid, false);
 assert.match(tampered.reports[0].evidence.problems.join("\n"), /sha256/i);
+
+mutateStore(root, (store) =>
+	updateWorkItem(store, "SI-1.1", {
+		evidence: [
+			{
+				kind: "self-improvement-report",
+				bundle: "../outside",
+				files: [],
+			},
+		],
+	}),
+);
+const unsafeBundle = buildWorkImproveState(root, "SI-1", options);
+assert.equal(unsafeBundle.reports[0].evidence.valid, false);
+assert.match(
+	unsafeBundle.reports[0].evidence.problems.join("\n"),
+	/unsafe bundle path/i,
+);
+
+const outsideBundle = mkdtempSync(path.join(tmpdir(), "work-improve-escape-"));
+writeFileSync(
+	path.join(outsideBundle, "manifest.json"),
+	JSON.stringify({ version: 1, files: [] }),
+);
+symlinkSync(
+	outsideBundle,
+	path.join(root, ".pi", "self-improvement-reports", "escaped"),
+	"junction",
+);
+mutateStore(root, (store) =>
+	updateWorkItem(store, "SI-1.1", {
+		evidence: [
+			{
+				kind: "self-improvement-report",
+				bundle: ".pi/self-improvement-reports/escaped",
+				files: [],
+			},
+		],
+	}),
+);
+const escapedManifest = buildWorkImproveState(root, "SI-1", options);
+assert.equal(escapedManifest.reports[0].evidence.valid, false);
+assert.match(
+	escapedManifest.reports[0].evidence.problems.join("\n"),
+	/manifest escapes report root/i,
+);
+
+const linkedBundle = path.join(
+	root,
+	".pi",
+	"self-improvement-reports",
+	"linked-evidence",
+);
+mkdirSync(linkedBundle);
+writeFileSync(
+	path.join(linkedBundle, "manifest.json"),
+	JSON.stringify({
+		version: 1,
+		files: [{ file: "linked/01-log.txt", bytes: log.length, sha256: hash }],
+	}),
+);
+writeFileSync(path.join(outsideBundle, "01-log.txt"), log);
+symlinkSync(outsideBundle, path.join(linkedBundle, "linked"), "junction");
+mutateStore(root, (store) =>
+	updateWorkItem(store, "SI-1.1", {
+		evidence: [
+			{
+				kind: "self-improvement-report",
+				bundle: ".pi/self-improvement-reports/linked-evidence",
+				files: [
+					{ file: "linked/01-log.txt", bytes: log.length, sha256: hash },
+				],
+			},
+		],
+	}),
+);
+const escapedEvidence = buildWorkImproveState(root, "SI-1", options);
+assert.equal(escapedEvidence.reports[0].evidence.valid, false);
+assert.match(
+	escapedEvidence.reports[0].evidence.problems.join("\n"),
+	/evidence escapes report root/i,
+);
 
 assert.equal(
 	buildWorkImproveState(root, "SI-1", {
