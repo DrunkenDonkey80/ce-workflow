@@ -152,17 +152,14 @@ try {
 	const endMarker = "<!-- END COMPOUND PI TOOL MAP -->";
 	const validInstructions = `before\n${beginMarker}\nlegacy\n${endMarker}\nafter\n`;
 	writeFileSync(agentsFile, validInstructions);
-	const legacyPreview = JSON.parse(run("legacy-instructions-preview", "AGENTS.md"));
+	const legacyPreview = JSON.parse(
+		run("legacy-instructions-preview", "AGENTS.md"),
+	);
 	assert.equal(legacyPreview.status, "preview");
 	assert.equal(legacyPreview.result, "before\nafter\n");
 	assert.equal(
 		JSON.parse(
-			run(
-				"legacy-instructions-apply",
-				"AGENTS.md",
-				"--confirm",
-				"stale",
-			),
+			run("legacy-instructions-apply", "AGENTS.md", "--confirm", "stale"),
 		).reason,
 		"confirmation-mismatch",
 	);
@@ -185,7 +182,10 @@ try {
 	assert.equal(readFileSync(agentsFile, "utf8"), "before\nafter\n");
 	for (const [text, reason] of [
 		[`prefix ${beginMarker}\n${endMarker}\n`, "malformed-markers"],
-		[`${beginMarker}\n${endMarker}\n${beginMarker}\n${endMarker}\n`, "duplicated-markers"],
+		[
+			`${beginMarker}\n${endMarker}\n${beginMarker}\n${endMarker}\n`,
+			"duplicated-markers",
+		],
 		[`${endMarker}\n${beginMarker}\n`, "reversed-markers"],
 	]) {
 		writeFileSync(agentsFile, text);
