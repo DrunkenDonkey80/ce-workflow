@@ -187,8 +187,7 @@ function legacyInstructionsPreview(requestedFile = "AGENTS.md") {
 		return { status: "refused", reason: "not-an-AGENTS-file", file };
 	if (pathEscapes(cwd, file))
 		return { status: "refused", reason: "outside-repository", file };
-	if (!existsSync(file))
-		return { status: "no-op", reason: "file-absent", file };
+	if (!existsSync(file)) return { status: "no-op", reason: "file-absent", file };
 	file = realpathSync(file);
 	if (pathEscapes(realpathSync(cwd), file))
 		return { status: "refused", reason: "outside-repository", file };
@@ -540,9 +539,7 @@ async function runVerification(command, shards = [], root = cwd) {
 		const result = await runVerificationCommand(command, root);
 		return { output: String(result.stdout ?? ""), manifest: null };
 	}
-	const authoritativeCommand = shards
-		.map((shard) => shard.command)
-		.join(" && ");
+	const authoritativeCommand = shards.map((shard) => shard.command).join(" && ");
 	if (command !== authoritativeCommand)
 		throw new Error(
 			"declared verification shards must exactly compose the authoritative --verify command in order",
@@ -552,8 +549,7 @@ async function runVerification(command, shards = [], root = cwd) {
 		const settings = JSON.parse(
 			readFileSync(
 				path.join(
-					process.env.PI_CODING_AGENT_DIR ||
-						path.join(os.homedir(), ".pi", "agent"),
+					process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"),
 					"settings.json",
 				),
 				"utf8",
@@ -580,8 +576,7 @@ async function runVerification(command, shards = [], root = cwd) {
 	return {
 		output: batch.manifest.shards
 			.map(
-				(shard) =>
-					`${shard.id}:${shard.status}:${shard.outputHash.slice(0, 12)}`,
+				(shard) => `${shard.id}:${shard.status}:${shard.outputHash.slice(0, 12)}`,
 			)
 			.join(", "),
 		manifest: batch.manifest,
@@ -671,10 +666,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		throw new Error(
 			"task-owned evidence is limited to 100 files and 100 MiB per finish-task run",
 		);
-	const evidenceFileSet = new Set([
-		...evidenceFiles,
-		...automaticEvidenceFiles,
-	]);
+	const evidenceFileSet = new Set([...evidenceFiles, ...automaticEvidenceFiles]);
 	const formatted = formatPendingFiles({
 		cwd: executionRoot,
 		files: gitStatusPaths(executionRoot),
@@ -686,8 +678,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	const unexpectedStaged = stagedBefore.filter((file) => {
 		const normalized = normalizeRepositoryPath(file);
 		return (
-			!normalized.startsWith(".ce-workflow/") &&
-			!evidenceFileSet.has(normalized)
+			!normalized.startsWith(".ce-workflow/") && !evidenceFileSet.has(normalized)
 		);
 	});
 	if (unexpectedStaged.length)
@@ -779,13 +770,11 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 			...(verificationManifest
 				? {
 						gateVersion: verificationManifest.gateVersion,
-						shards: verificationManifest.shards.map(
-							({ id, status, outputHash }) => ({
-								id,
-								status,
-								outputHash,
-							}),
-						),
+						shards: verificationManifest.shards.map(({ id, status, outputHash }) => ({
+							id,
+							status,
+							outputHash,
+						})),
 					}
 				: {}),
 		};
@@ -797,8 +786,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	const unrecognized = tidy.unrecognized.filter((file) => {
 		const normalized = normalizeRepositoryPath(file);
 		return (
-			!evidenceFileSet.has(normalized) &&
-			!ownedImplementationFiles.has(normalized)
+			!evidenceFileSet.has(normalized) && !ownedImplementationFiles.has(normalized)
 		);
 	});
 	if (unrecognized.length)
@@ -851,9 +839,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 			.split(/\r?\n/)
 			.filter(Boolean),
 	);
-	for (const file of implementationFiles.filter((item) =>
-		untracked.has(item),
-	)) {
+	for (const file of implementationFiles.filter((item) => untracked.has(item))) {
 		const absolute = path.join(executionRoot, file);
 		if (!existsSync(absolute)) continue;
 		changedLines +=
@@ -965,10 +951,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	if (!staged.length)
 		throw new Error("no staged changes after filtering runtime files");
 	const executionHeadBefore = git(["rev-parse", "HEAD"], executionRoot).trim();
-	const ownerHeadBefore = git(
-		["rev-parse", "HEAD"],
-		ownerRepositoryRoot,
-	).trim();
+	const ownerHeadBefore = git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim();
 	const canonical = storePath(cwd);
 	const canonicalBefore = existsSync(canonical)
 		? readFileSync(canonical, "utf8")
@@ -1092,9 +1075,7 @@ async function finishTask() {
 	);
 	const ownerRoot = canonicalGitRoot(cwd, "owner root");
 	const lockRoots =
-		executionRoot === ownerRoot
-			? [ownerRoot]
-			: [ownerRoot, executionRoot].sort();
+		executionRoot === ownerRoot ? [ownerRoot] : [ownerRoot, executionRoot].sort();
 	const mutations = [];
 	try {
 		for (const root of lockRoots)
@@ -1112,8 +1093,7 @@ function arr(value) {
 
 function field(issue, ...names) {
 	for (const name of names)
-		if (issue?.[name] !== null && issue?.[name] !== undefined)
-			return issue[name];
+		if (issue?.[name] !== null && issue?.[name] !== undefined) return issue[name];
 }
 
 function idOf(issue) {
@@ -1143,9 +1123,9 @@ function parentOf(issue) {
 function noteEntriesOf(issue) {
 	const notes = field(issue, "notes", "description", "body") ?? "";
 	if (Array.isArray(notes)) return notes.map((note) => String(note));
-	return (
-		typeof notes === "string" ? notes : JSON.stringify(notes ?? "")
-	).split(/\r?\n/);
+	return (typeof notes === "string" ? notes : JSON.stringify(notes ?? "")).split(
+		/\r?\n/,
+	);
 }
 
 function notesOf(issue) {
@@ -1307,10 +1287,7 @@ function positional() {
 function termScore(issue, terms) {
 	const haystack =
 		`${titleOf(issue)}\n${labelsOf(issue).join(" ")}\n${notesOf(issue).slice(-2000)}`.toLowerCase();
-	return terms.reduce(
-		(sum, term) => sum + (haystack.includes(term) ? 1 : 0),
-		0,
-	);
+	return terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
 }
 
 function jsonPath(object, key) {
@@ -1362,18 +1339,12 @@ try {
 		const children = childWorkItems(args[0]).filter(
 			(issue) => !status || statusOf(issue) === status,
 		);
-		const requestedLimit = Number(
-			option("--limit", full ? children.length : 50),
-		);
+		const requestedLimit = Number(option("--limit", full ? children.length : 50));
 		const limit =
-			Number.isInteger(requestedLimit) && requestedLimit > 0
-				? requestedLimit
-				: 50;
+			Number.isInteger(requestedLimit) && requestedLimit > 0 ? requestedLimit : 50;
 		const shown = children
 			.slice(0, limit)
-			.map((issue) =>
-				full ? summary(issue, 300) : compactChildSummary(issue),
-			);
+			.map((issue) => (full ? summary(issue, 300) : compactChildSummary(issue)));
 		if (children.length > shown.length)
 			shown.push({
 				truncated: true,

@@ -8522,6 +8522,9 @@
         },
         {
           "closeEvidence": "Completed by coded inline work path"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-9e76ad17-4a89-4efd-a6f1-1f32d1d485d7",
@@ -8533,13 +8536,15 @@
         "wo:improvement-safety SAFE Single atomic claim classified locally-owned: work_verifier_complete_fix still commits declared accepted-fix paths without flushing the existing configured formatter or checking post-commit cleanliness. Scope is the verifier completion commit path and focused fixture only; failure mode is a rejected completion rather than silent dirt. The formatter changes only already-declared dirty code paths, all effects are local Git changes, and rollback is revert the implementation commit or reset the formatter delta before completion.",
         "wo:verify-check FAIL\nCommand: node scripts/test-work-goal.mjs\n '  \\n' +\r\n    '\\n' +\r\n    'format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n' +\r\n    '\\n' +\r\n    '  × No files were processed in the specified paths.\\n' +\r\n    '  \\n' +\r\n    '  i Check your biome.json or biome.jsonc to ensure the paths are not ignored by the configuration.\\n' +\r\n    '  \\n' +\r\n    '  i These paths were provided but ignored:\\n' +\r\n    '  \\n' +\r\n    '  - rename-destination.js\\n' +\r\n    '  \\n' +\r\n    '\\n'\r\n}\r\n\r\nNode.js v24.14.0\r\n",
         "wo:review-scope {\"files\":[\"extensions/work-models.js\",\"scripts/test-work-goal.mjs\",\"scripts/work-helper.mjs\",\"scripts/work-hygiene.mjs\"],\"fingerprint\":\"7ef90057a7b970c52288fe3ef3a69ca9b4492f1c7b00bc03fcf18ed5059f1f6b\"}",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers",
+        "wo:correction Reopened once: authoritative post-agent settlement after 76756c6 immediately changed tracked scripts/test-work-goal.mjs and scripts/work-helper.mjs. The shared synchronous Biome flush used one batch invocation without pi-lens's per-file --no-errors-on-unmatched and config/editorconfig-aware inferred indentation flags, so deferred formatting still changed bytes. Preserve this dirt as correction evidence and fix only invocation parity plus focused clean-worktree coverage.",
         "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
       ],
       "parentId": "work-2",
       "status": "closed",
       "title": "Self-improvement report: After work_verifier_complete_fix committed accepted fixes as c02513d, the deferred formatter produced real byte changes in scripts",
       "type": "task",
-      "updatedAt": "2026-08-29T19:46:53.545Z"
+      "updatedAt": "2026-08-29T19:58:34.052Z"
     },
     "work-2.report-9ed01f48-b0f9-48ff-9310-ac5b50701fb3": {
       "createdAt": "2026-08-20T08:20:26.937Z",
@@ -12747,7 +12752,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T19:46:53.545Z"
+    "updatedAt": "2026-08-29T19:58:34.052Z"
   },
   "schemaVersion": 1
 }

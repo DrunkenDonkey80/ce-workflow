@@ -115,19 +115,67 @@ export function formatPendingFiles({ cwd, files, skip = false }) {
 			? undefined
 			: path.join(cwd, "node_modules", ".bin", "biome"));
 	if (!formatter || !existsSync(formatter)) return [];
-	const args = ["format", "--write", ...pending];
 	const withNode =
 		packageFormatter === formatter || /\.[cm]?js$/i.test(formatter);
-	execFileSync(
-		withNode ? process.execPath : formatter,
-		withNode ? [formatter, ...args] : args,
-		{
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
-		},
-	);
-	return pending;
+	const editorConfig = existsSync(path.join(cwd, ".editorconfig"));
+	let dir = path.resolve(cwd);
+	let biomeConfig = false;
+	while (true) {
+		if (
+			existsSync(path.join(dir, "biome.json")) ||
+			existsSync(path.join(dir, "biome.jsonc"))
+		) {
+			biomeConfig = true;
+			break;
+		}
+		const parent = path.dirname(dir);
+		if (parent === dir) break;
+		dir = parent;
+	}
+	const formatted = [];
+	for (const file of pending) {
+		const args = ["format", "--write", "--no-errors-on-unmatched"];
+		if (editorConfig) args.push("--use-editorconfig=true");
+		else if (!biomeConfig) {
+			const lines = readFileSync(path.join(cwd, file), "utf8").split(/\r?\n/);
+			const tabs = lines.filter((line) => /^\t+\S/.test(line)).length;
+			const spaces = lines
+				.map((line) => line.match(/^ +(?=\S)/)?.[0].length ?? 0)
+				.filter(Boolean);
+			if (!tabs && !spaces.length) continue;
+			let style = "space";
+			let width = 2;
+			if (tabs > spaces.length) {
+				style = "tab";
+				width = 1;
+			} else if (spaces.length > tabs) {
+				const deltas = new Map();
+				for (const count of spaces)
+					for (const other of spaces)
+						if (other > count) {
+							const delta = other - count;
+							deltas.set(delta, (deltas.get(delta) ?? 0) + 1);
+						}
+				width =
+					[...deltas].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ??
+					Math.min(...spaces);
+				if (width > 8) width = 2;
+			}
+			args.push("--indent-style", style, "--indent-width", String(width));
+		}
+		args.push(file);
+		execFileSync(
+			withNode ? process.execPath : formatter,
+			withNode ? [formatter, ...args] : args,
+			{
+				cwd,
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "pipe"],
+			},
+		);
+		formatted.push(file);
+	}
+	return formatted;
 }
 
 export function ignorePatternForBuildArtifact(file) {

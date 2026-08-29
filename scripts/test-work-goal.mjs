@@ -34,6 +34,7 @@ import {
 	mutateStore,
 	updateWorkItem,
 } from "../extensions/work-store.js";
+import { formatPendingFiles } from "./work-hygiene.mjs";
 
 const mod = await import(
 	pathToFileURL(
@@ -1572,6 +1573,8 @@ try {
 		path.join(tmpdir(), "ce-work-goal-committed-fix-"),
 	);
 	const previousVerifierFormatter = process.env.WORK_ORCH_FORMATTER_BIN;
+	const previousFormatterLog = process.env.FORMATTER_LOG;
+	const formatterLog = `${committedFixCwd}-formatter.log`;
 	try {
 		execFileSync("git", ["init"], { cwd: committedFixCwd, stdio: "ignore" });
 		execFileSync("git", ["config", "user.name", "Test"], {
@@ -1729,7 +1732,10 @@ try {
 			/no exact ancestor commit/,
 		);
 		writeFileSync(path.join(committedFixCwd, "untouched.js"), "fixed\n");
-		writeFileSync(path.join(committedFixCwd, "support.js"), "support fix\n");
+		writeFileSync(
+			path.join(committedFixCwd, "support.js"),
+			"function support() {\n\treturn true\n}\n",
+		);
 		const verifierFormatter = path.join(
 			committedFixCwd,
 			".ce-workflow",
@@ -1737,9 +1743,10 @@ try {
 		);
 		writeFileSync(
 			verifierFormatter,
-			'#!/usr/bin/env node\nimport { readFileSync, writeFileSync } from "node:fs";\nconst files = process.argv.slice(process.argv.indexOf("--write") + 1);\nfor (const file of files) if (file === "support.js" && readFileSync(file, "utf8") === "support fix\\n") writeFileSync(file, "support fix;\\n");\n',
+			'#!/usr/bin/env node\nimport { readFileSync, writeFileSync } from "node:fs";\nwriteFileSync(process.env.FORMATTER_LOG, `${JSON.stringify(process.argv.slice(2))}\\n`, { flag: "a" });\nconst file = process.argv.at(-1);\nif (readFileSync(file, "utf8") === "function support() {\\n\\treturn true\\n}\\n") writeFileSync(file, "function support() {\\n\\treturn true;\\n}\\n");\n',
 		);
 		process.env.WORK_ORCH_FORMATTER_BIN = verifierFormatter;
+		process.env.FORMATTER_LOG = formatterLog;
 		const multiPathResult = await tempTools.work_verifier_complete_fix.execute(
 			"multi-path-fix",
 			{
@@ -1756,21 +1763,68 @@ try {
 				sessionManager: { getSessionId: () => ownerSession },
 			},
 		);
+		const synchronousOutput = execFileSync(
+			"git",
+			["show", `${multiPathResult.details.commit}:support.js`],
+			{ cwd: committedFixCwd, encoding: "utf8" },
+		);
+		assert.equal(
+			synchronousOutput,
+			"function support() {\n\treturn true;\n}\n",
+			"the verifier fix commit includes formatter output",
+		);
+		assert.deepEqual(JSON.parse(readFileSync(formatterLog, "utf8").trim()), [
+			"format",
+			"--write",
+			"--no-errors-on-unmatched",
+			"--indent-style",
+			"tab",
+			"--indent-width",
+			"1",
+			"support.js",
+		]);
+
+		writeFileSync(path.join(committedFixCwd, ".editorconfig"), "root = true\n");
+		writeFileSync(path.join(committedFixCwd, "editor.js"), "  editor\n");
+		formatPendingFiles({ cwd: committedFixCwd, files: ["editor.js"] });
+		rmSync(path.join(committedFixCwd, ".editorconfig"));
+		rmSync(path.join(committedFixCwd, "editor.js"));
+		writeFileSync(path.join(committedFixCwd, "biome.json"), "{}\n");
+		writeFileSync(path.join(committedFixCwd, "configured.js"), "  configured\n");
+		formatPendingFiles({ cwd: committedFixCwd, files: ["configured.js"] });
+		rmSync(path.join(committedFixCwd, "biome.json"));
+		rmSync(path.join(committedFixCwd, "configured.js"));
+		assert.deepEqual(
+			readFileSync(formatterLog, "utf8")
+				.trim()
+				.split(/\r?\n/)
+				.slice(-2)
+				.map((line) => JSON.parse(line)),
+			[
+				[
+					"format",
+					"--write",
+					"--no-errors-on-unmatched",
+					"--use-editorconfig=true",
+					"editor.js",
+				],
+				["format", "--write", "--no-errors-on-unmatched", "configured.js"],
+			],
+			"explicit editorconfig and Biome config suppress inferred indentation",
+		);
+		formatPendingFiles({ cwd: committedFixCwd, files: ["support.js"] });
+		assert.equal(
+			readFileSync(path.join(committedFixCwd, "support.js"), "utf8"),
+			synchronousOutput,
+			"synchronous and deferred-equivalent formatter output is identical",
+		);
 		assert.equal(
 			execFileSync("git", ["status", "--porcelain=v1"], {
 				cwd: committedFixCwd,
 				encoding: "utf8",
 			}),
 			"",
-			"verifier completion flushes formatting and leaves no source dirt",
-		);
-		assert.equal(
-			execFileSync("git", ["show", `${multiPathResult.details.commit}:support.js`], {
-				cwd: committedFixCwd,
-				encoding: "utf8",
-			}),
-			"support fix;\n",
-			"the verifier fix commit includes formatter output",
+			"post-completion deferred-equivalent formatting leaves no source dirt",
 		);
 		assert.deepEqual(
 			execFileSync(
@@ -1977,6 +2031,9 @@ try {
 		if (previousVerifierFormatter === undefined)
 			delete process.env.WORK_ORCH_FORMATTER_BIN;
 		else process.env.WORK_ORCH_FORMATTER_BIN = previousVerifierFormatter;
+		if (previousFormatterLog === undefined) delete process.env.FORMATTER_LOG;
+		else process.env.FORMATTER_LOG = previousFormatterLog;
+		rmSync(formatterLog, { force: true });
 		rmSync(committedFixCwd, { recursive: true, force: true });
 	}
 	const invoke = (name, args, commandCtx = ctx) =>
