@@ -417,8 +417,7 @@ function reviewDispositionSatisfied(task, productionFiles) {
 	const failures = postScope.filter((event) => event.status === "FAIL").length;
 	const target = targetedReviewFindings(task);
 	let kind;
-	if (failures >= 2 || (failures === 1 && priorFailures))
-		kind = "residual-fix";
+	if (failures >= 2 || (failures === 1 && priorFailures)) kind = "residual-fix";
 	else if (failures === 1 || (failures === 0 && priorFailures))
 		kind = "mechanical-fix";
 	if (kind === "mechanical-fix" && productionFiles) return false;

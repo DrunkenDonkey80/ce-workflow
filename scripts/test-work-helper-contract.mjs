@@ -94,13 +94,7 @@ try {
 		"unknown options cannot consume a following flag",
 	);
 	assert.match(
-		failure(
-			"finish-task",
-			"TASK-1",
-			"--verify",
-			verifyArgs[1],
-			"--expect",
-		),
+		failure("finish-task", "TASK-1", "--verify", verifyArgs[1], "--expect"),
 		/missing value for --expect/,
 		"a trailing value option cannot disable a finish gate",
 	);
@@ -110,7 +104,8 @@ try {
 		"a value option cannot consume a following flag",
 	);
 	assert.match(
-		JSON.parse(run("work-note", "TASK-1", "--note-file", "note.txt")).notes_tail,
+		JSON.parse(run("work-note", "TASK-1", "--note-file", "note.txt"))
+			.notes_tail,
 		/bounded note file/,
 		"work-note reads a repository-contained note file",
 	);
@@ -1207,7 +1202,10 @@ try {
 		cwd: executionRoot,
 		stdio: "ignore",
 	});
-	writeFileSync(path.join(executionRoot, "source.js"), "export default true;\n");
+	writeFileSync(
+		path.join(executionRoot, "source.js"),
+		"export default true;\n",
+	);
 	const crossFinished = JSON.parse(
 		runFrom(
 			ownerRoot,
@@ -1222,7 +1220,10 @@ try {
 	);
 	const closedCross = loadStore(ownerRoot).items["CROSS-1"];
 	assert.equal(closedCross.status, "closed");
-	assert.equal(closedCross.executionRepositoryRoot, realpathSync(executionRoot));
+	assert.equal(
+		closedCross.executionRepositoryRoot,
+		realpathSync(executionRoot),
+	);
 	assert.equal(closedCross.executionCommit, crossFinished.executionCommit);
 	assert.equal(crossFinished.commit, crossFinished.executionCommit.slice(0, 7));
 	assert.notEqual(crossFinished.ownerCommit, crossFinished.executionCommit);
@@ -1362,9 +1363,13 @@ try {
 		executionBeforeForeignStore,
 		"foreign store refusal does not commit the execution repository",
 	);
-	execFileSync("git", ["restore", "source.js", ".ce-workflow/work-items.json"], {
-		cwd: executionRoot,
-	});
+	execFileSync(
+		"git",
+		["restore", "source.js", ".ce-workflow/work-items.json"],
+		{
+			cwd: executionRoot,
+		},
+	);
 
 	const pushStore = loadStore(ownerRoot);
 	createWorkItem(pushStore, {
