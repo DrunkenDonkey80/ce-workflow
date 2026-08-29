@@ -17135,7 +17135,8 @@ function sameCheckout(left, right) {
 }
 
 function isImprovementReport(issue) {
-	return labelsOf(issue).includes(SELF_IMPROVEMENT_REPORT_LABEL);
+	const labels = labelsOf(issue);
+	return labels.includes("report") && labels.includes(SELF_IMPROVEMENT_REPORT_LABEL);
 }
 
 function isOpenImprovementWork(issue) {

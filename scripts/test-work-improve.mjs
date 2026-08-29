@@ -222,7 +222,7 @@ mutateStore(root, (store) => {
 		status: "open",
 		parentId: "SI-1",
 		title: "Canonical upstream defect",
-		labels: ["upstream"],
+		labels: ["self-improvement", "upstream"],
 	});
 });
 const canonical = buildWorkImproveState(root, "SI-1", options);
