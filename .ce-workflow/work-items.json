@@ -4557,7 +4557,8 @@
         "upstream"
       ],
       "notes": [
-        "wo:ownership upstream-owned. Reproduced on 2026-08-29 with hypa_shell command \"C:\\Program Files\\nodejs\\node.exe\" --version; provider failed before launch with process path \"C:\\Program\". ce-workflow contains no hypa launcher implementation (package/source search found none), so no local workaround was added. Route: upstream compressed-shell provider must preserve quoted executable paths; rollback is closing this tracking item only after upstream verification."
+        "wo:ownership upstream-owned. Reproduced on 2026-08-29 with hypa_shell command \"C:\\Program Files\\nodejs\\node.exe\" --version; provider failed before launch with process path \"C:\\Program\". ce-workflow contains no hypa launcher implementation (package/source search found none), so no local workaround was added. Route: upstream compressed-shell provider must preserve quoted executable paths; rollback is closing this tracking item only after upstream verification.",
+        "wo:improvement-safety SAFE Upstream-owned quoted-path launcher defect; no ce-workflow source change or external side effect is required, and rollback is removing this tracking note while keeping the item open."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -6568,6 +6569,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-29T07:31:59.368Z",
           "workflowId": "01a04c2e-0925-7f3a-8425-510d13c4b7fb"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-558a2b61-c486-4b8d-bc20-ce04f18c06da",
@@ -6575,12 +6579,17 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE Already-fixed local reconciliation defect covered by commit ae01d75 and a focused regression test; the one-state recognition change has no persistent-format or external side effects, and rollback is reverting ae01d75.",
+        "wo:reconcile already-fixed by atomic report commit ae01d75e5ae229eb42eb200ea8d8c35f5a03b9ea:  is a terminal failure, valid artifacts are preserved, and node scripts/test-background-verifiers.mjs passed on 2026-08-29.",
+        "wo:reconcile correction: ae01d75e5ae229eb42eb200ea8d8c35f5a03b9ea classifies stopped as terminal failure, preserves valid artifacts, and node scripts/test-background-verifiers.mjs passed on 2026-08-29.",
+        "wo:verify-check PASS\nCommand: node scripts/test-background-verifiers.mjs\nOutput: background verifier domain tests passed"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: Background-verifier reconciliation leaves jobs permanently `running` when pi-subagents reports a terminal workflow state of `stopp",
       "type": "task",
-      "updatedAt": "2026-08-29T07:31:59.374Z"
+      "updatedAt": "2026-08-29T17:42:06.614Z"
     },
     "work-2.report-58390134-7183-4e92-bc36-53c45d95b337": {
       "createdAt": "2026-08-17T21:57:03.567Z",
@@ -12505,7 +12514,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T07:31:59.374Z"
+    "updatedAt": "2026-08-29T17:42:06.614Z"
   },
   "schemaVersion": 1
 }
