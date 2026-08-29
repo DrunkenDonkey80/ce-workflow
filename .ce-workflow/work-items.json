@@ -8951,6 +8951,9 @@
           "producer": "ce-workflow",
           "submittedAt": "2026-08-29T17:42:50.230Z",
           "workflowId": "workflow-mteo0fsg-bfpgvv"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
         }
       ],
       "id": "work-2.report-b2c27a65-617e-4b8e-bc09-cf855d0c22bd",
@@ -8958,12 +8961,17 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety BLOCKED Locally-owned broad /work-improve snapshot default will exclude open upstream canonical trackers without report evidence; failure mode is silently omitting actionable upstream work, and rollback is reverting the selector commit while retaining every tracker open.",
+        "wo:improvement-safety APPROVED Broad /work-improve snapshot default excludes open upstream canonical trackers without local report evidence; user approved selector change for work-2.report-b2c27a65-617e-4b8e-bc09-cf855d0c22bd; rollback by reverting the selector commit while retaining every tracker open.",
+        "wo:review PASS work-reviewer verified upstream canonical trackers are excluded at the shared selector while reports and local canonical work remain included; node scripts/test-work-improve.mjs passed.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-improve.mjs && echo PASS\nOutput: PASS"
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: The improvement snapshot selector included work-2.92, an already-classified upstream-owned canonical item with missing self-improv",
       "type": "task",
-      "updatedAt": "2026-08-29T17:42:50.237Z"
+      "updatedAt": "2026-08-29T17:55:25.364Z"
     },
     "work-2.report-b4957d2f-ec8a-4800-8f8f-3d7bbab6124b": {
       "createdAt": "2026-08-22T07:46:08.433Z",
@@ -12554,7 +12562,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T17:42:50.238Z"
+    "updatedAt": "2026-08-29T17:55:25.364Z"
   },
   "schemaVersion": 1
 }

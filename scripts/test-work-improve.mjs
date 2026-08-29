@@ -208,18 +208,34 @@ assert.equal(
 writeFileSync(path.join(bundle, "01-log.txt"), "tampered");
 const invalid = buildWorkImproveState(root, "SI-1", options);
 assert.equal(invalid.ok, false, "a closed snapshot has no work to improve");
-mutateStore(root, (store) =>
+mutateStore(root, (store) => {
 	createWorkItem(store, {
 		id: "SI-1.2",
 		type: "bug",
 		status: "open",
 		parentId: "SI-1",
+		title: "Canonical local defect",
+	});
+	createWorkItem(store, {
+		id: "SI-1.5",
+		type: "bug",
+		status: "open",
+		parentId: "SI-1",
 		title: "Canonical upstream defect",
-	}),
-);
+		labels: ["upstream"],
+	});
+});
 const canonical = buildWorkImproveState(root, "SI-1", options);
-assert.equal(canonical.ok, true, "open canonical work remains actionable");
-assert.deepEqual(canonical.snapshotIds, ["SI-1.2"]);
+assert.equal(
+	canonical.ok,
+	true,
+	"open local canonical work remains actionable",
+);
+assert.deepEqual(
+	canonical.snapshotIds,
+	["SI-1.2"],
+	"upstream canonical trackers stay open without joining the local snapshot",
+);
 assert.equal(canonical.reports[0].evidence.valid, true);
 assert.doesNotMatch(
 	buildWorkImproveObjective(canonical),

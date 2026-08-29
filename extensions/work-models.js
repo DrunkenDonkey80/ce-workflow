@@ -17167,6 +17167,10 @@ function selfImprovementRoadmap(cwd, target = "") {
 function improvementWorkItems(cwd, epicId) {
 	return childWorkItems(cwd, epicId)
 		.filter(isOpenImprovementWork)
+		.filter(
+			(issue) =>
+				isImprovementReport(issue) || !labelsOf(issue).includes("upstream"),
+		)
 		.sort(byCreatedAsc);
 }
 
