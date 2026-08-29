@@ -17136,7 +17136,9 @@ function sameCheckout(left, right) {
 
 function isImprovementReport(issue) {
 	const labels = labelsOf(issue);
-	return labels.includes("report") && labels.includes(SELF_IMPROVEMENT_REPORT_LABEL);
+	return (
+		labels.includes("report") && labels.includes(SELF_IMPROVEMENT_REPORT_LABEL)
+	);
 }
 
 function isOpenImprovementWork(issue) {
