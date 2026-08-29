@@ -412,17 +412,12 @@ function reviewEvents(task) {
 }
 
 function reviewDispositionSatisfied(task, productionFiles) {
-	const { scopeIndex, postScope, priorFailures, priorPasses } =
-		reviewEvents(task);
+	const { scopeIndex, postScope, priorFailures } = reviewEvents(task);
 	if (postScope.at(-1)?.status === "PASS") return true;
 	const failures = postScope.filter((event) => event.status === "FAIL").length;
 	const target = targetedReviewFindings(task);
 	let kind;
-	if (
-		failures >= 2 ||
-		(failures === 1 && priorFailures) ||
-		(failures === 0 && priorFailures && priorPasses)
-	)
+	if (failures >= 2 || (failures === 1 && priorFailures))
 		kind = "residual-fix";
 	else if (failures === 1 || (failures === 0 && priorFailures))
 		kind = "mechanical-fix";
@@ -1312,6 +1307,8 @@ function parsedArguments() {
 	const flags = new Set();
 	const values = new Map();
 	const missingValues = new Set();
+	if (command === "work-note")
+		return { positionals: args, flags, values, missingValues };
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (!arg.startsWith("--")) {
@@ -1320,15 +1317,17 @@ function parsedArguments() {
 		}
 		if (BOOLEAN_OPTIONS.has(arg)) flags.add(arg);
 		else if (!VALUE_OPTIONS.has(arg)) throw new Error(`unknown option: ${arg}`);
-		else if (i + 1 < args.length) {
+		else if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
 			values.set(arg, [...(values.get(arg) ?? []), args[i + 1]]);
 			i += 1;
 		} else missingValues.add(arg);
 	}
+	if (missingValues.size)
+		throw new Error(`missing value for ${[...missingValues].join(", ")}`);
 	return { positionals, flags, values, missingValues };
 }
 
-const parsed = parsedArguments();
+let parsed;
 
 function options(name) {
 	return parsed.values.get(name) ?? [];
@@ -1394,6 +1393,7 @@ function jsonAssertionFailures(file, root = cwd) {
 }
 
 try {
+	parsed = parsedArguments();
 	if (command === "work-summary") {
 		const issue = readWorkItem(args[0]);
 		print(summary(issue));

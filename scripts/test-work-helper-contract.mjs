@@ -27,6 +27,10 @@ const globalSettingsDir = mkdtempSync(
 	path.join(tmpdir(), "work-helper-global-settings-"),
 );
 process.env.PI_CODING_AGENT_DIR = globalSettingsDir;
+const previousFormatterBin = process.env.WORK_ORCH_FORMATTER_BIN;
+const fixtureFormatter = path.join(globalSettingsDir, "formatter.mjs");
+writeFileSync(fixtureFormatter, "#!/usr/bin/env node\n");
+process.env.WORK_ORCH_FORMATTER_BIN = fixtureFormatter;
 const runFrom = (root, ...args) =>
 	execFileSync(process.execPath, [helper, ...args], {
 		cwd: root,
@@ -84,15 +88,37 @@ try {
 	});
 	saveStore(cwd, store);
 	writeFileSync(path.join(cwd, "note.txt"), "bounded note file\n");
-	assert.throws(
-		() => run("work-summary", "TASK-1", "--reviewedd", "--full"),
+	assert.match(
+		failure("work-summary", "TASK-1", "--reviewedd", "--full"),
 		/unknown option: --reviewedd/,
 		"unknown options cannot consume a following flag",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-1",
+			"--verify",
+			verifyArgs[1],
+			"--expect",
+		),
+		/missing value for --expect/,
+		"a trailing value option cannot disable a finish gate",
+	);
+	assert.match(
+		failure("finish-task", "TASK-1", "--message", "--push"),
+		/missing value for --message/,
+		"a value option cannot consume a following flag",
 	);
 	assert.match(
 		JSON.parse(run("work-note", "TASK-1", "--note-file", "note.txt")).notes_tail,
 		/bounded note file/,
 		"work-note reads a repository-contained note file",
+	);
+	assert.match(
+		JSON.parse(run("work-note", "TASK-1", "--reviewed literal note"))
+			.notes_tail,
+		/--reviewed literal note/,
+		"work-note treats option-looking note text as opaque",
 	);
 	writeFileSync(path.join(cwd, "..notes.txt"), "dot-prefixed note file\n");
 	assert.match(
@@ -132,22 +158,14 @@ try {
 		path.join(cwd, "assertion.json"),
 		'{"status":"ok","--forbid-string":"present"}\n',
 	);
-	assert.equal(
-		JSON.parse(
-			run("json-assert", "assertion.json", "--required", "--forbid-string"),
-		).status,
-		"PASS",
-		"an option-looking value is not reinterpreted as an assertion",
+	assert.match(
+		failure("json-assert", "assertion.json", "--required", "--forbid-string"),
+		/missing value for --required, --forbid-string/,
+		"value options cannot consume following value options",
 	);
-	let missingForbidValue;
-	try {
-		run("json-assert", "assertion.json", "--forbid-string");
-	} catch (error) {
-		missingForbidValue = JSON.parse(String(error.stdout));
-	}
-	assert.deepEqual(
-		missingForbidValue?.failed_assertions,
-		["missing --forbid-string value"],
+	assert.match(
+		failure("json-assert", "assertion.json", "--forbid-string"),
+		/missing value for --forbid-string/,
 		"json-assert rejects a missing --forbid-string value",
 	);
 	for (const [args, expected] of [
@@ -799,6 +817,25 @@ try {
 	const refreshedResidualStore = loadStore(cwd);
 	refreshedResidualStore.items["TASK-2"].notes.push(residualDisposition);
 	saveStore(cwd, refreshedResidualStore);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-2",
+			"--max-files",
+			"1",
+			"--message",
+			"reject unreviewed residual scope",
+			...verifyArgs,
+			"--reviewed",
+		),
+		/durable wo:review PASS evidence/,
+		"an old residual disposition cannot authorize a fresh production scope",
+	);
+	const reviewedResidualStore = loadStore(cwd);
+	reviewedResidualStore.items["TASK-2"].notes.push(
+		"wo:review PASS - refreshed content approved",
+	);
+	saveStore(cwd, reviewedResidualStore);
 	const residualFinished = JSON.parse(
 		run(
 			"finish-task",
@@ -806,7 +843,7 @@ try {
 			"--max-files",
 			"1",
 			"--message",
-			"finish residual fixes",
+			"finish reviewed residual fixes",
 			...verifyArgs,
 			"--reviewed",
 		),
@@ -851,8 +888,8 @@ try {
 			"--reviewed",
 			...verifyArgs,
 		),
-		/independent review required/,
-		"a boolean-looking option value cannot activate the review flag",
+		/missing value for --message/,
+		"a boolean option cannot be consumed as a value",
 	);
 	assert.match(
 		failure(
@@ -864,8 +901,21 @@ try {
 			"--verify",
 			...verifyArgs,
 		),
-		/independent review required/,
-		"an option-looking value cannot shadow the real verification option",
+		/missing value for --message, --verify/,
+		"a value option cannot shadow the real verification option",
+	);
+	assert.match(
+		failure(
+			"finish-task",
+			"TASK-3",
+			"--max-files",
+			"1",
+			"--message",
+			"refresh mechanical scope",
+			...verifyArgs,
+		),
+		/Review only:/,
+		"a valid invocation persists the current review scope",
 	);
 	const multilineReviewStore = loadStore(cwd);
 	multilineReviewStore.items["TASK-3"].notes.push(
@@ -1543,6 +1593,9 @@ try {
 } finally {
 	if (previousConfigDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousConfigDir;
+	if (previousFormatterBin === undefined)
+		delete process.env.WORK_ORCH_FORMATTER_BIN;
+	else process.env.WORK_ORCH_FORMATTER_BIN = previousFormatterBin;
 	rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalSettingsDir, { recursive: true, force: true });
 }
