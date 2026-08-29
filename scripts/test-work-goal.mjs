@@ -1571,6 +1571,7 @@ try {
 	const committedFixCwd = mkdtempSync(
 		path.join(tmpdir(), "ce-work-goal-committed-fix-"),
 	);
+	const previousVerifierFormatter = process.env.WORK_ORCH_FORMATTER_BIN;
 	try {
 		execFileSync("git", ["init"], { cwd: committedFixCwd, stdio: "ignore" });
 		execFileSync("git", ["config", "user.name", "Test"], {
@@ -1729,6 +1730,16 @@ try {
 		);
 		writeFileSync(path.join(committedFixCwd, "untouched.js"), "fixed\n");
 		writeFileSync(path.join(committedFixCwd, "support.js"), "support fix\n");
+		const verifierFormatter = path.join(
+			committedFixCwd,
+			".ce-workflow",
+			"formatter.mjs",
+		);
+		writeFileSync(
+			verifierFormatter,
+			'#!/usr/bin/env node\nimport { readFileSync, writeFileSync } from "node:fs";\nconst files = process.argv.slice(process.argv.indexOf("--write") + 1);\nfor (const file of files) if (file === "support.js" && readFileSync(file, "utf8") === "support fix\\n") writeFileSync(file, "support fix;\\n");\n',
+		);
+		process.env.WORK_ORCH_FORMATTER_BIN = verifierFormatter;
 		const multiPathResult = await tempTools.work_verifier_complete_fix.execute(
 			"multi-path-fix",
 			{
@@ -1744,6 +1755,22 @@ try {
 				cwd: committedFixCwd,
 				sessionManager: { getSessionId: () => ownerSession },
 			},
+		);
+		assert.equal(
+			execFileSync("git", ["status", "--porcelain=v1"], {
+				cwd: committedFixCwd,
+				encoding: "utf8",
+			}),
+			"",
+			"verifier completion flushes formatting and leaves no source dirt",
+		);
+		assert.equal(
+			execFileSync("git", ["show", `${multiPathResult.details.commit}:support.js`], {
+				cwd: committedFixCwd,
+				encoding: "utf8",
+			}),
+			"support fix;\n",
+			"the verifier fix commit includes formatter output",
 		);
 		assert.deepEqual(
 			execFileSync(
@@ -1947,6 +1974,9 @@ try {
 			"a test-only fix commits only the declared test path",
 		);
 	} finally {
+		if (previousVerifierFormatter === undefined)
+			delete process.env.WORK_ORCH_FORMATTER_BIN;
+		else process.env.WORK_ORCH_FORMATTER_BIN = previousVerifierFormatter;
 		rmSync(committedFixCwd, { recursive: true, force: true });
 	}
 	const invoke = (name, args, commandCtx = ctx) =>

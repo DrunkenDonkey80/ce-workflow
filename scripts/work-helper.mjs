@@ -31,9 +31,9 @@ import {
 	updateWorkItem,
 } from "../extensions/work-store.js";
 import {
+	formatPendingFiles,
 	isGeneratedBuildPath,
 	isRuntimePath,
-	isWorkflowManaged,
 	tidyUntrackedFiles,
 } from "./work-hygiene.mjs";
 import {
@@ -427,50 +427,6 @@ function reviewDispositionSatisfied(task, productionFiles) {
 	);
 }
 
-function formatPendingFiles(root = cwd) {
-	if (flag("--skip-format")) return [];
-	const files = gitStatusPaths(root).filter(
-		(file) =>
-			!isWorkflowManaged(file) &&
-			/\.(?:[cm]?[jt]sx?|jsonc?|css|scss|sass|vue|svelte|html?)$/i.test(file) &&
-			existsSync(path.join(root, file)) &&
-			statSync(path.join(root, file)).size <= 10 * 1024 * 1024,
-	);
-	if (!files.length) return [];
-	const packageFormatters = [
-		path.join(root, "node_modules", "@biomejs", "biome", "bin", "biome"),
-		path.join(
-			os.homedir(),
-			".pi-lens",
-			"tools",
-			"node_modules",
-			"@biomejs",
-			"biome",
-			"bin",
-			"biome",
-		),
-	];
-	const packageFormatter = packageFormatters.find(existsSync);
-	const formatter =
-		process.env.WORK_ORCH_FORMATTER_BIN ||
-		packageFormatter ||
-		(process.platform === "win32"
-			? undefined
-			: path.join(root, "node_modules", ".bin", "biome"));
-	if (!formatter || !existsSync(formatter)) return [];
-	run(
-		packageFormatter === formatter ? process.execPath : formatter,
-		[
-			...(packageFormatter === formatter ? [formatter] : []),
-			"format",
-			"--write",
-			...files,
-		],
-		{ cwd: root },
-	);
-	return files;
-}
-
 function verificationTimeoutMs() {
 	const value = Number(
 		process.env.WORK_ORCH_VERIFY_TIMEOUT_MS ?? 30 * 60 * 1000,
@@ -719,7 +675,11 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		...evidenceFiles,
 		...automaticEvidenceFiles,
 	]);
-	const formatted = formatPendingFiles(executionRoot);
+	const formatted = formatPendingFiles({
+		cwd: executionRoot,
+		files: gitStatusPaths(executionRoot),
+		skip: flag("--skip-format"),
+	});
 	const stagedBefore = git(["diff", "--cached", "--name-only"], executionRoot)
 		.split(/\r?\n/)
 		.filter(Boolean);

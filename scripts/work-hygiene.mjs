@@ -4,7 +4,15 @@
 // decision. Pure + dir-aware so it is unit-testable against a temp git repo.
 
 import { execFileSync } from "node:child_process";
-import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	readFileSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 
 const RUNTIME_PREFIXES = [
@@ -72,6 +80,54 @@ export function isRuntimePath(file) {
 export function isWorkflowManaged(file) {
 	const norm = file.replaceAll("\\", "/");
 	return isRuntimePath(file) || norm === ".ce-workflow/work-items.json";
+}
+
+export function formatPendingFiles({ cwd, files, skip = false }) {
+	if (skip) return [];
+	const pending = [
+		...new Set(files.map((file) => file.replaceAll("\\", "/"))),
+	].filter(
+		(file) =>
+			!isWorkflowManaged(file) &&
+			/\.(?:[cm]?[jt]sx?|jsonc?|css|scss|sass|vue|svelte|html?)$/i.test(file) &&
+			existsSync(path.join(cwd, file)) &&
+			statSync(path.join(cwd, file)).size <= MAX_INFERRED_SOURCE_BYTES,
+	);
+	if (!pending.length) return [];
+	const packageFormatters = [
+		path.join(cwd, "node_modules", "@biomejs", "biome", "bin", "biome"),
+		path.join(
+			homedir(),
+			".pi-lens",
+			"tools",
+			"node_modules",
+			"@biomejs",
+			"biome",
+			"bin",
+			"biome",
+		),
+	];
+	const packageFormatter = packageFormatters.find(existsSync);
+	const formatter =
+		process.env.WORK_ORCH_FORMATTER_BIN ||
+		packageFormatter ||
+		(process.platform === "win32"
+			? undefined
+			: path.join(cwd, "node_modules", ".bin", "biome"));
+	if (!formatter || !existsSync(formatter)) return [];
+	const args = ["format", "--write", ...pending];
+	const withNode =
+		packageFormatter === formatter || /\.[cm]?js$/i.test(formatter);
+	execFileSync(
+		withNode ? process.execPath : formatter,
+		withNode ? [formatter, ...args] : args,
+		{
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		},
+	);
+	return pending;
 }
 
 export function ignorePatternForBuildArtifact(file) {

@@ -122,6 +122,7 @@ import {
 	updateWorkItem,
 	WorkStoreError,
 } from "./work-store.js";
+import { formatPendingFiles } from "../scripts/work-hygiene.mjs";
 import {
 	classifyShadowAssurance,
 	workflowTelemetryIdentity,
@@ -10096,19 +10097,27 @@ function registerVerifierTriageTools(pi) {
 				throw new Error(
 					"fixPaths must be unique repository-relative paths; omitted accepted finding paths must remain unchanged from their verifier checkpoint.",
 				);
-			const dirty = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
+			let dirty = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
 				normalizedRepoPath(item.path),
 			);
+			if (dirty.some((file) => !paths.includes(file)))
+				throw new Error(
+					`Accepted fix dirty scope exceeds declared paths; found ${dirty.join(", ")}.`,
+				);
+			if (dirty.length) formatPendingFiles({ cwd, files: dirty });
+			dirty = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
+				normalizedRepoPath(item.path),
+			);
+			if (dirty.some((file) => !paths.includes(file)))
+				throw new Error(
+					`Accepted fix formatter dirt exceeds declared paths; found ${dirty.join(", ")}.`,
+				);
 			let commit = "";
 			if (!dirty.length)
 				commit = committedAcceptedFix(
 					cwd,
 					findingIds.map((id) => store.findings[id]),
 					paths,
-				);
-			else if (dirty.some((file) => !paths.includes(file)))
-				throw new Error(
-					`Accepted fix dirty scope exceeds declared paths; found ${dirty.join(", ")}.`,
 				);
 			if (!dirty.length && !commit)
 				throw new Error(
@@ -10140,6 +10149,16 @@ function registerVerifierTriageTools(pi) {
 					run(cwd, "git", ["reset", "--mixed", base]);
 					throw failure;
 				}
+			const remaining = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
+				normalizedRepoPath(item.path),
+			);
+			if (remaining.length) {
+				if (createdCommit && run(cwd, "git", ["rev-parse", "HEAD"]) === commit)
+					run(cwd, "git", ["reset", "--mixed", base]);
+				throw new Error(
+					`Verifier fix commit left dirty paths: ${remaining.join(", ")}.`,
+				);
+			}
 			let result;
 			try {
 				result = mutateVerifierStore(cwd, (state) =>
