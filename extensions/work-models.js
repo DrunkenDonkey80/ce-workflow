@@ -17380,8 +17380,19 @@ function workImproveProgressFingerprint(goal, cwd) {
 	if (goal?.mode !== "improvement") return;
 	const ids = workImproveSnapshotIds(goal) ?? [];
 	const snapshot = ids.map((id) => [id, readWorkItem(cwd, id)]);
+	let verifierProgress = "";
+	try {
+		const store = loadVerifierStore(cwd);
+		verifierProgress = JSON.stringify([
+			Object.keys(store.dispositions ?? {}).sort(),
+			Object.keys(store.fixes ?? {}).sort(),
+		]);
+	} catch {
+		// Verifier state is optional until the first review batch exists.
+	}
 	const source = [
 		JSON.stringify(snapshot),
+		verifierProgress,
 		safeRun(cwd, "git", ["rev-parse", "--verify", "HEAD"]),
 		safeRun(cwd, "git", ["status", "--porcelain=v1"]),
 		safeRun(cwd, "git", ["diff", "--no-ext-diff", "--binary", "HEAD"]),
@@ -17476,7 +17487,7 @@ function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
 		: !IMPROVEMENT_READ_ONLY_TOOLS.has(tool);
 	if (!mutating) return;
 	if (goal.status !== "active")
-		return `Improvement safety blocks ${tool}: the workflow is ${goal.status}. Resume it explicitly before any source mutation.`;
+		return `Improvement safety blocks ${tool}: the workflow is ${goal.status}. Run /work-goal resume before any source mutation.`;
 	const ids = workImproveSnapshotIds(goal);
 	if (!ids?.length)
 		return `Improvement safety preflight blocks ${tool}: work-improvement snapshot IDs are missing.`;

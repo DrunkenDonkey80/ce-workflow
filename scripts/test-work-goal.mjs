@@ -26,6 +26,7 @@ import {
 	mutateVerifierStore,
 	recordOperationResult,
 	recordTriageDisposition,
+	reopenGroup,
 } from "../extensions/background-verifiers.js";
 import {
 	createWorkItem,
@@ -4019,7 +4020,45 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		"durable work-item progress resets the no-progress counter",
 	);
 	await settleImprovementTurn(3);
+	const reopened = mutateVerifierStore(cwd, (store) =>
+		reopenGroup(store, {
+			groupId: verifierInbox.details.claims[0].claim.groupId,
+		}),
+	);
+	const improvementVerifierOwner = `process-${process.pid}`;
+	const improvementVerifierClaim = mutateVerifierStore(cwd, (store) =>
+		claimGroup(store, {
+			groupId: reopened.id,
+			ownerSession: improvementVerifierOwner,
+		}),
+	);
+	mutateVerifierStore(cwd, (store) =>
+		recordTriageDisposition(store, {
+			claimId: improvementVerifierClaim.id,
+			ownerSession: improvementVerifierOwner,
+			findingId: completionFinding.id,
+			disposition: "accepted",
+			reason: "fixture improvement progress",
+		}),
+	);
+	mutateVerifierStore(cwd, (store) =>
+		completeAcceptedFix(store, {
+			claimId: improvementVerifierClaim.id,
+			ownerSession: improvementVerifierOwner,
+			findingIds: [completionFinding.id],
+			commit: "e".repeat(40),
+			verification: ["fixture improvement verification"],
+		}),
+	);
 	await settleImprovementTurn(4);
+	assert.equal(
+		JSON.parse(readFileSync(improvementStatePath, "utf8")).workGoal
+			.improvementStalledTurns,
+		0,
+		"durable verifier triage resets the no-progress counter",
+	);
+	await settleImprovementTurn(5);
+	await settleImprovementTurn(6);
 	assert.equal(
 		statuses["work-goal"],
 		"paused",
@@ -4029,6 +4068,16 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		notices.some((notice) =>
 			String(notice.message).includes("no durable improvement progress"),
 		),
+	);
+	assert.match(
+		(
+			await tempHooks.tool_call(
+				{ toolName: "edit", input: { path: "source.js" } },
+				ctx,
+			)
+		)?.reason ?? "",
+		/\/work-goal resume/,
+		"paused improvement guard names the correct resume command",
 	);
 	await invoke("work-goal", "clear", ctx);
 
