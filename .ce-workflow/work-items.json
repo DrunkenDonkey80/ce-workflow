@@ -6543,6 +6543,45 @@
       "type": "task",
       "updatedAt": "2026-08-26T06:02:31.647Z"
     },
+    "work-2.report-558a2b61-c486-4b8d-bc20-ce04f18c06da": {
+      "createdAt": "2026-08-29T07:31:59.374Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Background-verifier reconciliation leaves jobs permanently `running` when pi-subagents reports a terminal workflow state of `stopped` after an extension reload. Both verifier runs for checkpoint e1c973d have terminal `stopped` status, but `TERMINAL_FAILURE_STATES` in extensions/background-verifiers.js omits `stopped`, so reconcileVerifierRuns skips them and autonomous goal completion remains blocked as 'queued or running'.\nExpected: A terminal pi-subagents `stopped` workflow must reconcile as a failed verifier launch (preserving any artifact), after which normal failure acknowledgement/replacement coverage rules can proceed; it must never remain running indefinitely.\nImpact: Any extension reload that stops queued background verifiers can deadlock autonomous goal completion forever even though the child runs are definitively terminal and non-resumable.\nSuggested improvement: Add `stopped` to terminal failure states, cover reconciliation of a stopped status.json in scripts/test-background-verifiers.mjs, and verify stopped jobs become failed/orphaned rather than queued/running.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/84bcf993-7ef0-47ea-9ee2-3764ee569b49",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1436977,
+              "file": "01-2026-08-29T06-21-20-549Z_01a04c2e-0925-7f3a-8425-510d13c4b7fb.jsonl",
+              "sha256": "f6fe8d7e4b88e454efc255ad13c0a1b33004a401e860c329810d8cd86f00c218"
+            },
+            {
+              "bytes": 4066554,
+              "file": "02-state.json",
+              "sha256": "fd3290badcdf22d278784218401636a2a9a7288e106393b67c37bbf36e8a0aca"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-29T07:31:59.368Z",
+          "workflowId": "01a04c2e-0925-7f3a-8425-510d13c4b7fb"
+        }
+      ],
+      "id": "work-2.report-558a2b61-c486-4b8d-bc20-ce04f18c06da",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Background-verifier reconciliation leaves jobs permanently `running` when pi-subagents reports a terminal workflow state of `stopp",
+      "type": "task",
+      "updatedAt": "2026-08-29T07:31:59.374Z"
+    },
     "work-2.report-58390134-7183-4e92-bc36-53c45d95b337": {
       "createdAt": "2026-08-17T21:57:03.567Z",
       "dependencies": [],
@@ -12466,7 +12505,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T07:28:48.199Z"
+    "updatedAt": "2026-08-29T07:31:59.374Z"
   },
   "schemaVersion": 1
 }

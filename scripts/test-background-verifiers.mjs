@@ -1998,7 +1998,15 @@ try {
 	const terminalCwd = repo();
 	initVerifierStore(terminalCwd);
 	const terminalBatch = mutateVerifierStore(terminalCwd, (state) =>
-		createBatch(state, { checkpoint, profiles: reportProfiles, ...options }),
+		createBatch(state, {
+			checkpoint,
+			profiles: [
+				...reportProfiles,
+				{ model: "zai/glm-5", operations: ["correctness"], thinking: "low" },
+			],
+			...options,
+			models: new Set([...options.models, "zai/glm-5"]),
+		}),
 	);
 	const terminalJobs = Object.values(loadVerifierStore(terminalCwd).jobs);
 	const terminalWorkspace = mkdtempSync(
@@ -2039,7 +2047,7 @@ try {
 		};
 		writeFileSync(
 			path.join(asyncDir, "status.json"),
-			JSON.stringify({ state: index ? "timed_out" : "cancelled" }),
+			JSON.stringify({ state: ["cancelled", "timed_out", "stopped"][index] }),
 		);
 		writeFileSync(
 			output,

@@ -72,6 +72,7 @@ export const TERMINAL_FAILURE_STATES = new Set([
 	"error",
 	"cancelled",
 	"canceled",
+	"stopped",
 	"timed_out",
 	"timeout",
 ]);
