@@ -4521,6 +4521,50 @@
       "type": "bug",
       "updatedAt": "2026-08-24T13:52:16.484Z"
     },
+    "work-2.91": {
+      "acceptance": "The focused private-workflow test passes and leaves extensions/private-workflows plus extensions/work-compound-inventory.json byte-clean.",
+      "createdAt": "2026-08-29T07:25:19.681Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Tamper cases in scripts/test-work-private-workflows.mjs wrote tracked private workflow resources in place. Classification: already-fixed locally-owned claim; commit e2e7f31 moved tampering to a temporary fixture and injected resource/inventory paths.",
+      "evidence": [],
+      "id": "work-2.91",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:verification PASS already-fixed by commit e2e7f31 (format-only follow-up 339d978). ok 1 - verified brainstorm resource dispatch\nok 2 - external caller rejection\nok 3 - verified debug resource preserves investigation and blocker contracts\nok 4 - verified learning resource preserves destination, deduplication, key, and skip contracts\nok 5 - verified plan resource dispatch preserves the planning contract\nok 6 - verified review resource preserves scoped, read-only, bounded-cycle contracts\nok 7 - verified simplification resource preserves equivalent-change and no-op contracts\nok 8 - verified browser resource preserves affected-UI, waiver, and distinct specialist contracts\nok 9 - verified POV and conditional explain resources preserve candidate-review contracts\nok 10 - complete private parity matrix covers trigger through actor-visible failure outcome\nok 11 - literal workflow allowlist\nok 12 - workflow-specific action token rejection\nok 13 - debug authority cannot load learning resource\nok 14 - browser authority cannot load non-equivalent review resource\nok 15 - plan authority cannot load catch-up POV resource\nok 16 - manifest path escape rejection\nok 17 - missing resource rejection\nok 18 - missing debug resource rejection\nok 19 - missing learning resource rejection\nok 20 - missing review resource rejection\nok 21 - missing simplify resource rejection\nok 22 - missing browser resource rejection\nok 23 - missing pov resource rejection\nok 24 - missing explain resource rejection\nok 25 - mutated brainstorm resource rejection\nok 26 - mutated debug resource rejection\nok 27 - mutated learning resource rejection\nok 28 - mutated plan resource rejection\nok 29 - mutated review resource rejection\nok 30 - mutated simplify resource rejection\nok 31 - mutated browser resource rejection\nok 32 - mutated pov resource rejection\nok 33 - mutated explain resource rejection\nok 34 - unverified generation rejection\nok 35 - incomplete U4 parity row rejection\nok 36 - two offline translations from one verified closure are byte-identical\nok 37 - nine-workflow release, path, hash, license, and translator provenance\nok 38 - stable release states distinguish current, update, unknown, blocked, failed, non-writable, and unrelated dirt\nok 39 - official resolver selects the highest stable tag and peeled commit\nok 40 - promotion persists pending B and retained A while complete A remains active with zero CE surface\nok 41 - legacy presence only returns the exact actor recommendation while release, catch-up, and restart behavior stays identical\nok 42 - coded rollback is identical with the legacy package present or absent\nok 43 - persisted rollback stays quiet while fresh coded rollback remains actor-visible\nok 44 - acquisition failure preserves canonical bytes and removes quarantine\nok 45 - failing gate preserves canonical bytes and removes quarantine\nok 46 - incomplete parity preserves canonical bytes and removes quarantine\nok 47 - interrupted quarantine preserves canonical bytes and removes quarantine\nok 48 - interrupted prior retention preserves canonical bytes and removes quarantine\nok 49 - interrupted pending retention preserves canonical bytes and removes quarantine\nok 50 - mutated verified source preserves canonical bytes and removes quarantine\nok 51 - after-active-rename activation interruption restores complete A with coded rollback\nok 52 - after-candidate-rename activation interruption restores complete A with coded rollback\nok 53 - after-current-rename rollback interruption restores complete A without mixed outputs\nok 54 - after-retained-rename rollback interruption restores complete A without mixed outputs\nok 55 - missing-retained next-start check preserves complete A and never mixes generations\nok 56 - mutated-retained next-start check preserves complete A and never mixes generations\nok 57 - failed-verification next-start check preserves complete A and never mixes generations\nok 58 - canonical mutation during audit restores exact prior bytes and removes quarantine\nok 59 - mutated verified closure rejection\nok 60 - unverified source generation rejection\nok 61 - clean package runtime exposes zero private or CE surface\nPASS test-work-private-workflows (61 offline checks) zeroSurface=true passed 61 checks at HEAD e1c973d;  remained empty after the test. LSP primary diagnostics were clean for scripts/test-work-private-workflows.mjs and had only pre-existing hints in extensions/work-models.js.",
+        "wo:verification-correction The prior verification note was shell-expanded because it contained backticks; disregard its malformed text. PASS: commit e2e7f31 isolated tamper writes in a temporary fixture, formatting-only follow-up 339d978; node scripts/test-work-private-workflows.mjs passed 61 checks at HEAD e1c973d; git diff for extensions/private-workflows and extensions/work-compound-inventory.json remained empty afterward. LSP primary diagnostics were clean for scripts/test-work-private-workflows.mjs.",
+        "wo:review PASS Independent work-reviewer verified commit e2e7f31 plus formatting-only 339d978: tamper writes are confined to mkdtemp fixture roots, default production dispatch behavior and authority checks are unchanged, focused 61-check proof passes, and tracked private-workflow resources remain clean. Residual risk is low: tamper checks call verifyPrivateWorkflowGeneration directly rather than dispatch, while surviving dispatch checks preserve the single production call-site contract.",
+        "Closed as already fixed by commit e2e7f31 (format-only 339d978), verified by 61 focused checks, clean tracked resource diff, LSP, and independent wo:review PASS."
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Keep private-workflow verification read-only",
+      "type": "bug",
+      "updatedAt": "2026-08-29T07:28:36.152Z"
+    },
+    "work-2.92": {
+      "acceptance": "The upstream compressed-shell launcher executes a quoted C:\\Program Files executable path without splitting it, with a regression check on Windows.",
+      "createdAt": "2026-08-29T07:25:25.942Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "The hypa_shell provider splits quoted executable paths containing spaces before process launch. Classification: upstream-owned by the compressed-shell tool, not ce-workflow; the local project has no launcher implementation to correct and must not add a prompt-only npm workaround.",
+      "evidence": [],
+      "id": "work-2.92",
+      "labels": [
+        "self-improvement",
+        "upstream"
+      ],
+      "notes": [
+        "wo:ownership upstream-owned. Reproduced on 2026-08-29 with hypa_shell command \"C:\\Program Files\\nodejs\\node.exe\" --version; provider failed before launch with process path \"C:\\Program\". ce-workflow contains no hypa launcher implementation (package/source search found none), so no local workaround was added. Route: upstream compressed-shell provider must preserve quoted executable paths; rollback is closing this tracking item only after upstream verification."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Fix compressed-shell quoting for Windows executable paths",
+      "type": "bug",
+      "updatedAt": "2026-08-29T07:25:25.942Z"
+    },
     "work-2.report-004a4a47-7ce7-4de6-ad15-4d3d9c59efbe": {
       "createdAt": "2026-08-09T06:53:59.357Z",
       "dependencies": [],
@@ -9747,7 +9791,10 @@
     },
     "work-2.report-ea7e10ff-aafb-40db-b92e-a1001377bb16": {
       "createdAt": "2026-08-28T21:50:54.706Z",
-      "dependencies": [],
+      "dependencies": [
+        "work-2.91",
+        "work-2.92"
+      ],
       "dependencyEdges": [],
       "description": "Observed: `npm run verify:quiet` exercised `scripts/test-work-private-workflows.mjs`, which writes and restores tracked `extensions/private-workflows/*` resources in place. Pi Lens emitted BLIND WRITE warnings for those tracked files, and the verification window coincided with the directory being left regenerated from compound-engineering v3.23.4 instead of the reviewed v3.21.4 baseline. Separately, invoking `npm` through the current compressed bash launcher split `C:\\Program Files\\nodejs\\npm` at the space (`'C:\\Program' is not recognized`); direct `node .../npm-cli.js run verify:quiet` succeeded.\nExpected: The package verification suite should be read-only against tracked resources: private-workflow tamper tests should use a temporary copied resource root or injected fixture path, so verification cannot race with activation or leave generated files changed. The command launcher should preserve quoted executable paths containing spaces, or ce-workflow should invoke npm through a deterministic Node/npm-cli path on Windows.\nImpact: A required final verification can create unrelated tracked diffs, trigger diagnostics warnings, and potentially mix an unreviewed private-workflow release into a Pi/plugin catch-up. The npm launcher failure also makes the documented verification command fail despite a healthy repository.\nSuggested improvement: Inject a temporary resource root into dispatchPrivateWorkflow tests instead of mutating extensions/private-workflows, and fix the compressed command launcher path quoting (or normalize npm execution through process.execPath plus npm-cli.js).",
       "evidence": [
@@ -9772,12 +9819,16 @@
         "report",
         "self-improvement"
       ],
-      "notes": [],
+      "notes": [
+        "wo:improvement-safety SAFE Two atomic claims: tracked-resource mutation is locally-owned and can be fixed by isolating test fixtures; compressed launcher quoting is upstream-owned and needs durable routing, not a local workaround. Both are non-destructive and reversible; blast radius is verification/test infrastructure only, failure leaves dirty tracked files or a failed command, and rollback is reverting the focused commit/notes.",
+        "wo:reconciliation Atomized into canonical work-2.91 (locally-owned, already fixed) and work-2.92 (upstream-owned, routed open); report links both. work-2.91 is covered by commit e2e7f31 with formatting-only 339d978, node scripts/test-work-private-workflows.mjs PASS 61, empty tracked private-resource diff, clean focused LSP, and independent wo:review PASS. work-2.92 reproduces the quoted C:\\Program Files split in hypa_shell and remains open as the durable upstream route; no local prompt/npm workaround was added. New routed upstream work does not block this fixed snapshot.",
+        "Closed after verified coverage: read-only private-workflow verification fixed by e2e7f31 and reviewed PASS; compressed-shell quoting ownership routed durably to open upstream canonical work-2.92. Final safety disposition remains SAFE."
+      ],
       "parentId": "work-2",
-      "status": "open",
+      "status": "closed",
       "title": "Self-improvement report: `npm run verify:quiet` exercised `scripts/test-work-private-workflows.mjs`, which writes and restores tracked `extensions/private-",
       "type": "task",
-      "updatedAt": "2026-08-28T21:50:54.706Z"
+      "updatedAt": "2026-08-29T07:28:48.198Z"
     },
     "work-2.report-eb1f7ff8-3ec5-49f5-8450-ab86226ab4a6": {
       "createdAt": "2026-08-24T14:00:13.095Z",
@@ -12415,7 +12466,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-28T21:50:54.707Z"
+    "updatedAt": "2026-08-29T07:28:48.199Z"
   },
   "schemaVersion": 1
 }
