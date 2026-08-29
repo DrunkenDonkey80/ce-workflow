@@ -239,6 +239,24 @@ mutateStore(root, (store) =>
 		evidence: [
 			{
 				kind: "self-improvement-report",
+				bundle: ".pi/self-improvement-reports/report-1",
+				files: [],
+			},
+		],
+	}),
+);
+const omittedEvidence = buildWorkImproveState(root, "SI-1", options);
+assert.equal(omittedEvidence.reports[0].evidence.valid, false);
+assert.match(
+	omittedEvidence.reports[0].evidence.problems.join("\n"),
+	/manifest file set mismatch/i,
+);
+
+mutateStore(root, (store) =>
+	updateWorkItem(store, "SI-1.1", {
+		evidence: [
+			{
+				kind: "self-improvement-report",
 				bundle: "../outside",
 				files: [],
 			},
@@ -526,7 +544,7 @@ assert.doesNotMatch(
 		{
 			toolName: "bash",
 			input: {
-				command: `node "${path.join(root, "scripts", "work-helper.mjs")}" work-summary SI-1.1`,
+				command: `node "${helperScript}" work-summary SI-1.1`,
 			},
 		},
 		hookCtx,
@@ -535,6 +553,7 @@ assert.doesNotMatch(
 	"reviewers may read the scoped work item before safety approval",
 );
 for (const command of [
+	`node "${path.join(root, "scripts", "work-helper.mjs")}" work-summary SI-1.1`,
 	`node "${path.join(root, "scripts", "work-helper.mjs")}" work-note SI-1.1 --append-notes unsafe`,
 	`node "${path.join(root, "scripts", "work-helper.mjs")}" work-note SI-1.1 --append-notes "wo:improvement-safety SAFE wrong helper"`,
 	`${safetyNoteCommand("SAFE")} && echo unsafe`,

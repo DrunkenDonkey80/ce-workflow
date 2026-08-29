@@ -17202,10 +17202,26 @@ function validateImprovementEvidence(cwd, issue) {
 			);
 			continue;
 		}
+		if (manifest?.version !== 1 || !Array.isArray(manifest.files)) {
+			problems.push(`invalid manifest schema: ${record.bundle}`);
+			continue;
+		}
+		const expectedFiles = asArray(record.files);
 		const manifestFiles = new Map(
-			asArray(manifest.files).map((file) => [file?.file, file]),
+			manifest.files.map((file) => [file?.file, file]),
 		);
-		for (const expected of asArray(record.files)) {
+		const expectedNames = expectedFiles.map((file) => file?.file);
+		if (
+			!Array.isArray(record.files) ||
+			manifestFiles.size !== manifest.files.length ||
+			new Set(expectedNames).size !== expectedFiles.length ||
+			manifestFiles.size !== expectedFiles.length ||
+			expectedNames.some((name) => !manifestFiles.has(name))
+		) {
+			problems.push(`manifest file set mismatch: ${record.bundle}`);
+			continue;
+		}
+		for (const expected of expectedFiles) {
 			const name = String(expected?.file ?? "");
 			const listed = manifestFiles.get(name);
 			if (
@@ -17389,10 +17405,11 @@ function improvementSafetyNoteCommand(command) {
 function improvementSafetyShellAllowed(command) {
 	const text = String(command ?? "").trim();
 	const cwd = String.raw`(?:"[^"$\x60\r\n]+"|'[^'$\x60\r\n]+'|[\w./:\\-]+)`;
+	const helper = WORK_HELPER_SCRIPT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const git = String.raw`git(?:\s+-C\s+${cwd})?\s+`;
 	return [
 		new RegExp(
-			String.raw`^node(?:\.exe)?\s+${cwd}\s+work-(?:summary|children-summary|ready-summary)\s+[\w.:-]+$`,
+			String.raw`^node(?:\.exe)?\s+(?:"${helper}"|'${helper}'|${helper})\s+work-(?:summary|children-summary|ready-summary)\s+[\w.:-]+$`,
 			"i",
 		),
 		new RegExp(
