@@ -17373,6 +17373,19 @@ function workImproveProgressFingerprint(goal, cwd) {
 	return createHash("sha256").update(source).digest("hex");
 }
 
+function improvementSafetyNoteCommand(command) {
+	const script = WORK_HELPER_SCRIPT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const match = new RegExp(
+		String.raw`^node(?:\.exe)?\s+(?:"${script}"|'${script}'|${script})\s+work-note\s+([\w.:-]+)\s+--append-notes\s+(?:"(wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^"$\x60\\\r\n%]*)"|'(wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^'$\x60\\\r\n%]*)')$`,
+		"i",
+	).exec(String(command ?? "").trim());
+	if (!match) return;
+	return {
+		id: match[1],
+		disposition: (match[3] ?? match[5]).toUpperCase(),
+	};
+}
+
 function improvementSafetyShellAllowed(command) {
 	const text = String(command ?? "").trim();
 	const cwd = String.raw`(?:"[^"$\x60\r\n]+"|'[^'$\x60\r\n]+'|[\w./:\\-]+)`;
@@ -17440,7 +17453,8 @@ const IMPROVEMENT_READ_ONLY_TOOLS = new Set([
 function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
 	if (goal?.mode !== "improvement") return;
 	const tool = String(event?.toolName ?? "");
-	const mutating = ["bash", "hypa_shell"].includes(tool)
+	const shell = ["bash", "hypa_shell"].includes(tool);
+	const mutating = shell
 		? !improvementSafetyShellAllowed(event?.input?.command)
 		: !IMPROVEMENT_READ_ONLY_TOOLS.has(tool);
 	if (!mutating) return;
@@ -17449,6 +17463,22 @@ function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
 	const ids = workImproveSnapshotIds(goal);
 	if (!ids?.length)
 		return `Improvement safety preflight blocks ${tool}: work-improvement snapshot IDs are missing.`;
+	const safetyNote = shell
+		? improvementSafetyNoteCommand(event?.input?.command)
+		: undefined;
+	if (safetyNote && ids.includes(safetyNote.id)) {
+		if (safetyNote.disposition !== "APPROVED") return;
+		try {
+			if (
+				improvementApprovalMatches(
+					goal,
+					readWorkItem(cwd, safetyNote.id),
+					safetyNote.id,
+				)
+			)
+				return;
+		} catch {}
+	}
 	const pending = ids.filter((id) => {
 		try {
 			const issue = readWorkItem(cwd, id);

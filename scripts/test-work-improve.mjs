@@ -431,6 +431,10 @@ mutateStore(root, (store) => {
 	);
 });
 await executeOrchestratorAction("work-improve", "SI-1", hookCtx, pi);
+await hooks.before_agent_start(
+	{ prompt: sent.at(-1).message, systemPrompt: "base" },
+	hookCtx,
+);
 assert.match(
 	hooks.tool_call(
 		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
@@ -454,6 +458,40 @@ assert.match(
 	).reason,
 	/Improvement safety preflight blocks new_project_writer/,
 	"unknown tools default to mutating so newly registered writers cannot bypass preflight",
+);
+const helperScript = path.resolve(import.meta.dirname, "work-helper.mjs");
+const safetyNoteCommand = (disposition, id = "SI-1.1") =>
+	`node "${helperScript}" work-note ${id} --append-notes "wo:improvement-safety ${disposition} focused test-only change; rollback by reverting commit"`;
+for (const disposition of ["SAFE", "BLOCKED"])
+	assert.equal(
+		hooks.tool_call(
+			{
+				toolName: "bash",
+				input: { command: safetyNoteCommand(disposition) },
+			},
+			hookCtx,
+		),
+		undefined,
+		`the exact scoped ${disposition} safety note can break the preflight deadlock`,
+	);
+assert.match(
+	hooks.tool_call(
+		{
+			toolName: "bash",
+			input: { command: safetyNoteCommand("SAFE", "SI-OTHER") },
+		},
+		hookCtx,
+	).reason,
+	/Improvement safety preflight blocks bash/,
+	"a safety note cannot mutate work outside the active snapshot",
+);
+assert.match(
+	hooks.tool_call(
+		{ toolName: "bash", input: { command: safetyNoteCommand("APPROVED") } },
+		hookCtx,
+	).reason,
+	/Improvement safety preflight blocks bash/,
+	"APPROVED still requires its matching ask_user decision",
 );
 mutateStore(root, (store) =>
 	appendWorkNote(
@@ -498,6 +536,9 @@ assert.doesNotMatch(
 );
 for (const command of [
 	`node "${path.join(root, "scripts", "work-helper.mjs")}" work-note SI-1.1 --append-notes unsafe`,
+	`node "${path.join(root, "scripts", "work-helper.mjs")}" work-note SI-1.1 --append-notes "wo:improvement-safety SAFE wrong helper"`,
+	`${safetyNoteCommand("SAFE")} && echo unsafe`,
+	`node "${helperScript}" work-note SI-1.1 --append-notes "wo:improvement-safety SAFE $(echo unsafe)"`,
 	`git -C "${root}" rev-parse --show-toplevel && echo unsafe`,
 	`git -C "${root}" diff --output=unsafe.patch`,
 	`git -C "${root}" commit -am unsafe`,
@@ -567,6 +608,14 @@ const approveRisk = (toolCallId, ids = "SI-1.1") => {
 	);
 };
 approveRisk("scoped-approval");
+assert.equal(
+	hooks.tool_call(
+		{ toolName: "bash", input: { command: safetyNoteCommand("APPROVED") } },
+		hookCtx,
+	),
+	undefined,
+	"a scoped ask_user decision permits recording its APPROVED note",
+);
 mutateStore(root, (store) =>
 	appendWorkNote(
 		store,
