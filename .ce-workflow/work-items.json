@@ -8499,6 +8499,40 @@
       "type": "task",
       "updatedAt": "2026-08-26T06:00:32.430Z"
     },
+    "work-2.report-9e76ad17-4a89-4efd-a6f1-1f32d1d485d7": {
+      "createdAt": "2026-08-29T19:29:59.935Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After work_verifier_complete_fix committed accepted fixes as c02513d, the deferred formatter produced real byte changes in scripts/work-helper.mjs and scripts/test-work-helper-contract.mjs. The formatter output required a separate verified formatting-only commit, 7519aa5.\nExpected: work_verifier_complete_fix should flush the configured deferred formatter before staging and committing accepted fix paths, then confirm the worktree remains clean before reporting completion.\nImpact: A successful verifier completion can leave accepted fix files dirty and force a follow-up commit, weakening the tool's clean/sync guarantee and adding repetitive cleanup across multi-claim triage.\nSuggested improvement: Reuse the existing finish-task pre-commit formatting/flush path inside work_verifier_complete_fix and add a focused regression that completion returns with no formatter delta.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/5c0ee2e7-fd94-462d-90a1-53924d8998c3",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 694,
+              "file": "01-verifier-complete-fix-formatting.log",
+              "sha256": "e2c0a3f349f7218eff996a6cf9b65bab538d6d25e50488cc3f35594a2dc47c34"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-29T19:29:59.928Z",
+          "workflowId": "01a04eec-2273-7f8c-9390-fe4f2e310b6a"
+        }
+      ],
+      "id": "work-2.report-9e76ad17-4a89-4efd-a6f1-1f32d1d485d7",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After work_verifier_complete_fix committed accepted fixes as c02513d, the deferred formatter produced real byte changes in scripts",
+      "type": "task",
+      "updatedAt": "2026-08-29T19:29:59.935Z"
+    },
     "work-2.report-9ed01f48-b0f9-48ff-9310-ac5b50701fb3": {
       "createdAt": "2026-08-20T08:20:26.937Z",
       "dependencies": [
@@ -12705,7 +12739,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T18:53:06.903Z"
+    "updatedAt": "2026-08-29T19:29:59.936Z"
   },
   "schemaVersion": 1
 }
