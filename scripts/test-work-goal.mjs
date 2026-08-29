@@ -4542,6 +4542,114 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			"accepted verifier fixes do not recursively schedule verifier batches",
 		);
 		await invoke("work-goal", "clear", lifecycleCtx);
+		lifecycleCtx.hasUI = true;
+
+		await invoke("work-goal", "exercise unanswered ask fallback", lifecycleCtx);
+		await tempHooks.before_agent_start(
+			{ prompt: sent.at(-1).message, systemPrompt: "base" },
+			lifecycleCtx,
+		);
+		await tempHooks.agent_start({}, lifecycleCtx);
+		assert.match(
+			tempHooks.tool_call({ toolName: "work_goal_human_decision" }, lifecycleCtx)
+				?.reason ?? "",
+			/Use ask_user/,
+			"the durable fallback stays blocked before ask_user is attempted",
+		);
+		assert.equal(
+			tempHooks.tool_call(
+				{
+					toolCallId: "unanswered-goal-ask",
+					toolName: "ask_user",
+					input: { question: "Which external prerequisite is available?" },
+				},
+				lifecycleCtx,
+			),
+			undefined,
+		);
+		assert.match(
+			tempHooks.tool_call({ toolName: "work_goal_human_decision" }, lifecycleCtx)
+				?.reason ?? "",
+			/Use ask_user/,
+			"the durable fallback stays blocked while ask_user is pending",
+		);
+		tempHooks.tool_result(
+			{
+				toolCallId: "unanswered-goal-ask",
+				toolName: "ask_user",
+				isError: false,
+				details: { cancelled: true },
+			},
+			lifecycleCtx,
+		);
+		assert.equal(
+			tempHooks.tool_call({ toolName: "work_goal_human_decision" }, lifecycleCtx),
+			undefined,
+			"a cancelled ask_user result authorizes the fallback immediately",
+		);
+		tempHooks.tool_call(
+			{
+				toolCallId: "missing-goal-ask-result",
+				toolName: "ask_user",
+				input: { question: "Which external prerequisite is available?" },
+			},
+			lifecycleCtx,
+		);
+		await invoke("work-goal", "pause", lifecycleCtx);
+		await invoke("work-goal", "resume", lifecycleCtx);
+		assert.equal(
+			tempHooks.tool_call({ toolName: "work_goal_human_decision" }, lifecycleCtx),
+			undefined,
+			"resuming after ask_user returned no result authorizes the fallback",
+		);
+		await tempTools.work_goal_human_decision.execute(
+			"fallback-decision",
+			{
+				question: "Provide the external prerequisite?",
+				whyUserNeeded: "The prior ask_user returned no result.",
+				options: "Provide it; keep the goal paused.",
+				recommendation: "Keep the goal paused.",
+			},
+			undefined,
+			undefined,
+			lifecycleCtx,
+		);
+		assert.equal(statuses["work-goal"], "needs human");
+		await invoke("work-goal", "clear", lifecycleCtx);
+
+		await invoke("work-goal", "exercise answered ask cleanup", lifecycleCtx);
+		await tempHooks.before_agent_start(
+			{ prompt: sent.at(-1).message, systemPrompt: "base" },
+			lifecycleCtx,
+		);
+		await tempHooks.agent_start({}, lifecycleCtx);
+		tempHooks.tool_call(
+			{
+				toolCallId: "answered-goal-ask",
+				toolName: "ask_user",
+				input: { question: "Proceed?" },
+			},
+			lifecycleCtx,
+		);
+		tempHooks.tool_result(
+			{
+				toolCallId: "answered-goal-ask",
+				toolName: "ask_user",
+				isError: false,
+				details: {
+					response: { kind: "selection", selections: ["Proceed"] },
+					cancelled: false,
+				},
+			},
+			lifecycleCtx,
+		);
+		assert.match(
+			tempHooks.tool_call({ toolName: "work_goal_human_decision" }, lifecycleCtx)
+				?.reason ?? "",
+			/Use ask_user/,
+			"a successful ask_user answer clears fallback authorization",
+		);
+		await invoke("work-goal", "clear", lifecycleCtx);
 		delete pi.events;
 	} finally {
 		delete pi.events;

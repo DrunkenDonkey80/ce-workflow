@@ -18825,6 +18825,7 @@ function pauseWorkGoalForDecision(decision, ctx, pi) {
 		...activeWorkGoal,
 		status: "needs_human",
 		decision,
+		askUserFallbackPending: undefined,
 		updatedAt: Date.now(),
 	};
 	persistWorkGoal(pi);
@@ -18844,6 +18845,42 @@ function askUserPauseSelection(event) {
 			/^\s*(?:pause|wait)\b/i.test(String(selection)),
 		) ?? ""
 	);
+}
+
+function recordWorkGoalAskUserCall(event, pi) {
+	if (event.toolName !== "ask_user" || activeWorkGoal?.status !== "active")
+		return;
+	activeWorkGoal = {
+		...activeWorkGoal,
+		askUserFallbackPending: {
+			toolCallId: String(event.toolCallId ?? ""),
+			askedAt: Date.now(),
+		},
+		updatedAt: Date.now(),
+	};
+	persistWorkGoal(pi);
+}
+
+function recordWorkGoalAskUserResult(event, pi) {
+	if (event.toolName !== "ask_user" || !activeWorkGoal?.askUserFallbackPending)
+		return;
+	const pending = activeWorkGoal.askUserFallbackPending;
+	if (
+		pending.toolCallId &&
+		event.toolCallId &&
+		String(event.toolCallId) !== pending.toolCallId
+	)
+		return;
+	const unavailable =
+		event.isError || event.details?.cancelled || !event.details?.response;
+	activeWorkGoal = {
+		...activeWorkGoal,
+		askUserFallbackPending: unavailable
+			? { ...pending, unavailable: true }
+			: undefined,
+		updatedAt: Date.now(),
+	};
+	persistWorkGoal(pi);
 }
 
 function recordImprovementApprovalAskCall(event, cwd) {
@@ -18960,6 +18997,7 @@ function pauseWorkGoalFromAskUser(event, ctx, pi) {
 			answer: String(selection),
 			source: "ask_user",
 		},
+		askUserFallbackPending: undefined,
 		updatedAt: Date.now(),
 	};
 	persistWorkGoal(pi);
@@ -19281,6 +19319,9 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 			...activeWorkGoal,
 			status: "active",
 			decision: undefined,
+			askUserFallbackPending: activeWorkGoal.askUserFallbackPending
+				? { ...activeWorkGoal.askUserFallbackPending, unavailable: true }
+				: undefined,
 			continuationWindowStart: isCatchUpGoal(activeWorkGoal)
 				? (activeWorkGoal.iteration ?? 0)
 				: activeWorkGoal.continuationWindowStart,
@@ -24347,6 +24388,7 @@ export default function workModelsExtension(pi) {
 
 	pi.on("tool_call", (event, ctx) => {
 		if (event.toolName === "ask_user") {
+			recordWorkGoalAskUserCall(event, pi);
 			recordDirtyRecoveryAskCall(event);
 			recordImprovementApprovalAskCall(event, ctx?.cwd ?? activeWorkGoalCwd);
 		}
@@ -24359,7 +24401,8 @@ export default function workModelsExtension(pi) {
 		if (
 			event.toolName === "work_goal_human_decision" &&
 			ctx.hasUI &&
-			pi.getActiveTools?.().includes("ask_user")
+			pi.getActiveTools?.().includes("ask_user") &&
+			activeWorkGoal?.askUserFallbackPending?.unavailable !== true
 		)
 			return {
 				block: true,
@@ -24385,6 +24428,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("tool_result", (event, ctx) => {
+		recordWorkGoalAskUserResult(event, pi);
 		recordImprovementApprovalFromAskUser(event, ctx, pi);
 		pauseWorkGoalFromAskUser(event, ctx, pi);
 	});

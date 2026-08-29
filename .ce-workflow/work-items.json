@@ -4567,6 +4567,36 @@
       "type": "bug",
       "updatedAt": "2026-08-29T07:25:25.942Z"
     },
+    "work-2.93": {
+      "acceptance": "In an active UI work goal, work_goal_human_decision remains blocked before ask_user, remains blocked after a successful ask_user answer, and pauses durably after an unanswered/cancelled ask_user attempt. Existing improvement stall-counter coverage continues to pass.",
+      "createdAt": "2026-08-29T18:16:20.917Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Persist an active work-goal ask_user attempt until its result. Permit work_goal_human_decision after the ask is cancelled, errors, or returns no result; clear authorization after an ordinary answer. The report's separate no-progress claim is already covered by f4271f07/ec733328 and scripts/test-work-improve.mjs.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.93",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:classification locally-owned for cancelled-ask fallback; related-distinct already-fixed no-progress breaker verified in current source and history. Blast radius is internal goal pause authorization only; rollback by reverting the focused extension/test commit.",
+        "wo:review-scope {\"files\":[\"extensions/work-models.js\",\"scripts/test-work-goal.mjs\"],\"fingerprint\":\"14adb9abcb1d432db868362b768ea314c9791b8fa776da3ebbfe106bdec68d50\"}",
+        "wo:review FAIL scripts/test-work-goal.mjs lacked direct cancelled/error ask_user result coverage for the new unavailable authorization branch; add focused proof before finish.",
+        "wo:verify PASS node scripts/test-work-goal.mjs (ok - work-goal helpers); node scripts/test-work-improve.mjs (exit 0); primary LSP clean for extensions/work-models.js and scripts/test-work-goal.mjs.",
+        "wo:review-scope {\"files\":[\"extensions/work-models.js\",\"scripts/test-work-goal.mjs\"],\"fingerprint\":\"10af3bfe55150d62b0fe6f52c0264c0d14b8b3e5938574e1bf1aa879014ba38c\"}",
+        "wo:review PASS cancelled ask_user tool_result now directly authorizes work_goal_human_decision in scripts/test-work-goal.mjs, blocked-before/pending and answered-clears cases retained, unchanged extension guard reviewed, wo:verify PASS for test-work-goal.mjs and test-work-improve.mjs",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-goal.mjs\nOutput: ok - work-goal helpers"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Allow human-decision fallback after an unanswered ask_user",
+      "type": "bug",
+      "updatedAt": "2026-08-29T18:27:22.702Z"
+    },
     "work-2.report-004a4a47-7ce7-4de6-ad15-4d3d9c59efbe": {
       "createdAt": "2026-08-09T06:53:59.357Z",
       "dependencies": [],
@@ -5962,6 +5992,44 @@
       "title": "Self-improvement report: After all background verifier jobs for snapshot 256e75c terminated, work_goal_complete reports 'background verification has findin",
       "type": "task",
       "updatedAt": "2026-08-24T13:54:01.505Z"
+    },
+    "work-2.report-499d8ed5-2091-4b8a-b1b7-697c8cf12e11": {
+      "createdAt": "2026-08-29T18:04:49.734Z",
+      "dependencies": [
+        "work-2.93"
+      ],
+      "dependencyEdges": [],
+      "description": "Observed: In an active autonomous improvement goal, ask_user returned `No result provided` twice for a genuine external blocker, but subsequent work_goal_human_decision calls were rejected with `Use ask_user for the interactive decision`. Automatic continuations then repeated indefinitely despite the coded no-progress circuit-breaker contract.\nExpected: After ask_user returns no result/cancelled, work_goal_human_decision should accept the durable blocker and pause the goal; alternatively the automatic continuation circuit breaker should pause after two unchanged continuations.\nImpact: The workflow cannot terminate safely: it must neither close an unverified upstream item nor call completion, yet the only durable pause tool is rejected and continuations loop.\nSuggested improvement: Persist ask_user null/cancellation state for the active goal and allow the next work_goal_human_decision call; enforce the unchanged-continuation circuit breaker in code.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/be1e4147-9792-4a86-8b0d-a3acc1ccbfa9",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 700366,
+              "file": "01-2026-08-29T17-47-38-101Z_01a04ea2-5af4-7464-9fd5-f938e5388f8c.jsonl",
+              "sha256": "f1280fb36166fa9f5ed3fcc82cc441a9b37266715740e67d9494c14a98c7aa66"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-29T18:04:49.726Z",
+          "workflowId": "01a04ea2-5af4-7464-9fd5-f938e5388f8c"
+        }
+      ],
+      "id": "work-2.report-499d8ed5-2091-4b8a-b1b7-697c8cf12e11",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety SAFE Two atomized claims: the cancelled-ask fallback is a locally-owned internal orchestration guard defect, while the no-progress breaker is already present in current source/tests; neither changes public data, security, schema, history, releases, or external systems, and rollback is reverting the focused guard/test change or removing only newly created tracking links."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: In an active autonomous improvement goal, ask_user returned `No result provided` twice for a genuine external blocker, but subsequ",
+      "type": "task",
+      "updatedAt": "2026-08-29T18:16:27.041Z"
     },
     "work-2.report-4a81a49d-a04d-4270-bc55-637331d67eab": {
       "createdAt": "2026-08-21T10:23:12.916Z",
@@ -12563,7 +12631,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T17:58:08.630Z"
+    "updatedAt": "2026-08-29T18:27:22.702Z"
   },
   "schemaVersion": 1
 }
