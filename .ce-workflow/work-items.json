@@ -4558,7 +4558,8 @@
       ],
       "notes": [
         "wo:ownership upstream-owned. Reproduced on 2026-08-29 with hypa_shell command \"C:\\Program Files\\nodejs\\node.exe\" --version; provider failed before launch with process path \"C:\\Program\". ce-workflow contains no hypa launcher implementation (package/source search found none), so no local workaround was added. Route: upstream compressed-shell provider must preserve quoted executable paths; rollback is closing this tracking item only after upstream verification.",
-        "wo:improvement-safety SAFE Upstream-owned quoted-path launcher defect; no ce-workflow source change or external side effect is required, and rollback is removing this tracking note while keeping the item open."
+        "wo:improvement-safety SAFE Upstream-owned quoted-path launcher defect; no ce-workflow source change or external side effect is required, and rollback is removing this tracking note while keeping the item open.",
+        "wo:upstream-blocker 2026-08-29: hypa_shell still fails before launch for C:\\Program Files\\nodejs\\node.exe --version, reporting process path C:\\Program. The ce-workflow checkout has no Hypa launcher implementation; upstream provider source or a fixed provider build is required before acceptance can be verified and this item closed."
       ],
       "parentId": "work-2",
       "status": "open",
@@ -8925,6 +8926,45 @@
       "type": "task",
       "updatedAt": "2026-08-04T05:54:21.241Z"
     },
+    "work-2.report-b2c27a65-617e-4b8e-bc09-cf855d0c22bd": {
+      "createdAt": "2026-08-29T17:42:50.237Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The improvement snapshot selector included work-2.92, an already-classified upstream-owned canonical item with missing self-improvement report evidence. Its Hypa quoted-path defect remains reproducible, but ce-workflow has no owning launcher code, so the snapshot cannot satisfy both leave-unresolved-work-open and complete-only-when-every-snapshot-ID-is-closed.\nExpected: Improvement snapshot construction should exclude unresolved upstream-routed canonical items that lack actionable local report evidence, or route them to a separate upstream tracking queue that does not make a finite local improvement run impossible to complete.\nImpact: The autonomous improvement goal can never reach its completion contract: closing work-2.92 would falsely claim unverified upstream coverage, while leaving it open permanently blocks work_goal_complete.\nSuggested improvement: Filter upstream-labeled canonical items without locally actionable report evidence out of the /work-improve finite snapshot, while retaining their durable open tracking state.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/5ed88027-ef3e-4bec-bd0e-ba2b552baf68",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 482752,
+              "file": "01-2026-08-29.jsonl",
+              "sha256": "4316faaae9406dc29767c18cc9ac95c636a28077ba84a58e2c3e1f24b0dde327"
+            },
+            {
+              "bytes": 5109,
+              "file": "02-work-orchestrator-state.json",
+              "sha256": "b1fca37fa7745b6add4003e57e86cba3fb72861c3d53da1c00799d86b6ff7306"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-29T17:42:50.230Z",
+          "workflowId": "workflow-mteo0fsg-bfpgvv"
+        }
+      ],
+      "id": "work-2.report-b2c27a65-617e-4b8e-bc09-cf855d0c22bd",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The improvement snapshot selector included work-2.92, an already-classified upstream-owned canonical item with missing self-improv",
+      "type": "task",
+      "updatedAt": "2026-08-29T17:42:50.237Z"
+    },
     "work-2.report-b4957d2f-ec8a-4800-8f8f-3d7bbab6124b": {
       "createdAt": "2026-08-22T07:46:08.433Z",
       "dependencies": [
@@ -12514,7 +12554,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T17:42:06.614Z"
+    "updatedAt": "2026-08-29T17:42:50.238Z"
   },
   "schemaVersion": 1
 }
