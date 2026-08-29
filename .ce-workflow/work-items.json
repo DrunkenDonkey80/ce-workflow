@@ -4597,6 +4597,31 @@
       "type": "bug",
       "updatedAt": "2026-08-29T18:27:22.702Z"
     },
+    "work-2.94": {
+      "acceptance": "finish-task invokes the existing formatter without --immediate-format, excludes workflow-managed state such as .ce-workflow/work-items.json, verifies and commits the formatted result, and focused regression coverage passes.",
+      "createdAt": "2026-08-29T18:47:46.138Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Run the existing finish-task formatter pass by default before verification, review scoping, commit, and push so deferred formatting cannot dirty a checkout after completion. Keep workflow-managed state excluded from formatter inputs.",
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
+      "id": "work-2.94",
+      "labels": [
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:classification locally-owned finalizer ordering defect. User approved default formatting despite eligible task-file reformat risk; rollback is reverting the focused helper and regression-test commit to restore opt-in formatting.",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-optimization-helpers.mjs\nOutput: ok - workflow optimization helpers"
+      ],
+      "parentId": "work-2",
+      "status": "closed",
+      "title": "Format finish-task changes before verification and commit by default",
+      "type": "bug",
+      "updatedAt": "2026-08-29T18:52:01.727Z"
+    },
     "work-2.report-004a4a47-7ce7-4de6-ad15-4d3d9c59efbe": {
       "createdAt": "2026-08-09T06:53:59.357Z",
       "dependencies": [],
@@ -9654,6 +9679,43 @@
       "type": "task",
       "updatedAt": "2026-08-21T17:47:06.380Z"
     },
+    "work-2.report-db4cfaea-d854-4907-b0da-69b51b0445bc": {
+      "createdAt": "2026-08-29T18:33:36.500Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A live /wo → Improve project run committed and pushed its changes, verified master was clean and synchronized, and successfully called work_goal_complete. Only afterward, during session settlement, pi-lens applied deferred formatting to extensions/work-models.js and left the checkout dirty; the monitor had to push formatting-only cleanup commit 96d88b9.\nExpected: The coded finalization/completion path must flush or account for deferred formatter mutations before committing, pushing, and asserting a clean synchronized checkout, and must reject completion while deferred formatting can still mutate tracked files.\nImpact: Autonomous completion can make a false clean-state claim and leave tracked changes unpublished after successful completion.\nSuggested improvement: Make the coded finish path flush formatting before final verification and commit/push (for example by using the existing immediate-format path), then gate completion on there being no pending deferred formatter capable of changing tracked files.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/fd3c98a2-d57e-4a6a-8d46-cc56c957dd6b",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1359,
+              "file": "01-deferred-format-after-completion.log",
+              "sha256": "15e7c47a9c070028899afcf705a2cce5757edf158393a688db40e32e4cfb8397"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-08-29T18:33:36.467Z",
+          "workflowId": "01a04ecb-5ec2-78ac-9ac0-781ede0367db"
+        }
+      ],
+      "id": "work-2.report-db4cfaea-d854-4907-b0da-69b51b0445bc",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [
+        "wo:improvement-safety BLOCKED Making immediate formatting unconditional changes a broad finalizer default and may reformat task-owned files unexpectedly; rollback is reverting the focused helper and test commit, with Git preserving pre-change content.",
+        "wo:improvement-safety APPROVED User approved default formatting despite the risk that finalization may reformat task-owned eligible files; rollback is reverting the focused helper and test commit to restore explicit opt-in formatting."
+      ],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A live /wo → Improve project run committed and pushed its changes, verified master was clean and synchronized, and successfully ca",
+      "type": "task",
+      "updatedAt": "2026-08-29T18:33:36.500Z"
+    },
     "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
       "createdAt": "2026-08-12T16:54:19.072Z",
       "dependencies": [
@@ -12636,7 +12698,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T18:27:58.431Z"
+    "updatedAt": "2026-08-29T18:52:01.728Z"
   },
   "schemaVersion": 1
 }

@@ -179,7 +179,8 @@ try {
 		`console.log("[]");`,
 	);
 	assert(
-		invalidCheck.status === "FAIL" && invalidCheck.failed_assertions.length === 1,
+		invalidCheck.status === "FAIL" &&
+			invalidCheck.failed_assertions.length === 1,
 		"temp checks reject JSON without an explicit PASS or FAIL status",
 	);
 
@@ -232,7 +233,9 @@ try {
 				timestamp: "2026-01-01T00:00:02.000Z",
 				usage: { input: 5, output: 2, cacheRead: 11, cost: 0.1 },
 				message: {
-					content: [{ type: "toolCall", name: "read", arguments: { path: "x" } }],
+					content: [
+						{ type: "toolCall", name: "read", arguments: { path: "x" } },
+					],
 				},
 			},
 			{ role: "toolResult", text: "pi tool output" },
@@ -361,7 +364,8 @@ try {
 	);
 	assert(
 		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status ===
-			"no-op" && readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
+			"no-op" &&
+			readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
 		"legacy instruction cleanup is a no-op when markers are absent",
 	);
 	assert(
@@ -401,7 +405,8 @@ try {
 	}
 	rmSync(cleanupFile);
 	assert(
-		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status === "no-op",
+		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status ===
+			"no-op",
 		"legacy instruction cleanup is a no-op when AGENTS.md is absent",
 	);
 	const outsideFile = path.join(cwd, "AGENTS.md");
@@ -501,7 +506,10 @@ try {
 	});
 	execFileSync("git", ["config", "user.name", "Test"], { cwd: finishCwd });
 	writeFileSync(path.join(finishCwd, ".gitignore"), ".ce-workflow/\n");
-	writeFileSync(path.join(finishCwd, "result.js"), "const result = 'before';\n");
+	writeFileSync(
+		path.join(finishCwd, "result.js"),
+		"const result = 'before';\n",
+	);
 	const deletedAutomaticEvidenceFile =
 		"docs/evidence/TASK-EVIDENCE-AUTO/obsolete.png";
 	mkdirSync(path.join(finishCwd, path.dirname(deletedAutomaticEvidenceFile)), {
@@ -523,8 +531,9 @@ try {
 	const fakeFormatter = path.join(cwd, "fake-biome.mjs");
 	writeFileSync(
 		fakeFormatter,
-		'#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst files = process.argv.slice(2);\nif (files.some((file) => file.replaceAll("\\\\", "/").endsWith(".ce-workflow/work-items.json"))) throw new Error("runtime store must not be formatted");\nfor (const file of files) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
+		'#!/usr/bin/env node\nimport { statSync, writeFileSync } from "node:fs";\nconst files = process.argv.slice(process.argv.indexOf("--write") + 1);\nif (files.some((file) => file.replaceAll("\\\\", "/").endsWith(".ce-workflow/work-items.json"))) throw new Error("runtime store must not be formatted");\nif (files.some((file) => statSync(file).size > 10 * 1024 * 1024)) throw new Error("oversized source must not be formatted");\nfor (const file of files) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
 	);
+	process.env.WORK_ORCH_FORMATTER_BIN = fakeFormatter;
 	const fakeBdScript = path.join(finishCwd, "tracker-must-not-run");
 	let shardTraversalError = "";
 	try {
@@ -538,6 +547,7 @@ try {
 				"2",
 				"--message",
 				"reject shard traversal",
+				"--skip-format",
 				"--verify",
 				`"${process.execPath}" -e "process.stdout.write('ok')"`,
 				"--verify-shard",
@@ -571,7 +581,6 @@ try {
 				`"${process.execPath}" -e "process.stdout.write('checked')"`,
 				"--expect",
 				"checked",
-				"--immediate-format",
 			],
 			{
 				cwd: finishCwd,
@@ -592,7 +601,7 @@ try {
 				'"after"',
 			) &&
 			finished.clean,
-		"finish-task closes and leaves git clean",
+		"finish-task formats by default, excludes workflow state, and leaves git clean",
 	);
 	writeFileSync(path.join(finishCwd, "large.js"), "");
 	truncateSync(path.join(finishCwd, "large.js"), 10 * 1024 * 1024 + 1);
