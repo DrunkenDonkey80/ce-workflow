@@ -302,9 +302,14 @@ rejects(
 	"plan authority cannot load catch-up POV resource",
 );
 
-const tamperRoot = mkdtempSync(path.join(os.tmpdir(), "private-workflow-tamper-"));
+const tamperRoot = mkdtempSync(
+	path.join(os.tmpdir(), "private-workflow-tamper-"),
+);
 const tamperResourceRoot = path.join(tamperRoot, "private-workflows");
-const tamperInventoryPath = path.join(tamperRoot, "work-compound-inventory.json");
+const tamperInventoryPath = path.join(
+	tamperRoot,
+	"work-compound-inventory.json",
+);
 const restoreTamperFixture = () => {
 	mkdirSync(tamperResourceRoot, { recursive: true });
 	for (const [name, bytes] of Object.entries(generated))
