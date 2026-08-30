@@ -260,6 +260,56 @@ try {
 		"blocked",
 		"durable blocker releases the active writer fence",
 	);
+	const browserRunner = path.join(cwd, "browser-runner.mjs");
+	writeFileSync(
+		browserRunner,
+		'import { mkdirSync, writeFileSync } from "node:fs"; mkdirSync("artifacts", { recursive: true }); writeFileSync("artifacts/browser.png", "current-render"); process.stdout.write(JSON.stringify({ artifacts: { screenshot: "artifacts/browser.png" }, cleanup: { ok: true } }));',
+	);
+	const adapterContract = {
+		version: 1,
+		required: [
+			{
+				id: "render",
+				capability: "browser",
+				proof: "visual",
+				source: "rendered fixture",
+				artifacts: ["screenshot"],
+				inspection: "goal",
+				operation: {
+					command: `${JSON.stringify(process.execPath)} ${JSON.stringify(browserRunner)}`,
+					expectedExit: 0,
+					assertions: [{ target: "exit", operator: "equals", value: "0" }],
+				},
+			},
+		],
+	};
+	const adapterCreated = JSON.parse(
+		run(
+			"work-create",
+			"Browser adapter proof",
+			"--parent",
+			"E-1",
+			"--verification-contract",
+			JSON.stringify(adapterContract),
+		),
+	);
+	const adapterProof = JSON.parse(
+		run(
+			"work-run-proof",
+			adapterCreated.id,
+			"render",
+			"--inspection",
+			"The current render has the expected hierarchy and state.",
+		),
+	);
+	assert.equal(adapterProof.proof.issuer.id, "ce.browser.command");
+	assert.equal(adapterProof.verificationStatus.ok, true);
+	writeFileSync(path.join(cwd, "artifacts", "browser.png"), "stale-render");
+	assert.equal(
+		JSON.parse(run("work-summary", adapterCreated.id)).verificationStatus.ok,
+		false,
+		"browser screenshot evidence becomes stale when its bytes change",
+	);
 	writeFileSync(
 		path.join(cwd, "assertion.json"),
 		'{"status":"ok","--forbid-string":"present"}\n',

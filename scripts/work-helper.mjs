@@ -41,6 +41,7 @@ import {
 	hasProductionDiff,
 	readReviewPolicy,
 } from "../extensions/work-quality-policy.js";
+import { runCapabilityAdapter } from "../extensions/work-capability-adapters.js";
 import {
 	compatibilityVerificationContract,
 	fileArtifact,
@@ -1738,6 +1739,41 @@ try {
 			rememberWorkflowEpicForHelper(cwd, created);
 		}
 		print(summary(created, 300));
+	} else if (command === "work-run-proof") {
+		const [id, proofId] = positional();
+		const task = readWorkItem(id);
+		if (!task?.verificationContract || !proofId)
+			throw new Error(
+				"usage: work-run-proof <work-item-id> <proof-id> [--inspection <goal observation>]",
+			);
+		const requirement = task.verificationContract.required.find(
+			(entry) => entry.id === proofId,
+		);
+		if (!requirement)
+			throw new Error(`verification proof is not declared: ${proofId}`);
+		const revision = workspaceVerificationRevision(cwd);
+		const result = runCapabilityAdapter({
+			cwd,
+			requirement,
+			revision,
+			inspection: option("--inspection"),
+		});
+		const record = verificationProofRecord(task.verificationContract, proofId, {
+			...result,
+			targetRevision: result.targetRevision ?? revision,
+		});
+		const updated = mutateStore(cwd, (store) => {
+			updateWorkItem(store, id, {
+				verificationRevision: revision,
+				...(record.status === "BLOCKED" ? { status: "blocked" } : {}),
+			});
+			return addWorkEvidence(store, id, record);
+		});
+		print({
+			status: "recorded",
+			proof: record,
+			verificationStatus: verificationContractStatus(updated, { cwd, revision }),
+		});
 	} else if (command === "work-proof") {
 		const [id, positionalProofId] = positional();
 		const proofId = option("--proof-id", positionalProofId);
@@ -2062,7 +2098,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-proof|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-roadmap|bootstrap-plan-epic|legacy-instructions-preview|legacy-instructions-apply|json-assert> ...",
+			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-run-proof|work-proof|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-roadmap|bootstrap-plan-epic|legacy-instructions-preview|legacy-instructions-apply|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}
