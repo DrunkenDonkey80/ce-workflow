@@ -162,14 +162,18 @@ import {
 	COMPACTION_PROFILES,
 	compactionProfileFor,
 	compactionThreshold,
+	contextFilterCutIndex,
 	contentText,
 	filesFromOps,
 	formatCompactionSummary,
 } from "./work-compaction.js";
 
 let withFileMutationQueue = async (_file, mutation) => mutation();
+let estimateContextMessageTokens = (message) =>
+	Math.ceil(JSON.stringify(message ?? {}).length / 4);
 try {
-	({ withFileMutationQueue } = await import("@earendil-works/pi-coding-agent"));
+	({ withFileMutationQueue, estimateTokens: estimateContextMessageTokens } =
+		await import("@earendil-works/pi-coding-agent"));
 } catch {
 	// Local fixture runs do not install Pi peer dependencies.
 }
@@ -682,10 +686,19 @@ const contextCompactState = {
 	targetId: null,
 	workflowAuthorization: null,
 };
-let manualMicrocompactPending = false;
+const contextFilterState = {
+	requested: false,
+	active: false,
+	summary: "",
+	cutIndex: 0,
+	tokensBefore: 0,
+	targetId: null,
+	anchor: null,
+	userAnchor: null,
+	snapshot: null,
+};
+let contextFilterPersistenceTimer = null;
 let manualMicrocompactGoalResume = null;
-let manualMicrocompactResumePrompt = null;
-let manualMicrocompactWorkflowRunId = null;
 let pendingCompactionWorkflowAuthorization = null;
 let pendingWorkPrompt = null;
 let pendingPromptBackedAgentStart = false;
@@ -719,6 +732,10 @@ let workGoalRecovery = null;
 let workGoalCompactionResume = null;
 let workGoalProgressTimer = null;
 let workGoalUsageLimitTimer = null;
+let orchestratorPauseRequest = null;
+let orchestratorPausedJob = null;
+let orchestratorCompactState = null;
+let hideGracefulPauseAbort = false;
 let workExtensionPi;
 const extensionScoutRuns = new Map();
 
@@ -1906,7 +1923,12 @@ function failureStatusNote(run, event, telemetry, file) {
 }
 
 function appendFailureStatusNote(cwd, workItemId, run, event, telemetry, file) {
-	if (!workItemId || !hasWorkAgentFailure(event, telemetry)) return;
+	if (
+		!workItemId ||
+		statusOf(readWorkItem(cwd, workItemId)) === "closed" ||
+		!hasWorkAgentFailure(event, telemetry)
+	)
+		return;
 	try {
 		appendWorkflowWorkItemNote(
 			cwd,
@@ -4407,11 +4429,13 @@ function applyInlineSlicePlan(cwd, state, issue) {
 			labels: [...new Set([...labelsOf(issue), "wo:slice-planned"])],
 			notes: `${notesOf(issue)}\n${plan}`,
 		};
-		const advisorStep = advisorCriticStep(
-			cwd,
-			`slice plan note on WorkItem ${idOf(issue)}`,
-			workOrchSettings(cwd).advisorUsageForSlicePlans,
-		);
+		const advisorStep = labelsOf(issue).includes("wo:materialized")
+			? ""
+			: advisorCriticStep(
+					cwd,
+					`slice plan note on WorkItem ${idOf(issue)}`,
+					workOrchSettings(cwd).advisorUsageForSlicePlans,
+				);
 		return withHandoffPrompt(
 			withImplementationPolicy(
 				{
@@ -5560,44 +5584,275 @@ function compactionGoal(goal) {
 	};
 }
 
+function liveCompactionGoal(goal) {
+	return goal && AUTONOMOUS_GOAL_STATUSES.includes(goal.status) ? goal : null;
+}
+
 function compactionTargetId(goal) {
 	return (
 		contextCompactState.targetId ??
 		activeWorkAgent?.meta?.workItemId ??
 		pendingWorkPrompt?.meta?.workItemId ??
-		workGoalTargetId(goal) ??
+		workGoalTargetId(liveCompactionGoal(goal)) ??
 		null
 	);
 }
 
-function buildCompactionContext(event, ctx, current) {
+function mergedCompactionPreparation(event) {
+	const source = event?.preparation ?? {};
+	const previousFiles = asArray(event?.branchEntries)
+		.toReversed()
+		.find((entry) => entry?.type === "compaction" && entry?.details?.files)
+		?.details?.files;
+	const current = filesFromOps(source.fileOps);
+	const previous = filesFromOps(previousFiles);
+	return {
+		...source,
+		fileOps: {
+			readFiles: [...previous.read, ...current.read],
+			modifiedFiles: [...previous.modified, ...current.modified],
+		},
+	};
+}
+
+function captureCompactionState(ctx) {
 	const loadedGoal = activeWorkGoal ?? loadWorkGoalFromSession(ctx);
 	const goal =
-		loadedGoal && AUTONOMOUS_GOAL_STATUSES.includes(loadedGoal.status)
-			? loadedGoal
+		activeWorkGoal?.id === loadedGoal?.id
+			? liveCompactionGoal(activeWorkGoal)
 			: null;
 	const targetId = compactionTargetId(goal);
 	const profile = compactionProfileFor({
 		goalStatus: goal?.status,
 		targetId,
 	});
+	const parkedGoal = compactionGoal(loadedGoal);
 	const durable =
-		profile === COMPACTION_PROFILES.FREEFORM
+		profile === COMPACTION_PROFILES.FREEFORM && !parkedGoal
 			? null
 			: buildCompactionProjection(ctx.cwd, targetId, profile);
-	const compactGoal = compactionGoal(goal);
+	return { profile, durable, goal: parkedGoal, targetId };
+}
+
+function buildCompactionContext(event, ctx, current) {
+	const state = captureCompactionState(ctx);
+	const preparation = mergedCompactionPreparation(event);
+	const currentMessages =
+		(Array.isArray(event?.messages) && event.messages) ||
+		ctx.sessionManager?.buildSessionContext?.().messages ||
+		[];
+	const files = filesFromOps(preparation.fileOps);
 	return {
-		profile,
-		durable,
-		goal: compactGoal,
+		...state,
+		files,
 		summary: formatCompactionSummary({
-			profile,
-			preparation: event.preparation,
-			durable,
-			goal: compactGoal,
+			profile: state.profile,
+			preparation,
+			currentMessages,
+			durable: state.durable,
+			goal: state.goal,
 			maxSummaryChars: effectiveSummaryChars(current),
 		}),
 	};
+}
+
+function resetContextFilter() {
+	if (contextFilterPersistenceTimer) clearTimeout(contextFilterPersistenceTimer);
+	contextFilterPersistenceTimer = null;
+	contextFilterState.requested = false;
+	contextFilterState.active = false;
+	contextFilterState.summary = "";
+	contextFilterState.cutIndex = 0;
+	contextFilterState.tokensBefore = 0;
+	contextFilterState.targetId = null;
+	contextFilterState.anchor = null;
+	contextFilterState.userAnchor = null;
+	contextFilterState.snapshot = null;
+}
+
+function contextFilterFileOps(messages) {
+	const read = [];
+	const modified = [];
+	for (const message of messages) {
+		if (message?.role !== "assistant" || !Array.isArray(message.content))
+			continue;
+		for (const part of message.content) {
+			if (part?.type !== "toolCall") continue;
+			const name = String(part.name ?? "").toLowerCase();
+			const path = String(part.arguments?.path ?? "").trim();
+			if (!path) continue;
+			if (name === "read") read.push(path);
+			if (name === "edit" || name === "write") modified.push(path);
+		}
+	}
+	return { read, modified };
+}
+
+function contextMessageAnchor(message) {
+	if (!message) return null;
+	const calls = Array.isArray(message.content)
+		? message.content
+				.filter((part) => part?.type === "toolCall")
+				.map((part) => [part.id, part.name])
+		: [];
+	return createHash("sha256")
+		.update(
+			JSON.stringify({
+				role: message.role,
+				timestamp: message.timestamp,
+				toolCallId: message.toolCallId,
+				toolName: message.toolName,
+				calls,
+				text: contentText(message.content ?? message.message).slice(0, 500),
+			}),
+		)
+		.digest("hex")
+		.slice(0, 16);
+}
+
+function captureContextFilterSnapshot(ctx) {
+	let settings = {};
+	try {
+		settings = readEffectiveSettings(ctx.cwd);
+	} catch {
+		// Use defaults when settings are unreadable.
+	}
+	return {
+		state: captureCompactionState(ctx),
+		current: contextSettings(settings),
+		threshold: compactionThresholdFor(ctx, settings),
+		contextWindow: Number(ctx.model?.contextWindow ?? ctx.model?.context_window),
+	};
+}
+
+function prepareContextFilter(event) {
+	contextFilterState.requested = false;
+	const snapshot = contextFilterState.snapshot;
+	if (!snapshot) return false;
+	const messages = Array.isArray(event.messages) ? event.messages : [];
+	const { threshold, contextWindow, state, current } = snapshot;
+	const maxCurrentTurnTokens = Number.isFinite(contextWindow)
+		? Math.max(threshold.effectiveKeepRecentTokens, Math.floor(contextWindow / 2))
+		: Number.POSITIVE_INFINITY;
+	const cutIndex = contextFilterCutIndex(
+		messages,
+		threshold.effectiveKeepRecentTokens,
+		maxCurrentTurnTokens,
+		estimateContextMessageTokens,
+	);
+	if (!cutIndex) return false;
+	const removed = messages.slice(0, cutIndex);
+	const previousSummary = removed
+		.filter((message) => message?.role === "compactionSummary")
+		.at(-1)?.summary;
+	const tokensBefore = contextMessagesTokens(messages);
+	const preparation = {
+		messagesToSummarize: removed,
+		turnPrefixMessages: [],
+		previousSummary,
+		fileOps: contextFilterFileOps(removed),
+		tokensBefore,
+	};
+	contextFilterState.active = true;
+	contextFilterState.summary = formatCompactionSummary({
+		profile: state.profile,
+		preparation,
+		currentMessages: messages,
+		durable: state.durable,
+		goal: state.goal,
+		maxSummaryChars: effectiveSummaryChars(current),
+	});
+	contextFilterState.cutIndex = cutIndex;
+	contextFilterState.tokensBefore = tokensBefore;
+	contextFilterState.anchor = contextMessageAnchor(messages[cutIndex]);
+	contextFilterState.userAnchor = contextMessageAnchor(
+		messages.findLast((message) => message?.role === "user"),
+	);
+	return true;
+}
+
+function validFilteredContext(messages) {
+	return (
+		contextFilterState.active &&
+		contextFilterState.cutIndex > 0 &&
+		contextFilterState.cutIndex < messages.length &&
+		messages[contextFilterState.cutIndex]?.role !== "toolResult" &&
+		contextMessageAnchor(messages[contextFilterState.cutIndex]) ===
+			contextFilterState.anchor &&
+		contextMessageAnchor(
+			messages.findLast((message) => message?.role === "user"),
+		) === contextFilterState.userAnchor
+	);
+}
+
+function contextMessagesTokens(messages) {
+	return messages.reduce(
+		(total, message) =>
+			total + Math.max(1, Number(estimateContextMessageTokens(message)) || 0),
+		0,
+	);
+}
+
+function filteredContext(event) {
+	const messages = Array.isArray(event.messages) ? event.messages : [];
+	if (contextFilterState.active && !validFilteredContext(messages)) {
+		resetContextFilter();
+		return;
+	}
+	if (contextFilterState.active) {
+		const snapshot = contextFilterState.snapshot;
+		const keep = snapshot?.threshold?.effectiveKeepRecentTokens ?? 0;
+		const limit = Number.isFinite(snapshot?.contextWindow)
+			? Math.max(keep, Math.floor(snapshot.contextWindow / 2))
+			: keep;
+		if (
+			limit > 0 &&
+			contextMessagesTokens(messages.slice(contextFilterState.cutIndex)) > limit
+		)
+			contextFilterState.requested = true;
+	}
+	if (contextFilterState.requested) prepareContextFilter(event);
+	if (!contextFilterState.active) return;
+	return {
+		messages: [
+			{
+				role: "compactionSummary",
+				summary: contextFilterState.summary,
+				tokensBefore: contextFilterState.tokensBefore,
+				timestamp: Date.now(),
+			},
+			...messages.slice(contextFilterState.cutIndex),
+		],
+	};
+}
+
+function requestContextFilter(ctx) {
+	const snapshot =
+		contextFilterState.snapshot ?? captureContextFilterSnapshot(ctx);
+	contextFilterState.requested = true;
+	contextFilterState.snapshot = snapshot;
+	contextFilterState.targetId = snapshot.state.targetId;
+	return true;
+}
+
+function scheduleFilteredContextPersistence(ctx) {
+	if (
+		!contextFilterState.active ||
+		contextFilterPersistenceTimer ||
+		contextCompactState.inFlight
+	)
+		return;
+	contextFilterPersistenceTimer = setTimeout(() => {
+		contextFilterPersistenceTimer = null;
+		if (
+			!contextFilterState.active ||
+			ctx.isIdle?.() === false ||
+			ctx.hasPendingMessages?.() ||
+			contextCompactState.inFlight
+		)
+			return;
+		runNativeMicrocompact(ctx);
+	}, 0);
 }
 
 function contextStatus(ctx, settings) {
@@ -5615,12 +5870,12 @@ function contextStatus(ctx, settings) {
 			? `Reserved headroom: ${threshold.headroom.toLocaleString()} tokens (ceiling ${threshold.ceiling.toLocaleString()})`
 			: "Reserved headroom: model context window unavailable",
 		`Summary budget: ${effectiveSummaryChars(current).toLocaleString()} chars`,
-		"Compaction style: deterministic local profiles; context guard settings control proactive triggering only.",
+		`In-work filter: ${contextFilterState.active || contextFilterState.requested ? "active" : "inactive"}`,
+		"Compaction style: non-blocking context filtering during work, persisted native compaction when idle.",
 	].join("\n");
 }
 
 function beginContextCompaction(targetId = null, owner = "ce-workflow") {
-	manualMicrocompactPending = false;
 	const workflow = currentCommandWorkflow();
 	contextCompactState.generation += 1;
 	contextCompactState.inFlight = true;
@@ -5654,6 +5909,7 @@ function finishContextCompaction(generation) {
 }
 
 function resetContextCompaction() {
+	resetContextFilter();
 	contextCompactState.generation += 1;
 	contextCompactState.inFlight = false;
 	contextCompactState.requested = false;
@@ -5681,29 +5937,9 @@ function resumeWorkGoalAfterCompaction(ctx, goalId, generation) {
 	return true;
 }
 
-function maybeCompact(ctx, settings) {
-	const current = contextSettings(settings);
-	if (current.enabled === false || current.autoCompact !== true) return false;
-	const usage = ctx.getContextUsage?.();
-	if (!usage?.tokens || usage.tokens < compactTriggerTokens(ctx, settings))
+function runNativeMicrocompact(ctx) {
+	if (typeof ctx.compact !== "function" || contextCompactState.inFlight)
 		return false;
-	return requestManualMicrocompact(ctx);
-}
-
-function runManualMicrocompact(ctx, interruptActive = false) {
-	if (typeof ctx.compact !== "function") {
-		manualMicrocompactPending = false;
-		manualMicrocompactResumePrompt = null;
-		manualMicrocompactWorkflowRunId = null;
-		ctx.ui.notify("Microcompaction is unavailable in this mode", "warning");
-		return false;
-	}
-	if (contextCompactState.inFlight) {
-		ctx.ui.notify("Microcompaction is already in progress", "info");
-		return false;
-	}
-	const resumeAfter =
-		manualMicrocompactPending && activeWorkGoal?.status !== "active";
 	const pendingGoalContinuation =
 		activeWorkGoal?.status === "active" &&
 		workGoalContinuationPending?.goalId === activeWorkGoal.id;
@@ -5712,14 +5948,10 @@ function runManualMicrocompact(ctx, interruptActive = false) {
 		(activeWorkGoalRunning || pendingGoalContinuation)
 			? activeWorkGoal.id
 			: null;
-	const willResume = resumeAfter || Boolean(resumeGoalId);
-	const workflowPrompt = manualMicrocompactResumePrompt;
-	manualMicrocompactResumePrompt = null;
-	const targetId =
-		activeWorkAgent?.meta?.workItemId ??
-		pendingWorkPrompt?.meta?.workItemId ??
-		workGoalTargetId(activeWorkGoal);
-	const generation = beginContextCompaction(targetId);
+	const generation = beginContextCompaction(
+		contextFilterState.targetId ??
+			workGoalTargetId(liveCompactionGoal(activeWorkGoal)),
+	);
 	if (resumeGoalId)
 		manualMicrocompactGoalResume = {
 			goalId: resumeGoalId,
@@ -5728,75 +5960,52 @@ function runManualMicrocompact(ctx, interruptActive = false) {
 			requested: false,
 			note: "",
 		};
-	const resume = () => {
-		if (
-			resumeGoalId &&
-			resumeWorkGoalAfterCompaction(ctx, resumeGoalId, generation)
-		)
-			return;
-		if (!resumeAfter) return;
-		const message = workflowPrompt
-			? `Continue the active work-orchestrator turn after compaction. Resume from current native work-item store and git state; do not repeat completed steps. The original self-contained handoff follows:\n\n${workflowPrompt}`
-			: "Continue from the compacted context and finish the current work-orchestrator task.";
-		void sendFollowUp(ctx, message, workExtensionPi).catch((error) =>
-			ctx.ui.notify(
-				`Could not resume after microcompaction: ${formatError(error)}`,
-				"warning",
-			),
-		);
+	const finish = (error) => {
+		if (!finishContextCompaction(generation)) return;
+		if (error)
+			ctx.ui.notify(`Microcompaction failed: ${formatError(error)}`, "warning");
+		if (resumeGoalId)
+			resumeWorkGoalAfterCompaction(ctx, resumeGoalId, generation);
 	};
-	if (interruptActive) ctx.abort?.();
-	ctx.ui.notify("Microcompaction started", "info");
 	try {
 		ctx.compact({
 			customInstructions:
-				"work-context on-demand microcompact: preserve current goals, native work-item store/git state, file changes, blockers, and next action; omit reasoning and full tool logs.",
-			onComplete: () => {
-				if (!finishContextCompaction(generation)) return;
-				ctx.ui.notify(
-					willResume
-						? "Microcompaction completed; resuming work"
-						: "Microcompaction completed",
-					"info",
-				);
-				resume();
-			},
-			onError: (error) => {
-				if (!finishContextCompaction(generation)) return;
-				ctx.ui.notify(`Microcompaction failed: ${error.message}`, "warning");
-				resume();
-			},
+				"work-context microcompact: preserve the latest user requests, live goal or parked-goal status, native work-item/git state, changed paths, decisions, blockers, failed-tool evidence, bounded successful-tool results, and next action. Omit reasoning, replayable read/write/edit payloads, filler, and full logs.",
+			onComplete: () => finish(),
+			onError: finish,
 		});
 		return true;
 	} catch (error) {
-		finishContextCompaction(generation);
-		ctx.ui.notify(`Microcompaction failed: ${formatError(error)}`, "warning");
-		resume();
+		finish(error);
 		return false;
 	}
 }
 
-function requestManualMicrocompact(ctx) {
-	if (typeof ctx.compact !== "function") return runManualMicrocompact(ctx);
+function maybeCompact(ctx, settings) {
+	const current = contextSettings(settings);
+	if (current.enabled === false || current.autoCompact !== true) return false;
+	const usage = ctx.getContextUsage?.();
+	if (!usage?.tokens || usage.tokens < compactTriggerTokens(ctx, settings))
+		return false;
+	return ctx.isIdle?.() === false
+		? requestContextFilter(ctx)
+		: runNativeMicrocompact(ctx);
+}
+
+function requestMicrocompact(ctx) {
 	if (contextCompactState.inFlight) {
-		if (ctx.isIdle?.() === false) {
-			ctx.ui.notify(
-				"Microcompaction is queued; pausing the current turn now",
-				"info",
-			);
-			ctx.abort?.();
-			return true;
-		}
 		ctx.ui.notify("Microcompaction is already in progress", "info");
 		return false;
 	}
-	if (ctx.isIdle?.() !== false) return runManualMicrocompact(ctx);
-	manualMicrocompactPending = true;
-	const workflow = activeWorkAgent ?? pendingWorkPrompt;
-	manualMicrocompactResumePrompt = workflow?.prompt ?? null;
-	manualMicrocompactWorkflowRunId = workflow?.meta?.workflowRunId ?? null;
-	ctx.ui.notify("Pausing the current turn for microcompaction", "info");
-	return runManualMicrocompact(ctx, true);
+	if (ctx.isIdle?.() === false) return requestContextFilter(ctx);
+	if (typeof ctx.compact !== "function") {
+		ctx.ui.notify(
+			"Persistent microcompaction is unavailable in this mode",
+			"warning",
+		);
+		return false;
+	}
+	return runNativeMicrocompact(ctx);
 }
 
 function nodeScript(value) {
@@ -7889,9 +8098,10 @@ function buildEpicChildState(cwd, epic) {
 	});
 	const finiteBacklogPlanned = workItems.some(
 		(issue) =>
-			isPlanningIssue(issue) &&
-			statusOf(issue) === "closed" &&
-			notesOf(issue).includes(FINITE_BACKLOG_MARKER),
+			(isPlanningIssue(issue) &&
+				statusOf(issue) === "closed" &&
+				notesOf(issue).includes(FINITE_BACKLOG_MARKER)) ||
+			labelsOf(issue).includes("wo:materialized"),
 	);
 	return {
 		epicId,
@@ -8700,10 +8910,11 @@ function claimGoalOwnedImplementation(cwd, state, owner = {}) {
 				ownerSession,
 				goalId,
 				generation:
-					window?.state === "active" ? window.generation : (window?.generation ?? 0) + 1,
+					window?.state === "active"
+						? window.generation
+						: (window?.generation ?? 0) + 1,
 				state: "active",
-				acquiredAt:
-					window?.state === "active" ? window.acquiredAt : timestamp,
+				acquiredAt: window?.state === "active" ? window.acquiredAt : timestamp,
 				updatedAt: timestamp,
 			},
 		});
@@ -12498,6 +12709,7 @@ function createWorkflowWorkItem(
 		designFile,
 		acceptance,
 		labels,
+		verificationContract,
 	},
 ) {
 	const item = mutateStore(cwd, (store) =>
@@ -12511,6 +12723,7 @@ function createWorkflowWorkItem(
 				: [],
 			description,
 			acceptance,
+			verificationContract,
 			documentLinks: designFile
 				? { design: designFile }
 				: design
@@ -13178,7 +13391,8 @@ function claimWorkflowWorkItem(cwd, issue) {
 		error.reason = "planning-required";
 		throw error;
 	}
-	if (statusOf(issue) === "in_progress" && issue.verificationContract) return issue;
+	if (statusOf(issue) === "in_progress" && issue.verificationContract)
+		return issue;
 	return updateWorkItemNative(cwd, idOf(issue), {
 		status: "in_progress",
 		verificationContract: contract,
@@ -18243,8 +18457,8 @@ async function handleWorkCatchUpCommand(args, pi, ctx) {
 function workProjectAutopilotAppendix() {
 	return `Project autopilot policy:
 - Treat the target directory as the source of truth: verify git and native work-item store state there before mutating anything.
-- Keep intake, target selection, finish gates, commit, close, and push coded in the current session. Route every bounded implementation through the configured work-worker model.
-- Do not call subagent list or ask an LLM to select a role. Call the exact role directly: work-worker for implementation, work-planner for ambiguous/large slicing, work-debugger for root-cause failures, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
+- Keep intake, target selection, finish gates, commit, close, and push coded in the current session. The active project goal owns routine implementation directly from claim through proof and correction; do not hand it to a fresh work-worker context.
+- Do not call subagent list or ask an LLM to select a role. Use specialists only for coded exceptions: work-planner for genuinely missing/invalid slicing, work-debugger for unexplained root-cause failures, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
 - When a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child.
 - Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
 - Resume work starts the autonomous project loop. Inside that loop, advance one deterministic WorkItem boundary at a time so coded gates, prefetch, review, and recovery remain authoritative.
@@ -19569,7 +19783,7 @@ function completeActiveWorkGoal(summary, ctx, pi) {
 	clearWorkGoalUsageLimitTimer();
 	persistWorkGoal(pi, null);
 	updateWorkGoalStatus(ctx, null);
-	ctx.ui.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
+	stopWorkGoalProgressTimer(ctx);
 	const completionLabel =
 		goal.mode === "improvement"
 			? "Project improvement complete"
@@ -19857,6 +20071,204 @@ async function handleWorkResumeGoalCommand(args, pi, ctx) {
 	return command.kind === "edit"
 		? handleWorkGoalCommand(`edit ${objective}`, "project", pi, ctx)
 		: startWorkGoal("project", objective, pi, ctx);
+}
+
+function latestPiGoal(ctx) {
+	const entries =
+		ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? [];
+	for (let index = entries.length - 1; index >= 0; index -= 1) {
+		const entry = entries[index];
+		if (entry?.type !== "custom" || entry.customType !== "goal-state") continue;
+		return entry.data?.goal ?? null;
+	}
+	return null;
+}
+
+function currentOrchestratorJob(ctx) {
+	if (activeWorkGoal?.status === "active")
+		return {
+			kind: "work-goal",
+			id: activeWorkGoal.id,
+			mode: activeWorkGoal.mode,
+			status: activeWorkGoal.status,
+		};
+	const goal = latestPiGoal(ctx);
+	if (goal?.status === "active")
+		return { kind: "pi-goal", id: goal.id, status: goal.status };
+	const workflow = activeWorkAgent ?? pendingWorkPrompt;
+	if (workflow?.prompt && ctx.isIdle?.() === false)
+		return {
+			kind: "workflow",
+			prompt: workflow.prompt,
+			workflowRunId: workflow.meta?.workflowRunId,
+		};
+	return { kind: ctx.isIdle?.() === false ? "direct" : "idle" };
+}
+
+async function sendPiGoalCommand(pi, command) {
+	if (typeof pi?.sendUserMessage !== "function")
+		throw new Error("pi-goal command dispatch is unavailable");
+	await pi.sendUserMessage(`/goal ${command}`, { expandPromptTemplates: true });
+}
+
+async function completeOrchestratorPause(job, ctx, pi) {
+	if (
+		job.kind === "work-goal" &&
+		activeWorkGoal?.id === job.id &&
+		activeWorkGoal.status === "active"
+	)
+		await handleWorkGoalCommand("pause", activeWorkGoal.mode, pi, ctx);
+	if (job.kind === "pi-goal" && latestPiGoal(ctx)?.status === "active")
+		await sendPiGoalCommand(pi, "pause");
+	orchestratorPausedJob = job;
+}
+
+async function resumeOrchestratorJob(job, answer, ctx, pi) {
+	if (orchestratorCompactState) {
+		ctx.ui.notify(
+			"Compaction is still finishing; resume is already scheduled.",
+			"info",
+		);
+		return;
+	}
+	if (job?.kind === "work-goal") {
+		if (activeWorkGoal?.id !== job.id) {
+			ctx.ui.notify("The paused autonomous goal is no longer current.", "warning");
+			return;
+		}
+		orchestratorPausedJob = null;
+		return handleWorkGoalCommand(
+			`resume${answer ? ` ${answer}` : ""}`,
+			activeWorkGoal.mode,
+			pi,
+			ctx,
+		);
+	}
+	if (job?.kind === "pi-goal") {
+		orchestratorPausedJob = null;
+		return sendPiGoalCommand(pi, "resume");
+	}
+	orchestratorPausedJob = null;
+	if (job?.kind === "idle") return;
+	if (job?.kind === "workflow")
+		return sendFollowUp(
+			ctx,
+			`Continue the active work-orchestrator turn from the last completed tool boundary; do not repeat completed steps.${answer ? ` User guidance: ${answer}` : ""}\n\n${job.prompt}`,
+			pi,
+		);
+	return sendFollowUp(
+		ctx,
+		answer
+			? `Continue from the last completed tool boundary. User guidance: ${answer}`
+			: "Continue from the last completed tool boundary.",
+		pi,
+	);
+}
+
+function compactPausedOrchestrator(job, ctx, pi) {
+	if (contextCompactState.inFlight) {
+		ctx.ui.notify(
+			"Compaction is already in progress; the job remains paused.",
+			"warning",
+		);
+		return false;
+	}
+	if (typeof ctx.compact !== "function") {
+		ctx.ui.notify(
+			"Compaction is unavailable; the job remains paused.",
+			"warning",
+		);
+		return false;
+	}
+	const generation = beginContextCompaction(workGoalTargetId(activeWorkGoal));
+	const state = { job, generation };
+	orchestratorCompactState = state;
+	const finish = (error) => {
+		if (orchestratorCompactState !== state) return;
+		finishContextCompaction(generation);
+		orchestratorCompactState = null;
+		ctx.ui.notify(
+			error
+				? `Microcompaction failed; resuming unchanged: ${formatError(error)}`
+				: job.kind === "idle"
+					? "Microcompaction completed"
+					: "Microcompaction completed; resuming",
+			error ? "warning" : "info",
+		);
+		void resumeOrchestratorJob(job, "", ctx, pi).catch((resumeError) =>
+			ctx.ui.notify(
+				`Could not resume after compaction: ${formatError(resumeError)}`,
+				"warning",
+			),
+		);
+	};
+	ctx.ui.notify(
+		job.kind === "idle"
+			? "Microcompaction started"
+			: "Paused at the tool boundary; microcompacting",
+		"info",
+	);
+	try {
+		ctx.compact({
+			customInstructions:
+				"work-context on-demand microcompact at a graceful pause: preserve the current goal or direct request, completed work, Git and file state, verification evidence, blockers, and exact next action; omit reasoning and full tool logs.",
+			onComplete: () => finish(),
+			onError: finish,
+		});
+	} catch (error) {
+		finish(error);
+	}
+	return true;
+}
+
+async function requestOrchestratorPause(ctx, pi, compact = false) {
+	if (orchestratorPauseRequest) {
+		ctx.ui.notify("A graceful pause is already queued.", "info");
+		return;
+	}
+	const job = currentOrchestratorJob(ctx);
+	if (ctx.isIdle?.() === false) {
+		orchestratorPauseRequest = { job, compact, boundaryReached: false };
+		ctx.ui.notify(
+			compact
+				? "Compaction queued after the current tool batch finishes"
+				: "Graceful pause queued after the current tool batch finishes",
+			"info",
+		);
+		return;
+	}
+	await completeOrchestratorPause(job, ctx, pi);
+	if (compact) compactPausedOrchestrator(job, ctx, pi);
+	else ctx.ui.notify("Job paused. Run /wo resume to continue.", "info");
+}
+
+async function reachOrchestratorPauseBoundary(ctx, pi) {
+	const request = orchestratorPauseRequest;
+	if (!request || request.boundaryReached) return false;
+	request.boundaryReached = true;
+	await completeOrchestratorPause(request.job, ctx, pi);
+	hideGracefulPauseAbort = request.job.kind !== "idle";
+	// turn_end means every tool in this assistant batch has finished.
+	if (request.job.kind !== "idle") ctx.abort?.();
+	return true;
+}
+
+async function settleOrchestratorPause(ctx, pi) {
+	const request = orchestratorPauseRequest;
+	if (!request?.boundaryReached) return false;
+	orchestratorPauseRequest = null;
+	hideGracefulPauseAbort = false;
+	await completeOrchestratorPause(request.job, ctx, pi);
+	if (request.compact) return compactPausedOrchestrator(request.job, ctx, pi);
+	ctx.ui.notify("Job paused. Run /wo resume to continue.", "info");
+	return true;
+}
+
+function resetOrchestratorPauseState() {
+	orchestratorPauseRequest = null;
+	orchestratorPausedJob = null;
+	orchestratorCompactState = null;
+	hideGracefulPauseAbort = false;
 }
 
 async function handleWorkResumeStopCommand(args, pi, ctx) {
@@ -20853,7 +21265,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		});
 		if (!selected) return;
 		selectedIndex = selected.index;
-		if (selected.value === "microcompact") return requestManualMicrocompact(ctx);
+		if (selected.value === "microcompact") return requestMicrocompact(ctx);
 		if (selected.value === "fleet") return openWorkflowFleet(ctx, pi);
 		if (selected.value === "private-workflow-rollback") {
 			const result = rollbackPrivateWorkflowRelease(WORKFLOW_REPO_DIR);
@@ -21387,8 +21799,7 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		return { ...state, dirtyRecoveryQueued: true };
 	if (goalOwnedImplementation) {
 		const claimed = claimGoalOwnedImplementation(ctx.cwd, state, {
-			sessionId:
-				ctx.sessionManager?.getSessionId?.() ?? activeWorkGoal?.id,
+			sessionId: ctx.sessionManager?.getSessionId?.() ?? activeWorkGoal?.id,
 			goalId: activeWorkGoal?.id,
 		});
 		if (!claimed.ok) {
@@ -23413,7 +23824,7 @@ async function handleWorkContextCommand(args, ctx) {
 	if (!command || command === "status")
 		return ctx.ui.notify(contextStatus(ctx, settings), "info");
 	if (command === "compact") {
-		requestManualMicrocompact(ctx);
+		requestMicrocompact(ctx);
 		return;
 	}
 	if (["off", "disable"].includes(command)) {
@@ -24877,6 +25288,11 @@ export default function workModelsExtension(pi) {
 	}
 
 	pi.on("tool_call", (event, ctx) => {
+		try {
+			maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
+		} catch {
+			maybeCompact(ctx, {});
+		}
 		if (event.toolName === "ask_user") {
 			recordWorkGoalAskUserCall(event, pi);
 			recordDirtyRecoveryAskCall(event);
@@ -25007,9 +25423,6 @@ export default function workModelsExtension(pi) {
 		pendingWorkGoalTurn = false;
 		blockedWorkGoalTurn = false;
 		workGoalContinuationPending = null;
-		manualMicrocompactPending = false;
-		manualMicrocompactResumePrompt = null;
-		manualMicrocompactWorkflowRunId = null;
 		pendingSettledAgentEnd = null;
 		activeWorkAgent = null;
 		pendingPromptBackedAgentStart = false;
@@ -25018,6 +25431,7 @@ export default function workModelsExtension(pi) {
 		pendingVerifierSynthesis = null;
 		activeVerifierSynthesis = null;
 		resetContextCompaction();
+		resetOrchestratorPauseState();
 		clearWorkGoalRecovery();
 		if (activeWorkGoal?.status === "waiting_usage_limit")
 			scheduleWorkGoalUsageLimitRetry(pi, ctx, activeWorkGoal);
@@ -25058,9 +25472,6 @@ export default function workModelsExtension(pi) {
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
 		pendingMainEditorActions.clear();
-		manualMicrocompactPending = false;
-		manualMicrocompactResumePrompt = null;
-		manualMicrocompactWorkflowRunId = null;
 		pendingSettledAgentEnd = null;
 		activeWorkAgent = null;
 		pendingPromptBackedAgentStart = false;
@@ -25069,6 +25480,7 @@ export default function workModelsExtension(pi) {
 		pendingVerifierSynthesis = null;
 		activeVerifierSynthesis = null;
 		resetContextCompaction();
+		resetOrchestratorPauseState();
 		persistWorkGoal(pi);
 		clearWorkGoalUsageLimitTimer();
 		updateWorkGoalStatus(ctx, null);
@@ -25215,8 +25627,6 @@ export default function workModelsExtension(pi) {
 		const boundedSystemPrompt = baseSystemPrompt.includes(policyHeading)
 			? baseSystemPrompt
 			: `${baseSystemPrompt}\n\n${turnPolicy}`.trim();
-		if (meta?.workflowRunId === manualMicrocompactWorkflowRunId)
-			manualMicrocompactWorkflowRunId = null;
 		pendingWorkPrompt = meta
 			? {
 					id: telemetryId("agent"),
@@ -25352,7 +25762,7 @@ export default function workModelsExtension(pi) {
 		updateWorkGoalProgress(ctx);
 		if (
 			activeWorkGoal?.status === "active" &&
-			!manualMicrocompactPending &&
+			!orchestratorPauseRequest &&
 			!contextCompactState.inFlight
 		)
 			try {
@@ -25552,6 +25962,8 @@ export default function workModelsExtension(pi) {
 		activeHistoryTask = null;
 	};
 
+	pi.on("context", (event, ctx) => filteredContext(event, ctx));
+
 	pi.on("agent_end", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "agent_end", event);
 		pendingSettledAgentEnd = event;
@@ -25585,7 +25997,6 @@ export default function workModelsExtension(pi) {
 				compactionTargetId(activeWorkGoal),
 				"native",
 			);
-			manualMicrocompactResumePrompt = null;
 			if (activeWorkGoalRunning && activeWorkGoal?.status === "active")
 				manualMicrocompactGoalResume = {
 					goalId: activeWorkGoal.id,
@@ -25646,14 +26057,20 @@ export default function workModelsExtension(pi) {
 					profile: compacted.profile,
 					workflowAuthorization,
 					durableStateAvailable: compacted.durable?.available ?? null,
-					files: filesFromOps(preparation.fileOps),
+					files: compacted.files,
 				},
 			},
 		};
 	});
 
+	pi.on("session_before_switch", () => resetContextFilter());
+	pi.on("session_before_fork", () => resetContextFilter());
+	pi.on("session_before_tree", () => resetContextFilter());
+	pi.on("session_tree", () => resetContextFilter());
+
 	pi.on("session_compact", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "session_compact", event);
+		resetContextFilter();
 		const details = event.compactionEntry?.details;
 		const currentCompactionEntry =
 			contextCompactState.inFlight &&
@@ -25692,6 +26109,15 @@ export default function workModelsExtension(pi) {
 		}
 	});
 
+	pi.on("session_compact_failed", (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "session_compact_failed", event);
+		const generation = contextCompactState.generation;
+		if (contextCompactState.inFlight) finishContextCompaction(generation);
+		manualMicrocompactGoalResume = null;
+		workGoalCompactionResume = null;
+		pendingCompactionWorkflowAuthorization = null;
+	});
+
 	pi.on("agent_settled", async (_event, ctx) => {
 		await driveWorkActionLeases(ctx.cwd, {
 			pi,
@@ -25708,6 +26134,7 @@ export default function workModelsExtension(pi) {
 			pendingSettledAgentEnd = null;
 			await finalizeSettledAgent(event, ctx);
 		}
+		await settleOrchestratorPause(ctx, pi);
 		try {
 			reconcileSuccessorPrefetches(ctx.cwd);
 		} catch {
@@ -25716,31 +26143,26 @@ export default function workModelsExtension(pi) {
 		reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 		await presentPendingVerifierBatches(ctx.cwd, ctx, pi);
 		await flushWorkGoalContinuationRetry(ctx, pi);
-		const manualMicrocompactStarted =
-			manualMicrocompactPending &&
-			ctx.isIdle?.() !== false &&
-			runManualMicrocompact(ctx);
-		if (ctx.isIdle?.() !== false) {
-			if (!manualMicrocompactStarted && activeWorkGoal?.status !== "active")
-				try {
-					maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
-				} catch {
-					maybeCompact(ctx, {});
-				}
-		}
-		activePromptBackedAgent = false;
-		hideBackgroundVerifierAbort = false;
-	});
-
-	pi.on("turn_end", async (event, ctx) => {
-		recordSelfImprovementHistory(ctx, "turn_end", event);
-		if (!manualMicrocompactPending && activeWorkGoal?.status === "active")
+		if (ctx.isIdle?.() !== false && activeWorkGoal?.status !== "active")
 			try {
 				maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
 			} catch {
 				maybeCompact(ctx, {});
 			}
-		if (manualMicrocompactPending) runManualMicrocompact(ctx);
+		activePromptBackedAgent = false;
+		hideBackgroundVerifierAbort = false;
+		scheduleFilteredContextPersistence(ctx);
+	});
+
+	pi.on("turn_end", async (event, ctx) => {
+		recordSelfImprovementHistory(ctx, "turn_end", event);
+		if (!orchestratorPauseRequest && activeWorkGoal?.status === "active")
+			try {
+				maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
+			} catch {
+				maybeCompact(ctx, {});
+			}
+		await reachOrchestratorPauseBoundary(ctx, pi);
 		cleanupBenignInstructionDirt(ctx.cwd);
 		await flushWorkGoalContinuationRetry(ctx, pi);
 	});
@@ -25815,11 +26237,14 @@ export default function workModelsExtension(pi) {
 				String(event.message.errorMessage ?? "").trim(),
 			);
 		if (
-			(hideBackgroundVerifierAbort || hideCompactionAbort) &&
+			(hideBackgroundVerifierAbort ||
+				hideCompactionAbort ||
+				hideGracefulPauseAbort) &&
 			event.message?.role === "assistant" &&
 			event.message.stopReason === "aborted"
 		) {
 			if (hideBackgroundVerifierAbort) hideBackgroundVerifierAbort = false;
+			if (hideGracefulPauseAbort) hideGracefulPauseAbort = false;
 			const { errorMessage: _errorMessage, ...message } = event.message;
 			const replacement = { ...message, stopReason: "stop" };
 			recordSelfImprovementHistory(ctx, "message_end", {
@@ -25856,24 +26281,66 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("wo", {
-		description: "Open work orchestrator, or resume with /wo resume",
-		getArgumentCompletions: (prefix) =>
-			"resume".startsWith(String(prefix ?? "").trim())
-				? [
-						{
-							value: "resume",
-							label: "resume",
-							description: "Recover interrupted agents and continue work",
-						},
-					]
-				: null,
+		description:
+			"Open Orchestrator, or use /wo goal, /wo pause, /wo resume, /wo compact",
+		getArgumentCompletions: (prefix) => {
+			const input = String(prefix ?? "").trim();
+			if (/\s/.test(input)) return null;
+			const descriptions = {
+				goal: "Start an autonomous goal with the supplied objective",
+				pause: "Pause after the current tool batch finishes",
+				resume: "Resume the paused goal, workflow, or direct request",
+				compact: "Filter context during work; persist compaction when idle",
+			};
+			const items = Object.entries(descriptions)
+				.filter(([value]) => value.startsWith(input))
+				.map(([value, description]) => ({ value, label: value, description }));
+			return items.length ? items : null;
+		},
 		handler: async (args, ctx) => {
 			const [action, rest] = splitFirstWord(args);
 			if (!action) return handleWorkMenuCommand(ctx, pi);
-			if (action !== "resume") {
-				notify(ctx, "Usage: /wo or /wo resume [target or answer]", "warning");
-				return;
+			if (action === "context-fill") {
+				const tokens = Math.max(
+					0,
+					100_000 - (ctx.getContextUsage?.()?.tokens ?? 0),
+				);
+				for (let remaining = tokens; remaining > 0; remaining -= 10_000)
+					pi.sendMessage({
+						customType: "work-context-fill",
+						content: " the".repeat(Math.min(remaining, 10_000)),
+						display: false,
+					});
+				return notify(
+					ctx,
+					tokens
+						? `Added approximately ${tokens} tokens of hidden test context.`
+						: "Context is already at least 100,000 tokens.",
+					"info",
+				);
 			}
+			if (action === "goal") {
+				if (!rest) return notify(ctx, "Usage: /wo goal <objective>", "warning");
+				const goal = stripWorkGoalTokenFlag(rest);
+				if (goal.error) return notify(ctx, goal.error, "warning");
+				return startWorkGoal("generic", goal.text, pi, ctx, goal.budget);
+			}
+			if (action === "pause") return requestOrchestratorPause(ctx, pi);
+			if (action === "compact") return requestMicrocompact(ctx);
+			if (action !== "resume")
+				return notify(
+					ctx,
+					"Usage: /wo [goal <objective> | pause | resume | compact]",
+					"warning",
+				);
+			if (orchestratorPauseRequest)
+				return notify(
+					ctx,
+					"The graceful pause has not reached its boundary yet.",
+					"info",
+				);
+			if (orchestratorPausedJob)
+				return resumeOrchestratorJob(orchestratorPausedJob, rest, ctx, pi);
 			if (activeWorkGoal && activeWorkGoal.status !== "complete") {
 				if (!rest && activeWorkGoal.mode === "project")
 					return handleWorkResumeGoalCommand("", pi, ctx);
@@ -25884,6 +26351,14 @@ export default function workModelsExtension(pi) {
 					ctx,
 				);
 			}
+			const piGoal = latestPiGoal(ctx);
+			if (piGoal && piGoal.status !== "active")
+				return resumeOrchestratorJob(
+					{ kind: "pi-goal", id: piGoal.id, status: piGoal.status },
+					rest,
+					ctx,
+					pi,
+				);
 			return executeOrchestratorAction("work-resume", rest, ctx, pi);
 		},
 	});
@@ -25895,9 +26370,7 @@ export default function workModelsExtension(pi) {
 	});
 	pi.registerShortcut?.("f8", {
 		description: "Microcompact work context",
-		handler: async (ctx) => {
-			requestManualMicrocompact(ctx);
-		},
+		handler: async (ctx) => requestMicrocompact(ctx),
 	});
 	pi.registerShortcut?.("f9", {
 		description: "Open Fleet",

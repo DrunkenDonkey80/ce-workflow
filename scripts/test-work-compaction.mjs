@@ -4,6 +4,7 @@ import {
 	COMPACTION_PROFILES,
 	compactionProfileFor,
 	compactionThreshold,
+	contextFilterCutIndex,
 	filesFromOps,
 	formatCompactionSummary,
 } from "../extensions/work-compaction.js";
@@ -30,11 +31,15 @@ for (const [window, expected] of [
 	assert.ok(result.headroom > 0);
 }
 assert.equal(threshold(272_000).trigger, 150_000);
-for (const goalStatus of AUTONOMOUS_GOAL_STATUSES)
-	assert.equal(
-		compactionProfileFor({ goalStatus, targetId: "work-7.2" }),
-		COMPACTION_PROFILES.AUTONOMOUS_GOAL,
-	);
+assert.deepEqual(AUTONOMOUS_GOAL_STATUSES, ["active"]);
+assert.equal(
+	compactionProfileFor({ goalStatus: "active", targetId: "work-7.2" }),
+	COMPACTION_PROFILES.AUTONOMOUS_GOAL,
+);
+assert.equal(
+	compactionProfileFor({ goalStatus: "paused" }),
+	COMPACTION_PROFILES.FREEFORM,
+);
 assert.equal(
 	compactionProfileFor({ targetId: "work-7.2" }),
 	COMPACTION_PROFILES.WORK_RESUME,
@@ -53,6 +58,14 @@ assert.deepEqual(
 	}),
 	{ read: ["src/a.js", "src/z.js"], modified: ["test/b.js"] },
 );
+assert.deepEqual(
+	filesFromOps({
+		read: new Set(["src/a.js", "src/b.js"]),
+		written: new Set(["src/c.js"]),
+		edited: new Set(["src/b.js"]),
+	}),
+	{ read: ["src/a.js"], modified: ["src/b.js", "src/c.js"] },
+);
 
 const preparation = {
 	messagesToSummarize: [
@@ -60,15 +73,39 @@ const preparation = {
 		{ role: "reasoning", content: "private chain of thought" },
 		{
 			role: "assistant",
-			content: "I will inspect the parser.",
-			toolCalls: [{ name: "read" }],
+			content: [
+				{ type: "text", text: "I will inspect the parser." },
+				{
+					type: "toolCall",
+					id: "read-1",
+					name: "read",
+					arguments: { path: "src/parser.js" },
+				},
+			],
 		},
-		{ role: "toolResult", toolName: "read", content: "secret successful payload" },
 		{
 			role: "toolResult",
+			toolCallId: "read-1",
+			toolName: "read",
+			content: [{ type: "text", text: "secret successful payload" }],
+		},
+		{
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "bash-1",
+					name: "bash",
+					arguments: { command: "node test-parser.mjs" },
+				},
+			],
+		},
+		{
+			role: "toolResult",
+			toolCallId: "bash-1",
 			toolName: "bash",
 			isError: true,
-			content: "TypeError: parser failed",
+			content: [{ type: "text", text: "TypeError: parser failed" }],
 		},
 	],
 	fileOps: {
@@ -82,12 +119,105 @@ const preparation = {
 const freeform = formatCompactionSummary({ preparation });
 assert.match(freeform, /compact context \(freeform\)/);
 assert.match(freeform, /Build the smallest correct parser/);
-assert.match(freeform, /\[tool:read\] completed/);
+assert.match(freeform, /\[tool:read completed\].*src\/parser\.js/s);
 assert.match(freeform, /TypeError: parser failed/);
 assert.match(freeform, /src\/parser\.js/);
 assert.doesNotMatch(freeform, /private chain of thought|secret successful payload/);
 assert.doesNotMatch(freeform, /\/work-resume/);
 assert.equal(freeform.includes("\r"), false);
+
+const verification = formatCompactionSummary({
+	preparation: {
+		messagesToSummarize: [
+			{
+				role: "assistant",
+				content: [
+					{
+						type: "toolCall",
+						id: "verify-1",
+						name: "bash",
+						arguments: { command: "node focused-check.mjs" },
+					},
+				],
+			},
+			{
+				role: "toolResult",
+				toolCallId: "verify-1",
+				toolName: "bash",
+				content: [{ type: "text", text: `3 passed, 0 failed START ${"x".repeat(2_000)} END` }],
+			},
+			{
+				role: "assistant",
+				content: [
+					{
+						type: "toolCall",
+						id: "decision-1",
+						name: "ask_user",
+						arguments: { question: "Choose safe or fast" },
+					},
+				],
+			},
+			{
+				role: "toolResult",
+				toolCallId: "decision-1",
+				toolName: "ask_user",
+				content: [{ type: "text", text: "User chose safe rollout" }],
+			},
+		],
+	},
+});
+assert.match(verification, /3 passed, 0 failed START/);
+assert.match(verification, /END/);
+assert.match(verification, /User chose safe rollout/);
+assert.ok(verification.length <= 12_000);
+
+const paused = formatCompactionSummary({
+	profile: COMPACTION_PROFILES.FREEFORM,
+	preparation,
+	currentMessages: [{ role: "user", content: "Fix the current parser request." }],
+	goal: { id: "wg-old", status: "paused", objective: "Old unrelated goal" },
+	durable: { available: true },
+});
+assert.match(paused, /## Objective\nFix the current parser request\./);
+assert.match(paused, /Goal wg-old remains paused/);
+assert.doesNotMatch(paused, /Continue the active autonomous goal/);
+
+const longTurn = [
+	{ role: "assistant", content: `old prefix ${"z".repeat(2_000)}` },
+	{ role: "user", content: "REQ-SENTINEL: preserve this exact request" },
+	...Array.from({ length: 24 }, (_, index) => [
+		{
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: `call-${index}`,
+					name: "bash",
+					arguments: { command: `echo ${index}` },
+				},
+			],
+		},
+		{
+			role: "toolResult",
+			toolCallId: `call-${index}`,
+			toolName: "bash",
+			content: `result ${index} ${"r".repeat(160)}`,
+		},
+	]).flat(),
+];
+assert.equal(contextFilterCutIndex(longTurn, 200, 100_000), 1);
+const splitCut = contextFilterCutIndex(longTurn, 200, 100);
+assert.ok(splitCut > 1);
+assert.notEqual(longTurn[splitCut].role, "toolResult");
+const splitSummary = formatCompactionSummary({
+	preparation: { messagesToSummarize: longTurn.slice(0, splitCut) },
+	currentMessages: longTurn,
+});
+assert.match(splitSummary, /REQ-SENTINEL: preserve this exact request/);
+for (let keep = 1; keep <= 500; keep += 13) {
+	const cut = contextFilterCutIndex(longTurn, keep, 100);
+	if (cut !== null) assert.notEqual(longTurn[cut].role, "toolResult");
+}
 
 const interruptedAfterWrite = formatCompactionSummary({
 	preparation: {
@@ -109,7 +239,7 @@ const interruptedAfterWrite = formatCompactionSummary({
 });
 assert.match(
 	interruptedAfterWrite,
-	/\[tool:write\] completed/,
+	/\[tool:write completed\]/,
 	"the newest successful tool boundary survives duplicate compaction noise",
 );
 assert.doesNotMatch(interruptedAfterWrite, /This operation was aborted/);
