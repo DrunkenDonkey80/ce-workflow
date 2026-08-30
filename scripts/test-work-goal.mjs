@@ -505,10 +505,8 @@ assert.deepEqual(
 	mod.extractImplementationUnits(
 		`## Implementation Units\n\n### U1. First slice\n\n### U2. Second slice\n\n## Done`,
 	),
-	[
-		{ key: "U1", title: "First slice" },
-		{ key: "U2", title: "Second slice" },
-	],
+	[],
+	"headings alone do not become executable work",
 );
 const projectGoalProgress = mod.renderProjectGoalProgress({
 	title: "Epic",
