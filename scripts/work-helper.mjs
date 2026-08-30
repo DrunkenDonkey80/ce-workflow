@@ -1801,7 +1801,10 @@ try {
 			detail: option("--detail"),
 		});
 		const updated = mutateStore(cwd, (store) => {
-			updateWorkItem(store, id, { verificationRevision: revision });
+			updateWorkItem(store, id, {
+				verificationRevision: revision,
+				...(status === "BLOCKED" ? { status: "blocked" } : {}),
+			});
 			return addWorkEvidence(store, id, record);
 		});
 		print({

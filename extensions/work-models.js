@@ -7047,6 +7047,8 @@ function issueSummary(issue) {
 		executionMode: workflowExecutionMode(issue),
 	};
 	if (isIdeaIssue(issue)) summary.ideaStatus = deriveIdeaStatus(issue);
+	if (issue.executionWindow)
+		summary.executionWindow = structuredClone(issue.executionWindow);
 	if (typeOf(issue) !== "epic") {
 		summary.implementationScope = workflowImplementationScope(issue);
 		summary.implementationRisk = workflowImplementationRisk(issue);
@@ -7059,6 +7061,10 @@ function issueSummary(issue) {
 		if (acceptance) summary.acceptance = truncate(acceptance, 1600);
 		const changedPaths = implementationPathsFromNotes(issue);
 		if (changedPaths.length) summary.changedPaths = [...new Set(changedPaths)];
+		if (issue.verificationContract) {
+			summary.verificationContract = issue.verificationContract;
+			summary.verificationStatus = verificationContractStatus(issue);
+		}
 		const notes = notesOf(issue);
 		const slicePlanAt = notes.lastIndexOf("wo:slice-plan");
 		if (slicePlanAt >= 0)
@@ -8287,6 +8293,19 @@ function planResumeAction(state, cwd, options = {}) {
 			};
 		}
 		const leaseStatus = workActionLeaseState(cwd, activeImplementation.id);
+		if (
+			activeImplementation.labels?.includes("wo:goal-owned") &&
+			!leaseStatus?.lease
+		)
+			return withHandoffPrompt(
+				{
+					...routed,
+					action: "run-implementation",
+					message:
+						"The active project goal owns this in-progress WorkItem; resume the same implementation/proof window without a fresh worker.",
+				},
+				cwd,
+			);
 		return {
 			...routed,
 			action:
@@ -8633,6 +8652,81 @@ function directRoleTask(state, cwd) {
 	]
 		.filter(Boolean)
 		.join("\n");
+}
+
+function goalOwnedImplementationPrompt(state, cwd) {
+	const selected = state.selectedWorkItem;
+	const contract = selected?.verificationContract;
+	return [
+		"GOAL-OWNED IMPLEMENTATION WINDOW: the active project goal is the implementation owner for this WorkItem.",
+		"Do not launch work-worker, work-fixer, or another writer. Keep implementation, checks, rendered-artifact inspection, corrections, and finalization in this context.",
+		directRoleTask(state, cwd),
+		contract
+			? `Capability proof contract: ${JSON.stringify(contract)}. Run every required capability. A required unavailable capability is a blocker, never a PASS.`
+			: "Legacy verification contract: run the smallest complete executable check required by acceptance.",
+		contract?.required?.some((entry) => entry.capability !== "command")
+			? `For each non-command proof, retain its required artifacts and record it with node ${shellQuote(WORK_HELPER_SCRIPT)} work-proof ${selected?.id} <proof-id> ... . Visual proof requires the current screenshot hash plus a concise --inspection of what you actually observed.`
+			: "",
+		`When the implementation and proof are ready, use the coded helper boundary: node ${shellQuote(WORK_HELPER_SCRIPT)} finish-task ${selected?.id} --message <summary> --verify <command> plus --implementation-file/--evidence-file declarations as required. Follow a returned review handoff only when the coded policy requires it; otherwise finish in this window.`,
+		"After coded close, continue the roadmap from durable native state. Do not replay planning or the previous implementation transcript.",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function claimGoalOwnedImplementation(cwd, state, owner = {}) {
+	const id = state.selectedWorkItem?.id;
+	if (!id) return state;
+	claimWorkflowWorkItem(cwd, readWorkItem(cwd, id));
+	const ownerSession = String(owner.sessionId ?? owner.goalId ?? "");
+	const goalId = String(owner.goalId ?? ownerSession);
+	let conflict;
+	const claimed = mutateStore(cwd, (store) => {
+		const current = store.items[id];
+		const window = current.executionWindow;
+		if (
+			window?.state === "active" &&
+			(window.ownerSession !== ownerSession || window.goalId !== goalId)
+		) {
+			conflict = window;
+			return current;
+		}
+		const timestamp = new Date().toISOString();
+		return updateWorkItem(store, id, {
+			labels: labelsOf(current).includes("wo:goal-owned")
+				? labelsOf(current)
+				: [...labelsOf(current), "wo:goal-owned"],
+			executionWindow: {
+				ownerSession,
+				goalId,
+				generation:
+					window?.state === "active" ? window.generation : (window?.generation ?? 0) + 1,
+				state: "active",
+				acquiredAt:
+					window?.state === "active" ? window.acquiredAt : timestamp,
+				updatedAt: timestamp,
+			},
+		});
+	});
+	if (conflict)
+		return errorState(
+			"writer-fenced",
+			`WorkItem ${id} is owned by session ${conflict.ownerSession} in window generation ${conflict.generation}.`,
+			{
+				action: "writer-fenced",
+				selectedWorkItem: issueSummary(claimed),
+				resumeAction: `Resume goal ${conflict.goalId} in session ${conflict.ownerSession}; do not launch another writer.`,
+			},
+		);
+	return withImplementationPolicy(
+		{
+			...state,
+			action: "run-implementation",
+			selectedWorkItem: issueSummary(claimed),
+			message: `Active project goal claimed ${id} in writer window generation ${claimed.executionWindow.generation}.`,
+		},
+		cwd,
+	);
 }
 
 function directRoleHandoffParams(state, cwd, selectionNote = "") {
@@ -15729,7 +15823,8 @@ function buildWorkFinishState(cwd, args = "") {
 		const related = dirty.filter(
 			(file) => raw.includes(file) || raw.includes(file.split(/[\\/]/).pop()),
 		);
-		const verified = hasVerificationEvidence(workItem);
+		const contractStatus = verificationContractStatus(workItem, { cwd });
+		const verified = hasVerificationEvidence(workItem) && contractStatus.ok;
 		const acceptedReview =
 			hasReviewPass(workItem) ||
 			mechanicalFixAccepted(workItem) ||
@@ -15750,6 +15845,12 @@ function buildWorkFinishState(cwd, args = "") {
 			return stop("blocked", "Selected WorkItem is blocked/debug-needed.");
 		if (!acceptedReview && !codedReview && !reviewBeforeCommit)
 			return stop("missing-review", "PASS review evidence is missing.");
+		if (!contractStatus.ok)
+			return stop(
+				"verification-contract-incomplete",
+				`Required capability proof is incomplete: ${JSON.stringify({ missing: contractStatus.missing, blocked: contractStatus.blocked, stale: contractStatus.stale })}`,
+				{ verificationStatus: contractStatus },
+			);
 		if (!verified)
 			return stop("missing-verification", "Verification evidence is missing.");
 		if (!dirty.length)
@@ -15767,6 +15868,7 @@ function buildWorkFinishState(cwd, args = "") {
 				? simplifyBeforeReviewStep()
 				: "",
 			reviewBeforeCommit ? codeReviewBeforeCommitStep(reviewLevel) : "",
+			!workItem.verificationContract &&
 			(finishGateRequested(workItem, "browser") ||
 				(gates.browserTestsOnUiDiff && related.some(isUiPath))) &&
 			!hasFinishGateEvidence(workItem, "browser")
@@ -21238,9 +21340,17 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		ownerSession: verifierTriageOwner(ctx),
 	});
 	rememberRecommendedActions(ctx.cwd, recommendedActions(state), "work-resume");
-	const handoff = state.ok
-		? directRoleHandoffParams(state, ctx.cwd, selectionNote)
-		: null;
+	const goalOwnedImplementation = Boolean(
+		state.ok &&
+			state.action === "run-implementation" &&
+			activeWorkGoal?.status === "active" &&
+			activeWorkGoal?.mode === "project" &&
+			sameCheckout(activeWorkGoalCwd, ctx.cwd),
+	);
+	const handoff =
+		state.ok && !goalOwnedImplementation
+			? directRoleHandoffParams(state, ctx.cwd, selectionNote)
+			: null;
 	const finishEntry = state.ok && state.action === "finish-ready";
 	const resumeGate = ["review-analysis-required", "triage-required"].includes(
 		state.action,
@@ -21275,6 +21385,37 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		(await queueDirtyRecovery(state, ctx, pi))
 	)
 		return { ...state, dirtyRecoveryQueued: true };
+	if (goalOwnedImplementation) {
+		const claimed = claimGoalOwnedImplementation(ctx.cwd, state, {
+			sessionId:
+				ctx.sessionManager?.getSessionId?.() ?? activeWorkGoal?.id,
+			goalId: activeWorkGoal?.id,
+		});
+		if (!claimed.ok) {
+			notify(ctx, claimed.message, "warning");
+			return claimed;
+		}
+		activeWorkGoal = {
+			...activeWorkGoal,
+			currentWorkItemId: claimed.selectedWorkItem?.id,
+			updatedAt: Date.now(),
+		};
+		persistWorkGoal(pi);
+		await sendWorkflowFollowUp(
+			ctx,
+			withSelectionNote(
+				goalOwnedImplementationPrompt(claimed, ctx.cwd),
+				selectionNote,
+			),
+			pi,
+			claimed,
+		);
+		return {
+			...claimed,
+			goalOwnedImplementation: true,
+			autonomousGoalId: activeWorkGoal.id,
+		};
+	}
 	if (startAutonomous) {
 		const requestedTarget = String(args ?? "").trim();
 		const target = [state.epic?.id, state.selectedWorkItem?.id].includes(
@@ -21332,7 +21473,38 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 				handoffFailed: true,
 			};
 		}
-		const launchState = prepared.state;
+		let launchState = prepared.state;
+		if (launchState.action === "run-implementation") {
+			launchState = claimGoalOwnedImplementation(ctx.cwd, launchState, {
+				sessionId: ctx.sessionManager?.getSessionId?.() ?? goal.id,
+				goalId: goal.id,
+			});
+			if (!launchState.ok) {
+				pauseActiveWorkGoal(launchState.message, pi, ctx);
+				return {
+					...launchState,
+					autonomousGoalId: goal.id,
+					autonomousGoalStarted: true,
+				};
+			}
+			activeWorkGoal = {
+				...activeWorkGoal,
+				currentWorkItemId: launchState.selectedWorkItem?.id,
+				updatedAt: Date.now(),
+			};
+			persistWorkGoal(pi);
+			await sendWorkGoalPrompt(
+				pi,
+				ctx,
+				`${buildWorkGoalKickoffPrompt(goal)}\n\n${withSelectionNote(goalOwnedImplementationPrompt(launchState, ctx.cwd), selectionNote)}`,
+			);
+			return {
+				...launchState,
+				autonomousGoalId: goal.id,
+				autonomousGoalStarted: true,
+				goalOwnedImplementation: true,
+			};
+		}
 		const launchHandoff = directRoleHandoffParams(
 			launchState,
 			ctx.cwd,

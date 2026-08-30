@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
+import { loadStore } from "../extensions/work-store.js";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
@@ -1304,6 +1305,7 @@ try {
 		{
 			cwd: cwd,
 			mode: "tui",
+			sessionManager: { getSessionId: () => "session-owner" },
 			ui: { notify: (message, level) => notices.push({ message, level }) },
 			sendUserMessage: async () => {
 				throw new Error("TUI must inject through Pi");
@@ -1330,13 +1332,39 @@ try {
 	);
 	assert(
 		autonomousResult.autonomousGoalStarted &&
-			autonomousResult.actionLease?.mode === "autonomous" &&
+			autonomousResult.goalOwnedImplementation &&
+			!autonomousResult.actionLease &&
 			sent.length === 1 &&
 			sent[0].message.includes("Work-goal mode is active") &&
 			sent[0].message.includes("Target work item or roadmap ID: E-1") &&
-			sent[0].message.includes("Coded orchestration already launched") &&
-			tuiRpcRequest?.method === "spawn",
-		"TUI resume starts the visible autonomous root and its coded specialist",
+			sent[0].message.includes("GOAL-OWNED IMPLEMENTATION WINDOW") &&
+			sent[0].message.includes("Do not launch work-worker") &&
+			tuiRpcRequest === undefined,
+		"TUI resume starts one visible goal-owned implementation window without a fresh worker",
+	);
+	const ownedItem = loadStore(cwd).items[autonomousResult.selectedWorkItem.id];
+	assert(
+		ownedItem.executionWindow?.ownerSession === "session-owner" &&
+			ownedItem.executionWindow.state === "active" &&
+			ownedItem.executionWindow.generation === 1,
+		"goal-owned implementation acquires one durable session writer fence",
+	);
+	const competing = await handleWorkResumeCommand(
+		"E-1",
+		{
+			cwd,
+			mode: "rpc",
+			sessionManager: { getSessionId: () => "session-competitor" },
+			ui: { notify: (message, level) => notices.push({ message, level }) },
+			sendUserMessage: async (message, options) => sent.push({ message, options }),
+		},
+		{ events: { on: () => () => {}, emit: () => {} } },
+	);
+	assert(
+		competing.action === "writer-fenced" &&
+			loadStore(cwd).items[autonomousResult.selectedWorkItem.id].executionWindow
+				.generation === 1,
+		`a competing session cannot acquire or increment the active writer window: ${JSON.stringify(competing)}`,
 	);
 
 	setScenario();

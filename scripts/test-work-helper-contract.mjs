@@ -17,7 +17,9 @@ import {
 	createWorkItem,
 	initStore,
 	loadStore,
+	mutateStore,
 	saveStore,
+	updateWorkItem,
 } from "../extensions/work-store.js";
 
 const helper = realpathSync(path.join(import.meta.dirname, "work-helper.mjs"));
@@ -206,6 +208,19 @@ try {
 			JSON.stringify(visualContract),
 		),
 	);
+	mutateStore(cwd, (store) =>
+		updateWorkItem(store, visualTask.id, {
+			status: "in_progress",
+			executionWindow: {
+				ownerSession: "session-1",
+				goalId: "goal-1",
+				generation: 1,
+				state: "active",
+				acquiredAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			},
+		}),
+	);
 	mkdirSync(path.join(cwd, "docs", "evidence"), { recursive: true });
 	writeFileSync(path.join(cwd, "docs", "evidence", "screen.png"), "png-v1");
 	assert.match(
@@ -235,6 +250,16 @@ try {
 		),
 	);
 	assert.deepEqual(visualBlocker.verificationStatus.blocked, ["browser-visual"]);
+	assert.equal(
+		loadStore(cwd).items[visualTask.id].status,
+		"blocked",
+		"typed unavailable proof durably blocks the WorkItem",
+	);
+	assert.equal(
+		loadStore(cwd).items[visualTask.id].executionWindow.state,
+		"blocked",
+		"durable blocker releases the active writer fence",
+	);
 	writeFileSync(
 		path.join(cwd, "assertion.json"),
 		'{"status":"ok","--forbid-string":"present"}\n',

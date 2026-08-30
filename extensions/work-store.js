@@ -558,6 +558,22 @@ export function validateStore(store, file = "work store") {
 		)
 			throw error("corrupt", `Invalid implementation scope for ${key} in ${file}`);
 		if (
+			item.executionWindow !== undefined &&
+			(!plainObject(item.executionWindow) ||
+				!Number.isInteger(item.executionWindow.generation) ||
+				item.executionWindow.generation < 1 ||
+				!new Set(["active", "blocked", "closed"]).has(
+					item.executionWindow.state,
+				) ||
+				["ownerSession", "goalId", "acquiredAt", "updatedAt"].some(
+					(field) =>
+						typeof item.executionWindow[field] !== "string" ||
+						!item.executionWindow[field] ||
+						item.executionWindow[field].length > 200,
+				))
+		)
+			throw error("corrupt", `Invalid execution window for ${key} in ${file}`);
+		if (
 			item.verificationRevision !== undefined &&
 			(typeof item.verificationRevision !== "string" ||
 				!item.verificationRevision.trim() ||
@@ -667,6 +683,9 @@ export function createWorkItem(store, input = {}) {
 		...(input.implementationScope
 			? { implementationScope: structuredClone(input.implementationScope) }
 			: {}),
+		...(input.executionWindow
+			? { executionWindow: structuredClone(input.executionWindow) }
+			: {}),
 		...(input.verificationContract
 			? { verificationContract: structuredClone(input.verificationContract) }
 			: {}),
@@ -708,6 +727,9 @@ export function updateWorkItem(store, id, changes = {}, options = {}) {
 		...(fields.implementationScope
 			? { implementationScope: structuredClone(fields.implementationScope) }
 			: {}),
+		...(fields.executionWindow
+			? { executionWindow: structuredClone(fields.executionWindow) }
+			: {}),
 		...(fields.verificationContract
 			? { verificationContract: structuredClone(fields.verificationContract) }
 			: {}),
@@ -716,6 +738,15 @@ export function updateWorkItem(store, id, changes = {}, options = {}) {
 			: {}),
 	};
 	const closing = fields.status === "closed" && previous.status !== "closed";
+	if (
+		next.executionWindow?.state === "active" &&
+		["closed", "blocked"].includes(fields.status)
+	)
+		next.executionWindow = {
+			...next.executionWindow,
+			state: fields.status,
+			updatedAt: now(),
+		};
 	if (
 		closing &&
 		previous.status === "in_progress" &&
