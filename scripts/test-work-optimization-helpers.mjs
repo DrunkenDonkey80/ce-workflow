@@ -20,6 +20,7 @@ import {
 	loadStore,
 	saveStore,
 } from "../extensions/work-store.js";
+import { compatibilityVerificationContract } from "../extensions/work-verification-contract.js";
 
 const mod = await import(
 	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
@@ -77,6 +78,10 @@ try {
 		dependencies: ["DEP-1"],
 		notes: [issue.notes],
 		acceptance: "must pass",
+		verificationContract: compatibilityVerificationContract({
+			title: "Native task",
+			acceptance: "must pass",
+		}),
 	});
 	saveStore(cwd, store);
 	const oldBd = process.env.WORK_ORCH_BD_BIN;
@@ -117,6 +122,20 @@ try {
 			"work-note treats notes as literal text even when they match a local filename",
 		);
 		rmSync(path.join(cwd, "direct note"));
+		execFileSync(
+			process.execPath,
+			[
+				helper,
+				"work-proof",
+				"TASK-123",
+				"legacy-inspection",
+				"--inspection",
+				"Native task inspected.",
+				"--result",
+				"verified",
+			],
+			{ cwd },
+		);
 		execFileSync(
 			process.execPath,
 			[helper, "work-close", "TASK-123", "--reason", "verified closure"],
@@ -179,8 +198,7 @@ try {
 		`console.log("[]");`,
 	);
 	assert(
-		invalidCheck.status === "FAIL" &&
-			invalidCheck.failed_assertions.length === 1,
+		invalidCheck.status === "FAIL" && invalidCheck.failed_assertions.length === 1,
 		"temp checks reject JSON without an explicit PASS or FAIL status",
 	);
 
@@ -233,9 +251,7 @@ try {
 				timestamp: "2026-01-01T00:00:02.000Z",
 				usage: { input: 5, output: 2, cacheRead: 11, cost: 0.1 },
 				message: {
-					content: [
-						{ type: "toolCall", name: "read", arguments: { path: "x" } },
-					],
+					content: [{ type: "toolCall", name: "read", arguments: { path: "x" } }],
 				},
 			},
 			{ role: "toolResult", text: "pi tool output" },
@@ -364,8 +380,7 @@ try {
 	);
 	assert(
 		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status ===
-			"no-op" &&
-			readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
+			"no-op" && readFileSync(cleanupFile, "utf8") === beforeMarker + afterMarker,
 		"legacy instruction cleanup is a no-op when markers are absent",
 	);
 	assert(
@@ -405,8 +420,7 @@ try {
 	}
 	rmSync(cleanupFile);
 	assert(
-		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status ===
-			"no-op",
+		cleanupCommand("legacy-instructions-preview", "AGENTS.md").status === "no-op",
 		"legacy instruction cleanup is a no-op when AGENTS.md is absent",
 	);
 	const outsideFile = path.join(cwd, "AGENTS.md");
@@ -506,10 +520,7 @@ try {
 	});
 	execFileSync("git", ["config", "user.name", "Test"], { cwd: finishCwd });
 	writeFileSync(path.join(finishCwd, ".gitignore"), ".ce-workflow/\n");
-	writeFileSync(
-		path.join(finishCwd, "result.js"),
-		"const result = 'before';\n",
-	);
+	writeFileSync(path.join(finishCwd, "result.js"), "const result = 'before';\n");
 	const deletedAutomaticEvidenceFile =
 		"docs/evidence/TASK-EVIDENCE-AUTO/obsolete.png";
 	mkdirSync(path.join(finishCwd, path.dirname(deletedAutomaticEvidenceFile)), {
@@ -531,7 +542,7 @@ try {
 	const fakeFormatter = path.join(cwd, "fake-biome.mjs");
 	writeFileSync(
 		fakeFormatter,
-		'#!/usr/bin/env node\nimport { statSync, writeFileSync } from "node:fs";\nconst files = process.argv.slice(process.argv.indexOf("--write") + 1);\nif (files.some((file) => file.replaceAll("\\\\", "/").endsWith(".ce-workflow/work-items.json"))) throw new Error("runtime store must not be formatted");\nif (files.some((file) => statSync(file).size > 10 * 1024 * 1024)) throw new Error("oversized source must not be formatted");\nfor (const file of files) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
+		'#!/usr/bin/env node\nimport { statSync, writeFileSync } from "node:fs";\nconst files = process.argv.filter((file) => file.endsWith(".js"));\nif (files.some((file) => file.replaceAll("\\\\", "/").endsWith(".ce-workflow/work-items.json"))) throw new Error("runtime store must not be formatted");\nif (files.some((file) => statSync(file).size > 10 * 1024 * 1024)) throw new Error("oversized source must not be formatted");\nfor (const file of files) if (file.endsWith("result.js")) writeFileSync(file, "const result = \\"after\\";\\n");\n',
 	);
 	process.env.WORK_ORCH_FORMATTER_BIN = fakeFormatter;
 	const fakeBdScript = path.join(finishCwd, "tracker-must-not-run");
@@ -601,7 +612,7 @@ try {
 				'"after"',
 			) &&
 			finished.clean,
-		"finish-task formats by default, excludes workflow state, and leaves git clean",
+		`finish-task formats by default, excludes workflow state, and leaves git clean: ${JSON.stringify(finished)}`,
 	);
 	writeFileSync(path.join(finishCwd, "large.js"), "");
 	truncateSync(path.join(finishCwd, "large.js"), 10 * 1024 * 1024 + 1);

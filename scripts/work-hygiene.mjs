@@ -114,9 +114,27 @@ export function formatPendingFiles({ cwd, files, skip = false }) {
 		(process.platform === "win32"
 			? undefined
 			: path.join(cwd, "node_modules", ".bin", "biome"));
-	if (!formatter || !existsSync(formatter)) return [];
+	const prettier =
+		process.env.WORK_ORCH_PRETTIER_BIN ||
+		[
+			path.join(cwd, "node_modules", "prettier", "bin", "prettier.cjs"),
+			path.join(
+				homedir(),
+				".pi-lens",
+				"tools",
+				"node_modules",
+				"prettier",
+				"bin",
+				"prettier.cjs",
+			),
+		].find(existsSync);
+	if (
+		(!formatter || !existsSync(formatter)) &&
+		(!prettier || !existsSync(prettier))
+	)
+		return [];
 	const withNode =
-		packageFormatter === formatter || /\.[cm]?js$/i.test(formatter);
+		packageFormatter === formatter || /\.[cm]?js$/i.test(formatter ?? "");
 	const editorConfig = existsSync(path.join(cwd, ".editorconfig"));
 	let dir = path.resolve(cwd);
 	let biomeConfig = false;
@@ -134,6 +152,27 @@ export function formatPendingFiles({ cwd, files, skip = false }) {
 	}
 	const formatted = [];
 	for (const file of pending) {
+		if (
+			/\.html?$/i.test(file) &&
+			prettier &&
+			existsSync(prettier) &&
+			!process.env.WORK_ORCH_FORMATTER_BIN
+		) {
+			execFileSync(
+				/\.[cm]?js$/i.test(prettier) ? process.execPath : prettier,
+				/\.[cm]?js$/i.test(prettier)
+					? [prettier, "--write", file]
+					: ["--write", file],
+				{
+					cwd,
+					encoding: "utf8",
+					stdio: ["ignore", "pipe", "pipe"],
+				},
+			);
+			formatted.push(file);
+			continue;
+		}
+		if (!formatter || !existsSync(formatter)) continue;
 		const args = ["format", "--write", "--no-errors-on-unmatched"];
 		if (editorConfig) args.push("--use-editorconfig=true");
 		else if (!biomeConfig) {
@@ -142,7 +181,6 @@ export function formatPendingFiles({ cwd, files, skip = false }) {
 			const spaces = lines
 				.map((line) => line.match(/^ +(?=\S)/)?.[0].length ?? 0)
 				.filter(Boolean);
-			if (!tabs && !spaces.length) continue;
 			let style = "space";
 			let width = 2;
 			if (tabs > spaces.length) {
