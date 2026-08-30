@@ -21,6 +21,7 @@ import {
 	VERIFICATION_GATE_VERSION,
 } from "../extensions/read-only-lanes.js";
 import {
+	addWorkEvidence,
 	appendWorkNote,
 	closeWorkItem,
 	createWorkItem,
@@ -40,6 +41,16 @@ import {
 	hasProductionDiff,
 	readReviewPolicy,
 } from "../extensions/work-quality-policy.js";
+import {
+	compatibilityVerificationContract,
+	fileArtifact,
+	inlineResultArtifact,
+	validateExecutableVerificationContract,
+	validateVerificationContract,
+	verificationContractStatus,
+	verificationProofRecord,
+	verificationWaiverRecord,
+} from "../extensions/work-verification-contract.js";
 
 const cwd = process.cwd();
 const [, , command, ...args] = process.argv;
@@ -512,9 +523,14 @@ function execVerification(command, shell, options, timeoutMs) {
 	});
 }
 
-async function runVerificationCommand(command, root = cwd) {
+async function runVerificationCommand(command, root = cwd, runtime = {}) {
 	validateVerificationCommand(command);
-	const options = { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 };
+	const options = {
+		cwd: root,
+		encoding: "utf8",
+		maxBuffer: 10 * 1024 * 1024,
+		env: { ...process.env, ...(runtime.env ?? {}) },
+	};
 	const shell =
 		process.env.WORK_ORCH_VERIFY_SHELL ||
 		(process.platform === "win32" && process.env.MSYSTEM ? "bash" : "");
@@ -529,7 +545,7 @@ async function runVerificationCommand(command, root = cwd) {
 		normalized,
 		!windowsCommand && shell ? shell : "",
 		options,
-		verificationTimeoutMs(),
+		runtime.timeoutMs ?? verificationTimeoutMs(),
 	);
 	return { exitStatus: 0, stdout: result.stdout, stderr: result.stderr };
 }
@@ -583,6 +599,118 @@ async function runVerification(command, shards = [], root = cwd) {
 	};
 }
 
+function workspaceVerificationRevision(root) {
+	const hash = createHash("sha256");
+	let files = [];
+	try {
+		hash.update(git(["rev-parse", "HEAD"], root).trim());
+		files = gitStatusPaths(root);
+	} catch {
+		hash.update(`no-git:${path.resolve(root)}`);
+	}
+	for (const file of files
+		.filter((item) => item !== ".ce-workflow/work-items.json" && !isRuntimePath(item))
+		.sort()) {
+		hash.update(`\0${file}\0`);
+		const absolute = path.join(root, file);
+		if (existsSync(absolute) && statSync(absolute).isFile())
+			hash.update(readFileSync(absolute));
+		else hash.update("<deleted>");
+	}
+	return `workspace-sha256:${hash.digest("hex")}`;
+}
+
+function declaredOperationRoot(root, requested = ".") {
+	const absolute = path.resolve(root, requested);
+	const relative = path.relative(root, absolute).replaceAll("\\", "/");
+	if (relative.startsWith("../") || path.isAbsolute(relative))
+		throw new Error(`verification operation cwd escapes the repository: ${requested}`);
+	return absolute;
+}
+
+function assertionText(result, assertion, root) {
+	if (assertion.target === "stdout") return String(result.stdout ?? "");
+	if (assertion.target === "stderr") return String(result.stderr ?? "");
+	if (assertion.target === "exit") return String(result.exitStatus);
+	const absolute = path.resolve(root, assertion.path);
+	const relative = path.relative(root, absolute).replaceAll("\\", "/");
+	if (relative.startsWith("../") || path.isAbsolute(relative))
+		throw new Error(`verification assertion path escapes the repository: ${assertion.path}`);
+	if (assertion.operator === "exists") return existsSync(absolute) ? "true" : "false";
+	if (!existsSync(absolute) || !statSync(absolute).isFile())
+		throw new Error(`verification assertion file is missing: ${assertion.path}`);
+	if (assertion.operator === "sha256")
+		return createHash("sha256").update(readFileSync(absolute)).digest("hex");
+	return readFileSync(absolute, "utf8");
+}
+
+function assertDeclaredOperation(result, operation, root) {
+	const failures = [];
+	for (const assertion of operation.assertions) {
+		const actual = assertionText(result, assertion, root);
+		let pass = false;
+		if (assertion.operator === "equals" || assertion.operator === "sha256")
+			pass = actual === assertion.value;
+		else if (assertion.operator === "includes") pass = actual.includes(assertion.value);
+		else if (assertion.operator === "matches") pass = new RegExp(assertion.value, "u").test(actual);
+		else if (assertion.operator === "exists") pass = actual === "true";
+		if (!pass)
+			failures.push(
+				`${assertion.target}${assertion.path ? `:${assertion.path}` : ""} ${assertion.operator} ${JSON.stringify(assertion.value)} failed`,
+			);
+	}
+	if (failures.length) throw new Error(failures.join("; "));
+}
+
+async function runDeclaredCommand(requirement, root) {
+	const operation = requirement.operation;
+	const operationRoot = declaredOperationRoot(root, operation.cwd);
+	let result;
+	try {
+		result = await runVerificationCommand(operation.command, operationRoot, {
+			timeoutMs: operation.timeoutMs,
+			env: operation.env,
+		});
+	} catch (error) {
+		const exitStatus = Number(error.code);
+		if (!Number.isInteger(exitStatus) || exitStatus !== operation.expectedExit)
+			throw error;
+		result = {
+			exitStatus,
+			stdout: String(error.stdout ?? ""),
+			stderr: String(error.stderr ?? ""),
+		};
+	}
+	result.exitStatus ??= 0;
+	if (result.exitStatus !== operation.expectedExit)
+		throw new Error(
+			`expected exit ${operation.expectedExit}, got ${result.exitStatus}`,
+		);
+	assertDeclaredOperation(result, operation, operationRoot);
+	return {
+		requirement,
+		operation,
+		operationRoot,
+		result,
+		output: String(result.stdout ?? "").trim(),
+	};
+}
+
+function commandProofArtifacts(run) {
+	const artifacts = [inlineResultArtifact("result", run.output)];
+	const kinds = new Set(run.requirement.artifacts ?? []);
+	if (kinds.has("stdout"))
+		artifacts.push(inlineResultArtifact("stdout", run.result.stdout));
+	if (kinds.has("stderr"))
+		artifacts.push(inlineResultArtifact("stderr", run.result.stderr));
+	for (const assertion of run.operation.assertions.filter(
+		(entry) => entry.target === "file",
+	))
+		if (kinds.has("file"))
+			artifacts.push(fileArtifact(run.operationRoot, "file", assertion.path));
+	return artifacts;
+}
+
 async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	const id = args[0];
 	const message = option("--message");
@@ -601,6 +729,10 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		);
 	const task = readWorkItem(id);
 	if (!task) throw new Error(`Work item not found: ${id}`);
+	const canonical = storePath(cwd);
+	const canonicalBefore = existsSync(canonical)
+		? readFileSync(canonical, "utf8")
+		: null;
 	const taskContractText = `${titleOf(task)}\n${field(task, "description") ?? ""}\n${field(task, "acceptance", "acceptance_criteria") ?? ""}`;
 	const evidenceOnly = /\bevidence[- ](?:only|capture)\b/i.test(
 		taskContractText,
@@ -718,16 +850,45 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		),
 	);
 	const jsonFile = option("--json");
-	if (shardDeclarations.length && !verify)
+	const executableContract = task.verificationContract
+		? validateExecutableVerificationContract(task.verificationContract)
+		: null;
+	const commandRequirements =
+		executableContract?.required.filter(
+			(requirement) => requirement.capability === "command",
+		) ?? [];
+	if (executableContract && (jsonFile || expected !== undefined || shardDeclarations.length))
+		throw new Error(
+			"contract-bearing finish uses each declared operation/assertion; --json, --expect, and --verify-shard are legacy-only",
+		);
+	if (
+		executableContract &&
+		verify &&
+		(commandRequirements.length !== 1 ||
+			verify !== commandRequirements[0].operation.command)
+	)
+		throw new Error("--verify must exactly match the sole declared command operation");
+	if (!executableContract && shardDeclarations.length && !verify)
 		throw new Error("--verify-shard requires --verify");
-	if (!verify && !jsonFile)
+	if (!executableContract && !verify && !jsonFile)
 		throw new Error("finish-task requires --verify or --json");
 	let verificationResult;
 	let verificationCommand;
 	let verificationManifest;
-	let output;
+	let output = "";
+	let commandRuns = [];
 	try {
-		if (jsonFile) {
+		if (executableContract) {
+			commandRuns = [];
+			for (const requirement of commandRequirements)
+				commandRuns.push(await runDeclaredCommand(requirement, executionRoot));
+			verificationCommand = commandRuns
+				.map((run) => run.operation.command)
+				.join(" && ");
+			output = commandRuns
+				.map((run) => `${run.requirement.id}:${run.output}`)
+				.join("\n");
+		} else if (jsonFile) {
 			verificationCommand = `json-assert ${jsonFile}`;
 			const failures = jsonAssertionFailures(jsonFile, executionRoot);
 			if (failures.length) throw new Error(failures.join("; "));
@@ -750,10 +911,10 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		const verificationError = String(
 			error.stderr || error.message || error,
 		).slice(-500);
-		const verificationFailure = `wo:verify-check FAIL\nCommand: ${verificationCommand ?? "unknown verification"}\n${verificationError}`;
+		const verificationFailure = `wo:verify-check FAIL\nCommand: ${verificationCommand ?? "declared verification"}\n${verificationError}`;
 		mutateStore(cwd, (store) => appendWorkNote(store, id, verificationFailure));
 		throw new Error(
-			`verification failed: ${verificationCommand}\n${verificationError}`,
+			`verification failed: ${verificationCommand ?? "declared verification"}\n${verificationError}`,
 		);
 	} finally {
 		for (const outputPath of absentShardOutputs)
@@ -762,7 +923,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 				force: true,
 			});
 	}
-	if (verificationCommand)
+	if (verificationCommand) {
 		verificationResult = {
 			command: verificationCommand,
 			status: "PASS",
@@ -778,6 +939,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 					}
 				: {}),
 		};
+	}
 	const tidy = tidyUntrackedFiles({
 		cwd: executionRoot,
 		gitBin,
@@ -801,7 +963,16 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 			(ownedImplementationFiles.has(file) ||
 				(!isRuntimePath(file) && !isGeneratedBuildPath(file))),
 	);
-	if (!changed.length) throw new Error("no related changes to commit");
+	const children = childWorkItems(id);
+	const roadmapOnlyClose =
+		!distinctRoots &&
+		!changed.length &&
+		/^(?:epic|initiative|roadmap)$/i.test(typeOf(task)) &&
+		children.length > 0 &&
+		children.every((child) => statusOf(child) === "closed");
+	if (!changed.length && !roadmapOnlyClose)
+		throw new Error("no related changes to commit");
+	if (roadmapOnlyClose) changed.push(".ce-workflow/work-items.json");
 	const implementationFiles = changed.filter(
 		(file) => !file.startsWith(".ce-workflow/") && !evidenceFileSet.has(file),
 	);
@@ -865,6 +1036,43 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		)
 	)
 		reviewReasons.push("hardware/live-evidence contract");
+	const verificationRevision = workspaceVerificationRevision(executionRoot);
+	if (executableContract)
+		mutateStore(cwd, (store) => {
+			let updated = updateWorkItem(store, id, { verificationRevision });
+			for (const commandRun of commandRuns)
+				updated = addWorkEvidence(
+					store,
+					id,
+					verificationProofRecord(
+						executableContract,
+						commandRun.requirement.id,
+						{
+							status: "PASS",
+							targetRevision: verificationRevision,
+							issuer: {
+								type: "adapter",
+								id: "native-command",
+								version: "1",
+								capability: "command",
+							},
+							operation: commandRun.operation,
+							artifacts: commandProofArtifacts(commandRun),
+							detail: commandRun.operation.command,
+						},
+					),
+				);
+			return updated;
+		});
+	const proofState = verificationContractStatus(readWorkItem(id), {
+		cwd: executionRoot,
+		revision: executableContract ? verificationRevision : undefined,
+		requireContract: Boolean(executableContract),
+	});
+	if (!proofState.ok)
+		throw new Error(
+			`verification contract incomplete: ${JSON.stringify({ missing: proofState.missing, blocked: proofState.blocked, stale: proofState.stale, untrusted: proofState.untrusted })}\nRecord required inspection/manual proof with work-proof; executable PASS is adapter-issued and unavailable capabilities must remain BLOCKED.`,
+		);
 	if (
 		readReviewPolicy(executionRoot) === "review-all" &&
 		hasProductionDiff(implementationFiles)
@@ -944,6 +1152,20 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 				`refusing pre-staged owner files: ${ownerStaged.join(", ")}`,
 			);
 	}
+	if (roadmapOnlyClose)
+		mutateStore(cwd, (store) =>
+			closeWorkItem(
+				store,
+				id,
+				{
+					evidence: [
+						...(store.items[id]?.evidence ?? []),
+						{ closeEvidence: "Completed by coded roadmap finalization" },
+					],
+				},
+				{ cwd: executionRoot },
+			),
+		);
 	git(["add", "-A", "--", ...changed], executionRoot);
 	const staged = git(["diff", "--cached", "--name-only"], executionRoot)
 		.split(/\r?\n/)
@@ -952,10 +1174,6 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		throw new Error("no staged changes after filtering runtime files");
 	const executionHeadBefore = git(["rev-parse", "HEAD"], executionRoot).trim();
 	const ownerHeadBefore = git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim();
-	const canonical = storePath(cwd);
-	const canonicalBefore = existsSync(canonical)
-		? readFileSync(canonical, "utf8")
-		: null;
 	let push = "skipped";
 	let executionCommit;
 	let ownerCommit = null;
@@ -969,15 +1187,20 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 					executionCommit,
 				}),
 			);
-		mutateStore(cwd, (store) =>
-			updateWorkItem(store, id, {
-				status: "closed",
-				evidence: [
-					...(store.items[id]?.evidence ?? []),
-					{ closeEvidence: "Completed by coded inline work path" },
-				],
-			}),
-		);
+		if (!roadmapOnlyClose)
+			mutateStore(cwd, (store) =>
+				closeWorkItem(
+					store,
+					id,
+					{
+						evidence: [
+							...(store.items[id]?.evidence ?? []),
+							{ closeEvidence: "Completed by coded inline work path" },
+						],
+					},
+					{ cwd: executionRoot },
+				),
+			);
 		const ownerChanges = relevantChanges(ownerRepositoryRoot);
 		if (ownerChanges.some((file) => file !== ".ce-workflow/work-items.json"))
 			throw new Error(
@@ -1158,7 +1381,9 @@ function summary(issue, notesTail = 2000) {
 		acceptance: String(
 			field(issue, "acceptance", "acceptance_criteria") ?? "",
 		).slice(0, 4000),
-		evidence_tail: arr(issue?.evidence).slice(-3),
+		evidence_tail: arr(issue?.evidence).slice(-8),
+		verificationContract: issue?.verificationContract,
+		verificationStatus: verificationContractStatus(issue, { cwd }),
 		notes_tail: notesOf(issue).slice(-notesTail),
 	};
 }
@@ -1209,9 +1434,12 @@ const VALUE_OPTIONS = new Set([
 	"--acceptance",
 	"--add",
 	"--approval",
+	"--authority",
+	"--blocker-code",
 	"--by",
 	"--bytes",
 	"--confirm",
+	"--decision-id",
 	"--description",
 	"--epic",
 	"--equals",
@@ -1227,8 +1455,18 @@ const VALUE_OPTIONS = new Set([
 	"--max-files",
 	"--message",
 	"--note",
+	"--notes",
 	"--note-file",
 	"--parent",
+	"--proof-id",
+	"--artifact",
+	"--inspection",
+	"--detail",
+	"--result",
+	"--resume-action",
+	"--rationale",
+	"--issuer",
+	"--verification-contract",
 	"--proposal-json",
 	"--reason",
 	"--remove",
@@ -1466,9 +1704,20 @@ try {
 		const [title] = positional();
 		if (!title)
 			throw new Error(
-				"usage: work-create <title> [--parent <id>] [--type <type>] [--description <text>] [--acceptance <text>] [--note <text>] [--label <label>]",
+				"usage: work-create <title> [--parent <id>] [--type <type>] [--description <text>] [--acceptance <text>] [--note|--notes <text>] [--verification-contract <json>] [--label <label>]",
 			);
 		const labels = options("--label");
+		const contractText = option("--verification-contract");
+		let verificationContract;
+		if (contractText) {
+			try {
+				verificationContract = validateVerificationContract(
+					JSON.parse(contractText),
+				);
+			} catch (error) {
+				throw new Error(`invalid --verification-contract: ${error.message}`);
+			}
+		}
 		const created = mutateStore(cwd, (store) =>
 			createWorkItem(store, {
 				title,
@@ -1476,8 +1725,9 @@ try {
 				type: option("--type", "task"),
 				description: option("--description", ""),
 				acceptance: option("--acceptance", ""),
-				notes: option("--note") ? [option("--note")] : [],
+				notes: [...options("--note"), ...options("--notes")],
 				labels,
+				verificationContract,
 			}),
 		);
 		if (created.type === "epic" && !created.parentId) {
@@ -1488,6 +1738,116 @@ try {
 			rememberWorkflowEpicForHelper(cwd, created);
 		}
 		print(summary(created, 300));
+	} else if (command === "work-proof") {
+		const [id, positionalProofId] = positional();
+		const proofId = option("--proof-id", positionalProofId);
+		if (!id || !proofId)
+			throw new Error(
+				"usage: work-proof <work-item-id> <proof-id> [--status PASS|FAIL|BLOCKED] [--result <text>] [--artifact <kind=path> ...] [--inspection <summary>] [--by goal|human] [--issuer <id>] [--blocker-code <code> --resume-action <action>] [--detail <text>]",
+			);
+		const task = readWorkItem(id);
+		if (!task?.verificationContract)
+			throw new Error(`WorkItem ${id} has no verification contract`);
+		const requirement = task.verificationContract.required.find(
+			(entry) => entry.id === proofId,
+		);
+		if (!requirement)
+			throw new Error(`verification proof is not declared: ${proofId}`);
+		const status = String(option("--status", "PASS")).toUpperCase();
+		if (
+			status === "PASS" &&
+			!["inspection", "manual"].includes(requirement.capability)
+		)
+			throw new Error(
+				`${requirement.capability} PASS is issued only by its coded adapter`,
+			);
+		const by = option("--by", requirement.capability === "manual" ? "human" : "goal");
+		if (status === "PASS" && requirement.capability === "manual" && by !== "human")
+			throw new Error("manual PASS requires human authority");
+		const artifacts = options("--artifact").map((value) => {
+			const separator = value.indexOf("=");
+			if (separator < 1) throw new Error("--artifact must use kind=path");
+			return fileArtifact(
+				cwd,
+				value.slice(0, separator),
+				value.slice(separator + 1),
+			);
+		});
+		if (option("--result") !== undefined)
+			artifacts.push(inlineResultArtifact("result", option("--result")));
+		const revision = workspaceVerificationRevision(cwd);
+		const inspection = option("--inspection");
+		const record = verificationProofRecord(task.verificationContract, proofId, {
+			status,
+			targetRevision: revision,
+			...(status === "PASS"
+				? {
+						issuer: {
+							type: by,
+							id: option("--issuer", by),
+						},
+					}
+				: {}),
+			artifacts,
+			...(inspection ? { inspection: { by, summary: inspection } } : {}),
+			...(status === "BLOCKED"
+				? {
+						blocker: {
+							code: option("--blocker-code"),
+							resumeAction: option("--resume-action"),
+						},
+					}
+				: {}),
+			detail: option("--detail"),
+		});
+		const updated = mutateStore(cwd, (store) => {
+			updateWorkItem(store, id, { verificationRevision: revision });
+			return addWorkEvidence(store, id, record);
+		});
+		print({
+			status: "recorded",
+			proof: record,
+			verificationStatus: verificationContractStatus(updated, {
+				cwd,
+				revision,
+			}),
+		});
+	} else if (command === "work-waive") {
+		const [id, proofId] = positional();
+		const task = readWorkItem(id);
+		const decisionId = option("--decision-id");
+		if (!task?.verificationContract || !proofId || !decisionId)
+			throw new Error(
+				"usage: work-waive <work-item-id> <proof-id> --decision-id <recorded-human-decision> --authority <user-id> --rationale <text>",
+			);
+		const revision = workspaceVerificationRevision(cwd);
+		const waiver = verificationWaiverRecord(task.verificationContract, proofId, {
+			targetRevision: revision,
+			authority: {
+				type: "human",
+				id: option("--authority"),
+				decisionId,
+			},
+			rationale: option("--rationale"),
+		});
+		const updated = mutateStore(cwd, (store) =>
+			updateWorkItem(store, id, {
+				verificationRevision: revision,
+				verificationWaivers: [
+					...(store.items[id].verificationWaivers ?? []),
+					waiver,
+				],
+			}),
+		);
+		const verificationStatus = verificationContractStatus(updated, {
+			cwd,
+			revision,
+		});
+		if (!verificationStatus.waived.includes(proofId))
+			throw new Error(
+				`human decision ${decisionId} is absent, unapproved, or does not authorize ${proofId}`,
+			);
+		print({ status: "recorded", waiver, verificationStatus });
 	} else if (command === "work-close") {
 		const id = args[0];
 		if (!id)
@@ -1502,21 +1862,27 @@ try {
 				throw new Error(
 					`Initiative ${id} must be closed through /work-roadmap guarded close.`,
 				);
-			return closeWorkItem(store, id, {
-				notes: note ? [...current.notes, note] : current.notes,
-			});
+			return closeWorkItem(
+				store,
+				id,
+				{ notes: note ? [...current.notes, note] : current.notes },
+				{ cwd },
+			);
 		});
 		print(summary(closed, 300));
 	} else if (command === "work-claim") {
-		print(
-			summary(
-				updateNativeWorkItem(args[0], (current) => ({
-					...current,
-					status: "in_progress",
-				})),
-				300,
-			),
-		);
+		const id = args[0];
+		const claimed = mutateStore(cwd, (store) => {
+			const current = store.items[id];
+			if (!current) throw new Error(`WorkItem not found: ${id}`);
+			return updateWorkItem(store, id, {
+				status: "in_progress",
+				verificationContract:
+					current.verificationContract ??
+					compatibilityVerificationContract(current),
+			});
+		});
+		print(summary(claimed, 300));
 	} else if (command === "work-note") {
 		const [id] = args;
 		const noteArgs = args.slice(args[1] === "--append-notes" ? 2 : 1);
@@ -1693,7 +2059,7 @@ try {
 		if (failures.length) process.exitCode = 1;
 	} else {
 		console.error(
-			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-roadmap|bootstrap-plan-epic|legacy-instructions-preview|legacy-instructions-apply|json-assert> ...",
+			"usage: work-helper <work-summary|work-children-summary|work-ready-summary|work-create|work-proof|work-close|work-claim|work-note|work-label|work-block|blocker-search|search-summary|scan-capability|finish-task|finish-small|ensure-no-staged|initiative-summary|initiative-preview|initiative-apply|bootstrap-plan-roadmap|bootstrap-plan-epic|legacy-instructions-preview|legacy-instructions-apply|json-assert> ...",
 		);
 		process.exitCode = 2;
 	}

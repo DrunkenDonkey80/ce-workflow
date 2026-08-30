@@ -122,6 +122,12 @@ import {
 	updateWorkItem,
 	WorkStoreError,
 } from "./work-store.js";
+import {
+	compatibilityVerificationContract,
+	inferVerificationContract,
+	validateExecutableVerificationContract,
+	verificationContractStatus,
+} from "./work-verification-contract.js";
 import { formatPendingFiles } from "../scripts/work-hygiene.mjs";
 import {
 	classifyShadowAssurance,
@@ -13065,8 +13071,25 @@ function claimWorkflowWorkItem(cwd, issue) {
 		error.reason = "closed-target";
 		throw error;
 	}
-	if (statusOf(issue) === "in_progress") return issue;
-	return updateWorkItemNative(cwd, idOf(issue), { status: "in_progress" });
+	const contract =
+		issue.verificationContract ?? compatibilityVerificationContract(issue);
+	try {
+		validateExecutableVerificationContract(
+			contract,
+			`verificationContract for ${idOf(issue)}`,
+		);
+	} catch (cause) {
+		const error = new Error(
+			`WorkItem ${idOf(issue)} is not implementation-ready: ${cause.message}`,
+		);
+		error.reason = "planning-required";
+		throw error;
+	}
+	if (statusOf(issue) === "in_progress" && issue.verificationContract) return issue;
+	return updateWorkItemNative(cwd, idOf(issue), {
+		status: "in_progress",
+		verificationContract: contract,
+	});
 }
 
 function buildWorkSmallState(cwd, args = "") {
@@ -21433,7 +21456,7 @@ function closeTaskByRequest(cwd, id) {
 				throw new WorkStoreError("missing", `Work item ${id} is missing.`);
 			if (typeOf(current) === "epic")
 				throw new WorkStoreError("conflict", `${id} is a roadmap, not a task.`);
-			return closeWorkItem(store, id);
+			return closeWorkItem(store, id, {}, { cwd });
 		}),
 	);
 	workRoadmapFrameCache.delete(resolve(cwd));

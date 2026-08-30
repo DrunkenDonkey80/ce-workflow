@@ -104,14 +104,12 @@ try {
 		"a value option cannot consume a following flag",
 	);
 	assert.match(
-		JSON.parse(run("work-note", "TASK-1", "--note-file", "note.txt"))
-			.notes_tail,
+		JSON.parse(run("work-note", "TASK-1", "--note-file", "note.txt")).notes_tail,
 		/bounded note file/,
 		"work-note reads a repository-contained note file",
 	);
 	assert.match(
-		JSON.parse(run("work-note", "TASK-1", "--reviewed literal note"))
-			.notes_tail,
+		JSON.parse(run("work-note", "TASK-1", "--reviewed literal note")).notes_tail,
 		/--reviewed literal note/,
 		"work-note treats option-looking note text as opaque",
 	);
@@ -149,6 +147,94 @@ try {
 		["TASK-1"],
 		"ready summaries include executable grandchildren",
 	);
+	const contract = {
+		version: 1,
+		required: [
+			{
+				id: "check",
+				capability: "command",
+				proof: "test",
+				source: "helper contract",
+				artifacts: ["result"],
+				operation: {
+					command: `"${process.execPath}" -e "process.stdout.write('ok')"`,
+					timeoutMs: 30_000,
+					expectedExit: 0,
+					assertions: [
+						{ target: "exit", operator: "equals", value: "0" },
+						{ target: "stdout", operator: "equals", value: "ok" },
+					],
+				},
+			},
+		],
+	};
+	const createdWithNotes = JSON.parse(
+		run(
+			"work-create",
+			"Materialized task",
+			"--parent",
+			"E-1",
+			"--notes",
+			"source plan: PLAN.md",
+			"--verification-contract",
+			JSON.stringify(contract),
+		),
+	);
+	assert.match(createdWithNotes.notes_tail, /source plan: PLAN\.md/);
+	assert.deepEqual(createdWithNotes.verificationContract, contract);
+	assert.deepEqual(createdWithNotes.verificationStatus.missing, ["check"]);
+	const visualContract = {
+		version: 1,
+		required: [
+			{
+				id: "browser-visual",
+				capability: "browser",
+				proof: "visual",
+				source: "rendered acceptance",
+				artifacts: ["screenshot"],
+				inspection: "goal",
+			},
+		],
+	};
+	const visualTask = JSON.parse(
+		run(
+			"work-create",
+			"Inspect rendered UI",
+			"--parent",
+			"E-1",
+			"--verification-contract",
+			JSON.stringify(visualContract),
+		),
+	);
+	mkdirSync(path.join(cwd, "docs", "evidence"), { recursive: true });
+	writeFileSync(path.join(cwd, "docs", "evidence", "screen.png"), "png-v1");
+	assert.match(
+		failure(
+			"work-proof",
+			visualTask.id,
+			"browser-visual",
+			"--artifact",
+			"screenshot=docs/evidence/screen.png",
+			"--inspection",
+			"Rendered hierarchy and spacing are coherent.",
+		),
+		/coded adapter/,
+		"work-proof cannot mint executable browser PASS",
+	);
+	const visualBlocker = JSON.parse(
+		run(
+			"work-proof",
+			visualTask.id,
+			"browser-visual",
+			"--status",
+			"BLOCKED",
+			"--blocker-code",
+			"browser-unavailable",
+			"--resume-action",
+			"Configure a browser adapter and resume.",
+		),
+	);
+	assert.deepEqual(visualBlocker.verificationStatus.blocked, ["browser-visual"]);
 	writeFileSync(
 		path.join(cwd, "assertion.json"),
 		'{"status":"ok","--forbid-string":"present"}\n',
@@ -610,9 +696,9 @@ try {
 	}
 	assert.equal(finished.status, "PASS");
 	assert.deepEqual(
-		finished.formatted.sort(),
-		["source.js"],
-		"immediate-format reports the formatter-eligible changed files",
+		finished.formatted,
+		[],
+		"formatting skips files with no detectable indentation when no config exists",
 	);
 	assert.doesNotMatch(
 		execFileSync("git", ["show", "--pretty=", "--name-only", "HEAD"], {
@@ -1202,10 +1288,7 @@ try {
 		cwd: executionRoot,
 		stdio: "ignore",
 	});
-	writeFileSync(
-		path.join(executionRoot, "source.js"),
-		"export default true;\n",
-	);
+	writeFileSync(path.join(executionRoot, "source.js"), "export default true;\n");
 	const crossFinished = JSON.parse(
 		runFrom(
 			ownerRoot,
@@ -1220,10 +1303,7 @@ try {
 	);
 	const closedCross = loadStore(ownerRoot).items["CROSS-1"];
 	assert.equal(closedCross.status, "closed");
-	assert.equal(
-		closedCross.executionRepositoryRoot,
-		realpathSync(executionRoot),
-	);
+	assert.equal(closedCross.executionRepositoryRoot, realpathSync(executionRoot));
 	assert.equal(closedCross.executionCommit, crossFinished.executionCommit);
 	assert.equal(crossFinished.commit, crossFinished.executionCommit.slice(0, 7));
 	assert.notEqual(crossFinished.ownerCommit, crossFinished.executionCommit);
@@ -1363,13 +1443,9 @@ try {
 		executionBeforeForeignStore,
 		"foreign store refusal does not commit the execution repository",
 	);
-	execFileSync(
-		"git",
-		["restore", "source.js", ".ce-workflow/work-items.json"],
-		{
-			cwd: executionRoot,
-		},
-	);
+	execFileSync("git", ["restore", "source.js", ".ce-workflow/work-items.json"], {
+		cwd: executionRoot,
+	});
 
 	const pushStore = loadStore(ownerRoot);
 	createWorkItem(pushStore, {

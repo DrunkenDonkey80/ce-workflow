@@ -11,6 +11,10 @@ import {
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import {
+	validateVerificationContract,
+	verificationContractStatus,
+} from "./work-verification-contract.js";
 
 export const WORK_STORE_VERSION = 1;
 export const INITIATIVE_LABEL = "initiative";
@@ -375,10 +379,7 @@ function validateInitiativeMetadata(item, file) {
 		metadata.lastConfirmed !== undefined &&
 		!plainObject(metadata.lastConfirmed)
 	)
-		throw hierarchyError(
-			`Invalid initiative confirmation for ${item.id}`,
-			file,
-		);
+		throw hierarchyError(`Invalid initiative confirmation for ${item.id}`, file);
 	return metadata;
 }
 function validateParentGraph(items, file) {
@@ -485,9 +486,7 @@ export function validateStore(store, file = "work store") {
 		throw error("corrupt", `Work store must be an object: ${file}`);
 	if (store.schemaVersion !== WORK_STORE_VERSION) {
 		const category =
-			Number(store.schemaVersion) > WORK_STORE_VERSION
-				? "unsupported"
-				: "corrupt";
+			Number(store.schemaVersion) > WORK_STORE_VERSION ? "unsupported" : "corrupt";
 		throw error(
 			category,
 			`Unsupported work-store schema ${store.schemaVersion}: ${file}`,
@@ -529,16 +528,33 @@ export function validateStore(store, file = "work store") {
 		stringArray(item.dependencies, `dependencies for ${key}`, file);
 		stringArray(item.labels, `labels for ${key}`, file);
 		stringArray(item.notes, `notes for ${key}`, file);
+		if (item.verificationContract !== undefined) {
+			try {
+				validateVerificationContract(
+					item.verificationContract,
+					`verificationContract for ${key}`,
+				);
+			} catch (error) {
+				throw new WorkStoreError("corrupt", `${error.message} in ${file}`);
+			}
+		}
+		if (
+			item.verificationRevision !== undefined &&
+			(typeof item.verificationRevision !== "string" ||
+				!item.verificationRevision.trim() ||
+				item.verificationRevision.length > 200)
+		)
+			throw error("corrupt", `Invalid verification revision for ${key} in ${file}`);
 		for (const [field, entries] of [
 			["evidence", item.evidence],
+			["verificationWaivers", item.verificationWaivers],
 			["dependencyEdges", item.dependencyEdges],
 		])
 			if (
 				entries !== undefined &&
 				(!Array.isArray(entries) ||
 					entries.some(
-						(entry) =>
-							!entry || typeof entry !== "object" || Array.isArray(entry),
+						(entry) => !entry || typeof entry !== "object" || Array.isArray(entry),
 					))
 			)
 				throw error("corrupt", `Invalid ${field} for ${key} in ${file}`);
@@ -564,10 +580,7 @@ export function validateStore(store, file = "work store") {
 				typeof edge.type !== "string" ||
 				!edge.type
 			)
-				throw error(
-					"corrupt",
-					`Invalid dependency edge for ${item.id} in ${file}`,
-				);
+				throw error("corrupt", `Invalid dependency edge for ${item.id} in ${file}`);
 	}
 	validateParentGraph(store.items, file);
 	validateInitiativeHierarchy(store.items, file);
@@ -597,8 +610,7 @@ export function createWorkItem(store, input = {}) {
 	validateStore(store);
 	const timestamp = now(input.now);
 	const id = input.id ?? nextId(store, input.parentId);
-	if (store.items[id])
-		throw error("corrupt", `Work item already exists: ${id}`);
+	if (store.items[id]) throw error("corrupt", `Work item already exists: ${id}`);
 	const item = {
 		id,
 		type: input.type ?? "task",
@@ -607,31 +619,40 @@ export function createWorkItem(store, input = {}) {
 		createdAt: input.createdAt ?? timestamp,
 		updatedAt: input.updatedAt ?? timestamp,
 		...(input.parentId ? { parentId: input.parentId } : {}),
-		...(input.description !== undefined
-			? { description: input.description }
-			: {}),
-		...(input.owner !== undefined ? { owner: input.owner } : {}),
-		...(input.priority !== undefined ? { priority: input.priority } : {}),
+		...(input.description === undefined
+			? {}
+			: { description: input.description }),
+		...(input.owner === undefined ? {} : { owner: input.owner }),
+		...(input.priority === undefined ? {} : { priority: input.priority }),
 		dependencies: [...(input.dependencies ?? [])],
 		labels: [...(input.labels ?? [])],
 		notes: [...(input.notes ?? [])],
 		evidence: [...(input.evidence ?? [])],
 		dependencyEdges: structuredClone(input.dependencyEdges ?? []),
-		...(input.acceptance !== undefined ? { acceptance: input.acceptance } : {}),
-		...(input.executionMode !== undefined
-			? { executionMode: input.executionMode }
-			: {}),
+		...(input.acceptance === undefined ? {} : { acceptance: input.acceptance }),
+		...(input.executionMode === undefined
+			? {}
+			: { executionMode: input.executionMode }),
 		...(input.ideaLineage
 			? { ideaLineage: structuredClone(input.ideaLineage) }
 			: {}),
 		...(input.initiative
 			? { initiative: structuredClone(input.initiative) }
 			: {}),
-		...(input.reviewResult !== undefined
-			? { reviewResult: input.reviewResult }
-			: {}),
+		...(input.reviewResult === undefined
+			? {}
+			: { reviewResult: input.reviewResult }),
 		...(input.verificationSummary
 			? { verificationSummary: structuredClone(input.verificationSummary) }
+			: {}),
+		...(input.verificationContract
+			? { verificationContract: structuredClone(input.verificationContract) }
+			: {}),
+		...(input.verificationRevision
+			? { verificationRevision: input.verificationRevision }
+			: {}),
+		...(input.verificationWaivers
+			? { verificationWaivers: structuredClone(input.verificationWaivers) }
 			: {}),
 		...(input.documentLinks
 			? { documentLinks: structuredClone(input.documentLinks) }
@@ -643,7 +664,7 @@ export function createWorkItem(store, input = {}) {
 	return item;
 }
 
-export function updateWorkItem(store, id, changes = {}) {
+export function updateWorkItem(store, id, changes = {}, options = {}) {
 	validateStore(store);
 	const previous = store.items[id];
 	if (!previous) throw error("missing", `Work item is missing: ${id}`);
@@ -662,7 +683,42 @@ export function updateWorkItem(store, id, changes = {}) {
 		...(fields.initiative
 			? { initiative: structuredClone(fields.initiative) }
 			: {}),
+		...(fields.verificationContract
+			? { verificationContract: structuredClone(fields.verificationContract) }
+			: {}),
+		...(fields.verificationWaivers
+			? { verificationWaivers: structuredClone(fields.verificationWaivers) }
+			: {}),
 	};
+	const closing = fields.status === "closed" && previous.status !== "closed";
+	if (
+		closing &&
+		previous.status === "in_progress" &&
+		["task", "bug"].includes(previous.type) &&
+		!next.verificationContract
+	)
+		throw error(
+			"conflict",
+			`Executable WorkItem ${id} cannot close without a verification contract`,
+		);
+	const proofChanged =
+		previous.status === "closed" &&
+		["verificationContract", "verificationRevision", "verificationWaivers", "evidence"].some(
+			(field) => Object.hasOwn(fields, field),
+		);
+	if ((closing || proofChanged) && next.verificationContract) {
+		const proof = verificationContractStatus(next, {
+			cwd: options.cwd,
+			revision: next.verificationRevision,
+			requireContract: true,
+		});
+		if (!proof.ok)
+			throw error(
+				"conflict",
+				`Verification contract is incomplete for ${id}: ${JSON.stringify({ missing: proof.missing, blocked: proof.blocked, stale: proof.stale, untrusted: proof.untrusted })}`,
+				{ verificationStatus: proof },
+			);
+	}
 	validateStore({ ...store, items: { ...store.items, [id]: next } });
 	store.items[id] = next;
 	return next;
@@ -706,8 +762,8 @@ export function deleteWorkItem(store, id) {
 	return store;
 }
 
-export function closeWorkItem(store, id, changes = {}) {
-	return updateWorkItem(store, id, { ...changes, status: "closed" });
+export function closeWorkItem(store, id, changes = {}, options = {}) {
+	return updateWorkItem(store, id, { ...changes, status: "closed" }, options);
 }
 
 export function deleteWorkItemSubtree(store, id) {
@@ -775,8 +831,7 @@ function blockingDependencies(item) {
 	);
 	return (item.dependencies ?? []).filter(
 		(id) =>
-			id !== item.parentId &&
-			(!edges.has(id) || /^blocks?$/i.test(edges.get(id))),
+			id !== item.parentId && (!edges.has(id) || /^blocks?$/i.test(edges.get(id))),
 	);
 }
 
@@ -785,9 +840,7 @@ export function readyWorkItems(store) {
 	return Object.values(store.items)
 		.filter(
 			(item) =>
-				item.type !== "epic" &&
-				item.type !== "decision" &&
-				item.type !== "idea",
+				item.type !== "epic" && item.type !== "decision" && item.type !== "idea",
 		)
 		.filter((item) => item.status === "open" || item.status === "planned")
 		.filter((item) =>
