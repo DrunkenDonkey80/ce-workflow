@@ -28,6 +28,9 @@ const {
 } = await import("../extensions/work-action-leases.js");
 const { createWorkItem, initStore, loadStore, saveStore, updateWorkItem } =
 	await import("../extensions/work-store.js");
+const { inlineResultArtifact, verificationProofRecord } = await import(
+	"../extensions/work-verification-contract.js"
+);
 const { workflowChildParams } = await import("./work-command-fixture.mjs");
 
 function assert(value, message) {
@@ -109,7 +112,11 @@ function highState(cwd) {
 	);
 	return { state, direct };
 }
-function fakePi(outcomes, seen, credential = () => ({ ok: true, apiKey: "fixture" })) {
+function fakePi(
+	outcomes,
+	seen,
+	credential = () => ({ ok: true, apiKey: "fixture" }),
+) {
 	let reply;
 	return {
 		modelRegistry: {
@@ -148,7 +155,10 @@ try {
 	const oneModel = fixture("one-model", "main-first", false);
 	cleanup.push(oneModel);
 	const one = highState(oneModel);
-	assert(one.direct.routing.candidates.length === 1, "absent Backup preserves Main-only behavior");
+	assert(
+		one.direct.routing.candidates.length === 1,
+		"absent Backup preserves Main-only behavior",
+	);
 
 	const roundRobin = fixture("round-robin", "round-robin");
 	cleanup.push(roundRobin);
@@ -189,13 +199,12 @@ try {
 	);
 	assert(
 		backupLaunch.spawned.ok &&
-			unhealthyChecks.join(",") ===
-				"main-provider/builder,backup-provider/lead" &&
+			unhealthyChecks.join(",") === "main-provider/builder,backup-provider/lead" &&
 			unhealthyAttempts.join(",") === "backup-provider/lead" &&
 			currentWorkActionLeases(unhealthyPrimary).at(-1).selectedCandidate ===
 				"backup" &&
-			currentWorkActionLeases(unhealthyPrimary).at(-1)
-				.degradedIndependence === false,
+			currentWorkActionLeases(unhealthyPrimary).at(-1).degradedIndependence ===
+				false,
 		"credential preflight skips an unauthenticated Main and launches the authenticated Backup",
 	);
 
@@ -221,7 +230,9 @@ try {
 			currentWorkActionLeases(unavailable).length === unavailableLeaseCount &&
 			loadStore(unavailable).items["W-1"].status === "open" &&
 			unavailableEvidence?.candidates
-				.map((candidate) => `${candidate.id}:${candidate.model}:${candidate.reason}`)
+				.map(
+					(candidate) => `${candidate.id}:${candidate.model}:${candidate.reason}`,
+				)
 				.join("|") ===
 				"main:main-provider/builder:No API key or login is available.|backup:backup-provider/lead:No API key or login is available.",
 		"all-unavailable preflight performs no RPC or mutable lease/claim and returns deterministic candidate evidence",
@@ -244,8 +255,7 @@ try {
 	);
 	assert(
 		primaryLaunch.spawned.ok &&
-			healthyChecks.join(",") ===
-				"main-provider/builder,backup-provider/lead" &&
+			healthyChecks.join(",") === "main-provider/builder,backup-provider/lead" &&
 			healthyAttempts.join(",") === "main-provider/builder",
 		"healthy Main launches normally after registry credential lookups only, without a provider inference probe",
 	);
@@ -293,7 +303,8 @@ try {
 			String(parkedItem.notes).includes("wo:operator-blocker") &&
 			String(parkedItem.notes).includes("work-label W-1 --remove wo:blocked") &&
 			readWorkActionLeaseEvents(exhausted).some(
-				(event) => event.leaseId === parkedLease.leaseId && event.state === "parked",
+				(event) =>
+					event.leaseId === parkedLease.leaseId && event.state === "parked",
 			),
 		"candidate exhaustion parks durably with visible blocker evidence and a coded recovery command",
 	);
@@ -326,7 +337,10 @@ try {
 		action: "run-implementation",
 		semanticRole: "builder",
 	});
-	assert(unrelatedLease.workItemId === "W-2", "a parked item does not block unrelated repository work");
+	assert(
+		unrelatedLease.workItemId === "W-2",
+		"a parked item does not block unrelated repository work",
+	);
 	fenceWorkActionLease(exhausted, unrelatedLease.leaseId, "fixture-release");
 	const recoveryStore = loadStore(exhausted);
 	updateWorkItem(recoveryStore, "W-1", {
@@ -351,7 +365,9 @@ try {
 	fenceWorkActionLease(exhausted, recoveredLease.leaseId, "fixture-release");
 
 	const local = {
-		notes: ['wo:failure {"version":1,"classification":"localized","understood":true}'],
+		notes: [
+			'wo:failure {"version":1,"classification":"localized","understood":true}',
+		],
 	};
 	assert(
 		leadEscalationDecision(local, []).action === "repair" &&
@@ -372,10 +388,27 @@ try {
 		fakePi([true], []),
 		{ mode: "rpc" },
 	);
-	const successfulDir = currentWorkActionLeases(successfulFence).at(-1)
-		.launchIdentity.asyncDir;
+	const successfulDir =
+		currentWorkActionLeases(successfulFence).at(-1).launchIdentity.asyncDir;
 	const closedStore = loadStore(successfulFence);
-	updateWorkItem(closedStore, "W-1", { status: "closed" });
+	const closedItem = closedStore.items["W-1"];
+	const revision = "fixture-success";
+	updateWorkItem(closedStore, "W-1", {
+		status: "closed",
+		verificationRevision: revision,
+		evidence: [
+			verificationProofRecord(
+				closedItem.verificationContract,
+				"legacy-inspection",
+				{
+					targetRevision: revision,
+					issuer: { type: "goal", id: "fixture" },
+					artifacts: [inlineResultArtifact("result", "verified")],
+					inspection: { by: "goal", summary: "Fixture outcome inspected." },
+				},
+			),
+		],
+	});
 	saveStore(successfulFence, closedStore);
 	mkdirSync(successfulDir, { recursive: true });
 	writeFileSync(
@@ -412,8 +445,8 @@ try {
 	const changedStore = loadStore(supersededFence);
 	updateWorkItem(changedStore, "W-1", { labels: ["superseded"] });
 	saveStore(supersededFence, changedStore);
-	const supersededDir = currentWorkActionLeases(supersededFence).at(-1)
-		.launchIdentity.asyncDir;
+	const supersededDir =
+		currentWorkActionLeases(supersededFence).at(-1).launchIdentity.asyncDir;
 	mkdirSync(supersededDir, { recursive: true });
 	writeFileSync(
 		path.join(supersededDir, "status.json"),
@@ -440,7 +473,10 @@ try {
 	saveStore(repairFixture, repairStore);
 	const repairState = buildWorkResumeState(repairFixture, "E-1");
 	const repairDirect = directRoleHandoffParams(repairState, repairFixture);
-	assert(repairDirect.agent === "work-worker", "normal assurance starts with Builder");
+	assert(
+		repairDirect.agent === "work-worker",
+		"normal assurance starts with Builder",
+	);
 	const initialRepairLaunch = await launchDirectAction(
 		repairFixture,
 		repairState,
@@ -448,9 +484,12 @@ try {
 		fakePi([true], []),
 		{ mode: "rpc" },
 	);
-	assert(initialRepairLaunch.spawned.ok, "fixture Builder launch is acknowledged");
-	const failedDir = currentWorkActionLeases(repairFixture).at(-1).launchIdentity
-		?.asyncDir;
+	assert(
+		initialRepairLaunch.spawned.ok,
+		"fixture Builder launch is acknowledged",
+	);
+	const failedDir =
+		currentWorkActionLeases(repairFixture).at(-1).launchIdentity?.asyncDir;
 	mkdirSync(failedDir, { recursive: true });
 	writeFileSync(
 		path.join(failedDir, "status.json"),
@@ -491,7 +530,9 @@ try {
 			leadContract.includes("do not hand mutable ownership back to Builder"),
 		"Lead owns diagnosis, edit, and verification end to end",
 	);
-	process.stdout.write("ok - Lead routing, fallback strategy, and bounded escalation\n");
+	process.stdout.write(
+		"ok - Lead routing, fallback strategy, and bounded escalation\n",
+	);
 } finally {
 	for (const cwd of cleanup) rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalDir, { recursive: true, force: true });

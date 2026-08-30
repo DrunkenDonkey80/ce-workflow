@@ -772,8 +772,8 @@ try {
 	assert.equal(finished.status, "PASS");
 	assert.deepEqual(
 		finished.formatted,
-		[],
-		"formatting skips files with no detectable indentation when no config exists",
+		["source.js"],
+		"formatting applies deterministic default indentation when no config exists",
 	);
 	assert.doesNotMatch(
 		execFileSync("git", ["show", "--pretty=", "--name-only", "HEAD"], {

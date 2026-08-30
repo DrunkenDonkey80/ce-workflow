@@ -562,9 +562,7 @@ export function validateStore(store, file = "work store") {
 			(!plainObject(item.executionWindow) ||
 				!Number.isInteger(item.executionWindow.generation) ||
 				item.executionWindow.generation < 1 ||
-				!new Set(["active", "blocked", "closed"]).has(
-					item.executionWindow.state,
-				) ||
+				!new Set(["active", "blocked", "closed"]).has(item.executionWindow.state) ||
 				["ownerSession", "goalId", "acquiredAt", "updatedAt"].some(
 					(field) =>
 						typeof item.executionWindow[field] !== "string" ||
@@ -579,7 +577,10 @@ export function validateStore(store, file = "work store") {
 				!item.verificationRevision.trim() ||
 				item.verificationRevision.length > 200)
 		)
-			throw error("corrupt", `Invalid verification revision for ${key} in ${file}`);
+			throw error(
+				"corrupt",
+				`Invalid verification revision for ${key} in ${file}`,
+			);
 		for (const [field, entries] of [
 			["evidence", item.evidence],
 			["verificationWaivers", item.verificationWaivers],
@@ -749,7 +750,6 @@ export function updateWorkItem(store, id, changes = {}, options = {}) {
 		};
 	if (
 		closing &&
-		previous.status === "in_progress" &&
 		["task", "bug"].includes(previous.type) &&
 		!next.verificationContract
 	)
@@ -759,9 +759,12 @@ export function updateWorkItem(store, id, changes = {}, options = {}) {
 		);
 	const proofChanged =
 		previous.status === "closed" &&
-		["verificationContract", "verificationRevision", "verificationWaivers", "evidence"].some(
-			(field) => Object.hasOwn(fields, field),
-		);
+		[
+			"verificationContract",
+			"verificationRevision",
+			"verificationWaivers",
+			"evidence",
+		].some((field) => Object.hasOwn(fields, field));
 	if ((closing || proofChanged) && next.verificationContract) {
 		const proof = verificationContractStatus(next, {
 			cwd: options.cwd,

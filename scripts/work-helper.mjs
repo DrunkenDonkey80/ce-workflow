@@ -610,7 +610,9 @@ function workspaceVerificationRevision(root) {
 		hash.update(`no-git:${path.resolve(root)}`);
 	}
 	for (const file of files
-		.filter((item) => item !== ".ce-workflow/work-items.json" && !isRuntimePath(item))
+		.filter(
+			(item) => item !== ".ce-workflow/work-items.json" && !isRuntimePath(item),
+		)
 		.sort()) {
 		hash.update(`\0${file}\0`);
 		const absolute = path.join(root, file);
@@ -625,7 +627,9 @@ function declaredOperationRoot(root, requested = ".") {
 	const absolute = path.resolve(root, requested);
 	const relative = path.relative(root, absolute).replaceAll("\\", "/");
 	if (relative.startsWith("../") || path.isAbsolute(relative))
-		throw new Error(`verification operation cwd escapes the repository: ${requested}`);
+		throw new Error(
+			`verification operation cwd escapes the repository: ${requested}`,
+		);
 	return absolute;
 }
 
@@ -636,8 +640,11 @@ function assertionText(result, assertion, root) {
 	const absolute = path.resolve(root, assertion.path);
 	const relative = path.relative(root, absolute).replaceAll("\\", "/");
 	if (relative.startsWith("../") || path.isAbsolute(relative))
-		throw new Error(`verification assertion path escapes the repository: ${assertion.path}`);
-	if (assertion.operator === "exists") return existsSync(absolute) ? "true" : "false";
+		throw new Error(
+			`verification assertion path escapes the repository: ${assertion.path}`,
+		);
+	if (assertion.operator === "exists")
+		return existsSync(absolute) ? "true" : "false";
 	if (!existsSync(absolute) || !statSync(absolute).isFile())
 		throw new Error(`verification assertion file is missing: ${assertion.path}`);
 	if (assertion.operator === "sha256")
@@ -652,8 +659,10 @@ function assertDeclaredOperation(result, operation, root) {
 		let pass = false;
 		if (assertion.operator === "equals" || assertion.operator === "sha256")
 			pass = actual === assertion.value;
-		else if (assertion.operator === "includes") pass = actual.includes(assertion.value);
-		else if (assertion.operator === "matches") pass = new RegExp(assertion.value, "u").test(actual);
+		else if (assertion.operator === "includes")
+			pass = actual.includes(assertion.value);
+		else if (assertion.operator === "matches")
+			pass = new RegExp(assertion.value, "u").test(actual);
 		else if (assertion.operator === "exists") pass = actual === "true";
 		if (!pass)
 			failures.push(
@@ -858,17 +867,30 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		executableContract?.required.filter(
 			(requirement) => requirement.capability === "command",
 		) ?? [];
-	if (executableContract && (jsonFile || expected !== undefined || shardDeclarations.length))
+	const persistedLegacyContract = Boolean(
+		executableContract?.required.every(
+			(requirement) =>
+				requirement.source === "explicit legacy finish verification",
+		),
+	);
+	if (
+		executableContract &&
+		!persistedLegacyContract &&
+		(jsonFile || expected !== undefined || shardDeclarations.length)
+	)
 		throw new Error(
 			"contract-bearing finish uses each declared operation/assertion; --json, --expect, and --verify-shard are legacy-only",
 		);
 	if (
 		executableContract &&
+		!persistedLegacyContract &&
 		verify &&
 		(commandRequirements.length !== 1 ||
 			verify !== commandRequirements[0].operation.command)
 	)
-		throw new Error("--verify must exactly match the sole declared command operation");
+		throw new Error(
+			"--verify must exactly match the sole declared command operation",
+		);
 	if (!executableContract && shardDeclarations.length && !verify)
 		throw new Error("--verify-shard requires --verify");
 	if (!executableContract && !verify && !jsonFile)
@@ -1038,37 +1060,83 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	)
 		reviewReasons.push("hardware/live-evidence contract");
 	const verificationRevision = workspaceVerificationRevision(executionRoot);
-	if (executableContract)
+	let effectiveContract = executableContract;
+	let effectiveRuns = commandRuns;
+	if (!effectiveContract && ["task", "bug"].includes(typeOf(task))) {
+		const legacyOperations = normalizedShardDeclarations.length
+			? normalizedShardDeclarations.map((shard) => ({
+					id: `legacy-${shard.id}`,
+					command: shard.command,
+				}))
+			: [
+					{
+						id: "legacy-verification",
+						command: verify ?? `json-assert ${jsonFile}`,
+					},
+				];
+		effectiveContract = validateVerificationContract({
+			version: 1,
+			required: legacyOperations.map((operation) => ({
+				id: operation.id,
+				capability: "command",
+				proof: "test",
+				source: "explicit legacy finish verification",
+				artifacts: ["result"],
+				operation: {
+					command: operation.command,
+					expectedExit: 0,
+					assertions: [
+						{ target: "exit", operator: "equals", value: "0" },
+						...(expected !== undefined && !normalizedShardDeclarations.length
+							? [{ target: "stdout", operator: "equals", value: expected }]
+							: []),
+					],
+				},
+			})),
+		});
+		effectiveRuns = legacyOperations.map((operation) => ({
+			requirement: effectiveContract.required.find(
+				(requirement) => requirement.id === operation.id,
+			),
+			operation: {
+				command: operation.command,
+				exitCode: 0,
+				cleanup: { ok: true },
+			},
+			artifacts: [inlineResultArtifact("result", output || "PASS")],
+			output,
+		}));
+	}
+	if (effectiveContract)
 		mutateStore(cwd, (store) => {
-			let updated = updateWorkItem(store, id, { verificationRevision });
-			for (const commandRun of commandRuns)
+			let updated = updateWorkItem(store, id, {
+				verificationContract: effectiveContract,
+				verificationRevision,
+			});
+			for (const commandRun of effectiveRuns)
 				updated = addWorkEvidence(
 					store,
 					id,
-					verificationProofRecord(
-						executableContract,
-						commandRun.requirement.id,
-						{
-							status: "PASS",
-							targetRevision: verificationRevision,
-							issuer: {
-								type: "adapter",
-								id: "native-command",
-								version: "1",
-								capability: "command",
-							},
-							operation: commandRun.operation,
-							artifacts: commandProofArtifacts(commandRun),
-							detail: commandRun.operation.command,
+					verificationProofRecord(effectiveContract, commandRun.requirement.id, {
+						status: "PASS",
+						targetRevision: verificationRevision,
+						issuer: {
+							type: "adapter",
+							id: executableContract ? "native-command" : "legacy-finish-adapter",
+							version: "1",
+							capability: "command",
 						},
-					),
+						operation: commandRun.operation,
+						artifacts: commandRun.artifacts ?? commandProofArtifacts(commandRun),
+						detail: commandRun.operation.command,
+					}),
 				);
 			return updated;
 		});
 	const proofState = verificationContractStatus(readWorkItem(id), {
 		cwd: executionRoot,
-		revision: executableContract ? verificationRevision : undefined,
-		requireContract: Boolean(executableContract),
+		revision: effectiveContract ? verificationRevision : undefined,
+		requireContract: Boolean(effectiveContract),
 	});
 	if (!proofState.ok)
 		throw new Error(
@@ -1797,8 +1865,15 @@ try {
 			throw new Error(
 				`${requirement.capability} PASS is issued only by its coded adapter`,
 			);
-		const by = option("--by", requirement.capability === "manual" ? "human" : "goal");
-		if (status === "PASS" && requirement.capability === "manual" && by !== "human")
+		const by = option(
+			"--by",
+			requirement.capability === "manual" ? "human" : "goal",
+		);
+		if (
+			status === "PASS" &&
+			requirement.capability === "manual" &&
+			by !== "human"
+		)
 			throw new Error("manual PASS requires human authority");
 		const artifacts = options("--artifact").map((value) => {
 			const separator = value.indexOf("=");
@@ -1917,8 +1992,7 @@ try {
 			return updateWorkItem(store, id, {
 				status: "in_progress",
 				verificationContract:
-					current.verificationContract ??
-					compatibilityVerificationContract(current),
+					current.verificationContract ?? compatibilityVerificationContract(current),
 			});
 		});
 		print(summary(claimed, 300));

@@ -15,6 +15,11 @@ import {
 	saveStore,
 	updateWorkItem,
 } from "../extensions/work-store.js";
+import {
+	compatibilityVerificationContract,
+	inlineResultArtifact,
+	verificationProofRecord,
+} from "../extensions/work-verification-contract.js";
 
 const epics = [
 	{
@@ -269,9 +274,18 @@ export function seedNativeStore(cwd, sources) {
 	const store = initStore(cwd);
 	store.items = {};
 	for (const source of sources) {
+		const type = source.issue_type ?? source.type ?? "task";
+		const executable =
+			["task", "bug"].includes(type) && source.status === "in_progress";
+		const contract = executable
+			? (source.verificationContract ?? compatibilityVerificationContract(source))
+			: source.verificationContract;
+		const verified =
+			executable && /wo:verify-check PASS/i.test(source.notes ?? "");
+		const revision = verified ? "fixture-verification" : undefined;
 		createWorkItem(store, {
 			id: source.id,
-			type: source.issue_type ?? source.type ?? "task",
+			type,
 			status: source.status,
 			title: source.title,
 			labels: source.labels ?? [],
@@ -280,6 +294,18 @@ export function seedNativeStore(cwd, sources) {
 			updatedAt: source.updated_at ?? source.updatedAt,
 			description: source.description,
 			acceptance: source.acceptance ?? source.acceptance_criteria,
+			verificationContract: contract,
+			verificationRevision: revision,
+			evidence: verified
+				? [
+						verificationProofRecord(contract, contract.required[0].id, {
+							targetRevision: revision,
+							issuer: { type: "goal", id: "fixture" },
+							artifacts: [inlineResultArtifact("result", "verified")],
+							inspection: { by: "goal", summary: "Fixture outcome inspected." },
+						}),
+					]
+				: [],
 			documentLinks: {
 				...(source.design ? { design: source.design } : {}),
 				...(source.spec_id ? { spec: source.spec_id } : {}),

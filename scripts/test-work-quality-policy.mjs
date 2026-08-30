@@ -29,6 +29,11 @@ import {
 	saveStore,
 	updateWorkItem,
 } from "../extensions/work-store.js";
+import {
+	compatibilityVerificationContract,
+	inlineResultArtifact,
+	verificationProofRecord,
+} from "../extensions/work-verification-contract.js";
 
 function assert(value, message) {
 	if (!value) throw new Error(message);
@@ -177,9 +182,25 @@ try {
 			targetId: mode === "autonomous" ? "W-1" : undefined,
 			executeFinish: async (state) => {
 				finishes += 1;
-				mutateStore(cwd, (store) =>
-					updateWorkItem(store, "W-1", { status: "closed" }),
-				);
+				mutateStore(cwd, (store) => {
+					const item = store.items["W-1"];
+					const contract =
+						item.verificationContract ?? compatibilityVerificationContract(item);
+					const revision = "fixture-finish";
+					return updateWorkItem(store, "W-1", {
+						status: "closed",
+						verificationContract: contract,
+						verificationRevision: revision,
+						evidence: [
+							verificationProofRecord(contract, "legacy-inspection", {
+								targetRevision: revision,
+								issuer: { type: "goal", id: "fixture" },
+								artifacts: [inlineResultArtifact("result", "verified")],
+								inspection: { by: "goal", summary: "Fixture outcome inspected." },
+							}),
+						],
+					});
+				});
 				git(cwd, "add", "src/a.js", ".ce-workflow/work-items.json");
 				git(cwd, "commit", "-qm", "finish fixture");
 				const verifier = scheduleVerifierBatch(cwd, {

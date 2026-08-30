@@ -22,6 +22,11 @@ import {
 	updateWorkItem,
 	validateStore,
 } from "../extensions/work-store.js";
+import {
+	compatibilityVerificationContract,
+	inlineResultArtifact,
+	verificationProofRecord,
+} from "../extensions/work-verification-contract.js";
 
 const dirs = [];
 function repo() {
@@ -37,6 +42,25 @@ function throwsCategory(fn, category) {
 }
 function item(store, input) {
 	return createWorkItem(store, { now: "2026-07-15T00:00:00.000Z", ...input });
+}
+function verifiedClose(store, id) {
+	const task = store.items[id];
+	const contract =
+		task.verificationContract ?? compatibilityVerificationContract(task);
+	const revision = "fixture-verification";
+	updateWorkItem(store, id, {
+		verificationContract: contract,
+		verificationRevision: revision,
+		evidence: [
+			verificationProofRecord(contract, contract.required[0].id, {
+				targetRevision: revision,
+				issuer: { type: "goal", id: "fixture" },
+				artifacts: [inlineResultArtifact("result", "verified")],
+				inspection: { by: "goal", summary: "Fixture result inspected." },
+			}),
+		],
+	});
+	return closeWorkItem(store, id);
 }
 function initiativeMetadata(childId = "initiative-1.1") {
 	return {
@@ -250,9 +274,9 @@ try {
 		title: "B",
 		parentId: "roadmap",
 	});
-	closeWorkItem(lifecycle, "task-a");
+	verifiedClose(lifecycle, "task-a");
 	assert.equal(lifecycle.items.roadmap.status, "open");
-	closeWorkItem(lifecycle, "task-b");
+	verifiedClose(lifecycle, "task-b");
 	assert.equal(
 		lifecycle.items.roadmap.status,
 		"open",
@@ -283,7 +307,7 @@ try {
 			title: "Persistent task",
 			parentId: id,
 		});
-		closeWorkItem(lifecycle, `${id}-task`);
+		verifiedClose(lifecycle, `${id}-task`);
 		assert.equal(lifecycle.items[id].status, "open");
 		item(lifecycle, {
 			id: `${id}-delete`,
@@ -295,7 +319,7 @@ try {
 		assert.equal(lifecycle.items[id].status, "open");
 	}
 	for (const mutation of [
-		(store) => closeWorkItem(store, "initiative-1.1.1"),
+		(store) => verifiedClose(store, "initiative-1.1.1"),
 		(store) => deleteWorkItemSubtree(store, "initiative-1.1.1"),
 	]) {
 		const initiativeLifecycle = initiativeStore();
@@ -365,9 +389,7 @@ try {
 	const blockedBytes = readFileSync(storePath(subtreeDir), "utf8");
 	assert.throws(
 		() =>
-			mutateStore(subtreeDir, (store) =>
-				deleteWorkItemSubtree(store, "blocked"),
-			),
+			mutateStore(subtreeDir, (store) => deleteWorkItemSubtree(store, "blocked")),
 		/depend/i,
 	);
 	assert.equal(readFileSync(storePath(subtreeDir), "utf8"), blockedBytes);

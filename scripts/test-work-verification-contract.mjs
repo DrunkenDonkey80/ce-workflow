@@ -195,6 +195,16 @@ try {
 		/without a verification contract/,
 	);
 	createWorkItem(store, {
+		id: "work-open",
+		type: "task",
+		status: "open",
+		title: "Open close bypass",
+	});
+	assert.throws(
+		() => closeWorkItem(store, "work-open", {}, { cwd }),
+		/without a verification contract/,
+	);
+	createWorkItem(store, {
 		id: "work-1",
 		type: "task",
 		status: "in_progress",

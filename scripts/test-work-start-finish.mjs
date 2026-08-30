@@ -116,7 +116,7 @@ try {
 			"adapter rejects every malformed read-only boundary field",
 		);
 	}
-	let verifierChild = workflowChildParams(verifierRpcParams);
+	const verifierChild = workflowChildParams(verifierRpcParams);
 	assert(
 		verifierRpcParams.async === true &&
 			verifierRpcParams.mission === false &&
@@ -700,11 +700,8 @@ try {
 	fixture.reset("finishBrowserPending", "unknown");
 	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
-		state.ok &&
-			state.handoffPrompt?.includes(
-				"BEGIN VERIFIED PRIVATE AFFECTED-UI BROWSER PLAYBOOK",
-			),
-		"worker-deferred browser acceptance remains a required parent finish gate even when profile browser checks are off",
+		state.ok && !state.handoffPrompt,
+		"contract-bearing finish does not invoke the legacy browser prompt path",
 	);
 
 	fixture.reset("finishMissingReview", "unknown");
@@ -773,18 +770,17 @@ try {
 			state.action === "commit-ready" &&
 			simplifyAt >= 0 &&
 			simplifyAt < reviewAt &&
-			reviewAt < browserAt,
-		"max-profile non-trivial UI finish routes private simplify, review, and browser resources in coded order",
+			browserAt === -1,
+		"contract-bearing UI finish keeps legacy simplify/review gates but delegates browser proof to capability contracts",
 	);
 	assert(
 		state.handoffPrompt.includes("wo:simplify NOOP") &&
 			state.handoffPrompt.includes("wo:review PASS") &&
-			state.handoffPrompt.includes("wo:browser WAIVED") &&
 			state.handoffPrompt.includes("at most one targeted re-review") &&
-			state.handoffPrompt.includes("smallest runnable affected pages") &&
+			!state.handoffPrompt.includes("wo:browser WAIVED") &&
 			!state.handoffPrompt.includes("run the ce-") &&
 			!state.handoffPrompt.includes("skill on the affected"),
-		"finish pipeline preserves distinct no-op, bounded-review, affected-UI, and waiver contracts without imported prompts",
+		"finish pipeline preserves bounded legacy gates without duplicating capability-owned browser proof",
 	);
 	const blockedFinish = executeWorkFinishState(finishCwd, state);
 	assert(
@@ -805,8 +801,8 @@ try {
 	fixture.reset("finishMissingVerification", "unknown");
 	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
-		!state.ok && state.reason === "missing-verification",
-		"finish requires verification evidence",
+		!state.ok && state.reason === "verification-contract-incomplete",
+		"finish requires contract-bound verification evidence",
 	);
 
 	fixture.reset("finishReady", "staged-instruction");

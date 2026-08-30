@@ -29,12 +29,39 @@ import {
 	reopenGroup,
 } from "../extensions/background-verifiers.js";
 import {
+	addWorkEvidence,
 	createWorkItem,
 	initStore,
 	mutateStore,
 	updateWorkItem,
 } from "../extensions/work-store.js";
+import {
+	compatibilityVerificationContract,
+	inlineResultArtifact,
+	verificationProofRecord,
+} from "../extensions/work-verification-contract.js";
 import { formatPendingFiles } from "./work-hygiene.mjs";
+
+function closeVerifiedTask(store, id) {
+	const contract = compatibilityVerificationContract({ title: id });
+	const revision = "goal-test-revision";
+	updateWorkItem(store, id, {
+		verificationContract: contract,
+		verificationRevision: revision,
+	});
+	addWorkEvidence(
+		store,
+		id,
+		verificationProofRecord(contract, "legacy-inspection", {
+			status: "PASS",
+			targetRevision: revision,
+			issuer: { type: "goal", id: "goal-test" },
+			inspection: { by: "goal", summary: `${id} verified` },
+			artifacts: [inlineResultArtifact("result", "verified")],
+		}),
+	);
+	return updateWorkItem(store, id, { status: "closed" });
+}
 
 const mod = await import(
 	pathToFileURL(
@@ -371,13 +398,9 @@ try {
 		/observed 0/,
 		"guidance goals cannot complete before the requested work-item count closes",
 	);
-	mutateStore(targetCwd, (store) =>
-		updateWorkItem(store, "scope-task-1", { status: "closed" }),
-	);
+	mutateStore(targetCwd, (store) => closeVerifiedTask(store, "scope-task-1"));
 	assert.equal(mod.workGoalCompletionBlocker(scopedGoal, targetCwd), undefined);
-	mutateStore(targetCwd, (store) =>
-		updateWorkItem(store, "scope-task-2", { status: "closed" }),
-	);
+	mutateStore(targetCwd, (store) => closeVerifiedTask(store, "scope-task-2"));
 	assert.match(
 		mod.workGoalCompletionBlocker(scopedGoal, targetCwd),
 		/observed 2/,
@@ -1771,16 +1794,23 @@ try {
 			"function support() {\n\treturn true;\n}\n",
 			"the verifier fix commit includes formatter output",
 		);
-		assert.deepEqual(JSON.parse(readFileSync(formatterLog, "utf8").trim()), [
-			"format",
-			"--write",
-			"--no-errors-on-unmatched",
-			"--indent-style",
-			"tab",
-			"--indent-width",
-			"1",
-			"support.js",
-		]);
+		assert.deepEqual(
+			readFileSync(formatterLog, "utf8")
+				.trim()
+				.split(/\r?\n/)
+				.map((line) => JSON.parse(line))
+				.find((args) => args.at(-1) === "support.js"),
+			[
+				"format",
+				"--write",
+				"--no-errors-on-unmatched",
+				"--indent-style",
+				"tab",
+				"--indent-width",
+				"1",
+				"support.js",
+			],
+		);
 
 		writeFileSync(path.join(committedFixCwd, ".editorconfig"), "root = true\n");
 		writeFileSync(path.join(committedFixCwd, "editor.js"), "  editor\n");
@@ -2192,7 +2222,9 @@ try {
 		},
 	});
 	assert.equal(compactions.length, 1, "idle F8 microcompacts immediately");
-	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
+	assert.match(compactions[0].customInstructions, /work-context microcompact/);
+	compactions[0].onComplete();
+	await new Promise((resolve) => setImmediate(resolve));
 	const freeformCompaction = await tempHooks.session_before_compact(
 		{
 			reason: "overflow",
@@ -2223,38 +2255,49 @@ try {
 	notices.length = 0;
 	const abortsBeforeBusyCompact = aborts;
 	await tempShortcuts.f8.handler(ctx);
-	assert.equal(
-		compactions.length,
-		1,
-		"busy F8 starts microcompaction at a safe interruption boundary",
-	);
-	assert.equal(
-		aborts,
-		abortsBeforeBusyCompact + 1,
-		"busy F8 pauses the active turn so compaction cannot starve",
-	);
-	assert.ok(
-		notices.some((notice) => String(notice.message).includes("Pausing")),
-		"busy F8 reports the safe pause",
+	assert.equal(compactions.length, 0, "busy F8 does not compact in place");
+	assert.equal(aborts, abortsBeforeBusyCompact, "busy F8 does not abort tools");
+	const busyMessages = [
+		...Array.from({ length: 4 }, (_, index) => ({
+			role: "custom",
+			customType: "old-context",
+			content: `${index}:${"x".repeat(40_000)}`,
+			display: false,
+			timestamp: index,
+		})),
+		{ role: "user", content: "Keep this active task running.", timestamp: 5 },
+	];
+	const busyFiltered = await tempHooks.context({ messages: busyMessages }, ctx);
+	assert.equal(busyFiltered.messages[0].role, "compactionSummary");
+	assert(
+		!busyFiltered.messages.includes(busyMessages[0]),
+		"busy F8 filters old context before the next model call",
 	);
 	await tempHooks.turn_end(
 		{},
 		{ ...ctx, getContextUsage: () => ({ tokens: 1 }) },
 	);
 	assert.equal(
+		aborts,
+		abortsBeforeBusyCompact,
+		"turn end remains uninterrupted",
+	);
+	assert.equal(
+		compactions.length,
+		0,
+		"native compaction waits for idle settlement",
+	);
+	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
+	await new Promise((resolve) => setTimeout(resolve, 20));
+	assert.equal(
 		compactions.length,
 		1,
-		"turn end does not duplicate the completed F8 request",
+		"idle settlement persists the filtered context",
 	);
-	assert.equal(sent.length, 1, "queued F8 resumes work after compaction");
-	assert.match(sent[0].message, /Continue from the compacted context/);
-	assert.equal(sent[0].options?.deliverAs, "followUp");
-	assert.ok(
-		notices.some((notice) => String(notice.message).includes("resuming work")),
-		"queued F8 reports automatic resumption",
-	);
-	sent.length = 0;
+	assert.equal(sent.length, 0, "filtering needs no injected resume prompt");
+	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
 	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
+	await new Promise((resolve) => setImmediate(resolve));
 	assert.equal(compactions.length, 1, "settling does not repeat the request");
 	compactions.length = 0;
 
@@ -2384,62 +2427,50 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		{ prompt: inlineWorkflowPrompt, systemPrompt: "base" },
 		ctx,
 	);
+	await tempHooks.agent_start({}, ctx);
 	await tempShortcuts.f8.handler(ctx);
+	const inlineFiltered = await tempHooks.context(
+		{
+			messages: [
+				...busyMessages,
+				{ role: "user", content: inlineWorkflowPrompt, timestamp: 6 },
+			],
+		},
+		ctx,
+	);
+	assert.equal(inlineFiltered.messages[0].role, "compactionSummary");
+	assert.match(inlineFiltered.messages[0].summary, /work-7\.1/);
 	await tempHooks.turn_end(
 		{},
 		{ ...ctx, getContextUsage: () => ({ tokens: 1 }) },
 	);
-	assert.equal(compactions.length, 1, "queued F8 compacts inline work-resume");
-	assert.equal(sent.length, 1, "inline work-resume continues after compaction");
-	const resumedWorkflow = mod.parseWorkPromptMeta(sent[0].message);
-	assert.ok(
-		resumedWorkflow,
-		"compaction continuation keeps work-orchestrator metadata",
-	);
-	assert.equal(resumedWorkflow.workflowRunId, "wr-compact-resume");
-	assert.equal(resumedWorkflow.workItemId, "work-7.1");
-	assert.equal(resumedWorkflow.inlineWork, true);
-	await tempHooks.agent_end(
-		{
-			messages: [
-				{
-					role: "assistant",
-					stopReason: "aborted",
-					errorMessage: "Request aborted for manual compaction",
-					content: [],
-				},
-			],
-		},
-		ctx,
-	);
-	const compactedWorkflowClaim = workflowClaim("wr-compact-resume");
 	assert.equal(
-		existsSync(compactedWorkflowClaim),
-		false,
-		"manual compaction does not fail the interrupted work-resume run",
+		compactions.length,
+		0,
+		"inline F8 filters without interrupting work",
 	);
-	await tempHooks.before_agent_start(
-		{ prompt: sent[0].message, systemPrompt: "base" },
-		ctx,
-	);
-	await tempHooks.agent_start({}, ctx);
 	await tempHooks.agent_end(
 		{
 			messages: [
 				{
 					role: "assistant",
-					content: [{ type: "text", text: "Finished after compaction." }],
+					content: [{ type: "text", text: "Finished after filtering." }],
 				},
 			],
 		},
 		ctx,
 	);
-	await settle();
+	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
+	await new Promise((resolve) => setTimeout(resolve, 20));
+	assert.equal(compactions.length, 1, "idle inline work persists compaction");
+	assert.equal(sent.length, 0, "inline filtering needs no resume prompt");
+	const compactedWorkflowClaim = workflowClaim("wr-compact-resume");
 	assert.equal(
 		JSON.parse(readFileSync(compactedWorkflowClaim, "utf8")).outcome,
 		"completed",
-		"resumed work-resume keeps and completes the original workflow run",
+		"filtered work-resume completes the original workflow run",
 	);
+	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
 	sent.length = 0;
 	compactions.length = 0;
 
@@ -2603,18 +2634,19 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	const unavailableNoticeCount = notices.length;
 	const unavailableCtx = { ...ctx, compact: undefined };
 	await tempShortcuts.f8.handler(unavailableCtx);
-	assert.ok(
-		notices.some((notice) =>
-			String(notice.message).includes("unavailable in this mode"),
-		),
-		"F8 reports unavailable compaction instead of queueing forever",
+	const unavailableFiltered = await tempHooks.context(
+		{ messages: busyMessages },
+		unavailableCtx,
 	);
+	assert.equal(unavailableFiltered.messages[0].role, "compactionSummary");
 	await tempHooks.agent_settled({}, { ...unavailableCtx, isIdle: () => true });
+	await new Promise((resolve) => setTimeout(resolve, 20));
 	assert.equal(
 		notices.length,
-		unavailableNoticeCount + 1,
-		"unavailable F8 leaves no queued retry",
+		unavailableNoticeCount,
+		"missing ctx.compact leaves filtering active without retry noise",
 	);
+	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
 
 	writeFileSync(
 		path.join(cwd, ".pi", "settings.json"),
@@ -2624,23 +2656,24 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		}),
 	);
 	await tempShortcuts.f8.handler(ctx);
+	await tempHooks.context({ messages: busyMessages }, ctx);
 	await tempHooks.turn_end(
 		{},
 		{ ...ctx, getContextUsage: () => ({ tokens: 160_000 }) },
 	);
+	assert.equal(compactions.length, 0, "filtered F8 remains non-blocking");
+	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
+	await new Promise((resolve) => setTimeout(resolve, 20));
 	assert.equal(
 		compactions.length,
 		1,
-		"queued F8 takes precedence over turn-end auto-compaction",
+		"settlement persists the filtered context",
 	);
-	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
-	assert.equal(
-		sent.length,
-		1,
-		"queued F8 still resumes when auto-compaction is enabled",
-	);
-	sent.length = 0;
+	assert.match(compactions[0].customInstructions, /work-context microcompact/);
+	assert.equal(sent.length, 0, "persisting the filter needs no resume prompt");
+	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
 	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
+	await new Promise((resolve) => setTimeout(resolve, 20));
 	assert.equal(compactions.length, 1, "fulfilled F8 request is not repeated");
 	compactions.length = 0;
 	writeFileSync(
@@ -2664,7 +2697,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		1,
 		"settled auto-compaction is enabled by default",
 	);
-	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
+	assert.match(compactions[0].customInstructions, /work-context microcompact/);
 	compactions.length = 0;
 
 	const oldCompactions = [];
@@ -2745,11 +2778,20 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	assert.equal(
 		compactions.length,
-		1,
-		"active work goals compact at the configured threshold",
+		0,
+		"active work goals do not abort for threshold compaction",
 	);
-	assert.match(compactions[0].customInstructions, /on-demand microcompact/);
-	compactions.length = 0;
+	const goalFiltered = await tempHooks.context(
+		{
+			messages: [
+				...busyMessages,
+				{ role: "user", content: "write temp proof file", timestamp: 7 },
+			],
+		},
+		ctx,
+	);
+	assert.equal(goalFiltered.messages[0].role, "compactionSummary");
+	assert.match(goalFiltered.messages[0].summary, /write temp proof file/);
 
 	const before = await tempHooks.before_agent_start(
 		{ prompt: sent[0].message, systemPrompt: "base" },
@@ -2784,9 +2826,12 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await settle();
 	assert.equal(compactions.length, 1, "work-goal compacts before continuing");
 	assert.match(compactions[0].customInstructions, /work-goal microcompact/);
-	assert.equal(sent.length, 2);
-	assert.match(sent[1].message, /Automatic continuation #1/);
+	compactions[0].onComplete();
+	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.match(sent.at(-1).message, /Automatic continuation #1/);
 	assert.equal(statuses["work-goal"], "active #1");
+	compactions.length = 0;
 
 	const nativeGoalCompaction = await tempHooks.session_before_compact(
 		{
@@ -2830,7 +2875,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	assert.equal(
 		compactions.length,
-		1,
+		0,
 		"native compaction fences the overlapping ce-workflow threshold",
 	);
 	await tempHooks.session_compact(
@@ -2844,8 +2889,8 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	assert.equal(
 		compactions.length,
-		1,
-		"native recovery reuses the completed compaction",
+		0,
+		"native recovery does not start a second compaction",
 	);
 	await tempHooks.session_compact(
 		{ compactionEntry: { details: nativeGoalCompaction.compaction.details } },
@@ -2891,11 +2936,13 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempShortcuts.f8.handler(ctx);
 	assert.equal(
 		aborts,
-		abortsBeforeInFlightCompact + 1,
-		"busy F8 releases an already-queued compaction by pausing the turn",
+		abortsBeforeInFlightCompact,
+		"busy F8 does not disturb an in-flight native compaction",
 	);
 	assert(
-		notices.some((notice) => String(notice.message).includes("queued; pausing")),
+		notices.some((notice) =>
+			String(notice.message).includes("already in progress"),
+		),
 	);
 	const noticesBeforeStaleRecovery = notices.length;
 	await tempShortcuts.f8.handler({ ...ctx, isIdle: () => true });
@@ -2911,11 +2958,14 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	await tempHooks.turn_start({}, ctx);
 	await tempShortcuts.f8.handler({ ...ctx, isIdle: () => true });
+	await new Promise((resolve) => setImmediate(resolve));
 	assert.equal(
 		compactions.length,
 		compactionsBeforeStaleRecovery + 1,
 		"a new turn releases an abandoned native compaction fence",
 	);
+	compactions.at(-1).onComplete();
+	await new Promise((resolve) => setImmediate(resolve));
 	compactions.length = compactionsBeforeStaleRecovery;
 
 	await tempHooks.before_agent_start(
@@ -2928,26 +2978,30 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		compact: (options) => compactions.push(options),
 	};
 	const abortsBeforeThreshold = aborts;
-	await tempHooks.tool_execution_end(
-		{
-			toolCallId: "threshold-tool",
-			toolName: "write",
-			isError: false,
-			result: "Successfully wrote evidence",
-		},
+	await tempHooks.tool_call(
+		{ toolName: "write", input: { path: "proof.txt" } },
 		{ ...proactiveCompactionCtx, getContextUsage: () => ({ tokens: 160_000 }) },
 	);
 	assert.equal(
 		compactions.length,
-		2,
-		"an active goal crossing the threshold compacts at the next tool boundary",
+		0,
+		"an active goal crossing the threshold filters before the next model call",
 	);
 	assert.equal(
 		aborts,
-		abortsBeforeThreshold + 1,
-		"threshold compaction pauses the turn before context can keep growing",
+		abortsBeforeThreshold,
+		"threshold filtering does not preempt the tool",
 	);
-	assert.match(compactions[1].customInstructions, /on-demand microcompact/);
+	const thresholdFiltered = await tempHooks.context(
+		{
+			messages: [
+				...busyMessages,
+				{ role: "user", content: "write temp proof file", timestamp: 8 },
+			],
+		},
+		proactiveCompactionCtx,
+	);
+	assert.equal(thresholdFiltered.messages[0].role, "compactionSummary");
 	assert.equal(
 		await tempHooks.message_end(
 			{
@@ -2961,25 +3015,8 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			proactiveCompactionCtx,
 		),
 		undefined,
-		"compaction does not hide unrelated abort errors",
+		"filtering does not hide unrelated abort errors",
 	);
-	const hiddenCompactionAbort = await tempHooks.message_end(
-		{
-			message: {
-				role: "assistant",
-				stopReason: "aborted",
-				errorMessage: "This operation was aborted",
-				content: [],
-			},
-		},
-		proactiveCompactionCtx,
-	);
-	assert.deepEqual(hiddenCompactionAbort?.message, {
-		role: "assistant",
-		stopReason: "stop",
-		content: [],
-	});
-	compactions[1].onComplete?.();
 	await tempHooks.agent_end(
 		{
 			messages: [
@@ -2994,10 +3031,16 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await settle();
 	assert.equal(
 		compactions.length,
-		2,
-		"active-goal continuation reuses the completed F8 microcompact",
+		1,
+		"active-goal continuation persists the filtered context",
 	);
-	assert.equal(sent.length, 4, "active goal resumes after F8 microcompaction");
+	assert.match(compactions[0].customInstructions, /work-goal microcompact/);
+	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
+	assert.equal(
+		sent.length,
+		4,
+		"active goal continues without an interrupted turn",
+	);
 	assert.match(sent[3].message, /Automatic continuation #2/);
 	assert.equal(statuses["work-goal"], "active #2");
 
@@ -3329,19 +3372,27 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		compact: (options) => queuedCallbackCompactions.push(options),
 	};
 	await tempShortcuts.f8.handler(queuedCallbackCtx);
+	await tempHooks.context({ messages: busyMessages }, queuedCallbackCtx);
 	await tempHooks.turn_end(
 		{},
 		{ ...queuedCallbackCtx, getContextUsage: () => ({ tokens: 1 }) },
 	);
+	assert.equal(queuedCallbackCompactions.length, 0);
+	await tempHooks.agent_settled(
+		{},
+		{ ...queuedCallbackCtx, isIdle: () => true },
+	);
+	await new Promise((resolve) => setTimeout(resolve, 20));
 	assert.equal(queuedCallbackCompactions.length, 1);
 	queuedCallbackCompactions[0].onError?.(new Error("operation aborted"));
 	queuedCallbackCompactions[0].onComplete?.();
 	await new Promise((resolve) => setImmediate(resolve));
 	assert.equal(
 		sent.length,
-		queuedCallbackSent + 1,
-		"ordinary queued compaction resumes once across duplicate callbacks",
+		queuedCallbackSent,
+		"ordinary filtering does not inject a resume across duplicate callbacks",
 	);
+	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
 
 	const directLifecycleCompactions = [];
 	const directLifecycleSent = sent.length;
@@ -3458,31 +3509,40 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempHooks.turn_end({}, projectGoalCtx);
 	assert.equal(
 		projectGoalCompactions.length,
-		1,
-		"goal threshold and phase boundary share one compaction",
+		0,
+		"goal threshold filters without starting native compaction",
 	);
+	const projectGoalFiltered = await tempHooks.context(
+		{ messages: busyMessages },
+		projectGoalCtx,
+	);
+	assert.equal(projectGoalFiltered.messages[0].role, "compactionSummary");
 	await tempHooks.agent_end(
 		{
 			messages: [
 				{
 					role: "assistant",
-					stopReason: "error",
-					errorMessage: "This operation was aborted",
-					content: [],
+					content: [{ type: "text", text: "Completed the filtered phase." }],
 				},
 			],
 		},
 		projectGoalCtx,
 	);
-	await tempHooks.agent_settled({}, { ...projectGoalCtx, isIdle: () => true });
+	const projectGoalSettle = tempHooks.agent_settled(
+		{},
+		{ ...projectGoalCtx, isIdle: () => true },
+	);
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(projectGoalCompactions.length, 1);
 	assert.equal(
 		sent.length,
 		projectGoalSent,
-		"goal continuation waits for the in-flight compaction callback",
+		"goal continuation waits for the persistence callback",
 	);
 	projectGoalCompactions[0].onError?.(new Error("This operation was aborted"));
 	projectGoalCompactions[0].onComplete?.();
-	await new Promise((resolve) => setImmediate(resolve));
+	await projectGoalSettle;
+	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
 	assert.equal(
 		projectGoalCompactions.length,
 		1,

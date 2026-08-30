@@ -35,7 +35,8 @@ const npmRun = (args, options = {}) =>
 		npmCli.endsWith(".js") ? [npmCli, ...args] : args,
 		{ cwd: root, encoding: "utf8", ...options },
 	);
-const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8" });
+const git = (cwd, ...args) =>
+	execFileSync("git", args, { cwd, encoding: "utf8" });
 const initializeGit = (cwd) => {
 	git(cwd, "init", "--quiet");
 	git(cwd, "config", "user.email", "smoke@example.com");
@@ -76,7 +77,10 @@ try {
 	initializeGit(clean);
 	writeFileSync(path.join(clean, ".gitignore"), ".pi/\n");
 	assert.equal(models.buildWorkInitState(clean).action, "initialized");
-	const brainstorm = models.buildWorkBrainstormState(clean, "Native smoke product");
+	const brainstorm = models.buildWorkBrainstormState(
+		clean,
+		"Native smoke product",
+	);
 	assert(brainstorm.ok && brainstorm.epic.id);
 	git(clean, "add", ".gitignore", ".ce-workflow/work-items.json");
 	git(clean, "commit", "--quiet", "-m", "initialize native workflow");
@@ -86,7 +90,20 @@ try {
 	);
 	assert(started.ok && started.selectedWorkItem.status === "in_progress");
 	writeFileSync(path.join(clean, "result.js"), "export const smoke = true;\n");
-	const verify = `"${process.execPath}" -e "process.stdout.write('ok')"`;
+	execFileSync(
+		process.execPath,
+		[
+			path.join(installed, "scripts", "work-helper.mjs"),
+			"work-proof",
+			started.selectedWorkItem.id,
+			"legacy-inspection",
+			"--inspection",
+			"Native smoke result inspected.",
+			"--result",
+			"verified",
+		],
+		{ cwd: clean, encoding: "utf8" },
+	);
 	const finish = JSON.parse(
 		execFileSync(
 			process.execPath,
@@ -98,16 +115,15 @@ try {
 				"2",
 				"--message",
 				"native smoke",
-				"--verify",
-				verify,
-				"--expect",
-				"ok",
 			],
 			{ cwd: clean, encoding: "utf8" },
 		),
 	);
 	assert.equal(finish.status, "PASS");
-	assert.equal(storeApi.loadStore(clean).items[started.selectedWorkItem.id].status, "closed");
+	assert.equal(
+		storeApi.loadStore(clean).items[started.selectedWorkItem.id].status,
+		"closed",
+	);
 	assert.equal(git(clean, "status", "--porcelain=v1"), "");
 	assert(!existsSync(path.join(clean, ".beads")));
 
@@ -116,7 +132,12 @@ try {
 	initializeGit(legacy);
 	writeFileSync(path.join(legacy, ".gitignore"), ".pi/\n");
 	const records = [
-		{ id: "legacy-1", issue_type: "epic", status: "in_progress", title: "Legacy epic" },
+		{
+			id: "legacy-1",
+			issue_type: "epic",
+			status: "in_progress",
+			title: "Legacy epic",
+		},
 		{
 			id: "legacy-1.1",
 			issue_type: "task",
@@ -143,7 +164,9 @@ try {
 	assert.match(models.buildWorkStatus(clone, "legacy-1"), /Legacy epic/);
 	assert(!existsSync(path.join(clone, ".beads")));
 
-	console.log("native package smoke: PASS clean finish + legacy migration + clone");
+	console.log(
+		"native package smoke: PASS clean finish + legacy migration + clone",
+	);
 } finally {
 	rmSync(temp, {
 		recursive: true,
