@@ -2199,11 +2199,13 @@ function hydrateTelemetrySubagents(cwd, event, cache = new Map()) {
 
 function telemetryWaitTimes(event) {
 	const wallMs = Math.max(0, Number(event.durationMs ?? 0));
+	const nativePromptWaitMs = Math.max(0, Number(event.uiPromptWaitMs ?? 0));
 	const humanWaitMs = Math.min(
 		wallMs,
-		(event.tools ?? [])
-			.filter((tool) => tool.name === "ask_user")
-			.reduce((sum, tool) => sum + Math.max(0, Number(tool.durationMs ?? 0)), 0),
+		nativePromptWaitMs ||
+			(event.tools ?? [])
+				.filter((tool) => tool.name === "ask_user")
+				.reduce((sum, tool) => sum + Math.max(0, Number(tool.durationMs ?? 0)), 0),
 	);
 	const delegatedWaitMs = Math.min(
 		Math.max(0, wallMs - humanWaitMs),
@@ -3130,6 +3132,7 @@ function summarizeTelemetryEvent(event) {
 		epicId: event.epicId,
 		workItemId: event.workItemId ?? event.meta?.workItemId,
 		durationMs: event.durationMs,
+		uiPromptWaitMs: event.uiPromptWaitMs,
 		usage: event.usage,
 		messages: event.messages,
 		context: event.context,
@@ -5997,7 +6000,11 @@ function requestMicrocompact(ctx) {
 		ctx.ui.notify("Microcompaction is already in progress", "info");
 		return false;
 	}
-	if (ctx.isIdle?.() === false) return requestContextFilter(ctx);
+	if (ctx.isIdle?.() === false) {
+		requestContextFilter(ctx);
+		ctx.ui.notify("Microcompaction queued", "info");
+		return true;
+	}
 	if (typeof ctx.compact !== "function") {
 		ctx.ui.notify(
 			"Persistent microcompaction is unavailable in this mode",
@@ -6005,7 +6012,9 @@ function requestMicrocompact(ctx) {
 		);
 		return false;
 	}
-	return runNativeMicrocompact(ctx);
+	const started = runNativeMicrocompact(ctx);
+	if (started) ctx.ui.notify("Microcompaction started", "info");
+	return started;
 }
 
 function nodeScript(value) {
@@ -18210,18 +18219,21 @@ function catchUpReviewBlocker(pkg, targetVersion) {
 		return "has no recorded catch-up decisions";
 	for (const decision of pkg.decisions) {
 		const status = String(decision.status ?? "");
+		const pov = String(decision.pov ?? "");
 		if (
 			decision.version !== targetVersion ||
 			!String(decision.title ?? "").trim() ||
-			!String(decision.pov ?? "").trim() ||
+			!["Adopt", "Trial", "Hold", "Reject", "Not-our-problem"].includes(pov) ||
 			!String(decision.rationale ?? "").trim() ||
-			!["adopted", "deferred", "skipped", "no-action"].includes(status)
+			!["adopted", "no-action"].includes(status)
 		)
 			return "has an incomplete catch-up decision";
+		if (status === "adopted" && !["Adopt", "Trial"].includes(pov))
+			return "has an invalid adopted catch-up decision";
+		if (status === "no-action" && !["Reject", "Not-our-problem"].includes(pov))
+			return "has an actionable catch-up decision that was not adopted";
 		if (status === "adopted" && !String(decision.verification ?? "").trim())
 			return "adopted decision lacks verification";
-		if (status === "deferred" && !String(decision.workItemId ?? "").trim())
-			return "deferred decision lacks a work item";
 	}
 }
 
@@ -18365,11 +18377,11 @@ function buildWorkCatchUpObjective(state, args = "") {
 		"2. For Pi core, proactively check extension hooks/events/context, SDK and model-runtime changes, dynamic tool loading, model/thinking support, TUI/runtime lifecycle, and any native feature that can delete or simplify ce-workflow code. For plugins, check their public tool schemas, lifecycle, skills, and workflow capabilities—not only breaking changes.",
 		"3. Build a short list of concrete compatibility fixes, deletions/simplifications, and new capabilities that benefit this repository. Ignore generic release-note trivia.",
 		"4. Route every actionable candidate through the verified private POV playbook above (combine only tightly related candidates), preserving its graded verdict and actor-visible recommendation. Invoke the verified private explain playbook only after explicitly marking that candidate tooTechnical because its concise POV is insufficient for an informed actor decision; record the reason and never invoke explain for any other candidate.",
-		"Guided decision and implementation loop:",
-		"5. Rank viable candidates, then handle one at a time. Use exactly one ask_user call per candidate with allowFreeform=false, allowComment=true, and three options: Adopt now (recommended when the POV says Adopt), Defer as durable work item, or Skip this release. Include the POV, project benefit, cost/risk, and recommendation in context.",
-		"6. Adopt now: implement the smallest complete change immediately and run its focused check before presenting the next candidate. Defer: create/reuse one native upstream-catch-up roadmap and add a concrete child work item. Skip: retain the POV rationale plus the user's comment when supplied. Do not ask about findings graded Reject/Not-our-problem unless there is a real choice; record them as no-action.",
-		"7. Persist every target review in its baseline package object before advancing it: reviewedAt, reviewedVersion matching the target, plus a non-empty decisions array. Every decision has version matching the target, title, pov, status (adopted|deferred|skipped|no-action), and rationale; adopted also has verification, deferred also has workItemId. Replace the prior release's decisions rather than carrying them forward. This completion manifest is coded-gated so no opportunity disappears.",
-		"8. Run npm run verify:quiet once after all adopted changes. Update capturedAt and each handled package version only after all its decisions are implemented, durably deferred, skipped with rationale, or recorded no-action. Do not advance a partially reviewed package.",
+		"Automatic adoption and implementation loop:",
+		"5. Standing actor decision (overriding only the playbook's per-candidate question): every viable actionable candidate is pre-authorized as Adopt now. Handle candidates one at a time; do not call ask_user, defer, or skip. A Hold remains unresolved until its missing evidence is obtained and blocks baseline advancement.",
+		"6. Implement the smallest complete change immediately and run its focused check before advancing to the next candidate. Record findings graded Reject or Not-our-problem as no-action without asking.",
+		"7. Persist every target review in its baseline package object before advancing it: reviewedAt, reviewedVersion matching the target, plus a non-empty decisions array. Every decision has version matching the target, title, pov, status (adopted|no-action), and rationale; adopted also has verification. Replace the prior release's decisions rather than carrying them forward. This completion manifest is coded-gated so no opportunity disappears.",
+		"8. Run npm run verify:quiet once after all adopted changes. Update capturedAt and each handled package version only after all its decisions are implemented and verified or recorded no-action. Do not advance a partially reviewed package.",
 		workGoalSelfImprovingAppendix(),
 	]
 		.filter(Boolean)
@@ -21247,12 +21259,6 @@ async function handleWorkMenuCommand(ctx, pi) {
 					},
 				]
 			: []),
-		{
-			value: "microcompact",
-			label: "🧽 Microcompact now",
-			description:
-				"Compact old reasoning and tool noise now or at the next idle boundary.\nNative work state, Git evidence, files, blockers, and next action survive.",
-		},
 	];
 	const roadmapRuntime = { showAllRoadmaps: false };
 	let selectedIndex = 0;
@@ -21270,7 +21276,6 @@ async function handleWorkMenuCommand(ctx, pi) {
 		});
 		if (!selected) return;
 		selectedIndex = selected.index;
-		if (selected.value === "microcompact") return requestMicrocompact(ctx);
 		if (selected.value === "fleet") return openWorkflowFleet(ctx, pi);
 		if (selected.value === "private-workflow-rollback") {
 			const result = rollbackPrivateWorkflowRelease(WORKFLOW_REPO_DIR);
@@ -25705,6 +25710,9 @@ export default function workModelsExtension(pi) {
 			gitBefore: gitSnapshot(pendingWorkPrompt.cwd),
 			tools: [],
 			toolStarts: new Map(),
+			uiPromptDepth: 0,
+			uiPromptStartedAt: null,
+			uiPromptWaitMs: 0,
 		};
 		startWarpWork(
 			ctx ?? { cwd: activeWorkAgent.cwd },
@@ -25720,6 +25728,28 @@ export default function workModelsExtension(pi) {
 			});
 		updateWorkGoalStatus(ctx);
 		pendingWorkPrompt = null;
+	});
+
+	pi.on("ui_prompt_start", () => {
+		if (!activeWorkAgent) return;
+		if (activeWorkAgent.uiPromptDepth++ === 0)
+			activeWorkAgent.uiPromptStartedAt = Date.now();
+	});
+
+	pi.on("ui_prompt_end", (event) => {
+		if (!activeWorkAgent?.uiPromptDepth) return;
+		activeWorkAgent.uiPromptDepth -= 1;
+		if (
+			activeWorkAgent.uiPromptDepth ||
+			activeWorkAgent.uiPromptStartedAt === null
+		)
+			return;
+		const nativeDurationMs = Number(event.durationMs);
+		activeWorkAgent.uiPromptWaitMs +=
+			Number.isFinite(nativeDurationMs) && nativeDurationMs >= 0
+				? nativeDurationMs
+				: Math.max(0, Date.now() - activeWorkAgent.uiPromptStartedAt);
+		activeWorkAgent.uiPromptStartedAt = null;
 	});
 
 	pi.on("tool_execution_start", async (event, ctx) => {
@@ -25830,7 +25860,15 @@ export default function workModelsExtension(pi) {
 		const wasWorkGoalTurn = activeWorkGoalRunning;
 		activeWorkGoalRunning = false;
 		const usage = messageUsage(event.messages);
-		const durationMs = Math.max(0, Date.now() - run.startedAt);
+		const endedAt = Date.now();
+		const durationMs = Math.max(0, endedAt - run.startedAt);
+		const uiPromptWaitMs = Math.min(
+			durationMs,
+			run.uiPromptWaitMs +
+				(run.uiPromptStartedAt === null
+					? 0
+					: Math.max(0, endedAt - run.uiPromptStartedAt)),
+		);
 		const review = reviewTelemetry(run.meta, event);
 		const gitAfter = gitSnapshot(run.cwd);
 		const commitCreated = Boolean(
@@ -25865,6 +25903,7 @@ export default function workModelsExtension(pi) {
 			epicId: run.meta.epicId,
 			workItemId: run.meta.workItemId,
 			durationMs,
+			uiPromptWaitMs: uiPromptWaitMs || undefined,
 			promptChars: run.promptChars,
 			messages: summarizeMessages(event.messages),
 			tools: run.tools,
@@ -26286,8 +26325,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("wo", {
-		description:
-			"Open Orchestrator, or use /wo goal, /wo pause, /wo resume, /wo compact",
+		description: "Open Orchestrator, or use /wo goal, /wo pause, /wo resume",
 		getArgumentCompletions: (prefix) => {
 			const input = String(prefix ?? "").trim();
 			if (/\s/.test(input)) return null;
@@ -26295,7 +26333,6 @@ export default function workModelsExtension(pi) {
 				goal: "Start an autonomous goal with the supplied objective",
 				pause: "Pause after the current tool batch finishes",
 				resume: "Resume the paused goal, workflow, or direct request",
-				compact: "Filter context during work; persist compaction when idle",
 			};
 			const items = Object.entries(descriptions)
 				.filter(([value]) => value.startsWith(input))
@@ -26331,11 +26368,10 @@ export default function workModelsExtension(pi) {
 				return startWorkGoal("generic", goal.text, pi, ctx, goal.budget);
 			}
 			if (action === "pause") return requestOrchestratorPause(ctx, pi);
-			if (action === "compact") return requestMicrocompact(ctx);
 			if (action !== "resume")
 				return notify(
 					ctx,
-					"Usage: /wo [goal <objective> | pause | resume | compact]",
+					"Usage: /wo [goal <objective> | pause | resume]",
 					"warning",
 				);
 			if (orchestratorPauseRequest)

@@ -1,41 +1,27 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-28",
+  "capturedAt": "2026-08-30T17:43:23.370Z",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "0.84.3",
-      "reviewedAt": "2026-08-27",
-      "reviewedVersion": "0.84.3",
+      "version": "0.84.4",
+      "reviewedAt": "2026-08-30T17:43:23.370Z",
+      "reviewedVersion": "0.84.4",
       "decisions": [
         {
-          "version": "0.84.3",
-          "title": "Installed host release and catch-up baseline",
+          "version": "0.84.4",
+          "title": "Measure native Pi UI-prompt wait time",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 package rollback and baseline edit. Bottom line: record the installed 0.84.3 host release with no ce-workflow source change. Verified project fit: ce-workflow uses Pi extension hooks and sendUserMessage but does not import the renamed Google thinking type. Verified upstream evidence: the installed changelog and captured 0.84.2-to-0.84.3 artifact document the release. Benefit: inherit safer extension rollback, compaction/tool/runtime fixes, session-scoped model and thinking controls, and Windows support. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: adopt the release baseline.",
-          "verification": "Installed @earendil-works/pi-coding-agent changelog reports 0.84.3; captured 0.84.2-to-0.84.3 artifact reviewed"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 local telemetry fields. Bottom line: use Pi's native ui_prompt_start/ui_prompt_end events to measure user wait instead of relying only on ask_user tool duration. Verified project fit: ce-workflow's telemetry currently classifies user wait from ask_user calls, missing native extension prompts and dialogs. Verified upstream evidence: Pi 0.84.4 documents and exports paired UI-prompt lifecycle events with duration metadata. Benefit: complete, host-owned prompt timing and more accurate active-time metrics. Cost/risk: three small telemetry fields and two listeners; nested prompts and unfinished prompts must not double count. Confidence: high. Recommendation: adopt now.",
+          "verification": "node scripts/test-work-telemetry.mjs; node scripts/test-work-stats.mjs"
         },
         {
-          "version": "0.84.3",
-          "title": "Add native PowerShell to ce-workflow defaults",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1. Bottom line: keep existing Bash and explicit PowerShell command paths; do not widen every workflow tool set. Verified project fit: ce-workflow already runs its Windows commands through supported shell paths and has no coded native PowerShell-tool dependency. Upstream evidence: 0.84.3 makes PowerShell optional rather than replacing Bash. Benefit: avoids an unused tool and schema. Cost/risk: none until a concrete PowerShell-only operation appears. Confidence: high. Recommendation: no local change."
-        },
-        {
-          "version": "0.84.3",
-          "title": "Duplicate goal recovery on session_compact_failed",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not add a second compaction recovery owner for this patch. Verified project fit: ce-workflow already has tested retry, overflow, agent-end, and settled-boundary recovery with stale-continuation guards. Upstream evidence: 0.84.3 exposes session_compact_failed as additive telemetry. Benefit: avoids duplicate continuation scheduling. Cost/risk: the new event is not consumed locally. Confidence: high. Recommendation: retain the existing single recovery path unless a concrete missed-failure reproduction appears."
-        },
-        {
-          "version": "0.84.3",
-          "title": "Host-owned provider, model, update, and runtime changes",
+          "version": "0.84.4",
+          "title": "Host-owned between-tool compaction, RPC, and runtime fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit model catalogs, thinking controls, managed updates, startup optimizations, provider fixes, and TUI behavior without adapters. Verified project fit: these surfaces are owned by Pi and ce-workflow has no conflicting type import or installer implementation. Benefit: keeps ce-workflow smaller. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit native between-tool compaction, delayed overflow recovery, RPC prompt error typing, dynamic-tool guidance, and lifecycle fixes without adding adapters. Verified project fit: ce-workflow keeps a domain-specific compaction threshold and durable continuation owner, uses Pi's public events and RPC client, and has no conflicting private runtime import. Verified upstream evidence: the installed 0.84.4 changelog, public RPC types, compaction and extension docs, examples, and captured 0.84.3-to-0.84.4 artifact document these package-owned changes. Benefit: safer long tool loops and runtime behavior with no duplicate owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no additional local code."
         }
       ]
     },
@@ -60,45 +46,23 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.59.0",
-      "reviewedAt": "2026-08-28",
-      "reviewedVersion": "0.59.0",
+      "version": "0.60.0",
+      "reviewedAt": "2026-08-30T17:43:23.370Z",
+      "reviewedVersion": "0.60.0",
       "decisions": [
         {
-          "version": "0.59.0",
-          "title": "Exact-settlement, recovery, and lifecycle reliability release",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 package rollback and baseline-only edit. Bottom line: adopt installed 0.59.0 without ce-workflow source changes. Verified project fit: ce-workflow agents already omit removed turnBudget fields, nested fanout remains intentionally disabled, and current async workflowScript and RPC launches remain supported. Verified upstream evidence: the installed 0.59.0 changelog, public tool schema, type surface, and captured 0.58.0-to-0.59.0 artifact document the release. Benefit: inherit exact-child settlement, provider-abort recovery, global concurrency enforcement, Windows output locking fixes, clearer status, and lower-noise lifecycle behavior. Cost/risk: ordinary upstream regression exposure; no migration cost. Confidence: high. Recommendation: adopt now and advance only this package's reviewed baseline.",
-          "verification": "Installed pi-subagents changelog and public schema report 0.59.0; repository search confirms no turnBudget use and intentional nested-subagent denial; captured 0.58.0-to-0.59.0 artifact reviewed"
-        },
-        {
-          "version": "0.59.0",
-          "title": "Replace durable role and checkpoint orchestration with workflow helpers",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: retain ce-workflow's durable role router and checkpoint lanes instead of moving ownership to runs.host, runs.lanes, preflight, or display-only lane metadata. Verified project fit: role decisions persist across commands while checkpoint lanes enforce immutable claims, evidence, and merge accounting; the helpers are scoped to one workflow run and lane metadata is explicitly non-authoritative. Verified upstream evidence: the 0.59.0 public tool schema and workflow runtime define these helpers as workflow-local composition and display surfaces. Benefit: avoids a second source of truth and preserves resumability. Cost/risk: adopting them as replacements would require migration and weaken durable invariants. Confidence: high. Recommendation: no local change."
-        },
-        {
-          "version": "0.59.0",
-          "title": "Enable nested subagent fanout",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: keep nested fanout disabled. Verified project fit: ce-workflow's supervisor owns bounded role selection and current agent contracts explicitly deny subagent launch authority. Verified upstream evidence: 0.59.0 adds stricter global concurrency and exact-settlement handling but does not make nested ownership free or necessary. Benefit: retaining one owner prevents duplicate launches and simplifies accounting. Cost/risk: enabling nesting would add concurrency and coordination paths without a current capability gap. Confidence: high. Recommendation: no local change."
-        },
-        {
-          "version": "0.59.0",
-          "title": "Automate managed-worktree cleanup",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not add cleanup automation around the plan-only worktree.cleanup action. Verified project fit: ce-workflow already treats destructive cleanup as an explicit operator boundary. Verified upstream evidence: the 0.59.0 public schema supports cleanup planning but apply/removal remains unavailable. Benefit: avoids scaffolding around an incomplete lifecycle. Cost/risk: automation would still need separate destructive execution and safety policy. Confidence: high. Recommendation: reconsider only when a safe apply surface exists."
-        },
-        {
-          "version": "0.59.0",
-          "title": "Package-owned status, steering, recovery, concurrency, and runner changes",
+          "version": "0.60.0",
+          "title": "Package-owned capability discovery and timeout recovery evidence",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit provider recovery, settlement, global caps, external-runner and output-lock fixes, status rendering, and steering behavior without adapters. Verified project fit: ce-workflow consumes the public subagent tool and RPC boundaries rather than package internals. Benefit: keeps one lifecycle owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local source change."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit prompt-free agent capability discovery, timeout recovery receipts, exact host-command cwd guidance, and lifecycle/status fixes through the existing public subagent boundary. Verified project fit: ce-workflow launches fixed project-owned roles, already recovers dirty failed turns from durable Git/work-item state, and consumes terminal status without importing pi-subagents internals. Verified upstream evidence: the installed 0.60.0 changelog, public tool reference, workflow docs, schema/type changes, and captured 0.59.0-to-0.60.0 artifact document these surfaces. Benefit: clearer diagnostics and safer package behavior with no duplicate recovery owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local adapter."
+        },
+        {
+          "version": "0.60.0",
+          "title": "Add coded capability-list preflight before fixed-role launches",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 2 launch-path change. Bottom line: do not insert a second discovery RPC before every fixed-role action. Verified project fit: ce-workflow ships and selects exact project agents, while failed or disabled launches already return bounded terminal evidence and preserve the action lease. Verified upstream evidence: capabilities:true is declared/default routing discovery rather than exact task-specific preflight. Benefit: avoids an extra round trip and another launch dependency. Cost/risk: a missing agent still fails at the existing launch boundary. Confidence: high. Recommendation: use discovery only for interactive agent selection, not ce-workflow's coded fixed roles."
         }
       ]
     },
@@ -112,8 +76,9 @@
           "version": "0.14.0",
           "title": "Responsive decision UI and Herdr attention signaling",
           "pov": "Adopt",
-          "status": "no-action",
-          "rationale": "Responsive list layouts and blocked/waiting attention signals are implemented inside pi-ask-user and inherited by ce-workflow's existing ask_user calls. Local dialog policy remains separate and no compatibility shim is required."
+          "status": "adopted",
+          "rationale": "Responsive list layouts and blocked/waiting attention signals are implemented inside pi-ask-user and inherited by ce-workflow's existing ask_user calls. Local dialog policy remains separate and no compatibility shim is required.",
+          "verification": "Installed pi-ask-user behavior is inherited through ce-workflow's existing ask_user calls."
         },
         {
           "version": "0.14.0",
@@ -126,45 +91,16 @@
     },
     {
       "name": "pi-intercom",
-      "version": "0.12.0",
-      "reviewedAt": "2026-08-27",
-      "reviewedVersion": "0.12.0",
+      "version": "0.12.1",
+      "reviewedAt": "2026-08-30T17:43:23.370Z",
+      "reviewedVersion": "0.12.1",
       "decisions": [
         {
-          "version": "0.12.0",
-          "title": "Scoped routing and consent-aware extension release",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 baseline-only record and package rollback. Bottom line: record installed 0.12.0 with no ce-workflow source change. Verified project fit: ce-workflow's supervisor policy already uses exact sessions and explicit replies; the new scope boundary is opt-in, while enabling it by default would break intentional cross-project supervision. Verified upstream evidence: the captured 0.11.0-to-0.12.0 artifact and installed public README document scoped routing, lazy visibility, and the consent-aware extension outbox. Benefit: inherit scoped routing, consent-aware outbox support, broker hardening, and optional lazy visibility. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: adopt now and retain current unscoped and always-visible behavior.",
-          "verification": "Installed pi-intercom package manifest is 0.12.0; captured 0.11.0-to-0.12.0 public API and README artifact reviewed"
-        },
-        {
-          "version": "0.12.0",
-          "title": "Enable a broker scope by default",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1 environment change. Bottom line: keep sessions unscoped by default. Verified project fit: ce-workflow intentionally coordinates supervising and target sessions across project directories and relies on exact IDs for trust. Verified upstream evidence: PI_INTERCOM_SCOPE_ID is an opt-in hard routing boundary. Benefit: preserves current cross-project supervision while users can opt into isolation. Cost/risk: unscoped sessions retain existing visibility. Confidence: high. Recommendation: do not set a project-wide scope."
-        },
-        {
-          "version": "0.12.0",
-          "title": "Hide intercom until first use",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1 config change. Bottom line: retain always-visible intercom for ce-workflow sessions. Verified project fit: supervisor coordination may be the first action after a delayed message or trust-sensitive handoff. Verified upstream evidence: after-first-use visibility intentionally hides the generic tool until an inbound message, overlay send, or skill load. Benefit: avoids making required coordination availability stateful. Cost/risk: keeps one tool schema active. Confidence: high. Recommendation: no local config change."
-        },
-        {
-          "version": "0.12.0",
-          "title": "Replace agent-authored coordination with extension outbox sends",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: keep trust-sensitive coordination explicit and agent-authored. Verified project fit: ce-workflow requires the agent to inspect pending asks and durable state before replying; a coded outbox cannot make that judgment. Verified upstream evidence: the outbox is consent-aware and terminally acknowledged but does not replace message policy. Benefit: avoids a second message owner. Cost/risk: coded notifications do not use the new seam. Confidence: high. Recommendation: no local integration."
-        },
-        {
-          "version": "0.12.0",
-          "title": "Broker scope, outbox, routing, and UI internals",
+          "version": "0.12.1",
+          "title": "Package-owned reply routing guard and stable tool visibility",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit broker hardening, scoped mailbox behavior, provenance, and UI/config support without adapters. Verified project fit: ce-workflow owns coordination policy, not intercom transport or storage. Benefit: safer package-owned delivery. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit the active-ask reply-target guard and removal of lazy intercom tool visibility without a ce-workflow adapter. Verified project fit: ce-workflow already requires exact-session trust checks, pending-message inspection, and explicit reply threading; it has no toolVisibility configuration or intercom transport implementation. Verified upstream evidence: the installed 0.12.1 README, public tool/config behavior, and captured 0.12.0-to-0.12.1 artifact document the guard and stable active-tool policy. Benefit: safer replies and prompt-cache-stable tool schemas from the package owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code or config."
         }
       ]
     },

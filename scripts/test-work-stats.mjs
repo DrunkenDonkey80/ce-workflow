@@ -383,6 +383,7 @@ try {
 		type: "agent",
 		model: "openai-codex/gpt-5.6-codex",
 		durationMs: 90_000,
+		uiPromptWaitMs: 10_000,
 		usage: { totalTokens: 100 },
 		tools: [
 			{ name: "ask_user", durationMs: 20_000 },
@@ -421,7 +422,11 @@ try {
 		),
 		"stats recover child model usage from legacy project pi-subagents artifacts",
 	);
-	const sessionArtifactDir = path.join(cwd, "session-root", "subagent-artifacts");
+	const sessionArtifactDir = path.join(
+		cwd,
+		"session-root",
+		"subagent-artifacts",
+	);
 	mkdirSync(sessionArtifactDir, { recursive: true });
 	for (const file of [
 		"artifact-run_work-worker.jsonl",
@@ -448,9 +453,7 @@ try {
 	);
 	writeFileSync(
 		currentTranscript,
-		readFileSync(
-			path.join(sessionArtifactDir, "artifact-run_work-worker.jsonl"),
-		),
+		readFileSync(path.join(sessionArtifactDir, "artifact-run_work-worker.jsonl")),
 	);
 	const currentMetaPath = path.join(
 		currentArtifactDir,
@@ -507,9 +510,9 @@ try {
 	const artifactRoadmap = buildWorkStats(cwd, "EPIC-1");
 	assert(
 		artifactRoadmap.totals.parentWallDurationMs >= 90_000 &&
-			artifactRoadmap.totals.humanWaitMs >= 20_000 &&
+			artifactRoadmap.totals.humanWaitMs === 10_000 &&
 			artifactRoadmap.totals.delegatedWaitMs >= 30_000,
-		"roadmap stats split parent wall time from user and delegated waits",
+		"roadmap stats prefer native prompt timing and split delegated waits",
 	);
 	const timingLines = renderWorkStats(artifactRoadmap);
 	assert(

@@ -784,6 +784,8 @@ try {
 			},
 		);
 		await hooks.agent_start();
+		hooks.ui_prompt_start({ method: "custom" });
+		hooks.ui_prompt_end({ method: "custom", durationMs: 5 });
 		await hooks.tool_execution_start({
 			toolCallId: "subagent-retry",
 			args: JSON.stringify({ agent: "work-planner" }),
@@ -839,6 +841,10 @@ try {
 					1 &&
 				correlated.every((event) => event.activity === "validation"),
 			"worker command and agent share one workflow identity, marker, and terminal event",
+		);
+		assert(
+			correlated.find((event) => event.type === "agent")?.uiPromptWaitMs === 5,
+			"native UI prompt events contribute exact user-wait telemetry",
 		);
 		assert(
 			reviewSummary.slowest.some(

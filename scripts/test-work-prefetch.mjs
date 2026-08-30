@@ -34,20 +34,17 @@ const {
 	storePath,
 	updateWorkItem,
 } = await import(
-		pathToFileURL(path.join(import.meta.dirname, "../extensions/work-store.js"))
-			.href
-	);
+	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-store.js"))
+		.href
+);
 const {
 	compatibilityVerificationContract,
 	inlineResultArtifact,
 	verificationProofRecord,
 } = await import(
 	pathToFileURL(
-		path.join(
-			import.meta.dirname,
-			"../extensions/work-verification-contract.js",
-		),
-	).href,
+		path.join(import.meta.dirname, "../extensions/work-verification-contract.js"),
+	).href
 );
 const {
 	addFinding,
@@ -99,10 +96,7 @@ function fixture() {
 			notes: "Files changed: `feature.js`",
 		},
 	]);
-	writeFileSync(
-		path.join(cwd, ".gitignore"),
-		".pi/\n.ce-workflow/work-runs/\n",
-	);
+	writeFileSync(path.join(cwd, ".gitignore"), ".pi/\n.ce-workflow/work-runs/\n");
 	git(cwd, "add", ".gitignore", ".ce-workflow/work-items.json");
 	git(cwd, "commit", "-qm", "seed work items");
 	return cwd;
@@ -169,10 +163,8 @@ function mutateWithoutPromotion(cwd, derived, mutate, expected) {
 	);
 	assert(
 		Buffer.compare(storeBefore, readFileSync(storePath(cwd))) === 0 &&
-			Buffer.compare(
-				sourceBefore,
-				readFileSync(path.join(cwd, "feature.js")),
-			) === 0,
+			Buffer.compare(sourceBefore, readFileSync(path.join(cwd, "feature.js"))) ===
+				0,
 		`${expected} does not mutate source or WorkItems during discard`,
 	);
 }
@@ -363,10 +355,7 @@ try {
 			reason: "paths-changed",
 			mutate(cwd) {
 				git(cwd, "update-index", "--assume-unchanged", "feature.js");
-				writeFileSync(
-					path.join(cwd, "feature.js"),
-					"export const value = 2;\n",
-				);
+				writeFileSync(path.join(cwd, "feature.js"), "export const value = 2;\n");
 			},
 		},
 	]) {
@@ -471,11 +460,7 @@ try {
 		const derived = deriveSuccessorPrefetch(cwd, {
 			currentWorkItemId: "TASK-1",
 		});
-		const laneId = completeLane(
-			cwd,
-			derived,
-			artifact(derived, { version: 2 }),
-		);
+		const laneId = completeLane(cwd, derived, artifact(derived, { version: 2 }));
 		assert(
 			promoteSuccessorPrefetch(cwd, laneId).reason === "invalid-output",
 			"invalid output is discarded exactly",

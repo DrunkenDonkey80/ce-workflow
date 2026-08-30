@@ -134,18 +134,21 @@ try {
 		"approval requires an exact token suffix and one Apply selection",
 	);
 	const approvalContext = `Exact file/action list.\nDirty recovery token: ${token}`;
-	hooks.tool_call({
-		toolCallId: "unsafe-call",
-		toolName: "ask_user",
-		input: {
-			question: "Apply the recommended Git cleanup?",
-			context: approvalContext,
-			options: approvalOptions,
-			allowMultiple: false,
-			allowFreeform: false,
-			allowComment: true,
+	hooks.tool_call(
+		{
+			toolCallId: "unsafe-call",
+			toolName: "ask_user",
+			input: {
+				question: "Apply the recommended Git cleanup?",
+				context: approvalContext,
+				options: approvalOptions,
+				allowMultiple: false,
+				allowFreeform: false,
+				allowComment: true,
+			},
 		},
-	}, ctx);
+		ctx,
+	);
 	branch.push(
 		askResult("unsafe-call", approvalContext, [
 			"Apply recommendation and continue",
@@ -163,18 +166,21 @@ try {
 		/No matching ask_user approval/,
 		"approval rejects a prompt that enabled comments",
 	);
-	hooks.tool_call({
-		toolCallId: "safe-call",
-		toolName: "ask_user",
-		input: {
-			question: "Apply the recommended Git cleanup?",
-			context: approvalContext,
-			options: approvalOptions,
-			allowMultiple: false,
-			allowFreeform: false,
-			allowComment: false,
+	hooks.tool_call(
+		{
+			toolCallId: "safe-call",
+			toolName: "ask_user",
+			input: {
+				question: "Apply the recommended Git cleanup?",
+				context: approvalContext,
+				options: approvalOptions,
+				allowMultiple: false,
+				allowFreeform: false,
+				allowComment: false,
+			},
 		},
-	}, ctx);
+		ctx,
+	);
 	await assert.rejects(
 		() =>
 			tools.work_dirty_continue.execute(

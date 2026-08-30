@@ -16,6 +16,7 @@ export function compactionProfileFor({ goalStatus, targetId } = {}) {
 const OMITTED = "[... omitted by compaction budget ...]";
 const DEFAULT_KEEP_RECENT_TOKENS = 30_000;
 const DEFAULT_MAX_SUMMARY_CHARS = 12_000;
+const LATEST_REQUESTS_CHAR_BUDGET = 3_600;
 const MIN_TRIGGER_TOKENS = 30_000;
 
 function finiteNumber(value, fallback) {
@@ -396,14 +397,25 @@ function messagesFrom(preparation) {
 	return [...summarized, ...prefix];
 }
 
-function latestUserRequests(messages, limit = 5) {
-	return messages
+function latestUserRequests(
+	messages,
+	minimum = 5,
+	maxChars = LATEST_REQUESTS_CHAR_BUDGET,
+) {
+	const requests = messages
 		.filter((message) => /^user$/i.test(messageRole(message)))
 		.map((message) =>
 			normalizeText(contentText(message.content ?? message.message)),
 		)
-		.filter(Boolean)
-		.slice(-limit);
+		.filter(Boolean);
+	const selected = [];
+	let chars = 0;
+	for (const request of requests.toReversed()) {
+		if (selected.length >= minimum && chars >= maxChars) break;
+		selected.push(request);
+		chars += Math.min(request.length, 1_600) + 24;
+	}
+	return selected.toReversed();
 }
 
 function continuationOnlyRequest(value) {
@@ -617,7 +629,7 @@ export function formatCompactionSummary({
 			key: "latest",
 			title: "Latest user requests",
 			raw: latestRequests,
-			cap: 3_600,
+			cap: LATEST_REQUESTS_CHAR_BUDGET,
 			minimum: latestRequests ? 500 : 0,
 		},
 		{

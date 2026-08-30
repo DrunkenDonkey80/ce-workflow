@@ -69,7 +69,10 @@ assert.deepEqual(
 
 const preparation = {
 	messagesToSummarize: [
-		{ role: "user", content: "Build the smallest correct parser.\r\nKeep CRLF safe." },
+		{
+			role: "user",
+			content: "Build the smallest correct parser.\r\nKeep CRLF safe.",
+		},
 		{ role: "reasoning", content: "private chain of thought" },
 		{
 			role: "assistant",
@@ -122,9 +125,27 @@ assert.match(freeform, /Build the smallest correct parser/);
 assert.match(freeform, /\[tool:read completed\].*src\/parser\.js/s);
 assert.match(freeform, /TypeError: parser failed/);
 assert.match(freeform, /src\/parser\.js/);
-assert.doesNotMatch(freeform, /private chain of thought|secret successful payload/);
+assert.doesNotMatch(
+	freeform,
+	/private chain of thought|secret successful payload/,
+);
 assert.doesNotMatch(freeform, /\/work-resume/);
 assert.equal(freeform.includes("\r"), false);
+
+const expandedRequests = formatCompactionSummary({
+	preparation: {
+		messagesToSummarize: Array.from({ length: 9 }, (_, index) => ({
+			role: "user",
+			content: `request-${index + 1} ${"x".repeat(150)}`,
+		})),
+	},
+});
+assert.match(
+	expandedRequests,
+	/request-1 /,
+	"short requests fill the character budget",
+);
+assert.match(expandedRequests, /request-9 /);
 
 const verification = formatCompactionSummary({
 	preparation: {
@@ -144,7 +165,12 @@ const verification = formatCompactionSummary({
 				role: "toolResult",
 				toolCallId: "verify-1",
 				toolName: "bash",
-				content: [{ type: "text", text: `3 passed, 0 failed START ${"x".repeat(2_000)} END` }],
+				content: [
+					{
+						type: "text",
+						text: `3 passed, 0 failed START ${"x".repeat(2_000)} END`,
+					},
+				],
 			},
 			{
 				role: "assistant",
@@ -174,7 +200,9 @@ assert.ok(verification.length <= 12_000);
 const paused = formatCompactionSummary({
 	profile: COMPACTION_PROFILES.FREEFORM,
 	preparation,
-	currentMessages: [{ role: "user", content: "Fix the current parser request." }],
+	currentMessages: [
+		{ role: "user", content: "Fix the current parser request." },
+	],
 	goal: { id: "wg-old", status: "paused", objective: "Old unrelated goal" },
 	durable: { available: true },
 });

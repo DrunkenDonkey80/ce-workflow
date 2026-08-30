@@ -710,12 +710,15 @@ for (const action of [
 	"Context guard",
 	"Settings",
 	"Catch up project",
-	"Microcompact now",
 ])
 	assert(
 		orchestratorLabels.some((label) => label.includes(action)),
 		action,
 	);
+assert(
+	orchestratorLabels.every((label) => !label.includes("Microcompact now")),
+	"manual microcompact is absent from the /wo menu",
+);
 assert(orchestratorLabels.every((label) => !label.includes("/work-")));
 assert(
 	orchestratorLabels.every((label) => !/\p{Extended_Pictographic}/u.test(label)),
@@ -1479,13 +1482,13 @@ try {
 		/VERIFIED PRIVATE CATCH-UP EXPLAIN PLAYBOOK \(CONDITIONAL: INTENTIONALLY TOO-TECHNICAL CANDIDATES ONLY\)/,
 	);
 	assert.match(catchUpObjective, /never invoke explain for any other candidate/);
-	assert.match(catchUpObjective, /allowComment=true/);
+	assert.match(catchUpObjective, /every viable actionable candidate.*Adopt now/);
+	assert.match(catchUpObjective, /do not call ask_user, defer, or skip/);
+	assert.match(catchUpObjective, /A Hold remains unresolved/);
 	assert.match(
 		catchUpObjective,
-		/Rank viable candidates, then handle one at a time/,
+		/Record findings graded Reject or Not-our-problem as no-action/,
 	);
-	assert.match(catchUpObjective, /Adopt now.*Defer.*Skip this release/);
-	assert.match(catchUpObjective, /record them as no-action/);
 	assert.match(catchUpObjective, /npm run verify:quiet/);
 	const injectedObjective = mod.buildWorkCatchUpObjective(
 		{
@@ -1548,26 +1551,39 @@ try {
 					decisions: [
 						{
 							version: "2.0.0",
+							title: "Defer the migration",
+							pov: "Trial",
+							status: "deferred",
+							rationale: "Wait for later",
+							workItemId: "work-2",
+						},
+					],
+				},
+			],
+		}),
+	);
+	assert.match(
+		mod.workGoalCompletionBlocker(manifestGoal, cwd),
+		/incomplete catch-up decision/,
+		"catch-up cannot advance deferred features",
+	);
+	writeFileSync(
+		manifestBaseline,
+		JSON.stringify({
+			packages: [
+				{
+					name: "example-package",
+					version: "2.0.0",
+					reviewedAt: "2026-07-19",
+					reviewedVersion: "2.0.0",
+					decisions: [
+						{
+							version: "2.0.0",
 							title: "Use the new API",
 							pov: "Adopt",
 							status: "adopted",
 							rationale: "Removes compatibility code",
 							verification: "focused test passed",
-						},
-						{
-							version: "2.0.0",
-							title: "Defer the larger migration",
-							pov: "Trial",
-							status: "deferred",
-							rationale: "Needs a bounded follow-up",
-							workItemId: "work-2",
-						},
-						{
-							version: "2.0.0",
-							title: "Skip optional polish",
-							pov: "Hold",
-							status: "skipped",
-							rationale: "Actor skipped this release",
 						},
 						{
 							version: "2.0.0",
@@ -2221,6 +2237,7 @@ try {
 			},
 		},
 	});
+	assert.equal(notices.at(-1)?.message, "Microcompaction started");
 	assert.equal(compactions.length, 1, "idle F8 microcompacts immediately");
 	assert.match(compactions[0].customInstructions, /work-context microcompact/);
 	compactions[0].onComplete();
@@ -2255,6 +2272,7 @@ try {
 	notices.length = 0;
 	const abortsBeforeBusyCompact = aborts;
 	await tempShortcuts.f8.handler(ctx);
+	assert.equal(notices.at(-1)?.message, "Microcompaction queued");
 	assert.equal(compactions.length, 0, "busy F8 does not compact in place");
 	assert.equal(aborts, abortsBeforeBusyCompact, "busy F8 does not abort tools");
 	const busyMessages = [
@@ -2642,8 +2660,12 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempHooks.agent_settled({}, { ...unavailableCtx, isIdle: () => true });
 	await new Promise((resolve) => setTimeout(resolve, 20));
 	assert.equal(
+		notices.at(unavailableNoticeCount)?.message,
+		"Microcompaction queued",
+	);
+	assert.equal(
 		notices.length,
-		unavailableNoticeCount,
+		unavailableNoticeCount + 1,
 		"missing ctx.compact leaves filtering active without retry noise",
 	);
 	await tempHooks.session_compact({ compactionEntry: { details: {} } }, ctx);
