@@ -11,6 +11,8 @@ export const VERIFICATION_CAPABILITIES = new Set([
 	"desktop",
 	"android",
 	"device",
+	"macos",
+	"ios",
 	"manual",
 ]);
 export const VERIFICATION_PROOFS = new Set([
@@ -32,6 +34,8 @@ export const EXECUTABLE_VERIFICATION_CAPABILITIES = new Set([
 	"desktop",
 	"android",
 	"device",
+	"macos",
+	"ios",
 ]);
 const PROOF_STATUSES = new Set(["PASS", "FAIL", "BLOCKED"]);
 const ASSERTION_OPERATORS = new Set([
