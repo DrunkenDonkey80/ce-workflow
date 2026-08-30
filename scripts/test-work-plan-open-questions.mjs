@@ -7,14 +7,16 @@ const { assert, installWorkflowFixture } = await import(
 		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
 	).href
 );
-const { buildWorkPlanState, scanPlanOpenQuestions, bootstrapPlanEpic } =
-	await import(
-		pathToFileURL(
-			realpathSync(
-				path.join(import.meta.dirname, "../extensions/work-models.js"),
-			),
-		).href
-	);
+const {
+	buildWorkPlanState,
+	scanPlanOpenQuestions,
+	bootstrapPlanEpic,
+	executeOrchestratorAction,
+} = await import(
+	pathToFileURL(
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+	).href
+);
 
 const planWithOpenQuestions = [
 	"---",
@@ -140,4 +142,195 @@ try {
 	fixture.cleanup();
 }
 
-console.log("open-questions gate: PASS");
+const executableFixture = installWorkflowFixture({ native: true });
+try {
+	const cwd = executableFixture.cwd;
+	const planRel = path.join("docs", "plans", "executable-plan.md");
+	mkdirSync(path.join(cwd, "docs", "plans"), { recursive: true });
+	const commandContract = {
+		version: 1,
+		required: [
+			{
+				id: "focused-test",
+				capability: "command",
+				proof: "test",
+				source: "declared plan operation",
+				operation: {
+					command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify("process.stdout.write('ok')")}`,
+					expectedExit: 0,
+					assertions: [{ target: "stdout", operator: "includes", value: "ok" }],
+				},
+			},
+		],
+	};
+	const browserContract = {
+		version: 1,
+		required: [
+			{
+				id: "browser-visual",
+				capability: "browser",
+				proof: "visual",
+				source: "declared plan operation",
+				operation: { adapter: "browser", timeoutMs: 60_000 },
+				artifacts: ["screenshot"],
+				inspection: "goal",
+			},
+		],
+	};
+	writeFileSync(
+		path.join(cwd, planRel),
+		[
+			"---",
+			"title: Executable demo plan",
+			"artifact_readiness: executable",
+			"---",
+			"# Executable demo plan",
+			"```json",
+			JSON.stringify({
+				implementationUnits: [
+					{
+						key: "U1",
+						title: "Mechanical behavior",
+						outcome: "Keyboard arithmetic works.",
+						acceptance: ["Focused command passes."],
+						dependencies: [],
+						files: ["src/calculator.js"],
+						nonGoals: ["Browser styling"],
+						verificationContract: commandContract,
+					},
+					{
+						key: "U2",
+						title: "Browser presentation",
+						outcome: "Browser interaction and responsive presentation work.",
+						acceptance: "Visual proof is captured and inspected.",
+						dependencies: ["U1"],
+						surfaces: ["browser"],
+						discoveryAllowed: true,
+						nonGoals: ["Desktop packaging"],
+						verificationContract: browserContract,
+					},
+				],
+			}),
+			"```",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	const materialized = bootstrapPlanEpic(cwd, planRel);
+	const children = Object.values(executableFixture.store().items).filter(
+		(item) => item.parentId === materialized.epic?.id,
+	);
+	assert(
+		materialized.action !== "run-planner" &&
+			children.length === 2 &&
+			children.every(
+				(item) =>
+					!item.labels.includes("wo:planning") &&
+					item.labels.includes("wo:slice-planned"),
+			) &&
+			!materialized.handoffPrompt?.includes("Advisor critic gate"),
+		`executable plan units materialize as planned work without another planner or advisor gate: ${JSON.stringify({ materialized, children })}`,
+	);
+	assert(
+		children[0].dependencies.length === 0 &&
+			children[1].dependencies.includes(children[0].id) &&
+			children[0].implementationScope.files[0] === "src/calculator.js" &&
+			children[1].implementationScope.discoveryAllowed === true,
+		"materialized units preserve the declared dependency graph and scope",
+	);
+	assert(
+		children[0].verificationContract.required.some(
+			(entry) => entry.capability === "command",
+		) &&
+			children[1].verificationContract.required.some(
+				(entry) => entry.capability === "browser" && entry.proof === "visual",
+			),
+		"materialization preserves per-slice declared mechanical and rendered capability proof",
+	);
+} finally {
+	executableFixture.cleanup();
+}
+
+const incompleteFixture = installWorkflowFixture({ native: true });
+try {
+	const planRel = "incomplete-plan.md";
+	writeFileSync(
+		path.join(incompleteFixture.cwd, planRel),
+		"---\nartifact_readiness: implementation-ready\n---\n# Plan\n## U1: Heading only\n",
+	);
+	const rejected = bootstrapPlanEpic(incompleteFixture.cwd, planRel);
+	assert(
+		rejected.action === "planning-required" &&
+			rejected.missingFields.includes("implementationUnits[].verificationContract") &&
+			Object.keys(incompleteFixture.store().items).length === 2,
+		"heading-only readiness is rejected with exact missing structured fields and no store mutation",
+	);
+} finally {
+	incompleteFixture.cleanup();
+}
+
+const migrationFixture = installWorkflowFixture({ native: true });
+try {
+	const cwd = migrationFixture.cwd;
+	writeFileSync(
+		path.join(cwd, "PLAN.md"),
+		[
+			"---",
+			"artifact_readiness: implementation-ready",
+			"---",
+			"# Imported plan",
+			"```json",
+			JSON.stringify({
+				implementationUnits: [
+					{
+						key: "U1",
+						title: "Complete behavior",
+						outcome: "Focused behavior is complete.",
+						acceptance: "The declared command passes.",
+						dependencies: [],
+						files: ["src/result.js"],
+						verificationContract: {
+							version: 1,
+							required: [
+								{
+									id: "focused-test",
+									capability: "command",
+									proof: "test",
+									source: "imported plan",
+									operation: {
+										command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify("process.exit(0)")}`,
+										expectedExit: 0,
+										assertions: [{ target: "exit", operator: "equals", value: "0" }],
+									},
+								},
+							],
+						},
+					},
+				],
+			}),
+			"```",
+		].join("\n"),
+	);
+	const messages = [];
+	const migrated = await executeOrchestratorAction(
+		"work-migrate",
+		"PLAN.md",
+		{
+			cwd,
+			mode: "rpc",
+			ui: { notify: () => {} },
+			sendUserMessage: async (message) => messages.push(message),
+		},
+		{ sendUserMessage: async (message) => messages.push(message) },
+	);
+	assert(
+		migrated.action === "migrate-materialized" &&
+			migrated.materializedUnits?.length === 1 &&
+			messages.length === 0,
+		"executable plan migration is coded and launches neither migrator nor planner",
+	);
+} finally {
+	migrationFixture.cleanup();
+}
+
+console.log("open-questions and executable materialization gates: PASS");

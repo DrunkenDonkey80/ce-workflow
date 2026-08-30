@@ -124,7 +124,6 @@ import {
 } from "./work-store.js";
 import {
 	compatibilityVerificationContract,
-	inferVerificationContract,
 	validateExecutableVerificationContract,
 	verificationContractStatus,
 } from "./work-verification-contract.js";
@@ -13596,6 +13595,80 @@ function openQuestionsBlockState(cwd, rel, questions, command, git, init) {
 	};
 }
 
+function materializePlanUnitsInStore(store, epic, units, rel, command) {
+	const existing = Object.values(store.items).filter(
+		(item) =>
+			item.parentId === epic.id &&
+			!isPlanningIssue(item) &&
+			typeOf(item) !== "decision",
+	);
+	if (existing.length) return existing;
+	const created = units.map((unit) =>
+		createWorkItem(store, {
+			title: compactWorkItemTitle(`${unit.key}: ${unit.title}`),
+			type: "task",
+			parentId: epic.id,
+			description: unit.outcome,
+			acceptance: unit.acceptance,
+			labels: ["wo:materialized", "wo:vertical-slice", "wo:slice-planned"],
+			notes: [
+				workflowWorkItemNotes(command, unit.title, [
+					`source plan: ${rel}`,
+					`plan unit: ${unit.key}`,
+					FINITE_BACKLOG_MARKER,
+					`wo:slice-plan\nplan-path: ${rel}\ntarget: ${unit.title}\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.`,
+				]),
+			],
+			implementationScope: {
+				outcome: unit.outcome,
+				files: unit.files,
+				surfaces: unit.surfaces,
+				discoveryAllowed: unit.discoveryAllowed,
+				nonGoals: unit.nonGoals,
+			},
+			verificationContract: unit.verificationContract,
+		}),
+	);
+	const byKey = new Map(
+		units.map((unit, index) => [unit.key, created[index].id]),
+	);
+	for (const [index, unit] of units.entries())
+		if (unit.dependencies.length)
+			updateWorkItem(store, created[index].id, {
+				dependencies: unit.dependencies.map((dependency) => byKey.get(dependency)),
+			});
+	for (const planning of Object.values(store.items).filter(
+		(item) => item.parentId === epic.id && isPlanningIssue(item),
+	))
+		updateWorkItem(store, planning.id, {
+			status: "closed",
+			notes: [
+				...(planning.notes ?? []),
+				`wo:materialized ${created.length} implementation-ready plan units; no second planning pass`,
+			],
+		});
+	return created.map((item) => store.items[item.id]);
+}
+
+function materializeExecutablePlan(cwd, epic, units, rel, command) {
+	const created = mutateStore(cwd, (store) =>
+		materializePlanUnitsInStore(
+			store,
+			store.items[idOf(epic)],
+			units,
+			rel,
+			command,
+		),
+	);
+	const next = buildWorkResumeState(cwd, idOf(epic));
+	return {
+		...next,
+		materializedUnits: created.map(issueSummary),
+		message: `Materialized ${created.length} executable plan unit${created.length === 1 ? "" : "s"} from ${rel}; no second planning pass is required.`,
+		nextAction: `Next: implement ${next.selectedWorkItem?.id ?? "the first ready WorkItem"} in the active project goal.`,
+	};
+}
+
 export function bootstrapPlanEpic(
 	cwd,
 	rel,
@@ -13611,6 +13684,19 @@ export function bootstrapPlanEpic(
 			"Master plan path must be inside the project.",
 		);
 	const planText = readFileSync(join(cwd, rel), "utf8");
+	let implementationUnits;
+	try {
+		implementationUnits = extractImplementationUnits(planText);
+	} catch (error) {
+		if (error?.category !== "planning-required") throw error;
+		return errorState("planning-required", error.message, {
+			action: "planning-required",
+			planPath: rel,
+			missingFields: error.missingFields ?? [],
+			nextAction:
+				"Add the missing declared unit fields or run the planner; headings alone are not implementation-ready.",
+		});
+	}
 	const gitReport = git ?? resumeGitReport(cwd, [rel]);
 	const initReport = init ?? ensureWorkStoreInitialized(cwd);
 	const openQuestions = scanPlanOpenQuestions(planText);
@@ -13653,8 +13739,22 @@ export function bootstrapPlanEpic(
 			const parentInitiativeId = isInitiative(store.items[epic.parentId])
 				? epic.parentId
 				: undefined;
+			const materialized = implementationUnits.length
+				? materializePlanUnitsInStore(
+						store,
+						epic,
+						implementationUnits,
+						rel,
+						command,
+					)
+				: [];
 			if (parentInitiativeId)
-				return { epic: nativeIssue(epic), parentInitiativeId };
+				return {
+					epic: nativeIssue(epic),
+					parentInitiativeId,
+					materialized,
+				};
+			if (materialized.length) return { epic: nativeIssue(epic), materialized };
 			const planningChildren = Object.values(store.items).filter(
 				(item) =>
 					item.parentId === epic.id &&
@@ -13697,7 +13797,15 @@ export function bootstrapPlanEpic(
 				attached.parentInitiativeId,
 				attached.epic,
 				gitReport,
-				`Attached ${rel} to initiative roadmap ${idOf(attached.epic)}.`,
+				`Attached ${rel} to initiative roadmap ${idOf(attached.epic)}${attached.materialized?.length ? ` and materialized ${attached.materialized.length} executable units` : ""}.`,
+			);
+		if (attached.materialized?.length)
+			return materializeExecutablePlan(
+				cwd,
+				attached.epic,
+				implementationUnits,
+				rel,
+				command,
 			);
 		return withHandoffPrompt(
 			{
@@ -13817,6 +13925,24 @@ export function bootstrapPlanEpic(
 		});
 	}
 	rememberWorkflowEpic(cwd, epic);
+	if (implementationUnits.length) {
+		const materialized = materializeExecutablePlan(
+			cwd,
+			epic,
+			implementationUnits,
+			rel,
+			command,
+		);
+		if (idea) {
+			appendWorkflowWorkItemNote(
+				cwd,
+				idOf(idea),
+				`wo:idea status=discussed plan-path=${rel} epic-id=${idOf(epic)} task-id=${materialized.materializedUnits?.[0]?.id ?? "none"}`,
+			);
+			updateWorkItemNative(cwd, idOf(idea), { status: "closed" });
+		}
+		return materialized;
+	}
 	const planning = createWorkflowWorkItem(cwd, {
 		title: `Plan next slice for ${fields.title}`,
 		type: "task",
@@ -15048,7 +15174,30 @@ function buildWorkMigrateState(cwd, args = "") {
 				`Source path not found: ${sources.missing.join(", ")}`,
 				{ action: "missing-source", sources },
 			);
-		const git = resumeGitReport(cwd);
+		const git = resumeGitReport(cwd, sources.files);
+		if (sources.files.length === 1 && /\.md$/i.test(sources.files[0])) {
+			const sourceText = readFileSync(join(cwd, sources.files[0]), "utf8");
+			if (extractImplementationUnits(sourceText).length) {
+				const materialized = bootstrapPlanEpic(
+					cwd,
+					sources.files[0],
+					"/work-migrate",
+					git,
+				);
+				return {
+					...materialized,
+					action: "migrate-materialized",
+					handoffPrompt: undefined,
+					message: `${materialized.message} Migration is complete; implementation has not started.`,
+					suggestedCommands: materialized.epic?.id
+						? [`/work-resume ${materialized.epic.id}`]
+						: [],
+					nextAction: materialized.epic?.id
+						? `Next: /work-resume ${materialized.epic.id}.`
+						: materialized.nextAction,
+				};
+			}
+		}
 		return {
 			ok: true,
 			action: "handoff-migrate",
@@ -18191,19 +18340,144 @@ function normalizeProgressText(value) {
 
 function extractImplementationUnits(markdown) {
 	const text = String(markdown ?? "");
-	const start = text.search(/^##\s+Implementation Units\b/im);
-	let section = text;
-	if (start >= 0) {
-		const rest = text.slice(start);
-		const next = rest.slice(1).search(/^##\s+/im);
-		section = next >= 0 ? rest.slice(0, next + 1) : rest;
+	const readiness = /^artifact_readiness:\s*(\S+)/m.exec(text)?.[1];
+	const ready = ["implementation-ready", "executable"].includes(readiness);
+	let manifest;
+	for (const match of text.matchAll(/```json\s*\r?\n([\s\S]*?)\r?\n```/gi)) {
+		if (!/"implementationUnits"\s*:/.test(match[1])) continue;
+		try {
+			manifest = JSON.parse(match[1]);
+		} catch (cause) {
+			throw new WorkStoreError(
+				"planning-required",
+				`implementationUnits manifest is invalid JSON: ${cause.message}`,
+				{ missingFields: ["valid implementationUnits JSON"] },
+			);
+		}
+		break;
 	}
-	return [
-		...section.matchAll(/^###\s+((?:U|Unit\s*)\d+[\w.-]*)[).:\s-]*(.+)$/gim),
-	].map((match) => ({
-		key: match[1].replace(/\s+/g, "").replace(/[).:-]+$/, ""),
-		title: match[2].trim(),
-	}));
+	if (!manifest) {
+		if (ready)
+			throw new WorkStoreError(
+				"planning-required",
+				"Implementation-ready plan is missing its structured implementationUnits manifest.",
+				{
+					missingFields: [
+						"implementationUnits[].key",
+						"implementationUnits[].title",
+						"implementationUnits[].outcome",
+						"implementationUnits[].acceptance",
+						"implementationUnits[].dependencies",
+						"implementationUnits[].files or discoveryAllowed=true",
+						"implementationUnits[].verificationContract",
+					],
+				},
+			);
+		return [];
+	}
+	if (
+		!Array.isArray(manifest.implementationUnits) ||
+		manifest.implementationUnits.length === 0 ||
+		manifest.implementationUnits.length > 64
+	)
+		throw new WorkStoreError(
+			"planning-required",
+			"implementationUnits must contain 1-64 units.",
+			{ missingFields: ["implementationUnits[1..64]"] },
+		);
+	const keys = new Set();
+	const units = manifest.implementationUnits.map((unit, index) => {
+		const at = `implementationUnits[${index}]`;
+		const missing = [];
+		if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(unit?.key ?? ""))
+			missing.push(`${at}.key`);
+		if (typeof unit?.title !== "string" || !unit.title.trim())
+			missing.push(`${at}.title`);
+		if (typeof unit?.outcome !== "string" || !unit.outcome.trim())
+			missing.push(`${at}.outcome`);
+		if (
+			!(
+				(typeof unit?.acceptance === "string" && unit.acceptance.trim()) ||
+				(Array.isArray(unit?.acceptance) &&
+					unit.acceptance.length > 0 &&
+					unit.acceptance.every(
+						(entry) => typeof entry === "string" && entry.trim(),
+					))
+			)
+		)
+			missing.push(`${at}.acceptance`);
+		if (
+			!Array.isArray(unit?.dependencies) ||
+			unit.dependencies.some((entry) => typeof entry !== "string")
+		)
+			missing.push(`${at}.dependencies`);
+		if (
+			!(Array.isArray(unit?.files) && unit.files.length > 0) &&
+			unit?.discoveryAllowed !== true
+		)
+			missing.push(`${at}.files or ${at}.discoveryAllowed=true`);
+		try {
+			validateExecutableVerificationContract(
+				unit?.verificationContract,
+				`${at}.verificationContract`,
+			);
+		} catch (cause) {
+			missing.push(cause.message);
+		}
+		if (missing.length)
+			throw new WorkStoreError(
+				"planning-required",
+				`Implementation unit ${index + 1} is incomplete: ${missing.join(", ")}`,
+				{ missingFields: missing },
+			);
+		if (keys.has(unit.key))
+			throw new WorkStoreError(
+				"planning-required",
+				`Implementation unit key is duplicated: ${unit.key}`,
+				{ missingFields: [`unique ${at}.key`] },
+			);
+		keys.add(unit.key);
+		return {
+			key: unit.key,
+			title: unit.title.trim(),
+			outcome: unit.outcome.trim().slice(0, 12_000),
+			acceptance: Array.isArray(unit.acceptance)
+				? unit.acceptance.join("\n")
+				: unit.acceptance.trim(),
+			dependencies: [...unit.dependencies],
+			files: [...(unit.files ?? [])],
+			surfaces: [...(unit.surfaces ?? [])],
+			discoveryAllowed: unit.discoveryAllowed === true,
+			nonGoals: [...(unit.nonGoals ?? [])],
+			verificationContract: structuredClone(unit.verificationContract),
+		};
+	});
+	for (const unit of units)
+		for (const dependency of unit.dependencies)
+			if (!keys.has(dependency) || dependency === unit.key)
+				throw new WorkStoreError(
+					"planning-required",
+					`Implementation unit ${unit.key} has invalid dependency ${dependency}.`,
+					{ missingFields: [`valid dependency for ${unit.key}: ${dependency}`] },
+				);
+	const byKey = new Map(units.map((unit) => [unit.key, unit]));
+	const visiting = new Set();
+	const visited = new Set();
+	const visit = (key) => {
+		if (visiting.has(key))
+			throw new WorkStoreError(
+				"planning-required",
+				`Implementation unit dependency cycle includes ${key}.`,
+				{ missingFields: ["acyclic implementationUnits dependencies"] },
+			);
+		if (visited.has(key)) return;
+		visiting.add(key);
+		for (const dependency of byKey.get(key).dependencies) visit(dependency);
+		visiting.delete(key);
+		visited.add(key);
+	};
+	for (const key of keys) visit(key);
+	return units;
 }
 
 function planPathForEpic(cwd, epic) {

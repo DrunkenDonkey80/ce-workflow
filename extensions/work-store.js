@@ -539,6 +539,25 @@ export function validateStore(store, file = "work store") {
 			}
 		}
 		if (
+			item.implementationScope !== undefined &&
+			(!plainObject(item.implementationScope) ||
+				!Array.isArray(item.implementationScope.files) ||
+				!Array.isArray(item.implementationScope.surfaces) ||
+				!Array.isArray(item.implementationScope.nonGoals) ||
+				[
+					item.implementationScope.files,
+					item.implementationScope.surfaces,
+					item.implementationScope.nonGoals,
+				].some(
+					(entries) =>
+						entries.length > 64 ||
+						entries.some((entry) => typeof entry !== "string" || entry.length > 500),
+				) ||
+				typeof item.implementationScope.discoveryAllowed !== "boolean" ||
+				typeof item.implementationScope.outcome !== "string")
+		)
+			throw error("corrupt", `Invalid implementation scope for ${key} in ${file}`);
+		if (
 			item.verificationRevision !== undefined &&
 			(typeof item.verificationRevision !== "string" ||
 				!item.verificationRevision.trim() ||
@@ -645,6 +664,9 @@ export function createWorkItem(store, input = {}) {
 		...(input.verificationSummary
 			? { verificationSummary: structuredClone(input.verificationSummary) }
 			: {}),
+		...(input.implementationScope
+			? { implementationScope: structuredClone(input.implementationScope) }
+			: {}),
 		...(input.verificationContract
 			? { verificationContract: structuredClone(input.verificationContract) }
 			: {}),
@@ -682,6 +704,9 @@ export function updateWorkItem(store, id, changes = {}, options = {}) {
 		...(fields.evidence ? { evidence: [...fields.evidence] } : {}),
 		...(fields.initiative
 			? { initiative: structuredClone(fields.initiative) }
+			: {}),
+		...(fields.implementationScope
+			? { implementationScope: structuredClone(fields.implementationScope) }
 			: {}),
 		...(fields.verificationContract
 			? { verificationContract: structuredClone(fields.verificationContract) }
