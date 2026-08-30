@@ -1,0 +1,200 @@
+{
+  "version": 2,
+  "generatedAt": "2026-08-30T12:53:29.516Z",
+  "method": "deterministic transcript-replay benchmark; runtime includes legacy serialization handoff versus direct goal ownership",
+  "controls": {
+    "model": "deterministic-local-fixture",
+    "effort": "same",
+    "inputs": "identical",
+    "samples": 3,
+    "noiseThresholdPercent": 10
+  },
+  "fixtures": [
+    {
+      "name": "calculator",
+      "samples": [
+        {
+          "sample": 1,
+          "baseline": {
+            "ms": 22.2471,
+            "novelContextTokens": 36,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 37,
+            "ownerCount": 1,
+            "implementationSpecialists": 2,
+            "backgroundVerifiers": 0
+          },
+          "candidate": {
+            "ms": 0.5531999999999968,
+            "novelContextTokens": 12,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 13,
+            "ownerCount": 1,
+            "implementationSpecialists": 0,
+            "backgroundVerifiers": 0
+          },
+          "quality": "PASS"
+        },
+        {
+          "sample": 2,
+          "baseline": {
+            "ms": 20.2113,
+            "novelContextTokens": 36,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 37,
+            "ownerCount": 1,
+            "implementationSpecialists": 2,
+            "backgroundVerifiers": 0
+          },
+          "candidate": {
+            "ms": 0.16629999999999967,
+            "novelContextTokens": 12,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 13,
+            "ownerCount": 1,
+            "implementationSpecialists": 0,
+            "backgroundVerifiers": 0
+          },
+          "quality": "PASS"
+        },
+        {
+          "sample": 3,
+          "baseline": {
+            "ms": 19.899299999999997,
+            "novelContextTokens": 36,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 37,
+            "ownerCount": 1,
+            "implementationSpecialists": 2,
+            "backgroundVerifiers": 0
+          },
+          "candidate": {
+            "ms": 0.1670000000000016,
+            "novelContextTokens": 12,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 13,
+            "ownerCount": 1,
+            "implementationSpecialists": 0,
+            "backgroundVerifiers": 0
+          },
+          "quality": "PASS"
+        }
+      ],
+      "medians": {
+        "baselineMs": 20.2113,
+        "candidateMs": 0.1670000000000016,
+        "baselineNovelContextTokens": 36,
+        "candidateNovelContextTokens": 12,
+        "baselineTotalProviderTokens": 37,
+        "candidateTotalProviderTokens": 13
+      },
+      "changes": {
+        "runtimePercent": -99.17372954733243,
+        "novelContextPercent": -66.66666666666666,
+        "totalProviderTokensPercent": -64.86486486486487
+      },
+      "dispositions": {
+        "runtimePercent": "improved",
+        "novelContextPercent": "improved",
+        "totalProviderTokensPercent": "improved"
+      },
+      "quality": "PASS"
+    },
+    {
+      "name": "csv",
+      "samples": [
+        {
+          "sample": 1,
+          "baseline": {
+            "ms": 89.8126,
+            "novelContextTokens": 15,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 16,
+            "ownerCount": 1,
+            "implementationSpecialists": 2,
+            "backgroundVerifiers": 0
+          },
+          "candidate": {
+            "ms": 21.020099999999985,
+            "novelContextTokens": 5,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 6,
+            "ownerCount": 1,
+            "implementationSpecialists": 0,
+            "backgroundVerifiers": 0
+          },
+          "quality": "PASS"
+        },
+        {
+          "sample": 2,
+          "baseline": {
+            "ms": 89.68040000000002,
+            "novelContextTokens": 15,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 16,
+            "ownerCount": 1,
+            "implementationSpecialists": 2,
+            "backgroundVerifiers": 0
+          },
+          "candidate": {
+            "ms": 20.806100000000015,
+            "novelContextTokens": 5,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 6,
+            "ownerCount": 1,
+            "implementationSpecialists": 0,
+            "backgroundVerifiers": 0
+          },
+          "quality": "PASS"
+        },
+        {
+          "sample": 3,
+          "baseline": {
+            "ms": 90.02960000000002,
+            "novelContextTokens": 15,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 16,
+            "ownerCount": 1,
+            "implementationSpecialists": 2,
+            "backgroundVerifiers": 0
+          },
+          "candidate": {
+            "ms": 21.702799999999968,
+            "novelContextTokens": 5,
+            "cachedContextTokens": 0,
+            "totalProviderTokens": 6,
+            "ownerCount": 1,
+            "implementationSpecialists": 0,
+            "backgroundVerifiers": 0
+          },
+          "quality": "PASS"
+        }
+      ],
+      "medians": {
+        "baselineMs": 89.8126,
+        "candidateMs": 21.020099999999985,
+        "baselineNovelContextTokens": 15,
+        "candidateNovelContextTokens": 5,
+        "baselineTotalProviderTokens": 16,
+        "candidateTotalProviderTokens": 6
+      },
+      "changes": {
+        "runtimePercent": -76.59560017191353,
+        "novelContextPercent": -66.66666666666666,
+        "totalProviderTokensPercent": -62.5
+      },
+      "dispositions": {
+        "runtimePercent": "improved",
+        "novelContextPercent": "improved",
+        "totalProviderTokensPercent": "improved"
+      },
+      "quality": "PASS"
+    }
+  ],
+  "adoption": {
+    "quality": "PASS",
+    "oneOwner": true,
+    "zeroRoutineImplementationSpecialists": true,
+    "allMedianChangesAtLeastTenPercentBetter": true
+  }
+}

@@ -261,7 +261,9 @@ try {
 	const rejected = bootstrapPlanEpic(incompleteFixture.cwd, planRel);
 	assert(
 		rejected.action === "planning-required" &&
-			rejected.missingFields.includes("implementationUnits[].verificationContract") &&
+			rejected.missingFields.includes(
+				"implementationUnits[].verificationContract",
+			) &&
 			Object.keys(incompleteFixture.store().items).length === 2,
 		"heading-only readiness is rejected with exact missing structured fields and no store mutation",
 	);

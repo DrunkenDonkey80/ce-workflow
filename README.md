@@ -13,7 +13,7 @@ pi install npm:pi-ask-user
 # Optional: pi install npm:pi-intercom
 ```
 
-No tracker CLI is required for normal operation. Run **`/wo`** or press **F7** to open **Orchestrator**, then type to filter its actions. **Roadmaps** is first and initially selected; its picker remembers the last open roadmap or initiative. Press **F8** to microcompact immediately when idle or at the next safe boundary.
+No tracker CLI is required for normal operation. Run **`/wo`** or press **F7** to open **Orchestrator**, then type to filter its actions. **Roadmaps** is first and initially selected; its picker remembers the last open roadmap or initiative. `/wo goal <objective>` starts an autonomous goal, `/wo pause` waits for the current tool boundary, and `/wo resume` continues the paused goal, workflow, or direct request. `/wo compact` and **F8** share one path: compact immediately when idle, otherwise compact at the next tool boundary and continue the same operation.
 
 Typed or dictated TUI input can use the strict start-of-line prefix **`orchestrator`**: `orchestrator list roadmaps`, `orchestrator resume work-3`, `orchestrator resume last`, `orchestrator status`, or `orchestrator compact`. `orchestrator 1` runs a currently displayed recommended action. The extension parses and handles this fixed grammar before the model sees it; unknown prefixed commands stop with usage help, while extension-authored messages cannot invoke this user command surface.
 
@@ -51,11 +51,13 @@ Role agents are `work-planner`, `work-worker`, `work-reviewer`,
 tool-free `work-divergent` generator, and three configurable advisor roles:
 `work-advisor`, `work-advisor-2`, and `work-advisor-3`. Configured advisors
 review brainstorms and plans in parallel; slice plans use the profile's
-`none` / `first` / `all` policy. Every implementation runs in the isolated
-`work-worker` selected by the Work model setting; Small and Medium only bound
-scope. They use `scripts/work-helper.mjs` native helpers for compact work-item
-summaries, initiative hierarchy, preview/apply,
-children, ready, claim, note, label, and blocker operations.
+`none` / `first` / `all` policy. During autonomous Resume, the active project
+goal owns each routine WorkItem from claim through implementation, proof,
+correction, and coded finalization; it does not fracture that window into a
+fresh `work-worker`. Specialists remain available for coded planning, debug,
+review, or fix exceptions. They use `scripts/work-helper.mjs` native helpers
+for compact summaries, initiative hierarchy, preview/apply, children, ready,
+claim, note, label, capability proof, and blocker operations.
 
 ## Creative sidecar
 
@@ -101,9 +103,11 @@ Shard results join in declaration order into the exact version-1 finish manifest
 - Press **F9** for Fleet: the main-chat orchestrator is the root, with active and recent finished specialists, successor-prefetch lanes, and background verifiers beneath it. Fleet distinguishes running, queued, waiting-for-decision, paused, completed, stopped, and failed states.
 - `/wo → Status` and `/wo → Blocker report` are deterministic local projections; do not edit the store by hand during normal use.
 - Initiatives aggregate child progress and route explicit execution through their durable child order. Planning a child returns to the `/wo` menu instead of starting implementation; execution consumes the prepared prefix and pauses at the first child that needs planning. Initiative close cannot be forced past unresolved coverage, stale source/plan lineage, or open children. /wo previews complete hierarchy and coverage before its confirmation mints the single-use apply receipt.
-- Finish requires verification evidence and any required review before the store item closes.
+- An implementation-ready plan with a validated JSON `implementationUnits` manifest materializes those WorkItems directly; headings alone do not assert readiness, and Resume does not launch a second planner.
+- Every materialized WorkItem carries a capability-driven verification contract. Capabilities are per item (`inspection`, `command`, `service`, `browser`, `desktop`, `android`, `device`, `macos`, `ios`, or `manual`), so mixed repositories need no global application type.
+- Finish requires every declared proof plus any required review before the store item closes. Browser, desktop, and Android visual proof is revision-bound to a retained screenshot and a recorded goal/human inspection; unavailable required capabilities block rather than degrade to PASS.
 - Manual changes are classified before writer work starts. No parallel writers, automatic branch checkout, or push automation.
-- Put project verification contracts in project instructions. Real hardware or product proof is not replaced by mocks without approval.
+- Real hardware or product proof is not replaced by mocks without approval.
 
 ## Legacy migration
 
@@ -121,7 +125,7 @@ Set `workResume.selfImproving` to `true` only when a producer session may explic
 
 ## Workflow evaluation harness
 
-The standalone harness compares one declared workflow factor against immutable calculator and CSV-expenses bundles. Work-stage samples finalize native items in `.ce-workflow/work-items.json`; the harness does not require a tracker CLI.
+The standalone harness compares one declared workflow factor against immutable calculator and CSV-expenses bundles. Work-stage samples finalize native items in `.ce-workflow/work-items.json`; the harness does not require a tracker CLI. The deterministic adoption replay (`node scripts/run-work-slice-benchmarks.mjs`) records three calculator and CSV pairs, quality, runtime, novel/cached context, provider-token totals, ownership, verifier use, and specialist counts in `benchmarks/work-slice-adoption.json`; changes below 10% are reported as noise.
 
 Run the directly usable diagnostic descriptor from the package root:
 

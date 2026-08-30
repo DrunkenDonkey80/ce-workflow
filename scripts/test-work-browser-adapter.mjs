@@ -4,12 +4,19 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createWorkItem, initStore, saveStore } from "../extensions/work-store.js";
+import {
+	createWorkItem,
+	initStore,
+	saveStore,
+} from "../extensions/work-store.js";
 
 const cwd = mkdtempSync(path.join(os.tmpdir(), "work-browser-adapter-"));
 const helper = realpathSync(path.join(import.meta.dirname, "work-helper.mjs"));
-const runner = realpathSync(path.join(import.meta.dirname, "fixtures/capabilities/run-browser-smoke.mjs"));
-const run = (...args) => execFileSync(process.execPath, [helper, ...args], { cwd, encoding: "utf8" });
+const runner = realpathSync(
+	path.join(import.meta.dirname, "fixtures/capabilities/run-browser-smoke.mjs"),
+);
+const run = (...args) =>
+	execFileSync(process.execPath, [helper, ...args], { cwd, encoding: "utf8" });
 try {
 	execFileSync("git", ["init", "-q"], { cwd });
 	execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
@@ -39,19 +46,31 @@ try {
 						expectedExit: 0,
 						timeoutMs: 180_000,
 						env: { WORK_FIXTURE_ROOT: cwd },
-						assertions: [{ target: "stdout", operator: "includes", value: '"state":"ok"' }],
+						assertions: [
+							{ target: "stdout", operator: "includes", value: '"state":"ok"' },
+						],
 					},
 				},
 			],
 		},
 	});
 	saveStore(cwd, store);
-	const result = JSON.parse(run("work-run-proof", task.id, "browser-smoke", "--inspection", "Calculator shows 5 with a labelled live output at a mobile viewport."));
+	const result = JSON.parse(
+		run(
+			"work-run-proof",
+			task.id,
+			"browser-smoke",
+			"--inspection",
+			"Calculator shows 5 with a labelled live output at a mobile viewport.",
+		),
+	);
 	assert.equal(result.verificationStatus.ok, true);
 	assert.equal(result.proof.issuer.id, "ce.browser.command");
 	assert.equal(result.proof.operation.cleanup.ok, true);
 	assert.equal(result.proof.artifacts.length, 2);
-	assert(result.proof.artifacts.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)));
+	assert(
+		result.proof.artifacts.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)),
+	);
 	console.log("browser capability adapter live smoke: PASS");
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

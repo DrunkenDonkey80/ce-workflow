@@ -37,15 +37,16 @@ function assertionsPass(assertions, result, root) {
 						: assertion.operator === "matches"
 							? new RegExp(assertion.value).test(actual)
 							: assertion.operator === "sha256" &&
-								createHash("sha256")
-									.update(readFileSync(actual))
-									.digest("hex") === assertion.value;
-		if (!ok) throw new Error(`adapter assertion failed: ${JSON.stringify(assertion)}`);
+								createHash("sha256").update(readFileSync(actual)).digest("hex") ===
+									assertion.value;
+		if (!ok)
+			throw new Error(`adapter assertion failed: ${JSON.stringify(assertion)}`);
 	}
 }
 
 export function registerCapabilityAdapter(capability, adapter) {
-	if (adapters.has(capability)) throw new Error(`adapter already registered: ${capability}`);
+	if (adapters.has(capability))
+		throw new Error(`adapter already registered: ${capability}`);
 	adapters.set(capability, adapter);
 }
 
@@ -53,7 +54,12 @@ export function capabilityAdapter(capability) {
 	return adapters.get(capability);
 }
 
-export function runCapabilityAdapter({ cwd, requirement, revision, inspection }) {
+export function runCapabilityAdapter({
+	cwd,
+	requirement,
+	revision,
+	inspection,
+}) {
 	const adapter = capabilityAdapter(requirement.capability);
 	if (!adapter)
 		return {
@@ -113,7 +119,11 @@ function externalCommandAdapter(capability, id) {
 					detail: (result.error?.message ?? stderr ?? stdout).slice(0, 2_000),
 					operation: exactOperation,
 				};
-			assertionsPass(operation.assertions, { status: result.status, stdout, stderr }, executionRoot);
+			assertionsPass(
+				operation.assertions,
+				{ status: result.status, stdout, stderr },
+				executionRoot,
+			);
 			let payload = {};
 			try {
 				payload = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
@@ -121,13 +131,19 @@ function externalCommandAdapter(capability, id) {
 				// Artifact-free command checks may rely only on declared assertions.
 			}
 			if (payload.cleanup?.ok === false)
-				return { status: "FAIL", detail: `${capability} runner cleanup failed`, operation: exactOperation };
-			const artifacts = Object.entries(payload.artifacts ?? {}).map(([kind, file]) =>
-				artifact(cwd, kind, file),
+				return {
+					status: "FAIL",
+					detail: `${capability} runner cleanup failed`,
+					operation: exactOperation,
+				};
+			const artifacts = Object.entries(payload.artifacts ?? {}).map(
+				([kind, file]) => artifact(cwd, kind, file),
 			);
 			for (const kind of requirement.artifacts ?? [])
 				if (!artifacts.some((entry) => entry.kind === kind))
-					throw new Error(`${capability} runner did not produce required ${kind} artifact`);
+					throw new Error(
+						`${capability} runner did not produce required ${kind} artifact`,
+					);
 			return {
 				status: "PASS",
 				targetRevision: revision,

@@ -1367,7 +1367,7 @@ try {
 	const childMasterPlan = "docs/plans/i-1-2.md";
 	writeFileSync(
 		path.join(initiativeRoot, childMasterPlan),
-		"---\nartifact_readiness: implementation-ready\n---\n\n# I-1.2 master plan\n\n## Acceptance\n\n- Focused verification passes.\n",
+		"# I-1.2 master plan\n\n## Acceptance\n\n- Focused verification passes.\n",
 	);
 	const attachedPlan = bootstrapPlanEpic(
 		initiativeRoot,
@@ -1381,8 +1381,8 @@ try {
 	assert.equal(attachedPlan.initiative.id, "I-1");
 	assert.equal(attachedPlan.action, "initiative-preparation");
 	assert.deepEqual(attachedPlan.preparation.legalActions, [
+		"plan_next",
 		"select_child",
-		"start_execution",
 		"stop",
 	]);
 	assert.equal(attachedPlan.selectedWorkItem, undefined);

@@ -67,7 +67,11 @@ function boundedString(value, label, max = 2_000) {
 }
 
 function validateAssertions(assertions, label) {
-	if (!Array.isArray(assertions) || assertions.length === 0 || assertions.length > 16)
+	if (
+		!Array.isArray(assertions) ||
+		assertions.length === 0 ||
+		assertions.length > 16
+	)
 		fail(`${label} must contain 1-16 assertions`);
 	for (const [index, assertion] of assertions.entries()) {
 		const at = `${label}[${index}]`;
@@ -184,9 +188,7 @@ export function validateVerificationContract(
 			(!Array.isArray(entry.artifacts) ||
 				entry.artifacts.length > 8 ||
 				entry.artifacts.some(
-					(item) =>
-						typeof item !== "string" ||
-						!/^[a-z0-9._-]{1,32}$/i.test(item),
+					(item) => typeof item !== "string" || !/^[a-z0-9._-]{1,32}$/i.test(item),
 				))
 		)
 			fail(`${at}.artifacts is invalid`);
@@ -198,8 +200,7 @@ export function validateVerificationContract(
 			fail(`${at}.inspection must be goal or human`);
 		if (
 			entry.instructions !== undefined &&
-			(typeof entry.instructions !== "string" ||
-				entry.instructions.length > 2_000)
+			(typeof entry.instructions !== "string" || entry.instructions.length > 2_000)
 		)
 			fail(`${at}.instructions is invalid`);
 		validateOperation(entry.operation, at, entry.capability, options.executable);
@@ -226,7 +227,10 @@ function proof(
 }
 
 export function compatibilityVerificationContract(item = {}) {
-	const source = String(item.acceptance ?? item.description ?? item.title ?? "Legacy WorkItem").slice(0, 500) || "Legacy WorkItem";
+	const source =
+		String(
+			item.acceptance ?? item.description ?? item.title ?? "Legacy WorkItem",
+		).slice(0, 500) || "Legacy WorkItem";
 	return validateVerificationContract({
 		version: VERIFICATION_CONTRACT_VERSION,
 		required: [
@@ -311,9 +315,7 @@ export function inferVerificationContract(
 	if (/\b(?:android|adb|emulator|logcat|apk|gradle)\b/.test(lower))
 		addRendered("android");
 	if (
-		/\b(?:desktop|electron|tauri|wpf|winui|appkit|gtk|qt|window)\b/.test(
-			lower,
-		)
+		/\b(?:desktop|electron|tauri|wpf|winui|appkit|gtk|qt|window)\b/.test(lower)
 	)
 		addRendered("desktop");
 	if (/\b(?:api|http|service|endpoint|server|response)\b/.test(lower))
@@ -523,10 +525,16 @@ export function verificationProofRecord(contract, proofId, input = {}) {
 	if (status === "PASS" && !input.targetRevision)
 		fail("PASS verification proof requires targetRevision");
 	if (status === "PASS" && !trustedIssuer(requirement, { issuer: input.issuer }))
-		fail(`PASS verification proof requires a trusted ${requirement.capability} issuer`);
+		fail(
+			`PASS verification proof requires a trusted ${requirement.capability} issuer`,
+		);
 	if (status === "BLOCKED") {
 		boundedString(input.blocker?.code, "verification blocker code", 128);
-		boundedString(input.blocker?.resumeAction, "verification blocker resumeAction", 1_000);
+		boundedString(
+			input.blocker?.resumeAction,
+			"verification blocker resumeAction",
+			1_000,
+		);
 	}
 	return {
 		kind: "verification-proof",

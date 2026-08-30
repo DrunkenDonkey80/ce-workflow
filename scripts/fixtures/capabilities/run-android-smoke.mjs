@@ -129,8 +129,7 @@ try {
 	if (/FATAL EXCEPTION.*dev\.ceworkflow\.capability/s.test(logs.stdout))
 		throw new Error("fixture crashed");
 } finally {
-	if (booted)
-		runAdb(["shell", "am", "force-stop", "dev.ceworkflow.capability"]);
+	if (booted) runAdb(["shell", "am", "force-stop", "dev.ceworkflow.capability"]);
 	if (ownsEmulator) {
 		runAdb(["emu", "kill"]);
 		emulator.kill();

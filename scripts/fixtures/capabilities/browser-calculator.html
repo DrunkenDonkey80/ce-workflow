@@ -1,20 +1,50 @@
 <!doctype html>
 <html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Capability calculator</title>
-<style>body{font:18px system-ui;max-width:30rem;margin:3rem auto;padding:1rem}button{font:inherit;margin:.25rem;padding:.6rem}output{display:block;font-size:2rem}</style>
-<main>
-  <h1>Calculator</h1>
-  <output id="display" aria-live="polite">0</output>
-  <button data-value="2">2</button><button data-value="+">+</button><button data-value="3">3</button><button id="equals">=</button>
-</main>
-<script>
-let expression=""; const display=document.querySelector("#display");
-for(const button of document.querySelectorAll("[data-value]")) button.onclick=()=>{expression+=button.dataset.value;display.value=expression};
-document.querySelector("#equals").onclick=()=>{const [left,right]=expression.split("+").map(Number);display.value=String(left+right);localStorage.setItem("result",display.value)};
-for(const value of ["2","+","3"]) document.querySelector(`[data-value="${value}"]`).click();
-document.querySelector("#equals").click();
-document.documentElement.dataset.proof=display.value==="5"&&localStorage.getItem("result")==="5"?"ok":"fail";
-</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Capability calculator</title>
+  <style>
+    body {
+      font: 18px system-ui;
+      max-width: 30rem;
+      margin: 3rem auto;
+      padding: 1rem;
+    }
+    button {
+      font: inherit;
+      margin: 0.25rem;
+      padding: 0.6rem;
+    }
+    output {
+      display: block;
+      font-size: 2rem;
+    }
+  </style>
+  <main>
+    <h1>Calculator</h1>
+    <output id="display" aria-live="polite">0</output>
+    <button data-value="2">2</button><button data-value="+">+</button
+    ><button data-value="3">3</button><button id="equals">=</button>
+  </main>
+  <script>
+    let expression = "";
+    const display = document.querySelector("#display");
+    for (const button of document.querySelectorAll("[data-value]"))
+      button.onclick = () => {
+        expression += button.dataset.value;
+        display.value = expression;
+      };
+    document.querySelector("#equals").onclick = () => {
+      const [left, right] = expression.split("+").map(Number);
+      display.value = String(left + right);
+      localStorage.setItem("result", display.value);
+    };
+    for (const value of ["2", "+", "3"])
+      document.querySelector(`[data-value="${value}"]`).click();
+    document.querySelector("#equals").click();
+    document.documentElement.dataset.proof =
+      display.value === "5" && localStorage.getItem("result") === "5"
+        ? "ok"
+        : "fail";
+  </script>
 </html>
