@@ -12,12 +12,18 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
+	addWorkEvidence,
 	appendWorkNote,
 	createWorkItem,
 	initStore,
 	mutateStore,
 	updateWorkItem,
 } from "../extensions/work-store.js";
+import {
+	compatibilityVerificationContract,
+	inlineResultArtifact,
+	verificationProofRecord,
+} from "../extensions/work-verification-contract.js";
 import workModelsExtension, {
 	buildWorkImproveObjective,
 	buildWorkImproveState,
@@ -26,6 +32,27 @@ import workModelsExtension, {
 	executeOrchestratorAction,
 	workGoalCompletionBlocker,
 } from "../extensions/work-models.js";
+
+function closeVerified(store, id) {
+	const contract = compatibilityVerificationContract({ title: id });
+	const revision = "improvement-test-revision";
+	updateWorkItem(store, id, {
+		verificationContract: contract,
+		verificationRevision: revision,
+	});
+	addWorkEvidence(
+		store,
+		id,
+		verificationProofRecord(contract, "legacy-inspection", {
+			status: "PASS",
+			targetRevision: revision,
+			issuer: { type: "goal", id: "improvement-test" },
+			inspection: { by: "goal", summary: `${id} verified` },
+			artifacts: [inlineResultArtifact("result", "verified")],
+		}),
+	);
+	return updateWorkItem(store, id, { status: "closed" });
+}
 
 const root = mkdtempSync(path.join(tmpdir(), "work-improve-"));
 const bundle = path.join(root, ".pi", "self-improvement-reports", "report-1");
@@ -163,9 +190,7 @@ assert.match(
 	workGoalCompletionBlocker({ mode: "improvement", objective }, root),
 	/SI-1\.1 is still open/,
 );
-mutateStore(root, (store) =>
-	updateWorkItem(store, "SI-1.1", { status: "closed" }),
-);
+mutateStore(root, (store) => closeVerified(store, "SI-1.1"));
 assert.match(
 	workGoalCompletionBlocker({ mode: "improvement", objective }, root),
 	/lacks a final wo:improvement-safety SAFE or APPROVED assessment/,
@@ -242,7 +267,7 @@ assert.doesNotMatch(
 	/missing self-improvement report evidence/,
 );
 mutateStore(root, (store) => {
-	updateWorkItem(store, "SI-1.2", { status: "closed" });
+	closeVerified(store, "SI-1.2");
 	updateWorkItem(store, "SI-1.1", { status: "open" });
 });
 const tampered = buildWorkImproveState(root, "SI-1", options);
@@ -714,8 +739,8 @@ assert.equal(
 	"a new scoped decision covers the changed risk",
 );
 mutateStore(root, (store) => {
-	updateWorkItem(store, "SI-1.1", { status: "closed" });
-	updateWorkItem(store, "SI-1.4", { status: "closed" });
+	closeVerified(store, "SI-1.1");
+	closeVerified(store, "SI-1.4");
 });
 await tools.work_goal_complete.execute(
 	"improvement-complete",

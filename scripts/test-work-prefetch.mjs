@@ -26,11 +26,29 @@ const { laneStatus, queueLane, transitionLane } = await import(
 		path.join(import.meta.dirname, "../extensions/read-only-lanes.js"),
 	).href
 );
-const { createWorkItem, loadStore, mutateStore, storePath, updateWorkItem } =
-	await import(
+const {
+	addWorkEvidence,
+	createWorkItem,
+	loadStore,
+	mutateStore,
+	storePath,
+	updateWorkItem,
+} = await import(
 		pathToFileURL(path.join(import.meta.dirname, "../extensions/work-store.js"))
 			.href
 	);
+const {
+	compatibilityVerificationContract,
+	inlineResultArtifact,
+	verificationProofRecord,
+} = await import(
+	pathToFileURL(
+		path.join(
+			import.meta.dirname,
+			"../extensions/work-verification-contract.js",
+		),
+	).href,
+);
 const {
 	addFinding,
 	addGroup,
@@ -115,7 +133,28 @@ function completeLane(cwd, derived, output = artifact(derived)) {
 }
 
 function update(cwd, id, changes) {
-	mutateStore(cwd, (store) => updateWorkItem(store, id, changes));
+	mutateStore(cwd, (store) => {
+		if (changes.status === "closed") {
+			const contract = compatibilityVerificationContract({ title: id });
+			const revision = git(cwd, "rev-parse", "HEAD");
+			updateWorkItem(store, id, {
+				verificationContract: contract,
+				verificationRevision: revision,
+			});
+			addWorkEvidence(
+				store,
+				id,
+				verificationProofRecord(contract, "legacy-inspection", {
+					status: "PASS",
+					targetRevision: revision,
+					issuer: { type: "goal", id: "prefetch-test" },
+					inspection: { by: "goal", summary: `${id} verified` },
+					artifacts: [inlineResultArtifact("result", "verified")],
+				}),
+			);
+		}
+		return updateWorkItem(store, id, changes);
+	});
 }
 
 function mutateWithoutPromotion(cwd, derived, mutate, expected) {

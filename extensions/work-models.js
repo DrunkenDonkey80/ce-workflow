@@ -14196,7 +14196,7 @@ export function bootstrapPlanEpic(
 			const backlink = `wo:idea status=discussed plan-path=${rel} initiative-id=${initiativeContext.proposal.initiative.id} epic-id=${selected.id}`;
 			if (!notesOf(readWorkItem(cwd, idOf(idea))).includes(backlink))
 				appendWorkflowWorkItemNote(cwd, idOf(idea), backlink);
-			updateWorkItemNative(cwd, idOf(idea), { status: "closed" });
+			closeBrainstormIdea(cwd, idea);
 		}
 		rememberWorkflowEpic(cwd, epic);
 		return initiativePreparationState(
@@ -14247,7 +14247,7 @@ export function bootstrapPlanEpic(
 				idOf(idea),
 				`wo:idea status=discussed plan-path=${rel} epic-id=${idOf(epic)} task-id=${materialized.materializedUnits?.[0]?.id ?? "none"}`,
 			);
-			updateWorkItemNative(cwd, idOf(idea), { status: "closed" });
+			closeBrainstormIdea(cwd, idea);
 		}
 		return materialized;
 	}
@@ -14269,7 +14269,7 @@ export function bootstrapPlanEpic(
 			idOf(idea),
 			`wo:idea status=discussed plan-path=${rel} epic-id=${idOf(epic)} task-id=${idOf(planning)}`,
 		);
-		updateWorkItemNative(cwd, idOf(idea), { status: "closed" });
+		closeBrainstormIdea(cwd, idea);
 	}
 	return withHandoffPrompt(
 		{
@@ -14741,10 +14741,15 @@ function possibleDuplicateIdeas(ideas, title) {
 	});
 }
 
+function closeBrainstormIdea(cwd, idea) {
+	updateWorkItemNative(cwd, idOf(idea), { type: "idea" });
+	return updateWorkItemNative(cwd, idOf(idea), { status: "closed" });
+}
+
 function createBrainstormIdea(cwd, epic, topic, artifact = "") {
 	return createWorkflowWorkItem(cwd, {
 		title: compactBrainstormTitle(topic),
-		type: "task",
+		type: "idea",
 		parent: idOf(epic),
 		description: [
 			`Idea created by /work-brainstorm${artifact ? ` from ${artifact}` : ""}.`,

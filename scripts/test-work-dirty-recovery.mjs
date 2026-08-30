@@ -145,7 +145,7 @@ try {
 			allowFreeform: false,
 			allowComment: true,
 		},
-	});
+	}, ctx);
 	branch.push(
 		askResult("unsafe-call", approvalContext, [
 			"Apply recommendation and continue",
@@ -174,7 +174,7 @@ try {
 			allowFreeform: false,
 			allowComment: false,
 		},
-	});
+	}, ctx);
 	await assert.rejects(
 		() =>
 			tools.work_dirty_continue.execute(

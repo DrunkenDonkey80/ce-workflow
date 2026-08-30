@@ -70,7 +70,7 @@ try {
 		"standalone brainstorm initializes native state and creates an epic",
 	);
 	assert(
-		state.epic.type === "epic" && state.idea.type === "task",
+		state.epic.type === "epic" && state.idea.type === "idea",
 		"standalone brainstorm creates an epic and native idea",
 	);
 	assert(
