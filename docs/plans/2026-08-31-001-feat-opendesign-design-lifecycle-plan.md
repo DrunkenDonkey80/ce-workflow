@@ -755,6 +755,18 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
             }
           },
           {
+            "id": "design-telemetry-redaction",
+            "capability": "command",
+            "proof": "test",
+            "source": "R11 and R34 telemetry/log redaction acceptance",
+            "operation": {
+              "command": "node scripts/test-work-design.mjs",
+              "timeoutMs": 180000,
+              "expectedExit": 0,
+              "assertions": [{"target": "exit", "operator": "equals", "value": "0"}]
+            }
+          },
+          {
             "id": "package-regression",
             "capability": "command",
             "proof": "test",
