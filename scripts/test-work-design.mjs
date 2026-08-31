@@ -222,6 +222,35 @@ try {
 		"browser-runner-unavailable",
 		"missing browser command becomes a typed blocker",
 	);
+	const oversizedCriteria = Array.from({ length: 33 }, (_, index) => ({
+		id: `DES-${index + 1}`,
+		screenIds: ["screen"],
+		states: ["default"],
+		viewports: [`viewport-${index}`],
+		proofs: ["screenshot"],
+	}));
+	assert.equal(
+		createDesignFidelityContract({
+			authority: {
+				handoffHash: "b".repeat(64),
+				approvalHash: "c".repeat(64),
+				criteria: oversizedCriteria,
+			},
+			criteriaIds: oversizedCriteria.map((criterion) => criterion.id),
+			verificationContract: {
+				version: 1,
+				required: [
+					{
+						id: "browser",
+						capability: "browser",
+						operation: { command: "node browser-check.mjs" },
+					},
+				],
+			},
+		}).blocker.code,
+		"design-fidelity-manifest-too-large",
+		"lossless fidelity grouping fails closed rather than dropping cells",
+	);
 
 	let session = createDesignSession({
 		ownerId: "work-7",
