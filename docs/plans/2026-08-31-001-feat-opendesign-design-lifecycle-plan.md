@@ -5,7 +5,7 @@ date: 2026-08-31
 topic: opendesign-design-lifecycle
 artifact_contract: ce-unified-plan/v1
 artifact_readiness: executable
-product_contract_source: C:/Users/Flex/AppData/Local/Temp/ce-workflow-ui-design-plans/FULL-PLAN.md
+product_contract_source: docs/plans/sources/opendesign-design-lifecycle-product-contract.md
 execution: code
 ---
 
@@ -806,7 +806,7 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
 
 ## Sources and traceability
 
-- `C:/Users/Flex/AppData/Local/Temp/ce-workflow-ui-design-plans/FULL-PLAN.md` — authoritative product vision, lifecycle, schemas, failure/security rules, slices, and acceptance.
+- `docs/plans/sources/opendesign-design-lifecycle-product-contract.md` — authoritative product vision, lifecycle, schemas, failure/security rules, slices, and acceptance.
 - `extensions/work-models.js` — current settings, brainstorm linking, plan/resume/finish, telemetry, and command seams.
 - `extensions/work-dialogs.js` — mandatory shared list/checklist UX contract.
 - `extensions/work-verification-contract.js` and capability adapter tests — current executable proof model.
