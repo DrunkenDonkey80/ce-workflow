@@ -48,8 +48,14 @@ const TRANSITIONS = Object.freeze({
 		"run_pending",
 		"canceled",
 	],
-	sync_required: ["approval_required", "review_ready", "failed", "canceled"],
-	approval_required: ["approved", "run_pending", "canceled"],
+	sync_required: [
+		"approval_required",
+		"review_ready",
+		"run_pending",
+		"failed",
+		"canceled",
+	],
+	approval_required: ["approved", "sync_required", "run_pending", "canceled"],
 	approved: ["sync_required", "imported", "superseded"],
 	imported: ["plan_ready", "sync_required", "superseded"],
 	plan_ready: ["implementation_active", "sync_required", "superseded"],
@@ -424,15 +430,22 @@ export function normalizeRemoteFingerprint(files) {
 	const normalized = array(files, "remote files", { max: 64 }).map(
 		(file, index) => {
 			object(file, `remote files[${index}]`);
-			const name = validateDesignArtifactRelativePath(file.name);
+			const name = validateDesignArtifactRelativePath(file.path ?? file.name);
+			const size = Number(file.size ?? 0);
+			if (!Number.isSafeInteger(size) || size < 0)
+				fail(`remote files[${index}].size must be a non-negative integer`);
 			return {
 				name,
-				size: Number(file.size ?? 0),
+				size,
 				modifiedAt: optionalString(
-					file.modifiedAt,
+					file.mtime == null && file.modifiedAt == null
+						? undefined
+						: String(file.mtime ?? file.modifiedAt),
 					`remote files[${index}].modifiedAt`,
 					100,
 				),
+				mime: optionalString(file.mime, `remote files[${index}].mime`, 100),
+				kind: optionalString(file.kind, `remote files[${index}].kind`, 100),
 			};
 		},
 	);
@@ -480,6 +493,73 @@ export function resolveDesignArtifactPath(root, relativePath, options = {}) {
 			fail("artifact must be a regular file");
 	}
 	return target;
+}
+
+export function writeConfinedDesignArtifact(
+	root,
+	relativePath,
+	content,
+	options = {},
+) {
+	const target = resolveDesignArtifactPath(root, relativePath, options);
+	const bytes = Buffer.isBuffer(content)
+		? content
+		: Buffer.from(String(content), "utf8");
+	const maxBytes = options.maxBytes ?? 512_000;
+	if (bytes.length > maxBytes) fail("artifact is too large");
+	fs.mkdirSync(path.dirname(target), { recursive: true });
+	resolveDesignArtifactPath(root, relativePath, options);
+	const temp = `${target}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`;
+	try {
+		fs.writeFileSync(temp, bytes, { mode: 0o600, flag: "wx" });
+		fs.renameSync(temp, target);
+	} finally {
+		if (fs.existsSync(temp)) fs.unlinkSync(temp);
+	}
+	return target;
+}
+
+export function copyDesignReferenceAsset(cwd, designDirectory, input) {
+	const directory = String(designDirectory ?? "").replaceAll("\\", "/");
+	if (!/^docs\/designs\/[^/]+$/.test(directory))
+		fail("design directory must be one confined docs/designs child");
+	if (!["repository-local", "browser-adapter"].includes(input.sourceKind))
+		fail("image source must be repository-local or browser-adapter");
+	const license = string(input.license, "asset.license", 200);
+	if (/^(unknown|unlicensed|tbd|none)$/i.test(license.trim()))
+		fail("production asset requires a known license");
+	const sourcePath = validateDesignArtifactRelativePath(input.sourcePath, {
+		allowImages: true,
+	});
+	if (!ALLOWED_IMAGE_EXTENSIONS.has(path.extname(sourcePath).toLowerCase()))
+		fail("only approved image types can be copied");
+	const source = resolveDesignArtifactPath(cwd, sourcePath, {
+		allowImages: true,
+	});
+	const stats = fs.lstatSync(source);
+	if (!stats.isFile() || stats.size > (input.maxBytes ?? 5_000_000))
+		fail("image source must be a bounded regular file");
+	const targetName = path.basename(input.targetName ?? sourcePath);
+	validateDesignArtifactRelativePath(targetName, { allowImages: true });
+	return writeConfinedDesignArtifact(
+		path.resolve(cwd, directory),
+		`reference/${targetName}`,
+		fs.readFileSync(source),
+		{ allowImages: true, maxBytes: input.maxBytes ?? 5_000_000 },
+	);
+}
+
+export function renderDesignRepairPrompt(errors = []) {
+	const list = array(errors, "repair errors", { min: 1, max: 20 })
+		.map((entry) => string(String(entry), "repair error", 500))
+		.sort();
+	return [
+		"Repair the design handoff only; preserve the approved visual direction.",
+		"Return root DESIGN-HANDOFF.json v1 and DESIGN-HANDOFF.md.",
+		"Do not generate executable code or binary assets.",
+		"Validation errors:",
+		...list.map((entry) => `- ${entry}`),
+	].join("\n");
 }
 
 export function createDesignApproval(input) {
@@ -607,7 +687,10 @@ export function renderDesignRevisionPrompt(
 
 export function designLineageNotes(input) {
 	const pairs = {
+		"design-source": input.sourceId ?? input.sourceArtifact,
 		"design-directory": input.designDirectory,
+		"design-brief": input.briefPath,
+		"design-brief-sha256": input.briefHash,
 		"design-handoff": input.handoffPath,
 		"design-handoff-sha256": input.handoffHash,
 		"design-approval": input.approvalPath,

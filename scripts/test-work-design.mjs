@@ -6,6 +6,7 @@ import path from "node:path";
 import {
 	canonicalDesignJson,
 	consumeDesignRepairAttempt,
+	copyDesignReferenceAsset,
 	createDesignApproval,
 	createDesignSession,
 	createTextFallbackHandoff,
@@ -15,15 +16,18 @@ import {
 	loadDesignSession,
 	normalizeRemoteFingerprint,
 	renderDesignBrief,
+	renderDesignRepairPrompt,
 	resolveDesignArtifactPath,
 	saveDesignSession,
 	transitionDesignSession,
 	validateDesignArtifactRelativePath,
 	validateDesignHandoff,
+	writeConfinedDesignArtifact,
 } from "../extensions/work-design.js";
 import { openDesignPayloadDigest } from "../extensions/opendesign-client.js";
 import {
 	advanceDesignSession,
+	approveDesignSession,
 	buildWorkBrainstormState,
 	buildWorkPlanState,
 	buildWorkRedesignState,
@@ -32,6 +36,7 @@ import {
 	designReviewChoices,
 	reviewDesignSession,
 	substantialUiWork,
+	syncDesignSession,
 	waiveDesignSession,
 } from "../extensions/work-models.js";
 import { loadStore } from "../extensions/work-store.js";
@@ -221,6 +226,45 @@ try {
 	} catch (error) {
 		if (!["EPERM", "EACCES"].includes(error?.code)) throw error;
 	}
+
+	const confined = path.join(root, "docs", "designs", "confined");
+	writeConfinedDesignArtifact(confined, "DESIGN-HANDOFF.md", "# Safe\n");
+	assert.equal(
+		fs.readFileSync(path.join(confined, "DESIGN-HANDOFF.md"), "utf8"),
+		"# Safe\n",
+	);
+	rejects(
+		() => writeConfinedDesignArtifact(confined, "prototype.js", "alert(1)"),
+		/artifact type/,
+	);
+	fs.mkdirSync(path.join(root, "assets"), { recursive: true });
+	fs.writeFileSync(
+		path.join(root, "assets", "licensed.png"),
+		Buffer.from([1, 2, 3]),
+	);
+	const copied = copyDesignReferenceAsset(root, "docs/designs/confined", {
+		sourceKind: "repository-local",
+		sourcePath: "assets/licensed.png",
+		license: "MIT",
+	});
+	assert.equal(fs.readFileSync(copied).length, 3);
+	for (const input of [
+		{ sourceKind: "remote", sourcePath: "assets/licensed.png", license: "MIT" },
+		{
+			sourceKind: "repository-local",
+			sourcePath: "assets/licensed.png",
+			license: "unknown",
+		},
+	])
+		rejects(
+			() => copyDesignReferenceAsset(root, "docs/designs/confined", input),
+			/design-contract/,
+		);
+	assert.equal(
+		renderDesignRepairPrompt(["z error", "a error"]),
+		renderDesignRepairPrompt(["a error", "z error"]),
+		"repair prompt is deterministic",
+	);
 
 	const fallback = createTextFallbackHandoff({
 		briefHash: "a".repeat(64),
@@ -550,6 +594,182 @@ try {
 		});
 		assert.equal(retried.action, "design-run-recovered");
 		assert.equal(retried.designSession.runId, "retry-run");
+
+		const syncId = "sync-design";
+		const syncDirectory = `docs/designs/${syncId}`;
+		const syncBrief = `${syncDirectory}/DESIGN-BRIEF.md`;
+		fs.mkdirSync(path.join(lifecycleRoot, ...syncDirectory.split("/")), {
+			recursive: true,
+		});
+		fs.writeFileSync(
+			path.join(lifecycleRoot, ...syncBrief.split("/")),
+			"# Sync brief\n",
+		);
+		saveDesignSession(
+			lifecycleRoot,
+			createDesignSession({
+				ownerId: syncId,
+				policy: "required",
+				state: "review_ready",
+				metadata: {
+					briefPath: syncBrief,
+					briefHash: "a".repeat(64),
+					designDirectory: syncDirectory,
+					projectId: "project-sync",
+					previewUrl: "https://example.test/preview",
+				},
+			}),
+		);
+		let remoteVersion = 1;
+		const fetched = [];
+		const designPeer = async (tool, args) => {
+			if (tool === "list_files")
+				return {
+					files: [
+						{
+							path: "DESIGN-HANDOFF.json",
+							mime: "application/json",
+							size: 1_000,
+							mtime: remoteVersion,
+						},
+						{
+							path: "DESIGN-HANDOFF.md",
+							mime: "text/markdown",
+							size: 20,
+							mtime: remoteVersion,
+						},
+						{ path: "prototype.js", mime: "text/javascript", size: 99 },
+					],
+				};
+			if (tool === "get_file") {
+				fetched.push(args.path);
+				return args.path.endsWith(".json") ? valid : "# Human handoff\n";
+			}
+			throw new Error(`unexpected tool ${tool}`);
+		};
+		const synchronized = await syncDesignSession(lifecycleRoot, syncId, {
+			callTool: designPeer,
+		});
+		assert.equal(synchronized.action, "design-sync-updated");
+		assert.equal(synchronized.designSession.state, "approval_required");
+		assert.deepEqual(fetched.sort(), [
+			"DESIGN-HANDOFF.json",
+			"DESIGN-HANDOFF.md",
+		]);
+		assert.equal(
+			fs.existsSync(path.join(lifecycleRoot, syncDirectory, "prototype.js")),
+			false,
+		);
+		const approvedSync = await approveDesignSession(
+			lifecycleRoot,
+			syncId,
+			"Looks good",
+			{
+				callTool: designPeer,
+			},
+		);
+		assert.equal(approvedSync.action, "design-approved");
+		assert.equal(approvedSync.designSession.state, "approved");
+		assert.equal(
+			fs.existsSync(path.join(lifecycleRoot, syncDirectory, "APPROVAL.json")),
+			true,
+		);
+		remoteVersion = 2;
+		const stale = await syncDesignSession(lifecycleRoot, syncId, {
+			callTool: designPeer,
+		});
+		assert.equal(stale.action, "design-sync-updated");
+		assert.equal(stale.designSession.state, "approval_required");
+		assert.equal(
+			stale.designSession.revision,
+			approvedSync.designSession.revision + 1,
+		);
+		assert.equal(stale.designSession.approvalHash, undefined);
+		remoteVersion = 3;
+		const resynchronized = await syncDesignSession(lifecycleRoot, syncId, {
+			callTool: designPeer,
+		});
+		assert.equal(resynchronized.action, "design-sync-updated");
+		assert.equal(resynchronized.designSession.state, "approval_required");
+		assert.equal(
+			resynchronized.designSession.revision,
+			stale.designSession.revision + 1,
+		);
+
+		const repairId = "repair-design";
+		saveDesignSession(
+			lifecycleRoot,
+			createDesignSession({
+				ownerId: repairId,
+				policy: "required",
+				state: "review_ready",
+				metadata: {
+					briefPath: syncBrief,
+					briefHash: "a".repeat(64),
+					designDirectory: syncDirectory,
+					projectId: "project-repair",
+					previewUrl: "https://example.test/preview",
+				},
+			}),
+		);
+		const repaired = await syncDesignSession(lifecycleRoot, repairId, {
+			callTool: async (tool) => {
+				if (tool === "list_files")
+					return { files: [{ path: "DESIGN-HANDOFF.json", size: 10, mtime: 1 }] };
+				if (tool === "get_file") return invalid;
+				if (tool === "start_run") {
+					const durable = loadDesignSession(lifecycleRoot, repairId);
+					assert.equal(durable.state, "run_pending");
+					assert.equal(durable.repairAttempts, 1);
+					return { runId: "repair-run" };
+				}
+			},
+		});
+		assert.equal(repaired.action, "design-repair-started");
+		assert.equal(repaired.designSession.repairAttempts, 1);
+		saveDesignSession(
+			lifecycleRoot,
+			transitionDesignSession(repaired.designSession, "review_ready", {
+				runId: undefined,
+			}),
+		);
+		const secondInvalid = await syncDesignSession(lifecycleRoot, repairId, {
+			callTool: async (tool) => {
+				if (tool === "list_files")
+					return { files: [{ path: "DESIGN-HANDOFF.json", size: 10, mtime: 2 }] };
+				if (tool === "get_file") return invalid;
+				throw new Error("a second repair must not start");
+			},
+		});
+		assert.equal(secondInvalid.action, "design-sync-invalid");
+		assert.equal(secondInvalid.designSession.repairAttempts, 1);
+
+		const fetchId = "fetch-design";
+		saveDesignSession(
+			lifecycleRoot,
+			createDesignSession({
+				ownerId: fetchId,
+				policy: "required",
+				state: "review_ready",
+				metadata: {
+					briefPath: syncBrief,
+					briefHash: "a".repeat(64),
+					designDirectory: syncDirectory,
+					projectId: "project-fetch",
+					previewUrl: "https://example.test/preview",
+				},
+			}),
+		);
+		const fetchPending = await syncDesignSession(lifecycleRoot, fetchId, {
+			callTool: async (tool) => {
+				if (tool === "list_files")
+					return { files: [{ path: "DESIGN-HANDOFF.json", size: 10, mtime: 1 }] };
+				throw new Error("offline");
+			},
+		});
+		assert.equal(fetchPending.action, "design-sync-pending");
+		assert.equal(fetchPending.designSession.state, "review_ready");
+		assert.equal(fetchPending.designSession.repairAttempts, 0);
 	} finally {
 		fs.rmSync(lifecycleRoot, { recursive: true, force: true });
 	}

@@ -27,6 +27,7 @@ const {
 	approveInitiativeReconciliation,
 	deriveIdeaStatus,
 	executeOrchestratorAction,
+	recordDesignLineage,
 	renderWorkBrainstormText,
 } = await import(
 	pathToFileURL(
@@ -579,6 +580,30 @@ try {
 				note.includes("brainstorm-path=docs/brainstorms/accepted.md"),
 			),
 		"selected idea note includes brainstorm path",
+	);
+	recordDesignLineage(cwd, {
+		ownerId: "IDEA-2",
+		sourceWorkItemId: "IDEA-2",
+		sourceArtifact: "docs/brainstorms/accepted.md",
+		designDirectory: "docs/designs/accepted",
+		briefPath: "docs/designs/accepted/DESIGN-BRIEF.md",
+		briefHash: "a".repeat(64),
+		handoffPath: "docs/designs/accepted/DESIGN-HANDOFF.json",
+		handoffHash: "b".repeat(64),
+		approvalPath: "docs/designs/accepted/APPROVAL.json",
+		approvalHash: "c".repeat(64),
+		projectId: "project-1",
+		runId: "run-1",
+		state: "approved",
+	});
+	const designNotes = fixture
+		.store()
+		.items["IDEA-2"].notes.filter((note) => note.startsWith("wo:design "));
+	assert(
+		designNotes.some((note) => note.includes("design-source: IDEA-2")) &&
+			designNotes.some((note) => note.includes("design-approval:")) &&
+			designNotes.every((note) => !note.includes("brainstorm-path")),
+		"design lineage links forward without overloading brainstorm-path",
 	);
 	assert(
 		brainstormHandoffPrompt(state).includes("Run /work-plan E-1 now") &&

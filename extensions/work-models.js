@@ -139,14 +139,24 @@ import {
 	reconcileCreatedProject,
 } from "./opendesign-client.js";
 import {
+	canonicalDesignJson,
+	consumeDesignRepairAttempt,
+	createDesignApproval,
 	createDesignSession,
+	designApprovalIsCurrent,
+	designLineageNotes,
 	designSessionPath,
+	hashDesignValue,
 	loadDesignSession,
+	normalizeRemoteFingerprint,
 	renderCurrentUiAudit,
 	renderDesignBrief,
+	renderDesignRepairPrompt,
 	renderDesignRevisionPrompt,
 	saveDesignSession,
 	transitionDesignSession,
+	validateDesignHandoff,
+	writeConfinedDesignArtifact,
 } from "./work-design.js";
 import {
 	acknowledgeWorkActionLease,
@@ -12375,6 +12385,15 @@ function tryLoadDesignSession(cwd, ownerId) {
 		: null;
 }
 
+function designCallTool(cwd, options = {}) {
+	if (options.callTool) return options.callTool;
+	const configured = workOrchSettings(cwd).openDesignCommand;
+	const command = configured
+		? normalizeOpenDesignCommandSpec(configured)
+		: undefined;
+	return (tool, args) => callOpenDesignTool({ ...options, command, tool, args });
+}
+
 function designSessionGate(session) {
 	if (
 		!session ||
@@ -12715,10 +12734,7 @@ export async function reviseDesignSession(
 	});
 	saveDesignSession(cwd, session);
 	try {
-		const callTool =
-			options.callTool ??
-			((tool, args) => callOpenDesignTool({ ...options, tool, args }));
-		const started = await callTool("start_run", startPayload);
+		const started = await designCallTool(cwd, options)("start_run", startPayload);
 		session = transitionDesignSession(session, "run_active", {
 			runId: started.runId,
 			nextAction: `/wo design ${ownerId}`,
@@ -12849,6 +12865,350 @@ export async function reviewDesignSession(cwd, ownerId, ctx, options = {}) {
 	}
 }
 
+function remoteDesignFiles(result) {
+	const files = Array.isArray(result) ? result : result?.files;
+	if (!Array.isArray(files))
+		throw new Error("OpenDesign list_files returned no files");
+	return files
+		.map((file) => ({ ...file, name: file?.path ?? file?.name }))
+		.filter((file) =>
+			["DESIGN-HANDOFF.json", "DESIGN-HANDOFF.md"].includes(file.name),
+		);
+}
+
+function remoteDesignContent(result) {
+	if (typeof result === "string") return result;
+	if (typeof result?.content === "string") return result.content;
+	if (typeof result?.text === "string") return result.text;
+	return result;
+}
+
+async function fetchDesignFile(callTool, args) {
+	try {
+		return remoteDesignContent(await callTool("get_file", args));
+	} catch (cause) {
+		const error = new Error("OpenDesign file fetch is unavailable", { cause });
+		error.syncUnavailable = true;
+		throw error;
+	}
+}
+
+export function recordDesignLineage(cwd, session) {
+	const item = readWorkItem(cwd, session.ownerId);
+	if (!item) return [];
+	const notes = designLineageNotes({
+		sourceId: session.sourceWorkItemId ?? session.ownerId,
+		sourceArtifact: session.sourceArtifact,
+		designDirectory: session.designDirectory ?? posix.dirname(session.briefPath),
+		briefPath: session.briefPath,
+		briefHash: session.briefHash,
+		handoffPath: session.handoffPath,
+		handoffHash: session.handoffHash,
+		approvalPath: session.approvalPath,
+		approvalHash: session.approvalHash,
+		projectId: session.projectId,
+		runId: session.runId,
+		state: session.state,
+		supersedes: session.supersedes,
+	});
+	const existing = new Set(noteTextsOf(item));
+	for (const note of notes)
+		if (!existing.has(note))
+			appendWorkflowWorkItemNote(cwd, session.ownerId, note);
+	return notes;
+}
+
+export async function syncDesignSession(cwd, ownerId, options = {}) {
+	let session = tryLoadDesignSession(cwd, ownerId);
+	if (!session)
+		return errorState(
+			"design-not-found",
+			`No design session exists for ${ownerId}.`,
+			{
+				action: "design-not-found",
+			},
+		);
+	if (
+		![
+			"review_ready",
+			"sync_required",
+			"approval_required",
+			"approved",
+			"imported",
+			"plan_ready",
+		].includes(session.state)
+	)
+		return errorState(
+			"design-sync-invalid",
+			`Design session ${ownerId} cannot synchronize from ${session.state}.`,
+			{ action: "design-sync-invalid" },
+		);
+	if (!session.projectId)
+		return errorState(
+			"design-project-missing",
+			"OpenDesign project identity is missing.",
+			{
+				action: "design-project-missing",
+				designSession: session,
+			},
+		);
+	const callTool = designCallTool(cwd, options);
+	let files;
+	try {
+		files = remoteDesignFiles(
+			await callTool("list_files", { project: session.projectId }),
+		);
+	} catch (cause) {
+		return {
+			ok: false,
+			action: "design-sync-pending",
+			designSession: session,
+			message:
+				"OpenDesign files could not be checked; the prior authority was preserved.",
+			suggestedCommands: [`/wo design sync ${ownerId}`],
+			cause,
+		};
+	}
+	const jsonFile = files.find((file) => file.name === "DESIGN-HANDOFF.json");
+	const invalidMetadata = files.find(
+		(file) =>
+			Number(file.size ?? 0) > 512_000 ||
+			(file.mime &&
+				file.name.endsWith(".json") &&
+				!/^application\/(?:[\w.+-]+\+)?json\b/i.test(file.mime)),
+	);
+	let remoteFingerprintHash;
+	let syncError;
+	try {
+		if (!jsonFile) throw new Error("DESIGN-HANDOFF.json is missing");
+		if (invalidMetadata)
+			throw new Error(`${invalidMetadata.name} has unsafe metadata`);
+		remoteFingerprintHash = normalizeRemoteFingerprint(files);
+		if (
+			remoteFingerprintHash === session.remoteFingerprintHash &&
+			session.handoffHash
+		) {
+			if (["review_ready", "sync_required"].includes(session.state)) {
+				if (session.state === "review_ready")
+					session = transitionDesignSession(session, "sync_required");
+				session = transitionDesignSession(session, "approval_required", {
+					remoteCheckedAt: new Date().toISOString(),
+					nextAction: `/wo design approve ${ownerId}`,
+				});
+				saveDesignSession(cwd, session);
+			}
+			return {
+				ok: true,
+				action: "design-sync-current",
+				designSession: session,
+				message: "The OpenDesign handoff is unchanged.",
+				suggestedCommands:
+					session.state === "approval_required"
+						? [`/wo design approve ${ownerId}`]
+						: [],
+			};
+		}
+		const raw = await fetchDesignFile(callTool, {
+			project: session.projectId,
+			path: jsonFile.name,
+			offset: 0,
+			limit: 20_000,
+		});
+		const handoff = validateDesignHandoff(
+			typeof raw === "string" ? JSON.parse(raw) : raw,
+			{ briefHash: session.briefHash },
+		);
+		const markdownFile = files.find((file) => file.name === "DESIGN-HANDOFF.md");
+		const markdown = markdownFile
+			? await fetchDesignFile(callTool, {
+					project: session.projectId,
+					path: markdownFile.name,
+					offset: 0,
+					limit: 20_000,
+				})
+			: undefined;
+		if (markdownFile && typeof markdown !== "string")
+			throw new Error("DESIGN-HANDOFF.md is not text");
+		const designDirectory =
+			session.designDirectory ?? posix.dirname(session.briefPath);
+		const designRoot = resolve(cwd, ...designDirectory.split("/"));
+		writeConfinedDesignArtifact(
+			designRoot,
+			"DESIGN-HANDOFF.json",
+			`${canonicalDesignJson(handoff)}\n`,
+		);
+		if (markdownFile)
+			writeConfinedDesignArtifact(
+				designRoot,
+				"DESIGN-HANDOFF.md",
+				markdown.endsWith("\n") ? markdown : `${markdown}\n`,
+			);
+		if (session.state !== "sync_required")
+			session = transitionDesignSession(session, "sync_required");
+		const handoffHash = hashDesignValue(handoff);
+		const authorityChanged =
+			session.handoffHash !== handoffHash ||
+			session.remoteFingerprintHash !== remoteFingerprintHash;
+		session = transitionDesignSession(session, "approval_required", {
+			designDirectory,
+			handoffPath: `${designDirectory}/DESIGN-HANDOFF.json`,
+			handoffMarkdownPath: markdownFile
+				? `${designDirectory}/DESIGN-HANDOFF.md`
+				: undefined,
+			handoffHash,
+			remoteFingerprintHash,
+			remoteCheckedAt: new Date().toISOString(),
+			revision: session.revision + (authorityChanged ? 1 : 0),
+			approvalHash: undefined,
+			approvedAt: undefined,
+			nextAction: `/wo design approve ${ownerId}`,
+		});
+		saveDesignSession(cwd, session);
+		recordDesignLineage(cwd, session);
+		return {
+			ok: true,
+			action: authorityChanged ? "design-sync-updated" : "design-sync-current",
+			designSession: session,
+			message: authorityChanged
+				? "Design authority changed; the synchronized revision requires approval."
+				: "The synchronized design is ready for approval.",
+			suggestedCommands: [`/wo design approve ${ownerId}`],
+		};
+	} catch (cause) {
+		if (cause?.syncUnavailable)
+			return {
+				ok: false,
+				action: "design-sync-pending",
+				designSession: session,
+				message:
+					"OpenDesign files could not be fetched; the prior authority was preserved.",
+				suggestedCommands: [`/wo design sync ${ownerId}`],
+				cause,
+			};
+		syncError = String(cause?.message ?? cause).slice(0, 500);
+	}
+	if (session.state !== "sync_required")
+		session = transitionDesignSession(session, "sync_required");
+	if (session.repairAttempts >= 1) {
+		session = { ...session, syncError, nextAction: `/wo design sync ${ownerId}` };
+		saveDesignSession(cwd, session);
+		return {
+			ok: false,
+			action: "design-sync-invalid",
+			designSession: session,
+			message:
+				"The repaired handoff is still invalid; Preview remains available and sync is resumable.",
+			suggestedCommands: [
+				`/wo design sync ${ownerId}`,
+				`/wo design review ${ownerId}`,
+			],
+		};
+	}
+	const requestId = randomUUID();
+	const startPayload = {
+		project: session.projectId,
+		prompt: renderDesignRepairPrompt([syncError]),
+		requestId,
+	};
+	session = transitionDesignSession(
+		consumeDesignRepairAttempt(session),
+		"run_pending",
+		{
+			requestId,
+			startPayload,
+			payloadDigest: openDesignPayloadDigest(startPayload),
+			syncError,
+			nextAction: `/wo design ${ownerId}`,
+		},
+	);
+	saveDesignSession(cwd, session);
+	try {
+		const started = await callTool("start_run", startPayload);
+		session = transitionDesignSession(session, "run_active", {
+			runId: started.runId,
+			nextAction: `/wo design ${ownerId}`,
+		});
+		saveDesignSession(cwd, session);
+		return {
+			ok: true,
+			action: "design-repair-started",
+			designSession: session,
+			message: "OpenDesign is repairing the invalid handoff once.",
+			suggestedCommands: [`/wo design ${ownerId}`],
+		};
+	} catch (cause) {
+		return {
+			ok: false,
+			action: "design-repair-pending",
+			designSession: session,
+			message: "The repair request is saved and can be resumed safely.",
+			suggestedCommands: [`/wo design ${ownerId}`],
+			cause,
+		};
+	}
+}
+
+export async function approveDesignSession(
+	cwd,
+	ownerId,
+	notes = "",
+	options = {},
+) {
+	const synced = await syncDesignSession(cwd, ownerId, options);
+	if (!synced.ok) return synced;
+	let session = synced.designSession;
+	const current = {
+		ownerId: session.ownerId,
+		briefHash: session.briefHash,
+		handoffHash: session.handoffHash,
+		remoteFingerprint: session.remoteFingerprintHash,
+		revision: session.revision,
+	};
+	if (session.state === "approved" && session.approvalPath) {
+		const file = designArtifactFile(cwd, session.approvalPath);
+		if (
+			existsSync(file) &&
+			designApprovalIsCurrent(JSON.parse(readFileSync(file, "utf8")), current)
+		)
+			return {
+				ok: true,
+				action: "design-approval-current",
+				designSession: session,
+				message: "The current synchronized design is already approved.",
+				suggestedCommands: [],
+			};
+	}
+	if (session.state !== "approval_required")
+		return errorState(
+			"design-approval-invalid",
+			`Design session ${ownerId} cannot be approved from ${session.state}.`,
+			{ action: "design-approval-invalid", designSession: session },
+		);
+	const approval = createDesignApproval({ ...current, notes });
+	const designDirectory =
+		session.designDirectory ?? posix.dirname(session.briefPath);
+	writeConfinedDesignArtifact(
+		resolve(cwd, ...designDirectory.split("/")),
+		"APPROVAL.json",
+		`${canonicalDesignJson(approval)}\n`,
+	);
+	session = transitionDesignSession(session, "approved", {
+		approvalPath: `${designDirectory}/APPROVAL.json`,
+		approvalHash: hashDesignValue(approval),
+		approvedAt: approval.decidedAt,
+		nextAction: `/wo resume ${ownerId}`,
+	});
+	saveDesignSession(cwd, session);
+	recordDesignLineage(cwd, session);
+	return {
+		ok: true,
+		action: "design-approved",
+		designSession: session,
+		message: `Approved design revision ${session.revision}.`,
+		suggestedCommands: [`/wo resume ${ownerId}`],
+	};
+}
+
 export async function advanceDesignSession(cwd, ownerId, options = {}) {
 	let session = tryLoadDesignSession(cwd, ownerId);
 	if (!session)
@@ -12865,9 +13225,7 @@ export async function advanceDesignSession(cwd, ownerId, options = {}) {
 		});
 		saveDesignSession(cwd, session);
 	}
-	const callTool =
-		options.callTool ??
-		((tool, args) => callOpenDesignTool({ ...options, tool, args }));
+	const callTool = designCallTool(cwd, options);
 	if (session.state === "commission_ready") {
 		if (session.policy === "off")
 			return {
@@ -25598,6 +25956,10 @@ async function executeOrchestratorAction(
 			let state;
 			if (action === "waive") {
 				state = waiveDesignSession(ctx.cwd, target);
+			} else if (action === "sync") {
+				state = await syncDesignSession(ctx.cwd, target, options);
+			} else if (action === "approve") {
+				state = await approveDesignSession(ctx.cwd, target, "", options);
 			} else if (action === "review") {
 				state = await reviewDesignSession(ctx.cwd, target, ctx, options);
 			} else if (action === "prepare") {
@@ -25624,7 +25986,7 @@ async function executeOrchestratorAction(
 					? await advanceDesignSession(ctx.cwd, ownerId, options)
 					: errorState(
 							"usage",
-							"Usage: /wo design [prepare|resume|review] <work-item-id>",
+							"Usage: /wo design [prepare|resume|review|sync|approve|waive] <work-item-id>",
 							{ action: "usage" },
 						);
 			}
