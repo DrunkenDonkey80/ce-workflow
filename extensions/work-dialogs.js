@@ -153,6 +153,13 @@ async function nativeListDialog(ctx, options) {
 				return { action: "back", values: [...enabled] };
 			}
 			const item = choices[index];
+			if (item.disabled === true) {
+				ctx.ui.notify?.(
+					item.disabledReason ?? item.description ?? "This option is unavailable.",
+					"warning",
+				);
+				continue;
+			}
 			if (enabled.has(item.value)) enabled.delete(item.value);
 			else enabled.add(item.value);
 		}
@@ -173,17 +180,28 @@ async function nativeListDialog(ctx, options) {
 			preserveCase: true,
 		}),
 	);
-	const selected = await ctx.ui.select(title, labels);
-	const index = labels.indexOf(selected);
-	if (index < 0) return;
-	if (choices[index].value === "__dialog_tab__") return { action: "tab" };
-	dialogCursors.set(cursorKey, choices[index].value);
-	return {
-		action: "select",
-		value: choices[index].value,
-		item: choices[index],
-		index,
-	};
+	for (;;) {
+		const selected = await ctx.ui.select(title, labels);
+		const index = labels.indexOf(selected);
+		if (index < 0) return;
+		if (choices[index].value === "__dialog_tab__") return { action: "tab" };
+		if (choices[index].disabled === true) {
+			ctx.ui.notify?.(
+				choices[index].disabledReason ??
+					choices[index].description ??
+					"This option is unavailable.",
+				"warning",
+			);
+			continue;
+		}
+		dialogCursors.set(cursorKey, choices[index].value);
+		return {
+			action: "select",
+			value: choices[index].value,
+			item: choices[index],
+			index,
+		};
+	}
 }
 
 export async function showListDialog(ctx, options) {
@@ -301,7 +319,8 @@ export async function showListDialog(ctx, options) {
 						multi: Boolean(multi),
 					};
 					let color = item.color ?? "text";
-					if (selected && !item.color) color = "accent";
+					if (item.disabled === true) color = "dim";
+					else if (selected && !item.color) color = "accent";
 					else if (multi) color = enabled.has(item.value) ? "success" : "dim";
 					else if (item.enabled === true) color = "success";
 					else if (item.enabled === false) color = "dim";
@@ -380,6 +399,13 @@ export async function showListDialog(ctx, options) {
 				) {
 					const item = visible[index]?.item;
 					if (!item) return;
+					if (item.disabled === true) {
+						ctx.ui.notify?.(
+							item.disabledReason ?? item.description ?? "This option is unavailable.",
+							"warning",
+						);
+						return;
+					}
 					if (multi) {
 						if (enabled.has(item.value)) enabled.delete(item.value);
 						else enabled.add(item.value);

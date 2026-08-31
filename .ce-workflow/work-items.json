@@ -14255,7 +14255,308 @@
         "schemaVersion": 1,
         "title": "Add scoped settings and the human design review loop"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "id": "design-review-dialog",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-dialogs.mjs",
+            "cwd": ".",
+            "durationMs": 60,
+            "stderr": "",
+            "stdout": "ok - shared work dialogs\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:36:53.280Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:582a4eeb8c541fe203dd76a70975ad348e84c61c9f33032004957c096410e5c4"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "id": "design-revision-state",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-design.mjs",
+            "cwd": ".",
+            "durationMs": 250,
+            "stderr": "",
+            "stdout": "work-design tests passed\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:36:53.471Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:582a4eeb8c541fe203dd76a70975ad348e84c61c9f33032004957c096410e5c4"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "id": "design-settings",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-settings.mjs",
+            "cwd": ".",
+            "durationMs": 394,
+            "stderr": "",
+            "stdout": "ok - work-settings behavior\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:36:53.615Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:582a4eeb8c541fe203dd76a70975ad348e84c61c9f33032004957c096410e5c4"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "ebc376eeaa1ff028a5f48b76a8bb44faed77624c3f2d91de83370bda08559b0c"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "detail": "node scripts/test-work-settings.mjs",
+          "id": "design-settings",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-settings.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:37:32.900Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:d3f38723f47a512e9f0aad4cf43f6d8474dbe9acaff5809c015b4eb7a4e95fa7"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "75c47d6a9119a75667fb1a0bc2203a8e6e7bf5eee8486030871618a132f1bc4b"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "detail": "node scripts/test-work-dialogs.mjs",
+          "id": "design-review-dialog",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-dialogs.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:37:32.903Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:d3f38723f47a512e9f0aad4cf43f6d8474dbe9acaff5809c015b4eb7a4e95fa7"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "design-revision-state",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:37:32.905Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:d3f38723f47a512e9f0aad4cf43f6d8474dbe9acaff5809c015b4eb7a4e95fa7"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "ebc376eeaa1ff028a5f48b76a8bb44faed77624c3f2d91de83370bda08559b0c"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "detail": "node scripts/test-work-settings.mjs",
+          "id": "design-settings",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-settings.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:39:28.580Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:d3f38723f47a512e9f0aad4cf43f6d8474dbe9acaff5809c015b4eb7a4e95fa7"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "75c47d6a9119a75667fb1a0bc2203a8e6e7bf5eee8486030871618a132f1bc4b"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "detail": "node scripts/test-work-dialogs.mjs",
+          "id": "design-review-dialog",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-dialogs.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:39:28.583Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:d3f38723f47a512e9f0aad4cf43f6d8474dbe9acaff5809c015b4eb7a4e95fa7"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "998c5634983e8f866a42f74d01020d0e7305a459caada2753178c890afd7739a",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "design-revision-state",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:39:28.584Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:d3f38723f47a512e9f0aad4cf43f6d8474dbe9acaff5809c015b4eb7a4e95fa7"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-7.4",
       "implementationScope": {
         "discoveryAllowed": false,
@@ -14286,13 +14587,16 @@
         "wo:vertical-slice"
       ],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U4\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Scoped settings and human review/revision loop\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Scoped settings and human review/revision loop\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work."
+        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U4\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Scoped settings and human review/revision loop\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Scoped settings and human review/revision loop\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
+        "wo:review-scope {\"files\":[\"extensions/opendesign-client.js\",\"extensions/work-dialogs.js\",\"extensions/work-models.js\",\"scripts/test-work-design.mjs\",\"scripts/test-work-dialogs.mjs\",\"scripts/test-work-settings.mjs\"],\"fingerprint\":\"852b965e12da42d210347675a1f3b02b2f70675b32cb1d2647ac913fdc389a96\"}",
+        "wo:review PASS scoped diff (6 files) satisfies acceptance: settings default off/inherit/reset + credential-rejecting command spec, disabled-row handling in TUI+native showListDialog, revise/sync/approve/fallback/cancel with new persisted requestId and evidence-preserving cancel, no new command surface; test-work-settings/dialogs/design all pass locally",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-settings.mjs && node scripts/test-work-dialogs.mjs && node scripts/test-work-design.mjs\nOutput: design-settings:ok - work-settings behavior\ndesign-review-dialog:ok - shared work dialogs\ndesign-revision-state:work-design tests passed"
       ],
       "parentId": "work-7",
-      "status": "open",
+      "status": "closed",
       "title": "U4: Scoped settings and human review/revision loop",
       "type": "task",
-      "updatedAt": "2026-08-31T09:34:02.448Z",
+      "updatedAt": "2026-08-31T11:39:28.873Z",
       "verificationContract": {
         "required": [
           {
@@ -14351,7 +14655,8 @@
           }
         ],
         "version": 1
-      }
+      },
+      "verificationRevision": "workspace-sha256:d3f38723f47a512e9f0aad4cf43f6d8474dbe9acaff5809c015b4eb7a4e95fa7"
     },
     "work-7.5": {
       "acceptance": "Remote fingerprint changes fetch only expected files; invalid output receives one repair and remains resumable after a second failure.\nOpenDesign contributes only bounded Markdown/JSON; licensed images enter docs/designs only from repository-local or browser-adapter sources, while executable/prototype files, traversal, symlinks, devices, remote binaries, and unknown-license production assets fail closed.\nApproval syncs first and pins exact owner/brief/handoff/fingerprint/revision; any authority change invalidates it.\nwo:design notes/document references preserve backward/forward lineage without changing work-store schema or overloading brainstorm-path.",
@@ -14808,7 +15113,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T11:03:28.133Z"
+    "updatedAt": "2026-08-31T11:39:28.874Z"
   },
   "schemaVersion": 1
 }

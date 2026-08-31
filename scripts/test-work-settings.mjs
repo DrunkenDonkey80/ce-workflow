@@ -56,6 +56,12 @@ try {
 		"existing settings migrate to risk-based production review",
 	);
 	assert(
+		mod.workOrchSettings(cwd).visualDesignWorkflow === "off" &&
+			!mod.workOrchSettings(cwd).openDesignCommand &&
+			mod.workOrchSettings(cwd).designReviewProof === "standard",
+		"visual design settings default to Off, Auto executable, and Standard proof",
+	);
+	assert(
 		JSON.stringify(mod.workPerformanceSettings(cwd)) ===
 			JSON.stringify({
 				prepareNextCandidate: false,
@@ -561,6 +567,9 @@ try {
 		"› Advisor 2: Main model:none",
 		"› Advisor 3: Main model:none",
 		"creative sidecar: ask",
+		"workflow: off",
+		"OpenDesign executable: Auto",
+		"review proof: standard",
 		"advisor usage for slice plans: all",
 		"Planner writes slice plan before work",
 		"Agent slice planner for messy/large slices",
@@ -583,6 +592,90 @@ try {
 		"status removes the retired inline/agent option",
 	);
 	assert(existsSync(settingsFile()), "settings file exists");
+
+	const chooseDesignSetting = async (row, submenu, option, input) => {
+		let mainVisits = 0;
+		return invoke("work-settings", "", {
+			...ctx,
+			mode: "rpc",
+			ui: {
+				notify: ctx.ui.notify,
+				input,
+				select: async (title, labels) => {
+					if (title === "Settings: Global" && mainVisits++ === 0)
+						return labels.find((label) => label.includes(row));
+					if (title === submenu)
+						return labels.find((label) => label.includes(option));
+				},
+			},
+		});
+	};
+	await chooseDesignSetting(
+		"Visual design workflow:",
+		"Visual design workflow",
+		"Auto",
+	);
+	await chooseDesignSetting(
+		"OpenDesign executable:",
+		"OpenDesign executable",
+		"Configure command spec",
+		async () =>
+			JSON.stringify({
+				command: "od",
+				args: ["mcp"],
+				env: { OD_HOST: "local" },
+			}),
+	);
+	await chooseDesignSetting(
+		"Design review proof:",
+		"Design review proof",
+		"Strict",
+	);
+	let designSettings = readGlobalSettings().workOrchestrator;
+	assert(
+		designSettings.visualDesignWorkflow === "auto" &&
+			designSettings.designReviewProof === "strict" &&
+			designSettings.openDesignCommand.command === "od" &&
+			designSettings.openDesignCommand.env.OD_HOST === "local",
+		"global visual design settings persist a validated structured command spec",
+	);
+
+	const projectDesignBase = readSettings().workOrchestrator;
+	writeSettings({
+		...readSettings(),
+		workOrchestrator: {
+			...projectDesignBase,
+			visualDesignWorkflow: "required",
+		},
+	});
+	assert(
+		mod.workOrchSettings(cwd).visualDesignWorkflow === "required" &&
+			mod.workOrchSettings(cwd).designReviewProof === "strict" &&
+			mod.workOrchSettings(cwd).openDesignCommand.command === "od",
+		"project workflow override inherits global launch and proof settings",
+	);
+	writeSettings({ ...readSettings(), workOrchestrator: projectDesignBase });
+	assert(
+		mod.workOrchSettings(cwd).visualDesignWorkflow === "auto",
+		"clearing the project workflow override restores the global value",
+	);
+
+	const designNoticeCount = notices.length;
+	await chooseDesignSetting(
+		"OpenDesign executable:",
+		"OpenDesign executable",
+		"Configure command spec",
+		async () =>
+			JSON.stringify({ command: "od", env: { API_KEY: "do-not-store" } }),
+	);
+	designSettings = readGlobalSettings().workOrchestrator;
+	assert(
+		designSettings.openDesignCommand.env.OD_HOST === "local" &&
+			notices
+				.slice(designNoticeCount)
+				.every(({ message }) => !message.includes("do-not-store")),
+		"credential-bearing command specs are rejected without logging or persistence",
+	);
 
 	let profileMenuVisits = 0;
 	let profileChoices = [];

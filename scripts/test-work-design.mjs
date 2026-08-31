@@ -29,6 +29,8 @@ import {
 	buildWorkRedesignState,
 	buildWorkResumeState,
 	prepareDesignSession,
+	designReviewChoices,
+	reviewDesignSession,
 	substantialUiWork,
 	waiveDesignSession,
 } from "../extensions/work-models.js";
@@ -377,6 +379,78 @@ try {
 			},
 		);
 		assert.equal(reconciled.designSession.state, "review_ready");
+		assert.equal(
+			designReviewChoices(reconciled.designSession).find(
+				(choice) => choice.value === "approve",
+			).disabled,
+			true,
+			"review keeps approval disabled until a synchronized handoff exists",
+		);
+		const projectedReview = await reviewDesignSession(
+			lifecycleRoot,
+			redesign.epic.id,
+			{ ui: {} },
+		);
+		assert.equal(projectedReview.action, "design-review-ready");
+		assert.ok(
+			projectedReview.choices.some((choice) => choice.value === "revise"),
+			"headless review projects the same actions",
+		);
+
+		const firstRequestId = reconciled.designSession.requestId;
+		const revised = await reviewDesignSession(
+			lifecycleRoot,
+			redesign.epic.id,
+			{
+				mode: "rpc",
+				ui: {
+					select: async (_title, labels) =>
+						labels.find((label) => label.includes("Request changes")),
+					input: async () => "Increase contrast and preserve the recovery states.",
+				},
+			},
+			{
+				callTool: async (tool, args) => {
+					assert.equal(tool, "start_run");
+					assert.equal(args.project, reconciled.designSession.projectId);
+					assert.notEqual(args.requestId, firstRequestId);
+					const durable = loadDesignSession(lifecycleRoot, redesign.epic.id);
+					assert.equal(durable.state, "run_pending");
+					assert.equal(durable.requestId, args.requestId);
+					return { runId: "revision-run" };
+				},
+			},
+		);
+		assert.equal(revised.action, "design-revision-started");
+		assert.equal(revised.designSession.revision, 1);
+		assert.equal(revised.designSession.state, "run_active");
+		const revisionReady = await advanceDesignSession(
+			lifecycleRoot,
+			redesign.epic.id,
+			{
+				callTool: async () => ({
+					status: "succeeded",
+					previewUrl: "https://example.test/revision",
+					studioUrl: "https://example.test/studio-revision",
+					agentMessage: "Revision ready",
+				}),
+			},
+		);
+		assert.equal(revisionReady.designSession.state, "review_ready");
+		const canceled = await reviewDesignSession(lifecycleRoot, redesign.epic.id, {
+			mode: "rpc",
+			ui: {
+				select: async (_title, labels) =>
+					labels.find((label) => label.includes("Cancel design")),
+			},
+		});
+		assert.equal(canceled.designSession.state, "canceled");
+		assert.equal(
+			canceled.designSession.previewUrl,
+			"https://example.test/revision",
+		);
+		assert.match(canceled.designSession.feedback, /Increase contrast/);
+		assert.match(canceled.designSession.canceledReason, /human canceled/);
 
 		const interruptedBrief = "docs/designs/interrupted/DESIGN-BRIEF.md";
 		fs.mkdirSync(path.dirname(path.join(lifecycleRoot, interruptedBrief)), {

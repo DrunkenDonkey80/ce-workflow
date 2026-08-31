@@ -306,6 +306,43 @@ const special = await drive(
 assert.equal(special.action, "clear");
 assert.equal(special.item.value, "alpha");
 
+const disabledWarnings = [];
+let disabledResult;
+await showListDialog(
+	{
+		mode: "tui",
+		ui: {
+			notify: (message) => disabledWarnings.push(message),
+			custom: async (factory) => {
+				const component = factory(
+					{ requestRender() {} },
+					theme,
+					keybindings,
+					(value) => (disabledResult = value),
+				);
+				component.handleInput("enter");
+				assert.equal(disabledResult, undefined, "disabled TUI row stays open");
+				component.handleInput("down");
+				component.handleInput("enter");
+			},
+		},
+	},
+	{
+		title: "Disabled",
+		items: [
+			{
+				value: "approve",
+				label: "Approve",
+				disabled: true,
+				disabledReason: "Sync the handoff first.",
+			},
+			{ value: "cancel", label: "Cancel" },
+		],
+	},
+);
+assert.equal(disabledResult.value, "cancel");
+assert.deepEqual(disabledWarnings, ["Sync the handoff first."]);
+
 let nativeLabels;
 const native = await showListDialog(
 	{
@@ -327,6 +364,32 @@ const native = await showListDialog(
 assert.equal(native.value, "roadmaps");
 assert(nativeLabels[0].includes("Roadmaps — Browse work"));
 assert.doesNotMatch(nativeLabels[0], /\p{Extended_Pictographic}/u);
+
+const nativeDisabledWarnings = [];
+let nativeDisabledSelections = 0;
+const nativeEnabled = await showListDialog(
+	{
+		mode: "rpc",
+		ui: {
+			notify: (message) => nativeDisabledWarnings.push(message),
+			select: async (_title, labels) => labels[nativeDisabledSelections++],
+		},
+	},
+	{
+		title: "Native disabled",
+		items: [
+			{
+				value: "approve",
+				label: "Approve",
+				disabled: true,
+				disabledReason: "Sync the handoff first.",
+			},
+			{ value: "cancel", label: "Cancel" },
+		],
+	},
+);
+assert.equal(nativeEnabled.value, "cancel");
+assert.deepEqual(nativeDisabledWarnings, ["Sync the handoff first."]);
 
 const initialFrame = {
 	ok: true,

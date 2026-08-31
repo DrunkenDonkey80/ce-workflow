@@ -134,6 +134,7 @@ import {
 } from "./workflow-telemetry.js";
 import {
 	callOpenDesignTool,
+	normalizeOpenDesignCommandSpec,
 	openDesignPayloadDigest,
 	reconcileCreatedProject,
 } from "./opendesign-client.js";
@@ -143,6 +144,7 @@ import {
 	loadDesignSession,
 	renderCurrentUiAudit,
 	renderDesignBrief,
+	renderDesignRevisionPrompt,
 	saveDesignSession,
 	transitionDesignSession,
 } from "./work-design.js";
@@ -3936,8 +3938,21 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	const creativeMode = CREATIVE_MODES.includes(raw.creativeMode)
 		? raw.creativeMode
 		: "ask";
+	const visualDesignWorkflow = ["off", "auto", "required"].includes(
+		raw.visualDesignWorkflow,
+	)
+		? raw.visualDesignWorkflow
+		: "off";
+	const designReviewProof = ["standard", "strict"].includes(
+		raw.designReviewProof,
+	)
+		? raw.designReviewProof
+		: "standard";
 	return {
 		profile,
+		visualDesignWorkflow,
+		openDesignCommand: raw.openDesignCommand,
+		designReviewProof,
 		modelStrategy: MODEL_STRATEGIES.includes(raw.modelStrategy)
 			? raw.modelStrategy
 			: "main-first",
@@ -3992,6 +4007,27 @@ function setWorkOrchReviewPolicy(settings, value) {
 function setWorkOrchCreativeMode(settings, value) {
 	const block = workOrchBlock(settings);
 	block.creativeMode = CREATIVE_MODES.includes(value) ? value : "ask";
+}
+
+function setDesignWorkflowSetting(settings, value) {
+	workOrchBlock(settings).visualDesignWorkflow = [
+		"off",
+		"auto",
+		"required",
+	].includes(value)
+		? value
+		: "off";
+}
+
+function setOpenDesignCommandSetting(settings, value) {
+	const block = workOrchBlock(settings);
+	if (value) block.openDesignCommand = normalizeOpenDesignCommandSpec(value);
+	else delete block.openDesignCommand;
+}
+
+function setDesignReviewProofSetting(settings, value) {
+	workOrchBlock(settings).designReviewProof =
+		value === "strict" ? value : "standard";
 }
 
 function setWorkOrchAdvisorSliceUsage(settings, value) {
@@ -12578,6 +12614,239 @@ export function waiveDesignSession(cwd, ownerId) {
 			"OpenDesign was explicitly waived; the text-only design still requires human approval.",
 		suggestedCommands: [`/wo design approve ${ownerId}`],
 	};
+}
+
+export function designReviewChoices(session) {
+	const synced =
+		session.state === "approval_required" &&
+		Boolean(session.handoffHash) &&
+		Boolean(session.remoteFingerprintHash);
+	return [
+		{
+			value: "preview",
+			label: "Open Preview",
+			description: session.previewUrl || "No Preview URL is available yet.",
+			disabled: !session.previewUrl,
+			disabledReason: "No Preview URL is available yet.",
+		},
+		{
+			value: "studio",
+			label: "Open Studio",
+			description: session.studioUrl || "No Studio URL is available yet.",
+			disabled: !session.studioUrl,
+			disabledReason: "No Studio URL is available yet.",
+		},
+		{
+			value: "revise",
+			label: "Request changes",
+			description: "Commission a new run in this OpenDesign project.",
+		},
+		{
+			value: "sync",
+			label: "Sync design artifacts",
+			description: "Fetch and validate the latest authoritative handoff.",
+			disabled: session.state !== "review_ready",
+			disabledReason: "Sync is only available when an OpenDesign run is ready.",
+		},
+		{
+			value: "approve",
+			label: "Approve design",
+			description: synced
+				? "Pin approval to the synchronized handoff and remote fingerprint."
+				: "Synchronize a valid handoff before approval.",
+			disabled: !synced,
+			disabledReason: "Synchronize a valid handoff before approval.",
+		},
+		{
+			value: "fallback",
+			label: "Use text fallback / waiver",
+			description:
+				"Preserve the brief as authority and require explicit approval.",
+			disabled: session.state !== "review_ready",
+			disabledReason: "This session already uses the text approval path.",
+		},
+		{
+			value: "cancel",
+			label: "Cancel design",
+			description: "Keep all evidence and mark the design uncertainty unresolved.",
+		},
+	];
+}
+
+export async function reviseDesignSession(
+	cwd,
+	ownerId,
+	feedback,
+	options = {},
+) {
+	let session = tryLoadDesignSession(cwd, ownerId);
+	if (!session)
+		return errorState(
+			"design-not-found",
+			`No design session exists for ${ownerId}.`,
+			{
+				action: "design-not-found",
+			},
+		);
+	if (!["review_ready", "approval_required"].includes(session.state))
+		return errorState(
+			"design-revision-invalid",
+			`Design session ${ownerId} cannot be revised from ${session.state}.`,
+			{ action: "design-revision-invalid" },
+		);
+	const requestId = randomUUID();
+	const startPayload = {
+		project: session.projectId,
+		prompt: renderDesignRevisionPrompt(
+			feedback,
+			session.acceptedFacts,
+			session.constraints,
+		),
+		requestId,
+	};
+	session = transitionDesignSession(session, "run_pending", {
+		revision: session.revision + 1,
+		requestId,
+		startPayload,
+		payloadDigest: openDesignPayloadDigest(startPayload),
+		feedback: String(feedback).slice(0, 4_000),
+		runId: undefined,
+		nextAction: `/wo design ${ownerId}`,
+	});
+	saveDesignSession(cwd, session);
+	try {
+		const callTool =
+			options.callTool ??
+			((tool, args) => callOpenDesignTool({ ...options, tool, args }));
+		const started = await callTool("start_run", startPayload);
+		session = transitionDesignSession(session, "run_active", {
+			runId: started.runId,
+			nextAction: `/wo design ${ownerId}`,
+		});
+		saveDesignSession(cwd, session);
+		return {
+			ok: true,
+			action: "design-revision-started",
+			designSession: session,
+			message: `OpenDesign revision ${session.revision} started; resume later.`,
+			suggestedCommands: [`/wo design ${ownerId}`],
+		};
+	} catch (cause) {
+		return {
+			ok: false,
+			action: "design-revision-pending",
+			designSession: session,
+			message: "The revision request is saved and can be resumed safely.",
+			suggestedCommands: [`/wo design ${ownerId}`],
+			cause,
+		};
+	}
+}
+
+export async function reviewDesignSession(cwd, ownerId, ctx, options = {}) {
+	for (;;) {
+		let session = tryLoadDesignSession(cwd, ownerId);
+		if (!session)
+			return errorState(
+				"design-not-found",
+				`No design session exists for ${ownerId}.`,
+				{
+					action: "design-not-found",
+				},
+			);
+		if (!["review_ready", "approval_required"].includes(session.state))
+			return errorState(
+				"design-review-invalid",
+				`Design session ${ownerId} cannot be reviewed from ${session.state}.`,
+				{ action: "design-review-invalid" },
+			);
+		const choices = designReviewChoices(session);
+		if (!ctx?.ui?.select && !ctx?.ui?.custom)
+			return {
+				ok: true,
+				action: "design-review-ready",
+				designSession: session,
+				choices,
+				message: `Review ${session.previewUrl || session.studioUrl || "the text design"}; choose revise, sync, fallback, or cancel.`,
+				suggestedCommands: [`/wo design review ${ownerId}`],
+			};
+		const selected = await showListDialog(ctx, {
+			title: "Review visual design",
+			purpose:
+				"Inspect the direction, then revise, synchronize, approve, waive, or cancel.",
+			items: choices,
+			cursorKey: `design-review:${ownerId}`,
+			selectOnSpace: true,
+			descriptionMinLines: 1,
+		});
+		if (!selected)
+			return {
+				ok: true,
+				action: "design-review-back",
+				designSession: session,
+				message: "Design review left unchanged.",
+				suggestedCommands: [`/wo design review ${ownerId}`],
+			};
+		if (["preview", "studio"].includes(selected.value)) {
+			const url =
+				selected.value === "preview" ? session.previewUrl : session.studioUrl;
+			(options.openUrl ?? openUsageReport)(url);
+			continue;
+		}
+		if (selected.value === "revise") {
+			const feedback = await ctx.ui.input?.("Requested design changes", "");
+			if (!String(feedback ?? "").trim()) continue;
+			return reviseDesignSession(cwd, ownerId, feedback, options);
+		}
+		if (selected.value === "sync") {
+			session = transitionDesignSession(session, "sync_required", {
+				nextAction: `/wo design sync ${ownerId}`,
+			});
+			saveDesignSession(cwd, session);
+			return {
+				ok: true,
+				action: "design-sync-required",
+				designSession: session,
+				message: "Design synchronization is required before approval.",
+				suggestedCommands: [`/wo design sync ${ownerId}`],
+			};
+		}
+		if (selected.value === "fallback") {
+			session = transitionDesignSession(session, "approval_required", {
+				fallback: "explicit-text-only-waiver",
+				nextAction: `/wo design approve ${ownerId}`,
+			});
+			saveDesignSession(cwd, session);
+			return {
+				ok: true,
+				action: "design-waived-to-text",
+				designSession: session,
+				message: "The text-only design now requires explicit human approval.",
+				suggestedCommands: [`/wo design approve ${ownerId}`],
+			};
+		}
+		if (selected.value === "approve")
+			return {
+				ok: true,
+				action: "design-approval-required",
+				designSession: session,
+				message: "Approve the synchronized design.",
+				suggestedCommands: [`/wo design approve ${ownerId}`],
+			};
+		session = transitionDesignSession(session, "canceled", {
+			canceledReason: "human canceled during review",
+			nextAction: undefined,
+		});
+		saveDesignSession(cwd, session);
+		return {
+			ok: true,
+			action: "design-canceled",
+			designSession: session,
+			message:
+				"Design canceled; evidence was preserved and uncertainty remains explicit.",
+			suggestedCommands: [],
+		};
+	}
 }
 
 export async function advanceDesignSession(cwd, ownerId, options = {}) {
@@ -25329,6 +25598,8 @@ async function executeOrchestratorAction(
 			let state;
 			if (action === "waive") {
 				state = waiveDesignSession(ctx.cwd, target);
+			} else if (action === "review") {
+				state = await reviewDesignSession(ctx.cwd, target, ctx, options);
 			} else if (action === "prepare") {
 				const session = tryLoadDesignSession(ctx.cwd, target);
 				if (session) {
@@ -25353,7 +25624,7 @@ async function executeOrchestratorAction(
 					? await advanceDesignSession(ctx.cwd, ownerId, options)
 					: errorState(
 							"usage",
-							"Usage: /wo design [prepare|resume] <work-item-id>",
+							"Usage: /wo design [prepare|resume|review] <work-item-id>",
 							{ action: "usage" },
 						);
 			}
@@ -27169,6 +27440,11 @@ function workSettingsStatus(ctx) {
 		"  generators reuse Advisor 1–3 models; configured advisors critique the merged result",
 		`  ${onOff(resolved[PRE_BRAINSTORM_ADVISORS])} background advisor research before brainstorm`,
 		"",
+		"Visual design",
+		`  ${SUBMENU_ARROW} workflow: ${resolved.visualDesignWorkflow}`,
+		`  ${SUBMENU_ARROW} OpenDesign executable: ${resolved.openDesignCommand ? "configured" : "Auto"}`,
+		`  ${SUBMENU_ARROW} review proof: ${resolved.designReviewProof}`,
+		"",
 		"Background verifiers",
 		...(backgroundVerifierProfiles(ctx.cwd).length
 			? backgroundVerifierProfiles(ctx.cwd).map(
@@ -27336,6 +27612,9 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "backgroundVerifiers")
 		return owns(block, "backgroundVerifiers");
 	if (item.kind === "creativeMode") return owns(block, "creativeMode");
+	if (item.kind === "designWorkflow") return owns(block, "visualDesignWorkflow");
+	if (item.kind === "openDesignCommand") return owns(block, "openDesignCommand");
+	if (item.kind === "designReviewProof") return owns(block, "designReviewProof");
 	if (item.kind === "advisorSliceUsage")
 		return owns(block, "advisorUsageForSlicePlans");
 	if (item.kind === "reviewLevel") return owns(block, "codeReviewBeforeCommit");
@@ -27390,6 +27669,9 @@ function clearProjectOverride(settings, item) {
 	else if (item.kind === "profile") clearProfileOverride(settings);
 	else if (item.kind === "backgroundVerifiers") delete block.backgroundVerifiers;
 	else if (item.kind === "creativeMode") delete block.creativeMode;
+	else if (item.kind === "designWorkflow") delete block.visualDesignWorkflow;
+	else if (item.kind === "openDesignCommand") delete block.openDesignCommand;
+	else if (item.kind === "designReviewProof") delete block.designReviewProof;
 	else if (item.kind === "advisorSliceUsage")
 		delete block.advisorUsageForSlicePlans;
 	else if (item.kind === "reviewLevel") delete block.codeReviewBeforeCommit;
@@ -27532,6 +27814,26 @@ async function workSettingsLoop(ctx) {
 				label: `Creative sidecar: ${titleCase(resolved.creativeMode)} ${SUBMENU_ARROW}`,
 				description:
 					"3 isolated generators reuse Advisor 1–3 models; advisors critique the merged result",
+			},
+			{
+				kind: "designWorkflow",
+				value: "visualDesignWorkflow",
+				label: `Visual design workflow: ${resolved.visualDesignWorkflow === "required" ? "Required for UI" : titleCase(resolved.visualDesignWorkflow)} ${SUBMENU_ARROW}`,
+				description:
+					"Off, Auto fallback, or required approval for substantial UI work",
+			},
+			{
+				kind: "openDesignCommand",
+				value: "openDesignCommand",
+				label: `OpenDesign executable: ${resolved.openDesignCommand ? "Configured" : "Auto"} ${SUBMENU_ARROW}`,
+				description:
+					"Auto discovery or a validated command/args/env JSON spec; credentials are rejected",
+			},
+			{
+				kind: "designReviewProof",
+				value: "designReviewProof",
+				label: `Design review proof: ${titleCase(resolved.designReviewProof)} ${SUBMENU_ARROW}`,
+				description: "Standard evidence, or Strict with final human approval proof",
 			},
 			{
 				kind: "performance",
@@ -27721,6 +28023,104 @@ async function workSettingsLoop(ctx) {
 			setWorkOrchCreativeMode(settings, mode);
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Creative sidecar: ${mode}`, "info");
+			continue;
+		}
+		if (pick.kind === "designWorkflow") {
+			const policy = await choose(
+				ctx,
+				"Visual design workflow",
+				[
+					{ value: "off", label: "Off", description: "No OpenDesign lifecycle" },
+					{
+						value: "auto",
+						label: "Auto",
+						description:
+							"Use OpenDesign when available, otherwise require text approval",
+					},
+					{
+						value: "required",
+						label: "Required for UI",
+						description: "Block substantial UI planning until approved or waived",
+					},
+				],
+				resolved.visualDesignWorkflow,
+			);
+			if (!policy) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			setDesignWorkflowSetting(settings, policy);
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Visual design workflow: ${policy}`, "info");
+			continue;
+		}
+		if (pick.kind === "openDesignCommand") {
+			const mode = await choose(
+				ctx,
+				"OpenDesign executable",
+				[
+					{
+						value: "auto",
+						label: "Auto",
+						description: "Use OD_BIN or verified PATH discovery",
+					},
+					{
+						value: "configured",
+						label: "Configure command spec",
+						description:
+							"Paste command, args, and optional non-secret environment JSON",
+					},
+				],
+				resolved.openDesignCommand ? "configured" : "auto",
+			);
+			if (!mode) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			if (mode === "auto") {
+				setOpenDesignCommandSetting(settings, null);
+			} else {
+				const input = await ctx.ui.input?.(
+					"OpenDesign command spec JSON",
+					'{"command":"od","args":["mcp"]}',
+				);
+				if (!input) continue;
+				try {
+					setOpenDesignCommandSetting(settings, JSON.parse(input));
+				} catch (error) {
+					ctx.ui.notify(
+						`Invalid OpenDesign command spec: ${error instanceof Error ? error.message : "invalid input"}`,
+						"error",
+					);
+					continue;
+				}
+			}
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(
+				`OpenDesign executable: ${mode === "auto" ? "Auto" : "configured"}`,
+				"info",
+			);
+			continue;
+		}
+		if (pick.kind === "designReviewProof") {
+			const proof = await choose(
+				ctx,
+				"Design review proof",
+				[
+					{
+						value: "standard",
+						label: "Standard",
+						description: "Automated fidelity evidence",
+					},
+					{
+						value: "strict",
+						label: "Strict",
+						description: "Also require final human approval proof",
+					},
+				],
+				resolved.designReviewProof,
+			);
+			if (!proof) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			setDesignReviewProofSetting(settings, proof);
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Design review proof: ${proof}`, "info");
 			continue;
 		}
 		if (pick.kind === "advisorSliceUsage") {

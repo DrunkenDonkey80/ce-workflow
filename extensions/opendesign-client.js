@@ -130,12 +130,32 @@ function normalizeCommandSpec(spec, source) {
 	) {
 		throw error("invalid-command", `${source}.args must be bounded strings`);
 	}
-	assertNoCredentials(args, `${source}.args`);
-	return {
+	const env = spec.env ?? {};
+	if (
+		!plainObject(env) ||
+		Object.keys(env).length > 32 ||
+		Object.entries(env).some(
+			([key, value]) =>
+				!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ||
+				typeof value !== "string" ||
+				value.length > 4_000,
+		)
+	)
+		throw error(
+			"invalid-command",
+			`${source}.env must contain bounded environment strings`,
+		);
+	const normalized = {
 		command,
 		args: [...args],
-		env: plainObject(spec.env) ? spec.env : undefined,
+		...(Object.keys(env).length ? { env: { ...env } } : {}),
 	};
+	assertNoCredentials(normalized, source);
+	return normalized;
+}
+
+export function normalizeOpenDesignCommandSpec(spec) {
+	return normalizeCommandSpec(spec, "commandSpec");
 }
 
 export function resolveOpenDesignCommand(options = {}) {
@@ -144,7 +164,7 @@ export function resolveOpenDesignCommand(options = {}) {
 	let spec;
 	let source;
 	if (options.commandSpec) {
-		spec = normalizeCommandSpec(options.commandSpec, "commandSpec");
+		spec = normalizeOpenDesignCommandSpec(options.commandSpec);
 		source = "configured";
 	} else if (env.OD_BIN) {
 		spec = normalizeCommandSpec({ command: env.OD_BIN, args: ["mcp"] }, "OD_BIN");
