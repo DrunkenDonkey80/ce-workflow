@@ -13429,16 +13429,23 @@
       "documentLinks": {
         "design": "docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-7",
       "labels": [],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md"
+        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md",
+        "All eight OpenDesign lifecycle slices closed; final npm run verify:quiet PASS at 126b7dc.",
+        "wo:verify-check FAIL\nCommand: node scripts/work-helper.mjs work-summary work-7\net`; real provider billing is never implied by offline PASS.\\\",\\n  \\\"evidence_tail\\\": [],\\n  \\\"verificationStatus\\\": {\\n    \\\"required\\\": false,\\n    \\\"ok\\\": true,\\n    \\\"missing\\\": [],\\n    \\\"blocked\\\": [],\\n    \\\"stale\\\": [],\\n    \\\"untrusted\\\": [],\\n    \\\"waived\\\": []\\n  },\\n  \\\"notes_tail\\\": \\\"created by /work-plan\\\\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\\\\nAll eight OpenDesign lifecycle slices closed; final npm run verify:quiet PASS at 126b7dc.\\\"\\n}\"",
+        "wo:verify-check PASS\nCommand: json-assert .ce-workflow/work-items.json\nOutput: all JSON assertions passed"
       ],
-      "status": "open",
+      "status": "closed",
       "title": "First-class resumable OpenDesign lifecycle",
       "type": "epic",
-      "updatedAt": "2026-08-31T09:34:02.396Z"
+      "updatedAt": "2026-08-31T13:02:53.007Z"
     },
     "work-7.1": {
       "acceptance": "Every lifecycle transition and persisted field is bounded/versioned and illegal transitions fail closed.\nHandoff v1 validation covers required structure, enums, caps, IDs, colors, viewports, paths, executable fields, provenance, and empty open questions.\nCanonical hashes are key-order stable; changed brief/handoff/fingerprint/owner/revision invalidates approval.\nText fallback and one-pass repair state are represented without a provider dependency.",
@@ -16233,7 +16240,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T13:01:32.758Z"
+    "updatedAt": "2026-08-31T13:02:53.008Z"
   },
   "schemaVersion": 1
 }
