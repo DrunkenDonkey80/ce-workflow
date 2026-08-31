@@ -207,6 +207,7 @@ const normalPaths = [
 	"scripts/work-command-fixture.mjs",
 	"skills/work-orchestrator/SKILL.md",
 	"skills/work-orchestrator/references/full-policy.md",
+	"skills/work-design-handoff/SKILL.md",
 	"README.md",
 	"docs/orchestrator.md",
 	"docs/orchestrator_idea.md",
@@ -230,6 +231,17 @@ for (const rel of normalPaths) {
 	);
 }
 
+const designHandoffSkill = read("skills/work-design-handoff/SKILL.md");
+check(
+	"design handoff skill is bounded to approved artifacts and existing orchestration",
+	designHandoffSkill.includes(
+		"adds no command, provider call, or orchestration loop",
+	) &&
+		designHandoffSkill.includes("prototype code as reference only") &&
+		designHandoffSkill.includes("wo:design-deviation") &&
+		!designHandoffSkill.includes("API key:"),
+);
+
 const learningPolicy = read(
 	"skills/work-orchestrator/references/full-policy.md",
 );
@@ -248,6 +260,7 @@ const userFacingDocs = [
 	"docs/orchestrator_idea.md",
 	"skills/work-orchestrator/SKILL.md",
 	"skills/work-orchestrator/references/full-policy.md",
+	"skills/work-design-handoff/SKILL.md",
 	...agentFiles.map((name) => `agents/${name}`),
 ];
 const staleRoadmapTerms = userFacingDocs.flatMap((rel) =>

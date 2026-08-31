@@ -61,6 +61,7 @@ try {
 		},
 	});
 	const cases = [
+		entry("package-manager", "command", "output", "npm --version", []),
 		entry(
 			"csv",
 			"command",

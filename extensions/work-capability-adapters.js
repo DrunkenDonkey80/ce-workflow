@@ -77,6 +77,19 @@ function commandParts(value) {
 	for (const match of String(value).matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g))
 		parts.push(match[1] ?? match[2] ?? match[3]);
 	if (!parts.length) throw new Error("adapter command is empty");
+	if (
+		process.platform === "win32" &&
+		new Set(["npm", "npx"]).has(parts[0].toLowerCase())
+	) {
+		const cli = path.join(
+			path.dirname(process.execPath),
+			"node_modules",
+			"npm",
+			"bin",
+			`${parts[0].toLowerCase()}-cli.js`,
+		);
+		if (existsSync(cli)) return [process.execPath, cli, ...parts.slice(1)];
+	}
 	return parts;
 }
 

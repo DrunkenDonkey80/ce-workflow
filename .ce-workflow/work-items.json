@@ -16070,7 +16070,93 @@
         "schemaVersion": 1,
         "title": "Package, document, and harden the design lifecycle"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "e88f592bb099a057127477424b843e34816b20e2e127cab1e722d73ae7874bdd",
+          "detail": "spawnSync npm ENOENT",
+          "id": "package-regression",
+          "kind": "verification-proof",
+          "operation": {
+            "command": "npm run verify:quiet",
+            "cwd": ".",
+            "durationMs": 1,
+            "stderr": "",
+            "stdout": ""
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:54:10.188Z",
+          "status": "FAIL",
+          "targetRevision": "workspace-sha256:63ef3d3d4e8437900c17bcfd7626d5c56dbad83e805dbc7d8f4c8404cff58034"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "e88f592bb099a057127477424b843e34816b20e2e127cab1e722d73ae7874bdd",
+          "id": "package-regression",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "npm run verify:quiet",
+            "cwd": ".",
+            "durationMs": 135138,
+            "stderr": "",
+            "stdout": "\n> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:58:39.716Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:8186a52d8f8853fcdfa970a0705ca3fc30c3f436b78a3b41549e1df27fcd20cf"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "90c0a9b79fe644f270441f262d6662e586daae4b85653219d584c241f84a316c"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "e88f592bb099a057127477424b843e34816b20e2e127cab1e722d73ae7874bdd",
+          "detail": "npm run verify:quiet",
+          "id": "package-regression",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "npm run verify:quiet",
+            "expectedExit": 0,
+            "timeoutMs": 900000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T13:01:32.392Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:000554cc8624fbdeaa0fd4a9991055f60983b056acf51a0d47db19f2cb145de1"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-7.8",
       "implementationScope": {
         "discoveryAllowed": false,
@@ -16106,13 +16192,14 @@
         "wo:vertical-slice"
       ],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U8\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Packaged design handoff, docs, telemetry, and end-to-end hardening\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Packaged design handoff, docs, telemetry, and end-to-end hardening\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work."
+        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U8\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Packaged design handoff, docs, telemetry, and end-to-end hardening\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Packaged design handoff, docs, telemetry, and end-to-end hardening\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
+        "wo:verify-check PASS\nCommand: npm run verify:quiet\nOutput: package-regression:> pi-work-orchestrator@0.1.0 verify:quiet\n> node scripts/verify-package.mjs --quiet\n\nok - package checks passed"
       ],
       "parentId": "work-7",
-      "status": "open",
+      "status": "closed",
       "title": "U8: Packaged design handoff, docs, telemetry, and end-to-end hardening",
       "type": "task",
-      "updatedAt": "2026-08-31T09:34:02.452Z",
+      "updatedAt": "2026-08-31T13:01:32.757Z",
       "verificationContract": {
         "required": [
           {
@@ -16135,7 +16222,8 @@
           }
         ],
         "version": 1
-      }
+      },
+      "verificationRevision": "workspace-sha256:000554cc8624fbdeaa0fd4a9991055f60983b056acf51a0d47db19f2cb145de1"
     }
   },
   "metadata": {
@@ -16145,7 +16233,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T12:44:32.239Z"
+    "updatedAt": "2026-08-31T13:01:32.758Z"
   },
   "schemaVersion": 1
 }

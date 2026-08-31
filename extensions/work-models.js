@@ -146,6 +146,7 @@ import {
 	createDesignSession,
 	designApprovalIsCurrent,
 	designFidelityStatus,
+	designLifecycleTelemetry,
 	designLineageNotes,
 	designSessionPath,
 	hashDesignValue,
@@ -1285,6 +1286,16 @@ function stateTelemetry(state, cwd) {
 		counts: state?.counts,
 		creativeDepth: state?.creativeDepth,
 		creativeGate: state?.creativeGate,
+		design: state?.designSession
+			? designLifecycleTelemetry(state.designSession, {
+					availability:
+						state.action === "design-required-blocked" ? "unavailable" : undefined,
+					clarifications:
+						state.designSession.state === "clarification_required" ? 1 : 0,
+					syncs: state.action?.includes("sync") ? 1 : 0,
+					stale: state.action?.includes("stale") ? 1 : 0,
+				})
+			: undefined,
 		warnings: state?.warnings?.length
 			? { count: state.warnings.length }
 			: undefined,

@@ -810,6 +810,67 @@ export function createDesignFidelityContract({
 	};
 }
 
+export function designLifecycleTelemetry(session, input = {}) {
+	const phase = DESIGN_STATES.includes(session?.state)
+		? session.state
+		: "failed";
+	const policy = ALLOWED_POLICIES.has(session?.policy) ? session.policy : "off";
+	const allowedAvailability = new Set([
+		"not-checked",
+		"available",
+		"unavailable",
+		"fallback",
+	]);
+	const availability = allowedAvailability.has(input.availability)
+		? input.availability
+		: session?.fallback
+			? "fallback"
+			: session?.projectId
+				? "available"
+				: "not-checked";
+	const durationMs = Math.max(
+		0,
+		Math.min(
+			86_400_000,
+			Number(input.durationMs) ||
+				Date.parse(session?.updatedAt ?? "") -
+					Date.parse(session?.createdAt ?? "") ||
+				0,
+		),
+	);
+	const count = (value) =>
+		Math.max(0, Math.min(10_000, Number.isInteger(value) ? value : 0));
+	return {
+		version: 1,
+		eligible: policy !== "off",
+		policy,
+		availability,
+		phase,
+		durationMs,
+		revision: count(session?.revision),
+		counts: {
+			clarifications: count(input.clarifications),
+			repairs: count(session?.repairAttempts),
+			syncs: count(input.syncs),
+			stale: count(input.stale),
+			criteria: count(input.criteria),
+			proofs: count(input.proofs),
+		},
+		fallback: Boolean(session?.fallback),
+		approvalDurationMs:
+			phase === "approved" || phase === "imported" ? durationMs : undefined,
+		cancellationCategory: phase === "canceled" ? "human" : undefined,
+		failureCategory:
+			phase === "failed"
+				? ["protocol", "process", "validation", "unknown"].includes(
+						input.failureCategory,
+					)
+					? input.failureCategory
+					: "unknown"
+				: undefined,
+	};
+}
+
 export function designFidelityStatus(item, contractStatus) {
 	const entries = (item.verificationContract?.required ?? []).filter(
 		(entry) => entry.fidelity?.version === 1,

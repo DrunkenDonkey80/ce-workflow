@@ -38,6 +38,16 @@ If startup prints `pi remove npm:pi-compound-engineering`, the retired legacy pa
 
 Ordinary task actions use one durable `Misc` roadmap when no current roadmap is selected. When another roadmap is current, the UI asks whether new work belongs there or in `Misc`. Dedicated planning, brainstorming, and migration actions still create their own roadmaps. Untargeted **Resume work** falls back to ready `Misc` work and leaves an empty `Misc` idle. A resumable target runs autonomously until its requested scope completes or a real decision, limit, error, or explicit stop pauses it; an explicit child WorkItem ID limits the loop to that item, and questions use the main chat UI.
 
+## Optional OpenDesign workflow
+
+Visual design is **Off by default**. Enable **Auto** or **Required for UI** under `/wo → Settings → Visual design`; choose Standard or Strict review proof there. Configure the OpenDesign launch command only through that Settings entry, using the command/args/env JSON spec shown by OpenDesign Settings. Do not point it at `/usr/bin/od` until confirming that binary is OpenDesign—other packages commonly own that name. No API key belongs in ce-workflow settings.
+
+When enabled for substantial UI work, `/wo redesign <objective>`, `/wo design …`, and `/wo resume` audit, commission, review, synchronize, and approve a design before implementation. OpenDesign may contact its configured provider and network; ce-workflow uses only its local stdio MCP surface and never logs or stores provider credentials. Preview and Studio remain the normal human review surfaces. **Auto** can fall back to a validated text-only handoff when OpenDesign is unavailable; **Required for UI** blocks until recovery or an explicit waiver. Strict additionally requires final human visual approval.
+
+Runtime state is local under `.pi/designs/`; validated brief, handoff, approval, and licensed reference artifacts live under `docs/designs/<owner>/`. Approval is pinned to exact hashes and becomes stale after remote or manual authority changes. Generated prototype code is reference-only and is never imported or executed.
+
+Troubleshooting: use `/wo design sync <id>` for stale or changed output, `/wo design revise <id>` for rejected direction or a recorded implementation deviation, and `/wo design approve <id>` only after review. A missing executable or protocol failure returns a resumable action rather than replaying a mutation. Offline package tests use a fake stdio peer; a real provider smoke is optional and may incur provider charges.
+
 ## Context compaction
 
 ce-workflow formats every Pi compaction locally and deterministically. It selects one of three profiles without a model call: **freeform** preserves the current user request and bounded visible context; **work-resume** rereads the explicitly selected WorkItem, evidence, related decisions, and Git state; **autonomous-goal** rereads the persisted goal and its selected durable work. Successful tool payloads and reasoning are omitted, while failed tool output is bounded and retained.

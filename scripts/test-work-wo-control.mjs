@@ -78,7 +78,7 @@ const ctx = {
 try {
 	assert.deepEqual(
 		commands.wo.getArgumentCompletions("").map(({ value }) => value),
-		["goal", "pause", "resume"],
+		["goal", "pause", "resume", "design", "redesign"],
 	);
 
 	await commands.wo.handler("context-fill", ctx);

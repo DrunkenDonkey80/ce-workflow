@@ -13,6 +13,7 @@ import {
 	createTextFallbackHandoff,
 	designApprovalIsCurrent,
 	designFidelityStatus,
+	designLifecycleTelemetry,
 	designLineageNotes,
 	hashDesignValue,
 	loadDesignSession,
@@ -164,6 +165,50 @@ try {
 		),
 		"fidelity status retains every stale matrix cell and its proof id",
 	);
+	const privateTelemetry = designLifecycleTelemetry(
+		{
+			state: "failed",
+			policy: "required",
+			revision: 3,
+			repairAttempts: 1,
+			createdAt: "2026-08-31T00:00:00.000Z",
+			updatedAt: "2026-08-31T00:00:02.000Z",
+			projectId: "must-not-be-recorded",
+			previewUrl: "https://example.test/?token=secret",
+			feedback: "private prompt content",
+		},
+		{ criteria: 4, proofs: 8, failureCategory: "protocol" },
+	);
+	assert.deepEqual(
+		privateTelemetry,
+		{
+			version: 1,
+			eligible: true,
+			policy: "required",
+			availability: "available",
+			phase: "failed",
+			durationMs: 2_000,
+			revision: 3,
+			counts: {
+				clarifications: 0,
+				repairs: 1,
+				syncs: 0,
+				stale: 0,
+				criteria: 4,
+				proofs: 8,
+			},
+			fallback: false,
+			approvalDurationMs: undefined,
+			cancellationCategory: undefined,
+			failureCategory: "protocol",
+		},
+		"design telemetry is a bounded operational whitelist",
+	);
+	assert.doesNotMatch(
+		JSON.stringify(privateTelemetry),
+		/secret|prompt content|projectId|previewUrl/,
+	);
+
 	assert.equal(
 		createDesignFidelityContract({
 			authority: {
