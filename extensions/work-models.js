@@ -133,6 +133,20 @@ import {
 	workflowTelemetryIdentity,
 } from "./workflow-telemetry.js";
 import {
+	callOpenDesignTool,
+	openDesignPayloadDigest,
+	reconcileCreatedProject,
+} from "./opendesign-client.js";
+import {
+	createDesignSession,
+	designSessionPath,
+	loadDesignSession,
+	renderCurrentUiAudit,
+	renderDesignBrief,
+	saveDesignSession,
+	transitionDesignSession,
+} from "./work-design.js";
+import {
 	acknowledgeWorkActionLease,
 	acquireWorkActionLease,
 	currentWorkActionLeases,
@@ -212,6 +226,8 @@ const MAIN_EDITOR_ACTION_MAX_AGE_MS = 30 * 60 * 1000;
 const MAIN_EDITOR_ACTIONS = new Set([
 	"work-research",
 	"work-brainstorm",
+	"work-design",
+	"work-redesign",
 	"work-plan",
 	"work-small",
 	"work-med",
@@ -2266,6 +2282,8 @@ const ORCHESTRATOR_ACTION_LABELS = {
 	"work-auto": "Auto-route task",
 	"work-big": "Large task",
 	"work-brainstorm": "Brainstorm",
+	"work-design": "Visual design",
+	"work-redesign": "Redesign",
 	"work-research": "Research",
 	"work-catch-up": "Catch up project",
 	"work-extension-scout": "Scout Pi extensions in background",
@@ -2324,6 +2342,8 @@ const LONG_ORCHESTRATOR_ACTIONS = new Set([
 	"work-agent-health",
 	"work-big",
 	"work-brainstorm",
+	"work-design",
+	"work-redesign",
 	"work-catch-up",
 	"work-debug",
 	"work-finish",
@@ -12253,6 +12273,530 @@ function initiativePlanningStarvedState(cwd, resolved, target) {
 	};
 }
 
+function designWorkflowPolicy(cwd, override) {
+	const value =
+		override ?? readEffectiveSettings(cwd).workOrchestrator?.visualDesignWorkflow;
+	const normalized = String(value ?? "off").toLowerCase();
+	if (normalized.startsWith("required")) return "required";
+	if (normalized === "auto") return "auto";
+	return "off";
+}
+
+export function substantialUiWork(text) {
+	const value = String(text ?? "");
+	return (
+		/\b(?:ui|ux|interface|screen|page|dashboard|website|frontend|visual)\b/i.test(
+			value,
+		) &&
+		(/\b(?:redesign|overhaul|rebuild|new|build|substantial|multiple|system)\b/i.test(
+			value,
+		) ||
+			value.length >= 100)
+	);
+}
+
+function designSlug(value) {
+	return (
+		String(value ?? "design")
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-|-$/g, "")
+			.slice(0, 48) || "design"
+	);
+}
+
+function designArtifactDirectory(ownerId, objective, now = new Date()) {
+	const date = now instanceof Date ? now : new Date(now);
+	return posix.join(
+		"docs/designs",
+		`${date.toISOString().slice(0, 10)}-${designSlug(objective || ownerId)}`,
+	);
+}
+
+function designDirectionBoards(objective) {
+	return [
+		{
+			id: "preserve",
+			label: "Preserve and refine",
+			description: `Keep the product's recognizable structure while improving ${objective}.`,
+		},
+		{
+			id: "focused",
+			label: "Focused redesign",
+			description: `Replace weak hierarchy and interaction patterns for ${objective}.`,
+		},
+		{
+			id: "bold",
+			label: "Bold alternative",
+			description: `Reconsider the visual system and primary flow for ${objective}.`,
+		},
+	];
+}
+
+function tryLoadDesignSession(cwd, ownerId) {
+	return ownerId && existsSync(designSessionPath(cwd, ownerId))
+		? loadDesignSession(cwd, ownerId)
+		: null;
+}
+
+function designSessionGate(session) {
+	if (
+		!session ||
+		[
+			"not_applicable",
+			"plan_ready",
+			"implementation_active",
+			"proof_required",
+			"completed",
+			"canceled",
+			"superseded",
+		].includes(session.state)
+	)
+		return null;
+	return {
+		ok: session.state !== "failed",
+		action:
+			session.state === "clarification_required"
+				? "design-clarification-required"
+				: "design-resume-required",
+		reason: `design-${session.state}`,
+		designSession: session,
+		message: `Visual design for ${session.ownerId} is ${session.state.replaceAll("_", " ")}.`,
+		suggestedCommands: [session.nextAction || `/wo design ${session.ownerId}`],
+		warnings: [],
+	};
+}
+
+export function buildWorkRedesignState(cwd, args = "", options = {}) {
+	const objective = String(args ?? "").trim();
+	if (!objective)
+		return errorState("usage", "Usage: /wo redesign <objective>", {
+			action: "usage",
+		});
+	try {
+		ensureWorkStoreInitialized(cwd);
+		let initiative = createWorkflowWorkItem(cwd, {
+			title: `Redesign: ${objective}`,
+			type: "epic",
+			labels: ["wo:redesign"],
+			description: `Human-approved visual redesign initiative. Objective: ${objective}`,
+			notes: "created by /wo redesign",
+		});
+		const epic = createWorkflowWorkItem(cwd, {
+			title: objective,
+			type: "epic",
+			parent: initiative.id,
+			labels: ["wo:redesign", "wo:design-required"],
+			description: `Audit the current UI, commission a visual direction, and obtain approval before implementation planning. Objective: ${objective}`,
+		});
+		const audit = createWorkflowWorkItem(cwd, {
+			title: "Audit current UI and settle the design brief",
+			type: "decision",
+			parent: epic.id,
+			labels: ["wo:planning", "wo:design-audit"],
+			description:
+				"Inspect the current product and record preserve, reconsider, remove, states, responsive behavior, and accessibility constraints. Do not implement product code.",
+		});
+		const policy = designWorkflowPolicy(cwd, options.policy ?? "required");
+		const designDirectory = designArtifactDirectory(
+			epic.id,
+			objective,
+			options.now,
+		);
+		const briefPath = posix.join(designDirectory, "DESIGN-BRIEF.md");
+		const objectiveHash = createHash("sha256").update(objective).digest("hex");
+		mutateStore(cwd, (store) =>
+			updateWorkItem(store, initiative.id, {
+				labels: [...store.items[initiative.id].labels, "initiative"],
+				initiative: {
+					schemaVersion: 1,
+					sources: [{ id: "redesign-brief", path: briefPath, hash: objectiveHash }],
+					coverage: [
+						{
+							id: "redesign-outcome",
+							provenance: "redesign-brief:R1",
+							contentHash: objectiveHash,
+							disposition: "accepted",
+							epicId: epic.id,
+						},
+					],
+					childOrder: [epic.id],
+					evidence: [],
+				},
+			}),
+		);
+		initiative = readWorkItem(cwd, initiative.id);
+		const session = createDesignSession({
+			ownerId: epic.id,
+			policy,
+			state: "audit_required",
+			nextAction: `/wo design prepare ${epic.id}`,
+			now: options.now?.toISOString?.() ?? options.now,
+			metadata: {
+				objective,
+				initiativeId: initiative.id,
+				auditWorkItemId: audit.id,
+				designDirectory,
+				auditPath: posix.join(designDirectory, "CURRENT-UI-AUDIT.md"),
+				briefPath,
+			},
+		});
+		saveDesignSession(cwd, session);
+		rememberWorkflowEpic(cwd, nativeIssue(readWorkItem(cwd, epic.id)));
+		return {
+			ok: true,
+			action: "design-audit-required",
+			initiative: issueSummary(initiative),
+			epic: issueSummary(epic),
+			audit: issueSummary(audit),
+			designSession: session,
+			message: `Created redesign initiative ${initiative.id}; current-UI audit ${audit.id} must finish before implementation planning.`,
+			handoffPrompt: `Audit the current UI for ${objective}. Write ${session.auditPath} and ${session.briefPath}. Cover settled product and repository facts, visual hierarchy, every state and content variant, responsive behavior, accessibility, and explicit preserve/reconsider/remove decisions. Do not implement product code. Then run /wo design prepare ${epic.id}.`,
+			suggestedCommands: [`/wo design prepare ${epic.id}`],
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "design-error", error.message, {
+			action: "design-error",
+		});
+	}
+}
+
+function designArtifactFile(cwd, relativePath) {
+	const normalized = posix.normalize(String(relativePath ?? ""));
+	if (
+		!normalized.startsWith("docs/designs/") ||
+		normalized !== relativePath ||
+		isAbsolute(normalized)
+	)
+		throw new Error("Design artifact path must stay under docs/designs/.");
+	return resolve(cwd, ...normalized.split("/"));
+}
+
+function writeDesignArtifact(cwd, relativePath, content) {
+	const file = designArtifactFile(cwd, relativePath);
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, content.endsWith("\n") ? content : `${content}\n`, {
+		encoding: "utf8",
+		mode: 0o600,
+	});
+}
+
+export function prepareDesignSession(cwd, ownerId, input = {}) {
+	let session = tryLoadDesignSession(cwd, ownerId);
+	if (!session) throw new Error(`No design session exists for ${ownerId}.`);
+	if (input.directionOpen && !input.selectedDirection)
+		return {
+			ok: true,
+			action: "choose-design-direction",
+			designSession: session,
+			boards: designDirectionBoards(session.objective),
+			message: "Choose one visual direction before commissioning.",
+		};
+	const preserve = input.preserve ?? [
+		"Existing product behavior and recognizable content hierarchy",
+	];
+	const reconsider = input.reconsider ?? [
+		"Visual hierarchy, density, and interaction clarity",
+	];
+	const remove = input.remove ?? [
+		"Unnecessary decoration and duplicated controls",
+	];
+	const audit = renderCurrentUiAudit({ preserve, reconsider, remove });
+	const brief = `${renderDesignBrief({
+		title: input.title ?? session.objective ?? ownerId,
+		objective: session.objective ?? input.objective ?? "Improve the interface",
+		actorsAndFlows: input.actorsAndFlows ?? [
+			"Primary user completes the core flow",
+		],
+		statesAndContent: input.statesAndContent ?? [
+			"Default, loading, empty, error, and success states",
+		],
+		constraints: input.constraints ?? [
+			"Reuse repository components and preserve product behavior",
+		],
+	})}\n## Repository and reuse\n\n${(input.repositoryFacts ?? ["Reuse existing components and commands; generated prototype code is reference only"]).map((line) => `- ${line}`).join("\n")}\n\n## Visual direction\n\n- ${input.selectedDirection ?? "Preserve the accepted product identity while improving hierarchy."}\n\n## Responsive behavior\n\n${(input.responsiveRules ?? ["Define desktop and mobile reflow without clipping or hidden actions"]).map((line) => `- ${line}`).join("\n")}\n\n## Accessibility\n\n${(input.accessibility ?? ["Keyboard access, visible focus, semantic hierarchy, contrast, and reduced motion"]).map((line) => `- ${line}`).join("\n")}\n`;
+	const finalAudit = input.auditMarkdown ?? audit;
+	const finalBrief = input.briefMarkdown ?? brief;
+	writeDesignArtifact(cwd, session.auditPath, finalAudit);
+	writeDesignArtifact(cwd, session.briefPath, finalBrief);
+	if (session.state === "audit_required")
+		session = transitionDesignSession(session, "brief_required", {}, input.now);
+	if (session.state === "brief_required")
+		session = transitionDesignSession(
+			session,
+			"commission_ready",
+			{
+				briefHash: createHash("sha256").update(finalBrief).digest("hex"),
+				selectedDirection: input.selectedDirection ?? "settled",
+				nextAction: `/wo design ${ownerId}`,
+			},
+			input.now,
+		);
+	saveDesignSession(cwd, session);
+	if (session.auditWorkItemId)
+		mutateStore(cwd, (store) =>
+			closeWorkItem(store, session.auditWorkItemId, {
+				notes: [
+					...(store.items[session.auditWorkItemId]?.notes ?? []),
+					`wo:design brief: ${session.briefPath}`,
+				],
+			}),
+		);
+	return {
+		ok: true,
+		action: "design-commission-ready",
+		designSession: session,
+		message: `Design brief is ready for ${ownerId}.`,
+		suggestedCommands: [`/wo design ${ownerId}`],
+	};
+}
+
+export function waiveDesignSession(cwd, ownerId) {
+	let session = tryLoadDesignSession(cwd, ownerId);
+	if (!session)
+		return errorState(
+			"design-not-found",
+			`No design session exists for ${ownerId}.`,
+			{ action: "design-not-found" },
+		);
+	if (!["commission_ready", "run_pending", "failed"].includes(session.state))
+		return errorState(
+			"design-waiver-invalid",
+			`Design session ${ownerId} cannot be waived from ${session.state}.`,
+			{ action: "design-waiver-invalid" },
+		);
+	session = transitionDesignSession(session, "approval_required", {
+		fallback: "explicit-text-only-waiver",
+		nextAction: `/wo design approve ${ownerId}`,
+	});
+	saveDesignSession(cwd, session);
+	return {
+		ok: true,
+		action: "design-waived-to-text",
+		designSession: session,
+		message:
+			"OpenDesign was explicitly waived; the text-only design still requires human approval.",
+		suggestedCommands: [`/wo design approve ${ownerId}`],
+	};
+}
+
+export async function advanceDesignSession(cwd, ownerId, options = {}) {
+	let session = tryLoadDesignSession(cwd, ownerId);
+	if (!session)
+		return errorState(
+			"design-not-found",
+			`No design session exists for ${ownerId}.`,
+			{ action: "design-not-found" },
+		);
+	if (["audit_required", "brief_required"].includes(session.state))
+		return designSessionGate(session);
+	if (session.state === "failed" && !session.runId) {
+		session = transitionDesignSession(session, "run_pending", {
+			nextAction: `/wo design ${ownerId}`,
+		});
+		saveDesignSession(cwd, session);
+	}
+	const callTool =
+		options.callTool ??
+		((tool, args) => callOpenDesignTool({ ...options, tool, args }));
+	if (session.state === "commission_ready") {
+		if (session.policy === "off")
+			return {
+				ok: true,
+				action: "design-disabled",
+				designSession: session,
+				message: "Visual design workflow is Off.",
+				suggestedCommands: [],
+			};
+		const projectId = session.projectId || randomUUID();
+		session = transitionDesignSession(session, "run_pending", {
+			projectId,
+			projectName: String(session.objective ?? ownerId).slice(0, 200),
+			nextAction: `/wo design ${ownerId}`,
+		});
+		saveDesignSession(cwd, session);
+		try {
+			const created = await (options.reconcileProject ?? reconcileCreatedProject)({
+				...options,
+				projectId,
+				createArgs: { id: projectId, name: session.projectName },
+			});
+			const requestId = randomUUID();
+			const startPayload = {
+				project: projectId,
+				prompt: readFileSync(designArtifactFile(cwd, session.briefPath), "utf8"),
+				requestId,
+			};
+			session = {
+				...session,
+				conversationId: created.conversationId ?? "",
+				requestId,
+				startPayload,
+				payloadDigest: openDesignPayloadDigest(startPayload),
+			};
+			saveDesignSession(cwd, session);
+			const started = await callTool("start_run", startPayload);
+			session = transitionDesignSession(session, "run_active", {
+				runId: started.runId,
+				nextAction: `/wo design ${ownerId}`,
+			});
+			saveDesignSession(cwd, session);
+			return {
+				ok: true,
+				action: "design-run-started",
+				designSession: session,
+				message: `OpenDesign run ${session.runId} started; resume later without waiting.`,
+				suggestedCommands: [`/wo design ${ownerId}`, `/wo resume ${ownerId}`],
+			};
+		} catch (error) {
+			if (session.policy === "auto") {
+				session = transitionDesignSession(session, "approval_required", {
+					fallback: "text-only",
+					errorCategory: String(error?.category ?? "unavailable").slice(0, 100),
+					nextAction: `/wo design approve ${ownerId}`,
+				});
+				saveDesignSession(cwd, session);
+				return {
+					ok: true,
+					action: "design-text-fallback",
+					designSession: session,
+					message:
+						"OpenDesign is unavailable; Auto continued with a text-only design requiring approval.",
+					suggestedCommands: [`/wo design approve ${ownerId}`],
+				};
+			}
+			session = transitionDesignSession(session, "failed", {
+				errorCategory: String(error?.category ?? "unavailable").slice(0, 100),
+				nextAction: `/wo design ${ownerId}`,
+			});
+			saveDesignSession(cwd, session);
+			return {
+				ok: false,
+				action: "design-required-blocked",
+				designSession: session,
+				message: "OpenDesign is required for this UI work and is unavailable.",
+				suggestedCommands: [
+					"Open /wo → Settings and configure the OpenDesign command",
+					`/wo design waive ${ownerId}`,
+					`/wo design ${ownerId}`,
+				],
+			};
+		}
+	}
+	if (
+		session.state === "run_pending" &&
+		!session.runId &&
+		!session.startPayload
+	) {
+		try {
+			const created = await (options.reconcileProject ?? reconcileCreatedProject)({
+				...options,
+				projectId: session.projectId,
+				createArgs: { id: session.projectId, name: session.projectName },
+			});
+			const requestId = randomUUID();
+			const startPayload = {
+				project: session.projectId,
+				prompt: readFileSync(designArtifactFile(cwd, session.briefPath), "utf8"),
+				requestId,
+			};
+			session = {
+				...session,
+				conversationId: created.conversationId ?? "",
+				requestId,
+				startPayload,
+				payloadDigest: openDesignPayloadDigest(startPayload),
+			};
+			saveDesignSession(cwd, session);
+		} catch (error) {
+			if (session.policy === "auto") {
+				session = transitionDesignSession(session, "approval_required", {
+					fallback: "text-only",
+					errorCategory: String(error?.category ?? "unavailable").slice(0, 100),
+					nextAction: `/wo design approve ${ownerId}`,
+				});
+				saveDesignSession(cwd, session);
+				return {
+					ok: true,
+					action: "design-text-fallback",
+					designSession: session,
+					message:
+						"OpenDesign recovery was unavailable; Auto continued with a text-only design requiring approval.",
+					suggestedCommands: [`/wo design approve ${ownerId}`],
+				};
+			}
+			return {
+				ok: false,
+				action: "design-required-blocked",
+				designSession: session,
+				message: "OpenDesign project recovery is required before planning.",
+				suggestedCommands: [`/wo design ${ownerId}`, `/wo design waive ${ownerId}`],
+			};
+		}
+	}
+	if (
+		session.state === "run_pending" &&
+		!session.runId &&
+		session.startPayload
+	) {
+		const started = await callTool("start_run", session.startPayload);
+		session = transitionDesignSession(session, "run_active", {
+			runId: started.runId,
+			nextAction: `/wo design ${ownerId}`,
+		});
+		saveDesignSession(cwd, session);
+		return {
+			ok: true,
+			action: "design-run-recovered",
+			designSession: session,
+			message: `Recovered OpenDesign run ${session.runId}.`,
+			suggestedCommands: [`/wo design ${ownerId}`],
+		};
+	}
+	if (["run_pending", "run_active"].includes(session.state) && session.runId) {
+		const run = await callTool("get_run", { runId: session.runId });
+		const status = String(run.status ?? "").toLowerCase();
+		let next = status;
+		if (["succeeded", "completed", "success"].includes(status))
+			next = "review_ready";
+		else if (
+			["clarification_required", "waiting_for_user", "needs_input"].includes(
+				status,
+			)
+		)
+			next = "clarification_required";
+		else if (["failed", "error"].includes(status)) next = "failed";
+		else next = "run_active";
+		if (next !== session.state)
+			session = transitionDesignSession(session, next, {
+				previewUrl: String(run.previewUrl ?? "").slice(0, 2_000),
+				studioUrl: String(run.studioUrl ?? "").slice(0, 2_000),
+				agentMessage: String(run.agentMessage ?? "").slice(0, 4_000),
+				nextAction:
+					next === "review_ready"
+						? `/wo design review ${ownerId}`
+						: `/wo design ${ownerId}`,
+			});
+		saveDesignSession(cwd, session);
+		return {
+			ok: !["failed"].includes(session.state),
+			action: `design-${session.state.replaceAll("_", "-")}`,
+			designSession: session,
+			message: `OpenDesign run ${session.runId} is ${status || "active"}.`,
+			suggestedCommands: [session.nextAction],
+		};
+	}
+	return (
+		designSessionGate(session) ?? {
+			ok: true,
+			action: "design-ready",
+			designSession: session,
+			message: `Design session is ${session.state}.`,
+			suggestedCommands: [],
+		}
+	);
+}
+
 function buildWorkResumeState(cwd, args = "", options = {}) {
 	const gate = normalReadGate(cwd);
 	if (gate)
@@ -12299,6 +12843,10 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 				candidates: resolved.candidates ?? [],
 				suggestedCommands: resolved.suggestedCommands ?? [],
 			});
+		const designGate = designSessionGate(
+			tryLoadDesignSession(cwd, idOf(resolved.workItem ?? resolved.epic)),
+		);
+		if (designGate) return designGate;
 		if (resolved.kind === "planning_starved")
 			return initiativePlanningStarvedState(cwd, resolved, target);
 		if (selfImprovementRoadmap(cwd, idOf(resolved.epic)))
@@ -14817,6 +15365,44 @@ function resolveFreeformIdea(cwd, epic, topic) {
 	};
 }
 
+function attachBrainstormDesignSession(cwd, state, options = {}) {
+	if (!state?.ok || !state.idea) return state;
+	let session = tryLoadDesignSession(cwd, state.idea.id);
+	const policy = designWorkflowPolicy(cwd, options.policy);
+	if (!session && policy !== "off" && substantialUiWork(state.topic)) {
+		const designDirectory = designArtifactDirectory(
+			state.idea.id,
+			state.topic,
+			options.now,
+		);
+		session = createDesignSession({
+			ownerId: state.idea.id,
+			policy,
+			state: "audit_required",
+			nextAction: `/wo design prepare ${state.idea.id}`,
+			now: options.now?.toISOString?.() ?? options.now,
+			metadata: {
+				objective: state.topic,
+				sourceArtifact: state.artifact ?? "",
+				designDirectory,
+				auditPath: posix.join(designDirectory, "CURRENT-UI-AUDIT.md"),
+				briefPath: posix.join(designDirectory, "DESIGN-BRIEF.md"),
+			},
+		});
+		saveDesignSession(cwd, session);
+	} else if (
+		session &&
+		state.artifact &&
+		session.sourceArtifact !== state.artifact
+	) {
+		session = { ...session, sourceArtifact: state.artifact };
+		saveDesignSession(cwd, session);
+	}
+	return session
+		? { ...state, designSession: session, designBrief: session.briefPath }
+		: state;
+}
+
 function buildWorkBrainstormState(cwd, args = "", options = {}) {
 	const parsed = parseWorkBrainstormArgs(args, options);
 	if (parsed.kind === "usage")
@@ -14862,18 +15448,22 @@ function buildWorkBrainstormState(cwd, args = "", options = {}) {
 				resolvedIdea.idea.id,
 				ideaBrainstormNote(artifact, "selected-brainstorm"),
 			);
-			return {
-				ok: true,
-				action: "brainstorm-linked",
-				epic: issueSummary(epic),
-				idea: issueSummary(workItem),
-				artifact,
-				topic: parsed.topic,
-				message: `Linked brainstorm${artifact ? ` ${artifact}` : ""} to ${resolvedIdea.idea.id}.`,
-				suggestedCommands: artifact
-					? [`/work-plan ${artifact}`]
-					: [`/work-brainstorm idea ${resolvedIdea.idea.id} <brainstorm-path>`],
-			};
+			return attachBrainstormDesignSession(
+				cwd,
+				{
+					ok: true,
+					action: "brainstorm-linked",
+					epic: issueSummary(epic),
+					idea: issueSummary(workItem),
+					artifact,
+					topic: parsed.topic,
+					message: `Linked brainstorm${artifact ? ` ${artifact}` : ""} to ${resolvedIdea.idea.id}.`,
+					suggestedCommands: artifact
+						? [`/work-plan ${artifact}`]
+						: [`/work-brainstorm idea ${resolvedIdea.idea.id} <brainstorm-path>`],
+				},
+				options,
+			);
 		}
 		const match = resolveFreeformIdea(cwd, epic, parsed.topic);
 		if (match.error)
@@ -14888,29 +15478,33 @@ function buildWorkBrainstormState(cwd, args = "", options = {}) {
 					ideaBrainstormNote(artifact, "freeform-brainstorm"),
 				)
 			: createBrainstormIdea(cwd, epic, parsed.topic, artifact);
-		return {
-			ok: true,
-			action: createdEpic
-				? "brainstorm-epic-created"
-				: match.reused
-					? "brainstorm-reused"
-					: "brainstorm-created",
-			epic: issueSummary(epic),
-			idea: issueSummary(workItem),
-			artifact,
-			topic: parsed.topic,
-			possibleDuplicates: match.possibleDuplicates,
-			message: [
-				init.initialized ? init.message : "",
-				createdEpic ? `Created roadmap ${idOf(epic)}.` : "",
-				`${match.reused ? "Updated" : "Created"} idea ${idOf(workItem)} for brainstorm ${parsed.topic}.`,
-			]
-				.filter(Boolean)
-				.join(" "),
-			suggestedCommands: artifact
-				? [`/work-plan ${artifact}`]
-				: [`/work-brainstorm idea ${idOf(workItem)} <brainstorm-path>`],
-		};
+		return attachBrainstormDesignSession(
+			cwd,
+			{
+				ok: true,
+				action: createdEpic
+					? "brainstorm-epic-created"
+					: match.reused
+						? "brainstorm-reused"
+						: "brainstorm-created",
+				epic: issueSummary(epic),
+				idea: issueSummary(workItem),
+				artifact,
+				topic: parsed.topic,
+				possibleDuplicates: match.possibleDuplicates,
+				message: [
+					init.initialized ? init.message : "",
+					createdEpic ? `Created roadmap ${idOf(epic)}.` : "",
+					`${match.reused ? "Updated" : "Created"} idea ${idOf(workItem)} for brainstorm ${parsed.topic}.`,
+				]
+					.filter(Boolean)
+					.join(" "),
+				suggestedCommands: artifact
+					? [`/work-plan ${artifact}`]
+					: [`/work-brainstorm idea ${idOf(workItem)} <brainstorm-path>`],
+			},
+			options,
+		);
 	} catch (error) {
 		return errorState(error.reason ?? "work-store-error", error.message, {
 			action: error.reason ?? "work-store-error",
@@ -14938,6 +15532,9 @@ function linkBrainstormArtifactFromFinal(cwd, run, text) {
 		run.meta.workItemId,
 		ideaBrainstormNote(artifact, "completed-brainstorm"),
 	);
+	const designSession = tryLoadDesignSession(cwd, run.meta.workItemId);
+	if (designSession)
+		saveDesignSession(cwd, { ...designSession, sourceArtifact: artifact });
 	return {
 		ok: true,
 		action: "brainstorm-linked",
@@ -14993,6 +15590,9 @@ function brainstormHandoffPrompt(
 			: `Follow the verified private playbook below. The extension retains ownership of the artifact link. End the final response with exactly "Brainstorm saved: <absolute path>" so it links to ${state.idea.id}.`,
 		privatePlaybook
 			? `--- BEGIN VERIFIED PRIVATE BRAINSTORM PLAYBOOK ---\n${privatePlaybook}--- END VERIFIED PRIVATE BRAINSTORM PLAYBOOK ---`
+			: "",
+		state.designSession
+			? `This UI work has one authoritative visual-design contract. Audit the current UI into ${state.designSession.auditPath} and settle product, repository, states/content, responsive, accessibility, and preserve/reconsider/remove decisions in ${state.designSession.briefPath}. Later planning must consume that brief instead of inventing competing UI guidance.`
 			: "",
 		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can dispatch verified private planning with the preservation and self-audit contract.",
 		"Never silently skip clarification for broad, important, or underspecified work.",
@@ -15253,6 +15853,28 @@ function epicPlanningSources(cwd, epic, artifacts = epicArtifacts(cwd, epic)) {
 	);
 }
 
+function designBriefsForPlanning(cwd, references = []) {
+	const directory = join(cwd, ".ce-workflow", "work-runs", "design-sessions");
+	if (!existsSync(directory)) return [];
+	const wanted = new Set(
+		references.filter(Boolean).map((entry) => posix.normalize(entry)),
+	);
+	return readdirSync(directory)
+		.filter((name) => name.endsWith(".json"))
+		.flatMap((name) => {
+			try {
+				const session = loadDesignSession(cwd, name.slice(0, -5));
+				return session.briefPath &&
+					wanted.has(session.sourceArtifact) &&
+					existsSync(designArtifactFile(cwd, session.briefPath))
+					? [session.briefPath]
+					: [];
+			} catch {
+				return [];
+			}
+		});
+}
+
 function splitPlanTarget(input) {
 	const [target, rest] = splitFirstWord(input);
 	const [mode, tail] = splitFirstWord(rest);
@@ -15278,8 +15900,12 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 		const handoffPlan = (
 			message,
 			detail,
-			{ bootstrapRoadmapId, ...extra } = {},
+			{ bootstrapRoadmapId, designSources = [], ...extra } = {},
 		) => {
+			const designBriefs = designBriefsForPlanning(cwd, [
+				...sourceArtifacts,
+				...designSources,
+			]);
 			const bootstrapCommand = `node ${shellQuote(WORK_HELPER_SCRIPT)} bootstrap-plan-roadmap <plan-path>${bootstrapRoadmapId ? ` --roadmap ${bootstrapRoadmapId}` : ""}`;
 			return {
 				ok: true,
@@ -15288,6 +15914,9 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 				...extra,
 				handoffPrompt: [
 					privatePlanPlaybookBlock(),
+					designBriefs.length
+						? `Authoritative visual-design contract(s): ${designBriefs.join(", ")}. Read and preserve them; do not generate competing UI guidance.`
+						: "",
 					"Follow the verified private planning playbook to convert this input into a detailed master roadmap plan, then create the roadmap from it in this same flow; do not stop and ask the user to re-run /work-plan.",
 					sourceArtifacts.length
 						? `Source artifacts to read and cite verbatim in the final plan: ${sourceArtifacts.join(", ")}`
@@ -15366,7 +15995,11 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					]
 						.filter(Boolean)
 						.join("\n"),
-					{ epic: issueSummary(resolved.epic), bootstrapRoadmapId },
+					{
+						epic: issueSummary(resolved.epic),
+						bootstrapRoadmapId,
+						designSources: [planningSource],
+					},
 				);
 			}
 			if (mode === "strengthen") {
@@ -15388,7 +16021,11 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					]
 						.filter(Boolean)
 						.join("\n"),
-					{ epic: issueSummary(resolved.epic), bootstrapRoadmapId },
+					{
+						epic: issueSummary(resolved.epic),
+						bootstrapRoadmapId,
+						designSources: [planningSource],
+					},
 				);
 			}
 			return errorState(
@@ -21117,6 +21754,22 @@ async function handleWorkMenuCommand(ctx, pi) {
 			placeholder: "Describe a new brainstorm, or use idea <id> [artifact-path]",
 		},
 		{
+			value: "work-redesign",
+			label: "🎨 Redesign",
+			description:
+				"Create a visual redesign initiative and current-UI audit phase.\nImplementation planning waits for a durable approved design.",
+			argumentTitle: "Redesign objective",
+			placeholder: "Describe the product surface and desired outcome",
+		},
+		{
+			value: "work-design",
+			label: "🖼️ Visual design",
+			description:
+				"Prepare, commission, or resume a durable visual-design session.\nOpenDesign runs return control and reconcile on the next resume.",
+			argumentTitle: "Design target or action",
+			placeholder: "<work-item-id> or prepare <work-item-id>",
+		},
+		{
 			value: "work-plan",
 			label: "🧭 Plan",
 			description:
@@ -24566,12 +25219,16 @@ function parseOrchestratorInput(event = {}) {
 					help: ORCHESTRATOR_INPUT_HELP,
 				};
 	}
-	const routed = /^(resume|report|scout)(?:\s+(.+))?$/i.exec(body);
+	const routed = /^(resume|report|scout|design|redesign)(?:\s+(.+))?$/i.exec(
+		body,
+	);
 	if (routed) {
 		const command = {
 			resume: "work-resume",
 			report: "work-report",
 			scout: "work-extension-scout",
+			design: "work-design",
+			redesign: "work-redesign",
 		}[routed[1].toLowerCase()];
 		return { command, args: routed[2] ?? "" };
 	}
@@ -24659,6 +25316,50 @@ async function executeOrchestratorAction(
 	}
 	if (name === "work-goal")
 		return handleWorkGoalCommand(text, "generic", pi, ctx);
+	if (name === "work-redesign")
+		return withCommandTelemetry(name, text, ctx, async () => {
+			const state = buildWorkRedesignState(ctx.cwd, text, options);
+			notify(ctx, state.message, state.ok ? "info" : "warning");
+			if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
+			return stateTelemetry(state);
+		});
+	if (name === "work-design")
+		return withCommandTelemetry(name, text, ctx, async () => {
+			const [action, target] = splitFirstWord(text);
+			let state;
+			if (action === "waive") {
+				state = waiveDesignSession(ctx.cwd, target);
+			} else if (action === "prepare") {
+				const session = tryLoadDesignSession(ctx.cwd, target);
+				if (session) {
+					const readExisting = (relativePath) =>
+						relativePath && existsSync(designArtifactFile(ctx.cwd, relativePath))
+							? readFileSync(designArtifactFile(ctx.cwd, relativePath), "utf8")
+							: undefined;
+					state = prepareDesignSession(ctx.cwd, target, {
+						auditMarkdown: readExisting(session.auditPath),
+						briefMarkdown: readExisting(session.briefPath),
+					});
+				} else {
+					state = errorState(
+						"design-not-found",
+						`No design session exists for ${target || "that target"}.`,
+						{ action: "design-not-found" },
+					);
+				}
+			} else {
+				const ownerId = action === "resume" ? target : action;
+				state = ownerId
+					? await advanceDesignSession(ctx.cwd, ownerId, options)
+					: errorState(
+							"usage",
+							"Usage: /wo design [prepare|resume] <work-item-id>",
+							{ action: "usage" },
+						);
+			}
+			notify(ctx, state.message, state.ok ? "info" : "warning");
+			return stateTelemetry(state);
+		});
 	if (["work-stop", "work-resume-stop"].includes(name))
 		return handleWorkResumeStopCommand(text, pi, ctx);
 	if (name === "work-menu") return handleWorkMenuCommand(ctx, pi);
@@ -26350,6 +27051,8 @@ export default function workModelsExtension(pi) {
 				goal: "Start an autonomous goal with the supplied objective",
 				pause: "Pause after the current tool batch finishes",
 				resume: "Resume the paused goal, workflow, or direct request",
+				design: "Prepare, commission, or resume a visual design",
+				redesign: "Create a redesign initiative and current-UI audit",
 			};
 			const items = Object.entries(descriptions)
 				.filter(([value]) => value.startsWith(input))
@@ -26385,10 +27088,12 @@ export default function workModelsExtension(pi) {
 				return startWorkGoal("generic", goal.text, pi, ctx, goal.budget);
 			}
 			if (action === "pause") return requestOrchestratorPause(ctx, pi);
+			if (["design", "redesign"].includes(action))
+				return executeOrchestratorAction(`work-${action}`, rest, ctx, pi);
 			if (action !== "resume")
 				return notify(
 					ctx,
-					"Usage: /wo [goal <objective> | pause | resume]",
+					"Usage: /wo [goal <objective> | pause | resume | design … | redesign <objective>]",
 					"warning",
 				);
 			if (orchestratorPauseRequest)

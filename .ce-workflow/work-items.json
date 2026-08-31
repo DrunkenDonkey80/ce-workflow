@@ -6141,6 +6141,45 @@
       "type": "task",
       "updatedAt": "2026-08-21T11:12:19.886Z"
     },
+    "work-2.report-43ade938-75ab-414f-9d52-b652fe934c3c": {
+      "createdAt": "2026-08-31T10:42:43.276Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The precomputed implementation handoff said to run every required capability and later said finish-task runs declared command operations automatically, but it did not direct browser capabilities through `work-run-proof`. Running the declared browser command directly produced the required artifact but no durable adapter proof, so `work-run-proof` had to execute the adapter again, conflicting with this slice's explicit single-run/reuse acceptance.\nExpected: For non-command capability contracts, the handoff should give the exact `work-run-proof <item> <proof-id> --inspection ...` flow and warn not to invoke the underlying adapter directly. Ideally it should separate execute-and-record from inspect-and-reuse so one adapter execution is sufficient.\nImpact: The workflow forced a redundant browser-adapter execution and made an otherwise passing slice violate its no-double-run acceptance intent.\nSuggested improvement: Generate capability-specific handoff commands: use `finish-task` auto-verification for command capabilities and `work-run-proof` for browser capabilities requiring goal inspection.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/bc90c84f-3198-48c2-8f03-24cda2e738b5",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 17962,
+              "file": "01-work-items.json",
+              "sha256": "bfcd874b4b59276cf35ff3323b1478536fb442f252c8c0464ecffd10b640e5d5"
+            },
+            {
+              "bytes": 1338,
+              "file": "02-acceptance-results.json",
+              "sha256": "56b6310dcc428746e5d7a38faf54fb3975850f239675c16b44b8d7599b7945c7"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "project",
+          "submittedAt": "2026-08-31T10:42:43.266Z",
+          "workflowId": "workflow-mth3ul1l-6vv3iv"
+        }
+      ],
+      "id": "work-2.report-43ade938-75ab-414f-9d52-b652fe934c3c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The precomputed implementation handoff said to run every required capability and later said finish-task runs declared command oper",
+      "type": "task",
+      "updatedAt": "2026-08-31T10:42:43.276Z"
+    },
     "work-2.report-48460ef0-da77-4692-8c3c-7759664ed541": {
       "createdAt": "2026-08-22T06:51:52.862Z",
       "dependencies": [
@@ -13791,7 +13830,299 @@
         "schemaVersion": 1,
         "title": "Add redesign audits, commissioning, and resumable routing"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "f61b737a5497f1c04ae0d4da0e8464343ea6660e060034358dc41a20c6a85750",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "design-commissioning-state",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:01:09.840Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "a7e5f3ae1186ff2873de41dc5bddba37b624c68b0134935ed1c95deaebb30774"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "f61b737a5497f1c04ae0d4da0e8464343ea6660e060034358dc41a20c6a85750",
+          "detail": "node scripts/test-work-brainstorm.mjs",
+          "id": "design-brainstorm-link",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-brainstorm.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:01:09.842Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "6b2b9a73db9acf7802ee66683c57d562b365424357e04417bc0cb5f5c7eb9f4f"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "f61b737a5497f1c04ae0d4da0e8464343ea6660e060034358dc41a20c6a85750",
+          "detail": "node scripts/test-work-resume.mjs",
+          "id": "design-resume-routing",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-resume.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:01:09.843Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "f61b737a5497f1c04ae0d4da0e8464343ea6660e060034358dc41a20c6a85750",
+          "detail": "node scripts/test-work-roadmap.mjs",
+          "id": "design-roadmap-routing",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-roadmap.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:01:09.845Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "f61b737a5497f1c04ae0d4da0e8464343ea6660e060034358dc41a20c6a85750",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "design-commissioning-state",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:03:27.849Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "a7e5f3ae1186ff2873de41dc5bddba37b624c68b0134935ed1c95deaebb30774"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "f61b737a5497f1c04ae0d4da0e8464343ea6660e060034358dc41a20c6a85750",
+          "detail": "node scripts/test-work-brainstorm.mjs",
+          "id": "design-brainstorm-link",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-brainstorm.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:03:27.851Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "6b2b9a73db9acf7802ee66683c57d562b365424357e04417bc0cb5f5c7eb9f4f"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "f61b737a5497f1c04ae0d4da0e8464343ea6660e060034358dc41a20c6a85750",
+          "detail": "node scripts/test-work-resume.mjs",
+          "id": "design-resume-routing",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-resume.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:03:27.852Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "f61b737a5497f1c04ae0d4da0e8464343ea6660e060034358dc41a20c6a85750",
+          "detail": "node scripts/test-work-roadmap.mjs",
+          "id": "design-roadmap-routing",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-roadmap.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T11:03:27.854Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-7.3",
       "implementationScope": {
         "discoveryAllowed": false,
@@ -13823,13 +14154,16 @@
         "wo:vertical-slice"
       ],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U3\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Redesign audit, commissioning, and resumable routing\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Redesign audit, commissioning, and resumable routing\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work."
+        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U3\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Redesign audit, commissioning, and resumable routing\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Redesign audit, commissioning, and resumable routing\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
+        "wo:review-scope {\"files\":[\"extensions/work-design.js\",\"extensions/work-models.js\",\"scripts/test-work-design.mjs\"],\"fingerprint\":\"0329ffdf925fba39b614ab6582e43bcf6bede3ce8a205f2893f76b1fcb47ca0c\"}",
+        "wo:review PASS redesign initiative+audit, resume design gate, preallocated projectId/requestId persisted before create_project/start_run with recovery, Auto fallback vs Required block+waive verified; node scripts/test-work-design.mjs passed",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-design.mjs && node scripts/test-work-brainstorm.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-roadmap.mjs\nOutput: design-commissioning-state:work-design tests passed\ndesign-brainstorm-link:ok - work-brainstorm behavior\ndesign-resume-routing:ok - coded work-resume behavior\ndesign-roadmap-routing:"
       ],
       "parentId": "work-7",
-      "status": "open",
+      "status": "closed",
       "title": "U3: Redesign audit, commissioning, and resumable routing",
       "type": "task",
-      "updatedAt": "2026-08-31T09:34:02.446Z",
+      "updatedAt": "2026-08-31T11:03:28.133Z",
       "verificationContract": {
         "required": [
           {
@@ -13906,7 +14240,8 @@
           }
         ],
         "version": 1
-      }
+      },
+      "verificationRevision": "workspace-sha256:155612dc53940a3fb65eb97e401233cf616dba5d550af36876b3b2d076862b58"
     },
     "work-7.4": {
       "acceptance": "Workflow defaults Off and global/project setting inheritance, reset, command-spec validation, and redaction match existing settings behavior.\nThe review overlay uses showListDialog with purpose, filtering, cursor, Enter/Space, Escape/back, details, and non-selectable disabled approval rows in TUI and native fallback.\nFeedback commissions a same-project revision with a newly persisted action requestId; cancel preserves evidence and uncertainty.\nNo /work-design or other separate command/dialog surface is registered.",
@@ -14473,7 +14808,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T10:31:57.866Z"
+    "updatedAt": "2026-08-31T11:03:28.133Z"
   },
   "schemaVersion": 1
 }

@@ -36,6 +36,7 @@ const TRANSITIONS = Object.freeze({
 		"run_active",
 		"clarification_required",
 		"review_ready",
+		"approval_required",
 		"failed",
 		"canceled",
 	],
@@ -59,7 +60,7 @@ const TRANSITIONS = Object.freeze({
 		"canceled",
 	],
 	proof_required: ["completed", "implementation_active", "failed", "canceled"],
-	failed: ["run_pending", "canceled", "superseded"],
+	failed: ["run_pending", "approval_required", "canceled", "superseded"],
 });
 
 const MAX_TEXT = 20_000;
