@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "identity": {
+    "id": "bad",
+    "title": "Invalid handoff",
+    "briefHash": "not-a-hash"
+  },
+  "direction": {
+    "summary": "Incomplete",
+    "roleColors": [{ "name": "bad", "value": "red" }],
+    "signatureElement": "",
+    "intentionalRisk": ""
+  },
+  "content": {},
+  "tokens": {},
+  "screens": [],
+  "flows": [],
+  "components": [],
+  "responsiveRules": [],
+  "interactions": [],
+  "accessibility": [],
+  "assets": [{ "path": "../escape.js", "license": "", "provenance": "" }],
+  "implementationConstraints": [],
+  "acceptance": [],
+  "openQuestions": ["What should this be?"],
+  "provenance": {}
+}

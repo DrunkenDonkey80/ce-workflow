@@ -13411,7 +13411,119 @@
         "schemaVersion": 1,
         "title": "Build the durable design lifecycle and approval model"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "738965284ca3ffec3ffd719644474c4b5deca3dbea3aee77302fb3c4b5f4fff1",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "work-design-contracts",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 120000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T10:09:09.210Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:9d8b87a8b8c8ba59c15a98f6df75f3248c6f614e2610cb920987537715fb4a7b"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "738965284ca3ffec3ffd719644474c4b5deca3dbea3aee77302fb3c4b5f4fff1",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "work-design-contracts",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 120000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T10:14:00.787Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:3bdb219fa6df059e093d9aa6f38864eb8fd5356a28294e1f795e69dbe933d407"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "738965284ca3ffec3ffd719644474c4b5deca3dbea3aee77302fb3c4b5f4fff1",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "work-design-contracts",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 120000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T10:15:52.577Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:3bdb219fa6df059e093d9aa6f38864eb8fd5356a28294e1f795e69dbe933d407"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-7.1",
       "implementationScope": {
         "discoveryAllowed": false,
@@ -13439,13 +13551,18 @@
         "wo:vertical-slice"
       ],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U1\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Pure design lifecycle, artifacts, and approval\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Pure design lifecycle, artifacts, and approval\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work."
+        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U1\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Pure design lifecycle, artifacts, and approval\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Pure design lifecycle, artifacts, and approval\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
+        "wo:review-scope {\"files\":[\"extensions/work-design.js\",\"scripts/fixtures/opendesign/handoff-invalid.json\",\"scripts/fixtures/opendesign/handoff-valid.json\",\"scripts/test-work-design.mjs\"],\"fingerprint\":\"50fa779c75fbb65c7675dfb9f6d8d5ded11660585321543e5c2937f3ff18a662\"}",
+        "wo:review PASS node scripts/test-work-design.mjs exit=0; handoff v1 validation, key-order-stable hashes, illegal-transition fail-closed, repair cap, approval invalidation, and path trust boundary all covered by 4 scoped untracked files",
+        "wo:review-scope {\"files\":[\"extensions/work-design.js\",\"scripts/fixtures/opendesign/handoff-invalid.json\",\"scripts/fixtures/opendesign/handoff-valid.json\",\"scripts/test-work-design.mjs\"],\"fingerprint\":\"7c1e1b859a8fca983a18cb5633025fea61d3d9b444b36d52e901f51867674282\"}",
+        "wo:review PASS re-review after scope fingerprint change: node scripts/test-work-design.mjs exit=0; handoff v1 structure/enum/cap/id/color/viewport/path/executable/provenance checks, key-order-stable hashes, illegal-transition fail-closed, repair cap, approval invalidation, symlink+non-file path boundary all covered; nothing staged",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-design.mjs\nOutput: work-design-contracts:work-design tests passed"
       ],
       "parentId": "work-7",
-      "status": "open",
+      "status": "closed",
       "title": "U1: Pure design lifecycle, artifacts, and approval",
       "type": "task",
-      "updatedAt": "2026-08-31T09:34:02.436Z",
+      "updatedAt": "2026-08-31T10:15:52.849Z",
       "verificationContract": {
         "required": [
           {
@@ -13468,7 +13585,8 @@
           }
         ],
         "version": 1
-      }
+      },
+      "verificationRevision": "workspace-sha256:3bdb219fa6df059e093d9aa6f38864eb8fd5356a28294e1f795e69dbe933d407"
     },
     "work-7.2": {
       "acceptance": "Explicit command spec, OD_BIN, PATH, macOS collision, and Windows wrapper cases resolve without shell injection or auto-install.\nInitialize/tools discovery is required before calls and missing identity/tools produces typed diagnostics.\nSplit/coalesced LF/CRLF messages plus defensive Content-Length input, malformed/oversized output, stderr, timeout, abort, cleanup, and process exit are bounded.\nSafe reads may retry once; ambiguous mutations never do, lost create is reconciled by preallocated ID, and explicit recharge resume uses the exact requestId/original payload plus resume:true after user confirmation.",
@@ -14236,7 +14354,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T09:59:41.883Z"
+    "updatedAt": "2026-08-31T10:15:52.850Z"
   },
   "schemaVersion": 1
 }

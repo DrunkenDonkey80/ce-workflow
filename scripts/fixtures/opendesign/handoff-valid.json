@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "identity": {
+    "id": "DESIGN-DEMO",
+    "title": "Demo dashboard",
+    "briefHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "direction": {
+    "summary": "A calm operational dashboard with clear recovery paths.",
+    "roleColors": [
+      { "name": "canvas", "value": "#101820" },
+      { "name": "surface", "value": "#1E2A36" },
+      { "name": "text", "value": "#F4F7FA" },
+      { "name": "accent", "value": "#34C3A0" }
+    ],
+    "signatureElement": "A compact recovery rail",
+    "intentionalRisk": "Dense information on desktop"
+  },
+  "content": {
+    "heading": "System health",
+    "empty": "No incidents",
+    "error": "Health data is temporarily unavailable"
+  },
+  "tokens": {
+    "spacing": [4, 8, 16, 24],
+    "typeRoles": ["display", "body", "label"]
+  },
+  "screens": [
+    {
+      "id": "SCREEN-HOME",
+      "title": "Health dashboard",
+      "states": ["loading", "ready", "empty", "error"],
+      "viewports": ["desktop", "mobile"],
+      "requiredRegions": ["status summary", "incident list", "recovery actions"]
+    }
+  ],
+  "flows": [
+    {
+      "id": "FLOW-RECOVER",
+      "title": "Recover a failed service",
+      "steps": ["Open incident", "Inspect evidence", "Run recovery"]
+    }
+  ],
+  "components": [
+    {
+      "id": "COMP-INCIDENT",
+      "name": "Incident card",
+      "states": ["default", "focused", "disabled"]
+    }
+  ],
+  "responsiveRules": [
+    "Stack the recovery rail below the incident list on mobile"
+  ],
+  "interactions": [
+    {
+      "id": "INT-RECOVER",
+      "trigger": "Activate recovery action",
+      "outcome": "Show progress and an eventual success or failure state"
+    }
+  ],
+  "accessibility": [
+    "Keyboard access to every recovery action",
+    "Status changes use a live region"
+  ],
+  "assets": [
+    {
+      "path": "reference/operator-view.png",
+      "license": "CC0",
+      "provenance": "Repository-local reference"
+    }
+  ],
+  "implementationConstraints": [
+    "Reuse the existing status service",
+    "Do not execute prototype code"
+  ],
+  "acceptance": [
+    {
+      "id": "DES-1",
+      "description": "The dashboard presents every required state at desktop and mobile sizes.",
+      "screenIds": ["SCREEN-HOME"],
+      "states": ["loading", "ready", "empty", "error"],
+      "viewports": ["desktop", "mobile"],
+      "proofs": ["interaction", "visual", "accessibility", "logs"]
+    }
+  ],
+  "openQuestions": [],
+  "provenance": {
+    "source": "OpenDesign fake peer",
+    "generatedAt": "2026-08-31T00:00:00.000Z",
+    "remoteFingerprint": "demo-v1"
+  }
+}
