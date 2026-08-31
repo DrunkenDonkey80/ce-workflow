@@ -303,7 +303,7 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
             "id": "work-design-contracts",
             "capability": "command",
             "proof": "test",
-            "source": "R12-R24 pure lifecycle and trust-boundary acceptance",
+            "source": "R12-R16, R18-R19, and R23 pure lifecycle and trust-boundary acceptance",
             "operation": {
               "command": "node scripts/test-work-design.mjs",
               "timeoutMs": 120000,
