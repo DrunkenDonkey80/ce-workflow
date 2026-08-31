@@ -142,8 +142,10 @@ import {
 	canonicalDesignJson,
 	consumeDesignRepairAttempt,
 	createDesignApproval,
+	createDesignFidelityContract,
 	createDesignSession,
 	designApprovalIsCurrent,
+	designFidelityStatus,
 	designLineageNotes,
 	designSessionPath,
 	hashDesignValue,
@@ -15276,13 +15278,13 @@ export function bootstrapPlanEpic(
 		});
 	}
 	if (implementationUnits.designAuthority) {
-		const ownerId = implementationUnits.designAuthority.ownerId;
+		const authority = implementationUnits.designAuthority;
+		const ownerId = authority.ownerId;
 		const current = designPlanningAuthority(cwd, ownerId);
 		if (
 			current &&
 			(!current.ok ||
-				hashDesignValue(current.authority) !==
-					hashDesignValue(implementationUnits.designAuthority))
+				hashDesignValue(current.authority) !== hashDesignValue(authority))
 		)
 			return errorState(
 				"design-planning-blocked",
@@ -15296,6 +15298,23 @@ export function bootstrapPlanEpic(
 					],
 				},
 			);
+		const strict = workOrchSettings(cwd).designReviewProof === "strict";
+		for (const unit of implementationUnits) {
+			if (!unit.designCriteria.length) continue;
+			const fidelity = createDesignFidelityContract({
+				authority,
+				criteriaIds: unit.designCriteria,
+				verificationContract: unit.verificationContract,
+				strict,
+			});
+			if (!fidelity.ok)
+				return errorState(fidelity.blocker.code, fidelity.blocker.message, {
+					action: "design-proof-blocked",
+					planPath: rel,
+					suggestedCommands: [`/wo resume ${ownerId}`],
+				});
+			unit.verificationContract = fidelity.contract;
+		}
 	}
 	const gitReport = git ?? resumeGitReport(cwd, [rel]);
 	const initReport = init ?? ensureWorkStoreInitialized(cwd);
@@ -17520,6 +17539,16 @@ function buildWorkFinishState(cwd, args = "") {
 			(file) => raw.includes(file) || raw.includes(file.split(/[\\/]/).pop()),
 		);
 		const contractStatus = verificationContractStatus(workItem, { cwd });
+		const fidelity = designFidelityStatus(workItem, contractStatus);
+		if (!fidelity.ok)
+			return stop(
+				"design-fidelity-incomplete",
+				`Approved-design fidelity proof is incomplete: ${JSON.stringify(fidelity.missingCells)}`,
+				{
+					fidelityMatrix: fidelity.cells,
+					suggestedCommands: [`/wo resume ${idOf(workItem)}`],
+				},
+			);
 		const verified = hasVerificationEvidence(workItem) && contractStatus.ok;
 		const acceptedReview =
 			hasReviewPass(workItem) ||

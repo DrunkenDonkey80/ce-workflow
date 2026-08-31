@@ -15537,7 +15537,407 @@
         "schemaVersion": 1,
         "title": "Add design fidelity proof and finish gates"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "id": "design-fidelity-matrix",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-design.mjs",
+            "cwd": ".",
+            "durationMs": 288,
+            "stderr": "",
+            "stdout": "work-design tests passed\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:41:08.756Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:52861a0bbef3a8bab7fe9ce793cf814ff6b2278fe22c57c86261647a0e202766"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "id": "design-proof-contracts",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-verification-contract.mjs",
+            "cwd": ".",
+            "durationMs": 63,
+            "stderr": "",
+            "stdout": "work verification contracts: PASS\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:41:08.971Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:52861a0bbef3a8bab7fe9ce793cf814ff6b2278fe22c57c86261647a0e202766"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "id": "design-browser-operations",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-browser-adapter.mjs",
+            "cwd": ".",
+            "durationMs": 781,
+            "stderr": "warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'source.js', LF will be replaced by CRLF the next time Git touches it\n",
+            "stdout": "browser capability adapter live smoke: PASS\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:41:09.902Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:52861a0bbef3a8bab7fe9ce793cf814ff6b2278fe22c57c86261647a0e202766"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "id": "design-finish-gate",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-start-finish.mjs",
+            "cwd": ".",
+            "durationMs": 9340,
+            "stderr": "",
+            "stdout": "ok - coded work start/finish behavior\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:41:19.395Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:52861a0bbef3a8bab7fe9ce793cf814ff6b2278fe22c57c86261647a0e202766"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "design-fidelity-matrix",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:41:38.330Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "5f34d4cc10a218a23878dfd77c493bff28dfd2038516388bc12661b46cc56c15"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "detail": "node scripts/test-work-verification-contract.mjs",
+          "id": "design-proof-contracts",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-verification-contract.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:41:38.332Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "48712e1cbe478d69fcb0cdcb51cd4de16af0937330e271b27e742c47d9de8a2e"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "detail": "node scripts/test-work-browser-adapter.mjs",
+          "id": "design-browser-operations",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-browser-adapter.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 240000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:41:38.334Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "b80691e8f1eeefdbe745e5b090dd63e7976a85494f9eb2986d861555cc694ece"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "detail": "node scripts/test-work-start-finish.mjs",
+          "id": "design-finish-gate",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-start-finish.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 240000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:41:38.336Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "design-fidelity-matrix",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:44:31.943Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "5f34d4cc10a218a23878dfd77c493bff28dfd2038516388bc12661b46cc56c15"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "detail": "node scripts/test-work-verification-contract.mjs",
+          "id": "design-proof-contracts",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-verification-contract.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:44:31.945Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "48712e1cbe478d69fcb0cdcb51cd4de16af0937330e271b27e742c47d9de8a2e"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "detail": "node scripts/test-work-browser-adapter.mjs",
+          "id": "design-browser-operations",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-browser-adapter.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 240000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:44:31.947Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "b80691e8f1eeefdbe745e5b090dd63e7976a85494f9eb2986d861555cc694ece"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "b53766f7a184dcf784c9d145d44937b7e281480ddc48fcf320c16ec915fb77d8",
+          "detail": "node scripts/test-work-start-finish.mjs",
+          "id": "design-finish-gate",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-start-finish.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 240000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:44:31.948Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-7.7",
       "implementationScope": {
         "discoveryAllowed": false,
@@ -15569,13 +15969,16 @@
         "wo:vertical-slice"
       ],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U7\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Design fidelity proof and finish gates\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Design fidelity proof and finish gates\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work."
+        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U7\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Design fidelity proof and finish gates\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Design fidelity proof and finish gates\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
+        "wo:review-scope {\"files\":[\"extensions/work-design.js\",\"extensions/work-models.js\",\"scripts/test-work-browser-adapter.mjs\",\"scripts/test-work-design.mjs\",\"scripts/test-work-plan-open-questions.mjs\",\"scripts/test-work-start-finish.mjs\"],\"fingerprint\":\"9f7428de5cf70c0110a5e66b01d9c2f921b48af352f9fb986d8dc85093aeafd0\"}",
+        "wo:review PASS design fidelity contract/status + finish gate reviewed; 4 required proofs PASS at revision cda67a37 (work-design, verification-contract, browser-adapter, start-finish)",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-design.mjs && node scripts/test-work-verification-contract.mjs && node scripts/test-work-browser-adapter.mjs && node scripts/test-work-start-finish.mjs\nOutput: design-fidelity-matrix:work-design tests passed\ndesign-proof-contracts:work verification contracts: PASS\ndesign-browser-operations:browser capability adapter live smoke: PASS\ndesign-finish-gate:ok - coded work start/finish behavior"
       ],
       "parentId": "work-7",
-      "status": "open",
+      "status": "closed",
       "title": "U7: Design fidelity proof and finish gates",
       "type": "task",
-      "updatedAt": "2026-08-31T09:34:02.451Z",
+      "updatedAt": "2026-08-31T12:44:32.238Z",
       "verificationContract": {
         "required": [
           {
@@ -15652,7 +16055,8 @@
           }
         ],
         "version": 1
-      }
+      },
+      "verificationRevision": "workspace-sha256:cda67a3745d3ac16d84a9f3b1be98eb66aa162bd122f8b6724e5628d2b75bcda"
     },
     "work-7.8": {
       "acceptance": "The packaged skill carries design-to-plan discipline without credentials, direct provider calls, or a second command surface.\nREADME covers opt-in configuration, authoritative Settings command spec, /usr/bin/od collision, provider disclosure, fallback, paths, approval, and troubleshooting.\nTelemetry contains only bounded operational categories/counts/timing and excludes content, prompts, source, credentials, and token-bearing URLs.\nFake-peer end-to-end tests survive cancellation, process loss, restart, compaction, stale sync, and disabled/non-UI regression; package verification passes.",
@@ -15741,7 +16145,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T12:29:33.461Z"
+    "updatedAt": "2026-08-31T12:44:32.239Z"
   },
   "schemaVersion": 1
 }

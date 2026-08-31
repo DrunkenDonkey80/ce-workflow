@@ -8,9 +8,11 @@ import {
 	consumeDesignRepairAttempt,
 	copyDesignReferenceAsset,
 	createDesignApproval,
+	createDesignFidelityContract,
 	createDesignSession,
 	createTextFallbackHandoff,
 	designApprovalIsCurrent,
+	designFidelityStatus,
 	designLineageNotes,
 	hashDesignValue,
 	loadDesignSession,
@@ -109,6 +111,72 @@ try {
 		"hash is independent of object key order",
 	);
 	assert.equal(canonicalDesignJson(valid), canonicalDesignJson(reordered));
+
+	const fidelity = createDesignFidelityContract({
+		authority: {
+			handoffHash: "b".repeat(64),
+			approvalHash: "c".repeat(64),
+			criteria: validated.acceptance,
+		},
+		criteriaIds: ["DES-1"],
+		strict: true,
+		verificationContract: {
+			version: 1,
+			required: [
+				{
+					id: "browser-template",
+					capability: "browser",
+					proof: "visual",
+					source: "repository browser runner",
+					operation: {
+						command: "node scripts/browser-proof.mjs",
+						timeoutMs: 60_000,
+						expectedExit: 0,
+						assertions: [{ target: "stdout", operator: "includes", value: "PASS" }],
+					},
+				},
+			],
+		},
+	});
+	assert.equal(fidelity.ok, true);
+	assert.equal(fidelity.contract.required.length, 5);
+	assert.equal(fidelity.manifest.length, 40);
+	assert(
+		fidelity.contract.required
+			.filter((entry) => entry.capability === "browser")
+			.every(
+				(entry) =>
+					entry.operation.command === "node scripts/browser-proof.mjs" &&
+					entry.fidelity.handoffHash === "b".repeat(64) &&
+					entry.instructions.includes("pixel equality is not required"),
+			),
+		"derived browser proof copies the declared operation and binds semantic cells to the approved handoff",
+	);
+	const staleProof = fidelity.contract.required[0].id;
+	const fidelityStatus = designFidelityStatus(
+		{ verificationContract: fidelity.contract },
+		{ stale: [staleProof], missing: [], blocked: [], untrusted: [], waived: [] },
+	);
+	assert.equal(fidelityStatus.ok, false);
+	assert(
+		fidelityStatus.missingCells.every(
+			(cell) => cell.proofId === staleProof && cell.status === "stale",
+		),
+		"fidelity status retains every stale matrix cell and its proof id",
+	);
+	assert.equal(
+		createDesignFidelityContract({
+			authority: {
+				handoffHash: "b".repeat(64),
+				approvalHash: "c".repeat(64),
+				criteria: validated.acceptance,
+			},
+			criteriaIds: ["DES-1"],
+			verificationContract: { version: 1, required: [] },
+		}).blocker.code,
+		"browser-runner-unavailable",
+		"missing browser command becomes a typed blocker",
+	);
 
 	let session = createDesignSession({
 		ownerId: "work-7",

@@ -197,7 +197,13 @@ try {
 				capability: "browser",
 				proof: "visual",
 				source: "declared plan operation",
-				operation: { adapter: "browser", timeoutMs: 60_000 },
+				operation: {
+					adapter: "browser",
+					command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify("process.stdout.write('PASS')")}`,
+					timeoutMs: 60_000,
+					expectedExit: 0,
+					assertions: [{ target: "stdout", operator: "includes", value: "PASS" }],
+				},
 				artifacts: ["screenshot"],
 				inspection: "goal",
 			},
@@ -304,9 +310,13 @@ try {
 			(entry) => entry.capability === "command",
 		) &&
 			children[1].verificationContract.required.some(
-				(entry) => entry.capability === "browser" && entry.proof === "visual",
+				(entry) =>
+					entry.capability === "browser" &&
+					entry.proof === "visual" &&
+					entry.operation.command.includes("process.stdout.write") &&
+					entry.fidelity.cells.length === 2,
 			),
-		"materialization preserves per-slice declared mechanical and rendered capability proof",
+		"materialization derives lossless approved-design cells while preserving the declared browser operation",
 	);
 } finally {
 	executableFixture.cleanup();

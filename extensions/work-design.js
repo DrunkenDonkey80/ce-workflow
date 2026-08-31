@@ -685,6 +685,154 @@ export function renderDesignRevisionPrompt(
 	].join("\n");
 }
 
+const DESIGN_PROOF_ARTIFACTS = Object.freeze({
+	interaction: ["screenshot", "log"],
+	visual: ["screenshot", "log"],
+	accessibility: ["log"],
+	logs: ["log"],
+});
+
+const DESIGN_INSPECTION =
+	"Inspect hierarchy/signature, tokens, required regions/content, responsive reflow, visible states, clipping/overlap, focus, and reduced motion; raw pixel equality is not required.";
+
+export function createDesignFidelityContract({
+	authority,
+	criteriaIds,
+	verificationContract,
+	strict = false,
+}) {
+	const selected = authority.criteria.filter((criterion) =>
+		criteriaIds.includes(criterion.id),
+	);
+	const browserTemplate = verificationContract.required.find(
+		(entry) =>
+			entry.capability === "browser" &&
+			typeof entry.operation?.command === "string" &&
+			entry.operation.command.trim(),
+	);
+	const groups = new Map();
+	for (const criterion of selected) {
+		const proofs = new Set(criterion.proofs);
+		if (strict) proofs.add("manual");
+		for (const proof of proofs) {
+			if (proof === "manual" && !strict) continue;
+			const viewports = [...criterion.viewports].sort();
+			const key = `${proof}\0${viewports.join("\0")}`;
+			const group = groups.get(key) ?? { proof, viewports, cells: [] };
+			for (const screenId of criterion.screenIds)
+				for (const state of criterion.states)
+					for (const viewport of viewports)
+						group.cells.push({
+							criterionId: criterion.id,
+							screenId,
+							state,
+							viewport,
+							proof,
+							expectedArtifacts:
+								proof === "manual" ? [] : DESIGN_PROOF_ARTIFACTS[proof],
+						});
+			groups.set(key, group);
+		}
+	}
+	if (
+		[...groups.values()].some((group) => group.proof !== "manual") &&
+		!browserTemplate
+	)
+		return {
+			ok: false,
+			blocker: {
+				code: "browser-runner-unavailable",
+				message:
+					"Design fidelity proof requires a declared browser entry with operation.command.",
+			},
+		};
+	const retained = verificationContract.required.filter(
+		(entry) => entry.capability !== "browser" && entry.fidelity === undefined,
+	);
+	const required = [...groups.values()]
+		.sort((left, right) =>
+			`${left.proof}:${left.viewports.join(",")}`.localeCompare(
+				`${right.proof}:${right.viewports.join(",")}`,
+			),
+		)
+		.map((group) => {
+			const digest = hashDesignValue({
+				proof: group.proof,
+				viewports: group.viewports,
+				cells: group.cells,
+			}).slice(0, 12);
+			if (group.proof === "manual")
+				return {
+					id: `design-manual-${digest}`,
+					capability: "manual",
+					proof: "approval",
+					source: "Strict approved-design fidelity review",
+					inspection: "human",
+					instructions: DESIGN_INSPECTION,
+					fidelity: {
+						version: 1,
+						handoffHash: authority.handoffHash,
+						approvalHash: authority.approvalHash,
+						viewports: group.viewports,
+						cells: group.cells,
+					},
+				};
+			return {
+				id: `design-${group.proof}-${digest}`,
+				capability: "browser",
+				proof: group.proof,
+				source: "Approved design fidelity matrix",
+				artifacts: DESIGN_PROOF_ARTIFACTS[group.proof],
+				inspection: "goal",
+				instructions: DESIGN_INSPECTION,
+				operation: structuredClone(browserTemplate.operation),
+				fidelity: {
+					version: 1,
+					handoffHash: authority.handoffHash,
+					approvalHash: authority.approvalHash,
+					viewports: group.viewports,
+					cells: group.cells,
+				},
+			};
+		});
+	if (retained.length + required.length > 32)
+		return {
+			ok: false,
+			blocker: {
+				code: "design-fidelity-manifest-too-large",
+				message: "Design fidelity requirements cannot be grouped into 32 proofs.",
+			},
+		};
+	return {
+		ok: true,
+		contract: { version: 1, required: [...retained, ...required] },
+		manifest: required.flatMap((entry) => entry.fidelity.cells),
+	};
+}
+
+export function designFidelityStatus(item, contractStatus) {
+	const entries = (item.verificationContract?.required ?? []).filter(
+		(entry) => entry.fidelity?.version === 1,
+	);
+	const states = ["missing", "blocked", "stale", "untrusted", "waived"];
+	const stateFor = (id) =>
+		states.find((state) => contractStatus[state]?.includes(id));
+	const cells = entries.flatMap((entry) =>
+		entry.fidelity.cells.map((cell) => ({
+			...cell,
+			proofId: entry.id,
+			status: stateFor(entry.id) ?? "passed",
+		})),
+	);
+	return {
+		ok: cells.every((cell) => ["passed", "waived"].includes(cell.status)),
+		cells,
+		missingCells: cells.filter(
+			(cell) => !["passed", "waived"].includes(cell.status),
+		),
+	};
+}
+
 export function designLineageNotes(input) {
 	const pairs = {
 		"design-source": input.sourceId ?? input.sourceArtifact,

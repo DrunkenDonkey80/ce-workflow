@@ -8,7 +8,11 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { appendWorkNote, mutateStore } from "../extensions/work-store.js";
+import {
+	appendWorkNote,
+	mutateStore,
+	updateWorkItem,
+} from "../extensions/work-store.js";
 const { assert, installWorkflowFixture, workflowChildParams } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
@@ -579,6 +583,52 @@ try {
 			state.reason === "design-deviation-blocked" &&
 			state.suggestedCommands[0] === "/wo design revise E-1",
 		"finish refuses to close work with an unresolved approved-design deviation",
+	);
+
+	fixture.reset("finishReady", "unknown");
+	mutateStore(finishCwd, (store) =>
+		updateWorkItem(store, "FIN-1", {
+			verificationContract: {
+				version: 1,
+				required: [
+					{
+						id: "design-visual-demo",
+						capability: "browser",
+						proof: "visual",
+						source: "approved design fidelity matrix",
+						operation: {
+							command: "node browser-proof.mjs",
+							expectedExit: 0,
+							assertions: [{ target: "exit", operator: "equals", value: "0" }],
+						},
+						fidelity: {
+							version: 1,
+							handoffHash: "b".repeat(64),
+							approvalHash: "c".repeat(64),
+							viewports: ["mobile"],
+							cells: [
+								{
+									criterionId: "DES-1",
+									screenId: "SCREEN-HOME",
+									state: "ready",
+									viewport: "mobile",
+									proof: "visual",
+									expectedArtifacts: ["screenshot", "log"],
+								},
+							],
+						},
+					},
+				],
+			},
+		}),
+	);
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		!state.ok &&
+			state.reason === "design-fidelity-incomplete" &&
+			state.fidelityMatrix[0].criterionId === "DES-1" &&
+			state.suggestedCommands[0] === "/wo resume FIN-1",
+		"finish reports exact missing design cells and a deterministic resume action",
 	);
 
 	fixture.reset("finishReady", "unknown");

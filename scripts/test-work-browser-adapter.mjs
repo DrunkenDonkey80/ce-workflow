@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createDesignFidelityContract } from "../extensions/work-design.js";
 import {
 	createWorkItem,
 	initStore,
@@ -27,20 +28,29 @@ try {
 	execFileSync("git", ["commit", "-qm", "seed"], { cwd });
 	const store = initStore(cwd);
 	const epic = createWorkItem(store, { type: "epic", title: "Browser fixture" });
-	const task = createWorkItem(store, {
-		type: "task",
-		parentId: epic.id,
-		title: "Prove browser fixture",
+	const fidelity = createDesignFidelityContract({
+		authority: {
+			handoffHash: "b".repeat(64),
+			approvalHash: "c".repeat(64),
+			criteria: [
+				{
+					id: "DES-SMOKE",
+					screenIds: ["SCREEN-CALCULATOR"],
+					states: ["ready"],
+					viewports: ["mobile"],
+					proofs: ["visual"],
+				},
+			],
+		},
+		criteriaIds: ["DES-SMOKE"],
 		verificationContract: {
 			version: 1,
 			required: [
 				{
-					id: "browser-smoke",
+					id: "browser-template",
 					capability: "browser",
 					proof: "visual",
 					source: "repository browser fixture",
-					artifacts: ["screenshot", "log"],
-					inspection: "goal",
 					operation: {
 						command: `${JSON.stringify(process.execPath)} ${JSON.stringify(runner)}`,
 						expectedExit: 0,
@@ -54,8 +64,16 @@ try {
 			],
 		},
 	});
+	assert.equal(fidelity.ok, true);
+	const proofId = fidelity.contract.required[0].id;
+	const task = createWorkItem(store, {
+		type: "task",
+		parentId: epic.id,
+		title: "Prove browser fixture",
+		verificationContract: fidelity.contract,
+	});
 	saveStore(cwd, store);
-	const executed = JSON.parse(run("work-run-proof", task.id, "browser-smoke"));
+	const executed = JSON.parse(run("work-run-proof", task.id, proofId));
 	assert.equal(executed.reusedExecution, false);
 	assert.equal(executed.verificationStatus.ok, false);
 	assert.equal(executed.proof.issuer.id, "ce.browser.command");
@@ -68,7 +86,7 @@ try {
 		run(
 			"work-run-proof",
 			task.id,
-			"browser-smoke",
+			proofId,
 			"--inspection",
 			"Calculator shows 5 with a labelled live output at a mobile viewport.",
 		),
