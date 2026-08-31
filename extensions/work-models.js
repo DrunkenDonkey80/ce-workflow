@@ -135,7 +135,9 @@ import {
 import {
 	callOpenDesignTool,
 	normalizeOpenDesignCommandSpec,
+	normalizeOpenDesignUrl,
 	openDesignPayloadDigest,
+	redactOpenDesignText,
 	reconcileCreatedProject,
 } from "./opendesign-client.js";
 import {
@@ -12676,6 +12678,8 @@ export function waiveDesignSession(cwd, ownerId) {
 }
 
 export function designReviewChoices(session) {
+	const previewUrl = normalizeOpenDesignUrl(session.previewUrl);
+	const studioUrl = normalizeOpenDesignUrl(session.studioUrl);
 	const synced =
 		session.state === "approval_required" &&
 		Boolean(session.handoffHash) &&
@@ -12684,15 +12688,17 @@ export function designReviewChoices(session) {
 		{
 			value: "preview",
 			label: "Open Preview",
-			description: session.previewUrl || "No Preview URL is available yet.",
-			disabled: !session.previewUrl,
+			description:
+				redactOpenDesignText(previewUrl) || "No Preview URL is available yet.",
+			disabled: !previewUrl,
 			disabledReason: "No Preview URL is available yet.",
 		},
 		{
 			value: "studio",
 			label: "Open Studio",
-			description: session.studioUrl || "No Studio URL is available yet.",
-			disabled: !session.studioUrl,
+			description:
+				redactOpenDesignText(studioUrl) || "No Studio URL is available yet.",
+			disabled: !studioUrl,
 			disabledReason: "No Studio URL is available yet.",
 		},
 		{
@@ -12823,7 +12829,7 @@ export async function reviewDesignSession(cwd, ownerId, ctx, options = {}) {
 				action: "design-review-ready",
 				designSession: session,
 				choices,
-				message: `Review ${session.previewUrl || session.studioUrl || "the text design"}; choose revise, sync, fallback, or cancel.`,
+				message: `Review ${redactOpenDesignText(normalizeOpenDesignUrl(session.previewUrl) || normalizeOpenDesignUrl(session.studioUrl)) || "the text design"}; choose revise, sync, fallback, or cancel.`,
 				suggestedCommands: [`/wo design review ${ownerId}`],
 			};
 		const selected = await showListDialog(ctx, {
@@ -12844,9 +12850,10 @@ export async function reviewDesignSession(cwd, ownerId, ctx, options = {}) {
 				suggestedCommands: [`/wo design review ${ownerId}`],
 			};
 		if (["preview", "studio"].includes(selected.value)) {
-			const url =
-				selected.value === "preview" ? session.previewUrl : session.studioUrl;
-			(options.openUrl ?? openUsageReport)(url);
+			const url = normalizeOpenDesignUrl(
+				selected.value === "preview" ? session.previewUrl : session.studioUrl,
+			);
+			if (url) (options.openUrl ?? openUsageReport)(url);
 			continue;
 		}
 		if (selected.value === "revise") {
@@ -13452,9 +13459,9 @@ export async function advanceDesignSession(cwd, ownerId, options = {}) {
 		else next = "run_active";
 		if (next !== session.state)
 			session = transitionDesignSession(session, next, {
-				previewUrl: String(run.previewUrl ?? "").slice(0, 2_000),
-				studioUrl: String(run.studioUrl ?? "").slice(0, 2_000),
-				agentMessage: String(run.agentMessage ?? "").slice(0, 4_000),
+				previewUrl: normalizeOpenDesignUrl(run.previewUrl),
+				studioUrl: normalizeOpenDesignUrl(run.studioUrl),
+				agentMessage: redactOpenDesignText(run.agentMessage, 4_000),
 				nextAction:
 					next === "review_ready"
 						? `/wo design review ${ownerId}`

@@ -228,7 +228,7 @@ The original brainstorm remains requirements authority and links forward. Design
 
 - Add `extensions/opendesign-client.js` and `scripts/fixtures/opendesign/fake-od.mjs`.
 - Implement structured command resolution, collision rejection, bounded identity/tool probe, JSON-RPC lifecycle, bounded LF/CRLF framing with typed rejection of unrecognized framing, response correlation, secret-safe stderr, per-call/overall timeouts, AbortSignal, child-tree cleanup, action-specific tool wrappers, request mutation policy, and normalized errors.
-- `scripts/test-work-opendesign-client.mjs` drives executable absent, wrong `od`, daemon unreachable, split/coalesced frames, malformed/oversized frames, stderr noise, missing tools, timeout/cancel/exit, success/failure/canceled/clarification, read retry, lost `create_project` reconciliation, rejected changed-payload mutation, same-ID/same-payload lost-start recovery, explicit recharge `resume: true`, and Windows wrapper resolution with no real provider.
+- `scripts/test-work-opendesign-client.mjs` drives executable absent, wrong `od`, daemon unreachable, split/coalesced frames, malformed/oversized frames, stderr noise, missing tools, timeout/cancel/exit, success/failure/canceled/clarification, read retry, lost `create_project` reconciliation, rejected changed-payload mutation, same-ID/same-payload lost-start recovery, explicit recharge `resume: true`, tokenized/invalid-scheme URL validation with no automatic fetch or log/telemetry leak, and Windows wrapper resolution with no real provider.
 
 ### U3 — Redesign/audit/commissioning and resume routing
 

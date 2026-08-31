@@ -129,9 +129,15 @@ reader.on("line", (line) => {
 		toolResult(message.id, {
 			runId: args.runId,
 			status: "succeeded",
-			previewUrl: "https://example.test/preview",
-			studioUrl: "https://example.test/studio",
-			agentMessage: "Done",
+			previewUrl:
+				mode === "untrusted-urls"
+					? "https://example.test/preview?token=super-secret"
+					: "https://example.test/preview",
+			studioUrl:
+				mode === "untrusted-urls"
+					? "javascript:alert('unsafe')"
+					: "https://example.test/studio",
+			agentMessage: mode === "untrusted-urls" ? "Done token=super-secret" : "Done",
 		});
 	else if (name === "cancel_run")
 		toolResult(message.id, { runId: args.runId, canceled: true });

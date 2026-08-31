@@ -74,10 +74,27 @@ export function redactOpenDesignText(value, max = MAX_STDERR_BYTES) {
 		.replace(/([?&](?:token|key|code|secret)=)[^&\s]+/gi, "$1[REDACTED]")
 		.replace(/\b(?:sk|od|Bearer)[-_ ][A-Za-z0-9._-]{12,}\b/gi, "[REDACTED]")
 		.replace(
-			/("?(?:api[_-]?key|access[_-]?token|password|secret)"?\s*[:=]\s*)[^,\s}]+/gi,
+			/("?(?:api[_-]?key|access[_-]?token|token|password|secret)"?\s*[:=]\s*)[^,\s}]+/gi,
 			"$1[REDACTED]",
 		)
 		.slice(-max);
+}
+
+export function normalizeOpenDesignUrl(value) {
+	const text = String(value ?? "")
+		.trim()
+		.slice(0, 2_000);
+	if (!text) return "";
+	try {
+		const url = new URL(text);
+		return ["http:", "https:"].includes(url.protocol) &&
+			!url.username &&
+			!url.password
+			? text
+			: "";
+	} catch {
+		return "";
+	}
 }
 
 function executableFiles(directory, name, platform, pathExt) {
@@ -463,9 +480,16 @@ export class OpenDesignClient {
 		if (![...READ_TOOLS, ...WRITE_TOOLS].includes(name))
 			throw error("tool-forbidden", `OpenDesign tool is not allowlisted: ${name}`);
 		assertNoCredentials(args, `${name} arguments`);
-		return decodeToolResult(
+		const result = decodeToolResult(
 			await this.request("tools/call", { name, arguments: args }),
 		);
+		if (name !== "get_run" || !plainObject(result)) return result;
+		return {
+			...result,
+			previewUrl: normalizeOpenDesignUrl(result.previewUrl),
+			studioUrl: normalizeOpenDesignUrl(result.studioUrl),
+			agentMessage: redactOpenDesignText(result.agentMessage, 4_000),
+		};
 	}
 
 	failAll(failure) {

@@ -12,6 +12,8 @@ import {
 	resolveOpenDesignCommand,
 	validateStartRecovery,
 } from "../extensions/opendesign-client.js";
+import { designLifecycleTelemetry } from "../extensions/work-design.js";
+import { designReviewChoices } from "../extensions/work-models.js";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "ce-opendesign-client-"));
 const fake = path.resolve(
@@ -86,6 +88,42 @@ try {
 		});
 		assert.equal(result.status, "succeeded", `${mode} framing works`);
 	}
+	let fetches = 0;
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = async () => {
+		fetches += 1;
+		throw new Error("OpenDesign URLs must stay inert");
+	};
+	let untrustedUrls;
+	try {
+		untrustedUrls = await callOpenDesignTool({
+			command: command("untrusted-urls"),
+			tool: "get_run",
+			args: { runId: "run-1" },
+			timeoutMs: 1_000,
+		});
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+	assert.equal(fetches, 0, "returned URLs are never fetched automatically");
+	assert.equal(
+		untrustedUrls.previewUrl,
+		"https://example.test/preview?token=super-secret",
+	);
+	assert.equal(untrustedUrls.studioUrl, "");
+	assert.doesNotMatch(untrustedUrls.agentMessage, /super-secret/);
+	const urlProjection = JSON.stringify({
+		choices: designReviewChoices({ state: "review_ready", ...untrustedUrls }),
+		telemetry: designLifecycleTelemetry({
+			state: "review_ready",
+			policy: "required",
+			...untrustedUrls,
+		}),
+	});
+	assert.doesNotMatch(
+		urlProjection,
+		/super-secret|javascript:|token=super-secret/,
+	);
 	await rejects(
 		callOpenDesignTool({
 			command: command("content-length"),
