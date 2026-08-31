@@ -239,7 +239,7 @@ The original brainstorm remains requirements authority and links forward. Design
 ### U4 — Settings and human review/revision loop
 
 - Add scoped workflow/launch/proof settings to the existing settings loop and status, with first-release Off default and command-spec validation/redaction.
-- Reuse `showListDialog` for the review overlay, including disabled approval reasons, refreshed Preview/Studio display/open action, request-changes capture, sync, text fallback/waiver, cancel, and non-TUI projections. Fix the shared dialog so disabled rows cannot be selected in TUI or native fallback, and lock that invariant with focused tests.
+- Reuse `showListDialog` for the review overlay, including disabled approval reasons, refreshed Preview/Studio display/open action, request-changes capture, sync, text fallback/waiver, cancel, and non-TUI projections. Rely on its existing TUI/native disabled-row guard and cover that reuse with focused design-flow tests; do not change the shared dialog.
 - Keep all choices under `/wo`; no separate extension command or custom dialog implementation.
 
 ### U5 — Sync, repair, confined import, approval, and lineage
