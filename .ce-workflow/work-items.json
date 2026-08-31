@@ -13628,13 +13628,14 @@
         "wo:vertical-slice"
       ],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U2\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Safe OpenDesign stdio MCP adapter\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Safe OpenDesign stdio MCP adapter\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work."
+        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U2\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Safe OpenDesign stdio MCP adapter\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Safe OpenDesign stdio MCP adapter\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
+        "wo:decision lost start response recovery uses one OpenDesign-documented same-requestId/same-payload idempotent start_run replay; changed payload or identity is forbidden"
       ],
       "parentId": "work-7",
-      "status": "open",
+      "status": "in_progress",
       "title": "U2: Safe OpenDesign stdio MCP adapter",
       "type": "task",
-      "updatedAt": "2026-08-31T09:34:02.437Z",
+      "updatedAt": "2026-08-31T10:16:17.558Z",
       "verificationContract": {
         "required": [
           {
@@ -14354,7 +14355,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T10:15:52.850Z"
+    "updatedAt": "2026-08-31T10:17:44.806Z"
   },
   "schemaVersion": 1
 }

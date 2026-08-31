@@ -47,7 +47,7 @@ OpenDesign is optional and disabled by default in the first release. Enabling it
 3. **Launch configuration is structured.** Settings support `Auto` plus an explicit `{ command, args, env }` command spec copied from OpenDesign Settings. `OD_BIN` and a verified PATH `od` remain compatibility inputs. No shell interpolation or auto-install is permitted.
 4. **Identity is proved before availability.** Auto discovery rejects known collisions such as macOS `/usr/bin/od`, then performs a bounded `initialize` + `tools/list` probe and requires server identity plus the tools needed for the intended action. A filesystem name alone is never proof that the binary is OpenDesign.
 5. **One stdio process per ce-workflow action.** A process may execute the calls needed for one command/resume step, then closes. Long runs persist `{projectId, runId, requestId}` and reconcile on explicit `/wo resume`, `/wo design status/sync`, or an extension-owned wake if one is already available; no 5–30 minute modal or immortal child process is introduced.
-6. **Persist before mutation.** A preallocated valid project ID, canonical random UUID request ID, and exact bounded start payload digest are written atomically before their mutations. An ambiguous `create_project` is reconciled by `get_project` with the persisted explicit ID; it is never blindly replayed. An ambiguous `start_run` never generates a replacement ID or payload.
+6. **Persist before mutation.** A preallocated valid project ID, canonical random UUID request ID, and exact bounded start payload are written atomically before their mutations. An ambiguous `create_project` is reconciled by `get_project` with the persisted explicit ID; it is never blindly replayed. When `start_run` loses its response before a run ID is known, its documented idempotent recovery is one replay with the exact persisted request ID and payload; no new mutation identity or changed payload is allowed.
 7. **Use explicit project IDs.** `create_project` receives the preallocated ID; every later call uses it and never depends on expiring active-project context.
 8. **Preview is delivery; source import is narrow.** Success returns Preview/Studio for user review. OpenDesign sync imports only expected Markdown/JSON. Reference images may enter the design directory only from existing repository files or ce-workflow's browser adapter because the public MCP surface cannot read binary content. Generated HTML/JS, commands, package files, provider instructions, and remote binary files are never fetched, executed, or promoted.
 9. **Approval follows sync.** Approval is possible only after a current, valid, question-free handoff is synchronized. It pins canonical brief, handoff, remote fingerprint, owner, and revision hashes. Any relevant mutation invalidates approval.
@@ -73,7 +73,7 @@ OpenDesign is optional and disabled by default in the first release. Enabling it
 - **R6.** Discovery order is explicit command spec, `OD_BIN`, then verified PATH candidates (including Windows wrappers); no auto-install, shell interpolation, or unverified bare `od` use.
 - **R7.** The stdio client uses JSON-RPC 2.0 initialize/initialized, `tools/list`, correlated monotonically unique request IDs, bounded LF/CRLF parsing for the current SDK transport plus defensive Content-Length tolerance, separate stderr capture, byte/time caps, AbortSignal cancellation, child-tree cleanup, and secret scrubbing.
 - **R8.** Discovery requires the OpenDesign server identity and action-specific tools. Missing daemon/tools/provider returns a typed, actionable state and never crashes unrelated `/wo` flows.
-- **R9.** Mutating calls are never auto-replayed after ambiguous failure. Safe reads may retry once in a fresh process. Normal `start_run` reconciliation requires the persisted exact request ID and payload. A recharge resume occurs only after explicit user confirmation of top-up and calls `start_run` with that same request ID/original payload plus `resume: true`. Raw API keys and credential-like plugin inputs are rejected.
+- **R9.** Mutating calls are not generically retried after ambiguous failure. Safe reads may retry once in a fresh process. `create_project` is read-reconciled. If `start_run` loses its response before returning a run ID, one explicit recovery call replays the exact persisted request ID and payload, relying on OpenDesign's documented idempotency; a different payload with that ID is rejected. A recharge resume occurs only after explicit user confirmation of top-up and calls `start_run` with that same request ID/original payload plus `resume: true`. Raw API keys and credential-like plugin inputs are rejected.
 - **R10.** `create_project` receives a persisted preallocated ID; an ambiguous response is resolved through `get_project` for that ID without replay. `start_run` persists run/studio references; `get_run` recognizes `queued|running|succeeded|failed|canceled`, preserves bounded `agentMessage`, failure action/recharge URL, and missing-deliverable diagnostics; cancel preserves uncertainty when transport is lost.
 - **R11.** Every peer value is validated and clamped. URLs are inert `http/https` display/open references, never fetched automatically; prompts, credentials, tokens, full artifacts, and token-bearing URLs never enter telemetry or ordinary logs.
 
@@ -162,7 +162,7 @@ The original brainstorm remains requirements authority and links forward. Design
 
 1. Persist request ID + payload digest before mutation and project/run IDs immediately when known.
 2. Close the stdio child when the command step ends.
-3. On resume, read durable state, verify the configured peer, reconcile an ambiguous `create_project` by `get_project` with the preallocated ID, and query a known `runId` or reconcile an ambiguous start only with the exact persisted request identity.
+3. On resume, read durable state, verify the configured peer, reconcile an ambiguous `create_project` by `get_project` with the preallocated ID, and query a known `runId`; when no run ID was returned, replay `start_run` once with the exact persisted request ID and payload to recover OpenDesign's idempotent result.
 4. A recharge resume requires explicit user confirmation and the exact original start payload plus `resume: true`; never start a duplicate logical run merely because a response was lost.
 
 ### F4 — Manual OpenDesign edit and stale approval
@@ -192,7 +192,7 @@ The original brainstorm remains requirements authority and links forward. Design
 
 - **Wrong `od` executable:** deny known collisions, avoid shell resolution after discovery, verify MCP server identity/tools, and make explicit command spec the reliable path.
 - **Malicious/noisy stdio peer:** bounded dual framing parser, request correlation, strict schemas, stderr separation/redaction, timeout/abort, and process-tree cleanup.
-- **Duplicate paid run/project:** persist explicit project/request identity before dispatch; reconcile ambiguous create/start with safe reads, and use explicit-confirmation `resume: true` only for recharge.
+- **Duplicate paid run/project:** persist explicit project/request identity before dispatch; read-reconcile ambiguous create, use only OpenDesign's same-ID/same-payload idempotent replay for a lost start response, and use explicit-confirmation `resume: true` only for recharge.
 - **Long run blocks Pi:** process-per-action and durable lazy reconciliation; no persistent modal or child required.
 - **Stale design becomes implementation authority:** mandatory sync at approval/resume/planning, canonical hashes, owner/revision binding, and plan/finish stale gates.
 - **Prototype contaminates production:** confined allowlist imports and explicit planner/builder non-goal.
@@ -228,7 +228,7 @@ The original brainstorm remains requirements authority and links forward. Design
 
 - Add `extensions/opendesign-client.js` and `scripts/fixtures/opendesign/fake-od.mjs`.
 - Implement structured command resolution, collision rejection, bounded identity/tool probe, JSON-RPC lifecycle, current LF/CRLF framing plus defensive Content-Length tolerance, response correlation, secret-safe stderr, per-call/overall timeouts, AbortSignal, child-tree cleanup, action-specific tool wrappers, request mutation policy, and normalized errors.
-- `scripts/test-work-opendesign-client.mjs` drives executable absent, wrong `od`, daemon unreachable, split/coalesced frames, malformed/oversized frames, stderr noise, missing tools, timeout/cancel/exit, success/failure/canceled/clarification, read retry, lost `create_project` reconciliation, ambiguous mutation, exact request-ID reuse, explicit recharge `resume: true`, and Windows wrapper resolution with no real provider.
+- `scripts/test-work-opendesign-client.mjs` drives executable absent, wrong `od`, daemon unreachable, split/coalesced frames, malformed/oversized frames, stderr noise, missing tools, timeout/cancel/exit, success/failure/canceled/clarification, read retry, lost `create_project` reconciliation, rejected changed-payload mutation, same-ID/same-payload lost-start recovery, explicit recharge `resume: true`, and Windows wrapper resolution with no real provider.
 
 ### U3 — Redesign/audit/commissioning and resume routing
 
@@ -322,7 +322,7 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
         "Explicit command spec, OD_BIN, PATH, macOS collision, and Windows wrapper cases resolve without shell injection or auto-install.",
         "Initialize/tools discovery is required before calls and missing identity/tools produces typed diagnostics.",
         "Split/coalesced LF/CRLF messages plus defensive Content-Length input, malformed/oversized output, stderr, timeout, abort, cleanup, and process exit are bounded.",
-        "Safe reads may retry once; ambiguous mutations never do, lost create is reconciled by preallocated ID, and explicit recharge resume uses the exact requestId/original payload plus resume:true after user confirmation."
+        "Safe reads may retry once, lost create is read-reconciled by preallocated ID, lost start permits one documented same-requestId/same-payload idempotent recovery call, changed-payload mutation is rejected, and recharge resume uses the original identity/payload plus resume:true after user confirmation."
       ],
       "dependencies": [],
       "files": [
