@@ -9,6 +9,7 @@ const { assert, installWorkflowFixture } = await import(
 );
 const {
 	buildWorkPlanState,
+	extractImplementationUnits,
 	scanPlanOpenQuestions,
 	bootstrapPlanEpic,
 	executeOrchestratorAction,
@@ -163,6 +164,31 @@ try {
 			},
 		],
 	};
+	const designAuthority = {
+		version: 1,
+		ownerId: "work-design-demo",
+		revision: 2,
+		briefPath: "docs/designs/work-design-demo/DESIGN-BRIEF.md",
+		briefHash: "a".repeat(64),
+		handoffPath: "docs/designs/work-design-demo/DESIGN-HANDOFF.json",
+		handoffHash: "b".repeat(64),
+		approvalPath: "docs/designs/work-design-demo/APPROVAL.json",
+		approvalHash: "c".repeat(64),
+		fallback: false,
+		criteria: [
+			{
+				id: "DES-1",
+				description: "Responsive ready state",
+				screenIds: ["SCREEN-HOME"],
+				states: ["ready"],
+				viewports: ["desktop", "mobile"],
+				proofs: ["visual"],
+			},
+		],
+		constraints: ["Reuse the existing calculator shell"],
+		assets: [{ path: "reference.png", license: "CC0", provenance: "repo" }],
+		prototypeAuthority: false,
+	};
 	const browserContract = {
 		version: 1,
 		required: [
@@ -187,6 +213,7 @@ try {
 			"# Executable demo plan",
 			"```json",
 			JSON.stringify({
+				designAuthority,
 				implementationUnits: [
 					{
 						key: "U1",
@@ -196,6 +223,7 @@ try {
 						dependencies: [],
 						files: ["src/calculator.js"],
 						nonGoals: ["Browser styling"],
+						designCriteria: [],
 						verificationContract: commandContract,
 					},
 					{
@@ -207,6 +235,7 @@ try {
 						surfaces: ["browser"],
 						discoveryAllowed: true,
 						nonGoals: ["Desktop packaging"],
+						designCriteria: ["DES-1"],
 						verificationContract: browserContract,
 					},
 				],
@@ -238,6 +267,38 @@ try {
 			children[1].implementationScope.discoveryAllowed === true,
 		"materialized units preserve the declared dependency graph and scope",
 	);
+	assert(
+		children[1].acceptance.includes("DES-1") &&
+			children[1].notes.join("\n").includes("design-criteria: DES-1") &&
+			children[1].documentLinks.designApproval === designAuthority.approvalPath &&
+			children[1].implementationScope.nonGoals.includes(
+				"Copying or executing OpenDesign prototype code",
+			),
+		"materialized work preserves assigned DES matrix, authority links, shared hashes, and prototype non-authority",
+	);
+	let unmappedRejected = false;
+	try {
+		extractImplementationUnits(
+			`\`\`\`json\n${JSON.stringify({
+				designAuthority,
+				implementationUnits: [
+					{
+						key: "U1",
+						title: "Unmapped",
+						outcome: "Incomplete mapping",
+						acceptance: "Never accepted",
+						dependencies: [],
+						files: ["src/unmapped.js"],
+						designCriteria: [],
+						verificationContract: commandContract,
+					},
+				],
+			})}\n\`\`\``,
+		);
+	} catch (error) {
+		unmappedRejected = /missing DES-1/.test(error.message);
+	}
+	assert(unmappedRejected, "every approved DES criterion must map to a unit");
 	assert(
 		children[0].verificationContract.required.some(
 			(entry) => entry.capability === "command",

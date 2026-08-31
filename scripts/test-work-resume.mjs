@@ -1478,6 +1478,52 @@ try {
 	);
 	rmSync(maxCwd, { recursive: true, force: true });
 
+	const deviationCwd = mkdtempSync(
+		path.join(tmpdir(), "work-resume-design-deviation-"),
+	);
+	const deviationItems = [
+		{
+			id: "DESIGN-EPIC",
+			issue_type: "epic",
+			status: "open",
+			title: "Design implementation",
+		},
+		{
+			id: "DESIGN-TASK",
+			parent_id: "DESIGN-EPIC",
+			issue_type: "task",
+			status: "open",
+			title: "Implement approved screen",
+			labels: ["wo:slice-planned"],
+			notes:
+				"wo:slice-plan\ndesign-owner: DESIGN-EPIC\ndesign-criteria: DES-1\nwo:design-deviation layout cannot preserve the approved state",
+		},
+	];
+	seedNativeStore(deviationCwd, deviationItems);
+	let deviationState = buildWorkResumeState(deviationCwd, "DESIGN-EPIC");
+	assert(
+		deviationState.action === "design-deviation-blocked" &&
+			deviationState.suggestedCommands[0] === "/wo design revise DESIGN-EPIC",
+		"a reported design deviation pauses affected work for revision and reapproval",
+	);
+	seedNativeStore(
+		deviationCwd,
+		deviationItems.map((item) =>
+			item.id === "DESIGN-TASK"
+				? {
+						...item,
+						notes: `${item.notes}\nwo:design-deviation-resolved`,
+					}
+				: item,
+		),
+	);
+	deviationState = buildWorkResumeState(deviationCwd, "DESIGN-EPIC");
+	assert(
+		deviationState.action !== "design-deviation-blocked",
+		"resolved design deviation returns the slice to normal resume routing",
+	);
+	rmSync(deviationCwd, { recursive: true, force: true });
+
 	const miscCwd = mkdtempSync(path.join(tmpdir(), "work-resume-misc-"));
 	seedNativeStore(miscCwd, [
 		{

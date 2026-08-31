@@ -15004,7 +15004,407 @@
         "schemaVersion": 1,
         "title": "Make planning and work items design-aware"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "id": "design-plan-source",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-design.mjs",
+            "cwd": ".",
+            "durationMs": 286,
+            "stderr": "",
+            "stdout": "work-design tests passed\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:26:25.214Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:b25e10a4756ef6afcf2e95efdf9b2471aa087a65b129a5e6d9a6eab70a6cf8e1"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "id": "design-plan-open-gate",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-plan-open-questions.mjs",
+            "cwd": ".",
+            "durationMs": 640,
+            "stderr": "",
+            "stdout": "open-questions and executable materialization gates: PASS\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:26:26.010Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:b25e10a4756ef6afcf2e95efdf9b2471aa087a65b129a5e6d9a6eab70a6cf8e1"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "id": "design-plan-resume",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-resume.mjs",
+            "cwd": ".",
+            "durationMs": 6051,
+            "stderr": "",
+            "stdout": "ok - coded work-resume behavior\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:26:32.218Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:b25e10a4756ef6afcf2e95efdf9b2471aa087a65b129a5e6d9a6eab70a6cf8e1"
+        },
+        {
+          "artifacts": [],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "id": "design-plan-materialization",
+          "issuer": {
+            "capability": "command",
+            "id": "ce.command.process",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "cleanup": {
+              "ok": true
+            },
+            "command": "node scripts/test-work-start-finish.mjs",
+            "cwd": ".",
+            "durationMs": 9445,
+            "stderr": "",
+            "stdout": "ok - coded work start/finish behavior\n"
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:26:41.820Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:b25e10a4756ef6afcf2e95efdf9b2471aa087a65b129a5e6d9a6eab70a6cf8e1"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "design-plan-source",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:27:28.998Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "e8f0bfb2a04d73f292f147242d3e3f4cee95cc4ac3fb373f86a6d5998a3a6f4b"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "detail": "node scripts/test-work-plan-open-questions.mjs",
+          "id": "design-plan-open-gate",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-plan-open-questions.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:27:29.000Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "6b2b9a73db9acf7802ee66683c57d562b365424357e04417bc0cb5f5c7eb9f4f"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "detail": "node scripts/test-work-resume.mjs",
+          "id": "design-plan-resume",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-resume.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:27:29.001Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "b80691e8f1eeefdbe745e5b090dd63e7976a85494f9eb2986d861555cc694ece"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "detail": "node scripts/test-work-start-finish.mjs",
+          "id": "design-plan-materialization",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-start-finish.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 240000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:27:29.003Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "125d394c52a9ce78040fd68b9874933fe974b05ebc047a386176e908e54eff04"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "detail": "node scripts/test-work-design.mjs",
+          "id": "design-plan-source",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-design.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:29:33.163Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "e8f0bfb2a04d73f292f147242d3e3f4cee95cc4ac3fb373f86a6d5998a3a6f4b"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "detail": "node scripts/test-work-plan-open-questions.mjs",
+          "id": "design-plan-open-gate",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-plan-open-questions.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:29:33.166Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "6b2b9a73db9acf7802ee66683c57d562b365424357e04417bc0cb5f5c7eb9f4f"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "detail": "node scripts/test-work-resume.mjs",
+          "id": "design-plan-resume",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-resume.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:29:33.168Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "b80691e8f1eeefdbe745e5b090dd63e7976a85494f9eb2986d861555cc694ece"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "6768d0f6f2502532cd477cc9d483475b96e1a674577f8811218a1c9210857968",
+          "detail": "node scripts/test-work-start-finish.mjs",
+          "id": "design-plan-materialization",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-start-finish.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 240000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T12:29:33.169Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-7.6",
       "implementationScope": {
         "discoveryAllowed": false,
@@ -15036,13 +15436,16 @@
         "wo:vertical-slice"
       ],
       "notes": [
-        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U6\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Design-aware planning and work-item propagation\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Design-aware planning and work-item propagation\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work."
+        "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U6\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Design-aware planning and work-item propagation\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Design-aware planning and work-item propagation\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
+        "wo:review-scope {\"files\":[\"extensions/work-models.js\",\"scripts/test-work-design.mjs\",\"scripts/test-work-plan-open-questions.mjs\",\"scripts/test-work-resume.mjs\",\"scripts/test-work-start-finish.mjs\"],\"fingerprint\":\"48e42ef78dceec7ebc7bbe4c8dc28447625d13328acae522e4e236f6034d7f1d\"}",
+        "wo:review PASS design authority gating/propagation reviewed in work-models.js (designPlanningAuthority, designDeviationGate, manifest designAuthority validation + full DES mapping) with 4/4 contract tests PASS at revision 4fc21d37",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-design.mjs && node scripts/test-work-plan-open-questions.mjs && node scripts/test-work-resume.mjs && node scripts/test-work-start-finish.mjs\nOutput: design-plan-source:work-design tests passed\ndesign-plan-open-gate:open-questions and executable materialization gates: PASS\ndesign-plan-resume:ok - coded work-resume behavior\ndesign-plan-materialization:ok - coded work start/finish behavior"
       ],
       "parentId": "work-7",
-      "status": "open",
+      "status": "closed",
       "title": "U6: Design-aware planning and work-item propagation",
       "type": "task",
-      "updatedAt": "2026-08-31T09:34:02.450Z",
+      "updatedAt": "2026-08-31T12:29:33.461Z",
       "verificationContract": {
         "required": [
           {
@@ -15119,7 +15522,8 @@
           }
         ],
         "version": 1
-      }
+      },
+      "verificationRevision": "workspace-sha256:4fc21d37289cd6a50096119293929f13fc80f60075f371e756062cbcbb290f29"
     },
     "work-7.7": {
       "acceptance": "DES criteria deterministically derive only required browser interaction, desktop/mobile visual, accessibility/log, and Strict manual entries; executable entries include the declared browser-runner operation.\nProof is bound to target revision and approved handoff hash; a design change invalidates affected evidence.\nA stable manifest losslessly groups all screen/state/viewport/proof cells into at most 32 entries and gives concrete /wo resume recovery actions.\nNon-design/non-UI finish behavior and capability enums remain unchanged; pixel equality is not introduced.",
@@ -15337,7 +15741,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T12:02:09.669Z"
+    "updatedAt": "2026-08-31T12:29:33.461Z"
   },
   "schemaVersion": 1
 }

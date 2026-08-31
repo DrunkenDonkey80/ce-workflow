@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { appendWorkNote, mutateStore } from "../extensions/work-store.js";
 const { assert, installWorkflowFixture, workflowChildParams } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),
@@ -561,6 +562,23 @@ try {
 				},
 			},
 		}),
+	);
+
+	fixture.reset("finishReady", "unknown");
+	mutateStore(finishCwd, (store) => {
+		appendWorkNote(store, "FIN-1", "design-owner: E-1");
+		appendWorkNote(
+			store,
+			"FIN-1",
+			"wo:design-deviation approved responsive state cannot be preserved",
+		);
+	});
+	state = buildWorkFinishState(finishCwd, "FIN-1");
+	assert(
+		!state.ok &&
+			state.reason === "design-deviation-blocked" &&
+			state.suggestedCommands[0] === "/wo design revise E-1",
+		"finish refuses to close work with an unresolved approved-design deviation",
 	);
 
 	fixture.reset("finishReady", "unknown");

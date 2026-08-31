@@ -34,6 +34,7 @@ import {
 	buildWorkResumeState,
 	prepareDesignSession,
 	designReviewChoices,
+	designPlanningAuthority,
 	reviewDesignSession,
 	substantialUiWork,
 	syncDesignSession,
@@ -374,6 +375,14 @@ try {
 			accessibility: ["Keyboard flow, focus recovery, and announced errors"],
 		});
 		assert.equal(prepared.designSession.state, "commission_ready");
+		const blockedPlanning = buildWorkPlanState(
+			lifecycleRoot,
+			`${redesign.epic.id} fork`,
+		);
+		assert.equal(blockedPlanning.action, "design-planning-blocked");
+		assert.deepEqual(blockedPlanning.suggestedCommands, [
+			`/wo design revise ${redesign.epic.id}`,
+		]);
 		const brief = fs.readFileSync(
 			path.join(lifecycleRoot, ...prepared.designSession.briefPath.split("/")),
 			"utf8",
@@ -548,7 +557,11 @@ try {
 					ownerId,
 					policy,
 					state: "commission_ready",
-					metadata: { briefPath: relative, objective: ownerId },
+					metadata: {
+						briefPath: relative,
+						briefHash: "a".repeat(64),
+						objective: ownerId,
+					},
 				}),
 			);
 			const unavailable = await advanceDesignSession(lifecycleRoot, ownerId, {
@@ -564,6 +577,12 @@ try {
 				assert.equal(
 					waiveDesignSession(lifecycleRoot, ownerId).action,
 					"design-waived-to-text",
+				);
+				const fallbackApproval = await approveDesignSession(lifecycleRoot, ownerId);
+				assert.equal(fallbackApproval.action, "design-approved");
+				assert.equal(
+					designPlanningAuthority(lifecycleRoot, ownerId).authority.fallback,
+					true,
 				);
 			}
 		}
@@ -670,6 +689,10 @@ try {
 		);
 		assert.equal(approvedSync.action, "design-approved");
 		assert.equal(approvedSync.designSession.state, "approved");
+		const planningAuthority = designPlanningAuthority(lifecycleRoot, syncId);
+		assert.equal(planningAuthority.ok, true);
+		assert.equal(planningAuthority.authority.criteria[0].id, "DES-1");
+		assert.equal(planningAuthority.authority.prototypeAuthority, false);
 		assert.equal(
 			fs.existsSync(path.join(lifecycleRoot, syncDirectory, "APPROVAL.json")),
 			true,

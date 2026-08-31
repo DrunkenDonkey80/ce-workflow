@@ -8375,9 +8375,34 @@ function priorActionAttempt(cwd, workItemId, action) {
 	);
 }
 
+function designDeviationGate(cwd, state, issue) {
+	if (!issue?.id) return undefined;
+	const durable = readWorkItem(cwd, issue.id);
+	const notes = notesOf(durable);
+	const raisedAt = notes.lastIndexOf("wo:design-deviation");
+	if (
+		raisedAt < 0 ||
+		notes.lastIndexOf("wo:design-deviation-resolved") >= raisedAt
+	)
+		return undefined;
+	const ownerId = /^design-owner:\s*(\S+)/im.exec(notes)?.[1];
+	return {
+		...state,
+		action: "design-deviation-blocked",
+		selectedWorkItem: issue,
+		message:
+			"Implementation reported a design deviation; affected work is paused until revision and reapproval.",
+		suggestedCommands: ownerId
+			? [`/wo design revise ${ownerId}`, `/wo design approve ${ownerId}`]
+			: [`/work-report ${issue.id}`],
+	};
+}
+
 function planResumeAction(state, cwd, options = {}) {
 	if (!state.ok) return state;
 	const activeImplementation = state.inProgressExecutable?.[0];
+	const activeDesignGate = designDeviationGate(cwd, state, activeImplementation);
+	if (activeDesignGate) return activeDesignGate;
 	if (state.git && !state.git.safeForHandoff) {
 		const blockers = state.git.blockedPaths?.length
 			? state.git.blockedPaths
@@ -8621,6 +8646,8 @@ function planResumeAction(state, cwd, options = {}) {
 		(issue) => !isPlanningIssue(issue),
 	);
 	if (implementation) {
+		const readyDesignGate = designDeviationGate(cwd, state, implementation);
+		if (readyDesignGate) return readyDesignGate;
 		if (
 			(implementation.changedPaths?.length ?? 0) > FINISH_TASK_DEFAULT_MAX_FILES
 		)
@@ -13154,9 +13181,25 @@ export async function approveDesignSession(
 	notes = "",
 	options = {},
 ) {
-	const synced = await syncDesignSession(cwd, ownerId, options);
+	const existing = tryLoadDesignSession(cwd, ownerId);
+	const fallbackApproval =
+		existing?.fallback === "explicit-text-only-waiver" &&
+		existing.state === "approval_required";
+	const synced = fallbackApproval
+		? { ok: true, designSession: existing }
+		: await syncDesignSession(cwd, ownerId, options);
 	if (!synced.ok) return synced;
 	let session = synced.designSession;
+	if (fallbackApproval) {
+		session = {
+			...session,
+			handoffHash: hashDesignValue({
+				fallback: session.fallback,
+				briefHash: session.briefHash,
+			}),
+			remoteFingerprintHash: hashDesignValue({ fallback: session.fallback }),
+		};
+	}
 	const current = {
 		ownerId: session.ownerId,
 		briefHash: session.briefHash,
@@ -15105,6 +15148,7 @@ function openQuestionsBlockState(cwd, rel, questions, command, git, init) {
 }
 
 function materializePlanUnitsInStore(store, epic, units, rel, command) {
+	const designAuthority = units.designAuthority;
 	const existing = Object.values(store.items).filter(
 		(item) =>
 			item.parentId === epic.id &&
@@ -15112,20 +15156,31 @@ function materializePlanUnitsInStore(store, epic, units, rel, command) {
 			typeOf(item) !== "decision",
 	);
 	if (existing.length) return existing;
-	const created = units.map((unit) =>
-		createWorkItem(store, {
+	const created = units.map((unit) => {
+		const assignedCriteria = designAuthority?.criteria.filter((criterion) =>
+			unit.designCriteria.includes(criterion.id),
+		);
+		const designLines = designAuthority
+			? [
+					`Design authority: owner=${designAuthority.ownerId}; revision=${designAuthority.revision}; brief=${designAuthority.briefHash}; handoff=${designAuthority.handoffHash}; approval=${designAuthority.approvalHash}.`,
+					`Assigned design criteria: ${JSON.stringify(assignedCriteria)}.`,
+					`Shared design constraints: ${JSON.stringify(designAuthority.constraints)}.`,
+					"OpenDesign prototype output is reference-only; do not copy, import, or execute it.",
+				]
+			: [];
+		return createWorkItem(store, {
 			title: compactWorkItemTitle(`${unit.key}: ${unit.title}`),
 			type: "task",
 			parentId: epic.id,
 			description: unit.outcome,
-			acceptance: unit.acceptance,
+			acceptance: [unit.acceptance, ...designLines].filter(Boolean).join("\n"),
 			labels: ["wo:materialized", "wo:vertical-slice", "wo:slice-planned"],
 			notes: [
 				workflowWorkItemNotes(command, unit.title, [
 					`source plan: ${rel}`,
 					`plan unit: ${unit.key}`,
 					FINITE_BACKLOG_MARKER,
-					`wo:slice-plan\nplan-path: ${rel}\ntarget: ${unit.title}\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.`,
+					`wo:slice-plan\nplan-path: ${rel}\ntarget: ${unit.title}\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.${designAuthority ? `\ndesign-owner: ${designAuthority.ownerId}\ndesign-revision: ${designAuthority.revision}\ndesign-criteria: ${unit.designCriteria.join(", ")}\ndesign-hashes: ${designAuthority.briefHash} ${designAuthority.handoffHash} ${designAuthority.approvalHash}\ndesign-constraints: ${JSON.stringify(designAuthority.constraints)}\nprototype-authority: false` : ""}`,
 				]),
 			],
 			implementationScope: {
@@ -15133,11 +15188,25 @@ function materializePlanUnitsInStore(store, epic, units, rel, command) {
 				files: unit.files,
 				surfaces: unit.surfaces,
 				discoveryAllowed: unit.discoveryAllowed,
-				nonGoals: unit.nonGoals,
+				nonGoals: [
+					...unit.nonGoals,
+					...(designAuthority
+						? ["Copying or executing OpenDesign prototype code"]
+						: []),
+				],
 			},
+			...(designAuthority
+				? {
+						documentLinks: {
+							designBrief: designAuthority.briefPath,
+							designHandoff: designAuthority.handoffPath,
+							designApproval: designAuthority.approvalPath,
+						},
+					}
+				: {}),
 			verificationContract: unit.verificationContract,
-		}),
-	);
+		});
+	});
 	const byKey = new Map(
 		units.map((unit, index) => [unit.key, created[index].id]),
 	);
@@ -15205,6 +15274,28 @@ export function bootstrapPlanEpic(
 			nextAction:
 				"Add the missing declared unit fields or run the planner; headings alone are not implementation-ready.",
 		});
+	}
+	if (implementationUnits.designAuthority) {
+		const ownerId = implementationUnits.designAuthority.ownerId;
+		const current = designPlanningAuthority(cwd, ownerId);
+		if (
+			current &&
+			(!current.ok ||
+				hashDesignValue(current.authority) !==
+					hashDesignValue(implementationUnits.designAuthority))
+		)
+			return errorState(
+				"design-planning-blocked",
+				current?.message ??
+					`Plan design authority for ${ownerId} no longer matches the approved revision.`,
+				{
+					action: "design-planning-blocked",
+					planPath: rel,
+					suggestedCommands: current?.suggestedCommands ?? [
+						`/wo design sync ${ownerId}`,
+					],
+				},
+			);
 	}
 	const gitReport = git ?? resumeGitReport(cwd, [rel]);
 	const initReport = init ?? ensureWorkStoreInitialized(cwd);
@@ -16475,9 +16566,13 @@ function epicPlanningSources(cwd, epic, artifacts = epicArtifacts(cwd, epic)) {
 	const inherited = isInitiative(parent)
 		? asArray(parent.initiative?.sources).map((source) => source?.path)
 		: [];
-	return [...new Set([...artifacts.brainstorms, ...inherited])].filter(
-		(path) => path && existsSync(join(cwd, path)),
-	);
+	const design = designPlanningAuthority(cwd, idOf(epic));
+	const designSources = design?.ok
+		? [design.authority.briefPath, design.authority.handoffPath]
+		: [];
+	return [
+		...new Set([...artifacts.brainstorms, ...inherited, ...designSources]),
+	].filter((path) => path && existsSync(join(cwd, path)));
 }
 
 function designBriefsForPlanning(cwd, references = []) {
@@ -16500,6 +16595,78 @@ function designBriefsForPlanning(cwd, references = []) {
 				return [];
 			}
 		});
+}
+
+export function designPlanningAuthority(cwd, ownerId) {
+	const session = tryLoadDesignSession(cwd, ownerId);
+	if (!session) return undefined;
+	const recovery =
+		session.state === "approval_required"
+			? `/wo design approve ${ownerId}`
+			: session.state === "sync_required"
+				? `/wo design sync ${ownerId}`
+				: `/wo design revise ${ownerId}`;
+	if (session.state !== "approved")
+		return {
+			ok: false,
+			action: "design-planning-blocked",
+			message: `Design authority for ${ownerId} is ${session.state}; planning requires current approval.`,
+			suggestedCommands: [recovery],
+		};
+	try {
+		const approval = JSON.parse(
+			readFileSync(designArtifactFile(cwd, session.approvalPath), "utf8"),
+		);
+		const current = {
+			ownerId: session.ownerId,
+			briefHash: session.briefHash,
+			handoffHash: session.handoffHash,
+			remoteFingerprint: session.remoteFingerprintHash,
+			revision: session.revision,
+		};
+		if (!designApprovalIsCurrent(approval, current))
+			return {
+				ok: false,
+				action: "design-planning-blocked",
+				message: `Design approval for ${ownerId} is stale.`,
+				suggestedCommands: [`/wo design sync ${ownerId}`],
+			};
+		const fallback = session.fallback === "explicit-text-only-waiver";
+		const handoff = fallback
+			? undefined
+			: validateDesignHandoff(
+					JSON.parse(
+						readFileSync(designArtifactFile(cwd, session.handoffPath), "utf8"),
+					),
+					{ briefHash: session.briefHash },
+				);
+		return {
+			ok: true,
+			authority: {
+				version: 1,
+				ownerId,
+				revision: session.revision,
+				briefPath: session.briefPath,
+				briefHash: session.briefHash,
+				handoffPath: session.handoffPath,
+				handoffHash: session.handoffHash,
+				approvalPath: session.approvalPath,
+				approvalHash: session.approvalHash,
+				fallback,
+				criteria: handoff?.acceptance ?? [],
+				constraints: handoff?.implementationConstraints ?? [],
+				assets: handoff?.assets ?? [],
+				prototypeAuthority: false,
+			},
+		};
+	} catch (cause) {
+		return {
+			ok: false,
+			action: "design-planning-blocked",
+			message: `Design authority for ${ownerId} is incomplete: ${cause.message}`,
+			suggestedCommands: [`/wo design sync ${ownerId}`],
+		};
+	}
 }
 
 function splitPlanTarget(input) {
@@ -16527,7 +16694,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 		const handoffPlan = (
 			message,
 			detail,
-			{ bootstrapRoadmapId, designSources = [], ...extra } = {},
+			{ bootstrapRoadmapId, designSources = [], designAuthority, ...extra } = {},
 		) => {
 			const designBriefs = designBriefsForPlanning(cwd, [
 				...sourceArtifacts,
@@ -16543,6 +16710,12 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					privatePlanPlaybookBlock(),
 					designBriefs.length
 						? `Authoritative visual-design contract(s): ${designBriefs.join(", ")}. Read and preserve them; do not generate competing UI guidance.`
+						: "",
+					designAuthority
+						? `Approved design authority (copy this exact object into the plan manifest as designAuthority): ${JSON.stringify(designAuthority)}`
+						: "",
+					designAuthority
+						? "Map every designAuthority.criteria DES-* id to at least one implementationUnits[].designCriteria entry. Preserve screenIds, states, viewports, constraints, assets/licenses, hashes, and prototypeAuthority:false; prototype output is reference-only and must never be copied or executed."
 						: "",
 					"Follow the verified private planning playbook to convert this input into a detailed master roadmap plan, then create the roadmap from it in this same flow; do not stop and ask the user to re-run /work-plan.",
 					sourceArtifacts.length
@@ -16581,6 +16754,13 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					candidates: resolved.candidates ?? [],
 				});
 			const artifacts = epicArtifacts(cwd, resolved.epic);
+			const designGate = designPlanningAuthority(cwd, idOf(resolved.epic));
+			if (designGate && !designGate.ok)
+				return {
+					...designGate,
+					epic: issueSummary(resolved.epic),
+				};
+			const designAuthority = designGate?.authority;
 			const planningSource =
 				artifacts.brainstorms[0] ??
 				epicPlanningSources(cwd, resolved.epic, artifacts)[0];
@@ -16626,6 +16806,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 						epic: issueSummary(resolved.epic),
 						bootstrapRoadmapId,
 						designSources: [planningSource],
+						designAuthority,
 					},
 				);
 			}
@@ -16652,6 +16833,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 						epic: issueSummary(resolved.epic),
 						bootstrapRoadmapId,
 						designSources: [planningSource],
+						designAuthority,
 					},
 				);
 			}
@@ -17328,6 +17510,11 @@ function buildWorkFinishState(cwd, args = "") {
 				...extra,
 			});
 		const raw = notesOf(workItem);
+		const designGate = designDeviationGate(cwd, {}, workItem);
+		if (designGate)
+			return stop("design-deviation-blocked", designGate.message, {
+				suggestedCommands: designGate.suggestedCommands,
+			});
 		const dirty = (git.dirtyPaths ?? []).filter((file) => !isWorkStorePath(file));
 		const related = dirty.filter(
 			(file) => raw.includes(file) || raw.includes(file.split(/[\\/]/).pop()),
@@ -19999,6 +20186,76 @@ function extractImplementationUnits(markdown) {
 			"implementationUnits must contain 1-64 units.",
 			{ missingFields: ["implementationUnits[1..64]"] },
 		);
+	let designAuthority;
+	if (manifest.designAuthority !== undefined) {
+		const authority = manifest.designAuthority;
+		const hashes = ["briefHash", "handoffHash", "approvalHash"];
+		const paths = [
+			"briefPath",
+			"approvalPath",
+			...(authority?.fallback === true ? [] : ["handoffPath"]),
+		];
+		const invalid =
+			!authority ||
+			typeof authority !== "object" ||
+			Array.isArray(authority) ||
+			typeof authority.ownerId !== "string" ||
+			!authority.ownerId.trim() ||
+			authority.ownerId.length > 128 ||
+			!Number.isInteger(authority.revision) ||
+			authority.revision < 0 ||
+			authority.prototypeAuthority !== false ||
+			hashes.some((field) => !/^[a-f0-9]{64}$/.test(authority[field] ?? "")) ||
+			paths.some(
+				(field) =>
+					typeof authority[field] !== "string" ||
+					!authority[field].trim() ||
+					authority[field].length > 500,
+			) ||
+			!Array.isArray(authority.criteria) ||
+			authority.criteria.length > 128 ||
+			authority.criteria.some(
+				(criterion) =>
+					!/^DES-[A-Za-z0-9._-]+$/.test(criterion?.id ?? "") ||
+					typeof criterion?.description !== "string" ||
+					!criterion.description.trim() ||
+					criterion.description.length > 500 ||
+					!["screenIds", "states", "viewports", "proofs"].every(
+						(field) =>
+							Array.isArray(criterion[field]) &&
+							criterion[field].length > 0 &&
+							criterion[field].length <= 32 &&
+							criterion[field].every(
+								(entry) =>
+									typeof entry === "string" && entry.length > 0 && entry.length <= 128,
+							),
+					),
+			) ||
+			new Set(authority.criteria?.map((criterion) => criterion.id)).size !==
+				authority.criteria?.length ||
+			!Array.isArray(authority.constraints) ||
+			authority.constraints.length > 64 ||
+			authority.constraints.some(
+				(entry) => typeof entry !== "string" || !entry.trim() || entry.length > 500,
+			) ||
+			!Array.isArray(authority.assets) ||
+			authority.assets.length > 64 ||
+			authority.assets.some((asset) =>
+				["path", "license", "provenance"].some(
+					(field) =>
+						typeof asset?.[field] !== "string" ||
+						!asset[field].trim() ||
+						asset[field].length > 500,
+				),
+			);
+		if (invalid)
+			throw new WorkStoreError(
+				"planning-required",
+				"designAuthority must preserve approved paths, hashes, revision, DES criteria matrix, constraints, assets/licenses, and prototypeAuthority:false.",
+				{ missingFields: ["valid designAuthority"] },
+			);
+		designAuthority = structuredClone(authority);
+	}
 	const keys = new Set();
 	const units = manifest.implementationUnits.map((unit, index) => {
 		const at = `implementationUnits[${index}]`;
@@ -20050,6 +20307,19 @@ function extractImplementationUnits(markdown) {
 				`Implementation unit key is duplicated: ${unit.key}`,
 				{ missingFields: [`unique ${at}.key`] },
 			);
+		const designCriteria = unit.designCriteria ?? [];
+		if (
+			!Array.isArray(designCriteria) ||
+			designCriteria.length > 128 ||
+			designCriteria.some(
+				(entry) => typeof entry !== "string" || entry.length > 128,
+			)
+		)
+			throw new WorkStoreError(
+				"planning-required",
+				`${at}.designCriteria must be a string array.`,
+				{ missingFields: [`${at}.designCriteria`] },
+			);
 		keys.add(unit.key);
 		return {
 			key: unit.key,
@@ -20063,9 +20333,27 @@ function extractImplementationUnits(markdown) {
 			surfaces: [...(unit.surfaces ?? [])],
 			discoveryAllowed: unit.discoveryAllowed === true,
 			nonGoals: [...(unit.nonGoals ?? [])],
+			designCriteria: [...designCriteria],
 			verificationContract: structuredClone(unit.verificationContract),
 		};
 	});
+	if (designAuthority) {
+		const declared = new Set(designAuthority.criteria.map((entry) => entry.id));
+		const mapped = new Set(units.flatMap((unit) => unit.designCriteria));
+		const unknown = [...mapped].filter((id) => !declared.has(id));
+		const missing = [...declared].filter((id) => !mapped.has(id));
+		if (unknown.length || missing.length)
+			throw new WorkStoreError(
+				"planning-required",
+				`Design criteria mapping is incomplete: missing ${missing.join(", ") || "none"}; unknown ${unknown.join(", ") || "none"}.`,
+				{
+					missingFields: missing.map(
+						(id) => `implementationUnits[].designCriteria:${id}`,
+					),
+				},
+			);
+		units.designAuthority = designAuthority;
+	}
 	for (const unit of units)
 		for (const dependency of unit.dependencies)
 			if (!keys.has(dependency) || dependency === unit.key)
@@ -25960,7 +26248,7 @@ async function executeOrchestratorAction(
 				state = await syncDesignSession(ctx.cwd, target, options);
 			} else if (action === "approve") {
 				state = await approveDesignSession(ctx.cwd, target, "", options);
-			} else if (action === "review") {
+			} else if (["review", "revise"].includes(action)) {
 				state = await reviewDesignSession(ctx.cwd, target, ctx, options);
 			} else if (action === "prepare") {
 				const session = tryLoadDesignSession(ctx.cwd, target);
