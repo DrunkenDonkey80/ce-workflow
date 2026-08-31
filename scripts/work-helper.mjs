@@ -48,6 +48,7 @@ import {
 	inlineResultArtifact,
 	validateExecutableVerificationContract,
 	validateVerificationContract,
+	verificationContractHash,
 	verificationContractStatus,
 	verificationProofRecord,
 	verificationWaiverRecord,
@@ -706,6 +707,32 @@ async function runDeclaredCommand(requirement, root) {
 	};
 }
 
+function reusableInspectionProof(task, requirement, revision, root) {
+	if (requirement.inspection !== "goal") return null;
+	const contractHash = verificationContractHash(task.verificationContract);
+	return (task.evidence ?? []).toReversed().find((proof) => {
+		if (
+			proof.kind !== "verification-proof" ||
+			proof.id !== requirement.id ||
+			proof.status !== "PASS" ||
+			proof.contractHash !== contractHash ||
+			proof.targetRevision !== revision ||
+			proof.issuer?.type !== "adapter"
+		)
+			return false;
+		return (proof.artifacts ?? []).every((artifact) => {
+			if (artifact.inline === true) return true;
+			try {
+				return (
+					fileArtifact(root, artifact.kind, artifact.path).sha256 === artifact.sha256
+				);
+			} catch {
+				return false;
+			}
+		});
+	});
+}
+
 function commandProofArtifacts(run) {
 	const artifacts = [inlineResultArtifact("result", run.output)];
 	const kinds = new Set(run.requirement.artifacts ?? []);
@@ -729,7 +756,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	);
 	if (!id || !message || !Number.isInteger(maxFiles) || maxFiles < 1)
 		throw new Error(
-			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--execution-root <git-path>] [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--implementation-file <task-owned-new-file> ...] [--evidence-file <docs/evidence/task-owned-file> ...] [--skip-format] [--reviewed] [--push]",
+			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--execution-root <git-path>] [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--implementation-file <task-owned-new-file> ...] [--evidence-file <docs/evidence/task-owned-file> ...] [--skip-format] [--reviewed] [--push]; verification is omitted only for a clean completed roadmap close",
 		);
 	const executionRoot = canonicalExecutionRoot;
 	const distinctRoots = canonicalExecutionRoot !== ownerRepositoryRoot;
@@ -863,6 +890,13 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	const executableContract = task.verificationContract
 		? validateExecutableVerificationContract(task.verificationContract)
 		: null;
+	const children = childWorkItems(id);
+	const roadmapOnlyClose =
+		!distinctRoots &&
+		relevantChanges(executionRoot).length === 0 &&
+		/^(?:epic|initiative|roadmap)$/i.test(typeOf(task)) &&
+		children.length > 0 &&
+		children.every((child) => statusOf(child) === "closed");
 	const commandRequirements =
 		executableContract?.required.filter(
 			(requirement) => requirement.capability === "command",
@@ -893,7 +927,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 		);
 	if (!executableContract && shardDeclarations.length && !verify)
 		throw new Error("--verify-shard requires --verify");
-	if (!executableContract && !verify && !jsonFile)
+	if (!executableContract && !verify && !jsonFile && !roadmapOnlyClose)
 		throw new Error("finish-task requires --verify or --json");
 	let verificationResult;
 	let verificationCommand;
@@ -986,13 +1020,6 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 			(ownedImplementationFiles.has(file) ||
 				(!isRuntimePath(file) && !isGeneratedBuildPath(file))),
 	);
-	const children = childWorkItems(id);
-	const roadmapOnlyClose =
-		!distinctRoots &&
-		!changed.length &&
-		/^(?:epic|initiative|roadmap)$/i.test(typeOf(task)) &&
-		children.length > 0 &&
-		children.every((child) => statusOf(child) === "closed");
 	if (!changed.length && !roadmapOnlyClose)
 		throw new Error("no related changes to commit");
 	if (roadmapOnlyClose) changed.push(".ce-workflow/work-items.json");
@@ -1820,12 +1847,26 @@ try {
 		if (!requirement)
 			throw new Error(`verification proof is not declared: ${proofId}`);
 		const revision = workspaceVerificationRevision(cwd);
-		const result = runCapabilityAdapter({
-			cwd,
-			requirement,
-			revision,
-			inspection: option("--inspection"),
-		});
+		const inspection = option("--inspection");
+		const previous = inspection
+			? reusableInspectionProof(task, requirement, revision, cwd)
+			: null;
+		const result = previous
+			? {
+					status: "PASS",
+					targetRevision: revision,
+					issuer: previous.issuer,
+					operation: previous.operation,
+					artifacts: previous.artifacts,
+					inspection: { by: "goal", summary: inspection },
+					detail: previous.detail,
+				}
+			: runCapabilityAdapter({
+					cwd,
+					requirement,
+					revision,
+					inspection,
+				});
 		const record = verificationProofRecord(task.verificationContract, proofId, {
 			...result,
 			targetRevision: result.targetRevision ?? revision,
@@ -1839,6 +1880,7 @@ try {
 		});
 		print({
 			status: "recorded",
+			reusedExecution: Boolean(previous),
 			proof: record,
 			verificationStatus: verificationContractStatus(updated, { cwd, revision }),
 		});

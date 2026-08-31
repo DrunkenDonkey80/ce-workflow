@@ -221,6 +221,28 @@ const filtered = await drive(
 );
 assert.equal(filtered.value, "anthropic/claude");
 
+const directFilter = await drive(
+	{
+		title: "Workflow",
+		items: [
+			{
+				value: "work-roadmap",
+				label: "Roadmaps",
+				description: "Browse, inspect, plan, or continue roadmaps.",
+			},
+			{ value: "work-plan", label: "Plan", description: "Create a roadmap." },
+		],
+	},
+	(component) => {
+		for (const key of "plan") component.handleInput(key);
+		const output = component.render(70).join("\n");
+		assert(output.includes("Plan"));
+		assert(!output.includes("Roadmaps"));
+		component.handleInput("enter");
+	},
+);
+assert.equal(directFilter.value, "work-plan");
+
 await drive(
 	{
 		title: "Details",

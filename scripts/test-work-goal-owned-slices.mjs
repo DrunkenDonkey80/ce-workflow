@@ -107,16 +107,13 @@ try {
 				"work-1",
 				"--message",
 				"close completed roadmap",
-				"--verify",
-				`"${process.execPath}" -e "process.stdout.write('ok')"`,
-				"--expect",
-				"ok",
 				"--skip-format",
 			],
 			{ cwd, encoding: "utf8" },
 		),
 	);
 	assert.equal(roadmapResult.status, "PASS");
+	assert.equal(roadmapResult.verification, undefined);
 	assert.equal(loadStore(cwd).items["work-1"].status, "closed");
 	assert.equal(git("status", "--porcelain"), "");
 } finally {

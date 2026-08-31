@@ -6995,6 +6995,40 @@
       "type": "task",
       "updatedAt": "2026-08-26T06:02:31.754Z"
     },
+    "work-2.report-5c37b6d0-c58d-4201-bda5-9da7b15dd112": {
+      "createdAt": "2026-08-31T07:02:10.077Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: In this disposable calculator project, `work-run-proof work-1.2 calculator-browser-acceptance --inspection ...` reported verificationStatus.ok=true at revision 2fe290..., but the immediately following `finish-task work-1.2` recomputed revision 455317... and rejected the same proof as stale. No product files changed between those commands; only the tracked `.ce-workflow/work-items.json` was mutated by proof recording/finalizer state.\nExpected: Recording verification evidence and attempting finalization must not invalidate the proof solely by mutating the native tracked work-item store. Workspace verification revision should exclude workflow state or otherwise preserve proof freshness across its own evidence write.\nImpact: A task with required visual inspection cannot be finalized through the coded helper despite passing adapter execution and goal inspection, leaving the autonomous roadmap stuck.\nSuggested improvement: Exclude `.ce-workflow/work-items.json` from workspaceVerificationRevision, or compute/record the post-mutation revision atomically.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/34e9d63a-2114-4d22-804b-52596c9ddb6f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 39461,
+              "file": "01-work-items.json",
+              "sha256": "73632f68ed43aa5d26ad41c7bc68f5a6e9ccfac06e5d090284d8a5c4dc8f4dee"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "project",
+          "submittedAt": "2026-08-31T07:02:10.069Z",
+          "workflowId": "workflow-mtgvtezk-t6o1ee"
+        }
+      ],
+      "id": "work-2.report-5c37b6d0-c58d-4201-bda5-9da7b15dd112",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: In this disposable calculator project, `work-run-proof work-1.2 calculator-browser-acceptance --inspection ...` reported verificat",
+      "type": "task",
+      "updatedAt": "2026-08-31T07:02:10.077Z"
+    },
     "work-2.report-5e0dec37-d699-41a6-8358-a85df1b113a4": {
       "createdAt": "2026-08-20T05:46:51.737Z",
       "dependencies": [
@@ -7167,6 +7201,40 @@
       "title": "Self-improvement report: The work-planner handoff named C:/soft/git/ce-workflow/scripts/work-helper.mjs without a Node launcher, so the planner invoked the",
       "type": "task",
       "updatedAt": "2026-08-22T06:39:01.588Z"
+    },
+    "work-2.report-6258ad06-20e4-495e-aee8-c34e08bcd78b": {
+      "createdAt": "2026-08-31T07:03:58.300Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Correction to report task work-2.report-5c37b6d0-c58d-4201-bda5-9da7b15dd112: the revision change was caused by `finish-task` formatting pending product files before checking the previously recorded browser proof, not by the tracked work-item-store write. The helper returned only `verification contract incomplete ... stale`, without disclosing that its own formatter had changed proof-scoped files.\nExpected: When finish-task formatting invalidates a previously passing non-command/browser proof, the failure should name the formatted paths and direct the caller to rerun the proof, then retry with the now-formatted workspace (or avoid formatting after proof collection). The earlier store-mutation diagnosis should be treated as superseded by this correction.\nImpact: The opaque stale result led to a false workflow-bug diagnosis and forces extra revision forensics; autonomous execution cannot distinguish helper-induced formatting staleness from external dirt from the error alone.\nSuggested improvement: Include `formatted.changed` paths in the stale-proof error and a deterministic recovery command; mark the earlier report as superseded.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/c9a9e692-74a5-40da-9fcd-b46dabd6151b",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 39461,
+              "file": "01-work-items.json",
+              "sha256": "73632f68ed43aa5d26ad41c7bc68f5a6e9ccfac06e5d090284d8a5c4dc8f4dee"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "project",
+          "submittedAt": "2026-08-31T07:03:58.293Z",
+          "workflowId": "workflow-mtgvtezk-t6o1ee"
+        }
+      ],
+      "id": "work-2.report-6258ad06-20e4-495e-aee8-c34e08bcd78b",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Correction to report task work-2.report-5c37b6d0-c58d-4201-bda5-9da7b15dd112: the revision change was caused by `finish-task` form",
+      "type": "task",
+      "updatedAt": "2026-08-31T07:03:58.300Z"
     },
     "work-2.report-62fb9577-ee2e-4536-aa72-fcf4d1d25ce6": {
       "createdAt": "2026-08-05T08:07:27.045Z",
@@ -8893,6 +8961,45 @@
       "title": "Self-improvement report: On every agent_settled hook, reconcileBackgroundVerifierRuns calls reconcileVerifierRuns. For job-08176e4795dcd554bb3a0277, all op",
       "type": "task",
       "updatedAt": "2026-08-17T18:02:12.406Z"
+    },
+    "work-2.report-ace3d736-c5e6-4d58-ba55-dddf6c17dab5": {
+      "createdAt": "2026-08-31T06:54:38.927Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The precomputed run-implementation handoff for work-1.1 labels the slice “Evidence-only” and forbids product-source edits, but durable PLAN.md explicitly requires implementing calculator behavior in app.js and app.test.mjs, while tracked app.js is still a two-line “Not implemented” placeholder and app.test.mjs does not exist.\nExpected: The coded handoff should classify a slice with declared implementation files and unimplemented product behavior as implementation work, allowing edits to the plan-declared product and test files. Evidence-only mode should be used only when the requested condition is already implemented and an existing probe can prove it.\nImpact: The goal-owned agent cannot both obey the no-product-edit handoff and satisfy the required `node app.test.mjs` behavior contract, so an otherwise executable work item becomes blocked or tempts fabricated evidence.\nSuggested improvement: Derive evidence-only classification from an explicit work-item field, not merely the presence/type of a verification capability; validate that all declared implementation files/probes exist before emitting the no-source-edit constraint.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/91c4d90e-ddc1-4be5-9159-c7999f8f3223",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 3762,
+              "file": "01-PLAN.md",
+              "sha256": "36dae3ae0981fcddf55ebd81e39b1f62f0112b6b57fb3b37d5153c16b31ecd0d"
+            },
+            {
+              "bytes": 155,
+              "file": "02-app.js",
+              "sha256": "b4665250599e8d340c712c9980b4662640a6e23b20aaa057f38e3b390a3b95a7"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "project",
+          "submittedAt": "2026-08-31T06:54:38.919Z",
+          "workflowId": "workflow-mtgvtezk-t6o1ee"
+        }
+      ],
+      "id": "work-2.report-ace3d736-c5e6-4d58-ba55-dddf6c17dab5",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The precomputed run-implementation handoff for work-1.1 labels the slice “Evidence-only” and forbids product-source edits, but dur",
+      "type": "task",
+      "updatedAt": "2026-08-31T06:54:38.927Z"
     },
     "work-2.report-ae307e3b-5c59-4b36-85cd-ced4faa9cd12": {
       "createdAt": "2026-08-24T23:21:51.279Z",
@@ -12752,7 +12859,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-29T19:58:34.052Z"
+    "updatedAt": "2026-08-31T08:49:22.370Z"
   },
   "schemaVersion": 1
 }

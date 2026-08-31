@@ -233,13 +233,18 @@ export async function showListDialog(ctx, options) {
 		const applyFilter = () => {
 			const selectedValue = visible[index]?.item.value;
 			const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-			visible = source
+			const matches = source
 				.map((item, sourceIndex) => ({ item, index: sourceIndex }))
 				.filter(({ item }) => {
 					const haystack =
 						`${item.label} ${item.value} ${item.description ?? ""}`.toLowerCase();
 					return terms.every((term) => haystack.includes(term));
 				});
+			const direct = matches.filter(({ item }) => {
+				const haystack = `${item.label} ${item.value}`.toLowerCase();
+				return terms.every((term) => haystack.includes(term));
+			});
+			visible = direct.length ? direct : matches;
 			const retained = visible.findIndex(
 				({ item }) => item.value === selectedValue,
 			);

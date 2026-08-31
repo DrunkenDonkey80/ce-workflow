@@ -410,6 +410,16 @@ try {
 			!state.handoffPrompt.includes("Invoke the ce-plan skill"),
 		"work-plan handoff dispatches verified private planning while preserving closure contracts",
 	);
+	const absolutePlan = path.join(fixture.cwd, "FULL-PLAN.md");
+	writeFileSync(absolutePlan, "# Full plan\n", "utf8");
+	state = buildWorkPlanState(fixture.cwd, absolutePlan);
+	assert(
+		state.ok &&
+			state.action === "handoff-plan" &&
+			state.handoffPrompt.includes(absolutePlan),
+		"work-plan accepts an existing absolute source path",
+	);
+	rmSync(absolutePlan, { force: true });
 
 	fixture.reset("active");
 	state = buildWorkMasterState(fixture.cwd, "raw product idea");

@@ -8876,6 +8876,13 @@ function directRoleTask(state, cwd) {
 function goalOwnedImplementationPrompt(state, cwd) {
 	const selected = state.selectedWorkItem;
 	const contract = selected?.verificationContract;
+	const helper = shellQuote(WORK_HELPER_SCRIPT);
+	const adapterProofs = contract?.required?.filter(
+		(entry) => entry.capability !== "command" && entry.operation?.command,
+	);
+	const manualProofs = contract?.required?.filter(
+		(entry) => entry.capability !== "command" && !entry.operation?.command,
+	);
 	return [
 		"GOAL-OWNED IMPLEMENTATION WINDOW: the active project goal is the implementation owner for this WorkItem.",
 		"Do not launch work-worker, work-fixer, or another writer. Keep implementation, checks, rendered-artifact inspection, corrections, and finalization in this context.",
@@ -8883,10 +8890,20 @@ function goalOwnedImplementationPrompt(state, cwd) {
 		contract
 			? `Capability proof contract: ${JSON.stringify(contract)}. Run every required capability. A required unavailable capability is a blocker, never a PASS.`
 			: "Legacy verification contract: run the smallest complete executable check required by acceptance.",
-		contract?.required?.some((entry) => entry.capability !== "command")
-			? `For each non-command proof, retain its required artifacts and record it with node ${shellQuote(WORK_HELPER_SCRIPT)} work-proof ${selected?.id} <proof-id> ... . Visual proof requires the current screenshot hash plus a concise --inspection of what you actually observed.`
+		...(adapterProofs ?? []).map((entry) =>
+			entry.inspection === "goal"
+				? `Run executable proof ${entry.id}: node ${helper} work-run-proof ${selected?.id} ${entry.id}. Inspect its current artifacts, then attach the observation without rerunning it: node ${helper} work-run-proof ${selected?.id} ${entry.id} --inspection <actual observation>.`
+				: `Run executable proof ${entry.id}: node ${helper} work-run-proof ${selected?.id} ${entry.id}.`,
+		),
+		manualProofs?.length
+			? `Record only non-executable manual proofs with node ${helper} work-proof ${selected?.id} <proof-id> ... . Visual proof requires the current screenshot hash plus a concise --inspection of what you actually observed.`
 			: "",
-		`When the implementation and proof are ready, use the coded helper boundary: node ${shellQuote(WORK_HELPER_SCRIPT)} finish-task ${selected?.id} --message <summary> --verify <command> plus --implementation-file/--evidence-file declarations as required. Follow a returned review handoff only when the coded policy requires it; otherwise finish in this window.`,
+		contract
+			? `When implementation and proof are ready, finish with: node ${helper} finish-task ${selected?.id} --message <summary> plus --implementation-file/--evidence-file declarations as required. The declared command operations run automatically; do not add --verify. Follow a returned review handoff only when coded policy requires it.`
+			: `When implementation and proof are ready, finish with: node ${helper} finish-task ${selected?.id} --message <summary> --verify <command> plus --implementation-file/--evidence-file declarations as required. Follow a returned review handoff only when coded policy requires it.`,
+		state.epic?.id && state.epic.id !== selected?.id
+			? `After the final child closes, finalize the completed roadmap directly: node ${helper} finish-task ${state.epic.id} --message "Close completed roadmap". A clean roadmap-only close needs no verification flags.`
+			: "",
 		"After coded close, continue the roadmap from durable native state. Do not replay planning or the previous implementation transcript.",
 	]
 		.filter(Boolean)
@@ -15250,7 +15267,7 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 		});
 	try {
 		const first = normalizePathToken(input.split(/\s+/)[0]);
-		const pathExists = existsSync(join(cwd, first));
+		const pathExists = existsSync(resolve(cwd, first));
 		if (!pathExists && looksLikePath(first))
 			return errorState("missing-source", `Source path not found: ${first}`, {
 				action: "missing-source",

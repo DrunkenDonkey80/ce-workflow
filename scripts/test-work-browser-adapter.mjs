@@ -55,7 +55,16 @@ try {
 		},
 	});
 	saveStore(cwd, store);
-	const result = JSON.parse(
+	const executed = JSON.parse(run("work-run-proof", task.id, "browser-smoke"));
+	assert.equal(executed.reusedExecution, false);
+	assert.equal(executed.verificationStatus.ok, false);
+	assert.equal(executed.proof.issuer.id, "ce.browser.command");
+	assert.equal(executed.proof.operation.cleanup.ok, true);
+	assert.equal(executed.proof.artifacts.length, 2);
+	assert(
+		executed.proof.artifacts.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)),
+	);
+	const inspected = JSON.parse(
 		run(
 			"work-run-proof",
 			task.id,
@@ -64,13 +73,10 @@ try {
 			"Calculator shows 5 with a labelled live output at a mobile viewport.",
 		),
 	);
-	assert.equal(result.verificationStatus.ok, true);
-	assert.equal(result.proof.issuer.id, "ce.browser.command");
-	assert.equal(result.proof.operation.cleanup.ok, true);
-	assert.equal(result.proof.artifacts.length, 2);
-	assert(
-		result.proof.artifacts.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)),
-	);
+	assert.equal(inspected.reusedExecution, true);
+	assert.equal(inspected.verificationStatus.ok, true);
+	assert.deepEqual(inspected.proof.operation, executed.proof.operation);
+	assert.deepEqual(inspected.proof.artifacts, executed.proof.artifacts);
 	console.log("browser capability adapter live smoke: PASS");
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

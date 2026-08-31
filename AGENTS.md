@@ -25,6 +25,10 @@ If project workflow behavior can be handled in code without losing functionality
 
 Always look for ways to make ce-workflow faster, quieter, more autonomous, and cheaper in tokens/context. Use existing telemetry to spot waste in command flow, role selection, subagent handoffs, retries, output volume, and verification gates. If better telemetry would make the next improvement obvious, add the smallest structured signal needed. When you see a safe improvement to extension behavior, implement and verify it before moving on.
 
+## Optimization Regression Rule
+
+Never retain or describe a workflow optimization as successful from focused tests or fewer turns alone. Re-run the same end-to-end benchmark, aggregate every continuation session, and compare runtime, total provider tokens, cost, turns, and tool calls against the last accepted baseline. Revert the optimization when it causes a material overall regression; do not rationalize the regression from one improved submetric.
+
 ## Dialog UX Rule
 
 Use the shared `extensions/work-dialogs.js` overlay system for every
