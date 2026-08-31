@@ -280,31 +280,6 @@ class FrameDecoder {
 		if (this.buffer.length > this.maxBytes)
 			throw error("message-too-large", "OpenDesign stdout exceeded the byte cap");
 		while (this.buffer.length) {
-			if (
-				/^Content-Length:/i.test(
-					this.buffer.toString("ascii", 0, Math.min(20, this.buffer.length)),
-				)
-			) {
-				const boundary = this.buffer.indexOf("\r\n\r\n");
-				const alternate = this.buffer.indexOf("\n\n");
-				const end = boundary >= 0 ? boundary : alternate;
-				if (end < 0) return;
-				const separator = boundary >= 0 ? 4 : 2;
-				const header = this.buffer.subarray(0, end).toString("ascii");
-				const match = /^Content-Length:\s*(\d+)$/im.exec(header);
-				if (!match) throw error("protocol-error", "invalid Content-Length header");
-				const length = Number(match[1]);
-				if (!Number.isSafeInteger(length) || length > this.maxBytes)
-					throw error("message-too-large", "OpenDesign frame exceeded the byte cap");
-				if (this.buffer.length < end + separator + length) return;
-				const body = this.buffer.subarray(
-					end + separator,
-					end + separator + length,
-				);
-				this.buffer = this.buffer.subarray(end + separator + length);
-				this.emit(body);
-				continue;
-			}
 			const newline = this.buffer.indexOf(10);
 			if (newline < 0) return;
 			const body = this.buffer

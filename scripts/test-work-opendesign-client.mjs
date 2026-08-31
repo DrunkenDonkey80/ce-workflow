@@ -77,7 +77,7 @@ try {
 		(failure) => failure.category === "credentials-forbidden",
 	);
 
-	for (const mode of ["success", "split", "content-length"]) {
+	for (const mode of ["success", "split"]) {
 		const result = await callOpenDesignTool({
 			command: command(mode),
 			tool: "get_run",
@@ -86,6 +86,16 @@ try {
 		});
 		assert.equal(result.status, "succeeded", `${mode} framing works`);
 	}
+	await rejects(
+		callOpenDesignTool({
+			command: command("content-length"),
+			tool: "get_run",
+			args: { runId: "run-1" },
+			timeoutMs: 1_000,
+			retryRead: false,
+		}),
+		"protocol-error",
+	);
 	await rejects(
 		callOpenDesignTool({
 			command: command("wrong-identity"),

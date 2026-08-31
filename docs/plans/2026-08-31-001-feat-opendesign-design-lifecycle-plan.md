@@ -71,7 +71,7 @@ OpenDesign is optional and disabled by default in the first release. Enabling it
 ### OpenDesign adapter
 
 - **R6.** Discovery order is explicit command spec, `OD_BIN`, then verified PATH candidates (including Windows wrappers); no auto-install, shell interpolation, or unverified bare `od` use.
-- **R7.** The stdio client uses JSON-RPC 2.0 initialize/initialized, `tools/list`, correlated monotonically unique request IDs, bounded LF/CRLF parsing for the current SDK transport plus defensive Content-Length tolerance, separate stderr capture, byte/time caps, AbortSignal cancellation, child-tree cleanup, and secret scrubbing.
+- **R7.** The stdio client uses JSON-RPC 2.0 initialize/initialized, `tools/list`, correlated monotonically unique request IDs, bounded LF/CRLF parsing for the current SDK transport, typed rejection of unrecognized framing, separate stderr capture, byte/time caps, AbortSignal cancellation, child-tree cleanup, and secret scrubbing.
 - **R8.** Discovery requires the OpenDesign server identity and action-specific tools. Missing daemon/tools/provider returns a typed, actionable state and never crashes unrelated `/wo` flows.
 - **R9.** Mutating calls are not generically retried after ambiguous failure. Safe reads may retry once in a fresh process. `create_project` is read-reconciled. If `start_run` loses its response before returning a run ID, one explicit recovery call replays the exact persisted request ID and payload, relying on OpenDesign's documented idempotency; a different payload with that ID is rejected. A recharge resume occurs only after explicit user confirmation of top-up and calls `start_run` with that same request ID/original payload plus `resume: true`. Raw API keys and credential-like plugin inputs are rejected.
 - **R10.** `create_project` receives a persisted preallocated ID; an ambiguous response is resolved through `get_project` for that ID without replay. `start_run` persists run/studio references; `get_run` recognizes `queued|running|succeeded|failed|canceled`, preserves bounded `agentMessage`, failure action/recharge URL, and missing-deliverable diagnostics; cancel preserves uncertainty when transport is lost.
@@ -227,7 +227,7 @@ The original brainstorm remains requirements authority and links forward. Design
 ### U2 — Safe stdio MCP adapter
 
 - Add `extensions/opendesign-client.js` and `scripts/fixtures/opendesign/fake-od.mjs`.
-- Implement structured command resolution, collision rejection, bounded identity/tool probe, JSON-RPC lifecycle, current LF/CRLF framing plus defensive Content-Length tolerance, response correlation, secret-safe stderr, per-call/overall timeouts, AbortSignal, child-tree cleanup, action-specific tool wrappers, request mutation policy, and normalized errors.
+- Implement structured command resolution, collision rejection, bounded identity/tool probe, JSON-RPC lifecycle, bounded LF/CRLF framing with typed rejection of unrecognized framing, response correlation, secret-safe stderr, per-call/overall timeouts, AbortSignal, child-tree cleanup, action-specific tool wrappers, request mutation policy, and normalized errors.
 - `scripts/test-work-opendesign-client.mjs` drives executable absent, wrong `od`, daemon unreachable, split/coalesced frames, malformed/oversized frames, stderr noise, missing tools, timeout/cancel/exit, success/failure/canceled/clarification, read retry, lost `create_project` reconciliation, rejected changed-payload mutation, same-ID/same-payload lost-start recovery, explicit recharge `resume: true`, and Windows wrapper resolution with no real provider.
 
 ### U3 — Redesign/audit/commissioning and resume routing
@@ -321,7 +321,7 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
       "acceptance": [
         "Explicit command spec, OD_BIN, PATH, macOS collision, and Windows wrapper cases resolve without shell injection or auto-install.",
         "Initialize/tools discovery is required before calls and missing identity/tools produces typed diagnostics.",
-        "Split/coalesced LF/CRLF messages plus defensive Content-Length input, malformed/oversized output, stderr, timeout, abort, cleanup, and process exit are bounded.",
+        "Split/coalesced LF/CRLF messages work; unrecognized framing, malformed/oversized output, stderr, timeout, abort, cleanup, and process exit are bounded.",
         "Safe reads may retry once, lost create is read-reconciled by preallocated ID, lost start permits one documented same-requestId/same-payload idempotent recovery call, changed-payload mutation is rejected, and recharge resume uses the original identity/payload plus resume:true after user confirmation."
       ],
       "dependencies": [],
