@@ -732,6 +732,7 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
         "extensions/work-models.js",
         "scripts/test-work-design.mjs",
         "scripts/test-work-design-disabled.mjs",
+        "scripts/test-work-design-docs.mjs",
         "scripts/test-work-opendesign-client.mjs",
         "scripts/test-work-brainstorm.mjs",
         "scripts/test-work-resume.mjs",
@@ -761,6 +762,18 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
             "source": "R11 and R34 telemetry/log redaction acceptance",
             "operation": {
               "command": "node scripts/test-work-design.mjs",
+              "timeoutMs": 180000,
+              "expectedExit": 0,
+              "assertions": [{"target": "exit", "operator": "equals", "value": "0"}]
+            }
+          },
+          {
+            "id": "design-package-docs",
+            "capability": "command",
+            "proof": "test",
+            "source": "R32-R33 packaged skill and operator documentation acceptance",
+            "operation": {
+              "command": "node scripts/test-work-design-docs.mjs",
               "timeoutMs": 180000,
               "expectedExit": 0,
               "assertions": [{"target": "exit", "operator": "equals", "value": "0"}]
