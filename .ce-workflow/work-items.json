@@ -13598,7 +13598,119 @@
         "schemaVersion": 1,
         "title": "Build a safe OpenDesign stdio MCP adapter"
       },
-      "evidence": [],
+      "evidence": [
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "0677896a1590923e14c1239a5cac31b135ad7c34f099b4006618777e96e1fa44"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "98e4b4f4605e404cfec7ec24e494adefc486949ac1dfcea8b6ca38825a337971",
+          "detail": "node scripts/test-work-opendesign-client.mjs",
+          "id": "opendesign-client-protocol",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-opendesign-client.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T10:26:23.021Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:e3d12caa79a6df67c9d51da588c8a1407b871ea020f0c3a5ffdadafdc37000ef"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "0677896a1590923e14c1239a5cac31b135ad7c34f099b4006618777e96e1fa44"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "98e4b4f4605e404cfec7ec24e494adefc486949ac1dfcea8b6ca38825a337971",
+          "detail": "node scripts/test-work-opendesign-client.mjs",
+          "id": "opendesign-client-protocol",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-opendesign-client.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T10:30:14.975Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:195da04837b057435a8429cf402c0f55d79d907ec06ad2a422e5de63ae31b587"
+        },
+        {
+          "artifacts": [
+            {
+              "inline": true,
+              "kind": "result",
+              "sha256": "0677896a1590923e14c1239a5cac31b135ad7c34f099b4006618777e96e1fa44"
+            }
+          ],
+          "capability": "command",
+          "contractHash": "98e4b4f4605e404cfec7ec24e494adefc486949ac1dfcea8b6ca38825a337971",
+          "detail": "node scripts/test-work-opendesign-client.mjs",
+          "id": "opendesign-client-protocol",
+          "issuer": {
+            "capability": "command",
+            "id": "native-command",
+            "type": "adapter",
+            "version": "1"
+          },
+          "kind": "verification-proof",
+          "operation": {
+            "assertions": [
+              {
+                "operator": "equals",
+                "target": "exit",
+                "value": "0"
+              }
+            ],
+            "command": "node scripts/test-work-opendesign-client.mjs",
+            "expectedExit": 0,
+            "timeoutMs": 180000
+          },
+          "proof": "test",
+          "recordedAt": "2026-08-31T10:31:57.608Z",
+          "status": "PASS",
+          "targetRevision": "workspace-sha256:195da04837b057435a8429cf402c0f55d79d907ec06ad2a422e5de63ae31b587"
+        },
+        {
+          "closeEvidence": "Completed by coded inline work path"
+        }
+      ],
       "id": "work-7.2",
       "implementationScope": {
         "discoveryAllowed": false,
@@ -13629,13 +13741,18 @@
       ],
       "notes": [
         "created by /work-plan\nsource plan: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\nplan unit: U2\nwo:finite-backlog\nwo:slice-plan\nplan-path: docs/plans/2026-08-31-001-feat-opendesign-design-lifecycle-plan.md\ntarget: Safe OpenDesign stdio MCP adapter\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.\ntask: Safe OpenDesign stdio MCP adapter\nRole liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use subagent_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure. Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure. Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
-        "wo:decision lost start response recovery uses one OpenDesign-documented same-requestId/same-payload idempotent start_run replay; changed payload or identity is forbidden"
+        "wo:decision lost start response recovery uses one OpenDesign-documented same-requestId/same-payload idempotent start_run replay; changed payload or identity is forbidden",
+        "wo:review-scope {\"files\":[\"extensions/opendesign-client.js\",\"scripts/fixtures/opendesign/fake-od.mjs\",\"scripts/test-work-opendesign-client.mjs\"],\"fingerprint\":\"28db8121b8422a3e6ae10ab92b62216e310ffaab51197156854e859e612dd22b\"}",
+        "wo:review PASS reran node scripts/test-work-opendesign-client.mjs exit 0; identity/tools gating, LF+CRLF+Content-Length framing, oversized/malformed/timeout/abort/exit bounds, read-only retry, no write replay, preallocated-ID reconcile and resume-confirmation all covered; 3 untracked files, nothing staged",
+        "wo:review-scope {\"files\":[\"extensions/opendesign-client.js\",\"scripts/fixtures/opendesign/fake-od.mjs\",\"scripts/test-work-opendesign-client.mjs\"],\"fingerprint\":\"95261933e38b1f1772494fce56204abd488f8a8dbe994108aae8631fd3035926\"}",
+        "wo:review PASS re-review of updated scope: node scripts/test-work-opendesign-client.mjs exit 0; command spec/OD_BIN/PATH/darwin-collision/win-wrapper, identity+tools gating, LF/split/Content-Length framing, malformed/oversized/timeout/abort/process-exit bounds, read-only single retry, no write replay, preallocated-ID reconcile, resume confirmation all covered; 3 untracked files, nothing staged",
+        "wo:verify-check PASS\nCommand: node scripts/test-work-opendesign-client.mjs\nOutput: opendesign-client-protocol:work-opendesign-client tests passed"
       ],
       "parentId": "work-7",
-      "status": "in_progress",
+      "status": "closed",
       "title": "U2: Safe OpenDesign stdio MCP adapter",
       "type": "task",
-      "updatedAt": "2026-08-31T10:16:17.558Z",
+      "updatedAt": "2026-08-31T10:31:57.866Z",
       "verificationContract": {
         "required": [
           {
@@ -13658,7 +13775,8 @@
           }
         ],
         "version": 1
-      }
+      },
+      "verificationRevision": "workspace-sha256:195da04837b057435a8429cf402c0f55d79d907ec06ad2a422e5de63ae31b587"
     },
     "work-7.3": {
       "acceptance": "/wo redesign creates a parent initiative and audit phase rather than implementation work; /wo resume advances the common path without an ID.\nOff and non-UI paths remain unchanged; Auto falls back and Required blocks with exact recovery/waiver actions.\nBrief/audit output contains settled product, repository, visual, state, responsive, accessibility, and preserve/replace facts; genuinely open directions produce 2–3 boards and a user selection.\nA preallocated create_project ID persists before mutation and reconciles through get_project; request state persists before start_run and the command returns control with a resumable next action.",
@@ -14355,7 +14473,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T10:17:44.806Z"
+    "updatedAt": "2026-08-31T10:31:57.866Z"
   },
   "schemaVersion": 1
 }
