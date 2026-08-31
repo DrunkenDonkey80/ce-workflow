@@ -8389,7 +8389,7 @@ function priorActionAttempt(cwd, workItemId, action) {
 }
 
 function designDeviationGate(cwd, state, issue) {
-	if (!issue?.id) return undefined;
+	if (!issue?.id || designWorkflowPolicy(cwd) === "off") return undefined;
 	const durable = readWorkItem(cwd, issue.id);
 	const notes = notesOf(durable);
 	const raisedAt = notes.lastIndexOf("wo:design-deviation");
@@ -13526,9 +13526,12 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 				candidates: resolved.candidates ?? [],
 				suggestedCommands: resolved.suggestedCommands ?? [],
 			});
-		const designGate = designSessionGate(
-			tryLoadDesignSession(cwd, idOf(resolved.workItem ?? resolved.epic)),
-		);
+		const designGate =
+			designWorkflowPolicy(cwd) === "off"
+				? undefined
+				: designSessionGate(
+						tryLoadDesignSession(cwd, idOf(resolved.workItem ?? resolved.epic)),
+					);
 		if (designGate) return designGate;
 		if (resolved.kind === "planning_starved")
 			return initiativePlanningStarvedState(cwd, resolved, target);
@@ -16596,7 +16599,10 @@ function epicPlanningSources(cwd, epic, artifacts = epicArtifacts(cwd, epic)) {
 	const inherited = isInitiative(parent)
 		? asArray(parent.initiative?.sources).map((source) => source?.path)
 		: [];
-	const design = designPlanningAuthority(cwd, idOf(epic));
+	const design =
+		designWorkflowPolicy(cwd) === "off"
+			? undefined
+			: designPlanningAuthority(cwd, idOf(epic));
 	const designSources = design?.ok
 		? [design.authority.briefPath, design.authority.handoffPath]
 		: [];
@@ -16784,7 +16790,10 @@ function buildWorkPlanLikeState(cwd, args = "", command = "/work-plan") {
 					candidates: resolved.candidates ?? [],
 				});
 			const artifacts = epicArtifacts(cwd, resolved.epic);
-			const designGate = designPlanningAuthority(cwd, idOf(resolved.epic));
+			const designGate =
+				designWorkflowPolicy(cwd) === "off"
+					? undefined
+					: designPlanningAuthority(cwd, idOf(resolved.epic));
 			if (designGate && !designGate.ok)
 				return {
 					...designGate,

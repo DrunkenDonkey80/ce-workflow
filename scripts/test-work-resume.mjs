@@ -1499,6 +1499,11 @@ try {
 				"wo:slice-plan\ndesign-owner: DESIGN-EPIC\ndesign-criteria: DES-1\nwo:design-deviation layout cannot preserve the approved state",
 		},
 	];
+	mkdirSync(path.join(deviationCwd, ".pi"), { recursive: true });
+	writeFileSync(
+		path.join(deviationCwd, ".pi", "settings.json"),
+		JSON.stringify({ workOrchestrator: { visualDesignWorkflow: "auto" } }),
+	);
 	seedNativeStore(deviationCwd, deviationItems);
 	let deviationState = buildWorkResumeState(deviationCwd, "DESIGN-EPIC");
 	assert(

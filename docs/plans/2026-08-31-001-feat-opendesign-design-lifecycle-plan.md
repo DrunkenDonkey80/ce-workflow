@@ -365,6 +365,7 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
         "extensions/work-design.js",
         "extensions/work-models.js",
         "scripts/test-work-design.mjs",
+        "scripts/test-work-design-disabled.mjs",
         "scripts/test-work-brainstorm.mjs",
         "scripts/test-work-resume.mjs",
         "scripts/test-work-roadmap.mjs"
@@ -381,6 +382,18 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
             "source": "R1-R14 design lifecycle acceptance",
             "operation": {
               "command": "node scripts/test-work-design.mjs",
+              "timeoutMs": 180000,
+              "expectedExit": 0,
+              "assertions": [{"target": "exit", "operator": "equals", "value": "0"}]
+            }
+          },
+          {
+            "id": "design-disabled-non-ui-regression",
+            "capability": "command",
+            "proof": "test",
+            "source": "R1 Off and non-UI compatibility acceptance",
+            "operation": {
+              "command": "node scripts/test-work-design-disabled.mjs",
               "timeoutMs": 180000,
               "expectedExit": 0,
               "assertions": [{"target": "exit", "operator": "equals", "value": "0"}]
@@ -718,6 +731,7 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
         "extensions/work-design.js",
         "extensions/work-models.js",
         "scripts/test-work-design.mjs",
+        "scripts/test-work-design-disabled.mjs",
         "scripts/test-work-opendesign-client.mjs",
         "scripts/test-work-brainstorm.mjs",
         "scripts/test-work-resume.mjs",
@@ -728,6 +742,18 @@ U1 and U2 are independent foundations. U3 is the first vertical preview/fallback
       "verificationContract": {
         "version": 1,
         "required": [
+          {
+            "id": "design-disabled-non-ui-regression",
+            "capability": "command",
+            "proof": "test",
+            "source": "R31-R35 disabled/non-UI package compatibility",
+            "operation": {
+              "command": "node scripts/test-work-design-disabled.mjs",
+              "timeoutMs": 180000,
+              "expectedExit": 0,
+              "assertions": [{"target": "exit", "operator": "equals", "value": "0"}]
+            }
+          },
           {
             "id": "package-regression",
             "capability": "command",

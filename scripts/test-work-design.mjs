@@ -426,6 +426,11 @@ try {
 	);
 	try {
 		execFileSync("git", ["init"], { cwd: lifecycleRoot, stdio: "ignore" });
+		fs.mkdirSync(path.join(lifecycleRoot, ".pi"), { recursive: true });
+		fs.writeFileSync(
+			path.join(lifecycleRoot, ".pi", "settings.json"),
+			JSON.stringify({ workOrchestrator: { visualDesignWorkflow: "auto" } }),
+		);
 		const brainstorm = buildWorkBrainstormState(
 			lifecycleRoot,
 			"new Redesign the account settings interface with responsive recovery screens",

@@ -559,6 +559,7 @@ try {
 		path.join(finishCwd, ".pi", "settings.json"),
 		JSON.stringify({
 			workOrchestrator: {
+				visualDesignWorkflow: "auto",
 				browserTestsOnUiDiff: false,
 				codeReviewBeforeCommit: "off",
 				backgroundVerifiers: {
