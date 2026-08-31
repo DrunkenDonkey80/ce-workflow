@@ -38,6 +38,10 @@ root; Enter and Space toggle checklist rows without moving the cursor; parent
 cursors survive submenu round trips; every model list supports keyboard
 filtering. Keep native UI fallbacks for non-TUI modes.
 
+## Fast Commit-and-Push Rule
+
+For direct commit-and-push requests, use this path: one parallel preflight (`status`, `diff --stat`, branch/remote); inspect only unexpected or sensitive untracked files and never stage credentials; run one batched LSP check plus the smallest relevant tests; stage tracked changes with `git add -u`, then commit and push `master`; finish with one status/ahead check. If status and diff disagree, use `git diff-index` once instead of repeated probes. Do not create temporary comparison files.
+
 ## Branch Rule
 
 Always develop directly on `master`. Do not create or switch to feature branches, and do not ask for confirmation.
