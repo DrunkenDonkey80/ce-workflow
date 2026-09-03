@@ -2716,11 +2716,9 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempHooks.agent_settled({}, highUsageCtx);
 	assert.equal(
 		compactions.length,
-		1,
-		"settled auto-compaction is enabled by default",
+		0,
+		"settlement does not start an unrequested manual compaction",
 	);
-	assert.match(compactions[0].customInstructions, /work-context microcompact/);
-	compactions.length = 0;
 
 	const oldCompactions = [];
 	await tempShortcuts.f8.handler({
@@ -3493,14 +3491,9 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await tempHooks.agent_settled({}, finishedLifecycleCtx);
 	assert.equal(
 		finishedLifecycleCompactions.length,
-		1,
-		"finished direct work still performs one threshold compaction",
+		0,
+		"finished direct work does not start a settlement compaction",
 	);
-	finishedLifecycleCompactions[0].onComplete?.();
-	finishedLifecycleCompactions[0].onError?.(
-		new Error("late duplicate callback"),
-	);
-	await new Promise((resolve) => setImmediate(resolve));
 	assert.equal(
 		sent.length,
 		finishedLifecycleSent,

@@ -27882,12 +27882,6 @@ export default function workModelsExtension(pi) {
 		reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 		await presentPendingVerifierBatches(ctx.cwd, ctx, pi);
 		await flushWorkGoalContinuationRetry(ctx, pi);
-		if (ctx.isIdle?.() !== false && activeWorkGoal?.status !== "active")
-			try {
-				maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
-			} catch {
-				maybeCompact(ctx, {});
-			}
 		activePromptBackedAgent = false;
 		hideBackgroundVerifierAbort = false;
 		scheduleFilteredContextPersistence(ctx);
