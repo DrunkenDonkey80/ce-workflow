@@ -236,11 +236,11 @@ try {
 				},
 				ui: {
 					workDialogsNative: true,
-				select: async (title, labels) => {
-					menus.push({ title, labels });
-					if (title === "Creative sidecar")
-						return labels.find((label) => label.includes("Quick"));
-					if (roadmapSelected)
+					select: async (title, labels) => {
+						menus.push({ title, labels });
+						if (title === "Creative sidecar")
+							return labels.find((label) => label.includes("Quick"));
+						if (roadmapSelected)
 							return labels.find((label) => /full report/.test(label));
 						const roadmap = labels.find((label) => label.includes(names[id]));
 						if (roadmap) {

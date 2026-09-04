@@ -4384,13 +4384,7 @@ async function chooseCreativeGate(ctx, task = "") {
 			purpose: "Choose whether this broad task needs an isolated creative pass.",
 		},
 	);
-	if (depth === undefined)
-		return {
-			depth: null,
-			advisorUsage: "none",
-			cancelled: true,
-			reason: "cancelled",
-		};
+	if (depth == null) return null;
 	return {
 		depth,
 		advisorUsage: depth === "wide" ? "all" : "none",
@@ -4399,7 +4393,7 @@ async function chooseCreativeGate(ctx, task = "") {
 }
 
 async function chooseCreativeDepth(ctx, task = "") {
-	return (await chooseCreativeGate(ctx, task)).depth;
+	return (await chooseCreativeGate(ctx, task))?.depth ?? null;
 }
 
 async function withCreativeSidecar(builder, args, state, ctx) {
@@ -4408,13 +4402,15 @@ async function withCreativeSidecar(builder, args, state, ctx) {
 		builder === buildWorkPlanState && state.action === "handoff-plan";
 	if (!state.ok || (!isBig && !isPlan)) return state;
 	const gate = await chooseCreativeGate(ctx, args);
-	if (gate.cancelled)
+	if (!gate)
 		return {
 			...state,
-			ok: true,
+			ok: false,
 			action: "cancelled",
+			reason: "creative-gate-cancelled",
+			// ponytail: cleared locally because handleWorkflowAction sends handoffPrompt
+			// without checking state.ok; make that send ok-gated if another path repeats this.
 			handoffPrompt: undefined,
-			controlSessionHandoff: false,
 			message: "Cancelled at the creative-sidecar prompt — nothing queued.",
 		};
 	const target = isBig
