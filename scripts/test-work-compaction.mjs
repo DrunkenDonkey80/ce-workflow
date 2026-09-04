@@ -368,4 +368,130 @@ for (let generation = 0; generation < 5; generation += 1) {
 	);
 }
 
-console.log("ok - work compaction policy");
+const machineFiltered = formatCompactionSummary({
+	profile: COMPACTION_PROFILES.AUTONOMOUS_GOAL,
+	preparation: {
+		messagesToSummarize: [
+			{
+				role: "user",
+				content: "Human correction: preserve this exact preference.",
+			},
+			{
+				role: "user",
+				content: "<!-- work-goal-continuation:wg-1:2:x --> Continue",
+			},
+			{
+				role: "user",
+				content: "<work_goal_objective>machine objective</work_goal_objective>",
+			},
+			{ role: "user", content: "ORCHESTRATOR_RUN_V1 synthetic transport" },
+			{
+				role: "custom",
+				customType: "work-knowledge",
+				content: "STALE-KNOWLEDGE-MUST-NOT-RECUR",
+			},
+		],
+	},
+	goal: { ...goal, status: "active" },
+});
+assert.match(
+	machineFiltered,
+	/Human correction: preserve this exact preference/,
+);
+assert.doesNotMatch(
+	machineFiltered,
+	/work-goal-continuation|machine objective|ORCHESTRATOR_RUN_V1|STALE-KNOWLEDGE-MUST-NOT-RECUR/,
+);
+
+let pinnedHuman = "";
+for (let generation = 0; generation < 15; generation += 1) {
+	pinnedHuman = formatCompactionSummary({
+		profile: COMPACTION_PROFILES.AUTONOMOUS_GOAL,
+		preparation: {
+			previousSummary: pinnedHuman,
+			messagesToSummarize: [
+				...(generation === 0
+					? [{ role: "user", content: "PINNED-HUMAN-CORRECTION" }]
+					: []),
+				{
+					role: "user",
+					content: `<!-- work-goal-continuation:wg-1:${generation}:x --> Continue`,
+				},
+			],
+		},
+		goal: { ...goal, status: "active" },
+	});
+	assert.equal(
+		(pinnedHuman.match(/PINNED-HUMAN-CORRECTION/g) ?? []).length,
+		1,
+		`human correction survives generation ${generation + 1} exactly once`,
+	);
+	const earlier = pinnedHuman.match(
+		/## Earlier compacted context\n([\s\S]*?)(?=\n## |$)/,
+	)?.[1];
+	assert.doesNotMatch(
+		earlier ?? "",
+		/Latest user requests|Decisions and blockers|Changes and verification/,
+	);
+}
+
+const knowledgeOne =
+	'<durable-knowledge untrusted="true">\n- [k-one|human|live|matched:explicit] COMPACTION-KNOWLEDGE-ONE\n</durable-knowledge>';
+const knowledgeTwo =
+	'<durable-knowledge untrusted="true">\n- [k-two|human|live|matched:explicit] COMPACTION-KNOWLEDGE-TWO\n</durable-knowledge>';
+let knowledgeSummary = "";
+for (let generation = 0; generation < 15; generation += 1) {
+	let knowledge = "";
+	if (generation < 10) knowledge = knowledgeOne;
+	else if (generation === 10) knowledge = knowledgeTwo;
+	const input = {
+		profile: COMPACTION_PROFILES.WORK_RESUME,
+		preparation: { ...preparation, previousSummary: knowledgeSummary },
+		durable,
+		knowledge,
+		maxSummaryChars: 4_000,
+	};
+	knowledgeSummary = formatCompactionSummary(input);
+	assert.equal(knowledgeSummary, formatCompactionSummary(input));
+	assert.ok(knowledgeSummary.length <= 4_000);
+	assert.equal(
+		(knowledgeSummary.match(/## Durable knowledge/g) ?? []).length,
+		knowledge ? 1 : 0,
+	);
+	assert.equal(
+		(knowledgeSummary.match(/<durable-knowledge/g) ?? []).length,
+		knowledge ? 1 : 0,
+	);
+	assert.equal(
+		(knowledgeSummary.match(/k-one/g) ?? []).length,
+		generation < 10 ? 1 : 0,
+	);
+	assert.equal(
+		(knowledgeSummary.match(/k-two/g) ?? []).length,
+		generation === 10 ? 1 : 0,
+	);
+}
+
+const saturatedKnowledge = formatCompactionSummary({
+	profile: COMPACTION_PROFILES.WORK_RESUME,
+	preparation: noisy,
+	durable,
+	knowledge: `<durable-knowledge untrusted="true">${" knowledge".repeat(500)}</durable-knowledge>`,
+	maxSummaryChars: 4_000,
+});
+assert.ok(saturatedKnowledge.length <= 4_000);
+assert.match(saturatedKnowledge, /## Objective/);
+assert.match(saturatedKnowledge, /## Next action/);
+assert.match(saturatedKnowledge, /Run \/work-resume work-7\.2/);
+assert.match(saturatedKnowledge, /## Durable knowledge/);
+
+const foreignPrevious = formatCompactionSummary({
+	preparation: {
+		previousSummary:
+			'foreign summary\n<durable-knowledge untrusted="true">STALE-FOREIGN-CLAIM</durable-knowledge>\nkeep this',
+	},
+});
+assert.doesNotMatch(foreignPrevious, /STALE-FOREIGN-CLAIM/);
+assert.match(foreignPrevious, /keep this/);
+
+process.stdout.write("ok - work compaction policy\n");

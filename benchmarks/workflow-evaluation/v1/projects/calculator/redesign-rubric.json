@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "dimensions": [
+    "palette",
+    "hierarchy",
+    "composition",
+    "typography",
+    "signatureElement",
+    "responsiveAdaptation"
+  ],
+  "anchors": {
+    "0": "missing or contradictory",
+    "1": "major mismatch",
+    "2": "partial match",
+    "3": "clear match",
+    "4": "exceptionally close match"
+  },
+  "minimumDimension": 3,
+  "minimumMean": 3.25,
+  "requiredViewports": [
+    { "name": "mobile", "width": 390, "height": 844 },
+    { "name": "desktop", "width": 1024, "height": 768 }
+  ]
+}

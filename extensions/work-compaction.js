@@ -208,6 +208,28 @@ function toolCalls(message) {
 	return [...contentCalls, ...(Array.isArray(legacy) ? legacy : [])];
 }
 
+function filesFromMessages(messages) {
+	const read = [];
+	const modified = [];
+	for (const message of messages)
+		for (const call of toolCalls(message)) {
+			const name = String(call?.name ?? call?.toolName ?? "")
+				.split(".")
+				.at(-1);
+			const args = call?.arguments ?? call?.input ?? {};
+			const paths = [args.path, ...(Array.isArray(args.paths) ? args.paths : [])]
+				.filter((value) => typeof value === "string")
+				.map(normalizePath);
+			if (["edit", "write", "ast_grep_replace"].includes(name))
+				modified.push(...paths);
+			else if (
+				["read", "read_symbol", "read_enclosing", "module_report"].includes(name)
+			)
+				read.push(...paths);
+		}
+	return filesFromOps({ read, modified });
+}
+
 function toolArgumentSummary(call) {
 	const args = call?.arguments ?? call?.function?.arguments ?? call?.args;
 	if (!args || typeof args !== "object") return "";
@@ -327,7 +349,12 @@ function messageRecords(messages) {
 	const records = [];
 	for (const message of messages) {
 		const role = messageRole(message);
-		if (/thinking|reasoning/i.test(role) || /^user$/i.test(role)) continue;
+		if (
+			/thinking|reasoning/i.test(role) ||
+			/^user$/i.test(role) ||
+			(role === "custom" && message?.customType === "work-knowledge")
+		)
+			continue;
 		if (role === "assistant") {
 			const text = headTail(contentText(message.content), 900);
 			if (text)
@@ -371,6 +398,16 @@ function messageRecords(messages) {
 	return records;
 }
 
+function dedupeKey(value) {
+	return normalizeText(value)
+		.replace(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\b/g, "<timestamp>")
+		.replace(
+			/\b(?:claim|finding|lease|run|entry|event)[-_][a-z0-9-]{6,}\b/gi,
+			"<generated-id>",
+		)
+		.replace(/\b[a-f0-9]{32,64}\b/gi, "<hash>");
+}
+
 function newestUniqueRecords(records, limit) {
 	const seen = new Set();
 	const result = [];
@@ -380,8 +417,9 @@ function newestUniqueRecords(records, limit) {
 		index -= 1
 	) {
 		const record = records[index];
-		if (!record?.text || seen.has(record.key)) continue;
-		seen.add(record.key);
+		const key = dedupeKey(record?.key);
+		if (!record?.text || seen.has(key)) continue;
+		seen.add(key);
 		result.push(record.text);
 	}
 	return result.toReversed();
@@ -397,6 +435,15 @@ function messagesFrom(preparation) {
 	return [...summarized, ...prefix];
 }
 
+function syntheticUserRequest(value) {
+	return (
+		/work-goal-continuation:/i.test(value) ||
+		/<work_goal_objective>/i.test(value) ||
+		/^Compaction is complete\. Resume the parent task now\b/i.test(value) ||
+		/^ORCHESTRATOR_RUN_V1\b/i.test(value)
+	);
+}
+
 function latestUserRequests(
 	messages,
 	minimum = 5,
@@ -407,7 +454,7 @@ function latestUserRequests(
 		.map((message) =>
 			normalizeText(contentText(message.content ?? message.message)),
 		)
-		.filter(Boolean);
+		.filter((request) => request && !syntheticUserRequest(request));
 	const selected = [];
 	let chars = 0;
 	for (const request of requests.toReversed()) {
@@ -442,24 +489,27 @@ function delimited(name, value) {
 }
 
 function sectionFromPrevious(summary, title) {
-	const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const match = new RegExp(
-		`(?:^|\\n)## ${escaped}\\n([\\s\\S]*?)(?=\\n## |$)`,
-	).exec(summary);
-	return normalizeText(match?.[1]);
+	const heading = `## ${title}\n`;
+	const start = summary.indexOf(heading);
+	if (start < 0) return "";
+	const bodyStart = start + heading.length;
+	const end = summary.indexOf("\n## ", bodyStart);
+	return normalizeText(summary.slice(bodyStart, end < 0 ? undefined : end));
+}
+
+function stripKnowledgeBlocks(value) {
+	return normalizeText(value).replace(
+		/<durable-knowledge\b[^>]*>[\s\S]*?<\/durable-knowledge>/gi,
+		"",
+	);
 }
 
 function previousHighlights(previousSummary) {
-	const previous = normalizeText(previousSummary);
+	const previous = stripKnowledgeBlocks(previousSummary);
 	if (!previous) return "";
 	if (!previous.startsWith("## ce-workflow compact context"))
 		return bounded(previous, 1_500);
-	return [
-		"Latest user requests",
-		"Decisions and blockers",
-		"Changes and verification",
-		"Critical retained context",
-	]
+	return ["Critical retained context"]
 		.map((title) => {
 			const content = sectionFromPrevious(previous, title);
 			return content ? `### ${title}\n${content}` : "";
@@ -532,6 +582,7 @@ function fitSections(sections, maxChars) {
 		"recent",
 		"critical",
 		"changes",
+		"knowledge",
 		"decisions",
 		"durable",
 		"objective",
@@ -556,6 +607,7 @@ export function formatCompactionSummary({
 	currentMessages = [],
 	durable,
 	goal,
+	knowledge = "",
 	maxSummaryChars = DEFAULT_MAX_SUMMARY_CHARS,
 } = {}) {
 	const selectedProfile = Object.values(COMPACTION_PROFILES).includes(profile)
@@ -567,7 +619,16 @@ export function formatCompactionSummary({
 	const liveMessages = currentMessages.length ? currentMessages : messages;
 	const users = latestUserRequests(liveMessages);
 	const previous = normalizeText(source.previousSummary);
-	const files = filesFromOps(source.fileOps);
+	if (!users.length) {
+		const previousLatest = sectionFromPrevious(previous, "Latest user requests");
+		const previousCurrent = /(?:^|\n)### Current\n([\s\S]*?)(?=\n### |$)/.exec(
+			previousLatest,
+		)?.[1];
+		if (previousCurrent) users.push(normalizeText(previousCurrent));
+	}
+	let files = filesFromOps(source.fileOps);
+	if (!files.read.length && !files.modified.length)
+		files = filesFromMessages(messages);
 	const records = messageRecords(messages);
 	const recent = newestUniqueRecords(
 		records.filter((record) => !record.critical),
@@ -591,20 +652,33 @@ export function formatCompactionSummary({
 				`### ${index === 0 ? "Current" : "Earlier"}\n${headTail(request, 1_600)}`,
 		)
 		.join("\n\n");
+	const goalObjective =
+		normalizeText(goal?.objective) === normalizeText(objective)
+			? undefined
+			: goal?.objective;
 	const compactGoal = goal
 		? {
 				id: goal.id,
 				status: goal.status,
-				objective: goal.objective,
+				objective: goalObjective,
 				pendingDecision: goal.pendingDecision,
 			}
 		: undefined;
+	let compactDurable = durable;
+	if (durable?.target) {
+		const compactTarget = { ...durable.target };
+		if (selectedProfile === COMPACTION_PROFILES.WORK_RESUME) {
+			compactTarget.title = undefined;
+			compactTarget.description = undefined;
+		}
+		compactDurable = { ...durable, target: compactTarget };
+	}
 	const durableState =
 		selectedProfile === COMPACTION_PROFILES.FREEFORM && !compactGoal
 			? ""
 			: delimited("durable-work-state", {
 					goal: compactGoal,
-					state: durable,
+					state: compactDurable,
 				});
 	const decisions = delimited("decisions-and-blockers", {
 		pendingDecision: goal?.pendingDecision,
@@ -638,6 +712,13 @@ export function formatCompactionSummary({
 			raw: nextActionFor(selectedProfile, durable, goal),
 			cap: 900,
 			minimum: 160,
+		},
+		{
+			key: "knowledge",
+			title: "Durable knowledge",
+			raw: normalizeText(knowledge),
+			cap: 1_200,
+			minimum: knowledge ? 400 : 0,
 		},
 		{
 			key: "durable",

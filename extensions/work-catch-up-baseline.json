@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-30T17:43:23.370Z",
+  "capturedAt": "2026-09-03T17:17:56.241Z",
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
@@ -46,98 +46,91 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.60.0",
-      "reviewedAt": "2026-08-30T17:43:23.370Z",
-      "reviewedVersion": "0.60.0",
+      "version": "0.64.0",
+      "reviewedAt": "2026-09-03T17:00:08.495Z",
+      "reviewedVersion": "0.64.0",
       "decisions": [
         {
-          "version": "0.60.0",
-          "title": "Package-owned capability discovery and timeout recovery evidence",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit prompt-free agent capability discovery, timeout recovery receipts, exact host-command cwd guidance, and lifecycle/status fixes through the existing public subagent boundary. Verified project fit: ce-workflow launches fixed project-owned roles, already recovers dirty failed turns from durable Git/work-item state, and consumes terminal status without importing pi-subagents internals. Verified upstream evidence: the installed 0.60.0 changelog, public tool reference, workflow docs, schema/type changes, and captured 0.59.0-to-0.60.0 artifact document these surfaces. Benefit: clearer diagnostics and safer package behavior with no duplicate recovery owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local adapter."
+          "version": "0.64.0",
+          "title": "Replace the removed subagent_wait alias with bg_wait",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 prompt and telemetry rename. Bottom line: use bg_wait in generated research and creative-sidecar instructions and recognize it in wait telemetry. Verified project fit: two ce-workflow prompt generators still told agents to call subagent_wait, and the telemetry classifier plus focused fixtures used that retired name. Verified upstream evidence: the installed 0.64.0 changelog and public tool schema state that 0.61.0 removed the deprecated compatibility alias and bg_wait is the supported background wait tool. Benefit: generated workflows call an available tool and retain accurate wait accounting. Cost/risk: three text/fixture substitutions with no state migration. Confidence: high. Recommendation: adopt now.",
+          "verification": "node scripts/test-work-settings.mjs; node scripts/test-work-stats.mjs; node scripts/test-work-brainstorm.mjs"
         },
         {
-          "version": "0.60.0",
-          "title": "Add coded capability-list preflight before fixed-role launches",
-          "pov": "Reject",
+          "version": "0.64.0",
+          "title": "Package-owned watchdog, workflow, worktree, and async-run capabilities",
+          "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2 launch-path change. Bottom line: do not insert a second discovery RPC before every fixed-role action. Verified project fit: ce-workflow ships and selects exact project agents, while failed or disabled launches already return bounded terminal evidence and preserve the action lease. Verified upstream evidence: capabilities:true is declared/default routing discovery rather than exact task-specific preflight. Benefit: avoids an extra round trip and another launch dependency. Cost/risk: a missing agent still fails at the existing launch boundary. Confidence: high. Recommendation: use discovery only for interactive agent selection, not ce-workflow's coded fixed roles."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit 0.61.0-0.64.0 named workflow resources, workflow limits, excludeTools, session schedules, worktree providers, async recovery, progress UI, watchdog rules, and Windows launch fixes through pi-subagents without duplicating them. Verified project fit: ce-workflow already launches fixed roles through the public subagent boundary, owns its domain leases and durable evidence, and has no rejected watchdog or autoFollow settings in its project configuration. Verified upstream evidence: the installed 0.64.0 changelog, tool reference, configuration and extension API docs, package metadata, and captured 0.60.0-to-0.64.0 artifact document these package-owned surfaces and removal of unsupported watchdog settings. Benefit: reliability and UI improvements arrive from their owner while ce-workflow keeps one orchestration owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no additional local adapter or watchdog configuration."
         }
       ]
     },
     {
       "name": "pi-ask-user",
-      "version": "0.14.0",
-      "reviewedAt": "2026-08-06",
-      "reviewedVersion": "0.14.0",
+      "version": "0.15.0",
+      "reviewedAt": "2026-09-03T17:17:56.241Z",
+      "reviewedVersion": "0.15.0",
       "decisions": [
         {
-          "version": "0.14.0",
-          "title": "Responsive decision UI and Herdr attention signaling",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Responsive list layouts and blocked/waiting attention signals are implemented inside pi-ask-user and inherited by ce-workflow's existing ask_user calls. Local dialog policy remains separate and no compatibility shim is required.",
-          "verification": "Installed pi-ask-user behavior is inherited through ce-workflow's existing ask_user calls."
+          "version": "0.15.0",
+          "title": "Package-owned private outcome events and compatibility fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit redacted ask outcome events, Kitty repeat/release filtering, and TypeBox-shim compatibility directly from pi-ask-user. Verified project fit: ce-workflow consumes ask_user through normal tool results and lifecycle hooks, has no ask:answered or ask:cancelled listener, does not set PI_ASK_USER_EMIT_FULL_EVENTS, and does not copy the plugin schema or overlay listener. Verified upstream evidence: the installed 0.15.0 README, package metadata, public schema, implementation diff, and captured 0.14.0-to-0.15.0 artifact document these surfaces; the package ships no changelog. Benefit: safer event privacy and more reliable prompts without a second owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local event adapter or full-event opt-in."
         },
         {
-          "version": "0.14.0",
-          "title": "ask_user telemetry integration",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "The release exposes no stable per-call telemetry API, while ce-workflow already records tool timing and dialog decisions. Local wrapping would duplicate package behavior without measurable savings; revisit if a public metrics hook appears."
+          "version": "0.15.0",
+          "title": "Open ask_user decision context by default",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 environment default. Bottom line: set PI_ASK_USER_CONTEXT_EXPANDED=true when ce-workflow loads so decision evidence is visible without Ctrl+E. Verified project fit: ce-workflow routinely supplies decision context for planning, approvals, and recovery; the extension-level default covers every ask_user call while preserving an explicit true or false user environment preference. Verified upstream evidence: pi-ask-user 0.15.0 reads PI_ASK_USER_CONTEXT_EXPANDED at call time and supports contextExpanded as the per-call override. Benefit: actors see the full message immediately. Cost/risk: large contexts consume more terminal space. Confidence: high. Recommendation: use expanded context as ce-workflow's default.",
+          "verification": "node scripts/test-work-settings.mjs"
         }
       ]
     },
     {
       "name": "pi-intercom",
-      "version": "0.12.1",
-      "reviewedAt": "2026-08-30T17:43:23.370Z",
-      "reviewedVersion": "0.12.1",
+      "version": "0.13.0",
+      "reviewedAt": "2026-09-03T17:00:08.495Z",
+      "reviewedVersion": "0.13.0",
       "decisions": [
         {
-          "version": "0.12.1",
-          "title": "Package-owned reply routing guard and stable tool visibility",
+          "version": "0.13.0",
+          "title": "Package-owned session alias command and Unicode-safe Windows broker launch",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit the active-ask reply-target guard and removal of lazy intercom tool visibility without a ce-workflow adapter. Verified project fit: ce-workflow already requires exact-session trust checks, pending-message inspection, and explicit reply threading; it has no toolVisibility configuration or intercom transport implementation. Verified upstream evidence: the installed 0.12.1 README, public tool/config behavior, and captured 0.12.0-to-0.12.1 artifact document the guard and stable active-tool policy. Benefit: safer replies and prompt-cache-stable tool schemas from the package owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code or config."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit the /alias command and UTF-16LE Windows hidden-launcher fix from pi-intercom without a ce-workflow adapter. Verified project fit: ce-workflow does not name sessions or spawn the intercom broker, keeps pi-intercom optional, uses list-cwd only for operator discovery, and already requires exact session IDs for trust-sensitive or ambiguous coordination. Verified upstream evidence: the installed 0.13.0 README, package metadata, implementation diff, public command/tool behavior, and captured 0.12.1-to-0.13.0 artifact document both changes; the package ships no changelog. Benefit: users can persist a peer-friendly session name and Windows installations with non-ASCII paths launch reliably, while transport ownership stays in the plugin. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code, docs, or naming convention."
+        },
+        {
+          "version": "0.13.0",
+          "title": "Name ce-workflow role sessions through /alias",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 1 optional naming policy. Bottom line: do not add alias mutation to coded role launches. Verified project fit: managed subagents already carry stable run and child identity, while delayed supervisor guidance intentionally prefers exact session IDs when identity matters. Verified upstream evidence: 0.13.0 presents /alias as a user-facing current-session command, not a subagent routing requirement. Benefit: preserves collision-resistant run identity and avoids persistent name churn. Cost/risk: operators may still set friendly aliases manually for long-lived peer sessions. Confidence: high. Recommendation: reserve /alias for user-managed peers."
         }
       ]
     },
     {
       "name": "@narumitw/pi-goal",
-      "version": "0.54.3",
-      "reviewedAt": "2026-08-27",
-      "reviewedVersion": "0.54.3",
+      "version": "0.54.4",
+      "reviewedAt": "2026-09-03T17:00:08.495Z",
+      "reviewedVersion": "0.54.4",
       "decisions": [
         {
-          "version": "0.54.3",
-          "title": "Independent goal safety and coexistence release",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 baseline-only record and package rollback. Bottom line: record installed 0.54.3 as an independently owned goal extension; do not replace or integrate ce-workflow's domain-specific autonomous engine. Verified project fit: this repository has no pi-goal dependency or command/event callsite, while ce-workflow's goal loop owns work-item, verifier, catch-up, compaction, and completion gates. Verified upstream evidence: the captured 0.52.1-to-0.54.3 artifact and installed README document stable goal tools, safety limits, a built runtime, and cooperative workflow mutex behavior. Benefit: acknowledge the installed package's stable tools, safety limits, mutex behavior, and built runtime. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: adopt now as no-local-action.",
-          "verification": "Installed @narumitw/pi-goal package manifest is 0.54.3; captured 0.52.1-to-0.54.3 README and public runtime artifact reviewed; repository search found no integration callsite"
-        },
-        {
-          "version": "0.54.3",
-          "title": "Replace ce-workflow autonomous goals with pi-goal",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 3 after state and command migration. Bottom line: pi-goal remains a generic single-objective loop, not a substitute for ce-workflow's work-item, verifier, catch-up, lease, and completion gates. Verified project fit: ce-workflow enforces domain state before completion and has distinct human-decision and safety paths. Verified upstream evidence: 0.54.3 exposes generic goal_complete, goal_blocked, goal_wait, and optional managed-run behavior. Benefit: avoids deleting required domain guarantees for superficial code reduction. Cost/risk: the purpose-built engine remains. Confidence: high. Recommendation: no replacement."
-        },
-        {
-          "version": "0.54.3",
-          "title": "Add workflow mutex integration without a reproduced collision",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2. Bottom line: do not add an optional coordination protocol without evidence that ce-workflow and pi-goal contend in supported use. Verified project fit: ce-workflow does not invoke pi-goal and the package is not a dependency. Verified upstream evidence: the mutex is cooperative and its documented coexistence guarantee is characterized for pi-goal with plan mode, not ce-workflow. Benefit: avoids speculative lifecycle state. Cost/risk: independently activated workflow extensions can still conflict if a user deliberately runs both. Confidence: high. Recommendation: revisit only with a concrete collision reproduction."
-        },
-        {
-          "version": "0.54.3",
-          "title": "Goal package UI, persistence, safety, and build internals",
+          "version": "0.54.4",
+          "title": "Package-owned Markdown completion rendering and metadata refresh",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit package-owned tool visibility, state restoration, limits, mutex participation, and bundled runtime behavior without adapters. Verified project fit: ce-workflow has no pi-goal API consumer. Benefit: keeps ownership clear. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code."
+          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit pi-goal's Markdown rendering for accepted goal_complete results and its package/documentation refresh without a compatibility adapter. Verified project fit: ce-workflow's narrow coexistence path reads the unchanged goal-state session entry and forwards the unchanged public /goal pause and /goal resume commands; it does not render pi-goal tool results or import pi-goal internals. Verified upstream evidence: the installed 0.54.4 source, README, package metadata, and captured 0.54.3-to-0.54.4 artifact show one runtime behavior change confined to goal_complete renderResult, removal of unused piExtension lifecycle metadata, dev-dependency updates, and documentation clarification. Benefit: pi-goal users receive a readable completion card while ce-workflow coexistence stays stable. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local adapter."
+        },
+        {
+          "version": "0.54.4",
+          "title": "Copy pi-goal's completion renderer into work_goal_complete",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Grade: Reject. Reversibility: Tier 2 tool-rendering and dependency change. Bottom line: do not add a second completion card for ce-workflow's internal terminal tool. Verified project fit: work_goal_complete already returns a bounded completion result and explicitly asks the agent to give the user one concise final summary; work-models.js currently needs no direct pi-tui import. Verified upstream evidence: 0.54.4's new renderer is scoped to pi-goal's own goal_complete result and introduces Markdown plus theme dependencies. Benefit: avoids duplicate user-visible completion output and a new direct TUI dependency. Cost/risk: the internal tool row remains plain text before the final assistant summary. Confidence: high. Recommendation: retain the existing final-response handoff."
         }
       ]
     },

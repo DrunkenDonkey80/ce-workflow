@@ -185,6 +185,12 @@ try {
 		"verifier instructions reject textual pseudo-tool calls",
 	);
 	assert(
+		fixtureLaunch?.task.includes(
+			"Result objects must not repeat jobId, model, or checkpoint",
+		),
+		"verifier results do not repeat the large checkpoint identity",
+	);
+	assert(
 		fixtureLaunch?.output === undefined && fixtureLaunch.outputMode === undefined,
 		"structured verifier output does not request an impossible agent-side file write",
 	);
@@ -613,6 +619,48 @@ ${requiredItemFields}`;
 			"real user aborts remain visible",
 		);
 	}
+
+	const analysisBatch = mutateVerifierStore(cwd, (state) =>
+		createBatch(state, {
+			checkpoint,
+			purpose: "analysis",
+			profiles: [
+				{
+					model: "fixture/analyzer",
+					operations: ["correctness"],
+					thinking: "low",
+				},
+			],
+		}),
+	);
+	const analysisJob = Object.values(loadVerifierStore(cwd).jobs).find(
+		(candidate) => candidate.batchId === analysisBatch.id,
+	);
+	mutateVerifierStore(cwd, (state) =>
+		recordOperationResult(state, {
+			jobId: analysisJob.id,
+			operation: "correctness",
+			outcome: "no-findings",
+		}),
+	);
+	await hooks.agent_settled({}, ctx);
+	const synthesisPrompt = followUps.at(-1)?.text;
+	assert(
+		synthesisPrompt?.includes("Background analysis batch"),
+		"completed Analyze verifiers queue their internal synthesis turn",
+	);
+	const synthesisPolicy = await hooks.before_agent_start(
+		{ prompt: synthesisPrompt, systemPrompt: "base" },
+		ctx,
+	);
+	assert(
+		!synthesisPolicy.systemPrompt.includes("Direct request mode") &&
+			synthesisPolicy.systemPrompt.includes("Review cycle budget") &&
+			hooks.tool_call({ toolName: "work_verifier_inbox", input: {} }, ctx) ===
+				undefined,
+		"the internal verifier synthesis turn retains workflow authorization",
+	);
+
 	process.stdout.write(
 		"ok - completed task commit fires a background verifier in a disposable repository\n",
 	);

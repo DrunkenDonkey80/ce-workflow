@@ -5515,6 +5515,45 @@
       "type": "task",
       "updatedAt": "2026-08-26T06:02:31.176Z"
     },
+    "work-2.report-2a941cf9-012a-4d82-809d-54851af97810": {
+      "createdAt": "2026-09-03T01:51:02.818Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After mandatory verifier fixes committed the implementation for in-progress work-1.13, finish-task could no longer close the item: rerunning the coded finalizer with its persisted PASS review returned \"no related changes to commit\" even though the task's implementation, verification proof, and review evidence were already present in ancestor commits/native state.\nExpected: finish-task should reconcile an in-progress task whose task-owned implementation landed in an ancestor commit (for example through mandatory accepted-verifier completion), revalidate its persisted proof/review state, and close it without requiring an artificial new diff.\nImpact: Autonomous roadmap execution stalls after mandatory verifier correction and must bypass the normal finish path with a direct work-close, weakening the coded commit/close invariant and creating repeated continuation churn.\nSuggested improvement: Add an explicit ancestor-reconciliation path to finish-task keyed by the persisted review scope and verification revision, similar to verifier complete-fix reconciliation.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/e7f69acd-c414-4705-aa1a-a56d9e161dfd",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1166621,
+              "file": "01-01a064ef-cf24-798f-b47a-171e3fa76e77.jsonl",
+              "sha256": "cf59d5b438cc4c47e5cc6c2fca58cb67ace063c28c98d47f3417057a8d9d733d"
+            },
+            {
+              "bytes": 3209398,
+              "file": "02-01a064ca-00aa-7208-9ec4-20a4879a4624.jsonl",
+              "sha256": "ad00d1d9398d4311462f16f592f786a03954b4aa2efb659e9accdc839ba4013d"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "AI-Wedge",
+          "submittedAt": "2026-09-03T01:51:02.811Z",
+          "workflowId": "01a064ef-cf24-798f-b47a-171e3fa76e77"
+        }
+      ],
+      "id": "work-2.report-2a941cf9-012a-4d82-809d-54851af97810",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After mandatory verifier fixes committed the implementation for in-progress work-1.13, finish-task could no longer close the item:",
+      "type": "task",
+      "updatedAt": "2026-09-03T01:51:02.818Z"
+    },
     "work-2.report-2cdd87c5-81e8-444e-8075-85ef78e8d3aa": {
       "createdAt": "2026-08-20T06:01:26.367Z",
       "dependencies": [
@@ -6460,6 +6499,40 @@
       "title": "Self-improvement report: Three consecutive required async work-worker launches failed before child creation because pi-subagents attempted to mkdir an asyn",
       "type": "task",
       "updatedAt": "2026-08-08T19:53:25.349Z"
+    },
+    "work-2.report-4e606bac-32ea-43f9-a1ab-94e472c2c156": {
+      "createdAt": "2026-09-03T04:02:03.111Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: For a compatibility verification contract whose sole requirement is capability=inspection and inspection=goal, `work-run-proof work-1.25 legacy-inspection --inspection ...` recorded BLOCKED with `inspection-adapter-unavailable`, even though the current goal supplied the requested revision-bound inspection summary.\nExpected: The helper should either record the supplied goal inspection as PASS for goal-owned inspection requirements, or direct the caller to `work-proof ... --status PASS --inspection ... --by goal` before mutating the work item. It should not create a spurious blocker that must be superseded manually.\nImpact: Routine legacy work items are left blocked after successful code inspection and build verification, adding recovery steps and misleading durable evidence during autonomous resume loops.\nSuggested improvement: Handle goal-owned inspection directly in work-run-proof when --inspection is provided, or fail without mutation and print the exact work-proof command.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/ec0c8a97-d166-47b8-a571-087e6896777e",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 97417,
+              "file": "01-work-items.json",
+              "sha256": "9c94e82d00c531abaa622521b49c8206770437eedcc66e0b58301f871481094f"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "AI-Wedge",
+          "submittedAt": "2026-09-03T04:02:03.105Z",
+          "workflowId": "01a06567-57da-7e33-be18-d048f46cdd0f"
+        }
+      ],
+      "id": "work-2.report-4e606bac-32ea-43f9-a1ab-94e472c2c156",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: For a compatibility verification contract whose sole requirement is capability=inspection and inspection=goal, `work-run-proof wor",
+      "type": "task",
+      "updatedAt": "2026-09-03T04:02:03.111Z"
     },
     "work-2.report-4f5ba7ee-3fc6-4bb9-ab47-a99239fb6bf6": {
       "createdAt": "2026-08-18T10:14:53.899Z",
@@ -10334,6 +10407,45 @@
       "title": "Self-improvement report: A live /wo → Improve project run committed and pushed its changes, verified master was clean and synchronized, and successfully ca",
       "type": "task",
       "updatedAt": "2026-08-29T18:53:06.903Z"
+    },
+    "work-2.report-db53bc98-2067-47d3-a3f5-5f51a63dfde8": {
+      "createdAt": "2026-09-02T23:46:47.123Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Precomputed run-implementation handoff for legacy WorkItem work-1.1 required `finish-task`, but the verified outcome already existed in ancestor commit 2c07887 and the working tree was clean. After the required current-revision inspection proof passed, `finish-task` failed with `no related changes to commit`.\nExpected: For a legacy WorkItem whose required capability proof passes against a clean current revision and whose implementation is traceable to an exact ancestor commit, the coded finalizer should support a verified no-diff reconciliation/close instead of requiring artificial source changes.\nImpact: The generated handoff is not executable as written and leaves a fully verified legacy task unable to close through the mandated finish path, encouraging cosmetic edits or an undocumented fallback to work-close.\nSuggested improvement: Add a guarded finish-task legacy reconciliation option that requires a passing current-revision verification contract plus an exact ancestor commit containing the implementation, records that commit, and closes without creating a new code commit.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/2320e026-7e8c-4388-ae3f-e47927c2b18f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 129916,
+              "file": "01-2026-09-02.jsonl",
+              "sha256": "0ac1db606722924a5910f4db8717acbc1d12ba72cdab2462f9ab705dae829e4e"
+            },
+            {
+              "bytes": 3548,
+              "file": "02-work-orchestrator-state.json",
+              "sha256": "3a970cd24fb7bdec20a9c5704b03f291145ea384de37f8dea4bf11ced74ece94"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "AI-Wedge",
+          "submittedAt": "2026-09-02T23:46:47.114Z",
+          "workflowId": "workflow-mtkqu88k-8c50ba"
+        }
+      ],
+      "id": "work-2.report-db53bc98-2067-47d3-a3f5-5f51a63dfde8",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Precomputed run-implementation handoff for legacy WorkItem work-1.1 required `finish-task`, but the verified outcome already exist",
+      "type": "task",
+      "updatedAt": "2026-09-02T23:46:47.123Z"
     },
     "work-2.report-ddd0da8f-cd4a-486c-ae95-d3bf81399777": {
       "createdAt": "2026-08-12T16:54:19.072Z",
@@ -16240,7 +16352,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-08-31T13:02:53.008Z"
+    "updatedAt": "2026-09-04T19:37:29.860Z"
   },
   "schemaVersion": 1
 }

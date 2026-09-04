@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "description": "Sanitized incident queries held apart from their earlier durable claims; project names and paths are genericized.",
+  "claims": [
+    { "id": "k-od-binary", "project": "workflow", "claim": "OpenDesign executable discovery must prefer the installed OpenDesign application; PATH od.exe is GNU octal dump and is unrelated.", "kind": "environment", "authority": "human", "symbols": ["resolveOpenDesignCommand"] },
+    { "id": "k-od-fake", "project": "workflow", "claim": "Offline fake OpenDesign output proves prompt construction only and cannot satisfy real visual preview or screenshot acceptance.", "kind": "dead-end", "authority": "observed" },
+    { "id": "k-regression-rule", "project": "workflow", "claim": "Workflow optimizations require the same end-to-end benchmark with aggregate runtime, provider tokens, cost, turns, and tool calls; revert material overall regressions.", "kind": "procedure", "authority": "human" },
+    { "id": "k-memory-scope", "project": "workflow", "claim": "Durable session knowledge covers compaction, microcompact fact injection, and explicit fact storage and search commands.", "kind": "fact", "authority": "observed" },
+    { "id": "k-verifier-policy", "project": "workflow", "claim": "Background verifier provider failures are non-blocking and must not keep roadmaps open indefinitely.", "kind": "procedure", "authority": "observed" },
+    { "id": "k-calculator-baseline", "project": "workflow", "claim": "Calculator workflow evaluation compares identical seeded projects and plans across workflow and autonomous lanes.", "kind": "fact", "authority": "observed" },
+    { "id": "k-design-selection", "project": "workflow", "claim": "Redesign must present three real OpenDesign variants for user selection and approval before implementation.", "kind": "procedure", "authority": "human" },
+    { "id": "k-direct-mode", "project": "workflow", "claim": "Direct request mode must not create work items or invoke orchestration without an explicit orchestrator command.", "kind": "procedure", "authority": "human" },
+    { "id": "k-monitor-register", "project": "monitor", "claim": "Monitor color preset switching uses VCP E2 values; applying E2 to the F0 capability register is invalid.", "kind": "dead-end", "authority": "observed", "symbols": ["applyMonitorPreset"] },
+    { "id": "k-monitor-hotkey", "project": "monitor", "claim": "The pause and resume hotkey paused once but did not resume, while game hotkeys produced no in-game reaction.", "kind": "dead-end", "authority": "observed" },
+    { "id": "k-monitor-profiles", "project": "monitor", "claim": "A guessed registry profile list produced no monitor color change; inspect discovered DDC profiles instead of repeating guessed values.", "kind": "procedure", "authority": "observed" },
+    { "id": "k-belot-cards", "project": "cards", "claim": "Card art should use the supplied randomly split illustrated image reference and offer several visible deck image sets, not color-only variants.", "kind": "preference", "authority": "human" },
+    { "id": "k-belot-seats", "project": "cards", "claim": "Local play always places the current player south and the partner north; no seat picker is needed.", "kind": "fact", "authority": "observed" },
+    { "id": "k-android-triage", "project": "android", "claim": "Android verifier triage must inspect current code and dispose each finding before roadmap work.", "kind": "procedure", "authority": "observed" },
+    { "id": "k-absolute-paths", "project": "user", "scope": "user", "claim": "Present user-facing file locations as absolute paths.", "kind": "preference", "authority": "human" }
+  ],
+  "queries": [
+    { "project": "workflow", "text": "OpenDesign was not configured, so this used the offline fake and produced no real visual previews or screenshots.", "expected": ["k-od-binary", "k-od-fake"] },
+    { "project": "workflow", "text": "This is the second od.exe mistake; find the installed OpenDesign executable and rerun it.", "expected": ["k-od-binary"] },
+    { "project": "workflow", "text": "Revert that serious regression and preserve what future optimization checks must cover.", "expected": ["k-regression-rule"] },
+    { "project": "monitor", "text": "Preset switching still fails: E2 was read, but applying it to F0 is wrong.", "expected": ["k-monitor-register"] },
+    { "project": "monitor", "text": "Color presets still do not work; profile enumeration worked before but guessed switching changes nothing.", "expected": ["k-monitor-register", "k-monitor-profiles"] },
+    { "project": "monitor", "text": "Pause works once, but the hotkey will not resume and there is no reaction in game.", "expected": ["k-monitor-hotkey"] },
+    { "project": "cards", "text": "Use the illustrated split image and generate several beautiful visible deck sets, not just colors.", "expected": ["k-belot-cards"] },
+    { "project": "workflow", "text": "Compaction and microcompact need relevant durable facts plus commands to store and search them.", "expected": ["k-memory-scope"] },
+    { "project": "workflow", "text": "We need three real variants to select and approve before implementation starts.", "expected": ["k-design-selection"] },
+    { "project": "android", "text": "Rename the marketing heading and adjust its spacing.", "expected": [] }
+  ]
+}

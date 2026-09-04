@@ -3,9 +3,13 @@ import { createHash } from "node:crypto";
 import {
 	acquireVerifierLock,
 	addFinding,
+	analysisInboxProjection,
 	analysisReviewProjection,
+	beginAnalysisCandidateFinalization,
+	blockAnalysisCandidateFinalization,
 	claimAnalysisReview,
 	createBatch,
+	discardAnalysisCandidates,
 	disposeAnalysisReview,
 	ingestAnalysisReview,
 	initVerifierStore,
@@ -13,6 +17,7 @@ import {
 	mutateVerifierStore,
 	recordOperationResult,
 	saveAnalysisReviewProposal,
+	setAnalysisCandidateEnabled,
 } from "../extensions/background-verifiers.js";
 import {
 	materializeVerifierAnalysis,
@@ -164,6 +169,22 @@ try {
 		"failed",
 		"lock contention remains retryable instead of being classified as malformed synthesis",
 	);
+	const materialized = materializeVerifierAnalysis(cwd, {
+		batchIds: [batch.id],
+		markdown: JSON.stringify({
+			candidates,
+			decisions: { "tag-identity": "What does tag identity mean?" },
+			conflicts: {
+				"tag-identity": {
+					summary: "The model emitted descriptive conflict metadata.",
+				},
+				coverageFailures: [{ model: "fixture/failed" }],
+			},
+		}),
+		reportPath: path.join(cwd, "analysis.md"),
+	});
+	assert.equal(materialized.recognized, true);
+	assert.equal(materialized.count, 1);
 	const first = mutateVerifierStore(cwd, (store) =>
 		ingestAnalysisReview(store, {
 			batchId: batch.id,
@@ -496,6 +517,167 @@ try {
 		loadVerifierStore(cwd).analysisFinalizations[finalizationId].status,
 		"blocked",
 	);
+
+	const inboxSource = addAnalysisSource(
+		"fixture/inbox",
+		"2026-01-01T00:00:10.000Z",
+	);
+	const inboxCandidates = [
+		{
+			sourceFindingId: inboxSource.finding.id,
+			verdict: "accepted",
+			title: "Preferred inbox finding",
+			rationale: "The model considers this worth doing.",
+			evidence: "src/a.js:1",
+			recommendation: "Do the preferred change.",
+			decisionKey: "inbox-preference",
+		},
+		{
+			sourceFindingId: inboxSource.finding.id,
+			verdict: "rejected",
+			title: "Optional inbox finding",
+			rationale: "The model considers this optional.",
+			evidence: "src/a.js:1",
+			recommendation: "Skip the optional change.",
+			decisionKey: "inbox-preference",
+		},
+	];
+	mutateVerifierStore(cwd, (store) =>
+		ingestAnalysisReview(store, {
+			batchId: inboxSource.batch.id,
+			candidates: inboxCandidates,
+			now: "2026-01-01T00:00:11.000Z",
+		}),
+	);
+	let inbox = analysisInboxProjection(loadVerifierStore(cwd)).filter(
+		(candidate) => candidate.decisionKey === "inbox-preference",
+	);
+	assert.deepEqual(
+		inbox.map(({ title, state }) => [title, state]),
+		[
+			["Optional inbox finding", "auto-off"],
+			["Preferred inbox finding", "auto-on"],
+		],
+	);
+	for (const candidate of inbox)
+		mutateVerifierStore(cwd, (store) =>
+			setAnalysisCandidateEnabled(store, {
+				candidateId: candidate.id,
+				enabled: !candidate.enabled,
+			}),
+		);
+	inbox = analysisInboxProjection(loadVerifierStore(cwd)).filter(
+		(candidate) => candidate.decisionKey === "inbox-preference",
+	);
+	assert.deepEqual(
+		inbox.map(({ title, state }) => [title, state]),
+		[
+			["Optional inbox finding", "on"],
+			["Preferred inbox finding", "off"],
+		],
+		"manual toggles replace automatic ranking",
+	);
+	mutateVerifierStore(cwd, (store) =>
+		discardAnalysisCandidates(store, {
+			candidateIds: inbox.map((candidate) => candidate.id),
+			now: "2026-01-01T00:00:12.000Z",
+		}),
+	);
+	assert.ok(
+		analysisInboxProjection(loadVerifierStore(cwd))
+			.filter((candidate) => candidate.decisionKey === "inbox-preference")
+			.every((candidate) => candidate.state === "discarded"),
+	);
+
+	const repeatedInboxSource = addAnalysisSource(
+		"fixture/inbox-repeat",
+		"2026-01-01T00:00:13.000Z",
+	);
+	mutateVerifierStore(cwd, (store) =>
+		ingestAnalysisReview(store, {
+			batchId: repeatedInboxSource.batch.id,
+			candidates: inboxCandidates.map((candidate) => ({
+				...candidate,
+				sourceFindingId: repeatedInboxSource.finding.id,
+			})),
+			now: "2026-01-01T00:00:14.000Z",
+		}),
+	);
+	inbox = analysisInboxProjection(loadVerifierStore(cwd)).filter(
+		(candidate) => candidate.decisionKey === "inbox-preference",
+	);
+	assert.equal(
+		inbox.length,
+		2,
+		"equivalent discarded findings stay deduplicated",
+	);
+	assert.ok(
+		inbox.every((candidate) => candidate.state === "discarded"),
+		"equivalent discarded findings never reappear as active",
+	);
+
+	const finalizationSource = addAnalysisSource(
+		"fixture/inbox-finalize",
+		"2026-01-01T00:00:15.000Z",
+	);
+	const [finalizationGroup] = mutateVerifierStore(cwd, (store) =>
+		ingestAnalysisReview(store, {
+			batchId: finalizationSource.batch.id,
+			candidates: [
+				{
+					sourceFindingId: finalizationSource.finding.id,
+					verdict: "accepted",
+					title: "Finalizable inbox finding",
+					rationale: "This one should become work.",
+					evidence: "src/a.js:1",
+					recommendation: "Create the work item.",
+					decisionKey: "inbox-finalization",
+				},
+			],
+			now: "2026-01-01T00:00:16.000Z",
+		}),
+	);
+	const inboxFinalization = mutateVerifierStore(cwd, (store) =>
+		beginAnalysisCandidateFinalization(store, {
+			title: "Analysis 2026-01-01 00:00:17",
+			candidateIds: finalizationGroup.candidateIds,
+			now: "2026-01-01T00:00:17.000Z",
+		}),
+	);
+	mutateVerifierStore(cwd, (store) =>
+		blockAnalysisCandidateFinalization(store, {
+			finalizationId: inboxFinalization.id,
+			reason: "fixture failure",
+			now: "2026-01-01T00:00:18.000Z",
+		}),
+	);
+	assert.equal(
+		analysisInboxProjection(loadVerifierStore(cwd)).find(
+			(candidate) => candidate.decisionKey === "inbox-finalization",
+		).reviewStatus,
+		"active",
+		"blocked finalization returns the finding to review",
+	);
+	mutateVerifierStore(cwd, (store) =>
+		beginAnalysisCandidateFinalization(store, {
+			title: "Analysis 2026-01-01 00:00:19",
+			candidateIds: finalizationGroup.candidateIds,
+			now: "2026-01-01T00:00:19.000Z",
+		}),
+	);
+	const createdInboxTasks = reconcileAnalysisFinalizations(cwd);
+	assert.equal(createdInboxTasks.length, 1);
+	const finalizedInboxTask = loadStore(cwd).items[createdInboxTasks[0].id];
+	const analysisRoadmap = loadStore(cwd).items[finalizedInboxTask.parentId];
+	assert.equal(analysisRoadmap.type, "epic");
+	assert.equal(analysisRoadmap.title, "Analysis 2026-01-01 00:00:17");
+	assert.ok(
+		!analysisInboxProjection(loadVerifierStore(cwd)).some(
+			(candidate) => candidate.decisionKey === "inbox-finalization",
+		),
+		"accepted findings create work under an Analysis roadmap and disappear",
+	);
+
 	process.stdout.write("analysis review lifecycle tests passed\n");
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

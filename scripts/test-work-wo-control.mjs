@@ -78,7 +78,7 @@ const ctx = {
 try {
 	assert.deepEqual(
 		commands.wo.getArgumentCompletions("").map(({ value }) => value),
-		["goal", "pause", "resume", "design", "redesign"],
+		["goal", "pause", "resume", "design", "redesign", "fact"],
 	);
 
 	await commands.wo.handler("context-fill", ctx);
@@ -178,13 +178,53 @@ try {
 
 	await commands.wo.handler("goal pause only after proving the alias", ctx);
 	assert.match(sent.at(-1).message, /pause only after proving the alias/i);
-	await commands.wo.handler("pause", ctx);
+	entries.push({
+		type: "custom",
+		customType: "goal-state",
+		data: { goal: { id: "parent-goal", status: "active" } },
+	});
+	idle = false;
+	const beforeImmediatePause = aborts;
+	assert.deepEqual(
+		await hooks.input(
+			{ source: "interactive", text: "pause", streamingBehavior: "steer" },
+			ctx,
+		),
+		{ action: "handled" },
+		"bare pause is consumed as control input instead of reaching the model",
+	);
+	assert.equal(
+		aborts,
+		beforeImmediatePause + 1,
+		"bare pause aborts immediately",
+	);
+	assert.equal(
+		entries.filter((entry) => entry.customType === "work-goal-state").at(-1).data
+			.goal.status,
+		"paused",
+		"bare pause durably pauses the /wo goal",
+	);
+	assert.deepEqual(sent.at(-1), {
+		message: "/goal pause",
+		options: { expandPromptTemplates: true, deliverAs: "steer" },
+	});
+	entries.push({
+		type: "custom",
+		customType: "goal-state",
+		data: { goal: { id: "parent-goal", status: "paused" } },
+	});
+	idle = true;
 	const beforeGoalResume = sent.length;
 	await commands.wo.handler("resume", ctx);
-	assert.equal(sent.length, beforeGoalResume + 1);
-	assert.match(sent.at(-1).message, /Continue the active autonomous goal/i);
+	assert.equal(
+		sent.length,
+		beforeGoalResume + 2,
+		"resume restores both controllers",
+	);
+	assert.match(sent.at(-2).message, /Continue the active autonomous goal/i);
+	assert.equal(sent.at(-1).message, "/goal resume");
 
-	console.log("work /wo control tests passed");
+	process.stdout.write("work /wo control tests passed\n");
 } finally {
 	rmSync(cwd, { recursive: true, force: true });
 }

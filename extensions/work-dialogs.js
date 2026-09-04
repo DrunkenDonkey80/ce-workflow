@@ -221,6 +221,7 @@ export async function showListDialog(ctx, options) {
 		descriptionMaxLines = 3,
 		descriptionMinLines = 0,
 		selectOnSpace = false,
+		spaceAction = false,
 		tabAction,
 		onInput,
 		forceCustom = false,
@@ -273,6 +274,13 @@ export async function showListDialog(ctx, options) {
 			remember();
 			done(result);
 		};
+		const move = (delta) => {
+			if (!visible.length) return;
+			for (let attempts = 0; attempts < visible.length; attempts += 1) {
+				index = (index + delta + visible.length) % visible.length;
+				if (!visible[index].item.heading) break;
+			}
+		};
 		const back = () => {
 			if (multi?.requireOne && !enabled.size) {
 				ctx.ui.notify?.("Select at least one option", "warning");
@@ -312,6 +320,10 @@ export async function showListDialog(ctx, options) {
 				if (!visible.length) add(theme.fg("warning", "  No matches"));
 				for (let row = start; row < start + count && visible[row]; row += 1) {
 					const item = visible[row].item;
+					if (item.heading) {
+						add(theme.fg(item.color ?? "accent", theme.bold(itemLabel(item))));
+						continue;
+					}
 					const selected = row === index;
 					const state = {
 						checked: enabled.has(item.value),
@@ -327,14 +339,19 @@ export async function showListDialog(ctx, options) {
 					else if (item.value === currentValue) color = "success";
 					const indicator = itemIndicator(item, state);
 					const prefix = `${selected ? ">" : " "} ${indicator ? `${indicator} ` : ""}`;
-					const label = item.labelSegments
-						? item.labelSegments
-								.map((segment) =>
-									theme.fg(segment.color ?? color, plainLabel(segment.text)),
-								)
-								.join("")
-						: theme.fg(color, itemLabel(item));
+					let label;
+					if (item.labelSegments)
+						label = item.labelSegments
+							.map((segment) => {
+								const text = theme.fg(segment.color ?? color, plainLabel(segment.text));
+								return segment.bold ? theme.bold(text) : text;
+							})
+							.join("");
+					else label = theme.fg(color, itemLabel(item));
 					add(`${theme.fg(color, prefix)}${label}`);
+					for (const detail of item.detailLines ?? [])
+						for (const line of wrapText(detail, Math.max(1, safeWidth - 4), 2))
+							add(`    ${theme.fg(item.detailColor ?? "muted", line)}`);
 				}
 
 				const selected = visible[index]?.item;
@@ -358,11 +375,11 @@ export async function showListDialog(ctx, options) {
 			handleInput(data) {
 				const selected = visible[index];
 				if (keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A")) {
-					if (visible.length) index = (index - 1 + visible.length) % visible.length;
+					move(-1);
 				} else if (
 					keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B")
 				) {
-					if (visible.length) index = (index + 1) % visible.length;
+					move(1);
 				} else if (
 					tabAction &&
 					keyMatches(keybindings, data, "tui.input.tab", "tab", "\t")
@@ -385,6 +402,15 @@ export async function showListDialog(ctx, options) {
 						query = "";
 						applyFilter();
 					} else return back();
+				} else if (spaceAction && data === " ") {
+					const item = visible[index]?.item;
+					if (!item || item.heading || item.disabled === true) return;
+					return close({
+						action: "space",
+						value: item.value,
+						item,
+						index: visible[index].index,
+					});
 				} else if (
 					keyMatches(
 						keybindings,
@@ -398,7 +424,7 @@ export async function showListDialog(ctx, options) {
 					((multi || selectOnSpace) && data === " ")
 				) {
 					const item = visible[index]?.item;
-					if (!item) return;
+					if (!item || item.heading) return;
 					if (item.disabled === true) {
 						ctx.ui.notify?.(
 							item.disabledReason ?? item.description ?? "This option is unavailable.",

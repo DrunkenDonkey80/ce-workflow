@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
@@ -454,6 +455,35 @@ try {
 			outcome: "no-findings",
 		}),
 	);
+	const analysisArtifact = { bytes: 0, path: "private" };
+	const analysisReason = "invalid";
+	const analysisQuarantineId = `quarantine-${createHash("sha256")
+		.update(
+			JSON.stringify({
+				artifact: analysisArtifact,
+				jobId: failedJob.id,
+				reason: analysisReason,
+			}),
+		)
+		.digest("hex")
+		.slice(0, 24)}`;
+	mutateVerifierStore(failedCwd, (state) => {
+		state.batches[failedBatch.id].purpose = "analysis";
+		state.quarantines[analysisQuarantineId] = {
+			id: analysisQuarantineId,
+			jobId: failedJob.id,
+			artifact: analysisArtifact,
+			reason: analysisReason,
+			createdAt: "2026-07-21T00:00:04.500Z",
+		};
+	});
+	assert.equal(
+		analysisReviewProjection(loadVerifierStore(failedCwd)).some(
+			(entry) => entry.state === "quarantined",
+		),
+		true,
+		"unacknowledged quarantined analysis remains visible",
+	);
 	assert.equal(
 		verifierCompletionBlocker(
 			loadVerifierStore(failedCwd),
@@ -470,6 +500,13 @@ try {
 		}),
 	);
 	assert.deepEqual(acknowledgement.coveredBy, [coveringJob.id]);
+	assert.equal(
+		analysisReviewProjection(loadVerifierStore(failedCwd)).some(
+			(entry) => entry.state === "quarantined",
+		),
+		false,
+		"equivalent-coverage acknowledgement clears the quarantined analysis gate",
+	);
 	assert.equal(verifierStatus(loadVerifierStore(failedCwd)), "fully-triaged");
 	assert.equal(
 		verifierCompletionBlocker(
@@ -916,9 +953,13 @@ try {
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "base\n");
 	writeFileSync(path.join(gitCwd, "other.txt"), "unrelated\n");
 	writeFileSync(path.join(gitCwd, "deleted.txt"), "removed\n");
-	git("add", "tracked.txt", "other.txt", "deleted.txt");
+	writeFileSync(path.join(gitCwd, ".gitignore"), "ignored-after-delete.txt\n");
+	writeFileSync(path.join(gitCwd, "ignored-after-delete.txt"), "ignored\n");
+	git("add", "tracked.txt", "other.txt", "deleted.txt", ".gitignore");
+	git("add", "-f", "ignored-after-delete.txt");
 	git("commit", "-qm", "base");
 	rmSync(path.join(gitCwd, "deleted.txt"));
+	git("rm", "--cached", "ignored-after-delete.txt");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "staged\n");
 	git("add", "tracked.txt");
 	writeFileSync(path.join(gitCwd, "tracked.txt"), "unstaged\n");
@@ -946,6 +987,10 @@ try {
 	assert.equal(git("diff", "--binary"), worktreeBefore);
 	assert.equal(git("show", `${captured.snapshot}:tracked.txt`), "unstaged");
 	assert.equal(git("show", `${captured.snapshot}:untracked.txt`), "untracked");
+	assert.throws(
+		() => git("cat-file", "-e", `${captured.snapshot}:ignored-after-delete.txt`),
+		"an ignored worktree copy does not undo its staged deletion",
+	);
 	const requests = [];
 	const adapter = {
 		enforcesReadOnlyBoundary: true,
@@ -1017,6 +1062,7 @@ try {
 		...(magicPath ? [magicPath] : []),
 		"a-binary.so",
 		"deleted.txt",
+		"ignored-after-delete.txt",
 		"large.txt",
 		"nested/inside.txt",
 		"tracked.txt",
@@ -1538,6 +1584,11 @@ try {
 		adapter: {
 			enforcesReadOnlyBoundary: true,
 			async spawn(request) {
+				assert.equal(
+					request.checkpoint.paths,
+					undefined,
+					"verifiers echo only compact checkpoint identity",
+				);
 				assert.equal(
 					readFileSync(path.join(request.cwd, "tracked.txt"), "utf8"),
 					"working\n",
@@ -2203,17 +2254,22 @@ try {
 		["Verifier terminal output was unavailable or invalid"],
 		"artifact-only failure retains its recoverable marker",
 	);
+	const compactResultReport = JSON.parse(
+		reportPayload(structuredJob, findingPayload(10, 12)),
+	);
+	delete compactResultReport.checkpoint.paths;
+	for (const result of compactResultReport.results) {
+		delete result.jobId;
+		delete result.model;
+		result.checkpoint = Object.fromEntries(
+			Object.entries(result.checkpoint).filter(([key]) => key !== "paths"),
+		);
+	}
 	writeFileSync(
 		structuredStatus,
 		JSON.stringify({
 			state: "completed",
-			workflow: {
-				value: {
-					structuredOutput: JSON.parse(
-						reportPayload(structuredJob, findingPayload(10, 12)),
-					),
-				},
-			},
+			workflow: { value: { output: JSON.stringify(compactResultReport) } },
 		}),
 	);
 	assert.deepEqual(

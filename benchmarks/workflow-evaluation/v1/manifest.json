@@ -60,12 +60,12 @@
       "version": 1,
       "approved": true,
       "approvedBy": "Flex (interactive re-approval)",
-      "approvedAt": "2026-07-15T14:33:22.856Z",
-      "bundleSha": "4f99bb6def57cdc578d5497af5dcc928ab059e2db82333824ff270827230a81a",
+      "approvedAt": "2026-09-01T13:06:16.562Z",
+      "bundleSha": "810fdb2b3281b5e4d761598f78407c668976fdbb55862ffa06d4c749a5af7469",
       "brainstormSha": "fe2204b44c48cd50fa4bcc516a81dc2174424a08883ff422c393746763407a46",
       "planSha": "5330c5c186a36d0de6e979320c083cef1c2f8d40cb8ca0084e6c41aa42c93005",
       "acceptancePassed": true,
-      "evidence": "node scripts/test-workflow-evaluation-calculator.mjs; retained PNG assertion; npm run verify:quiet"
+      "evidence": "interactive re-approval; node scripts/test-work-redesign-calculator-e2e.mjs; node scripts/test-work-design-fidelity.mjs; node scripts/test-workflow-evaluation-visual.mjs"
     },
     "csv-expenses": {
       "version": 1,

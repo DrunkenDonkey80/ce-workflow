@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import {
 	chmodSync,
 	closeSync,
+	copyFileSync,
 	existsSync,
 	fstatSync,
 	fsyncSync,
@@ -196,6 +197,11 @@ function validateCheckpoint(
 		patchHash: value.patchHash,
 		...(value.scope === undefined ? {} : { scope: value.scope }),
 	};
+}
+function compactCheckpoint(value) {
+	return Object.fromEntries(
+		Object.entries(value).filter(([key]) => key !== "paths"),
+	);
 }
 function modelIds(models) {
 	if (models === undefined) return undefined;
@@ -733,12 +739,37 @@ export function captureVerifierCheckpoint(cwd = process.cwd(), input = {}) {
 				"index",
 			);
 			const env = { ...process.env, GIT_INDEX_FILE: temporaryIndex };
-			git(cwd, ["read-tree", head], { env });
-			git(
-				cwd,
-				["--literal-pathspecs", "add", "-A", "--", ...snapshotWorkingPaths],
-				{ env },
+			copyFileSync(
+				path.resolve(cwd, git(cwd, ["rev-parse", "--git-path", "index"])),
+				temporaryIndex,
 			);
+			const scoped = new Set(snapshotWorkingPaths);
+			const excludedStaged = git(cwd, [
+				"diff",
+				"--cached",
+				"--name-only",
+				"-z",
+				head,
+			])
+				.split("\0")
+				.filter((entry) => entry && !scoped.has(entry));
+			if (excludedStaged.length)
+				git(
+					cwd,
+					["--literal-pathspecs", "reset", "-q", head, "--", ...excludedStaged],
+					{ env },
+				);
+			const worktreePaths = new Set([
+				...git(cwd, ["diff", "--name-only", "-z"]).split("\0").filter(Boolean),
+				...git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"])
+					.split("\0")
+					.filter(Boolean),
+			]);
+			const addPaths = snapshotWorkingPaths.filter((entry) =>
+				worktreePaths.has(entry),
+			);
+			if (addPaths.length)
+				git(cwd, ["--literal-pathspecs", "add", "-A", "--", ...addPaths], { env });
 			const tree = git(cwd, ["write-tree"], { env });
 			snapshot = git(cwd, ["commit-tree", tree, "-p", head], {
 				env: verifierCommitEnv(env),
@@ -975,7 +1006,7 @@ function verifierRequest(cwd, batch, job, workspace) {
 			cwdConfinedReadTools: true,
 			credentialsIsolated: true,
 		},
-		checkpoint: structuredClone(batch.checkpoint),
+		checkpoint: compactCheckpoint(batch.checkpoint),
 		paths: [...batch.checkpoint.paths],
 	};
 }
@@ -1898,13 +1929,25 @@ function validateFindingRange(job, batch, finding) {
 }
 
 function validateResult(job, batch, result) {
-	const required = ["jobId", "model", "checkpoint", "operation", "outcome"];
-	if (!exactKeys(result, required, ["findings", "usage", "failure"]))
-		throw error("invalid", "Verifier result has an invalid schema");
+	const required = ["operation", "outcome"];
 	if (
-		result.jobId !== job.id ||
-		result.model !== job.model ||
-		!same(result.checkpoint, batch.checkpoint) ||
+		!exactKeys(result, required, [
+			"jobId",
+			"model",
+			"checkpoint",
+			"findings",
+			"usage",
+			"failure",
+		])
+	)
+		throw error("invalid", "Verifier result has an invalid schema");
+	const compact = compactCheckpoint(batch.checkpoint);
+	if (
+		(result.jobId !== undefined && result.jobId !== job.id) ||
+		(result.model !== undefined && result.model !== job.model) ||
+		(result.checkpoint !== undefined &&
+			!same(result.checkpoint, batch.checkpoint) &&
+			!same(result.checkpoint, compact)) ||
 		!job.operations.includes(result.operation) ||
 		!OUTCOMES.has(result.outcome) ||
 		!validUsage(result.usage)
@@ -1995,7 +2038,10 @@ function validateTerminalReport(job, batch, text) {
 		report.version !== 1 ||
 		report.jobId !== job.id ||
 		report.model !== job.model ||
-		!same(report.checkpoint, batch.checkpoint) ||
+		!same(
+			compactCheckpoint(report.checkpoint),
+			compactCheckpoint(batch.checkpoint),
+		) ||
 		!Array.isArray(report.results)
 	)
 		throw error("invalid", "Verifier report identity is invalid");
@@ -2262,6 +2308,7 @@ function structuredReportForStatus(status) {
 	const value =
 		status?.structuredOutput ??
 		status?.workflow?.value?.structuredOutput ??
+		status?.workflow?.value?.output ??
 		status?.steps?.find((step) => step?.structuredOutput !== undefined)
 			?.structuredOutput;
 	if (value === undefined) return undefined;
@@ -2432,6 +2479,53 @@ const REVIEW_STATES = new Set([
 	"quarantined",
 ]);
 const REVIEW_VERDICTS = new Set(["accepted", "rejected"]);
+const ANALYSIS_CANDIDATE_STATUSES = new Set([
+	"active",
+	"discarded",
+	"finalization_pending",
+	"finalized",
+]);
+
+function analysisReviewGroupFor(store, candidateId) {
+	return Object.values(store.analysisReviewGroups).find((group) =>
+		group.candidateIds.includes(candidateId),
+	);
+}
+
+function analysisCandidateStatus(store, candidate) {
+	if (candidate.reviewStatus) return candidate.reviewStatus;
+	const state = analysisReviewGroupFor(store, candidate.id)?.state;
+	if (state === "rejected" || state === "deferred") return "discarded";
+	if (state === "finalized") return "finalized";
+	return "active";
+}
+
+function analysisCandidateSuppressionKey(store, candidate) {
+	const finding = store.findings[candidate.source.findingId];
+	return digest({
+		decisionKey: candidate.decisionKey,
+		title: candidate.title.toLowerCase().replace(/\W+/g, " ").trim(),
+		operation: finding?.operation,
+		path: candidate.source.path,
+	});
+}
+
+function refreshAnalysisReviewGroup(store, group, timestamp) {
+	const statuses = group.candidateIds.map((id) =>
+		analysisCandidateStatus(store, store.analysisCandidates[id]),
+	);
+	const active = statuses.some(
+		(status) => !["discarded", "finalized"].includes(status),
+	);
+	if (active) group.state = "pending";
+	else if (statuses.includes("finalized")) group.state = "finalized";
+	else group.state = "rejected";
+	delete group.lease;
+	delete group.proposal;
+	delete group.proposalDigest;
+	group.revision += 1;
+	group.updatedAt = timestamp;
+}
 
 function reviewEvent(next, groupId, type, timestamp, details = {}) {
 	const id = stableId("analysis-event", {
@@ -2493,18 +2587,33 @@ export function ingestAnalysisReview(store, input = {}) {
 				decisionKey: value.decisionKey.trim(),
 			});
 			const id = stableId("analysis-candidate", { source, contentDigest });
-			next.analysisCandidates[id] ??= {
-				id,
-				source,
-				verdict: value.verdict,
-				title: value.title.trim(),
-				rationale: value.rationale.trim(),
-				evidence: value.evidence.trim(),
-				recommendation: value.recommendation.trim(),
-				decisionKey: value.decisionKey.trim(),
-				contentDigest,
-				createdAt: timestamp,
-			};
+			if (!next.analysisCandidates[id]) {
+				const candidate = {
+					id,
+					source,
+					verdict: value.verdict,
+					title: value.title.trim(),
+					rationale: value.rationale.trim(),
+					evidence: value.evidence.trim(),
+					recommendation: value.recommendation.trim(),
+					decisionKey: value.decisionKey.trim(),
+					contentDigest,
+					createdAt: timestamp,
+				};
+				const suppressionKey = analysisCandidateSuppressionKey(next, candidate);
+				const priorDiscarded = Object.values(next.analysisCandidates).find(
+					(prior) =>
+						analysisCandidateStatus(next, prior) === "discarded" &&
+						analysisCandidateSuppressionKey(next, prior) === suppressionKey,
+				);
+				if (priorDiscarded) {
+					candidate.reviewStatus = "discarded";
+					candidate.userEnabled = false;
+					candidate.discardedAt = timestamp;
+					candidate.suppressedBy = priorDiscarded.id;
+				}
+				next.analysisCandidates[id] = candidate;
+			}
 			const key = value.decisionKey.trim();
 			if (!grouped.has(key)) grouped.set(key, []);
 			grouped.get(key).push(id);
@@ -2577,15 +2686,26 @@ export function ingestAnalysisReview(store, input = {}) {
 			const governingDecision = input.decisions?.[decisionKey];
 			if (governingDecision !== undefined && !nonempty(governingDecision))
 				throw error("invalid", `Invalid governing decision: ${decisionKey}`);
+			const allDiscarded = candidateIds.every(
+				(candidateId) =>
+					analysisCandidateStatus(next, next.analysisCandidates[candidateId]) ===
+					"discarded",
+			);
+			let state = "pending";
+			if (allDiscarded) state = "rejected";
+			else if (terminalConflictId) state = "revisit_pending";
 			const group = {
 				id,
 				decisionKey,
 				governingDecision: governingDecision?.trim() || decisionKey,
 				candidateIds,
 				batchIds: [input.batchId],
-				state: terminalConflictId ? "revisit_pending" : "pending",
+				state,
 				revision: 1,
 				...(terminalConflictId ? { terminalConflictId } : {}),
+				...(allDiscarded
+					? { humanResolution: "Suppressed by an earlier discarded finding." }
+					: {}),
 				createdAt: timestamp,
 				updatedAt: timestamp,
 			};
@@ -2734,6 +2854,208 @@ export function disposeAnalysisReview(store, input = {}) {
 	});
 }
 
+export function analysisInboxProjection(store) {
+	validateVerifierStore(store);
+	const rows = Object.values(store.analysisCandidates)
+		.map((candidate) => {
+			const group = analysisReviewGroupFor(store, candidate.id);
+			const finding = store.findings[candidate.source.findingId];
+			const reviewStatus = analysisCandidateStatus(store, candidate);
+			const automatic = candidate.verdict === "accepted";
+			const manuallyRanked = typeof candidate.userEnabled === "boolean";
+			const enabled = manuallyRanked ? candidate.userEnabled : automatic;
+			let state;
+			if (reviewStatus === "discarded") state = "discarded";
+			else if (manuallyRanked) state = enabled ? "on" : "off";
+			else state = automatic ? "auto-on" : "auto-off";
+			return {
+				...structuredClone(candidate),
+				groupId: group?.id,
+				governingDecision: group?.governingDecision ?? candidate.decisionKey,
+				category: finding?.operation ?? finding?.category ?? "other",
+				model: finding?.model,
+				severity: finding?.severity,
+				reviewStatus,
+				state,
+				enabled,
+				suppressionKey: analysisCandidateSuppressionKey(store, candidate),
+			};
+		})
+		.filter((candidate) => candidate.reviewStatus !== "finalized");
+	const discarded = new Map();
+	for (const row of rows)
+		if (row.reviewStatus === "discarded") discarded.set(row.suppressionKey, row);
+	return [
+		...rows.filter((row) => row.reviewStatus !== "discarded"),
+		...discarded.values(),
+	].sort((left, right) =>
+		`${left.category}\0${left.reviewStatus === "discarded" ? 1 : 0}\0${left.title}`.localeCompare(
+			`${right.category}\0${right.reviewStatus === "discarded" ? 1 : 0}\0${right.title}`,
+		),
+	);
+}
+
+export function setAnalysisCandidateEnabled(store, input = {}) {
+	return edit(store, (next) => {
+		const candidate = next.analysisCandidates[input.candidateId];
+		if (!candidate || analysisCandidateStatus(next, candidate) !== "active")
+			throw error("stale", "Analysis candidate is not editable");
+		if (typeof input.enabled !== "boolean")
+			throw error("invalid", "Analysis candidate selection must be boolean");
+		const timestamp = now(input.now);
+		candidate.userEnabled = input.enabled;
+		candidate.updatedAt = timestamp;
+		const group = analysisReviewGroupFor(next, candidate.id);
+		if (group) {
+			group.state = "pending";
+			delete group.lease;
+			delete group.proposal;
+			delete group.proposalDigest;
+			group.revision += 1;
+			group.updatedAt = timestamp;
+			reviewEvent(next, group.id, "candidate-selection", timestamp, {
+				candidateId: candidate.id,
+				enabled: input.enabled,
+			});
+		}
+		return candidate;
+	});
+}
+
+export function discardAnalysisCandidates(store, input = {}) {
+	if (
+		!Array.isArray(input.candidateIds) ||
+		!input.candidateIds.length ||
+		input.candidateIds.length > 100
+	)
+		throw error("invalid", "Discard requires a bounded candidate list");
+	return edit(store, (next) => {
+		const timestamp = now(input.now);
+		const groups = new Set();
+		const discarded = [];
+		for (const id of [...new Set(input.candidateIds)]) {
+			const candidate = next.analysisCandidates[id];
+			if (!candidate || analysisCandidateStatus(next, candidate) !== "active")
+				continue;
+			candidate.reviewStatus = "discarded";
+			candidate.userEnabled = false;
+			candidate.discardedAt = timestamp;
+			candidate.updatedAt = timestamp;
+			discarded.push(id);
+			const group = analysisReviewGroupFor(next, id);
+			if (group) groups.add(group);
+		}
+		for (const group of groups) {
+			refreshAnalysisReviewGroup(next, group, timestamp);
+			reviewEvent(next, group.id, "candidates-discarded", timestamp, {
+				candidateIds: discarded.filter((id) => group.candidateIds.includes(id)),
+			});
+		}
+		return discarded;
+	});
+}
+
+export function beginAnalysisCandidateFinalization(store, input = {}) {
+	if (
+		!Array.isArray(input.candidateIds) ||
+		!input.candidateIds.length ||
+		input.candidateIds.length > 100 ||
+		!nonempty(input.title)
+	)
+		throw error(
+			"invalid",
+			"Analysis finalization requires candidates and a title",
+		);
+	return edit(store, (next) => {
+		const candidateIds = [...new Set(input.candidateIds)].sort();
+		for (const id of candidateIds) {
+			const candidate = next.analysisCandidates[id];
+			if (
+				!candidate ||
+				analysisCandidateStatus(next, candidate) !== "active" ||
+				!(candidate.userEnabled ?? candidate.verdict === "accepted")
+			)
+				throw error("stale", "Approved analysis candidates changed");
+		}
+		const id = stableId("analysis-finalization", { candidateIds });
+		const timestamp = now(input.now);
+		const existing = next.analysisFinalizations[id];
+		if (existing?.status === "completed") return existing;
+		const record = existing ?? {
+			id,
+			candidateIds,
+			title: input.title.trim(),
+			status: "pending",
+			createdAt: timestamp,
+		};
+		record.status = "pending";
+		delete record.blockedAt;
+		delete record.blockedReason;
+		next.analysisFinalizations[id] = record;
+		for (const candidateId of candidateIds) {
+			const candidate = next.analysisCandidates[candidateId];
+			candidate.reviewStatus = "finalization_pending";
+			candidate.finalizationId = id;
+			candidate.updatedAt = timestamp;
+		}
+		return record;
+	});
+}
+
+export function completeAnalysisCandidateFinalization(store, input = {}) {
+	return edit(store, (next) => {
+		const finalization = next.analysisFinalizations[input.finalizationId];
+		if (!finalization || !Array.isArray(finalization.candidateIds))
+			throw error("stale", "Analysis finalization is unavailable");
+		if (!plainObject(input.workItemIds) || !nonempty(input.roadmapId))
+			throw error("invalid", "Analysis work-item mapping is required");
+		const timestamp = now(input.now);
+		const groups = new Set();
+		for (const candidateId of finalization.candidateIds) {
+			const candidate = next.analysisCandidates[candidateId];
+			const workItemId = input.workItemIds[candidateId];
+			if (!candidate || !nonempty(workItemId))
+				throw error("invalid", "Analysis candidate work item is missing");
+			candidate.reviewStatus = "finalized";
+			candidate.workItemId = workItemId;
+			candidate.finalizedAt = timestamp;
+			candidate.updatedAt = timestamp;
+			const group = analysisReviewGroupFor(next, candidateId);
+			if (group) groups.add(group);
+		}
+		for (const group of groups)
+			refreshAnalysisReviewGroup(next, group, timestamp);
+		finalization.status = "completed";
+		finalization.roadmapId = input.roadmapId;
+		finalization.taskIds = finalization.candidateIds.map(
+			(id) => input.workItemIds[id],
+		);
+		finalization.completedAt = timestamp;
+		return finalization;
+	});
+}
+
+export function blockAnalysisCandidateFinalization(store, input = {}) {
+	return edit(store, (next) => {
+		const finalization = next.analysisFinalizations[input.finalizationId];
+		if (!finalization || !Array.isArray(finalization.candidateIds)) return null;
+		const timestamp = now(input.now);
+		finalization.status = "blocked";
+		finalization.blockedReason = String(
+			input.reason ?? "Analysis finalization failed",
+		);
+		finalization.blockedAt = timestamp;
+		for (const candidateId of finalization.candidateIds) {
+			const candidate = next.analysisCandidates[candidateId];
+			if (candidate?.reviewStatus !== "finalization_pending") continue;
+			candidate.reviewStatus = "active";
+			delete candidate.finalizationId;
+			candidate.updatedAt = timestamp;
+		}
+		return finalization;
+	});
+}
+
 export function analysisReviewProjection(store) {
 	validateVerifierStore(store);
 	const groups = Object.values(store.analysisReviewGroups)
@@ -2782,10 +3104,13 @@ export function analysisReviewProjection(store) {
 			createdAt: batch.createdAt,
 		}));
 	const quarantines = Object.values(store.quarantines)
-		.filter(
-			(entry) =>
-				store.batches[store.jobs[entry.jobId]?.batchId]?.purpose === "analysis",
-		)
+		.filter((entry) => {
+			const job = store.jobs[entry.jobId];
+			return (
+				store.batches[job?.batchId]?.purpose === "analysis" &&
+				!acknowledgedVerifierFailure(store, job)
+			);
+		})
 		.map((entry) => ({
 			id: `analysis-quarantined:${entry.id}`,
 			state: "quarantined",
@@ -3093,7 +3418,11 @@ export function validateVerifierStore(store, file = "verifier store") {
 			!plainObject(candidate.source) ||
 			!store.batches[candidate.source.batchId] ||
 			!store.findings[candidate.source.findingId] ||
-			!nonempty(candidate.contentDigest)
+			!nonempty(candidate.contentDigest) ||
+			(candidate.userEnabled !== undefined &&
+				typeof candidate.userEnabled !== "boolean") ||
+			(candidate.reviewStatus !== undefined &&
+				!ANALYSIS_CANDIDATE_STATUSES.has(candidate.reviewStatus))
 		)
 			throw error("corrupt", `Invalid analysis candidate ${id} in ${file}`);
 	}

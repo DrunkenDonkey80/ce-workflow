@@ -22,6 +22,7 @@ function assert(ok, message) {
 
 const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
 const previousSerial = process.env.WORK_ORCH_SERIAL;
+const previousAskUserContextExpanded = process.env.PI_ASK_USER_CONTEXT_EXPANDED;
 const globalDir = mkdtempSync(path.join(tmpdir(), "work-global-settings-"));
 process.env.PI_CODING_AGENT_DIR = globalDir;
 delete process.env.WORK_ORCH_SERIAL;
@@ -436,12 +437,17 @@ try {
 	);
 
 	const commands = {};
+	delete process.env.PI_ASK_USER_CONTEXT_EXPANDED;
 	mod.default({
 		on: () => {},
 		registerCommand: (name, config) => {
 			commands[name] = config;
 		},
 	});
+	assert(
+		process.env.PI_ASK_USER_CONTEXT_EXPANDED === "true",
+		"ask_user context starts expanded by default",
+	);
 	const invoke = (name, args, ctx) =>
 		mod.executeOrchestratorAction(name, args, ctx, {});
 	assert(!commands["work-models"], "redundant work-models command removed");
@@ -1251,7 +1257,7 @@ try {
 			new Set(creativeKeys).size === 3 &&
 			!creativeStep.includes("tasks mode") &&
 			creativeStep.includes("async:true") &&
-			creativeStep.includes("subagent_wait with all:true") &&
+			creativeStep.includes("bg_wait with all:true") &&
 			creativeStep.includes("wo:divergent-analysis") &&
 			creativeStep.includes("test/generator-c"),
 		"creative sidecar uses unique stable-key workflowScript branches and preserves provenance",
@@ -1575,6 +1581,9 @@ try {
 	else process.env.PI_CODING_AGENT_DIR = previousConfigDir;
 	if (previousSerial === undefined) delete process.env.WORK_ORCH_SERIAL;
 	else process.env.WORK_ORCH_SERIAL = previousSerial;
+	if (previousAskUserContextExpanded === undefined)
+		delete process.env.PI_ASK_USER_CONTEXT_EXPANDED;
+	else process.env.PI_ASK_USER_CONTEXT_EXPANDED = previousAskUserContextExpanded;
 }
 
 process.stdout.write("ok - work-settings behavior\n");

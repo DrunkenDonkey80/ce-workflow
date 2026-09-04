@@ -387,7 +387,7 @@ try {
 		usage: { totalTokens: 100 },
 		tools: [
 			{ name: "ask_user", durationMs: 20_000 },
-			{ name: "subagent_wait", durationMs: 30_000 },
+			{ name: "bg_wait", durationMs: 30_000 },
 			{ name: "subagent", runId: "artifact-run" },
 		],
 	});

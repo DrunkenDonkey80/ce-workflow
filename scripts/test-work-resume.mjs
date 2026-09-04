@@ -1759,7 +1759,7 @@ try {
 	const analysisState = buildWorkResumeState(triageCwd, "IMP-1");
 	assert(
 		analysisState.action === "review-analysis-required",
-		"Review analysis blocks even an explicit Resume target",
+		"Analysis findings block even an explicit Resume target",
 	);
 	const analysisNotices = [];
 	const messagesBeforeAnalysis = triageMessages.length;
@@ -1786,7 +1786,7 @@ try {
 			(notice) =>
 				notice.message.includes("Action: review analysis required") &&
 				notice.message.includes(analysisState.review[0].id) &&
-				notice.message.includes("Open /wo → Review analysis"),
+				notice.message.includes("Open /wo → Analysis findings"),
 		),
 		"exact-target Resume renders analysis payload and recommended action",
 	);

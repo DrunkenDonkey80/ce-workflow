@@ -69,6 +69,196 @@ const mod = await import(
 	).href
 );
 
+const legacyImplementationPrompt = mod.goalOwnedImplementationPrompt(
+	{
+		action: "run-implementation",
+		epic: { id: "work-1", title: "Legacy analysis" },
+		selectedWorkItem: {
+			id: "work-1.1",
+			status: "in_progress",
+			title: "Verified legacy fix",
+			type: "task",
+			verificationContract: {
+				version: 1,
+				required: [{ id: "legacy-inspection", capability: "inspection" }],
+			},
+		},
+		git: { dirtyPaths: [] },
+	},
+	process.cwd(),
+);
+assert.match(legacyImplementationPrompt, /work-close work-1\.1/);
+assert.match(legacyImplementationPrompt, /Never invent a diff/);
+assert.match(legacyImplementationPrompt, /Never add --push unless/);
+assert.match(
+	legacyImplementationPrompt,
+	/no open, in-progress, or blocked sibling/,
+);
+
+assert.equal(
+	mod.knowledgeWriteBucketKey({
+		workItemId: "work-1",
+		goalId: "goal-1",
+		sessionId: "session-1",
+		cwd: ".",
+	}),
+	"work-item:work-1",
+);
+assert.equal(
+	mod.knowledgeWriteBucketKey({ goalId: "goal-1", sessionId: "session-1" }),
+	"goal:goal-1",
+);
+assert.equal(
+	mod.knowledgeWriteBucketKey({ sessionId: "session-1" }),
+	"session:session-1",
+);
+assert.equal(
+	mod.knowledgeWriteBucketKey({ cwd: "." }),
+	`checkout:${createHash("sha256").update(path.resolve(".")).digest("hex")}`,
+);
+assert.deepEqual(mod.knowledgeDiscovererSettings(".", {}), {
+	model: "__none_model__",
+	thinking: "low",
+});
+assert.deepEqual(
+	mod.knowledgeDiscovererSettings(".", {
+		workKnowledge: { discoverer: { model: "test/free", thinking: "high" } },
+	}),
+	{ model: "test/free", thinking: "high" },
+);
+assert.deepEqual(
+	mod.knowledgeDiscovererSettings(".", {
+		workKnowledge: {
+			discoverer: { model: "test/free", thinking: "unsupported" },
+		},
+	}),
+	{ model: "test/free", thinking: "low" },
+);
+const discovererPacket = mod.buildKnowledgeDiscovererPacket([
+	{ role: "user", content: "Wrong od.exe was found first." },
+	{
+		role: "assistant",
+		content: [{ type: "text", text: "Use the configured OpenDesign path." }],
+	},
+]);
+assert.match(discovererPacket.text, /user: Wrong od\.exe/);
+assert.match(
+	discovererPacket.text,
+	/assistant: Use the configured OpenDesign path/,
+);
+assert.equal(discovererPacket.truncated, false);
+assert.equal(discovererPacket.fingerprint.length, 64);
+assert.doesNotMatch(
+	mod.buildKnowledgeDiscovererPacket([
+		{ role: "user", content: "api_key=abcdefghijklmnopqrstuv" },
+	]).text,
+	/abcdefghijklmnopqrstuv/,
+);
+
+const discovererCwd = mkdtempSync(path.join(tmpdir(), "ce-work-discoverer-"));
+try {
+	mkdirSync(path.join(discovererCwd, ".pi"));
+	writeFileSync(
+		path.join(discovererCwd, ".pi", "settings.json"),
+		JSON.stringify({
+			workKnowledge: {
+				discoverer: { model: "test/free", thinking: "low" },
+			},
+		}),
+	);
+	const listeners = new Map();
+	let launched;
+	const discovererPi = {
+		events: {
+			on(name, handler) {
+				listeners.set(name, handler);
+				return () => listeners.delete(name);
+			},
+			emit(name, event) {
+				if (name !== "subagents:rpc:v1:request") return;
+				launched = event.params;
+				listeners.get(`subagents:rpc:v1:reply:${event.requestId}`)?.({
+					success: true,
+					data: { runId: "discoverer-run" },
+				});
+			},
+		},
+	};
+	let absorbedNotice;
+	await mod.launchKnowledgeDiscoverer(
+		discovererPi,
+		{
+			cwd: discovererCwd,
+			sessionManager: { getSessionId: () => "discoverer-session" },
+			ui: { notify: (message) => (absorbedNotice = message) },
+		},
+		[
+			{
+				role: "user",
+				content: "The configured binary path avoids the PATH collision.",
+			},
+		],
+	);
+	assert.equal(launched.async, true);
+	assert.match(launched.workflowScript, /"model":"test\/free"/);
+	assert.match(launched.workflowScript, /"thinking":"low"/);
+	assert.match(launched.workflowScript, /"context":"fresh"/);
+	assert.match(
+		launched.workflowScript,
+		/configured binary path avoids the PATH collision/,
+	);
+	assert.equal(
+		mod.isKnowledgeDiscovererCompletionMessage({
+			role: "custom",
+			customType: "subagent-notify",
+			content:
+				"Background task completed: **workflow**\n\nWorkflow run: discoverer-run",
+		}),
+		true,
+		"a tracked discoverer completion can be absorbed without another model turn",
+	);
+	assert.equal(
+		mod.isKnowledgeDiscovererCompletionMessage({
+			role: "custom",
+			customType: "subagent-notify",
+			content:
+				"Background tasks completed (2)\n\nWorkflow run: discoverer-run\nWorkflow run: user-run",
+		}),
+		false,
+		"mixed completion batches still wake the model for the user-requested run",
+	);
+	const absorbed = mod.absorbKnowledgeDiscovererCompletion({
+		runId: "discoverer-run",
+		results: [
+			{
+				success: true,
+				structuredOutput: {
+					claims: [
+						{
+							claim: "Use the configured binary path to avoid the PATH collision.",
+							kind: "procedure",
+							scope: "project",
+							authority: "observed",
+						},
+					],
+				},
+			},
+		],
+	});
+	assert.equal(absorbed.count, 1);
+	absorbed.notify("Knowledge discoverer absorbed 1 item.");
+	assert.equal(absorbedNotice, "Knowledge discoverer absorbed 1 item.");
+	assert.match(
+		readFileSync(
+			path.join(discovererCwd, ".ce-workflow", "local", "knowledge.jsonl"),
+			"utf8",
+		),
+		/Use the configured binary path/,
+	);
+} finally {
+	rmSync(discovererCwd, { recursive: true, force: true });
+}
+
 assert.equal(mod.parseWorkGoalCommand("").kind, "status");
 assert.deepEqual(mod.parseWorkGoalCommand("pause"), { kind: "pause" });
 assert.deepEqual(mod.parseWorkGoalCommand("stop"), { kind: "stop" });
@@ -1211,7 +1401,7 @@ assert.equal(
 	1,
 	"unrelated menu actions retain argument dialogs",
 );
-assert.equal(Object.keys(tools).length, 14);
+assert.equal(Object.keys(tools).length, 15);
 const assertStrictSchema = (schema) => {
 	if (!schema || typeof schema !== "object") return;
 	if (schema.properties) {
@@ -1240,6 +1430,7 @@ assert.equal(
 );
 assert.ok(tools.work_goal_complete);
 assert.ok(tools.work_goal_human_decision);
+assert.ok(tools.knowledge);
 assert.deepEqual(tools.work_goal_complete.parameters.properties.question.type, [
 	"string",
 	"null",
@@ -1267,6 +1458,8 @@ assert.match(
 assert.ok(hooks.tool_result);
 
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-work-goal-"));
+const originalPiCodingAgentDir = process.env.PI_CODING_AGENT_DIR;
+process.env.PI_CODING_AGENT_DIR = path.join(cwd, ".pi-agent");
 try {
 	execFileSync("git", ["init"], { cwd, stdio: "ignore" });
 	const tempCommands = {};
@@ -1372,6 +1565,26 @@ try {
 				),
 			),
 			"normal committed agent runs schedule configured background verifiers",
+		);
+
+		mkdirSync(path.join(verifierCwd, "docs", "plans"), { recursive: true });
+		writeFileSync(
+			path.join(verifierCwd, "docs", "plans", "roadmap.md"),
+			"# Plan\n",
+		);
+		execFileSync("git", ["add", "docs/plans/roadmap.md"], { cwd: verifierCwd });
+		execFileSync("git", ["commit", "-m", "plan only"], { cwd: verifierCwd });
+		const planHead = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: verifierCwd,
+			encoding: "utf8",
+		}).trim();
+		assert.equal(
+			mod.scheduleCommittedRunVerifiers(verifierCwd, pi, {
+				before: after,
+				after: planHead,
+			}),
+			null,
+			"automatic verifier runs skip already-reviewed roadmap documents",
 		);
 	} finally {
 		rmSync(verifierCwd, { recursive: true, force: true });
@@ -1606,6 +1819,109 @@ try {
 	else process.env.APPDATA = oldAppData;
 
 	mod.default(pi);
+	await tempCommands.wo.handler(
+		"fact add Freeform task active requires KNOWLEDGE-HOOK-SENTINEL.",
+		ctx,
+	);
+	const knowledgeId = notices.at(-1)?.message.match(/(k-[a-z0-9-]+)/)?.[1];
+	assert.ok(
+		knowledgeId,
+		`the /wo fact command stores an extension-assigned ID: ${notices.at(-1)?.message}`,
+	);
+	await tempCommands.wo.handler("fact search freeform task active", ctx);
+	assert.match(notices.at(-1)?.message ?? "", /KNOWLEDGE-HOOK-SENTINEL/);
+	let modelKnowledgeSessionId = "knowledge-session-a";
+	const modelKnowledgeCtx = {
+		...ctx,
+		sessionManager: {
+			...ctx.sessionManager,
+			getSessionId: () => modelKnowledgeSessionId,
+		},
+	};
+	const activeKnowledgeBucket =
+		mod.currentKnowledgeWriteBucketKey(modelKnowledgeCtx);
+	assert.match(activeKnowledgeBucket, /^goal:/);
+	assert.throws(
+		() =>
+			tempTools.knowledge.execute(
+				"tool-knowledge-reject",
+				{ action: "reject", id: knowledgeId, reason: "model cannot remove it" },
+				undefined,
+				undefined,
+				modelKnowledgeCtx,
+			),
+		/cannot remove a trusted claim/,
+	);
+	for (let index = 0; index < 20; index += 1)
+		tempTools.knowledge.execute(
+			`tool-knowledge-record-${index}`,
+			{
+				action: "record",
+				claim: `Rate limit durable datum number ${index}.`,
+				authority: "observed",
+			},
+			undefined,
+			undefined,
+			modelKnowledgeCtx,
+		);
+	assert.throws(
+		() =>
+			tempTools.knowledge.execute(
+				"tool-knowledge-record-over-limit",
+				{
+					action: "record",
+					claim: "Rate limit durable datum over the ceiling.",
+					authority: "observed",
+				},
+				undefined,
+				undefined,
+				modelKnowledgeCtx,
+			),
+		/20-claim model write limit/,
+	);
+	modelKnowledgeSessionId = "knowledge-session-b";
+	assert.equal(
+		mod.currentKnowledgeWriteBucketKey(modelKnowledgeCtx),
+		activeKnowledgeBucket,
+		"an active durable goal keeps its allowance across Pi session changes",
+	);
+	assert.throws(
+		() =>
+			tempTools.knowledge.execute(
+				"tool-knowledge-record-new-session-same-goal",
+				{
+					action: "record",
+					claim: "A new Pi session does not reset the active goal allowance.",
+					authority: "observed",
+				},
+				undefined,
+				undefined,
+				modelKnowledgeCtx,
+			),
+		/20-claim model write limit/,
+	);
+	const ordinaryKnowledgeContext = await tempHooks.context(
+		{ messages: [{ role: "user", content: "Keep the freeform task active." }] },
+		ctx,
+	);
+	assert.equal(
+		ordinaryKnowledgeContext.messages.filter(
+			(message) => message.customType === "work-knowledge",
+		).length,
+		1,
+		"ordinary session context injects relevant knowledge without persistence",
+	);
+	const repeatedKnowledgeContext = await tempHooks.context(
+		ordinaryKnowledgeContext,
+		ctx,
+	);
+	assert.equal(
+		repeatedKnowledgeContext.messages.filter(
+			(message) => message.customType === "work-knowledge",
+		).length,
+		1,
+		"reapplying the context hook replaces rather than duplicates knowledge",
+	);
 	const committedFixCwd = mkdtempSync(
 		path.join(tmpdir(), "ce-work-goal-committed-fix-"),
 	);
@@ -2248,6 +2564,12 @@ try {
 			preparation: {
 				messagesToSummarize: [
 					{ role: "user", content: "Keep this freeform task active." },
+					{
+						role: "assistant",
+						stopReason: "aborted",
+						errorMessage: "Operation aborted",
+						content: [],
+					},
 				],
 				fileOps: { modifiedFiles: ["src\\freeform.js"] },
 				firstKeptEntryId: "freeform-1",
@@ -2263,10 +2585,63 @@ try {
 		/Keep this freeform task active/,
 	);
 	assert.match(freeformCompaction.compaction.summary, /src\/freeform\.js/);
+	assert.equal(
+		(
+			freeformCompaction.compaction.summary.match(/KNOWLEDGE-HOOK-SENTINEL/g) ?? []
+		).length,
+		1,
+		"native compaction injects relevant durable knowledge once",
+	);
 	assert.doesNotMatch(freeformCompaction.compaction.summary, /\/work-resume/);
 	await tempHooks.session_compact(
 		{ compactionEntry: { details: freeformCompaction.compaction.details } },
 		ctx,
+	);
+	const idleResumePrompt =
+		"Compaction is complete. Resume the parent task now; background subagent results will arrive separately when ready.";
+	const sentBeforeIdleResume = sent.length;
+	assert.deepEqual(
+		await tempHooks.input(
+			{ source: "extension", text: idleResumePrompt },
+			{ ...ctx, isIdle: () => true },
+		),
+		{ action: "handled" },
+		"idle compaction completion does not start an agent turn",
+	);
+	assert.equal(sent.length, sentBeforeIdleResume);
+	const abortsBeforeIdleResumeFallback = aborts;
+	await tempHooks.before_agent_start(
+		{ prompt: idleResumePrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	assert.equal(
+		aborts,
+		abortsBeforeIdleResumeFallback,
+		"the resume prompt reaches the provider guard before an abort is requested",
+	);
+	await tempHooks.before_provider_request({ payload: { messages: [] } }, ctx);
+	assert.equal(
+		aborts,
+		abortsBeforeIdleResumeFallback + 1,
+		"an unauthorized post-F8 resume is aborted before the model request",
+	);
+	assert.deepEqual(
+		await tempHooks.message_end(
+			{
+				message: {
+					role: "assistant",
+					stopReason: "aborted",
+					errorMessage: "Operation aborted",
+					content: [],
+				},
+			},
+			ctx,
+		),
+		{
+			message: { role: "assistant", stopReason: "stop", content: [] },
+		},
+		"the suppressed resume leaves no visible assistant response",
 	);
 	compactions.length = 0;
 	notices.length = 0;
@@ -2287,9 +2662,45 @@ try {
 	];
 	const busyFiltered = await tempHooks.context({ messages: busyMessages }, ctx);
 	assert.equal(busyFiltered.messages[0].role, "compactionSummary");
+	assert.equal(
+		busyFiltered.messages.filter(
+			(message) => message.customType === "work-knowledge",
+		).length,
+		1,
+	);
+	assert.match(
+		busyFiltered.messages.find(
+			(message) => message.customType === "work-knowledge",
+		)?.content ?? "",
+		/KNOWLEDGE-HOOK-SENTINEL/,
+	);
 	assert(
 		!busyFiltered.messages.includes(busyMessages[0]),
 		"busy F8 filters old context before the next model call",
+	);
+	await tempCommands.wo.handler(
+		`fact correct ${knowledgeId} Active task correction is KNOWLEDGE-HOOK-REPLACEMENT.`,
+		ctx,
+	);
+	const refreshedFiltered = await tempHooks.context(
+		{ messages: busyMessages },
+		ctx,
+	);
+	assert.equal(
+		refreshedFiltered.messages[0].summary,
+		busyFiltered.messages[0].summary,
+		"knowledge refresh does not move or rebuild the frozen compaction cut",
+	);
+	const refreshedKnowledge = refreshedFiltered.messages.find(
+		(message) => message.customType === "work-knowledge",
+	)?.content;
+	assert.match(refreshedKnowledge ?? "", /KNOWLEDGE-HOOK-REPLACEMENT/);
+	assert.doesNotMatch(refreshedKnowledge ?? "", /KNOWLEDGE-HOOK-SENTINEL/);
+	assert.equal(
+		refreshedFiltered.messages.filter(
+			(message) => message.customType === "work-knowledge",
+		).length,
+		1,
 	);
 	await tempHooks.turn_end(
 		{},
@@ -2411,6 +2822,18 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		{ compactionEntry: { details: workCompaction.compaction.details } },
 		ctx,
 	);
+	assert.equal(
+		await tempHooks.input(
+			{
+				source: "extension",
+				text:
+					"Compaction is complete. Resume the parent task now; background subagent results will arrive separately when ready.",
+			},
+			ctx,
+		),
+		undefined,
+		"an authorized compaction resume is not consumed as ordinary input",
+	);
 	const compactResumePolicy = await tempHooks.before_agent_start(
 		{
 			prompt:
@@ -2421,6 +2844,14 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	assert.match(compactResumePolicy.systemPrompt, /Review cycle budget/);
 	assert.doesNotMatch(compactResumePolicy.systemPrompt, /Direct request mode/);
+	const abortsBeforeAuthorizedResume = aborts;
+	const authorizedPayload = { messages: ["continue authorized workflow"] };
+	assert.equal(
+		await tempHooks.before_provider_request({ payload: authorizedPayload }, ctx),
+		authorizedPayload,
+		"an authorized compaction resume reaches its provider request",
+	);
+	assert.equal(aborts, abortsBeforeAuthorizedResume);
 	assert.equal(
 		await tempHooks.tool_call(
 			{
@@ -2432,6 +2863,62 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		undefined,
 		"the runtime compaction-resume turn retains helper authorization",
 	);
+	const interruptedMessage = {
+		role: "assistant",
+		stopReason: "aborted",
+		errorMessage: "Operation aborted",
+		content: [],
+	};
+	assert.equal(
+		await tempHooks.message_end({ message: interruptedMessage }, ctx),
+		undefined,
+	);
+	await tempHooks.agent_end({ messages: [interruptedMessage] }, ctx);
+	await tempShortcuts.f8.handler(ctx);
+	const interruptedWorkflowCompaction = await tempHooks.session_before_compact(
+		{
+			reason: "manual",
+			preparation: {
+				messagesToSummarize: [],
+				fileOps: {},
+				firstKeptEntryId: "work-interrupted",
+				tokensBefore: 90_001,
+			},
+		},
+		ctx,
+	);
+	assert.equal(
+		interruptedWorkflowCompaction.compaction.details.workflowAuthorization,
+		null,
+		"F8 cannot authorize a resume after agent_end, even before agent_settled",
+	);
+	await tempHooks.session_compact(
+		{
+			compactionEntry: {
+				details: interruptedWorkflowCompaction.compaction.details,
+			},
+		},
+		ctx,
+	);
+	const sentBeforeInterruptedResume = sent.length;
+	assert.deepEqual(
+		await tempHooks.input(
+			{
+				source: "extension",
+				text:
+					"Compaction is complete. Resume the parent task now; background subagent results will arrive separately when ready.",
+			},
+			{ ...ctx, isIdle: () => true },
+		),
+		{ action: "handled" },
+		"an interrupted workflow cannot be restarted by a late compaction callback",
+	);
+	assert.equal(
+		sent.length,
+		sentBeforeInterruptedResume,
+		"the rejected resume does not queue workflow continuation",
+	);
+	await tempHooks.agent_settled({}, { ...ctx, isIdle: () => true });
 	const postCompactionOrdinaryPolicy = await tempHooks.before_agent_start(
 		{ prompt: "explain the latest change", systemPrompt: "base" },
 		ctx,
@@ -2441,8 +2928,15 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		postCompactionOrdinaryPolicy.systemPrompt,
 		/Review cycle budget/,
 	);
+	const filteredWorkflowId = "wr-compact-filter";
 	await tempHooks.before_agent_start(
-		{ prompt: inlineWorkflowPrompt, systemPrompt: "base" },
+		{
+			prompt: inlineWorkflowPrompt.replace(
+				"wr-compact-resume",
+				filteredWorkflowId,
+			),
+			systemPrompt: "base",
+		},
 		ctx,
 	);
 	await tempHooks.agent_start({}, ctx);
@@ -2482,7 +2976,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await new Promise((resolve) => setTimeout(resolve, 20));
 	assert.equal(compactions.length, 1, "idle inline work persists compaction");
 	assert.equal(sent.length, 0, "inline filtering needs no resume prompt");
-	const compactedWorkflowClaim = workflowClaim("wr-compact-resume");
+	const compactedWorkflowClaim = workflowClaim(filteredWorkflowId);
 	assert.equal(
 		JSON.parse(readFileSync(compactedWorkflowClaim, "utf8")).outcome,
 		"completed",
@@ -2754,6 +3248,67 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			workOrchestrator: { context: { autoCompact: false } },
 		}),
 	);
+	sent.length = 0;
+	compactions.length = 0;
+	await invoke("work-goal", "interrupt then compact regression", ctx);
+	const interruptedGoalPrompt = sent.at(-1).message;
+	await tempHooks.before_agent_start(
+		{ prompt: interruptedGoalPrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	const interruptedGoalMessage = {
+		role: "assistant",
+		stopReason: "aborted",
+		errorMessage: "Operation aborted",
+		content: [],
+	};
+	await tempHooks.message_end({ message: interruptedGoalMessage }, ctx);
+	await tempHooks.agent_end({ messages: [interruptedGoalMessage] }, ctx);
+	const sentBeforeInterruptedGoalCompact = sent.length;
+	await tempShortcuts.f8.handler({ ...ctx, isIdle: () => true });
+	assert.equal(
+		compactions.length,
+		1,
+		"F8 still compacts after an interrupted goal",
+	);
+	const interruptedGoalCompaction = await tempHooks.session_before_compact(
+		{
+			reason: "manual",
+			preparation: {
+				messagesToSummarize: [],
+				fileOps: {},
+				firstKeptEntryId: "goal-interrupted",
+				tokensBefore: 90_001,
+			},
+		},
+		ctx,
+	);
+	assert.equal(
+		interruptedGoalCompaction.compaction.details.workflowAuthorization,
+		null,
+		"F8 cannot authorize an interrupted goal before agent_settled",
+	);
+	compactions[0].onComplete();
+	await tempHooks.session_compact(
+		{
+			compactionEntry: {
+				details: interruptedGoalCompaction.compaction.details,
+			},
+		},
+		ctx,
+	);
+	await settle();
+	assert.equal(
+		sent.length,
+		sentBeforeInterruptedGoalCompact,
+		"Ctrl-C followed by F8 does not inject a goal continuation",
+	);
+	assert.match(statuses["work-goal"], /paused/);
+	await invoke("work-goal", "clear", ctx);
+	sent.length = 0;
+	compactions.length = 0;
+
 	await invoke("work-goal", "write temp proof file", ctx);
 	assert.equal(thinkingLevel, "medium");
 	assert.equal(sent.length, 1);
@@ -2843,6 +3398,44 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		{ ...ctx, hasPendingMessages: () => true },
 	);
 	assert.equal(sent.length, 1, "pending messages defer goal continuation");
+	const backgroundWorkflowPolicy = await tempHooks.before_agent_start(
+		{
+			prompt:
+				"Background task completed: **workflow**\n\nWorkflow completed with 3 child run(s).",
+			systemPrompt: "base",
+		},
+		ctx,
+	);
+	assert.match(backgroundWorkflowPolicy.systemPrompt, /Active autonomous goal/);
+	assert.match(backgroundWorkflowPolicy.systemPrompt, /Review cycle budget/);
+	assert.doesNotMatch(
+		backgroundWorkflowPolicy.systemPrompt,
+		/Direct request mode/,
+	);
+	assert.equal(
+		await tempHooks.tool_call(
+			{
+				toolName: "bash",
+				input: { command: "node scripts/work-helper.mjs work-proof work-1.1" },
+			},
+			ctx,
+		),
+		undefined,
+		"background workflow completion may finalize the active work goal",
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.agent_end(
+		{
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "Processed advisor results." }],
+				},
+			],
+		},
+		{ ...ctx, hasPendingMessages: () => true },
+	);
+	assert.equal(sent.length, 1, "pending messages still defer goal continuation");
 	await settle();
 	assert.equal(compactions.length, 1, "work-goal compacts before continuing");
 	assert.match(compactions[0].customInstructions, /work-goal microcompact/);
@@ -2937,6 +3530,14 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.doesNotMatch(
 		staleCompactionResumePolicy.systemPrompt,
 		/Review cycle budget/,
+	);
+	const abortsBeforeStaleCompactionResume = aborts;
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.before_provider_request({ payload: { messages: [] } }, ctx);
+	assert.equal(
+		aborts,
+		abortsBeforeStaleCompactionResume + 1,
+		"stale compaction completion is aborted before its model request",
 	);
 
 	await tempHooks.session_before_compact(
@@ -3924,6 +4525,70 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.match(statuses["work-goal"], /stopped/);
 	await invoke("work-goal", "clear", ctx);
 
+	const blockedResumeCwd = mkdtempSync(
+		path.join(tmpdir(), "ce-work-needs-human-resume-"),
+	);
+	try {
+		execFileSync("git", ["init"], { cwd: blockedResumeCwd, stdio: "ignore" });
+		execFileSync("git", ["config", "user.name", "Test"], {
+			cwd: blockedResumeCwd,
+		});
+		execFileSync("git", ["config", "user.email", "test@example.com"], {
+			cwd: blockedResumeCwd,
+		});
+		writeFileSync(
+			path.join(blockedResumeCwd, ".gitignore"),
+			".pi/\n.ce-workflow/\n",
+		);
+		execFileSync("git", ["add", ".gitignore"], { cwd: blockedResumeCwd });
+		execFileSync("git", ["commit", "-m", "baseline"], {
+			cwd: blockedResumeCwd,
+			stdio: "ignore",
+		});
+		initStore(blockedResumeCwd);
+		mutateStore(blockedResumeCwd, (store) => {
+			createWorkItem(store, {
+				id: "blocked-roadmap",
+				type: "epic",
+				title: "Blocked roadmap",
+			});
+			createWorkItem(store, {
+				id: "ready-sibling",
+				parentId: "blocked-roadmap",
+				title: "Ready sibling",
+				description: "Continue despite the blocked sibling.",
+				acceptance: "The ready sibling runs.",
+			});
+		});
+		mkdirSync(path.join(blockedResumeCwd, ".pi"), { recursive: true });
+		writeFileSync(
+			path.join(blockedResumeCwd, ".pi", "work-orchestrator-state.json"),
+			JSON.stringify({
+				workGoal: {
+					id: "wg-blocked-roadmap-resume",
+					mode: "project",
+					objective: "Target work item or roadmap ID: blocked-roadmap",
+					status: "needs_human",
+					iteration: 1,
+					decision: { question: "Resolve the blocked sibling?" },
+				},
+			}),
+		);
+		const blockedCtx = { ...ctx, cwd: blockedResumeCwd };
+		tempHooks.session_start?.({}, blockedCtx);
+		const beforeBlockedRoadmapResume = sent.length;
+		await invoke("work-resume", "blocked-roadmap", blockedCtx);
+		assert.equal(
+			sent.length,
+			beforeBlockedRoadmapResume + 1,
+			"work-resume continues a needs-human roadmap when another slice is ready",
+		);
+		assert.match(statuses["work-goal"], /active/);
+		await invoke("work-goal", "clear", blockedCtx);
+	} finally {
+		rmSync(blockedResumeCwd, { recursive: true, force: true });
+	}
+
 	const beforeResumeSent = sent.length;
 	const beforeResumeNotices = notices.length;
 	await invoke("work-resume", "one task only", ctx);
@@ -4022,6 +4687,27 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	entries.push(handoffEntry);
 	tempHooks.session_start?.({}, ctx);
 	assert.match(statuses["work-goal"], /active #3/);
+	await invoke("work-goal", "clear", ctx);
+
+	writeFileSync(
+		path.join(cwd, ".pi", "work-orchestrator-state.json"),
+		JSON.stringify({
+			workGoal: {
+				id: "wg-lazy-durable-resume",
+				mode: "project",
+				objective: "resume a goal persisted by another controller",
+				status: "active",
+				iteration: 0,
+				updatedAt: Date.now() + 1_000,
+				currentWorkItemId: "work-1.1.2",
+			},
+		}),
+	);
+	const beforeLazyResumeSent = sent.length;
+	await invoke("work-goal", "resume", ctx);
+	assert.equal(sent.length, beforeLazyResumeSent + 1);
+	assert.match(sent.at(-1).message, /wg-lazy-durable-resume/);
+	assert.match(statuses["work-goal"], /active/);
 	await invoke("work-goal", "clear", ctx);
 
 	writeFileSync(
@@ -4320,12 +5006,21 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	);
 	assert.match(sent.at(-1).message, /waive only disconnection screenshot/);
 	const sentBeforePlainPause = sent.length;
+	const abortsBeforePlainPause = aborts;
 	const plainPauseResult = await tempHooks.input?.(
 		{ source: "user", text: "pause" },
 		ctx,
 	);
-	assert.equal(plainPauseResult, undefined);
-	assert.match(statuses["work-goal"], /active/);
+	assert.deepEqual(plainPauseResult, { action: "handled" });
+	assert.equal(statuses["work-goal"], "paused");
+	assert.equal(aborts, abortsBeforePlainPause + 1);
+	assert.equal(
+		sent.length,
+		sentBeforePlainPause,
+		"bare pause does not queue another autonomous continuation",
+	);
+	await invoke("work-goal", "resume", ctx);
+	const sentBeforePrefixedPause = sent.length;
 	const prefixedPauseResult = await tempHooks.input?.(
 		{ source: "user", text: "orchestrator pause" },
 		ctx,
@@ -4334,7 +5029,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.equal(statuses["work-goal"], "paused");
 	assert.equal(
 		sent.length,
-		sentBeforePlainPause,
+		sentBeforePrefixedPause,
 		"prefixed pause does not queue another autonomous continuation",
 	);
 
@@ -4816,6 +5511,9 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		rmSync(lifecycleVerifierCwd, { recursive: true, force: true });
 	}
 } finally {
+	if (originalPiCodingAgentDir === undefined)
+		delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = originalPiCodingAgentDir;
 	rmSync(path.join(cwd, ".git"), { recursive: true, force: true });
 	rmSync(path.join(cwd, ".pi"), { recursive: true, force: true });
 	try {

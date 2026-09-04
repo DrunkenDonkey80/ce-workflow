@@ -5,6 +5,7 @@ node_modules/
 .env
 .ce-workflow/.work-items.candidate.json
 .ce-workflow/work-runs/
+.ce-workflow/local/
 .ce-workflow/*.tmp
 .ce-workflow/*.bak
 *.log
