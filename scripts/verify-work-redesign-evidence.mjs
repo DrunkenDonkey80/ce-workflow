@@ -11,11 +11,7 @@ try {
 	const cwd = process.cwd();
 	const session = JSON.parse(
 		readFileSync(
-			path.join(
-				cwd,
-				".ce-workflow/work-runs/design-sessions",
-				`${ownerId}.json`,
-			),
+			path.join(cwd, ".ce-workflow/work-runs/design-sessions", `${ownerId}.json`),
 			"utf8",
 		),
 	);
@@ -42,6 +38,8 @@ try {
 	if (!result.passed) throw new Error(result.reason);
 	process.stdout.write(`${JSON.stringify(result)}\n`);
 } catch (error) {
-	process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+	process.stderr.write(
+		`${error instanceof Error ? error.message : String(error)}\n`,
+	);
 	process.exitCode = 1;
 }

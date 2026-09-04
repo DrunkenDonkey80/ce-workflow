@@ -64,7 +64,8 @@ try {
 											signatureElement: 4,
 											responsiveAdaptation: 3,
 										},
-										rationale: "The anonymous images share the approved palette and structure.",
+										rationale:
+											"The anonymous images share the approved palette and structure.",
 									}),
 								},
 							],

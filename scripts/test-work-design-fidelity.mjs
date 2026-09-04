@@ -177,7 +177,10 @@ try {
 			path.join(root, capture.screenshotPath),
 			`${capture.role}-${capture.viewport}`,
 		);
-	assert.equal(validateDesignFidelityEvidence(evidence, authority, handoff).version, 1);
+	assert.equal(
+		validateDesignFidelityEvidence(evidence, authority, handoff).version,
+		1,
+	);
 	const evidencePath = path.join(root, "fidelity.json");
 	writeFileSync(evidencePath, JSON.stringify(evidence));
 	assert.equal(

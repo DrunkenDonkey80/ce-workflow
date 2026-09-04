@@ -6,7 +6,12 @@ import { validateDesignFidelityEvidence } from "../../../../../../extensions/wor
 const sha256 = (file) =>
 	crypto.createHash("sha256").update(readFileSync(file)).digest("hex");
 
-export function verifyCalculatorRedesign(root, evidenceFile, authority, handoff) {
+export function verifyCalculatorRedesign(
+	root,
+	evidenceFile,
+	authority,
+	handoff,
+) {
 	try {
 		const workspace = path.resolve(root);
 		const evidencePath = path.resolve(evidenceFile);
@@ -21,12 +26,16 @@ export function verifyCalculatorRedesign(root, evidenceFile, authority, handoff)
 			)
 				throw new Error("screenshot evidence escaped its retained directory");
 			if (!existsSync(file) || sha256(file) !== capture.screenshotHash)
-				throw new Error(`missing or changed ${capture.role} ${capture.viewport} screenshot`);
+				throw new Error(
+					`missing or changed ${capture.role} ${capture.viewport} screenshot`,
+				);
 			if (
 				capture.role === "implemented" &&
 				path.resolve(capture.workspaceRoot) !== workspace
 			)
-				throw new Error("implemented screenshot provenance is outside the calculator workspace");
+				throw new Error(
+					"implemented screenshot provenance is outside the calculator workspace",
+				);
 		}
 		return { project: "calculator-redesign", passed: true };
 	} catch (error) {

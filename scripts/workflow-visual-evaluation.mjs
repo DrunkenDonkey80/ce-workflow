@@ -80,7 +80,10 @@ export function runVisualEvaluation(input, seams = {}) {
 	const implementedPath = path.resolve(input.implementedPath);
 	const selectedHash = sha256(selectedPath);
 	const implementedHash = sha256(implementedPath);
-	if (selectedHash !== input.selectedHash || implementedHash !== input.implementedHash)
+	if (
+		selectedHash !== input.selectedHash ||
+		implementedHash !== input.implementedHash
+	)
 		throw new Error("visual evaluation input hash drift");
 	const evaluator = input.evaluator ?? {};
 	const approvedTraits = JSON.stringify(input.approvedTraits ?? {});
@@ -90,7 +93,9 @@ export function runVisualEvaluation(input, seams = {}) {
 		throw new Error("visual evaluator identity is required");
 	const expectedFingerprint = `${evaluator.provider}/${evaluator.model}`;
 	if (expectedFingerprint === input.writerFingerprint)
-		throw new Error("visual evaluator must differ from the implementation writer");
+		throw new Error(
+			"visual evaluator must differ from the implementation writer",
+		);
 	const temp = mkdtempSync(path.join(os.tmpdir(), "ce-visual-evaluator-"));
 	const swap = (seams.randomBytes ?? randomBytes)(1)[0] % 2 === 1;
 	const mapping = swap
@@ -107,7 +112,13 @@ export function runVisualEvaluation(input, seams = {}) {
 		JSON.stringify({
 			approvedTraits: input.approvedTraits ?? {},
 			dimensions: DIMENSIONS,
-			anchors: { 0: "missing", 1: "major mismatch", 2: "partial", 3: "match", 4: "close match" },
+			anchors: {
+				0: "missing",
+				1: "major mismatch",
+				2: "partial",
+				3: "match",
+				4: "close match",
+			},
 		}),
 	);
 	const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -143,7 +154,8 @@ export function runVisualEvaluation(input, seams = {}) {
 		if (run.status !== 0)
 			throw new Error(`visual evaluator failed: ${run.stderr || run.stdout}`);
 		const assistant = assistantMessage(run.stdout);
-		if (!assistant) throw new Error("visual evaluator produced no assistant result");
+		if (!assistant)
+			throw new Error("visual evaluator produced no assistant result");
 		const actualProvider = assistant.provider;
 		const actualModel = assistant.model;
 		if (
@@ -155,7 +167,9 @@ export function runVisualEvaluation(input, seams = {}) {
 			throw new Error("visual evaluator fingerprint mismatch");
 		const actualFingerprint = `${actualProvider}/${actualModel}`;
 		if (actualFingerprint === input.writerFingerprint)
-			throw new Error("visual evaluator identity matches the implementation writer");
+			throw new Error(
+				"visual evaluator identity matches the implementation writer",
+			);
 		const parsed = parseResult(assistant);
 		const mean =
 			Object.values(parsed.scores).reduce((sum, score) => sum + score, 0) /
@@ -180,9 +194,15 @@ export function runVisualEvaluation(input, seams = {}) {
 				.digest("hex"),
 		};
 		if (input.outputPath)
-			writeFileSync(path.resolve(input.outputPath), JSON.stringify(output, null, 2));
+			writeFileSync(
+				path.resolve(input.outputPath),
+				JSON.stringify(output, null, 2),
+			);
 		if (input.controlPath)
-			writeFileSync(path.resolve(input.controlPath), JSON.stringify(control, null, 2));
+			writeFileSync(
+				path.resolve(input.controlPath),
+				JSON.stringify(control, null, 2),
+			);
 		return { output, control };
 	} finally {
 		rmSync(temp, { recursive: true, force: true });
@@ -198,7 +218,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 		const result = runVisualEvaluation(input);
 		process.stdout.write(`${JSON.stringify(result.output)}\n`);
 	} catch (error) {
-		process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+		process.stderr.write(
+			`${error instanceof Error ? error.message : String(error)}\n`,
+		);
 		process.exitCode = 1;
 	}
 }
