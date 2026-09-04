@@ -319,6 +319,33 @@ try {
 		"optional configured advisors research the clarified request before the main brainstorm artifact",
 	);
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), "{}\n");
+	writeFileSync(
+		path.join(cwd, "plan-cancel-probe.md"),
+		"# Probe plan\n\nGoal: cancel probe.\n",
+	);
+	const cancelledFollowUps = [];
+	const cancelledPlan = await executeOrchestratorAction(
+		"work-plan",
+		path.join(cwd, "plan-cancel-probe.md"),
+		{
+			cwd,
+			mode: "tui",
+			ui: {
+				notify() {},
+				select: async () => undefined,
+			},
+		},
+		{
+			sendUserMessage: async (message) => cancelledFollowUps.push(message),
+			events: { emit() {} },
+		},
+		"",
+		{},
+	);
+	assert(
+		cancelledPlan.action === "cancelled" && cancelledFollowUps.length === 0,
+		"cancelling the creative-sidecar prompt aborts work-plan with no handoff queued",
+	);
 	const followUps = [];
 	let brainstormRpc = 0;
 	const routedClipboardBody =

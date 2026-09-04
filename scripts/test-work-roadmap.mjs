@@ -236,9 +236,11 @@ try {
 				},
 				ui: {
 					workDialogsNative: true,
-					select: async (title, labels) => {
-						menus.push({ title, labels });
-						if (roadmapSelected)
+				select: async (title, labels) => {
+					menus.push({ title, labels });
+					if (title === "Creative sidecar")
+						return labels.find((label) => label.includes("Quick"));
+					if (roadmapSelected)
 							return labels.find((label) => /full report/.test(label));
 						const roadmap = labels.find((label) => label.includes(names[id]));
 						if (roadmap) {
@@ -1343,6 +1345,8 @@ try {
 			sessionManager: { getSessionId: () => "roadmap-planning-session" },
 			ui: {
 				select: async (title, labels) => {
+					if (title === "Creative sidecar")
+						return labels.find((label) => label.includes("Quick"));
 					if (title.includes("operation"))
 						return labels.find((label) => /plan.*next child/i.test(label));
 					return labels.find((label) => /Initiative/i.test(label));

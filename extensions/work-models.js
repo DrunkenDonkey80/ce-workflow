@@ -4363,28 +4363,34 @@ async function chooseCreativeGate(ctx, task = "") {
 	if (mode === "auto") return automaticCreativeGate(task);
 	if (ctx.mode !== "tui")
 		return { depth: "quick", advisorUsage: "none", reason: "non-tui" };
-	const depth =
-		(await choose(
-			ctx,
-			"Creative sidecar",
-			[
-				{
-					value: "quick",
-					label: "Quick",
-					description: "Use the normal brainstorm or planning flow",
-				},
-				{
-					value: "wide",
-					label: "Wide — 3 isolated perspectives",
-					description:
-						"Run parallel divergent branches, merge them, then use configured advisors as critics",
-				},
-			],
-			"wide",
+	const depth = await choose(
+		ctx,
+		"Creative sidecar",
+		[
 			{
-				purpose: "Choose whether this broad task needs an isolated creative pass.",
+				value: "quick",
+				label: "Quick",
+				description: "Use the normal brainstorm or planning flow",
 			},
-		)) ?? "quick";
+			{
+				value: "wide",
+				label: "Wide — 3 isolated perspectives",
+				description:
+					"Run parallel divergent branches, merge them, then use configured advisors as critics",
+			},
+		],
+		"wide",
+		{
+			purpose: "Choose whether this broad task needs an isolated creative pass.",
+		},
+	);
+	if (depth === undefined)
+		return {
+			depth: null,
+			advisorUsage: "none",
+			cancelled: true,
+			reason: "cancelled",
+		};
 	return {
 		depth,
 		advisorUsage: depth === "wide" ? "all" : "none",
@@ -4402,6 +4408,15 @@ async function withCreativeSidecar(builder, args, state, ctx) {
 		builder === buildWorkPlanState && state.action === "handoff-plan";
 	if (!state.ok || (!isBig && !isPlan)) return state;
 	const gate = await chooseCreativeGate(ctx, args);
+	if (gate.cancelled)
+		return {
+			...state,
+			ok: true,
+			action: "cancelled",
+			handoffPrompt: undefined,
+			controlSessionHandoff: false,
+			message: "Cancelled at the creative-sidecar prompt — nothing queued.",
+		};
 	const target = isBig
 		? `planning WorkItem ${state.selectedWorkItem.id}`
 		: `master plan input ${String(args).trim()}`;
@@ -27110,6 +27125,7 @@ async function handleWorkRoadmapWorkspace(ctx, pi, runtime) {
 					"master-plan-resume-started",
 					"handoff-plan",
 					"initiative-conversion-started",
+					"cancelled",
 				].includes(result?.action)
 			)
 				return result;
@@ -28438,6 +28454,14 @@ async function executeOrchestratorAction(
 			}
 			const creativeDepth =
 				options.creativeDepth ?? (await chooseCreativeDepth(ctx, text));
+			if (creativeDepth == null) {
+				notify(
+					ctx,
+					"Cancelled at the creative-sidecar prompt — nothing queued.",
+					"info",
+				);
+				return stateTelemetry({ ok: true, action: "cancelled" });
+			}
 			const state = buildWorkRedesignState(ctx.cwd, text, {
 				...options,
 				uiInput: discovery.intake,
@@ -28676,6 +28700,14 @@ async function executeOrchestratorAction(
 			}
 			const creativeDepth =
 				state.ok && !state.artifact ? await chooseCreativeDepth(ctx) : "quick";
+			if (creativeDepth == null) {
+				notify(
+					ctx,
+					"Cancelled at the creative-sidecar prompt — nothing queued.",
+					"info",
+				);
+				return stateTelemetry({ ...state, action: "cancelled" });
+			}
 			state = { ...state, creativeDepth };
 			notify(ctx, renderWorkBrainstormText(state), state.ok ? "info" : "warning");
 			if (state.ok)
