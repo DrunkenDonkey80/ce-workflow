@@ -4408,9 +4408,6 @@ async function withCreativeSidecar(builder, args, state, ctx) {
 			ok: false,
 			action: "cancelled",
 			reason: "creative-gate-cancelled",
-			// ponytail: cleared locally because handleWorkflowAction sends handoffPrompt
-			// without checking state.ok; make that send ok-gated if another path repeats this.
-			handoffPrompt: undefined,
 			message: "Cancelled at the creative-sidecar prompt — nothing queued.",
 		};
 	const target = isBig
@@ -25800,7 +25797,7 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 			handoffError: launched.spawned.message,
 		};
 	}
-	if (state.handoffPrompt)
+	if (state.ok && state.handoffPrompt)
 		await sendWorkflowFollowUp(
 			ctx,
 			withSelectionNote(state.handoffPrompt, selectionNote),
@@ -25995,7 +25992,7 @@ async function handleWorkflowAction(
 			handoffFailed: true,
 		};
 	}
-	if (state.handoffPrompt)
+	if (state.ok && state.handoffPrompt)
 		await sendWorkflowFollowUp(
 			ctx,
 			withSelectionNote(state.handoffPrompt, selectionNote),
