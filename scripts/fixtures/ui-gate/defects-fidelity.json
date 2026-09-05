@@ -1,0 +1,8 @@
+[
+	{
+		"spec": "fidelity-spec.html", "file": "fidelity-actual.html",
+		"expect": ["position-drift", "typography-drift", "color-token-mismatch"]
+	},
+	{ "spec": "fidelity-spec.html", "file": "fidelity-actual-missing-anchor.html", "expect": ["anchor-missing"] },
+	{ "spec": "fidelity-spec-noanchors.html", "file": "fidelity-actual-missing-region.html", "expect": ["region-missing"] }
+]

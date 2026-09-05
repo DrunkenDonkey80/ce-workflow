@@ -1,0 +1,24 @@
+{
+	"version": 1,
+	"recipes": {
+		"clipped-text": "Give the container min-width:0 / allow wrapping, or make truncation deliberate with text-overflow:ellipsis and -webkit-line-clamp.",
+		"interactive-overlap": "Separate the controls: fix the grid/flow so hit areas do not intersect; tighten negative margins.",
+		"occluded-content": "Raise or resize the covering element; re-check z-index/stacking and remove stray overlays.",
+		"offscreen-essential": "Return the anchored element into the layout flow (remove absolute offsets outside the document).",
+		"scroll-trap": "Restore root scrolling (html/body overflow) or make the content fit the viewport.",
+		"content-missing": "Render the declared handoff copy for this state before verification.",
+		"spacing-drift": "Snap sibling gaps to tokens.spacing (within 1px) or adjust the token scale.",
+		"alignment-drift": "Flush stacked siblings that share a left edge (within 2px).",
+		"baseline-drift": "Review the geometry change against the last accepted baseline; accept with --accept-baseline when intended.",
+		"position-drift": "Move the element back near the spec position (uniform scale, y relative to its region anchor).",
+		"size-drift": "Match the spec box within 15% after viewport scaling.",
+		"typography-drift": "Use the spec font-size role for this element (within 15%).",
+		"color-token-mismatch": "Use the nearest approved roleColors token instead of an off-palette color.",
+		"text-mismatch": "Render the spec text for this state.",
+		"ordering-violation": "Restore the spec order of the matched pair in the DOM.",
+		"anchor-missing": "Add data-ce-el for the spec anchor in the implementation (or drop it from the spec).",
+		"region-missing": "Implement the required region with a data-ce-el anchor.",
+		"region-overlap": "Separate the required regions so their boxes do not intersect.",
+		"layout-assertion": "Fix the spatial relation named in the handoff layout assertion."
+	}
+}

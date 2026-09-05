@@ -1,7 +1,7 @@
 # UI Gate — Implementation Plan (master roadmap seed)
 
 ```yaml
-status: implementation-ready
+status: in-implementation (P0+P1 shipped 2026-09-05; P2 core engine shipped, extension wiring pending; P3+ pending)
 type: master-plan
 created: 2026-09-04
 source: .pi/ui-gate-plan/plan-final.md (final v2 — reconciled through two adversarial review rounds: opus-review.md, opus-review-2.md; all load-bearing claims source-verified 2026-09-04)
@@ -95,7 +95,7 @@ Platform matrix: web P0 (full); Electron/Tauri/CEF cheap add on the CDP rung; An
 
 ## Planning contract — implementation units
 
-### P0 — Deterministic web validity
+### P0 — Deterministic web validity — ✅ shipped 2026-09-05
 
 - **Goal.** `capture.mjs` + determinism harness + rules R1–R5 + finding format + cheap checks + SVG evidence + telemetry: the measured foundation every later phase trusts.
 - **Files.** New: `scripts/ui-gate/capture.mjs`, `scripts/ui-gate/validity-rules.mjs`, `scripts/ui-gate/overlays.mjs` (SVG + 30-line HTML viewer), `scripts/ui-gate/allowlist.json` (repo-local), `scripts/fixtures/ui-gate/defects-validity.json`, `scripts/test-ui-gate-validity.mjs`. Reuses: `scripts/fixtures/capabilities/run-browser-smoke.mjs` (headless-shell launch pattern), `scripts/fixtures/capabilities/browser-calculator.html`, telemetry path in `extensions/work-models.js`.
@@ -104,7 +104,7 @@ Platform matrix: web P0 (full); Electron/Tauri/CEF cheap add on the CDP rung; An
 - **Verification.** `node scripts/test-ui-gate-validity.mjs` green; determinism run archived; telemetry line lands with `ui_gate_round` fields.
 - **Acceptance (source §3 P0).** Byte-stable across 10 consecutive runs; zero findings on every existing HTML surface in the repo; 100% recall on `defects-validity.json`.
 
-### P1 — Fidelity from approved candidate
+### P1 — Fidelity from approved candidate — ✅ shipped 2026-09-05
 
 - **Goal.** Spec side = candidate HTML captured with the same profile; matcher + acceptance + contract-field production; measured `validateDesignFidelityEvidence`.
 - **Files.** New: `scripts/ui-gate/spec-capture.mjs`, `scripts/ui-gate/fidelity-matcher.mjs`, `scripts/ui-gate/contract-evidence.mjs`, `scripts/fixtures/ui-gate/defects-fidelity.json`, `scripts/test-ui-gate-fidelity.mjs`. Modified: `extensions/work-design.js` — `designHandoffContractPrompt` gains optional `layoutAssertions`/`elementsRef` wording (required key set unchanged).
@@ -113,7 +113,7 @@ Platform matrix: web P0 (full); Electron/Tauri/CEF cheap add on the CDP rung; An
 - **Verification.** `node scripts/test-ui-gate-fidelity.mjs` green; `scripts/test-work-design.mjs` + `scripts/test-work-design-fidelity.mjs` still green (AC1).
 - **Acceptance (source §3 P1).** 100% recall on `defects-fidelity.json`; clean variant passes.
 
-### P2 — Repair loop
+### P2 — Repair loop — 🔶 core engine shipped 2026-09-05
 
 - **Goal.** `work-ui-gate` extension driving bounded, monotone convergence with recipe hints and human escalation.
 - **Files.** New: `extensions/work-ui-gate.js`, repair-recipe table (`scripts/ui-gate/repair-recipes.json`). Modified: `extensions/work-models.js` (telemetry event wiring), escalation content via `extensions/work-dialogs.js`, leases via existing `work-action-leases`.
@@ -150,6 +150,8 @@ Platform matrix: web P0 (full); Electron/Tauri/CEF cheap add on the CDP rung; An
 - **Acceptance.** Source §3 P4: native profiles produce full-gate coverage on their fixture targets.
 
 ## Scope boundaries
+
+> **Progress note (2026-09-05):** P0 and P1 are shipped and wired into `scripts/verify-package.mjs` (`scripts/test-ui-gate-validity.mjs`, `scripts/test-ui-gate-fidelity.mjs`, `scripts/test-work-ui-gate.mjs`) and into the fake-OD calculator redesign e2e, which now captures the approved OD candidate and the implemented page (desktop+mobile) and asserts measured fidelity (zero findings, deltas ≤ 0.15, all responsive flags, regions verified). Deviation from the unit file list: `spec-capture.mjs` and `contract-evidence.mjs` are folded into `scripts/ui-gate/gate.mjs` + `fidelity-matcher.mjs` (one orchestrator, fewer files). P2 shipped as the engine inside `gate.mjs` (bounded rounds ≤3, stable finding ids, monotone improved/converged/earlyStop, repair-recipe hints, `ui_gate_round` telemetry with `vlmCalls: 0`); the `work-ui-gate` extension wiring (leases, `work-dialogs` escalation, `inferVerificationContract` classification) remains the next unit. A redesign-flow defect surfaced and was fixed during wiring: the seed/e2e calculator CSS overflowed mobile by 12px (`content-box` width + padding + border > 100vw) — now `box-sizing: border-box` in both the e2e fixture and the OD candidate.
 
 **Non-goals / cuts (all deliberate, source §0.9 + §4):**
 

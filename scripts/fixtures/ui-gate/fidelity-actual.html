@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Calculator</title>
+<style>
+*{margin:0;box-sizing:border-box}
+body{background:#FFF4CC;color:#202044;font:18px system-ui;padding:20px}
+.calculator{max-width:26rem;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;background:#7D5CFF;padding:20px;border-radius:12px}
+h1{color:#FFFFFF;font-size:24px;font-weight:700}
+#theme{font:inherit;background:#FFF4CC;color:#202044;border:none;border-radius:8px;padding:8px 12px}
+#display{display:block;background:#FFFFFF;color:#202044;font-size:42px;text-align:right;margin:20px 0 12px;padding:12px;border-radius:12px;border:none}
+#keys{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+button.key{font:inherit;font-size:20px;padding:20px 8px;border:none;border-radius:12px;background:#FFFFFF;color:#202044}
+button.key.op{background:#27C7FF;color:#202044}
+#equals{background:#FF4F81;color:#202044;font-weight:700}
+</style>
+</head>
+<body>
+<main class="calculator">
+<header data-ce-el="title"><h1>My Calculator</h1><button id="theme" type="button">Theme</button></header>
+<output id="display" data-ce-el="display" aria-live="polite">0</output>
+<div id="keys" data-ce-el="keypad">
+<button class="key" style="color:#9370DB">7</button><button class="key">8</button><button class="key">9</button><button class="key op">&divide;</button>
+<button class="key">4</button><button class="key">5</button><button class="key">6</button><button class="key op">&times;</button>
+<button class="key">1</button><button class="key">2</button><button class="key">3</button><button class="key op">&minus;</button>
+<button class="key">0</button><button class="key">C</button>
+<button class="key" id="equals" data-ce-el="equals control" style="position:relative;top:60px">=</button><button class="key op">+</button>
+</div>
+</main>
+</body>
+</html>

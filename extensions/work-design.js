@@ -588,6 +588,8 @@ export function validateDesignHandoff(raw, options = {}) {
 	string(direction.intentionalRisk, "direction.intentionalRisk");
 	object(handoff.content, "content");
 	object(handoff.tokens, "tokens");
+	if (handoff.elementsRef != null)
+		optionalString(handoff.elementsRef, "elementsRef", 200);
 	records(handoff.screens, "screens", "SCREEN", (screen, index) => {
 		string(screen.title, `screens[${index}].title`, 200);
 		if (handoff.version === DESIGN_HANDOFF_VERSION) {
@@ -616,6 +618,10 @@ export function validateDesignHandoff(raw, options = {}) {
 			min: 1,
 			max: 32,
 		});
+		if (screen.layoutAssertions != null)
+			stringList(screen.layoutAssertions, `screens[${index}].layoutAssertions`, {
+				max: 32,
+			});
 	});
 	records(handoff.flows, "flows", "FLOW", (flow, index) => {
 		stringList(flow.steps, `flows[${index}].steps`, { min: 1, max: 32 });
@@ -700,6 +706,7 @@ export function validateDesignHandoff(raw, options = {}) {
 		string(provenance.remoteFingerprint, "provenance.remoteFingerprint", 128);
 	return canonicalizeDesignValue({
 		version: handoff.version,
+		...(handoff.elementsRef ? { elementsRef: handoff.elementsRef } : {}),
 		...(handoff.version === DESIGN_HANDOFF_VERSION
 			? { targets: handoff.targets, variants: handoff.variants }
 			: {}),
@@ -950,7 +957,8 @@ function designHandoffContractPrompt({
 		'Use version: 2. targets is 1+ {id:"TARGET-*",platform,requiredViewports:[desktop|tablet|mobile],evidence:[string],requiredScreenIds:["SCREEN-*"],requiredFlowIds:["FLOW-*"]}.',
 		'variants is 1+ {id:"VARIANT-*",targetId,viewport,previewRoute or previewArtifact,screenIds:["SCREEN-*"],flowIds:["FLOW-*"]}; cover every required target/viewport.',
 		'identity is {id:"DESIGN-*",title,briefHash}. direction is {summary,roleColors:[4-6 {name,value:"#RRGGBB"}],signatureElement,intentionalRisk}. content and tokens are objects.',
-		'screens is 1+ {id:"SCREEN-*",title,targetIds,variantIds,states,viewports,requiredRegions}; flows is 1+ {id:"FLOW-*",steps,targetIds,variantIds}; components is 1+ {id:"COMP-*",name,states}.',
+		'screens is 1+ {id:"SCREEN-*",title,targetIds,variantIds,states,viewports,requiredRegions,layoutAssertions?}; layoutAssertions is an optional string array of spatial facts like "display above keypad" verified per viewport. flows is 1+ {id:"FLOW-*",steps,targetIds,variantIds}; components is 1+ {id:"COMP-*",name,states}.',
+		'Optional top-level elementsRef may point at the hash-bound design/elements.json sidecar (list it in assets with path "design/elements.json"); geometry gates bind to that hash.',
 		'interactions is 1+ {id:"INT-*",trigger,outcome}. responsiveRules, accessibility, and implementationConstraints are non-empty string arrays. assets is an array of {path,license,provenance}; asset paths may end only in .md, .json, .png, .jpg, .jpeg, or .webp. Never list .html in assets: an HTML Preview belongs only in variants[].previewArtifact.',
 		'acceptance is 1+ {id:"DES-*",description,screenIds,targetIds,variantIds,states,viewports,proofs:[interaction|visual|accessibility|logs|manual]}. openQuestions must be []. provenance is {source,generatedAt}; omit remoteFingerprint (if present it must be at most 128 UTF-8 bytes).',
 	].filter(Boolean);

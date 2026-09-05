@@ -1,0 +1,11 @@
+{
+	"version": 1,
+	"entries": [
+		{
+			"pair": "BUTTON@[key-accept]|BUTTON@[key-clear]",
+			"reason": "deliberate overlapping clear affordance (example entry, unused by fixtures)",
+			"viewport": "any",
+			"state": "any"
+		}
+	]
+}

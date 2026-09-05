@@ -1,0 +1,7 @@
+[
+	{ "file": "clipped-text.html", "expect": ["clipped-text"] },
+	{ "file": "overlap.html", "expect": ["interactive-overlap"] },
+	{ "file": "occluded.html", "expect": ["occluded-content"] },
+	{ "file": "offscreen.html", "expect": ["offscreen-essential"] },
+	{ "file": "scroll-trap.html", "expect": ["scroll-trap"] }
+]

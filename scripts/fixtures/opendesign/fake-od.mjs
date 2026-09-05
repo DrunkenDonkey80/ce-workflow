@@ -86,26 +86,59 @@ function candidateFiles(prompt) {
 	lastBriefHash = briefHash;
 	const targets = promptTargets(prompt);
 	const targetIds = targets.map((target) => target.id);
+	// The selected candidate is a full anchored calculator page whose geometry
+	// mirrors the e2e implementation (same spacing/type scale), so the UI gate
+	// can measure fidelity from the approved artifact.
+	const selectedContent = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sunny Stickers Calculator</title>
+<style>
+:root { --canvas: #FFF4CC; --surface: #7D5CFF; --text: #202044; --accent: #FF4F81; --action: #27C7FF; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 18px system-ui; color: var(--text); background: linear-gradient(135deg, var(--canvas), var(--accent)); }
+.calculator { width: min(92vw, 26rem); padding: 1.5rem; border: 6px solid var(--accent); border-radius: 2rem; background: var(--surface); box-shadow: 0 1rem 0 var(--text); }
+header { display: flex; align-items: center; justify-content: space-between; }
+#display { display: block; box-sizing: border-box; width: 100%; min-height: 4rem; margin: 1rem 0; padding: .75rem; border: 3px solid var(--text); border-radius: 1rem; background: var(--canvas); font-size: 2rem; text-align: right; }
+.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+button { min-width: 44px; min-height: 44px; border: 0; border-radius: 1rem; background: var(--action); color: var(--text); font: inherit; font-weight: 700; }
+button:focus-visible { outline: 4px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 480px) { .calculator { width: calc(100vw - 2rem); padding: 1rem; border-radius: 1.25rem; } }
+</style>
+</head>
+<body>
+<main class="calculator" data-ce-candidate-id="CANDIDATE-2" data-ce-brief-hash="${briefHash}">
+<header data-ce-el="title"><h1>My Calculator</h1><button id="theme" type="button" aria-label="Toggle theme">Theme</button></header>
+<output id="display" data-ce-el="display" aria-live="polite">0</output>
+<div id="keys" class="keys" data-ce-el="keypad">
+<button type="button">7</button><button type="button">8</button><button type="button">9</button><button type="button">÷</button>
+<button type="button">4</button><button type="button">5</button><button type="button">6</button><button type="button">×</button>
+<button type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">−</button>
+<button type="button">0</button><button type="button">C</button><button type="button" data-ce-el="equals control">=</button><button type="button">+</button>
+</div>
+</main>
+</body>
+</html>`;
 	const candidates = [
-		["CANDIDATE-1", "Rainbow Blocks", "#ff4f81", "#27c7ff"],
-		["CANDIDATE-2", "Sunny Stickers", "#ffb800", "#7d5cff"],
-		["CANDIDATE-3", "Candy Space", "#3cdb8f", "#ff6b35"],
-	].map(([id, title, primary, accent], index) => {
-		const previewArtifact = `candidate-${index + 1}.html`;
-		const content = `<!doctype html><main data-ce-candidate-id="${id}" data-ce-brief-hash="${briefHash}" style="background:${primary};color:${accent}"><h1>${title} Calculator</h1><output>5</output><button>7</button><button>+</button></main>`;
-		projectFiles.set(previewArtifact, content);
+		["CANDIDATE-1", "Rainbow Blocks", "#ff4f81", "#27c7ff", null],
+		["CANDIDATE-2", "Sunny Stickers", "#ffb800", "#7d5cff", selectedContent],
+		["CANDIDATE-3", "Candy Space", "#3cdb8f", "#ff6b35", null],
+	].map(([id, title, primary, accent, content]) => {
+		const previewArtifact = `candidate-${id.slice(-1)}.html`;
+		const body =
+			content ??
+			`<!doctype html><main data-ce-candidate-id="${id}" data-ce-brief-hash="${briefHash}" style="background:${primary};color:${accent}"><h1>${title} Calculator</h1><output>5</output><button>7</button><button>+</button></main>`;
+		projectFiles.set(previewArtifact, body);
 		return {
 			id,
 			title,
-			rationale: `A distinct bright kids-like calculator direction ${index + 1}.`,
-			differentiators: [
-				`Palette ${primary}/${accent}`,
-				`Layout motif ${index + 1}`,
-			],
+			rationale: `A distinct bright kids-like calculator direction.`,
+			differentiators: [`Palette ${primary}/${accent}`, `Layout motif`],
 			previewArtifact,
 			previewFragment: `#candidate=${id}`,
 			targets: targetIds,
-			artifactHash: crypto.createHash("sha256").update(content).digest("hex"),
+			artifactHash: crypto.createHash("sha256").update(body).digest("hex"),
 		};
 	});
 	projectFiles.set(

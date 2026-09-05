@@ -1,0 +1,26 @@
+{
+	"version": 2,
+	"identity": { "id": "DESIGN-CALCULATOR", "title": "Kids-like bright calculator", "briefHash": "b3c0ffee00000000000000000000000000000000000000000000000000000000" },
+	"direction": {
+		"summary": "Bright child-oriented calculator with chunky controls.",
+		"roleColors": [
+			{ "name": "canvas", "value": "#FFF4CC" },
+			{ "name": "surface", "value": "#7D5CFF" },
+			{ "name": "text", "value": "#202044" },
+			{ "name": "accent", "value": "#FF4F81" },
+			{ "name": "action", "value": "#27C7FF" }
+		],
+		"signatureElement": "Bouncy star-shaped equals control",
+		"intentionalRisk": "Playful shapes require disciplined focus treatment"
+	},
+	"content": { "heading": "My Calculator", "display": "0" },
+	"tokens": { "spacing": [8, 12, 20, 28], "typeRoles": ["display", "number", "label"] },
+	"screens": [
+		{
+			"id": "SCREEN-CALCULATOR", "title": "Calculator", "targetIds": ["TARGET-CALCULATOR"], "variantIds": ["VARIANT-1"],
+			"states": ["ready"], "viewports": ["desktop", "mobile"],
+			"requiredRegions": ["title", "display", "keypad", "equals control"],
+			"layoutAssertions": ["display above keypad"]
+		}
+	]
+}

@@ -498,6 +498,8 @@ check(
 
 const tests = [
 	"test-background-verifiers.mjs",
+	"test-ui-gate-fidelity.mjs",
+	"test-ui-gate-validity.mjs",
 	"test-work-improvement-reporting.mjs",
 	"test-work-store.mjs",
 	"test-work-store-performance.mjs",

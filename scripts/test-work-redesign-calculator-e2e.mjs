@@ -18,6 +18,7 @@ import {
 	executeOrchestratorAction,
 	renderWorkResumeText,
 } from "../extensions/work-models.js";
+import { runGate } from "./ui-gate/gate.mjs";
 
 const source = readFileSync(fileURLToPath(import.meta.url), "utf8");
 for (const name of [
@@ -282,20 +283,32 @@ try {
 	const colors = Object.fromEntries(
 		handoff.direction.roleColors.map(({ name, value }) => [name, value]),
 	);
-	const css = `:root { --canvas: ${colors.canvas}; --surface: ${colors.surface}; --text: ${colors.text}; --accent: ${colors.accent}; --action: ${colors.action}; }\nbody { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 18px system-ui; color: var(--text); background: linear-gradient(135deg, var(--canvas), var(--accent)); }\n.calculator { width: min(92vw, 26rem); padding: 1.5rem; border: 6px solid var(--accent); border-radius: 2rem; background: var(--surface); box-shadow: 0 1rem 0 var(--text); }\nheader { display: flex; align-items: center; justify-content: space-between; }\n#display { display: block; box-sizing: border-box; width: 100%; min-height: 4rem; margin: 1rem 0; padding: .75rem; border: 3px solid var(--text); border-radius: 1rem; background: var(--canvas); font-size: 2rem; text-align: right; }\n.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; }\nbutton { min-width: 44px; min-height: 44px; border: 0; border-radius: 1rem; background: var(--action); color: var(--text); font: inherit; font-weight: 700; }\nbutton:focus-visible { outline: 4px solid var(--accent); outline-offset: 2px; }\n@media (max-width: 480px) { .calculator { width: calc(100vw - 2rem); padding: 1rem; border-radius: 1.25rem; } }\n@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }\n`;
+	const css = `:root { --canvas: ${colors.canvas}; --surface: ${colors.surface}; --text: ${colors.text}; --accent: ${colors.accent}; --action: ${colors.action}; }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 18px system-ui; color: var(--text); background: linear-gradient(135deg, var(--canvas), var(--accent)); }\n.calculator { width: min(92vw, 26rem); padding: 1.5rem; border: 6px solid var(--accent); border-radius: 2rem; background: var(--surface); box-shadow: 0 1rem 0 var(--text); }\nheader { display: flex; align-items: center; justify-content: space-between; }\n#display { display: block; box-sizing: border-box; width: 100%; min-height: 4rem; margin: 1rem 0; padding: .75rem; border: 3px solid var(--text); border-radius: 1rem; background: var(--canvas); font-size: 2rem; text-align: right; }\n.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }\nbutton { min-width: 44px; min-height: 44px; border: 0; border-radius: 1rem; background: var(--action); color: var(--text); font: inherit; font-weight: 700; }\nbutton:focus-visible { outline: 4px solid var(--accent); outline-offset: 2px; }\n@media (max-width: 480px) { .calculator { width: calc(100vw - 2rem); padding: 1rem; border-radius: 1.25rem; } }\n@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }\n`;
 	writeFileSync(path.join(workspace, "styles.css"), css);
 	const appPath = path.join(workspace, "app.js");
 	writeFileSync(
 		appPath,
-		`export function calculate(left, operator, right) {\n  if (operator === "+") return left + right;\n  if (operator === "−") return left - right;\n  if (operator === "×") return left * right;\n  if (operator === "÷") return right === 0 ? "Error" : left / right;\n  return right;\n}\nif (typeof document !== "undefined") {\n  const display = document.querySelector("#display");\n  let left = 0, operator = "+", entry = "";\n  const keys = ["7","8","9","÷","4","5","6","×","1","2","3","−","0","C","=","+"];\n  for (const value of keys) {\n    const button = document.createElement("button");\n    button.type = "button"; button.textContent = value; button.setAttribute("aria-label", value);\n    button.onclick = () => {\n      if (/\\d/.test(value)) entry += value;\n      else if (value === "C") { left = 0; operator = "+"; entry = ""; }\n      else if (value === "=") { entry = String(calculate(left, operator, Number(entry || 0))); localStorage.setItem("result", entry); }\n      else { left = Number(entry || 0); operator = value; entry = ""; }\n      display.value = entry || "0";\n    };\n    document.querySelector("#keys").append(button);\n  }\n  document.querySelector("#theme").onclick = () => {\n    const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";\n    document.documentElement.dataset.theme = theme; localStorage.setItem("theme", theme);\n  };\n}\n`,
+		`export function calculate(left, operator, right) {\n  if (operator === "+") return left + right;\n  if (operator === "−") return left - right;\n  if (operator === "×") return left * right;\n  if (operator === "÷") return right === 0 ? "Error" : left / right;\n  return right;\n}\nif (typeof document !== "undefined") {\n  const display = document.querySelector("#display");\n  let left = 0, operator = "+", entry = "";\n  const keys = ["7","8","9","÷","4","5","6","×","1","2","3","−","0","C","=","+"];\n  for (const value of keys) {\n    const button = document.createElement("button");\n    button.type = "button"; button.textContent = value; button.setAttribute("aria-label", value);
+    if (value === "=") button.setAttribute("data-ce-el", "equals control");\n    button.onclick = () => {\n      if (/\\d/.test(value)) entry += value;\n      else if (value === "C") { left = 0; operator = "+"; entry = ""; }\n      else if (value === "=") { entry = String(calculate(left, operator, Number(entry || 0))); localStorage.setItem("result", entry); }\n      else { left = Number(entry || 0); operator = value; entry = ""; }\n      display.value = entry || "0";\n    };\n    document.querySelector("#keys").append(button);\n  }\n  document.querySelector("#theme").onclick = () => {\n    const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";\n    document.documentElement.dataset.theme = theme; localStorage.setItem("theme", theme);\n  };\n}\n`,
 	);
 	const indexPath = path.join(workspace, "index.html");
 	writeFileSync(
 		indexPath,
-		readFileSync(indexPath, "utf8").replace(
-			'<main class="calculator"',
-			`<main class="calculator" data-design-candidate="${session.selectedCandidateId}" data-design-criteria="${handoff.acceptance.map((item) => item.id).join(" ")}"`,
-		),
+		readFileSync(indexPath, "utf8")
+			.replace(
+				'<main class="calculator"',
+				`<main class="calculator" data-design-candidate="${session.selectedCandidateId}" data-design-criteria="${handoff.acceptance.map((item) => item.id).join(" ")}"`,
+			)
+			.replace("<header>", '<header data-ce-el="title">')
+			.replace("<h1>Calculator</h1>", "<h1>My Calculator</h1>")
+			.replace(
+				'<output id="display"',
+				'<output id="display" data-ce-el="display"',
+			)
+			.replace(
+				'<div id="keys" class="keys"></div>',
+				'<div id="keys" class="keys" data-ce-el="keypad"></div>',
+			),
 	);
 
 	const implementationText = `${readFileSync(indexPath, "utf8")}\n${readFileSync(path.join(workspace, "styles.css"), "utf8")}`;
@@ -313,6 +326,45 @@ try {
 	);
 	assert.equal(runtime.calculate(2, "+", 3), 5);
 	assert.equal(runtime.calculate(9, "÷", 0), "Error");
+
+	// Measured UI gate: approved OD candidate (spec) vs implemented page.
+	const fixtureFiles = JSON.parse(
+		readFileSync(fixtureStateFile, "utf8"),
+	).files;
+	const specPath = path.join(workspace, ".ce-workflow/evidence/redesign-e2e/spec-candidate-2.html");
+	mkdirSync(path.dirname(specPath), { recursive: true });
+	writeFileSync(specPath, fixtureFiles["candidate-2.html"]);
+	const gateOut = path.join(
+		workspace,
+		".ce-workflow/evidence/redesign-e2e/ui-gate",
+	);
+	const gate = await runGate({
+		actual: indexPath,
+		spec: specPath,
+		viewports: ["desktop", "mobile"],
+		out: gateOut,
+		handoffFile: path.join(workspace, session.handoffPath),
+	});
+	assert.equal(gate.errors, 0, `ui gate must be clean: ${JSON.stringify(gate.byRule)}`);
+	const gateReport = JSON.parse(
+		readFileSync(path.join(gateOut, "findings.json"), "utf8"),
+	);
+	assert.ok(
+		gateReport.evidence.geometryDeltas.every((delta) => delta <= 0.15),
+		"measured geometry deltas within the 15% contract tolerance",
+	);
+	assert.ok(
+		gateReport.evidence.typographyDeltas.every((delta) => delta <= 0.15),
+		"measured typography deltas within the 15% contract tolerance",
+	);
+	for (const flag of ["reflow", "noHorizontalOverflow", "visibleFocus", "contrast"])
+		assert.equal(gateReport.evidence.responsive[flag], true, `${flag} measured true`);
+	assert.ok(
+		["title", "display", "keypad", "equals control"].every((region) =>
+			gateReport.evidence.regions.includes(region),
+		),
+		"ui gate verifies all required regions",
+	);
 
 	const evidence = path.join(workspace, ".ce-workflow/evidence/redesign-e2e");
 	mkdirSync(evidence, { recursive: true });
@@ -347,6 +399,14 @@ try {
 		})),
 		sourceHash,
 		visualEvidence: false,
+		uiGate: {
+			ok: gate.ok,
+			errors: gate.errors,
+			warnings: gate.warnings,
+			regions: gateReport.evidence.regions,
+			measuredBy: "web-chromium",
+			vlmCalls: 0,
+		},
 	};
 	writeFileSync(
 		path.join(evidence, "fixture-controller-report.json"),
