@@ -1838,6 +1838,12 @@ try {
 			getSessionId: () => modelKnowledgeSessionId,
 		},
 	};
+	// Model knowledge writes must anchor to the durable goal, not the session:
+	// the 20-claim ceiling below is per bucket, so a session-keyed bucket would
+	// let a model reset its own write limit by rotating its session id.
+	pi.appendEntry("goal-state", {
+		goal: { id: "goal-knowledge-a", status: "active" },
+	});
 	const activeKnowledgeBucket =
 		mod.currentKnowledgeWriteBucketKey(modelKnowledgeCtx);
 	assert.match(activeKnowledgeBucket, /^goal:/);
