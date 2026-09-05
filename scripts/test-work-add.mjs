@@ -17,9 +17,7 @@ const {
 	transformPendingRichTaskInput,
 } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
 	).href
 );
 
@@ -51,10 +49,7 @@ try {
 	);
 
 	state = buildWorkAddState(fixture.cwd, "");
-	assert(
-		!state.ok && state.reason === "usage",
-		"empty task returns usage stop",
-	);
+	assert(!state.ok && state.reason === "usage", "empty task returns usage stop");
 
 	fixture.reset("active");
 	state = buildWorkAddState(
@@ -157,7 +152,9 @@ try {
 				mode: "tui",
 				ui: {
 					notify: () => {},
-					select: async (_title, labels) => {
+					select: async (title, labels) => {
+						if (title === "Creative sidecar")
+							return labels.find((label) => label.includes("Quick"));
 						sawClosedRoadmap ||= labels.some(
 							(label) => label.includes("E-2") && /closed/i.test(label),
 						);
