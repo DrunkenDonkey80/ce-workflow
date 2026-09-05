@@ -12,10 +12,21 @@ export function findingId(rule, matchKey, viewport, state) {
 }
 
 function describe(el) {
-	return el.anchor ?? (el.testId ? `[testid=${el.testId}]` : `${el.tag}@${el.key}`);
+	return (
+		el.anchor ?? (el.testId ? `[testid=${el.testId}]` : `${el.tag}@${el.key}`)
+	);
 }
 
-function makeFinding(rule, severity, el, measured, threshold, viewport, state, extra) {
+function makeFinding(
+	rule,
+	severity,
+	el,
+	measured,
+	threshold,
+	viewport,
+	state,
+	extra,
+) {
 	return {
 		id: findingId(rule, describe(el), viewport, state),
 		rule,
@@ -55,13 +66,22 @@ function ruleClippedText(geometry, skip) {
 			el.styles.lineClamp !== "none";
 		const intent =
 			el.styles.textOverflow === "ellipsis" ||
-			(el.styles.lineClamp !== "none" && Number.isFinite(Number(el.styles.lineClamp)));
+			(el.styles.lineClamp !== "none" &&
+				Number.isFinite(Number(el.styles.lineClamp)));
 		if (horizontal && vertical && !intent)
 			findings.push(
-				makeFinding("clipped-text", "error", el, {
-					scrollWidth: el.overflow.scrollWidth,
-					clientWidth: el.overflow.clientWidth,
-				}, { clientWidth: el.overflow.clientWidth }, geometry.viewport.name, geometry.state),
+				makeFinding(
+					"clipped-text",
+					"error",
+					el,
+					{
+						scrollWidth: el.overflow.scrollWidth,
+						clientWidth: el.overflow.clientWidth,
+					},
+					{ clientWidth: el.overflow.clientWidth },
+					geometry.viewport.name,
+					geometry.state,
+				),
 			);
 	}
 	return findings;
@@ -70,19 +90,29 @@ function ruleClippedText(geometry, skip) {
 // R2 interactive-overlap: two interactive elements overlapping >5% of the smaller box.
 function ruleInteractiveOverlap(geometry, skip, allowlist) {
 	const findings = [];
-	const interactive = geometry.elements.filter((el) => el.interactive && !skip.has(el.key));
+	const interactive = geometry.elements.filter(
+		(el) => el.interactive && !skip.has(el.key),
+	);
 	for (let i = 0; i < interactive.length; i++) {
 		for (let j = i + 1; j < interactive.length; j++) {
 			const a = interactive[i];
 			const b = interactive[j];
 			if (isDescendantKey(b.key, a.key) || isDescendantKey(a.key, b.key)) continue;
 			const area = overlapArea(a.rect, b.rect);
-			const smaller = Math.min(a.rect.width * a.rect.height, b.rect.width * b.rect.height);
+			const smaller = Math.min(
+				a.rect.width * a.rect.height,
+				b.rect.width * b.rect.height,
+			);
 			if (smaller <= 0 || area / smaller <= 0.05) continue;
 			const pair = [describe(a), describe(b)].sort().join("|");
 			if (allowlist.some((entry) => entry.pair === pair)) continue;
 			findings.push({
-				id: findingId("interactive-overlap", pair, geometry.viewport.name, geometry.state),
+				id: findingId(
+					"interactive-overlap",
+					pair,
+					geometry.viewport.name,
+					geometry.state,
+				),
 				rule: "interactive-overlap",
 				severity: "error",
 				element: { matchKey: describe(a), anchor: a.anchor, tag: a.tag },
@@ -114,15 +144,33 @@ function ruleOccludedContent(geometry, skip) {
 		const corners = ["tl", "tr", "bl", "br"].filter(covered).length;
 		if (center && corners === 4)
 			findings.push(
-				makeFinding("occluded-content", "error", el, { corners }, { corners: 4 }, geometry.viewport.name, geometry.state, {
-					occluder: el.hits.center,
-				}),
+				makeFinding(
+					"occluded-content",
+					"error",
+					el,
+					{ corners },
+					{ corners: 4 },
+					geometry.viewport.name,
+					geometry.state,
+					{
+						occluder: el.hits.center,
+					},
+				),
 			);
 		else if (center)
 			findings.push(
-				makeFinding("occluded-content", "warning", el, { corners }, { corners: 4 }, geometry.viewport.name, geometry.state, {
-					occluder: el.hits.center,
-				}),
+				makeFinding(
+					"occluded-content",
+					"warning",
+					el,
+					{ corners },
+					{ corners: 4 },
+					geometry.viewport.name,
+					geometry.state,
+					{
+						occluder: el.hits.center,
+					},
+				),
 			);
 	}
 	const faded = geometry.elements.find(
@@ -130,9 +178,18 @@ function ruleOccludedContent(geometry, skip) {
 	);
 	if (faded)
 		findings.push(
-			makeFinding("occluded-content", "warning", faded, faded.effectiveOpacity, { opacity: 0.1 }, geometry.viewport.name, geometry.state, {
-				occluder: "ancestor-opacity",
-			}),
+			makeFinding(
+				"occluded-content",
+				"warning",
+				faded,
+				faded.effectiveOpacity,
+				{ opacity: 0.1 },
+				geometry.viewport.name,
+				geometry.state,
+				{
+					occluder: "ancestor-opacity",
+				},
+			),
 		);
 	return findings;
 }
@@ -146,11 +203,38 @@ function ruleOffscreenEssential(geometry, skip) {
 		if (skip.has(el.key) || !(el.anchor || el.testId)) continue;
 		const { x, y, width, height } = el.rect;
 		const outsideDocument =
-			x > doc.scrollWidth || y > doc.scrollHeight || x + width < 0 || y + height < 0;
+			x > doc.scrollWidth ||
+			y > doc.scrollHeight ||
+			x + width < 0 ||
+			y + height < 0;
 		if (outsideDocument)
-			findings.push(makeFinding("offscreen-essential", "error", el, el.rect, { document: [doc.scrollWidth, doc.scrollHeight] }, geometry.viewport.name, geometry.state));
-		else if (!scrollable && (y + height < 0 || y > doc.innerHeight) && el.styles.position !== "fixed")
-			findings.push(makeFinding("offscreen-essential", "error", el, el.rect, { viewportHeight: doc.innerHeight }, geometry.viewport.name, geometry.state));
+			findings.push(
+				makeFinding(
+					"offscreen-essential",
+					"error",
+					el,
+					el.rect,
+					{ document: [doc.scrollWidth, doc.scrollHeight] },
+					geometry.viewport.name,
+					geometry.state,
+				),
+			);
+		else if (
+			!scrollable &&
+			(y + height < 0 || y > doc.innerHeight) &&
+			el.styles.position !== "fixed"
+		)
+			findings.push(
+				makeFinding(
+					"offscreen-essential",
+					"error",
+					el,
+					el.rect,
+					{ viewportHeight: doc.innerHeight },
+					geometry.viewport.name,
+					geometry.state,
+				),
+			);
 	}
 	return findings;
 }
@@ -165,7 +249,12 @@ function ruleScrollTrap(geometry) {
 	if (trapped)
 		return [
 			{
-				id: findingId("scroll-trap", "document", geometry.viewport.name, geometry.state),
+				id: findingId(
+					"scroll-trap",
+					"document",
+					geometry.viewport.name,
+					geometry.state,
+				),
 				rule: "scroll-trap",
 				severity: "warning",
 				element: { matchKey: "document", anchor: null, tag: "HTML" },
@@ -184,7 +273,12 @@ function ruleContent(geometry, contentStrings) {
 	for (const expected of contentStrings) {
 		if (!text.includes(norm(expected)))
 			findings.push({
-				id: findingId("content-missing", norm(expected), geometry.viewport.name, geometry.state),
+				id: findingId(
+					"content-missing",
+					norm(expected),
+					geometry.viewport.name,
+					geometry.state,
+				),
 				rule: "content-missing",
 				severity: "error",
 				element: { matchKey: `text:${norm(expected)}`, anchor: null, tag: "TEXT" },
@@ -221,7 +315,12 @@ function ruleTokenAlignment(geometry, skip, spacingTokens) {
 			const gap = b.rect.y - (a.rect.y + a.rect.height);
 			if (gap > 1 && gap < 24 && !snaps(gap)) {
 				findings.push({
-					id: findingId("spacing-drift", `${describe(a)}|${describe(b)}`, geometry.viewport.name, geometry.state),
+					id: findingId(
+						"spacing-drift",
+						`${describe(a)}|${describe(b)}`,
+						geometry.viewport.name,
+						geometry.state,
+					),
 					rule: "spacing-drift",
 					severity: "warning",
 					element: { matchKey: describe(a), anchor: a.anchor, tag: a.tag },
@@ -233,13 +332,14 @@ function ruleTokenAlignment(geometry, skip, spacingTokens) {
 					threshold: 1,
 				});
 			}
-			if (
-				Math.abs(a.rect.x - b.rect.x) <= 1 &&
-				gap > 2 &&
-				gap < 6
-			) {
+			if (Math.abs(a.rect.x - b.rect.x) <= 1 && gap > 2 && gap < 6) {
 				findings.push({
-					id: findingId("alignment-drift", `${describe(a)}|${describe(b)}`, geometry.viewport.name, geometry.state),
+					id: findingId(
+						"alignment-drift",
+						`${describe(a)}|${describe(b)}`,
+						geometry.viewport.name,
+						geometry.state,
+					),
 					rule: "alignment-drift",
 					severity: "warning",
 					element: { matchKey: describe(a), anchor: a.anchor, tag: a.tag },
@@ -272,9 +372,18 @@ function ruleBaselineDrift(geometry, baseline) {
 		);
 		if (moved > 2)
 			findings.push(
-				makeFinding("baseline-drift", "info", el, moved, { anyEdge: 2 }, geometry.viewport.name, geometry.state, {
-					previousRect: before.rect,
-				}),
+				makeFinding(
+					"baseline-drift",
+					"info",
+					el,
+					moved,
+					{ anyEdge: 2 },
+					geometry.viewport.name,
+					geometry.state,
+					{
+						previousRect: before.rect,
+					},
+				),
 			);
 	}
 	return findings;
@@ -304,7 +413,8 @@ export function runValidityRules(
 		...(baselineGeometry ? ruleBaselineDrift(geometry, baselineGeometry) : []),
 	].sort(
 		(a, b) =>
-			SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || a.id.localeCompare(b.id),
+			SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] ||
+			a.id.localeCompare(b.id),
 	);
 }
 

@@ -166,7 +166,8 @@ export async function runGate({
 				actual: actualGeometry,
 				handoff,
 				layoutAssertions,
-			});			evidence.geometryDeltas.push(...(fidelity.evidence.geometryDeltas ?? []));
+			});
+			evidence.geometryDeltas.push(...(fidelity.evidence.geometryDeltas ?? []));
 			evidence.typographyDeltas.push(
 				...(fidelity.evidence.typographyDeltas ?? []),
 			);

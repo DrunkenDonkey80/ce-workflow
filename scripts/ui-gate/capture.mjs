@@ -142,7 +142,9 @@ async function startServer(target) {
 	}
 	const baseDir = isFile ? path.dirname(path.resolve(target)) : null;
 	const server = http.createServer((request, response) => {
-		const pathname = decodeURIComponent(new URL(request.url, "http://x").pathname);
+		const pathname = decodeURIComponent(
+			new URL(request.url, "http://x").pathname,
+		);
 		const finish = (status, body, type) => {
 			response.writeHead(status, {
 				"content-type": type ?? "application/octet-stream",
@@ -176,9 +178,7 @@ async function startServer(target) {
 					const body = Buffer.concat(chunks);
 					finish(
 						up.statusCode ?? 502,
-						/html/i.test(type)
-							? injectHtml(body.toString("utf8"))
-							: body,
+						/html/i.test(type) ? injectHtml(body.toString("utf8")) : body,
 						type || undefined,
 					);
 				});
@@ -196,9 +196,10 @@ async function startServer(target) {
 }
 
 function extractGeometry(dom, label) {
-	const match = /<script type="application\/json" id="ce-ui-gate-geometry">([\s\S]*?)<\/script>/.exec(
-		dom,
-	);
+	const match =
+		/<script type="application\/json" id="ce-ui-gate-geometry">([\s\S]*?)<\/script>/.exec(
+			dom,
+		);
 	if (!match)
 		throw new Error(
 			`geometry self-report missing from ${label} dump (CSP or script failure)`,
@@ -219,10 +220,7 @@ function run(chromium, args, timeout) {
 		});
 		let stdout = "";
 		let stderr = "";
-		const timer = setTimeout(
-			() => child.kill(),
-			timeout,
-		);
+		const timer = setTimeout(() => child.kill(), timeout);
 		child.stdout.on("data", (chunk) => {
 			stdout += chunk;
 		});
@@ -240,8 +238,8 @@ function run(chromium, args, timeout) {
 				reject(
 					new Error(
 						`chrome-headless-shell failed (exit ${code}): ${stderr || stdout}`,
-				),
-			);
+					),
+				);
 		});
 	});
 }
@@ -331,7 +329,10 @@ export async function captureCell({
 				? { screenshotSha256: sha256(readFileSync(screenshot)) }
 				: {}),
 		};
-		writeFileSync(path.join(out, "meta.json"), `${JSON.stringify(meta, null, 1)}\n`);
+		writeFileSync(
+			path.join(out, "meta.json"),
+			`${JSON.stringify(meta, null, 1)}\n`,
+		);
 		return {
 			ok: true,
 			cell: { profile: "web-chromium", viewport: viewportName, state, target },

@@ -14,8 +14,7 @@ function iou(a, b) {
 	const right = Math.min(a.x + a.width, b.x + b.width);
 	const bottom = Math.min(a.y + a.height, b.y + b.height);
 	const intersection = right > x && bottom > y ? (right - x) * (bottom - y) : 0;
-	const union =
-		a.width * a.height + b.width * b.height - intersection;
+	const union = a.width * a.height + b.width * b.height - intersection;
 	return union > 0 ? intersection / union : 0;
 }
 
@@ -66,7 +65,8 @@ function contrastRatio(foreground, background) {
 		const scaled = value / 255;
 		return scaled <= 0.03928 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
 	};
-	const lum = ([r, g, bl]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(bl);
+	const lum = ([r, g, bl]) =>
+		0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(bl);
 	const lumA = lum(a);
 	const lumB = lum(b);
 	return (Math.max(lumA, lumB) + 0.05) / (Math.min(lumA, lumB) + 0.05);
@@ -98,7 +98,8 @@ function matchPairs(spec, actual) {
 		}
 	}
 	const cascade = [
-		(specEl, actualEl) => norm(specEl.text) && norm(specEl.text) === norm(actualEl.text),
+		(specEl, actualEl) =>
+			norm(specEl.text) && norm(specEl.text) === norm(actualEl.text),
 		(specEl, actualEl) =>
 			norm(specEl.text) &&
 			norm(specEl.text).length > 2 &&
@@ -110,8 +111,10 @@ function matchPairs(spec, actual) {
 			specEl.tag === actualEl.tag &&
 			specEl.role === actualEl.role,
 	];
-	const specPool = () => spec.elements.filter((el) => !usedSpec.has(el.key) && el.text);
-	const actualPool = () => actual.elements.filter((el) => !usedActual.has(el.key) && el.text);
+	const specPool = () =>
+		spec.elements.filter((el) => !usedSpec.has(el.key) && el.text);
+	const actualPool = () =>
+		actual.elements.filter((el) => !usedActual.has(el.key) && el.text);
 	for (const matches of cascade) {
 		for (const element of actualPool()) {
 			const candidates = specPool().filter((specEl) => matches(specEl, element));
@@ -129,7 +132,10 @@ function matchPairs(spec, actual) {
 	for (const element of actualLeft)
 		for (const specEl of specLeft) {
 			const score = iou(
-				{ ...specEl.rect, x: specEl.rect.x * (actual.viewport.width / spec.viewport.width) },
+				{
+					...specEl.rect,
+					x: specEl.rect.x * (actual.viewport.width / spec.viewport.width),
+				},
 				element.rect,
 			);
 			if (score > 0) greedy.push({ score, spec: specEl, actual: element });
@@ -137,8 +143,15 @@ function matchPairs(spec, actual) {
 	greedy
 		.sort((a, b) => b.score - a.score)
 		.forEach((candidate) => {
-			if (!usedSpec.has(candidate.spec.key) && !usedActual.has(candidate.actual.key)) {
-				pairs.push({ spec: candidate.spec, actual: candidate.actual, method: "iou" });
+			if (
+				!usedSpec.has(candidate.spec.key) &&
+				!usedActual.has(candidate.actual.key)
+			) {
+				pairs.push({
+					spec: candidate.spec,
+					actual: candidate.actual,
+					method: "iou",
+				});
 				usedSpec.add(candidate.spec.key);
 				usedActual.add(candidate.actual.key);
 			}
@@ -155,17 +168,27 @@ function regionFor(element, regionAnchors) {
 			region.rect.y <= element.rect.y &&
 			region.rect.x + region.rect.width >= element.rect.x + element.rect.width &&
 			region.rect.y + region.rect.height >= element.rect.y + element.rect.height;
-		if (contains && (!best || region.rect.width * region.rect.height < best.rect.width * best.rect.height))
+		if (
+			contains &&
+			(!best ||
+				region.rect.width * region.rect.height < best.rect.width * best.rect.height)
+		)
 			best = region;
 	}
 	return best;
 }
 
-export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [] }) {
+export function matchFidelity({
+	spec,
+	actual,
+	handoff = {},
+	layoutAssertions = [],
+}) {
 	const viewport = actual.viewport.name;
 	const scale = actual.viewport.width / spec.viewport.width;
 	const roleColors = handoff.direction?.roleColors ?? [];
-	const requiredRegions = handoff.screens?.flatMap((screen) => screen.requiredRegions ?? []) ?? [];
+	const requiredRegions =
+		handoff.screens?.flatMap((screen) => screen.requiredRegions ?? []) ?? [];
 	const findings = [];
 	const geometryDeltas = [];
 	const typographyDeltas = [];
@@ -173,7 +196,10 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 	// Region checks (plan R12): requiredRegions presence + non-overlap in the
 	// actual capture; also the fallback tier when the spec carries no anchors.
 	const regionElements = requiredRegions
-		.map((name) => ({ name, element: actual.elements.find((el) => el.anchor === name) }))
+		.map((name) => ({
+			name,
+			element: actual.elements.find((el) => el.anchor === name),
+		}))
 		.filter((entry) => entry.element);
 	for (const name of requiredRegions)
 		if (!regionElements.some((entry) => entry.name === name))
@@ -205,10 +231,19 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 			const smaller = Math.min(a.width * a.height, b.width * b.height);
 			if (smaller > 0 && area / smaller > 0.25)
 				findings.push({
-					id: findingId("region-overlap", `${regionElements[i].name}|${regionElements[j].name}`, viewport, actual.state),
+					id: findingId(
+						"region-overlap",
+						`${regionElements[i].name}|${regionElements[j].name}`,
+						viewport,
+						actual.state,
+					),
 					rule: "region-overlap",
 					severity: "error",
-					element: { matchKey: regionElements[i].name, anchor: regionElements[i].name, tag: "REGION" },
+					element: {
+						matchKey: regionElements[i].name,
+						anchor: regionElements[i].name,
+						tag: "REGION",
+					},
 					rect: a,
 					viewport,
 					state: actual.state,
@@ -227,19 +262,35 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 	const regionAnchors = regionElements.map((entry) => entry.element);
 
 	const specOrder = new Map(spec.elements.map((el, index) => [el.key, index]));
-	const actualOrder = new Map(actual.elements.map((el, index) => [el.key, index]));
+	const actualOrder = new Map(
+		actual.elements.map((el, index) => [el.key, index]),
+	);
 	const ordered = pairs
-		.filter((pair) => specOrder.has(pair.spec.key) && actualOrder.has(pair.actual.key))
+		.filter(
+			(pair) => specOrder.has(pair.spec.key) && actualOrder.has(pair.actual.key),
+		)
 		.sort((a, b) => specOrder.get(a.spec.key) - specOrder.get(b.spec.key));
 	for (let i = 0; i + 1 < ordered.length; i++)
-		if (actualOrder.get(ordered[i].actual.key) > actualOrder.get(ordered[i + 1].actual.key)) {
+		if (
+			actualOrder.get(ordered[i].actual.key) >
+			actualOrder.get(ordered[i + 1].actual.key)
+		) {
 			const a = ordered[i];
 			const b = ordered[i + 1];
 			findings.push({
-				id: findingId("ordering-violation", `${a.spec.anchor ?? a.spec.key}|${b.spec.anchor ?? b.spec.key}`, viewport, actual.state),
+				id: findingId(
+					"ordering-violation",
+					`${a.spec.anchor ?? a.spec.key}|${b.spec.anchor ?? b.spec.key}`,
+					viewport,
+					actual.state,
+				),
 				rule: "ordering-violation",
 				severity: "warning",
-				element: { matchKey: a.spec.anchor ?? a.spec.key, anchor: a.spec.anchor, tag: a.actual.tag },
+				element: {
+					matchKey: a.spec.anchor ?? a.spec.key,
+					anchor: a.spec.anchor,
+					tag: a.actual.tag,
+				},
 				rect: a.actual.rect,
 				viewport,
 				state: actual.state,
@@ -258,20 +309,35 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 			height: specEl.rect.height * scale,
 		};
 		const region = regionFor(actualEl, regionAnchors);
-		const specRegion = regionFor(specEl, spec.elements.filter((el) => requiredRegions.includes(el.anchor)));
+		const specRegion = regionFor(
+			specEl,
+			spec.elements.filter((el) => requiredRegions.includes(el.anchor)),
+		);
 		const dy =
-			actualEl.rect.y - (region ? region.rect.y : 0) - (specEl.rect.y - (specRegion ? specRegion.rect.y : 0)) * scale;
+			actualEl.rect.y -
+			(region ? region.rect.y : 0) -
+			(specEl.rect.y - (specRegion ? specRegion.rect.y : 0)) * scale;
 		const dx = actualEl.rect.x - scaled.x;
 		const offset = Math.max(Math.abs(dx), Math.abs(dy));
 		const limit = Math.max(4, 0.02 * actual.viewport.width);
-		const normalized = Math.round((offset / actual.viewport.width) * 10000) / 10000;
+		const normalized =
+			Math.round((offset / actual.viewport.width) * 10000) / 10000;
 		geometryDeltas.push(normalized);
 		if (offset > limit)
 			findings.push({
-				id: findingId("position-drift", actualEl.anchor ?? actualEl.key, viewport, actual.state),
+				id: findingId(
+					"position-drift",
+					actualEl.anchor ?? actualEl.key,
+					viewport,
+					actual.state,
+				),
 				rule: "position-drift",
 				severity: normalized > 0.15 ? "error" : "warning",
-				element: { matchKey: actualEl.anchor ?? actualEl.key, anchor: actualEl.anchor, tag: actualEl.tag },
+				element: {
+					matchKey: actualEl.anchor ?? actualEl.key,
+					anchor: actualEl.anchor,
+					tag: actualEl.tag,
+				},
 				rect: actualEl.rect,
 				specRect: specEl.rect,
 				viewport,
@@ -281,15 +347,28 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 				matchMethod: pair.method,
 			});
 		const widthRatio = scaled.width > 1 ? actualEl.rect.width / scaled.width : 1;
-		const heightRatio = scaled.height > 1 ? actualEl.rect.height / scaled.height : 1;
-		const sizeDrift = Math.max(Math.abs(1 - widthRatio), Math.abs(1 - heightRatio));
+		const heightRatio =
+			scaled.height > 1 ? actualEl.rect.height / scaled.height : 1;
+		const sizeDrift = Math.max(
+			Math.abs(1 - widthRatio),
+			Math.abs(1 - heightRatio),
+		);
 		geometryDeltas.push(Math.round(sizeDrift * 10000) / 10000);
 		if (sizeDrift > 0.15)
 			findings.push({
-				id: findingId("size-drift", actualEl.anchor ?? actualEl.key, viewport, actual.state),
+				id: findingId(
+					"size-drift",
+					actualEl.anchor ?? actualEl.key,
+					viewport,
+					actual.state,
+				),
 				rule: "size-drift",
 				severity: "warning",
-				element: { matchKey: actualEl.anchor ?? actualEl.key, anchor: actualEl.anchor, tag: actualEl.tag },
+				element: {
+					matchKey: actualEl.anchor ?? actualEl.key,
+					anchor: actualEl.anchor,
+					tag: actualEl.tag,
+				},
 				rect: actualEl.rect,
 				specRect: specEl.rect,
 				viewport,
@@ -299,15 +378,26 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 				matchMethod: pair.method,
 			});
 		if (specEl.text && actualEl.text) {
-			const fontSizeDrift = Math.abs(1 - actualEl.styles.fontSize / (specEl.styles.fontSize || 1));
+			const fontSizeDrift = Math.abs(
+				1 - actualEl.styles.fontSize / (specEl.styles.fontSize || 1),
+			);
 			if (Number.isFinite(fontSizeDrift)) {
 				typographyDeltas.push(Math.round(fontSizeDrift * 10000) / 10000);
 				if (fontSizeDrift > 0.15)
 					findings.push({
-						id: findingId("typography-drift", actualEl.anchor ?? actualEl.key, viewport, actual.state),
+						id: findingId(
+							"typography-drift",
+							actualEl.anchor ?? actualEl.key,
+							viewport,
+							actual.state,
+						),
 						rule: "typography-drift",
 						severity: "warning",
-						element: { matchKey: actualEl.anchor ?? actualEl.key, anchor: actualEl.anchor, tag: actualEl.tag },
+						element: {
+							matchKey: actualEl.anchor ?? actualEl.key,
+							anchor: actualEl.anchor,
+							tag: actualEl.tag,
+						},
 						rect: actualEl.rect,
 						viewport,
 						state: actual.state,
@@ -321,10 +411,19 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 			const specToken = nearestToken(specEl.styles.color, roleColors);
 			if (actualToken && specToken && actualToken.name !== specToken.name)
 				findings.push({
-					id: findingId("color-token-mismatch", actualEl.anchor ?? actualEl.key, viewport, actual.state),
+					id: findingId(
+						"color-token-mismatch",
+						actualEl.anchor ?? actualEl.key,
+						viewport,
+						actual.state,
+					),
 					rule: "color-token-mismatch",
 					severity: "warning",
-					element: { matchKey: actualEl.anchor ?? actualEl.key, anchor: actualEl.anchor, tag: actualEl.tag },
+					element: {
+						matchKey: actualEl.anchor ?? actualEl.key,
+						anchor: actualEl.anchor,
+						tag: actualEl.tag,
+					},
 					rect: actualEl.rect,
 					viewport,
 					state: actual.state,
@@ -334,7 +433,9 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 		}
 	}
 
-	for (const specEl of spec.elements.filter((el) => el.anchor && !usedSpec.has(el.key)))
+	for (const specEl of spec.elements.filter(
+		(el) => el.anchor && !usedSpec.has(el.key),
+	))
 		findings.push({
 			id: findingId("anchor-missing", specEl.anchor, viewport, actual.state),
 			rule: "anchor-missing",
@@ -348,21 +449,29 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 		});
 
 	for (const assertion of layoutAssertions) {
-		const match = /^(\S+)\s+(above|below|left-of|right-of)\s+(\S+)$/.exec(assertion.trim());
+		const match = /^(\S+)\s+(above|below|left-of|right-of)\s+(\S+)$/.exec(
+			assertion.trim(),
+		);
 		if (!match) continue;
 		const [, leftName, relation, rightName] = match;
 		const find = (name) =>
 			actual.elements.find(
-				(el) => el.anchor === name || el.tag === name || norm(el.text) === norm(name),
+				(el) =>
+					el.anchor === name || el.tag === name || norm(el.text) === norm(name),
 			);
 		const left = find(leftName);
 		const right = find(rightName);
 		const holds =
-			left && right &&
-			((relation === "above" && left.rect.y + left.rect.height <= right.rect.y + 2) ||
-				(relation === "below" && right.rect.y + right.rect.height <= left.rect.y + 2) ||
-				(relation === "left-of" && left.rect.x + left.rect.width <= right.rect.x + 2) ||
-				(relation === "right-of" && right.rect.x + right.rect.width <= left.rect.x + 2));
+			left &&
+			right &&
+			((relation === "above" &&
+				left.rect.y + left.rect.height <= right.rect.y + 2) ||
+				(relation === "below" &&
+					right.rect.y + right.rect.height <= left.rect.y + 2) ||
+				(relation === "left-of" &&
+					left.rect.x + left.rect.width <= right.rect.x + 2) ||
+				(relation === "right-of" &&
+					right.rect.x + right.rect.width <= left.rect.x + 2));
 		if (!holds)
 			findings.push({
 				id: findingId("layout-assertion", assertion.trim(), viewport, actual.state),
@@ -384,7 +493,8 @@ export function matchFidelity({ spec, actual, handoff = {}, layoutAssertions = [
 			const background = effectiveBackground(el, byKey);
 			const ratio = contrastRatio(el.styles.color, background);
 			if (ratio === null) return true;
-			const large = el.styles.fontSize >= 24 || Number(el.styles.fontWeight) >= 700;
+			const large =
+				el.styles.fontSize >= 24 || Number(el.styles.fontWeight) >= 700;
 			return ratio >= (large ? 3 : 4.5);
 		});
 

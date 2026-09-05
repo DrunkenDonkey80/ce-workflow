@@ -2,7 +2,13 @@
 // UI gate P1 tests: anchor-first matching, acceptance normalization, measured
 // fidelity evidence, seeded fidelity defects, handoff optional fields, no VLM.
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,7 +76,12 @@ const el = (overrides) => ({
 		lineClamp: "none",
 		zIndex: "auto",
 	},
-	overflow: { scrollWidth: 100, clientWidth: 100, scrollHeight: 20, clientHeight: 20 },
+	overflow: {
+		scrollWidth: 100,
+		clientWidth: 100,
+		scrollHeight: 20,
+		clientHeight: 20,
+	},
 	...overrides,
 });
 
@@ -78,68 +89,195 @@ function syntheticMatcherTests() {
 	// Identical anchored spec/actual → clean, measured evidence.
 	const page = (ys = {}) =>
 		geo([
-			el({ key: "1", anchor: "title", tag: "H1", text: "My Calculator", rect: { x: 10, y: ys.title ?? 10, width: 100, height: 20 } }),
-			el({ key: "2", anchor: "display", tag: "OUTPUT", text: "0", rect: { x: 10, y: ys.display ?? 50, width: 100, height: 20 } }),
-			el({ key: "3", anchor: "keypad", tag: "DIV", rect: { x: 10, y: ys.keypad ?? 100, width: 100, height: 20 } }),
-			el({ key: "4", anchor: "equals control", tag: "BUTTON", text: "=", rect: { x: 10, y: ys.equals ?? 150, width: 100, height: 20 } }),
+			el({
+				key: "1",
+				anchor: "title",
+				tag: "H1",
+				text: "My Calculator",
+				rect: { x: 10, y: ys.title ?? 10, width: 100, height: 20 },
+			}),
+			el({
+				key: "2",
+				anchor: "display",
+				tag: "OUTPUT",
+				text: "0",
+				rect: { x: 10, y: ys.display ?? 50, width: 100, height: 20 },
+			}),
+			el({
+				key: "3",
+				anchor: "keypad",
+				tag: "DIV",
+				rect: { x: 10, y: ys.keypad ?? 100, width: 100, height: 20 },
+			}),
+			el({
+				key: "4",
+				anchor: "equals control",
+				tag: "BUTTON",
+				text: "=",
+				rect: { x: 10, y: ys.equals ?? 150, width: 100, height: 20 },
+			}),
 		]);
 	const result = matchFidelity({ spec: page(), actual: page(), handoff });
-	assert.equal(result.findings.length, 0, `no findings on identical pair: ${JSON.stringify(result.findings)}`);
+	assert.equal(
+		result.findings.length,
+		0,
+		`no findings on identical pair: ${JSON.stringify(result.findings)}`,
+	);
 	assert.ok(result.evidence.geometryDeltas.every((delta) => delta <= 0.15));
 	assert.ok(result.evidence.responsive.noHorizontalOverflow);
-	assert.deepEqual(result.evidence.regions, ["title", "display", "keypad", "equals control"]);
+	assert.deepEqual(result.evidence.regions, [
+		"title",
+		"display",
+		"keypad",
+		"equals control",
+	]);
 
 	// Position drift beyond threshold; deltas still normalized.
-	const drift = matchFidelity({ spec: page(), actual: page({ display: 460 }), handoff });
-	assert.ok(drift.findings.some((finding) => finding.rule === "position-drift"), "450px move is a position-drift finding");
-	assert.ok(drift.evidence.geometryDeltas.some((delta) => delta > 0.15), "large drift is measured > 0.15");
+	const drift = matchFidelity({
+		spec: page(),
+		actual: page({ display: 460 }),
+		handoff,
+	});
+	assert.ok(
+		drift.findings.some((finding) => finding.rule === "position-drift"),
+		"450px move is a position-drift finding",
+	);
+	assert.ok(
+		drift.evidence.geometryDeltas.some((delta) => delta > 0.15),
+		"large drift is measured > 0.15",
+	);
 
 	// Layout assertions.
 	const below = page({ display: 200, keypad: 300 });
-	const okAssertion = matchFidelity({ spec: below, actual: page({ display: 200, keypad: 300 }), handoff, layoutAssertions: ["display above keypad"] });
-	assert.equal(okAssertion.findings.length, 0, "satisfied layout assertion passes");
-	const badAssertion = matchFidelity({ spec: below, actual: page({ display: 400, keypad: 300 }), handoff, layoutAssertions: ["display above keypad"] });
-	assert.ok(badAssertion.findings.some((finding) => finding.rule === "layout-assertion"), "violated layout assertion is a finding");
+	const okAssertion = matchFidelity({
+		spec: below,
+		actual: page({ display: 200, keypad: 300 }),
+		handoff,
+		layoutAssertions: ["display above keypad"],
+	});
+	assert.equal(
+		okAssertion.findings.length,
+		0,
+		"satisfied layout assertion passes",
+	);
+	const badAssertion = matchFidelity({
+		spec: below,
+		actual: page({ display: 400, keypad: 300 }),
+		handoff,
+		layoutAssertions: ["display above keypad"],
+	});
+	assert.ok(
+		badAssertion.findings.some((finding) => finding.rule === "layout-assertion"),
+		"violated layout assertion is a finding",
+	);
 
 	// Ordering violation (DOM topology, reflow-tolerant per plan B4).
 	const orderedSpec = page();
-	const swappedDom = geo([
-		orderedSpec.elements[1],
-		orderedSpec.elements[0],
-		orderedSpec.elements[2],
-		orderedSpec.elements[3],
-	].map((element) => ({ ...element })));
-	const orderResult = matchFidelity({ spec: orderedSpec, actual: swappedDom, handoff });
-	assert.ok(orderResult.findings.some((finding) => finding.rule === "ordering-violation"), "DOM order inversion is a finding");
+	const swappedDom = geo(
+		[
+			orderedSpec.elements[1],
+			orderedSpec.elements[0],
+			orderedSpec.elements[2],
+			orderedSpec.elements[3],
+		].map((element) => ({ ...element })),
+	);
+	const orderResult = matchFidelity({
+		spec: orderedSpec,
+		actual: swappedDom,
+		handoff,
+	});
+	assert.ok(
+		orderResult.findings.some((finding) => finding.rule === "ordering-violation"),
+		"DOM order inversion is a finding",
+	);
 
 	// Region fallback without anchors: missing + overlap.
-	const noAnchor = geo([
-		el({ key: "1", tag: "H1", text: "My Calculator" }),
-	]);
-	const missingRegions = matchFidelity({ spec: noAnchor, actual: geo([el({ key: "1", anchor: "title", tag: "H1", text: "My Calculator" })]), handoff });
-	assert.ok(missingRegions.findings.some((finding) => finding.rule === "region-missing"), "missing required region is an error");
+	const noAnchor = geo([el({ key: "1", tag: "H1", text: "My Calculator" })]);
+	const missingRegions = matchFidelity({
+		spec: noAnchor,
+		actual: geo([
+			el({ key: "1", anchor: "title", tag: "H1", text: "My Calculator" }),
+		]),
+		handoff,
+	});
+	assert.ok(
+		missingRegions.findings.some((finding) => finding.rule === "region-missing"),
+		"missing required region is an error",
+	);
 	const overlapping = geo([
-		el({ key: "1", anchor: "title", tag: "H1", text: "My Calculator", rect: { x: 0, y: 0, width: 200, height: 20 } }),
-		el({ key: "2", anchor: "display", tag: "OUTPUT", text: "0", rect: { x: 0, y: 5, width: 200, height: 20 } }),
+		el({
+			key: "1",
+			anchor: "title",
+			tag: "H1",
+			text: "My Calculator",
+			rect: { x: 0, y: 0, width: 200, height: 20 },
+		}),
+		el({
+			key: "2",
+			anchor: "display",
+			tag: "OUTPUT",
+			text: "0",
+			rect: { x: 0, y: 5, width: 200, height: 20 },
+		}),
 	]);
-	const overlapResult = matchFidelity({ spec: noAnchor, actual: overlapping, handoff });
-	assert.ok(overlapResult.findings.some((finding) => finding.rule === "region-overlap"), "overlapping regions are an error");
+	const overlapResult = matchFidelity({
+		spec: noAnchor,
+		actual: overlapping,
+		handoff,
+	});
+	assert.ok(
+		overlapResult.findings.some((finding) => finding.rule === "region-overlap"),
+		"overlapping regions are an error",
+	);
 
 	// Color token mismatch.
 	const offPalette = geo([
-		el({ key: "1", anchor: "display", tag: "OUTPUT", text: "0", styles: { ...el().styles, color: "#9370DB" } }),
+		el({
+			key: "1",
+			anchor: "display",
+			tag: "OUTPUT",
+			text: "0",
+			styles: { ...el().styles, color: "#9370DB" },
+		}),
 	]);
 	const palette = geo([
-		el({ key: "1", anchor: "display", tag: "OUTPUT", text: "0", styles: { ...el().styles, color: "#FF4F81" } }),
+		el({
+			key: "1",
+			anchor: "display",
+			tag: "OUTPUT",
+			text: "0",
+			styles: { ...el().styles, color: "#FF4F81" },
+		}),
 	]);
-	const colorResult = matchFidelity({ spec: palette, actual: offPalette, handoff });
-	assert.ok(colorResult.findings.some((finding) => finding.rule === "color-token-mismatch"), "off-palette color is a token mismatch");
+	const colorResult = matchFidelity({
+		spec: palette,
+		actual: offPalette,
+		handoff,
+	});
+	assert.ok(
+		colorResult.findings.some(
+			(finding) => finding.rule === "color-token-mismatch",
+		),
+		"off-palette color is a token mismatch",
+	);
 
 	// Text cascade matching without anchors.
-	const cascadeSpec = geo([el({ key: "1", tag: "BUTTON", text: "Equals", interactive: true })]);
-	const cascadeActual = geo([el({ key: "1", tag: "BUTTON", text: "Equals", interactive: true })]);
-	const cascade = matchFidelity({ spec: cascadeSpec, actual: cascadeActual, handoff: { direction: { roleColors: [] } } });
-	assert.equal(cascade.evidence.matchedPairs, 1, "text cascade matches identical buttons");
+	const cascadeSpec = geo([
+		el({ key: "1", tag: "BUTTON", text: "Equals", interactive: true }),
+	]);
+	const cascadeActual = geo([
+		el({ key: "1", tag: "BUTTON", text: "Equals", interactive: true }),
+	]);
+	const cascade = matchFidelity({
+		spec: cascadeSpec,
+		actual: cascadeActual,
+		handoff: { direction: { roleColors: [] } },
+	});
+	assert.equal(
+		cascade.evidence.matchedPairs,
+		1,
+		"text cascade matches identical buttons",
+	);
 }
 
 async function realCaptureTests() {
@@ -161,7 +299,10 @@ async function realCaptureTests() {
 				`${defect.file} must surface ${rule} (got ${report.findings.map((f) => f.rule).join(",") || "none"})`,
 			);
 		assert.equal(result.errors > 0, true, `${defect.file} must register errors`);
-		assert.ok(existsSync(path.join(out, "desktop", "spec", "geometry.json")), "spec sidecar capture exists");
+		assert.ok(
+			existsSync(path.join(out, "desktop", "spec", "geometry.json")),
+			"spec sidecar capture exists",
+		);
 	}
 
 	// Clean pair: zero findings, measured deltas within the contract tolerance.
@@ -173,14 +314,36 @@ async function realCaptureTests() {
 		out: cleanOut,
 		handoffFile: path.join(fixtures, "handoff-test.json"),
 	});
-	assert.equal(clean.errors, 0, `clean pair must have zero errors: ${JSON.stringify(clean.byRule)}`);
-	assert.equal(clean.warnings, 0, `clean pair must have zero warnings: ${JSON.stringify(clean.byRule)}`);
+	assert.equal(
+		clean.errors,
+		0,
+		`clean pair must have zero errors: ${JSON.stringify(clean.byRule)}`,
+	);
+	assert.equal(
+		clean.warnings,
+		0,
+		`clean pair must have zero warnings: ${JSON.stringify(clean.byRule)}`,
+	);
 	const evidence = readJson(path.join(cleanOut, "findings.json")).evidence;
-	assert.ok(evidence.geometryDeltas.every((delta) => delta <= 0.15), "geometry deltas within 15% tolerance");
-	assert.ok(evidence.typographyDeltas.every((delta) => delta <= 0.15), "typography deltas within 15% tolerance");
-	assert.ok(evidence.responsive.noHorizontalOverflow && evidence.responsive.visibleFocus && evidence.responsive.contrast, "responsive flags measured true");
+	assert.ok(
+		evidence.geometryDeltas.every((delta) => delta <= 0.15),
+		"geometry deltas within 15% tolerance",
+	);
+	assert.ok(
+		evidence.typographyDeltas.every((delta) => delta <= 0.15),
+		"typography deltas within 15% tolerance",
+	);
+	assert.ok(
+		evidence.responsive.noHorizontalOverflow &&
+			evidence.responsive.visibleFocus &&
+			evidence.responsive.contrast,
+		"responsive flags measured true",
+	);
 	assert.ok(evidence.responsive.reflow, "desktop/mobile widths differ (reflow)");
-	assert.ok(!JSON.stringify(evidence).includes("visualEvaluation"), "gate emits no VLM scores");
+	assert.ok(
+		!JSON.stringify(evidence).includes("visualEvaluation"),
+		"gate emits no VLM scores",
+	);
 }
 
 function handoffFieldTests() {
@@ -192,7 +355,9 @@ function handoffFieldTests() {
 	withOptional.screens[0].layoutAssertions = ["display above keypad"];
 	withOptional.elementsRef = "design/elements.json";
 	const canonical = validateDesignHandoff(withOptional);
-	assert.deepEqual(canonical.screens[0].layoutAssertions, ["display above keypad"]);
+	assert.deepEqual(canonical.screens[0].layoutAssertions, [
+		"display above keypad",
+	]);
 	assert.equal(canonical.elementsRef, "design/elements.json");
 	// Baseline handoff without the fields still validates.
 	const baseline = validateDesignHandoff(validHandoff);

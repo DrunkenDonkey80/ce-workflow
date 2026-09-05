@@ -301,10 +301,7 @@ try {
 			)
 			.replace("<header>", '<header data-ce-el="title">')
 			.replace("<h1>Calculator</h1>", "<h1>My Calculator</h1>")
-			.replace(
-				'<output id="display"',
-				'<output id="display" data-ce-el="display"',
-			)
+			.replace('<output id="display"', '<output id="display" data-ce-el="display"')
 			.replace(
 				'<div id="keys" class="keys"></div>',
 				'<div id="keys" class="keys" data-ce-el="keypad"></div>',
@@ -328,10 +325,11 @@ try {
 	assert.equal(runtime.calculate(9, "÷", 0), "Error");
 
 	// Measured UI gate: approved OD candidate (spec) vs implemented page.
-	const fixtureFiles = JSON.parse(
-		readFileSync(fixtureStateFile, "utf8"),
-	).files;
-	const specPath = path.join(workspace, ".ce-workflow/evidence/redesign-e2e/spec-candidate-2.html");
+	const fixtureFiles = JSON.parse(readFileSync(fixtureStateFile, "utf8")).files;
+	const specPath = path.join(
+		workspace,
+		".ce-workflow/evidence/redesign-e2e/spec-candidate-2.html",
+	);
 	mkdirSync(path.dirname(specPath), { recursive: true });
 	writeFileSync(specPath, fixtureFiles["candidate-2.html"]);
 	const gateOut = path.join(
@@ -345,7 +343,11 @@ try {
 		out: gateOut,
 		handoffFile: path.join(workspace, session.handoffPath),
 	});
-	assert.equal(gate.errors, 0, `ui gate must be clean: ${JSON.stringify(gate.byRule)}`);
+	assert.equal(
+		gate.errors,
+		0,
+		`ui gate must be clean: ${JSON.stringify(gate.byRule)}`,
+	);
 	const gateReport = JSON.parse(
 		readFileSync(path.join(gateOut, "findings.json"), "utf8"),
 	);
@@ -357,8 +359,17 @@ try {
 		gateReport.evidence.typographyDeltas.every((delta) => delta <= 0.15),
 		"measured typography deltas within the 15% contract tolerance",
 	);
-	for (const flag of ["reflow", "noHorizontalOverflow", "visibleFocus", "contrast"])
-		assert.equal(gateReport.evidence.responsive[flag], true, `${flag} measured true`);
+	for (const flag of [
+		"reflow",
+		"noHorizontalOverflow",
+		"visibleFocus",
+		"contrast",
+	])
+		assert.equal(
+			gateReport.evidence.responsive[flag],
+			true,
+			`${flag} measured true`,
+		);
 	assert.ok(
 		["title", "display", "keypad", "equals control"].every((region) =>
 			gateReport.evidence.regions.includes(region),
