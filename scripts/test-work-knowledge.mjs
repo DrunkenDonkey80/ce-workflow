@@ -354,7 +354,7 @@ try {
 	for (const claim of [
 		"ghp_abcdefghijklmnopqrstuvwxyz1234567890AB",
 		["AKIA", "ABCDEFGHIJKLMNOP"].join(""),
-		"xoxb-123456789012-abcdefghijklmnop",
+		["xoxb", "123456789012", "abcdefghijklmnop"].join("-"),
 	])
 		assert.throws(
 			() =>
