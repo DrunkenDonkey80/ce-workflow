@@ -1,0 +1,53 @@
+{
+ "model": "deterministic-stub",
+ "generatedAt": "2026-09-06T08:38:12.714Z",
+ "surfaces": [
+  {
+   "surface": "scripts/fixtures/ui-gate/clean.html",
+   "anchors": 4,
+   "blocked": null,
+   "centerErrors": [
+    8.3,
+    10,
+    8.3,
+    8.6
+   ]
+  },
+  {
+   "surface": "scripts/fixtures/ui-gate/fidelity-actual.html",
+   "anchors": 4,
+   "blocked": null,
+   "centerErrors": [
+    8.3,
+    9.9,
+    12.9,
+    8.6
+   ]
+  },
+  {
+   "surface": "scripts/fixtures/ui-gate/states.html",
+   "anchors": 1,
+   "blocked": null,
+   "centerErrors": [
+    44.9
+   ]
+  }
+ ],
+ "aggregate": {
+  "requested": 9,
+  "localized": 9,
+  "centerErrorPx": {
+   "p50": 8.6,
+   "p95": 44.9,
+   "p99": 44.9
+  },
+  "tolerancePx": 44.9,
+  "withinTolerance": 1,
+  "falseMissingRate": 0,
+  "vlmCallsPerSurfaceMax": 3
+ },
+ "gate": {
+  "pass": true,
+  "reasons": []
+ }
+}

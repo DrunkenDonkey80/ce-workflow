@@ -1,7 +1,7 @@
 # UI Gate — Implementation Plan (master roadmap seed)
 
 ```yaml
-status: in-implementation (P0+P1 shipped 2026-09-05; P2 core engine shipped, extension wiring pending; P3+ pending)
+status: implemented (P0+P1 shipped 2026-09-05; P2+P3+P3.5+P4 shipped 2026-09-06 — full verify gate green)
 type: master-plan
 created: 2026-09-04
 source: .pi/ui-gate-plan/plan-final.md (final v2 — reconciled through two adversarial review rounds: opus-review.md, opus-review-2.md; all load-bearing claims source-verified 2026-09-04)

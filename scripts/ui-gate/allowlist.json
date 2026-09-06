@@ -7,5 +7,6 @@
 			"viewport": "any",
 			"state": "any"
 		}
-	]
+	],
+	"minTargetExceptions": []
 }

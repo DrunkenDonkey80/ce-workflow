@@ -1,0 +1,23 @@
+[
+	{
+		"tag": "Window",
+		"name": "ce-ui-gate fixture",
+		"focusable": false,
+		"invoke": false,
+		"rect": { "x": 60, "y": 60, "width": 360, "height": 200 }
+	},
+	{
+		"tag": "Button",
+		"name": "Alpha",
+		"focusable": true,
+		"invoke": true,
+		"rect": { "x": 80, "y": 90, "width": 100, "height": 40 }
+	},
+	{
+		"tag": "Button",
+		"name": "Beta",
+		"focusable": true,
+		"invoke": true,
+		"rect": { "x": 160, "y": 90, "width": 100, "height": 40 }
+	}
+]

@@ -499,6 +499,10 @@ check(
 const tests = [
 	"test-background-verifiers.mjs",
 	"test-ui-gate-fidelity.mjs",
+	"test-ui-gate-hardening.mjs",
+	"test-ui-gate-native.mjs",
+	"test-ui-gate-repair.mjs",
+	"test-ui-gate-tier3.mjs",
 	"test-ui-gate-validity.mjs",
 	"test-work-improvement-reporting.mjs",
 	"test-work-store.mjs",

@@ -57,7 +57,7 @@ function nearestToken(color, tokens) {
 }
 
 // Relative luminance contrast ratio (WCAG).
-function contrastRatio(foreground, background) {
+export function contrastRatio(foreground, background) {
 	const a = hexToRgb(foreground);
 	const b = hexToRgb(background);
 	if (!a || !b) return null;

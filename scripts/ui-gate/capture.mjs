@@ -76,12 +76,16 @@ var INTERACTIVE={A:1,BUTTON:1,INPUT:1,SELECT:1,TEXTAREA:1,SUMMARY:1};
 function interactive(el){return !!INTERACTIVE[el.tagName]||el.hasAttribute('onclick')||/^(button|link|tab|checkbox|radio|switch|option|menuitem)$/.test(el.getAttribute('role')||'')||el.hasAttribute('tabindex')}
 function color(c){var m=/rgba?\\(([^)]+)\\)/.exec(c);if(!m)return c;var p=m[1].split(',').map(parseFloat);if((p[3]===undefined?1:p[3])<=0)return 'transparent';return '#'+p.slice(0,3).map(function(v){return Math.round(v).toString(16).padStart(2,'0')}).join('')}
 function opacity(el){var o=1;for(var n=el;n&&n.nodeType===1;n=n.parentElement){o*=parseFloat(getComputedStyle(n).opacity||'1')}return r2(Math.min(1,o))}
+var FOCUS_PROPS=['outlineWidth','outlineStyle','boxShadow','background','backgroundColor','borderColor','color','textDecoration','filter','transform'];
+function focusRules(){var out=[];try{for(var s=0;s<document.styleSheets.length;s++){var rules;try{rules=document.styleSheets[s].cssRules}catch(e){continue}for(var r=0;r<rules.length;r++){var rule=rules[r];if(!rule.selectorText||rule.selectorText.indexOf(':focus')<0)continue;var st=rule.style;if(!st)continue;var has=false;for(var p=0;p<FOCUS_PROPS.length;p++){var v=st[FOCUS_PROPS[p]];if(v&&v!=='none'&&v!=='initial'){has=true;break}}if(!has)continue;var parts=rule.selectorText.split(',');for(var q=0;q<parts.length;q++){var base=parts[q].replace(/::?focus(-visible|-within)?\\b/g,'').replace(/::?(hover|active)\\b/g,'').trim();if(base)out.push(base)}}}}catch(e){}return out}
+function matchesAny(el,sels){for(var i=0;i<sels.length;i++){try{if(el.matches(sels[i]))return true}catch(e){}}return false}
 function text(el){var t='';for(var i=0;i<el.childNodes.length;i++){var n=el.childNodes[i];if(n.nodeType===3)t+=(n.textContent||'').trim()+' '}return t.replace(/\\s+/g,' ').trim().slice(0,200)}
 function measure(){
 Promise.resolve().then(async function(){
 try{await document.fonts.ready}catch(e){}
 try{await Promise.all(Array.prototype.slice.call(document.images).map(function(i){return i.decode().catch(function(){})}))}catch(e){}
 var byEl=new Map(),elements=[],SKIP={SCRIPT:1,STYLE:1,LINK:1,META:1,NOSCRIPT:1};
+var FSEL=focusRules();
 function walk(el,p){
 if(elements.length>=4000)return;
 byEl.set(el,p);
@@ -89,7 +93,7 @@ if(!SKIP[el.tagName]){
 var cs=getComputedStyle(el),vis=cs.display!=='none'&&cs.visibility!=='hidden'&&parseFloat(cs.opacity||'1')>0.01;
 var b=el.getBoundingClientRect();
 if(vis&&b.width>0&&b.height>0){
-elements.push({key:p,parent:p.replace(/\\/[^/]+$/,'')||null,anchor:el.getAttribute('data-ce-el')||null,testId:el.getAttribute('data-testid')||null,tag:el.tagName,role:el.getAttribute('role')||null,text:text(el),rect:{x:r2(b.x),y:r2(b.y),width:r2(b.width),height:r2(b.height)},interactive:interactive(el),effectiveOpacity:opacity(el),styles:{color:color(cs.color),backgroundColor:color(cs.backgroundColor),fontSize:r2(parseFloat(cs.fontSize)),fontWeight:String(cs.fontWeight),display:cs.display,position:cs.position,overflow:cs.overflow,textOverflow:cs.textOverflow,lineClamp:String(cs.webkitLineClamp),zIndex:cs.zIndex},overflow:{scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight}});
+elements.push({key:p,parent:p.replace(/\\/[^/]+$/,'')||null,anchor:el.getAttribute('data-ce-el')||null,testId:el.getAttribute('data-testid')||null,tag:el.tagName,role:el.getAttribute('role')||null,text:text(el),rect:{x:r2(b.x),y:r2(b.y),width:r2(b.width),height:r2(b.height)},interactive:interactive(el),focusIndicator:interactive(el)?matchesAny(el,FSEL):null,effectiveOpacity:opacity(el),styles:{color:color(cs.color),backgroundColor:color(cs.backgroundColor),fontSize:r2(parseFloat(cs.fontSize)),fontWeight:String(cs.fontWeight),display:cs.display,position:cs.position,overflow:cs.overflow,textOverflow:cs.textOverflow,lineClamp:String(cs.webkitLineClamp),zIndex:cs.zIndex},overflow:{scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight}});
 }}
 var i=0;for(var c=el.firstElementChild;c;c=c.nextElementSibling){walk(c,p+'/'+i);i++}
 }
@@ -270,9 +274,14 @@ export async function captureCell({
 		"--virtual-time-budget=10000",
 	];
 	try {
+		// State navigation (R8): pages opt in via the ce-ui-state query param.
+		const navigated =
+			state === "ready"
+				? root
+				: `${root}${root.includes("?") ? "&" : "?"}ce-ui-state=${encodeURIComponent(state)}`;
 		const dumps = [
-			await run(chromium, [...common, "--dump-dom", root], timeoutMs),
-			await run(chromium, [...common, "--dump-dom", root], timeoutMs),
+			await run(chromium, [...common, "--dump-dom", navigated], timeoutMs),
+			await run(chromium, [...common, "--dump-dom", navigated], timeoutMs),
 		];
 		const geometries = dumps.map((dom, index) =>
 			extractGeometry(dom, `run ${index + 1}`),
@@ -308,7 +317,7 @@ export async function captureCell({
 			screenshot = path.join(out, "screenshot.png");
 			await run(
 				chromium,
-				[...common, `--screenshot=${screenshot}`, root],
+				[...common, `--screenshot=${screenshot}`, navigated],
 				timeoutMs,
 			);
 		}

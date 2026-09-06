@@ -1,6 +1,8 @@
-// UI gate deterministic validity rules (plan-final.md §2.2 R1–R5 + cheap checks).
+// UI gate deterministic validity rules (plan-final.md §2.2 R1–R5 + cheap checks,
+// P3 hardening: R6 focus, R7 min-target, computed contrast).
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { contrastRatio } from "./fidelity-matcher.mjs";
 
 export const SEVERITY_RANK = { info: 0, warning: 1, error: 2 };
 
@@ -389,6 +391,83 @@ function ruleBaselineDrift(geometry, baseline) {
 	return findings;
 }
 
+// R6 focus-missing (P3, computed): focusable control with no :focus/:focus-visible
+// indicator rule that targets it (static stylesheet scan in the capture probe).
+function ruleFocusMissing(geometry, skip) {
+	const findings = [];
+	for (const el of geometry.elements) {
+		if (skip.has(el.key) || !el.interactive || el.focusIndicator !== false)
+			continue;
+		findings.push(
+			makeFinding(
+				"focus-missing",
+				"warning",
+				el,
+				false,
+				"focus indicator rule",
+				geometry.viewport.name,
+				geometry.state,
+			),
+		);
+	}
+	return findings;
+}
+
+// R7 min-target-size (P3): hit targets ≥24px desktop / 44px mobile.
+function ruleMinTargetSize(geometry, skip, exceptions) {
+	const findings = [];
+	const min = geometry.viewport.name === "mobile" ? 44 : 24;
+	const exempt = new Set(exceptions);
+	for (const el of geometry.elements) {
+		if (skip.has(el.key) || !el.interactive) continue;
+		const smallest = Math.min(el.rect.width, el.rect.height);
+		if (
+			smallest >= min ||
+			exempt.has(describe(el)) ||
+			(el.anchor && exempt.has(el.anchor))
+		)
+			continue;
+		findings.push(
+			makeFinding(
+				"min-target-size",
+				"warning",
+				el,
+				smallest,
+				{ px: min },
+				geometry.viewport.name,
+				geometry.state,
+			),
+		);
+	}
+	return findings;
+}
+
+// Computed WCAG contrast (P3): text below 4.5:1 on solid backgrounds.
+function ruleContrast(geometry, skip) {
+	const findings = [];
+	const hex = (value) => /^#[0-9a-f]{6}$/i.test(value ?? "");
+	for (const el of geometry.elements) {
+		if (skip.has(el.key) || !el.text) continue;
+		const { color, backgroundColor } = el.styles ?? {};
+		if (!hex(color) || !hex(backgroundColor)) continue;
+		const ratio = contrastRatio(color, backgroundColor);
+		if (ratio < 4.5)
+			findings.push(
+				makeFinding(
+					"low-contrast",
+					"warning",
+					el,
+					Math.round(ratio * 100) / 100,
+					4.5,
+					geometry.viewport.name,
+					geometry.state,
+					{ foreground: color, background: backgroundColor },
+				),
+			);
+	}
+	return findings;
+}
+
 export function runValidityRules(
 	geometry,
 	{
@@ -397,6 +476,8 @@ export function runValidityRules(
 		contentStrings = [],
 		spacingTokens = null,
 		baselineGeometry = null,
+		minTargetExceptions = [],
+		hardening = false,
 	} = {},
 ) {
 	const skip = new Set(quarantined);
@@ -411,6 +492,13 @@ export function runValidityRules(
 			? ruleTokenAlignment(geometry, skip, spacingTokens)
 			: []),
 		...(baselineGeometry ? ruleBaselineDrift(geometry, baselineGeometry) : []),
+		...(hardening
+			? [
+					...ruleFocusMissing(geometry, skip),
+				...ruleMinTargetSize(geometry, skip, minTargetExceptions),
+				...ruleContrast(geometry, skip),
+				]
+			: []),
 	].sort(
 		(a, b) =>
 			SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] ||

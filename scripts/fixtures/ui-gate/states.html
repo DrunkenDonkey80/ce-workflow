@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>states</title>
+<style>body{font:18px system-ui;padding:20px;background:#fff;color:#000}
+[hidden]{display:none!important}
+.error-note{color:#b00000}</style></head>
+<body>
+<h1>Status panel</h1>
+<p class="ready-only" data-ce-el="status">All systems ready</p>
+<p class="error-only" data-ce-el="status" hidden>Something failed - retry</p>
+<button id="retry" hidden data-ce-el="retry">Retry now</button>
+<script>
+var m=/[?&]ce-ui-state=([a-z-]+)/.exec(location.search);
+if(m&&m[1]==='error'){
+document.querySelector('.ready-only').hidden=true;
+document.querySelector('.error-only').hidden=false;
+document.querySelector('#retry').hidden=false;
+}
+</script>
+</body></html>

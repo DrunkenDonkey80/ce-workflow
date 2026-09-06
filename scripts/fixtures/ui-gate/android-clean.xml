@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
+    <node index="0" text="Alpha" resource-id="com.example:id/alpha" class="android.widget.Button" content-desc="" clickable="true" enabled="true" focusable="true" scrollable="false" bounds="[100,200][400,300]" />
+    <node index="1" text="Beta" resource-id="com.example:id/beta" class="android.widget.Button" content-desc="" clickable="true" enabled="true" focusable="true" scrollable="false" bounds="[500,200][800,300]" />
+  </node>
+</hierarchy>

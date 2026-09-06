@@ -36,6 +36,7 @@ import {
 	modernizeLegacyAgentOverrides,
 } from "./legacy-beads-migration.js";
 import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.js";
+import { registerWorkUiGate } from "./work-ui-gate.js";
 import { openWorkFleet } from "./work-fleet.js";
 import { dispatchPrivateWorkflow } from "./work-private-workflows.js";
 import {
@@ -28969,6 +28970,7 @@ export default function workModelsExtension(pi) {
 	subscriptionFooterController = createSubscriptionFooterController(pi, {
 		readGlobalSettings,
 	});
+	registerWorkUiGate(pi);
 	exposeBundledSubagentAgents();
 	const workflowOnlyTools = new Set([
 		"work_goal_complete",
