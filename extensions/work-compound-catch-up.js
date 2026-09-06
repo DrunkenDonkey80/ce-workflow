@@ -56,7 +56,9 @@ export const PRIVATE_WORKFLOW_RELEASE_GATES = [
 	},
 ];
 
-const PRIVATE_NAMES = PRIVATE_WORKFLOW_OWNED_OUTPUTS.map((entry) => path.posix.basename(entry)).sort();
+const PRIVATE_NAMES = PRIVATE_WORKFLOW_OWNED_OUTPUTS.map((entry) =>
+	path.posix.basename(entry),
+).sort();
 const ALLOWED_AMBIENT_DIRT = new Set([".ce-workflow/work-items.json"]);
 
 function json(value) {
@@ -84,8 +86,15 @@ export function resolveLatestOfficialStableRelease(descriptor, options = {}) {
 	const repository = String(descriptor?.repository ?? "").trim();
 	const currentVersion = String(descriptor?.version ?? "").trim();
 	const currentRelease = String(descriptor?.release ?? "").trim();
-	if (!repository || !releaseParts(currentVersion) || !currentRelease.endsWith(currentVersion))
-		return { status: "blocked", reason: "invalid official stable-release descriptor" };
+	if (
+		!repository ||
+		!releaseParts(currentVersion) ||
+		!currentRelease.endsWith(currentVersion)
+	)
+		return {
+			status: "blocked",
+			reason: "invalid official stable-release descriptor",
+		};
 	try {
 		const output = (options.execFileSync ?? execFileSync)(
 			"git",
@@ -115,11 +124,15 @@ export function resolveLatestOfficialStableRelease(descriptor, options = {}) {
 				peeledCommitSha: refs.get(`${ref}^{}`) ?? objectSha,
 			});
 		}
-		candidates.sort((left, right) => compareVersions(right.version, left.version));
+		candidates.sort((left, right) =>
+			compareVersions(right.version, left.version),
+		);
 		const latest = candidates[0];
-		if (!latest) return { status: "unknown", reason: "no official stable tag found" };
+		if (!latest)
+			return { status: "unknown", reason: "no official stable tag found" };
 		return {
-			status: compareVersions(latest.version, currentVersion) > 0 ? "update" : "current",
+			status:
+				compareVersions(latest.version, currentVersion) > 0 ? "update" : "current",
 			...latest,
 		};
 	} catch (error) {
@@ -132,7 +145,8 @@ export function classifyPrivateWorkflowRelease({
 	writable = true,
 	dirtyPaths = [],
 }) {
-	if (!writable) return { status: "non-writable", reason: "owned outputs are not writable" };
+	if (!writable)
+		return { status: "non-writable", reason: "owned outputs are not writable" };
 	const unrelated = dirtyPaths.filter(
 		(entry) =>
 			!ALLOWED_AMBIENT_DIRT.has(entry) &&
@@ -140,8 +154,16 @@ export function classifyPrivateWorkflowRelease({
 			!entry.startsWith(".ce-workflow/work-runs/"),
 	);
 	if (unrelated.length)
-		return { status: "unrelated-dirt", reason: "unrelated dirty worktree", dirtyPaths: unrelated.sort() };
-	if (!["current", "update", "unknown", "blocked", "failed"].includes(resolution?.status))
+		return {
+			status: "unrelated-dirt",
+			reason: "unrelated dirty worktree",
+			dirtyPaths: unrelated.sort(),
+		};
+	if (
+		!["current", "update", "unknown", "blocked", "failed"].includes(
+			resolution?.status,
+		)
+	)
 		return { status: "unknown", reason: "release resolution was incomplete" };
 	return resolution;
 }
@@ -150,7 +172,10 @@ function directorySnapshot(root) {
 	const result = {};
 	for (const name of readdirSync(root).sort()) {
 		const file = path.join(root, name);
-		result[name] = { bytes: readFileSync(file), sha256: sha256(readFileSync(file)) };
+		result[name] = {
+			bytes: readFileSync(file),
+			sha256: sha256(readFileSync(file)),
+		};
 	}
 	return result;
 }
@@ -184,10 +209,21 @@ function restoreSnapshot(root, snapshot) {
 }
 
 const ACTIVATION_SCHEMA_VERSION = 1;
-const ACTIVATION_STATUSES = new Set(["pending", "activating", "active", "rolling-back", "rolled-back"]);
+const ACTIVATION_STATUSES = new Set([
+	"pending",
+	"activating",
+	"active",
+	"rolling-back",
+	"rolled-back",
+]);
 
 function releaseArtifactRoot(repositoryRoot) {
-	return path.join(repositoryRoot, ".ce-workflow", "work-runs", "compound-releases");
+	return path.join(
+		repositoryRoot,
+		".ce-workflow",
+		"work-runs",
+		"compound-releases",
+	);
 }
 
 function activationStatePath(repositoryRoot) {
@@ -246,7 +282,10 @@ function retainedGenerationPath(repositoryRoot, generation) {
 }
 
 function activationTransactionRoot(repositoryRoot) {
-	return path.join(releaseArtifactRoot(repositoryRoot), "activation-transaction");
+	return path.join(
+		releaseArtifactRoot(repositoryRoot),
+		"activation-transaction",
+	);
 }
 
 function rollbackResult(state, reason, automatic) {
@@ -274,9 +313,19 @@ function rolledBackState(state, reason, automatic) {
 }
 
 function recoverInterruptedRollback(repositoryRoot, state, reason) {
-	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
-	const retainedRoot = retainedGenerationPath(repositoryRoot, state.retainedGenerationSha256);
-	const pendingRoot = pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256);
+	const canonicalRoot = path.join(
+		repositoryRoot,
+		"extensions",
+		"private-workflows",
+	);
+	const retainedRoot = retainedGenerationPath(
+		repositoryRoot,
+		state.retainedGenerationSha256,
+	);
+	const pendingRoot = pendingGenerationPath(
+		repositoryRoot,
+		state.pendingGenerationSha256,
+	);
 	const transactionRoot = activationTransactionRoot(repositoryRoot);
 	const transactionCurrent = path.join(transactionRoot, "current");
 	const transactionRestore = path.join(transactionRoot, "restore");
@@ -288,9 +337,15 @@ function recoverInterruptedRollback(repositoryRoot, state, reason) {
 			canonicalGeneration = undefined;
 		}
 	}
-	if (canonicalGeneration === state.pendingGenerationSha256 && !existsSync(transactionCurrent))
+	if (
+		canonicalGeneration === state.pendingGenerationSha256 &&
+		!existsSync(transactionCurrent)
+	)
 		renameSync(canonicalRoot, transactionCurrent);
-	else if (canonicalGeneration !== state.retainedGenerationSha256 && existsSync(canonicalRoot))
+	else if (
+		canonicalGeneration !== state.retainedGenerationSha256 &&
+		existsSync(canonicalRoot)
+	)
 		rmSync(canonicalRoot, { recursive: true, force: true });
 	if (!existsSync(canonicalRoot)) {
 		if (existsSync(transactionRestore)) {
@@ -315,8 +370,15 @@ function recoverInterruptedRollback(repositoryRoot, state, reason) {
 }
 
 function restoreActivationPrior(repositoryRoot, state, reason) {
-	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
-	const pendingRoot = pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256);
+	const canonicalRoot = path.join(
+		repositoryRoot,
+		"extensions",
+		"private-workflows",
+	);
+	const pendingRoot = pendingGenerationPath(
+		repositoryRoot,
+		state.pendingGenerationSha256,
+	);
 	const transactionRoot = activationTransactionRoot(repositoryRoot);
 	const transactionActive = path.join(transactionRoot, "active");
 	if (existsSync(canonicalRoot)) {
@@ -327,7 +389,8 @@ function restoreActivationPrior(repositoryRoot, state, reason) {
 			canonicalGeneration = undefined;
 		}
 		if (canonicalGeneration === state.pendingGenerationSha256) {
-			if (existsSync(pendingRoot)) rmSync(canonicalRoot, { recursive: true, force: true });
+			if (existsSync(pendingRoot))
+				rmSync(canonicalRoot, { recursive: true, force: true });
 			else {
 				mkdirSync(path.dirname(pendingRoot), { recursive: true });
 				renameSync(canonicalRoot, pendingRoot);
@@ -345,17 +408,32 @@ function restoreActivationPrior(repositoryRoot, state, reason) {
 	return rollbackResult(next, reason, true);
 }
 
-export function activatePendingPrivateWorkflowRelease(repositoryRoot, options = {}) {
+export function activatePendingPrivateWorkflowRelease(
+	repositoryRoot,
+	options = {},
+) {
 	repositoryRoot = path.resolve(repositoryRoot);
 	let state = readPrivateWorkflowActivationState(repositoryRoot);
-	if (!state) return { status: "current", reason: "no pending private workflow release" };
+	if (!state)
+		return { status: "current", reason: "no pending private workflow release" };
 	if (state.status === "activating")
-		return restoreActivationPrior(repositoryRoot, state, "interrupted activation recovered on start");
+		return restoreActivationPrior(
+			repositoryRoot,
+			state,
+			"interrupted activation recovered on start",
+		);
 	if (state.status === "rolling-back")
-		return recoverInterruptedRollback(repositoryRoot, state, "interrupted rollback recovered on start");
+		return recoverInterruptedRollback(
+			repositoryRoot,
+			state,
+			"interrupted rollback recovered on start",
+		);
 	if (state.status !== "pending") {
 		if (state.status === "active")
-			rmSync(activationTransactionRoot(repositoryRoot), { recursive: true, force: true });
+			rmSync(activationTransactionRoot(repositoryRoot), {
+				recursive: true,
+				force: true,
+			});
 		if (state.status === "rolled-back")
 			return {
 				status: state.status,
@@ -366,9 +444,19 @@ export function activatePendingPrivateWorkflowRelease(repositoryRoot, options = 
 			};
 		return { status: state.status, state };
 	}
-	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
-	const pendingRoot = pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256);
-	const retainedRoot = retainedGenerationPath(repositoryRoot, state.retainedGenerationSha256);
+	const canonicalRoot = path.join(
+		repositoryRoot,
+		"extensions",
+		"private-workflows",
+	);
+	const pendingRoot = pendingGenerationPath(
+		repositoryRoot,
+		state.pendingGenerationSha256,
+	);
+	const retainedRoot = retainedGenerationPath(
+		repositoryRoot,
+		state.retainedGenerationSha256,
+	);
 	const transactionRoot = activationTransactionRoot(repositoryRoot);
 	const transactionActive = path.join(transactionRoot, "active");
 	try {
@@ -419,25 +507,55 @@ export function activatePendingPrivateWorkflowRelease(repositoryRoot, options = 
 export function rollbackPrivateWorkflowRelease(repositoryRoot, options = {}) {
 	repositoryRoot = path.resolve(repositoryRoot);
 	let state = readPrivateWorkflowActivationState(repositoryRoot);
-	if (!state) return { status: "current", reason: "no private workflow release to roll back" };
+	if (!state)
+		return {
+			status: "current",
+			reason: "no private workflow release to roll back",
+		};
 	if (state.status === "pending") {
-		const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
+		const canonicalRoot = path.join(
+			repositoryRoot,
+			"extensions",
+			"private-workflows",
+		);
 		generationSha256(canonicalRoot, state.activeGenerationSha256);
 		rmSync(pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256), {
 			recursive: true,
 			force: true,
 		});
-		state = rolledBackState(state, options.reason ?? "operator rollback before activation", false);
+		state = rolledBackState(
+			state,
+			options.reason ?? "operator rollback before activation",
+			false,
+		);
 		writeActivationState(repositoryRoot, state);
 		return rollbackResult(state, state.rollback.reason, false);
 	}
 	if (state.status === "rolled-back")
-		return rollbackResult(state, state.rollback?.reason ?? "already rolled back", false);
+		return rollbackResult(
+			state,
+			state.rollback?.reason ?? "already rolled back",
+			false,
+		);
 	if (state.status !== "active")
-		return { status: "failed", code: "private-workflow-rollback", reason: `cannot roll back ${state.status} state` };
-	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
-	const retainedRoot = retainedGenerationPath(repositoryRoot, state.retainedGenerationSha256);
-	const pendingRoot = pendingGenerationPath(repositoryRoot, state.pendingGenerationSha256);
+		return {
+			status: "failed",
+			code: "private-workflow-rollback",
+			reason: `cannot roll back ${state.status} state`,
+		};
+	const canonicalRoot = path.join(
+		repositoryRoot,
+		"extensions",
+		"private-workflows",
+	);
+	const retainedRoot = retainedGenerationPath(
+		repositoryRoot,
+		state.retainedGenerationSha256,
+	);
+	const pendingRoot = pendingGenerationPath(
+		repositoryRoot,
+		state.pendingGenerationSha256,
+	);
 	const transactionRoot = activationTransactionRoot(repositoryRoot);
 	const transactionCurrent = path.join(transactionRoot, "current");
 	const transactionRestore = path.join(transactionRoot, "restore");
@@ -458,7 +576,11 @@ export function rollbackPrivateWorkflowRelease(repositoryRoot, options = {}) {
 		rmSync(pendingRoot, { recursive: true, force: true });
 		mkdirSync(path.dirname(pendingRoot), { recursive: true });
 		renameSync(transactionCurrent, pendingRoot);
-		state = rolledBackState(state, options.reason ?? "operator requested rollback", false);
+		state = rolledBackState(
+			state,
+			options.reason ?? "operator requested rollback",
+			false,
+		);
 		writeActivationState(repositoryRoot, state);
 		rmSync(transactionRoot, { recursive: true, force: true });
 		return rollbackResult(state, state.rollback.reason, false);
@@ -484,7 +606,9 @@ function equalGenerations(left, right) {
 	const rightNames = Object.keys(right).sort();
 	return (
 		JSON.stringify(leftNames) === JSON.stringify(rightNames) &&
-		leftNames.every((name) => Buffer.from(left[name]).equals(Buffer.from(right[name])))
+		leftNames.every((name) =>
+			Buffer.from(left[name]).equals(Buffer.from(right[name])),
+		)
 	);
 }
 
@@ -499,7 +623,8 @@ function defaultDirtyPaths(repositoryRoot) {
 	for (let index = 0; index < records.length; index++) {
 		const record = records[index];
 		paths.push(record.slice(3).replaceAll("\\", "/"));
-		if (record[0] === "R" || record[1] === "R") paths.push(records[++index]?.replaceAll("\\", "/"));
+		if (record[0] === "R" || record[1] === "R")
+			paths.push(records[++index]?.replaceAll("\\", "/"));
 	}
 	return paths.filter(Boolean);
 }
@@ -508,7 +633,10 @@ function defaultWritable(repositoryRoot) {
 	try {
 		accessSync(path.join(repositoryRoot, "extensions"), constants.W_OK);
 		for (const relativePath of PRIVATE_WORKFLOW_OWNED_OUTPUTS)
-			accessSync(path.join(repositoryRoot, ...relativePath.split("/")), constants.W_OK);
+			accessSync(
+				path.join(repositoryRoot, ...relativePath.split("/")),
+				constants.W_OK,
+			);
 		return true;
 	} catch {
 		return false;
@@ -527,32 +655,62 @@ function runDefaultGate(gate, repositoryRoot) {
 }
 
 function archiveUrl(repository, release) {
-	const match = /^https:\/\/github\.com\/([^/]+)\/([^/.]+)(?:\.git)?$/.exec(repository);
+	const match = /^https:\/\/github\.com\/([^/]+)\/([^/.]+)(?:\.git)?$/.exec(
+		repository,
+	);
 	if (!match) throw new Error("unsupported official repository URL");
 	return `https://codeload.github.com/${match[1]}/${match[2]}/tar.gz/refs/tags/${release}`;
 }
 
-async function acquireOfficialCandidate({ quarantineRoot, descriptor, resolution, fetchImpl = fetch }) {
+async function acquireOfficialCandidate({
+	quarantineRoot,
+	descriptor,
+	resolution,
+	fetchImpl = fetch,
+}) {
 	const sourceRoot = path.join(quarantineRoot, "source");
 	execFileSync(
 		"git",
-		["clone", "--quiet", "--depth", "1", "--branch", resolution.release, descriptor.repository, sourceRoot],
+		[
+			"clone",
+			"--quiet",
+			"--depth",
+			"1",
+			"--branch",
+			resolution.release,
+			descriptor.repository,
+			sourceRoot,
+		],
 		{ env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }, timeout: 180_000 },
 	);
-	const checkoutSha = execFileSync("git", ["-C", sourceRoot, "rev-parse", "HEAD"], {
-		encoding: "utf8",
-	}).trim();
+	const checkoutSha = execFileSync(
+		"git",
+		["-C", sourceRoot, "rev-parse", "HEAD"],
+		{
+			encoding: "utf8",
+		},
+	).trim();
 	if (checkoutSha !== resolution.peeledCommitSha)
 		throw new Error("official stable tag changed during acquisition");
-	const response = await fetchImpl(archiveUrl(descriptor.repository, resolution.release), {
-		redirect: "follow",
-	});
-	if (!response.ok) throw new Error(`official archive download failed: HTTP ${response.status}`);
+	const response = await fetchImpl(
+		archiveUrl(descriptor.repository, resolution.release),
+		{
+			redirect: "follow",
+		},
+	);
+	if (!response.ok)
+		throw new Error(`official archive download failed: HTTP ${response.status}`);
 	const archiveBytes = Buffer.from(await response.arrayBuffer());
 	const tracked = gitTrackedEntries(sourceRoot);
 	const allowed = new Set(tracked.map((entry) => entry.path));
-	const manifest = JSON.parse(readConfinedFile(sourceRoot, "package.json", allowed));
-	const licenseBytes = readConfinedFile(sourceRoot, descriptor.license.path, allowed);
+	const manifest = JSON.parse(
+		readConfinedFile(sourceRoot, "package.json", allowed),
+	);
+	const licenseBytes = readConfinedFile(
+		sourceRoot,
+		descriptor.license.path,
+		allowed,
+	);
 	const policy = {
 		...descriptor,
 		release: resolution.release,
@@ -573,7 +731,9 @@ async function acquireOfficialCandidate({ quarantineRoot, descriptor, resolution
 		commitSha: checkoutSha,
 		trackedEntries: tracked,
 	});
-	const imported = new Map(inspected.importedFiles.map((entry) => [entry.path, entry]));
+	const imported = new Map(
+		inspected.importedFiles.map((entry) => [entry.path, entry]),
+	);
 	const evidence = {
 		schemaVersion: 1,
 		release: resolution.release,
@@ -609,10 +769,14 @@ function releaseAudit({ current, candidate, generated, parity, gates }) {
 			.map(([name, bytes]) => [name, sha256(bytes)]),
 	);
 	const priorSources = candidate.currentProvenance?.sources ?? [];
-	const priorSourceHashes = new Map(priorSources.map((entry) => [entry.path, entry.sha256]));
+	const priorSourceHashes = new Map(
+		priorSources.map((entry) => [entry.path, entry.sha256]),
+	);
 	const nextSources = candidate.evidence.inventory.resourceClosures;
 	const nextSourceEntries = Object.values(nextSources).flat();
-	const nextSourceHashes = new Map(nextSourceEntries.map((entry) => [entry.path, entry.sha256]));
+	const nextSourceHashes = new Map(
+		nextSourceEntries.map((entry) => [entry.path, entry.sha256]),
+	);
 	return {
 		schemaVersion: 1,
 		classification: "update",
@@ -622,11 +786,15 @@ function releaseAudit({ current, candidate, generated, parity, gates }) {
 			toRelease: candidate.evidence.release,
 			peeledCommitSha: candidate.evidence.peeledCommitSha,
 			archiveSha256: candidate.evidence.archive.sha256,
-			changedPaths: [...new Set([
-				...priorSources.map((entry) => entry.path),
-				...nextSourceEntries.map((entry) => entry.path),
-			])]
-				.filter((entry) => priorSourceHashes.get(entry) !== nextSourceHashes.get(entry))
+			changedPaths: [
+				...new Set([
+					...priorSources.map((entry) => entry.path),
+					...nextSourceEntries.map((entry) => entry.path),
+				]),
+			]
+				.filter(
+					(entry) => priorSourceHashes.get(entry) !== nextSourceHashes.get(entry),
+				)
 				.sort(),
 		},
 		closure: Object.fromEntries(
@@ -660,12 +828,20 @@ function releaseAudit({ current, candidate, generated, parity, gates }) {
 
 export async function promoteVerifiedPrivateWorkflowRelease(options) {
 	const repositoryRoot = path.resolve(options.repositoryRoot);
-	const canonicalRoot = path.join(repositoryRoot, "extensions", "private-workflows");
+	const canonicalRoot = path.join(
+		repositoryRoot,
+		"extensions",
+		"private-workflows",
+	);
 	let dirtyPaths;
 	try {
 		dirtyPaths = (options.dirtyPaths ?? defaultDirtyPaths)(repositoryRoot);
 	} catch (error) {
-		return { status: "failed", phase: "worktree", reason: String(error?.message ?? error) };
+		return {
+			status: "failed",
+			phase: "worktree",
+			reason: String(error?.message ?? error),
+		};
 	}
 	const classification = classifyPrivateWorkflowRelease({
 		resolution: options.resolution,
@@ -688,12 +864,14 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 		verifyPrivateWorkflowGeneration(canonicalRoot);
 		current = directorySnapshot(canonicalRoot);
 		const currentProvenance = JSON.parse(current["provenance.json"].bytes);
-		const acquired = await (options.acquireCandidate ?? acquireOfficialCandidate)({
-			quarantineRoot,
-			descriptor: options.descriptor,
-			resolution: options.resolution,
-			fetchImpl: options.fetchImpl,
-		});
+		const acquired = await (options.acquireCandidate ?? acquireOfficialCandidate)(
+			{
+				quarantineRoot,
+				descriptor: options.descriptor,
+				resolution: options.resolution,
+				fetchImpl: options.fetchImpl,
+			},
+		);
 		const translator = options.translate ?? translateVerifiedWorkflows;
 		const translationArgs = { ...acquired, currentProvenance };
 		const first = translator(translationArgs);
@@ -706,7 +884,8 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 		verifyPrivateWorkflowGeneration(candidateRoot);
 		let parity;
 		try {
-			parity = (options.parityCheck ?? assertCompletePrivateWorkflowParity)() === true;
+			parity =
+				(options.parityCheck ?? assertCompletePrivateWorkflowParity)() === true;
 		} catch (error) {
 			return {
 				status: "blocked",
@@ -717,12 +896,20 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 		}
 		const gates = [];
 		for (const gate of options.gates ?? PRIVATE_WORKFLOW_RELEASE_GATES) {
-			const passed = await (options.runGate ?? runDefaultGate)(gate, repositoryRoot, candidateRoot);
+			const passed = await (options.runGate ?? runDefaultGate)(
+				gate,
+				repositoryRoot,
+				candidateRoot,
+			);
 			if (passed !== true) throw new Error(`release gate failed: ${gate.name}`);
 			gates.push({ name: gate.name, status: "passed" });
 		}
 		await options.interrupt?.("after-gates");
-		assertSnapshot(canonicalRoot, current, "canonical generation during verification");
+		assertSnapshot(
+			canonicalRoot,
+			current,
+			"canonical generation during verification",
+		);
 		const audit = releaseAudit({
 			current,
 			candidate: { ...acquired, currentProvenance },
@@ -731,7 +918,9 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 			gates,
 		});
 		const generation = JSON.parse(first["manifest.json"]).generationSha256;
-		const priorGeneration = JSON.parse(current["manifest.json"].bytes).generationSha256;
+		const priorGeneration = JSON.parse(
+			current["manifest.json"].bytes,
+		).generationSha256;
 		const evidenceRoot = path.join(artifactRoot, generation);
 		retentionPath = path.join(artifactRoot, "prior", priorGeneration);
 		auditPath = path.join(evidenceRoot, "audit.json");
@@ -750,7 +939,11 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 		pendingPath = pendingGenerationPath(repositoryRoot, generation);
 		mkdirSync(path.dirname(pendingPath), { recursive: true });
 		if (existsSync(pendingPath)) {
-			assertSnapshot(pendingPath, directorySnapshot(candidateRoot), "pending generation");
+			assertSnapshot(
+				pendingPath,
+				directorySnapshot(candidateRoot),
+				"pending generation",
+			);
 			rmSync(candidateRoot, { recursive: true, force: true });
 		} else {
 			renameSync(candidateRoot, pendingPath);
@@ -789,10 +982,14 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 			}
 			if (pendingPath) rmSync(pendingPath, { recursive: true, force: true });
 		} finally {
-			if (auditPath) rmSync(path.dirname(auditPath), { recursive: true, force: true });
+			if (auditPath)
+				rmSync(path.dirname(auditPath), { recursive: true, force: true });
 		}
 		const reason = String(error?.message ?? error);
-		const blocked = /(?:unknown .* surface|unresolved|unsafe|symlink|collision|identity|license|closure|source resource changed|deterministic generation|owned output|canonical generation.*changed)/i.test(reason);
+		const blocked =
+			/(?:unknown .* surface|unresolved|unsafe|symlink|collision|identity|license|closure|source resource changed|deterministic generation|owned output|canonical generation.*changed)/i.test(
+				reason,
+			);
 		return {
 			status: blocked ? "blocked" : "failed",
 			phase: "promotion",

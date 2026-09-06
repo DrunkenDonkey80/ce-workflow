@@ -72,8 +72,8 @@ const WORKFLOW_RULES = {
 	explain: [
 		"verify-complete-u1-explain-closure",
 		"remove-pi-discovery-frontmatter-and-executable-helpers",
-    "preserve-deep-technical-explanation-without-changing-the-verdict",
-    "adapt-output-to-conditional-catch-up-decision-support-contract",
+		"preserve-deep-technical-explanation-without-changing-the-verdict",
+		"adapt-output-to-conditional-catch-up-decision-support-contract",
 	],
 	ideate: [
 		"verify-complete-u1-ideate-closure",
@@ -139,11 +139,18 @@ function assertVerifiedEvidence(evidence, policy) {
 function verifiedClosure(sourceRoot, evidence, workflow) {
 	const descriptor = WORKFLOW_SOURCES[workflow];
 	const closure = evidence.inventory?.resourceClosures?.[descriptor.closure];
-	if (!Array.isArray(closure) || !closure.length || closure[0]?.path !== descriptor.source)
+	if (
+		!Array.isArray(closure) ||
+		!closure.length ||
+		closure[0]?.path !== descriptor.source
+	)
 		throw new Error(`missing verified ${workflow} closure`);
 	const paths = closure.map((entry) => normalizeSourcePath(entry.path));
 	const prefix = `skills/${descriptor.closure}/`;
-	if (new Set(paths).size !== paths.length || paths.some((entry) => !entry.startsWith(prefix)))
+	if (
+		new Set(paths).size !== paths.length ||
+		paths.some((entry) => !entry.startsWith(prefix))
+	)
 		throw new Error(`invalid verified ${workflow} closure`);
 	const allowed = new Set(paths);
 	for (const [index, entry] of closure.entries()) {
@@ -195,7 +202,7 @@ function explainPlaybook(sourceClosureSha256) {
 }
 
 function ideatePlaybook(sourceClosureSha256) {
-	return `# Private Ideate Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary\n\nGenerate and evaluate grounded ideas for one topic. This playbook precedes brainstorm: it answers \"what is worth exploring\", never \"what exactly to build\". Do not produce requirements, plans, code, or brainstorm artifacts; the caller's Ideas dashboard owns selection.\n\n## Grounding and scope\n\n1. Resolve the subject before generating. If the topic names only a catch-all quality (\"improvements\", \"ideas\"), ask exactly one blocking \`ask_user\` question offering specify-a-subject, surprise-me, or cancel; never silently interpret a vague topic as \"about this repo\".\n2. Ground before ideating: scan the repository's actual patterns, pain points, and leverage points relevant to the focus, including existing \`wo:idea\` records and rejected fingerprints so already-rejected directions are not re-proposed. No abstract product advice detached from what exists.\n3. Decompose the settled subject into 3-5 orthogonal axes named in the topic's language; skip only for atomic subjects. Cover the axes instead of converging on the first salient reading.\n\n## Divergence and critique\n\n1. Generate many candidates first (default roughly 20-30), then critique every one: generate-many, critique-all, explain-survivors. Quality comes from explicit rejection with reasons, not optimistic ranking.\n2. Score each surviving idea 0-100 confidence grounded in evidence strength, payoff, and effort/risk. Weak ideas die with a one-line reason rather than being padded. Merge exact duplicates keeping the strongest phrasing; near-duplicates share one \`area\` token instead of forcing a merge.\n3. Keep every idea traceable: cite the repository behavior or external source that grounds it. Unverifiable candidates are dropped, not marked uncertain.\n\n## Output contract\n\nEmit exactly one fenced JSON block: \`ideas: [{ title, summary, score, area }]\` with title unique and specific, summary 2-4 lines, score integer 0-100, area one lowercase token. No prose ranking, no topPicks, no artifact files; the caller parses the block, deduplicates by fingerprint, and saves each idea under the roadmap as a \`wo:idea\` work item.\n\n## Handoff\n\nAfter the JSON block, stop. Selection, brainstorming, rejection, and deletion happen through the caller's Ideas dashboard; routing a chosen idea into brainstorm is the caller's action, never this playbook's.\n`;
+	return `# Private Ideate Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary\n\nGenerate and evaluate grounded ideas for one topic. This playbook precedes brainstorm: it answers "what is worth exploring", never "what exactly to build". Do not produce requirements, plans, code, or brainstorm artifacts; the caller's Ideas dashboard owns selection.\n\n## Grounding and scope\n\n1. Resolve the subject before generating. If the topic names only a catch-all quality ("improvements", "ideas"), ask exactly one blocking \`ask_user\` question offering specify-a-subject, surprise-me, or cancel; never silently interpret a vague topic as "about this repo".\n2. Ground before ideating: scan the repository's actual patterns, pain points, and leverage points relevant to the focus, including existing \`wo:idea\` records and rejected fingerprints so already-rejected directions are not re-proposed. No abstract product advice detached from what exists.\n3. Decompose the settled subject into 3-5 orthogonal axes named in the topic's language; skip only for atomic subjects. Cover the axes instead of converging on the first salient reading.\n\n## Divergence and critique\n\n1. Generate many candidates first (default roughly 20-30), then critique every one: generate-many, critique-all, explain-survivors. Quality comes from explicit rejection with reasons, not optimistic ranking.\n2. Score each surviving idea 0-100 confidence grounded in evidence strength, payoff, and effort/risk. Weak ideas die with a one-line reason rather than being padded. Merge exact duplicates keeping the strongest phrasing; near-duplicates share one \`area\` token instead of forcing a merge.\n3. Keep every idea traceable: cite the repository behavior or external source that grounds it. Unverifiable candidates are dropped, not marked uncertain.\n\n## Output contract\n\nEmit exactly one fenced JSON block: \`ideas: [{ title, summary, score, area }]\` with title unique and specific, summary 2-4 lines, score integer 0-100, area one lowercase token. No prose ranking, no topPicks, no artifact files; the caller parses the block, deduplicates by fingerprint, and saves each idea under the roadmap as a \`wo:idea\` work item.\n\n## Handoff\n\nAfter the JSON block, stop. Selection, brainstorming, rejection, and deletion happen through the caller's Ideas dashboard; routing a chosen idea into brainstorm is the caller's action, never this playbook's.\n`;
 }
 
 const PLAYBOOKS = {
@@ -216,7 +223,18 @@ export function translateVerifiedWorkflows({
 	evidence,
 	policy,
 	translatorBytes,
-	workflows = ["brainstorm", "browser", "debug", "explain", "ideate", "learning", "plan", "pov", "review", "simplify"],
+	workflows = [
+		"brainstorm",
+		"browser",
+		"debug",
+		"explain",
+		"ideate",
+		"learning",
+		"plan",
+		"pov",
+		"review",
+		"simplify",
+	],
 }) {
 	assertVerifiedEvidence(evidence, policy);
 	if (
@@ -231,13 +249,18 @@ export function translateVerifiedWorkflows({
 		throw new Error("unknown private workflow translation request");
 	const selected = [...new Set(workflows)].sort();
 	const closures = Object.fromEntries(
-		selected.map((workflow) => [workflow, verifiedClosure(sourceRoot, evidence, workflow)]),
+		selected.map((workflow) => [
+			workflow,
+			verifiedClosure(sourceRoot, evidence, workflow),
+		]),
 	);
 	const sources = selected.flatMap((workflow) => closures[workflow]);
 	const sourceClosureSha256 = sha256(JSON.stringify(sources));
 	const translator = {
 		path: TRANSLATOR_PATH,
-		sha256: sha256(translatorBytes ?? readFileSync(fileURLToPath(import.meta.url))),
+		sha256: sha256(
+			translatorBytes ?? readFileSync(fileURLToPath(import.meta.url)),
+		),
 		version: TRANSLATOR_VERSION,
 		rules: selected.flatMap((workflow) => WORKFLOW_RULES[workflow]),
 	};
@@ -273,12 +296,18 @@ export function translateVerifiedWorkflows({
 	const generation = {
 		schemaVersion: 1,
 		verified: true,
-		translator: { path: translator.path, sha256: translator.sha256, version: translator.version },
+		translator: {
+			path: translator.path,
+			sha256: translator.sha256,
+			version: translator.version,
+		},
 		provenance: { path: "provenance.json", sha256: sha256(provenanceText) },
 		workflows: workflowEntries,
 	};
 	return {
-		...Object.fromEntries(selected.map((workflow) => [`${workflow}.md`, playbooks[workflow]])),
+		...Object.fromEntries(
+			selected.map((workflow) => [`${workflow}.md`, playbooks[workflow]]),
+		),
 		"manifest.json": json({
 			...generation,
 			generationSha256: sha256(JSON.stringify(generation)),
@@ -310,10 +339,15 @@ function argumentsFrom(argv) {
 	return values;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+	process.argv[1] &&
+	path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
 	const args = argumentsFrom(process.argv.slice(2));
 	if (!args.source || !args.evidence)
-		throw new Error("usage: generate-work-private-workflows.mjs --source <verified-root> --evidence <u1-report> [--output <directory>]");
+		throw new Error(
+			"usage: generate-work-private-workflows.mjs --source <verified-root> --evidence <u1-report> [--output <directory>]",
+		);
 	const repositoryRoot = path.resolve(import.meta.dirname, "..");
 	const evidence = readJson(path.resolve(args.evidence), "source evidence");
 	const policy = readJson(
@@ -323,7 +357,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	const outputRoot = path.resolve(
 		args.output ?? path.join(repositoryRoot, "extensions", "private-workflows"),
 	);
-	const files = translateVerifiedWorkflows({ sourceRoot: path.resolve(args.source), evidence, policy });
+	const files = translateVerifiedWorkflows({
+		sourceRoot: path.resolve(args.source),
+		evidence,
+		policy,
+	});
 	writePrivateWorkflowGeneration(outputRoot, files);
-	console.log(`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,explain,ideate,learning,plan,pov,review,simplify files=${Object.keys(files).length}`);
+	console.log(
+		`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,explain,ideate,learning,plan,pov,review,simplify files=${Object.keys(files).length}`,
+	);
 }
