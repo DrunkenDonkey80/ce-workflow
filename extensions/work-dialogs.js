@@ -222,6 +222,7 @@ export async function showListDialog(ctx, options) {
 		descriptionMinLines = 0,
 		selectOnSpace = false,
 		spaceAction = false,
+		rowAction,
 		tabAction,
 		onInput,
 		forceCustom = false,
@@ -407,6 +408,21 @@ export async function showListDialog(ctx, options) {
 					if (!item || item.heading || item.disabled === true) return;
 					return close({
 						action: "space",
+						value: item.value,
+						item,
+						index: visible[index].index,
+					});
+				} else if (rowAction && data === rowAction.key) {
+					const item = visible[index]?.item;
+					if (
+						!item ||
+						item.heading ||
+						item.disabled === true ||
+						item.rowAction === false
+					)
+						return;
+					return close({
+						action: "row",
 						value: item.value,
 						item,
 						index: visible[index].index,

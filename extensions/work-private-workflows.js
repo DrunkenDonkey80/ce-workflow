@@ -77,6 +77,10 @@ const AUTHORITIES = new Map([
 		{ caller: WORK_MODELS_CALLER, workflows: new Set(["plan"]) },
 	],
 	[
+		"work-models:wf:ideate:v1",
+		{ caller: WORK_MODELS_CALLER, workflows: new Set(["ideate"]) },
+	],
+	[
 		"work-models:catch-up:candidate-review:v1",
 		{ caller: WORK_MODELS_CALLER, workflows: new Set(["pov", "explain"]) },
 	],

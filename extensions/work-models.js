@@ -116,6 +116,7 @@ import {
 	appendWorkNote,
 	closeWorkItem,
 	createWorkItem,
+	deleteWorkItem,
 	deleteWorkItemSubtree,
 	initStore,
 	loadStore,
@@ -246,7 +247,7 @@ const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
 const DEFAULT_THINKING = "__default_thinking__";
 const IDEA_LABEL = "wo:idea";
-const IDEA_SCHEMA_VERSION = 1;
+const IDEA_SCHEMA_VERSION = 2;
 const BRAINSTORM_TITLE_MAX = 180;
 const WORK_ITEM_TITLE_MAX = 180;
 const DISPLAY_METADATA_SCHEMA_VERSION = 1;
@@ -7710,7 +7711,8 @@ function isIdeaIssue(issue) {
 		metadata.kind === "idea" ||
 		metadata.type === "idea" ||
 		metadata.idea === true ||
-		Number(metadata.ideaSchemaVersion) === IDEA_SCHEMA_VERSION ||
+		Number(metadata.ideaSchemaVersion) >= 1 &&
+			Number(metadata.ideaSchemaVersion) <= IDEA_SCHEMA_VERSION ||
 		/(^|\s)wo:idea(\s|:|$)/i.test(notesOf(issue))
 	);
 }
@@ -7758,6 +7760,8 @@ function deriveIdeaStatus(issue) {
 	);
 	const hasDownstream = hasMetadataValue(
 		metadata,
+		"brainstormEpicId",
+		"ideaFile",
 		"brainstormId",
 		"brainstormPath",
 		"planId",
@@ -7789,7 +7793,15 @@ function deriveIdeaStatus(issue) {
 		)
 	)
 		return "planned";
-	if (hasMetadataValue(metadata, "brainstormId", "brainstormPath"))
+	if (
+		hasMetadataValue(
+			metadata,
+			"brainstormEpicId",
+			"ideaFile",
+			"brainstormId",
+			"brainstormPath",
+		)
+	)
 		return "brainstormed";
 	return manual || "raw";
 }
@@ -17539,6 +17551,8 @@ const IDEA_ACTIONS = new Set([
 	"discuss",
 	"inspect",
 	"import",
+	"edit",
+	"delete",
 ]);
 const BRAINSTORM_ACTIONS = new Set(["link", "inspect"]);
 const IDEA_STATUS_ORDER = [
@@ -17563,8 +17577,17 @@ function workIdeateSnapshotPath(cwd) {
 	return join(workIdeateDir(cwd), "dashboard.json");
 }
 
+function ideaTitleHash(value) {
+	return createHash("sha256")
+		.update(normalizedIdeaTitle(value))
+		.digest("hex")
+		.slice(0, 16);
+}
+
 function titleFingerprint(issue) {
-	return titleOf(issue).trim().toLowerCase().replace(/\s+/g, " ");
+	const stored = ideaMetadata(issue).titleFingerprint;
+	if (stored) return String(stored);
+	return ideaTitleHash(titleOf(issue));
 }
 
 function normalizedIdeaTitle(value) {
@@ -17616,6 +17639,7 @@ function ideaSummaries(cwd, epicId) {
 	return ideaRecords(cwd, epicId)
 		.map((issue) => ({
 			...issueSummary(issue),
+			score: ideaScore(issue),
 			fingerprint: titleFingerprint(issue),
 			sourcePath: ideaSourcePath(issue),
 			actionHint: ideaActionHint(deriveIdeaStatus(issue)),
@@ -17665,9 +17689,19 @@ function parseWorkIdeateArgs(args = "") {
 	const input = String(args).trim();
 	if (!input) return { kind: "dashboard" };
 	const parts = input.split(/\s+/);
-	const action = parts.at(-1);
-	if (IDEA_ACTIONS.has(action))
-		return { kind: "action", action, target: parts.slice(0, -1).join(" ") };
+	const head = parts[0]?.toLowerCase();
+	if (head === "wide" || head === "narrow")
+		return { kind: "topic", topic: parts.slice(1).join(" "), agents: head };
+	if (IDEA_ACTIONS.has(head)) {
+		if ((head === "edit" || head === "delete") && parts.length > 1)
+			return {
+				kind: "action",
+				action: head,
+				target: parts[1],
+				text: head === "edit" ? parts.slice(2).join(" ") : "",
+			};
+		return { kind: "action", action: head, target: parts.slice(1).join(" ") };
+	}
 	return { kind: "topic", topic: input };
 }
 
@@ -17750,7 +17784,7 @@ function importIdea(cwd, epic, target) {
 		epic: issueSummary(epic),
 		idea: issueSummary(workItem),
 		message: `${existing ? "Updated" : "Created"} idea ${idOf(workItem)} from ${rel}.`,
-		suggestedCommands: [`/work-ideate ${idOf(workItem)} inspect`],
+		suggestedCommands: [`/work-ideate inspect ${idOf(workItem)}`],
 	};
 }
 
@@ -17785,27 +17819,34 @@ function parseIdeationIdeas(output) {
 	// ponytail: JSON-only capture; add markdown parsing only if CE output drifts.
 	const payload = jsonPayload(output);
 	const ideas = Array.isArray(payload) ? payload : asArray(payload?.ideas);
-	const topPicks = new Set(asArray(payload?.topPicks ?? payload?.top_picks));
+	const total = ideas.length;
 	return ideas
 		.map((item, index) => {
 			const title = String(
 				typeof item === "string" ? item : field(item, "title", "name", "idea"),
 			).trim();
 			if (!title) return undefined;
-			const rank = Number(field(item, "rank", "index") ?? index + 1);
-			const status = normalizeIdeaStatus(field(item, "status", "state"));
-			const accepted =
-				status === "accepted" ||
-				field(item, "topPick", "top_pick", "accepted") === true ||
-				topPicks.has(rank) ||
-				topPicks.has(index + 1) ||
-				topPicks.has(title);
+			const rawScore = Number(
+				field(item, "score", "confidence", "confidenceScore"),
+			);
+			const score = Number.isFinite(rawScore)
+				? Math.max(0, Math.min(100, Math.round(rawScore)))
+				: Math.round(total > 1 ? 100 - (index * 90) / (total - 1) : 100);
+			const area = String(field(item, "area", "domain") ?? "")
+				.trim()
+				.toLowerCase()
+				.replace(/[^a-z0-9-]+/g, "-")
+				.replace(/^-+|-+$/g, "")
+				.slice(0, 24);
 			return {
 				index: index + 1,
 				title,
 				summary: String(field(item, "summary", "description", "why") ?? ""),
-				status: accepted ? "accepted" : "contender",
+				status: "contender",
+				score,
+				area,
 				hash: textHash(title),
+				fingerprint: ideaTitleHash(title),
 			};
 		})
 		.filter(Boolean);
@@ -17848,28 +17889,48 @@ function captureIdeationIdeas(
 	}
 	const saved = [];
 	const unsaved = [];
+	let duplicates = 0;
+	let suppressed = 0;
+	const before = ideaRecords(cwd, idOf(epic));
+	const rejectedFingerprints = new Set(
+		before
+			.filter((issue) => deriveIdeaStatus(issue) === "rejected")
+			.map((issue) => titleFingerprint(issue)),
+	);
+	const knownFingerprints = new Set(
+		before.map((issue) => titleFingerprint(issue)),
+	);
 	for (const idea of parsed) {
 		try {
-			const existing = existingIdeaByRun(
-				ideaRecords(cwd, idOf(epic)),
-				runId,
-				idea,
-			);
-			const note = `wo:idea schema=${IDEA_SCHEMA_VERSION} status=${idea.status} source-run-id=${runId} source-index=${idea.index} title-hash=${idea.hash}`;
-			const workItem = existing
-				? appendWorkflowWorkItemNote(cwd, idOf(existing), note)
-				: createWorkflowWorkItem(cwd, {
-						title: idea.title,
-						type: "task",
-						parent: idOf(epic),
-						description: idea.summary || `Idea from /work-ideate ${topic}.`,
-						notes: note,
-					});
+			if (rejectedFingerprints.has(idea.fingerprint)) {
+				suppressed += 1;
+				continue;
+			}
+			const sameRun = existingIdeaByRun(before, runId, idea);
+			const note = `wo:idea schema=${IDEA_SCHEMA_VERSION} status=contender score=${idea.score}${idea.area ? ` area=${idea.area}` : ""} source-run-id=${runId} source-index=${idea.index} title-hash=${idea.hash} title-fingerprint=${idea.fingerprint}`;
+			if (sameRun) {
+				const workItem = appendWorkflowWorkItemNote(cwd, idOf(sameRun), note);
+				saved.push(issueSummary(workItem));
+				continue;
+			}
+			if (knownFingerprints.has(idea.fingerprint)) {
+				duplicates += 1;
+				continue;
+			}
+			const workItem = createWorkflowWorkItem(cwd, {
+				title: idea.title,
+				type: "task",
+				parent: idOf(epic),
+				description: idea.summary || `Idea from /work-ideate ${topic}.`,
+				notes: note,
+			});
+			knownFingerprints.add(idea.fingerprint);
 			saved.push(issueSummary(workItem));
 		} catch (error) {
 			unsaved.push({ title: idea.title, error: commandErrorText(error) });
 		}
 	}
+	const trim = trimIdeasToTop(cwd, idOf(epic));
 	return {
 		ok: unsaved.length === 0,
 		action: unsaved.length ? "capture-partial" : "capture-complete",
@@ -17877,24 +17938,85 @@ function captureIdeationIdeas(
 		runId,
 		saved,
 		unsaved,
-		message: unsaved.length
-			? `Saved ${saved.length}/${parsed.length} ideas; rerun with run ${runId} to recover the rest.`
-			: `Saved ${saved.length} ideas from /work-ideate.`,
+		duplicates,
+		suppressed,
+		dropped: trim.dropped,
+		keptReferenced: trim.keptReferenced,
+		message: [
+			unsaved.length
+				? `Saved ${saved.length}/${parsed.length} ideas; rerun with run ${runId} to recover the rest.`
+				: `Saved ${saved.length} ideas from /work-ideate.`,
+			duplicates ? `${duplicates} duplicates merged.` : "",
+			suppressed ? `${suppressed} rejected ideas suppressed.` : "",
+			trim.dropped.length
+				? `${trim.dropped.length} ideas dropped beyond the top ${IDEA_MAIN_LIMIT}.`
+				: "",
+		]
+			.filter(Boolean)
+			.join(" "),
 	};
 }
 
-function ideationHandoffPrompt(epic, topic, runId) {
+function ideateSidecarStep(cwd, target, offlineModels = [], currentModel = "") {
+	const models = divergentTaskModels(cwd);
+	const offline = new Set(offlineModels);
+	const tasks = DIVERGENT_FRAMES.map((frame, index) => ({
+		frame,
+		model: models[index],
+	}))
+		.filter(({ model }) => !offline.has(configuredModelId(model, currentModel)))
+		.map(({ frame, model }, index) => ({
+			key: `divergent-${index + 1}`,
+			agent: "work-divergent",
+			...(model && model !== INHERIT_MODEL ? { model } : {}),
+			task: [
+				"Use only the topic and real constraints supplied by the parent.",
+				`FRAME — ${frame.label}: ${frame.prompt}`,
+				"Generate non-obvious idea candidates as the agent contract requires.",
+			].join("\n"),
+		}));
+	if (!tasks.length) return "";
+	return [
+		`Ideation sidecar gate for ${target}: launch exactly one subagent workflowScript with async:true, context:fresh and runs.all over these stable-key child templates: ${JSON.stringify(tasks)}. Prepend the same topic and constraints to every child task; never include sibling output.`,
+		"While those branches run, form the normal baseline independently. Then call bg_wait with all:true, cluster duplicates, merge semantically similar ideas into single entries keeping the max score, and produce one merged ranked JSON ideas[] (title, summary, area, score 0-100). A failed branch is recorded and not retried; this is one bounded divergence pass with no branch deepening.",
+	].join("\n");
+}
+
+function ideationHandoffPrompt(
+	epic,
+	topic,
+	runId,
+	{ agents = "narrow", cwd, offlineModels = [], currentModel = "" } = {},
+) {
+	const privatePlaybook = dispatchPrivateWorkflow("ideate", {
+		actionToken: "work-models:wf:ideate:v1",
+		callerUrl: import.meta.url,
+	});
+	const creativeStep =
+		cwd && agents === "wide"
+			? ideateSidecarStep(
+					cwd,
+					`ideation for ${idOf(epic)}`,
+					offlineModels,
+					currentModel,
+				)
+			: "";
 	return [
 		"Use the work-orchestrator skill in mode: ideate with this precomputed extension state.",
 		`Roadmap: ${idOf(epic)} — ${titleOf(epic)}`,
 		`Topic: ${topic}`,
 		`Run ID: ${runId}`,
-		`Structured capture contract: ${captureIdeationIdeas.name} expects JSON ideas[] (title, summary, area, score 0-100 confidence) — no topPicks.`,
-		"Follow the generated private ideate playbook at extensions/private-workflows/ideate.md (translated upstream ce-ideate) for the ideation method: ground in the repository, diverge widely, critique every candidate, then rank.",
-		"Generate 20-30 ideas, score each 0-100 confidence, tag one area each, merge semantically similar ideas into one (max score), then capture only the top 20 by score as native work-item store under the roadmap with wo:idea notes and source-run/source-index metadata.",
+		`Depth: ${agents}${agents === "wide" ? " (3 divergent agents, merged)" : ""}`,
+		`Structured capture contract: ${captureIdeationIdeas.name} expects one JSON object with ideas[] (title, summary, area, score 0-100 confidence) — no topPicks.`,
+		`--- BEGIN VERIFIED PRIVATE IDEATE PLAYBOOK ---\n${privatePlaybook}--- END VERIFIED PRIVATE IDEATE PLAYBOOK ---`,
+		"Follow the verified private playbook above for the ideation method: ground in the repository, diverge widely, critique every candidate, then rank. Generate 20-30 ideas, score each 0-100 confidence, tag one area each, merge semantically similar ideas into one (max score), then capture only the top 20 by score. Do not re-propose previously rejected ideas.",
+		creativeStep,
+		"After ideation, call the extension capture with the merged JSON so ideas become native work items with wo:idea notes.",
 		"If structured capture fails, preserve the raw output in a recovery decision WorkItem and report saved vs unsaved ideas.",
 		ROLE_TIMEOUT_GUIDANCE,
-	].join("\n");
+	]
+		.filter(Boolean)
+		.join("\n");
 }
 
 function parseWorkBrainstormArgs(args = "", options = {}) {
@@ -18339,7 +18461,7 @@ function renderWorkBrainstormText(state) {
 		.join("\n");
 }
 
-function buildWorkIdeateState(cwd, args = "") {
+function buildWorkIdeateState(cwd, args = "", options = {}) {
 	const gate = normalReadGate(cwd);
 	if (gate)
 		return errorState(gate.reason, gate.message, {
@@ -18357,26 +18479,53 @@ function buildWorkIdeateState(cwd, args = "") {
 			});
 		const epic = resolved.epic;
 		if (parsed.kind === "topic") {
+			if (!parsed.topic)
+				return errorState(
+					"missing-topic",
+					"Usage: /work-ideate [wide|narrow] <topic>",
+					{ action: "usage" },
+				);
 			const runId = telemetryId("ideate");
+			const agents = parsed.agents ?? options.agents ?? "narrow";
 			return {
 				ok: true,
 				action: "handoff-ideate",
 				epic: issueSummary(epic),
 				topic: parsed.topic,
 				runId,
-				message: `Starting ideation capture for ${parsed.topic}.`,
-				handoffPrompt: ideationHandoffPrompt(epic, parsed.topic, runId),
+				agents,
+				agentCount: agents === "wide" ? 3 : 1,
+				message: `Starting ${agents} ideation capture for ${parsed.topic}.`,
+				handoffPrompt: ideationHandoffPrompt(epic, parsed.topic, runId, {
+					agents,
+					cwd,
+					offlineModels: options.offlineModels ?? [],
+					currentModel: options.currentModel ?? "",
+				}),
 				suggestedCommands: [`/work-ideate ${runId}`],
 			};
 		}
 		if (parsed.kind === "dashboard") {
+			const lists = ideaDashboardList(cwd, idOf(epic));
 			const state = {
 				ok: true,
 				action: "dashboard",
 				epic: issueSummary(epic),
 				filter: "all",
 				viewId: telemetryId("ideas"),
-				ideas: ideaSummaries(cwd, idOf(epic)),
+				groups: {
+					main: lists.main.length,
+					brainstormed: lists.brainstormed.length,
+					rejected: lists.rejected.length,
+					downstream: lists.downstream.length,
+				},
+				ideas: [
+					...lists.main,
+					...lists.overflow,
+					...lists.downstream,
+					...lists.brainstormed,
+					...lists.rejected,
+				],
 			};
 			writeIdeaSnapshot(cwd, state);
 			return state;
@@ -18390,6 +18539,41 @@ function buildWorkIdeateState(cwd, args = "") {
 			});
 		const idea = resolvedIdea.idea;
 		const status = idea.ideaStatus;
+		if (parsed.action === "edit") {
+			const description = String(parsed.text ?? "").trim();
+			if (!description)
+				return errorState(
+					"missing-text",
+					"Usage: /work-ideate edit <index|id> <new description>",
+					{ action: "missing-text" },
+				);
+			const workItem = updateWorkItemNative(cwd, idea.id, { description });
+			return {
+				ok: true,
+				action: "edited",
+				epic: issueSummary(epic),
+				idea: issueSummary(workItem),
+				message: `Updated description of ${idea.id}.`,
+				suggestedCommands: [`/work-ideate inspect ${idea.id}`],
+			};
+		}
+		if (parsed.action === "delete") {
+			try {
+				deleteWorkflowWorkItem(cwd, idea.id);
+				return {
+					ok: true,
+					action: "deleted",
+				epic: issueSummary(epic),
+					idea,
+					message: `Deleted ${idea.id}.`,
+				};
+			} catch (error) {
+				return errorState(error.reason ?? "delete-refused", error.message, {
+					action: "delete-refused",
+					idea,
+				});
+			}
+		}
 		if (parsed.action === "inspect")
 			return {
 				ok: true,
@@ -18397,7 +18581,7 @@ function buildWorkIdeateState(cwd, args = "") {
 				epic: issueSummary(epic),
 				idea,
 				message: `${idea.id} ${status} — ${idea.title}`,
-				suggestedCommands: [`/work-ideate ${idea.id} discuss`],
+				suggestedCommands: [`/work-ideate discuss ${idea.id}`],
 			};
 		if (parsed.action === "reject") {
 			if (!["raw", "accepted", "contender", "discussed"].includes(status))
@@ -18413,7 +18597,7 @@ function buildWorkIdeateState(cwd, args = "") {
 				epic: issueSummary(epic),
 				idea: issueSummary(workItem),
 				message: `Rejected ${idea.id}; it remains inspectable and resume-ineligible.`,
-				suggestedCommands: [`/work-ideate ${idea.id} inspect`],
+				suggestedCommands: [`/work-ideate inspect ${idea.id}`],
 			};
 		}
 		if (parsed.action === "accept") {
@@ -18424,7 +18608,7 @@ function buildWorkIdeateState(cwd, args = "") {
 				epic: issueSummary(epic),
 				idea: issueSummary(workItem),
 				message: `Accepted ${idea.id}.`,
-				suggestedCommands: [`/work-ideate ${idea.id} discuss`],
+				suggestedCommands: [`/work-ideate discuss ${idea.id}`],
 			};
 		}
 		if (parsed.action === "discuss") {
@@ -18482,6 +18666,486 @@ function renderWorkIdeateText(state) {
 		}
 	}
 	return lines.join("\n");
+}
+
+const IDEA_MAIN_LIMIT = 20;
+const IDEA_ACTIVE_STATUSES = new Set([
+	"raw",
+	"accepted",
+	"contender",
+	"discussed",
+]);
+const IDEA_PINNED_STATUSES = new Set([
+	"planned",
+	"in_progress",
+	"complete",
+	"reopened",
+	"conflicted",
+	"brainstormed",
+]);
+
+function deleteWorkflowWorkItem(cwd, id) {
+	return mutateStore(cwd, (store) => deleteWorkItem(store, id));
+}
+
+function ideaScore(issue) {
+	const raw = Number(ideaMetadata(issue).score);
+	return Number.isFinite(raw)
+		? Math.max(0, Math.min(100, Math.round(raw)))
+		: 50;
+}
+
+function scoreChipColor(score) {
+	if (score > 70) return "success";
+	if (score < 30) return "error";
+	return "warning";
+}
+
+function trimIdeasToTop(cwd, epicId, { keep = IDEA_MAIN_LIMIT } = {}) {
+	const records = ideaRecords(cwd, epicId);
+	const active = records.filter(
+		(issue) => !IDEA_PINNED_STATUSES.has(deriveIdeaStatus(issue)),
+	);
+	const scored = active
+		.map((issue) => ({ issue, score: ideaScore(issue) }))
+		.sort(
+			(a, b) =>
+				b.score - a.score ||
+				String(idOf(a.issue)).localeCompare(String(idOf(b.issue))),
+		);
+	const dropped = [];
+	const keptReferenced = [];
+	for (const { issue } of scored.slice(keep)) {
+		try {
+			deleteWorkflowWorkItem(cwd, idOf(issue));
+			dropped.push(issueSummary(issue));
+		} catch {
+			keptReferenced.push(issueSummary(issue));
+		}
+	}
+	return { dropped, keptReferenced };
+}
+
+function brainstormedIdeaIds(cwd) {
+	const ids = new Set();
+	for (const item of Object.values(loadStore(cwd).items)) {
+		if (typeOf(item) !== "epic") continue;
+		const linked = objectMetadata(item?.documentLinks).idea;
+		const match = String(linked ?? "").match(/([A-Z][A-Z0-9]*-\d+)\.md$/i);
+		if (match) ids.add(match[1].toUpperCase());
+	}
+	return ids;
+}
+
+function ideaDashboardList(cwd, epicId) {
+	const brainstormedIds = brainstormedIdeaIds(cwd);
+	const ideas = ideaSummaries(cwd, epicId).map((idea) =>
+		brainstormedIds.has(String(idea.id).toUpperCase())
+			? { ...idea, ideaStatus: "brainstormed" }
+			: idea,
+	);
+	const active = ideas
+		.filter((idea) => IDEA_ACTIVE_STATUSES.has(idea.ideaStatus))
+		.sort(
+			(a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)),
+		);
+	const brainstormed = ideas.filter((idea) => idea.ideaStatus === "brainstormed");
+	const rejected = ideas.filter((idea) => idea.ideaStatus === "rejected");
+	const downstream = ideas.filter(
+		(idea) =>
+			!IDEA_ACTIVE_STATUSES.has(idea.ideaStatus) &&
+			idea.ideaStatus !== "brainstormed" &&
+			idea.ideaStatus !== "rejected",
+	);
+	return {
+		main: active.slice(0, IDEA_MAIN_LIMIT),
+		overflow: active.slice(IDEA_MAIN_LIMIT),
+		brainstormed,
+		rejected,
+		downstream,
+	};
+}
+
+function ideateDetailsText(idea) {
+	return [
+		`${idea.id} — ${idea.title}`,
+		`Status: ${idea.ideaStatus} · Score: ${idea.score}${idea.area ? ` · Area: ${idea.area}` : ""}`,
+		"",
+		String(idea.description ?? ""),
+		"",
+		`Actions: /work-ideate accept|reject|discuss|edit|delete ${idea.id}`,
+	].join("\n");
+}
+
+function ideateDialogItems(
+	lists,
+	{ showBrainstormed = false, showRejected = false } = {},
+) {
+	const items = [];
+	const row = (idea, extra = {}) => ({
+		value: `idea:${idea.id}`,
+		label: idea.title,
+		description: `${idea.id} — ${idea.ideaStatus} · score ${idea.score}`,
+		detailLines: [
+			`${idea.id} · ${idea.ideaStatus} · score ${idea.score}`,
+			String(idea.description ?? "").slice(0, 200),
+		].filter((line) => line.trim()),
+		labelSegments: [
+			{
+				text: `[${idea.score}] `,
+				color: scoreChipColor(idea.score),
+				bold: true,
+			},
+			{ text: idea.title },
+		],
+		...extra,
+	});
+	if (lists.main.length) {
+		items.push({ heading: true, label: "Top ideas" });
+		for (const idea of lists.main) items.push(row(idea));
+	}
+	if (lists.downstream.length) {
+		items.push({ heading: true, label: "Downstream" });
+		for (const idea of lists.downstream)
+			items.push(row(idea, { color: "dim" }));
+	}
+	if (showBrainstormed && lists.brainstormed.length) {
+		items.push({ heading: true, label: "Brainstormed" });
+		for (const idea of lists.brainstormed)
+			items.push(row(idea, { color: "dim" }));
+	}
+	if (showRejected && lists.rejected.length) {
+		items.push({ heading: true, label: "Rejected" });
+		for (const idea of lists.rejected)
+			items.push(row(idea, { color: "dim" }));
+	}
+	if (lists.brainstormed.length)
+		items.push({
+			value: "toggle:brainstormed",
+			label: `${showBrainstormed ? "Hide" : "Show"} brainstormed (${lists.brainstormed.length})`,
+			rowAction: false,
+		});
+	if (lists.rejected.length)
+		items.push({
+			value: "toggle:rejected",
+			label: `${showRejected ? "Hide" : "Show"} rejected (${lists.rejected.length})`,
+			rowAction: false,
+		});
+	return items;
+}
+
+async function chooseIdeateDepth(ctx) {
+	if (
+		typeof ctx.ui?.custom !== "function" &&
+		typeof ctx.ui?.select !== "function"
+	)
+		return "narrow";
+	const result = await showListDialog(ctx, {
+		title: "Ideation depth",
+		purpose: "Choose how widely to explore ideas before ranking.",
+		items: [
+			{
+				value: "narrow",
+				label: "Narrow",
+				description: "One focused ideation pass.",
+			},
+			{
+				value: "wide",
+				label: "Wide",
+				description: "3 divergent agents, merged into one ranked top 20.",
+			},
+		],
+		cursorKey: "work-ideate-depth",
+	});
+	return result?.value;
+}
+
+async function ideateConfirmDelete(ctx, idea) {
+	const confirm = await showListDialog(ctx, {
+		title: `Delete ${idea.id}`,
+		purpose: "Permanently remove this idea from the store.",
+		items: [
+			{
+				value: "yes",
+				label: "Delete",
+				description: `Remove ${idea.id} — ${idea.title}`,
+			},
+			{ value: "no", label: "Keep" },
+		],
+		cursorKey: "work-ideate-delete",
+	});
+	if (confirm?.value !== "yes") return;
+	const state = buildWorkIdeateState(ctx.cwd, `delete ${idea.id}`);
+	notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
+}
+
+async function ideateIdeaDetails(ctx, pi, epic, idea) {
+	if (typeof ctx.ui?.editor === "function")
+		await ctx.ui.editor(`${idea.id} — ${idea.title}`, ideateDetailsText(idea));
+	for (;;) {
+		const action = await choose(ctx, idea.title, [
+			...(idea.ideaStatus === "rejected"
+				? [
+						{
+							value: "accept",
+							label: "Accept back",
+							description: "Restore this idea to the main list.",
+						},
+					]
+				: []),
+			{ value: "back", label: "Go back" },
+			{
+				value: "brainstorm",
+				label: "Brainstorm",
+				description: "Create a brainstorm epic with this idea attached.",
+			},
+			{
+				value: "reject",
+				label: "Reject",
+				description:
+				"Hide behind 'Show rejected'; future runs skip it.",
+			},
+			{
+				value: "delete",
+			label: "Delete",
+			description: "Remove this idea permanently.",
+			},
+			{
+				value: "discuss",
+				label: "Discuss in chat",
+			description: "Continue in chat with idea context.",
+			},
+		]);
+		if (!action || action === "back") return;
+		if (action === "accept") {
+			const state = buildWorkIdeateState(ctx.cwd, `accept ${idea.id}`);
+			notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
+			return;
+		}
+		if (action === "brainstorm")
+			return ideateStartBrainstorm(ctx, pi, epic, idea);
+		if (action === "reject") {
+			const state = buildWorkIdeateState(ctx.cwd, `reject ${idea.id}`);
+			notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
+			return;
+		}
+		if (action === "delete") return ideateConfirmDelete(ctx, idea);
+		if (action === "discuss") {
+			buildWorkIdeateState(ctx.cwd, `discuss ${idea.id}`);
+			await sendFollowUp(
+				ctx,
+				`Discuss this idea with me before deciding. I can accept, reject, brainstorm, or edit it afterward.\n\n${ideateDetailsText(idea)}`,
+				pi,
+			);
+			return;
+		}
+	}
+}
+
+function ideaFileRel(ideaId) {
+	return `docs/ideas/${ideaId}.md`;
+}
+
+function ideaFileMarkdown(idea) {
+	return [
+		`# ${idea.title}`,
+		"",
+		`- Idea: ${idea.id}`,
+		`- Status: ${idea.ideaStatus}`,
+		`- Score: ${idea.score}`,
+		...(idea.area ? [`- Area: ${idea.area}`] : []),
+		"",
+		String(idea.description ?? ""),
+		"",
+	].join("\n");
+}
+
+function startIdeaBrainstorm(cwd, roadmapEpic, idea, extra = "") {
+	try {
+		const rel = ideaFileRel(idea.id);
+		mkdirSync(join(cwd, "docs", "ideas"), { recursive: true });
+		writeFileSync(join(cwd, ...rel.split("/")), ideaFileMarkdown(idea));
+		const brainstormEpic = createWorkflowWorkItem(cwd, {
+			title: brainstormEpicTitle(idea.title),
+			type: "epic",
+			parent: idOf(roadmapEpic),
+			description: `Brainstorm workspace for idea ${idea.id} — ${idea.title}`,
+			notes: `wo:brainstorm auto-created for idea ${idea.id}`,
+		});
+		updateWorkItemNative(cwd, idOf(brainstormEpic), {
+			documentLinks: { idea: rel },
+		});
+		const updated = appendWorkflowWorkItemNote(
+			cwd,
+			idea.id,
+			[
+				"wo:idea",
+				"status=brainstormed",
+				"action=selected-brainstorm",
+				`brainstorm-epic-id=${idOf(brainstormEpic)}`,
+				`idea-file=${rel}`,
+				`brainstormed-at=${new Date().toISOString()}`,
+			].join(" "),
+		);
+		const topic = [idea.title, extra?.trim()].filter(Boolean).join("\n\n");
+		return {
+			ok: true,
+			action: "idea-brainstorm-started",
+			epic: issueSummary(brainstormEpic),
+			idea: issueSummary(updated),
+			topic,
+			message: `Created brainstorm epic ${idOf(brainstormEpic)} with idea file ${rel}; starting brainstorm.`,
+			handoffPrompt: brainstormHandoffPrompt(
+				{
+					epic: issueSummary(brainstormEpic),
+					idea: issueSummary(updated),
+				topic,
+					artifact: "",
+				},
+				cwd,
+				"quick",
+			),
+		};
+	} catch (error) {
+		return errorState(error.reason ?? "work-store-error", error.message, {
+			action: error.reason ?? "work-store-error",
+		});
+	}
+}
+
+async function ideateStartBrainstorm(ctx, pi, epic, idea) {
+	const confirm = await showListDialog(ctx, {
+		title: `Brainstorm ${idea.id}`,
+		purpose: "Start the brainstorm flow with this idea attached.",
+		items: [
+			{ value: "go", label: "Go", description: "Create the brainstorm epic and start." },
+			{
+				value: "go-text",
+				label: "Go with extra text",
+			description: "Add guidance for the brainstorm.",
+		},
+		{ value: "cancel", label: "Cancel" },
+		],
+		cursorKey: "work-ideate-brainstorm",
+	});
+	if (!confirm || confirm.value === "cancel") return;
+	let extra = "";
+	if (confirm.value === "go-text" && typeof ctx.ui?.editor === "function") {
+		const text = await ctx.ui.editor("Brainstorm guidance", `${idea.title}\n\n`);
+		if (text !== undefined) extra = text;
+	}
+	const state = startIdeaBrainstorm(ctx.cwd, epic, idea, extra);
+	notify(ctx, state.message, state.ok ? "info" : "warning");
+	if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
+	return stateTelemetry(state);
+}
+
+async function ideateDashboardLoop(ctx, pi) {
+	let showBrainstormed = false;
+	let showRejected = false;
+	for (;;) {
+		const state = buildWorkIdeateState(ctx.cwd, "");
+		if (!state.ok) {
+			notify(ctx, renderWorkIdeateText(state), "warning");
+			return stateTelemetry(state);
+		}
+		const lists = ideaDashboardList(ctx.cwd, state.epic.id);
+		const total =
+			lists.main.length +
+			lists.downstream.length +
+			lists.brainstormed.length +
+			lists.rejected.length;
+		if (!total) {
+			notify(ctx, `No ideas yet for ${state.epic.title}.`, "info");
+			return stateTelemetry(state);
+		}
+		const all = [
+			...lists.main,
+			...lists.downstream,
+			...lists.brainstormed,
+			...lists.rejected,
+		];
+		const result = await showListDialog(ctx, {
+			title: `Ideas — ${state.epic.title}`,
+			purpose: "Review scored ideas; Enter opens details.",
+			help: "Up/Down navigate · Enter details · Ctrl+D deletes row · Esc closes",
+			items: ideateDialogItems(lists, { showBrainstormed, showRejected }),
+			cursorKey: "work-ideate-dashboard",
+			rowAction: { key: "\x04", label: "Delete" },
+			maxVisible: 12,
+		});
+		if (!result || result.action === "back") return stateTelemetry(state);
+		if (result.value === "toggle:brainstormed") {
+			showBrainstormed = !showBrainstormed;
+			continue;
+		}
+		if (result.value === "toggle:rejected") {
+			showRejected = !showRejected;
+			continue;
+		}
+		const idea = all.find((item) => `idea:${item.id}` === result.value);
+		if (!idea) continue;
+		if (result.action === "row") {
+			await ideateConfirmDelete(ctx, idea);
+			continue;
+		}
+		await ideateIdeaDetails(ctx, pi, state.epic, idea);
+	}
+}
+
+async function handleWorkIdeateCommand(ctx, pi, text = "") {
+	const parsed = parseWorkIdeateArgs(text);
+	if (parsed.kind === "dashboard") return ideateDashboardLoop(ctx, pi);
+	if (parsed.kind === "topic" && !parsed.topic) {
+		const state = errorState(
+			"missing-topic",
+			"Usage: /work-ideate [wide|narrow] <topic>",
+			{ action: "usage" },
+		);
+		notify(ctx, renderWorkIdeateText(state), "warning");
+		return stateTelemetry(state);
+	}
+	if (parsed.kind === "topic") {
+		let agents = parsed.agents;
+		if (!agents) {
+			agents = await chooseIdeateDepth(ctx);
+			if (!agents) {
+				const cancelled = {
+					ok: false,
+					action: "ideate-cancelled",
+					message: "Ideation cancelled.",
+				};
+				notify(ctx, cancelled.message, "info");
+				return stateTelemetry(cancelled);
+			}
+		}
+		let offlineModels = [];
+		if (agents === "wide") {
+			const health = await brainstormAgentHealthPreflight(ctx);
+			offlineModels = health.offlineModels ?? [];
+			if (!health.proceed) {
+				notify(
+					ctx,
+					"Wide ideation cancelled; falling back to narrow.",
+					"warning",
+					);
+				agents = "narrow";
+				offlineModels = [];
+			}
+		}
+		const state = buildWorkIdeateState(ctx.cwd, text, {
+			agents,
+			offlineModels,
+			currentModel: ctx.model ?? "",
+		});
+		notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
+		if (state.handoffPrompt)
+			await sendFollowUp(ctx, state.handoffPrompt, pi);
+		return stateTelemetry(state);
+	}
+	const state = buildWorkIdeateState(ctx.cwd, text);
+	notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
+	return stateTelemetry(state);
 }
 
 function buildWorkInitState(cwd, _args = "") {
@@ -24824,9 +25488,9 @@ async function handleWorkMenuCommand(ctx, pi) {
 			value: "work-ideate",
 			label: "💡 Ideas",
 			description:
-				"List, capture, inspect, accept, reject, discuss, or import ideas.\nBlank opens the current roadmap's idea dashboard.",
+				"Open the scored ideas dashboard, or start [wide|narrow] ideation on a topic.\nEnter opens details; ideas can be accepted, rejected, edited, deleted, or brainstormed.",
 			argumentTitle: "Idea topic or action",
-			placeholder: "Blank lists ideas; try <id> inspect or import <path>",
+			placeholder: "Blank opens the dashboard; try wide <topic> or edit <id> <text>",
 		},
 		{
 			value: "work-research",
@@ -28637,10 +29301,7 @@ async function executeOrchestratorAction(
 	if (name === "work-ideate")
 		return withCommandTelemetry(name, text, ctx, async () => {
 			cleanupBenignInstructionDirt(ctx.cwd);
-			const state = buildWorkIdeateState(ctx.cwd, text);
-			notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
-			if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
-			return stateTelemetry(state);
+			return handleWorkIdeateCommand(ctx, pi, text);
 		});
 	if (name === "work-research")
 		return withCommandTelemetry(name, text, ctx, async () => {
@@ -28824,6 +29485,12 @@ export {
 	buildWorkCatchUpState,
 	buildWorkCatchUpObjective,
 	captureIdeationIdeas,
+	parseWorkIdeateArgs,
+	ideaDashboardList,
+	ideateDialogItems,
+	scoreChipColor,
+	startIdeaBrainstorm,
+	handleWorkIdeateCommand,
 	brainstormHandoffPrompt,
 	researchHandoffPrompt,
 	linkBrainstormArtifactFromFinal,

@@ -1,7 +1,7 @@
 # Work-Ideate — ce-ideate Integration + Scored Ideas Dashboard
 
 ```yaml
-status: plan
+status: implemented
 type: feature-plan
 created: 2026-09-06
 revised: 2026-09-06 (v2 — Opus-5 adversarial review + user decisions: top-20 only, agent-side semantic merge, delete on list rows, idea-as-file-in-epat)
@@ -78,7 +78,7 @@ optional file, like plan attachments.
 Shipped as `d777472` (2026-09-06): policy v3.23.4, 10 workflows, generator
 closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
 
-### U1a — Dispatch authority + stable fingerprints + arg grammar (unblocks everything)
+### U1a — Dispatch authority + stable fingerprints + arg grammar (unblocks everything) — DONE
 
 - `extensions/work-private-workflows.js`: AUTHORITIES +=
   `["work-models:wf:ideate:v1", { caller: WORK_MODELS_CALLER, workflows:
@@ -110,7 +110,7 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
   grammar: `/work-ideate edit IDEA-3 new description text`,
   `/work-ideate wide hero page`.
 
-### U1 — Scored capture contract (schema v2)
+### U1 — Scored capture contract (schema v2) — DONE
 
 - `parseIdeationIdeas`: read `score` (int, clamp 0-100, default derive),
   `area` (single token); drop topPicks parsing — every captured idea is
@@ -129,7 +129,7 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
   fixtures** (`ideaSchemaVersion: 1` → 2, ~L38) and the status-grouped text
   assertions (~L129-141); rejected suppression (from U1a) re-verified here.
 
-### U2 — Front door: Narrow or Wide (agent-side orchestration)
+### U2 — Front door: Narrow or Wide (agent-side orchestration) — DONE
 
 - `/work-ideate [wide|narrow] <topic>`: leading keyword wins; without one, TUI
   asks via `showListDialog` (purpose line, two options, keyboard filter;
@@ -151,7 +151,7 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
 - Tests: keyword + dialog + default wiring; state fields; prompt contains the
   merge instruction for wide.
 
-### U3 — Ideas dashboard (interactive handler, scored, color-coded, toggled)
+### U3 — Ideas dashboard (interactive handler, scored, color-coded, toggled) — DONE
 
 - New `handleWorkIdeateCommand(ctx, pi)` async handler replaces the
   fire-and-forget notify path **but keeps** `withCommandTelemetry`,
@@ -182,7 +182,7 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
   rejected absent from main body; snapshot index stability across toggles;
   delete row action removes idea and refuses referenced ones.
 
-### U4 — Per-idea action loop + description editing + brainstorm attachment
+### U4 — Per-idea action loop + description editing + brainstorm attachment — DONE
 
 - Details → `choose()` loop: **Go back** / **Brainstorm** / **Reject** /
   **Delete** / **Discuss in chat**.
@@ -212,6 +212,20 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
   idea-file attachment.
 
 ## Verification
+
+- Implemented and verified 2026-09-06: `node scripts/test-work-ideate.mjs`
+  (authority dispatch, fingerprints, grammar, schema v2, trim, dashboard,
+  handler dialogs, headless default), `node scripts/test-work-brainstorm.mjs`,
+  `node scripts/test-work-dialogs.mjs`, `node scripts/test-work-private-workflows.mjs`
+  (61 checks, zeroSurface=true), and the full `node scripts/verify-package.mjs`
+  gate all green; plus a disposable temp-repo end-to-end run (store seed →
+  wide handoff → 25-idea capture trimmed to top 20 → snapshot → dialog
+  reject/suppress/accept-back/recapture → brainstorm attachment → edit →
+  delete → headless narrow → clean git commit) passing all checks. Deviation:
+  legacy `brainstormId`/`brainstormPath` metadata keys stay valid brainstormed
+  indicators in `deriveIdeaStatus` alongside the new `brainstormEpicId`/
+  `ideaFile` keys — retiring them outright would break the existing
+  brainstorm flow, which is an explicit non-goal to change.
 
 - `node scripts/test-work-private-workflows.mjs` green (ideate dispatch case).
 - `node scripts/test-work-ideate.mjs` green with all new cases.
