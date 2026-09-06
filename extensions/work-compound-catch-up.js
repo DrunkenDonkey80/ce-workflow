@@ -33,6 +33,7 @@ export const PRIVATE_WORKFLOW_OWNED_OUTPUTS = [
 	"extensions/private-workflows/browser.md",
 	"extensions/private-workflows/debug.md",
 	"extensions/private-workflows/explain.md",
+	"extensions/private-workflows/ideate.md",
 	"extensions/private-workflows/learning.md",
 	"extensions/private-workflows/manifest.json",
 	"extensions/private-workflows/plan.md",

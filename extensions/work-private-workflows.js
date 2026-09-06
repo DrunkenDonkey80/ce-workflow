@@ -20,6 +20,7 @@ const ALLOWLIST = new Map([
 	["browser", "browser.md"],
 	["debug", "debug.md"],
 	["explain", "explain.md"],
+	["ideate", "ideate.md"],
 	["learning", "learning.md"],
 	["plan", "plan.md"],
 	["pov", "pov.md"],
@@ -36,6 +37,7 @@ const PARITY_WORKFLOWS = [
 	"ce-explain",
 	"ce-debug",
 	"ce-compound",
+	"ce-ideate",
 ];
 const PARITY_FIELDS = [
 	"trigger",

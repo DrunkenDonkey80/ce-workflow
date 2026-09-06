@@ -3,50 +3,54 @@
   "verified": true,
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "f26cec70eaa91b8469b00de505f4b63c79c7a3de66e6ad26ef9d30397a6e430e",
+    "sha256": "4a5877461fa23f89792679a5de30832b3583b458aa301f10f4685d9b2064022d",
     "version": 6
   },
   "provenance": {
     "path": "provenance.json",
-    "sha256": "03df54644293806572c8ee3eb44f2c9fecf3673e6284ca6fc2b1c8c7949c7ee4"
+    "sha256": "a6f314b0be4f4eff59bd101d278c01bf1be6a3ce9e5f26b1fd0fe8b5e7b7e194"
   },
   "workflows": {
     "brainstorm": {
       "path": "brainstorm.md",
-      "sha256": "989f3a09f4666e5457433a043178f0ac368d8d0621a8e01c6d7e7713edcae8d8"
+      "sha256": "b6951685bf7e3fd8425f73ab371db96fa6e589883f7e7d7be7ff920eff7f38eb"
     },
     "browser": {
       "path": "browser.md",
-      "sha256": "e6820ea334fcd6bb8a9b21f008a7dbac6f0dca79028a280ddd864c1d958a4679"
+      "sha256": "6c3698d6bb1a485688235a8bddec026a15ff7c4234f9904109e3678b95cfa783"
     },
     "debug": {
       "path": "debug.md",
-      "sha256": "90de0361c174428326f4ae1ce6440b5968ae3910737570f0a1a250074cbb27e6"
+      "sha256": "a529b8c10228ddc68a72c5d3d13c50ba73ff12af5f45704f5e2f25f9713e0514"
     },
     "explain": {
       "path": "explain.md",
-      "sha256": "7f99179a6b5d7073acf8525c8086bd8c324f6e7189d96005ddabd885391a7d61"
+      "sha256": "5980be131ee2b128fef664ad2204f12c76eb5752602dc1e942c888cb89e4ef0c"
+    },
+    "ideate": {
+      "path": "ideate.md",
+      "sha256": "535017c5bd7425c3526a1a066c7afbe7a2e6b159e52db6c9ab2a61ded772e7cb"
     },
     "learning": {
       "path": "learning.md",
-      "sha256": "dd2d739448fdf8e249eb7fbc55d08f418ab5fc7e2fe9f83ea876d79af1cfc8cd"
+      "sha256": "1ee5fa58f9c83c587c3c21707d2445171d07d7e35f2de6af764fbfe3a43b3493"
     },
     "plan": {
       "path": "plan.md",
-      "sha256": "f39078d34215bee5d5475392a9877e17ec3efc56501c3d74ce9687a85a09d510"
+      "sha256": "5613d54dd265de68fb7300ab78fa09d9497047be456703a9025358ef3a62cac7"
     },
     "pov": {
       "path": "pov.md",
-      "sha256": "76400f78085ff5ce5a10cea874c6ce07c0a5cd105dbbf2121df6f7d7fa8e8e16"
+      "sha256": "fd5296b44e635cfb14312547079554cf55e48c11aa5ba2fea28fd54540ae9859"
     },
     "review": {
       "path": "review.md",
-      "sha256": "6ee29b58ed5c31e57a1fff31398c07ebcff1bd049441b959ecc682090f9982ae"
+      "sha256": "4c60a249a90aa491bfa3afe622e757eda70f4b6fbbd292a9913da5b019bca77f"
     },
     "simplify": {
       "path": "simplify.md",
-      "sha256": "f1477b1bd8c91bbcb5b3db0d1168ca276dc1ae9a8067f4a5c7e25195e3a95b48"
+      "sha256": "827fbcafff992156094153a49764414db46c43615aa093b414474bd20d4ba188"
     }
   },
-  "generationSha256": "acd3477693b47ba501e27c3a8983be66416358518cafc5cff17538ad278dd225"
+  "generationSha256": "e8f9550c3ee42cf6131893d020817c1a3345931ffe6b06c2ea75e63143e01511"
 }

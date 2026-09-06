@@ -1,6 +1,6 @@
 # Private Affected-UI Browser Playbook
 
-<!-- generated; source-closure-sha256: 0426e38f0c4247b1eaebed5a1fa82a13fd5722faa164e47765f975920b596cab -->
+<!-- generated; source-closure-sha256: c7871c57de2c16bfce86091ebc1b953529dd99701bd9ceb8b580c00847c47fde -->
 
 ## Affected UI selection
 

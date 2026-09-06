@@ -132,6 +132,7 @@ const generated = Object.fromEntries(
 		"browser.md",
 		"debug.md",
 		"explain.md",
+		"ideate.md",
 		"learning.md",
 		"plan.md",
 		"pov.md",
@@ -232,6 +233,7 @@ check(() => {
 				"ce-pov",
 				"ce-simplify-code",
 				"ce-test-browser",
+				"ce-ideate",
 			].includes(name),
 		),
 		[
@@ -244,6 +246,7 @@ check(() => {
 			"ce-explain",
 			"ce-debug",
 			"ce-compound",
+			"ce-ideate",
 		],
 	);
 	for (const field of [
@@ -264,6 +267,7 @@ check(() => {
 			"ce-explain",
 			"ce-simplify-code",
 			"ce-test-browser",
+			"ce-ideate",
 		])
 			assert.ok(parity[name][field]);
 	assert.match(playbook, /stop without inventing it/i);
@@ -447,6 +451,9 @@ try {
 		"---\nname: source-pov\n---\nForm a graded verdict.\n",
 	);
 	const explainSourcePath = "skills/ce-explain/SKILL.md";
+	const ideateSourcePath = "skills/ce-ideate/SKILL.md";
+	const ideateSourceBytes =
+		"---\nname: source-ideate\n---\nGenerate and evaluate grounded ideas.\n";
 	const explainSourceBytes = Buffer.from(
 		"---\nname: source-explain\n---\nTeach the technical subject.\n",
 	);
@@ -460,6 +467,7 @@ try {
 		[browserSourcePath, browserSourceBytes],
 		[povSourcePath, povSourceBytes],
 		[explainSourcePath, explainSourceBytes],
+		[ideateSourcePath, ideateSourceBytes],
 	];
 	for (const [source, bytes] of fixtureSources) {
 		const file = path.join(fixtureRoot, ...source.split("/"));
@@ -551,6 +559,13 @@ try {
 						sha256: sha256(explainSourceBytes),
 					},
 				],
+				"ce-ideate": [
+					{
+						path: ideateSourcePath,
+						bytes: ideateSourceBytes.length,
+						sha256: sha256(ideateSourceBytes),
+					},
+				],
 			},
 		},
 	};
@@ -583,7 +598,8 @@ try {
 		assert.match(first["browser.md"], /Affected UI selection/);
 		assert.match(first["pov.md"], /Graded verdict/);
 		assert.match(first["explain.md"], /Conditional boundary/);
-	}, "nine-workflow release, path, hash, license, and translator provenance");
+		assert.match(first["ideate.md"], /Grounding and scope/);
+	}, "ten-workflow release, path, hash, license, and translator provenance");
 
 	check(() => {
 		for (const status of ["current", "update", "unknown", "blocked", "failed"])

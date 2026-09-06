@@ -123,7 +123,7 @@ Do not implement until the roadmap contains the master plan and durable executab
 
 Prefer the extension command `/wo → Ideas` when available. It lists `wo:idea` work items, guards numeric dashboard indexes with a disposable snapshot, and mutates only the resolved idea for `accept`, `reject`, `discuss`, `inspect`, and `import`.
 
-Fallback behavior: read the active roadmap's child work items, filter idea records marked with `wo:idea`, and show their derived status. For a topic handoff, run the verified private ideation workflow, ask for structured JSON with `ideas[]` and optional `topPicks`, save every parsed idea under the roadmap with `source-run-id` and `source-index` notes, and create a recovery decision work item if parsing or saving fails. Never treat an idea record as executable work; only linked planning/task descendants can be resumed.
+Fallback behavior: read the active roadmap's child work items, filter idea records marked with `wo:idea`, and show their derived status. For a topic handoff, run the verified private ideate playbook (`extensions/private-workflows/ideate.md`, translated from upstream `ce-ideate`), ask for structured JSON with `ideas[]` and optional `topPicks`, save every parsed idea under the roadmap with `source-run-id` and `source-index` notes, and create a recovery decision work item if parsing or saving fails. Never treat an idea record as executable work; only linked planning/task descendants can be resumed.
 
 ## Mode: brainstorm
 

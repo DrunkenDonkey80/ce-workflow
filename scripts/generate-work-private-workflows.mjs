@@ -18,6 +18,7 @@ export const SIMPLIFY_SOURCE = "skills/ce-simplify-code/SKILL.md";
 export const BROWSER_SOURCE = "skills/ce-test-browser/SKILL.md";
 export const POV_SOURCE = "skills/ce-pov/SKILL.md";
 export const EXPLAIN_SOURCE = "skills/ce-explain/SKILL.md";
+export const IDEATE_SOURCE = "skills/ce-ideate/SKILL.md";
 const TRANSLATOR_PATH = "scripts/generate-work-private-workflows.mjs";
 const WORKFLOW_RULES = {
 	brainstorm: [
@@ -71,8 +72,14 @@ const WORKFLOW_RULES = {
 	explain: [
 		"verify-complete-u1-explain-closure",
 		"remove-pi-discovery-frontmatter-and-executable-helpers",
-		"preserve-deep-technical-explanation-without-changing-the-verdict",
-		"adapt-output-to-conditional-catch-up-decision-support-contract",
+    "preserve-deep-technical-explanation-without-changing-the-verdict",
+    "adapt-output-to-conditional-catch-up-decision-support-contract",
+	],
+	ideate: [
+		"verify-complete-u1-ideate-closure",
+		"remove-pi-discovery-frontmatter-and-executable-helpers",
+		"preserve-grounded-divergence-axis-coverage-and-critique-before-ranking",
+		"adapt-output-to-work-ideate-ideas-json-capture-contract",
 	],
 };
 const WORKFLOW_SOURCES = {
@@ -85,6 +92,7 @@ const WORKFLOW_SOURCES = {
 	pov: { closure: "ce-pov", source: POV_SOURCE },
 	review: { closure: "ce-code-review", source: REVIEW_SOURCE },
 	simplify: { closure: "ce-simplify-code", source: SIMPLIFY_SOURCE },
+	ideate: { closure: "ce-ideate", source: IDEATE_SOURCE },
 };
 
 function json(value) {
@@ -186,11 +194,16 @@ function explainPlaybook(sourceClosureSha256) {
 	return `# Private Catch-up Technical-Explanation Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Conditional boundary\n\nInvoke this read-only playbook only after the POV marks a candidate intentionally too-technical for the actor to decide from its concise summary. Do not invoke it for ordinary candidates, brief follow-ups, status reporting, or as a substitute for missing POV evidence. It teaches the already-grounded candidate and never selects, changes, or softens the graded verdict.\n\n## Decision-ready explanation\n\nExplain the candidate's mechanism in the repository's actual terms, then connect it to the current call sites, incumbent behavior, likely change, benefit, cost, risk, and reversibility. Prefer a compact worked example or before/after flow over generic background. Label any unverified claim and keep internal workflow mechanics out of the actor-visible explanation.\n\n## Return and failure\n\nReturn the explanation to the same undecided candidate so the caller can present its original POV, recommendation, and one-at-a-time Adopt now, Defer, or Skip this release choice. If the explanation cannot be grounded safely, identify the missing fact and keep the candidate undecided; do not advance the completion manifest.\n`;
 }
 
+function ideatePlaybook(sourceClosureSha256) {
+	return `# Private Ideate Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary\n\nGenerate and evaluate grounded ideas for one topic. This playbook precedes brainstorm: it answers \"what is worth exploring\", never \"what exactly to build\". Do not produce requirements, plans, code, or brainstorm artifacts; the caller's Ideas dashboard owns selection.\n\n## Grounding and scope\n\n1. Resolve the subject before generating. If the topic names only a catch-all quality (\"improvements\", \"ideas\"), ask exactly one blocking \`ask_user\` question offering specify-a-subject, surprise-me, or cancel; never silently interpret a vague topic as \"about this repo\".\n2. Ground before ideating: scan the repository's actual patterns, pain points, and leverage points relevant to the focus, including existing \`wo:idea\` records and rejected fingerprints so already-rejected directions are not re-proposed. No abstract product advice detached from what exists.\n3. Decompose the settled subject into 3-5 orthogonal axes named in the topic's language; skip only for atomic subjects. Cover the axes instead of converging on the first salient reading.\n\n## Divergence and critique\n\n1. Generate many candidates first (default roughly 20-30), then critique every one: generate-many, critique-all, explain-survivors. Quality comes from explicit rejection with reasons, not optimistic ranking.\n2. Score each surviving idea 0-100 confidence grounded in evidence strength, payoff, and effort/risk. Weak ideas die with a one-line reason rather than being padded. Merge exact duplicates keeping the strongest phrasing; near-duplicates share one \`area\` token instead of forcing a merge.\n3. Keep every idea traceable: cite the repository behavior or external source that grounds it. Unverifiable candidates are dropped, not marked uncertain.\n\n## Output contract\n\nEmit exactly one fenced JSON block: \`ideas: [{ title, summary, score, area }]\` with title unique and specific, summary 2-4 lines, score integer 0-100, area one lowercase token. No prose ranking, no topPicks, no artifact files; the caller parses the block, deduplicates by fingerprint, and saves each idea under the roadmap as a \`wo:idea\` work item.\n\n## Handoff\n\nAfter the JSON block, stop. Selection, brainstorming, rejection, and deletion happen through the caller's Ideas dashboard; routing a chosen idea into brainstorm is the caller's action, never this playbook's.\n`;
+}
+
 const PLAYBOOKS = {
 	brainstorm: brainstormPlaybook,
 	browser: browserPlaybook,
 	debug: debugPlaybook,
 	explain: explainPlaybook,
+	ideate: ideatePlaybook,
 	learning: learningPlaybook,
 	plan: planPlaybook,
 	pov: povPlaybook,
@@ -203,7 +216,7 @@ export function translateVerifiedWorkflows({
 	evidence,
 	policy,
 	translatorBytes,
-	workflows = ["brainstorm", "browser", "debug", "explain", "learning", "plan", "pov", "review", "simplify"],
+	workflows = ["brainstorm", "browser", "debug", "explain", "ideate", "learning", "plan", "pov", "review", "simplify"],
 }) {
 	assertVerifiedEvidence(evidence, policy);
 	if (
@@ -312,5 +325,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	);
 	const files = translateVerifiedWorkflows({ sourceRoot: path.resolve(args.source), evidence, policy });
 	writePrivateWorkflowGeneration(outputRoot, files);
-	console.log(`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,explain,learning,plan,pov,review,simplify files=${Object.keys(files).length}`);
+	console.log(`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,explain,ideate,learning,plan,pov,review,simplify files=${Object.keys(files).length}`);
 }

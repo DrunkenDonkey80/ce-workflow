@@ -1,6 +1,6 @@
 # Private Scoped Simplification Playbook
 
-<!-- generated; source-closure-sha256: f5525b31d981b528bea3a94e5784bbea09e5a4a59801a7f4e76dcfce37e3c38e -->
+<!-- generated; source-closure-sha256: f1762038ef8c60020c26c72e491272728cc1fc80b1a713bca7b4b2f12d585761 -->
 
 ## Boundary and selection
 

@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
-  "release": "compound-engineering-v3.21.0",
-  "version": "3.21.0",
-  "peeledCommitSha": "c553b957842fbd87f65f90ff5af4f18deb91f56c",
+  "release": "compound-engineering-v3.23.4",
+  "version": "3.23.4",
+  "peeledCommitSha": "33d9bd92689d60580e732890f94466e5793385b1",
   "archive": {
-    "url": "https://codeload.github.com/EveryInc/compound-engineering-plugin/tar.gz/refs/tags/compound-engineering-v3.21.0",
-    "sha256": "faec7a2c7582c7606327abff7356d30830dd30e1455012537f1a7d9b3b4f36e2",
-    "bytes": 3546636
+    "url": "https://codeload.github.com/EveryInc/compound-engineering-plugin/tar.gz/refs/tags/compound-engineering-v3.23.4",
+    "sha256": "d190a32dd09a7632b1653d2ecdfe6eb8f82978fb40cd8792cefa962701d53bf8",
+    "bytes": 5264871
   },
   "packageIdentity": {
     "name": "compound-engineering",
@@ -46,6 +46,7 @@
     "ce-compound",
     "ce-debug",
     "ce-explain",
+    "ce-ideate",
     "ce-plan",
     "ce-pov",
     "ce-simplify-code",
