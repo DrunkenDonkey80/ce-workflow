@@ -7711,8 +7711,8 @@ function isIdeaIssue(issue) {
 		metadata.kind === "idea" ||
 		metadata.type === "idea" ||
 		metadata.idea === true ||
-		Number(metadata.ideaSchemaVersion) >= 1 &&
-			Number(metadata.ideaSchemaVersion) <= IDEA_SCHEMA_VERSION ||
+		(Number(metadata.ideaSchemaVersion) >= 1 &&
+			Number(metadata.ideaSchemaVersion) <= IDEA_SCHEMA_VERSION) ||
 		/(^|\s)wo:idea(\s|:|$)/i.test(notesOf(issue))
 	);
 }
@@ -18563,7 +18563,7 @@ function buildWorkIdeateState(cwd, args = "", options = {}) {
 				return {
 					ok: true,
 					action: "deleted",
-				epic: issueSummary(epic),
+					epic: issueSummary(epic),
 					idea,
 					message: `Deleted ${idea.id}.`,
 				};
@@ -18690,9 +18690,7 @@ function deleteWorkflowWorkItem(cwd, id) {
 
 function ideaScore(issue) {
 	const raw = Number(ideaMetadata(issue).score);
-	return Number.isFinite(raw)
-		? Math.max(0, Math.min(100, Math.round(raw)))
-		: 50;
+	return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : 50;
 }
 
 function scoreChipColor(score) {
@@ -18749,7 +18747,9 @@ function ideaDashboardList(cwd, epicId) {
 		.sort(
 			(a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)),
 		);
-	const brainstormed = ideas.filter((idea) => idea.ideaStatus === "brainstormed");
+	const brainstormed = ideas.filter(
+		(idea) => idea.ideaStatus === "brainstormed",
+	);
 	const rejected = ideas.filter((idea) => idea.ideaStatus === "rejected");
 	const downstream = ideas.filter(
 		(idea) =>
@@ -18806,8 +18806,7 @@ function ideateDialogItems(
 	}
 	if (lists.downstream.length) {
 		items.push({ heading: true, label: "Downstream" });
-		for (const idea of lists.downstream)
-			items.push(row(idea, { color: "dim" }));
+		for (const idea of lists.downstream) items.push(row(idea, { color: "dim" }));
 	}
 	if (showBrainstormed && lists.brainstormed.length) {
 		items.push({ heading: true, label: "Brainstormed" });
@@ -18816,8 +18815,7 @@ function ideateDialogItems(
 	}
 	if (showRejected && lists.rejected.length) {
 		items.push({ heading: true, label: "Rejected" });
-		for (const idea of lists.rejected)
-			items.push(row(idea, { color: "dim" }));
+		for (const idea of lists.rejected) items.push(row(idea, { color: "dim" }));
 	}
 	if (lists.brainstormed.length)
 		items.push({
@@ -18902,18 +18900,17 @@ async function ideateIdeaDetails(ctx, pi, epic, idea) {
 			{
 				value: "reject",
 				label: "Reject",
-				description:
-				"Hide behind 'Show rejected'; future runs skip it.",
+				description: "Hide behind 'Show rejected'; future runs skip it.",
 			},
 			{
 				value: "delete",
-			label: "Delete",
-			description: "Remove this idea permanently.",
+				label: "Delete",
+				description: "Remove this idea permanently.",
 			},
 			{
 				value: "discuss",
 				label: "Discuss in chat",
-			description: "Continue in chat with idea context.",
+				description: "Continue in chat with idea context.",
 			},
 		]);
 		if (!action || action === "back") return;
@@ -18999,7 +18996,7 @@ function startIdeaBrainstorm(cwd, roadmapEpic, idea, extra = "") {
 				{
 					epic: issueSummary(brainstormEpic),
 					idea: issueSummary(updated),
-				topic,
+					topic,
 					artifact: "",
 				},
 				cwd,
@@ -19018,13 +19015,17 @@ async function ideateStartBrainstorm(ctx, pi, epic, idea) {
 		title: `Brainstorm ${idea.id}`,
 		purpose: "Start the brainstorm flow with this idea attached.",
 		items: [
-			{ value: "go", label: "Go", description: "Create the brainstorm epic and start." },
+			{
+				value: "go",
+				label: "Go",
+				description: "Create the brainstorm epic and start.",
+			},
 			{
 				value: "go-text",
 				label: "Go with extra text",
-			description: "Add guidance for the brainstorm.",
-		},
-		{ value: "cancel", label: "Cancel" },
+				description: "Add guidance for the brainstorm.",
+			},
+			{ value: "cancel", label: "Cancel" },
 		],
 		cursorKey: "work-ideate-brainstorm",
 	});
@@ -19124,11 +19125,7 @@ async function handleWorkIdeateCommand(ctx, pi, text = "") {
 			const health = await brainstormAgentHealthPreflight(ctx);
 			offlineModels = health.offlineModels ?? [];
 			if (!health.proceed) {
-				notify(
-					ctx,
-					"Wide ideation cancelled; falling back to narrow.",
-					"warning",
-					);
+				notify(ctx, "Wide ideation cancelled; falling back to narrow.", "warning");
 				agents = "narrow";
 				offlineModels = [];
 			}
@@ -19139,8 +19136,7 @@ async function handleWorkIdeateCommand(ctx, pi, text = "") {
 			currentModel: ctx.model ?? "",
 		});
 		notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
-		if (state.handoffPrompt)
-			await sendFollowUp(ctx, state.handoffPrompt, pi);
+		if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
 		return stateTelemetry(state);
 	}
 	const state = buildWorkIdeateState(ctx.cwd, text);
@@ -25490,7 +25486,8 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description:
 				"Open the scored ideas dashboard, or start [wide|narrow] ideation on a topic.\nEnter opens details; ideas can be accepted, rejected, edited, deleted, or brainstormed.",
 			argumentTitle: "Idea topic or action",
-			placeholder: "Blank opens the dashboard; try wide <topic> or edit <id> <text>",
+			placeholder:
+				"Blank opens the dashboard; try wide <topic> or edit <id> <text>",
 		},
 		{
 			value: "work-research",

@@ -1,5 +1,12 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -179,10 +186,16 @@ assert(
 	)[0].status === "contender",
 	"topPicks no longer mark ideas accepted",
 );
-assert(parseIdeationIdeas("not json").length === 0, "malformed output is empty");
+assert(
+	parseIdeationIdeas("not json").length === 0,
+	"malformed output is empty",
+);
 
 // --- U1a: leading-token grammar ----------------------------------------------
-assert(parseWorkIdeateArgs("").kind === "dashboard", "bare call opens dashboard");
+assert(
+	parseWorkIdeateArgs("").kind === "dashboard",
+	"bare call opens dashboard",
+);
 assert(
 	JSON.stringify(parseWorkIdeateArgs("wide hero page")) ===
 		JSON.stringify({ kind: "topic", topic: "hero page", agents: "wide" }),
@@ -209,8 +222,7 @@ assert(
 );
 assert(
 	parseWorkIdeateArgs("reject hero page banner").action === "reject" &&
-		parseWorkIdeateArgs("reject hero page banner").target ===
-			"hero page banner",
+		parseWorkIdeateArgs("reject hero page banner").target === "hero page banner",
 	"action targets may span multiple tokens",
 );
 assert(
@@ -258,8 +270,14 @@ try {
 			JSON.stringify(["IDEA-1", "IDEA-2", "IDEA-3"]),
 		"main list sorts by score then id",
 	);
-	assert(lists.main.every((item) => item.score === 50), "unscored ideas default to 50");
-	assert(lists.brainstormed[0].id === "IDEA-4", "brainstormed ideas group separately");
+	assert(
+		lists.main.every((item) => item.score === 50),
+		"unscored ideas default to 50",
+	);
+	assert(
+		lists.brainstormed[0].id === "IDEA-4",
+		"brainstormed ideas group separately",
+	);
 	assert(lists.rejected[0].id === "IDEA-7", "rejected ideas group separately");
 
 	let items = ideateDialogItems(lists, {});
@@ -279,7 +297,10 @@ try {
 		items.some((item) => item.heading && item.label === "Top ideas"),
 		"main rows sit under a heading",
 	);
-	items = ideateDialogItems(lists, { showRejected: true, showBrainstormed: true });
+	items = ideateDialogItems(lists, {
+		showRejected: true,
+		showBrainstormed: true,
+	});
 	assert(
 		items.some((item) => item.label === "Rejected idea" && item.color === "dim"),
 		"revealed rejected rows render dim",
@@ -303,7 +324,13 @@ try {
 	);
 
 	const text = renderWorkIdeateText(state);
-	for (const status of ["raw", "accepted", "contender", "brainstormed", "rejected"])
+	for (const status of [
+		"raw",
+		"accepted",
+		"contender",
+		"brainstormed",
+		"rejected",
+	])
 		assert(text.includes(`${status}:`), `dashboard groups ${status}`);
 
 	// --- actions --------------------------------------------------------------
@@ -322,7 +349,10 @@ try {
 	fixture.reset("ideas");
 	buildWorkIdeateState(cwd, "");
 	state = buildWorkIdeateState(cwd, "inspect 1");
-	assert(state.ok && state.action === "inspect", "fresh numeric snapshot resolves");
+	assert(
+		state.ok && state.action === "inspect",
+		"fresh numeric snapshot resolves",
+	);
 	fixture.reset("noIdeas");
 	state = buildWorkIdeateState(cwd, "inspect 1");
 	assert(
@@ -411,16 +441,20 @@ try {
 
 	// --- U1: scored capture with fingerprint identity -------------------------
 	fixture.reset("noIdeas");
-	let capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-1",
-		output: JSON.stringify({
-			ideas: [
-				{ title: "Top idea", score: 90, area: "ux" },
-				{ title: "Other idea", score: 40 },
-			],
-		}),
-	});
+	let capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-1",
+			output: JSON.stringify({
+				ideas: [
+					{ title: "Top idea", score: 90, area: "ux" },
+					{ title: "Other idea", score: 40 },
+				],
+			}),
+		},
+	);
 	assert(capture.ok && capture.saved.length === 2, "capture saves parsed ideas");
 	const savedId = capture.saved[0].id;
 	const savedNotes = fixture.store().items[savedId].notes.join("\n");
@@ -431,57 +465,75 @@ try {
 			savedNotes.includes("title-fingerprint="),
 		"capture notes carry score, area, and fingerprint",
 	);
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-1",
-		output: JSON.stringify({
-			ideas: [
-				{ title: "Top idea", score: 90, area: "ux" },
-				{ title: "Other idea", score: 40 },
-			],
-		}),
-	});
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-1",
+			output: JSON.stringify({
+				ideas: [
+					{ title: "Top idea", score: 90, area: "ux" },
+					{ title: "Other idea", score: 40 },
+				],
+			}),
+		},
+	);
 	assert(
 		capture.saved.length === 2 && capture.duplicates === 0,
 		"same-run capture retry is idempotent",
 	);
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-2",
-		output: JSON.stringify({
-			ideas: [
-				{ title: "Top idea", score: 90 },
-				{ title: "Other idea", score: 40 },
-			],
-		}),
-	});
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-2",
+			output: JSON.stringify({
+				ideas: [
+					{ title: "Top idea", score: 90 },
+					{ title: "Other idea", score: 40 },
+				],
+			}),
+		},
+	);
 	assert(
 		capture.duplicates === 2 && capture.saved.length === 0,
 		"cross-run exact duplicates merge instead of duplicating",
 	);
 	buildWorkIdeateState(cwd, `reject ${savedId}`);
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-3",
-		output: JSON.stringify({
-			ideas: [
-				{ title: "Top idea", score: 90 },
-				{ title: "Other idea", score: 40 },
-			],
-		}),
-	});
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-3",
+			output: JSON.stringify({
+				ideas: [
+					{ title: "Top idea", score: 90 },
+					{ title: "Other idea", score: 40 },
+				],
+			}),
+		},
+	);
 	assert(
 		capture.suppressed === 1,
 		"rejected fingerprints are suppressed on later runs",
 	);
 
 	fixture.reset("noIdeas");
-	const longTitle = "Implement a hero page with a giant gradient banner ".repeat(5).trim();
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-L1",
-		output: JSON.stringify({ ideas: [{ title: longTitle, score: 80 }] }),
-	});
+	const longTitle = "Implement a hero page with a giant gradient banner "
+		.repeat(5)
+		.trim();
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-L1",
+			output: JSON.stringify({ ideas: [{ title: longTitle, score: 80 }] }),
+		},
+	);
 	const storedLong = Object.values(fixture.store().items).find((item) =>
 		(item.notes ?? []).some((note) => note.startsWith("wo:idea")),
 	);
@@ -489,11 +541,15 @@ try {
 		storedLong.title.length < longTitle.length,
 		"long idea titles compact on save",
 	);
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-L2",
-		output: JSON.stringify({ ideas: [{ title: longTitle, score: 80 }] }),
-	});
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-L2",
+			output: JSON.stringify({ ideas: [{ title: longTitle, score: 80 }] }),
+		},
+	);
 	assert(
 		capture.duplicates === 1,
 		"fingerprint dedup survives display truncation",
@@ -505,11 +561,15 @@ try {
 		title: `Idea ${String(index + 1).padStart(2, "0")}`,
 		score: index + 1,
 	}));
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-25",
-		output: JSON.stringify({ ideas: many }),
-	});
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-25",
+			output: JSON.stringify({ ideas: many }),
+		},
+	);
 	assert(
 		capture.saved.length === 25 && capture.dropped.length === 5,
 		"capture keeps only the global top 20",
@@ -524,16 +584,20 @@ try {
 		remaining.every((item) => noteScore(item) >= 6),
 		"the lowest-scored ideas are the dropped ones",
 	);
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-26",
-		output: JSON.stringify({
-			ideas: Array.from({ length: 5 }, (_, index) => ({
-				title: `New idea ${index}`,
-				score: 95 + index,
-			})),
-		}),
-	});
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-26",
+			output: JSON.stringify({
+				ideas: Array.from({ length: 5 }, (_, index) => ({
+					title: `New idea ${index}`,
+					score: 95 + index,
+				})),
+			}),
+		},
+	);
 	remaining = Object.values(fixture.store().items).filter(
 		(item) => item.parentId === "E-1",
 	);
@@ -547,11 +611,15 @@ try {
 	);
 
 	fixture.reset("noIdeas");
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-BAD",
-		output: "not json",
-	});
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-BAD",
+			output: "not json",
+		},
+	);
 	assert(
 		!capture.ok && capture.action === "capture-recovery",
 		"malformed output creates recovery state",
@@ -566,7 +634,10 @@ try {
 		'---\ntitle: "Imported idea"\n---\n# Imported idea\n',
 	);
 	state = buildWorkIdeateState(cwd, "import docs/plans/idea.md");
-	assert(state.ok && state.action === "import-created", "valid path imports idea");
+	assert(
+		state.ok && state.action === "import-created",
+		"valid path imports idea",
+	);
 	state = buildWorkIdeateState(cwd, "import docs/plans/idea.md");
 	assert(
 		state.ok && state.action === "import-updated",
@@ -595,8 +666,7 @@ try {
 	);
 	const bsEpic = Object.values(fixture.store().items).find(
 		(item) =>
-			item.type === "epic" &&
-			item.documentLinks?.idea === "docs/ideas/IDEA-3.md",
+			item.type === "epic" && item.documentLinks?.idea === "docs/ideas/IDEA-3.md",
 	);
 	assert(bsEpic, "brainstorm epic links the idea file via documentLinks");
 	assert(
@@ -609,11 +679,15 @@ try {
 			!postLists.main.some((item) => item.id === "IDEA-3"),
 		"brainstormed idea hides behind its toggle",
 	);
-	capture = captureIdeationIdeas(cwd, { id: "E-1", title: "Active epic" }, {
-		topic: "workflow",
-		runId: "RUN-BS",
-		output: JSON.stringify({ ideas: [{ title: "Contender idea", score: 50 }] }),
-	});
+	capture = captureIdeationIdeas(
+		cwd,
+		{ id: "E-1", title: "Active epic" },
+		{
+			topic: "workflow",
+			runId: "RUN-BS",
+			output: JSON.stringify({ ideas: [{ title: "Contender idea", score: 50 }] }),
+		},
+	);
 	assert(
 		capture.duplicates === 1,
 		"brainstormed ideas dedup instead of re-capturing",
@@ -697,8 +771,7 @@ try {
 	assert(
 		Object.values(fixture.store().items).some(
 			(item) =>
-				item.type === "epic" &&
-				item.documentLinks?.idea === "docs/ideas/IDEA-3.md",
+				item.type === "epic" && item.documentLinks?.idea === "docs/ideas/IDEA-3.md",
 		),
 		"dialog brainstorm flow creates the linked epic",
 	);
