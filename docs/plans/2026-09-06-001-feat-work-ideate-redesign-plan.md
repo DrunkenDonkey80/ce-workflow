@@ -4,7 +4,8 @@
 status: plan
 type: feature-plan
 created: 2026-09-06
-revised: 2026-09-06 (v2 — Opus-5 adversarial review + user decisions: top-20 only, agent-side semantic merge, delete on list rows, idea-as-file-in-epic)
+revised: 2026-09-06 (v2 — Opus-5 adversarial review + user decisions: top-20 only, agent-side semantic merge, delete on list rows, idea-as-file-in-epat)
+revised: 2026-09-06 (v3 — second Opus-5 pass: pinned edit/target grammar + emitter/test migration, global top-20 trim with zombie cleanup, work-dialogs row-action key, ideate sidecar variant + cwd threading, schema range check, documentLinks write path)
 source: user request 2026-09-06 (chat) + analyzer-list UX precedent (k-mtluv0mx/k-mtlv5zuu); ce-ideate integration confirmed as the primary goal
 ```
 
@@ -60,10 +61,13 @@ optional file, like plan attachments.
 4. **Delete reuses `deleteWorkItem`** (already refuses referenced items).
    Available both as a direct row action on the list (confirm once) and in the
    details loop. No new store op, no raw filter+write.
-5. **Idea attaches to its brainstorm epic as an optional file** (like the plan
-   attachment): the brainstorm flow writes the idea (id + title + summary) into
-   the epic; the dashboard derives `brainstormed` by scanning epics for that
-   reference — no backlink parsing, no status derivation chain.
+5. **Idea attaches to its brainstorm epic as an optional file** via the
+   existing `documentLinks` mechanism: the brainstorm flow writes the idea
+   file and links it with `updateWorkItemNative(cwd, epicId, { documentLinks:
+   { idea: ideaFile } })`; the dashboard derives `brainstormed` by scanning
+   epics for `documentLinks.idea` (read back by `issueArtifactPaths`), and
+   the old `brainstormId`/`brainstormPath` chain in `deriveIdeaStatus`
+   (~L7754) is retired in the same unit. No backlink parsing.
 6. **Leading-token grammar**: `wide`/`narrow` and actions (`edit`, `delete`,
    `accept`, …) parse from the **first** token; the rest is target/topic text.
 
@@ -77,18 +81,29 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
 ### U1a — Dispatch authority + stable fingerprints + arg grammar (unblocks everything)
 
 - `extensions/work-private-workflows.js`: AUTHORITIES +=
-  `work-models:wf:ideate:v1` bound to `ideate.md`; verifyAuthority passes it.
+  `["work-models:wf:ideate:v1", { caller: WORK_MODELS_CALLER, workflows:
+  new Set(["ideate"]), callerUrl: import.meta.url }]` (the token binds to the
+  workflow KEY; ALLOWLIST already maps `ideate → ideate.md`); verifyAuthority
+  passes it.
 - `extensions/work-models.js` `ideationHandoffPrompt`: replace the
   playbook-path sentence with `dispatchPrivateWorkflow("ideate", { actionToken,
   … })` inlined bytes (brainstorm pattern at ~L18293).
 - `captureIdeationIdeas`: compute and store `titleFingerprint` (sha256 of
   normalizedIdeaTitle of the FULL title, before any truncation) in idea
   metadata. Cross-run exact dedup and rejected-suppression compare
-  fingerprints, never stored titles. Consolidate `titleFingerprint` vs
+  fingerprints, never stored titles. Pre-U1a ideas without a stored hash fall
+  back to hash-of-stored-title at read time (best effort — suppression
+  degrades gracefully, never crashes). Consolidate `titleFingerprint` vs
   `normalizedIdeaTitle` call sites into one helper (~L17566).
-- `parseWorkIdeateArgs`: action from the **first** token when it is an
-  action/`wide`/`narrow`; remainder = target/topic. `IDEA_ACTIONS` += `edit`,
-  `delete`.
+- `parseWorkIdeateArgs` pinned grammar: first token = action (an
+  `IDEA_ACTIONS` member or `wide`/`narrow`); for `edit`/`delete` the target is
+  the **second token only** (numeric index, `IDEA-3`, or exact id — titles are
+  not addressable, killing the target-vs-text ambiguity); for `edit` the
+  remaining tokens are the new description text. `IDEA_ACTIONS` += `edit`,
+  `delete`. Migrate every trailing-action emitter and test to the leading
+  form in this unit: call sites ~L17753 (`inspect`), ~L18400/18416/18427
+  (`discuss`/`inspect`), `/wo` placeholder ~L24829; tests ~L139-165, 249-262
+  in `scripts/test-work-ideate.mjs`.
 - Files: `extensions/work-private-workflows.js`, `extensions/work-models.js`.
 - Tests: authority dispatch for ideate; fingerprint dedup survives a long
   title that displays truncated; rejected fingerprint suppressed on next run;
@@ -101,8 +116,14 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
   `area` (single token); drop topPicks parsing — every captured idea is
   `contender` unless accepted via dashboard action. Update
   `IDEA_STATUS_ORDER`/`ideaActionHint` accordingly.
-- `IDEA_SCHEMA_VERSION` → 2; note line gains `score=`/`area=`.
-- Capture trims to top 20 by score after fingerprint dedup.
+- `IDEA_SCHEMA_VERSION` → 2, and `isIdeaIssue` accepts version 1 or 2
+  (range, not equality — schema-1 ideas stay identified); note line gains
+  `score=`/`area=`. Keep `accepted` in `IDEA_STATUS_ORDER` (accept and
+  accept-back still produce it); only topPicks parsing is removed.
+- Capture trims **globally**: fingerprint-merge the new run into the epic's
+  existing ideas, keep the top 20 by score, and permanently remove the
+  dropped `wo:idea` records via `deleteWorkItem` — no invisible epic children.
+  Dashboard cap = the same 20.
 - Files: `extensions/work-models.js`.
 - Tests: score parse/clamp/derive; schema-v2 round-trip; **migrate existing
   fixtures** (`ideaSchemaVersion: 1` → 2, ~L38) and the status-grouped text
@@ -115,10 +136,16 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
   non-TUI → `nativeListDialog`); agent-issued/menu invocations without a
   keyword default to `narrow` (never block a non-interactive caller).
 - Wide = the handoff instructs the orchestrating agent to launch 3 divergent
-  subagents (existing `creativeSidecarStep` pattern), then **merge their
-  outputs and semantically similar ideas into one top-20 schema-v2 JSON**
-  before one `captureIdeationIdeas` call. The extension never harvests
-  subagent output — single capture, no fan-in code.
+  subagents via an **ideate-shaped variant** of `creativeSidecarStep` (drop
+  its merge-into-artifact / `wo:divergent-analysis` / post-hoc critics text;
+  keep the 3-frame launch), then **merge their outputs and semantically
+  similar ideas into one top-20 schema-v2 JSON** before one
+  `captureIdeationIdeas` call. The extension never harvests subagent output —
+  single capture, no fan-in code.
+- Thread the sidecar's real inputs: `ideationHandoffPrompt` gains `cwd` +
+  model-health preflight (mirror the brainstorm branch's
+  `brainstormAgentHealthPreflight` ~L28690) so the variant receives
+  `offlineModels`/`currentModel`.
 - `buildWorkIdeateState` gains `agents: narrow|wide` + `agentCount` telemetry.
 - Files: `extensions/work-models.js`.
 - Tests: keyword + dialog + default wiring; state fields; prompt contains the
@@ -127,15 +154,20 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
 ### U3 — Ideas dashboard (interactive handler, scored, color-coded, toggled)
 
 - New `handleWorkIdeateCommand(ctx, pi)` async handler replaces the
-  fire-and-forget notify path; `/wo` menu row (~L24820) rewritten to the new
-  contract.
+  fire-and-forget notify path **but keeps** `withCommandTelemetry`,
+  `cleanupBenignInstructionDirt`, and `stateTelemetry` from the live branch
+  (~L28637-28643); agent-issued non-interactive actions (`<id> reject` etc.)
+  stay dialog-free; `/wo` menu row (~L24820) rewritten to the new contract.
 - List = `showListDialog` (analyzer pattern):
   - sorted score desc, top 20; rows carry `labelSegments` score chip colored
     `success` (>70) / `warning` (30-70) / `error` (<30) — **leave `item.color`
     unset** so the selected-row accent survives;
   - per-row multi-line summary via `item.detailLines` (NOT
     `descriptionMaxLines`, which is a single highlighted-row pane);
-  - **Delete as a direct row action** (confirm once → `deleteWorkItem`);
+  - **Delete as a direct row action**: add a generic per-row action-key hook
+    to `work-dialogs.js` (e.g. `rowAction: { key: "d", label: "Delete" }`,
+    honoring the Dialog UX Rule; confirm once → `deleteWorkItem`).
+    `spaceAction` keeps its toggle semantics — do not reassign it;
   - Enter → full details (`ctx.ui.editor` or details pane);
   - trailing toggles `Show brainstormed (N)` / `Show rejected (N)` (dim rows);
     rejected group rows offer **accept-back** (restore);
@@ -144,7 +176,8 @@ closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
 - Dialog UX acceptance criteria (from AGENTS.md): one muted purpose line,
   Escape → parent / close at root, Enter and Space semantics preserved,
   keyboard filter where lists are long, native fallback verified.
-- Files: `extensions/work-models.js`.
+- Files: `extensions/work-models.js`, `extensions/work-dialogs.js`
+  (row-action key hook).
 - Tests: ordering + 70/30 color boundaries; toggle groups; brainstormed/
   rejected absent from main body; snapshot index stability across toggles;
   delete row action removes idea and refuses referenced ones.
