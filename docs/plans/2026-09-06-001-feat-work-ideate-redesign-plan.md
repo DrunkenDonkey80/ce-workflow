@@ -4,169 +4,187 @@
 status: plan
 type: feature-plan
 created: 2026-09-06
+revised: 2026-09-06 (v2 — Opus-5 adversarial review + user decisions: top-20 only, agent-side semantic merge, delete on list rows, idea-as-file-in-epic)
 source: user request 2026-09-06 (chat) + analyzer-list UX precedent (k-mtluv0mx/k-mtlv5zuu); ce-ideate integration confirmed as the primary goal
 ```
 
 ## Goal capsule
 
-**Primary: integrate upstream `ce-ideate` into the compound-source sync**
-the same way ce-brainstorm/ce-plan/etc. are integrated — translator source,
-policy workflow entry, sha256-verified closure, generated private playbook
-— and make it the ideation prompt that `/work-ideate` runs internally.
-On top of it: an agent-driven, scored, dashboard-first flow —
-ask Narrow or Wide (Wide = 3 background divergent agents), run the
-c-ideate-derived playbook internally, then render an **Ideas** section — a looping
-list sorted by 0-100 confidence, color-coded (green >70, yellow 30-70,
-red <30), several-line rows, Enter for full details — with per-idea actions
-**Go back / Brainstorm / Reject / Delete** and chat-editable descriptions.
-Brainstormed and rejected ideas persist but hide behind trailing toggles;
-later ideate runs never re-propose rejected ideas.
+**Primary (done): integrate upstream `ce-ideate` into the compound-source sync**
+— shipped in U0 (commit `d777472`): policy pinned v3.23.4, 10 translated
+workflows including `extensions/private-workflows/ideate.md`, sha256-verified.
+On top of it: an agent-driven, scored, dashboard-first flow — ask Narrow or
+Wide (Wide = 3 background divergent agents, merged agent-side), run the
+ce-ideate playbook internally via `dispatchPrivateWorkflow`, then render an
+**Ideas** dashboard — the **top 20 only** by 0-100 confidence, color-coded
+(green >70, yellow 30-70, red <30), multi-line rows, Enter for full details
+— with per-idea actions **Go back / Brainstorm / Reject / Delete**,
+delete directly on list rows, chat-editable descriptions, and
+brainstormed/rejected ideas hidden behind trailing toggles. Later ideate runs
+never re-propose rejected ideas. Brainstormed ideas attach to their epic as an
+optional file, like plan attachments.
 
-## Current state (verified 2026-09-06)
+## Current state (verified 2026-09-06, post-d777472)
 
 | Piece | Where | Today |
 |---|---|---|
-| Ideate command | `extensions/work-models.js` `workIdeateDir`→`buildWorkIdeateState` (~L17558-18400) | topic → epic → `ideationHandoffPrompt`: "roughly 20 ideas, ~7 top picks accepted, rest contenders" — **no numeric score**; ideas saved as `wo:idea` children with `source-run-id`/`source-index` |
-| Dashboard | same block, `parseWorkIdeateArgs`/`resolveIdeaTarget` | numeric-index list guarded by `.ce-workflow/work-ideate/dashboard.json` snapshot; actions accept/reject/discuss/inspect/import (`IDEA_ACTIONS` L17536) |
-| Statuses | `deriveIdeaStatus`/`ideaActionHint` | raw/accepted/contender/discussed/brainstormed/planned/… rejected exists with accept-back path |
-| 3-agent pattern | `CREATIVE_MODES`/`DIVERGENT_FRAMES` (~L670-690), packaged advisor launch (~L4194-4246) | off/ask/auto; ask = "Quick or Wide"; auto = 3 isolated divergent branches |
-| Analyzer list UX | `handleWorkReviewAnalysisCommand` (~L24660) | looping `showListDialog`: colored `labelSegments`, Space toggles, Enter → details + choose() loop, trailing accept-all/discard-all, discarded stay gray and never resurface |
-| Delete | — | **no `deleteWorkflowWorkItem` exists**; only status transitions |
-| Tests | `scripts/test-work-ideate.mjs` (283 lines) | capture/parse/dashboard-index coverage |
-| CE skill sync | `work-compound-source-policy.json` + `work-compound-catch-up.js` + `generate-work-private-workflows.mjs` | pins EveryInc/compound-engineering-plugin @ v3.21.0 (provenance v3.21.4); translates exactly 9 upstream skills into private playbooks — **`ce-ideate` exists upstream (55KB SKILL.md + references/ + scripts/, present already at v3.21.0) but is NOT in the synced set**; ideation today is the inline hand-rolled prompt |
+| CE skill sync | `work-compound-source-policy.json` + `work-compound-catch-up.js` + `generate-work-private-workflows.mjs` | **done**: pins v3.23.4, translates 10 workflows incl. `ideate.md` |
+| Ideation handoff | `extensions/work-models.js` `ideationHandoffPrompt` (~L17884) | points at the playbook; contract line now demands score 0-100 + area, agent-side similar-idea merge, top-20 capture, no topPicks (live fix, this session) |
+| Playbook dispatch | `work-private-workflows.js` AUTHORITIES (~L48-83) | brainstorm/plan have `work-models:wf:*:v1` tokens; **no `ideate` token — the handoff cannot inline the playbook yet** |
+| Ideate command | `work-models.js` `buildWorkIdeateState` (~L17558-18400), handler (~L28637) | fire-and-forget: build state → `notify` → follow-up; no interactive `ctx` handler exists |
+| Arg grammar | `parseWorkIdeateArgs` (~L17664) | action = **last** token; `edit <text>`/`wide` keywords unparseable |
+| Dashboard | same block, `writeIdeaSnapshot`/`resolveIdeaTarget` | numeric-index text list guarded by `dashboard.json` snapshot; actions accept/reject/discuss/inspect/import |
+| Statuses | `deriveIdeaStatus`/`ideaActionHint`; `parseIdeationIdeas` (~L17797) | raw/accepted/contender/discussed/brainstormed/planned; `accepted` derives from topPicks (to be removed) |
+| 3-agent pattern | `CREATIVE_MODES`/`DIVERGENT_FRAMES` (~L670-690), `creativeSidecarStep` (~L4261-4300) | prompt-text machinery: tells the agent to spawn divergent subagents; **extension never harvests them** |
+| Analyzer list UX | `handleWorkReviewAnalysisCommand` (~L24648) | looping `showListDialog`: colored `labelSegments`, Space toggles, Enter → details + choose() loop, trailing toggles |
+| Delete | `work-store.js` `deleteWorkItem` (~L808) | **exists** — validated, refuses referenced items; not wired to `/work-ideate` |
+| Row descriptions | `work-dialogs.js` | `item.detailLines` renders per-row multi-line text; `descriptionMaxLines` is a single highlighted-row Details pane |
+| Tests | `scripts/test-work-ideate.mjs` | asserts status-grouped text output and `ideaSchemaVersion: 1` fixtures |
 
-## Design decisions (defaults; veto any)
+## Design decisions (user-confirmed)
 
-1. **Ideation prompt = translated `ce-ideate` playbook** (new
-   `extensions/private-workflows/ideate.md`), generated and verified like the
-   other 9; the inline `ideationHandoffPrompt` body is replaced by a pointer
-   to the playbook plus the machine contract (schema v2 JSON).
-2. **Top 20**: main list shows the top 20 by score; overflow (if any) sits
-   behind a trailing "Show all (N)" toggle. Generation target rises to
-   "roughly 20-30 ideas".
-3. **Merge**: exact `normalizedIdeaTitle` fingerprint merges within and
-   across runs (max score, `merged-from` note). Near-duplicates are NOT
-   force-merged (brainstorm policy refuses fuzzy auto-merge); agents tag
-   each idea with an `area:` label and the list groups adjacent areas.
-4. **Delete** = new store op that removes the `wo:idea` work item record
-   permanently. No tombstone — `rejected` already covers
-   compare-later-without-showing.
-5. **Brainstorm button** reuses the existing `/wo → Brainstorm idea <id>`
-   flow verbatim (backlink → derived status `brainstormed` → hidden behind
-   the toggle). Optional text appends to the brainstorm topic prompt.
+1. **Playbook runs in-process**: new authority token
+   `work-models:wf:ideate:v1`; handoff inlines playbook bytes via
+   `dispatchPrivateWorkflow("ideate", …)` — same pattern as brainstorm/plan.
+   No repo-relative paths in handoff text.
+2. **Top 20 only**: generation targets 20-30 ideas, capture trims to the
+   top 20 by score. The rest is dropped — no overflow storage, no "Show all".
+3. **Merge is agent-side, identity is hash-side**: the capturing agent merges
+   semantically similar ideas (e.g. "hero page with banner" ≡ "hero page with
+   red banner") into one entry, max score, before emitting JSON. The extension
+   never fuzzy-merges; it keeps exact-title dedup and rejected-suppression via
+   a **full-title fingerprint** (sha256 of the normalized FULL title, stored in
+   idea metadata at capture time — immune to display truncation). If agent-side
+   merging proves unreliable in practice, drop merging entirely (user-accepted
+   fallback); exact fingerprints stay for identity either way.
+4. **Delete reuses `deleteWorkItem`** (already refuses referenced items).
+   Available both as a direct row action on the list (confirm once) and in the
+   details loop. No new store op, no raw filter+write.
+5. **Idea attaches to its brainstorm epic as an optional file** (like the plan
+   attachment): the brainstorm flow writes the idea (id + title + summary) into
+   the epic; the dashboard derives `brainstormed` by scanning epics for that
+   reference — no backlink parsing, no status derivation chain.
+6. **Leading-token grammar**: `wide`/`narrow` and actions (`edit`, `delete`,
+   `accept`, …) parse from the **first** token; the rest is target/topic text.
 
 ## Units
 
-### U0 — Integrate upstream ce-ideate into the compound-source sync (the main thing)
+### U0 — Integrate upstream ce-ideate into the compound-source sync — DONE
 
-- Extend `scripts/generate-work-private-workflows.mjs`:
-  `IDEATE_SOURCE = "skills/ce-ideate/SKILL.md"`, `WORKFLOW_SOURCES.ideate`
-  with closure prefix `skills/ce-ideate/`; translation rules for the 55KB
-  source — strip pi discovery frontmatter/executable helpers, preserve the
-  upstream ideation method (lenses/divergence/scoring approach it ships),
-  adapt the output to our `ideas[]` schema-v2 JSON capture contract
-  (score 0-100 + area + title + summary per idea).
-- `work-compound-source-policy.json` `workflows[]` += `ce-ideate`;
-  regenerate `work-compound-inventory.json` and
-  `extensions/private-workflows/{manifest,provenance}.json` + the new
-  `ideate.md` via the existing generator flow (sha256 closures verified).
-- `extensions/work-models.js`: `ideationHandoffPrompt` now points the
-  orchestrator at the private ideate playbook (same pattern as the
-  brainstorm/plan handoffs) while keeping the machine-capture contract
-  lines; `/work-ideate` unchanged from the caller's view.
-- Reconcile the v3.21.0 (policy/inventory) vs v3.21.4 (provenance) drift in
-  the same pass so all three pin one release.
-- Files: `scripts/generate-work-private-workflows.mjs`,
-  `extensions/work-compound-source-policy.json`,
-  `extensions/work-compound-inventory.json`,
-  `extensions/private-workflows/*`, `extensions/work-models.js`.
-- Tests: `scripts/test-work-private-workflows.mjs` — ce-ideate closure
-  verification, manifest hash round-trip, policy workflow list matches the
-  10 generated workflows; `scripts/test-work-ideate.mjs` — handoff prompt
-  references the playbook and still carries the capture contract.
+Shipped as `d777472` (2026-09-06): policy v3.23.4, 10 workflows, generator
+closure + tests, allowlist/parity/owned-outputs updated. Not re-scoped here.
+
+### U1a — Dispatch authority + stable fingerprints + arg grammar (unblocks everything)
+
+- `extensions/work-private-workflows.js`: AUTHORITIES +=
+  `work-models:wf:ideate:v1` bound to `ideate.md`; verifyAuthority passes it.
+- `extensions/work-models.js` `ideationHandoffPrompt`: replace the
+  playbook-path sentence with `dispatchPrivateWorkflow("ideate", { actionToken,
+  … })` inlined bytes (brainstorm pattern at ~L18293).
+- `captureIdeationIdeas`: compute and store `titleFingerprint` (sha256 of
+  normalizedIdeaTitle of the FULL title, before any truncation) in idea
+  metadata. Cross-run exact dedup and rejected-suppression compare
+  fingerprints, never stored titles. Consolidate `titleFingerprint` vs
+  `normalizedIdeaTitle` call sites into one helper (~L17566).
+- `parseWorkIdeateArgs`: action from the **first** token when it is an
+  action/`wide`/`narrow`; remainder = target/topic. `IDEA_ACTIONS` += `edit`,
+  `delete`.
+- Files: `extensions/work-private-workflows.js`, `extensions/work-models.js`.
+- Tests: authority dispatch for ideate; fingerprint dedup survives a long
+  title that displays truncated; rejected fingerprint suppressed on next run;
+  grammar: `/work-ideate edit IDEA-3 new description text`,
+  `/work-ideate wide hero page`.
 
 ### U1 — Scored capture contract (schema v2)
 
-- `parseIdeationIdeas`: read `score` (int, clamp 0-100, derive default from
-  status), read `area` (single token).
-- `IDEA_SCHEMA_VERSION` bump; note line gains `score=` and `area=`.
-- Handoff (now U0's playbook pointer): "roughly 20-30 ideas, score each
-  0-100 confidence, tag one area each, no topPicks".
-- Cross-run fingerprint merge in `captureIdeationIdeas`: same-fingerprint
-  existing idea → keep, bump score to max, append merge note; new run ids
-  recorded.
-- **Ingest suppression**: ideas whose fingerprint matches an existing
-  `rejected` idea are parsed but not saved (counted as `suppressed`).
+- `parseIdeationIdeas`: read `score` (int, clamp 0-100, default derive),
+  `area` (single token); drop topPicks parsing — every captured idea is
+  `contender` unless accepted via dashboard action. Update
+  `IDEA_STATUS_ORDER`/`ideaActionHint` accordingly.
+- `IDEA_SCHEMA_VERSION` → 2; note line gains `score=`/`area=`.
+- Capture trims to top 20 by score after fingerprint dedup.
 - Files: `extensions/work-models.js`.
-- Tests (`scripts/test-work-ideate.mjs`): score parse/clamp/derive; schema
-  v2 note round-trip; cross-run merge keeps max score; rejected fingerprint
-  suppressed on next run; recovery path unchanged.
+- Tests: score parse/clamp/derive; schema-v2 round-trip; **migrate existing
+  fixtures** (`ideaSchemaVersion: 1` → 2, ~L38) and the status-grouped text
+  assertions (~L129-141); rejected suppression (from U1a) re-verified here.
 
-### U2 — Front door: Narrow or Wide
+### U2 — Front door: Narrow or Wide (agent-side orchestration)
 
-- `/work-ideate <topic>` first asks via `ask_user`/`choose`: **Narrow**
-  (single in-session ideation pass, current behavior) or **Wide**
-  (3 background agents, one per `DIVERGENT_FRAME`, each returning `ideas[]`
-  JSON; harvested, then merged/grouped by U1 logic).
-- Wide reuses the packaged 3-branch background launch machinery; each agent
-  gets the topic + its frame prompt + the schema-v2 JSON contract.
-- `buildWorkIdeateState` gains `agents: narrow|wide` and run telemetry
-  (`agentCount`).
+- `/work-ideate [wide|narrow] <topic>`: leading keyword wins; without one, TUI
+  asks via `showListDialog` (purpose line, two options, keyboard filter;
+  non-TUI → `nativeListDialog`); agent-issued/menu invocations without a
+  keyword default to `narrow` (never block a non-interactive caller).
+- Wide = the handoff instructs the orchestrating agent to launch 3 divergent
+  subagents (existing `creativeSidecarStep` pattern), then **merge their
+  outputs and semantically similar ideas into one top-20 schema-v2 JSON**
+  before one `captureIdeationIdeas` call. The extension never harvests
+  subagent output — single capture, no fan-in code.
+- `buildWorkIdeateState` gains `agents: narrow|wide` + `agentCount` telemetry.
 - Files: `extensions/work-models.js`.
-- Tests: arg/state wiring for narrow vs wide; merge of three agents' outputs
-  with one overlapping fingerprint produces one idea (max score) and
-  per-area grouping order.
+- Tests: keyword + dialog + default wiring; state fields; prompt contains the
+  merge instruction for wide.
 
-### U3 — Ideas dashboard (scored, color-coded, toggled)
+### U3 — Ideas dashboard (interactive handler, scored, color-coded, toggled)
 
-- Rewrite the dashboard list on `showListDialog` (analyzer pattern):
-  - items sorted score desc; `labelSegments` `[score] title` colored
-    `success` (>70) / `warning` (30-70) / `error` (<30); several-line
-    description = idea summary (`descriptionMaxLines`);
-  - Enter → `ctx.ui.editor` full details (description + metadata + status);
-  - trailing rows: `Show brainstormed (N)`, `Show rejected (N)`,
-    `Show all (N)` (only when N > 0 / overflow) — in-loop toggles that
-    redraw with those groups appended (dim rows), mirroring the analyzer's
-    category headers;
-  - snapshot `dashboard.json` still pins numeric indexes (extend entries
-    with score).
+- New `handleWorkIdeateCommand(ctx, pi)` async handler replaces the
+  fire-and-forget notify path; `/wo` menu row (~L24820) rewritten to the new
+  contract.
+- List = `showListDialog` (analyzer pattern):
+  - sorted score desc, top 20; rows carry `labelSegments` score chip colored
+    `success` (>70) / `warning` (30-70) / `error` (<30) — **leave `item.color`
+    unset** so the selected-row accent survives;
+  - per-row multi-line summary via `item.detailLines` (NOT
+    `descriptionMaxLines`, which is a single highlighted-row pane);
+  - **Delete as a direct row action** (confirm once → `deleteWorkItem`);
+  - Enter → full details (`ctx.ui.editor` or details pane);
+  - trailing toggles `Show brainstormed (N)` / `Show rejected (N)` (dim rows);
+    rejected group rows offer **accept-back** (restore);
+  - snapshot `dashboard.json` pins indexes over the **full ordered list** —
+    hidden rows keep their index; toggles only reveal (no stale-index risk).
+- Dialog UX acceptance criteria (from AGENTS.md): one muted purpose line,
+  Escape → parent / close at root, Enter and Space semantics preserved,
+  keyboard filter where lists are long, native fallback verified.
 - Files: `extensions/work-models.js`.
-- Tests: ordering + color thresholds (70/30 boundaries); toggle groups
-  appear/disappear; brainstormed/rejected absent from the main body;
-  snapshot round-trip with score.
+- Tests: ordering + 70/30 color boundaries; toggle groups; brainstormed/
+  rejected absent from main body; snapshot index stability across toggles;
+  delete row action removes idea and refuses referenced ones.
 
-### U4 — Per-idea action loop + description editing + delete
+### U4 — Per-idea action loop + description editing + brainstorm attachment
 
-- Details view → `choose()` loop with buttons:
-  - **Go back** — return to list;
-  - **Brainstorm** — confirm dialog with optional freeform text (checkbox
-    pattern from ask-user) → existing brainstorm flow on the idea; idea
-    disappears from main list (status brainstormed);
-  - **Reject** — existing reject action; hidden to `Show rejected`;
-  - **Delete** — confirm once, then permanently remove the record;
-  - **Discuss in chat** — existing discuss follow-up; the prompt authorizes
-    the main agent to update the description through the new
-    `/work-ideate <target> edit <text>` action and the loop reflects it.
-- `IDEA_ACTIONS` += `edit`, `delete`; new `deleteWorkflowWorkItem(cwd, id)`
-  store op (filter + write; refuses non-idea items or items with children).
-- Files: `extensions/work-models.js`.
-- Tests: action transitions (raw→brainstormed hidden, raw→rejected hidden
-  - suppressed next run, raw→deleted gone); edit updates description and
-  survives reopen; delete refuses ideas with linked children (safety).
+- Details → `choose()` loop: **Go back** / **Brainstorm** / **Reject** /
+  **Delete** / **Discuss in chat**.
+- Brainstorm = two-step confirm: `showListDialog` (Go / Go with extra text /
+  cancel) then `ctx.ui.editor` for the optional text when chosen (work-dialogs
+  exports no text-field dialog; this is the established editor precedent
+  ~L24611). Runs the existing brainstorm flow; the new epic stores the idea as
+  an optional file/attachment (decision 5); dashboard hides the idea behind
+  `Show brainstormed` by scanning epics for the attachment.
+- Reject = existing action → hidden to `Show rejected`, restorable there,
+  fingerprint-suppressed in future runs.
+- Delete = confirm once → `deleteWorkItem`.
+- Discuss = existing follow-up; authorizes the main agent to update the
+  description via `/work-ideate <target> edit <text>` (U1a grammar); loop
+  reflects it.
+- Files: `extensions/work-models.js`, `extensions/work-store.js` (only if the
+  epic-attachment write needs a helper).
+- Tests: raw→brainstormed hidden + epic attachment present; edit updates
+  description and survives reopen; delete flow end-to-end; accept-back from
+  rejected restores visibility and future re-capture.
 
 ## Non-goals
 
-- No fuzzy auto-merge of near-duplicate ideas (grouping only).
-- No change to brainstorm/plan flows themselves.
-- No new persistence format — ideas stay `wo:idea` work items.
+- No fuzzy merge in extension code (agent-side only; fallback = none).
+- No storage beyond the top 20 (excess is dropped, per user decision).
+- No change to brainstorm/plan flows themselves beyond the optional
+  idea-file attachment.
 
 ## Verification
 
-- `node scripts/test-work-private-workflows.mjs` green with ce-ideate
-  closure + manifest cases (U0).
+- `node scripts/test-work-private-workflows.mjs` green (ideate dispatch case).
 - `node scripts/test-work-ideate.mjs` green with all new cases.
-- `node scripts/verify-package.mjs` full gate green (suites already wired in
-  the hardcoded test list — confirm, else add).
-- Manual: `/work-ideate <topic>` wide run on a scratch topic, exercise all
-  four buttons and both toggles; confirm the ideation output visibly follows
-  the ce-ideate playbook's method.
+- `node scripts/verify-package.mjs` full gate green (new `test-work-*` suites
+  auto-glob — no manual wiring).
+- Manual: `/work-ideate wide <scratch topic>` end-to-end — dialog, 3-agent
+  run, merged top-20 capture, all row/details actions, both toggles,
+  accept-back, edit round-trip; non-TUI fallback smoke; Dialog UX checklist
+  (purpose line, Escape semantics, native fallback).

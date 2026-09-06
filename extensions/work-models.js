@@ -17889,9 +17889,9 @@ function ideationHandoffPrompt(epic, topic, runId) {
 		`Roadmap: ${idOf(epic)} — ${titleOf(epic)}`,
 		`Topic: ${topic}`,
 		`Run ID: ${runId}`,
-		`Structured capture contract: ${captureIdeationIdeas.name} expects JSON ideas[] plus optional topPicks.`,
+		`Structured capture contract: ${captureIdeationIdeas.name} expects JSON ideas[] (title, summary, area, score 0-100 confidence) — no topPicks.`,
 		"Follow the generated private ideate playbook at extensions/private-workflows/ideate.md (translated upstream ce-ideate) for the ideation method: ground in the repository, diverge widely, critique every candidate, then rank.",
-		"Generate roughly 20 ideas, mark about 7 top picks as accepted, the rest as contenders, then create native work-item store under the roadmap with wo:idea notes and source-run/source-index metadata.",
+		"Generate 20-30 ideas, score each 0-100 confidence, tag one area each, merge semantically similar ideas into one (max score), then capture only the top 20 by score as native work-item store under the roadmap with wo:idea notes and source-run/source-index metadata.",
 		"If structured capture fails, preserve the raw output in a recovery decision WorkItem and report saved vs unsaved ideas.",
 		ROLE_TIMEOUT_GUIDANCE,
 	].join("\n");
