@@ -56,8 +56,9 @@ export function createStubModel({ shift = 7, grow = 3 } = {}) {
 		async ask({ prompt }) {
 			// Answer exactly the requested anchors (a real model reads the
 			// prompt; the stub reads its anchor list).
-			const requested = [...String(prompt).matchAll(/^- ([^\n(]+?)(?: \(text:[^\n]*\))?$/gm)]
-				.map((match) => match[1].trim());
+			const requested = [
+				...String(prompt).matchAll(/^- ([^\n(]+?)(?: \(text:[^\n]*\))?$/gm),
+			].map((match) => match[1].trim());
 			const regions = {};
 			for (const name of requested) {
 				const entry = truth.find((candidate) => candidate.anchor === name);
@@ -73,16 +74,15 @@ export function createStubModel({ shift = 7, grow = 3 } = {}) {
 				const width = 1280;
 				const height = 800;
 				const rect = [
-						clamp1000(((entry.rect.x + shift) / width) * 1000),
-						clamp1000(((entry.rect.y + shift - 2) / height) * 1000),
-						clamp1000(
-							((entry.rect.x + entry.rect.width + shift + grow) / width) * 1000,
-						),
-						clamp1000(
-							((entry.rect.y + entry.rect.height + shift + grow - 2) / height) *
-								1000,
-						),
-					];
+					clamp1000(((entry.rect.x + shift) / width) * 1000),
+					clamp1000(((entry.rect.y + shift - 2) / height) * 1000),
+					clamp1000(
+						((entry.rect.x + entry.rect.width + shift + grow) / width) * 1000,
+					),
+					clamp1000(
+						((entry.rect.y + entry.rect.height + shift + grow - 2) / height) * 1000,
+					),
+				];
 				regions[name] = {
 					cell: cellOf(rect, width, height),
 					rect,
@@ -97,12 +97,18 @@ export function createStubModel({ shift = 7, grow = 3 } = {}) {
 
 function percentile(sorted, p) {
 	if (!sorted.length) return 0;
-	const index = Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1);
+	const index = Math.min(
+		sorted.length - 1,
+		Math.ceil((p / 100) * sorted.length) - 1,
+	);
 	return sorted[index];
 }
 
 export async function calibrate({ surfaces, model, tolerance = null }) {
-	const outRoot = path.join(os.tmpdir(), `ui-gate-tier3-calibrate-${Date.now()}`);
+	const outRoot = path.join(
+		os.tmpdir(),
+		`ui-gate-tier3-calibrate-${Date.now()}`,
+	);
 	const report = {
 		model: model.name,
 		generatedAt: new Date().toISOString(),
@@ -237,7 +243,13 @@ if (isDirect) {
 		});
 		const out =
 			arg("--out") ??
-			path.join(repoRoot, "scripts", "fixtures", "ui-gate", "tier3-calibration-report.json");
+			path.join(
+				repoRoot,
+				"scripts",
+				"fixtures",
+				"ui-gate",
+				"tier3-calibration-report.json",
+			);
 		mkdirSync(path.dirname(out), { recursive: true });
 		writeFileSync(out, `${JSON.stringify(report, null, 1)}\n`);
 		process.stdout.write(

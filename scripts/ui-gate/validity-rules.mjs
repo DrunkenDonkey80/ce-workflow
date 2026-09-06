@@ -495,8 +495,8 @@ export function runValidityRules(
 		...(hardening
 			? [
 					...ruleFocusMissing(geometry, skip),
-				...ruleMinTargetSize(geometry, skip, minTargetExceptions),
-				...ruleContrast(geometry, skip),
+					...ruleMinTargetSize(geometry, skip, minTargetExceptions),
+					...ruleContrast(geometry, skip),
 				]
 			: []),
 	].sort(

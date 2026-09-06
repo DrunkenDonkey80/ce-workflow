@@ -15,7 +15,12 @@ export function schmitt({ measured, threshold }) {
 // A finding that disappears while the fingerprint is unchanged was not
 // fixed — hold it open with hysteresisHeld so threshold noise cannot
 // manufacture convergence.
-export function applyHysteresis({ previous, current, fingerprintAtFire, fingerprint }) {
+export function applyHysteresis({
+	previous,
+	current,
+	fingerprintAtFire,
+	fingerprint,
+}) {
 	const held = [];
 	const currentKeys = new Set(current.map((finding) => finding.id));
 	for (const finding of previous ?? []) {

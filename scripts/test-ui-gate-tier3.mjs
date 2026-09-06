@@ -31,7 +31,10 @@ function syntheticImage({ width = 300, height = 200, boxes = [] }) {
 			for (let x = Math.round(box.x); x < box.x + box.x2; x += 1) {
 				const target = (y * width + x) * 4;
 				const border =
-					x < box.x + 2 || y < box.y + 2 || x >= box.x + box.x2 - 2 || y >= box.y + box.y2 - 2;
+					x < box.x + 2 ||
+					y < box.y + 2 ||
+					x >= box.x + box.x2 - 2 ||
+					y >= box.y + box.y2 - 2;
 				const shade = border ? 20 : 128;
 				data[target] = data[target + 1] = data[target + 2] = shade;
 			}
@@ -54,9 +57,9 @@ const to1000 = (x0, y0, x1, y1, width, height) => [
 ];
 
 function parseAnchors(prompt) {
-	return [...String(prompt).matchAll(/^- ([^\n(]+?)(?: \(text:[^\n]*\))?$/gm)].map(
-		(match) => match[1].trim(),
-	);
+	return [
+		...String(prompt).matchAll(/^- ([^\n(]+?)(?: \(text:[^\n]*\))?$/gm),
+	].map((match) => match[1].trim());
 }
 
 // Model that answers from a fixed map of px rects (converted to 0–1000).
@@ -68,7 +71,12 @@ function rectModel({ width, height, rects, overrides = {}, tokens = 500 }) {
 			for (const name of parseAnchors(prompt)) {
 				const rect = rects[name];
 				if (!rect) {
-					regions[name] = { cell: "A0", rect: [1, 1, 2, 2], status: "not-found", confidence: 50 };
+					regions[name] = {
+						cell: "A0",
+						rect: [1, 1, 2, 2],
+						status: "not-found",
+						confidence: 50,
+					};
 					continue;
 				}
 				const norm = to1000(...rect, width, height);
@@ -204,7 +212,11 @@ function rectModel({ width, height, rects, overrides = {}, tokens = 500 }) {
 	assert.ok(existsSync(reportFile), "calibration report artifact committed");
 	const report = readJson(reportFile);
 	assert.equal(report.model, "deterministic-stub");
-	assert.equal(report.gate.pass, true, `gate reasons: ${JSON.stringify(report.gate.reasons)}`);
+	assert.equal(
+		report.gate.pass,
+		true,
+		`gate reasons: ${JSON.stringify(report.gate.reasons)}`,
+	);
 	for (const key of ["p50", "p95", "p99"])
 		assert.ok(
 			Number.isFinite(report.aggregate.centerErrorPx[key]),
@@ -224,7 +236,12 @@ function rectModel({ width, height, rects, overrides = {}, tokens = 500 }) {
 		async ask({ prompt }) {
 			const regions = {};
 			for (const name of parseAnchors(prompt))
-				regions[name] = { cell: "A0", rect: [1, 1, 2, 2], status: "not-found", confidence: 60 };
+				regions[name] = {
+					cell: "A0",
+					rect: [1, 1, 2, 2],
+					status: "not-found",
+					confidence: 60,
+				};
 			return { json: { regions }, tokens: 200 };
 		},
 	};
@@ -241,12 +258,18 @@ function rectModel({ width, height, rects, overrides = {}, tokens = 500 }) {
 	assert.ok(result.ok, "advisory-only findings keep the run ok");
 	assert.ok(result.total > 0, "region-not-verified findings recorded");
 	const report = readJson(path.join(out, "findings.json"));
-	assert.equal(report.evidence, null, "no validateDesignFidelityEvidence fields");
+	assert.equal(
+		report.evidence,
+		null,
+		"no validateDesignFidelityEvidence fields",
+	);
 	const telemetry = readFileSync(path.join(out, "telemetry.jsonl"), "utf8");
 	assert.match(telemetry, /"captureTier":"tier3"/);
 	assert.match(telemetry, /"measuredBy":"test-not-found"/);
 	assert.ok(Number.parseInt(/"vlmCalls":(\d+)/.exec(telemetry)[1], 10) > 0);
-	console.log("ok - tier 3 leaves fidelity-evidence fields unset, records degraded");
+	console.log(
+		"ok - tier 3 leaves fidelity-evidence fields unset, records degraded",
+	);
 }
 
 console.log("ui-gate tier3 tests passed");

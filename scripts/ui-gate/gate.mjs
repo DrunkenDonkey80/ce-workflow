@@ -13,7 +13,11 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { captureCell } from "./capture.mjs";
-import { runValidityRules, loadAllowlist, findingId } from "./validity-rules.mjs";
+import {
+	runValidityRules,
+	loadAllowlist,
+	findingId,
+} from "./validity-rules.mjs";
 import { matchFidelity } from "./fidelity-matcher.mjs";
 import { writeEvidenceArtifacts } from "./overlays.mjs";
 import { runGateCheap } from "./fingerprint.mjs";
@@ -94,7 +98,9 @@ export async function runGate({
 }) {
 	mkdirSync(out, { recursive: true });
 	const allowlist =
-		allowlistFile && existsSync(allowlistFile) ? loadAllowlist(allowlistFile) : [];
+		allowlistFile && existsSync(allowlistFile)
+			? loadAllowlist(allowlistFile)
+			: [];
 	const handoff = readJson(handoffFile, {});
 	const recipes = readJson(path.join(uiGateDir, "repair-recipes.json"), {
 		recipes: {},
@@ -128,7 +134,7 @@ export async function runGate({
 		throw new Error("profile 'vlm' requires a tier3 model adapter");
 	const tier3Anchors = tier3
 		? [
-					...requiredRegions.slice(0, 32).map((name) => ({ name })),
+				...requiredRegions.slice(0, 32).map((name) => ({ name })),
 				...requiredContent.map((text) => ({ name: `text:${text}`, text })),
 			]
 		: null;
@@ -189,9 +195,7 @@ export async function runGate({
 				image: decodePng(readFileSync(screenshotPath)),
 				blockingOptIn: false,
 			});
-			findings.push(
-				...cellFindings.map((finding) => ({ ...finding, viewport })),
-			);
+			findings.push(...cellFindings.map((finding) => ({ ...finding, viewport })));
 			tier3Meta = cell.meta;
 			if (!cellFindings.some((finding) => finding.severity === "error"))
 				writeFileSync(
@@ -209,171 +213,159 @@ export async function runGate({
 			artifactPaths[viewport] = { ...capture.artifacts };
 		}
 	else
-	for (const viewport of viewports) {
-		const cellDirFor = (stateName) =>
-			multiState
-				? path.join(out, viewport, stateName)
-				: path.join(out, viewport);
-		const specDir = path.join(out, viewport, "spec");
-		const specShot = multiState
-			? path.join("..", "..", "spec", "screenshot.png")
-			: path.join("..", "spec", "screenshot.png");
-		const stateHashes = {};
-		for (const stateName of stateList) {
-			const cellDir = cellDirFor(stateName);
-			const actualResult = await captureCell({
-				target: actual,
-				viewport,
-				state: stateName,
-				out: path.join(cellDir, "actual"),
-				geometryOnly,
-			});
-			const actualMeta = readJson(path.join(cellDir, "actual", "meta.json"), {});
-			const actualGeometry = readJson(
-				path.join(cellDir, "actual", "geometry.json"),
-			);
-			mainWidths[viewport] =
-				actualGeometry.elements[0]?.rect.width ?? actualGeometry.viewport.width;
-			// R8 compares layout only — the state label itself must not break
-			// degeneracy detection.
-			stateHashes[stateName] = createHash("sha256")
-				.update(
-					JSON.stringify({
-						document: actualGeometry.document,
-						elements: actualGeometry.elements,
-						text: actualGeometry.text,
-					}),
-				)
-				.digest("hex");
-
-			const baselinePath = path.join(cellDir, "baseline.json");
-			const baselineGeometry =
-				!acceptBaseline && existsSync(baselinePath)
-					? readJson(baselinePath)
-					: null;
-
-			const validity = runValidityRules(actualGeometry, {
-				quarantined: actualMeta.quarantined ?? [],
-				allowlist,
-				contentStrings: requiredContent,
-				spacingTokens,
-				baselineGeometry,
-				minTargetExceptions,
-				hardening,
-			});
-
-			const actualAnchors = new Set(
-				actualGeometry.elements
-					.map((element) => element.anchor)
-					.filter(Boolean),
-			);
-			evidence.regions.push(
-				...requiredRegions.filter((name) => actualAnchors.has(name)),
-			);
-
-			let fidelity = { findings: [], evidence: { matchedPairs: 0 } };
-			if (spec) {
-				if (!existsSync(path.join(specDir, "geometry.json"))) {
-					await captureCell({
-						target: spec,
-						viewport,
-						state: "ready",
-						out: specDir,
-						geometryOnly,
-					});
-				}
-				fidelity = matchFidelity({
-					spec: readJson(path.join(specDir, "geometry.json")),
-					actual: actualGeometry,
-					handoff,
-					layoutAssertions,
+		for (const viewport of viewports) {
+			const cellDirFor = (stateName) =>
+				multiState ? path.join(out, viewport, stateName) : path.join(out, viewport);
+			const specDir = path.join(out, viewport, "spec");
+			const specShot = multiState
+				? path.join("..", "..", "spec", "screenshot.png")
+				: path.join("..", "spec", "screenshot.png");
+			const stateHashes = {};
+			for (const stateName of stateList) {
+				const cellDir = cellDirFor(stateName);
+				const actualResult = await captureCell({
+					target: actual,
+					viewport,
+					state: stateName,
+					out: path.join(cellDir, "actual"),
+					geometryOnly,
 				});
-				evidence.geometryDeltas.push(
-					...(fidelity.evidence.geometryDeltas ?? []),
+				const actualMeta = readJson(path.join(cellDir, "actual", "meta.json"), {});
+				const actualGeometry = readJson(
+					path.join(cellDir, "actual", "geometry.json"),
 				);
-				evidence.typographyDeltas.push(
-					...(fidelity.evidence.typographyDeltas ?? []),
-				);
-				evidence.regions.push(...(fidelity.evidence.regions ?? []));
-				evidence.matchedPairs += fidelity.evidence.matchedPairs ?? 0;
-				for (const flag of ["noHorizontalOverflow", "contrast", "visibleFocus"])
-					evidence.responsive[flag] =
-					evidence.responsive[flag] && fidelity.evidence.responsive?.[flag];
-			} else {
-				for (const flag of ["noHorizontalOverflow", "contrast", "visibleFocus"]) {
-					const fromDoc =
-						flag === "noHorizontalOverflow"
-							? actualGeometry.document.scrollWidth <=
-								actualGeometry.document.innerWidth + 1
-							: undefined;
-					if (fromDoc !== undefined)
-						evidence.responsive[flag] =
-							evidence.responsive[flag] && fromDoc;
-				}
-			}
+				mainWidths[viewport] =
+					actualGeometry.elements[0]?.rect.width ?? actualGeometry.viewport.width;
+				// R8 compares layout only — the state label itself must not break
+				// degeneracy detection.
+				stateHashes[stateName] = createHash("sha256")
+					.update(
+						JSON.stringify({
+							document: actualGeometry.document,
+							elements: actualGeometry.elements,
+							text: actualGeometry.text,
+						}),
+					)
+					.digest("hex");
 
-			const cellFindings = decorate(
-				[...validity, ...fidelity.findings],
-				recipes,
-			);
-			findings.push(
-				...cellFindings.map((finding) => ({ ...finding, viewport })),
-			);
-			if (cellFindings.length || !geometryOnly) {
-				const overlays = writeEvidenceArtifacts({
-					outDir: path.join(cellDir, "actual"),
-					geometry: actualGeometry,
-					findings: cellFindings,
-					specGeometry: spec
-						? readJson(path.join(specDir, "geometry.json"))
-						: undefined,
-					specScreenshotName: spec ? specShot : undefined,
+				const baselinePath = path.join(cellDir, "baseline.json");
+				const baselineGeometry =
+					!acceptBaseline && existsSync(baselinePath)
+						? readJson(baselinePath)
+						: null;
+
+				const validity = runValidityRules(actualGeometry, {
+					quarantined: actualMeta.quarantined ?? [],
+					allowlist,
+					contentStrings: requiredContent,
+					spacingTokens,
+					baselineGeometry,
+					minTargetExceptions,
+					hardening,
 				});
-				const cellArtifacts = { ...actualResult.artifacts, ...overlays };
-				if (multiState) {
-					artifactPaths[viewport] ??= {};
-					artifactPaths[viewport][stateName] = cellArtifacts;
-				} else artifactPaths[viewport] = cellArtifacts;
-			}
-			// Plan §2.4: persist the last-passing geometry as the drift baseline;
-			// --accept-baseline records a deliberate human re-acceptance.
-			if (
-				acceptBaseline ||
-				!cellFindings.some((finding) => finding.severity === "error")
-			)
-				writeFileSync(
-					baselinePath,
-					`${JSON.stringify(actualGeometry, null, 1)}\n`,
-				);
-		}
 
-		// R8 state-coverage: declared states must be pairwise non-degenerate.
-		if (multiState) {
-			const names = Object.keys(stateHashes).sort();
-			for (let i = 0; i + 1 < names.length; i += 1)
-				for (let j = i + 1; j < names.length; j += 1)
-					if (stateHashes[names[i]] === stateHashes[names[j]])
-						findings.push({
-							id: findingId(
-								"state-degenerate",
-								`${names[i]}|${names[j]}`,
-								viewport,
-								names[j],
-							),
-							rule: "state-degenerate",
-							severity: "warning",
-							element: {
-								matchKey: `${names[i]}|${names[j]}`,
-								anchor: null,
-								tag: "STATE",
-							},
+				const actualAnchors = new Set(
+					actualGeometry.elements.map((element) => element.anchor).filter(Boolean),
+				);
+				evidence.regions.push(
+					...requiredRegions.filter((name) => actualAnchors.has(name)),
+				);
+
+				let fidelity = { findings: [], evidence: { matchedPairs: 0 } };
+				if (spec) {
+					if (!existsSync(path.join(specDir, "geometry.json"))) {
+						await captureCell({
+							target: spec,
 							viewport,
-							state: names[j],
-							measured: "identical geometry hash",
-							threshold: "distinct geometry per declared state",
+							state: "ready",
+							out: specDir,
+							geometryOnly,
 						});
+					}
+					fidelity = matchFidelity({
+						spec: readJson(path.join(specDir, "geometry.json")),
+						actual: actualGeometry,
+						handoff,
+						layoutAssertions,
+					});
+					evidence.geometryDeltas.push(...(fidelity.evidence.geometryDeltas ?? []));
+					evidence.typographyDeltas.push(
+						...(fidelity.evidence.typographyDeltas ?? []),
+					);
+					evidence.regions.push(...(fidelity.evidence.regions ?? []));
+					evidence.matchedPairs += fidelity.evidence.matchedPairs ?? 0;
+					for (const flag of ["noHorizontalOverflow", "contrast", "visibleFocus"])
+						evidence.responsive[flag] =
+							evidence.responsive[flag] && fidelity.evidence.responsive?.[flag];
+				} else {
+					for (const flag of ["noHorizontalOverflow", "contrast", "visibleFocus"]) {
+						const fromDoc =
+							flag === "noHorizontalOverflow"
+								? actualGeometry.document.scrollWidth <=
+									actualGeometry.document.innerWidth + 1
+								: undefined;
+						if (fromDoc !== undefined)
+							evidence.responsive[flag] = evidence.responsive[flag] && fromDoc;
+					}
+				}
+
+				const cellFindings = decorate([...validity, ...fidelity.findings], recipes);
+				findings.push(...cellFindings.map((finding) => ({ ...finding, viewport })));
+				if (cellFindings.length || !geometryOnly) {
+					const overlays = writeEvidenceArtifacts({
+						outDir: path.join(cellDir, "actual"),
+						geometry: actualGeometry,
+						findings: cellFindings,
+						specGeometry: spec
+							? readJson(path.join(specDir, "geometry.json"))
+							: undefined,
+						specScreenshotName: spec ? specShot : undefined,
+					});
+					const cellArtifacts = { ...actualResult.artifacts, ...overlays };
+					if (multiState) {
+						artifactPaths[viewport] ??= {};
+						artifactPaths[viewport][stateName] = cellArtifacts;
+					} else artifactPaths[viewport] = cellArtifacts;
+				}
+				// Plan §2.4: persist the last-passing geometry as the drift baseline;
+				// --accept-baseline records a deliberate human re-acceptance.
+				if (
+					acceptBaseline ||
+					!cellFindings.some((finding) => finding.severity === "error")
+				)
+					writeFileSync(
+						baselinePath,
+						`${JSON.stringify(actualGeometry, null, 1)}\n`,
+					);
+			}
+
+			// R8 state-coverage: declared states must be pairwise non-degenerate.
+			if (multiState) {
+				const names = Object.keys(stateHashes).sort();
+				for (let i = 0; i + 1 < names.length; i += 1)
+					for (let j = i + 1; j < names.length; j += 1)
+						if (stateHashes[names[i]] === stateHashes[names[j]])
+							findings.push({
+								id: findingId(
+									"state-degenerate",
+									`${names[i]}|${names[j]}`,
+									viewport,
+									names[j],
+								),
+								rule: "state-degenerate",
+								severity: "warning",
+								element: {
+									matchKey: `${names[i]}|${names[j]}`,
+									anchor: null,
+									tag: "STATE",
+								},
+								viewport,
+								state: names[j],
+								measured: "identical geometry hash",
+								threshold: "distinct geometry per declared state",
+							});
+			}
 		}
-	}
 
 	const widths = Object.values(mainWidths);
 	if (!tier3 && widths.length > 1) {
@@ -438,9 +430,7 @@ export async function runGate({
 		converged: evaluation.converged,
 		earlyStop: Boolean(evaluation.earlyStop),
 		roundCapReached: runRecord.roundCapReached,
-		...(tier3
-			? { captureTier: "tier3", capabilityDegraded: true }
-			: {}),
+		...(tier3 ? { captureTier: "tier3", capabilityDegraded: true } : {}),
 		...(tier3Blocked ? { blocked: tier3Blocked } : {}),
 		artifacts: {
 			findings: "findings.json",
@@ -490,8 +480,7 @@ if (isDirect) {
 				out,
 				run: () => runGate(gateOptions),
 			});
-			if (result.reused)
-				process.stdout.write(`${JSON.stringify(result)}\n`);
+			if (result.reused) process.stdout.write(`${JSON.stringify(result)}\n`);
 		} else {
 			result = await runGate(gateOptions);
 		}
@@ -499,7 +488,7 @@ if (isDirect) {
 			const runFile = `${out}/gate-run.json`;
 			const runRecord = readJson(runFile, { rounds: [] });
 			if (runRecord.rounds.at(-1))
-					runRecord.rounds.at(-1).wallMs = Date.now() - started;
+				runRecord.rounds.at(-1).wallMs = Date.now() - started;
 			writeFileSync(runFile, `${JSON.stringify(runRecord, null, 1)}\n`);
 		}
 		if (!result.ok) process.exitCode = 2;

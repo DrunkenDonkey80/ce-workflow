@@ -109,10 +109,7 @@ export function decodePng(buffer) {
 function chunk(type, data) {
 	const length = Buffer.alloc(4);
 	length.writeUInt32BE(data.length, 0);
-	const body = Buffer.concat([
-		Buffer.from(type, "ascii"),
-		data,
-	]);
+	const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
 	const crc = Buffer.alloc(4);
 	crc.writeUInt32BE(crc32(body), 0);
 	return Buffer.concat([length, body, crc]);

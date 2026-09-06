@@ -66,7 +66,7 @@ function scratch(name, html) {
 }
 
 function overlapIds(out) {
-const findings = readJson(path.join(out, "findings.json")).findings;
+	const findings = readJson(path.join(out, "findings.json")).findings;
 	return findings
 		.filter((finding) => finding.rule === "interactive-overlap")
 		.map((finding) => finding.id)
@@ -91,7 +91,11 @@ const findings = readJson(path.join(out, "findings.json")).findings;
 			return true;
 		},
 	});
-	assert.equal(loop.errors, 0, `repaired within cap: ${JSON.stringify(loop.rounds)}`);
+	assert.equal(
+		loop.errors,
+		0,
+		`repaired within cap: ${JSON.stringify(loop.rounds)}`,
+	);
 	assert.equal(loop.round, 3, "used exactly the seeded 3 rounds");
 	assert.ok(loop.converged, "converged");
 	const telemetry = readFileSync(path.join(dir, "telemetry.jsonl"), "utf8")
@@ -108,7 +112,9 @@ const findings = readJson(path.join(out, "findings.json")).findings;
 		telemetry.slice(1).every((line) => line.improved),
 		"every post-first round marked improved",
 	);
-	console.log("ok - seeded defects repaired within 3 rounds, monotone telemetry");
+	console.log(
+		"ok - seeded defects repaired within 3 rounds, monotone telemetry",
+	);
 }
 
 // (b) Round 2 non-improving → early stop, cap not exhausted.
@@ -123,7 +129,11 @@ const findings = readJson(path.join(out, "findings.json")).findings;
 			return true;
 		},
 	});
-	assert.equal(loop.round, 2, `stopped after the non-improving round: ${loop.round}`);
+	assert.equal(
+		loop.round,
+		2,
+		`stopped after the non-improving round: ${loop.round}`,
+	);
 	assert.ok(loop.earlyStop, "earlyStop recorded");
 	assert.ok(!loop.converged, "not converged");
 	assert.equal(loop.errors, 2, "defects still present");
@@ -136,7 +146,11 @@ const findings = readJson(path.join(out, "findings.json")).findings;
 {
 	const first = scratch("c1", repairPage({ shiftB: 20 }));
 	const second = scratch("c2", repairPage({ shiftB: 26 }));
-	await runUiGateRepairLoop({ actual: first.file, out: first.dir, maxRounds: 1 });
+	await runUiGateRepairLoop({
+		actual: first.file,
+		out: first.dir,
+		maxRounds: 1,
+	});
 	await runUiGateRepairLoop({
 		actual: second.file,
 		out: second.dir,
@@ -184,7 +198,11 @@ const findings = readJson(path.join(out, "findings.json")).findings;
 		"side-by-side viewer HTML is the dialog content",
 	);
 	const headless = await defaultEscalation({ result: loop, out: dir });
-	assert.equal(headless.decision, "stopped", "headless escalation never approves");
+	assert.equal(
+		headless.decision,
+		"stopped",
+		"headless escalation never approves",
+	);
 	console.log("ok - strict escalation renders through work-dialogs");
 }
 

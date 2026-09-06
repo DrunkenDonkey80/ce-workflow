@@ -42,7 +42,7 @@ function globToRegExp(glob) {
 		.replace(/\*\*/g, "\u0000")
 		.replace(/\*/g, "[^/]*")
 		.replace(/\?/g, ".")
-	.split("\u0000")
+		.split("\u0000")
 		.join(".*");
 	return new RegExp(`^${source}$`);
 }

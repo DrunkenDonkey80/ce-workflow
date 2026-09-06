@@ -36,7 +36,9 @@ async function gate(name, options) {
 	return { result, findings: report.findings, out };
 }
 
-const rulesOf = (findings) => [...new Set(findings.map((finding) => finding.rule))];
+const rulesOf = (findings) => [
+	...new Set(findings.map((finding) => finding.rule)),
+];
 
 // (a)+(b) CI cheap-mode: unchanged fingerprint reuses the recorded verdict
 // fast; a render-file change invalidates it.
@@ -47,7 +49,10 @@ const rulesOf = (findings) => [...new Set(findings.map((finding) => finding.rule
 		path.join(surface, "page.html"),
 		'<!doctype html><html><head><meta charset="utf-8"><style>body{font:18px system-ui;padding:20px;color:#000;background:#fff}</style></head><body><button data-ce-el="go" style="width:48px;height:32px">Go</button></body></html>',
 	);
-	writeFileSync(path.join(surface, "styles", "tokens.css"), ":root{--pad:12px}\n");
+	writeFileSync(
+		path.join(surface, "styles", "tokens.css"),
+		":root{--pad:12px}\n",
+	);
 	const verdictCacheFile = path.join(root, "verdict-cache.json");
 	const first = await runGateCheap({
 		fingerprintRoot: surface,
@@ -82,9 +87,16 @@ const rulesOf = (findings) => [...new Set(findings.map((finding) => finding.rule
 		path.join(root, "cheap-2", "telemetry.jsonl"),
 		"utf8",
 	);
-	assert.match(telemetry, /ui_gate_verdict_reused/, "reuse is visible in telemetry");
+	assert.match(
+		telemetry,
+		/ui_gate_verdict_reused/,
+		"reuse is visible in telemetry",
+	);
 	// (b) a token change invalidates the fingerprint.
-	appendFileSync(path.join(surface, "styles", "tokens.css"), "--accent:#ff0055\n");
+	appendFileSync(
+		path.join(surface, "styles", "tokens.css"),
+		"--accent:#ff0055\n",
+	);
 	const third = await runGateCheap({
 		fingerprintRoot: surface,
 		verdictCacheFile,
@@ -97,7 +109,9 @@ const rulesOf = (findings) => [...new Set(findings.map((finding) => finding.rule
 			}),
 	});
 	assert.equal(third.reused, false, "token change invalidates the fingerprint");
-	console.log("ok - fingerprint cheap-mode reuses verdicts, token change invalidates");
+	console.log(
+		"ok - fingerprint cheap-mode reuses verdicts, token change invalidates",
+	);
 }
 
 // (c) R6 focus-missing and R7 min-target-size seeded defects fire; their
@@ -111,7 +125,11 @@ const rulesOf = (findings) => [...new Set(findings.map((finding) => finding.rule
 		(finding) => finding.rule === "focus-missing",
 	);
 	assert.equal(focusFindings.length, 1, "R6 fires on the unstyled link");
-	assert.match(focusFindings[0].element.matchKey, /^A@/, "finding names the link");
+	assert.match(
+		focusFindings[0].element.matchKey,
+		/^A@/,
+		"finding names the link",
+	);
 	assert.ok(
 		!focusFindings.some((finding) => /BUTTON/.test(finding.element.matchKey)),
 		"the styled button stays clean",
@@ -150,7 +168,9 @@ const rulesOf = (findings) => [...new Set(findings.map((finding) => finding.rule
 	);
 	for (const state of ["ready", "error"])
 		assert.ok(
-			existsSync(path.join(distinct.out, "desktop", state, "actual", "geometry.json")),
+			existsSync(
+				path.join(distinct.out, "desktop", state, "actual", "geometry.json"),
+			),
 			`state ${state} captured`,
 		);
 	const errorText = readJson(
@@ -171,7 +191,9 @@ const rulesOf = (findings) => [...new Set(findings.map((finding) => finding.rule
 	);
 	assert.equal(flagged.length, 1, "identical state geometry is flagged");
 	assert.equal(flagged[0].element.matchKey, "error|ready");
-	console.log("ok - R8 state-coverage: distinct states pass, degenerate flagged");
+	console.log(
+		"ok - R8 state-coverage: distinct states pass, degenerate flagged",
+	);
 }
 
 // (e) Computed WCAG contrast: #777 on #fff (~4.47:1) fires at the 4.5

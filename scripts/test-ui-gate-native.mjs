@@ -48,9 +48,7 @@ const rules = (geometry) =>
 		readFileSync(path.join(fixtures, "android-overlap.xml"), "utf8"),
 	);
 	assert.equal(overlap.profile, "android-uiautomator");
-	const buttons = overlap.elements.filter(
-		(element) => element.tag === "Button",
-	);
+	const buttons = overlap.elements.filter((element) => element.tag === "Button");
 	assert.equal(buttons.length, 2, "both buttons normalized");
 	assert.ok(buttons.every((button) => button.interactive));
 	const overlapFindings = rules(overlap).filter(
@@ -82,7 +80,9 @@ const rules = (geometry) =>
 		}
 		assert.ok(Array.isArray(rules(geometry)), "rules run on live geometry");
 		assert.ok(existsSync(path.join(out, "screenshot.png")), "screencap landed");
-		console.log(`ok - android fixture defect fires R2; live device captured (${geometry.elements.length} elements)`);
+		console.log(
+			`ok - android fixture defect fires R2; live device captured (${geometry.elements.length} elements)`,
+		);
 	} else {
 		const cell = await captureAndroidCell({
 			out: path.join(root, "android-missing"),
@@ -98,9 +98,7 @@ const rules = (geometry) =>
 {
 	const overlapTree = readJson(path.join(fixtures, "winuia-overlap.json"));
 	const overlap = normalizeUiaTree(overlapTree);
-	const buttons = overlap.elements.filter(
-		(element) => element.tag === "Button",
-	);
+	const buttons = overlap.elements.filter((element) => element.tag === "Button");
 	assert.equal(buttons.length, 2);
 	assert.ok(buttons.every((button) => button.interactive));
 	const overlapFindings = rules(overlap).filter(
@@ -126,18 +124,28 @@ const rules = (geometry) =>
 	if (live.ok) {
 		const geometry = readJson(path.join(root, "winuia-live", "geometry.json"));
 		const texts = geometry.elements.map((element) => element.text);
-		assert.ok(texts.some((text) => /Alpha/.test(text)), "Alpha button dumped");
-		assert.ok(texts.some((text) => /Beta/.test(text)), "Beta button dumped");
+		assert.ok(
+			texts.some((text) => /Alpha/.test(text)),
+			"Alpha button dumped",
+		);
+		assert.ok(
+			texts.some((text) => /Beta/.test(text)),
+			"Beta button dumped",
+		);
 		const findings = rules(geometry);
 		assert.deepEqual(
-			findings.filter((finding) => finding.severity === "error").map((f) => f.rule),
+			findings
+				.filter((finding) => finding.severity === "error")
+				.map((f) => f.rule),
 			[],
 			`fixture app passes the gate: ${JSON.stringify(findings)}`,
 		);
 		console.log("ok - win-uia fixture app dumped live and passes the gate");
 	} else {
 		assert.ok(live.skipped, "live row records the skip reason");
-		console.log(`ok - win-uia fixture defect fires R2; live row skipped (${live.skipped})`);
+		console.log(
+			`ok - win-uia fixture defect fires R2; live row skipped (${live.skipped})`,
+		);
 	}
 }
 
@@ -179,7 +187,9 @@ const rules = (geometry) =>
 			rules(geometry).map((finding) => finding.rule),
 			[],
 		);
-		console.log(`ok - tkinter helper round-trips via recorded report (live skipped: ${live.skipped})`);
+		console.log(
+			`ok - tkinter helper round-trips via recorded report (live skipped: ${live.skipped})`,
+		);
 	}
 }
 
@@ -200,7 +210,7 @@ const rules = (geometry) =>
 				data[target + 2] = 0xff;
 			}
 			data[target + 3] = 255;
-	}
+		}
 	const verdict = histogramFromPng(encodePng({ width: 20, height: 10, data }), {
 		x: 0,
 		y: 0,
@@ -208,7 +218,11 @@ const rules = (geometry) =>
 		height: 10,
 	});
 	assert.equal(verdict.modes, 2, "two colour modes detected");
-	assert.equal(verdict.colour[0], 0xff, "dominant channel survives quantization");
+	assert.equal(
+		verdict.colour[0],
+		0xff,
+		"dominant channel survives quantization",
+	);
 	console.log("ok - histogram colour sampler counts deterministic modes");
 }
 

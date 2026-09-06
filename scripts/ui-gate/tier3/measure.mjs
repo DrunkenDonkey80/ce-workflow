@@ -5,7 +5,12 @@
 // 0–1000 origin top-left. The deterministic verification chain (probes.mjs)
 // vets every rect; degradation is BLOCKED, never a silent pass.
 import { readFileSync } from "node:fs";
-import { composeGrid, decodePng, encodePng, scaleToLongestEdge } from "./png.mjs";
+import {
+	composeGrid,
+	decodePng,
+	encodePng,
+	scaleToLongestEdge,
+} from "./png.mjs";
 import {
 	edgeSnap,
 	gridCrossCheck,
@@ -122,8 +127,7 @@ export async function runTier3Cell({
 			throw error;
 		}
 	}
-	if (unparseable || !response)
-		return blocked("vlm-unparseable");
+	if (unparseable || !response) return blocked("vlm-unparseable");
 
 	const quarantined = [];
 	const verified = [];
@@ -162,14 +166,8 @@ export async function runTier3Cell({
 				const cropBox = {
 					x: Math.max(0, rect.x - rect.width * pad),
 					y: Math.max(0, rect.y - rect.height * pad),
-					width: Math.min(
-						image.width,
-						rect.width * (1 + 2 * pad),
-					),
-					height: Math.min(
-						image.height,
-						rect.height * (1 + 2 * pad),
-					),
+					width: Math.min(image.width, rect.width * (1 + 2 * pad)),
+					height: Math.min(image.height, rect.height * (1 + 2 * pad)),
 				};
 				const cropData = new Uint8Array(
 					Math.round(cropBox.width) * Math.round(cropBox.height) * 4,
@@ -177,8 +175,8 @@ export async function runTier3Cell({
 				for (let y = 0; y < Math.round(cropBox.height); y += 1)
 					for (let x = 0; x < Math.round(cropBox.width); x += 1) {
 						const source =
-							((Math.round(cropBox.y) + y) * image.width +
-								Math.round(cropBox.x) + x) * 4;
+							((Math.round(cropBox.y) + y) * image.width + Math.round(cropBox.x) + x) *
+							4;
 						const target = (y * Math.round(cropBox.width) + x) * 4;
 						cropData[target] = image.data[source];
 						cropData[target + 1] = image.data[source + 1];

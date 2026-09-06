@@ -4,6 +4,7 @@ Debug-mode self-report: walks the widget tree and prints one JSON line
 with normalized geometry. Apps embed `report(root)`; the fixture mode
 below builds a two-button window for the gate's own tests.
 """
+
 import json
 import sys
 import tkinter as tk

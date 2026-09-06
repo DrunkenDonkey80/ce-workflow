@@ -62,8 +62,7 @@ export function normalizeUiaTree(tree, { viewport } = {}) {
 		const parent = raw
 			.filter((other) => contains(other, entry))
 			.sort(
-				(a, b) =>
-					a.rect.width * a.rect.height - b.rect.width * b.rect.height,
+				(a, b) => a.rect.width * a.rect.height - b.rect.width * b.rect.height,
 			)[0];
 		return {
 			key: `uia-${index + 1}`,

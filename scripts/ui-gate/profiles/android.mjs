@@ -144,13 +144,22 @@ export async function captureAndroidCell({
 	let lastError = null;
 	for (let attempt = 0; attempt <= retries && !xml; attempt += 1) {
 		try {
-			await run("adb", [...base, "shell", "uiautomator", "dump", "/sdcard/window_dump.xml"]);
+			await run("adb", [
+				...base,
+				"shell",
+				"uiautomator",
+				"dump",
+				"/sdcard/window_dump.xml",
+			]);
 			xml = await run("adb", [...base, "shell", "cat", "/sdcard/window_dump.xml"]);
 		} catch (error) {
 			lastError = error;
 		}
 	}
-	if (!xml) throw new Error(`uiautomator dump failed: ${lastError?.message ?? "no output"}`);
+	if (!xml)
+		throw new Error(
+			`uiautomator dump failed: ${lastError?.message ?? "no output"}`,
+		);
 	const geometry = normalizeUiautomatorDump(xml, { viewport });
 	geometry.state = state;
 	const geometryJson = `${JSON.stringify(geometry, null, 1)}\n`;

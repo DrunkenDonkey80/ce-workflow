@@ -41,9 +41,10 @@ export function normalizeTkReport(report) {
 				width: Number(element.w),
 				height: Number(element.h),
 			},
-			interactive: /^(T?Button|T?Checkbutton|T?Radiobutton|T?Entry|T?Combobox|T?Spinbox|T?Menubutton|T?Scale|T?Scrollbar)$/i.test(
-				String(element.class ?? ""),
-			),
+			interactive:
+				/^(T?Button|T?Checkbutton|T?Radiobutton|T?Entry|T?Combobox|T?Spinbox|T?Menubutton|T?Scale|T?Scrollbar)$/i.test(
+					String(element.class ?? ""),
+				),
 			effectiveOpacity: 1,
 			styles: {
 				color: null,
@@ -98,10 +99,7 @@ export async function capturePyGuiCell({
 	} catch (error) {
 		return { ok: false, skipped: `python/tkinter unavailable: ${error.message}` };
 	}
-	const jsonLine = stdout
-		.trim()
-		.split("\n")
-		.at(-1);
+	const jsonLine = stdout.trim().split("\n").at(-1);
 	let report;
 	try {
 		report = JSON.parse(jsonLine);

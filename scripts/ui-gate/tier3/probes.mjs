@@ -30,7 +30,10 @@ export function pixelProbe({ image, rect }) {
 	// Inset scales with the smaller side: erosion exists to skip borders and
 	// rounded corners, which never scale with box width (a right-aligned
 	// glyph would fall outside a width-proportional inset).
-	const inset = Math.max(1, Math.round(Math.min(rect.width, rect.height) * 0.12));
+	const inset = Math.max(
+		1,
+		Math.round(Math.min(rect.width, rect.height) * 0.12),
+	);
 	const erodeX = inset;
 	const erodeY = inset;
 	const left = Math.round(rect.x + erodeX);
@@ -47,7 +50,10 @@ export function pixelProbe({ image, rect }) {
 	};
 	// Outer ring at a tiny inset: borders and edge-hugging ink live within a
 	// few pixels of the raw edges — a 12% erosion would skip them entirely.
-	const rim = Math.max(1, Math.min(3, Math.round(Math.min(rect.width, rect.height) * 0.05)));
+	const rim = Math.max(
+		1,
+		Math.min(3, Math.round(Math.min(rect.width, rect.height) * 0.05)),
+	);
 	for (let x = Math.round(rect.x); x < rect.x + rect.width; x += 1) {
 		sample(x, Math.round(rect.y) + rim);
 		sample(x, Math.round(rect.y + rect.height) - rim - 1);
@@ -56,7 +62,10 @@ export function pixelProbe({ image, rect }) {
 		sample(Math.round(rect.x) + rim, y);
 		sample(Math.round(rect.x + rect.width) - rim - 1, y);
 	}
-	const band = Math.max(1, Math.round(Math.min(right - left, bottom - top) * 0.25));
+	const band = Math.max(
+		1,
+		Math.round(Math.min(right - left, bottom - top) * 0.25),
+	);
 	for (let x = left; x < right; x += 1) {
 		sample(x, top);
 		sample(x, top + band);
@@ -71,7 +80,10 @@ export function pixelProbe({ image, rect }) {
 	}
 	// Interior ink: text regions carry their ink in the middle, not at the
 	// border — sample a coarse grid across the eroded interior too.
-	const step = Math.max(1, Math.floor(Math.min(right - left, bottom - top) / 12));
+	const step = Math.max(
+		1,
+		Math.floor(Math.min(right - left, bottom - top) / 12),
+	);
 	for (let y = top; y < bottom; y += step)
 		for (let x = left; x < right; x += step) sample(x, y);
 	if (!lums.length) return { flat: true, variance: 0, samples: 0 };
@@ -86,8 +98,10 @@ export function pixelProbe({ image, rect }) {
 // measurement. Sharp high-contrast edges snap within ~2px.
 export function edgeSnap({ image, rect, band = 0.1 }) {
 	const lumAt = (x, y) => {
-		const i = (Math.min(image.height - 1, Math.max(0, y)) * image.width +
-			Math.min(image.width - 1, Math.max(0, x))) * 4;
+		const i =
+			(Math.min(image.height - 1, Math.max(0, y)) * image.width +
+				Math.min(image.width - 1, Math.max(0, x))) *
+			4;
 		return luminance(image.data[i], image.data[i + 1], image.data[i + 2]);
 	};
 	const snapVertical = (edge, inward) => {
@@ -98,7 +112,11 @@ export function edgeSnap({ image, rect, band = 0.1 }) {
 		for (let offset = -range; offset <= range; offset += 1) {
 			const candidate = edge + offset;
 			let gradient = 0;
-			for (let y = Math.round(rect.y); y < Math.round(rect.y + rect.height); y += 1) {
+			for (
+				let y = Math.round(rect.y);
+				y < Math.round(rect.y + rect.height);
+				y += 1
+			) {
 				const here = lumAt(candidate, y);
 				const there = lumAt(candidate + (inward ? -1 : 1), y);
 				gradient += Math.abs(here - there);
@@ -118,7 +136,11 @@ export function edgeSnap({ image, rect, band = 0.1 }) {
 		for (let offset = -range; offset <= range; offset += 1) {
 			const candidate = edge + offset;
 			let gradient = 0;
-			for (let x = Math.round(rect.x); x < Math.round(rect.x + rect.width); x += 1) {
+			for (
+				let x = Math.round(rect.x);
+				x < Math.round(rect.x + rect.width);
+				x += 1
+			) {
 				const here = lumAt(x, candidate);
 				const there = lumAt(x, candidate + (inward ? -1 : 1));
 				gradient += Math.abs(here - there);

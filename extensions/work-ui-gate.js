@@ -33,10 +33,7 @@ export async function withGateLease(outDir, fn) {
 		try {
 			const fd = openSync(lockPath, "wx");
 			try {
-				writeSync(
-					fd,
-					`${JSON.stringify({ pid: process.pid, at: Date.now() })}\n`,
-				);
+				writeSync(fd, `${JSON.stringify({ pid: process.pid, at: Date.now() })}\n`);
 			} finally {
 				closeSync(fd);
 			}
@@ -200,7 +197,10 @@ export async function runUiGateRepairLoop({
 }
 
 function parseCommandArgs(args) {
-	const tokens = String(args ?? "").trim().split(/\s+/).filter(Boolean);
+	const tokens = String(args ?? "")
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean);
 	const parsed = { viewports: [] };
 	for (let index = 0; index < tokens.length; index += 1) {
 		const token = tokens[index];
@@ -230,8 +230,7 @@ export async function uiGateCommand(args, ctx) {
 		);
 		return;
 	}
-	const resolveFrom = (value) =>
-		value ? path.resolve(ctx.cwd, value) : value;
+	const resolveFrom = (value) => (value ? path.resolve(ctx.cwd, value) : value);
 	let result;
 	try {
 		result = await runUiGateRepairLoop({
@@ -268,7 +267,8 @@ export async function uiGateCommand(args, ctx) {
 export function registerWorkUiGate(pi) {
 	if (typeof pi?.registerCommand !== "function") return;
 	pi.registerCommand("ui-gate", {
-		description: "Run the UI gate repair loop (capture → rules → fidelity → bounded repair)",
+		description:
+			"Run the UI gate repair loop (capture → rules → fidelity → bounded repair)",
 		handler: async (args, ctx) => uiGateCommand(args, ctx),
 	});
 }

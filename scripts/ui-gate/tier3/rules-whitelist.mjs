@@ -79,17 +79,11 @@ export function evaluateTier3({
 			);
 			if (moved > threshold)
 				findings.push(
-					makeTier3Finding(
-						"region-out-of-place",
-						entry.anchor,
-						viewport,
-						state,
-						{
-							measured: "moved beyond threshold",
-							threshold: `${Math.round(threshold)}px center drift (categorical)`,
-							hint: `region ${entry.anchor} is not where the design places it — inspect the layout container`,
-						},
-					),
+					makeTier3Finding("region-out-of-place", entry.anchor, viewport, state, {
+						measured: "moved beyond threshold",
+						threshold: `${Math.round(threshold)}px center drift (categorical)`,
+						hint: `region ${entry.anchor} is not where the design places it — inspect the layout container`,
+					}),
 				);
 		}
 	}
@@ -138,7 +132,9 @@ export function evaluateTier3({
 
 	// ordering-violation: purely ordinal, the tier's most noise-robust check.
 	for (const assertion of layoutAssertions) {
-		const match = /^(.+?)\s+(?:is\s+)?above\s+(.+)$/i.exec(String(assertion).trim());
+		const match = /^(.+?)\s+(?:is\s+)?above\s+(.+)$/i.exec(
+			String(assertion).trim(),
+		);
 		if (!match) continue;
 		const top = names.has(match[1]) ? match[1] : null;
 		const bottom = names.has(match[2]) ? match[2] : null;
@@ -150,11 +146,17 @@ export function evaluateTier3({
 			const bottomCenter = bottomEntry.rect.y + bottomEntry.rect.height / 2;
 			if (topCenter >= bottomCenter)
 				findings.push(
-					makeTier3Finding("ordering-violation", `${top}|${bottom}`, viewport, state, {
-						measured: `${top} is not above ${bottom}`,
-						threshold: assertion,
-						hint: `${top} should render above ${bottom}`,
-					}),
+					makeTier3Finding(
+						"ordering-violation",
+						`${top}|${bottom}`,
+						viewport,
+						state,
+						{
+							measured: `${top} is not above ${bottom}`,
+							threshold: assertion,
+							hint: `${top} should render above ${bottom}`,
+						},
+					),
 				);
 		}
 	}
@@ -202,7 +204,9 @@ function parseHex(value) {
 }
 
 const toHex = (colour) =>
-	colour.map((channel) => Math.round(channel).toString(16).padStart(2, "0")).join("");
+	colour
+		.map((channel) => Math.round(channel).toString(16).padStart(2, "0"))
+		.join("");
 
 const colourDistance = (a, b) => {
 	const parsed = parseHex(b);
@@ -234,6 +238,10 @@ export function dominantColour({ image, rect }) {
 	const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
 	const modes = ranked.filter(([, count]) => count / samples > 0.15).length;
 	const [key] = ranked[0];
-	const colour = [((key >> 8) & 0xf) * 17, ((key >> 4) & 0xf) * 17, (key & 0xf) * 17];
+	const colour = [
+		((key >> 8) & 0xf) * 17,
+		((key >> 4) & 0xf) * 17,
+		(key & 0xf) * 17,
+	];
 	return { colour, modes };
 }
