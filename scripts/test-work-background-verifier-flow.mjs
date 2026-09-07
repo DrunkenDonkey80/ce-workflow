@@ -332,8 +332,9 @@ try {
 	const completion = {
 		message: {
 			role: "custom",
-			customType: "intercom_message",
-			content: "subagent results: Step 0 (work-background-verifier): completed",
+			customType: "subagent-notify",
+			content:
+				"Background task completed: **workflow**\n\nagent: work-background-verifier\n\nWorkflow run: verifier-run",
 		},
 	};
 	await hooks.message_end(completion, ctx);

@@ -5635,8 +5635,7 @@ function isBackgroundVerifierCompletionMessage(message) {
 
 function knownKnowledgeDiscovererRun(runId) {
 	return (
-		knowledgeDiscovererRuns.has(runId) ||
-		knowledgeDiscovererDoneRuns.has(runId)
+		knowledgeDiscovererRuns.has(runId) || knowledgeDiscovererDoneRuns.has(runId)
 	);
 }
 
@@ -5670,7 +5669,6 @@ export function isKnowledgeDiscovererCompletionMessage(message) {
 		knowledgeDiscovererCompletionText(message.content)
 	);
 }
-
 
 function compactionEvidence(issue) {
 	return asArray(issue?.evidence)
@@ -9381,7 +9379,7 @@ function planResumeAction(state, cwd, options = {}) {
 const ROLE_TIMEOUT_GUIDANCE = [
 	"Role liveness guidance: when a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use bg_wait/status; never block the TUI on a foreground child. needsAttentionAfterMs=30000 is an attention notification, not a hard timeout. If a run needs an explicit timeout, planner/worker/reviewer/fixer/debugger/migrator get at least 10 minutes and committer gets at least 3 minutes. Treat timeout or startup/auth failure as infrastructure evidence, not implementation failure.",
 	"Reviewer handoff guidance: do not handcraft a reviewer task when a coded handoff is available. A reviewer waiting on contact_supervisor is not an implementation or review failure.",
-	"Delayed supervisor guidance: use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous-name coordination by exact session ID. Query intercom pending plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live request use intercom action reply; replyTo is a message ID, never a child session name. Timeout is not cancellation: cancel only a known queued message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
+	"Delayed supervisor guidance: use subagent_supervisor pending/status plus the subagent run and work-item state before replying. If no request is pending, the run is terminal, or the work item is closed, classify it as stale and do not reply, resume, append another verdict, or restart work. For a live child request use subagent_supervisor action reply, targeting the exact child/request when needed. Use intercom list-cwd only for operator peer discovery; target trust-sensitive or ambiguous peer names by exact session ID. Timeout is not cancellation: cancel only a known queued intercom message ID, use supersedes for an authored replacement, use retryOf for an authored retry, and never assume cancellation can undo injected work.",
 ].join(" ");
 
 function gitDirtyClassification(git) {
