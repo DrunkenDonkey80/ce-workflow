@@ -102,7 +102,8 @@ try {
 	const distinct = recordKnowledge(
 		cwd,
 		{
-			claim: "Pi loads extensions only at session startup; editing one needs a restart.",
+			claim:
+				"Pi loads extensions only at session startup; editing one needs a restart.",
 			kind: "environment",
 			scope: "user",
 			authority: "observed",

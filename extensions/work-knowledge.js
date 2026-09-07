@@ -403,9 +403,11 @@ const CLAIM_SIMILARITY_MIN_TOKENS = 8;
 
 function claimTokens(claim) {
 	return new Set(
-		(normalizeText(claim).toLowerCase().match(/[a-z0-9_][a-z0-9_.]+/g) ?? []).map(
-			(token) => token.replace(/\.+$/, ""),
-		),
+		(
+			normalizeText(claim)
+				.toLowerCase()
+				.match(/[a-z0-9_][a-z0-9_.]+/g) ?? []
+		).map((token) => token.replace(/\.+$/, "")),
 	);
 }
 
