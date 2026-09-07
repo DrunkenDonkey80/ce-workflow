@@ -21,6 +21,7 @@ const {
 	default: workModelsExtension,
 	directRoleHandoffParams,
 	executeOrchestratorAction,
+	matchesTelemetryScope,
 	parseWorkPromptMeta,
 	reconcilePendingDirectRuns,
 	recordPendingDirectRun,
@@ -960,6 +961,27 @@ try {
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 	rmSync(globalDir, { recursive: true, force: true });
 	rmSync(cwd, { recursive: true, force: true });
+}
+
+// ISO date scopes contain hyphens too, so they used to fall into the work-item
+// id branch and match nothing, making `work-telemetry <date>` report zero events.
+{
+	const dayEvent = {
+		timestamp: "2026-08-09T12:00:00.000Z",
+		workItemId: "work-3",
+	};
+	assert(
+		matchesTelemetryScope(dayEvent, { scope: "2026-08-09" }) === true,
+		"an explicit ISO date scope matches events recorded that day",
+	);
+	assert(
+		matchesTelemetryScope(dayEvent, { scope: "2026-08-10" }) === false,
+		"an ISO date scope does not match a different day",
+	);
+	assert(
+		matchesTelemetryScope(dayEvent, { scope: "work-3" }) === true,
+		"hyphenated work-item id scopes still match by id",
+	);
 }
 
 process.stdout.write("ok - work telemetry behavior\n");

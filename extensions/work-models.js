@@ -2626,6 +2626,10 @@ function matchesTelemetryScope(event, { scope, value }) {
 		return event.epicId === value || event.meta?.epicId === value;
 	if (scope === "workItem" || scope === "task")
 		return event.workItemId === value || event.meta?.workItemId === value;
+	// ISO dates contain hyphens too, so they must be matched before the work-item
+	// id heuristic below; otherwise an explicit date scope reports zero events.
+	if (/^\d{4}-\d{2}-\d{2}$/.test(scope))
+		return event.timestamp?.slice(0, 10) === scope;
 	if (scope.includes("-"))
 		return (
 			event.epicId === scope ||
@@ -29559,6 +29563,7 @@ export {
 	parseOrchestratorInput,
 	workGoalConfirmationLabel,
 	completeWorkflowOnce,
+	matchesTelemetryScope,
 	withCommandTelemetry,
 	sendWorkflowFollowUp,
 	parseWorkPromptMeta,
