@@ -6603,7 +6603,10 @@ function maybeCompact(ctx, settings) {
 }
 
 function isCompactionResumePrompt(value) {
-	return /^Compaction is complete\. Resume the parent task now\b/.test(
+	// Multiline: the resume line can arrive on its own line after a compaction
+	// summary. Anchoring to the start of the whole prompt missed those and let
+	// an idle microcompact spend a full model turn.
+	return /^Compaction is complete\. Resume the parent task now\b/m.test(
 		contentText(value).trim(),
 	);
 }

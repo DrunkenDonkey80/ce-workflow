@@ -2655,6 +2655,22 @@ try {
 		abortsBeforeIdleResumeFallback + 1,
 		"an unauthorized post-F8 resume is aborted before the model request",
 	);
+	// A microcompact can deliver the resume line after a summary block. Anchoring
+	// to the start of the whole prompt missed those, so the guard never armed and
+	// an idle F8 spent a full model turn.
+	const prefixedResumePrompt = `The conversation history before this point was compacted into the following summary:\n\nsummary body\n\n${idleResumePrompt}`;
+	const abortsBeforePrefixedResume = aborts;
+	await tempHooks.before_agent_start(
+		{ prompt: prefixedResumePrompt, systemPrompt: "base" },
+		ctx,
+	);
+	await tempHooks.agent_start({}, ctx);
+	await tempHooks.before_provider_request({ payload: { messages: [] } }, ctx);
+	assert.equal(
+		aborts,
+		abortsBeforePrefixedResume + 1,
+		"a resume prompt carrying a compaction summary prefix is still aborted",
+	);
 	assert.deepEqual(
 		await tempHooks.message_end(
 			{
