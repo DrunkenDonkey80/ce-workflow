@@ -80,6 +80,38 @@ try {
 	assert.equal(duplicate.deduplicated, true);
 	assert.equal(resolveKnowledge(cwd, options).length, 1);
 
+	// Reworded restatement of a known fact: same token set, different bytes, so
+	// the exact fingerprint misses it. Must still dedup, or every session
+	// re-banks facts it already knows.
+	const reworded = recordKnowledge(
+		cwd,
+		{
+			claim: "On this machine, PATH's od.exe is GNU coreutils, not OpenDesign!",
+			kind: "environment",
+			scope: "user",
+			authority: "observed",
+			paths: ["extensions/opendesign-client.js"],
+			symbols: ["resolveOpenDesignCommand"],
+		},
+		options,
+	);
+	assert.equal(reworded.deduplicated, true);
+	assert.equal(resolveKnowledge(cwd, options).length, 1);
+
+	// A genuinely different fact in the same kind/scope must still be recorded.
+	const distinct = recordKnowledge(
+		cwd,
+		{
+			claim: "Pi loads extensions only at session startup; editing one needs a restart.",
+			kind: "environment",
+			scope: "user",
+			authority: "observed",
+		},
+		options,
+	);
+	assert.equal(distinct.deduplicated, false);
+	assert.equal(resolveKnowledge(cwd, options).length, 2);
+
 	const corrected = correctKnowledge(
 		cwd,
 		"k-od",

@@ -394,6 +394,36 @@ function recordFingerprint(record) {
 		.digest("hex");
 }
 
+// ponytail: token-set Jaccard is a cheap paraphrase check; move to embeddings
+// only if reworded claims still slip through at this threshold.
+// Digits and short tokens are KEPT on purpose: they are often the only
+// discriminator between otherwise identical claims ("R6 rule" vs "R7 rule",
+// "Concurrent process 3" vs "... 4"). Dropping them merges distinct facts.
+const CLAIM_SIMILARITY_MIN_TOKENS = 8;
+
+function claimTokens(claim) {
+	return new Set(
+		(normalizeText(claim).toLowerCase().match(/[a-z0-9_][a-z0-9_.]+/g) ?? []).map(
+			(token) => token.replace(/\.+$/, ""),
+		),
+	);
+}
+
+function claimSimilarity(a, b) {
+	const left = claimTokens(a);
+	const right = claimTokens(b);
+	// Short claims carry too little signal for paraphrase matching; they stay on
+	// the exact-fingerprint path rather than risking a false merge.
+	if (
+		left.size < CLAIM_SIMILARITY_MIN_TOKENS ||
+		right.size < CLAIM_SIMILARITY_MIN_TOKENS
+	)
+		return 0;
+	let shared = 0;
+	for (const token of left) if (right.has(token)) shared += 1;
+	return shared / (left.size + right.size - shared);
+}
+
 function bindingStatus(record, cwd) {
 	if (!record.binding) return "live";
 	try {
@@ -529,10 +559,20 @@ export function recordKnowledge(cwd, input, options = {}) {
 					throw new Error(`Knowledge claim ${record.supersedes} is no longer live.`);
 				return true;
 			}
+			const fingerprint = recordFingerprint(record);
 			duplicate = resolved.find(
-				(item) =>
-					item.status === "live" && item.fingerprint === recordFingerprint(record),
+				(item) => item.status === "live" && item.fingerprint === fingerprint,
 			);
+			// Exact fingerprints only catch byte-identical claims, so a reworded
+			// restatement of a known fact used to land as a fresh record.
+			if (!duplicate)
+				duplicate = resolved.find(
+					(item) =>
+						item.status === "live" &&
+						item.kind === record.kind &&
+						item.scope === record.scope &&
+						claimSimilarity(item.claim, record.claim) >= 0.9,
+				);
 			return !duplicate;
 		},
 	);
