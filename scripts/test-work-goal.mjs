@@ -255,6 +255,29 @@ try {
 		),
 		/Use the configured binary path/,
 	);
+	// Absorb deletes the live entry, but the subagent-notify message is filtered
+	// afterwards. If the run stops being recognized here, the notification is
+	// injected as a new turn and interrupts whatever the user was reading.
+	assert.equal(
+		mod.isKnowledgeDiscovererCompletionMessage({
+			role: "custom",
+			customType: "subagent-notify",
+			content:
+				"Background task completed: **workflow**\n\nWorkflow run: discoverer-run",
+		}),
+		true,
+		"an already-absorbed discoverer run stays silent instead of waking the session",
+	);
+	assert.equal(
+		mod.isKnowledgeDiscovererCompletionMessage({
+			role: "custom",
+			customType: "subagent-notify",
+			content:
+				"Background tasks completed (2)\n\nWorkflow run: discoverer-run\nWorkflow run: user-run",
+		}),
+		false,
+		"a batch mixing an absorbed discoverer run with a user run still wakes the model",
+	);
 } finally {
 	rmSync(discovererCwd, { recursive: true, force: true });
 }

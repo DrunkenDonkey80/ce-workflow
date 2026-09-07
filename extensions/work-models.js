@@ -746,6 +746,10 @@ const KNOWLEDGE_DISCOVERER_MAX_CLAIMS = 3;
 const KNOWLEDGE_DISCOVERER_MAX_INPUT_CHARS = 400_000;
 const knowledgeDiscovererRuns = new Map();
 const knowledgeDiscovererCuts = new Set();
+// Absorbing a completion deletes its live entry, but the subagent-notify
+// message is filtered afterwards. Without this short memory the filter stops
+// recognizing the run and the notification wakes the session as a new turn.
+const knowledgeDiscovererDoneRuns = new Set();
 const contextCompactState = {
 	generation: 0,
 	inFlight: false,
@@ -5628,7 +5632,11 @@ export function isKnowledgeDiscovererCompletionMessage(message) {
 		.filter(Boolean);
 	return (
 		runIds.length > 0 &&
-		runIds.every((runId) => knowledgeDiscovererRuns.has(runId))
+		runIds.every(
+			(runId) =>
+				knowledgeDiscovererRuns.has(runId) ||
+				knowledgeDiscovererDoneRuns.has(runId),
+		)
 	);
 }
 
@@ -6163,6 +6171,11 @@ export function absorbKnowledgeDiscovererCompletion(event) {
 	const tracked = knowledgeDiscovererRuns.get(event?.runId);
 	if (!tracked) return null;
 	knowledgeDiscovererRuns.delete(event.runId);
+	knowledgeDiscovererDoneRuns.add(event.runId);
+	if (knowledgeDiscovererDoneRuns.size > 32)
+		knowledgeDiscovererDoneRuns.delete(
+			knowledgeDiscovererDoneRuns.values().next().value,
+		);
 	const result = Array.isArray(event.results) ? event.results[0] : event;
 	if (result?.success === false || !result?.structuredOutput)
 		return { count: 0, notify: tracked.notify };
