@@ -13,7 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import workModelsExtension from "../extensions/work-models.js";
+import workModelsExtension from "../extensions/work-models.ts";
 
 const scenarios = ["idle", "direct"];
 const scriptPath = fileURLToPath(import.meta.url);

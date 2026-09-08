@@ -32,7 +32,7 @@ const {
 	withCommandTelemetry,
 } = await import(
 	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 const { installWorkflowFixture, seedNativeStore, workflowChildParams } =
@@ -549,7 +549,7 @@ try {
 		handoffPrompt: "review",
 		selectedWorkItem: {
 			id: "TASK-REVIEW",
-			changedPaths: ["extensions/work-models.js"],
+			changedPaths: ["extensions/work-models.ts"],
 		},
 	};
 	let metadataFollowUp = "";

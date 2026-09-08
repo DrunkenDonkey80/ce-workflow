@@ -17,7 +17,7 @@ import {
 	buildWorkResumeState,
 	executeOrchestratorAction,
 	renderWorkResumeText,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import { runGate } from "./ui-gate/gate.mjs";
 
 const source = readFileSync(fileURLToPath(import.meta.url), "utf8");

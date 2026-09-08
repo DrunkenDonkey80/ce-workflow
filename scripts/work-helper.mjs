@@ -1828,7 +1828,7 @@ try {
 		);
 		if (created.type === "epic" && !created.parentId) {
 			const modUrl = pathToFileURL(
-				path.join(import.meta.dirname, "..", "extensions", "work-models.js"),
+				path.join(import.meta.dirname, "..", "extensions", "work-models.ts"),
 			);
 			const { rememberWorkflowEpicForHelper } = await import(modUrl.href);
 			rememberWorkflowEpicForHelper(cwd, created);
@@ -2106,7 +2106,7 @@ try {
 	} else if (command === "initiative-summary") {
 		const [target] = positional();
 		const { buildInitiativeProjection } = await import(
-			"../extensions/work-models.js"
+			"../extensions/work-models.ts"
 		);
 		const projection = buildInitiativeProjection(cwd);
 		if (target) {
@@ -2129,7 +2129,7 @@ try {
 				"usage: initiative-preview [proposal-json-file | --proposal-json <json>]",
 			);
 		const { previewInitiativeReconciliation } = await import(
-			"../extensions/work-models.js"
+			"../extensions/work-models.ts"
 		);
 		print(
 			previewInitiativeReconciliation(
@@ -2147,7 +2147,7 @@ try {
 				"usage: initiative-apply [proposal-json-file | --proposal-json <json>] --token <preview-token> --approval <receipt>",
 			);
 		const { applyInitiativeReconciliation } = await import(
-			"../extensions/work-models.js"
+			"../extensions/work-models.ts"
 		);
 		print(
 			applyInitiativeReconciliation(
@@ -2169,7 +2169,7 @@ try {
 					: "usage: bootstrap-plan-roadmap <plan-path> [--roadmap <existing-roadmap-id>]",
 			);
 		const modUrl = pathToFileURL(
-			path.join(import.meta.dirname, "..", "extensions", "work-models.js"),
+			path.join(import.meta.dirname, "..", "extensions", "work-models.ts"),
 		).href;
 		const roadmapIdField =
 			command === "bootstrap-plan-epic" ? "epic_id" : "roadmap_id";

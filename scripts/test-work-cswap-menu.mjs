@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { cswapMenuItems, resolveCswap } from "../extensions/work-models.js";
+import { cswapMenuItems, resolveCswap } from "../extensions/work-models.ts";
 
 // Accounts with >50% 5h quota free come first, nearest reset first.
 const { items, activeNumber } = cswapMenuItems({

@@ -12,7 +12,7 @@ import {
 import {
 	buildWorkResumeState,
 	buildWorkStatus,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 
 const cwd = mkdtempSync(path.join(os.tmpdir(), "ce-work-store-performance-"));
 const previousBd = process.env.WORK_ORCH_BD_BIN;

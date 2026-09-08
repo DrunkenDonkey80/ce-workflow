@@ -10,7 +10,7 @@ const INVENTORY_PATH = fileURLToPath(
 	new URL("./work-compound-inventory.json", import.meta.url),
 );
 const WORK_MODELS_CALLER = fileURLToPath(
-	new URL("./work-models.js", import.meta.url),
+	new URL("./work-models.ts", import.meta.url),
 );
 const EVALUATION_CALLER = fileURLToPath(
 	new URL("../scripts/workflow-evaluation.mjs", import.meta.url),

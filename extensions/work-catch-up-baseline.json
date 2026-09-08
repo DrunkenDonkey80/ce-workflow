@@ -49,7 +49,7 @@
           "pov": "Adopt",
           "status": "adopted",
           "rationale": "Grade: Adopt. Reversibility: Tier 1 prompt and policy change. Bottom line: answer child contact_supervisor requests through subagent_supervisor and keep intercom only for optional peer coordination. Verified project fit: ce roles use contact_supervisor, while the parent policy incorrectly directed replies through external intercom. Verified upstream evidence: the installed 0.66.0 changelog and configuration documentation pair contact_supervisor with the native subagent_supervisor control. Benefit: blocked children receive answers through the supported path without an optional bridge. Cost/risk: small wording and assertion changes while preserving stale-request checks. Confidence: high. Recommendation: use native supervisor control for child requests.",
-          "verification": "node scripts/test-work-goal.mjs; LSP diagnostics clean for extensions/work-models.js and scripts/test-work-goal.mjs"
+          "verification": "node scripts/test-work-goal.mjs; LSP diagnostics clean for extensions/work-models.ts and scripts/test-work-goal.mjs"
         },
         {
           "version": "0.66.0",
@@ -138,7 +138,7 @@
           "title": "Copy pi-goal's completion renderer into work_goal_complete",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 2 tool-rendering and dependency change. Bottom line: do not add a second completion card for ce-workflow's internal terminal tool. Verified project fit: work_goal_complete already returns a bounded completion result and explicitly asks the agent to give the user one concise final summary; work-models.js currently needs no direct pi-tui import. Verified upstream evidence: 0.54.4's new renderer is scoped to pi-goal's own goal_complete result and introduces Markdown plus theme dependencies. Benefit: avoids duplicate user-visible completion output and a new direct TUI dependency. Cost/risk: the internal tool row remains plain text before the final assistant summary. Confidence: high. Recommendation: retain the existing final-response handoff."
+          "rationale": "Grade: Reject. Reversibility: Tier 2 tool-rendering and dependency change. Bottom line: do not add a second completion card for ce-workflow's internal terminal tool. Verified project fit: work_goal_complete already returns a bounded completion result and explicitly asks the agent to give the user one concise final summary; work-models.ts currently needs no direct pi-tui import. Verified upstream evidence: 0.54.4's new renderer is scoped to pi-goal's own goal_complete result and introduces Markdown plus theme dependencies. Benefit: avoids duplicate user-visible completion output and a new direct TUI dependency. Cost/risk: the internal tool row remains plain text before the final assistant summary. Confidence: high. Recommendation: retain the existing final-response handoff."
         }
       ]
     },

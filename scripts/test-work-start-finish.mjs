@@ -39,7 +39,7 @@ const {
 	shellQuote,
 } = await import(
 	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 
@@ -342,7 +342,7 @@ try {
 	process.env.WORK_FLOW_GIT_DIRTY = "unknown";
 	assert(
 		directRoleHandoffParams(state, fixture.cwd)?.params.task.includes(
-			'"launchBlockedPaths":["extensions/work-models.js"]',
+			'"launchBlockedPaths":["extensions/work-models.ts"]',
 		),
 		"planner handoff records unrelated dirt that appears after intake as a launch blocker",
 	);
@@ -519,7 +519,7 @@ try {
 		"master dirty state stops before WorkItems mutation",
 	);
 	assert(
-		state.message.includes("extensions/work-models.js"),
+		state.message.includes("extensions/work-models.ts"),
 		"master dirty stop names blocking files",
 	);
 

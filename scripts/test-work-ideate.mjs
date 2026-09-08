@@ -31,7 +31,7 @@ const {
 	startIdeaBrainstorm,
 } = await import(
 	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 const { dispatchPrivateWorkflow } = await import(
@@ -42,7 +42,7 @@ const { dispatchPrivateWorkflow } = await import(
 	).href
 );
 const workModelsUrl = pathToFileURL(
-	realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+	realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 ).href;
 
 // --- U1a: authority dispatch -------------------------------------------------

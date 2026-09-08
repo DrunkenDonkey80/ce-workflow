@@ -16,7 +16,7 @@ import {
 import {
 	buildWorkResumeState,
 	driveWorkActionLeases,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import {
 	loadVerifierStore,
 	scheduleVerifierBatch,

@@ -17,7 +17,7 @@ import {
 	validateStartRecovery,
 } from "../extensions/opendesign-client.js";
 import { designLifecycleTelemetry } from "../extensions/work-design.js";
-import { designReviewChoices } from "../extensions/work-models.js";
+import { designReviewChoices } from "../extensions/work-models.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "ce-opendesign-client-"));
 const fake = path.resolve(

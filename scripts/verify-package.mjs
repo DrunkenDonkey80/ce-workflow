@@ -31,7 +31,7 @@ check(
 check("no tracker dependency", !JSON.stringify(pkg).match(/@beads|\bbd\b/i));
 check(
 	"native extension is packaged",
-	pkg.pi?.extensions?.includes("extensions/work-models.js"),
+	pkg.pi?.extensions?.includes("extensions/work-models.ts"),
 );
 check("native store is packaged", pkg.files?.includes("extensions/"));
 check(
@@ -202,7 +202,7 @@ for (const rel of advisorFiles) {
 }
 
 const normalPaths = [
-	"extensions/work-models.js",
+	"extensions/work-models.ts",
 	"scripts/work-helper.mjs",
 	"scripts/work-command-fixture.mjs",
 	"skills/work-orchestrator/SKILL.md",
@@ -372,7 +372,7 @@ check(
 		evaluationDocs.includes("not a hostile-code sandbox") &&
 		evaluationDocs.includes("sandboxCommand"),
 );
-const models = read("extensions/work-models.js");
+const models = read("extensions/work-models.ts");
 const verifierStore = read("extensions/background-verifiers.js");
 check(
 	"background verifier tools are registered with the extension",
@@ -421,7 +421,7 @@ const initiatives = read("extensions/work-initiatives.js");
 check(
 	"initiative domain is packaged with one-way dependencies",
 	initiatives.includes("projectInitiativeHierarchy") &&
-		!initiatives.includes('from "./work-models.js"'),
+		!initiatives.includes('from "./work-models.ts"'),
 );
 check(
 	"initiative helper and planner contracts are packaged",

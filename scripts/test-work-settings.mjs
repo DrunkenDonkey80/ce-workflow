@@ -13,7 +13,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const mod = await import(
-	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
+	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.ts"))
 		.href
 );
 

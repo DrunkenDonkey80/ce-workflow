@@ -15,7 +15,7 @@ import {
 	buildWorkPlanState,
 	buildWorkResumeState,
 	designPlanningAuthority,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import { appendWorkNote, mutateStore } from "../extensions/work-store.js";
 import { installWorkflowFixture } from "./work-command-fixture.mjs";
 

@@ -33,7 +33,7 @@ import {
 	reconcilePendingDirectRuns,
 	resumePausedWorkActionLease,
 	recordPendingDirectRun,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import {
 	createLaneEnvelope,
 	queueLane,

@@ -79,7 +79,7 @@ const child = spawn(
 		path.join(cwd, "sessions"),
 		"--no-extensions",
 		"-e",
-		path.join(repo, "extensions", "work-models.js"),
+		path.join(repo, "extensions", "work-models.ts"),
 		"-e",
 		path.join(cwd, "resume-stub.js"),
 		"--model",

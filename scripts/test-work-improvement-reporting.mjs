@@ -24,7 +24,7 @@ const {
 	submitImprovementReport,
 } = await import("../extensions/work-improvement-reporting.js");
 const { default: workModelsExtension } = await import(
-	"../extensions/work-models.js"
+	"../extensions/work-models.ts"
 );
 const assert = (ok, message) => {
 	if (!ok) throw new Error(message);
@@ -43,7 +43,7 @@ writeFileSync(
 	JSON.stringify({ name: "pi-work-orchestrator", version: "1.2.3" }),
 );
 writeFileSync(
-	path.join(source, "extensions", "work-models.js"),
+	path.join(source, "extensions", "work-models.ts"),
 	"export {};\n",
 );
 initStore(source);
@@ -100,7 +100,7 @@ try {
 		JSON.stringify({ name: "pi-work-orchestrator", version: "1.2.3" }),
 	);
 	writeFileSync(
-		path.join(mirror, "extensions", "work-models.js"),
+		path.join(mirror, "extensions", "work-models.ts"),
 		"export {};\n",
 	);
 	initStore(mirror);

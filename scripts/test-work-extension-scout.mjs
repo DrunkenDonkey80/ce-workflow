@@ -776,7 +776,7 @@ try {
 	writeFileSync(path.join(agentDir, "settings.json"), "{}\n");
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 	const { executeOrchestratorAction } = await import(
-		`../extensions/work-models.js?scout=${Date.now()}`
+		`../extensions/work-models.ts?scout=${Date.now()}`
 	);
 	const unavailable = await executeOrchestratorAction(
 		"work-extension-scout",

@@ -19,7 +19,7 @@ const {
 	executeOrchestratorAction,
 	launchDirectAction,
 	leadEscalationDecision,
-} = await import("../extensions/work-models.js");
+} = await import("../extensions/work-models.ts");
 const {
 	acquireWorkActionLease,
 	currentWorkActionLeases,

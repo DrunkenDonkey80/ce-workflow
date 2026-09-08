@@ -16,7 +16,7 @@ import {
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const { implementationExecutionPolicy, withCommandTelemetry } = await import(
-	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js")).href
+	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.ts")).href
 );
 
 function assert(ok, message) {

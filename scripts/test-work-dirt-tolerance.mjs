@@ -12,7 +12,7 @@ const { assert } = await import(
 const { isWorkflowDirt, isGeneratedBuildArtifact } = await import(
 	pathToFileURL(
 		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
+			path.join(import.meta.dirname, "../extensions/work-models.ts"),
 		),
 	).href
 );

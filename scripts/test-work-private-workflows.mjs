@@ -15,7 +15,7 @@ import { sha256 } from "../extensions/work-compound-source.js";
 import {
 	legacyCompoundRemovalRecommendation,
 	privateWorkflowActivationWarning,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import {
 	dispatchPrivateWorkflow,
 	verifyPrivateWorkflowGeneration,
@@ -58,7 +58,7 @@ const packageZeroSurface = () => {
 		"package manifest",
 	);
 	const extensionSource = readFileSync(
-		path.join(extensionRoot, "work-models.js"),
+		path.join(extensionRoot, "work-models.ts"),
 		"utf8",
 	);
 	const privateName = /(?:^|[\\/-])(?:ce-|private-workflows?)/i;
@@ -99,7 +99,7 @@ const expectedZeroSurface = {
 };
 const authority = {
 	actionToken: "work-models:wf:brainstorm:v1",
-	callerUrl: pathToFileURL(path.join(extensionRoot, "work-models.js")).href,
+	callerUrl: pathToFileURL(path.join(extensionRoot, "work-models.ts")).href,
 };
 const debugAuthority = {
 	...authority,
@@ -1071,7 +1071,7 @@ check(() => {
 		"package manifest",
 	);
 	assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
-	assert.deepEqual(packageManifest.pi.extensions, ["extensions/work-models.js"]);
+	assert.deepEqual(packageManifest.pi.extensions, ["extensions/work-models.ts"]);
 	assert.deepEqual(packageManifest.pi.skills, ["./skills"]);
 	assert.equal(
 		packageManifest.peerDependencies["pi-compound-engineering"],

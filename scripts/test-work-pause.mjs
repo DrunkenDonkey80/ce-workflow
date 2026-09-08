@@ -7,7 +7,7 @@ import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 const { buildWorkPauseState } = await import(
 	pathToFileURL(
 		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
+			path.join(import.meta.dirname, "../extensions/work-models.ts"),
 		),
 	).href
 );
@@ -46,7 +46,7 @@ try {
 	fixture.reset("active", "unknown");
 	state = buildWorkPauseState(fixture.cwd, "dirty checkpoint");
 	assert(
-		state.ok && state.note.includes("extensions/work-models.js"),
+		state.ok && state.note.includes("extensions/work-models.ts"),
 		"dirty files are listed by path",
 	);
 

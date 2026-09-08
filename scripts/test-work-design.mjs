@@ -50,7 +50,7 @@ import {
 	substantialUiWork,
 	syncDesignSession,
 	waiveDesignSession,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import { loadStore } from "../extensions/work-store.js";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "ce-work-design-"));

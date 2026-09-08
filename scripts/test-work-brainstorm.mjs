@@ -31,7 +31,7 @@ const {
 	renderWorkBrainstormText,
 } = await import(
 	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 const { mutateStore } = await import(
@@ -494,7 +494,7 @@ try {
 	const boundedFollowUps = [];
 	const boundedTask = await executeOrchestratorAction(
 		"work-big",
-		"--roadmap E-1 Update extensions/work-models.js. Current behavior launches every specialist for this bounded change. Expected: retain one requirements advisor. Verification: node scripts/test-work-brainstorm.mjs. Do not change other files.",
+		"--roadmap E-1 Update extensions/work-models.ts. Current behavior launches every specialist for this bounded change. Expected: retain one requirements advisor. Verification: node scripts/test-work-brainstorm.mjs. Do not change other files.",
 		{ cwd, mode: "tui", ui: { notify() {} } },
 		{ sendUserMessage: async (message) => boundedFollowUps.push(message) },
 	);

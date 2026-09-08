@@ -90,7 +90,7 @@ const run = spawnSync(
 	process.env.PI_COMMAND ?? "pi",
 	[
 		"--extension",
-		path.join(sourceRoot, "extensions/work-models.js"),
+		path.join(sourceRoot, "extensions/work-models.ts"),
 		instruction,
 	],
 	{ cwd: workspace, stdio: "inherit", timeout: 7_200_000 },

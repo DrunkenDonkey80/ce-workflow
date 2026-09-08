@@ -33,7 +33,7 @@ import workModelsExtension, {
 	launchCurrentTaskReadOnlyLanes,
 	readOnlyLaneRuntimeStatus,
 	reconcileReadOnlyLaneRuns,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const roots = [];

@@ -24,7 +24,7 @@ import {
 	reconcileAnalysisFinalizations,
 	reconcileLegacyAnalysisTasks,
 	validateAnalysisFinalizationInput,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import {
 	createWorkItem,
 	loadStore,

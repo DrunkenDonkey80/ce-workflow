@@ -625,7 +625,7 @@ function fakeProcess(events, options = {}) {
 				{
 					name: "work-brainstorm",
 					source: "extension",
-					path: path.join(packageRoot, "extensions", "work-models.js"),
+					path: path.join(packageRoot, "extensions", "work-models.ts"),
 				},
 			];
 			child.stdout.write(
@@ -865,12 +865,12 @@ const duplicateCommands = [
 	{
 		name: "work-brainstorm",
 		source: "extension",
-		path: path.join(packageRoot, "extensions", "work-models.js"),
+		path: path.join(packageRoot, "extensions", "work-models.ts"),
 	},
 	{
 		name: "work-brainstorm",
 		source: "extension",
-		path: path.join(packageRoot, "extensions", "work-models.js"),
+		path: path.join(packageRoot, "extensions", "work-models.ts"),
 	},
 ];
 await expectFailure(

@@ -31,7 +31,7 @@ import workModelsExtension, {
 	buildWorkResumeState,
 	executeOrchestratorAction,
 	workGoalCompletionBlocker,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 
 function closeVerified(store, id) {
 	const contract = compatibilityVerificationContract({ title: id });
@@ -63,7 +63,7 @@ writeFileSync(
 	path.join(root, "package.json"),
 	JSON.stringify({ name: "pi-work-orchestrator", version: "test" }),
 );
-writeFileSync(path.join(root, "extensions", "work-models.js"), "");
+writeFileSync(path.join(root, "extensions", "work-models.ts"), "");
 writeFileSync(path.join(root, ".gitignore"), ".pi/\n.ce-workflow/\n");
 execFileSync("git", ["add", "."], { cwd: root, stdio: "ignore" });
 execFileSync(
@@ -496,7 +496,7 @@ await hooks.before_agent_start(
 );
 assert.match(
 	hooks.tool_call(
-		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		{ toolName: "edit", input: { path: "extensions/work-models.ts" } },
 		hookCtx,
 	).reason,
 	/Improvement safety preflight blocks edit/,
@@ -504,7 +504,7 @@ assert.match(
 );
 assert.equal(
 	hooks.tool_call(
-		{ toolName: "read", input: { path: "extensions/work-models.js" } },
+		{ toolName: "read", input: { path: "extensions/work-models.ts" } },
 		hookCtx,
 	),
 	undefined,
@@ -561,7 +561,7 @@ mutateStore(root, (store) =>
 );
 assert.match(
 	hooks.tool_call(
-		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		{ toolName: "edit", input: { path: "extensions/work-models.ts" } },
 		hookCtx,
 	).reason,
 	/Improvement safety preflight blocks edit/,
@@ -619,7 +619,7 @@ mutateStore(root, (store) =>
 );
 assert.match(
 	hooks.tool_call(
-		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		{ toolName: "edit", input: { path: "extensions/work-models.ts" } },
 		hookCtx,
 	).reason,
 	/need a final wo:improvement-safety/,
@@ -685,7 +685,7 @@ mutateStore(root, (store) =>
 );
 assert.match(
 	hooks.tool_call(
-		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		{ toolName: "edit", input: { path: "extensions/work-models.ts" } },
 		hookCtx,
 	).reason,
 	/SI-1\.4/,
@@ -701,7 +701,7 @@ mutateStore(root, (store) =>
 );
 assert.equal(
 	hooks.tool_call(
-		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		{ toolName: "edit", input: { path: "extensions/work-models.ts" } },
 		hookCtx,
 	),
 	undefined,
@@ -716,7 +716,7 @@ mutateStore(root, (store) =>
 );
 assert.match(
 	hooks.tool_call(
-		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		{ toolName: "edit", input: { path: "extensions/work-models.ts" } },
 		hookCtx,
 	).reason,
 	/need a final wo:improvement-safety/,
@@ -732,7 +732,7 @@ mutateStore(root, (store) =>
 );
 assert.equal(
 	hooks.tool_call(
-		{ toolName: "edit", input: { path: "extensions/work-models.js" } },
+		{ toolName: "edit", input: { path: "extensions/work-models.ts" } },
 		hookCtx,
 	),
 	undefined,

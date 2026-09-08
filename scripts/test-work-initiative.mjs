@@ -35,7 +35,7 @@ import {
 	buildWorkRoadmapState,
 	buildWorkStatus,
 	previewInitiativeReconciliation,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 
 const dir = mkdtempSync(path.join(os.tmpdir(), "ce-initiative-"));
 const promotionDir = mkdtempSync(path.join(os.tmpdir(), "ce-promotion-"));
@@ -72,7 +72,7 @@ try {
 			new URL("../extensions/work-initiatives.js", import.meta.url),
 			"utf8",
 		),
-		/from ["'].+work-models\.js["']/,
+		/from ["'].+work-models\.ts["']/,
 	);
 	const store = initStore(dir, { now: timestamp });
 	store.items = {

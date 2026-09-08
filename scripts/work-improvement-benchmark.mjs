@@ -48,7 +48,7 @@ export const CHANGED_PATH_FIXTURE_MANIFEST = Object.freeze([
 		agentBacked: [],
 	},
 	{
-		match: /^extensions\/work-models\.js$/,
+		match: /^extensions\/work-models\.ts$/,
 		deterministic: ORCHESTRATION_FIXTURES,
 		agentBacked: AGENT_SCENARIOS,
 	},

@@ -63,7 +63,7 @@ const isolatedAgentDir = mkdtempSync(
 	path.join(os.tmpdir(), "ce-background-verifier-agent-"),
 );
 process.env.PI_CODING_AGENT_DIR = isolatedAgentDir;
-const workModels = await import("../extensions/work-models.js");
+const workModels = await import("../extensions/work-models.ts");
 const {
 	default: workModelsExtension,
 	executeVerifierFind,
@@ -104,7 +104,7 @@ const checkpoint = {
 	repository: "repo-identity",
 	base: "a".repeat(40),
 	snapshot: "b".repeat(40),
-	paths: ["extensions/work-models.js", "scripts/test-work-settings.mjs"],
+	paths: ["extensions/work-models.ts", "scripts/test-work-settings.mjs"],
 	patchHash: "c".repeat(64),
 };
 
@@ -257,7 +257,7 @@ try {
 			operation: "correctness",
 			model: firstJob.model,
 			checkpoint: batch.checkpoint,
-			path: "extensions/work-models.js",
+			path: "extensions/work-models.ts",
 			startLine: 1,
 			endLine: 1,
 			category: "correctness",
@@ -348,7 +348,7 @@ try {
 			operation: "security",
 			model: triageJob.model,
 			checkpoint: triageBatch.checkpoint,
-			path: "extensions/work-models.js",
+			path: "extensions/work-models.ts",
 			startLine: 1,
 			endLine: 1,
 			category: "security",
@@ -383,7 +383,7 @@ try {
 			operation: "security",
 			model: triageJob.model,
 			checkpoint: triageBatch.checkpoint,
-			path: "extensions/work-models.js",
+			path: "extensions/work-models.ts",
 			startLine: 1,
 			endLine: 1,
 			category: "lease-recovery",
@@ -635,7 +635,7 @@ try {
 					operation: "correctness",
 					model: reviewJob.model,
 					checkpoint: reviewBatch.checkpoint,
-					path: "extensions/work-models.js",
+					path: "extensions/work-models.ts",
 					startLine: index + 1,
 					endLine: index + 1,
 					category: "correctness",
@@ -1932,7 +1932,7 @@ try {
 	);
 	mkdirSync(path.join(reportWorkspace, "extensions"), { recursive: true });
 	writeFileSync(
-		path.join(reportWorkspace, "extensions", "work-models.js"),
+		path.join(reportWorkspace, "extensions", "work-models.ts"),
 		Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join("\n"),
 	);
 	writeFileSync(
@@ -1979,7 +1979,7 @@ try {
 			],
 		});
 	const findingPayload = (startLine, endLine, category = "correctness") => ({
-		path: "extensions/work-models.js",
+		path: "extensions/work-models.ts",
 		startLine,
 		endLine,
 		category,
@@ -2066,7 +2066,7 @@ try {
 	mkdirSync(path.join(terminalWorkspace, "extensions"), { recursive: true });
 	mkdirSync(path.join(terminalWorkspace, "scripts"), { recursive: true });
 	writeFileSync(
-		path.join(terminalWorkspace, "extensions", "work-models.js"),
+		path.join(terminalWorkspace, "extensions", "work-models.ts"),
 		"export const value = 1;\n",
 	);
 	writeFileSync(
@@ -2175,7 +2175,7 @@ try {
 	);
 	mkdirSync(path.join(structuredWorkspace, "extensions"), { recursive: true });
 	writeFileSync(
-		path.join(structuredWorkspace, "extensions", "work-models.js"),
+		path.join(structuredWorkspace, "extensions", "work-models.ts"),
 		Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join("\n"),
 	);
 	writeFileSync(
@@ -2325,7 +2325,7 @@ try {
 	);
 	mkdirSync(path.join(malformedWorkspace, "extensions"), { recursive: true });
 	writeFileSync(
-		path.join(malformedWorkspace, "extensions", "work-models.js"),
+		path.join(malformedWorkspace, "extensions", "work-models.ts"),
 		"only one line\n",
 	);
 	writeFileSync(
@@ -2560,7 +2560,7 @@ try {
 			disposition: "accepted",
 			reason: "reproduced",
 			changedTarget: true,
-			currentCodeEvidence: "extensions/work-models.js:sha",
+			currentCodeEvidence: "extensions/work-models.ts:sha",
 			now: "2026-07-21T03:32:00.000Z",
 		}),
 	);
@@ -2665,7 +2665,7 @@ try {
 			operation: "security",
 			model: historicalFixJob.model,
 			checkpoint: historicalFixBatch.checkpoint,
-			path: "extensions/work-models.js",
+			path: "extensions/work-models.ts",
 			startLine: 1,
 			endLine: 1,
 			category: "legacy-verifier-fix",

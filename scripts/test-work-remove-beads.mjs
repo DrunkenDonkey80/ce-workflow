@@ -15,7 +15,7 @@ import path from "node:path";
 const { migrateLegacyBeads, detectWorkStoreState, MigrationError } =
 	await import("../extensions/legacy-beads-migration.js");
 const { buildWorkRemoveBeadsState } = await import(
-	"../extensions/work-models.js"
+	"../extensions/work-models.ts"
 );
 const dirs = [];
 const repo = () => {

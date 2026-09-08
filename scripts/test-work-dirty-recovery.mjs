@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import workModelsExtension, {
 	executeOrchestratorAction,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import {
 	installWorkflowFixture,
 	workflowChildParams,
@@ -66,7 +66,7 @@ try {
 	assert.equal(fixture.logs().length, 0, "dirty preflight mutates nothing");
 	assert.equal(sent.length, 1, "dirty preflight queries the LLM once");
 	assert.match(sent[0].message, /WO_DIRTY_RECOVERY_V1/);
-	assert.match(sent[0].message, /extensions\/work-models\.js/);
+	assert.match(sent[0].message, /extensions\/work-models\.ts/);
 	assert.match(sent[0].message, /Apply recommendation and continue/);
 	assert.match(sent[0].message, /Cancel for manual cleanup/);
 	assert.match(sent[0].message, /Never discard, revert, reset, stash, force/);
@@ -93,7 +93,7 @@ try {
 		{
 			title: "Apply recommendation and continue",
 			description:
-				"extensions/work-models.js — stage and commit the intentional change",
+				"extensions/work-models.ts — stage and commit the intentional change",
 		},
 		{
 			title: "Cancel for manual cleanup",

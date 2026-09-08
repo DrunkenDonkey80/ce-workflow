@@ -149,7 +149,7 @@ assert.ok(calibration.wallMsCeiling >= 1010);
 
 assert.equal(requiresSentinel(["extensions/private-workflows/plan.md"], "handoff"), true);
 assert.equal(
-	requiresSentinel(["extensions/work-models.js"], "default-behavior"),
+	requiresSentinel(["extensions/work-models.ts"], "default-behavior"),
 	true,
 );
 assert.equal(requiresSentinel(["agents/work-worker.md"], "agent"), true);

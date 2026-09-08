@@ -24,7 +24,7 @@ const {
 	renderWorkResumeText,
 } = await import(
 	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.js")),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 const {
@@ -288,7 +288,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Verified isolated implementation",
 			notes:
-				"wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nCommand: npm run verify",
+				"wo:execution-agent\nFiles changed: extensions/work-models.ts.\nwo:verify-check PASS\nCommand: npm run verify",
 		},
 	],
 	inProgressSensitiveContract: [
@@ -321,7 +321,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				"wo:execution-agent\nFiles changed: extensions/work-models.js, `scripts/file with space.js`, .ce-workflow/work-items.json, .pi-subagents/artifacts/review.md, .pi/work-runs/run.json.\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed\nwo:verify-check PASS",
+				"wo:execution-agent\nFiles changed: extensions/work-models.ts, `scripts/file with space.js`, .ce-workflow/work-items.json, .pi-subagents/artifacts/review.md, .pi/work-runs/run.json.\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed\nwo:verify-check PASS",
 		},
 	],
 	inProgressFixStaleVerification: [
@@ -332,7 +332,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				"wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed",
+				"wo:execution-agent\nFiles changed: extensions/work-models.ts.\nwo:verify-check PASS\nwo:review FAIL - permission bypass remains\nwo:fix PASS - bypass removed",
 		},
 	],
 	inProgressFixReadyNoPaths: [
@@ -365,7 +365,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review PASS - old scope\nwo:review-scope ["extensions/work-models.js"]',
+				'wo:execution-agent\nFiles changed: extensions/work-models.ts.\nwo:verify-check PASS\nwo:review PASS - old scope\nwo:review-scope ["extensions/work-models.ts"]',
 		},
 	],
 	inProgressQuotedReviewPass: [
@@ -376,7 +376,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				"wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - parser misreads prose mentioning review PASS handling",
+				"wo:execution-agent\nFiles changed: extensions/work-models.ts.\nwo:verify-check PASS\nwo:review FAIL - parser misreads prose mentioning review PASS handling",
 		},
 	],
 	inProgressMechanicalFix: [
@@ -398,7 +398,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - permission guard is missing\nwo:fix PASS - guard added\nwo:verify-check PASS\nwo:mechanical-fix PASS {"dispositions":[{"finding":"permission guard is missing","fix":"guard added","evidence":"focused test passed"}]}',
+				'wo:execution-agent\nFiles changed: extensions/work-models.ts.\nwo:verify-check PASS\nwo:review FAIL - permission guard is missing\nwo:fix PASS - guard added\nwo:verify-check PASS\nwo:mechanical-fix PASS {"dispositions":[{"finding":"permission guard is missing","fix":"guard added","evidence":"focused test passed"}]}',
 		},
 	],
 	inProgressSecondReviewFail: [
@@ -409,7 +409,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - first finding\nwo:fix PASS\nwo:verify-check PASS\nwo:review FAIL {"findings":["residual A"]}',
+				'wo:execution-agent\nFiles changed: extensions/work-models.ts.\nwo:verify-check PASS\nwo:review FAIL - first finding\nwo:fix PASS\nwo:verify-check PASS\nwo:review FAIL {"findings":["residual A"]}',
 		},
 	],
 	inProgressLargeUntracked: [
@@ -442,7 +442,7 @@ const childrenByScenario = {
 			status: "in_progress",
 			title: "Update authentication permission checks",
 			notes:
-				'wo:execution-agent\nFiles changed: extensions/work-models.js.\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL {"findings":["residual A","residual B"]}\nwo:fix PASS - both residuals fixed\nwo:verify-check PASS\nwo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"bounded guard","evidence":"focused test A passed"},{"finding":"residual B","fix":"scope guard","evidence":"focused test B passed"}]}',
+				'wo:execution-agent\nFiles changed: extensions/work-models.ts.\nwo:verify-check PASS\nwo:review FAIL - one\nwo:fix PASS\nwo:review FAIL {"findings":["residual A","residual B"]}\nwo:fix PASS - both residuals fixed\nwo:verify-check PASS\nwo:residual-fix PASS {"dispositions":[{"finding":"residual A","fix":"bounded guard","evidence":"focused test A passed"},{"finding":"residual B","fix":"scope guard","evidence":"focused test B passed"}]}',
 		},
 	],
 	blocked: [
@@ -568,10 +568,10 @@ if (args[0] === "diff") {
   if (dirty.startsWith("formatter-") && args.includes("--numstat")) {
     if (dirty === "formatter-expanded-staged" && !args.includes("HEAD")) process.exit(0);
     const counts = dirty === "formatter-semantic"
-      ? ["180\\t0\\textensions/work-models.js", "450\\t0\\textensions/work-models.js"]
+      ? ["180\\t0\\textensions/work-models.ts", "450\\t0\\textensions/work-models.ts"]
       : dirty === "formatter-ratio"
-        ? ["60\\t0\\textensions/work-models.js", "120\\t0\\textensions/work-models.js"]
-        : ["8\\t2\\textensions/work-models.js", "450\\t450\\textensions/work-models.js"];
+        ? ["60\\t0\\textensions/work-models.ts", "120\\t0\\textensions/work-models.ts"]
+        : ["8\\t2\\textensions/work-models.ts", "450\\t450\\textensions/work-models.ts"];
     console.log(counts[args.includes("--ignore-all-space") ? 0 : 1]);
     process.exit(0);
   }
@@ -584,7 +584,7 @@ if (args[0] === "diff") {
   process.exit(0);
 }
 function printDirty() {
-  if (["unknown", "formatter-expanded", "formatter-expanded-staged", "formatter-semantic", "formatter-ratio"].includes(dirty)) console.log(" M extensions/work-models.js");
+  if (["unknown", "formatter-expanded", "formatter-expanded-staged", "formatter-semantic", "formatter-ratio"].includes(dirty)) console.log(" M extensions/work-models.ts");
   if (["benign", "instruction-substantive", "instruction-formatter", "workflow"].includes(dirty)) console.log(" M AGENTS.md");
   if (dirty === "untracked-instruction") console.log("?? AGENTS.md");
   if (dirty === "workflow") {
@@ -927,7 +927,7 @@ try {
 				`Summary command (from execution repository): node ${helper} work-summary AUTH-1`,
 			) &&
 			reviewerHandoff.params.task.includes(
-				'Review only: "extensions/work-models.js", "scripts/file with space.js"',
+				'Review only: "extensions/work-models.ts", "scripts/file with space.js"',
 			) &&
 			reviewerHandoff.params.task.includes("durable `wo:review PASS|FAIL` note") &&
 			reviewerHandoff.params.task.includes(
@@ -1195,7 +1195,7 @@ try {
 		"unknown dirty file stops writer handoff",
 	);
 	assert(
-		state.message.includes("extensions/work-models.js"),
+		state.message.includes("extensions/work-models.ts"),
 		"dirty stop names true blocking files",
 	);
 	assert(!state.handoffPrompt, "dirty stop does not inject handoff");
@@ -1204,7 +1204,7 @@ try {
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
 		state.action === "run-review" &&
-			state.selectedWorkItem.changedPaths.includes("extensions/work-models.js"),
+			state.selectedWorkItem.changedPaths.includes("extensions/work-models.ts"),
 		"verified detached-writer files may cross the dirty gate into scoped review",
 	);
 	process.env.WORK_RESUME_GIT_DIRTY = "formatter-expanded";
@@ -1580,7 +1580,7 @@ try {
 		repository: triageCwd,
 		base: "a".repeat(40),
 		snapshot: "b".repeat(40),
-		paths: ["extensions/work-models.js"],
+		paths: ["extensions/work-models.ts"],
 		patchHash: "c".repeat(64),
 	};
 	mutateVerifierStore(triageCwd, (store) =>
@@ -1609,7 +1609,7 @@ try {
 			operation: "correctness",
 			model: triageJob.model,
 			checkpoint: triageCheckpoint,
-			path: "extensions/work-models.js",
+			path: "extensions/work-models.ts",
 			startLine: 1,
 			endLine: 1,
 			category: "correctness",
@@ -1730,7 +1730,7 @@ try {
 			operation: "correctness",
 			model: analysisJob.model,
 			checkpoint: triageCheckpoint,
-			path: "extensions/work-models.js",
+			path: "extensions/work-models.ts",
 			startLine: 2,
 			endLine: 2,
 			category: "correctness",
@@ -1857,7 +1857,7 @@ try {
 			operation: "correctness",
 			model: orphanJob.model,
 			checkpoint: triageCheckpoint,
-			path: "extensions/work-models.js",
+			path: "extensions/work-models.ts",
 			startLine: 1,
 			endLine: 1,
 			category: "correctness",
@@ -1876,7 +1876,7 @@ try {
 			operation: "correctness",
 			model: orphanJob.model,
 			checkpoint: triageCheckpoint,
-			path: "extensions/work-models.js",
+			path: "extensions/work-models.ts",
 			startLine: 2,
 			endLine: 2,
 			category: "maintainability",

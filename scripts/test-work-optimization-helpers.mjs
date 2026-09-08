@@ -23,7 +23,7 @@ import {
 import { compatibilityVerificationContract } from "../extensions/work-verification-contract.js";
 
 const mod = await import(
-	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
+	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.ts"))
 		.href
 );
 

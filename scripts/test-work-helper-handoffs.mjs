@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 const root = realpathSync(path.join(import.meta.dirname, ".."));
 const helperPath = path.join(root, "scripts", "work-helper.mjs");
 const { directRoleHandoffParams, shellQuote } = await import(
-	pathToFileURL(path.join(root, "extensions", "work-models.js")).href
+	pathToFileURL(path.join(root, "extensions", "work-models.ts")).href
 );
 const quotedHelper = shellQuote(helperPath);
 

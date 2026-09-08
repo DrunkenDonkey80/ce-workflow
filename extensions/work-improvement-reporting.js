@@ -149,7 +149,7 @@ export function resolveReportingSource(options = {}) {
 		);
 		if (
 			pkg.name !== PACKAGE_NAME ||
-			!existsSync(path.join(sourceCwd, "extensions", "work-models.js"))
+			!existsSync(path.join(sourceCwd, "extensions", "work-models.ts"))
 		)
 			fail(
 				"configured source is not a pi-work-orchestrator checkout",

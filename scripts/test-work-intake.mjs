@@ -8,7 +8,7 @@ import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 const { buildWorkflowIntakeState } = await import(
 	pathToFileURL(
 		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
+			path.join(import.meta.dirname, "../extensions/work-models.ts"),
 		),
 	).href
 );
@@ -58,7 +58,7 @@ try {
 	state = buildWorkflowIntakeState(cwd, "E-1");
 	assert(!state.git.safeForHandoff, "unknown dirty file is unsafe");
 	assert(
-		state.git.dirtyPaths.includes("extensions/work-models.js"),
+		state.git.dirtyPaths.includes("extensions/work-models.ts"),
 		"dirty paths come from porcelain",
 	);
 

@@ -14,7 +14,7 @@ import {
 	buildWorkReportState,
 	buildWorkResumeState,
 	buildWorkRoadmapState,
-} from "../extensions/work-models.js";
+} from "../extensions/work-models.ts";
 import { installWorkflowFixture } from "./work-command-fixture.mjs";
 
 const dirs = [];

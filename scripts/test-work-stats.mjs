@@ -18,7 +18,7 @@ const {
 	renderWorkStats,
 	roadmapMenuItems,
 } = await import(
-	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.js"))
+	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.ts"))
 		.href
 );
 const { assert, seedNativeStore } = await import(

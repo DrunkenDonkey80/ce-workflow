@@ -1766,7 +1766,7 @@ export function requiresSentinel(changedPaths, declaredChangeType = "") {
 		/^(README\.md|docs\/|scripts\/test-|benchmarks\/workflow-evaluation\/)/;
 	return changedPaths.some(
 		(file) =>
-			/^(extensions\/(work-models\.js|private-workflows\/)|agents\/work-)/.test(
+			/^(extensions\/(work-models\.ts|private-workflows\/)|agents\/work-)/.test(
 				file.replaceAll("\\", "/"),
 			) || !knownNarrow.test(file.replaceAll("\\", "/")),
 	);

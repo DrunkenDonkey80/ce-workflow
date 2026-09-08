@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import workModelsExtension from "../extensions/work-models.js";
+import workModelsExtension from "../extensions/work-models.ts";
 
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-work-wo-control-"));
 const commands = {};

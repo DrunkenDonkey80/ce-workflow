@@ -286,7 +286,7 @@ const durable = {
 	],
 	verification: ["node scripts/test-work-compaction.mjs passes"],
 	nextAction: "Run /work-resume work-7.2.",
-	git: { head: "abc1234", status: [" M extensions/work-models.js"] },
+	git: { head: "abc1234", status: [" M extensions/work-models.ts"] },
 };
 const work = formatCompactionSummary({
 	profile: COMPACTION_PROFILES.WORK_RESUME,

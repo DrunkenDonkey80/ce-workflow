@@ -17,7 +17,7 @@ import { initStore, loadStore, saveStore } from "../extensions/work-store.js";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const workModelsPath = realpathSync(
-	path.join(import.meta.dirname, "../extensions/work-models.js"),
+	path.join(import.meta.dirname, "../extensions/work-models.ts"),
 );
 const {
 	default: workModelsExtension,

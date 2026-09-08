@@ -174,7 +174,7 @@ const scenarioChildren = {
 			status: "in_progress",
 			title: "Finishable slice",
 			notes:
-				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.js",
+				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.ts",
 		},
 	],
 	finishDebugReady: [
@@ -185,7 +185,7 @@ const scenarioChildren = {
 			status: "in_progress",
 			title: "Verified root-cause fix",
 			notes:
-				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.js",
+				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.ts",
 		},
 	],
 	finishBigReady: [
@@ -197,7 +197,7 @@ const scenarioChildren = {
 			title: "Verified big-work slice",
 			labels: ["wo:big-work"],
 			notes:
-				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.js",
+				"wo:review PASS fixture approval\nwo:verify-check PASS\nFiles: extensions/work-models.ts",
 		},
 	],
 	finishMissingReview: [
@@ -207,7 +207,7 @@ const scenarioChildren = {
 			issue_type: "task",
 			status: "in_progress",
 			title: "Unreviewed slice",
-			notes: "wo:verify-check PASS\nFiles: extensions/work-models.js",
+			notes: "wo:verify-check PASS\nFiles: extensions/work-models.ts",
 		},
 	],
 	finishMissingVerification: [
@@ -217,7 +217,7 @@ const scenarioChildren = {
 			issue_type: "task",
 			status: "in_progress",
 			title: "Unverified slice",
-			notes: "wo:review PASS fixture approval\nFiles: extensions/work-models.js",
+			notes: "wo:review PASS fixture approval\nFiles: extensions/work-models.ts",
 		},
 	],
 	finishUiMissingReview: [
@@ -249,7 +249,7 @@ const scenarioChildren = {
 			status: "in_progress",
 			title: "Browser-gated backend slice",
 			notes:
-				"wo:review PASS fixture approval\nwo:verify-check PASS\nBrowser gate: pending parent\nFiles: extensions/work-models.js",
+				"wo:review PASS fixture approval\nwo:verify-check PASS\nBrowser gate: pending parent\nFiles: extensions/work-models.ts",
 		},
 	],
 };
@@ -418,8 +418,8 @@ function save() { writeFileSync(statePath, JSON.stringify(state, null, "\t")); }
 function log(value) { appendFileSync(logPath, JSON.stringify({ tool: "git", args, ...value }) + "\\n"); }
 function dirtyLines() {
   if (state.gitCommitted) return [];
-  if (["unknown", "large", "extra-staged", "commit-fails"].includes(dirty)) return [" M extensions/work-models.js"];
-  if (dirty === "related-plus-unrelated") return [" M extensions/work-models.js", " M unrelated.txt"];
+  if (["unknown", "large", "extra-staged", "commit-fails"].includes(dirty)) return [" M extensions/work-models.ts"];
+  if (dirty === "related-plus-unrelated") return [" M extensions/work-models.ts", " M unrelated.txt"];
   if (dirty === "large-ui") return [" M src/components/App.tsx"];
   if (dirty === "benign" || dirty === "instruction-substantive") return [" M AGENTS.md"];
   if (dirty === "staged-instruction") return ["M  AGENTS.md"];
@@ -429,14 +429,14 @@ function dirtyLines() {
   return [];
 }
 if (args[0] === "diff" && args.includes("--numstat")) {
-  if (["unknown", "extra-staged", "commit-fails"].includes(dirty)) console.log("12\t3\textensions/work-models.js");
-  if (dirty === "related-plus-unrelated") console.log("12\t3\textensions/work-models.js\\n1\t0\tunrelated.txt");
-  if (dirty === "large") console.log("90\t40\textensions/work-models.js");
+  if (["unknown", "extra-staged", "commit-fails"].includes(dirty)) console.log("12\t3\textensions/work-models.ts");
+  if (dirty === "related-plus-unrelated") console.log("12\t3\textensions/work-models.ts\\n1\t0\tunrelated.txt");
+  if (dirty === "large") console.log("90\t40\textensions/work-models.ts");
   if (dirty === "large-ui") console.log("90\t40\tsrc/components/App.tsx");
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-status")) {
-  if (state.gitStaged) process.stdout.write("M\\0extensions/work-models.js\\0M\\0.ce-workflow/work-items.json\\0");
+  if (state.gitStaged) process.stdout.write("M\\0extensions/work-models.ts\\0M\\0.ce-workflow/work-items.json\\0");
 } else if (args[0] === "diff" && args.includes("--cached") && args.includes("--name-only")) {
-  if (state.gitStaged) process.stdout.write("extensions/work-models.js\\0.ce-workflow/work-items.json\\0" + (dirty === "extra-staged" ? "unrelated.txt\\0" : ""));
+  if (state.gitStaged) process.stdout.write("extensions/work-models.ts\\0.ce-workflow/work-items.json\\0" + (dirty === "extra-staged" ? "unrelated.txt\\0" : ""));
 } else if (args[0] === "diff") process.exit(dirty === "benign" ? 0 : 1);
 else if (args[0] === "add") { state.gitStaged = true; save(); log({ op: "add" }); }
 else if (args[0] === "commit") {

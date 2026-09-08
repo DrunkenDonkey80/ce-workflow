@@ -16,7 +16,7 @@ import { seedNativeStore } from "./work-command-fixture.mjs";
 const { buildWorkReport } = await import(
 	pathToFileURL(
 		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.js"),
+			path.join(import.meta.dirname, "../extensions/work-models.ts"),
 		),
 	).href
 );
@@ -101,7 +101,7 @@ function installFakeCommands() {
 		`#!/usr/bin/env node
 if (process.env.WORK_REPORT_GIT_FAIL === "1") process.exit(1);
 console.log("## feat/coded-work-report");
-console.log(" M extensions/work-models.js");
+console.log(" M extensions/work-models.ts");
 `,
 	);
 	chmodSync(git, 0o755);

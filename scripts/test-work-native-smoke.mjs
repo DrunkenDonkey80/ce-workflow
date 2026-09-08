@@ -8,6 +8,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -65,9 +66,19 @@ try {
 	);
 	const installed = path.join(host, "node_modules", "pi-work-orchestrator");
 	assert(existsSync(path.join(installed, "extensions", "work-store.js")));
-	const models = await import(
-		pathToFileURL(path.join(installed, "extensions", "work-models.js")).href
+	// The extension entry is TypeScript and Node refuses to strip types under
+	// node_modules, so load it exactly like Pi does: through Pi's own jiti.
+	const piPackage = path.join(
+		npmRun(["root", "-g"]).trim(),
+		"@earendil-works",
+		"pi-coding-agent",
+		"package.json",
 	);
+	assert(existsSync(piPackage), `pi is not installed globally: ${piPackage}`);
+	const { createJiti } = createRequire(piPackage)("jiti");
+	const models = await createJiti(
+		path.join(installed, "extensions", "smoke.mjs"),
+	).import(path.join(installed, "extensions", "work-models.ts"));
 	const storeApi = await import(
 		pathToFileURL(path.join(installed, "extensions", "work-store.js")).href
 	);
