@@ -2437,6 +2437,46 @@ try {
 
 	// U5: completed groups claim atomically, require changed-code evidence, and stay gated through accepted fix evidence.
 	const triageGroup = Object.values(reconciledStore.groups)[0];
+	const scopeFinding = reconciledStore.findings[triageGroup.findingIds[0]];
+	const scopeReport = reconciledStore.reports[scopeFinding.reportId];
+	const scopeBatch = reconciledStore.batches[scopeReport.batchId];
+	const beforeScope = new Date(
+		Date.parse(scopeBatch.createdAt) - 1_000,
+	).toISOString();
+	const afterScope = new Date(
+		Date.parse(scopeBatch.createdAt) + 1_000,
+	).toISOString();
+	const scopedStore = structuredClone(reconciledStore);
+	const [scopedClaim] = claimCompletedGroups(scopedStore, {
+		ownerSession: "triage-scope",
+		now: "2026-07-21T02:59:00.000Z",
+	});
+	assert.ok(scopedClaim, "unscoped triage still claims historical findings");
+	assert.equal(
+		renderTriageClaim(scopedStore, scopedClaim.id, { since: afterScope }).findings
+			.length,
+		0,
+		"triage rendering excludes findings from batches before the goal",
+	);
+	const futureScopeStore = structuredClone(reconciledStore);
+	assert.equal(
+		claimCompletedGroups(futureScopeStore, {
+			ownerSession: "triage-future",
+			since: afterScope,
+		}).some((claim) => claim.groupId === triageGroup.id),
+		false,
+		"goal-scoped triage does not claim pre-goal findings",
+	);
+	const baselineScopeStore = structuredClone(reconciledStore);
+	assert.equal(
+		claimCompletedGroups(baselineScopeStore, {
+			ownerSession: "triage-baseline",
+			since: beforeScope,
+			baselineSnapshot: scopeBatch.checkpoint.snapshot,
+		}).some((claim) => claim.groupId === triageGroup.id),
+		false,
+		"goal-scoped triage ignores the goal baseline snapshot",
+	);
 	const triageClaims = mutateVerifierStore(reconcileCwd, (state) =>
 		claimCompletedGroups(state, {
 			ownerSession: "triage-a",

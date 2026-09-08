@@ -1988,6 +1988,8 @@ try {
 		writeFileSync(path.join(committedFixCwd, "test-gap.js"), "production\n");
 		writeFileSync(path.join(committedFixCwd, "dispose-source.js"), "current\n");
 		writeFileSync(path.join(committedFixCwd, "relocated-source.js"), "before\n");
+		writeFileSync(path.join(committedFixCwd, "deleted-source.js"), "obsolete\n");
+		writeFileSync(path.join(committedFixCwd, "deleted-only.js"), "remove\n");
 		execFileSync("git", ["add", "."], { cwd: committedFixCwd });
 		execFileSync("git", ["commit", "-m", "checkpoint"], {
 			cwd: committedFixCwd,
@@ -2011,6 +2013,8 @@ try {
 						"test-gap.js",
 						"dispose-source.js",
 						"relocated-source.js",
+						"deleted-source.js",
+						"deleted-only.js",
 					],
 					patchHash: "c".repeat(64),
 				},
@@ -2040,6 +2044,8 @@ try {
 			"test-gap.js",
 			"dispose-source.js",
 			"relocated-source.js",
+			"deleted-source.js",
+			"deleted-only.js",
 		].map((file) =>
 			mutateVerifierStore(committedFixCwd, (store) =>
 				addFinding(store, {
@@ -2066,7 +2072,7 @@ try {
 			const claim = mutateVerifierStore(committedFixCwd, (store) =>
 				claimGroup(store, { groupId: group.id, ownerSession }),
 			);
-			if (index !== 4)
+			if (![4, 6, 7].includes(index))
 				mutateVerifierStore(committedFixCwd, (store) =>
 					recordTriageDisposition(store, {
 						claimId: claim.id,
@@ -2344,6 +2350,70 @@ try {
 				sessionManager: { getSessionId: () => ownerSession },
 			},
 		);
+		rmSync(path.join(committedFixCwd, "deleted-source.js"));
+		rmSync(path.join(committedFixCwd, "deleted-only.js"));
+		writeFileSync(
+			path.join(committedFixCwd, "replacement.js"),
+			Array.from({ length: 20 }, (_, index) => `replacement ${index}\n`).join(""),
+		);
+		execFileSync("git", ["add", "-A"], { cwd: committedFixCwd });
+		execFileSync("git", ["commit", "-m", "replace deleted targets"], {
+			cwd: committedFixCwd,
+		});
+		const replacementBytes = readFileSync(
+			path.join(committedFixCwd, "replacement.js"),
+		);
+		await tempTools.work_verifier_dispose.execute(
+			"deleted-successor-disposition",
+			{
+				claimId: claims[6].id,
+				findingId: findings[6].id,
+				disposition: "stale",
+				reason: "deleted target was replaced and the successor was inspected",
+				currentCode: {
+					path: "replacement.js",
+					sha256: createHash("sha256").update(replacementBytes).digest("hex"),
+				},
+			},
+			null,
+			null,
+			{
+				...ctx,
+				cwd: committedFixCwd,
+				sessionManager: { getSessionId: () => ownerSession },
+			},
+		);
+		await tempTools.work_verifier_dispose.execute(
+			"deleted-only-disposition",
+			{
+				claimId: claims[7].id,
+				findingId: findings[7].id,
+				disposition: "stale",
+				reason: "deleted target no longer has live code to inspect",
+			},
+			null,
+			null,
+			{
+				...ctx,
+				cwd: committedFixCwd,
+				sessionManager: { getSessionId: () => ownerSession },
+			},
+		);
+		const deletionStore = loadVerifierStore(committedFixCwd);
+		assert.match(
+			deletionStore.dispositions[
+				deletionStore.findings[findings[6].id].dispositionId
+			].currentCodeEvidence,
+			/^deleted:deleted-source\.js;successor:replacement\.js:[0-9a-f]{64}$/,
+			"a non-rename replacement records deletion and exact successor evidence",
+		);
+		assert.equal(
+			deletionStore.dispositions[
+				deletionStore.findings[findings[7].id].dispositionId
+			].currentCodeEvidence,
+			"deleted:deleted-only.js",
+			"a pure deletion records typed evidence without fabricating a live file",
+		);
 		renameSync(
 			path.join(committedFixCwd, "relocated-source.js"),
 			path.join(committedFixCwd, "relocated-destination.js"),
@@ -2523,15 +2593,12 @@ try {
 	assert.match(ordinaryPolicy.systemPrompt, /Do not invoke work_\* tools/);
 	assert.match(ordinaryPolicy.systemPrompt, /smallest relevant check/);
 	assert.doesNotMatch(ordinaryPolicy.systemPrompt, /Review cycle budget/);
-	assert.match(
-		(
-			await tempHooks.tool_call(
-				{ toolName: "subagent", input: { agent: "work-worker" } },
-				ctx,
-			)
-		)?.reason ?? "",
-		/Direct request mode/,
+	const directRequestBlock = await tempHooks.tool_call(
+		{ toolName: "subagent", input: { agent: "work-worker" } },
+		ctx,
 	);
+	assert.match(directRequestBlock?.reason ?? "", /Direct request mode/);
+	assert.match(directRequestBlock?.reason ?? "", /\/wo resume <roadmap-id>/);
 	assert.match(
 		(
 			await tempHooks.tool_call(
@@ -3489,13 +3556,14 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.match(before.systemPrompt, /Active autonomous goal/);
 	assert.match(before.systemPrompt, /Review cycle budget/);
 	assert.doesNotMatch(before.systemPrompt, /Direct request mode/);
+	await tempHooks.agent_settled({}, ctx);
 	assert.equal(
 		await tempHooks.tool_call(
 			{ toolName: "subagent", input: { agent: "work-worker" } },
 			ctx,
 		),
 		undefined,
-		"tagged workflow turns may use managed work roles",
+		"a late settlement from the preceding turn cannot revoke tagged workflow authorization",
 	);
 	assert.match(before.systemPrompt, /work_goal_human_decision/);
 	await tempHooks.agent_start({}, ctx);
@@ -4439,6 +4507,14 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		"agent_end does not consume a goal iteration before Pi settles",
 	);
 	assert.equal(notices.length, retryNotices);
+	assert.equal(
+		await tempHooks.tool_call(
+			{ toolName: "work_verifier_complete_fix", input: {} },
+			ctx,
+		),
+		undefined,
+		"native provider retries retain workflow-tool authorization until settlement",
+	);
 	await tempHooks.agent_start({}, ctx);
 	await tempHooks.agent_end(
 		{
@@ -4667,7 +4743,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 				title: "Blocked roadmap",
 			});
 			createWorkItem(store, {
-				id: "ready-sibling",
+				id: "work-2",
 				parentId: "blocked-roadmap",
 				title: "Ready sibling",
 				description: "Continue despite the blocked sibling.",
@@ -4688,7 +4764,11 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 				},
 			}),
 		);
-		const blockedCtx = { ...ctx, cwd: blockedResumeCwd };
+		const blockedCtx = {
+			...ctx,
+			cwd: blockedResumeCwd,
+			ui: { ...ctx.ui, notify() {} },
+		};
 		tempHooks.session_start?.({}, blockedCtx);
 		const beforeBlockedRoadmapResume = sent.length;
 		await invoke("work-resume", "blocked-roadmap", blockedCtx);
@@ -4696,6 +4776,17 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 			sent.length,
 			beforeBlockedRoadmapResume + 1,
 			"work-resume continues a needs-human roadmap when another slice is ready",
+		);
+		await tempCommands.wo.handler("resume-work work-2", blockedCtx);
+		assert.equal(
+			sent.length,
+			beforeBlockedRoadmapResume + 2,
+			"explicit native resume activates the project goal and enters coded resume once",
+		);
+		assert.match(
+			sent.at(-1).message,
+			/work-2/,
+			"explicit native resume can recover a different target without treating it as a freeform answer",
 		);
 		assert.match(statuses["work-goal"], /active/);
 		await invoke("work-goal", "clear", blockedCtx);

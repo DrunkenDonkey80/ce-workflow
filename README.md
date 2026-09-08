@@ -13,7 +13,7 @@ pi install npm:pi-ask-user
 # Optional: pi install npm:pi-intercom
 ```
 
-No tracker CLI is required for normal operation. Run **`/wo`** or press **F7** to open **Orchestrator**, then type to filter its actions. **Roadmaps** is first and initially selected; its picker remembers the last open roadmap or initiative. `/wo goal <objective>` starts an autonomous goal, `/wo pause` waits for the current tool boundary, and `/wo resume` continues the paused goal, workflow, or direct request. Context is microcompacted automatically; **F8** remains the manual shortcut.
+No tracker CLI is required for normal operation. Run **`/wo`** or press **F7** to open **Orchestrator**, then type to filter its actions. **Roadmaps** is first and initially selected; its picker remembers the last open roadmap or initiative. `/wo goal <objective>` starts an autonomous goal, `/wo pause` waits for the current tool boundary, and `/wo resume` continues the paused goal, workflow, or direct request. For deterministic console recovery, `/wo resume-work <id>` bypasses goal-answer interpretation and resumes native work state directly. Context is microcompacted automatically; **F8** or `/wo compact` remains the manual shortcut.
 
 Typed or dictated TUI input can use the strict start-of-line prefix **`orchestrator`**: `orchestrator list roadmaps`, `orchestrator resume work-3`, `orchestrator resume last`, `orchestrator status`, or `orchestrator compact`. `orchestrator 1` runs a currently displayed recommended action. The extension parses and handles this fixed grammar before the model sees it; unknown prefixed commands stop with usage help, while extension-authored messages cannot invoke this user command surface.
 

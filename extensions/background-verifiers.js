@@ -1583,6 +1583,26 @@ function findingNeedsFix(store, finding) {
 		!finding.fixId
 	);
 }
+function verificationBatchIdsSince(store, since, baselineSnapshot) {
+	const startedAt = typeof since === "number" ? since : Date.parse(since);
+	if (!Number.isFinite(startedAt)) return null;
+	const baseline = nonempty(baselineSnapshot) ? baselineSnapshot : undefined;
+	return new Set(
+		Object.values(store.batches)
+			.filter(
+				(batch) =>
+					batch.purpose === "verification" &&
+					!batchIsVerifierFixCommit(store, batch) &&
+					batch.checkpoint.snapshot !== baseline &&
+					Date.parse(batch.createdAt) >= startedAt,
+			)
+			.map((batch) => batch.id),
+	);
+}
+function findingInVerificationScope(store, finding, batchIds) {
+	if (!batchIds) return true;
+	return batchIds.has(store.reports[finding.reportId]?.batchId);
+}
 function remainingFindings(next, group) {
 	return group.findingIds.filter((id) => {
 		const finding = next.findings[id];
@@ -1652,12 +1672,21 @@ export function claimGroup(store, input = {}) {
 }
 export function claimCompletedGroups(store, input = {}) {
 	return edit(store, (next) => {
+		const batchIds = verificationBatchIdsSince(
+			next,
+			input.since,
+			input.baselineSnapshot,
+		);
 		const groups = Object.values(next.groups).filter(
 			(group) => group.status === "completed" || group.status === "claimed",
 		);
 		for (const group of groups) updateGroupTriage(next, group);
 		return groups
-			.filter((group) => remainingFindings(next, group).length > 0)
+			.filter((group) =>
+				remainingFindings(next, group).some((id) =>
+					findingInVerificationScope(next, next.findings[id], batchIds),
+				),
+			)
 			.sort((left, right) => left.id.localeCompare(right.id))
 			.slice(0, input.limit ?? Number.POSITIVE_INFINITY)
 			.map((group) => claimGroupIn(next, { ...input, groupId: group.id }));
@@ -3235,20 +3264,8 @@ export function verifierStatus(store, configured = undefined) {
 
 export function verifierCompletionBlocker(store, since, baselineSnapshot) {
 	validateVerifierStore(store);
-	const startedAt = typeof since === "number" ? since : Date.parse(since);
-	if (!Number.isFinite(startedAt)) return;
-	const baseline = nonempty(baselineSnapshot) ? baselineSnapshot : undefined;
-	const batchIds = new Set(
-		Object.values(store.batches)
-			.filter(
-				(batch) =>
-					batch.purpose === "verification" &&
-					!batchIsVerifierFixCommit(store, batch) &&
-					batch.checkpoint.snapshot !== baseline &&
-					Date.parse(batch.createdAt) >= startedAt,
-			)
-			.map((batch) => batch.id),
-	);
+	const batchIds = verificationBatchIdsSince(store, since, baselineSnapshot);
+	if (!batchIds) return;
 	const jobs = Object.values(store.jobs).filter((job) =>
 		batchIds.has(job.batchId),
 	);
@@ -3285,11 +3302,16 @@ export function renderVerifierFinding(finding) {
 		`suggestion (untrusted): ${quoted(finding.suggestedAction)}`,
 	].join("\n");
 }
-export function renderTriageClaim(store, claimId) {
+export function renderTriageClaim(store, claimId, input = {}) {
 	validateVerifierStore(store);
 	const claim = store.claims[claimId];
 	if (!claim) throw error("missing", `Verifier claim is missing: ${claimId}`);
 	const group = store.groups[claim.groupId];
+	const batchIds = verificationBatchIdsSince(
+		store,
+		input.since,
+		input.baselineSnapshot,
+	);
 	return {
 		claim: {
 			id: claim.id,
@@ -3301,9 +3323,10 @@ export function renderTriageClaim(store, claimId) {
 			.filter((id) => {
 				const finding = store.findings[id];
 				return (
-					!finding.dispositionId ||
-					(store.dispositions[finding.dispositionId]?.disposition === "accepted" &&
-						!finding.fixId)
+					findingInVerificationScope(store, finding, batchIds) &&
+					(!finding.dispositionId ||
+						(store.dispositions[finding.dispositionId]?.disposition === "accepted" &&
+							!finding.fixId))
 				);
 			})
 			.map((id) => {

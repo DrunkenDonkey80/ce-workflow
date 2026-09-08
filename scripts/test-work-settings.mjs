@@ -3,6 +3,7 @@ import {
 	existsSync,
 	mkdtempSync,
 	readFileSync,
+	readdirSync,
 	rmSync,
 	writeFileSync,
 	mkdirSync,
@@ -455,6 +456,7 @@ try {
 	const notices = [];
 	const customUi = (actions, options = {}) => ({
 		notify: (message, level) => notices.push({ message, level }),
+		editor: options.editor,
 		input: options.input ?? (async () => undefined),
 		select: options.select ?? (async () => undefined),
 		confirm: options.confirm ?? (async () => true),
@@ -1573,6 +1575,187 @@ try {
 			footerCalls.at(-1) === undefined &&
 			notices.at(-1).message.includes("/reload"),
 		"disable does not warn again, applies live, and explains footer restoration",
+	);
+
+	// Export/import operates on the selected raw file, never merged defaults.
+	writeGlobalSettings({
+		theme: "dark",
+		workOrchestrator: { creativeMode: "ask" },
+	});
+	writeSettings({ workOrchestrator: { creativeMode: "off" } });
+	const beforeImport = readFileSync(globalSettingsFile(), "utf8");
+	let copied;
+	await mod.exportSettings(
+		{
+			...ctx,
+			ui: customUi([{ expectText: "Export settings: Global", key: "escape" }]),
+		},
+		"global",
+		async (content) => {
+			copied = content;
+		},
+	);
+	assert(
+		copied === beforeImport &&
+			notices.at(-1).message.includes("copied to clipboard") &&
+			notices.at(-1).message.includes(globalSettingsFile()),
+		"export copies exact global JSON and reports the absolute path",
+	);
+	await mod.exportSettings(
+		{
+			...ctx,
+			ui: customUi([{ key: "escape" }]),
+		},
+		"project",
+		async () => {
+			throw new Error("clipboard unavailable");
+		},
+	);
+	assert(
+		notices.at(-1).message.includes("Could not read or copy") &&
+			notices.at(-1).message.includes(settingsFile()),
+		"clipboard failure still shows the project file path",
+	);
+
+	const imported =
+		'{\n  "workOrchestrator": { "creativeMode": "auto" },\n  "theme": "light",\n  "custom": "Unicode: 日本語 🚀"\n}';
+	await invoke("work-settings", "", {
+		...ctx,
+		ui: customUi(
+			[
+				{ target: "Import settings", key: "enter" },
+				{ expectText: "Replace global settings?", key: "enter" },
+				{ expectInitial: "Import settings", key: "escape" },
+			],
+			{ editor: async () => imported },
+		),
+	});
+	const backups = (dir) =>
+		readdirSync(dir).filter((name) => name.endsWith(".bak"));
+	assert(
+		readFileSync(globalSettingsFile(), "utf8") === imported &&
+			readFileSync(path.join(globalDir, backups(globalDir)[0]), "utf8") ===
+				beforeImport &&
+			/settings\.json\.\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z\./.test(
+				backups(globalDir)[0],
+			),
+		"pasted JSON replaces the full file after preserving a timestamped exact backup",
+	);
+	assert(
+		mod.workOrchSettings(cwd).creativeMode === "off" &&
+			notices.some(
+				({ message }) =>
+					message.includes("Imported settings:") && message.includes("/reload"),
+			),
+		"import preserves project overrides and explains reload behavior",
+	);
+
+	const sourceFile = path.join(cwd, "2026 imported settings.json");
+	writeFileSync(sourceFile, imported);
+	const beforeProject = readFileSync(settingsFile(), "utf8");
+	await invoke("work-settings", "", {
+		...ctx,
+		ui: customUi(
+			[
+				{ key: "\t" },
+				{ target: "Import settings", key: "enter" },
+				{ expectText: "Replace project settings?", key: "enter" },
+				{ expectInitial: "Import settings", key: "escape" },
+			],
+			{ editor: async () => `"${sourceFile}"` },
+		),
+	});
+	assert(
+		readFileSync(settingsFile(), "utf8") === imported &&
+			readFileSync(
+				path.join(cwd, ".pi", backups(path.join(cwd, ".pi"))[0]),
+				"utf8",
+			) === beforeProject &&
+			mod.workOrchSettings(cwd).creativeMode === "auto",
+		"quoted file path replaces only the selected project file and workflow reads update live",
+	);
+
+	const importContext = (input, key = "enter") => ({
+		...ctx,
+		ui: customUi([{ key }], { input: async () => input }),
+	});
+	await mod.importSettings(importContext(path.basename(sourceFile)), "global");
+	await mod.importSettings(importContext(`"${globalSettingsFile()}"`), "global");
+	assert(
+		backups(globalDir).length === 3 &&
+			readFileSync(sourceFile, "utf8") === imported,
+		"relative numeric-leading paths and self-import work without clobbering earlier backups or the source",
+	);
+
+	for (const input of [
+		undefined,
+		"",
+		"   ",
+		"[]",
+		"null",
+		"true",
+		"42",
+		'{"secret":"DO-NOT-ECHO",',
+		'{"__proto__":{"polluted":true}}',
+		"missing-settings.json",
+	]) {
+		await mod.importSettings(importContext(input), "global");
+		assert(
+			readFileSync(globalSettingsFile(), "utf8") === imported &&
+				backups(globalDir).length === 3,
+			"empty, invalid, unsafe, or missing imports leave the current file and backups untouched",
+		);
+	}
+	assert(
+		!notices.some(({ message }) => message.includes("DO-NOT-ECHO")),
+		"invalid JSON errors never echo pasted secrets",
+	);
+	await mod.importSettings(importContext("{}", "escape"), "global");
+	assert(
+		readFileSync(globalSettingsFile(), "utf8") === imported &&
+			backups(globalDir).length === 3,
+		"canceling confirmation does not write settings or a backup",
+	);
+	writeFileSync(sourceFile, "not JSON");
+	await mod.importSettings(importContext(sourceFile), "global");
+	assert(
+		readFileSync(globalSettingsFile(), "utf8") === imported &&
+			backups(globalDir).length === 3,
+		"invalid file contents are rejected before backup or replacement",
+	);
+
+	// Existing corrupt settings are recoverable too; missing files aren't materialized by export.
+	writeFileSync(settingsFile(), "broken original");
+	await mod.importSettings(importContext("{}"), "project");
+	assert(
+		backups(path.join(cwd, ".pi")).some(
+			(name) =>
+				readFileSync(path.join(cwd, ".pi", name), "utf8") === "broken original",
+		),
+		"import preserves even a corrupt previous file verbatim",
+	);
+	rmSync(settingsFile());
+	await mod.exportSettings(
+		{ ...ctx, ui: customUi([{ key: "escape" }]) },
+		"project",
+		async () => {
+			throw new Error("must not copy a missing file");
+		},
+	);
+	assert(
+		!existsSync(settingsFile()) &&
+			notices.at(-1).message.includes("No settings file exists"),
+		"export of an absent scope reports its path without creating a file",
+	);
+	await mod.importSettings(importContext("{}"), "project");
+	assert(
+		readFileSync(settingsFile(), "utf8") === "{}" &&
+			notices.at(-1).message.includes("No previous file"),
+		"first import creates settings without pretending a backup exists",
+	);
+	assert(
+		!readdirSync(globalDir).some((name) => name.endsWith(".tmp")),
+		"successful imports leave no temporary files",
 	);
 } finally {
 	rmSync(cwd, { recursive: true, force: true });

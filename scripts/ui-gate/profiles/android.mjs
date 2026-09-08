@@ -116,10 +116,12 @@ export function normalizeUiautomatorDump(xml, { viewport } = {}) {
 }
 
 export async function androidCapability({ serial = null } = {}) {
-	const base = serial ? ["-s", serial] : [];
 	try {
-		const list = await run("adb", [...base, "devices"], 10_000);
-		return /device\s*$/m.test(list.replace("List of devices attached", ""));
+		const list = await run("adb", ["devices"], 10_000);
+		const devices = [...list.matchAll(/^(\S+)\s+device(?:\s|$)/gm)].map(
+			(match) => match[1],
+		);
+		return serial ? devices.includes(serial) : devices.length === 1;
 	} catch {
 		return false;
 	}

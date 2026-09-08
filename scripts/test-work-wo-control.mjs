@@ -78,7 +78,16 @@ const ctx = {
 try {
 	assert.deepEqual(
 		commands.wo.getArgumentCompletions("").map(({ value }) => value),
-		["goal", "pause", "resume", "design", "redesign", "fact"],
+		[
+			"goal",
+			"pause",
+			"compact",
+			"resume",
+			"resume-work",
+			"design",
+			"redesign",
+			"fact",
+		],
 	);
 
 	await commands.wo.handler("context-fill", ctx);
@@ -172,9 +181,10 @@ try {
 
 	compactOptions = null;
 	await commands.wo.handler("compact", ctx);
-	assert.equal(compactOptions, null, "/wo compact is no longer available");
-	assert.match(notices.at(-1).message, /goal <objective> \| pause \| resume/);
-	assert.doesNotMatch(notices.at(-1).message, /compact/);
+	assert.ok(
+		compactOptions,
+		"/wo compact starts the same native compaction as F8",
+	);
 
 	await commands.wo.handler("goal pause only after proving the alias", ctx);
 	assert.match(sent.at(-1).message, /pause only after proving the alias/i);

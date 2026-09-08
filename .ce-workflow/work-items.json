@@ -4871,6 +4871,40 @@
       "type": "task",
       "updatedAt": "2026-08-21T11:12:37.933Z"
     },
+    "work-2.report-0a42c30a-8876-4156-b33d-e29a06c7f96c": {
+      "createdAt": "2026-09-07T20:35:47.748Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: A correctly assigned work-worker could not execute because its contract requires `work-claim`, while the helper rejects that claim in direct child-request mode. The user-origin parent then claimed the same item successfully.\nExpected: The coded orchestrator should preclaim the native work item before launching a mandatory work-worker, or grant the worker extension-owned authority for the exact claim/read operations.\nImpact: Verifier remediation aborted without edits or tests, consuming a failed worker run and requiring parent-side recovery before retry.\nSuggested improvement: Preclaim in the user-origin parent and hand the worker an already-claimed item; let the child use helper summary/note operations only.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/6f4ca65c-1a26-46bb-9e85-1b6bbc30bf2d",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 720143,
+              "file": "01-work-items.json",
+              "sha256": "73cd4a44a513bae3e56fd87abe972f72ea3c48815fc718ada7cf1d4c72a17973"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-09-07T20:35:47.742Z",
+          "workflowId": "01a07d8f-94dc-73b1-b7da-4d109d478f1f"
+        }
+      ],
+      "id": "work-2.report-0a42c30a-8876-4156-b33d-e29a06c7f96c",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: A correctly assigned work-worker could not execute because its contract requires `work-claim`, while the helper rejects that claim",
+      "type": "task",
+      "updatedAt": "2026-09-07T20:35:47.748Z"
+    },
     "work-2.report-0b6db163-27b9-476a-bcfc-8ac8b9b7ad35": {
       "createdAt": "2026-08-18T08:10:00.217Z",
       "dependencies": [],
@@ -7816,6 +7850,40 @@
       "type": "task",
       "updatedAt": "2026-08-12T17:19:55.793Z"
     },
+    "work-2.report-6922afc4-7768-41af-9458-4a6811b9c349": {
+      "createdAt": "2026-09-07T19:51:47.932Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: Verifier triage cannot dispose a valid finding as stale when its target file was deleted after the checkpoint and the replacement was not detected by Git as a rename. work_verifier_dispose rejects null evidence, rejects the replacement file SHA, and rejects the old checkpoint SHA because currentCodeEvidence requires a readable current file.\nExpected: work_verifier_dispose should accept explicit deletion evidence for a changed target, such as currentCode:null when git confirms the path is absent at HEAD, or a typed deleted-path evidence value tied to the checkpoint and current HEAD.\nImpact: Mandatory verifier triage is deadlocked, so /work-resume cannot continue even though inspection confirms the cited duplicate code no longer exists and the replacement compiles.\nSuggested improvement: Teach currentCodeEvidence/verifier disposal to validate deleted targets with git cat-file/diff evidence instead of requiring a readable current file.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/d0d15491-5fc3-4de1-b9be-1b639e25e149",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 1238,
+              "file": "01-verifier-deleted-target-triage-friction.md",
+              "sha256": "f3c81c1bb70aa44ac497d57c6b9a78705ddd352402ec358ade2e7e5c35f0dd56"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-09-07T19:51:47.915Z",
+          "workflowId": "01a07d67-24c7-73b1-b7da-4d08db834111"
+        }
+      ],
+      "id": "work-2.report-6922afc4-7768-41af-9458-4a6811b9c349",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: Verifier triage cannot dispose a valid finding as stale when its target file was deleted after the checkpoint and the replacement ",
+      "type": "task",
+      "updatedAt": "2026-09-07T19:51:47.932Z"
+    },
     "work-2.report-695e3705-5f87-4767-883a-c5f7a52636aa": {
       "createdAt": "2026-08-24T13:33:42.674Z",
       "dependencies": [],
@@ -9845,6 +9913,45 @@
       "title": "Self-improvement report: In a verified private brainstorm launched from F7, the playbook says to ask exactly one focused clarification per turn. After each",
       "type": "task",
       "updatedAt": "2026-08-18T21:11:31.136Z"
+    },
+    "work-2.report-bdf37ea0-7238-410e-ae35-002eb7e8612d": {
+      "createdAt": "2026-09-07T22:10:27.537Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After work-1 was verified closed, all open children were exhausted, verifier-fix commits were pushed, and work_verifier_inbox returned [], work_goal_complete still rejected completion with 'background verification has findings awaiting triage'. The native verifier state contains 26 groups still marked claimed with undisposed findings, but their claim leases expired on 2026-08-21/22 and none are visible to this session's inbox.\nExpected: Completion should either ignore/reconcile expired abandoned claims, expose them through a reclaimable inbox/action, or report the exact active group/owner blocking completion so an autonomous goal can make deterministic progress.\nImpact: The autonomous goal cannot complete despite no actionable verifier findings in its inbox, and blindly polling or duplicating another session's triage risks conflicting work.\nSuggested improvement: On completion gating, reconcile expired claimed groups and return bounded blocking group IDs plus lease/owner state.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/24414a90-6d5f-46e3-87fa-8914a6526f79",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 4191118,
+              "file": "01-state.json",
+              "sha256": "09a9d57873fd6b560bf5114cf7500033773f11a66b8e106a8915a53f0c2a8e1a"
+            },
+            {
+              "bytes": 3557,
+              "file": "02-work-orchestrator-state.json",
+              "sha256": "e721862c8e887e63caab62db262e84d54a9c4d0005120ed557f12ad8f9809a64"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "belot",
+          "submittedAt": "2026-09-07T22:10:27.529Z",
+          "workflowId": "01a07de7-aec9-7782-9e0f-2af26ad2b4a7"
+        }
+      ],
+      "id": "work-2.report-bdf37ea0-7238-410e-ae35-002eb7e8612d",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After work-1 was verified closed, all open children were exhausted, verifier-fix commits were pushed, and work_verifier_inbox retu",
+      "type": "task",
+      "updatedAt": "2026-09-07T22:10:27.537Z"
     },
     "work-2.report-c1b571e8-2545-47e6-ac98-078db3518c3d": {
       "createdAt": "2026-08-09T21:09:37.017Z",
@@ -16352,7 +16459,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-09-07T18:21:41.263Z"
+    "updatedAt": "2026-09-08T05:14:22.159Z"
   },
   "schemaVersion": 1
 }

@@ -13,6 +13,7 @@ import {
 	readFileSync,
 	readSync,
 	realpathSync,
+	renameSync,
 	rmSync,
 	statSync,
 	writeFileSync,
@@ -224,11 +225,12 @@ import {
 	renderKnowledge,
 } from "./work-knowledge.js";
 
+let copyToClipboard;
 let withFileMutationQueue = async (_file, mutation) => mutation();
 let estimateContextMessageTokens = (message) =>
 	Math.ceil(JSON.stringify(message ?? {}).length / 4);
 try {
-	({ withFileMutationQueue, estimateTokens: estimateContextMessageTokens } =
+	({ copyToClipboard, withFileMutationQueue, estimateTokens: estimateContextMessageTokens } =
 		await import("@earendil-works/pi-coding-agent"));
 } catch {
 	// Local fixture runs do not install Pi peer dependencies.
@@ -11037,9 +11039,15 @@ function registerVerifierTriageTools(pi) {
 			const finding = store.findings[params.findingId];
 			if (!finding) throw new Error("Verifier finding is missing.");
 			const changedTarget = verifierFindingChanged(cwd, finding);
-			if (changedTarget && !currentCodeEvidence(cwd, finding, params.currentCode))
+			const codeEvidence = currentCodeEvidence(
+				cwd,
+				finding,
+				params.currentCode,
+				params.disposition !== "accepted",
+			);
+			if (changedTarget && !codeEvidence)
 				throw new Error(
-					"Changed target requires matching current-code SHA-256 evidence.",
+					"Changed target requires matching current-code SHA-256 or verified deletion evidence.",
 				);
 			const result = mutateVerifierStore(cwd, (state) =>
 				recordTriageDisposition(state, {
@@ -11049,11 +11057,7 @@ function registerVerifierTriageTools(pi) {
 					disposition: params.disposition,
 					reason: params.reason,
 					changedTarget,
-					...(params.currentCode
-						? {
-								currentCodeEvidence: `${params.currentCode.path}:${params.currentCode.sha256}`,
-							}
-						: {}),
+					...(codeEvidence ? { currentCodeEvidence: codeEvidence } : {}),
 				}),
 			);
 			const after = loadVerifierStore(cwd);
@@ -12645,12 +12649,18 @@ function completedVerifierResumeTarget(store, ownerSession) {
 		return "";
 	return claims[0].resumeTarget;
 }
-function verifierTriageState(cwd, ownerSession, resumeTarget) {
+function verifierTriageState(cwd, ownerSession, resumeTarget, input = {}) {
 	reconcileBackgroundVerifierRuns(cwd);
 	let claims;
 	try {
 		claims = mutateVerifierStore(cwd, (store) =>
-			claimCompletedGroups(store, { ownerSession, resumeTarget, limit: 1 }),
+			claimCompletedGroups(store, {
+				ownerSession,
+				resumeTarget,
+				limit: 1,
+				since: input.since,
+				baselineSnapshot: input.baselineSnapshot,
+			}),
 		);
 	} catch (cause) {
 		if (cause?.category === "missing") return null;
@@ -12664,7 +12674,12 @@ function verifierTriageState(cwd, ownerSession, resumeTarget) {
 	}
 	if (!claims.length) return null;
 	const store = loadVerifierStore(cwd);
-	const inbox = claims.map((claim) => renderTriageClaim(store, claim.id));
+	const inbox = claims.map((claim) =>
+		renderTriageClaim(store, claim.id, {
+			since: input.since,
+			baselineSnapshot: input.baselineSnapshot,
+		}),
+	);
 	if (!inbox.some((entry) => entry.findings.length)) return null;
 	return {
 		claims: inbox,
@@ -12767,19 +12782,47 @@ function checkpointRenameTarget(cwd, finding, candidate) {
 	}
 }
 
-function currentCodeEvidence(cwd, finding, evidence) {
-	if (!evidence || !/^[0-9a-f]{64}$/i.test(evidence.sha256 ?? "")) return false;
-	const file = normalizedRepoPath(evidence.path);
+function checkpointTargetDeleted(cwd, finding) {
+	const file = normalizedRepoPath(finding?.path);
 	if (
-		file !== normalizedRepoPath(finding.path) &&
-		!checkpointRenameTarget(cwd, finding, file)
+		!file ||
+		isAbsolute(file) ||
+		file === ".." ||
+		file.startsWith("../") ||
+		existsSync(join(cwd, file))
 	)
 		return false;
+	for (const revision of [
+		finding?.checkpoint?.snapshot,
+		finding?.checkpoint?.base,
+	]) {
+		if (!/^[0-9a-f]{40,64}$/i.test(revision ?? "")) continue;
+		try {
+			run(cwd, "git", ["cat-file", "-e", `${revision}:${file}`]);
+			return true;
+		} catch {}
+	}
+	return false;
+}
+
+function currentCodeEvidence(cwd, finding, evidence, allowDeletionOnly = false) {
+	const source = normalizedRepoPath(finding.path);
+	const deleted = checkpointTargetDeleted(cwd, finding);
+	if (!evidence)
+		return deleted && allowDeletionOnly ? `deleted:${source}` : "";
+	if (!/^[0-9a-f]{64}$/i.test(evidence.sha256 ?? "")) return "";
+	const file = normalizedRepoPath(evidence.path);
+	if (file !== source && !checkpointRenameTarget(cwd, finding, file) && !deleted)
+		return "";
 	try {
 		const bytes = readFileSync(join(cwd, file));
-		return createHash("sha256").update(bytes).digest("hex") === evidence.sha256;
+		if (createHash("sha256").update(bytes).digest("hex") !== evidence.sha256)
+			return "";
+		return deleted && file !== source
+			? `deleted:${source};successor:${file}:${evidence.sha256}`
+			: `${file}:${evidence.sha256}`;
 	} catch {
-		return false;
+		return "";
 	}
 }
 
@@ -15557,7 +15600,10 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 			.filter((issue) => !isPlanningIssue(issue) && typeOf(issue) !== "decision")
 			.map(issueSummary);
 		const triage = options.ownerSession
-			? verifierTriageState(cwd, options.ownerSession, childState.epicId)
+			? verifierTriageState(cwd, options.ownerSession, childState.epicId, {
+					since: activeWorkGoal?.startedAt,
+					baselineSnapshot: workGoalBaselineHead(activeWorkGoal),
+				})
 			: null;
 		if (triage) {
 			return {
@@ -23539,7 +23585,10 @@ function buildWorkGoalContinuePrompt(goal, marker, note = "") {
 }
 
 function buildClaimedWorkGoalContinuePrompt(goal, marker, note, ctx, cwd) {
-	const triage = verifierTriageState(cwd, verifierTriageOwner(ctx));
+	const triage = verifierTriageState(cwd, verifierTriageOwner(ctx), undefined, {
+		since: goal.startedAt,
+		baselineSnapshot: workGoalBaselineHead(goal),
+	});
 	return buildWorkGoalContinuePrompt(
 		goal,
 		marker,
@@ -24234,7 +24283,7 @@ async function recoverInterruptedWork(ctx, pi) {
 	}
 }
 
-async function handleWorkGoalCommand(args, mode, pi, ctx) {
+async function handleWorkGoalCommand(args, mode, pi, ctx, options = {}) {
 	const command = parseWorkGoalCommand(args);
 	if (command.error) {
 		ctx.ui.notify(command.error, "warning");
@@ -24344,17 +24393,18 @@ async function handleWorkGoalCommand(args, mode, pi, ctx) {
 		]
 			.filter(Boolean)
 			.join("\n\n");
-		await sendWorkGoalPrompt(
-			pi,
-			ctx,
-			buildClaimedWorkGoalContinuePrompt(
-				activeWorkGoal,
-				workGoalContinuationMarker(activeWorkGoal),
-				note,
+		if (!options.deferPrompt)
+			await sendWorkGoalPrompt(
+				pi,
 				ctx,
-				activeWorkGoalCwd ?? ctx.cwd,
-			),
-		);
+				buildClaimedWorkGoalContinuePrompt(
+					activeWorkGoal,
+					workGoalContinuationMarker(activeWorkGoal),
+					note,
+					ctx,
+					activeWorkGoalCwd ?? ctx.cwd,
+				),
+			);
 		return;
 	}
 	if (command.kind === "edit") {
@@ -26082,7 +26132,16 @@ function formatError(error) {
 
 async function sendFollowUp(ctx, message, pi) {
 	if (!message) return;
-	const text = roadmapTerminology(message);
+	// Every queued handoff must carry its own workflow authorization, or the next
+	// turn is classified as a direct request and its work-* subagents are blocked.
+	const missingMetadata = workflowPromptMetadata().filter(
+		(item) => !String(message).includes(item),
+	);
+	const text = roadmapTerminology(
+		missingMetadata.length
+			? `${message}\n${missingMetadata.join("\n")}`
+			: message,
+	);
 	if (ctx.mode === "tui" && typeof pi?.sendUserMessage === "function") {
 		await pi.sendUserMessage(text, { deliverAs: "followUp" });
 		return;
@@ -26114,11 +26173,6 @@ function unsupportedPrintWorkflow(ctx) {
 }
 
 async function sendWorkflowFollowUp(ctx, message, pi, state) {
-	const missingMetadata = workflowPromptMetadata().filter(
-		(item) => !String(message).includes(item),
-	);
-	if (missingMetadata.length)
-		message = `${message}\n${missingMetadata.join("\n")}`;
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
 	let compactEnabled = true;
 	try {
@@ -30130,7 +30184,7 @@ export default function workModelsExtension(pi) {
 				return {
 					block: true,
 					reason:
-						"Direct request mode does not authorize ce-workflow orchestration. Use /wo or a user-origin orchestrator command to start or resume managed work.",
+						"Direct request mode does not authorize ce-workflow orchestration. Run `/wo resume <roadmap-id>` from the input, or run `/wo` and choose Resume work.",
 				};
 		}
 	});
@@ -30561,6 +30615,24 @@ export default function workModelsExtension(pi) {
 		pendingWorkPrompt = null;
 	});
 
+	// pi-subagents sends its compaction-resume message with
+	// pi.sendMessage(..., { triggerTurn: true }), which calls _runAgentPrompt
+	// directly and never emits before_agent_start. Arm the same guard here so an
+	// idle microcompact cannot spend a model turn.
+	pi.on("message_start", (event) => {
+		if (blockedCompactionResumeTurn) return;
+		const role = event?.message?.role;
+		if (role !== "custom" && role !== "user") return;
+		if (!isCompactionResumePrompt(event.message.content)) return;
+		if (
+			activeCompactionWorkflowAuthorization(
+				pendingCompactionWorkflowAuthorization,
+			)
+		)
+			return;
+		blockedCompactionResumeTurn = true;
+	});
+
 	pi.on("before_provider_request", async (event, ctx) => {
 		if (!blockedCompactionResumeTurn) return event.payload;
 		blockedCompactionResumeTurn = false;
@@ -30853,7 +30925,6 @@ export default function workModelsExtension(pi) {
 		recordSelfImprovementHistory(ctx, "agent_end", event);
 		pendingSettledAgentEnd = event;
 		activePromptBackedAgent = false;
-		workflowTurnAuthorized = false;
 		const settling = activeWorkAgent?.meta;
 		if (settling?.workItemId)
 			await maybeLaunchSuccessorPrefetch(
@@ -31042,7 +31113,6 @@ export default function workModelsExtension(pi) {
 		await presentPendingVerifierBatches(ctx.cwd, ctx, pi);
 		await flushWorkGoalContinuationRetry(ctx, pi);
 		activePromptBackedAgent = false;
-		workflowTurnAuthorized = false;
 		blockedCompactionResumeTurn = false;
 		blockedInternalBackgroundCompletionTurn = false;
 		pendingInternalBackgroundCompletionPrompt = null;
@@ -31203,7 +31273,9 @@ export default function workModelsExtension(pi) {
 			const descriptions = {
 				goal: "Start an autonomous goal with the supplied objective",
 				pause: "Pause after the current tool batch finishes",
+				compact: "Microcompact the work context (same as F8)",
 				resume: "Resume the paused goal, workflow, or direct request",
+				"resume-work": "Resume native work state directly",
 				design: "Prepare, commission, or resume a visual design",
 				redesign: "Create a redesign initiative and current-UI audit",
 				fact: "Store, search, correct, or forget durable session knowledge",
@@ -31242,13 +31314,25 @@ export default function workModelsExtension(pi) {
 				return startWorkGoal("generic", goal.text, pi, ctx, goal.budget);
 			}
 			if (action === "pause") return requestOrchestratorPause(ctx, pi);
+			if (action === "compact") return requestMicrocompact(ctx);
 			if (action === "fact") return handleKnowledgeCommand(rest, ctx);
 			if (["design", "redesign"].includes(action))
 				return executeOrchestratorAction(`work-${action}`, rest, ctx, pi);
+			if (action === "resume-work") {
+				if (activeWorkGoal && activeWorkGoal.status !== "active")
+					await handleWorkGoalCommand(
+						"resume",
+						activeWorkGoal?.mode ?? "project",
+						pi,
+						ctx,
+						{ deferPrompt: true },
+					);
+				return executeOrchestratorAction("work-resume", rest, ctx, pi);
+			}
 			if (action !== "resume")
 				return notify(
 					ctx,
-					"Usage: /wo [goal <objective> | pause | resume | fact … | design … | redesign <objective>]",
+					"Usage: /wo [goal <objective> | pause | resume | resume-work [id] | fact … | design … | redesign <objective>]",
 					"warning",
 				);
 			if (orchestratorPauseRequest)
@@ -31260,6 +31344,29 @@ export default function workModelsExtension(pi) {
 			if (orchestratorPausedJob)
 				return resumeOrchestratorJob(orchestratorPausedJob, rest, ctx, pi);
 			if (activeWorkGoal && activeWorkGoal.status !== "complete") {
+				const requestedTarget = rest.trim();
+				const projectTarget =
+					activeWorkGoal.mode === "project"
+						? workGoalTargetId(activeWorkGoal)
+						: undefined;
+				if (
+					projectTarget &&
+					(!requestedTarget ||
+						requestedTarget === projectTarget ||
+						isNativeWorkItemId(requestedTarget))
+				) {
+					if (activeWorkGoal.status !== "active")
+						await handleWorkGoalCommand("resume", "project", pi, ctx, {
+							deferPrompt: true,
+						});
+					if (activeWorkGoal?.status === "active")
+						return executeOrchestratorAction(
+							"work-resume",
+							requestedTarget || projectTarget,
+							ctx,
+							pi,
+						);
+				}
 				if (!rest && activeWorkGoal.mode === "project")
 					return handleWorkResumeGoalCommand("", pi, ctx);
 				return handleWorkGoalCommand(
@@ -31616,6 +31723,108 @@ async function chooseWorkSetting(ctx, items, selectedIndex, scope) {
 	return { pick: result.item, index: result.index };
 }
 
+export async function exportSettings(ctx, scope, copy = copyToClipboard) {
+	const file = resolve(scope === "global" ? globalSettingsPath() : settingsPath(ctx.cwd));
+	let status;
+	try {
+		const content = readFileSync(file, "utf8");
+		if (typeof copy !== "function" || (ctx.mode && ctx.mode !== "tui"))
+			throw new Error("Clipboard unavailable");
+		await copy(content);
+		status = "Settings JSON copied to clipboard (terminal support required).";
+	} catch (error) {
+		status = error?.code === "ENOENT"
+			? "No settings file exists in this scope yet; nothing copied."
+			: "Could not read or copy settings; use the file path below.";
+	}
+	ctx.ui.notify(`${status}\n${file}`, "info");
+	await showListDialog(ctx, {
+		title: `Export settings: ${titleCase(scope)}`,
+		purpose: status,
+		items: [{ value: "back", label: "Settings JSON file (Enter to return)", description: file, preserveCase: true }],
+		descriptionMaxLines: 20,
+		filter: false,
+		forceCustom: true,
+	});
+}
+
+function parseImportedSettings(content) {
+	let settings;
+	try {
+		settings = JSON.parse(content, (key, value) => {
+			if (["__proto__", "constructor", "prototype"].includes(key))
+				throw new Error("Unsafe settings key");
+			return value;
+		});
+	} catch {
+		// JSON parser errors can include pasted secrets; never echo their text.
+		throw new Error("Settings must be valid JSON without prototype-related keys.");
+	}
+	if (!settings || typeof settings !== "object" || Array.isArray(settings))
+		throw new Error("Settings must be a JSON object.");
+	return settings;
+}
+
+export async function importSettings(ctx, scope) {
+	const file = resolve(scope === "global" ? globalSettingsPath() : settingsPath(ctx.cwd));
+	const title = `Import ${scope} settings: paste a file path or JSON`;
+	const input = typeof ctx.ui.editor === "function"
+		? await ctx.ui.editor(title, "")
+		: await ctx.ui.input?.(title);
+	if (!input?.trim()) return;
+	let backup;
+	try {
+		const text = input.trim();
+		let content = text;
+		if (!/^[{\[]/.test(text) && !/^(?:null|true|false|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)$/.test(text)) {
+			let source = text.replace(/^(["'])(.*)\1$/s, "$2");
+			if (/^~[/\\]/.test(source)) source = join(homedir(), source.slice(2));
+			content = readFileSync(resolve(ctx.cwd, source), "utf8");
+		}
+		content = content.replace(/^\uFEFF/, "");
+		parseImportedSettings(content);
+		const confirmed = await showListDialog(ctx, {
+			title: `Replace ${scope} settings?`,
+			purpose: "Only import trusted settings. This replaces the whole file, including non-workflow settings.",
+			items: [{ value: "replace", label: "Back up current settings and import", description: file }],
+			descriptionMaxLines: 20,
+			filter: false,
+			forceCustom: true,
+		});
+		if (!confirmed) return;
+		await withFileMutationQueue(file, async () => {
+			mkdirSync(dirname(file), { recursive: true });
+			if (existsSync(file)) {
+				backup = `${file}.${new Date().toISOString().replace(/[:.]/g, "-")}.${randomUUID()}.bak`;
+				writeFileSync(backup, readFileSync(file), { flag: "wx", mode: 0o600 });
+			}
+			const temporary = `${file}.${randomUUID()}.tmp`;
+			try {
+				writeFileSync(temporary, content, { flag: "wx", mode: 0o600 });
+				renameSync(temporary, file);
+			} finally {
+				rmSync(temporary, { force: true });
+			}
+		});
+	} catch (error) {
+		ctx.ui.notify(
+			`Settings import failed; current settings were not replaced. ${error?.code ?? error.message}${backup ? `\nBackup: ${backup}` : ""}`,
+			"error",
+		);
+		return;
+	}
+	ctx.ui.notify(
+		`Imported settings: ${file}\n${backup ? `Backup: ${backup}` : "No previous file; no backup needed."}\nWorkflow settings are read on the next action; running work is unchanged. Use /reload to refresh Pi and other extensions after a full-file import.`,
+		"info",
+	);
+	try {
+		syncImprovementReportTool(workExtensionPi, ctx);
+		if (scope === "global") subscriptionFooterController.apply(ctx);
+	} catch {
+		ctx.ui.notify("Settings were imported, but live refresh failed. Use /reload.", "warning");
+	}
+}
+
 async function workSettingsLoop(ctx) {
 	let selectedIndex = 0;
 	let scope = "global";
@@ -31811,6 +32020,18 @@ async function workSettingsLoop(ctx) {
 						? "Restore built-in workflow defaults"
 						: "Use global values for every workflow setting",
 			},
+			{
+				kind: "export",
+				value: "exportSettings",
+				label: "Export settings",
+				description: `Show the ${scope} JSON file path and copy its full contents to clipboard`,
+			},
+			{
+				kind: "import",
+				value: "importSettings",
+				label: "Import settings",
+				description: `Replace the ${scope} JSON file from a path or pasted JSON; back up the current file first`,
+			},
 		];
 		for (const item of items)
 			item.local = hasProjectOverride(projectSettings, item);
@@ -31822,6 +32043,14 @@ async function workSettingsLoop(ctx) {
 			continue;
 		}
 		const { pick } = selected;
+		if (pick.kind === "export") {
+			await exportSettings(ctx, scope);
+			continue;
+		}
+		if (pick.kind === "import") {
+			await importSettings(ctx, scope);
+			continue;
+		}
 		if (selected.action === "clear") {
 			if (clearProjectOverride(projectSettings, pick)) {
 				writeSettings(ctx.cwd, projectSettings);

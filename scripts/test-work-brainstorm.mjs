@@ -391,6 +391,15 @@ try {
 		"explicit freeform body reaches the TUI handoff unchanged",
 	);
 	assert(
+		followUps[0]?.includes("work-orchestrator") &&
+			telemetryEvents.some(
+				(event) =>
+					event.command === "work-brainstorm" &&
+					followUps[0]?.includes(`Workflow Run ID: ${event.workflowRunId}`),
+			),
+		"queued handoffs carry workflow authorization metadata so the next turn can launch work-* subagents",
+	);
+	assert(
 		telemetryEvents.some(
 			(event) =>
 				event.command === "work-brainstorm" &&
