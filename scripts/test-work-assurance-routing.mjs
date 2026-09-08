@@ -16,7 +16,8 @@ import {
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const { implementationExecutionPolicy, withCommandTelemetry } = await import(
-	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.ts")).href
+	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.ts"))
+		.href
 );
 
 function assert(ok, message) {
@@ -74,16 +75,16 @@ assert(
 			settings: { workOrchestrator: { profile: "medium" } },
 			source: { dirtySourceHash: "a".repeat(64) },
 		}) &&
-	fingerprint !==
-		workflowBehaviorFingerprint({
-			...input,
-			settings: { workOrchestrator: { profile: "high" } },
-		}) &&
-	fingerprint !==
-		workflowBehaviorFingerprint({
-			...input,
-			prompts: { worker: "changed writer prompt" },
-		}),
+		fingerprint !==
+			workflowBehaviorFingerprint({
+				...input,
+				settings: { workOrchestrator: { profile: "high" } },
+			}) &&
+		fingerprint !==
+			workflowBehaviorFingerprint({
+				...input,
+				prompts: { worker: "changed writer prompt" },
+			}),
 	"canonical source/settings/prompt fingerprints are stable and behavior-sensitive",
 );
 
@@ -114,7 +115,10 @@ seedNativeStore(cwd, [
 const storeFile = path.join(cwd, ".ce-workflow", "work-items.json");
 const storeBefore = readFileSync(storeFile, "utf8");
 const routeBefore = implementationExecutionPolicy({
-	selectedWorkItem: { title: "Concurrency recovery", implementationScope: "medium" },
+	selectedWorkItem: {
+		title: "Concurrency recovery",
+		implementationScope: "medium",
+	},
 });
 await withCommandTelemetry(
 	"work-resume",
@@ -149,7 +153,10 @@ assert(
 );
 assert(
 	implementationExecutionPolicy({
-		selectedWorkItem: { title: "Concurrency recovery", implementationScope: "medium" },
+		selectedWorkItem: {
+			title: "Concurrency recovery",
+			implementationScope: "medium",
+		},
 	}).kind === routeBefore.kind &&
 		readFileSync(storeFile, "utf8") === storeBefore,
 	"shadow classification changes neither routing nor WorkItem notes",

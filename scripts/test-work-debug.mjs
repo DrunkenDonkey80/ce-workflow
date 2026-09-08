@@ -6,9 +6,7 @@ import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 
 const { buildWorkDebugState } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.ts"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 
@@ -62,7 +60,9 @@ try {
 	);
 	assert(
 		fixture.store().items["BLOCK-1"].status === "open" &&
-			fixture.store().items["BLOCK-1"].notes.some((note) => note.includes("retry-guidance")) &&
+			fixture
+				.store()
+				.items["BLOCK-1"].notes.some((note) => note.includes("retry-guidance")) &&
 			fixture.logs().length === 0,
 		"blocked target is reopened natively before handoff",
 	);
@@ -96,7 +96,8 @@ try {
 		"guidance after first colon is preserved",
 	);
 	assert(
-		Object.values(fixture.store().items).filter((item) => item.type === "bug").length === 1,
+		Object.values(fixture.store().items).filter((item) => item.type === "bug")
+			.length === 1,
 		"reuse path does not create duplicate bug",
 	);
 
@@ -142,7 +143,10 @@ try {
 
 	fixture.reset("active");
 	state = buildWorkDebugState(fixture.cwd, "--roadmap E-1 broken thing");
-	assert(state.ok && fixture.logs().length === 0, "native debug does not require bd");
+	assert(
+		state.ok && fixture.logs().length === 0,
+		"native debug does not require bd",
+	);
 
 	fixture.reset("active", "unknown");
 	state = buildWorkDebugState(fixture.cwd, "IMP-1");

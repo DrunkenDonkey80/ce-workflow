@@ -98,9 +98,7 @@ for (const mode of ["tui", "rpc", "autonomous"]) {
 			session: `${mode}-session`,
 		});
 		assert(
-			ambiguous.baseHead &&
-				ambiguous.baseStoreHash &&
-				ambiguous.baseWorkItemHash,
+			ambiguous.baseHead && ambiguous.baseStoreHash && ambiguous.baseWorkItemHash,
 			`${mode}: durable base fingerprints`,
 		);
 		assert(
@@ -204,9 +202,7 @@ for (const mode of ["tui", "rpc", "autonomous"]) {
 			session: `${mode}-session`,
 		});
 		assert(
-			driven.length === 1 &&
-				driven[0].action === "run-fix" &&
-				driven[0].launched,
+			driven.length === 1 && driven[0].action === "run-fix" && driven[0].launched,
 			`${mode}: one coded planResumeAction transition`,
 		);
 		assert(
@@ -310,9 +306,8 @@ for (const mode of ["tui", "rpc", "autonomous"]) {
 				orphanAfterMs: 1_000,
 			});
 			assert(
-				currentWorkActionLeases(cwd).find(
-					(item) => item.leaseId === lease.leaseId,
-				)?.state === "fenced",
+				currentWorkActionLeases(cwd).find((item) => item.leaseId === lease.leaseId)
+					?.state === "fenced",
 				`stale ${state} lease without asyncDir is fenced`,
 			);
 		}
@@ -327,9 +322,8 @@ for (const mode of ["tui", "rpc", "autonomous"]) {
 			orphanAfterMs: 1_000,
 		});
 		assert(
-			currentWorkActionLeases(cwd).find(
-				(item) => item.leaseId === orphan.leaseId,
-			)?.state === "orphaned",
+			currentWorkActionLeases(cwd).find((item) => item.leaseId === orphan.leaseId)
+				?.state === "orphaned",
 			"missing launch becomes orphaned",
 		);
 		reconcileWorkActionLeaseLiveness(cwd, {

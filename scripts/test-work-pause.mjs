@@ -6,9 +6,7 @@ import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 
 const { buildWorkPauseState } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.ts"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 
@@ -19,7 +17,10 @@ try {
 		state.ok && state.action === "checkpoint-appended",
 		"active in-progress WorkItem gets checkpoint",
 	);
-	assert(state.selectedWorkItem.id === "IMP-1", "pause selects in-progress WorkItem");
+	assert(
+		state.selectedWorkItem.id === "IMP-1",
+		"pause selects in-progress WorkItem",
+	);
 	assert(
 		state.note.includes("last verification: Command: npm run verify"),
 		"checkpoint includes last verification",
@@ -38,8 +39,11 @@ try {
 	);
 	assert(!state.handoffPrompt, "pause never queues a handoff");
 	assert(
-		fixture.store().items["IMP-1"].notes.some((note) => note.includes("work-pause checkpoint")) &&
-			fixture.logs().length === 0,
+		fixture
+			.store()
+			.items["IMP-1"].notes.some((note) =>
+				note.includes("work-pause checkpoint"),
+			) && fixture.logs().length === 0,
 		"pause persists checkpoint natively without bd",
 	);
 

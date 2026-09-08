@@ -147,7 +147,10 @@ assert.ok(calibration.maximumDimensionRegression >= 0.1);
 assert.ok(calibration.tokenCeiling >= 102);
 assert.ok(calibration.wallMsCeiling >= 1010);
 
-assert.equal(requiresSentinel(["extensions/private-workflows/plan.md"], "handoff"), true);
+assert.equal(
+	requiresSentinel(["extensions/private-workflows/plan.md"], "handoff"),
+	true,
+);
 assert.equal(
 	requiresSentinel(["extensions/work-models.ts"], "default-behavior"),
 	true,

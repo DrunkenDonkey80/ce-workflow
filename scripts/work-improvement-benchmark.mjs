@@ -64,7 +64,8 @@ export const CHANGED_PATH_FIXTURE_MANIFEST = Object.freeze([
 		agentBacked: AGENT_SCENARIOS,
 	},
 	{
-		match: /^(extensions\/work-improvement-reporting\.js|scripts\/test-work-improvement-reporting\.mjs)$/,
+		match:
+			/^(extensions\/work-improvement-reporting\.js|scripts\/test-work-improvement-reporting\.mjs)$/,
 		deterministic: ["test-work-improvement-reporting.mjs", ...TELEMETRY_FIXTURES],
 		agentBacked: [],
 	},
@@ -93,7 +94,10 @@ export async function runBenchmarkGatePlan(plan, seams = {}) {
 		return Promise.race([
 			Promise.resolve(promise),
 			new Promise((_, reject) => {
-				timer = setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
+				timer = setTimeout(
+					() => reject(new Error(`${label} timed out`)),
+					timeoutMs,
+				);
 			}),
 		]).finally(() => clearTimeout(timer));
 	};
@@ -245,10 +249,7 @@ function mandatoryQuality(fixture) {
 		outcomes: [...BASE_QUALITY.outcomes],
 		gates: [...BASE_QUALITY.gates],
 	};
-	if (
-		fixture.fixtureId === "test-work-goal.mjs" ||
-		fixture.fixtureId === "goal"
-	)
+	if (fixture.fixtureId === "test-work-goal.mjs" || fixture.fixtureId === "goal")
 		requirements.outcomes.push("goal");
 	if (
 		fixture.fixtureId === "test-work-start-finish.mjs" ||
@@ -265,9 +266,7 @@ function mandatoryQuality(fixture) {
 function aggregateSamples(samples) {
 	const rawSamples = samples.slice(0, MAX_RAW_SAMPLES).map(boundedSample);
 	const outcomeKeys = [
-		...new Set(
-			rawSamples.flatMap((sample) => Object.keys(sample.hard.outcomes)),
-		),
+		...new Set(rawSamples.flatMap((sample) => Object.keys(sample.hard.outcomes))),
 	];
 	const gateKeys = [
 		...new Set(rawSamples.flatMap((sample) => Object.keys(sample.hard.gates))),
@@ -374,8 +373,7 @@ function validRawSample(sample) {
 function sameAggregate(fixture) {
 	const aggregate = aggregateSamples(fixture.rawSamples);
 	return (
-		JSON.stringify(aggregate.measurement) ===
-		JSON.stringify(fixture.measurement)
+		JSON.stringify(aggregate.measurement) === JSON.stringify(fixture.measurement)
 	);
 }
 
@@ -503,11 +501,7 @@ export function evaluateBenchmarkEvidence(baseline, candidate, options = {}) {
 		const before = totals.baseline[key];
 		const after = totals.candidate[key];
 		ratios[key] =
-			before === 0
-				? after === 0
-					? 1
-					: Number.POSITIVE_INFINITY
-				: after / before;
+			before === 0 ? (after === 0 ? 1 : Number.POSITIVE_INFINITY) : after / before;
 		if (ratios[key] > 1 + MAXIMUM_DIMENSION_REGRESSION)
 			return invalid("cost-dimension-regression", {
 				dimension: key,

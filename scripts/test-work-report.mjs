@@ -15,9 +15,7 @@ import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const { buildWorkReport } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.ts"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 
@@ -170,15 +168,11 @@ try {
 		"json includes blocked workItem",
 	);
 	assert(
-		json.blockers
-			.find((item) => item.id === "B-1")
-			.dependencies.includes("D-1"),
+		json.blockers.find((item) => item.id === "B-1").dependencies.includes("D-1"),
 		"json keeps blocking dependency id",
 	);
 	assert(
-		!json.blockers
-			.find((item) => item.id === "B-1")
-			.dependencies.includes("E-1"),
+		!json.blockers.find((item) => item.id === "B-1").dependencies.includes("E-1"),
 		"json ignores parent-child dependency id",
 	);
 	assert(

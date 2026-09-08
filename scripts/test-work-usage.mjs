@@ -18,9 +18,7 @@ const {
 	renderWorkUsageText,
 } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.ts"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 const { assert, installWorkflowFixture, seedNativeStore } = await import(
@@ -186,10 +184,7 @@ try {
 	);
 
 	const jsonl = buildWorkUsageState(cwd, "epic E-1 --jsonl --open");
-	assert(
-		jsonl.format === "jsonl" && !jsonl.path,
-		"jsonl usage skips html file",
-	);
+	assert(jsonl.format === "jsonl" && !jsonl.path, "jsonl usage skips html file");
 	assert(jsonl.open === false, "jsonl usage ignores browser open");
 	const jsonlRows = renderWorkUsageText(jsonl).split(/\r?\n/).map(JSON.parse);
 	assert(

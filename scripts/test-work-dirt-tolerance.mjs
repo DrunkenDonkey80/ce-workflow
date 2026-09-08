@@ -11,9 +11,7 @@ const { assert } = await import(
 );
 const { isWorkflowDirt, isGeneratedBuildArtifact } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.ts"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 
@@ -94,10 +92,7 @@ assert(
 // Windows reserved-name junk (e.g. a stray `nul`) cannot be real source.
 if (process.platform === "win32") {
 	assert(dirt("nul"), "Windows reserved-name junk (nul) is tolerated");
-	assert(
-		dirt("src/CON.log"),
-		"Windows reserved name in a subpath is tolerated",
-	);
+	assert(dirt("src/CON.log"), "Windows reserved name in a subpath is tolerated");
 }
 
 // Real source/config is NOT tolerated — these correctly remain blockers.

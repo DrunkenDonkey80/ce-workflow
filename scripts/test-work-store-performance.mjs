@@ -53,7 +53,10 @@ try {
 	}
 	samples.sort((left, right) => left - right);
 	const medianMs = samples[Math.floor(samples.length / 2)];
-	assert(medianMs < 250, `native status/resume median ${medianMs.toFixed(1)} ms exceeds 250 ms`);
+	assert(
+		medianMs < 250,
+		`native status/resume median ${medianMs.toFixed(1)} ms exceeds 250 ms`,
+	);
 	const legacyBaselineMs = 3_000;
 	console.log(
 		`native store performance: PASS median=${medianMs.toFixed(1)}ms baseline=${legacyBaselineMs}ms improvement=${(legacyBaselineMs / medianMs).toFixed(1)}x`,

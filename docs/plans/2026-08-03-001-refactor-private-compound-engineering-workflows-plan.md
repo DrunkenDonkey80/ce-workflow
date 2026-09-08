@@ -164,12 +164,12 @@ flowchart TB
 
 - Official stable release metadata, source archives, and commit identity remain available through GitHub.
 - ce-workflow can define behavior fixtures for every current CE-backed path and can identify source changes outside their covered translation surface.
-- Pi restart is the only activation boundary; in-session replacement of loaded workflow resources is not required.
+- The canonical TypeScript extension entry supports in-session activation with `/reload`; a Pi or Herdr restart is not required.
 - The peeled commit SHA and imported-file hashes are canonical identity. The archive digest is recorded as acquisition evidence rather than treated as the sole trust anchor.
 
 ### Sources and Research
 
-- `extensions/work-models.js` — current CE handoffs, advisor routing, browser/review/simplification hooks, npm-only catch-up behavior, and dirty-tree safety gates.
+- `extensions/work-models.ts` — current CE handoffs, advisor routing, browser/review/simplification hooks, npm-only catch-up behavior, and dirty-tree safety gates.
 - `extensions/work-catch-up-baseline.json` — current npm package baseline.
 - `agents/work-debugger.md` and `skills/work-orchestrator/references/full-policy.md` — inherited CE debugging, learning-capture, and policy coupling.
 - `package.json`, `README.md`, and `scripts/workflow-evaluation.mjs` — peer dependency, installation guidance, dependency-root lookup, required skill resources, and evaluation assumptions that must migrate together.
@@ -315,4 +315,3 @@ Only after U1-U6 pass, remove `pi-compound-engineering` from `package.json`, `RE
 ### Next planning boundary
 
 After U1-U3 close, create one new `wo:planning` item under roadmap `work-5` to re-read the inventory/parity results and cut the smallest remaining U4 tracer. Do not pre-create U4-U7 executable tasks; their exact shape depends on the source closure and the two tracer results. No product or architecture decision is currently unresolved.
-

@@ -55,8 +55,7 @@ const answers = {
 		continue: "Yes",
 		name: "Ada",
 		details: "Line 1\nLine 2",
-		"user-facing purpose|report purpose|should become easier":
-			"Automate reports",
+		"user-facing purpose|report purpose|should become easier": "Automate reports",
 		"primary user|first user": [
 			"A developer using it in scripts or CI",
 			"Automation/CI",
@@ -192,9 +191,15 @@ for (const stage of ["brainstorm", "plan"]) {
 		packageRoot,
 	);
 	assert.deepEqual(candidateResources.requiredResources, []);
-	assert.equal(candidateResources.privateResources[0].name, `private-workflow:${stage}`);
+	assert.equal(
+		candidateResources.privateResources[0].name,
+		`private-workflow:${stage}`,
+	);
 	assert.doesNotThrow(() =>
-		validatePrivateWorkflowResources(candidateResources.privateResources, packageRoot),
+		validatePrivateWorkflowResources(
+			candidateResources.privateResources,
+			packageRoot,
+		),
 	);
 	const baselineResources = resolveEvaluationResources(
 		{ stage, dependencyPackages: [] },
@@ -648,9 +653,7 @@ function fakeProcess(events, options = {}) {
 				if (event === "__exit") child.emit("exit", 2, null);
 				else
 					child.stdout.write(
-						typeof event === "string"
-							? `${event}\n`
-							: `${JSON.stringify(event)}\n`,
+						typeof event === "string" ? `${event}\n` : `${JSON.stringify(event)}\n`,
 					);
 			}
 		} else if (command.type === "get_session_stats") {

@@ -250,10 +250,7 @@ try {
 	]) {
 		const d = repo();
 		const s = writeExport(d, bad);
-		assert.throws(
-			() => migrateLegacyBeads(d, { exportPath: s }),
-			MigrationError,
-		);
+		assert.throws(() => migrateLegacyBeads(d, { exportPath: s }), MigrationError);
 		assert(!existsSync(path.join(d, ".ce-workflow", "work-items.json")));
 	}
 	const changed = repo();
@@ -352,10 +349,7 @@ try {
 			migrateLegacyBeads(concurrent, {
 				exportPath: concurrentSource,
 				onBeforePublish: () =>
-					writeFileSync(
-						path.join(concurrent, ".beads", "config.yaml"),
-						"changed",
-					),
+					writeFileSync(path.join(concurrent, ".beads", "config.yaml"), "changed"),
 			}),
 		/migration-owned path changed/,
 	);

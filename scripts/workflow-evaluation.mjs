@@ -305,13 +305,9 @@ function evidenceRawFiles(root) {
 		for (const name of readdirSync(directory)) {
 			const file = path.join(directory, name);
 			const relative = path.relative(root, file);
-			if (
-				relative === "authority" ||
-				relative.startsWith(`authority${path.sep}`)
-			)
+			if (relative === "authority" || relative.startsWith(`authority${path.sep}`))
 				continue;
-			if (["evidence-manifest.json", "report.json"].includes(relative))
-				continue;
+			if (["evidence-manifest.json", "report.json"].includes(relative)) continue;
 			if (statSync(file).isDirectory()) visit(file);
 			else files.push(relative);
 		}
@@ -421,9 +417,7 @@ function sourceState(root) {
 	return {
 		status: status.stdout,
 		files: hash.digest("hex"),
-		bundle: existsSync(
-			path.join(root, "benchmarks", "workflow-evaluation", "v1"),
-		)
+		bundle: existsSync(path.join(root, "benchmarks", "workflow-evaluation", "v1"))
 			? treeHash(path.join(root, "benchmarks", "workflow-evaluation", "v1"))
 			: null,
 	};
@@ -792,7 +786,9 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 	const requiredResources = evaluationResources.requiredResources;
 	if (customPrompt) {
 		const promptCommand = customPrompt.match(/^\/([A-Za-z0-9-]+)/)?.[1];
-		const customCommand = promptCommand?.startsWith("work-") ? promptCommand : undefined;
+		const customCommand = promptCommand?.startsWith("work-")
+			? promptCommand
+			: undefined;
 		if (promptCommand && !customCommand)
 			throw new Error("only native work commands are supported for evaluation");
 		requiredCommands = customCommand ? [customCommand] : [];
@@ -1004,9 +1000,7 @@ async function defaultRunSample(sample, descriptor, sourceRoot) {
 	let handoffArtifact = outputText;
 	if (sample.stage !== "work") {
 		const readiness =
-			sample.stage === "brainstorm"
-				? "requirements-only"
-				: "implementation-ready";
+			sample.stage === "brainstorm" ? "requirements-only" : "implementation-ready";
 		handoffArtifact =
 			artifacts.find((artifact) => artifact.readiness === readiness)?.content ??
 			outputText;
@@ -1041,8 +1035,7 @@ function messageText(message) {
 function parseJsonObject(text, label) {
 	const start = text.indexOf("{");
 	const end = text.lastIndexOf("}");
-	if (start < 0 || end <= start)
-		throw new Error(`${label} did not return JSON`);
+	if (start < 0 || end <= start) throw new Error(`${label} did not return JSON`);
 	try {
 		return JSON.parse(text.slice(start, end + 1));
 	} catch (error) {
@@ -1467,10 +1460,7 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 						};
 					}
 					writeFileSync(
-						path.join(
-							controlRoot,
-							`raw-${pairIndex}-${attemptIndex}-${side}.json`,
-						),
+						path.join(controlRoot, `raw-${pairIndex}-${attemptIndex}-${side}.json`),
 						`${JSON.stringify(sanitize(raw[side]), null, 2)}\n`,
 					);
 					appendResultLifecycle(
@@ -1490,9 +1480,7 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 						side,
 					});
 				}
-				if (
-					provenanceMismatch(raw.baseline, raw.candidate, descriptor.factor)
-				) {
+				if (provenanceMismatch(raw.baseline, raw.candidate, descriptor.factor)) {
 					attempts.push({
 						comparisonFailure: "provenance-mismatch",
 						baseline: decisionSample(raw.baseline, {}, descriptor.budgets),
@@ -1538,8 +1526,7 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 							));
 				} catch (error) {
 					attempts.push({
-						evaluatorFailure:
-							error instanceof Error ? error.message : String(error),
+						evaluatorFailure: error instanceof Error ? error.message : String(error),
 						baseline: decisionSample(raw.baseline, {}, descriptor.budgets),
 						candidate: decisionSample(raw.candidate, {}, descriptor.budgets),
 						raw: sanitize(raw),
@@ -1642,8 +1629,7 @@ export async function runDecisionExperiment(descriptor, seams = {}) {
 			bugs: rawSamples
 				.filter(
 					(sample) =>
-						!passed(sample, descriptor.budgets) &&
-						!infrastructureFailure([sample]),
+						!passed(sample, descriptor.budgets) && !infrastructureFailure([sample]),
 				)
 				.map((sample) => ({
 					failure: sample.failure,
@@ -1741,16 +1727,12 @@ export function deriveCalibration(pairs) {
 		minimumImprovement: Math.max(0.05, ...noise),
 		maximumDimensionRegression: Math.max(0.1, ...noise),
 		tokenCeiling: Math.ceil(
-			Math.max(
-				...values("baseline", "tokens"),
-				...values("candidate", "tokens"),
-			) * 1.2,
+			Math.max(...values("baseline", "tokens"), ...values("candidate", "tokens")) *
+				1.2,
 		),
 		wallMsCeiling: Math.ceil(
-			Math.max(
-				...values("baseline", "wallMs"),
-				...values("candidate", "wallMs"),
-			) * 1.2,
+			Math.max(...values("baseline", "wallMs"), ...values("candidate", "wallMs")) *
+				1.2,
 		),
 	};
 }
@@ -1846,9 +1828,7 @@ export async function runSentinelExperiment(descriptor, seams = {}) {
 				calibrationPath: descriptor.calibrations?.[`${project}:${stage}`],
 			};
 			if (!stageDescriptor.calibrationPath)
-				throw new Error(
-					`sentinel requires calibration for ${project}:${stage}`,
-				);
+				throw new Error(`sentinel requires calibration for ${project}:${stage}`);
 			const calibration = loadCalibration(stageDescriptor, sourceRoot);
 			stageDescriptor.budgets = {
 				...descriptor.budgets,
@@ -1895,10 +1875,7 @@ export async function runSentinelExperiment(descriptor, seams = {}) {
 			return verifyCalculatorProject(workspaceRoot, null);
 		});
 	try {
-		for (const project of descriptor.projects ?? [
-			"calculator",
-			"csv-expenses",
-		]) {
+		for (const project of descriptor.projects ?? ["calculator", "csv-expenses"]) {
 			const projectDir = projectRoot(sourceRoot, project);
 			if (!seams.skipApproval)
 				validateGoldenApproval(
@@ -1962,11 +1939,7 @@ export async function runSentinelExperiment(descriptor, seams = {}) {
 						path.join(controlRoot, `checkpoint-${project}-${side}.json`),
 						`${JSON.stringify(projectResult, null, 2)}\n`,
 					);
-					appendResultLifecycle(
-						lifecycle,
-						{ project, side, stage },
-						stageResult,
-					);
+					appendResultLifecycle(lifecycle, { project, side, stage }, stageResult);
 					if (
 						stageResult.status !== "completed" ||
 						stageResult.verifier?.passed === false ||
@@ -2060,11 +2033,7 @@ export async function runCalibrationExperiment(descriptor, seams = {}) {
 	const stable = ["candidate-accepted", "quality-pass-no-cost-win"].includes(
 		decision.status,
 	);
-	if (
-		!stable ||
-		!decision.verdict?.pairs ||
-		decision.verdict.pairs.length !== 3
-	)
+	if (!stable || !decision.verdict?.pairs || decision.verdict.pairs.length !== 3)
 		return { ...decision, mode: "calibration", status: "invalid-calibration" };
 	const pairs = decision.verdict.pairs.map((pair) => {
 		const attempt = pair.attempts[pair.selectedAttempt];
@@ -2361,8 +2330,7 @@ export async function runSmokeExperiment(descriptor, seams = {}) {
 						0,
 					) < 0 ||
 					rubric.criticalDimensions.some(
-						(dimension) =>
-							candidateScores[dimension] < baselineScores[dimension],
+						(dimension) => candidateScores[dimension] < baselineScores[dimension],
 					);
 				const baselineQuestions = (attempts[0].result.questions ?? []).filter(
 					(question) => question.expected === false,
@@ -2373,8 +2341,7 @@ export async function runSmokeExperiment(descriptor, seams = {}) {
 				if (qualityRegressed || candidateQuestions > baselineQuestions)
 					status = "diagnostic-candidate-rejected";
 			} catch (error) {
-				evaluatorFailure =
-					error instanceof Error ? error.message : String(error);
+				evaluatorFailure = error instanceof Error ? error.message : String(error);
 				status = "invalid";
 			}
 		}
@@ -2393,10 +2360,7 @@ export async function runSmokeExperiment(descriptor, seams = {}) {
 				calibration: calibration ? fingerprint(calibration) : null,
 				source: before,
 				sides: Object.fromEntries(
-					attempts.map((item) => [
-						item.side,
-						fingerprint(descriptor[item.side]),
-					]),
+					attempts.map((item) => [item.side, fingerprint(descriptor[item.side])]),
 				),
 			},
 			declaredFactor: descriptor.factor,
@@ -2489,18 +2453,14 @@ async function main() {
 	}
 	let descriptor;
 	try {
-		descriptor = readJson(
-			path.resolve(process.argv[2]),
-			"experiment descriptor",
-		);
+		descriptor = readJson(path.resolve(process.argv[2]), "experiment descriptor");
 	} catch (error) {
 		throw new Error(
 			`${error instanceof Error ? error.message : String(error)}\n${usage()}`,
 		);
 	}
 	let result;
-	if (descriptor.mode === "smoke")
-		result = await runSmokeExperiment(descriptor);
+	if (descriptor.mode === "smoke") result = await runSmokeExperiment(descriptor);
 	else if (descriptor.mode === "decision")
 		result = await runDecisionExperiment(descriptor);
 	else if (descriptor.mode === "calibration")

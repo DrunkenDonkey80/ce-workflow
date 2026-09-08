@@ -4916,9 +4916,13 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	await invoke("work-goal", "clear", ctx);
 
 	const reloadMod = await import(
-		`${pathToFileURL(
-			realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
-		).href}?reload-authorization=${Date.now()}`
+		`${
+			pathToFileURL(
+				realpathSync(
+					path.join(import.meta.dirname, "../extensions/work-models.ts"),
+				),
+			).href
+		}?reload-authorization=${Date.now()}`
 	);
 	const reloadHooks = {};
 	let reloadActiveTools = [];
@@ -4957,8 +4961,7 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	};
 	const mismatchedReloadPolicy = await reloadHooks.before_agent_start(
 		{
-			prompt:
-				"Continue.\n\n<!-- work-goal-continuation:wg-other:74:mismatch -->",
+			prompt: "Continue.\n\n<!-- work-goal-continuation:wg-other:74:mismatch -->",
 			systemPrompt: "base",
 		},
 		reloadCtx,

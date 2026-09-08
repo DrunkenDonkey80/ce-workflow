@@ -140,10 +140,7 @@ export function resolveReportingSource(options = {}) {
 			}).trim(),
 		);
 		if (!samePath(gitRoot, sourceCwd))
-			fail(
-				"configured source is not the ce-workflow Git root",
-				"source-identity",
-			);
+			fail("configured source is not the ce-workflow Git root", "source-identity");
 		const pkg = JSON.parse(
 			readFileSync(path.join(sourceCwd, "package.json"), "utf8"),
 		);
@@ -204,10 +201,7 @@ function checkedLog(file, roots, baseCwd) {
 	if (!samePath(canonical, lexical))
 		fail("evidence path must not contain symlinks", "unsafe-evidence");
 	if (!roots.some((root) => contained(root, canonical)))
-		fail(
-			"evidence path is outside an approved evidence root",
-			"unsafe-evidence",
-		);
+		fail("evidence path is outside an approved evidence root", "unsafe-evidence");
 	let listed;
 	try {
 		listed = lstatSync(canonical);
@@ -225,10 +219,7 @@ function checkedLog(file, roots, baseCwd) {
 		);
 		const before = fstatSync(fd);
 		if (!before.isFile() || identity(before) !== identity(listed))
-			fail(
-				"evidence file changed before it could be opened",
-				"unsafe-evidence",
-			);
+			fail("evidence file changed before it could be opened", "unsafe-evidence");
 		if (before.size > MAX_FILE_BYTES)
 			fail("evidence file exceeds the reporting limit", "evidence-too-large");
 		accepted = true;
@@ -266,10 +257,7 @@ function copyStable(input, destination) {
 			offset += count;
 		}
 		const after = fstatSync(input.fd);
-		if (
-			identity(after) !== input.beforeIdentity ||
-			offset !== input.before.size
-		)
+		if (identity(after) !== input.beforeIdentity || offset !== input.before.size)
 			fail("evidence changed while being copied", "unstable-evidence");
 		return { bytes: offset, sha256: hash.digest("hex") };
 	} finally {
@@ -387,8 +375,7 @@ export async function submitImprovementReport(options = {}) {
 		for (const log of report.logs)
 			inputs.push(checkedLog(log, roots, consumerCwd));
 		if (
-			inputs.reduce((sum, input) => sum + input.before.size, 0) >
-			MAX_TOTAL_BYTES
+			inputs.reduce((sum, input) => sum + input.before.size, 0) > MAX_TOTAL_BYTES
 		)
 			fail("evidence bundle exceeds the reporting limit", "evidence-too-large");
 	} catch (error) {

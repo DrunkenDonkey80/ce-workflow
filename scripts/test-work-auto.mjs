@@ -6,9 +6,7 @@ import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 
 const { buildWorkAutoState } = await import(
 	pathToFileURL(
-		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-models.ts"),
-		),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
 	).href
 );
 
