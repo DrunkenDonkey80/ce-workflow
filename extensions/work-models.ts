@@ -23580,6 +23580,20 @@ function markWorkGoalContinuationDelivered(prompt) {
 		workGoalContinuationPending = null;
 }
 
+function restorePersistedWorkGoalForContinuation(ctx, pi, marker) {
+	if (activeWorkGoal || !marker) return activeWorkGoal;
+	const persisted = loadWorkGoalFromSession(ctx);
+	if (
+		!["active", "paused"].includes(persisted?.status) ||
+		marker.split(":", 1)[0] !== persisted.id
+	)
+		return null;
+	activeWorkGoal = persisted;
+	activeWorkGoalCwd = ctx.cwd;
+	syncWorkGoalTools(pi, persisted);
+	return persisted;
+}
+
 function buildWorkGoalContinuePrompt(goal, marker, note = "") {
 	return `Continue the active autonomous goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. If the human answer asked you to perform an action, do that action first before unrelated work. Do not ask the same question again unless the answer is impossible to act on. Use ask_user for real human-decision blockers; use work_goal_human_decision only if ask_user is unavailable or cancelled. Otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
 }
@@ -30474,8 +30488,9 @@ export default function workModelsExtension(pi) {
 		}
 		pendingPromptBackedAgentStart = true;
 		const baseSystemPrompt = String(event.systemPrompt ?? "");
-		markWorkGoalContinuationDelivered(event.prompt);
 		const marker = extractWorkGoalContinuationMarker(event.prompt);
+		restorePersistedWorkGoalForContinuation(ctx, pi, marker);
+		markWorkGoalContinuationDelivered(event.prompt);
 		const matchingWorkGoalTurn = Boolean(
 			activeWorkGoal &&
 				(marker?.startsWith(`${activeWorkGoal.id}:`) ||

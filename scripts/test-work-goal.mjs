@@ -4915,6 +4915,83 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 	assert.match(statuses["work-goal"], /active/);
 	await invoke("work-goal", "clear", ctx);
 
+	const reloadMod = await import(
+		`${pathToFileURL(
+			realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
+		).href}?reload-authorization=${Date.now()}`
+	);
+	const reloadHooks = {};
+	let reloadActiveTools = [];
+	reloadMod.default({
+		getActiveTools: () => reloadActiveTools,
+		setActiveTools: (next) => {
+			reloadActiveTools = next;
+		},
+		on: (name, handler) => {
+			reloadHooks[name] = handler;
+		},
+		registerCommand: () => {},
+		registerTool: () => {},
+		registerShortcut: () => {},
+		appendEntry: () => {},
+	});
+	const reloadGoal = {
+		id: "wg-reload-authorization",
+		mode: "project",
+		objective: "continue after extension reload",
+		status: "active",
+		iteration: 74,
+		updatedAt: Date.now() + 60_000,
+	};
+	const reloadCtx = {
+		...ctx,
+		sessionManager: {
+			getBranch: () => [
+				{
+					type: "custom",
+					customType: "work-goal-state",
+					data: { goal: reloadGoal },
+				},
+			],
+		},
+	};
+	const mismatchedReloadPolicy = await reloadHooks.before_agent_start(
+		{
+			prompt:
+				"Continue.\n\n<!-- work-goal-continuation:wg-other:74:mismatch -->",
+			systemPrompt: "base",
+		},
+		reloadCtx,
+	);
+	assert.match(mismatchedReloadPolicy.systemPrompt, /Direct request mode/);
+	assert.match(
+		(
+			await reloadHooks.tool_call(
+				{ toolName: "work_verifier_inbox", input: {} },
+				reloadCtx,
+			)
+		)?.reason ?? "",
+		/Direct request mode/,
+		"a persisted goal does not authorize a mismatched continuation marker",
+	);
+	const restoredReloadPolicy = await reloadHooks.before_agent_start(
+		{
+			prompt:
+				"Continue.\n\n<!-- work-goal-continuation:wg-reload-authorization:74:reload -->",
+			systemPrompt: "base",
+		},
+		reloadCtx,
+	);
+	assert.match(restoredReloadPolicy.systemPrompt, /Review cycle budget/);
+	assert.equal(
+		await reloadHooks.tool_call(
+			{ toolName: "work_verifier_inbox", input: {} },
+			reloadCtx,
+		),
+		undefined,
+		"a matching persisted goal authorizes verifier tools after extension reload",
+	);
+
 	writeFileSync(
 		path.join(cwd, ".pi", "work-orchestrator-state.json"),
 		JSON.stringify({
