@@ -100,6 +100,32 @@ try {
 		`${brainstorm.epic.id} Add smoke result`,
 	);
 	assert(started.ok && started.selectedWorkItem.status === "in_progress");
+	// Regression guard: helper commands that dynamically import the TypeScript
+	// extension entry must also work from an installed copy under node_modules.
+	assert(
+		execFileSync(
+			process.execPath,
+			[path.join(installed, "scripts", "work-helper.mjs"), "initiative-summary"],
+			{ cwd: clean, encoding: "utf8" },
+		).trim(),
+		"initiative-summary printed nothing",
+	);
+	writeFileSync(
+		path.join(clean, "helper-plan.md"),
+		"# Native helper plan\n\n## Acceptance\n\n- Installed helper loads the extension.\n",
+	);
+	const bootstrapped = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				path.join(installed, "scripts", "work-helper.mjs"),
+				"bootstrap-plan-roadmap",
+				"helper-plan.md",
+			],
+			{ cwd: clean, encoding: "utf8" },
+		),
+	);
+	assert(bootstrapped.roadmap_id, "installed bootstrap printed no roadmap id");
 	writeFileSync(path.join(clean, "result.js"), "export const smoke = true;\n");
 	execFileSync(
 		process.execPath,

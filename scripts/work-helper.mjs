@@ -12,7 +12,6 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import {
 	acquireRepositoryMutationLock,
 	admitVerificationManifest,
@@ -55,6 +54,11 @@ import {
 } from "../extensions/work-verification-contract.js";
 
 const cwd = process.cwd();
+let jiti;
+async function importWorkModels() {
+	jiti ??= (await import("jiti")).createJiti(import.meta.url);
+	return jiti.import("../extensions/work-models.ts");
+}
 const [, , command, ...args] = process.argv;
 const gitBin = process.env.WORK_ORCH_GIT_BIN || "git";
 
@@ -1827,10 +1831,7 @@ try {
 			}),
 		);
 		if (created.type === "epic" && !created.parentId) {
-			const modUrl = pathToFileURL(
-				path.join(import.meta.dirname, "..", "extensions", "work-models.ts"),
-			);
-			const { rememberWorkflowEpicForHelper } = await import(modUrl.href);
+			const { rememberWorkflowEpicForHelper } = await importWorkModels();
 			rememberWorkflowEpicForHelper(cwd, created);
 		}
 		print(summary(created, 300));
@@ -2105,9 +2106,7 @@ try {
 		);
 	} else if (command === "initiative-summary") {
 		const [target] = positional();
-		const { buildInitiativeProjection } = await import(
-			"../extensions/work-models.ts"
-		);
+		const { buildInitiativeProjection } = await importWorkModels();
 		const projection = buildInitiativeProjection(cwd);
 		if (target) {
 			const root = projection.nodes.find((node) => node.id === target);
@@ -2128,9 +2127,7 @@ try {
 			throw new Error(
 				"usage: initiative-preview [proposal-json-file | --proposal-json <json>]",
 			);
-		const { previewInitiativeReconciliation } = await import(
-			"../extensions/work-models.ts"
-		);
+		const { previewInitiativeReconciliation } = await importWorkModels();
 		print(
 			previewInitiativeReconciliation(
 				cwd,
@@ -2146,9 +2143,7 @@ try {
 			throw new Error(
 				"usage: initiative-apply [proposal-json-file | --proposal-json <json>] --token <preview-token> --approval <receipt>",
 			);
-		const { applyInitiativeReconciliation } = await import(
-			"../extensions/work-models.ts"
-		);
+		const { applyInitiativeReconciliation } = await importWorkModels();
 		print(
 			applyInitiativeReconciliation(
 				cwd,
@@ -2168,15 +2163,20 @@ try {
 					? "usage: bootstrap-plan-epic <plan-path> [--epic <existing-epic-id>]"
 					: "usage: bootstrap-plan-roadmap <plan-path> [--roadmap <existing-roadmap-id>]",
 			);
-		const modUrl = pathToFileURL(
-			path.join(import.meta.dirname, "..", "extensions", "work-models.ts"),
-		).href;
+		const modUrl = path.join(
+			import.meta.dirname,
+			"..",
+			"extensions",
+			"work-models.ts",
+		);
+		const jitiUrl = import.meta.resolve("jiti");
 		const roadmapIdField =
 			command === "bootstrap-plan-epic" ? "epic_id" : "roadmap_id";
 		const roadmapTitleField =
 			command === "bootstrap-plan-epic" ? "epic_title" : "roadmap_title";
 		const bridge = `(async () => {
-			const { bootstrapPlanEpic } = await import(${JSON.stringify(modUrl)});
+			const { createJiti } = await import(${JSON.stringify(jitiUrl)});
+			const { bootstrapPlanEpic } = await createJiti(import.meta.url).import(${JSON.stringify(modUrl)});
 			const s = bootstrapPlanEpic(${JSON.stringify(cwd)}, ${JSON.stringify(rel)}, "/work-plan", undefined, undefined, ${JSON.stringify(targetEpicId ? { targetEpicId } : undefined)});
 			const slim = {
 				ok: !!s.ok,
