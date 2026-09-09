@@ -1513,6 +1513,7 @@ try {
 	const compactions = [];
 	const thinkingChanges = [];
 	let thinkingLevel = "high";
+	let sessionName = "session";
 	let aborts = 0;
 	let activeTools = [
 		"ask_user",
@@ -1529,6 +1530,7 @@ try {
 			thinkingLevel = level;
 			thinkingChanges.push(level);
 		},
+		getSessionName: () => sessionName,
 		on: (name, handler) => {
 			tempHooks[name] = handler;
 		},
@@ -2651,14 +2653,10 @@ try {
 			delete process.env.PI_SUBAGENT_CHILD_AGENT;
 		else process.env.PI_SUBAGENT_CHILD_AGENT = originalChildAgent;
 	}
-	const originalGetBranch = ctx.sessionManager.getBranch;
+	const originalSessionName = sessionName;
 	try {
-		ctx.sessionManager.getBranch = () => [
-			{
-				type: "session_info",
-				name: "subagent-work-planner-7564142d-c6c7-409a-869b-ffe92e05fde9-1",
-			},
-		];
+		sessionName =
+			"subagent-work-planner-7564142d-c6c7-409a-869b-ffe92e05fde9-1";
 		const spawnedChildPolicy = await tempHooks.before_agent_start(
 			{ prompt: "Plan work item work-1.2", systemPrompt: "base" },
 			ctx,
@@ -2682,9 +2680,7 @@ try {
 			undefined,
 			"work-* child sessions keep work-helper access (LPGSlim work-1 planner blocker)",
 		);
-		ctx.sessionManager.getBranch = () => [
-			{ type: "session_info", name: "session" },
-		];
+		sessionName = "session";
 		const ordinarySessionPolicy = await tempHooks.before_agent_start(
 			{ prompt: "Plan work item work-1.2", systemPrompt: "base" },
 			ctx,
@@ -2698,19 +2694,19 @@ try {
 			(
 				await tempHooks.tool_call(
 					{
-					toolName: "bash",
-					input: {
-						command:
+						toolName: "bash",
+						input: {
+							command:
 							"node 'C:/soft/git/ce-workflow/scripts/work-helper.mjs' work-summary work-1.2",
+						},
 					},
-				},
-				ctx,
-			)
+					ctx,
+				)
 			)?.reason ?? "",
 			/Direct request mode/,
 		);
 	} finally {
-		ctx.sessionManager.getBranch = originalGetBranch;
+		sessionName = originalSessionName;
 	}
 	await tempHooks.before_agent_start(
 		{ prompt: "continue ordinary chat", systemPrompt: "base" },

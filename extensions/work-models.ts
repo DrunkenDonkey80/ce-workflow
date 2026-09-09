@@ -22959,13 +22959,15 @@ function loadWorkGoalFromSession(ctx) {
 	return goal?.status === "complete" ? null : goal;
 }
 
-function managedWorkSubagentSessionName(ctx) {
-	const entries =
-		ctx?.sessionManager?.getBranch?.() ??
-		ctx?.sessionManager?.getEntries?.() ??
-		[];
+function managedWorkSubagentSessionName(pi, ctx) {
+	// Harness-set identity: pi-subagents child sessions are named
+	// subagent-work-<agent>-<uuid>-<n>; session_info.name is not reliably
+	// exposed via getBranch()/getEntries() at before_agent_start, so use the
+	// official pi.getSessionName()/sessionManager.getSessionName() accessors.
 	const name = String(
-		entries.find((item) => item?.type === "session_info")?.name ?? "",
+		(pi?.getSessionName?.call(pi) ??
+			ctx?.sessionManager?.getSessionName?.call(ctx.sessionManager)) ??
+			"",
 	);
 	return /^subagent-(work-.*?)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-\d+$/i.test(
 		name,
@@ -30757,7 +30759,7 @@ export default function workModelsExtension(pi) {
 		);
 		const managedWorkSubagent =
 			/^work-/i.test(process.env.PI_SUBAGENT_CHILD_AGENT ?? "") ||
-			Boolean(managedWorkSubagentSessionName(ctx));
+			Boolean(managedWorkSubagentSessionName(pi, ctx));
 		const workflowTurn =
 			matchingWorkGoalTurn ||
 			backgroundWorkflowCompletionTurn ||
