@@ -1409,6 +1409,25 @@ try {
 		status: "open",
 		title: "Finish with a non-Git state root",
 	});
+	createWorkItem(stateOnlyStore, {
+		id: "STATE-INSPECTION",
+		type: "task",
+		status: "open",
+		title: "Inspect work in a separate Git root",
+		verificationContract: {
+			version: 1,
+			required: [
+				{
+					id: "inspect",
+					capability: "inspection",
+					proof: "approval",
+					source: "separate execution repository",
+					artifacts: ["result"],
+					inspection: "goal",
+				},
+			],
+		},
+	});
 	saveStore(stateOnlyOwner, stateOnlyStore);
 	writeFileSync(path.join(stateOnlyExecution, "app.js"), "export default 1;\n");
 	execFileSync("git", ["add", "app.js"], { cwd: stateOnlyExecution });
@@ -1435,6 +1454,46 @@ try {
 		stateOnlyFinished.executionRepositoryRoot,
 		realpathSync(stateOnlyExecution),
 		"finish-task keeps the owner state root outside Git and commits only execution files",
+	);
+	writeFileSync(path.join(stateOnlyExecution, "app.js"), "export default 3;\n");
+	const stateOnlyProof = JSON.parse(
+		runFrom(
+			stateOnlyOwner,
+			"work-proof",
+			"STATE-INSPECTION",
+			"inspect",
+			"--execution-root",
+			stateOnlyExecution,
+			"--result",
+			"inspected",
+			"--inspection",
+			"The separate execution change is correct.",
+		),
+	);
+	assert.equal(
+		stateOnlyProof.verificationStatus.ok,
+		true,
+		"work-proof binds inspection evidence to the explicit execution root",
+	);
+	const stateOnlyInspectionFinished = JSON.parse(
+		runFrom(
+			stateOnlyOwner,
+			"finish-small",
+			"STATE-INSPECTION",
+			"--execution-root",
+			stateOnlyExecution,
+			"--message",
+			"finish inspected companion change",
+			"--skip-format",
+		),
+	);
+	assert.equal(
+		loadStore(stateOnlyOwner).items["STATE-INSPECTION"].status,
+		"closed",
+	);
+	assert.equal(
+		stateOnlyInspectionFinished.executionRepositoryRoot,
+		realpathSync(stateOnlyExecution),
 	);
 	rmSync(stateOnlyOwner, { recursive: true, force: true });
 	rmSync(stateOnlyExecution, { recursive: true, force: true });

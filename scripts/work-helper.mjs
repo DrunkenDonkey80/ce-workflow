@@ -1913,8 +1913,11 @@ try {
 		const proofId = option("--proof-id", positionalProofId);
 		if (!id || !proofId)
 			throw new Error(
-				"usage: work-proof <work-item-id> <proof-id> [--status PASS|FAIL|BLOCKED] [--result <text>] [--artifact <kind=path> ...] [--inspection <summary>] [--by goal|human] [--issuer <id>] [--blocker-code <code> --resume-action <action>] [--detail <text>]",
+				"usage: work-proof <work-item-id> <proof-id> [--execution-root <git-path>] [--status PASS|FAIL|BLOCKED] [--result <text>] [--artifact <kind=path> ...] [--inspection <summary>] [--by goal|human] [--issuer <id>] [--blocker-code <code> --resume-action <action>] [--detail <text>]",
 			);
+		const verificationRoot = option("--execution-root")
+			? canonicalGitRoot(option("--execution-root"), "execution root")
+			: cwd;
 		const task = readWorkItem(id);
 		if (!task?.verificationContract)
 			throw new Error(`WorkItem ${id} has no verification contract`);
@@ -1945,14 +1948,14 @@ try {
 			const separator = value.indexOf("=");
 			if (separator < 1) throw new Error("--artifact must use kind=path");
 			return fileArtifact(
-				cwd,
+				verificationRoot,
 				value.slice(0, separator),
 				value.slice(separator + 1),
 			);
 		});
 		if (option("--result") !== undefined)
 			artifacts.push(inlineResultArtifact("result", option("--result")));
-		const revision = workspaceVerificationRevision(cwd);
+		const revision = workspaceVerificationRevision(verificationRoot);
 		const inspection = option("--inspection");
 		const record = verificationProofRecord(task.verificationContract, proofId, {
 			status,
@@ -1988,7 +1991,7 @@ try {
 			status: "recorded",
 			proof: record,
 			verificationStatus: verificationContractStatus(updated, {
-				cwd,
+				cwd: verificationRoot,
 				revision,
 			}),
 		});
