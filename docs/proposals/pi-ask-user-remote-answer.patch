@@ -1,0 +1,168 @@
+diff --git a/index.ts b/index.ts
+index 3f29698..dc0effe 100644
+--- a/index.ts
++++ b/index.ts
+@@ -226,6 +226,45 @@ function createSelectionResponse(selections: string[], comment?: string | null):
+       : { kind: "selection", selections: normalizedSelections };
+ }
+ 
++// Remote-answer channel: another extension (e.g. an intercom bridge) can answer
++// this exact ask on behalf of the human. Answers are validated against the same
++// options the local UI shows, so a remote answerer cannot invent a choice.
++// Opt-in: PI_ASK_USER_REMOTE_ANSWERS=1.
++export const ASK_PENDING_EVENT = "ask:pending";
++export const ASK_ANSWER_EVENT = "ask:answer";
++
++function matchOptionTitles(values: string[], options: QuestionOption[]): string[] {
++   const titles: string[] = [];
++   for (const value of values) {
++      const needle = value.trim().toLowerCase();
++      const hit = options.find((option) => option.title.trim().toLowerCase() === needle);
++      if (!hit) return [];
++      if (!titles.includes(hit.title)) titles.push(hit.title);
++   }
++   return titles;
++}
++
++function coerceRemoteAnswer(
++   payload: { selections?: unknown; text?: unknown; comment?: unknown },
++   options: QuestionOption[],
++   allowMultiple: boolean,
++   allowFreeform: boolean,
++   allowComment: boolean,
++): AskResponse | null {
++   const requested = Array.isArray(payload.selections)
++      ? payload.selections.filter((value): value is string => typeof value === "string")
++      : typeof payload.text === "string"
++         ? [payload.text]
++         : [];
++   if (requested.length === 0) return null;
++   if (requested.length > 1 && !allowMultiple) return null;
++   const comment = allowComment && typeof payload.comment === "string" ? payload.comment : null;
++   const selections = options.length > 0 ? matchOptionTitles(requested, options) : [];
++   if (selections.length > 0) return createSelectionResponse(selections, comment);
++   if (!allowFreeform || requested.length > 1) return null;
++   return createFreeformResponse(requested[0]);
++}
++
+ function formatResponseSummary(response: AskResponse): string {
+    if (response.kind === "freeform") return response.text;
+ 
+@@ -2173,6 +2212,49 @@ export default function(pi: ExtensionAPI) {
+             pi.events.emit("ask:cancelled", emitFullEvents ? { question, context: normalizedContext, options } : { question });
+          };
+ 
++         // A remote answerer may answer this exact ask instead of the local
++         // human; whichever answers first wins and closes the local prompt.
++         const remoteAnswersEnabled = parseBooleanPreference(process.env.PI_ASK_USER_REMOTE_ANSWERS) ?? false;
++         const askId = globalThis.crypto.randomUUID();
++         const openRemoteChannel = () => {
++            if (!remoteAnswersEnabled) {
++               return {
++                  answered: new Promise<AskResponse>(() => { }),
++                  dispose: () => { },
++                  bindLocalUI: (_done: (result: AskUIResult) => void) => { },
++               };
++            }
++            let settle: ((response: AskResponse) => void) | undefined;
++            let closeLocalUI: ((result: AskUIResult) => void) | undefined;
++            const answered = new Promise<AskResponse>((resolve) => {
++               settle = resolve;
++            });
++            const dispose = pi.events.on(ASK_ANSWER_EVENT, (payload: unknown) => {
++               const event = payload as { askId?: unknown; selections?: unknown; text?: unknown; comment?: unknown } | null;
++               if (!event || typeof event !== "object" || event.askId !== askId) return;
++               const response = coerceRemoteAnswer(event, options, allowMultiple, allowFreeform, allowComment);
++               if (!response) return;
++               settle?.(response);
++               closeLocalUI?.(response);
++            });
++            pi.events.emit(ASK_PENDING_EVENT, {
++               askId,
++               question,
++               context: normalizedContext,
++               options,
++               allowMultiple,
++               allowFreeform,
++               allowComment,
++            });
++            return {
++               answered,
++               dispose,
++               bindLocalUI: (done: (result: AskUIResult) => void) => {
++                  closeLocalUI = done;
++               },
++            };
++         };
++
+          if (rawOptions.length > 0 && options.length === 0) {
+             return {
+                content: [
+@@ -2208,14 +2290,19 @@ export default function(pi: ExtensionAPI) {
+ 
+          if (options.length === 0) {
+             const prompt = normalizedContext ? `${question}\n\nContext:\n${normalizedContext}` : question;
++            const remote = openRemoteChannel();
+             pi.events.emit("herdr:blocked", { active: true, label: "Waiting for user response" });
+-            let answer: string | undefined;
++            let response: AskResponse | null;
+             try {
+-               answer = await ctx.ui.input(prompt, "Type your answer...", timeout ? { timeout } : undefined);
++               response = await Promise.race([
++                  remote.answered,
++                  Promise.resolve(ctx.ui.input(prompt, "Type your answer...", timeout ? { timeout } : undefined))
++                     .then((answer) => createFreeformResponse(answer)),
++               ]);
+             } finally {
++               remote.dispose();
+                pi.events.emit("herdr:blocked", { active: false });
+             }
+-            const response = createFreeformResponse(answer);
+ 
+             if (!response) {
+                return {
+@@ -2240,9 +2327,11 @@ export default function(pi: ExtensionAPI) {
+          let overlayHandle: OverlayHandle | undefined;
+          let removeOverlayInputListener: (() => void) | undefined;
+          let hasAnnouncedHide = false;
++         const remote = openRemoteChannel();
+          pi.events.emit("herdr:blocked", { active: true, label: "Waiting for user response" });
+          try {
+             const customFactory = (tui: TUI, theme: Theme, keybindings: KeybindingsManager, done: (result: AskUIResult | null) => void) => {
++               remote.bindLocalUI(done);
+                if (signal) {
+                   const onAbort = () => done(null);
+                   signal.addEventListener("abort", onAbort, { once: true });
+@@ -2298,18 +2387,21 @@ export default function(pi: ExtensionAPI) {
+                });
+             }
+ 
+-            const customResult = await ctx.ui.custom<AskUIResult | null>(
++            const customResult = await Promise.race([remote.answered, ctx.ui.custom<AskUIResult | null>(
+                customFactory,
+                buildCustomUIOptions(effectiveDisplayMode, (handle) => {
+                   overlayHandle = handle;
+                }),
+-            );
++            )]);
+ 
+             if (customResult !== undefined) {
+                result = customResult;
+             } else {
+                // RPC/headless mode: degrade to select()/input() dialog protocol
+-               result = await askViaDialogs(ctx.ui, question, normalizedContext, options, allowMultiple, allowFreeform, allowComment, timeout);
++               result = await Promise.race([
++                  remote.answered,
++                  askViaDialogs(ctx.ui, question, normalizedContext, options, allowMultiple, allowFreeform, allowComment, timeout),
++               ]);
+             }
+          } catch (error) {
+             const message =
+@@ -2320,6 +2412,7 @@ export default function(pi: ExtensionAPI) {
+                details: { error: message },
+             };
+          } finally {
++            remote.dispose();
+             removeOverlayInputListener?.();
+             pi.events.emit("herdr:blocked", { active: false });
+          }

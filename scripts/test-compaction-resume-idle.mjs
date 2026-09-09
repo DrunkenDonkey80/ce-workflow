@@ -9,6 +9,7 @@ import { execSync, spawn } from "node:child_process";
 import {
 	appendFileSync,
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
 	rmSync,
 	writeFileSync,
@@ -44,12 +45,29 @@ const piCli =
 		"cli.js",
 	);
 
-// Exactly what pi-subagents does in its session_compact handler when async work
-// is live (node_modules/pi-subagents/src/extension/index.ts).
+mkdirSync(path.join(cwd, ".pi"));
+writeFileSync(
+	path.join(cwd, ".pi", "settings.json"),
+	JSON.stringify({
+		workKnowledge: { discoverer: { model: "inherit", thinking: "low" } },
+	}),
+);
+// Replay both the immediate resume and delayed internal failure/control notices.
+// The RPC stub records a discoverer identity without launching any child/model.
 writeFileSync(
 	path.join(cwd, "resume-stub.js"),
 	`import { writeFileSync } from "node:fs";
 export default function resumeStub(pi) {
+	const runId = "43b46a2e-ec06-4f14-b99e-e3f81478d87a";
+	const timers = [];
+	pi.events.on("subagents:rpc:v1:request", (request) => {
+		if (request.method !== "spawn") return;
+		writeFileSync(${JSON.stringify(path.join(cwd, "discoverer-launched"))}, request.params.workflowScript);
+		pi.events.emit("subagents:rpc:v1:reply:" + request.requestId, {
+			success: true, data: { runId },
+		});
+	});
+	pi.on("session_shutdown", () => timers.forEach(clearTimeout));
 	pi.on("session_compact", () => {
 		writeFileSync(${JSON.stringify(path.join(cwd, "stub-fired"))}, "1");
 		pi.sendMessage(
@@ -60,6 +78,16 @@ export default function resumeStub(pi) {
 			},
 			{ triggerTurn: true },
 		);
+		const failure = "Subagent failed: delegate\\nRun: " + runId + " step 1\\nSignal: delegate completed without making edits for an implementation task";
+		const messages = [
+			{ customType: "subagent_control_notice", content: failure, details: { event: { runId, reason: "completion_guard" } } },
+			{ customType: "intercom_message", content: failure, details: { from: { id: "subagent-control" }, bodyText: failure } },
+			{ customType: "subagent-notify", content: "Background task failed: **workflow**\\nWorkflow run: wrapper-run\\nChild runs: main=" + runId + " (failed)" },
+		];
+		messages.forEach((message, index) => timers.push(setTimeout(() => {
+			pi.sendMessage({ ...message, display: false }, { triggerTurn: true });
+			writeFileSync(${JSON.stringify(path.join(cwd, "notice-fired-"))} + index, "1");
+		}, (index + 1) * 750)));
 	});
 }
 `,
@@ -180,6 +208,11 @@ try {
 	await sleep(20_000);
 	if (!existsSync(path.join(cwd, "stub-fired")))
 		fail("resume stub never fired: session_compact was not emitted");
+	if (!existsSync(path.join(cwd, "discoverer-launched")))
+		fail("knowledge discovery did not register its run identity");
+	for (let index = 0; index < 3; index++)
+		if (!existsSync(path.join(cwd, `notice-fired-${index}`)))
+			fail(`delayed internal notice ${index} was not delivered`);
 	// The guard aborts the resume turn before the provider request, so an empty
 	// aborted assistant message is fine; any streamed text or tool call is not.
 	const after = events.slice(
@@ -197,7 +230,9 @@ try {
 		fail(
 			`microcompact spent a model turn: ${spoke.length} post-compaction model events (${settledBefore} settled before)`,
 		);
-	console.log("ok - microcompact compacts and stops (no resume turn)");
+	console.log(
+		"ok - microcompact and delayed internal failure notices spend no model turn",
+	);
 	cleanup();
 } catch (error) {
 	fail(error.message);

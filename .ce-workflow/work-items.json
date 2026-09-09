@@ -5630,6 +5630,45 @@
       "type": "task",
       "updatedAt": "2026-08-20T11:42:46.140Z"
     },
+    "work-2.report-2e68b6cb-b8d6-4499-b72b-a63d677acfee": {
+      "createdAt": "2026-09-09T07:53:12.187Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: The autonomous-goal planner handoff path did not provide the exact absolute work-helper.mjs path or a launch Git baseline, and the selected work-planner failed closed before inspecting or creating the finite backlog.\nExpected: The coded action lease/kickoff for a planning specialist should include the resolved absolute helper path and a revision-bound Git baseline (HEAD, staged files, unstaged tracked files, and untracked paths) automatically so planning can start safely without a failed launch.\nImpact: The roadmap remains blocked at its planning item, consumes an unnecessary specialist run, and requires manual handoff repair despite deterministic local data being available.\nSuggested improvement: Have the extension resolve work-helper.mjs and capture git status/HEAD when constructing specialist handoffs, then embed both as immutable launch context.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/bdb9d2f9-41ef-4d9f-8c1f-079f102de98f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2357,
+              "file": "01-work-1.2-planner.md",
+              "sha256": "23c868b1572376aed0e0213ff18a2d98329e794a6f219b664bee1d73191efedb"
+            },
+            {
+              "bytes": 16856,
+              "file": "02-session.jsonl",
+              "sha256": "16495751470981944ff247db80ae097469358ea2b0d754a6efefbbec37bde50f"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGSlim",
+          "submittedAt": "2026-09-09T07:53:12.175Z",
+          "workflowId": "01a08525-963f-7342-a423-25c6f6613d31"
+        }
+      ],
+      "id": "work-2.report-2e68b6cb-b8d6-4499-b72b-a63d677acfee",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: The autonomous-goal planner handoff path did not provide the exact absolute work-helper.mjs path or a launch Git baseline, and the",
+      "type": "task",
+      "updatedAt": "2026-09-09T07:53:12.187Z"
+    },
     "work-2.report-2f6a0624-0fb6-4a06-a170-2a1d80f2fc86": {
       "createdAt": "2026-08-25T00:25:50.060Z",
       "dependencies": [],
@@ -8690,6 +8729,40 @@
       "type": "task",
       "updatedAt": "2026-08-09T14:50:00.841Z"
     },
+    "work-2.report-874176cc-2891-4eb0-be74-cc1f972573b6": {
+      "createdAt": "2026-09-09T07:48:48.807Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After autonomous-goal continuation reset into a fresh session, the existing async work-planner run remained visible through subagent status and stayed blocked in contact_supervisor, but subagent_supervisor pending and intercom pending were empty. Direct subagent steer/resume both returned that the run was not found in the active session, so the parent could not deliver the routine supervisor decision to the live run.\nExpected: A fresh continuation session should discover and answer pending contact_supervisor requests for its monitored async run, or coded recovery should rebind the run so one exact steer/resume can deliver the answer without duplicating the specialist.\nImpact: The deterministic planning boundary is stranded even though the child process is live and the needed decision is routine; autonomous resume cannot safely progress the native backlog.\nSuggested improvement: Persist and rebind supervisor-request ownership across work-goal continuation resets, and allow status-resolvable live run IDs to accept authenticated resume/steer from the continuation session.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/63fcfa1b-9d37-478e-990b-8c378b9a232f",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 29218,
+              "file": "01-2026-09-09.jsonl",
+              "sha256": "aad08aef25241a0877fa541e43cfa2afa2813de6ce3eb5de16c128692d60a3fb"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGSlim",
+          "submittedAt": "2026-09-09T07:48:48.797Z",
+          "workflowId": "01a08520-141b-7342-a423-25c3622db0e3"
+        }
+      ],
+      "id": "work-2.report-874176cc-2891-4eb0-be74-cc1f972573b6",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After autonomous-goal continuation reset into a fresh session, the existing async work-planner run remained visible through subage",
+      "type": "task",
+      "updatedAt": "2026-09-09T07:48:48.807Z"
+    },
     "work-2.report-8aae8d4e-3ce7-48ab-9bc0-b1294327c0a2": {
       "createdAt": "2026-08-25T00:40:14.686Z",
       "dependencies": [],
@@ -10140,6 +10213,45 @@
       "title": "Self-improvement report: The coded finish-task gate cannot complete a policy-compliant residual fix made after the one allowed targeted re-review returned ",
       "type": "task",
       "updatedAt": "2026-08-24T13:42:21.702Z"
+    },
+    "work-2.report-cbeffcf4-5096-4b54-b520-954b0383262a": {
+      "createdAt": "2026-09-09T07:55:15.644Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: After the corrected planner handoff supplied the exact helper and Git baseline, work-helper.mjs rejected the planner's first read with: 'Direct request mode does not authorize ce-workflow orchestration. Run /wo resume <roadmap-id> from the input'. This active autonomous goal was itself created to continue work-1, but that goal context was not accepted as orchestration authorization.\nExpected: A coded active autonomous goal that explicitly targets a roadmap and instructs continuation should carry a scoped authorization lease accepted by work-helper.mjs and delegated specialists, equivalent to `/wo resume <roadmap-id>`, without requiring another user command.\nImpact: The deterministic planning item cannot be read or closed, and the project loop is deadlocked despite explicit user intent and two safe planner attempts.\nSuggested improvement: Issue and propagate a roadmap-scoped orchestration authorization token when starting or continuing a work goal, and have helper authorization recognize it for the current session and exact target.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/193e0b97-cccf-4257-af86-bc7d735507ed",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2744,
+              "file": "01-work-1.2-planner.md",
+              "sha256": "211906a3a44a9fec3fc460a2ea385adaa65a826004b93577b9e85ea2feab5e75"
+            },
+            {
+              "bytes": 32127,
+              "file": "02-session.jsonl",
+              "sha256": "99ba0ad28b4a6720bd43a919ab25acd24893d88cab46c103488625cc5da9b2b0"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "LPGSlim",
+          "submittedAt": "2026-09-09T07:55:15.635Z",
+          "workflowId": "01a08525-963f-7342-a423-25c6f6613d31"
+        }
+      ],
+      "id": "work-2.report-cbeffcf4-5096-4b54-b520-954b0383262a",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: After the corrected planner handoff supplied the exact helper and Git baseline, work-helper.mjs rejected the planner's first read ",
+      "type": "task",
+      "updatedAt": "2026-09-09T07:55:15.644Z"
     },
     "work-2.report-cf894eb3-89f4-49a3-ae13-178ae2f21e8d": {
       "createdAt": "2026-08-24T22:02:30.905Z",
@@ -16459,7 +16571,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-09-08T05:14:22.159Z"
+    "updatedAt": "2026-09-09T07:55:15.644Z"
   },
   "schemaVersion": 1
 }

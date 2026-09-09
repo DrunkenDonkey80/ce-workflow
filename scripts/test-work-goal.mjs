@@ -1439,7 +1439,9 @@ assert.equal(
 	1,
 	"unrelated menu actions retain argument dialogs",
 );
-assert.equal(Object.keys(tools).length, 15);
+assert.equal(Object.keys(tools).length, 17);
+assert(tools.work_monitor_bind);
+assert(tools.work_monitor_reload);
 const assertStrictSchema = (schema) => {
 	if (!schema || typeof schema !== "object") return;
 	if (schema.properties) {
@@ -2648,6 +2650,67 @@ try {
 		if (originalChildAgent === undefined)
 			delete process.env.PI_SUBAGENT_CHILD_AGENT;
 		else process.env.PI_SUBAGENT_CHILD_AGENT = originalChildAgent;
+	}
+	const originalGetBranch = ctx.sessionManager.getBranch;
+	try {
+		ctx.sessionManager.getBranch = () => [
+			{
+				type: "session_info",
+				name: "subagent-work-planner-7564142d-c6c7-409a-869b-ffe92e05fde9-1",
+			},
+		];
+		const spawnedChildPolicy = await tempHooks.before_agent_start(
+			{ prompt: "Plan work item work-1.2", systemPrompt: "base" },
+			ctx,
+		);
+		assert.doesNotMatch(
+			spawnedChildPolicy.systemPrompt,
+			/Direct request mode/,
+			"a pi-subagents work-* child session is not a direct request",
+		);
+		assert.equal(
+			await tempHooks.tool_call(
+				{
+					toolName: "bash",
+					input: {
+						command:
+							"node 'C:/soft/git/ce-workflow/scripts/work-helper.mjs' work-summary work-1.2",
+					},
+				},
+				ctx,
+			),
+			undefined,
+			"work-* child sessions keep work-helper access (LPGSlim work-1 planner blocker)",
+		);
+		ctx.sessionManager.getBranch = () => [
+			{ type: "session_info", name: "session" },
+		];
+		const ordinarySessionPolicy = await tempHooks.before_agent_start(
+			{ prompt: "Plan work item work-1.2", systemPrompt: "base" },
+			ctx,
+		);
+		assert.match(
+			ordinarySessionPolicy.systemPrompt,
+			/Direct request mode/,
+			"ordinary session names keep direct-request blocking",
+		);
+		assert.match(
+			(
+				await tempHooks.tool_call(
+					{
+					toolName: "bash",
+					input: {
+						command:
+							"node 'C:/soft/git/ce-workflow/scripts/work-helper.mjs' work-summary work-1.2",
+					},
+				},
+				ctx,
+			)
+			)?.reason ?? "",
+			/Direct request mode/,
+		);
+	} finally {
+		ctx.sessionManager.getBranch = originalGetBranch;
 	}
 	await tempHooks.before_agent_start(
 		{ prompt: "continue ordinary chat", systemPrompt: "base" },
