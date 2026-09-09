@@ -8623,9 +8623,40 @@ function planBootstrapDirtyStop(cwd, git, planPath, command) {
 	);
 }
 
-function resumeGitReport(cwd, planPaths = []) {
+// State roots may live outside any Git repository while the product repo is
+// nested one level down (e.g. C:\proj\proj). When the state root itself is
+// not a repository, deterministically fall back to the single nested repo.
+function resolveNestedGitRoot(cwd) {
+	let dirents;
 	try {
-		const rawStatus = run(cwd, "git", [
+		dirents = readdirSync(cwd, { withFileTypes: true });
+	} catch {
+		return null;
+	}
+	const roots = dirents
+		.filter((item) => item.isDirectory() && !item.name.startsWith("."))
+		.map((item) => join(cwd, item.name))
+		.filter((item) => existsSync(join(item, ".git")));
+	if (roots.length === 1) return roots[0];
+	const preferred = roots.filter(
+		(item) =>
+			basename(item).toLowerCase() === basename(realpathSync(cwd)).toLowerCase(),
+	);
+	return preferred.length === 1 ? preferred[0] : null;
+}
+
+function executionRepositoryRoot(cwd) {
+	try {
+		run(cwd, "git", ["rev-parse", "--is-inside-work-tree"]);
+		return realpathSync(cwd);
+	} catch {
+		return resolveNestedGitRoot(cwd) ?? realpathSync(cwd);
+	}
+}
+
+function resumeGitReport(cwd, planPaths = []) {
+	const collect = (repoCwd) => {
+		const rawStatus = run(repoCwd, "git", [
 			"status",
 			"--porcelain=v1",
 			"--branch",
@@ -8634,11 +8665,11 @@ function resumeGitReport(cwd, planPaths = []) {
 		const status = rawStatus || "clean";
 		const dirtyFiles = parsePorcelainStatus(rawStatus);
 		const dirtyPaths = dirtyFiles.map((item) => item.path);
-		const blockers = dirtyBlockers(cwd, dirtyFiles, planPaths);
+		const blockers = dirtyBlockers(repoCwd, dirtyFiles, planPaths);
 		const blockedPaths = blockers.map((item) => item.path);
 		const benignDirty =
 			dirtyFiles.length > 0 &&
-			dirtyFiles.every((item) => isBenignInstructionDirt(cwd, item));
+			dirtyFiles.every((item) => isBenignInstructionDirt(repoCwd, item));
 		const workflowDirty =
 			dirtyFiles.length > 0 && blockers.length === 0 && !benignDirty;
 		let warnings = [];
@@ -8662,6 +8693,9 @@ function resumeGitReport(cwd, planPaths = []) {
 			workflowDirty,
 			warnings,
 		};
+	};
+	try {
+		return collect(executionRepositoryRoot(cwd));
 	} catch {
 		return {
 			ok: false,
@@ -9487,17 +9521,20 @@ function reviewerHandoffLines(state, cwd) {
 	const selected = state.selectedWorkItem;
 	if (!selected?.id) return [];
 	const helper = shellQuote(WORK_HELPER_SCRIPT);
-	const root = shellQuote(realpathSync(cwd));
+	const ownerRoot = shellQuote(realpathSync(cwd));
+	const root = shellQuote(state.executionRoot ?? executionRepositoryRoot(cwd));
 	const reviewOnly = (selected.changedPaths ?? [])
 		.map((file) => JSON.stringify(normalizedRepoPath(file)))
 		.join(", ");
 	return [
 		`Work item: ${selected.id}`,
+		`Owner/state repository: ${ownerRoot}`,
 		`Execution repository: ${root}`,
 		`Repository preflight: git -C ${root} rev-parse --show-toplevel must resolve to this execution repository; stop BLOCKED before reading files or writing notes if it does not.`,
-		`Run every helper and file-inspection command with ${root} as the current working directory.`,
+		`Run file-inspection and git commands with ${root} as the current working directory; keep work-item reads/notes in ${ownerRoot}.`,
 		`Helper: ${helper}`,
-		`Summary command (from execution repository): node ${helper} work-summary ${selected.id}`,
+		`Summary command (from owner/state repository): node ${helper} work-summary ${selected.id}`,
+		`Finish command: node ${helper} finish-task ${selected.id} --execution-root ${root} ...`,
 		`Review only: ${reviewOnly}`,
 		`Review reasons: ${state.handoffReason ?? "coded independent review gate"}`,
 		`Required outcome: one durable \`wo:review PASS|FAIL\` note on ${selected.id}.`,
@@ -9511,9 +9548,10 @@ function reviewerHandoffLines(state, cwd) {
 
 function plannerLaunchBaseline(cwd) {
 	const launchGit = resumeGitReport(cwd);
+	const executionRoot = executionRepositoryRoot(cwd);
 	const objectId = (args) => {
 		try {
-			return run(cwd, "git", args).trim();
+			return run(executionRoot, "git", args).trim();
 		} catch {
 			return "";
 		}
@@ -9544,6 +9582,10 @@ function plannerLaunchBaseline(cwd) {
 function directRoleTask(state, cwd) {
 	const selected = state.selectedWorkItem;
 	const helper = shellQuote(WORK_HELPER_SCRIPT);
+	const ownerRoot = shellQuote(realpathSync(cwd));
+	const executionRoot = shellQuote(
+		state.executionRoot ?? executionRepositoryRoot(cwd),
+	);
 	const plannerBaseline =
 		state.action === "run-planner" ? plannerLaunchBaseline(cwd) : undefined;
 	const expectedImplementationDiff =
@@ -9566,6 +9608,12 @@ function directRoleTask(state, cwd) {
 				? "Known dirt is the scoped implementation diff plus workflow artifacts; avoid unrelated paths and do not enumerate them again."
 				: `Known workflow-owned dirt: ${state.git.dirtyPaths.length} paths; avoid it and do not enumerate it again.`
 			: "Known dirt: none",
+		`Owner/state repository: ${ownerRoot}`,
+		`Execution repository: ${executionRoot}`,
+		`Run file-inspection and git commands with ${executionRoot}; keep work-item reads/notes in ${ownerRoot}.`,
+		selected?.id
+			? `Finish command: node ${helper} finish-task ${selected.id} --execution-root ${executionRoot} ...`
+			: "",
 		...(state.action === "run-review"
 			? reviewerHandoffLines(state, cwd)
 			: [
@@ -11687,9 +11735,10 @@ function readOnlyLaneEnvelope(
 		);
 	const workItem = readWorkItem(cwd, request.workItemId);
 	if (!workItem) throw new Error(`No WorkItem found for ${request.workItemId}`);
-	const head = run(cwd, "git", ["rev-parse", "HEAD"]);
+	const executionRoot = executionRepositoryRoot(cwd);
+	const head = run(executionRoot, "git", ["rev-parse", "HEAD"]);
 	return createLaneEnvelope({
-		repository: realpathSync(cwd),
+		repository: executionRoot,
 		laneKind: request.laneKind,
 		producer: request.producer ?? "work-orchestrator",
 		workItemId: request.workItemId,
@@ -12920,6 +12969,21 @@ function blockerPreflightLines(cwd, state) {
 
 function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 	const selected = state.selectedWorkItem;
+	const ownerRoot = cwd ? shellQuote(realpathSync(cwd)) : "";
+	const executionRoot = cwd
+		? shellQuote(state.executionRoot ?? executionRepositoryRoot(cwd))
+		: "";
+	const rootLines =
+		ownerRoot && executionRoot
+			? [
+					`Owner/state repository: ${ownerRoot}`,
+					`Execution repository: ${executionRoot}`,
+					`Run file-inspection and git commands with ${executionRoot}; keep work-item reads/notes in ${ownerRoot}.`,
+					selected?.id
+						? `Finish command: node ${shellQuote(WORK_HELPER_SCRIPT)} finish-task ${selected.id} --execution-root ${executionRoot} ...`
+						: "",
+				]
+			: [];
 	const selectedLine = selected
 		? `${selected.id} ${selected.type} ${selected.status} — ${selected.title}`
 		: "none; create/reuse a wo:planning work item if needed";
@@ -12944,6 +13008,7 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 		state.git?.dirtyPaths?.length
 			? `Known dirty paths: ${state.git.dirtyPaths.join(", ")}`
 			: "Known dirty paths: none",
+		...rootLines,
 		ROLE_TIMEOUT_GUIDANCE,
 		...workflowHelperGuidance(cwd, state),
 		...blockerPreflightLines(cwd, state),
@@ -15607,6 +15672,7 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 		rememberWorkflowEpic(cwd, resolved.epic);
 		const childState = buildEpicChildState(cwd, resolved.epic);
 		const git = resumeGitReport(cwd, planRefsFromIssue(resolved.epic));
+		const executionRoot = executionRepositoryRoot(cwd);
 		const planPath = planPathForEpic(cwd, resolved.epic);
 		const targetWorkItem = resolved.workItem;
 		const inTargetScope = (issue) =>
@@ -15704,6 +15770,7 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 					}
 				: {}),
 			git,
+			executionRoot,
 			planPath,
 			finiteBacklogPlanned: childState.finiteBacklogPlanned,
 			suggestedCommands: [`/work-resume ${childState.epicId}`],

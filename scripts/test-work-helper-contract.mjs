@@ -1391,6 +1391,54 @@ try {
 		"tracked owner metadata gets a separate store-only commit",
 	);
 
+	const stateOnlyOwner = mkdtempSync(path.join(tmpdir(), "work-helper-state-only-"));
+	const stateOnlyExecution = mkdtempSync(
+		path.join(tmpdir(), "work-helper-state-execution-"),
+	);
+	execFileSync("git", ["init"], { cwd: stateOnlyExecution, stdio: "ignore" });
+	execFileSync("git", ["config", "user.email", "test@example.com"], {
+		cwd: stateOnlyExecution,
+	});
+	execFileSync("git", ["config", "user.name", "Test"], {
+		cwd: stateOnlyExecution,
+	});
+	const stateOnlyStore = initStore(stateOnlyOwner);
+	createWorkItem(stateOnlyStore, {
+		id: "STATE-ONLY",
+		type: "task",
+		status: "open",
+		title: "Finish with a non-Git state root",
+	});
+	saveStore(stateOnlyOwner, stateOnlyStore);
+	writeFileSync(path.join(stateOnlyExecution, "app.js"), "export default 1;\n");
+	execFileSync("git", ["add", "app.js"], { cwd: stateOnlyExecution });
+	execFileSync("git", ["commit", "-m", "state-only baseline"], {
+		cwd: stateOnlyExecution,
+		stdio: "ignore",
+	});
+	writeFileSync(path.join(stateOnlyExecution, "app.js"), "export default 2;\n");
+	const stateOnlyFinished = JSON.parse(
+		runFrom(
+			stateOnlyOwner,
+			"finish-small",
+			"STATE-ONLY",
+			"--execution-root",
+			stateOnlyExecution,
+			"--message",
+			"finish from a non-Git state root",
+			...verifyArgs,
+		),
+	);
+	assert.equal(loadStore(stateOnlyOwner).items["STATE-ONLY"].status, "closed");
+	assert.equal(stateOnlyFinished.ownerCommit, null);
+	assert.equal(
+		stateOnlyFinished.executionRepositoryRoot,
+		realpathSync(stateOnlyExecution),
+		"finish-task keeps the owner state root outside Git and commits only execution files",
+	);
+	rmSync(stateOnlyOwner, { recursive: true, force: true });
+	rmSync(stateOnlyExecution, { recursive: true, force: true });
+
 	const reviewStore = loadStore(ownerRoot);
 	createWorkItem(reviewStore, {
 		id: "CROSS-REVIEW",

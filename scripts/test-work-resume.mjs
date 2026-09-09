@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 import {
 	chmodSync,
 	mkdirSync,
@@ -680,6 +681,37 @@ try {
 	setScenario();
 	delete process.env.WORK_RESUME_GIT_DIRTY;
 	let state = buildWorkResumeState(cwd, "E-1");
+	const nestedRoot = path.join(cwd, path.basename(cwd));
+	const decoyRoot = path.join(cwd, "SDK");
+	mkdirSync(nestedRoot, { recursive: true });
+	mkdirSync(decoyRoot, { recursive: true });
+	execFileSync("git", ["init"], { cwd: nestedRoot, stdio: "ignore" });
+	execFileSync("git", ["init"], { cwd: decoyRoot, stdio: "ignore" });
+	const fakeGit = process.env.WORK_ORCH_GIT_BIN;
+	process.env.WORK_ORCH_GIT_BIN = "git";
+	setScenario("implementation");
+	const nestedState = buildWorkResumeState(cwd, "E-1");
+	const nestedHandoff = directRoleHandoffParams(nestedState, cwd);
+	assert(
+		nestedState.executionRoot === realpathSync(nestedRoot),
+		`nested execution root resolved: ${nestedState.executionRoot}`,
+	);
+	assert(nestedState.git.ok, "nested git report remains available");
+	assert(
+		nestedHandoff?.params.task.includes(realpathSync(cwd)),
+		"handoff names owner/state repository",
+	);
+	assert(
+		nestedHandoff.params.task.includes(realpathSync(nestedRoot)),
+		"handoff names nested execution repository",
+	);
+	assert(
+		nestedHandoff.params.task.includes(
+			`--execution-root '${realpathSync(nestedRoot)}'`,
+		),
+		"handoff carries finish-task execution-root contract",
+	);
+	process.env.WORK_ORCH_GIT_BIN = fakeGit;
 	assert(
 		state.ok && state.action === "run-debug",
 		"ready debug bug wins even when native store echoes non-blocking dependencies",
@@ -917,6 +949,9 @@ try {
 			!reviewerHandoff.params.task.includes(".pi/work-runs/") &&
 			reviewerHandoff.params.task.includes("Work item: AUTH-1") &&
 			reviewerHandoff.params.task.includes(
+				`Owner/state repository: ${reviewerRoot}`,
+			) &&
+			reviewerHandoff.params.task.includes(
 				`Execution repository: ${reviewerRoot}`,
 			) &&
 			reviewerHandoff.params.task.includes(
@@ -924,7 +959,10 @@ try {
 			) &&
 			reviewerHandoff.params.task.includes(`Helper: ${helper}`) &&
 			reviewerHandoff.params.task.includes(
-				`Summary command (from execution repository): node ${helper} work-summary AUTH-1`,
+				`Summary command (from owner/state repository): node ${helper} work-summary AUTH-1`,
+			) &&
+			reviewerHandoff.params.task.includes(
+				`finish-task AUTH-1 --execution-root ${reviewerRoot}`,
 			) &&
 			reviewerHandoff.params.task.includes(
 				'Review only: "extensions/work-models.ts", "scripts/file with space.js"',

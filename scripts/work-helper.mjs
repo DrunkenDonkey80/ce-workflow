@@ -752,7 +752,11 @@ function commandProofArtifacts(run) {
 	return artifacts;
 }
 
-async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
+async function finishTaskUnlocked(
+	ownerRepositoryRoot,
+	canonicalExecutionRoot,
+	ownerIsGitRepository,
+) {
 	const id = args[0];
 	const message = option("--message");
 	const maxFiles = Number(
@@ -763,7 +767,8 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 			"usage: finish-task <work-item-id> --max-files <n> --message <summary> [--execution-root <git-path>] [--verify <command> [--verify-shard <json> ...] --expect <stdout> | --json <file> --equals <path=value>] [--implementation-file <task-owned-new-file> ...] [--evidence-file <docs/evidence/task-owned-file> ...] [--skip-format] [--reviewed] [--push]; verification is omitted only for a clean completed roadmap close",
 		);
 	const executionRoot = canonicalExecutionRoot;
-	const distinctRoots = canonicalExecutionRoot !== ownerRepositoryRoot;
+	const distinctRoots =
+		canonicalExecutionRoot !== ownerRepositoryRoot || !ownerIsGitRepository;
 	if (distinctRoots && flag("--push"))
 		throw new Error(
 			"distinct-root --push is not supported; push each repository explicitly after finalization",
@@ -1240,7 +1245,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 				`wo:verify-check PASS\nCommand: ${verificationCommand}\nOutput: ${output.slice(-500)}`,
 			),
 		);
-	if (distinctRoots) {
+	if (distinctRoots && ownerIsGitRepository) {
 		const ownerStaged = git(
 			["diff", "--cached", "--name-only"],
 			ownerRepositoryRoot,
@@ -1273,7 +1278,9 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 	if (!staged.length)
 		throw new Error("no staged changes after filtering runtime files");
 	const executionHeadBefore = git(["rev-parse", "HEAD"], executionRoot).trim();
-	const ownerHeadBefore = git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim();
+	const ownerHeadBefore = ownerIsGitRepository
+		? git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim()
+		: null;
 	let push = "skipped";
 	let executionCommit;
 	let ownerCommit = null;
@@ -1301,17 +1308,21 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 					{ cwd: executionRoot },
 				),
 			);
-		const ownerChanges = relevantChanges(ownerRepositoryRoot);
+		const ownerChanges = ownerIsGitRepository
+			? relevantChanges(ownerRepositoryRoot)
+			: [];
 		if (ownerChanges.some((file) => file !== ".ce-workflow/work-items.json"))
 			throw new Error(
 				`non-work-store files changed during close: ${ownerChanges.join(", ")}`,
 			);
-		const storeTracked = Boolean(
-			git(
-				["ls-files", "--", ".ce-workflow/work-items.json"],
-				ownerRepositoryRoot,
-			).trim(),
-		);
+		const storeTracked = ownerIsGitRepository
+			? Boolean(
+					git(
+						["ls-files", "--", ".ce-workflow/work-items.json"],
+						ownerRepositoryRoot,
+					).trim(),
+				)
+			: false;
 		if (storeTracked) {
 			git(["add", "--", ".ce-workflow/work-items.json"], ownerRepositoryRoot);
 			if (distinctRoots)
@@ -1326,7 +1337,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 			? git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim()
 			: null;
 		const executionRemaining = relevantChanges(executionRoot);
-		const ownerRemaining = distinctRoots
+		const ownerRemaining = distinctRoots && ownerIsGitRepository
 			? relevantChanges(ownerRepositoryRoot)
 			: executionRemaining;
 		if (executionRemaining.length || ownerRemaining.length)
@@ -1353,7 +1364,7 @@ async function finishTaskUnlocked(ownerRepositoryRoot, canonicalExecutionRoot) {
 			}
 		}
 	} catch (error) {
-		if (distinctRoots)
+		if (distinctRoots && ownerIsGitRepository)
 			git(["reset", "--mixed", ownerHeadBefore], ownerRepositoryRoot);
 		git(["reset", "--mixed", executionHeadBefore], executionRoot);
 		if (canonicalBefore === null) rmSync(canonical, { force: true });
@@ -1396,14 +1407,26 @@ async function finishTask() {
 		requestedExecutionRoot ?? cwd,
 		"execution root",
 	);
-	const ownerRoot = canonicalGitRoot(cwd, "owner root");
-	const lockRoots =
-		executionRoot === ownerRoot ? [ownerRoot] : [ownerRoot, executionRoot].sort();
+	let ownerRoot = realpathSync(path.resolve(cwd));
+	let ownerIsGitRepository = true;
+	try {
+		ownerRoot = canonicalGitRoot(cwd, "owner root");
+	} catch {
+		ownerIsGitRepository = false;
+	}
+	const lockRoots = [
+		...(ownerIsGitRepository && executionRoot !== ownerRoot ? [ownerRoot] : []),
+		executionRoot,
+	].sort();
 	const mutations = [];
 	try {
 		for (const root of lockRoots)
 			mutations.push(acquireRepositoryMutationLock(root));
-		return await finishTaskUnlocked(ownerRoot, executionRoot);
+		return await finishTaskUnlocked(
+			ownerRoot,
+			executionRoot,
+			ownerIsGitRepository,
+		);
 	} finally {
 		for (const mutation of mutations.reverse()) mutation.release();
 	}
