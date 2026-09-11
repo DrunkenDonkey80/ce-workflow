@@ -1,5 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import {
+	mkdir,
+	open,
+	readFile,
+	rename,
+	stat,
+	unlink,
+	writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -14,6 +23,10 @@ const MAX_BACKOFF_MS = 3_600_000;
 const LOCK_STALE_MS = 30_000;
 const FETCH_TIMEOUT_MS = 10_000;
 const UNAVAILABLE_MS = 600_000;
+const POOL_MAX_AGE_MS = 900_000;
+const DEFAULT_AGENT_DIR =
+	process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+let poolServed = false;
 const ANSI_PATTERN = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
@@ -26,9 +39,12 @@ function codePointWidth(codePoint) {
 		(codePoint >= 0xfe00 && codePoint <= 0xfe0f) ||
 		(codePoint >= 0xfe20 && codePoint <= 0xfe2f) ||
 		(codePoint >= 0x1f3fb && codePoint <= 0x1f3ff)
-	) return 0;
+	)
+		return 0;
 	return codePoint >= 0x1100 &&
-		(codePoint <= 0x115f || codePoint === 0x2329 || codePoint === 0x232a ||
+		(codePoint <= 0x115f ||
+			codePoint === 0x2329 ||
+			codePoint === 0x232a ||
 			(codePoint >= 0x2e80 && codePoint <= 0xa4cf) ||
 			(codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
 			(codePoint >= 0xf900 && codePoint <= 0xfaff) ||
@@ -37,12 +53,15 @@ function codePointWidth(codePoint) {
 			(codePoint >= 0xff00 && codePoint <= 0xff60) ||
 			(codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
 			(codePoint >= 0x1f300 && codePoint <= 0x1faff) ||
-			(codePoint >= 0x20000 && codePoint <= 0x3fffd)) ? 2 : 1;
+			(codePoint >= 0x20000 && codePoint <= 0x3fffd))
+		? 2
+		: 1;
 }
 
 function graphemeWidth(value) {
 	let width = 0;
-	for (const character of value) width = Math.max(width, codePointWidth(character.codePointAt(0)));
+	for (const character of value)
+		width = Math.max(width, codePointWidth(character.codePointAt(0)));
 	return width;
 }
 
@@ -52,7 +71,8 @@ export function stripAnsi(value) {
 
 export function visibleWidth(value) {
 	let width = 0;
-	for (const { segment } of segmenter.segment(stripAnsi(value))) width += graphemeWidth(segment);
+	for (const { segment } of segmenter.segment(stripAnsi(value)))
+		width += graphemeWidth(segment);
 	return width;
 }
 
@@ -77,17 +97,25 @@ function formatTokens(count) {
 	if (value < 1000) return String(Math.round(value));
 	if (value < 10000) return `${(value / 1000).toFixed(1)}k`;
 	if (value < 1000000) return `${Math.round(value / 1000)}k`;
-	return value < 10000000 ? `${(value / 1000000).toFixed(1)}M` : `${Math.round(value / 1000000)}M`;
+	return value < 10000000
+		? `${(value / 1000000).toFixed(1)}M`
+		: `${Math.round(value / 1000000)}M`;
 }
 
 function contextValues(ctx) {
 	const usage = ctx.getContextUsage?.() ?? {};
 	const used = Math.max(0, Number(usage.tokens) || 0);
-	const total = Math.max(0, Number(usage.contextWindow ?? usage.maxTokens ?? ctx.model?.contextWindow) || 0);
+	const total = Math.max(
+		0,
+		Number(usage.contextWindow ?? usage.maxTokens ?? ctx.model?.contextWindow) ||
+			0,
+	);
 	const rawPercent = usage.percent;
 	const percent = Number.isFinite(rawPercent)
 		? Math.max(0, Math.min(100, Math.round(rawPercent)))
-		: total ? Math.max(0, Math.min(100, Math.round((used / total) * 100))) : 0;
+		: total
+			? Math.max(0, Math.min(100, Math.round((used / total) * 100)))
+			: 0;
 	return { used, total, percent };
 }
 
@@ -98,7 +126,10 @@ function contextBar(percent, cells) {
 
 export function renderModelRow(ctx, theme, width, thinkingLevel) {
 	if (width < MIN_WIDTH) {
-		const diagnostic = truncatePlain("Subscription footer needs at least 56 columns", width);
+		const diagnostic = truncatePlain(
+			"Subscription footer needs at least 56 columns",
+			width,
+		);
 		return [theme?.fg?.("warning", diagnostic) ?? diagnostic];
 	}
 	const { used, total, percent } = contextValues(ctx);
@@ -112,9 +143,9 @@ export function renderModelRow(ctx, theme, width, thinkingLevel) {
 		width >= FULL_WIDTH &&
 		width >=
 			visibleWidth(fullFolder) +
-			visibleWidth(" · Model: ") +
-			visibleWidth(fullSuffix) +
-			4;
+				visibleWidth(" · Model: ") +
+				visibleWidth(fullSuffix) +
+				4;
 	const bar = full
 		? fullBar
 		: contextBar(percent, Math.max(4, Math.min(10, width - 52)));
@@ -128,7 +159,8 @@ export function renderModelRow(ctx, theme, width, thinkingLevel) {
 		Math.min(identityWidth, visibleWidth(folderText)),
 	);
 	const modelPrefix = full ? " · Model: " : " · ";
-	const modelWidth = identityWidth - visibleWidth(plainFolder) - visibleWidth(modelPrefix);
+	const modelWidth =
+		identityWidth - visibleWidth(plainFolder) - visibleWidth(modelPrefix);
 	const identity =
 		modelWidth > 0
 			? `${plainFolder}${modelPrefix}${truncatePlain(model, modelWidth)}`
@@ -146,20 +178,30 @@ class QuotaError extends Error {
 	}
 }
 
-const table = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+const table = (value) =>
+	value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
-const percent = (value) => finite(value) ? Math.max(0, Math.min(100, value)) : undefined;
+const percent = (value) =>
+	finite(value) ? Math.max(0, Math.min(100, value)) : undefined;
 const resetTime = (value) => {
 	if (finite(value) && value > 0) return value > 1e12 ? value : value * 1000;
-	if (typeof value === "string" && value) { const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : undefined; }
+	if (typeof value === "string" && value) {
+		const parsed = Date.parse(value);
+		return Number.isFinite(parsed) ? parsed : undefined;
+	}
 	return undefined;
 };
 
 function resolvedToken(result) {
 	const headers = table(result?.auth?.headers);
-	const authorization = Object.entries(headers).find(([key]) => key.toLowerCase() === "authorization")?.[1];
-	if (typeof authorization === "string" && authorization) return authorization.replace(/^Bearer\s+/i, "");
-	return typeof result?.auth?.apiKey === "string" && result.auth.apiKey ? result.auth.apiKey : undefined;
+	const authorization = Object.entries(headers).find(
+		([key]) => key.toLowerCase() === "authorization",
+	)?.[1];
+	if (typeof authorization === "string" && authorization)
+		return authorization.replace(/^Bearer\s+/i, "");
+	return typeof result?.auth?.apiKey === "string" && result.auth.apiKey
+		? result.auth.apiKey
+		: undefined;
 }
 
 function authHeaders(result, extras = {}, raw = false) {
@@ -177,17 +219,39 @@ function retryAfterMs(response, now = Date.now()) {
 	if (Number.isFinite(date)) return Math.max(0, date - now);
 }
 
-async function requestJson(url, headers, { fetchImpl, signal, timeout = FETCH_TIMEOUT_MS, now = Date.now, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout }) {
+async function requestJson(
+	url,
+	headers,
+	{
+		fetchImpl,
+		signal,
+		timeout = FETCH_TIMEOUT_MS,
+		now = Date.now,
+		setTimeoutImpl = setTimeout,
+		clearTimeoutImpl = clearTimeout,
+	},
+) {
 	const controller = new AbortController();
 	const abort = () => controller.abort();
-	if (signal?.aborted) abort(); else signal?.addEventListener?.("abort", abort, { once: true });
+	if (signal?.aborted) abort();
+	else signal?.addEventListener?.("abort", abort, { once: true });
 	const timer = setTimeoutImpl(abort, timeout);
 	try {
-		const response = await fetchImpl(url, { headers, signal: controller.signal, redirect: "error" });
-		if (response.status === 401 || response.status === 403) throw new QuotaError("auth rejected");
-		if (response.status === 429) throw new QuotaError("rate limited", retryAfterMs(response, now()));
+		const response = await fetchImpl(url, {
+			headers,
+			signal: controller.signal,
+			redirect: "error",
+		});
+		if (response.status === 401 || response.status === 403)
+			throw new QuotaError("auth rejected");
+		if (response.status === 429)
+			throw new QuotaError("rate limited", retryAfterMs(response, now()));
 		if (!response.ok) throw new QuotaError("unavailable");
-		try { return await response.json(); } catch { throw new QuotaError("unavailable"); }
+		try {
+			return await response.json();
+		} catch {
+			throw new QuotaError("unavailable");
+		}
 	} catch (error) {
 		if (error instanceof QuotaError) throw error;
 		throw new QuotaError("unavailable");
@@ -198,53 +262,140 @@ async function requestJson(url, headers, { fetchImpl, signal, timeout = FETCH_TI
 }
 
 function complete(windows) {
-	if (!Array.isArray(windows) || windows.length === 0 || windows.some((window) =>
-		!window || typeof window.id !== "string" || typeof window.label !== "string" ||
-		!finite(window.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100 ||
-		(window.resetsAt !== undefined && !finite(window.resetsAt)))) throw new QuotaError("unavailable");
+	if (
+		!Array.isArray(windows) ||
+		windows.length === 0 ||
+		windows.some(
+			(window) =>
+				!window ||
+				typeof window.id !== "string" ||
+				typeof window.label !== "string" ||
+				!finite(window.usedPercent) ||
+				window.usedPercent < 0 ||
+				window.usedPercent > 100 ||
+				(window.resetsAt !== undefined && !finite(window.resetsAt)),
+		)
+	)
+		throw new QuotaError("unavailable");
 	return windows;
 }
 
 function whamWindow(value, fallback, now) {
 	if (!value) return undefined;
 	if (!finite(value.used_percent)) throw new QuotaError("unavailable");
-	const resetsAt = resetTime(value.reset_at, now) ?? (finite(value.reset_after_seconds) ? now + value.reset_after_seconds * 1000 : undefined);
+	const resetsAt =
+		resetTime(value.reset_at, now) ??
+		(finite(value.reset_after_seconds)
+			? now + value.reset_after_seconds * 1000
+			: undefined);
 	if (!resetsAt) throw new QuotaError("unavailable");
-	const id = finite(value.limit_window_seconds) && value.limit_window_seconds > 0
-		? value.limit_window_seconds <= 21600 ? "5h" : "7d" : fallback;
+	const id =
+		finite(value.limit_window_seconds) && value.limit_window_seconds > 0
+			? value.limit_window_seconds <= 21600
+				? "5h"
+				: "7d"
+			: fallback;
 	return { id, label: id, usedPercent: percent(value.used_percent), resetsAt };
 }
 
 function codexParser(payload, now) {
 	const rate = table(payload).rate_limit;
 	if (!rate || typeof rate !== "object") throw new QuotaError("unavailable");
-	return complete([whamWindow(rate.primary_window, "5h", now), whamWindow(rate.secondary_window, "7d", now)]
-		.filter(Boolean).sort((a, b) => Number(b.id === "5h") - Number(a.id === "5h")));
+	return complete(
+		[
+			whamWindow(rate.primary_window, "5h", now),
+			whamWindow(rate.secondary_window, "7d", now),
+		]
+			.filter(Boolean)
+			.sort((a, b) => Number(b.id === "5h") - Number(a.id === "5h")),
+	);
 }
 
 function claudeParser(payload) {
 	if (!Array.isArray(table(payload).limits)) throw new QuotaError("unavailable");
 	const windows = table(payload).limits.map((limit, index) => {
-		if (!limit || !finite(limit.percent) || !limit.kind) throw new QuotaError("unavailable");
+		if (!limit || !finite(limit.percent) || !limit.kind)
+			throw new QuotaError("unavailable");
 		const resetsAt = resetTime(limit.resets_at);
 		if (!resetsAt) throw new QuotaError("unavailable");
-		const id = limit.kind === "session" ? "5h" : limit.kind === "weekly_all" ? "7d" : `model-${index}`;
-		return { id, label: id.startsWith("model-") ? limit.scope?.model?.display_name ?? "model" : id, usedPercent: percent(limit.percent), resetsAt };
+		const id =
+			limit.kind === "session"
+				? "5h"
+				: limit.kind === "weekly_all"
+					? "7d"
+					: `model-${index}`;
+		return {
+			id,
+			label: id.startsWith("model-")
+				? (limit.scope?.model?.display_name ?? "model")
+				: id,
+			usedPercent: percent(limit.percent),
+			resetsAt,
+		};
 	});
-	return complete(windows.sort((a, b) => Number(b.id === "5h") - Number(a.id === "5h")));
+	return complete(
+		windows.sort((a, b) => Number(b.id === "5h") - Number(a.id === "5h")),
+	);
+}
+
+// pi-provider-claude-plus ("claude-ex") already polls /api/oauth/usage for the
+// whole account pool into a shared 3-minute cache. When it is installed and
+// fresh, read that file instead of spending our own request against the same
+// per-identity rate budget.
+function claudePoolQuota({ now, agentDir = DEFAULT_AGENT_DIR }) {
+	let windows;
+	try {
+		const read = (name) => JSON.parse(readFileSync(join(agentDir, name), "utf8"));
+		const active = table(read("claude-pool.json")).active;
+		const entry = table(table(read("claude-pool-usage.json"))[active]);
+		if (!finite(entry.at) || now() - entry.at > POOL_MAX_AGE_MS)
+			throw new QuotaError("unavailable");
+		windows = complete(
+			[
+				["5h", table(entry.five_hour)],
+				["7d", table(entry.seven_day)],
+			]
+				.filter(([, window]) => finite(window.pct))
+				.map(([id, window]) => ({
+					id,
+					label: id,
+					usedPercent: percent(window.pct),
+					resetsAt: resetTime(window.resets_at),
+				})),
+		);
+	} catch {
+		windows = undefined;
+	}
+	poolServed = Boolean(windows);
+	return windows;
 }
 
 function copilotParser(payload) {
-	const quota = table(table(table(payload).quota_snapshots).premium_interactions);
-	if (quota.unlimited === true || !finite(quota.percent_remaining)) throw new QuotaError("unavailable");
+	const quota = table(
+		table(table(payload).quota_snapshots).premium_interactions,
+	);
+	if (quota.unlimited === true || !finite(quota.percent_remaining))
+		throw new QuotaError("unavailable");
 	const resetsAt = resetTime(table(payload).quota_reset_date);
 	if (!resetsAt) throw new QuotaError("unavailable");
-	return complete([{ id: "mo", label: "mo", usedPercent: 100 - Math.max(0, Math.min(100, quota.percent_remaining)), resetsAt }]);
+	return complete([
+		{
+			id: "mo",
+			label: "mo",
+			usedPercent: 100 - Math.max(0, Math.min(100, quota.percent_remaining)),
+			resetsAt,
+		},
+	]);
 }
 
 function numericValue(value) {
 	if (finite(value)) return value;
-	if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+	if (
+		typeof value === "string" &&
+		value.trim() &&
+		Number.isFinite(Number(value))
+	)
+		return Number(value);
 }
 
 function glmParser(payload) {
@@ -256,16 +407,32 @@ function glmParser(payload) {
 	const windows = [];
 	for (const [index, limit] of limits.entries()) {
 		const percentage = numericValue(limit?.percentage);
-		if (percentage === undefined || typeof limit.type !== "string" || !limit.type) continue;
+		if (percentage === undefined || typeof limit.type !== "string" || !limit.type)
+			continue;
 		const number = numericValue(limit.number);
 		const unit = numericValue(limit.unit);
-		const seconds = number === undefined || unit === undefined ? 0 : number * (unitSeconds[unit] ?? 0);
+		const seconds =
+			number === undefined || unit === undefined
+				? 0
+				: number * (unitSeconds[unit] ?? 0);
 		const tokenLimit = limit.type === "TOKENS" || limit.type === "TOKENS_LIMIT";
-		const id = tokenLimit && seconds > 0 && seconds <= 21600 ? "5h" : tokenLimit && seconds > 21600 && seconds <= 604800 ? "7d" : undefined;
+		const id =
+			tokenLimit && seconds > 0 && seconds <= 21600
+				? "5h"
+				: tokenLimit && seconds > 21600 && seconds <= 604800
+					? "7d"
+					: undefined;
 		if (!id) continue;
-		const resetsAt = resetTime(numericValue(limit.nextResetTime) ?? limit.nextResetTime);
+		const resetsAt = resetTime(
+			numericValue(limit.nextResetTime) ?? limit.nextResetTime,
+		);
 		if (!resetsAt && !(id === "5h" && unit === 3 && number === 5)) continue;
-		windows.push({ id: `${id}-${index}`, label: id, usedPercent: percent(percentage), ...(resetsAt ? { resetsAt } : {}) });
+		windows.push({
+			id: `${id}-${index}`,
+			label: id,
+			usedPercent: percent(percentage),
+			...(resetsAt ? { resetsAt } : {}),
+		});
 	}
 	return complete(windows.sort((a, b) => order[a.label] - order[b.label]));
 }
@@ -273,32 +440,68 @@ function glmParser(payload) {
 function kimiRow(data, window, fallback, now, index) {
 	const limit = numericValue(data.limit);
 	let used = numericValue(data.used);
-	if (used === undefined && numericValue(data.remaining) !== undefined && limit !== undefined) used = limit - numericValue(data.remaining);
-	if (used === undefined || limit === undefined || limit <= 0) throw new QuotaError("unavailable");
+	if (
+		used === undefined &&
+		numericValue(data.remaining) !== undefined &&
+		limit !== undefined
+	)
+		used = limit - numericValue(data.remaining);
+	if (used === undefined || limit === undefined || limit <= 0)
+		throw new QuotaError("unavailable");
 	let resetsAt;
-	for (const key of ["reset_at", "resetAt", "reset_time", "resetTime"]) if (!resetsAt) resetsAt = resetTime(data[key]);
-	for (const key of ["reset_in", "resetIn", "ttl"]) if (!resetsAt && numericValue(data[key]) > 0) resetsAt = now + numericValue(data[key]) * 1000;
+	for (const key of ["reset_at", "resetAt", "reset_time", "resetTime"])
+		if (!resetsAt) resetsAt = resetTime(data[key]);
+	for (const key of ["reset_in", "resetIn", "ttl"])
+		if (!resetsAt && numericValue(data[key]) > 0)
+			resetsAt = now + numericValue(data[key]) * 1000;
 	if (!resetsAt) throw new QuotaError("unavailable");
 	let label = fallback;
 	const duration = numericValue(window.duration ?? data.duration);
 	if (duration > 0) {
 		const unit = String(window.timeUnit ?? data.timeUnit ?? "");
-		const multiplier = unit.includes("MINUTE") ? 60 : unit.includes("HOUR") ? 3600 : unit.includes("DAY") ? 86400 : unit.includes("WEEK") ? 604800 : unit.includes("MONTH") ? 2592000 : 1;
+		const multiplier = unit.includes("MINUTE")
+			? 60
+			: unit.includes("HOUR")
+				? 3600
+				: unit.includes("DAY")
+					? 86400
+					: unit.includes("WEEK")
+						? 604800
+						: unit.includes("MONTH")
+							? 2592000
+							: 1;
 		const seconds = duration * multiplier;
 		label = seconds <= 21600 ? "5h" : seconds <= 604800 ? "7d" : "mo";
 	}
-	return { id: `${label}-${index}`, label, usedPercent: percent((used / limit) * 100), resetsAt };
+	return {
+		id: `${label}-${index}`,
+		label,
+		usedPercent: percent((used / limit) * 100),
+		resetsAt,
+	};
 }
 
 function kimiParser(payload, now) {
 	const root = table(table(payload).data ?? payload);
 	const rows = [];
-	if (root.usage && typeof root.usage === "object") rows.push(kimiRow(table(root.usage), {}, "7d", now, rows.length));
-	if (Array.isArray(root.limits)) for (const item of root.limits) {
-		const row = table(item);
-		rows.push(kimiRow(table(row.detail ?? row), table(row.window), "7d", now, rows.length));
-	}
-	return complete(rows.sort((a, b) => Number(b.label === "5h") - Number(a.label === "5h")));
+	if (root.usage && typeof root.usage === "object")
+		rows.push(kimiRow(table(root.usage), {}, "7d", now, rows.length));
+	if (Array.isArray(root.limits))
+		for (const item of root.limits) {
+			const row = table(item);
+			rows.push(
+				kimiRow(
+					table(row.detail ?? row),
+					table(row.window),
+					"7d",
+					now,
+					rows.length,
+				),
+			);
+		}
+	return complete(
+		rows.sort((a, b) => Number(b.label === "5h") - Number(a.label === "5h")),
+	);
 }
 
 const INCIDENT_SOURCES = Object.freeze([
@@ -309,15 +512,33 @@ const INCIDENT_SOURCES = Object.freeze([
 
 function incidentIndicator(payload) {
 	const value = table(payload).status?.indicator;
-	return ["minor", "major", "critical", "maintenance"].includes(value) ? value : "none";
+	return ["minor", "major", "critical", "maintenance"].includes(value)
+		? value
+		: "none";
 }
 
-function provider({ id, label, piProviderId, url, parser, headers, pollMs = POLL_MS, unavailableMs = UNAVAILABLE_MS }) {
+function provider({
+	id,
+	label,
+	piProviderId,
+	url,
+	parser,
+	headers,
+	preferred,
+	pollMs = POLL_MS,
+	unavailableMs = UNAVAILABLE_MS,
+}) {
 	return Object.freeze({
-		id, label, piProviderId, pollMs, unavailableMs,
+		id,
+		label,
+		piProviderId,
+		pollMs,
+		unavailableMs,
 		resolveAuth: (ctx) => ctx.modelRegistry?.getProviderAuth?.(piProviderId),
 		identity: authIdentity,
 		async fetchQuota(auth, options) {
+			const reused = await preferred?.(options);
+			if (reused) return reused;
 			const payload = await requestJson(url, headers(auth), options);
 			return parser(payload, options.now());
 		},
@@ -325,33 +546,93 @@ function provider({ id, label, piProviderId, url, parser, headers, pollMs = POLL
 }
 
 export const PRODUCTION_PROVIDERS = Object.freeze([
-	provider({ id: "codex", label: "Codex", piProviderId: "openai-codex", url: "https://chatgpt.com/backend-api/wham/usage", parser: codexParser, headers: (auth) => {
-		const headers = authHeaders(auth, { "user-agent": "codex-cli" });
-		const source = table(auth?.auth?.headers);
-		for (const [key, value] of Object.entries(source)) if (key.toLowerCase() === "chatgpt-account-id") headers["chatgpt-account-id"] = value;
-		return headers;
-	} }),
-	provider({ id: "claude", label: "Claude", piProviderId: "anthropic", url: "https://api.anthropic.com/api/oauth/usage", parser: claudeParser, headers: (auth) => authHeaders(auth, { "anthropic-beta": "oauth-2025-04-20" }), pollMs: CLAUDE_POLL_MS, unavailableMs: CLAUDE_UNAVAILABLE_MS }),
-	provider({ id: "copilot", label: "Copilot", piProviderId: "github-copilot", url: "https://api.github.com/copilot_internal/user", parser: copilotParser, headers: (auth) => authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }) }),
-	provider({ id: "glm", label: "GLM/Z.ai", piProviderId: "zai", url: "https://api.z.ai/api/monitor/usage/quota/limit", parser: glmParser, headers: (auth) => authHeaders(auth, {}, true) }),
-	provider({ id: "kimi", label: "Kimi", piProviderId: "kimi-coding", url: "https://api.kimi.com/coding/v1/usages", parser: kimiParser, headers: (auth) => authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }) }),
+	provider({
+		id: "codex",
+		label: "Codex",
+		piProviderId: "openai-codex",
+		url: "https://chatgpt.com/backend-api/wham/usage",
+		parser: codexParser,
+		headers: (auth) => {
+			const headers = authHeaders(auth, { "user-agent": "codex-cli" });
+			const source = table(auth?.auth?.headers);
+			for (const [key, value] of Object.entries(source))
+				if (key.toLowerCase() === "chatgpt-account-id")
+					headers["chatgpt-account-id"] = value;
+			return headers;
+		},
+	}),
+	// Poll at the normal cadence while the pool cache serves us (a file read costs
+	// nothing); fall back to the slow, rate-limited direct cadence otherwise.
+	Object.freeze({
+		...provider({
+			id: "claude",
+			label: "Claude",
+			piProviderId: "anthropic",
+			url: "https://api.anthropic.com/api/oauth/usage",
+			parser: claudeParser,
+			headers: (auth) =>
+				authHeaders(auth, { "anthropic-beta": "oauth-2025-04-20" }),
+			preferred: claudePoolQuota,
+			unavailableMs: CLAUDE_UNAVAILABLE_MS,
+		}),
+		get pollMs() {
+			return poolServed ? POLL_MS : CLAUDE_POLL_MS;
+		},
+	}),
+	provider({
+		id: "copilot",
+		label: "Copilot",
+		piProviderId: "github-copilot",
+		url: "https://api.github.com/copilot_internal/user",
+		parser: copilotParser,
+		headers: (auth) =>
+			authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }),
+	}),
+	provider({
+		id: "glm",
+		label: "GLM/Z.ai",
+		piProviderId: "zai",
+		url: "https://api.z.ai/api/monitor/usage/quota/limit",
+		parser: glmParser,
+		headers: (auth) => authHeaders(auth, {}, true),
+	}),
+	provider({
+		id: "kimi",
+		label: "Kimi",
+		piProviderId: "kimi-coding",
+		url: "https://api.kimi.com/coding/v1/usages",
+		parser: kimiParser,
+		headers: (auth) =>
+			authHeaders(auth, { "user-agent": "ce-workflow-subscription-footer" }),
+	}),
 ]);
 
 function authIdentity(result) {
 	const headers = table(result?.auth?.headers);
-	const stable = Object.entries(headers).find(([key, value]) => /(?:account|user)[-_]?id/i.test(key) && typeof value === "string")?.[1];
+	const stable = Object.entries(headers).find(
+		([key, value]) =>
+			/(?:account|user)[-_]?id/i.test(key) && typeof value === "string",
+	)?.[1];
 	const token = resolvedToken(result);
 	if (!token) throw new QuotaError("auth rejected");
 	let claim;
 	try {
-		const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
+		const payload = JSON.parse(
+			Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"),
+		);
 		claim = payload.account_id ?? payload.sub;
 	} catch {}
-	return createHash("sha256").update(String(stable ?? claim ?? JSON.stringify(result.auth))).digest("hex");
+	return createHash("sha256")
+		.update(String(stable ?? claim ?? JSON.stringify(result.auth)))
+		.digest("hex");
 }
 
 function storedAuth(result) {
-	return result && (result.source === "OAuth" || result.source === "stored credential") && resolvedToken(result) ? result : undefined;
+	return result &&
+		(result.source === "OAuth" || result.source === "stored credential") &&
+		resolvedToken(result)
+		? result
+		: undefined;
 }
 
 function formatDuration(ms) {
@@ -361,22 +642,36 @@ function formatDuration(ms) {
 	return days ? `${days}d ${hours}h` : `${hours}h ${minutes % 60}m`;
 }
 
-function quotaColor(value) { return value > 80 ? "error" : value > 50 ? "warning" : "text"; }
+function quotaColor(value) {
+	return value > 80 ? "error" : value > 50 ? "warning" : "text";
+}
 
 function windowText(window, now, barCells = 8) {
 	const pct = Math.round(window.usedPercent);
 	const filled = Math.round((pct / 100) * barCells);
-	const reset = window.resetsAt ? `(${formatDuration(window.resetsAt - now)})` : "";
+	const reset = window.resetsAt
+		? `(${formatDuration(window.resetsAt - now)})`
+		: "";
 	return `${window.label}${reset} [${"█".repeat(filled)}${"░".repeat(barCells - filled)}] ${pct}%`;
 }
 
 function providerDisplay(provider, state, theme) {
 	const marker = state?.incident && state.incident !== "none" ? " !" : "";
 	const label = `${provider.label}${marker}`;
-	const styledLabel = theme?.fg?.("accent", theme?.bold?.(provider.label) ?? provider.label) ?? provider.label;
+	const styledLabel =
+		theme?.fg?.("accent", theme?.bold?.(provider.label) ?? provider.label) ??
+		provider.label;
 	if (!marker) return { label, styledLabel };
-	const color = state.incident === "maintenance" ? "accent" : state.incident === "minor" ? "warning" : "error";
-	return { label, styledLabel: `${styledLabel}${theme?.fg?.(color, marker) ?? marker}` };
+	const color =
+		state.incident === "maintenance"
+			? "accent"
+			: state.incident === "minor"
+				? "warning"
+				: "error";
+	return {
+		label,
+		styledLabel: `${styledLabel}${theme?.fg?.(color, marker) ?? marker}`,
+	};
 }
 
 function styleSegment(text, window, providerLabel, styledProviderLabel, theme) {
@@ -384,26 +679,41 @@ function styleSegment(text, window, providerLabel, styledProviderLabel, theme) {
 	const reset = styled.match(/\([^)]*\)/)?.[0];
 	if (reset) styled = styled.replace(reset, theme?.fg?.("dim", reset) ?? reset);
 	const quota = styled.match(/\[[█░]+\] \d+%/)?.[0];
-	if (quota) styled = styled.replace(quota, theme?.fg?.(quotaColor(window.usedPercent), quota) ?? quota);
+	if (quota)
+		styled = styled.replace(
+			quota,
+			theme?.fg?.(quotaColor(window.usedPercent), quota) ?? quota,
+		);
 	if (providerLabel && styled.startsWith(providerLabel))
 		styled = `${styledProviderLabel}${styled.slice(providerLabel.length)}`;
 	return styled;
 }
 
-export function renderQuotaRows(registry, states, theme, width, now = Date.now()) {
+export function renderQuotaRows(
+	registry,
+	states,
+	theme,
+	width,
+	now = Date.now(),
+) {
 	if (width < MIN_WIDTH) return [];
 	const lines = [];
 	let parts = [];
 	let plainWidth = 0;
 	let currentProvider;
 	const flush = () => {
-		if (parts.length) lines.push(parts.map((part) => `${part.separator}${part.styled}`).join(""));
+		if (parts.length)
+			lines.push(parts.map((part) => `${part.separator}${part.styled}`).join(""));
 		parts = [];
 		plainWidth = 0;
 		currentProvider = undefined;
 	};
 	const append = (plain, styled, providerId) => {
-		const separator = parts.length ? currentProvider === providerId ? " · " : " │ " : "";
+		const separator = parts.length
+			? currentProvider === providerId
+				? " · "
+				: " │ "
+			: "";
 		parts.push({ separator, styled });
 		plainWidth += visibleWidth(separator) + visibleWidth(plain);
 		currentProvider = providerId;
@@ -412,13 +722,21 @@ export function renderQuotaRows(registry, states, theme, width, now = Date.now()
 		const state = states.get(provider.id);
 		if (!state?.authenticated) continue;
 		const display = providerDisplay(provider, state, theme);
-		const age = state.lastSuccessAt === undefined ? Infinity : now - state.lastSuccessAt;
+		const age =
+			state.lastSuccessAt === undefined ? Infinity : now - state.lastSuccessAt;
 		if (!state.snapshot || age >= (provider.unavailableMs ?? UNAVAILABLE_MS)) {
-			const failure = state.failure === "auth rejected" || state.failure === "rate limited" ? ` · ${state.failure}` : "";
+			const failure =
+				state.failure === "auth rejected" || state.failure === "rate limited"
+					? ` · ${state.failure}`
+					: "";
 			let plain = `${display.label} quota unavailable${failure}`;
 			if (parts.length && plainWidth + 3 + visibleWidth(plain) > width) flush();
 			plain = truncatePlain(plain, width);
-			append(plain, styleSegment(plain, {}, display.label, display.styledLabel, theme), provider.id);
+			append(
+				plain,
+				styleSegment(plain, {}, display.label, display.styledLabel, theme),
+				provider.id,
+			);
 			continue;
 		}
 		const marker = state.failure
@@ -439,7 +757,17 @@ export function renderQuotaRows(registry, states, theme, width, now = Date.now()
 				plain = `${prefix}${body}${suffix}`;
 			}
 			plain = truncatePlain(plain, width);
-			append(plain, styleSegment(plain, window, prefix ? display.label : undefined, display.styledLabel, theme), provider.id);
+			append(
+				plain,
+				styleSegment(
+					plain,
+					window,
+					prefix ? display.label : undefined,
+					display.styledLabel,
+					theme,
+				),
+				provider.id,
+			);
 		}
 	}
 	flush();
@@ -463,10 +791,13 @@ async function pollingLockState(lockFile, fsImpl) {
 	} catch (error) {
 		if (error?.code === "ENOENT") return "missing";
 		try {
-			return typeof fsImpl.stat === "function" && Date.now() - (await fsImpl.stat(lockFile)).mtimeMs >= LOCK_STALE_MS
+			return typeof fsImpl.stat === "function" &&
+				Date.now() - (await fsImpl.stat(lockFile)).mtimeMs >= LOCK_STALE_MS
 				? "stale"
 				: "live";
-		} catch { return "live"; }
+		} catch {
+			return "live";
+		}
 	}
 }
 
@@ -478,8 +809,11 @@ async function acquireRecoveryOwnership(lockFile, fsImpl) {
 		} catch (error) {
 			if (error?.code !== "EEXIST") return null;
 			try {
-				if (Date.now() - (await fsImpl.stat(recoveryFile)).mtimeMs < LOCK_STALE_MS) return null;
-			} catch { return null; }
+				if (Date.now() - (await fsImpl.stat(recoveryFile)).mtimeMs < LOCK_STALE_MS)
+					return null;
+			} catch {
+				return null;
+			}
 		}
 	}
 	return null;
@@ -494,15 +828,21 @@ async function acquirePollingOwnership(lockFile, fsImpl) {
 		try {
 			await handle.writeFile(JSON.stringify({ pid: process.pid, nonce }));
 		} catch (error) {
-			try { await handle.close(); } catch {}
-			try { await fsImpl.unlink(lockFile); } catch {}
+			try {
+				await handle.close();
+			} catch {}
+			try {
+				await fsImpl.unlink(lockFile);
+			} catch {}
 			throw error;
 		}
 		let released = false;
 		return async () => {
 			if (released) return;
 			released = true;
-			try { await handle.close(); } catch {}
+			try {
+				await handle.close();
+			} catch {}
 			try {
 				const owner = JSON.parse(await fsImpl.readFile(lockFile, "utf8"));
 				if (owner?.nonce === nonce) await fsImpl.unlink(lockFile);
@@ -514,7 +854,7 @@ async function acquirePollingOwnership(lockFile, fsImpl) {
 	} catch (error) {
 		if (error?.code !== "EEXIST") return null;
 	}
-	if (await pollingLockState(lockFile, fsImpl) !== "stale") return null;
+	if ((await pollingLockState(lockFile, fsImpl)) !== "stale") return null;
 
 	const recovery = await acquireRecoveryOwnership(lockFile, fsImpl);
 	if (!recovery) return null;
@@ -522,10 +862,18 @@ async function acquirePollingOwnership(lockFile, fsImpl) {
 		const state = await pollingLockState(lockFile, fsImpl);
 		if (state === "live") return null;
 		if (state === "stale") await fsImpl.unlink(lockFile);
-		try { return await claim(); } catch { return null; }
+		try {
+			return await claim();
+		} catch {
+			return null;
+		}
 	} finally {
-		try { await recovery.handle.close(); } catch {}
-		try { await fsImpl.unlink(recovery.path); } catch {}
+		try {
+			await recovery.handle.close();
+		} catch {}
+		try {
+			await fsImpl.unlink(recovery.path);
+		} catch {}
 	}
 }
 
@@ -553,19 +901,27 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	let releasePollingOwnership;
 	let followerTimer;
 	const registry = [...providers];
-	const states = new Map(registry.map((entry) => [entry.id, { authenticated: false }]));
+	const states = new Map(
+		registry.map((entry) => [entry.id, { authenticated: false }]),
+	);
 	const timers = new Map();
 	const aborters = new Map();
 	const incidentTimers = new Map();
 	const incidentAborters = new Map();
 	const cacheFile = join(agentDir, "subscription-footer-cache.json");
 	const pollingLockFile = join(agentDir, "subscription-footer-poll.lock");
-	const setting = () => readGlobalSettings?.().workOrchestrator?.subscriptionFooter ?? {};
+	const setting = () =>
+		readGlobalSettings?.().workOrchestrator?.subscriptionFooter ?? {};
 
 	async function loadCache() {
 		try {
 			const value = JSON.parse(await fsImpl.readFile(cacheFile, "utf8"));
-			if (value?.version === 1 && value.providers && typeof value.providers === "object") cache = value;
+			if (
+				value?.version === 1 &&
+				value.providers &&
+				typeof value.providers === "object"
+			)
+				cache = value;
 		} catch {}
 	}
 
@@ -584,34 +940,58 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	function schedule(entry, delay, gen) {
 		if (gen !== generation) return;
 		clearTimeoutImpl(timers.get(entry.id));
-		timers.set(entry.id, setTimeoutImpl(() => void refresh(entry, gen), delay));
+		timers.set(
+			entry.id,
+			setTimeoutImpl(() => void refresh(entry, gen), delay),
+		);
 	}
 
 	function scheduleIncident(source, delay, gen) {
 		if (gen !== generation || !setting().incidents) return;
 		clearTimeoutImpl(incidentTimers.get(source.id));
-		incidentTimers.set(source.id, setTimeoutImpl(() => void refreshIncident(source, gen), delay));
+		incidentTimers.set(
+			source.id,
+			setTimeoutImpl(() => void refreshIncident(source, gen), delay),
+		);
 	}
 
 	async function refreshIncident(source, gen) {
-		if (gen !== generation || !activeCtx || !setting().incidents || !states.get(source.id)?.authenticated) return;
+		if (
+			gen !== generation ||
+			!activeCtx ||
+			!setting().incidents ||
+			!states.get(source.id)?.authenticated
+		)
+			return;
 		const controller = new AbortController();
 		incidentAborters.get(source.id)?.abort();
 		incidentAborters.set(source.id, controller);
 		try {
-			const payload = await requestJson(source.url, {}, { fetchImpl, signal: controller.signal, setTimeoutImpl, clearTimeoutImpl });
-			if (gen !== generation || controller.signal.aborted || !setting().incidents) return;
+			const payload = await requestJson(
+				source.url,
+				{},
+				{ fetchImpl, signal: controller.signal, setTimeoutImpl, clearTimeoutImpl },
+			);
+			if (gen !== generation || controller.signal.aborted || !setting().incidents)
+				return;
 			states.get(source.id).incident = incidentIndicator(payload);
 			requestRender();
 		} catch {
-			if (gen !== generation || controller.signal.aborted || !setting().incidents) return;
+			if (gen !== generation || controller.signal.aborted || !setting().incidents)
+				return;
 		}
 		scheduleIncident(source, POLL_MS, gen);
 	}
 
 	function reconcileIncidents(gen) {
 		if (setting().incidents && releasePollingOwnership) {
-			for (const source of INCIDENT_SOURCES) if (states.get(source.id)?.authenticated && !incidentTimers.has(source.id) && !incidentAborters.has(source.id)) void refreshIncident(source, gen);
+			for (const source of INCIDENT_SOURCES)
+				if (
+					states.get(source.id)?.authenticated &&
+					!incidentTimers.has(source.id) &&
+					!incidentAborters.has(source.id)
+				)
+					void refreshIncident(source, gen);
 		} else {
 			for (const timer of incidentTimers.values()) clearTimeoutImpl(timer);
 			incidentTimers.clear();
@@ -621,7 +1001,12 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		}
 	}
 
-	async function refresh(entry, gen, allowNetwork = Boolean(releasePollingOwnership), render = true) {
+	async function refresh(
+		entry,
+		gen,
+		allowNetwork = Boolean(releasePollingOwnership),
+		render = true,
+	) {
 		if (gen !== generation || !activeCtx) return;
 		let resolved;
 		try {
@@ -633,14 +1018,25 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		if (gen !== generation) return;
 		const state = states.get(entry.id);
 		if (!resolved) {
-			Object.assign(state, { authenticated: false, identityKey: undefined, snapshot: undefined, lastSuccessAt: undefined, failure: undefined });
+			Object.assign(state, {
+				authenticated: false,
+				identityKey: undefined,
+				snapshot: undefined,
+				lastSuccessAt: undefined,
+				failure: undefined,
+			});
 			if (render) requestRender();
 			if (allowNetwork) schedule(entry, POLL_MS, gen);
 			return;
 		}
 		const identityKey = (entry.identity ?? authIdentity)(resolved);
 		if (state.identityKey !== identityKey) {
-			Object.assign(state, { identityKey, snapshot: undefined, lastSuccessAt: undefined, failure: undefined });
+			Object.assign(state, {
+				identityKey,
+				snapshot: undefined,
+				lastSuccessAt: undefined,
+				failure: undefined,
+			});
 			if (allowNetwork && cache.providers[entry.id]?.identityKey !== identityKey) {
 				delete cache.providers[entry.id];
 				void saveCache();
@@ -653,16 +1049,27 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			delete cache.providers[entry.id];
 			void saveCache();
 		}
-		if ((!state.snapshot || cached?.fetchedAt > state.lastSuccessAt) && cached?.identityKey === identityKey) {
+		if (
+			(!state.snapshot || cached?.fetchedAt > state.lastSuccessAt) &&
+			cached?.identityKey === identityKey
+		) {
 			try {
-				state.snapshot = { providerId: entry.id, identityKey, fetchedAt: cached.fetchedAt, windows: complete(cached.windows) };
+				state.snapshot = {
+					providerId: entry.id,
+					identityKey,
+					fetchedAt: cached.fetchedAt,
+					windows: complete(cached.windows),
+				};
 				state.lastSuccessAt = cached.fetchedAt;
 			} catch {}
 		}
 		if (render) requestRender();
 		if (!allowNetwork) return;
 		const pollMs = entry.pollMs ?? POLL_MS;
-		const age = state.lastSuccessAt === undefined ? Infinity : Math.max(0, now() - state.lastSuccessAt);
+		const age =
+			state.lastSuccessAt === undefined
+				? Infinity
+				: Math.max(0, now() - state.lastSuccessAt);
 		if (age < pollMs) {
 			schedule(entry, pollMs - age, gen);
 			return;
@@ -671,7 +1078,16 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		aborters.get(entry.id)?.abort();
 		aborters.set(entry.id, controller);
 		try {
-			const windows = complete(await entry.fetchQuota(resolved, { fetchImpl, signal: controller.signal, now, setTimeoutImpl, clearTimeoutImpl }));
+			const windows = complete(
+				await entry.fetchQuota(resolved, {
+					fetchImpl,
+					signal: controller.signal,
+					now,
+					agentDir,
+					setTimeoutImpl,
+					clearTimeoutImpl,
+				}),
+			);
 			if (gen !== generation || controller.signal.aborted) return;
 			const fetchedAt = now();
 			state.snapshot = { providerId: entry.id, identityKey, fetchedAt, windows };
@@ -686,8 +1102,14 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			if (gen !== generation || controller.signal.aborted) return;
 			state.failure = error instanceof QuotaError ? error.category : "unavailable";
 			state.failureCount = (state.failureCount ?? 0) + 1;
-			const backoff = Math.min(MAX_BACKOFF_MS, BACKOFF_MS * 2 ** (state.failureCount - 1));
-			const retryDelay = Math.min(MAX_BACKOFF_MS, error instanceof QuotaError ? error.retryAfterMs ?? 0 : 0);
+			const backoff = Math.min(
+				MAX_BACKOFF_MS,
+				BACKOFF_MS * 2 ** (state.failureCount - 1),
+			);
+			const retryDelay = Math.min(
+				MAX_BACKOFF_MS,
+				error instanceof QuotaError ? (error.retryAfterMs ?? 0) : 0,
+			);
 			if (render) requestRender();
 			schedule(entry, Math.max(backoff, retryDelay, pollMs), gen);
 		}
@@ -696,14 +1118,19 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	function scheduleFollower(gen) {
 		if (gen !== generation || releasePollingOwnership) return;
 		clearTimeoutImpl(followerTimer);
-		followerTimer = setTimeoutImpl(() => void startPolling(gen), FOLLOWER_SYNC_MS);
+		followerTimer = setTimeoutImpl(
+			() => void startPolling(gen),
+			FOLLOWER_SYNC_MS,
+		);
 	}
 
 	async function ensurePollingOwner(gen) {
 		if (releasePollingOwnership) return true;
 		ownershipLifecycle = ownershipLifecycle.then(async () => {
 			if (gen !== generation || releasePollingOwnership) return;
-			try { await fsImpl.mkdir(agentDir, { recursive: true }); } catch {}
+			try {
+				await fsImpl.mkdir(agentDir, { recursive: true });
+			} catch {}
 			const release = await acquirePollingOwnership(pollingLockFile, fsImpl);
 			if (gen !== generation) await release?.();
 			else if (release) releasePollingOwnership = release;
@@ -726,7 +1153,9 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		generation++;
 		const release = releasePollingOwnership;
 		releasePollingOwnership = undefined;
-		ownershipLifecycle = ownershipLifecycle.then(() => release?.()).catch(() => {});
+		ownershipLifecycle = ownershipLifecycle
+			.then(() => release?.())
+			.catch(() => {});
 		clearTimeoutImpl(followerTimer);
 		followerTimer = undefined;
 		for (const timer of timers.values()) clearTimeoutImpl(timer);
@@ -743,11 +1172,16 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		activeCtx = undefined;
 		if (installed && restore) ctx?.ui?.setFooter?.(undefined);
 		installed = false;
-		if (notify) ctx?.ui?.notify?.("Subscription footer disabled; Pi's built-in footer is restored. Use /reload for another footer extension to reclaim ownership.", "info");
+		if (notify)
+			ctx?.ui?.notify?.(
+				"Subscription footer disabled; Pi's built-in footer is restored. Use /reload for another footer extension to reclaim ownership.",
+				"info",
+			);
 	}
 
 	function install(ctx) {
-		if (ctx?.mode !== "tui" || ctx.hasUI === false || !setting().enabled) return false;
+		if (ctx?.mode !== "tui" || ctx.hasUI === false || !setting().enabled)
+			return false;
 		stop({ restore: false });
 		activeCtx = ctx;
 		installed = true;
@@ -758,9 +1192,13 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				invalidate() {},
 				render(width) {
 					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.());
-					return width < MIN_WIDTH ? model : [...model, ...renderQuotaRows(registry, states, theme, width, now())];
+					return width < MIN_WIDTH
+						? model
+						: [...model, ...renderQuotaRows(registry, states, theme, width, now())];
 				},
-				dispose() { if (gen === generation) stop({ restore: false }); },
+				dispose() {
+					if (gen === generation) stop({ restore: false });
+				},
 			};
 		});
 		void startPolling(gen);
@@ -773,16 +1211,26 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		start: install,
 		apply(ctx) {
 			if (activeCtx && activeCtx !== ctx) return false;
-			if (setting().enabled && activeCtx === ctx) { reconcileIncidents(generation); requestRender(); return true; }
+			if (setting().enabled && activeCtx === ctx) {
+				reconcileIncidents(generation);
+				requestRender();
+				return true;
+			}
 			if (setting().enabled) return install(ctx);
 			if (activeCtx === ctx) stop({ notify: true });
 			return false;
 		},
-		shutdown(ctx) { if (activeCtx === ctx) stop(); },
+		shutdown(ctx) {
+			if (activeCtx === ctx) stop();
+		},
 		providers: registry,
 		isInstalled: () => installed,
 		states,
 	};
 }
 
-export const SUBSCRIPTION_FOOTER_DEFAULTS = Object.freeze({ enabled: false, incidents: false, ownershipNoticeAcknowledged: false });
+export const SUBSCRIPTION_FOOTER_DEFAULTS = Object.freeze({
+	enabled: false,
+	incidents: false,
+	ownershipNoticeAcknowledged: false,
+});
