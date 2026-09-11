@@ -2729,6 +2729,70 @@ try {
 		1,
 		"explicit reopen produces one later claim",
 	);
+	// Regression: a terminal job whose launch still says "running" must close out
+	// during reconcile instead of throwing "Invalid operation accounting".
+	const staleCwd = repo();
+	initVerifierStore(staleCwd);
+	const staleBatch = mutateVerifierStore(staleCwd, (state) =>
+		createBatch(state, {
+			checkpoint,
+			profiles: [
+				{
+					model: "openai/gpt-5",
+					operations: ["correctness", "test-gap"],
+					thinking: "high",
+				},
+			],
+			...options,
+		}),
+	);
+	const staleJob = Object.values(loadVerifierStore(staleCwd).jobs)[0];
+	const staleAsyncDir = path.join(staleCwd, "gone-async-run");
+	mutateVerifierStore(staleCwd, (state) =>
+		queueVerifierJobs(state, {
+			batchId: staleBatch.id,
+			requests: {
+				[staleJob.id]: {
+					logicalJobId: staleJob.id,
+					model: staleJob.model,
+					cwd: staleCwd,
+					output: path.join(staleAsyncDir, `${staleJob.id}.json`),
+				},
+			},
+		}),
+	);
+	mutateVerifierStore(staleCwd, (state) =>
+		recordVerifierLaunch(state, {
+			jobId: staleJob.id,
+			ok: true,
+			identity: { asyncDir: staleAsyncDir },
+			now: "2026-07-21T02:00:00.000Z",
+		}),
+	);
+	mutateVerifierStore(staleCwd, (state) => {
+		for (const operation of staleJob.operations)
+			recordOperationResult(state, {
+				jobId: staleJob.id,
+				operation,
+				outcome: "failed",
+				failure: "stale runtime",
+				now: "2026-07-21T02:05:00.000Z",
+			});
+	});
+	assert.deepEqual(
+		reconcileVerifierRuns(staleCwd),
+		[staleJob.id],
+		"terminal job with stale running launch closes out exactly once",
+	);
+	const staleStore = loadVerifierStore(staleCwd);
+	assert.equal(staleStore.jobs[staleJob.id].launch.status, "orphaned");
+	assert.equal(staleStore.jobs[staleJob.id].status, "failed");
+	assert.deepEqual(
+		reconcileVerifierRuns(staleCwd),
+		[],
+		"closed stale launches do not recur on later reconciles",
+	);
+
 	process.env.WORK_ORCH_SERIAL = "1";
 	assert.equal(
 		typeof reconcileBackgroundVerifierRuns(reconcileCwd).status,

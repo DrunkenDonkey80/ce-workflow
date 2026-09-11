@@ -2379,6 +2379,22 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 		const recovering = recoverableTerminalOutputFailure(store, job);
 		let state = "";
 		let runtimeStatus;
+		if (
+			!Object.values(job.operationStatus).some(
+				(status) => status === "pending",
+			)
+		) {
+			// ponytail: terminal jobs with stale launches only need close-out, no artifact flow
+			if (job.launch.status === "running") {
+				mutateVerifierStore(
+					cwd,
+					(next) => markVerifierOrphaned(next, job.id, input.now),
+					input,
+				);
+				reconciled.push(job.id);
+			}
+			continue;
+		}
 		const statusFile = job.launch.asyncDir
 			? path.join(job.launch.asyncDir, "status.json")
 			: "";
