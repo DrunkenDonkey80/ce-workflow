@@ -749,6 +749,11 @@ const KNOWLEDGE_DISCOVERER_MAX_CLAIMS = 3;
 const KNOWLEDGE_DISCOVERER_MAX_INPUT_CHARS = 400_000;
 const knowledgeDiscovererRuns = new Map();
 const knowledgeDiscovererCuts = new Set();
+// The in-work filter re-cuts on every turn while the session sits above the
+// compaction trigger, so the removed prefix grows instead of changing. Remember
+// the last message already handed to the discoverer and feed only what is new;
+// otherwise every turn re-derives the same claims at full subagent cost.
+let knowledgeDiscovererCutAnchor = null;
 // Absorbing a completion deletes its live entry, but the subagent-notify
 // message is filtered afterwards. Without this short memory the filter stops
 // recognizing the run and the notification wakes the session as a new turn.
@@ -6454,14 +6459,23 @@ function filteredContext(event, ctx) {
 		)
 			contextFilterState.requested = true;
 	}
-	if (contextFilterState.requested) {
-		const prepared = prepareContextFilter(event);
-		if (prepared)
-			void launchKnowledgeDiscoverer(
-				workExtensionPi,
-				ctx,
-				messages.slice(0, contextFilterState.cutIndex),
-			).catch(() => {});
+	if (contextFilterState.requested && prepareContextFilter(event)) {
+		// A missing anchor (fresh session, or a native compaction rewrote the
+		// history) falls back to the whole removed prefix.
+		const start = knowledgeDiscovererCutAnchor
+			? messages.findIndex(
+					(message) =>
+						contextMessageAnchor(message) === knowledgeDiscovererCutAnchor,
+				) + 1
+			: 0;
+		const removed = messages.slice(start, contextFilterState.cutIndex);
+		if (removed.length) {
+			knowledgeDiscovererCutAnchor =
+				contextMessageAnchor(messages[contextFilterState.cutIndex - 1]) ?? null;
+			void launchKnowledgeDiscoverer(workExtensionPi, ctx, removed).catch(
+				() => {},
+			);
+		}
 	}
 	const state = contextFilterState.snapshot?.state ?? {
 		targetId: compactionTargetId(activeWorkGoal),
@@ -10650,13 +10664,62 @@ async function subagentRpc(pi, method, params, timeoutMs = 2000) {
 	});
 }
 
+// A quota-blocked model is excluded by pi-subagents for hours, so retrying it on
+// every launch burns a doomed child before every fallback. Park the model until
+// its stated expiry (or an hour) and go straight to the inherited model.
+const MODEL_QUOTA_BACKOFF_MS = 3_600_000;
+const modelQuotaBackoff = new Map();
+const MODEL_EXCLUSION_PATTERN =
+	/'([^']{1,160})' is excluded and cannot be replaced by a fallback \(([^)]*)\)/g;
+
+export function noteExcludedModels(event, now = Date.now()) {
+	let text;
+	try {
+		text = JSON.stringify(event);
+	} catch {
+		return 0;
+	}
+	let noted = 0;
+	for (const [, model, detail] of String(text ?? "").matchAll(
+		MODEL_EXCLUSION_PATTERN,
+	)) {
+		const expires = Date.parse(/expires:\s*([^;,\s]+)/.exec(detail)?.[1] ?? "");
+		modelQuotaBackoff.set(
+			model,
+			Number.isFinite(expires) && expires > now
+				? expires
+				: now + MODEL_QUOTA_BACKOFF_MS,
+		);
+		noted += 1;
+	}
+	return noted;
+}
+
+export function excludedModelParked(model, now = Date.now()) {
+	const until = modelQuotaBackoff.get(model);
+	if (until === undefined) return false;
+	if (until > now) return true;
+	modelQuotaBackoff.delete(model);
+	return false;
+}
+
 export function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
-	const { async = true, clarify: _clarify, ...child } = params;
+	const {
+		async = true,
+		clarify: _clarify,
+		fallbackToInheritedModel = false,
+		...child
+	} = params;
+	if (fallbackToInheritedModel && excludedModelParked(child.model))
+		delete child.model;
+	const workflowScript = fallbackToInheritedModel && child.model
+		? `const task = ${JSON.stringify(child)}; try { return await runs.run("main", task); } catch { delete task.model; return runs.run("fallback", task); }`
+		: `return runs.run("main", ${JSON.stringify(child)})`;
 	return subagentRpc(
 		pi,
 		"spawn",
 		{
-			workflowScript: `return runs.run("main", ${JSON.stringify(child)})`,
+			workflowScript,
 			mission: false,
 			async,
 			...(child.cwd ? { cwd: child.cwd } : {}),
@@ -29991,6 +30054,7 @@ export default function workModelsExtension(pi) {
 	process.env.PI_ASK_USER_CONTEXT_EXPANDED ||= "true";
 	workExtensionPi = pi;
 	pi.events?.on?.("subagent:async-complete", (event) => {
+		noteExcludedModels(event);
 		const absorbed = absorbKnowledgeDiscovererCompletion(event);
 		if (absorbed?.count)
 			absorbed.notify?.(

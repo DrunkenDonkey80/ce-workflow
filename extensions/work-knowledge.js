@@ -765,7 +765,18 @@ export function renderKnowledge(results, options = {}) {
 		1_200,
 		Math.max(200, Number(options.maxChars ?? 1_200)),
 	);
-	const safe = results.filter((record) => !hasSecret(record.claim)).slice(0, 5);
+	// Record-time dedupe only merges claims at >=0.9 similarity, so a fact
+	// reworded a few times survives as separate records and this block reads as
+	// the same sentence three times. Collapse the looser paraphrases here too,
+	// keeping the highest-ranked wording.
+	const safe = [];
+	for (const record of results) {
+		if (hasSecret(record.claim)) continue;
+		if (safe.some((kept) => claimSimilarity(kept.claim, record.claim) >= 0.6))
+			continue;
+		safe.push(record);
+		if (safe.length === 5) break;
+	}
 	if (!safe.length) return "";
 	const lines = [];
 	for (const record of safe) {

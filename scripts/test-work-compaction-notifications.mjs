@@ -11,8 +11,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import workModelsExtension, {
 	absorbKnowledgeDiscovererCompletion,
+	excludedModelParked,
 	isKnowledgeDiscovererCompletionMessage,
 	launchKnowledgeDiscoverer,
+	noteExcludedModels,
 } from "../extensions/work-models.ts";
 
 // Replay the delayed wakeups seen after compaction in LPGSlim and ce-workflow
@@ -22,6 +24,7 @@ const hooks = {};
 const listeners = new Map();
 let aborts = 0;
 let launch;
+let workflowScript;
 const runId = "43b46a2e-ec06-4f14-b99e-e3f81478d87a";
 const pi = {
 	on: (name, handler) => {
@@ -38,9 +41,9 @@ const pi = {
 		emit(name, event) {
 			if (name !== "subagents:rpc:v1:request") return;
 			try {
-				launch = JSON.parse(
-					event.params.workflowScript.match(/runs\.run\("main", (.*)\)$/s)[1],
-				);
+				workflowScript = event.params.workflowScript;
+				assert.match(workflowScript, /"agent":"work-knowledge-discoverer"/);
+				launch = { agent: "work-knowledge-discoverer" };
 			} catch (error) {
 				assert.fail(`Invalid discoverer launch envelope: ${error.message}`);
 			}
@@ -213,6 +216,52 @@ try {
 		launch.agent,
 		"work-knowledge-discoverer",
 		"discovery must not use a mutation-capable delegate",
+	);
+	assert.match(
+		workflowScript,
+		/runs\.run\("fallback", task\)/,
+		"an unavailable configured model falls back to the parent model",
+	);
+	assert.equal(
+		(workflowScript.match(/"model":/g) ?? []).length,
+		1,
+		"the inherited fallback must not keep the unavailable model override",
+	);
+	// A quota-excluded model is parked until its expiry instead of being retried
+	// (and failing) ahead of every fallback launch.
+	const excluded = (model, detail) => ({
+		results: [
+			{
+				success: false,
+				error: {
+					message: `Requested subagent model '${model}' is excluded and cannot be replaced by a fallback (${detail}).`,
+				},
+			},
+		],
+	});
+	assert.equal(
+		noteExcludedModels(
+			excluded(
+				"test/free",
+				"reason: limit reached; expires: 2099-01-01T00:00:00.000Z",
+			),
+		),
+		1,
+	);
+	await launchKnowledgeDiscoverer(pi, ctx, [
+		{ role: "user", content: "A later removed turn." },
+	]);
+	assert.doesNotMatch(
+		workflowScript,
+		/"model":|runs\.run\("fallback"/,
+		"a quota-parked model is skipped instead of re-failing before every fallback",
+	);
+	noteExcludedModels(excluded("test/hourly", "reason: runtime-failure"), 1_000);
+	assert.equal(excludedModelParked("test/hourly", 1_000 + 3_599_000), true);
+	assert.equal(
+		excludedModelParked("test/hourly", 1_000 + 3_601_000),
+		false,
+		"an exclusion without an expiry retries once an hour",
 	);
 	const agent = readFileSync(
 		new URL("../agents/work-knowledge-discoverer.md", import.meta.url),
