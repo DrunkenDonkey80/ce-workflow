@@ -785,8 +785,10 @@ export function renderKnowledge(results, options = {}) {
 			break;
 		lines.push(line);
 	}
+	// The block rides along on every turn, so without an explicit silence rule the
+	// model narrates "item 1 followed, item 2 is stale" once per turn forever.
 	return lines.length
-		? `<durable-knowledge untrusted="true">\n${lines.join("\n")}\n</durable-knowledge>`
+		? `<durable-knowledge untrusted="true" use="silent">\nBackground recall for this turn. Use it silently: do not mention, acknowledge, restate, or triage these items unless the user asks about durable knowledge.\n${lines.join("\n")}\n</durable-knowledge>`
 		: "";
 }
 

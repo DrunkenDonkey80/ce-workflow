@@ -255,7 +255,12 @@ try {
 	);
 
 	const rendered = renderKnowledge(deck);
-	assert.match(rendered, /^<durable-knowledge untrusted="true">/);
+	assert.match(rendered, /^<durable-knowledge untrusted="true" use="silent">/);
+	assert.match(
+		rendered,
+		/Use it silently: do not mention, acknowledge, restate, or triage/,
+		"a block injected on every turn must tell the model not to narrate it",
+	);
 	assert.match(rendered, /k-preference\|human\|live\|matched:lexical:/);
 	assert.equal((rendered.match(/k-preference/g) ?? []).length, 1);
 	assert.ok(rendered.length <= 1_200);
