@@ -44,8 +44,7 @@ const pi = {
 			if (name !== "subagents:rpc:v1:request") return;
 			try {
 				workflowScript = event.params.workflowScript;
-			if (!discovererPayloadScript)
-				discovererPayloadScript = workflowScript;
+				if (!discovererPayloadScript) discovererPayloadScript = workflowScript;
 				assert.match(workflowScript, /"agent":"work-knowledge-discoverer"/);
 				launch = { agent: "work-knowledge-discoverer" };
 			} catch (error) {
@@ -323,7 +322,7 @@ try {
 	);
 	assert.match(
 		discovererPayloadScript,
-		/crc32:[0-9a-f]{8}/,
+		/image payload dropped/,
 		"the discoverer payload carries image placeholders",
 	);
 	const strippedConsumed = stripProcessedImages(consumed);
@@ -334,8 +333,8 @@ try {
 	);
 	assert.match(
 		strippedConsumed[1].content[1].text,
-		/crc32:[0-9a-f]{8}.*C:\/x\/shot\.png/s,
-		"the placeholder names the file and its crc32",
+		/image payload dropped.*C:\/x\/shot\.png/s,
+		"the placeholder names the file",
 	);
 	assert(
 		strippedConsumed[1].content.every((part) => part.text?.trim()),
@@ -367,12 +366,60 @@ try {
 		1,
 		"an image-only toolResult keeps exactly one non-empty placeholder",
 	);
-	assert.match(strippedImageOnly[1].content[0].text, /crc32:[0-9a-f]{8}/);
+	assert.match(strippedImageOnly[1].content[0].text, /image payload dropped/);
 	const live = [imageCall, imageResult];
 	assert.equal(
 		stripProcessedImages(live),
 		live,
 		"an image the model has not yet answered keeps its payload (same reference)",
+	);
+	// Stamps are size+mtime from the file, frozen at first build: a changed
+	// file gets a fresh stamp only through a NEW read (new toolCallId), and an
+	// old message's placeholder never mutates again.
+	const shotPath = path.join(cwd, "shot.png");
+	writeFileSync(shotPath, Buffer.alloc(2048));
+	const realCall = (id) => ({
+		role: "assistant",
+		content: [
+			{ type: "toolCall", id, name: "read", arguments: { path: shotPath } },
+		],
+	});
+	const realResult = (id) => ({
+		role: "toolResult",
+		toolCallId: id,
+		toolName: "read",
+		content: [{ type: "image", data: "aGk=" }],
+	});
+	const answered = (rest) => [
+		...rest,
+		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
+	];
+	const stampedOnce = stripProcessedImages(
+		answered([realCall("img-r1"), realResult("img-r1")]),
+	);
+	assert.match(
+		stampedOnce[1].content[0].text,
+		/file 2KB, modified/,
+		"the stamp uses file size and mtime",
+	);
+	writeFileSync(shotPath, Buffer.alloc(4096));
+	const stampedTwice = stripProcessedImages(
+		answered([
+			realCall("img-r1"),
+			realResult("img-r1"),
+			realCall("img-r2"),
+			realResult("img-r2"),
+		]),
+	);
+	assert.match(
+		stampedTwice[3].content[0].text,
+		/file 4KB/,
+		"a re-read after a change stamps the new size",
+	);
+	assert.equal(
+		stampedTwice[1].content[0].text,
+		stampedOnce[1].content[0].text,
+		"the first stamp is frozen: an old message never mutates again",
 	);
 	const agent = readFileSync(
 		new URL("../agents/work-knowledge-discoverer.md", import.meta.url),

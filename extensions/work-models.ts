@@ -20,7 +20,6 @@ import {
 	writeSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import zlib from "node:zlib";
 import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import {
@@ -6514,14 +6513,28 @@ function filteredContext(event, ctx) {
 	};
 }
 
-function imageDropPlaceholder(data, path) {
-	const bytes = Buffer.from(String(data ?? ""), "base64");
-	const crc = (
-		typeof zlib.crc32 === "function" ? zlib.crc32(bytes) : bytes.length
-	)
-		.toString(16)
-		.padStart(8, "0");
-	return `[image payload dropped (${Math.round(bytes.length / 1024)}KB, crc32:${crc}) — re-read ${path ?? "the source file"} to view current contents; a differing crc32 means the file changed since this read.]`;
+// Stamps are frozen on first build: re-statting each turn would let a changed
+// file mutate an old message's placeholder (breaking prompt-cache monotonicity),
+// and re-hashing the payload every turn is pure waste. A changed file gets a
+// fresh stamp only through a new read (new toolCallId), which is the moment the
+// model would re-process it anyway.
+const imageStampCache = new Map();
+
+function imageDropPlaceholder(data, path, key) {
+	const cached = imageStampCache.get(key);
+	if (cached) return cached;
+	let stamp;
+	try {
+		const info = statSync(path);
+		stamp = `file ${Math.round(info.size / 1024)}KB, modified ${info.mtime.toISOString()}`;
+	} catch {
+		stamp = `payload ~${Math.round((String(data ?? "").length * 3) / 4096)}KB`;
+	}
+	const text = `[image payload dropped (${stamp}) — re-read ${path ?? "the source file"} to view current contents; a different size or timestamp means the file changed since this read.]`;
+	if (imageStampCache.size > 64)
+		imageStampCache.delete(imageStampCache.keys().next().value);
+	imageStampCache.set(key, text);
+	return text;
 }
 
 // Image payloads are re-sent and re-processed by the model on every turn until
@@ -6529,7 +6542,7 @@ function imageDropPlaceholder(data, path) {
 // lives in the transcript as assistant text. Once any assistant message
 // follows an image toolResult the payload is redundant: drop it from the
 // OUTGOING context only (the stored session keeps the image), leaving a
-// placeholder whose crc32 lets a later re-read detect that the file changed.
+// placeholder whose frozen size+mtime stamp lets a later re-read detect that
 // Monotonic by construction — once consumed, always consumed — so the
 // serialized form of an old message never changes twice (one prompt-cache
 // break per image, right after its analysis turn).
@@ -6559,13 +6572,14 @@ export function stripProcessedImages(messages) {
 		stripped = true;
 		return {
 			...message,
-			content: message.content.map((part) =>
+			content: message.content.map((part, partIndex) =>
 				part?.type === "image"
 					? {
 							type: "text",
 							text: imageDropPlaceholder(
 								part.data,
 								paths.get(message.toolCallId),
+								`${message.toolCallId}:${partIndex}`,
 							),
 						}
 					: part,
