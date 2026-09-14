@@ -6207,6 +6207,7 @@ export async function launchKnowledgeDiscoverer(pi, ctx, messages) {
 		stripProcessedPayloads(messages, {
 			supersededReads: false,
 			giantResults: false,
+			thinking: false,
 		}),
 	);
 	const cutKey = `${resolve(ctx.cwd)}:${packet.fingerprint}`;
@@ -6217,6 +6218,7 @@ export async function launchKnowledgeDiscoverer(pi, ctx, messages) {
 	const spawned = await spawnSubagentRpc(pi, {
 		agent: "work-knowledge-discoverer",
 		acceptance: false,
+		fallbackToInheritedModel: configured.model !== INHERIT_MODEL,
 		...(configured.model === INHERIT_MODEL ? {} : { model: configured.model }),
 		thinking: configured.thinking,
 		context: "fresh",
@@ -6497,6 +6499,20 @@ function filteredContext(event, ctx) {
 	const outgoing = stripProcessedPayloads(messages, {
 		fromIndex: contextFilterState.active ? contextFilterState.cutIndex : 0,
 	});
+	if (process.env.STRIP_DEBUG) {
+		const thinkingParts = (list) =>
+			list.reduce(
+				(sum, m) =>
+					sum +
+					(Array.isArray(m?.content)
+						? m.content.filter((p) => p?.type === "thinking").length
+						: 0),
+				0,
+			);
+		console.error(
+				`[strip] msgs ${messages.length} -> ${outgoing.length}, thinking parts ${thinkingParts(messages)} in / ${thinkingParts(outgoing)} out`,
+		);
+	}
 	if (!contextFilterState.active)
 		return knowledge || removedInternalMessages || outgoing !== messages
 			? { messages: [...outgoing, ...(knowledge ? [knowledge] : [])] }
@@ -6613,6 +6629,7 @@ export function stripProcessedPayloads(
 		giantResults = true,
 		supersededReads = true,
 		duplicates = true,
+		thinking = true,
 		fromIndex = 0,
 	} = {},
 ) {
@@ -6666,6 +6683,18 @@ export function stripProcessedPayloads(
 	}
 	let stripped = false;
 	const outgoing = messages.map((message, index) => {
+		// Aged thinking blocks are dead weight: providers only require thinking
+		// for the current tool-use loop, but pi re-sends every old block every
+		// turn. Dropped blocks are never signature-checked, so pruning them is
+		// safe; the grace window keeps the active loop intact.
+		if (message?.role === "assistant" && Array.isArray(message.content)) {
+			if (!thinking || index >= secondLastAssistant) return message;
+			const kept = message.content.filter((part) => part?.type !== "thinking");
+			if (!kept.length || kept.length === message.content.length)
+				return message;
+			stripped = true;
+			return { ...message, content: kept };
+		}
 		if (
 			index >= lastAssistant ||
 			message?.role !== "toolResult" ||

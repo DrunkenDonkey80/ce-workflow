@@ -609,6 +609,57 @@ try {
 		/stale read of C:\/x\/mod\.ts/,
 		"read_symbol results are superseded like reads",
 	);
+	const thinkA1 = {
+		role: "assistant",
+		content: [
+			{ type: "thinking", thinking: "hmm", thinkingSignature: "sig" },
+			{ type: "text", text: "answer" },
+		],
+	};
+	const thinkA2 = { role: "assistant", content: [{ type: "text", text: "two" }] };
+	const thinkA3 = { role: "assistant", content: [{ type: "text", text: "three" }] };
+	const thinkStripped = stripProcessedPayloads([thinkA1, thinkA2, thinkA3]);
+	assert.equal(
+		thinkStripped[0].content.length,
+		1,
+		"aged thinking is dropped from old assistant turns",
+	);
+	assert.equal(thinkStripped[0].content[0].type, "text");
+	assert.equal(
+		stripProcessedPayloads([thinkA1, thinkA2])[0].content.length,
+		2,
+		"thinking survives the grace window",
+	);
+	assert.equal(
+		stripProcessedPayloads([thinkA1, thinkA2, thinkA3], { thinking: false })[0]
+			.content.length,
+		2,
+		"the thinking flag disables dropping",
+	);
+	const thinkTool = stripProcessedPayloads(
+		[
+			{
+				role: "assistant",
+				content: [
+					{ type: "thinking", thinking: "hmm", thinkingSignature: "s" },
+					{
+						type: "toolCall",
+						id: "tc-9",
+						name: "bash",
+						arguments: { command: "ls" },
+					},
+				],
+			},
+			thinkA2,
+			thinkA3,
+		],
+		{ thinking: true },
+	);
+	assert.equal(
+		thinkTool[0].content[0].type,
+		"toolCall",
+		"toolCall parts survive thinking drops",
+	);
 	if (process.platform === "win32") {
 		const casing = stripProcessedPayloads([
 			{
