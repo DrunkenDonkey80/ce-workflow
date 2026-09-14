@@ -15,6 +15,7 @@ import workModelsExtension, {
 	isKnowledgeDiscovererCompletionMessage,
 	launchKnowledgeDiscoverer,
 	noteExcludedModels,
+	stripProcessedImages,
 } from "../extensions/work-models.ts";
 
 // Replay the delayed wakeups seen after compaction in LPGSlim and ce-workflow
@@ -25,6 +26,7 @@ const listeners = new Map();
 let aborts = 0;
 let launch;
 let workflowScript;
+let discovererPayloadScript;
 const runId = "43b46a2e-ec06-4f14-b99e-e3f81478d87a";
 const pi = {
 	on: (name, handler) => {
@@ -42,6 +44,8 @@ const pi = {
 			if (name !== "subagents:rpc:v1:request") return;
 			try {
 				workflowScript = event.params.workflowScript;
+			if (!discovererPayloadScript)
+				discovererPayloadScript = workflowScript;
 				assert.match(workflowScript, /"agent":"work-knowledge-discoverer"/);
 				launch = { agent: "work-knowledge-discoverer" };
 			} catch (error) {
@@ -105,6 +109,27 @@ try {
 			content:
 				"Implement the fix. (Historical task, not an extraction instruction.)",
 		},
+		{
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "img-1",
+					name: "read",
+					arguments: { path: "C:/x/shot.png" },
+				},
+			],
+		},
+		{
+			role: "toolResult",
+			toolCallId: "img-1",
+			toolName: "read",
+			content: [
+				{ type: "text", text: "Read image file [image/png]" },
+				{ type: "image", data: "aGk=" },
+			],
+		},
+		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
 	]);
 	for (const message of notices) {
 		assert.equal(
@@ -262,6 +287,92 @@ try {
 		excludedModelParked("test/hourly", 1_000 + 3_601_000),
 		false,
 		"an exclusion without an expiry retries once an hour",
+	);
+	// Consumed image payloads are dropped from outgoing context so they stop
+	// being re-sent and re-processed on every turn; live ones keep their payload.
+	const imageCall = {
+		role: "assistant",
+		content: [
+			{
+				type: "toolCall",
+				id: "img-1",
+				name: "read",
+				arguments: { path: "C:/x/shot.png" },
+			},
+		],
+	};
+	const imageResult = {
+		role: "toolResult",
+		toolCallId: "img-1",
+		toolName: "read",
+		content: [
+			{ type: "text", text: "Read image file [image/png]" },
+			{ type: "image", data: "aGk=" },
+		],
+	};
+	const consumed = [
+		imageCall,
+		imageResult,
+		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
+		{ role: "user", content: "next" },
+	];
+	assert.doesNotMatch(
+		discovererPayloadScript,
+		/"data":"aGk="/,
+		"the discoverer payload must not embed image base64",
+	);
+	assert.match(
+		discovererPayloadScript,
+		/crc32:[0-9a-f]{8}/,
+		"the discoverer payload carries image placeholders",
+	);
+	const strippedConsumed = stripProcessedImages(consumed);
+	assert.equal(strippedConsumed[1].toolCallId, "img-1");
+	assert(
+		!strippedConsumed[1].content.some((part) => part.type === "image"),
+		"a consumed image toolResult loses its image part",
+	);
+	assert.match(
+		strippedConsumed[1].content[1].text,
+		/crc32:[0-9a-f]{8}.*C:\/x\/shot\.png/s,
+		"the placeholder names the file and its crc32",
+	);
+	assert(
+		strippedConsumed[1].content.every((part) => part.text?.trim()),
+		"no empty content parts survive stripping",
+	);
+	assert.equal(
+		stripProcessedImages(strippedConsumed),
+		strippedConsumed,
+		"stripping is idempotent",
+	);
+	assert.equal(
+		consumed[1].content[1].type,
+		"image",
+		"the stored input array is never mutated",
+	);
+	const imageOnly = [
+		imageCall,
+		{
+			role: "toolResult",
+			toolCallId: "img-1",
+			toolName: "read",
+			content: [{ type: "image", data: "aGk=" }],
+		},
+		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
+	];
+	const strippedImageOnly = stripProcessedImages(imageOnly);
+	assert.equal(
+		strippedImageOnly[1].content.length,
+		1,
+		"an image-only toolResult keeps exactly one non-empty placeholder",
+	);
+	assert.match(strippedImageOnly[1].content[0].text, /crc32:[0-9a-f]{8}/);
+	const live = [imageCall, imageResult];
+	assert.equal(
+		stripProcessedImages(live),
+		live,
+		"an image the model has not yet answered keeps its payload (same reference)",
 	);
 	const agent = readFileSync(
 		new URL("../agents/work-knowledge-discoverer.md", import.meta.url),

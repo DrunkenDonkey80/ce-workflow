@@ -20,6 +20,7 @@ import {
 	writeSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
+import zlib from "node:zlib";
 import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import {
@@ -6200,7 +6201,9 @@ const KNOWLEDGE_DISCOVERER_SCHEMA = {
 export async function launchKnowledgeDiscoverer(pi, ctx, messages) {
 	const configured = knowledgeDiscovererSettings(ctx.cwd);
 	if (configured.model === NONE_MODEL || !messages.length) return;
-	const packet = buildKnowledgeDiscovererPacket(messages);
+	const packet = buildKnowledgeDiscovererPacket(
+		stripProcessedImages(messages),
+	);
 	const cutKey = `${resolve(ctx.cwd)}:${packet.fingerprint}`;
 	if (!packet.text || knowledgeDiscovererCuts.has(cutKey)) return;
 	knowledgeDiscovererCuts.add(cutKey);
@@ -6486,9 +6489,10 @@ function filteredContext(event, ctx) {
 		state,
 		files: filesFromOps(contextFilterFileOps(messages)),
 	});
+	const outgoing = stripProcessedImages(messages);
 	if (!contextFilterState.active)
-		return knowledge || removedInternalMessages
-			? { messages: [...messages, ...(knowledge ? [knowledge] : [])] }
+		return knowledge || removedInternalMessages || outgoing !== messages
+			? { messages: [...outgoing, ...(knowledge ? [knowledge] : [])] }
 			: undefined;
 	return {
 		messages: [
@@ -6508,6 +6512,67 @@ function filteredContext(event, ctx) {
 			...(knowledge ? [knowledge] : []),
 		],
 	};
+}
+
+function imageDropPlaceholder(data, path) {
+	const bytes = Buffer.from(String(data ?? ""), "base64");
+	const crc = (
+		typeof zlib.crc32 === "function" ? zlib.crc32(bytes) : bytes.length
+	)
+		.toString(16)
+		.padStart(8, "0");
+	return `[image payload dropped (${Math.round(bytes.length / 1024)}KB, crc32:${crc}) — re-read ${path ?? "the source file"} to view current contents; a differing crc32 means the file changed since this read.]`;
+}
+
+// Image payloads are re-sent and re-processed by the model on every turn until
+// a compaction finally cuts them, even though the model's analysis already
+// lives in the transcript as assistant text. Once any assistant message
+// follows an image toolResult the payload is redundant: drop it from the
+// OUTGOING context only (the stored session keeps the image), leaving a
+// placeholder whose crc32 lets a later re-read detect that the file changed.
+// Monotonic by construction — once consumed, always consumed — so the
+// serialized form of an old message never changes twice (one prompt-cache
+// break per image, right after its analysis turn).
+export function stripProcessedImages(messages) {
+	let lastAssistant = -1;
+	for (let i = messages.length - 1; i >= 0; i--)
+		if (messages[i]?.role === "assistant") {
+			lastAssistant = i;
+			break;
+		}
+	if (lastAssistant < 0) return messages;
+	const paths = new Map();
+	for (const message of messages)
+		if (message?.role === "assistant" && Array.isArray(message.content))
+			for (const part of message.content)
+				if (part?.type === "toolCall" && part.arguments?.path)
+					paths.set(part.id, String(part.arguments.path));
+	let stripped = false;
+	const outgoing = messages.map((message, index) => {
+		if (
+			index >= lastAssistant ||
+			message?.role !== "toolResult" ||
+			!Array.isArray(message.content) ||
+			!message.content.some((part) => part?.type === "image")
+		)
+			return message;
+		stripped = true;
+		return {
+			...message,
+			content: message.content.map((part) =>
+				part?.type === "image"
+					? {
+							type: "text",
+							text: imageDropPlaceholder(
+								part.data,
+								paths.get(message.toolCallId),
+							),
+						}
+					: part,
+			),
+		};
+	});
+	return stripped ? outgoing : messages;
 }
 
 function requestContextFilter(ctx) {
