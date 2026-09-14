@@ -6563,6 +6563,14 @@ const STRIP_GIANT_RESULT_CHARS = 24_000;
 const STRIP_GIANT_HEAD_LINES = 64;
 const STRIP_GIANT_TAIL_LINES = 32;
 const STRIP_DUPLICATE_MIN_CHARS = 1_000;
+// Path-bearing tools whose results are file reads for supersession purposes.
+const STRIP_READ_LIKE_TOOLS = new Set([
+	"read",
+	"hypa_read",
+	"read_symbol",
+	"read_enclosing",
+	"module_report",
+]);
 
 function truncateGiantText(text) {
 	const lines = text.split("\n");
@@ -6570,7 +6578,10 @@ function truncateGiantText(text) {
 		const head = lines.slice(0, STRIP_GIANT_HEAD_LINES);
 		const tail = lines.slice(-STRIP_GIANT_TAIL_LINES);
 		const dropped = lines.length - head.length - tail.length;
-		return `${head.join("\n")}\n[... ${dropped} lines truncated (${dropped.toLocaleString()} of ${lines.length.toLocaleString()} lines omitted) — re-read with offset/limit if the middle is needed ...]\n${tail.join("\n")}`;
+		const lineCut = `${head.join("\n")}\n[... ${dropped} lines truncated (${dropped.toLocaleString()} of ${lines.length.toLocaleString()} lines omitted) — re-read with offset/limit if the middle is needed ...]\n${tail.join("\n")}`;
+		// Few-but-very-long lines (grep dumps, minified files) can keep the
+		// line cut above the giant budget — fall through to the char cut.
+		if (lineCut.length < STRIP_GIANT_RESULT_CHARS) return lineCut;
 	}
 	const head = text.slice(0, 12_000);
 	const tail = text.slice(-6_000);
@@ -6627,7 +6638,7 @@ export function stripProcessedPayloads(
 			const name = String(part.name ?? "").toLowerCase();
 			const path = String(part.arguments?.path ?? "").trim();
 			if (!path) continue;
-			if (name === "read") paths.set(part.id, path);
+			if (STRIP_READ_LIKE_TOOLS.has(name)) paths.set(part.id, path);
 			if (name === "edit" || name === "write") {
 				// Normalized (resolved, case-folded on Windows) so a read of
 				// "x.ts" is superseded by an edit of "C:/full/path/X.TS" too.

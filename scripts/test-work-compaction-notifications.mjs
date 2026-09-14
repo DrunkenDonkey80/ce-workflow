@@ -457,6 +457,21 @@ try {
 		grace,
 		"giants keep their payload for one grace turn past the first answer",
 	);
+	const longLines = Array.from(
+		{ length: 105 },
+		(_, i) => `${i}: ` + "x".repeat(500),
+	).join("\n");
+	assert.ok(longLines.length >= 24_000, "long-line giant fixture");
+	const longLineCut = stripProcessedPayloads([
+		bashResult(longLines),
+		assistant,
+		assistant,
+	])[0].content[0].text;
+	assert.ok(
+		longLineCut.length < 20_000,
+		`few-but-long-line giants fall through to the char cut (got ${longLineCut.length})`,
+	);
+	assert.match(longLineCut, /chars truncated/);
 	const giant = stripProcessedPayloads([
 		bashResult(bigText),
 		assistant,
@@ -551,6 +566,48 @@ try {
 		stripProcessedPayloads(dupBody, { duplicates: false })[1].content[0].text,
 		dupText,
 		"the duplicates flag disables collapsing",
+	);
+	const readLike = stripProcessedPayloads([
+		{
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "rl-1",
+					name: "read_symbol",
+					arguments: { path: "C:/x/mod.ts", symbol: "foo" },
+				},
+			],
+		},
+		{
+			role: "toolResult",
+			toolCallId: "rl-1",
+			toolName: "read_symbol",
+			content: [{ type: "text", text: "function foo() {}" }],
+		},
+		{
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "rl-2",
+					name: "edit",
+					arguments: { path: "C:/x/mod.ts" },
+				},
+			],
+		},
+		{
+			role: "toolResult",
+			toolCallId: "rl-2",
+			toolName: "edit",
+			content: [{ type: "text", text: "done" }],
+		},
+		assistant,
+	]);
+	assert.match(
+		readLike[1].content[0].text,
+		/stale read of C:\/x\/mod\.ts/,
+		"read_symbol results are superseded like reads",
 	);
 	if (process.platform === "win32") {
 		const casing = stripProcessedPayloads([
