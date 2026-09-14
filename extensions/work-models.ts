@@ -6200,8 +6200,14 @@ const KNOWLEDGE_DISCOVERER_SCHEMA = {
 export async function launchKnowledgeDiscoverer(pi, ctx, messages) {
 	const configured = knowledgeDiscovererSettings(ctx.cwd);
 	if (configured.model === NONE_MODEL || !messages.length) return;
+	// The discoverer mines a removed prefix in one shot with fresh context, so
+	// staleness cannot mislead it — keep full text there and only drop the
+	// megabytes of image payloads.
 	const packet = buildKnowledgeDiscovererPacket(
-		stripProcessedPayloads(messages),
+		stripProcessedPayloads(messages, {
+			supersededReads: false,
+			giantResults: false,
+		}),
 	);
 	const cutKey = `${resolve(ctx.cwd)}:${packet.fingerprint}`;
 	if (!packet.text || knowledgeDiscovererCuts.has(cutKey)) return;
@@ -6488,7 +6494,9 @@ function filteredContext(event, ctx) {
 		state,
 		files: filesFromOps(contextFilterFileOps(messages)),
 	});
-	const outgoing = stripProcessedPayloads(messages);
+	const outgoing = stripProcessedPayloads(messages, {
+		fromIndex: contextFilterState.active ? contextFilterState.cutIndex : 0,
+	});
 	if (!contextFilterState.active)
 		return knowledge || removedInternalMessages || outgoing !== messages
 			? { messages: [...outgoing, ...(knowledge ? [knowledge] : [])] }
@@ -6522,7 +6530,13 @@ const imageStampCache = new Map();
 
 function imageDropPlaceholder(data, path, key) {
 	const cached = imageStampCache.get(key);
-	if (cached) return cached;
+	if (cached) {
+		// LRU refresh: a long-lived image must not be evicted by churn and
+		// re-stamped with different metadata — that would mutate an old message.
+		imageStampCache.delete(key);
+		imageStampCache.set(key, cached);
+		return cached;
+	}
 	let stamp;
 	try {
 		const info = statSync(path);
@@ -6531,7 +6545,7 @@ function imageDropPlaceholder(data, path, key) {
 		stamp = `payload ~${Math.round((String(data ?? "").length * 3) / 4096)}KB`;
 	}
 	const text = `[image payload dropped (${stamp}) — re-read ${path ?? "the source file"} to view current contents; a different size or timestamp means the file changed since this read.]`;
-	if (imageStampCache.size > 64)
+	if (imageStampCache.size > 512)
 		imageStampCache.delete(imageStampCache.keys().next().value);
 	imageStampCache.set(key, text);
 	return text;
@@ -6543,9 +6557,8 @@ function imageDropPlaceholder(data, path, key) {
 // follows an image toolResult the payload is redundant: drop it from the
 // OUTGOING context only (the stored session keeps the image), leaving a
 // placeholder whose frozen size+mtime stamp lets a later re-read detect that
-// Monotonic by construction — once consumed, always consumed — so the
-// serialized form of an old message never changes twice (one prompt-cache
-// break per image, right after its analysis turn).
+// the file changed. Payloads survive one grace turn past the model's first
+// answer so mid-analysis work never goes blind.
 const STRIP_GIANT_RESULT_CHARS = 24_000;
 const STRIP_GIANT_HEAD_LINES = 64;
 const STRIP_GIANT_TAIL_LINES = 32;
@@ -6565,22 +6578,42 @@ function truncateGiantText(text) {
 	return `${head}\n[... ${dropped.toLocaleString()} of ${text.length.toLocaleString()} chars truncated — re-read with offset/limit if the middle is needed ...]\n${tail}`;
 }
 
+function normalizeStripPath(value) {
+	// resolve() anchors relative paths to process.cwd(); close enough for
+	// read-vs-edit supersession within one session.
+	const abs = resolve(String(value ?? ""));
+	return process.platform === "win32" ? abs.toLowerCase() : abs;
+}
+
 // Giant, superseded, and duplicate toolResults and consumed image payloads are
 // all redundant context: the model already acted on them, and stale reads are
 // actively misleading after a later edit. Strip them from the OUTGOING context
 // only (the stored session keeps everything), always leaving the live turn
-// intact. Every decision is monotonic — once consumed, superseded, or repeated,
-// always — so the serialized form of an old message changes at most once per
-// event and prompt caches survive.
+// intact. Transitions are bounded and terminal — a message can move at most a
+// few times (duplicate-collapsed, giant-truncated, finally stale-marked) and
+// never reverts, so prompt caches break a bounded number of times per message.
+// `fromIndex` scopes duplicate detection to the region that will actually be
+// sent, so a "the identical result appears again later" marker can never point
+// at a message the in-work filter is about to cut away.
 export function stripProcessedPayloads(
 	messages,
-	{ images = true, giantResults = true, supersededReads = true } = {},
+	{
+		images = true,
+		giantResults = true,
+		supersededReads = true,
+		duplicates = true,
+		fromIndex = 0,
+	} = {},
 ) {
 	let lastAssistant = -1;
+	let secondLastAssistant = -1;
 	for (let i = messages.length - 1; i >= 0; i--)
 		if (messages[i]?.role === "assistant") {
-			lastAssistant = i;
-			break;
+			if (lastAssistant < 0) lastAssistant = i;
+			else {
+				secondLastAssistant = i;
+				break;
+			}
 		}
 	if (lastAssistant < 0) return messages;
 	const paths = new Map();
@@ -6596,19 +6629,25 @@ export function stripProcessedPayloads(
 			if (!path) continue;
 			if (name === "read") paths.set(part.id, path);
 			if (name === "edit" || name === "write") {
-				const list = editIndices.get(path) ?? [];
+				// Normalized (resolved, case-folded on Windows) so a read of
+				// "x.ts" is superseded by an edit of "C:/full/path/X.TS" too.
+				const editKey = normalizeStripPath(path);
+				const list = editIndices.get(editKey) ?? [];
 				list.push(index);
-				editIndices.set(path, list);
+				editIndices.set(editKey, list);
 			}
 		}
 	}
 	const duplicateLast = new Map();
+	const texts = new Array(messages.length);
 	for (let index = 0; index < messages.length; index++) {
 		const message = messages[index];
 		if (message?.role !== "toolResult" || !Array.isArray(message.content))
 			continue;
 		const text = contentText(message.content);
-		if (text.length < STRIP_DUPLICATE_MIN_CHARS) continue;
+		texts[index] = text;
+		if (index < fromIndex || text.length < STRIP_DUPLICATE_MIN_CHARS)
+			continue;
 		duplicateLast.set(
 			`${message.toolName}:${createHash("sha256").update(text).digest("hex").slice(0, 12)}`,
 			index,
@@ -6626,7 +6665,9 @@ export function stripProcessedPayloads(
 		if (
 			supersededReads &&
 			path &&
-			(editIndices.get(path) ?? []).some((editIndex) => editIndex > index)
+			(editIndices.get(normalizeStripPath(path)) ?? []).some(
+				(editIndex) => editIndex > index,
+			)
 		) {
 			stripped = true;
 			return {
@@ -6639,8 +6680,12 @@ export function stripProcessedPayloads(
 				],
 				};
 		}
-		const text = contentText(message.content);
-		if (text.length >= STRIP_DUPLICATE_MIN_CHARS) {
+		const text = texts[index] ?? "";
+		if (
+			duplicates &&
+			index >= fromIndex &&
+			text.length >= STRIP_DUPLICATE_MIN_CHARS
+		) {
 			const key = `${message.toolName}:${createHash("sha256").update(text).digest("hex").slice(0, 12)}`;
 			if (duplicateLast.get(key) !== index) {
 				stripped = true;
@@ -6656,8 +6701,12 @@ export function stripProcessedPayloads(
 			}
 		}
 		let changed = false;
+		// One grace turn: images and giants keep their payload until a second
+		// assistant turn has passed, so multi-turn work over one read isn't
+		// forced into re-reads.
+		const aged = index < secondLastAssistant;
 		const content = message.content.map((part, partIndex) => {
-			if (images && part?.type === "image") {
+			if (images && aged && part?.type === "image") {
 				changed = true;
 				return {
 					type: "text",
@@ -6670,6 +6719,7 @@ export function stripProcessedPayloads(
 			}
 			if (
 				giantResults &&
+				aged &&
 				part?.type === "text" &&
 				(part.text ?? "").length >= STRIP_GIANT_RESULT_CHARS
 			) {

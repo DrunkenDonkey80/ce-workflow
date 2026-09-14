@@ -129,6 +129,7 @@ try {
 			],
 		},
 		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
+		{ role: "assistant", content: [{ type: "text", text: "More." }] },
 	]);
 	for (const message of notices) {
 		assert.equal(
@@ -314,6 +315,7 @@ try {
 		imageResult,
 		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
 		{ role: "user", content: "next" },
+		{ role: "assistant", content: [{ type: "text", text: "More." }] },
 	];
 	assert.doesNotMatch(
 		discovererPayloadScript,
@@ -359,6 +361,7 @@ try {
 			content: [{ type: "image", data: "aGk=" }],
 		},
 		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
+		{ role: "assistant", content: [{ type: "text", text: "More." }] },
 	];
 	const strippedImageOnly = stripProcessedPayloads(imageOnly);
 	assert.equal(
@@ -393,6 +396,7 @@ try {
 	const answered = (rest) => [
 		...rest,
 		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
+		{ role: "assistant", content: [{ type: "text", text: "More." }] },
 	];
 	const stampedOnce = stripProcessedPayloads(
 		answered([realCall("img-r1"), realResult("img-r1")]),
@@ -431,7 +435,10 @@ try {
 		toolName: "bash",
 		content: [{ type: "text", text }],
 	});
-	const assistant = { role: "assistant", content: [{ type: "text", text: "ok" }] };
+	const assistant = {
+		role: "assistant",
+		content: [{ type: "text", text: "ok" }],
+	};
 	const small = [bashResult("small output"), assistant];
 	assert.equal(
 		stripProcessedPayloads(small),
@@ -444,7 +451,17 @@ try {
 		giantOff,
 		"the giant flag disables truncation",
 	);
-	const giant = stripProcessedPayloads([bashResult(bigText), assistant]);
+	const grace = [bashResult(bigText), assistant];
+	assert.equal(
+		stripProcessedPayloads(grace),
+		grace,
+		"giants keep their payload for one grace turn past the first answer",
+	);
+	const giant = stripProcessedPayloads([
+		bashResult(bigText),
+		assistant,
+		assistant,
+	]);
 	assert.match(
 		giant[0].content[0].text,
 		/\[\.\.\. \d+ lines truncated/,
@@ -479,7 +496,7 @@ try {
 					id: "e-1",
 					name: "edit",
 					arguments: { path: "C:/x/a.ts" },
-			},
+				},
 			],
 		},
 		{
@@ -518,6 +535,67 @@ try {
 		dupText,
 		"the newest identical output keeps its content",
 	);
+	const dupBody = [
+		dupCall("d-1"),
+		bashResult(dupText),
+		dupCall("d-2"),
+		bashResult(dupText),
+		assistant,
+	];
+	assert.equal(
+		stripProcessedPayloads(dupBody, { fromIndex: 3 })[1].content[0].text,
+		dupText,
+		"duplicate markers are scoped to the sent region: no marker may point below the cut",
+	);
+	assert.equal(
+		stripProcessedPayloads(dupBody, { duplicates: false })[1].content[0].text,
+		dupText,
+		"the duplicates flag disables collapsing",
+	);
+	if (process.platform === "win32") {
+		const casing = stripProcessedPayloads([
+			{
+				role: "assistant",
+				content: [
+					{
+						type: "toolCall",
+						id: "rc-1",
+						name: "read",
+						arguments: { path: "c:/x/aA.ts" },
+					},
+				],
+			},
+			{
+				role: "toolResult",
+				toolCallId: "rc-1",
+				toolName: "read",
+				content: [{ type: "text", text: "content" }],
+			},
+			{
+				role: "assistant",
+				content: [
+					{
+						type: "toolCall",
+						id: "ec-1",
+						name: "edit",
+						arguments: { path: "C:/X/Aa.TS" },
+					},
+				],
+			},
+			{
+				role: "toolResult",
+				toolCallId: "ec-1",
+				toolName: "edit",
+				content: [{ type: "text", text: "done" }],
+			},
+			assistant,
+		]);
+		assert.match(
+			casing[1].content[0].text,
+			/stale read of c:\/x\/aA\.ts/,
+			"edit path casing does not defeat supersession on Windows",
+		);
+	}
 	const agent = readFileSync(
 		new URL("../agents/work-knowledge-discoverer.md", import.meta.url),
 		"utf8",
