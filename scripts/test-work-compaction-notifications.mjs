@@ -15,7 +15,7 @@ import workModelsExtension, {
 	isKnowledgeDiscovererCompletionMessage,
 	launchKnowledgeDiscoverer,
 	noteExcludedModels,
-	stripProcessedImages,
+	stripProcessedPayloads,
 } from "../extensions/work-models.ts";
 
 // Replay the delayed wakeups seen after compaction in LPGSlim and ce-workflow
@@ -325,7 +325,7 @@ try {
 		/image payload dropped/,
 		"the discoverer payload carries image placeholders",
 	);
-	const strippedConsumed = stripProcessedImages(consumed);
+	const strippedConsumed = stripProcessedPayloads(consumed);
 	assert.equal(strippedConsumed[1].toolCallId, "img-1");
 	assert(
 		!strippedConsumed[1].content.some((part) => part.type === "image"),
@@ -341,7 +341,7 @@ try {
 		"no empty content parts survive stripping",
 	);
 	assert.equal(
-		stripProcessedImages(strippedConsumed),
+		stripProcessedPayloads(strippedConsumed),
 		strippedConsumed,
 		"stripping is idempotent",
 	);
@@ -360,7 +360,7 @@ try {
 		},
 		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
 	];
-	const strippedImageOnly = stripProcessedImages(imageOnly);
+	const strippedImageOnly = stripProcessedPayloads(imageOnly);
 	assert.equal(
 		strippedImageOnly[1].content.length,
 		1,
@@ -369,7 +369,7 @@ try {
 	assert.match(strippedImageOnly[1].content[0].text, /image payload dropped/);
 	const live = [imageCall, imageResult];
 	assert.equal(
-		stripProcessedImages(live),
+		stripProcessedPayloads(live),
 		live,
 		"an image the model has not yet answered keeps its payload (same reference)",
 	);
@@ -394,7 +394,7 @@ try {
 		...rest,
 		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
 	];
-	const stampedOnce = stripProcessedImages(
+	const stampedOnce = stripProcessedPayloads(
 		answered([realCall("img-r1"), realResult("img-r1")]),
 	);
 	assert.match(
@@ -403,7 +403,7 @@ try {
 		"the stamp uses file size and mtime",
 	);
 	writeFileSync(shotPath, Buffer.alloc(4096));
-	const stampedTwice = stripProcessedImages(
+	const stampedTwice = stripProcessedPayloads(
 		answered([
 			realCall("img-r1"),
 			realResult("img-r1"),
@@ -420,6 +420,103 @@ try {
 		stampedTwice[1].content[0].text,
 		stampedOnce[1].content[0].text,
 		"the first stamp is frozen: an old message never mutates again",
+	);
+	// Giant results truncate the middle, stale reads are replaced whole, and
+	// duplicate identical outputs keep only the newest — each behind its flag.
+	const bigText = `${Array.from({ length: 600 }, (_, i) => `line ${i} with padding `.repeat(2)).join("\n")}`;
+	assert.ok(bigText.length >= 24_000, "giant fixture");
+	const bashResult = (text) => ({
+		role: "toolResult",
+		toolCallId: "b-1",
+		toolName: "bash",
+		content: [{ type: "text", text }],
+	});
+	const assistant = { role: "assistant", content: [{ type: "text", text: "ok" }] };
+	const small = [bashResult("small output"), assistant];
+	assert.equal(
+		stripProcessedPayloads(small),
+		small,
+		"small outputs pass through untouched",
+	);
+	const giantOff = [bashResult(bigText), assistant];
+	assert.equal(
+		stripProcessedPayloads(giantOff, { giantResults: false }),
+		giantOff,
+		"the giant flag disables truncation",
+	);
+	const giant = stripProcessedPayloads([bashResult(bigText), assistant]);
+	assert.match(
+		giant[0].content[0].text,
+		/\[\.\.\. \d+ lines truncated/,
+		"giant results drop their middle",
+	);
+	assert.match(giant[0].content[0].text, /line 599/);
+	assert.doesNotMatch(giant[0].content[0].text, /line 300/);
+	assert.ok(giant[0].content[0].text.length < bigText.length / 2);
+	const stale = stripProcessedPayloads([
+		{
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "r-1",
+					name: "read",
+					arguments: { path: "C:/x/a.ts" },
+				},
+			],
+		},
+		{
+			role: "toolResult",
+			toolCallId: "r-1",
+			toolName: "read",
+			content: [{ type: "text", text: bigText }],
+		},
+		{
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "e-1",
+					name: "edit",
+					arguments: { path: "C:/x/a.ts" },
+			},
+			],
+		},
+		{
+			role: "toolResult",
+			toolCallId: "e-1",
+			toolName: "edit",
+			content: [{ type: "text", text: "done" }],
+		},
+		assistant,
+	]);
+	assert.match(
+		stale[1].content[0].text,
+		/stale read of C:\/x\/a\.ts — this file was edited after this read/,
+		"a read superseded by a later edit is replaced whole",
+	);
+	const dupText = `${Array.from({ length: 40 }, (_, i) => `status ${i} ${"x".repeat(60)}`).join("\n")}`;
+	assert.ok(dupText.length >= 1_000 && dupText.length < 24_000);
+	const dupCall = (id) => ({
+		role: "assistant",
+		content: [{ type: "toolCall", id, name: "bash", arguments: {} }],
+	});
+	const dup = stripProcessedPayloads([
+		dupCall("d-1"),
+		bashResult(dupText),
+		dupCall("d-2"),
+		bashResult(dupText),
+		assistant,
+	]);
+	assert.match(
+		dup[1].content[0].text,
+		/duplicate bash output omitted/,
+		"older identical outputs collapse to a marker",
+	);
+	assert.equal(
+		dup[3].content[0].text,
+		dupText,
+		"the newest identical output keeps its content",
 	);
 	const agent = readFileSync(
 		new URL("../agents/work-knowledge-discoverer.md", import.meta.url),

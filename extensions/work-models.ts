@@ -6201,7 +6201,7 @@ export async function launchKnowledgeDiscoverer(pi, ctx, messages) {
 	const configured = knowledgeDiscovererSettings(ctx.cwd);
 	if (configured.model === NONE_MODEL || !messages.length) return;
 	const packet = buildKnowledgeDiscovererPacket(
-		stripProcessedImages(messages),
+		stripProcessedPayloads(messages),
 	);
 	const cutKey = `${resolve(ctx.cwd)}:${packet.fingerprint}`;
 	if (!packet.text || knowledgeDiscovererCuts.has(cutKey)) return;
@@ -6488,7 +6488,7 @@ function filteredContext(event, ctx) {
 		state,
 		files: filesFromOps(contextFilterFileOps(messages)),
 	});
-	const outgoing = stripProcessedImages(messages);
+	const outgoing = stripProcessedPayloads(messages);
 	if (!contextFilterState.active)
 		return knowledge || removedInternalMessages || outgoing !== messages
 			? { messages: [...outgoing, ...(knowledge ? [knowledge] : [])] }
@@ -6546,7 +6546,36 @@ function imageDropPlaceholder(data, path, key) {
 // Monotonic by construction — once consumed, always consumed — so the
 // serialized form of an old message never changes twice (one prompt-cache
 // break per image, right after its analysis turn).
-export function stripProcessedImages(messages) {
+const STRIP_GIANT_RESULT_CHARS = 24_000;
+const STRIP_GIANT_HEAD_LINES = 64;
+const STRIP_GIANT_TAIL_LINES = 32;
+const STRIP_DUPLICATE_MIN_CHARS = 1_000;
+
+function truncateGiantText(text) {
+	const lines = text.split("\n");
+	if (lines.length > STRIP_GIANT_HEAD_LINES + STRIP_GIANT_TAIL_LINES + 8) {
+		const head = lines.slice(0, STRIP_GIANT_HEAD_LINES);
+		const tail = lines.slice(-STRIP_GIANT_TAIL_LINES);
+		const dropped = lines.length - head.length - tail.length;
+		return `${head.join("\n")}\n[... ${dropped} lines truncated (${dropped.toLocaleString()} of ${lines.length.toLocaleString()} lines omitted) — re-read with offset/limit if the middle is needed ...]\n${tail.join("\n")}`;
+	}
+	const head = text.slice(0, 12_000);
+	const tail = text.slice(-6_000);
+	const dropped = text.length - head.length - tail.length;
+	return `${head}\n[... ${dropped.toLocaleString()} of ${text.length.toLocaleString()} chars truncated — re-read with offset/limit if the middle is needed ...]\n${tail}`;
+}
+
+// Giant, superseded, and duplicate toolResults and consumed image payloads are
+// all redundant context: the model already acted on them, and stale reads are
+// actively misleading after a later edit. Strip them from the OUTGOING context
+// only (the stored session keeps everything), always leaving the live turn
+// intact. Every decision is monotonic — once consumed, superseded, or repeated,
+// always — so the serialized form of an old message changes at most once per
+// event and prompt caches survive.
+export function stripProcessedPayloads(
+	messages,
+	{ images = true, giantResults = true, supersededReads = true } = {},
+) {
 	let lastAssistant = -1;
 	for (let i = messages.length - 1; i >= 0; i--)
 		if (messages[i]?.role === "assistant") {
@@ -6555,36 +6584,103 @@ export function stripProcessedImages(messages) {
 		}
 	if (lastAssistant < 0) return messages;
 	const paths = new Map();
-	for (const message of messages)
-		if (message?.role === "assistant" && Array.isArray(message.content))
-			for (const part of message.content)
-				if (part?.type === "toolCall" && part.arguments?.path)
-					paths.set(part.id, String(part.arguments.path));
+	const editIndices = new Map();
+	for (let index = 0; index < messages.length; index++) {
+		const message = messages[index];
+		if (message?.role !== "assistant" || !Array.isArray(message.content))
+			continue;
+		for (const part of message.content) {
+			if (part?.type !== "toolCall") continue;
+			const name = String(part.name ?? "").toLowerCase();
+			const path = String(part.arguments?.path ?? "").trim();
+			if (!path) continue;
+			if (name === "read") paths.set(part.id, path);
+			if (name === "edit" || name === "write") {
+				const list = editIndices.get(path) ?? [];
+				list.push(index);
+				editIndices.set(path, list);
+			}
+		}
+	}
+	const duplicateLast = new Map();
+	for (let index = 0; index < messages.length; index++) {
+		const message = messages[index];
+		if (message?.role !== "toolResult" || !Array.isArray(message.content))
+			continue;
+		const text = contentText(message.content);
+		if (text.length < STRIP_DUPLICATE_MIN_CHARS) continue;
+		duplicateLast.set(
+			`${message.toolName}:${createHash("sha256").update(text).digest("hex").slice(0, 12)}`,
+			index,
+		);
+	}
 	let stripped = false;
 	const outgoing = messages.map((message, index) => {
 		if (
 			index >= lastAssistant ||
 			message?.role !== "toolResult" ||
-			!Array.isArray(message.content) ||
-			!message.content.some((part) => part?.type === "image")
+			!Array.isArray(message.content)
 		)
 			return message;
-		stripped = true;
-		return {
-			...message,
-			content: message.content.map((part, partIndex) =>
-				part?.type === "image"
-					? {
+		const path = paths.get(message.toolCallId);
+		if (
+			supersededReads &&
+			path &&
+			(editIndices.get(path) ?? []).some((editIndex) => editIndex > index)
+		) {
+			stripped = true;
+			return {
+				...message,
+				content: [
+					{
+						type: "text",
+						text: `[stale read of ${path} — this file was edited after this read; re-read it before relying on its contents or line numbers.]`,
+					},
+				],
+				};
+		}
+		const text = contentText(message.content);
+		if (text.length >= STRIP_DUPLICATE_MIN_CHARS) {
+			const key = `${message.toolName}:${createHash("sha256").update(text).digest("hex").slice(0, 12)}`;
+			if (duplicateLast.get(key) !== index) {
+				stripped = true;
+				return {
+					...message,
+					content: [
+						{
 							type: "text",
-							text: imageDropPlaceholder(
-								part.data,
-								paths.get(message.toolCallId),
-								`${message.toolCallId}:${partIndex}`,
-							),
-						}
-					: part,
-			),
-		};
+							text: `[duplicate ${message.toolName} output omitted — the identical result appears again later in this context.]`,
+						},
+					],
+				};
+			}
+		}
+		let changed = false;
+		const content = message.content.map((part, partIndex) => {
+			if (images && part?.type === "image") {
+				changed = true;
+				return {
+					type: "text",
+					text: imageDropPlaceholder(
+						part.data,
+						path,
+						`${message.toolCallId}:${partIndex}`,
+					),
+				};
+			}
+			if (
+				giantResults &&
+				part?.type === "text" &&
+				(part.text ?? "").length >= STRIP_GIANT_RESULT_CHARS
+			) {
+				changed = true;
+				return { type: "text", text: truncateGiantText(part.text) };
+			}
+			return part;
+		});
+		if (!changed) return message;
+		stripped = true;
+		return { ...message, content };
 	});
 	return stripped ? outgoing : messages;
 }
