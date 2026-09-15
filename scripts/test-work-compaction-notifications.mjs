@@ -15,6 +15,8 @@ import workModelsExtension, {
 	isKnowledgeDiscovererCompletionMessage,
 	launchKnowledgeDiscoverer,
 	noteExcludedModels,
+	requestContextFilter,
+	resetContextFilter,
 	stripProcessedPayloads,
 } from "../extensions/work-models.ts";
 
@@ -128,7 +130,13 @@ try {
 				{ type: "image", data: "aGk=" },
 			],
 		},
-		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
+		{
+			role: "assistant",
+			content: [
+				{ type: "thinking", thinking: "DISCOVERER_HIDDEN_REASONING" },
+				{ type: "text", text: "Analyzed." },
+			],
+		},
 		{ role: "assistant", content: [{ type: "text", text: "More." }] },
 	]);
 	for (const message of notices) {
@@ -327,7 +335,12 @@ try {
 		/image payload dropped/,
 		"the discoverer payload carries image placeholders",
 	);
-	const strippedConsumed = stripProcessedPayloads(consumed);
+	assert.doesNotMatch(
+		discovererPayloadScript,
+		/DISCOVERER_HIDDEN_REASONING/,
+		"knowledge discovery serializes visible transcript text, not hidden reasoning",
+	);
+	const strippedConsumed = stripProcessedPayloads(consumed, { images: true });
 	assert.equal(strippedConsumed[1].toolCallId, "img-1");
 	assert(
 		!strippedConsumed[1].content.some((part) => part.type === "image"),
@@ -363,7 +376,7 @@ try {
 		{ role: "assistant", content: [{ type: "text", text: "Analyzed." }] },
 		{ role: "assistant", content: [{ type: "text", text: "More." }] },
 	];
-	const strippedImageOnly = stripProcessedPayloads(imageOnly);
+	const strippedImageOnly = stripProcessedPayloads(imageOnly, { images: true });
 	assert.equal(
 		strippedImageOnly[1].content.length,
 		1,
@@ -376,9 +389,83 @@ try {
 		live,
 		"an image the model has not yet answered keeps its payload (same reference)",
 	);
-	// Stamps are size+mtime from the file, frozen at first build: a changed
-	// file gets a fresh stamp only through a NEW read (new toolCallId), and an
-	// old message's placeholder never mutates again.
+	const largeImageResult = {
+		...imageResult,
+		content: [
+			{ type: "text", text: "Read image file [image/png]" },
+			{ type: "image", data: Buffer.alloc(64 * 1024).toString("base64") },
+		],
+	};
+	const preparedLargeImage = stripProcessedPayloads(
+		[imageCall, largeImageResult],
+		{ images: "large" },
+	);
+	assert.equal(preparedLargeImage[1].content[1].type, "image");
+	assert.match(
+		preparedLargeImage[1].content[2].text,
+		/preserve a concise text record/,
+		"a live large image tells the model to retain reusable visual facts",
+	);
+	const visualRecord = {
+		role: "assistant",
+		content: [{ type: "text", text: "VISUAL_RECORD TRIANGLES=3" }],
+	};
+	const largeConsumed = stripProcessedPayloads(
+		[
+			imageCall,
+			largeImageResult,
+			visualRecord,
+			{ role: "user", content: "next" },
+			{ role: "assistant", content: [{ type: "text", text: "More." }] },
+		],
+		{ images: "large" },
+	);
+	assert.equal(largeConsumed[1].content[1].type, "text");
+	assert.equal(
+		largeConsumed[2],
+		visualRecord,
+		"rolling removal preserves the model's processed visual record",
+	);
+	assert.equal(
+		stripProcessedPayloads(consumed, { images: "large" }),
+		consumed,
+		"small images stay cache-stable until compaction",
+	);
+	const boundaryImages = [
+		{ role: "user", timestamp: 100, content: [{ type: "image", data: "user" }] },
+		{ ...imageCall, timestamp: 150 },
+		{ ...imageResult, timestamp: 200 },
+		{
+			role: "assistant",
+			timestamp: 250,
+			content: [{ type: "text", text: "Analyzed." }],
+		},
+		{ ...imageCall, timestamp: 300 },
+		{ ...imageResult, timestamp: 350 },
+		{
+			role: "assistant",
+			timestamp: 400,
+			content: [{ type: "text", text: "Done." }],
+		},
+	];
+	const boundaryStripped = stripProcessedPayloads(boundaryImages, {
+		images: false,
+		imageBeforeTimestamp: 250,
+	});
+	assert.equal(boundaryStripped[0].content[0].type, "text");
+	assert.equal(boundaryStripped[2].content[1].type, "text");
+	assert.equal(
+		boundaryStripped[5].content[1].type,
+		"image",
+		"compaction drops every pre-boundary image even with rolling disabled, but not later images",
+	);
+	assert.equal(
+		boundaryImages[0].content[0].type,
+		"image",
+		"boundary image stripping does not mutate stored messages",
+	);
+	// Image markers are deterministic and truthful: metadata observed only at
+	// strip time would describe the current file, not the historical payload.
 	const shotPath = path.join(cwd, "shot.png");
 	writeFileSync(shotPath, Buffer.alloc(2048));
 	const realCall = (id) => ({
@@ -400,11 +487,12 @@ try {
 	];
 	const stampedOnce = stripProcessedPayloads(
 		answered([realCall("img-r1"), realResult("img-r1")]),
+		{ images: true },
 	);
-	assert.match(
+	assert.equal(
 		stampedOnce[1].content[0].text,
-		/file 2KB, modified/,
-		"the stamp uses file size and mtime",
+		`[image payload dropped — re-read ${shotPath} to view current contents.]`,
+		"the marker identifies the recoverable source without false historical metadata",
 	);
 	writeFileSync(shotPath, Buffer.alloc(4096));
 	const stampedTwice = stripProcessedPayloads(
@@ -414,16 +502,12 @@ try {
 			realCall("img-r2"),
 			realResult("img-r2"),
 		]),
-	);
-	assert.match(
-		stampedTwice[3].content[0].text,
-		/file 4KB/,
-		"a re-read after a change stamps the new size",
+		{ images: true },
 	);
 	assert.equal(
-		stampedTwice[1].content[0].text,
+		stampedTwice[3].content[0].text,
 		stampedOnce[1].content[0].text,
-		"the first stamp is frozen: an old message never mutates again",
+		"the same path always produces the same cache-friendly marker",
 	);
 	// Giant results truncate the middle, stale reads are replaced whole, and
 	// duplicate identical outputs keep only the newest — each behind its flag.
@@ -527,6 +611,24 @@ try {
 		/stale read of C:\/x\/a\.ts — this file was edited after this read/,
 		"a read superseded by a later edit is replaced whole",
 	);
+	const failedEdit = structuredClone(stale);
+	failedEdit[1].content = [{ type: "text", text: bigText }];
+	failedEdit[3] = { ...failedEdit[3], isError: true };
+	assert.doesNotMatch(
+		stripProcessedPayloads(failedEdit)[1].content[0].text,
+		/stale read/,
+		"an explicitly failed edit does not stale a prior read",
+	);
+	const relativePath = path.relative(cwd, path.join(cwd, "nested", "same.ts"));
+	const cwdMatched = structuredClone(stale);
+	cwdMatched[1].content = [{ type: "text", text: bigText }];
+	cwdMatched[0].content[0].arguments.path = relativePath;
+	cwdMatched[2].content[0].arguments.path = path.join(cwd, "nested", "same.ts");
+	assert.match(
+		stripProcessedPayloads(cwdMatched, { cwd })[1].content[0].text,
+		/stale read/,
+		"relative and absolute paths match against the session cwd",
+	);
 	const dupText = `${Array.from({ length: 40 }, (_, i) => `status ${i} ${"x".repeat(60)}`).join("\n")}`;
 	assert.ok(dupText.length >= 1_000 && dupText.length < 24_000);
 	const dupCall = (id) => ({
@@ -566,6 +668,65 @@ try {
 		stripProcessedPayloads(dupBody, { duplicates: false })[1].content[0].text,
 		dupText,
 		"the duplicates flag disables collapsing",
+	);
+	const mixedDup = structuredClone(dupBody);
+	mixedDup[1].content.push({ type: "image", data: "first" });
+	mixedDup[3].content.push({ type: "image", data: "second" });
+	assert.equal(
+		stripProcessedPayloads(mixedDup)[1].content[0].text,
+		dupText,
+		"text-equal results with non-text payloads do not collapse",
+	);
+	const readCall = (id, file) => ({
+		role: "assistant",
+		content: [{ type: "toolCall", id, name: "read", arguments: { path: file } }],
+	});
+	const editCall = (id, file) => ({
+		role: "assistant",
+		content: [{ type: "toolCall", id, name: "edit", arguments: { path: file } }],
+	});
+	const duplicateThenStale = stripProcessedPayloads([
+		readCall("ra", "C:/x/A.ts"),
+		{
+			role: "toolResult",
+			toolCallId: "ra",
+			toolName: "read",
+			content: [{ type: "text", text: dupText }],
+		},
+		readCall("rb", "C:/x/B.ts"),
+		{
+			role: "toolResult",
+			toolCallId: "rb",
+			toolName: "read",
+			content: [{ type: "text", text: dupText }],
+		},
+		editCall("eb", "C:/x/B.ts"),
+		{
+			role: "toolResult",
+			toolCallId: "eb",
+			toolName: "edit",
+			content: [{ type: "text", text: "done" }],
+		},
+		assistant,
+	]);
+	assert.equal(
+		duplicateThenStale[1].content[0].text,
+		dupText,
+		"duplicate collapsing keeps a full non-stale copy when the newer copy is stale",
+	);
+	assert.match(duplicateThenStale[3].content[0].text, /stale read/);
+	const giantDuplicate = stripProcessedPayloads([
+		dupCall("g-1"),
+		bashResult(bigText),
+		dupCall("g-2"),
+		bashResult(bigText),
+		assistant,
+		assistant,
+	]);
+	assert.match(
+		giantDuplicate[1].content[0].text,
+		/later occurrence is retained in this context, possibly shortened/,
+		"duplicate markers truthfully describe a giant keeper",
 	);
 	const readLike = stripProcessedPayloads([
 		{
@@ -616,13 +777,27 @@ try {
 			{ type: "text", text: "answer" },
 		],
 	};
-	const thinkA2 = { role: "assistant", content: [{ type: "text", text: "two" }] };
-	const thinkA3 = { role: "assistant", content: [{ type: "text", text: "three" }] };
-	const thinkStripped = stripProcessedPayloads([thinkA1, thinkA2, thinkA3]);
+	const thinkA2 = {
+		role: "assistant",
+		content: [{ type: "text", text: "two" }],
+	};
+	const thinkA3 = {
+		role: "assistant",
+		content: [{ type: "text", text: "three" }],
+	};
+	const thinkingDefault = [thinkA1, thinkA2, thinkA3];
+	assert.equal(
+		stripProcessedPayloads(thinkingDefault),
+		thinkingDefault,
+		"thinking removal defaults off until the provider replay path is validated",
+	);
+	const thinkStripped = stripProcessedPayloads([thinkA1, thinkA2, thinkA3], {
+		thinking: true,
+	});
 	assert.equal(
 		thinkStripped[0].content.length,
 		1,
-		"aged thinking is dropped from old assistant turns",
+		"opt-in aged thinking is dropped from old assistant turns",
 	);
 	assert.equal(thinkStripped[0].content[0].type, "text");
 	assert.equal(
@@ -635,6 +810,31 @@ try {
 			.content.length,
 		2,
 		"the thinking flag disables dropping",
+	);
+	const interactionThinking = stripProcessedPayloads(
+		[
+			{ role: "user", content: "stage one" },
+			thinkA1,
+			{ role: "user", content: "stage two" },
+			{
+				role: "assistant",
+				content: [
+					{ type: "thinking", thinking: "current", thinkingSignature: "sig-2" },
+					{ type: "text", text: "working" },
+				],
+			},
+		],
+		{ thinking: "interaction" },
+	);
+	assert.equal(
+		interactionThinking[1].content.length,
+		1,
+		"interaction policy drops reasoning from completed user interactions",
+	);
+	assert.equal(
+		interactionThinking[3].content.length,
+		2,
+		"interaction policy preserves the current user interaction",
 	);
 	const thinkTool = stripProcessedPayloads(
 		[
@@ -660,6 +860,115 @@ try {
 		"toolCall",
 		"toolCall parts survive thinking drops",
 	);
+	const previousGiantFlag = process.env.STRIP_GIANT_RESULTS;
+	const previousThinkingFlag = process.env.STRIP_THINKING;
+	try {
+		process.env.STRIP_GIANT_RESULTS = "0";
+		const giantDisabled = await hooks.context(
+			{ messages: [bashResult(bigText), assistant, assistant] },
+			ctx,
+		);
+		assert.equal(
+			giantDisabled,
+			undefined,
+			"STRIP_GIANT_RESULTS=0 disables giant stripping at the runtime hook",
+		);
+		process.env.STRIP_THINKING = "1";
+		const thinkingEnabled = await hooks.context(
+			{ messages: [thinkA1, thinkA2, thinkA3] },
+			ctx,
+		);
+		assert.equal(
+			thinkingEnabled.messages[0].content.length,
+			1,
+			"STRIP_THINKING=1 opts into thinking removal at the runtime hook",
+		);
+		process.env.STRIP_THINKING = "interaction";
+		const interactionEnabled = await hooks.context(
+			{
+				messages: [
+					{ role: "user", content: "one" },
+					thinkA1,
+					{ role: "user", content: "two" },
+					thinkA2,
+				],
+			},
+			ctx,
+		);
+		assert.equal(
+			interactionEnabled.messages[1].content.length,
+			1,
+			"STRIP_THINKING=interaction drops only completed interactions",
+		);
+	} finally {
+		if (previousGiantFlag === undefined) delete process.env.STRIP_GIANT_RESULTS;
+		else process.env.STRIP_GIANT_RESULTS = previousGiantFlag;
+		if (previousThinkingFlag === undefined) delete process.env.STRIP_THINKING;
+		else process.env.STRIP_THINKING = previousThinkingFlag;
+	}
+	const errorAgedImage = stripProcessedPayloads([
+		realCall("img-errors"),
+		realResult("img-errors"),
+		{ role: "assistant", content: [], stopReason: "error" },
+		{ role: "assistant", content: [], stopReason: "aborted" },
+	]);
+	assert.equal(
+		errorAgedImage[1].content[0].type,
+		"image",
+		"failed and aborted assistant responses do not consume an image",
+	);
+	resetContextFilter();
+	const activeMessages = [
+		{ role: "user", content: "old " + "x".repeat(130_000) },
+		{ role: "assistant", content: [{ type: "text", text: "old answer" }] },
+		{ role: "user", content: "current turn" },
+		{
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "active-giant",
+					name: "bash",
+					arguments: { command: "generate" },
+				},
+			],
+		},
+		{
+			role: "toolResult",
+			toolCallId: "active-giant",
+			toolName: "bash",
+			content: [{ type: "text", text: "g".repeat(30_000) }],
+		},
+		{ role: "assistant", content: [{ type: "text", text: "used giant" }] },
+		{
+			role: "assistant",
+			content: [{ type: "text", text: "y".repeat(100_000) }],
+		},
+	];
+	const activeCtx = { ...ctx, model: { contextWindow: 200_000 } };
+	requestContextFilter(activeCtx);
+	const activeFiltered = await hooks.context(
+		{ messages: activeMessages },
+		activeCtx,
+	);
+	const activeResult = activeFiltered.messages.find(
+		(message) => message?.toolCallId === "active-giant",
+	);
+	assert(
+		activeFiltered.messages.some(
+			(message) => message.role === "compactionSummary",
+		),
+	);
+	assert(
+		activeResult.content[0].text.length < 24_000,
+		"the registered active-context path sends the stripped post-cut tail",
+	);
+	assert.equal(
+		activeMessages[4].content[0].text.length,
+		30_000,
+		"active filtering does not mutate stored input messages",
+	);
+	resetContextFilter();
 	if (process.platform === "win32") {
 		const casing = stripProcessedPayloads([
 			{

@@ -19,6 +19,9 @@
     "README.md"
   ],
   "scripts": {
+    "audit:payload-strip": "node scripts/audit-payload-strip.mjs",
+    "benchmark:image-strip": "node scripts/benchmark-image-strip-live.mjs",
+    "benchmark:reasoning-strip": "node scripts/benchmark-reasoning-strip-live.mjs",
     "verify": "node scripts/verify-package.mjs",
     "verify:quiet": "node scripts/verify-package.mjs --quiet"
   },

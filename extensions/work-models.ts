@@ -754,6 +754,9 @@ const knowledgeDiscovererCuts = new Set();
 // the last message already handed to the discoverer and feed only what is new;
 // otherwise every turn re-derives the same claims at full subagent cost.
 let knowledgeDiscovererCutAnchor = null;
+// Images present when compaction completes must never leak back into later
+// provider requests, even when they were in the freshly retained tail.
+let imageCompactionCutoff = 0;
 // Absorbing a completion deletes its live entry, but the subagent-notify
 // message is filtered afterwards. Without this short memory the filter stops
 // recognizing the run and the notification wakes the session as a new turn.
@@ -780,6 +783,7 @@ const contextFilterState = {
 let contextFilterPersistenceTimer = null;
 let manualMicrocompactGoalResume = null;
 let pendingCompactionWorkflowAuthorization = null;
+let restoredActiveWorkflow = null;
 let pendingWorkPrompt = null;
 let pendingPromptBackedAgentStart = false;
 let activePromptBackedAgent = false;
@@ -859,6 +863,9 @@ const WORK_GOAL_DECISION_MARKER = "WORK_GOAL_NEEDS_HUMAN_DECISION";
 const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
 const WORK_GOAL_MAX_RETRIES = 4;
 const WORK_IMPROVE_MAX_STALLED_TURNS = 2;
+const WORK_PROJECT_DEFAULT_TOKEN_BUDGET = 2_000_000;
+const WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS = 30;
+const WORK_PROJECT_MAX_NO_PROGRESS_TOOL_FAILURES = 3;
 const WORK_CATCH_UP_MAX_CONTINUATIONS = 20;
 const WORK_GOAL_USAGE_LIMIT_RETRY_MS = 10 * 60 * 1000;
 const WORK_MONITOR_INTERVAL_MS = 10 * 60 * 1000;
@@ -1487,7 +1494,7 @@ function workflowActivityMarker() {
 }
 
 function workflowPromptMetadata() {
-	const workflow = currentCommandWorkflow();
+	const workflow = currentCommandWorkflow() ?? restoredActiveWorkflow;
 	if (!workflow?.workflowRunId) return [];
 	return [
 		"work-orchestrator",
@@ -1499,6 +1506,73 @@ function workflowPromptMetadata() {
 function workflowClaimPath(cwd, workflowRunId) {
 	const key = createHash("sha256").update(String(workflowRunId)).digest("hex");
 	return join(telemetryDir(cwd), "claims", `${key}.complete`);
+}
+
+function activeWorkflowRecordPath(cwd) {
+	return join(telemetryDir(cwd), "active-workflow.json");
+}
+
+function writeActiveWorkflowRecord(cwd, workflow, session) {
+	if (!cwd || !workflow?.workflowRunId) return;
+	try {
+		mkdirSync(telemetryDir(cwd), { recursive: true });
+		writeFileSync(
+			activeWorkflowRecordPath(cwd),
+			JSON.stringify({
+				workflowRunId: workflow.workflowRunId,
+				activity: workflow.activity ?? null,
+				session: session ?? null,
+				epicId: workflow.epicId ?? null,
+				workItemId: workflow.workItemId ?? null,
+				updatedAt: Date.now(),
+			}),
+		);
+	} catch {
+		// Best-effort: prompt metadata remains the primary authorization path.
+	}
+}
+
+function clearActiveWorkflowRecord(cwd, workflowRunId) {
+	if (!cwd) return;
+	try {
+		const file = activeWorkflowRecordPath(cwd);
+		if (workflowRunId) {
+			const record = JSON.parse(readFileSync(file, "utf8"));
+			if (record?.workflowRunId && record.workflowRunId !== workflowRunId)
+				return;
+		}
+		rmSync(file, { force: true });
+	} catch {
+		// Missing or unreadable record is already clear.
+	}
+}
+
+function restoreWorkflowAuthorization(
+	cwd,
+	session,
+	promptText,
+	isCompactionResume,
+) {
+	restoredActiveWorkflow = null;
+	if (!cwd) return null;
+	try {
+		const record = JSON.parse(
+			readFileSync(activeWorkflowRecordPath(cwd), "utf8"),
+		);
+		if (!record?.workflowRunId) return null;
+		if (existsSync(workflowClaimPath(cwd, record.workflowRunId))) return null;
+		if (record.session && session && record.session !== session) return null;
+		const prompt = String(promptText ?? "");
+		if (!isCompactionResume && !prompt.includes(record.workflowRunId))
+			return null;
+		restoredActiveWorkflow = {
+			workflowRunId: record.workflowRunId,
+			activity: record.activity ?? undefined,
+		};
+		return record;
+	} catch {
+		return null;
+	}
 }
 
 function completeWorkflowOnce(cwd, completion) {
@@ -1523,6 +1597,7 @@ function completeWorkflowOnce(cwd, completion) {
 	} finally {
 		if (descriptor !== undefined) closeSync(descriptor);
 	}
+	clearActiveWorkflowRecord(cwd, completion.workflowRunId);
 	return claim;
 }
 
@@ -2551,6 +2626,17 @@ async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 			if (note && state?.handoffPrompt)
 				appendTelemetryNote(ctx.cwd, summary.workItemId, event, file);
 			const awaitingAgent = Boolean(state?.handoffPrompt) && !state?.handoffFailed;
+			if (awaitingAgent)
+				writeActiveWorkflowRecord(
+					ctx.cwd,
+					{
+						...workflow,
+						epicId: summary.epicId,
+						workItemId: summary.workItemId,
+					},
+					ctx.sessionManager?.getSessionId?.(),
+				);
+			else clearActiveWorkflowRecord(ctx.cwd, workflow.workflowRunId);
 			if (!awaitingAgent)
 				completeWorkflowOnce(
 					ctx.cwd,
@@ -6205,6 +6291,7 @@ export async function launchKnowledgeDiscoverer(pi, ctx, messages) {
 	// megabytes of image payloads.
 	const packet = buildKnowledgeDiscovererPacket(
 		stripProcessedPayloads(messages, {
+			images: true,
 			supersededReads: false,
 			giantResults: false,
 			thinking: false,
@@ -6245,7 +6332,11 @@ export function absorbKnowledgeDiscovererCompletion(event) {
 		knowledgeDiscovererDoneRuns.delete(
 			knowledgeDiscovererDoneRuns.values().next().value,
 		);
-	const result = Array.isArray(event.results) ? event.results[0] : event;
+	const result = Array.isArray(event.results)
+		? event.results.find(
+				(candidate) => candidate?.success !== false && candidate?.structuredOutput,
+			)
+		: event;
 	if (result?.success === false || !result?.structuredOutput)
 		return { count: 0, notify: tracked.notify };
 	const claims = Array.isArray(result.structuredOutput.claims)
@@ -6498,6 +6589,24 @@ function filteredContext(event, ctx) {
 	});
 	const outgoing = stripProcessedPayloads(messages, {
 		fromIndex: contextFilterState.active ? contextFilterState.cutIndex : 0,
+		cwd: ctx?.cwd,
+		images:
+			process.env.STRIP_IMAGES === "0"
+				? false
+				: process.env.STRIP_IMAGES === "all"
+					? true
+					: "large",
+		imageBeforeTimestamp: contextFilterState.active
+			? Number.POSITIVE_INFINITY
+			: imageCompactionCutoff,
+		giantResults: process.env.STRIP_GIANT_RESULTS !== "0",
+		supersededReads: process.env.STRIP_SUPERSEDED_READS !== "0",
+		duplicates: process.env.STRIP_DUPLICATES !== "0",
+		thinking:
+			process.env.STRIP_THINKING === "interaction"
+				? "interaction"
+				: process.env.STRIP_THINKING === "1" ||
+						process.env.STRIP_THINKING === "aggressive",
 	});
 	if (process.env.STRIP_DEBUG) {
 		const thinkingParts = (list) =>
@@ -6509,8 +6618,9 @@ function filteredContext(event, ctx) {
 						: 0),
 				0,
 			);
+		const outputText = outgoing.map((message) => contentText(message.content)).join("\n");
 		console.error(
-				`[strip] msgs ${messages.length} -> ${outgoing.length}, thinking parts ${thinkingParts(messages)} in / ${thinkingParts(outgoing)} out`,
+			`[strip] active=${contextFilterState.active} from=${contextFilterState.active ? contextFilterState.cutIndex : 0} chars=${JSON.stringify(messages).length}->${JSON.stringify(outgoing).length} markers=image:${(outputText.match(/\[image payload dropped/g) ?? []).length},giant:${(outputText.match(/\[\.\.\. [0-9]+ (?:lines|chars) omitted \.\.\.\]/g) ?? []).length},stale:${(outputText.match(/\[stale read of /g) ?? []).length},duplicate:${(outputText.match(/\[duplicate .*? output omitted/g) ?? []).length} thinking=${thinkingParts(messages)}->${thinkingParts(outgoing)}`,
 		);
 	}
 	if (!contextFilterState.active)
@@ -6525,7 +6635,7 @@ function filteredContext(event, ctx) {
 				tokensBefore: contextFilterState.tokensBefore,
 				timestamp: Date.now(),
 			},
-			...messages
+			...outgoing
 				.slice(contextFilterState.cutIndex)
 				.filter(
 					(message) =>
@@ -6537,44 +6647,19 @@ function filteredContext(event, ctx) {
 	};
 }
 
-// Stamps are frozen on first build: re-statting each turn would let a changed
-// file mutate an old message's placeholder (breaking prompt-cache monotonicity),
-// and re-hashing the payload every turn is pure waste. A changed file gets a
-// fresh stamp only through a new read (new toolCallId), which is the moment the
-// model would re-process it anyway.
-const imageStampCache = new Map();
-
-function imageDropPlaceholder(data, path, key) {
-	const cached = imageStampCache.get(key);
-	if (cached) {
-		// LRU refresh: a long-lived image must not be evicted by churn and
-		// re-stamped with different metadata — that would mutate an old message.
-		imageStampCache.delete(key);
-		imageStampCache.set(key, cached);
-		return cached;
-	}
-	let stamp;
-	try {
-		const info = statSync(path);
-		stamp = `file ${Math.round(info.size / 1024)}KB, modified ${info.mtime.toISOString()}`;
-	} catch {
-		stamp = `payload ~${Math.round((String(data ?? "").length * 3) / 4096)}KB`;
-	}
-	const text = `[image payload dropped (${stamp}) — re-read ${path ?? "the source file"} to view current contents; a different size or timestamp means the file changed since this read.]`;
-	if (imageStampCache.size > 512)
-		imageStampCache.delete(imageStampCache.keys().next().value);
-	imageStampCache.set(key, text);
-	return text;
+function imageDropPlaceholder(path) {
+	return path
+		? `[image payload dropped — re-read ${path} to view current contents.]`
+		: "[image payload dropped — reattach or re-read the source image to view its contents.]";
 }
 
-// Image payloads are re-sent and re-processed by the model on every turn until
-// a compaction finally cuts them, even though the model's analysis already
-// lives in the transcript as assistant text. Once any assistant message
-// follows an image toolResult the payload is redundant: drop it from the
-// OUTGOING context only (the stored session keeps the image), leaving a
-// placeholder whose frozen size+mtime stamp lets a later re-read detect that
-// the file changed. Payloads survive one grace turn past the model's first
-// answer so mid-analysis work never goes blind.
+// Large image payloads are re-sent on every turn until compaction. Ask the
+// model to retain a task-relevant text record, then drop only the pixels from
+// OUTGOING context after two responses. Small images stay cache-stable until
+// compaction, which always drops every image regardless of this rolling gate.
+const STRIP_LARGE_IMAGE_BYTES = 64 * 1024;
+const IMAGE_RECORD_NOTE =
+	"[large image: preserve a concise text record of every visual fact likely needed for the current task; later requests may omit these pixels.]";
 const STRIP_GIANT_RESULT_CHARS = 24_000;
 const STRIP_GIANT_HEAD_LINES = 64;
 const STRIP_GIANT_TAIL_LINES = 32;
@@ -6587,6 +6672,20 @@ const STRIP_READ_LIKE_TOOLS = new Set([
 	"read_enclosing",
 	"module_report",
 ]);
+
+function imagePayloadBytes(part) {
+	let data = part?.data ?? part?.source?.data;
+	if (typeof data !== "string") return 0;
+	if (data.startsWith("data:")) data = data.slice(data.indexOf(",") + 1);
+	const padding = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
+	return Math.max(0, Math.floor((data.length * 3) / 4) - padding);
+}
+
+function largeImagePart(part) {
+	// ponytail: compressed bytes cheaply approximate replay cost; parse pixel
+	// dimensions only if real mixed-format sessions expose bad classifications.
+	return part?.type === "image" && imagePayloadBytes(part) >= STRIP_LARGE_IMAGE_BYTES;
+}
 
 function truncateGiantText(text) {
 	const lines = text.split("\n");
@@ -6605,46 +6704,74 @@ function truncateGiantText(text) {
 	return `${head}\n[... ${dropped.toLocaleString()} of ${text.length.toLocaleString()} chars truncated — re-read with offset/limit if the middle is needed ...]\n${tail}`;
 }
 
-function normalizeStripPath(value) {
-	// resolve() anchors relative paths to process.cwd(); close enough for
-	// read-vs-edit supersession within one session.
-	const abs = resolve(String(value ?? ""));
+function normalizeStripPath(value, cwd = process.cwd()) {
+	const abs = resolve(cwd, String(value ?? ""));
 	return process.platform === "win32" ? abs.toLowerCase() : abs;
 }
 
-// Giant, superseded, and duplicate toolResults and consumed image payloads are
-// all redundant context: the model already acted on them, and stale reads are
-// actively misleading after a later edit. Strip them from the OUTGOING context
-// only (the stored session keeps everything), always leaving the live turn
-// intact. Transitions are bounded and terminal — a message can move at most a
-// few times (duplicate-collapsed, giant-truncated, finally stale-marked) and
-// never reverts, so prompt caches break a bounded number of times per message.
-// `fromIndex` scopes duplicate detection to the region that will actually be
-// sent, so a "the identical result appears again later" marker can never point
-// at a message the in-work filter is about to cut away.
+function successfulAssistant(message) {
+	if (
+		message?.role !== "assistant" ||
+		message.stopReason === "error" ||
+		message.stopReason === "aborted"
+	)
+		return false;
+	return Array.isArray(message.content)
+		? message.content.length > 0
+		: Boolean(String(message.content ?? "").trim());
+}
+
+function successfulToolResult(message) {
+	return !message?.isError && !message?.error && !message?.content?.isError;
+}
+
+function textOnlyToolResult(message) {
+	return (
+		Array.isArray(message?.content) &&
+		message.content.length > 0 &&
+		message.content.every((part) => part?.type === "text")
+	);
+}
+
+// Bound old outgoing payloads without mutating stored session history. These
+// are lossy policies: deterministic markers identify how to recover persistent
+// inputs, and each class can be disabled independently. Duplicate keepers are
+// selected only after stale results are excluded, so transformations cannot
+// jointly erase the only retained copy.
 export function stripProcessedPayloads(
 	messages,
 	{
-		images = true,
+		images = "large",
 		giantResults = true,
 		supersededReads = true,
 		duplicates = true,
-		thinking = true,
+		thinking = false,
 		fromIndex = 0,
+		imageBeforeTimestamp = 0,
+		cwd = process.cwd(),
 	} = {},
 ) {
 	let lastAssistant = -1;
 	let secondLastAssistant = -1;
 	for (let i = messages.length - 1; i >= 0; i--)
-		if (messages[i]?.role === "assistant") {
+		if (successfulAssistant(messages[i])) {
 			if (lastAssistant < 0) lastAssistant = i;
 			else {
 				secondLastAssistant = i;
 				break;
 			}
 		}
-	if (lastAssistant < 0) return messages;
 	const paths = new Map();
+	const mutationResults = new Map();
+	for (const message of messages)
+		if (
+			message?.role === "toolResult" &&
+			(message.toolName === "edit" || message.toolName === "write")
+		)
+			mutationResults.set(
+				message.toolCallId,
+				successfulToolResult(message),
+			);
 	const editIndices = new Map();
 	for (let index = 0; index < messages.length; index++) {
 		const message = messages[index];
@@ -6656,16 +6783,28 @@ export function stripProcessedPayloads(
 			const path = String(part.arguments?.path ?? "").trim();
 			if (!path) continue;
 			if (STRIP_READ_LIKE_TOOLS.has(name)) paths.set(part.id, path);
-			if (name === "edit" || name === "write") {
-				// Normalized (resolved, case-folded on Windows) so a read of
-				// "x.ts" is superseded by an edit of "C:/full/path/X.TS" too.
-				const editKey = normalizeStripPath(path);
+			if (
+				(name === "edit" || name === "write") &&
+				mutationResults.get(part.id) === true
+			) {
+				const editKey = normalizeStripPath(path, cwd);
 				const list = editIndices.get(editKey) ?? [];
 				list.push(index);
 				editIndices.set(editKey, list);
 			}
 		}
 	}
+	const stale = messages.map((message, index) => {
+		const path = paths.get(message?.toolCallId);
+		return Boolean(
+			supersededReads &&
+			message?.role === "toolResult" &&
+			path &&
+			(editIndices.get(normalizeStripPath(path, cwd)) ?? []).some(
+				(editIndex) => editIndex > index,
+			),
+		);
+	});
 	const duplicateLast = new Map();
 	const texts = new Array(messages.length);
 	for (let index = 0; index < messages.length; index++) {
@@ -6674,41 +6813,78 @@ export function stripProcessedPayloads(
 			continue;
 		const text = contentText(message.content);
 		texts[index] = text;
-		if (index < fromIndex || text.length < STRIP_DUPLICATE_MIN_CHARS)
+		if (
+			index < fromIndex ||
+			stale[index] ||
+			!textOnlyToolResult(message) ||
+			text.length < STRIP_DUPLICATE_MIN_CHARS
+		)
 			continue;
 		duplicateLast.set(
 			`${message.toolName}:${createHash("sha256").update(text).digest("hex").slice(0, 12)}`,
 			index,
 		);
 	}
+	const lastUser = messages.findLastIndex((message) => message?.role === "user");
+	const thinkingBoundary =
+		thinking === "interaction" ? lastUser : secondLastAssistant;
 	let stripped = false;
 	const outgoing = messages.map((message, index) => {
-		// Aged thinking blocks are dead weight: providers only require thinking
-		// for the current tool-use loop, but pi re-sends every old block every
-		// turn. Dropped blocks are never signature-checked, so pruning them is
-		// safe; the grace window keeps the active loop intact.
+		// Reasoning replay contracts vary by provider. This remains opt-in until
+		// each enabled provider path has passed signed multi-tool-loop tests.
 		if (message?.role === "assistant" && Array.isArray(message.content)) {
-			if (!thinking || index >= secondLastAssistant) return message;
+			if (!thinking || index >= thinkingBoundary) return message;
 			const kept = message.content.filter((part) => part?.type !== "thinking");
 			if (!kept.length || kept.length === message.content.length)
 				return message;
 			stripped = true;
 			return { ...message, content: kept };
 		}
-		if (
-			index >= lastAssistant ||
-			message?.role !== "toolResult" ||
-			!Array.isArray(message.content)
-		)
-			return message;
+		if (!Array.isArray(message?.content)) return message;
+		const aged = index < secondLastAssistant;
+		const messageTimestamp =
+			typeof message.timestamp === "string"
+				? Date.parse(message.timestamp)
+				: Number(message.timestamp);
+		const compactedImage =
+			imageBeforeTimestamp > 0 &&
+			(imageBeforeTimestamp === Number.POSITIVE_INFINITY ||
+				(Number.isFinite(messageTimestamp) &&
+					messageTimestamp <= imageBeforeTimestamp));
 		const path = paths.get(message.toolCallId);
+		const rollingImagePart = (part) =>
+			part?.type === "image" &&
+			(images === true || (images === "large" && largeImagePart(part)));
+		let changed = false;
+		let content = message.content.map((part) => {
+			if (
+				part?.type === "image" &&
+				(compactedImage || (aged && rollingImagePart(part)))
+			) {
+				changed = true;
+				return {
+					type: "text",
+					text: imageDropPlaceholder(path),
+				};
+			}
+			return part;
+		});
 		if (
-			supersededReads &&
-			path &&
-			(editIndices.get(normalizeStripPath(path)) ?? []).some(
-				(editIndex) => editIndex > index,
-			)
+			!compactedImage &&
+			Boolean(images) &&
+			content.some(largeImagePart) &&
+			!content.some((part) => part?.type === "text" && part.text === IMAGE_RECORD_NOTE)
 		) {
+			changed = true;
+			content = [...content, { type: "text", text: IMAGE_RECORD_NOTE }];
+		}
+		if (message.role !== "toolResult") {
+			if (!changed) return message;
+			stripped = true;
+			return { ...message, content };
+		}
+		if (index >= lastAssistant && !changed) return message;
+		if (supersededReads && stale[index]) {
 			stripped = true;
 			return {
 				...message,
@@ -6724,39 +6900,27 @@ export function stripProcessedPayloads(
 		if (
 			duplicates &&
 			index >= fromIndex &&
+			textOnlyToolResult(message) &&
 			text.length >= STRIP_DUPLICATE_MIN_CHARS
 		) {
 			const key = `${message.toolName}:${createHash("sha256").update(text).digest("hex").slice(0, 12)}`;
-			if (duplicateLast.get(key) !== index) {
+			const keeper = duplicateLast.get(key);
+			if (keeper !== undefined && keeper !== index) {
 				stripped = true;
 				return {
 					...message,
 					content: [
 						{
 							type: "text",
-							text: `[duplicate ${message.toolName} output omitted — the identical result appears again later in this context.]`,
+							text: `[duplicate ${message.toolName} output omitted — a later occurrence is retained in this context${texts[keeper]?.length >= STRIP_GIANT_RESULT_CHARS ? ", possibly shortened" : ""}.]`,
 						},
 					],
 				};
 			}
 		}
-		let changed = false;
-		// One grace turn: images and giants keep their payload until a second
-		// assistant turn has passed, so multi-turn work over one read isn't
-		// forced into re-reads.
-		const aged = index < secondLastAssistant;
-		const content = message.content.map((part, partIndex) => {
-			if (images && aged && part?.type === "image") {
-				changed = true;
-				return {
-					type: "text",
-					text: imageDropPlaceholder(
-						part.data,
-						path,
-						`${message.toolCallId}:${partIndex}`,
-					),
-				};
-			}
+		// One grace turn: rolling images and giants keep their payload until a
+		// second assistant turn has passed. Compaction overrides that grace.
+		content = content.map((part) => {
 			if (
 				giantResults &&
 				aged &&
@@ -9561,6 +9725,25 @@ function planResumeAction(state, cwd, options = {}) {
 		}
 		const leaseStatus = workActionLeaseState(cwd, activeImplementation.id);
 		if (
+			!leaseStatus &&
+			routed.git?.safeForHandoff &&
+			!routed.git?.dirtyPaths?.length &&
+			headCommitMatchesWorkItem(cwd, activeImplementation.id)
+		)
+			return withHandoffPrompt(
+				{
+					...routed,
+					action: "run-implementation",
+					message:
+						"HEAD already contains this WorkItem's clean commit, but the prior worker stopped before durable closure; resume only verification, review reconciliation, and the coded finish gate.",
+					handoffExtra: [
+						...(routed.handoffExtra ?? []),
+						`Committed-worker recovery: HEAD is ${activeImplementation.id}. Do not redo implementation or change product files unless fresh verification finds a concrete defect. Re-record stale capability proof at the current revision, reconcile required review evidence, then run the coded finish command.`,
+					],
+				},
+				cwd,
+			);
+		if (
 			activeImplementation.labels?.includes("wo:goal-owned") &&
 			!leaseStatus?.lease
 		)
@@ -9909,7 +10092,7 @@ function directRoleTask(state, cwd) {
 			? `For child state use: node ${helper} work-children-summary ${state.epic.id}`
 			: "",
 		state.action === "run-planner"
-			? `Use compact native summaries; no raw store JSON or broad discovery. Freeze one finite backlog: batch same-surface defects, cite an original requirement plus failing evidence, create external blockers, and mark the planning item ${FINITE_BACKLOG_MARKER}. Once exhausted, later work needs an explicit failing bug or user-added scope. Open decisions are only for unresolved human, product, or architectural authority; record a technical winner otherwise. Verify once with node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close the planning item, then stop. Planner parent launch baseline: ${JSON.stringify(plannerBaseline)}; predeclared paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. If launchSafe is false, stop BLOCKED; new paths fail closed. A new unstaged tracked instruction path is tolerable only when its whitespace-ignored diff is empty. Additionally, only when managedAgentsOverlayEligible is true, a new unstaged tracked AGENTS.md modification may be treated as a transient managed startup overlay even when substantive; never modify, stage, or revert it. Staged/untracked AGENTS, a baseline AGENTS entry, or unrelated dirt always blocks. Before finishing, require AGENTS.md to hash to agentsWorktree and agentsHead and reject every final undeclared mutation outside the native store, workflow runtime, or requested dated plan.`
+			? `Create one finite backlog: default one vertical item, max three unless exhaustive requested. Manual checks stay in acceptance, not tasks. Cite requirement or failure; mark ${FINITE_BACKLOG_MARKER}; no gap-finding after closure. Only human/product/architecture authority makes decisions; record a technical winner otherwise. Run node ${helper} work-ready-summary ${state.epic?.id ?? "<roadmap>"}, close, stop. Planner parent launch baseline: ${JSON.stringify(plannerBaseline)}; predeclared paths: ${JSON.stringify(state.git?.dirtyPaths ?? [])}. If launchSafe is false, stop BLOCKED; new paths block except an unstaged instruction whose whitespace-ignored diff is empty. Only when managedAgentsOverlayEligible is true, a new unstaged tracked AGENTS.md modification may be treated as a transient managed startup overlay; never modify, stage, or revert it. Staged/untracked AGENTS, a baseline AGENTS entry, or unrelated dirt always blocks. Before finishing, require AGENTS.md to hash to agentsWorktree and agentsHead and reject undeclared mutation outside the native store, runtime, or requested plan.`
 			: "",
 		["run-planner", "run-implementation"].includes(state.action) && selected?.id
 			? `Claim exactly with: node ${helper} work-claim ${selected.id}`
@@ -9976,6 +10159,19 @@ function goalOwnedImplementationPrompt(state, cwd) {
 		.join("\n");
 }
 
+// ponytail: no heartbeat exists, so a writer window is judged dead purely by age.
+// Every live claim refreshes updatedAt, so this only steals windows whose owner
+// stopped handing off. Add a real heartbeat if a healthy writer can idle longer.
+const EXECUTION_WINDOW_STALE_MS = 15 * 60 * 1000;
+
+function staleExecutionWindow(window) {
+	const updated = Date.parse(window?.updatedAt ?? "");
+	return (
+		!Number.isFinite(updated) ||
+		Date.now() - updated > EXECUTION_WINDOW_STALE_MS
+	);
+}
+
 function claimGoalOwnedImplementation(cwd, state, owner = {}) {
 	const id = state.selectedWorkItem?.id;
 	if (!id) return state;
@@ -9986,8 +10182,9 @@ function claimGoalOwnedImplementation(cwd, state, owner = {}) {
 	const claimed = mutateStore(cwd, (store) => {
 		const current = store.items[id];
 		const window = current.executionWindow;
+		const held = window?.state === "active" && !staleExecutionWindow(window);
 		if (
-			window?.state === "active" &&
+			held &&
 			(window.ownerSession !== ownerSession || window.goalId !== goalId)
 		) {
 			conflict = window;
@@ -10001,12 +10198,9 @@ function claimGoalOwnedImplementation(cwd, state, owner = {}) {
 			executionWindow: {
 				ownerSession,
 				goalId,
-				generation:
-					window?.state === "active"
-						? window.generation
-						: (window?.generation ?? 0) + 1,
+				generation: held ? window.generation : (window?.generation ?? 0) + 1,
 				state: "active",
-				acquiredAt: window?.state === "active" ? window.acquiredAt : timestamp,
+				acquiredAt: held ? window.acquiredAt : timestamp,
 				updatedAt: timestamp,
 			},
 		});
@@ -13318,8 +13512,8 @@ function roleHandoffPrompt(state, mode, extraLines = [], cwd) {
 	const plannerLines =
 		state.action === "run-planner"
 			? [
-					"Planner efficiency: do not run raw raw store JSON; project roadmaps can contain full plans. Use compact helper projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
-					`Create one finite backlog of all currently known local work, batch same-surface defects, create durable external blockers, and mark the planning item ${FINITE_BACKLOG_MARKER}. Every executable item needs original requirement/acceptance traceability plus concrete failing evidence. Once that backlog is exhausted, generic gap-finding is forbidden; later work requires an explicit failing bug or user-added scope.`,
+					"Planner efficiency: do not run raw store JSON; project roadmaps can contain full plans. Use compact helper projections or the referenced plan file's expected unit section plus summarized child ids/titles/status.",
+					`Create one finite backlog: prefer one vertical item and use at most three independent items unless the user requests exhaustive decomposition. Put manual/device checks in acceptance notes, not child work. Batch same-surface defects and mark the planning item ${FINITE_BACKLOG_MARKER}. Every executable item needs requirement traceability or failing evidence. Once that backlog is exhausted, generic gap-finding is forbidden; later work requires an explicit failing bug or user-added scope.`,
 				]
 			: [];
 	const settings = cwd ? workOrchSettings(cwd) : null;
@@ -16104,7 +16298,28 @@ function buildWorkResumeState(cwd, args = "", options = {}) {
 			suggestedCommands: [`/work-resume ${childState.epicId}`],
 			warnings: git.warnings,
 		};
-		return planResumeAction(base, cwd, options);
+		const routed = planResumeAction(base, cwd, options);
+		if (
+			routed.action === "in-progress-agent" &&
+			!routed.actionLease &&
+			routed.selectedWorkItem?.id &&
+			!options.requeueRetried
+		) {
+			const requeuedId = routed.selectedWorkItem.id;
+			mutateStore(cwd, (store) => {
+				appendWorkNote(
+					store,
+					requeuedId,
+					"Auto-requeued: in_progress without an action lease after an interrupted launch.",
+				);
+				updateWorkItem(store, requeuedId, { status: "open" });
+			});
+			return buildWorkResumeState(cwd, args, {
+				...options,
+				requeueRetried: true,
+			});
+		}
+		return routed;
 	} catch (error) {
 		return errorState(error.reason ?? "work-store-error", error.message, {
 			action: "work-store-error",
@@ -20461,6 +20676,19 @@ function gitDirty(cwd) {
 	);
 }
 
+function headCommitMatchesWorkItem(cwd, workItemId) {
+	try {
+		const subject = run(executionRepositoryRoot(cwd), "git", [
+			"log",
+			"-1",
+			"--format=%s",
+		]).trim();
+		return subject === workItemId || subject.startsWith(`${workItemId}:`);
+	} catch {
+		return false;
+	}
+}
+
 function normalizedPathSet(paths = []) {
 	return new Set(paths.map(normalizedRepoPath));
 }
@@ -20733,7 +20961,9 @@ function buildWorkFinishState(cwd, args = "") {
 		const related = dirty.filter(
 			(file) => raw.includes(file) || raw.includes(file.split(/[\\/]/).pop()),
 		);
-		const contractStatus = verificationContractStatus(workItem, { cwd });
+		const contractStatus = verificationContractStatus(workItem, {
+			cwd: executionRepositoryRoot(cwd),
+		});
 		const fidelity = designFidelityStatus(workItem, contractStatus);
 		if (!fidelity.ok)
 			return stop(
@@ -22675,6 +22905,45 @@ function workImproveProgressFingerprint(goal, cwd) {
 	return createHash("sha256").update(source).digest("hex");
 }
 
+function projectGoalProgressFingerprint(cwd) {
+	let workItems = [];
+	try {
+		workItems = Object.values(loadStore(cwd).items)
+			.map((item) => [
+				item.id,
+				item.type,
+				item.status,
+				item.parentId ?? "",
+				[...(item.dependencies ?? [])].sort(),
+			])
+			.sort(([left], [right]) => String(left).localeCompare(String(right)));
+	} catch {
+		// A project goal may start before its native store exists.
+	}
+	const root = executionRepositoryRoot(cwd);
+	const source = [
+		JSON.stringify(workItems),
+		safeRun(root, "git", ["rev-parse", "--verify", "HEAD"]),
+		safeRun(root, "git", ["status", "--porcelain=v1"]),
+		safeRun(root, "git", ["diff", "--no-ext-diff", "--numstat", "HEAD"]),
+	].join("\0");
+	return createHash("sha256").update(source).digest("hex");
+}
+
+function advanceProjectGoalToolBudget(goal, fingerprint, failed = false) {
+	const progressed = goal.projectProgressFingerprint !== fingerprint;
+	return {
+		...goal,
+		projectProgressFingerprint: fingerprint,
+		noProgressToolCalls: progressed
+			? 0
+			: Number(goal.noProgressToolCalls ?? 0) + 1,
+		noProgressToolFailures: progressed
+			? 0
+			: Number(goal.noProgressToolFailures ?? 0) + Number(Boolean(failed)),
+	};
+}
+
 function improvementSafetyNoteCommand(command) {
 	const script = WORK_HELPER_SCRIPT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const match = new RegExp(
@@ -23222,8 +23491,8 @@ function workProjectAutopilotAppendix() {
 - Resume work starts the autonomous project loop. Inside that loop, advance one deterministic WorkItem boundary at a time so coded gates, prefetch, review, and recovery remain authoritative.
 - Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it explicitly says N tasks, stop after N executable native work-item store closes. Identifiers such as work-2 are targets, never task counts.
 - When given a target work item or roadmap ID, resolve that exact ID and continue until it is closed; an open roadmap with no ready children needs its next planned slice, not premature completion.
-- At each phase boundary, inspect only observed workflow friction. If a safe ce-workflow fix exists, implement, verify, and commit it in the workflow repo (${WORKFLOW_REPO_DIR}) before continuing.
-- Stop only when the requested scope is done, the roadmap is complete, or a real product/credential/hardware/destructive/verification decision is required.`;
+- Never inspect, contact, modify, test, commit, or push the ce-workflow source checkout while developing another project. Record at most one bounded work_report_improvement and continue the target project; orchestrator maintenance is a separate explicit /wo improve or direct user task.
+- Stop only when the requested scope is done, the roadmap is complete, a circuit breaker pauses the run, or a real product/credential/hardware/destructive/verification decision is required.`;
 }
 
 function parseWorkProjectGoalInput(input = "") {
@@ -23277,6 +23546,60 @@ function buildWorkSelfImprovingObjective(input = "", options = {}) {
 	]
 		.filter(Boolean)
 		.join("\n\n");
+}
+
+function projectGoalSourceMaintenanceBlockReason(
+	event,
+	cwd,
+	goal = activeWorkGoal,
+) {
+	if (
+		goal?.mode !== "project" ||
+		goal.status !== "active" ||
+		sameCheckout(activeWorkGoalCwd ?? cwd, WORKFLOW_REPO_DIR)
+	)
+		return;
+	const tool = String(event?.toolName ?? "");
+	const input = event?.input ?? event?.args ?? {};
+	if (
+		tool === "intercom" &&
+		["ask", "send"].includes(String(input.action ?? "").toLowerCase())
+	)
+		return "Project autopilot cannot contact another session. Report workflow friction once and keep working in the target project.";
+	const normalizedSource = normalizedRepoPath(WORKFLOW_REPO_DIR)
+		.replace(/\/+/g, "/")
+		.toLowerCase();
+	const normalizedInput = normalizedRepoPath(JSON.stringify(input))
+		.replace(/\/+/g, "/")
+		.toLowerCase();
+	const normalizedHelper = normalizedRepoPath(WORK_HELPER_SCRIPT)
+		.replace(/\/+/g, "/")
+		.toLowerCase();
+	const checkedInput = ["bash", "hypa_shell", "subagent"].includes(tool)
+		? normalizedInput.replaceAll(normalizedHelper, "")
+		: normalizedInput;
+	if (
+		[
+			"bash",
+			"edit",
+			"hypa_find",
+			"hypa_grep",
+			"hypa_ls",
+			"hypa_read",
+			"hypa_shell",
+			"lens_diagnostics",
+			"lsp_diagnostics",
+			"module_report",
+			"read",
+			"read_enclosing",
+			"read_symbol",
+			"subagent",
+			"symbol_search",
+			"write",
+		].includes(tool) &&
+		checkedInput.includes(normalizedSource)
+	)
+		return "Project autopilot cannot inspect or mutate the ce-workflow source checkout from another project. Use work_report_improvement once and continue product work.";
 }
 
 function buildWorkResumeGoalObjective(cwd, args = "", options = {}) {
@@ -23874,7 +24197,7 @@ function executableWorkItemStates(cwd) {
 }
 
 function createWorkGoal(mode, objective, tokenBudget, options = {}) {
-	const { baselineTokens = 0, baselineHead, cwd } = options;
+	const { baselineTokens = 0, baselineHead, cwd, usageSessionId } = options;
 	const now = Date.now();
 	const closureLimit =
 		mode === "project" ? requestedWorkItemClosureLimit(objective) : undefined;
@@ -23902,9 +24225,16 @@ function createWorkGoal(mode, objective, tokenBudget, options = {}) {
 		iteration: 0,
 		startedAt: now,
 		updatedAt: now,
-		tokenBudget,
+		tokenBudget:
+			tokenBudget ??
+			(mode === "project" ? WORK_PROJECT_DEFAULT_TOKEN_BUDGET : undefined),
 		tokensUsed: 0,
 		baselineTokens,
+		usageSnapshotTokens: baselineTokens,
+		...(usageSessionId ? { usageSessionId } : {}),
+		...(mode === "project" && cwd
+			? { projectProgressFingerprint: projectGoalProgressFingerprint(cwd) }
+			: {}),
 		...(baselineHead ? { baselineHead } : {}),
 		...(closureLimit
 			? { requestedClosureLimit: closureLimit, closureBaseline }
@@ -23950,15 +24280,30 @@ function workGoalTokenTotal(ctx) {
 		if (entry?.type !== "message" || entry?.message?.role !== "assistant")
 			continue;
 		const usage = entry.message.usage;
-		total += Number(usage?.input ?? 0) + Number(usage?.output ?? 0);
+		const measured =
+			Number(usage?.input ?? 0) +
+			Number(usage?.output ?? 0) +
+			Number(usage?.cacheRead ?? 0) +
+			Number(usage?.cacheWrite ?? 0);
+		total += Math.max(Number(usage?.totalTokens ?? 0), measured);
 	}
 	return total;
 }
 
 function updateWorkGoalUsage(goal, ctx) {
 	if (!goal) return goal;
-	const baseline = goal.baselineTokens ?? 0;
-	goal.tokensUsed = Math.max(0, workGoalTokenTotal(ctx) - baseline);
+	const current = workGoalTokenTotal(ctx);
+	const sessionId = ctx?.sessionManager?.getSessionId?.();
+	const sameSession =
+		!goal.usageSessionId || !sessionId || goal.usageSessionId === sessionId;
+	const previous = Number(
+		goal.usageSnapshotTokens ?? goal.baselineTokens ?? current,
+	);
+	goal.tokensUsed =
+		Number(goal.tokensUsed ?? 0) +
+		(sameSession ? Math.max(0, current - previous) : current);
+	goal.usageSnapshotTokens = current;
+	if (sessionId) goal.usageSessionId = sessionId;
 	goal.timeUsedSeconds = Math.max(
 		0,
 		Math.floor((Date.now() - (goal.startedAt ?? Date.now())) / 1000),
@@ -24802,6 +25147,7 @@ async function startWorkGoal(
 			baselineTokens: workGoalTokenTotal(ctx),
 			baselineHead: currentWorkGoalBaselineHead(ctx.cwd),
 			cwd: ctx.cwd,
+			usageSessionId: ctx.sessionManager?.getSessionId?.(),
 		}),
 		...(options.goalData ?? {}),
 	};
@@ -24810,7 +25156,7 @@ async function startWorkGoal(
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
 	ctx.ui.notify(
-		`autonomous goal started: ${truncate(text, 240)}${tokenBudget ? ` (budget ${formatTokenCount(tokenBudget)})` : ""}`,
+		`autonomous goal started: ${truncate(text, 240)}${activeWorkGoal.tokenBudget ? ` (budget ${formatTokenCount(activeWorkGoal.tokenBudget)})` : ""}`,
 		"info",
 	);
 	if (!options.deferPrompt)
@@ -24937,10 +25283,23 @@ async function handleWorkGoalCommand(args, mode, pi, ctx, options = {}) {
 		clearWorkGoalRecovery();
 		clearWorkGoalUsageLimitTimer();
 		clearWorkMonitorTimer();
+		const resumedFromBudget = activeWorkGoal.status === "budget_limited";
 		activeWorkGoal = {
 			...activeWorkGoal,
 			status: "active",
 			decision: undefined,
+			...(resumedFromBudget
+				? {
+						tokenBudget:
+							Number(activeWorkGoal.tokensUsed ?? 0) +
+							WORK_PROJECT_DEFAULT_TOKEN_BUDGET,
+						noProgressToolCalls: 0,
+						noProgressToolFailures: 0,
+						projectProgressFingerprint: projectGoalProgressFingerprint(
+							activeWorkGoalCwd ?? ctx.cwd,
+						),
+					}
+				: {}),
 			askUserFallbackPending: activeWorkGoal.askUserFallbackPending
 				? { ...activeWorkGoal.askUserFallbackPending, unavailable: true }
 				: undefined,
@@ -25059,8 +25418,13 @@ async function handleWorkResumeGoalCommand(args, pi, ctx) {
 		return handleWorkGoalCommand(raw, "project", pi, ctx);
 	const objective = buildWorkResumeGoalObjective(ctx.cwd, command.objective);
 	return command.kind === "edit"
-		? handleWorkGoalCommand(`edit ${objective}`, "project", pi, ctx)
-		: startWorkGoal("project", objective, pi, ctx);
+		? handleWorkGoalCommand(
+				`edit${command.tokenBudget === undefined ? "" : ` --tokens ${command.tokenBudget}`} ${objective}`,
+				"project",
+				pi,
+				ctx,
+			)
+		: startWorkGoal("project", objective, pi, ctx, command.tokenBudget);
 }
 
 function latestPiGoal(ctx) {
@@ -26815,6 +27179,63 @@ function pauseActiveWorkGoal(reason, pi, ctx, level = "warning") {
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
 	notify(ctx, `Autonomous orchestrator paused: ${reason}`, level);
+}
+
+function enforceProjectGoalCircuitBreakers(event, ctx, pi) {
+	if (
+		!activeWorkGoalRunning ||
+		activeWorkGoal?.mode !== "project" ||
+		activeWorkGoal.status !== "active"
+	)
+		return false;
+	updateWorkGoalUsage(activeWorkGoal, ctx);
+	const cwd = activeWorkGoalCwd ?? ctx.cwd;
+	activeWorkGoal = advanceProjectGoalToolBudget(
+		activeWorkGoal,
+		projectGoalProgressFingerprint(cwd),
+		event.isError,
+	);
+	if (
+		activeWorkGoal.tokenBudget !== undefined &&
+		activeWorkGoal.tokensUsed >= activeWorkGoal.tokenBudget
+	) {
+		restoreWorkGoalThinking(pi, activeWorkGoal);
+		activeWorkGoal = {
+			...activeWorkGoal,
+			status: "budget_limited",
+			stopReason: `project token budget reached (${formatWorkGoalBudget(activeWorkGoal)})`,
+			updatedAt: Date.now(),
+		};
+		persistWorkGoal(pi);
+		updateWorkGoalStatus(ctx);
+		notify(ctx, `Autonomous orchestrator paused: ${activeWorkGoal.stopReason}`, "warning");
+		ctx.abort?.();
+		return true;
+	}
+	if (
+		activeWorkGoal.noProgressToolFailures >=
+		WORK_PROJECT_MAX_NO_PROGRESS_TOOL_FAILURES
+	) {
+		pauseActiveWorkGoal(
+			`${WORK_PROJECT_MAX_NO_PROGRESS_TOOL_FAILURES} tool failures without product or work-item progress`,
+			pi,
+			ctx,
+		);
+		ctx.abort?.();
+		return true;
+	}
+	if (
+		activeWorkGoal.noProgressToolCalls >= WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS
+	) {
+		pauseActiveWorkGoal(
+			`${WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS} tool calls without product or work-item progress`,
+			pi,
+			ctx,
+		);
+		ctx.abort?.();
+		return true;
+	}
+	return false;
 }
 
 async function prepareAutonomousResumeEntry(
@@ -30157,6 +30578,11 @@ async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
 }
 
 export {
+	writeActiveWorkflowRecord,
+	clearActiveWorkflowRecord,
+	restoreWorkflowAuthorization,
+	activeWorkflowRecordPath,
+	workflowClaimPath,
 	buildWorkAddState,
 	buildWorkAutoState,
 	classifyAutoTask,
@@ -30260,6 +30686,14 @@ export {
 	parseWorkProjectGoalInput,
 	buildWorkMonitorObjective,
 	createWorkGoal,
+	workGoalTokenTotal,
+	updateWorkGoalUsage,
+	advanceProjectGoalToolBudget,
+	projectGoalSourceMaintenanceBlockReason,
+	buildWorkResumeGoalObjective,
+	resetContextFilter,
+	requestContextFilter,
+	filteredContext,
 	workGoalCompletionBlocker,
 	workGoalBaselineHead,
 	planResumeAction,
@@ -30527,7 +30961,9 @@ export default function workModelsExtension(pi) {
 				let dirty;
 				try {
 					dirty = new Set(
-						gitDirty(recovery.cwd).map((item) => normalizedRepoPath(item.path)),
+						gitDirty(executionRepositoryRoot(recovery.cwd)).map((item) =>
+							normalizedRepoPath(item.path),
+						),
 					);
 				} catch {
 					throw new Error("Git status is unavailable; fix it manually.");
@@ -30689,6 +31125,13 @@ export default function workModelsExtension(pi) {
 					throw new Error(
 						"Workflow improvement reporting is disabled for this project.",
 					);
+				if (
+					activeWorkGoal?.mode === "project" &&
+					Number(activeWorkGoal.improvementReportsRecorded ?? 0) >= 1
+				)
+					throw new Error(
+						"This project run already reported workflow friction. Continue product work; orchestrator maintenance is separate.",
+					);
 				const workflow = currentCommandWorkflow();
 				const sessionId = ctx?.sessionManager?.getSessionId?.();
 				const sessionFile = ctx?.sessionManager?.getSessionFile?.();
@@ -30711,6 +31154,15 @@ export default function workModelsExtension(pi) {
 						bundle: truncate(result.bundle, 240),
 						source: result.source,
 					};
+					if (activeWorkGoal?.mode === "project") {
+						activeWorkGoal = {
+							...activeWorkGoal,
+							improvementReportsRecorded:
+								Number(activeWorkGoal.improvementReportsRecorded ?? 0) + 1,
+							updatedAt: Date.now(),
+						};
+						persistWorkGoal(pi);
+					}
 					return {
 						content: [
 							{
@@ -30793,6 +31245,12 @@ export default function workModelsExtension(pi) {
 		} catch {
 			maybeCompact(ctx, {});
 		}
+		const sourceMaintenanceBlock = projectGoalSourceMaintenanceBlockReason(
+			event,
+			ctx?.cwd ?? activeWorkGoalCwd,
+		);
+		if (sourceMaintenanceBlock)
+			return { block: true, reason: sourceMaintenanceBlock };
 		if (event.toolName === "ask_user") {
 			recordWorkGoalAskUserCall(event, pi);
 			recordDirtyRecoveryAskCall(event);
@@ -31107,8 +31565,14 @@ export default function workModelsExtension(pi) {
 					pendingCompactionWorkflowAuthorization,
 				)
 			: null;
+		const durableWorkflow = restoreWorkflowAuthorization(
+			ctx.cwd,
+			ctx.sessionManager?.getSessionId?.(),
+			contentText(event.prompt),
+			compactionResumePrompt,
+		);
 		blockedCompactionResumeTurn =
-			compactionResumePrompt && !compactionAuthorization;
+			compactionResumePrompt && !compactionAuthorization && !durableWorkflow;
 		blockedInternalBackgroundCompletionTurn = Boolean(
 			pendingInternalBackgroundCompletionPrompt &&
 				contentText(event.prompt).trim() ===
@@ -31162,6 +31626,7 @@ export default function workModelsExtension(pi) {
 			goalClarificationTurn ||
 			managedWorkSubagent ||
 			Boolean(meta) ||
+			Boolean(durableWorkflow) ||
 			Boolean(compactionAuthorization) ||
 			Boolean(activeVerifierSynthesis);
 		workflowTurnAuthorized = workflowTurn;
@@ -31183,7 +31648,21 @@ export default function workModelsExtension(pi) {
 					meta,
 					contextBefore: usageSnapshot(ctx),
 				}
-			: null;
+			: durableWorkflow
+				? {
+						id: telemetryId("agent"),
+						cwd: ctx.cwd,
+						prompt: String(event.prompt ?? ""),
+						promptChars: String(event.prompt ?? "").length,
+						meta: {
+							workflowRunId: durableWorkflow.workflowRunId,
+							activity: durableWorkflow.activity ?? undefined,
+							epicId: durableWorkflow.epicId ?? undefined,
+							workItemId: durableWorkflow.workItemId ?? undefined,
+						},
+						contextBefore: usageSnapshot(ctx),
+					}
+				: null;
 		recordSelfImprovementHistory(ctx, "before_agent_start", event);
 		if (!activeWorkGoal) return { systemPrompt: boundedSystemPrompt };
 		if (
@@ -31384,6 +31863,7 @@ export default function workModelsExtension(pi) {
 				event.result,
 			);
 		updateWorkGoalProgress(ctx);
+		if (enforceProjectGoalCircuitBreakers(event, ctx, pi)) return;
 		if (
 			activeWorkGoal?.status === "active" &&
 			!orchestratorPauseRequest &&
@@ -31708,14 +32188,20 @@ export default function workModelsExtension(pi) {
 		};
 	});
 
-	pi.on("session_before_switch", () => resetContextFilter());
-	pi.on("session_before_fork", () => resetContextFilter());
-	pi.on("session_before_tree", () => resetContextFilter());
-	pi.on("session_tree", () => resetContextFilter());
+	const resetSessionContextFilter = () => {
+		resetContextFilter();
+		imageCompactionCutoff = 0;
+	};
+	pi.on("session_before_switch", resetSessionContextFilter);
+	pi.on("session_before_fork", resetSessionContextFilter);
+	pi.on("session_before_tree", resetSessionContextFilter);
+	pi.on("session_tree", resetSessionContextFilter);
 
 	pi.on("session_compact", async (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "session_compact", event);
 		resetContextFilter();
+		imageCompactionCutoff =
+			Date.parse(event.compactionEntry?.timestamp) || Date.now();
 		const details = event.compactionEntry?.details;
 		const currentCompactionEntry =
 			contextCompactState.inFlight &&
