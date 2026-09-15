@@ -969,6 +969,97 @@ try {
 		"active filtering does not mutate stored input messages",
 	);
 	resetContextFilter();
+	// A large advertised window must not inflate the 30k retention target.
+	const millionTokenCtx = { ...ctx, model: { contextWindow: 1_000_000 } };
+	const batch = (start, count) =>
+		Array.from({ length: count }, (_, offset) => {
+			const id = `large-window-${start + offset}`;
+			return [
+				{
+					role: "assistant",
+					content: [
+						{
+							type: "toolCall",
+							id,
+							name: "bash",
+							arguments: { command: `echo ${id}` },
+						},
+					],
+				},
+				{
+					role: "toolResult",
+					toolCallId: id,
+					toolName: "bash",
+					content: [{ type: "text", text: `${id} ${"x".repeat(8_000)}` }],
+				},
+			];
+		}).flat();
+	const longActiveTurn = [
+		{ role: "user", content: "older task" },
+		{ role: "assistant", content: [{ type: "text", text: "finished" }] },
+		{
+			role: "user",
+			content:
+				"CURRENT-REQUEST: implement all phases without changing the public API",
+		},
+		...batch(0, 80),
+	];
+	const originalLongTurn = JSON.stringify(longActiveTurn);
+	const assertCompactTail = (result) => {
+		assert.equal(result.messages[0].role, "compactionSummary");
+		assert.match(result.messages[0].summary, /CURRENT-REQUEST/);
+		assert(
+			JSON.stringify(result.messages).length / 4 < 40_000,
+			"a 1M-window model must retain roughly 30k, not the entire 160k current turn",
+		);
+		const calls = new Set(
+			result.messages.flatMap((message) =>
+				Array.isArray(message.content)
+					? message.content
+							.filter((part) => part.type === "toolCall")
+							.map((part) => part.id)
+					: [],
+			),
+		);
+		for (const message of result.messages)
+			if (message.role === "toolResult")
+				assert(
+					calls.has(message.toolCallId),
+					"retained tool results need their calls",
+				);
+	};
+	requestContextFilter(millionTokenCtx);
+	const compactLongTurn = await hooks.context(
+		{ messages: longActiveTurn },
+		millionTokenCtx,
+	);
+	assertCompactTail(compactLongTurn);
+	assert.equal(
+		JSON.stringify(longActiveTurn),
+		originalLongTurn,
+		"stored history remains unchanged",
+	);
+	const slightlyLonger = [...longActiveTurn, ...batch(80, 2)];
+	const stableTail = await hooks.context(
+		{ messages: slightlyLonger },
+		millionTokenCtx,
+	);
+	assert.equal(
+		stableTail.messages[1],
+		compactLongTurn.messages[1],
+		"do not roll the cut forward on every tool turn",
+	);
+	const grownTail = await hooks.context(
+		{ messages: [...slightlyLonger, ...batch(82, 70)] },
+		millionTokenCtx,
+	);
+	assertCompactTail(grownTail);
+	assert.notEqual(
+		grownTail.messages[1],
+		compactLongTurn.messages[1],
+		"recompact at the configured trigger, not half of the model window",
+	);
+	resetContextFilter();
 	if (process.platform === "win32") {
 		const casing = stripProcessedPayloads([
 			{

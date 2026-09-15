@@ -6471,10 +6471,10 @@ function prepareContextFilter(event) {
 	const snapshot = contextFilterState.snapshot;
 	if (!snapshot) return false;
 	const messages = Array.isArray(event.messages) ? event.messages : [];
-	const { threshold, contextWindow, state, current } = snapshot;
-	const maxCurrentTurnTokens = Number.isFinite(contextWindow)
-		? Math.max(threshold.effectiveKeepRecentTokens, Math.floor(contextWindow / 2))
-		: Number.POSITIVE_INFINITY;
+	const { threshold, state, current } = snapshot;
+	// Preserve a complete current turn only when it fits the retention budget,
+	// not half the model window (which can be 500k on a 1M-window model).
+	const maxCurrentTurnTokens = threshold.effectiveKeepRecentTokens;
 	const cutIndex = contextFilterCutIndex(
 		messages,
 		threshold.effectiveKeepRecentTokens,
@@ -6550,10 +6550,8 @@ function filteredContext(event, ctx) {
 	}
 	if (contextFilterState.active) {
 		const snapshot = contextFilterState.snapshot;
-		const keep = snapshot?.threshold?.effectiveKeepRecentTokens ?? 0;
-		const limit = Number.isFinite(snapshot?.contextWindow)
-			? Math.max(keep, Math.floor(snapshot.contextWindow / 2))
-			: keep;
+		// Keep the retained prefix stable until the next compaction trigger.
+		const limit = snapshot?.threshold?.trigger ?? 0;
 		if (
 			limit > 0 &&
 			contextMessagesTokens(messages.slice(contextFilterState.cutIndex)) > limit
