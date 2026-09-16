@@ -271,6 +271,67 @@ try {
 	assert.match(sent[0]?.message ?? "", /WO_DIRTY_RECOVERY_V1/);
 	assert.ok(sent[0]?.message.includes("/wo → Resume work E-1"));
 
+	fixture.reset("noInProgress", "clean");
+	sent.length = 0;
+	await invoke("work-resume", "E-1", ctx);
+	assert.match(
+		sent.at(-1)?.message ?? "",
+		/Work-goal mode is active/,
+		"fixture starts the project goal that dirty recovery must settle",
+	);
+
+	fixture.reset("finiteBacklogComplete", "unknown");
+	sent.length = 0;
+	await invoke("work-resume", "E-1", ctx);
+	const terminalToken = sent[0]?.message.match(
+		/Recovery token: ([\w-]+)/,
+	)?.[1];
+	assert.ok(terminalToken, "terminal dirty recovery supplies a token");
+	const terminalContext = `Exact file/action list.\nDirty recovery token: ${terminalToken}`;
+	hooks.tool_call(
+		{
+			toolCallId: "terminal-safe-call",
+			toolName: "ask_user",
+			input: {
+				question: "Apply the recommended Git cleanup?",
+				context: terminalContext,
+				options: approvalOptions,
+				allowMultiple: false,
+				allowFreeform: false,
+				allowComment: false,
+			},
+		},
+		ctx,
+	);
+	branch.push(
+		askResult("terminal-safe-call", terminalContext, [
+			"Apply recommendation and continue",
+		]),
+	);
+	process.env.WORK_FLOW_GIT_DIRTY = "clean";
+	const terminalResult = await tools.work_dirty_continue.execute(
+		"terminal-approved",
+		{ token: terminalToken },
+		undefined,
+		undefined,
+		ctx,
+	);
+	assert.equal(terminalResult.details.outcome, "done-candidate");
+	assert.match(terminalResult.content[0].text, /\(done-candidate\)/);
+	assert.equal(
+		sent.length,
+		1,
+		"terminal dirty recovery does not inject a generic autonomous turn",
+	);
+	assert.ok(
+		notices.some(
+			(entry) =>
+				entry.level === "info" &&
+				/coded resume reached done-candidate/.test(entry.message),
+		),
+		"terminal dirty recovery pauses the matching project goal cleanly",
+	);
+
 	process.stdout.write("dirty recovery: PASS\n");
 } finally {
 	fixture.cleanup();
