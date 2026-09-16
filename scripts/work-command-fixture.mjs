@@ -61,6 +61,16 @@ const scenarioChildren = {
 			title: "Ready slice",
 		},
 	],
+	finiteBacklogComplete: [
+		{
+			id: "PLAN-1",
+			parent_id: "E-1",
+			issue_type: "task",
+			status: "closed",
+			title: "Materialize finite backlog",
+			notes: "wo:planning\nwo:finite-backlog",
+		},
+	],
 	noIdeas: [],
 	empty: [],
 	"no-legacy-empty": [],

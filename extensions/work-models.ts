@@ -27338,6 +27338,23 @@ async function handleWorkResumeCommand(args, ctx, pi, selectionNote = "") {
 		(await queueDirtyRecovery(state, ctx, pi))
 	)
 		return { ...state, dirtyRecoveryQueued: true };
+	if (
+		state.action === "done-candidate" &&
+		activeWorkGoal?.mode === "project" &&
+		activeWorkGoal.status !== "complete" &&
+		sameCheckout(activeWorkGoalCwd, ctx.cwd) &&
+		[state.epic?.id, state.targetWorkItem?.id].includes(
+			workGoalTargetId(activeWorkGoal),
+		)
+	) {
+		pauseActiveWorkGoal(
+			`coded resume reached done-candidate: ${state.message}`,
+			pi,
+			ctx,
+			"info",
+		);
+		return { ...state, autonomousGoalPaused: true };
+	}
 	if (goalOwnedImplementation) {
 		const claimed = claimGoalOwnedImplementation(ctx.cwd, state, {
 			sessionId: ctx.sessionManager?.getSessionId?.() ?? activeWorkGoal?.id,
@@ -30976,15 +30993,20 @@ export default function workModelsExtension(pi) {
 				const parsed = recovery.command.match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
 				if (!parsed) throw new Error("Blocked orchestrator action is malformed.");
 				pendingDirtyRecoveries.delete(token);
-				await executeOrchestratorAction(parsed[1], parsed[2] ?? "", ctx, pi);
+				const resumed = await executeOrchestratorAction(
+					parsed[1],
+					parsed[2] ?? "",
+					ctx,
+					pi,
+				);
 				return {
 					content: [
 						{
 							type: "text",
-							text: `Approved cleanup is clear; resumed ${ORCHESTRATOR_ACTION_LABELS[parsed[1]] ?? "work"}.`,
+							text: `Approved cleanup is clear; resumed ${ORCHESTRATOR_ACTION_LABELS[parsed[1]] ?? "work"}${resumed?.action ? ` (${resumed.action})` : ""}.`,
 						},
 					],
-					details: { action: parsed[1] },
+					details: { action: parsed[1], outcome: resumed?.action },
 					terminate: true,
 				};
 			},
