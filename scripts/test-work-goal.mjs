@@ -235,6 +235,7 @@ try {
 	const absorbed = mod.absorbKnowledgeDiscovererCompletion({
 		runId: "discoverer-run",
 		results: [
+			{ success: false, error: "configured model unavailable" },
 			{
 				success: true,
 				structuredOutput: {
@@ -417,6 +418,70 @@ for (const command of [
 		"--tokens only applies to start/edit",
 	);
 assert.equal(mod.parseTokenBudget("42"), 42);
+const usageEntries = (usage) => [
+	{ type: "message", message: { role: "assistant", usage } },
+];
+assert.equal(
+	mod.workGoalTokenTotal({
+		sessionManager: {
+			getBranch: () =>
+				usageEntries({ input: 10, output: 5, cacheRead: 85, totalTokens: 0 }),
+		},
+	}),
+	100,
+	"token budgets include cached context",
+);
+const cumulativeUsageGoal = mod.createWorkGoal("project", "ship it", 1_000, {
+	baselineTokens: 100,
+	usageSessionId: "session-1",
+});
+mod.updateWorkGoalUsage(cumulativeUsageGoal, {
+	sessionManager: {
+		getSessionId: () => "session-1",
+		getBranch: () => usageEntries({ totalTokens: 250 }),
+	},
+});
+assert.equal(cumulativeUsageGoal.tokensUsed, 150);
+mod.updateWorkGoalUsage(cumulativeUsageGoal, {
+	sessionManager: {
+		getSessionId: () => "session-1",
+		getBranch: () => usageEntries({ totalTokens: 50 }),
+	},
+});
+assert.equal(
+	cumulativeUsageGoal.tokensUsed,
+	150,
+	"same-session compaction cannot erase recorded usage",
+);
+mod.updateWorkGoalUsage(cumulativeUsageGoal, {
+	sessionManager: {
+		getSessionId: () => "session-2",
+		getBranch: () => usageEntries({ totalTokens: 200 }),
+	},
+});
+assert.equal(
+	cumulativeUsageGoal.tokensUsed,
+	350,
+	"new-session continuations add to durable usage",
+);
+let circuit = { projectProgressFingerprint: "same" };
+for (let index = 0; index < 30; index += 1)
+	circuit = mod.advanceProjectGoalToolBudget(circuit, "same");
+assert.equal(circuit.noProgressToolCalls, 30);
+circuit = mod.advanceProjectGoalToolBudget(circuit, "changed");
+assert.equal(circuit.noProgressToolCalls, 0);
+for (let index = 0; index < 3; index += 1)
+	circuit = mod.advanceProjectGoalToolBudget(circuit, "changed", true);
+assert.equal(circuit.noProgressToolFailures, 3);
+circuit = mod.advanceProjectGoalToolBudget(circuit, "changed", false);
+assert.equal(
+	circuit.noProgressToolFailures,
+	0,
+	"a non-failing call resets the failure streak even without fingerprint progress",
+);
+for (let index = 0; index < 2; index += 1)
+	circuit = mod.advanceProjectGoalToolBudget(circuit, "changed", true);
+assert.equal(circuit.noProgressToolFailures, 2);
 assert.equal(mod.formatTokenCount(1500), "1.5k");
 assert.equal(mod.formatTokenCount(999_949), "999.9k");
 assert.equal(mod.formatTokenCount(999_950), "1.0m");
@@ -610,6 +675,76 @@ try {
 		{ cwd: targetCwd },
 	);
 	assert.equal(exactGoal.requestedClosureLimit, 2);
+	assert.equal(
+		exactGoal.tokenBudget,
+		2_000_000,
+		"project autopilot has a finite default token budget",
+	);
+	assert.equal(
+		mod.createWorkGoal("generic", "ship it", undefined).tokenBudget,
+		undefined,
+		"ordinary autonomous goals keep explicit budget semantics",
+	);
+	assert.equal(
+		mod.createWorkGoal("project", "ship it", 123_456, { cwd: targetCwd })
+			.tokenBudget,
+		123_456,
+		"an explicit project budget overrides the default",
+	);
+	const projectObjective = mod.buildWorkResumeGoalObjective(targetCwd, "", {
+		targetId: "work-2",
+	});
+	assert.match(projectObjective, /Never inspect, contact, modify, test, commit/);
+	assert.doesNotMatch(projectObjective, /implement, verify, and commit it/);
+	assert.match(
+		mod.projectGoalSourceMaintenanceBlockReason(
+			{ toolName: "intercom", input: { action: "send", to: "maintainer" } },
+			targetCwd,
+			{ mode: "project", status: "active" },
+		),
+		/cannot contact another session/,
+	);
+	assert.match(
+		mod.projectGoalSourceMaintenanceBlockReason(
+			{
+				toolName: "bash",
+				input: { command: `git -C "${process.cwd()}" status` },
+			},
+			targetCwd,
+			{ mode: "project", status: "active" },
+		),
+		/cannot inspect or mutate/,
+	);
+	assert.equal(
+		mod.projectGoalSourceMaintenanceBlockReason(
+			{
+				toolName: "bash",
+				input: {
+					command: `node "${path.join(process.cwd(), "scripts", "work-helper.mjs")}" work-summary work-2`,
+				},
+			},
+			targetCwd,
+			{ mode: "project", status: "active" },
+		),
+		undefined,
+		"the required absolute work-helper path remains allowed",
+	);
+	assert.match(
+		mod.projectGoalSourceMaintenanceBlockReason(
+			{ toolName: "read", input: { path: path.join(process.cwd(), "README.md") } },
+			targetCwd,
+			{ mode: "project", status: "active" },
+		),
+		/cannot inspect or mutate/,
+	);
+	assert.equal(
+		mod.projectGoalSourceMaintenanceBlockReason(
+			{ toolName: "read", input: { path: "src/app.js" } },
+			targetCwd,
+			{ mode: "project", status: "active" },
+		),
+		undefined,
+	);
 	const scopedGoal = mod.createWorkGoal(
 		"project",
 		mod.buildWorkSelfImprovingObjective(
@@ -2655,8 +2790,7 @@ try {
 	}
 	const originalSessionName = sessionName;
 	try {
-		sessionName =
-			"subagent-work-planner-7564142d-c6c7-409a-869b-ffe92e05fde9-1";
+		sessionName = "subagent-work-planner-7564142d-c6c7-409a-869b-ffe92e05fde9-1";
 		const spawnedChildPolicy = await tempHooks.before_agent_start(
 			{ prompt: "Plan work item work-1.2", systemPrompt: "base" },
 			ctx,
@@ -2697,7 +2831,7 @@ try {
 						toolName: "bash",
 						input: {
 							command:
-							"node 'C:/soft/git/ce-workflow/scripts/work-helper.mjs' work-summary work-1.2",
+								"node 'C:/soft/git/ce-workflow/scripts/work-helper.mjs' work-summary work-1.2",
 						},
 					},
 					ctx,

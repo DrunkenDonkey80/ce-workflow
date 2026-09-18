@@ -22936,9 +22936,10 @@ function advanceProjectGoalToolBudget(goal, fingerprint, failed = false) {
 		noProgressToolCalls: progressed
 			? 0
 			: Number(goal.noProgressToolCalls ?? 0) + 1,
-		noProgressToolFailures: progressed
-			? 0
-			: Number(goal.noProgressToolFailures ?? 0) + Number(Boolean(failed)),
+		noProgressToolFailures:
+			progressed || !failed
+				? 0
+				: Number(goal.noProgressToolFailures ?? 0) + 1,
 	};
 }
 
