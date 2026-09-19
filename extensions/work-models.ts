@@ -864,7 +864,8 @@ const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
 const WORK_GOAL_MAX_RETRIES = 4;
 const WORK_IMPROVE_MAX_STALLED_TURNS = 2;
 const WORK_PROJECT_DEFAULT_TOKEN_BUDGET = 2_000_000;
-const WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS = 30;
+const WORK_PROJECT_NO_PROGRESS_NUDGE_CALLS = 30;
+const WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS = 60;
 const WORK_PROJECT_MAX_NO_PROGRESS_TOOL_FAILURES = 3;
 const WORK_CATCH_UP_MAX_CONTINUATIONS = 20;
 const WORK_GOAL_USAGE_LIMIT_RETRY_MS = 10 * 60 * 1000;
@@ -22928,11 +22929,21 @@ function projectGoalProgressFingerprint(cwd) {
 	return createHash("sha256").update(source).digest("hex");
 }
 
+function workProjectNoProgressNudge() {
+	return [
+		`Progress check: ${WORK_PROJECT_NO_PROGRESS_NUDGE_CALLS} tool calls with no file, commit, or work-item change.`,
+		"Answer in two sentences: what concrete output exists now, and what is the next step?",
+		"If you are repeating yourself, change approach or ask. Do not recap the session.",
+	].join(" ");
+}
+
 function advanceProjectGoalToolBudget(goal, fingerprint, failed = false) {
 	const progressed = goal.projectProgressFingerprint !== fingerprint;
 	return {
 		...goal,
 		projectProgressFingerprint: fingerprint,
+		// Nudge once per no-progress streak; real progress re-arms it.
+		noProgressNudged: progressed ? false : Boolean(goal.noProgressNudged),
 		noProgressToolCalls: progressed
 			? 0
 			: Number(goal.noProgressToolCalls ?? 0) + 1,
@@ -27222,6 +27233,23 @@ function enforceProjectGoalCircuitBreakers(event, ctx, pi) {
 		);
 		ctx.abort?.();
 		return true;
+	}
+	if (
+		activeWorkGoal.noProgressToolCalls >=
+			WORK_PROJECT_NO_PROGRESS_NUDGE_CALLS &&
+		!activeWorkGoal.noProgressNudged
+	) {
+		activeWorkGoal = { ...activeWorkGoal, noProgressNudged: true };
+		persistWorkGoal(pi);
+		if (typeof pi?.sendUserMessage === "function")
+			Promise.resolve(
+				pi.sendUserMessage(workProjectNoProgressNudge(), {
+					deliverAs: "steer",
+				}),
+			).catch(() => {
+				// A refused steer must not abort an otherwise healthy goal.
+			});
+		return false;
 	}
 	if (
 		activeWorkGoal.noProgressToolCalls >= WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS

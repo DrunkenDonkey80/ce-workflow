@@ -468,8 +468,20 @@ let circuit = { projectProgressFingerprint: "same" };
 for (let index = 0; index < 30; index += 1)
 	circuit = mod.advanceProjectGoalToolBudget(circuit, "same");
 assert.equal(circuit.noProgressToolCalls, 30);
+circuit = { ...circuit, noProgressNudged: true };
+circuit = mod.advanceProjectGoalToolBudget(circuit, "same");
+assert.equal(
+	circuit.noProgressNudged,
+	true,
+	"the nudge stays armed while the streak continues, so it fires once",
+);
 circuit = mod.advanceProjectGoalToolBudget(circuit, "changed");
 assert.equal(circuit.noProgressToolCalls, 0);
+assert.equal(
+	circuit.noProgressNudged,
+	false,
+	"real progress re-arms the nudge for the next streak",
+);
 for (let index = 0; index < 3; index += 1)
 	circuit = mod.advanceProjectGoalToolBudget(circuit, "changed", true);
 assert.equal(circuit.noProgressToolFailures, 3);
