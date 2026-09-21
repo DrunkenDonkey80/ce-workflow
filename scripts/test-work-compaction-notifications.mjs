@@ -30,6 +30,7 @@ let launch;
 let workflowScript;
 let discovererPayloadScript;
 const runId = "43b46a2e-ec06-4f14-b99e-e3f81478d87a";
+let replyRunId = runId;
 const pi = {
 	on: (name, handler) => {
 		hooks[name] = handler;
@@ -54,7 +55,7 @@ const pi = {
 			}
 			listeners.get(`subagents:rpc:v1:reply:${event.requestId}`)({
 				success: true,
-				data: { runId },
+				data: { runId: replyRunId },
 			});
 		},
 	},
@@ -1059,6 +1060,109 @@ try {
 		compactLongTurn.messages[1],
 		"recompact at the configured trigger, not half of the model window",
 	);
+	resetContextFilter();
+	// Pin and validate against the same list after removing internal messages.
+	const withInternalPrefix = [
+		{ role: "custom", customType: "work-knowledge", content: "old knowledge" },
+		...longActiveTurn,
+	];
+	requestContextFilter(millionTokenCtx);
+	const cleanedTail = await hooks.context(
+		{ messages: withInternalPrefix },
+		millionTokenCtx,
+	);
+	assertCompactTail(cleanedTail);
+	const continuedCleanedTail = await hooks.context(
+		{ messages: [...withInternalPrefix, ...batch(80, 1)] },
+		millionTokenCtx,
+	);
+	assertCompactTail(continuedCleanedTail);
+	assert.equal(
+		continuedCleanedTail.messages[1],
+		cleanedTail.messages[1],
+		"excluded prefix messages must not invalidate the pinned cut on the next request",
+	);
+	const nextUser = { role: "user", content: "NEXT-REQUEST: preserve the API" };
+	const newUserHistory = [...withInternalPrefix, ...batch(80, 1), nextUser];
+	const originalNewUserHistory = JSON.stringify(newUserHistory);
+	const newUserTail = await hooks.context(
+		{ messages: newUserHistory },
+		millionTokenCtx,
+	);
+	assertCompactTail(newUserTail);
+	assert(newUserTail.messages.includes(nextUser), "new user survives recovery");
+	assert.match(newUserTail.messages[0].summary, /NEXT-REQUEST/);
+	assert(!newUserTail.messages.includes(withInternalPrefix[0]));
+	const stableRecoveredTail = await hooks.context(
+		{ messages: newUserHistory },
+		millionTokenCtx,
+	);
+	assert.equal(
+		stableRecoveredTail.messages[0].summary,
+		newUserTail.messages[0].summary,
+	);
+	assert.equal(stableRecoveredTail.messages[1], newUserTail.messages[1]);
+	assert.equal(JSON.stringify(newUserHistory), originalNewUserHistory);
+
+	// A real rewrite can delete the pinned tool turn. Recover without reviving it.
+	const cut = newUserHistory.indexOf(newUserTail.messages[1]);
+	assert.equal(newUserHistory[cut].role, "assistant");
+	assert.equal(newUserHistory[cut + 1].role, "toolResult");
+	const withoutCut = [
+		...newUserHistory.slice(0, cut),
+		...newUserHistory.slice(cut + 2),
+	];
+	const recoveredCut = await hooks.context(
+		{ messages: withoutCut },
+		millionTokenCtx,
+	);
+	assertCompactTail(recoveredCut);
+	assert(!recoveredCut.messages.includes(newUserHistory[cut]));
+	assert(recoveredCut.messages.includes(nextUser));
+
+	// Tiny/empty rewritten histories still take the cleaned ordinary path.
+	const tiny = await hooks.context(
+		{ messages: [withInternalPrefix[0], nextUser] },
+		millionTokenCtx,
+	);
+	assert.equal(tiny.messages[0], nextUser);
+	assert(!tiny.messages.includes(withInternalPrefix[0]));
+	assert(
+		tiny.messages
+			.slice(1)
+			.every((message) => message.customType === "work-knowledge"),
+	);
+	resetContextFilter();
+
+	// Genuine registry eviction changes which historical notifications are excluded.
+	await new Promise((resolve) => setImmediate(resolve));
+	absorbKnowledgeDiscovererCompletion({ runId, success: false });
+	assert(isKnowledgeDiscovererCompletionMessage(notices[2]));
+	replyRunId = "filter-arming-discoverer";
+	const notifiedHistory = [notices[2], ...longActiveTurn];
+	requestContextFilter(millionTokenCtx);
+	assertCompactTail(
+		await hooks.context({ messages: notifiedHistory }, millionTokenCtx),
+	);
+	await new Promise((resolve) => setImmediate(resolve));
+	for (let index = 0; index < 32; index++) {
+		replyRunId = `filter-eviction-${index}`;
+		await launchKnowledgeDiscoverer(pi, ctx, [
+			{ role: "user", content: `Distinct removed turn for eviction ${index}` },
+		]);
+		absorbKnowledgeDiscovererCompletion({ runId: replyRunId, success: false });
+	}
+	assert(
+		!isKnowledgeDiscovererCompletionMessage(notices[2]),
+		"old run really evicted",
+	);
+	const evictionHistory = [...notifiedHistory, ...batch(80, 1)];
+	const beforeEvictionRecovery = JSON.stringify(evictionHistory);
+	assertCompactTail(
+		await hooks.context({ messages: evictionHistory }, millionTokenCtx),
+	);
+	assert.equal(JSON.stringify(evictionHistory), beforeEvictionRecovery);
+	replyRunId = runId;
 	resetContextFilter();
 	if (process.platform === "win32") {
 		const casing = stripProcessedPayloads([

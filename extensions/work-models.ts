@@ -6546,8 +6546,9 @@ function filteredContext(event, ctx) {
 	);
 	const removedInternalMessages = messages.length !== sourceMessages.length;
 	if (contextFilterState.active && !validFilteredContext(messages)) {
+		// Rebuild in this request: returning undefined would send raw history.
 		resetContextFilter();
-		return;
+		requestContextFilter(ctx);
 	}
 	if (contextFilterState.active) {
 		const snapshot = contextFilterState.snapshot;
@@ -6559,7 +6560,10 @@ function filteredContext(event, ctx) {
 		)
 			contextFilterState.requested = true;
 	}
-	if (contextFilterState.requested && prepareContextFilter(event)) {
+	if (
+		contextFilterState.requested &&
+		prepareContextFilter({ ...event, messages })
+	) {
 		// A missing anchor (fresh session, or a native compaction rewrote the
 		// history) falls back to the whole removed prefix.
 		const start = knowledgeDiscovererCutAnchor
