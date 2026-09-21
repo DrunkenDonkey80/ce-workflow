@@ -14,7 +14,6 @@ export const PLAN_SOURCE = "skills/ce-plan/SKILL.md";
 export const DEBUG_SOURCE = "skills/ce-debug/SKILL.md";
 export const LEARNING_SOURCE = "skills/ce-compound/SKILL.md";
 export const REVIEW_SOURCE = "skills/ce-code-review/SKILL.md";
-export const SIMPLIFY_SOURCE = "skills/ce-simplify-code/SKILL.md";
 export const BROWSER_SOURCE = "skills/ce-test-browser/SKILL.md";
 export const POV_SOURCE = "skills/ce-pov/SKILL.md";
 export const EXPLAIN_SOURCE = "skills/ce-explain/SKILL.md";
@@ -51,12 +50,6 @@ const WORKFLOW_RULES = {
 		"preserve-scoped-findings-read-only-review-and-bounded-rereview",
 		"adapt-output-to-work-finish-review-evidence-contract",
 	],
-	simplify: [
-		"verify-complete-u1-simplify-code-closure",
-		"remove-pi-discovery-frontmatter-and-executable-helpers",
-		"preserve-equivalent-scoped-simplification-and-noop",
-		"adapt-output-to-work-finish-simplify-evidence-contract",
-	],
 	browser: [
 		"verify-complete-u1-test-browser-closure",
 		"remove-pi-discovery-frontmatter-and-executable-helpers",
@@ -91,7 +84,6 @@ const WORKFLOW_SOURCES = {
 	plan: { closure: "ce-plan", source: PLAN_SOURCE },
 	pov: { closure: "ce-pov", source: POV_SOURCE },
 	review: { closure: "ce-code-review", source: REVIEW_SOURCE },
-	simplify: { closure: "ce-simplify-code", source: SIMPLIFY_SOURCE },
 	ideate: { closure: "ce-ideate", source: IDEATE_SOURCE },
 };
 
@@ -170,7 +162,7 @@ function brainstormPlaybook(sourceClosureSha256) {
 }
 
 function planPlaybook(sourceClosureSha256) {
-	return `# Private Plan Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary\n\nConvert the caller's source into an implementation-ready plan. Plan only: do not implement, debug, review code, create unrelated work, or invoke a public Compound Engineering skill. The ce-workflow caller owns roadmap mutation and the final actor-visible next action.\n\n## Clarification and depth\n\n1. Read every named source artifact and settled decision before planning. Ask exactly one focused question per \`ask_user\` call when the input is broad, important, contradictory, or underspecified. After each answer, continue planning in the same assistant turn unless the user cancels or a required answer remains unresolved; do not emit a status-only response or wait for a user-authored continuation. Never replace a required product or architecture decision with an assumption.\n2. Honor the caller-selected depth. Lightweight uses strong local patterns and skips flow analysis and external research. Standard adds repository flow analysis. Deep performs the full warranted research and deepening pass. Depth changes evidence effort, not requirement preservation or the final quality gate.\n3. Inspect the repository, history, project instructions, and available learnings only enough to identify the real architecture, affected files, reusable patterns, boundaries, and verification seams. Record requested-but-unavailable evidence rather than pretending it ran.\n\n## Requirement preservation and self-audit\n\nPreserve every decided requirement, constraint, non-goal, actor-visible flow, acceptance example, authoritative reference, and open question. Trace each source decision to a plan requirement, implementation unit, verification proof, explicit open question, or intentionally dropped-with-rationale note. Keep product scope unchanged unless the user explicitly approves a substantive change.\n\nAfter drafting, self-audit for missing source decisions, weak or subjective proof, uncovered failure behavior, cross-layer effects, unsafe sequencing, and implementation units that are too broad. Resolve each material uncertainty by fixing the plan, asking one blocking question, recording a decision/blocker instruction, or documenting an explicit waiver. Never leave a blocking uncertainty as passive risk prose.\n\n## Artifact and Open Question Gate\n\nWrite the caller-requested Markdown plan under \`docs/plans/\`. A master plan includes a goal capsule, product and planning contracts, stable implementation units with Goal/Files/Approach/Test scenarios/Verification, scope boundaries, risks, sources, a verification contract, and definition of done. A slice plan stays compact and contains exactly the caller-requested implementation unit. Set implementation-ready metadata when producing a complete software plan.\n\nKeep unresolved questions explicit and classify blocking versus deferred. Do not bootstrap, attach, or hand implementation a plan with blocking open questions. Run the caller-provided work-helper bootstrap command when present; if its Open Question Gate blocks, ask each reported decision through the platform's blocking question UI, fold the answer into the plan, and rerun the same helper.\n\n## Actor-visible handoff\n\nFollow the caller's exact handoff: master planning returns the hardened plan and coded roadmap/initiative next action; slice planning appends the requested \`wo:slice-plan\` note and stops for the next resume. Do not show the legacy post-generation menu, invoke legacy \`ce-work\`, or invent a different next command.\n`;
+	return `# Private Plan Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary\n\nConvert the caller's source into an implementation-ready plan. Plan only: do not implement, debug, review code, create unrelated work, or invoke a public Compound Engineering skill. The ce-workflow caller owns roadmap mutation and the final actor-visible next action.\n\n## Clarification and depth\n\n1. Read every named source artifact and settled decision before planning. Ask exactly one focused question per \`ask_user\` call when the input is broad, important, contradictory, or underspecified. After each answer, continue planning in the same assistant turn unless the user cancels or a required answer remains unresolved; do not emit a status-only response or wait for a user-authored continuation. Never replace a required product or architecture decision with an assumption.\n2. Honor the caller-selected depth. Lightweight uses strong local patterns and skips flow analysis and external research. Standard adds repository flow analysis. Deep performs the full warranted research and deepening pass. Depth changes evidence effort, not requirement preservation or the final quality gate.\n3. Inspect the repository, history, project instructions, and available learnings only enough to identify the real architecture, affected files, reusable patterns, boundaries, and verification seams. Record requested-but-unavailable evidence rather than pretending it ran.\n\n## Requirement preservation and self-audit\n\nPreserve every decided requirement, constraint, non-goal, actor-visible flow, acceptance example, authoritative reference, and open question. Trace each source decision to a plan requirement, implementation unit, verification proof, explicit open question, or intentionally dropped-with-rationale note. Keep product scope unchanged unless the user explicitly approves a substantive change.\n\nAfter drafting, self-audit for missing source decisions, weak or subjective proof, uncovered failure behavior, cross-layer effects, unsafe sequencing, and implementation units that are too broad. Resolve each material uncertainty by fixing the plan, asking one blocking question, recording a decision/blocker instruction, or documenting an explicit waiver. Never leave a blocking uncertainty as passive risk prose.\n\n## Artifact and Open Question Gate\n\nWrite the caller-requested Markdown plan under \`docs/plans/\`. A master plan includes a goal capsule, product and planning contracts, stable implementation units with Goal/Files/Approach/Test scenarios/Verification, scope boundaries, risks, sources, a verification contract, and definition of done. Set implementation-ready metadata when producing a complete software plan.\n\nKeep unresolved questions explicit and classify blocking versus deferred. Do not bootstrap, attach, or hand implementation a plan with blocking open questions. Run the caller-provided work-helper bootstrap command when present; if its Open Question Gate blocks, ask each reported decision through the platform's blocking question UI, fold the answer into the plan, and rerun the same helper.\n\n## Actor-visible handoff\n\nFollow the caller's exact handoff: master planning returns the hardened plan and coded roadmap/initiative next action. Do not show the legacy post-generation menu, invoke legacy \`ce-work\`, or invent a different next command.\n`;
 }
 
 function debugPlaybook(sourceClosureSha256) {
@@ -183,10 +175,6 @@ function learningPlaybook(sourceClosureSha256) {
 
 function reviewPlaybook(sourceClosureSha256) {
 	return `# Private Scoped Code-Review Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary\n\nReview only the caller-supplied work item, scoped dirty files, current diff, acceptance contract, and verification evidence. Review is read-only: do not edit, stage, commit, close work items, broaden to the whole repository, simplify code, or run browser acceptance.\n\n## Findings and bounded cycle\n\n1. Inspect the complete scoped diff and the smallest surrounding code needed to validate correctness, security, reliability, compatibility, tests, and project conventions. Apply only relevant specialist lenses; do not manufacture findings to fill categories.\n2. Report each actionable finding with severity, file and location, observed risk, and the smallest safe fix. Reject duplicates, speculation without a causal path, and pre-existing issues outside the slice.\n3. Run one initial review cycle. The caller batches blocking fixes into one fixer pass, then runs at most one targeted re-review only when those fixes materially changed production behavior. Skip re-review for tests, docs, formatting, traceability, or other mechanical fixes. Never launch a third review cycle.\n\n## Evidence and failure\n\nAppend exactly one durable \`wo:review PASS\` note when no blocking findings remain, or \`wo:review FAIL\` with the actionable findings when they do. A failed, unavailable, or incomplete required review blocks coded commit and close; do not claim PASS or substitute prose. Return the scoped verdict and the caller's exact next finish action.\n`;
-}
-
-function simplifyPlaybook(sourceClosureSha256) {
-	return `# Private Scoped Simplification Playbook\n\n<!-- generated; source-closure-sha256: ${sourceClosureSha256} -->\n\n## Boundary and selection\n\nRun only on the caller-supplied non-trivial implementation diff after self-verification and before review. Inspect the scoped diff for concrete duplication, dead flexibility, unnecessary abstraction, avoidable indirection, or code that can be made plainly smaller without changing behavior, public contracts, error handling, validation, security, or accessibility. Do not redesign or widen scope.\n\n## Equivalent change or no-op\n\nIf no material simplification is justified, do not churn the diff; append \`wo:simplify NOOP\`. Otherwise make the smallest equivalent cleanup, rerun the focused verification affected by the edit, and append \`wo:simplify PASS\` with the command and result. Do not stage, commit, close the work item, or perform correctness review or browser testing here.\n\n## Failure\n\nIf equivalence or verification is uncertain, restore or leave the last verified behavior unchanged, record the exact failure evidence, and stop. Missing PASS/NOOP evidence blocks the coded review/commit path.\n`;
 }
 
 function browserPlaybook(sourceClosureSha256) {
@@ -215,7 +203,6 @@ const PLAYBOOKS = {
 	plan: planPlaybook,
 	pov: povPlaybook,
 	review: reviewPlaybook,
-	simplify: simplifyPlaybook,
 };
 
 export function translateVerifiedWorkflows({
@@ -233,7 +220,6 @@ export function translateVerifiedWorkflows({
 		"plan",
 		"pov",
 		"review",
-		"simplify",
 	],
 }) {
 	assertVerifiedEvidence(evidence, policy);
@@ -364,6 +350,6 @@ if (
 	});
 	writePrivateWorkflowGeneration(outputRoot, files);
 	console.log(
-		`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,explain,ideate,learning,plan,pov,review,simplify files=${Object.keys(files).length}`,
+		`PASS generate-work-private-workflows release=${evidence.release} workflows=brainstorm,browser,debug,explain,ideate,learning,plan,pov,review files=${Object.keys(files).length}`,
 	);
 }

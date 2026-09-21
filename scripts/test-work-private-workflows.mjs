@@ -114,10 +114,6 @@ const reviewAuthority = {
 	...authority,
 	actionToken: "work-models:finish:review:v1",
 };
-const simplifyAuthority = {
-	...authority,
-	actionToken: "work-models:finish:simplify:v1",
-};
 const browserAuthority = {
 	...authority,
 	actionToken: "work-models:finish:browser:v1",
@@ -137,7 +133,6 @@ const generated = Object.fromEntries(
 		"plan.md",
 		"pov.md",
 		"review.md",
-		"simplify.md",
 		"manifest.json",
 		"provenance.json",
 	].map((name) => [name, readFileSync(path.join(resourceRoot, name))]),
@@ -184,7 +179,6 @@ check(() => {
 	assert.match(planPlaybook, /Actor-visible handoff/);
 }, "verified plan resource dispatch preserves the planning contract");
 const reviewPlaybook = dispatchPrivateWorkflow("review", reviewAuthority);
-const simplifyPlaybook = dispatchPrivateWorkflow("simplify", simplifyAuthority);
 const browserPlaybook = dispatchPrivateWorkflow("browser", browserAuthority);
 const povPlaybook = dispatchPrivateWorkflow("pov", catchUpAuthority);
 const explainPlaybook = dispatchPrivateWorkflow("explain", catchUpAuthority);
@@ -195,18 +189,11 @@ check(() => {
 	assert.match(reviewPlaybook, /blocks coded commit and close/);
 }, "verified review resource preserves scoped, read-only, bounded-cycle contracts");
 check(() => {
-	assert.match(simplifyPlaybook, /without changing behavior/);
-	assert.match(simplifyPlaybook, /wo:simplify NOOP/);
-	assert.match(simplifyPlaybook, /wo:simplify PASS/);
-	assert.match(simplifyPlaybook, /last verified behavior unchanged/);
-}, "verified simplification resource preserves equivalent-change and no-op contracts");
-check(() => {
 	assert.match(browserPlaybook, /smallest runnable affected pages/);
 	assert.match(browserPlaybook, /wo:browser PASS/);
 	assert.match(browserPlaybook, /wo:browser WAIVED/);
 	assert.match(browserPlaybook, /coded commit and close remain blocked/);
 	assert.notEqual(browserPlaybook, reviewPlaybook);
-	assert.notEqual(browserPlaybook, simplifyPlaybook);
 }, "verified browser resource preserves affected-UI, waiver, and distinct specialist contracts");
 check(() => {
 	assert.match(povPlaybook, /every actionable catch-up candidate/);
@@ -240,7 +227,6 @@ check(() => {
 			"ce-brainstorm",
 			"ce-plan",
 			"ce-code-review",
-			"ce-simplify-code",
 			"ce-test-browser",
 			"ce-pov",
 			"ce-explain",
@@ -265,7 +251,6 @@ check(() => {
 			"ce-plan",
 			"ce-pov",
 			"ce-explain",
-			"ce-simplify-code",
 			"ce-test-browser",
 			"ce-ideate",
 		])
@@ -275,7 +260,6 @@ check(() => {
 	assert.match(learningPlaybook, /Skipping is a successful gate outcome/i);
 	assert.match(planPlaybook, /Do not bootstrap.*blocking open questions/i);
 	assert.match(reviewPlaybook, /failed.*blocks coded commit and close/i);
-	assert.match(simplifyPlaybook, /Missing PASS\/NOOP evidence blocks/i);
 	assert.match(browserPlaybook, /not an implicit waiver/i);
 	assert.match(povPlaybook, /blocks baseline advancement/i);
 	assert.match(explainPlaybook, /keep the candidate undecided/i);
@@ -345,7 +329,6 @@ try {
 		"debug",
 		"learning",
 		"review",
-		"simplify",
 		"browser",
 		"pov",
 		"explain",
@@ -365,7 +348,6 @@ try {
 		["learning", learningPlaybook],
 		["plan", planPlaybook],
 		["review", reviewPlaybook],
-		["simplify", simplifyPlaybook],
 		["browser", browserPlaybook],
 		["pov", povPlaybook],
 		["explain", explainPlaybook],
@@ -438,10 +420,6 @@ try {
 	const reviewSourceBytes = Buffer.from(
 		"---\nname: source-review\n---\nReview the scoped diff.\n",
 	);
-	const simplifySourcePath = "skills/ce-simplify-code/SKILL.md";
-	const simplifySourceBytes = Buffer.from(
-		"---\nname: source-simplify\n---\nSimplify equivalently.\n",
-	);
 	const browserSourcePath = "skills/ce-test-browser/SKILL.md";
 	const browserSourceBytes = Buffer.from(
 		"---\nname: source-browser\n---\nTest affected pages.\n",
@@ -463,7 +441,6 @@ try {
 		[learningSourcePath, learningSourceBytes],
 		[planSourcePath, planSourceBytes],
 		[reviewSourcePath, reviewSourceBytes],
-		[simplifySourcePath, simplifySourceBytes],
 		[browserSourcePath, browserSourceBytes],
 		[povSourcePath, povSourceBytes],
 		[explainSourcePath, explainSourceBytes],
@@ -531,13 +508,6 @@ try {
 						sha256: sha256(reviewSourceBytes),
 					},
 				],
-				"ce-simplify-code": [
-					{
-						path: simplifySourcePath,
-						bytes: simplifySourceBytes.length,
-						sha256: sha256(simplifySourceBytes),
-					},
-				],
 				"ce-test-browser": [
 					{
 						path: browserSourcePath,
@@ -594,12 +564,11 @@ try {
 		assert.match(first["learning.md"], /Destination and deduplication/);
 		assert.match(first["plan.md"], /Open Question Gate/);
 		assert.match(first["review.md"], /bounded cycle/);
-		assert.match(first["simplify.md"], /Equivalent change or no-op/);
 		assert.match(first["browser.md"], /Affected UI selection/);
 		assert.match(first["pov.md"], /Graded verdict/);
 		assert.match(first["explain.md"], /Conditional boundary/);
 		assert.match(first["ideate.md"], /Grounding and scope/);
-	}, "ten-workflow release, path, hash, license, and translator provenance");
+	}, "nine-workflow release, path, hash, license, and translator provenance");
 
 	check(() => {
 		for (const status of ["current", "update", "unknown", "blocked", "failed"])

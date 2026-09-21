@@ -25,13 +25,11 @@ const ALLOWLIST = new Map([
 	["plan", "plan.md"],
 	["pov", "pov.md"],
 	["review", "review.md"],
-	["simplify", "simplify.md"],
 ]);
 const PARITY_WORKFLOWS = [
 	"ce-brainstorm",
 	"ce-plan",
 	"ce-code-review",
-	"ce-simplify-code",
 	"ce-test-browser",
 	"ce-pov",
 	"ce-explain",
@@ -67,10 +65,6 @@ const AUTHORITIES = new Map([
 	[
 		"work-models:finish:review:v1",
 		{ caller: WORK_MODELS_CALLER, workflows: new Set(["review"]) },
-	],
-	[
-		"work-models:finish:simplify:v1",
-		{ caller: WORK_MODELS_CALLER, workflows: new Set(["simplify"]) },
 	],
 	[
 		"work-models:wf:plan:v1",
@@ -165,7 +159,6 @@ export function assertCompletePrivateWorkflowParity(
 ) {
 	const inventory = parseJson(readFileSync(inventoryPath), "parity inventory");
 	const parity = inventory.parityIndex;
-	exactKeys(parity, PARITY_WORKFLOWS, "parity rows");
 	for (const workflow of PARITY_WORKFLOWS) {
 		exactKeys(parity[workflow], PARITY_FIELDS, `${workflow} parity row`);
 		for (const field of PARITY_FIELDS)

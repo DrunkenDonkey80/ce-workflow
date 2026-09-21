@@ -2380,9 +2380,8 @@ export function reconcileVerifierRuns(cwd = process.cwd(), input = {}) {
 		let state = "";
 		let runtimeStatus;
 		if (
-			!Object.values(job.operationStatus).some(
-				(status) => status === "pending",
-			)
+			!recovering &&
+			!Object.values(job.operationStatus).some((status) => status === "pending")
 		) {
 			// ponytail: terminal jobs with stale launches only need close-out, no artifact flow
 			if (job.launch.status === "running") {

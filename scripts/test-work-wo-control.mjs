@@ -104,12 +104,6 @@ try {
 		JSON.stringify({ workResume: { selfImproving: false } }),
 	);
 	await commands.wo.handler("monitor peer-session", ctx);
-	assert.match(notices.at(-1).message, /self-improving is enabled/i);
-	writeFileSync(
-		path.join(cwd, ".pi", "settings.json"),
-		JSON.stringify({ workResume: { selfImproving: true } }),
-	);
-	await commands.wo.handler("monitor peer-session", ctx);
 	assert.match(sent.at(-1).message, /WO_MONITOR_V1/);
 	assert.match(sent.at(-1).message, /peer-session/);
 	assert.match(sent.at(-1).message, /work_monitor_bind/);
@@ -200,19 +194,19 @@ try {
 
 	idle = false;
 	await commands.wo.handler("pause", ctx);
-	assert.match(notices.at(-1).message, /current tool batch finishes/i);
-	assert.equal(aborts, 0, "pause does not abort tools that are still running");
+	assert.match(notices.at(-1).message, /current LLM cycle finishes/i);
+	assert.equal(aborts, 0, "pause lets the current LLM cycle finish");
 	await hooks.turn_end({}, ctx);
 	assert.equal(
 		aborts,
 		1,
-		"pause aborts only after turn_end marks the tool boundary",
+		"pause aborts only after turn_end completes the current LLM cycle",
 	);
 	idle = true;
 	await hooks.agent_settled({}, ctx);
 	assert.match(notices.at(-1).message, /Job paused/i);
 	await commands.wo.handler("resume", ctx);
-	assert.match(sent.at(-1).message, /last completed tool boundary/i);
+	assert.match(sent.at(-1).message, /last completed LLM cycle/i);
 
 	entries.push({
 		type: "custom",
@@ -283,7 +277,10 @@ try {
 		data: { goal: { id: "parent-goal", status: "active" } },
 	});
 	idle = false;
-	const beforeImmediatePause = aborts;
+	const beforeGracefulPause = aborts;
+	const goalStateCount = entries.filter(
+		(entry) => entry.customType === "work-goal-state",
+	).length;
 	assert.deepEqual(
 		await hooks.input(
 			{ source: "interactive", text: "pause", streamingBehavior: "steer" },
@@ -294,25 +291,38 @@ try {
 	);
 	assert.equal(
 		aborts,
-		beforeImmediatePause + 1,
-		"bare pause aborts immediately",
+		beforeGracefulPause,
+		"bare pause does not interrupt the current LLM cycle",
+	);
+	assert.equal(
+		entries.filter((entry) => entry.customType === "work-goal-state").length,
+		goalStateCount,
+		"bare pause does not pause durably before the cycle boundary",
+	);
+	assert.match(notices.at(-1).message, /current LLM cycle finishes/i);
+	await hooks.turn_end({}, ctx);
+	assert.equal(
+		aborts,
+		beforeGracefulPause + 1,
+		"bare pause stops before the next LLM cycle",
 	);
 	assert.equal(
 		entries.filter((entry) => entry.customType === "work-goal-state").at(-1).data
 			.goal.status,
 		"paused",
-		"bare pause durably pauses the /wo goal",
+		"bare pause durably pauses the /wo goal at the cycle boundary",
 	);
 	assert.deepEqual(sent.at(-1), {
 		message: "/goal pause",
 		options: { expandPromptTemplates: true, deliverAs: "steer" },
 	});
+	idle = true;
+	await hooks.agent_settled({}, ctx);
 	entries.push({
 		type: "custom",
 		customType: "goal-state",
 		data: { goal: { id: "parent-goal", status: "paused" } },
 	});
-	idle = true;
 	const beforeGoalResume = sent.length;
 	await commands.wo.handler("resume", ctx);
 	assert.equal(

@@ -108,7 +108,6 @@ import {
 	laneTelemetryEvents,
 	loadLaneStore,
 	promoteLane,
-	queueLane,
 	reconcileReadOnlyLanes,
 	runReadOnlyLaneBatch,
 	transitionLane,
@@ -285,10 +284,6 @@ const MISC_ROADMAP_LABEL = "wo:misc";
 const FINITE_BACKLOG_MARKER = "wo:finite-backlog";
 const MISC_ROADMAP_CHOICE = "__misc_roadmap__";
 const VERIFIER_RPC_TIMEOUT_MS = 30_000;
-const PREFETCH_RPC_TIMEOUT_MS = 2_000;
-const PREFETCH_ARTIFACT_MAX_BYTES = 128 * 1024;
-const PREFETCH_OUTPUT_VERSION = 1;
-const PREFETCH_TOOL_NAMES = ["read", "grep", "find", "ls"];
 const AGENT_HEALTH_TIMEOUT_MS = 30_000;
 const DESIGN_RUN_LIVENESS_ATTENTION_MS = 15 * 60 * 1000;
 const ACTIVE_SELF_IMPROVEMENT_STATUSES = new Set([
@@ -517,12 +512,7 @@ const EFFORT_PROFILES = {
 		advisor: "high",
 		advisor2: "high",
 		advisor3: "high",
-		advisorUsageForSlicePlans: "none",
 		advisorVerifyTask: false,
-		slicePlanBeforeWork: true,
-		slicePlanWithCePlan: false,
-		slicePlanCeDepth: "Lightweight",
-		simplifyBeforeReview: false,
 		browserTestsOnUiDiff: false,
 		codeReviewBeforeCommit: "off",
 	},
@@ -535,12 +525,7 @@ const EFFORT_PROFILES = {
 		advisor: "high",
 		advisor2: "high",
 		advisor3: "high",
-		advisorUsageForSlicePlans: "first",
 		advisorVerifyTask: true,
-		slicePlanBeforeWork: true,
-		slicePlanWithCePlan: false,
-		slicePlanCeDepth: "Lightweight",
-		simplifyBeforeReview: false,
 		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: "light",
 	},
@@ -553,12 +538,7 @@ const EFFORT_PROFILES = {
 		advisor: "high",
 		advisor2: "high",
 		advisor3: "high",
-		advisorUsageForSlicePlans: "all",
 		advisorVerifyTask: true,
-		slicePlanBeforeWork: true,
-		slicePlanWithCePlan: true,
-		slicePlanCeDepth: "Standard",
-		simplifyBeforeReview: true,
 		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: "light",
 	},
@@ -571,12 +551,7 @@ const EFFORT_PROFILES = {
 		advisor: "high",
 		advisor2: "high",
 		advisor3: "high",
-		advisorUsageForSlicePlans: "all",
 		advisorVerifyTask: true,
-		slicePlanBeforeWork: true,
-		slicePlanWithCePlan: true,
-		slicePlanCeDepth: "Deep",
-		simplifyBeforeReview: true,
 		browserTestsOnUiDiff: true,
 		codeReviewBeforeCommit: "full",
 	},
@@ -587,7 +562,7 @@ const PROFILE_GUIDANCE = {
 	low: {
 		summary: "Lean execution for small, familiar, low-risk changes.",
 		pros: "Fastest feedback and lowest token use.",
-		cons: "Skips review and browser/simplification gates; weaker on ambiguity.",
+		cons: "Skips review and browser gates; weaker on ambiguity.",
 		consumption: "Lowest tokens · shortest time",
 	},
 	medium: {
@@ -598,8 +573,7 @@ const PROFILE_GUIDANCE = {
 	},
 	high: {
 		summary: "Thorough planning and review for important or complex work.",
-		pros:
-			"All advisors, agent planning, simplification, browser checks, and review.",
+		pros: "All advisors, browser checks, and review.",
 		cons: "Higher latency and token use, especially with several advisors.",
 		consumption: "High tokens · longer time",
 	},
@@ -610,36 +584,14 @@ const PROFILE_GUIDANCE = {
 		consumption: "Highest tokens · longest time",
 	},
 };
-const PRE_BRAINSTORM_ADVISORS = "preBrainstormAdvisors";
 const WORK_ORCH_BOOLEANS = [
-	{
-		key: PRE_BRAINSTORM_ADVISORS,
-		label: "Background advisor research before brainstorm",
-	},
 	{ key: "advisorVerifyTask", label: "Coded task-vs-plan checklist" },
-	{
-		key: "slicePlanBeforeWork",
-		label: "Planner writes slice plan before work",
-	},
-	{
-		key: "slicePlanWithCePlan",
-		label: "Agent slice planner for messy/large slices",
-	},
-	{
-		key: "simplifyBeforeReview",
-		label: "Private simplification before review",
-	},
 	{
 		key: "browserTestsOnUiDiff",
 		label: "Private browser checks when diff touches UI",
 	},
 ];
 const WORK_PERFORMANCE_FLAGS = [
-	{
-		key: "prepareNextCandidate",
-		label: "Prepare next candidate",
-		defaultValue: false,
-	},
 	{
 		key: "parallelReadOnlyLanes",
 		label: "Read-only task lanes",
@@ -661,12 +613,6 @@ const WORK_PERFORMANCE_FLAGS = [
 		defaultValue: true,
 	},
 ];
-const SLICE_PLAN_ADVISOR_USAGE = ["none", "first", "all"];
-const SLICE_PLAN_ADVISOR_USAGE_DESC = {
-	none: "skip advisor review for slice plans",
-	first: "run the first configured advisor",
-	all: "run all configured advisors in parallel",
-};
 const REVIEW_LEVELS = ["off", "light", "full"];
 const REVIEW_POLICY_DESC = {
 	"risk-based":
@@ -1002,10 +948,13 @@ function writeSettings(cwd, settings) {
 	syncImprovementReportTool(workExtensionPi, { cwd });
 }
 
-function syncImprovementReportTool(pi, ctx) {
-	if (!pi?.getActiveTools || !pi?.setActiveTools || !ctx?.cwd) return;
+function syncImprovementReportTool(pi) {
+	if (!pi?.getActiveTools || !pi?.setActiveTools) return;
 	const active = new Set(Array.from(pi.getActiveTools() ?? []));
-	if (workResumeSettings(ctx.cwd).selfImproving)
+	if (
+		activeWorkGoal?.mode === "self-improving" &&
+		activeWorkGoal.status === "active"
+	)
 		active.add(IMPROVEMENT_REPORT_TOOL);
 	else active.delete(IMPROVEMENT_REPORT_TOOL);
 	pi.setActiveTools([...active]);
@@ -1602,8 +1551,9 @@ function completeWorkflowOnce(cwd, completion) {
 	return claim;
 }
 
-function improvementStatus(cwd) {
-	return workResumeSettings(cwd).selfImproving
+function improvementStatus() {
+	return activeWorkGoal?.mode === "self-improving" &&
+		activeWorkGoal.status === "active"
 		? { enabled: true, state: "explicit reporting" }
 		: { enabled: false, state: "off" };
 }
@@ -1822,16 +1772,11 @@ function jsonSafe(value) {
 	}
 }
 
-function selfImprovementHistoryEnabled(ctx) {
-	if (process.env.WORK_ORCH_HISTORY_OFF === "1") return false;
-	if (activeWorkGoal?.mode === "self-improving") return true;
-	try {
-		return workResumeSettings(
-			ctx?.cwd ?? activeWorkAgent?.cwd ?? activeWorkGoalCwd,
-		).selfImproving;
-	} catch {
-		return false;
-	}
+function selfImprovementHistoryEnabled() {
+	return (
+		process.env.WORK_ORCH_HISTORY_OFF !== "1" &&
+		activeWorkGoal?.mode === "self-improving"
+	);
 }
 
 function historyTaskFromText(value) {
@@ -2459,7 +2404,7 @@ const ORCHESTRATOR_ACTION_LABELS = {
 	"work-design": "Visual design",
 	"work-redesign": "Redesign",
 	"work-research": "Research",
-	"work-catch-up": "Catch up project",
+	"work-catch-up": "Catch up packages",
 	"work-extension-scout": "Scout Pi extensions in background",
 	"work-context": "Context guard",
 	"work-debug": "Debug",
@@ -4110,17 +4055,11 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 			raw.advisorEnabled?.[slot.key] ?? slot.defaultEnabled,
 		]),
 	);
-	const advisorUsageForSlicePlans = SLICE_PLAN_ADVISOR_USAGE.includes(
-		raw.advisorUsageForSlicePlans,
-	)
-		? raw.advisorUsageForSlicePlans
-		: base.advisorUsageForSlicePlans;
 	const flags = {};
 	for (const { key } of WORK_ORCH_BOOLEANS)
 		flags[key] = raw[key] ?? base[key] ?? false;
 	flags.serialReadOnlyLanes =
 		!workPerformanceSettings(cwd).parallelReadOnlyLanes;
-	const slicePlanCeDepth = raw.slicePlanCeDepth ?? base.slicePlanCeDepth;
 	const codeReviewBeforeCommit =
 		raw.codeReviewBeforeCommit ?? base.codeReviewBeforeCommit;
 	const reviewPolicy = normalizeReviewPolicy(raw.reviewPolicy);
@@ -4147,8 +4086,6 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 			: "main-first",
 		creativeMode,
 		advisorEnabled,
-		advisorUsageForSlicePlans,
-		slicePlanCeDepth,
 		codeReviewBeforeCommit,
 		reviewPolicy,
 		...flags,
@@ -4173,15 +4110,14 @@ function applyProfile(settings, profileKey) {
 	block.profile = profileKey;
 	for (const { key } of WORK_ORCH_BOOLEANS)
 		if (profile[key] !== undefined) block[key] = profile[key];
-	block.advisorUsageForSlicePlans = profile.advisorUsageForSlicePlans;
-	block.slicePlanCeDepth = profile.slicePlanCeDepth;
 	block.codeReviewBeforeCommit = profile.codeReviewBeforeCommit;
 	return true;
 }
 
 function setWorkOrchBoolean(settings, key, value) {
-	const block = workOrchBlock(settings);
-	block[key] = Boolean(value);
+	if (!WORK_ORCH_BOOLEANS.some((flag) => flag.key === key)) return false;
+	workOrchBlock(settings)[key] = Boolean(value);
+	return true;
 }
 
 function setWorkOrchReviewLevel(settings, value) {
@@ -4217,13 +4153,6 @@ function setOpenDesignCommandSetting(settings, value) {
 function setDesignReviewProofSetting(settings, value) {
 	workOrchBlock(settings).designReviewProof =
 		value === "strict" ? value : "standard";
-}
-
-function setWorkOrchAdvisorSliceUsage(settings, value) {
-	const block = workOrchBlock(settings);
-	block.advisorUsageForSlicePlans = SLICE_PLAN_ADVISOR_USAGE.includes(value)
-		? value
-		: "none";
 }
 
 function setWorkResumeBoolean(settings, key, value) {
@@ -4351,29 +4280,6 @@ function advisorCriticStep(
 		`Give every advisor the same exact ${target}, authoritative sources, and review contract, plus its independent charter: ${agents.map((agent, index) => `${agent} = ${charters[index]}`).join("; ")}. Require concrete locations and smallest fixes. Advisors must not edit files, mutate WorkItems, or launch subagents.`,
 		"Wait for all configured advisors, deduplicate their findings, and apply only authority-grounded fixes. Complete this gate before any plan bootstrap, slicing, or implementation. Convert any unresolved blocking gap into a decision/blocker WorkItem before proceeding; an unavailable advisor is recorded and not replaced or retried.",
 		`If fixes changed the artifact, decide whether one focused re-review by ${first} is warranted. Re-run it once only for substantive cross-section changes, ambiguity resolution, or a fix that could create a new inconsistency; skip re-review for mechanical wording/traceability fixes. Never start a recursive review loop.`,
-	].join("\n");
-}
-
-function preBrainstormAdvisorStep(cwd, offlineModels = [], currentModel = "") {
-	if (!workOrchSettings(cwd).preBrainstormAdvisors) return "";
-	const settings = readEffectiveSettings(cwd);
-	const offline = new Set(offlineModels);
-	const agents = configuredAdvisorSlots(settings)
-		.filter(
-			(slot) =>
-				!offline.has(
-					configuredModelId(slotSelection(slot, settings).model, currentModel),
-				),
-		)
-		.map((slot) => slot.agents[0]);
-	if (!agents.length) return "";
-	const launch = workPerformanceSettings(cwd).parallelAdvisors
-		? `launch exactly one parallel subagent call via workflowScript using runs.all with context:fresh and one stable-key child for each configured agent: ${agents.join(", ")}`
-		: `launch these configured agents one at a time with separate context:fresh single-agent calls, waiting for each before starting the next: ${agents.join(", ")}`;
-	return [
-		`Optional pre-brainstorm research gate: after the private brainstorm has clarified the request but before it writes the artifact, ${launch}. Use only these packaged work-advisor roles.`,
-		"Give every advisor the same clarified request and authoritative local sources. Ask for independent relevant research, constraints, risks, and concrete options. Advisors are read-only, must not mutate WorkItems or files, and must not launch subagents.",
-		"Wait for every configured advisor, deduplicate and synthesize their findings, then feed that synthesis into the main private brainstorm reasoning before writing the brainstorm artifact. Record unavailable advisors without retry; do not replace them.",
 	].join("\n");
 }
 
@@ -4604,121 +4510,6 @@ function hasSlicePlan(issue) {
 	);
 }
 
-function slicePlanAdvisorAgents(cwd) {
-	const settings = readEffectiveSettings(cwd);
-	return configuredAdvisorSlots(
-		settings,
-		workOrchSettings(cwd, settings).advisorUsageForSlicePlans,
-	).map((slot) => slot.agents[0]);
-}
-
-function hasPlannerCreatedSlicePlan(issue) {
-	return /(?:^|\n)planner:\s*work-planner\s*(?:\n|$)/i.test(
-		issue.slicePlan ?? notesOf(issue),
-	);
-}
-
-function hasSlicePlanAdvisorPass(issue, agents) {
-	return (
-		issue.sliceAdvisorGate?.verdict === "PASS" &&
-		issue.sliceAdvisorGate.agents.join(",") === agents.join(",")
-	);
-}
-
-function slicePlanAdvisorGateState(cwd, state, issue) {
-	const agents = slicePlanAdvisorAgents(cwd);
-	if (!agents.length || hasSlicePlanAdvisorPass(issue, agents)) return null;
-	const marker = `wo:slice-advisor PASS agents=${agents.join(",")}`;
-	return withHandoffPrompt(
-		{
-			...state,
-			action: "advisor-gate-pending",
-			selectedWorkItem: issue,
-			message: `Configured slice-plan advisor challenge is pending: ${agents.join(", ")}.`,
-			handoffExtra: [
-				advisorCriticStep(
-					cwd,
-					`slice plan for WorkItem ${issue.id}`,
-					workOrchSettings(cwd).advisorUsageForSlicePlans,
-				),
-				`Do not claim or implement this WorkItem yet. After every configured advisor returns CLEAN and any grounded plan fixes are applied, append the exact durable note with node ${shellQuote(WORK_HELPER_SCRIPT)} work-note ${issue.id} ${shellQuote(marker)}. If concerns remain, persist them with work-note and stop without the PASS marker. Resume only after the exact marker is present.`,
-			],
-			suggestedCommands: [],
-		},
-		cwd,
-	);
-}
-
-function issueRefText(issue) {
-	const summary = issueRef(issue);
-	return (
-		[summary.id, summary.title].filter(Boolean).join(" — ") || "unknown WorkItem"
-	);
-}
-
-function needsPlannerAgent(issue, state) {
-	const text = [notesOf(issue), issue?.description, issue?.acceptance].join(
-		"\n",
-	);
-	return text.length > 4_000 || (state?.executableSlices?.length ?? 0) > 12;
-}
-
-function inlineSlicePlanNote(issue, state, cwd) {
-	const plan = state.planPath ? relative(cwd, state.planPath) : "none linked";
-	return [
-		"wo:slice-plan",
-		`plan-path: ${plan}`,
-		`target: ${issueRefText(issue)}`,
-		"approach: implement the WorkItem's acceptance with the smallest localized diff; reuse existing helpers before adding code.",
-		"likely files: derive from the WorkItem notes/design before editing; do not broaden scope.",
-		"verification: run the WorkItem's named check, or the smallest focused command that proves the acceptance.",
-		"risks/out-of-scope: create a blocker WorkItem instead of guessing when acceptance, hardware/live proof, or ownership is unclear.",
-	].join("\n");
-}
-
-function applyInlineSlicePlan(cwd, state, issue) {
-	try {
-		const plan = inlineSlicePlanNote(issue, state, cwd);
-		appendWorkflowWorkItemNote(cwd, idOf(issue), plan);
-		const planned = {
-			...issue,
-			labels: [...new Set([...labelsOf(issue), "wo:slice-planned"])],
-			notes: `${notesOf(issue)}\n${plan}`,
-		};
-		const advisorStep = labelsOf(issue).includes("wo:materialized")
-			? ""
-			: advisorCriticStep(
-					cwd,
-					`slice plan note on WorkItem ${idOf(issue)}`,
-					workOrchSettings(cwd).advisorUsageForSlicePlans,
-				);
-		return withHandoffPrompt(
-			withImplementationPolicy(
-				{
-					...state,
-					action: "run-implementation",
-					selectedWorkItem: issueSummary(planned),
-					message:
-						"Added coded slice-plan note and continued directly to implementation; no planner boundary needed.",
-					handoffExtra: advisorStep ? [advisorStep] : [],
-				},
-				cwd,
-			),
-			cwd,
-		);
-	} catch (error) {
-		return errorState(
-			"slice-plan-failed",
-			commandErrorText(error) || error.message,
-			{
-				...state,
-				action: "slice-plan-stop",
-				selectedWorkItem: issueSummary(issue),
-			},
-		);
-	}
-}
-
 function privatePlanPlaybookBlock() {
 	const playbook = dispatchPrivateWorkflow("plan", {
 		actionToken: "work-models:wf:plan:v1",
@@ -4764,46 +4555,10 @@ function privateCatchUpCandidatePlaybooks() {
 	].join("\n\n");
 }
 
-function cePlanSliceStep(
-	issue,
-	cwd,
-	masterPlanPath,
-	depth = "Lightweight",
-	advisorUsage = "none",
-) {
-	const scopeLine = masterPlanPath
-		? `Scope: this WorkItem's acceptance/design plus the matching Implementation Unit from ${relative(cwd, masterPlanPath)}.`
-		: `Scope: this WorkItem's acceptance/design and notes.`;
-	let depthLine =
-		"Use Lightweight depth: skip flow analysis and external research when local patterns are strong.";
-	if (depth === "Deep")
-		depthLine =
-			"Use Deep depth for the full private planning research/deepening pass.";
-	else if (depth === "Standard")
-		depthLine =
-			"Use Standard depth so repository flow analysis runs without Deep extensions.";
-	return [
-		`Private slice-planning pass before implementation: target ${issueRefText(issue)} already exists as executable work. Do not create child native work-item store and do not dispatch work-planner.`,
-		privatePlanPlaybookBlock(),
-		scopeLine,
-		`Follow the verified private playbook in the control session to produce a compact plan doc at docs/plans/YYYY-MM-DD-NNN-slice-${safeArtifactPart(idOf(issue))}-plan.md with a single Implementation Unit (Goal, Files, Approach, Test scenarios, Verification). ${depthLine}`,
-		`Then append a WorkItem note headed \`wo:slice-plan\` containing both \`plan-path: <repo-relative plan doc path>\` and \`planner: work-planner\`, add label \`wo:slice-planned\`, and stop. Implementation happens on the next /work-resume; the worker executes the plan doc, not the WorkItem title.`,
-		advisorUsage === "none"
-			? ""
-			: "Do not launch advisors from work-planner. The next coded resume boundary durably blocks implementation until the configured slice-plan advisor gate passes.",
-	]
-		.filter(Boolean)
-		.join("\n");
-}
-
 function codeReviewBeforeCommitStep(level) {
 	if (level === "light")
 		return "Pre-commit review gate (light): launch exactly one work-reviewer on the scoped slice diff. Batch its blocking findings into one work-fixer pass, then run at most one scoped re-review only for substantive production-code fixes. Never re-review mechanical fixes or launch a third review cycle.";
 	return privateFinishPlaybookBlock("review", "SCOPED CODE-REVIEW");
-}
-
-function simplifyBeforeReviewStep() {
-	return privateFinishPlaybookBlock("simplify", "SCOPED SIMPLIFICATION");
 }
 
 function browserTestsOnUiDiffStep() {
@@ -5132,9 +4887,6 @@ function profileDescription(key) {
 		`Token/time consumption: ${guidance.consumption}`,
 		"Active settings:",
 		...SLOTS.map((slot) => `  ${slot.label}: ${titleCase(profile[slot.key])}`),
-		`  Slice-plan advisors: ${titleCase(profile.advisorUsageForSlicePlans)}`,
-		`  Agent slice planning: ${profile.slicePlanWithCePlan ? profile.slicePlanCeDepth : "Off"}`,
-		`  Simplify before review: ${profile.simplifyBeforeReview ? "On" : "Off"}`,
 		`  Browser tests on UI changes: ${profile.browserTestsOnUiDiff ? "On" : "Off"}`,
 		`  Pre-commit review: ${titleCase(profile.codeReviewBeforeCommit)}`,
 	].join("\n");
@@ -8439,21 +8191,6 @@ function issueSummary(issue) {
 			summary.verificationContract = issue.verificationContract;
 			summary.verificationStatus = verificationContractStatus(issue);
 		}
-		const notes = notesOf(issue);
-		const slicePlanAt = notes.lastIndexOf("wo:slice-plan");
-		if (slicePlanAt >= 0)
-			summary.slicePlan = notes.slice(slicePlanAt, slicePlanAt + 1600);
-		const advisorGates = [
-			...notes.matchAll(
-				/^wo:slice-advisor\s+(PASS|CONCERNS)\s+agents=([^\r\n]+)$/gim,
-			),
-		];
-		const advisorGate = advisorGates.at(-1);
-		if (advisorGate)
-			summary.sliceAdvisorGate = {
-				verdict: advisorGate[1].toUpperCase(),
-				agents: advisorGate[2].split(",").filter(Boolean),
-			};
 		summary.verificationReady = hasVerificationEvidence(issue);
 		summary.reviewPassed = hasReviewPass(issue);
 		summary.reviewFailed = hasReviewFail(issue);
@@ -9522,7 +9259,7 @@ function designDeviationGate(cwd, state, issue) {
 	};
 }
 
-function planResumeAction(state, cwd, options = {}) {
+function planResumeAction(state, cwd, _options = {}) {
 	if (!state.ok) return state;
 	const activeImplementation = state.inProgressExecutable?.[0];
 	const activeDesignGate = designDeviationGate(cwd, state, activeImplementation);
@@ -9808,33 +9545,6 @@ function planResumeAction(state, cwd, options = {}) {
 				},
 				cwd,
 			);
-		const settings = workOrchSettings(cwd);
-		if (settings.slicePlanBeforeWork && !hasSlicePlan(implementation)) {
-			if (settings.slicePlanWithCePlan && needsPlannerAgent(implementation, state))
-				return withHandoffPrompt(
-					{
-						...state,
-						action: "run-planner",
-						selectedWorkItem: implementation,
-						handoffExtra: [
-							cePlanSliceStep(
-								implementation,
-								cwd,
-								state.planPath,
-								settings.slicePlanCeDepth,
-								settings.advisorUsageForSlicePlans,
-							),
-						],
-					},
-					cwd,
-				);
-			if (!options.readOnlyPlanning)
-				return applyInlineSlicePlan(cwd, state, implementation);
-		}
-		if (hasPlannerCreatedSlicePlan(implementation)) {
-			const advisorGate = slicePlanAdvisorGateState(cwd, state, implementation);
-			if (advisorGate) return advisorGate;
-		}
 		return withHandoffPrompt(
 			withImplementationPolicy(
 				{
@@ -12254,10 +11964,8 @@ function readOnlyLaneEnvelope(
 	request,
 	settings = readEffectiveSettings(cwd),
 ) {
-	if (!["discovery", "debug", "prefetch"].includes(request?.laneKind))
-		throw new Error(
-			"Read-only lanes support only current-task discovery/debug or successor prefetch",
-		);
+	if (!["discovery", "debug"].includes(request?.laneKind))
+		throw new Error("Read-only lanes support only current-task discovery/debug");
 	const workItem = readWorkItem(cwd, request.workItemId);
 	if (!workItem) throw new Error(`No WorkItem found for ${request.workItemId}`);
 	const executionRoot = executionRepositoryRoot(cwd);
@@ -12359,288 +12067,6 @@ function prefetchVerifierStatus(cwd) {
 	}
 }
 
-function prefetchRelevantPaths(candidate, supplied = []) {
-	return [...new Set([...(supplied ?? []), ...(candidate?.changedPaths ?? [])])]
-		.map(normalizedRepoPath)
-		.filter(
-			(file) =>
-				file &&
-				!isWorkStorePath(file) &&
-				!isPiRuntimeArtifact(file) &&
-				!isAbsolute(file) &&
-				!file.startsWith("../"),
-		)
-		.sort();
-}
-
-function prefetchPathHashes(cwd, paths) {
-	return Object.fromEntries(
-		paths.map((file) => {
-			const target = join(cwd, file);
-			try {
-				const info = lstatSync(target);
-				return [
-					file,
-					info.isFile() && !info.isSymbolicLink()
-						? laneDigest(readFileSync(target))
-						: "non-file",
-				];
-			} catch {
-				return [file, "missing"];
-			}
-		}),
-	);
-}
-
-function prefetchTaskRevision(issue) {
-	return laneDigest({
-		title: titleOf(issue),
-		type: typeOf(issue),
-		description: field(issue, "description"),
-		design: field(issue, "design", "documentLinks"),
-		notes: notesOf(issue),
-		labels: labelsOf(issue).sort(),
-	});
-}
-
-function prefetchEpicChildren(cwd, epicId) {
-	return laneDigest(
-		descendantsOf(cwd, epicId)
-			.map((issue) => ({
-				id: idOf(issue),
-				parentId: parentOf(issue),
-				status: statusOf(issue),
-				type: typeOf(issue),
-				dependencies: depsOf(issue).sort(),
-				updated: updatedAt(issue),
-			}))
-			.sort((left, right) => left.id.localeCompare(right.id)),
-	);
-}
-
-function prefetchCheckpoint(
-	cwd,
-	state,
-	current,
-	candidate,
-	relevantPaths,
-	advisorChallenge,
-) {
-	const issue = readWorkItem(cwd, candidate.id);
-	const settings = readEffectiveSettings(cwd);
-	const verifier = prefetchVerifierStatus(cwd);
-	const checkpoint = {
-		version: 1,
-		epicId: state.epic.id,
-		currentWorkItemId: idOf(current),
-		selectedWorkItemId: candidate.id,
-		action: state.action,
-		head: run(cwd, "git", ["rev-parse", "HEAD"]),
-		acceptanceHash: laneDigest(
-			field(issue, "acceptance", "acceptance_criteria", "acceptanceCriteria") ??
-				"",
-		),
-		taskRevisionHash: prefetchTaskRevision(issue),
-		dependenciesHash: laneDigest(depsOf(issue).sort()),
-		epicChildrenHash: prefetchEpicChildren(cwd, state.epic.id),
-		verifierStatus: verifier,
-		settingsHash: laneDigest(settings),
-		advisorChallengeHash: laneDigest(advisorChallenge),
-		relevantPathHashes: prefetchPathHashes(cwd, relevantPaths),
-		createdAt: new Date().toISOString(),
-	};
-	checkpoint.id = laneDigest({ ...checkpoint, createdAt: undefined });
-	return checkpoint;
-}
-
-function pendingPrefetchSlot(cwd) {
-	try {
-		return Object.values(loadLaneStore(cwd).lanes).find(
-			(lane) =>
-				lane.laneKind === "prefetch" &&
-				(["queued", "running", "completed"].includes(lane.state) ||
-					lane.launch?.acknowledgement === "ambiguous"),
-		);
-	} catch {
-		return undefined;
-	}
-}
-
-function nextPrefetchGeneration(cwd, workItemId) {
-	try {
-		return (
-			Math.max(
-				0,
-				...Object.values(loadLaneStore(cwd).lanes)
-					.filter(
-						(lane) => lane.laneKind === "prefetch" && lane.workItemId === workItemId,
-					)
-					.map((lane) => lane.generation),
-			) + 1
-		);
-	} catch {
-		return 1;
-	}
-}
-
-function configuredPrefetchAdvisorChallenge(cwd, candidate) {
-	const step = advisorCriticStep(
-		cwd,
-		`prefetched slice plan for WorkItem ${candidate.id}`,
-		workOrchSettings(cwd).advisorUsageForSlicePlans,
-	);
-	return step
-		? `Future orchestrator gate only; the prefetch role must not launch it:\n${step}`
-		: "No advisor challenge is configured for slice plans.";
-}
-
-function prefetchOutputPath(cwd, laneId) {
-	return join(
-		cwd,
-		".ce-workflow",
-		"work-runs",
-		"read-only-lanes",
-		"outputs",
-		`${laneId}.json`,
-	);
-}
-
-function prefetchRoleTask(candidate, checkpoint, advisorChallenge) {
-	return [
-		`Prepare only depth-one successor WorkItem ${candidate.id}; do not implement or mutate anything.`,
-		`Successor summary: ${JSON.stringify(candidate)}`,
-		`Immutable checkpoint: ${JSON.stringify(checkpoint)}`,
-		"Return exactly one JSON object with version:1, the exact workItemId and checkpoint id, provisionalContext and slicePlan strings, focusedVerification and unresolvedDecisions string arrays, the supplied advisorChallenge string, and preparationOnly:true.",
-		"Live/device/evidence-dependent work receives preparation only. Never infer foreground success. Do not write source, Git, WorkItems, or runtime state, and do not launch subagents.",
-		`Configured advisor challenge to preserve verbatim as advisorChallenge (do not execute it): ${advisorChallenge}`,
-	].join("\n");
-}
-
-function prefetchRequest(cwd, candidate, checkpoint, lane, advisorChallenge) {
-	const output = prefetchOutputPath(cwd, lane.id);
-	return {
-		version: 1,
-		agent: "work-prefetch",
-		workItemId: candidate.id,
-		checkpoint,
-		lane,
-		context: "fresh",
-		async: true,
-		cwd,
-		output,
-		outputMode: "file-only",
-		task: prefetchRoleTask(candidate, checkpoint, advisorChallenge),
-		boundary: {
-			readOnly: true,
-			depth: 1,
-			deny: ["write", "edit", "bash", "process", "network", "subagent"],
-		},
-	};
-}
-
-function deriveSuccessorPrefetch(cwd, input = {}) {
-	const settings = input.settings ?? readEffectiveSettings(cwd);
-	const performance = workPerformanceSettings(cwd);
-	if (!performance.prepareNextCandidate)
-		return {
-			eligible: false,
-			reason: process.env.WORK_ORCH_SERIAL === "1" ? "serial-mode" : "disabled",
-		};
-	const occupied = pendingPrefetchSlot(cwd);
-	if (occupied)
-		return { eligible: false, reason: "slot-occupied", laneId: occupied.id };
-	if (prefetchVerifierStatus(cwd) === "completed-awaiting-triage")
-		return { eligible: false, reason: "triage-required" };
-	const current = readWorkItem(cwd, input.currentWorkItemId);
-	if (!current) return { eligible: false, reason: "current-task-missing" };
-	const epicId = input.epicId ?? parentOf(current);
-	if (!epicId) return { eligible: false, reason: "unstable-selection" };
-	const state = buildWorkResumeState(cwd, epicId, {
-		readOnlyPlanning: true,
-	});
-	const candidate = state.selectedWorkItem;
-	if (
-		!state.ok ||
-		!["run-implementation", "run-debug", "run-planner"].includes(state.action) ||
-		!candidate?.id ||
-		candidate.id === idOf(current)
-	)
-		return { eligible: false, reason: "unstable-selection", state };
-	const ready = (state.readyWork ?? []).filter((item) => {
-		const issue = readWorkItem(cwd, item.id);
-		if (!issue || item.id === idOf(current)) return false;
-		if (
-			parentOf(issue) === parentOf(current) &&
-			!depsOf(issue).includes(idOf(current))
-		)
-			return true;
-		if (!depsOf(issue).includes(idOf(current))) return false;
-		return depsOf(issue)
-			.filter((id) => id !== idOf(current))
-			.every((id) => statusOf(readWorkItem(cwd, id)) === "closed");
-	});
-	if (ready.length !== 1 || ready[0].id !== candidate.id)
-		return { eligible: false, reason: "unstable-selection", state };
-	const relevantPaths = prefetchRelevantPaths(candidate, input.relevantPaths);
-	const advisorChallenge = configuredPrefetchAdvisorChallenge(cwd, candidate);
-	const checkpoint = prefetchCheckpoint(
-		cwd,
-		state,
-		current,
-		candidate,
-		relevantPaths,
-		advisorChallenge,
-	);
-	const generation = nextPrefetchGeneration(cwd, candidate.id);
-	const lane = readOnlyLaneEnvelope(
-		cwd,
-		{
-			laneKind: "prefetch",
-			producer: "work-orchestrator",
-			workItemId: candidate.id,
-			generation,
-			checkpoint: JSON.stringify(checkpoint),
-			selection: {
-				action: state.action,
-				selectedWorkItemId: candidate.id,
-			},
-			relevantPaths,
-			resourceKeys: ["repo:read", "successor-prefetch"],
-			gateVersion: "successor-prefetch-v1",
-			promotionOwner: "work-orchestrator",
-		},
-		settings,
-	);
-	return {
-		eligible: true,
-		state,
-		candidate,
-		checkpoint,
-		advisorChallenge,
-		lane,
-		request: prefetchRequest(cwd, candidate, checkpoint, lane, advisorChallenge),
-	};
-}
-
-function validPrefetchArtifact(artifact, lane, checkpoint) {
-	return (
-		artifact?.version === PREFETCH_OUTPUT_VERSION &&
-		artifact.workItemId === lane.workItemId &&
-		artifact.checkpoint === checkpoint.id &&
-		typeof artifact.provisionalContext === "string" &&
-		Boolean(artifact.provisionalContext.trim()) &&
-		typeof artifact.slicePlan === "string" &&
-		Boolean(artifact.slicePlan.trim()) &&
-		Array.isArray(artifact.focusedVerification) &&
-		artifact.focusedVerification.every((value) => typeof value === "string") &&
-		Array.isArray(artifact.unresolvedDecisions) &&
-		artifact.unresolvedDecisions.every((value) => typeof value === "string") &&
-		typeof artifact.advisorChallenge === "string" &&
-		laneDigest(artifact.advisorChallenge) === checkpoint.advisorChallengeHash &&
-		artifact.preparationOnly === true
-	);
-}
-
 function prefetchDurationMetrics(lane, discarded) {
 	const started = Date.parse(
 		lane.timestamps.runningAt ?? lane.timestamps.queuedAt,
@@ -12662,286 +12088,18 @@ function discardSuccessorPrefetch(cwd, lane, reason) {
 	return { state: "discarded", reason, lane: discarded };
 }
 
-function prefetchPromotionNote(lane, artifact) {
-	return [
-		`wo:prefetch ${lane.id}`,
-		"Preparation only; authoritative state was re-derived before promotion.",
-		`Provisional context: ${artifact.provisionalContext.trim()}`,
-		`Compact slice plan: ${artifact.slicePlan.trim()}`,
-		`Focused verification: ${artifact.focusedVerification.join("; ") || "none proposed"}`,
-		`Unresolved decisions: ${artifact.unresolvedDecisions.join("; ") || "none"}`,
-		`Configured advisor challenge: ${artifact.advisorChallenge.trim() || "none"}`,
-	].join("\n");
-}
-
-function promoteSuccessorPrefetch(cwd, laneId, options = {}) {
-	const lane = loadLaneStore(cwd).lanes[laneId];
-	if (!lane || lane.laneKind !== "prefetch")
-		return { state: "missing", reason: "invalid-output" };
-	if (["promoted", "discarded"].includes(lane.state))
-		return {
-			state: lane.state,
-			reason: lane.discardReason ?? lane.reason,
-			lane,
-		};
-	if (lane.state !== "completed")
-		return { state: lane.state, reason: "not-completed", lane };
-	let checkpoint;
-	try {
-		checkpoint = JSON.parse(lane.checkpoint);
-	} catch {
-		return discardSuccessorPrefetch(cwd, lane, "invalid-output");
-	}
-	const issue = readWorkItem(cwd, lane.workItemId);
-	const marker = `wo:prefetch ${lane.id}`;
-	if (issue && notesOf(issue).includes(marker)) {
-		const promoted = promoteLane(cwd, lane.id, lane.promotionOwner, {
-			metrics: prefetchDurationMetrics(lane, false),
-		});
-		return { state: promoted.state, lane: promoted, alreadyApplied: true };
-	}
-	const state = buildWorkResumeState(cwd, checkpoint.epicId, {
-		readOnlyPlanning: true,
-	});
-	if (
-		!state.ok ||
-		state.action !== checkpoint.action ||
-		state.selectedWorkItem?.id !== checkpoint.selectedWorkItemId
-	)
-		return discardSuccessorPrefetch(cwd, lane, "selection-changed");
-	if (run(cwd, "git", ["rev-parse", "HEAD"]) !== checkpoint.head)
-		return discardSuccessorPrefetch(cwd, lane, "head-changed");
-	if (
-		!issue ||
-		prefetchTaskRevision(issue) !== checkpoint.taskRevisionHash ||
-		laneDigest(
-			field(issue, "acceptance", "acceptance_criteria", "acceptanceCriteria") ??
-				"",
-		) !== checkpoint.acceptanceHash
-	)
-		return discardSuccessorPrefetch(cwd, lane, "task-revised");
-	if (laneDigest(depsOf(issue).sort()) !== checkpoint.dependenciesHash)
-		return discardSuccessorPrefetch(cwd, lane, "dependencies-changed");
-	const verifier = prefetchVerifierStatus(cwd);
-	if (verifier === "completed-awaiting-triage")
-		return discardSuccessorPrefetch(cwd, lane, "triage-required");
-	if (
-		laneDigest(prefetchPathHashes(cwd, lane.relevantPaths)) !==
-		laneDigest(checkpoint.relevantPathHashes)
-	)
-		return discardSuccessorPrefetch(cwd, lane, "paths-changed");
-	if (
-		verifier !== checkpoint.verifierStatus ||
-		prefetchEpicChildren(cwd, checkpoint.epicId) !==
-			checkpoint.epicChildrenHash ||
-		laneDigest(readEffectiveSettings(cwd)) !== checkpoint.settingsHash
-	)
-		return discardSuccessorPrefetch(cwd, lane, "selection-changed");
-	if (options.cancelled === true)
-		return discardSuccessorPrefetch(cwd, lane, "cancelled");
-	const newest = Math.max(
-		...Object.values(loadLaneStore(cwd).lanes)
-			.filter(
-				(other) =>
-					other.laneKind === "prefetch" && other.workItemId === lane.workItemId,
-			)
-			.map((other) => other.generation),
-	);
-	if (lane.generation !== newest)
-		return discardSuccessorPrefetch(cwd, lane, "late-generation");
-	if (!validPrefetchArtifact(lane.artifact, lane, checkpoint))
-		return discardSuccessorPrefetch(cwd, lane, "invalid-output");
-	appendWorkflowWorkItemNote(
-		cwd,
-		lane.workItemId,
-		prefetchPromotionNote(lane, lane.artifact),
-	);
-	const promoted = promoteLane(cwd, lane.id, lane.promotionOwner, {
-		metrics: prefetchDurationMetrics(lane, false),
-	});
-	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
-	return { state: promoted.state, lane: promoted };
-}
-
-async function launchSuccessorPrefetch(cwd, input, adapter, options = {}) {
-	const derived = input?.lane ? input : deriveSuccessorPrefetch(cwd, input);
-	if (!derived.eligible) return derived;
-	if (typeof adapter?.spawn !== "function")
-		return { eligible: false, reason: "adapter-unavailable" };
-	if (options.cancelled === true || options.signal?.aborted) {
-		queueLane(cwd, derived.lane);
-		return discardSuccessorPrefetch(cwd, derived.lane, "cancelled");
-	}
-	const result = await runReadOnlyLaneBatch(
-		cwd,
-		[derived.lane],
-		async (lane) => {
-			if (options.signal?.aborted) return { status: "cancelled", promote: false };
-			const spawned = await adapter.spawn({ ...derived.request, lane });
-			const identity = directRunIdentity(derived.request, spawned);
-			acknowledgeLaneLaunch(cwd, lane.id, {
-				ambiguous: spawned?.ambiguous === true,
-				...identity,
-			});
-			if (!spawned?.ok && spawned?.ambiguous) return { status: "running" };
-			if (!spawned?.ok)
-				throw new Error(spawned?.message ?? "successor prefetch launch failed");
-			if (options.signal?.aborted) return { status: "cancelled", promote: false };
-			const settled =
-				typeof adapter.wait === "function"
-					? await adapter.wait(identity, lane)
-					: spawned;
-			return {
-				artifact: settled.artifact,
-				durationMs: settled.durationMs,
-				status:
-					settled.completed === true ? "completed" : (settled.status ?? "running"),
-			};
-		},
-		{
-			maxConcurrency: 1,
-			deferPromotion: true,
-			failFast: true,
-		},
-	);
-	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
-	const lane = loadLaneStore(cwd).lanes[derived.lane.id];
-	const promotion =
-		lane?.state === "completed"
-			? promoteSuccessorPrefetch(cwd, lane.id, options)
-			: undefined;
-	return { ...derived, result, promotion };
-}
-
-function createSuccessorPrefetchAdapter(pi) {
-	return {
-		async spawn(request) {
-			if (
-				request?.version !== 1 ||
-				request.agent !== "work-prefetch" ||
-				request.context !== "fresh" ||
-				request.async !== true ||
-				request.boundary?.readOnly !== true ||
-				request.boundary?.depth !== 1 ||
-				request.boundary.deny?.includes("subagent") !== true
-			)
-				return {
-					ok: false,
-					message: "Successor prefetch read-only boundary cannot be enforced",
-				};
-			mkdirSync(dirname(request.output), { recursive: true, mode: 0o700 });
-			return spawnSubagentRpc(
-				pi,
-				{
-					agent: request.agent,
-					task: request.task,
-					context: request.context,
-					cwd: request.cwd,
-					async: request.async,
-					clarify: false,
-					output: request.output,
-					outputMode: request.outputMode,
-					tools: PREFETCH_TOOL_NAMES,
-					boundary: request.boundary,
-					inheritProjectContext: true,
-					inheritSkills: false,
-				},
-				PREFETCH_RPC_TIMEOUT_MS,
-			);
-		},
-	};
-}
-
-async function maybeLaunchSuccessorPrefetch(
-	cwd,
-	currentWorkItemId,
-	epicId,
-	pi,
-) {
-	if (!currentWorkItemId || !pi)
-		return { eligible: false, reason: "no-current-task" };
-	try {
-		return await launchSuccessorPrefetch(
-			cwd,
-			{ currentWorkItemId, epicId },
-			createSuccessorPrefetchAdapter(pi),
-		);
-	} catch (error) {
-		return {
-			eligible: false,
-			reason: "launch-failed",
-			message: error instanceof Error ? error.message : String(error),
-		};
-	}
-}
-
-function readPrefetchArtifact(file) {
-	const info = lstatSync(file);
-	if (
-		!info.isFile() ||
-		info.isSymbolicLink() ||
-		info.size > PREFETCH_ARTIFACT_MAX_BYTES
-	)
-		throw new Error("invalid prefetch artifact");
-	return readWorkflowJson(file, "prefetch artifact");
-}
-
-function reconcileSuccessorPrefetches(cwd, options = {}) {
+function reconcileSuccessorPrefetches(cwd) {
 	const reconciled = [];
-	reconcileReadOnlyLanes(cwd);
 	for (const lane of Object.values(loadLaneStore(cwd).lanes)) {
-		if (lane.laneKind !== "prefetch") continue;
-		if (lane.state === "running") {
-			const output = prefetchOutputPath(cwd, lane.id);
-			let terminal = false;
-			let succeeded = false;
-			let statusState = "";
-			if (lane.launch?.asyncDir) {
-				const statusFile = join(lane.launch.asyncDir, "status.json");
-				if (existsSync(statusFile)) {
-					try {
-						const status = JSON.parse(readFileSync(statusFile, "utf8"));
-						terminal = directStatusComplete(status);
-						statusState = directStatusState(status);
-						succeeded = statusState
-							? DIRECT_SUCCESS_STATES.has(statusState)
-							: status.steps.every((step) =>
-									DIRECT_SUCCESS_STATES.has(String(step?.status ?? "").toLowerCase()),
-								);
-					} catch {
-						continue;
-					}
-				}
-			}
-			if (terminal && !succeeded) {
-				transitionLane(cwd, lane.id, "failed", {
-					reason: statusState || "prefetch runner failed",
-				});
-				reconciled.push(lane.id);
-				continue;
-			}
-			if (!terminal && !existsSync(output)) continue;
-			let artifact;
-			try {
-				artifact = readPrefetchArtifact(output);
-			} catch {
-				if (!terminal) continue;
-				artifact = { invalid: true };
-			}
-			transitionLane(cwd, lane.id, "completed", {
-				artifact,
-				metrics: prefetchDurationMetrics(lane, false),
-			});
-			reconciled.push(lane.id);
-		}
-		const current = loadLaneStore(cwd).lanes[lane.id];
-		if (current?.state === "completed") {
-			promoteSuccessorPrefetch(cwd, lane.id, options);
-			reconciled.push(lane.id);
-		}
+		if (
+			lane.laneKind !== "prefetch" ||
+			["discarded", "promoted"].includes(lane.state)
+		)
+			continue;
+		discardSuccessorPrefetch(cwd, lane, "retired");
+		reconciled.push(lane.id);
 	}
-	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
-	return { reconciled: [...new Set(reconciled)], lanes: laneStatus(cwd) };
+	return { reconciled, lanes: laneStatus(cwd) };
 }
 
 function reconcileReadOnlyLaneRuns(cwd) {
@@ -13597,10 +12755,8 @@ function planReference(state, cwd) {
 			: state.planPath
 		: undefined;
 	if (slicePlanned) {
-		const line = `Plan: execute the wo:slice-plan note on WorkItem ${workItem.id} as your spec; if the note references a plan-path doc, that doc is your spec. The WorkItem is the tracking item, not the spec — do not invent scope beyond it.`;
-		return planPath
-			? `${line} Roadmap master plan for context: ${planPath}.`
-			: line;
+		const line = `Historical context: WorkItem ${workItem.id} contains legacy wo:slice-plan metadata. Treat it as context only; current WorkItem acceptance and the roadmap plan govern scope.`;
+		return planPath ? `${line} Roadmap plan: ${planPath}.` : line;
 	}
 	if (planPath)
 		return `Plan: execute the matching Implementation Unit from ${planPath} for WorkItem ${workItem.id}; the WorkItem is the tracking item, the plan is your spec.`;
@@ -17863,13 +17019,12 @@ function materializePlanUnitsInStore(store, epic, units, rel, command) {
 			parentId: epic.id,
 			description: unit.outcome,
 			acceptance: [unit.acceptance, ...designLines].filter(Boolean).join("\n"),
-			labels: ["wo:materialized", "wo:vertical-slice", "wo:slice-planned"],
+			labels: ["wo:materialized", "wo:vertical-slice"],
 			notes: [
 				workflowWorkItemNotes(command, unit.title, [
 					`source plan: ${rel}`,
 					`plan unit: ${unit.key}`,
 					FINITE_BACKLOG_MARKER,
-					`wo:slice-plan\nplan-path: ${rel}\ntarget: ${unit.title}\napproach: execute the declared vertical outcome without a second planning pass.\nverification: satisfy the declared capability contract.${designAuthority ? `\ndesign-owner: ${designAuthority.ownerId}\ndesign-revision: ${designAuthority.revision}\ndesign-criteria: ${unit.designCriteria.join(", ")}\ndesign-hashes: ${designAuthority.briefHash} ${designAuthority.handoffHash} ${designAuthority.approvalHash}\ndesign-constraints: ${JSON.stringify(designAuthority.constraints)}\nprototype-authority: false` : ""}`,
 				]),
 			],
 			implementationScope: {
@@ -19135,10 +18290,6 @@ function brainstormHandoffPrompt(
 					currentModel,
 				)
 			: "";
-	const preBrainstormStep =
-		cwd && !artifact
-			? preBrainstormAdvisorStep(cwd, offlineModels, currentModel)
-			: "";
 	const advisorStep = cwd
 		? advisorCriticStep(
 				cwd,
@@ -19172,7 +18323,6 @@ function brainstormHandoffPrompt(
 		"/work-brainstorm owns the brainstorm→plan handoff so /work-plan can dispatch verified private planning with the preservation and self-audit contract.",
 		"Never silently skip clarification for broad, important, or underspecified work.",
 		creativeStep,
-		preBrainstormStep,
 		"Use temporary high/xhigh thinking when uncertainty is high; do not change persistent defaults.",
 		ROLE_TIMEOUT_GUIDANCE,
 		...criticLines,
@@ -21015,11 +20165,6 @@ function buildWorkFinishState(cwd, args = "") {
 				{ relatedFiles: related },
 			);
 		const preCommitSteps = [
-			gates.simplifyBeforeReview &&
-			nonTrivial &&
-			!hasFinishGateEvidence(workItem, "simplify")
-				? simplifyBeforeReviewStep()
-				: "",
 			reviewBeforeCommit ? codeReviewBeforeCommitStep(reviewLevel) : "",
 			!workItem.verificationContract &&
 			(finishGateRequested(workItem, "browser") ||
@@ -22531,9 +21676,9 @@ function parseWorkGoalCommand(args = "") {
 function workGoalSelfImprovingAppendix() {
 	return `Self-improving overlay:
 - Use the ce-workflow/work-orchestrator process where it applies; prefer /work-init, /work-plan, /work-resume, /work-status, /work-report, and native work-item store-backed state over chat-only tracking.
-- If a live or disposable target project exposes ce-workflow friction, call work_report_improvement with the observation, expected behavior, impact, and local logs; do not modify the ce-workflow source from the producer project.
 - Prefer coded automation over prompt-only guidance when workflow behavior can be handled in this extension.
 - Use work telemetry and context guard microcompaction to keep loops cheap, quiet, and resumable.
+- If a target project exposes ce-workflow friction, call work_report_improvement with the observation, expected behavior, impact, and local logs; do not modify the ce-workflow source from the producer project.
 - Finish after target-project progress is verified and any discovered ce-workflow issue is reported.`;
 }
 
@@ -22555,12 +21700,6 @@ Bounded autonomous authority:
 }
 
 async function handleWorkMonitorCommand(args, pi, ctx) {
-	if (!workResumeSettings(ctx.cwd).selfImproving)
-		return notify(
-			ctx,
-			"/wo monitor is available only when self-improving is enabled.",
-			"warning",
-		);
 	const [action] = splitFirstWord(args);
 	if (["status", "pause", "resume", "stop", "clear"].includes(action)) {
 		if (activeWorkGoal?.mode !== "monitor")
@@ -22587,11 +21726,8 @@ async function handleWorkMonitorCommand(args, pi, ctx) {
 function workResumeSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	const value = settings.workResume;
 	const project = typeof value === "object" && value !== null ? value : {};
-	const globalDefault = project.selfImprovingDefault === true;
 	return {
-		selfImproving:
-			project.selfImproving === true ||
-			(project.selfImproving !== false && globalDefault),
+		selfImproving: false,
 		newSessionBetweenIterations: project.newSessionBetweenIterations !== false,
 		goalThinkingLevel: ["inherit", ...THINKING_LEVELS].includes(
 			project.goalThinkingLevel,
@@ -22764,11 +21900,6 @@ function validateImprovementEvidence(cwd, issue) {
 
 function resolveWorkImproveTarget(cwd, target = "", options = {}) {
 	const settings = options.settings ?? readEffectiveSettings(cwd);
-	if (!workResumeSettings(cwd, settings).selfImproving)
-		return errorState(
-			"self-improving-disabled",
-			"/work-improve requires workResume.selfImproving: true.",
-		);
 	let sourceCwd = options.sourceCwd;
 	try {
 		sourceCwd ??= resolveReportingSource({
@@ -23270,14 +22401,6 @@ function catchUpReviewBlocker(pkg, targetVersion) {
 }
 
 function buildWorkCatchUpState(cwd) {
-	if (!workResumeSettings(cwd).selfImproving) {
-		return {
-			ok: false,
-			reason: "self-improving-off",
-			message:
-				"/work-catch-up is available only when .pi/settings.json has workResume.selfImproving: true.",
-		};
-	}
 	const baseline = readWorkCatchUpBaseline();
 	const dir = join(
 		cwd,
@@ -23499,13 +22622,13 @@ function workProjectAutopilotAppendix() {
 	return `Project autopilot policy:
 - Treat the target directory as the source of truth: verify git and native work-item store state there before mutating anything.
 - Keep intake, target selection, finish gates, commit, close, and push coded in the current session. The active project goal owns routine implementation directly from claim through proof and correction; do not hand it to a fresh work-worker context.
-- Do not call subagent list or ask an LLM to select a role. Use specialists only for coded exceptions: work-planner for genuinely missing/invalid slicing, work-debugger for unexplained root-cause failures, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
+- Do not call subagent list or ask an LLM to select a role. Use specialists only for coded exceptions: work-debugger for unexplained root-cause failures, work-reviewer for sensitive/large/ambiguous diffs, and work-fixer only for concrete review findings.
 - When a specialist is required, launch it async with control.needsAttentionAfterMs=30000 and use bg_wait/status; never block the TUI on a foreground child.
 - Never launch work-committer for routine work; use the coded finish helper. Never run a second writer or reviewer when equivalent passing evidence already exists.
-- Resume work starts the autonomous project loop. Inside that loop, advance one deterministic WorkItem boundary at a time so coded gates, prefetch, review, and recovery remain authoritative.
+- Resume work starts the autonomous project loop. Inside that loop, advance one deterministic WorkItem boundary at a time so coded gates, review, and recovery remain authoritative.
 - Obey the user instruction literally; if it says one task only, stop after one executable WorkItem closes. If it explicitly says N tasks, stop after N executable native work-item store closes. Identifiers such as work-2 are targets, never task counts.
 - When given a target work item or roadmap ID, resolve that exact ID and continue until it is closed; an open roadmap with no ready children needs its next planned slice, not premature completion.
-- Never inspect, contact, modify, test, commit, or push the ce-workflow source checkout while developing another project. Record at most one bounded work_report_improvement and continue the target project; orchestrator maintenance is a separate explicit /wo improve or direct user task.
+- Never inspect, contact, modify, test, commit, or push the ce-workflow source checkout while developing another project. Orchestrator maintenance is a separate explicit /wo improve or direct user task.
 - Stop only when the requested scope is done, the roadmap is complete, a circuit breaker pauses the run, or a real product/credential/hardware/destructive/verification decision is required.`;
 }
 
@@ -23613,7 +22736,7 @@ function projectGoalSourceMaintenanceBlockReason(
 		].includes(tool) &&
 		checkedInput.includes(normalizedSource)
 	)
-		return "Project autopilot cannot inspect or mutate the ce-workflow source checkout from another project. Use work_report_improvement once and continue product work.";
+		return "Project autopilot cannot inspect or mutate the ce-workflow source checkout from another project. Run orchestrator maintenance separately with /wo improve.";
 }
 
 function buildWorkResumeGoalObjective(cwd, args = "", options = {}) {
@@ -23623,14 +22746,12 @@ function buildWorkResumeGoalObjective(cwd, args = "", options = {}) {
 			`Target project: ${cwd}`,
 			`Target work item or roadmap ID: ${options.targetId}`,
 			workProjectAutopilotAppendix(),
-			workResumeSettings(cwd).selfImproving ? workGoalSelfImprovingAppendix() : "",
-		]
-			.filter(Boolean)
-			.join("\n\n");
+		].join("\n\n");
 	if (!raw)
 		return buildWorkSelfImprovingObjective(cwd, {
 			project: true,
 			...workResumeSettings(cwd),
+			selfImproving: false,
 		});
 	const explicit = parseWorkProjectGoalInput(raw);
 	const candidate = explicit.project
@@ -23642,10 +22763,12 @@ function buildWorkResumeGoalObjective(cwd, args = "", options = {}) {
 		return buildWorkSelfImprovingObjective(raw, {
 			project: true,
 			...workResumeSettings(candidate),
+			selfImproving: false,
 		});
 	return buildWorkSelfImprovingObjective(`${cwd} -- ${raw}`, {
 		project: true,
 		...workResumeSettings(cwd),
+		selfImproving: false,
 	});
 }
 
@@ -23711,6 +22834,7 @@ function managedWorkSubagentSessionName(pi, ctx) {
 function persistWorkGoal(pi, goal = activeWorkGoal, cwd = activeWorkGoalCwd) {
 	pi?.appendEntry?.(WORK_GOAL_STATE_ENTRY_TYPE, { goal: goal ?? null });
 	syncWorkGoalTools(pi, goal);
+	syncImprovementReportTool(pi);
 	if (!cwd) return;
 	const state = readWorkState(cwd);
 	if (goal) state.workGoal = goal;
@@ -24629,13 +23753,6 @@ function scheduleWorkMonitorCheck(pi, ctx, goal = activeWorkGoal) {
 	clearWorkMonitorTimer();
 	if (!goal || goal.mode !== "monitor" || goal.status !== "waiting_monitor")
 		return;
-	if (!workResumeSettings(activeWorkGoalCwd ?? ctx.cwd).selfImproving) {
-		activeWorkGoal = { ...goal, status: "paused", updatedAt: Date.now() };
-		persistWorkGoal(pi);
-		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("Monitor paused because self-improving is disabled.", "warning");
-		return;
-	}
 	const delayMs = Math.max(
 		0,
 		Number(goal.nextMonitorAt ?? Date.now()) - Date.now(),
@@ -25166,6 +24283,7 @@ async function startWorkGoal(
 		...(options.goalData ?? {}),
 	};
 	activeWorkGoalCwd = ctx.cwd;
+	syncImprovementReportTool(pi);
 	applyWorkGoalThinking(pi, activeWorkGoal, ctx);
 	persistWorkGoal(pi);
 	updateWorkGoalStatus(ctx);
@@ -25219,6 +24337,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx, options = {}) {
 		if (durableGoal) {
 			activeWorkGoal = durableGoal;
 			activeWorkGoalCwd = ctx.cwd;
+			syncImprovementReportTool(pi);
 			syncWorkGoalTools(pi, activeWorkGoal);
 			updateWorkGoalStatus(ctx);
 		}
@@ -25234,6 +24353,7 @@ async function handleWorkGoalCommand(args, mode, pi, ctx, options = {}) {
 		const previous = activeWorkGoal?.objective;
 		restoreWorkGoalThinking(pi, activeWorkGoal);
 		activeWorkGoal = null;
+		syncImprovementReportTool(pi);
 		workGoalContinuationPending = null;
 		clearWorkGoalRecovery();
 		clearWorkGoalUsageLimitTimer();
@@ -25539,14 +24659,14 @@ async function resumeOrchestratorJob(job, answer, ctx, pi) {
 	if (job?.kind === "workflow")
 		return sendFollowUp(
 			ctx,
-			`Continue the active work-orchestrator turn from the last completed tool boundary; do not repeat completed steps.${answer ? ` User guidance: ${answer}` : ""}\n\n${job.prompt}`,
+			`Continue the active work-orchestrator turn after the last completed LLM cycle; do not repeat completed steps.${answer ? ` User guidance: ${answer}` : ""}\n\n${job.prompt}`,
 			pi,
 		);
 	return sendFollowUp(
 		ctx,
 		answer
-			? `Continue from the last completed tool boundary. User guidance: ${answer}`
-			: "Continue from the last completed tool boundary.",
+			? `Continue after the last completed LLM cycle. User guidance: ${answer}`
+			: "Continue after the last completed LLM cycle.",
 		pi,
 	);
 }
@@ -25591,7 +24711,7 @@ function compactPausedOrchestrator(job, ctx, pi) {
 	ctx.ui.notify(
 		job.kind === "idle"
 			? "Microcompaction started"
-			: "Paused at the tool boundary; microcompacting",
+			: "Paused at the LLM cycle boundary; microcompacting",
 		"info",
 	);
 	try {
@@ -25607,23 +24727,6 @@ function compactPausedOrchestrator(job, ctx, pi) {
 	return true;
 }
 
-async function pauseOrchestratorNow(ctx, pi) {
-	const job = currentOrchestratorJob(ctx);
-	orchestratorPauseRequest = null;
-	workGoalContinuationPending = null;
-	workGoalContinuationRetry = null;
-	clearWorkGoalRecovery();
-	clearWorkGoalUsageLimitTimer();
-	await completeOrchestratorPause(job, ctx, pi);
-	if (ctx.isIdle?.() === false) ctx.abort?.();
-	ctx.ui.notify(
-		job.kind === "idle"
-			? "Nothing active to pause."
-			: "Paused immediately. Run /wo resume to continue.",
-		job.kind === "idle" ? "warning" : "info",
-	);
-}
-
 async function requestOrchestratorPause(ctx, pi, compact = false) {
 	if (orchestratorPauseRequest) {
 		ctx.ui.notify("A graceful pause is already queued.", "info");
@@ -25634,8 +24737,8 @@ async function requestOrchestratorPause(ctx, pi, compact = false) {
 		orchestratorPauseRequest = { job, compact, boundaryReached: false };
 		ctx.ui.notify(
 			compact
-				? "Compaction queued after the current tool batch finishes"
-				: "Graceful pause queued after the current tool batch finishes",
+				? "Compaction queued after the current LLM cycle finishes"
+				: "Graceful pause queued after the current LLM cycle finishes",
 			"info",
 		);
 		return;
@@ -25651,7 +24754,7 @@ async function reachOrchestratorPauseBoundary(ctx, pi) {
 	request.boundaryReached = true;
 	await completeOrchestratorPause(request.job, ctx, pi);
 	hideGracefulPauseAbort = request.job.kind !== "idle";
-	// turn_end means every tool in this assistant batch has finished.
+	// Stop before another LLM cycle starts, after this cycle and its tools finish.
 	if (request.job.kind !== "idle") ctx.abort?.();
 	return true;
 }
@@ -25661,7 +24764,6 @@ async function settleOrchestratorPause(ctx, pi) {
 	if (!request?.boundaryReached) return false;
 	orchestratorPauseRequest = null;
 	hideGracefulPauseAbort = false;
-	await completeOrchestratorPause(request.job, ctx, pi);
 	if (request.compact) return compactPausedOrchestrator(request.job, ctx, pi);
 	ctx.ui.notify("Job paused. Run /wo resume to continue.", "info");
 	return true;
@@ -26708,20 +25810,16 @@ async function handleWorkMenuCommand(ctx, pi) {
 		},
 		{
 			value: "work-catch-up",
-			label: "🔄 Catch up project",
+			label: "🔄 Catch up packages",
 			description:
-				"Review a project's workflow history and continue missed improvements.\nAvailable when self-improving reporting is enabled.",
+				"Review monitored Pi/plugin releases and verified private-workflow updates.\nExplicit maintenance; no ordinary-work reporting is enabled.",
 		},
-		...(workResumeSettings(ctx.cwd).selfImproving
-			? [
-					{
-						value: "work-extension-scout",
-						label: "🔭 Scout Pi extensions",
-						description:
-							"Scan every catalog page in the background with live progress.\nOpus 5 reviews candidates; nothing is installed automatically.",
-					},
-				]
-			: []),
+		{
+			value: "work-extension-scout",
+			label: "🔭 Scout Pi extensions",
+			description:
+				"Explicitly scan catalog pages in the background with live progress.\nOpus 5 reviews candidates; nothing is installed automatically.",
+		},
 		...(privateWorkflowRollbackAvailable
 			? [
 					{
@@ -29204,6 +28302,7 @@ async function handleWorkRoadmapCommand(
 				buildWorkSelfImprovingObjective(`${ctx.cwd} -- ${selected}`, {
 					project: true,
 					...workResumeSettings(ctx.cwd),
+					selfImproving: false,
 				}),
 				`Starting-state planning gate: ${selected} has source intent but no roadmap-specific master plan or executable child tasks.`,
 				`Source intent artifacts: ${sources.join(", ")}`,
@@ -30198,7 +29297,6 @@ async function executeOrchestratorAction(
 		"work-auto": buildWorkAutoState,
 	};
 	if (name === "work-extension-scout") {
-		if (!workResumeSettings(ctx.cwd).selfImproving) return false;
 		const action = text.trim().toLowerCase();
 		if (action === "stop" || action === "cancel") return stopExtensionScout(ctx);
 		if (action === "review" || action === "re-review")
@@ -30669,7 +29767,6 @@ export {
 	previewInitiativeReconciliation,
 	buildWorkMasterState,
 	buildWorkMedState,
-	cePlanSliceStep,
 	buildWorkPlanState,
 	buildWorkMigrateState,
 	buildWorkRemoveBeadsState,
@@ -30751,7 +29848,6 @@ export {
 	setWorkOrchReviewLevel,
 	setWorkOrchReviewPolicy,
 	setWorkOrchCreativeMode,
-	setWorkOrchAdvisorSliceUsage,
 	creativeSidecarStep,
 	divergentTaskModels,
 	advisorCriticStep,
@@ -30765,11 +29861,7 @@ export {
 	setWorkPerformanceBoolean,
 	backgroundVerifierProfiles,
 	launchCurrentTaskReadOnlyLanes,
-	deriveSuccessorPrefetch,
-	launchSuccessorPrefetch,
-	promoteSuccessorPrefetch,
 	reconcileSuccessorPrefetches,
-	createSuccessorPrefetchAdapter,
 	reconcileReadOnlyLaneRuns,
 	readOnlyLaneRuntimeStatus,
 	readOnlyLaneEnvelope,
@@ -31167,16 +30259,15 @@ export default function workModelsExtension(pi) {
 				"Explicitly record a ce-workflow problem with local evidence for later maintainer review.",
 			promptSnippet:
 				"Report a concrete ce-workflow problem only when self-improving reporting is enabled",
-			promptGuidelines: [
-				"Use work_report_improvement only for a concrete workflow problem with at least one local log.",
-				"work_report_improvement reports evidence; it never changes, benchmarks, commits, or pushes the ce-workflow source checkout.",
-			],
 			parameters: IMPROVEMENT_REPORT_TOOL_SCHEMA,
 			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 				const cwd = ctx?.cwd ?? process.cwd();
-				if (!workResumeSettings(cwd).selfImproving)
+				if (
+					activeWorkGoal?.mode !== "self-improving" ||
+					activeWorkGoal.status !== "active"
+				)
 					throw new Error(
-						"Workflow improvement reporting is disabled for this project.",
+						"Workflow improvement reporting is available only during explicit orchestrator maintenance.",
 					);
 				if (
 					activeWorkGoal?.mode === "project" &&
@@ -31427,6 +30518,7 @@ export default function workModelsExtension(pi) {
 		} else {
 			restoreWorkGoalThinking(pi, activeWorkGoal);
 			syncWorkGoalTools(pi);
+			syncImprovementReportTool(pi);
 		}
 		pendingInitiativeConversions.clear();
 		pendingRichTaskComposers.clear();
@@ -31512,7 +30604,7 @@ export default function workModelsExtension(pi) {
 
 	pi.on("input", async (event, ctx) => {
 		if (isOperatorPauseInput(event)) {
-			await pauseOrchestratorNow(ctx, pi);
+			await requestOrchestratorPause(ctx, pi);
 			return { action: "handled" };
 		}
 		if (
@@ -31563,10 +30655,7 @@ export default function workModelsExtension(pi) {
 				);
 			return { action: "handled" };
 		}
-		const pendingRuns = readPendingDirectEvents(ctx.cwd).filter(
-			(item) => item.type === "pending",
-		);
-		const reconciledRuns = reconcilePendingDirectRuns(ctx.cwd, {
+		reconcilePendingDirectRuns(ctx.cwd, {
 			pi,
 			mode: ctx.mode,
 			session: ctx.sessionManager?.getSessionId?.(),
@@ -31583,18 +30672,8 @@ export default function workModelsExtension(pi) {
 		});
 		try {
 			reconcileSuccessorPrefetches(ctx.cwd);
-			const settled = pendingRuns
-				.filter((item) => reconciledRuns.includes(item.workflowRunId))
-				.at(-1);
-			if (settled?.workItemId)
-				await maybeLaunchSuccessorPrefetch(
-					ctx.cwd,
-					settled.workItemId,
-					settled.epicId,
-					pi,
-				);
 		} catch {
-			// Prefetch is opportunistic and must not block normal input handling.
+			// Legacy prefetch cleanup must not block normal input handling.
 		}
 		recordSelfImprovementHistory(ctx, "input", sanitizedEvent);
 		if (!extractWorkGoalContinuationMarker(sanitizedEvent.text))
@@ -32130,18 +31209,10 @@ export default function workModelsExtension(pi) {
 
 	pi.on("context", (event, ctx) => filteredContext(event, ctx));
 
-	pi.on("agent_end", async (event, ctx) => {
+	pi.on("agent_end", (event, ctx) => {
 		recordSelfImprovementHistory(ctx, "agent_end", event);
 		pendingSettledAgentEnd = event;
 		activePromptBackedAgent = false;
-		const settling = activeWorkAgent?.meta;
-		if (settling?.workItemId)
-			await maybeLaunchSuccessorPrefetch(
-				ctx.cwd,
-				settling.workItemId,
-				settling.epicId,
-				pi,
-			);
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
@@ -32517,7 +31588,7 @@ export default function workModelsExtension(pi) {
 			const descriptions = {
 				goal: "Start an autonomous goal with the supplied objective",
 				monitor: "Monitor another Pi session every 10 minutes",
-				pause: "Pause after the current tool batch finishes",
+				pause: "Pause after the current LLM cycle finishes",
 				compact: "Microcompact the work context (same as F8)",
 				resume: "Resume the paused goal, workflow, or direct request",
 				"resume-work": "Resume native work state directly",
@@ -32676,7 +31747,6 @@ function workSettingsStatus(ctx) {
 		"Creative analysis",
 		`  ${SUBMENU_ARROW} creative sidecar: ${resolved.creativeMode}`,
 		"  generators reuse Advisor 1–3 models; configured advisors critique the merged result",
-		`  ${onOff(resolved[PRE_BRAINSTORM_ADVISORS])} background advisor research before brainstorm`,
 		"",
 		"Visual design",
 		`  ${SUBMENU_ARROW} workflow: ${resolved.visualDesignWorkflow}`,
@@ -32696,27 +31766,20 @@ function workSettingsStatus(ctx) {
 		"  analyzes removed context in the background; failures do not block work",
 		"",
 		"Performance tweaks (global)",
-		`  ${onOff(performance.prepareNextCandidate)} prepare next candidate`,
-		...WORK_PERFORMANCE_FLAGS.filter(
-			(flag) => flag.key !== "prepareNextCandidate",
-		).map(
+		...WORK_PERFORMANCE_FLAGS.map(
 			(flag) =>
 				`  ${performance[flag.key] ? "parallel" : "sequential"} ${flag.label.toLowerCase()}`,
 		),
 		"",
 		"Gates",
-		`  ${SUBMENU_ARROW} advisor usage for slice plans: ${resolved.advisorUsageForSlicePlans}`,
-		...WORK_ORCH_BOOLEANS.filter(
-			(flag) => flag.key !== PRE_BRAINSTORM_ADVISORS,
-		).map((flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`),
-		`  ${SUBMENU_ARROW} ce-plan slice depth: ${resolved.slicePlanCeDepth}`,
+		...WORK_ORCH_BOOLEANS.map(
+			(flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`,
+		),
 		`  ${SUBMENU_ARROW} production review policy: ${resolved.reviewPolicy}`,
 		`  ${SUBMENU_ARROW} pre-commit review: ${resolved.codeReviewBeforeCommit}`,
 		"  implementation: configured Work model (isolated work-worker)",
 		"",
 		"Resume automation",
-		`  ${onOff(resume.selfImproving)} self-improving workflow reporting (explicit evidence intake)`,
-		`  source: ${settings.workImprovement?.sourceCheckout ?? process.env.CE_WORKFLOW_SOURCE_DIR ?? "package checkout fallback"}`,
 		`  ${onOff(resume.newSessionBetweenIterations)} new session between iterations`,
 		`  ${SUBMENU_ARROW} autonomous-goal main effort: ${resume.goalThinkingLevel}`,
 	];
@@ -32802,17 +31865,11 @@ async function editPerformanceSettings(ctx) {
 		const performance = workPerformanceSettings(ctx.cwd);
 		const result = await showListDialog(ctx, {
 			title: "Performance tweaks: Global",
-			subtitle: "Control workflow concurrency and speculative next-task work",
+			subtitle: "Control workflow concurrency",
 			items: WORK_PERFORMANCE_FLAGS.map((flag) => ({
 				value: flag.key,
-				label:
-					flag.key === "prepareNextCandidate"
-						? `${onOff(performance[flag.key])} ${flag.label}`
-						: `${performance[flag.key] ? "⇉ parallel" : "→ sequential"} ${flag.label}`,
-				description:
-					flag.key === "prepareNextCandidate"
-						? "Speculatively prepare one likely successor while current work settles"
-						: "Applies globally to every project",
+				label: `${performance[flag.key] ? "⇉ parallel" : "→ sequential"} ${flag.label}`,
+				description: "Applies globally to every project",
 			})),
 			selectedIndex,
 			cursorKey: "work-performance-settings",
@@ -32862,8 +31919,6 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "designWorkflow") return owns(block, "visualDesignWorkflow");
 	if (item.kind === "openDesignCommand") return owns(block, "openDesignCommand");
 	if (item.kind === "designReviewProof") return owns(block, "designReviewProof");
-	if (item.kind === "advisorSliceUsage")
-		return owns(block, "advisorUsageForSlicePlans");
 	if (item.kind === "reviewLevel") return owns(block, "codeReviewBeforeCommit");
 	if (item.kind === "reviewPolicy") return owns(block, "reviewPolicy");
 	if (item.kind === "bool") return owns(block, item.value);
@@ -32884,12 +31939,8 @@ function clearProfileOverride(settings) {
 		}
 		for (const { key } of WORK_ORCH_BOOLEANS)
 			if (block[key] === profile[key]) delete block[key];
-		for (const key of [
-			"advisorUsageForSlicePlans",
-			"slicePlanCeDepth",
-			"codeReviewBeforeCommit",
-		])
-			if (block[key] === profile[key]) delete block[key];
+		if (block.codeReviewBeforeCommit === profile.codeReviewBeforeCommit)
+			delete block.codeReviewBeforeCommit;
 	}
 	delete block.profile;
 	compactOverrides(settings);
@@ -32923,8 +31974,6 @@ function clearProjectOverride(settings, item) {
 	else if (item.kind === "designWorkflow") delete block.visualDesignWorkflow;
 	else if (item.kind === "openDesignCommand") delete block.openDesignCommand;
 	else if (item.kind === "designReviewProof") delete block.designReviewProof;
-	else if (item.kind === "advisorSliceUsage")
-		delete block.advisorUsageForSlicePlans;
 	else if (item.kind === "reviewLevel") delete block.codeReviewBeforeCommit;
 	else if (item.kind === "reviewPolicy") delete block.reviewPolicy;
 	else if (item.kind === "bool") delete block[item.value];
@@ -33130,20 +32179,6 @@ async function workSettingsLoop(ctx) {
 						labelSegments: [{ text: backupLabel, color: "muted" }],
 						description: "Optional fallback; absent preserves Main-only behavior",
 					},
-					...(slot.key === "plan"
-						? [
-								{
-									kind: "bool",
-									value: PRE_BRAINSTORM_ADVISORS,
-									...boolLabel(
-										"background advisor research before brainstorm",
-										resolved[PRE_BRAINSTORM_ADVISORS],
-									),
-									description:
-										"Feed configured advisors’ read-only research into the main brainstorm",
-								},
-							]
-						: []),
 				];
 			}),
 			{
@@ -33200,7 +32235,7 @@ async function workSettingsLoop(ctx) {
 				kind: "performance",
 				value: "performance",
 				label: `Performance tweaks (global only) ${SUBMENU_ARROW}`,
-				description: `Next ${performance.prepareNextCandidate ? "on" : "off"} · verification ${performance.parallelVerification ? "parallel" : "sequential"} · background/advisors ${performance.parallelBackgroundVerifiers && performance.parallelAdvisors ? "parallel" : "mixed"}`,
+				description: `Verification ${performance.parallelVerification ? "parallel" : "sequential"} · background/advisors ${performance.parallelBackgroundVerifiers && performance.parallelAdvisors ? "parallel" : "mixed"}`,
 			},
 			{
 				kind: "subscriptionFooter",
@@ -33210,15 +32245,7 @@ async function workSettingsLoop(ctx) {
 					? "on · custom context footer owns the active TUI"
 					: "off · Pi's built-in footer remains active",
 			},
-			{
-				kind: "advisorSliceUsage",
-				value: "advisorUsageForSlicePlans",
-				label: `advisor usage for slice plans ${SUBMENU_ARROW}`,
-				description: resolved.advisorUsageForSlicePlans,
-			},
-			...WORK_ORCH_BOOLEANS.filter(
-				(flag) => flag.key !== PRE_BRAINSTORM_ADVISORS,
-			).map((flag) => ({
+			...WORK_ORCH_BOOLEANS.map((flag) => ({
 				kind: "bool",
 				value: flag.key,
 				...boolLabel(flag.label, resolved[flag.key]),
@@ -33234,11 +32261,6 @@ async function workSettingsLoop(ctx) {
 				value: "codeReviewBeforeCommit",
 				label: `pre-commit review ${SUBMENU_ARROW}`,
 				description: resolved.codeReviewBeforeCommit,
-			},
-			{
-				kind: "resumeBool",
-				value: "selfImproving",
-				...boolLabel("self-improving workflow reporting", resume.selfImproving),
 			},
 			{
 				kind: "resumeBool",
@@ -33527,24 +32549,6 @@ async function workSettingsLoop(ctx) {
 			setDesignReviewProofSetting(settings, proof);
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Design review proof: ${proof}`, "info");
-			continue;
-		}
-		if (pick.kind === "advisorSliceUsage") {
-			const usage = await choose(
-				ctx,
-				"Advisor usage for slice plans",
-				SLICE_PLAN_ADVISOR_USAGE.map((value) => ({
-					value,
-					label: value,
-					description: SLICE_PLAN_ADVISOR_USAGE_DESC[value],
-				})),
-				resolved.advisorUsageForSlicePlans,
-			);
-			if (!usage) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setWorkOrchAdvisorSliceUsage(settings, usage);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Advisor usage for slice plans: ${usage}`, "info");
 			continue;
 		}
 		if (pick.kind === "reviewPolicy") {

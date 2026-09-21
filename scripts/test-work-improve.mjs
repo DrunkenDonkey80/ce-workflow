@@ -377,8 +377,9 @@ assert.equal(
 	buildWorkImproveState(root, "SI-1", {
 		settings: { workResume: { selfImproving: false } },
 		sourceCwd: root,
-	}).reason,
-	"self-improving-disabled",
+	}).ok,
+	true,
+	"explicit improve ignores the legacy self-improving flag",
 );
 assert.equal(
 	buildWorkImproveState(root, "SI-1", { ...options, sourceCwd: tmpdir() })

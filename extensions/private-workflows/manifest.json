@@ -3,12 +3,12 @@
   "verified": true,
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "4a5877461fa23f89792679a5de30832b3583b458aa301f10f4685d9b2064022d",
+    "sha256": "64791c158025d6d3a67fde93418f686b1e27de37e41de84564af75d28982f953",
     "version": 6
   },
   "provenance": {
     "path": "provenance.json",
-    "sha256": "a6f314b0be4f4eff59bd101d278c01bf1be6a3ce9e5f26b1fd0fe8b5e7b7e194"
+    "sha256": "c7c1503b4d424daec2bfbc062ce1b1894a6fc0f0f96a9fccabfc7356b91ba98b"
   },
   "workflows": {
     "brainstorm": {
@@ -37,7 +37,7 @@
     },
     "plan": {
       "path": "plan.md",
-      "sha256": "5613d54dd265de68fb7300ab78fa09d9497047be456703a9025358ef3a62cac7"
+      "sha256": "55cb5908ef515c0ab17e01c9f9adf62d6ee295531a10bf72e46148248b0cb9f6"
     },
     "pov": {
       "path": "pov.md",
@@ -46,11 +46,7 @@
     "review": {
       "path": "review.md",
       "sha256": "4c60a249a90aa491bfa3afe622e757eda70f4b6fbbd292a9913da5b019bca77f"
-    },
-    "simplify": {
-      "path": "simplify.md",
-      "sha256": "827fbcafff992156094153a49764414db46c43615aa093b414474bd20d4ba188"
     }
   },
-  "generationSha256": "e8f9550c3ee42cf6131893d020817c1a3345931ffe6b06c2ea75e63143e01511"
+  "generationSha256": "757c8c78bfb465e6f7cde265680354c5bbb8579b2795daef38b64a014fb9df91"
 }

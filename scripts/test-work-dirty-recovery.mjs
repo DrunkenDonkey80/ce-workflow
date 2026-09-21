@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import workModelsExtension, {
 	executeOrchestratorAction,
 } from "../extensions/work-models.ts";
@@ -100,7 +103,12 @@ try {
 			description: "Make no changes",
 		},
 	];
-	const askResult = (toolCallId, context, selections) => ({
+	const askResult = (
+		toolCallId,
+		context,
+		selections,
+		options = approvalOptions,
+	) => ({
 		type: "message",
 		message: {
 			role: "toolResult",
@@ -109,7 +117,7 @@ try {
 			details: {
 				question: "Apply the recommended Git cleanup?",
 				context,
-				options: approvalOptions,
+				options,
 				response: { kind: "selection", selections },
 				cancelled: false,
 			},
@@ -283,9 +291,7 @@ try {
 	fixture.reset("finiteBacklogComplete", "unknown");
 	sent.length = 0;
 	await invoke("work-resume", "E-1", ctx);
-	const terminalToken = sent[0]?.message.match(
-		/Recovery token: ([\w-]+)/,
-	)?.[1];
+	const terminalToken = sent[0]?.message.match(/Recovery token: ([\w-]+)/)?.[1];
 	assert.ok(terminalToken, "terminal dirty recovery supplies a token");
 	const terminalContext = `Exact file/action list.\nDirty recovery token: ${terminalToken}`;
 	hooks.tool_call(
@@ -330,6 +336,69 @@ try {
 				/coded resume reached done-candidate/.test(entry.message),
 		),
 		"terminal dirty recovery pauses the matching project goal cleanly",
+	);
+
+	fixture.reset("active", "clean");
+	const nested = path.join(fixture.cwd, "product");
+	mkdirSync(nested);
+	process.env.WORK_ORCH_GIT_BIN = "git";
+	const realGit = (...args) =>
+		execFileSync("git", args, { cwd: nested, encoding: "utf8" });
+	realGit("init", "--quiet");
+	realGit("config", "user.email", "fixture@example.invalid");
+	realGit("config", "user.name", "Fixture");
+	writeFileSync(path.join(nested, "source.txt"), "before\n");
+	realGit("add", "source.txt");
+	realGit("commit", "--quiet", "-m", "fixture");
+	writeFileSync(path.join(nested, "source.txt"), "after\n");
+	sent.length = 0;
+	await invoke("work-resume", "E-1", ctx);
+	const nestedToken = sent[0]?.message.match(/Recovery token: ([\w-]+)/)?.[1];
+	assert.ok(nestedToken, "nested repository dirty recovery supplies a token");
+	const nestedApprovalContext = `Exact file/action list.\nDirty recovery token: ${nestedToken}`;
+	const nestedApprovalOptions = [
+		{
+			title: "Apply recommendation and continue",
+			description: "source.txt — stage and commit the intentional change",
+		},
+		approvalOptions[1],
+	];
+	hooks.tool_call(
+		{
+			toolCallId: "nested-safe-call",
+			toolName: "ask_user",
+			input: {
+				question: "Apply the recommended Git cleanup?",
+				context: nestedApprovalContext,
+				options: nestedApprovalOptions,
+				allowMultiple: false,
+				allowFreeform: false,
+				allowComment: false,
+			},
+		},
+		ctx,
+	);
+	branch.push(
+		askResult(
+			"nested-safe-call",
+			nestedApprovalContext,
+			["Apply recommendation and continue"],
+			nestedApprovalOptions,
+		),
+	);
+	realGit("add", "source.txt");
+	realGit("commit", "--quiet", "-m", "approved cleanup");
+	const nestedResult = await tools.work_dirty_continue.execute(
+		"nested-approved",
+		{ token: nestedToken },
+		undefined,
+		undefined,
+		ctx,
+	);
+	assert.equal(
+		nestedResult.terminate,
+		true,
+		"dirty continuation resolves the nested execution repository before checking status",
 	);
 
 	process.stdout.write("dirty recovery: PASS\n");

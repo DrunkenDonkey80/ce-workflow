@@ -40,7 +40,6 @@ export const PRIVATE_WORKFLOW_OWNED_OUTPUTS = [
 	"extensions/private-workflows/pov.md",
 	"extensions/private-workflows/provenance.json",
 	"extensions/private-workflows/review.md",
-	"extensions/private-workflows/simplify.md",
 ];
 
 export const PRIVATE_WORKFLOW_RELEASE_GATES = [
@@ -63,6 +62,14 @@ const ALLOWED_AMBIENT_DIRT = new Set([".ce-workflow/work-items.json"]);
 
 function json(value) {
 	return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function parseJson(value, label) {
+	try {
+		return JSON.parse(value);
+	} catch (error) {
+		throw new Error(`invalid ${label}: ${error.message}`);
+	}
 }
 
 function releaseParts(version) {
@@ -253,7 +260,7 @@ export function readPrivateWorkflowActivationState(repositoryRoot) {
 	const backup = `${target}.old`;
 	if (!existsSync(target) && existsSync(backup)) renameSync(backup, target);
 	if (!existsSync(target)) return undefined;
-	const state = JSON.parse(readFileSync(target, "utf8"));
+	const state = parseJson(readFileSync(target, "utf8"), "activation state");
 	if (
 		state?.schemaVersion !== ACTIVATION_SCHEMA_VERSION ||
 		!ACTIVATION_STATUSES.has(state.status) ||
@@ -703,8 +710,9 @@ async function acquireOfficialCandidate({
 	const archiveBytes = Buffer.from(await response.arrayBuffer());
 	const tracked = gitTrackedEntries(sourceRoot);
 	const allowed = new Set(tracked.map((entry) => entry.path));
-	const manifest = JSON.parse(
+	const manifest = parseJson(
 		readConfinedFile(sourceRoot, "package.json", allowed),
+		"upstream package manifest",
 	);
 	const licenseBytes = readConfinedFile(
 		sourceRoot,
@@ -815,7 +823,8 @@ function releaseAudit({ current, candidate, generated, parity, gates }) {
 		},
 		provenance: {
 			license: candidate.evidence.licenseEvidence,
-			translator: JSON.parse(generated["provenance.json"]).translator,
+			translator: parseJson(generated["provenance.json"], "generated provenance")
+				.translator,
 		},
 		compatibility: {
 			zeroEffectiveSurface: candidate.evidence.runtimeProbe.zeroEffectiveSurface,
@@ -863,7 +872,10 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 		assertExactOwnedNames(canonicalRoot);
 		verifyPrivateWorkflowGeneration(canonicalRoot);
 		current = directorySnapshot(canonicalRoot);
-		const currentProvenance = JSON.parse(current["provenance.json"].bytes);
+		const currentProvenance = parseJson(
+			current["provenance.json"].bytes,
+			"current provenance",
+		);
 		const acquired = await (options.acquireCandidate ?? acquireOfficialCandidate)(
 			{
 				quarantineRoot,
@@ -917,9 +929,13 @@ export async function promoteVerifiedPrivateWorkflowRelease(options) {
 			parity: { complete: parity, rows: 9 },
 			gates,
 		});
-		const generation = JSON.parse(first["manifest.json"]).generationSha256;
-		const priorGeneration = JSON.parse(
+		const generation = parseJson(
+			first["manifest.json"],
+			"generated manifest",
+		).generationSha256;
+		const priorGeneration = parseJson(
 			current["manifest.json"].bytes,
+			"current manifest",
 		).generationSha256;
 		const evidenceRoot = path.join(artifactRoot, generation);
 		retentionPath = path.join(artifactRoot, "prior", priorGeneration);

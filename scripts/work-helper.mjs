@@ -91,6 +91,38 @@ function childWorkItems(parentId) {
 	);
 }
 
+const PLANNER_OPEN_SLICE_CAP = 3;
+const NON_SLICE_LABELS = new Set([
+	"report",
+	"self-improvement",
+	"wo:brainstorm",
+	"wo:idea",
+	"wo:materialized",
+	"wo:planning",
+]);
+
+function isExecutableSlice(item) {
+	return (
+		["task", "bug"].includes(item.type ?? "task") &&
+		!(item.labels ?? []).some((label) => NON_SLICE_LABELS.has(label))
+	);
+}
+
+// Planner children slice one finite backlog; the cap keeps a single planning
+// pass from materializing a 10-item roadmap the actor never asked for.
+function assertPlannerSliceBudget(parentId, candidate, exhaustive) {
+	const plannerContext = `${process.env.PI_SUBAGENT_CHILD_AGENT ?? ""} ${process.env.PI_SESSION_NAME ?? ""}`;
+	if (exhaustive || !parentId || !/work-planner/i.test(plannerContext)) return;
+	if (!isExecutableSlice(candidate)) return;
+	const open = childWorkItems(parentId).filter(
+		(item) => item.status !== "closed" && isExecutableSlice(item),
+	);
+	if (open.length < PLANNER_OPEN_SLICE_CAP) return;
+	throw new Error(
+		`slice budget exceeded: ${parentId} already has ${open.length} open executable items (${open.map((item) => item.id).join(", ")}). Keep one finite backlog of at most ${PLANNER_OPEN_SLICE_CAP} items: fold the extra scope into an existing item's acceptance criteria, or pass --exhaustive only when the user explicitly requested exhaustive decomposition.`,
+	);
+}
+
 function descendantIds(parentId) {
 	const byParent = new Map();
 	for (const item of Object.values(loadStore(cwd).items)) {
@@ -124,6 +156,15 @@ function updateNativeWorkItem(id, changes) {
 
 function git(argv, root = cwd) {
 	return run(gitBin, argv, { cwd: root });
+}
+
+function headSubjectMatches(root, id) {
+	try {
+		const subject = git(["log", "-1", "--format=%s"], root).trim();
+		return subject === id || subject.startsWith(`${id}:`);
+	} catch {
+		return false;
+	}
 }
 
 function canonicalGitRoot(candidate, label) {
@@ -1029,7 +1070,12 @@ async function finishTaskUnlocked(
 			(ownedImplementationFiles.has(file) ||
 				(!isRuntimePath(file) && !isGeneratedBuildPath(file))),
 	);
-	if (!changed.length && !roadmapOnlyClose)
+	const committedClose =
+		!changed.length &&
+		!roadmapOnlyClose &&
+		(headSubjectMatches(executionRoot, id) ||
+			workspaceVerificationRevision(executionRoot) === task.verificationRevision);
+	if (!changed.length && !roadmapOnlyClose && !committedClose)
 		throw new Error("no related changes to commit");
 	if (roadmapOnlyClose) changed.push(".ce-workflow/work-items.json");
 	const implementationFiles = changed.filter(
@@ -1271,12 +1317,15 @@ async function finishTaskUnlocked(
 				{ cwd: executionRoot },
 			),
 		);
-	git(["add", "-A", "--", ...changed], executionRoot);
-	const staged = git(["diff", "--cached", "--name-only"], executionRoot)
-		.split(/\r?\n/)
-		.filter(Boolean);
-	if (!staged.length)
-		throw new Error("no staged changes after filtering runtime files");
+	let staged = [];
+	if (!committedClose) {
+		git(["add", "-A", "--", ...changed], executionRoot);
+		staged = git(["diff", "--cached", "--name-only"], executionRoot)
+			.split(/\r?\n/)
+			.filter(Boolean);
+		if (!staged.length)
+			throw new Error("no staged changes after filtering runtime files");
+	}
 	const executionHeadBefore = git(["rev-parse", "HEAD"], executionRoot).trim();
 	const ownerHeadBefore = ownerIsGitRepository
 		? git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim()
@@ -1285,7 +1334,8 @@ async function finishTaskUnlocked(
 	let executionCommit;
 	let ownerCommit = null;
 	try {
-		git(["commit", "-m", `${id}: ${message}`], executionRoot);
+		if (!committedClose)
+			git(["commit", "-m", `${id}: ${message}`], executionRoot);
 		executionCommit = git(["rev-parse", "HEAD"], executionRoot).trim();
 		if (distinctRoots)
 			mutateStore(cwd, (store) =>
@@ -1337,9 +1387,10 @@ async function finishTaskUnlocked(
 			? git(["rev-parse", "HEAD"], ownerRepositoryRoot).trim()
 			: null;
 		const executionRemaining = relevantChanges(executionRoot);
-		const ownerRemaining = distinctRoots && ownerIsGitRepository
-			? relevantChanges(ownerRepositoryRoot)
-			: executionRemaining;
+		const ownerRemaining =
+			distinctRoots && ownerIsGitRepository
+				? relevantChanges(ownerRepositoryRoot)
+				: executionRemaining;
 		if (executionRemaining.length || ownerRemaining.length)
 			throw new Error(
 				`related files remain dirty: ${[
@@ -1547,6 +1598,7 @@ const BOOLEAN_OPTIONS = new Set([
 	"--allow-work-store",
 	"--append-notes",
 	"--approved",
+	"--exhaustive",
 	"--full",
 	"--immediate-format",
 	"--push",
@@ -1827,7 +1879,7 @@ try {
 		const [title] = positional();
 		if (!title)
 			throw new Error(
-				"usage: work-create <title> [--parent <id>] [--type <type>] [--description <text>] [--acceptance <text>] [--note|--notes <text>] [--verification-contract <json>] [--label <label>]",
+				"usage: work-create <title> [--parent <id>] [--type <type>] [--description <text>] [--acceptance <text>] [--note|--notes <text>] [--verification-contract <json>] [--label <label>] [--exhaustive]",
 			);
 		const labels = options("--label");
 		const contractText = option("--verification-contract");
@@ -1841,6 +1893,11 @@ try {
 				throw new Error(`invalid --verification-contract: ${error.message}`);
 			}
 		}
+		assertPlannerSliceBudget(
+			option("--parent"),
+			{ type: option("--type", "task"), labels },
+			flag("--exhaustive"),
+		);
 		const created = mutateStore(cwd, (store) =>
 			createWorkItem(store, {
 				title,

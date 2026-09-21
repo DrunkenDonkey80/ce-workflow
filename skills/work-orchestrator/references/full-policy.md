@@ -278,7 +278,7 @@ Checkpoint and stop safely:
 1. Inspect the active work item and `git status`.
 2. Update work item notes with current state, files changed, last verification, failures, and next step.
 3. Do not create speculative work.
-4. Stop at a clean boundary.
+4. Let the current LLM cycle and its tool calls finish, then stop before another cycle starts; never treat pause as an immediate abort.
 
 ## Mode: status
 
@@ -326,7 +326,7 @@ work items and git preserve the memory; Pi chat is disposable working context. T
 - rely on `/wo → Context guard status` for current token/trigger state; proactive compaction is enabled by default at 150k tokens, capped by model context, and keeps at least the latest 30k tokens via Pi compaction settings; use `/wo → Context guard off` to disable it;
 - compact only inside a single work item when context gets high or after a noisy debug/review phase;
 - `/wo → Resume work` is an autonomous slice loop; each slice still gets a fresh-context boundary, but the loop continues to the next ready work item until a decision, blocker, completion, or `/wo → Stop safely`;
-- self-improvement reporting is off by default; opt in with `workResume.selfImproving: true` and use `work_report_improvement` only for explicit evidence intake; it never changes the ce-workflow source from a producer project;
+- ordinary work never enables self-improvement reporting or `work_report_improvement`; legacy `workResume.selfImproving` settings are ignored, and maintenance runs only from explicit `/wo` improve, monitor, scout, or catch-up actions;
 - `/wo → Stop safely` requests a clean stop for any active work (project goal, resume loop, or inline slice): checkpoint native work-item store/git, finish the current safe phase, and do not start another work item; (`/wo → Stop safely` is a kept alias)
 - after a work item is committed and closed, continue to the next ready work item automatically rather than stopping to ask.
 
@@ -447,7 +447,7 @@ Responsibilities:
 
 ### work-advisor / work-advisor-2 / work-advisor-3
 
-Identical read-only critics launched by the orchestrator from `/wo → Settings` (not primary implementation roles). Each slot supports `none`, inherited current model, or an explicit model at high effort; the primary defaults to inherited/high and advisors 2–3 default to none/high. Run every configured advisor in one parallel call on brainstorms and master plans; slice plans use the configured `none` / `first` / `all` policy. Advisors must not edit source code, mutate work items, or launch subagents. Do not substitute `ce-doc-review`, fallback roles, or retries for an unavailable configured advisor.
+Identical read-only critics launched by the orchestrator from `/wo → Settings` (not primary implementation roles). Each slot supports `none`, inherited current model, or an explicit model at high effort; the primary defaults to inherited/high and advisors 2–3 default to none/high. Run every configured advisor in one parallel call only after a brainstorm or master-plan artifact is complete. Advisors must not edit source code, mutate work items, or launch subagents. Do not substitute `ce-doc-review`, fallback roles, or retries for an unavailable configured advisor.
 
 Responsibilities:
 
@@ -460,11 +460,8 @@ Responsibilities:
 
 `/wo → Settings` toggles these on or off; when on, the extension appends the gate step to the matching handoff prompt, so the receiving role actually runs it. Defaults come from the effort profile:
 
-- **advisor review on brainstorm/master plan** — run all configured advisor slots in one parallel call after the verified private brainstorm/planning workflow; deduplicate findings and apply authority-grounded fixes. After fixes, the parent may rerun only the first configured advisor once when the change was substantive, never as a recursive loop.
-- **advisor usage for slice plans** — profile-driven 3-state: none (low), first configured advisor (medium), or all configured advisors in parallel (high/max).
-- **slice plan before work** — code writes a compact `wo:slice-plan` note for routine slices and continues without a planning boundary. Only genuinely ambiguous, architectural, or explicit big work launches the planner with the verified private planning workflow.
+- **advisor review on brainstorm/master plan** — run all configured advisor slots in one parallel call only after the verified private brainstorm/planning artifact is complete; deduplicate findings and apply authority-grounded fixes. After fixes, the parent may rerun only the first configured advisor once when the change was substantive, never as a recursive loop.
 - **advisor verifies task vs plan** — use `work-advisor` only when plan-to-diff alignment remains ambiguous after the coded acceptance/evidence check.
-- **simplify before review** — the coded finish gate loads the verified private simplification playbook only for non-trivial diffs; its durable PASS/NOOP evidence is required before review.
 - **browser tests on UI diff** — the coded finish gate selects affected UI paths and loads the verified private browser playbook; PASS/NOOP or an explicit evidence-only user waiver is required, while backend/CLI/docs-only diffs skip it.
 - **pre-commit review** — profile-driven 3-state: off (low), one `work-reviewer` pass on the scoped diff (medium/high), or the verified private scoped-review playbook (max). Review stays bounded and skips small diffs automatically.
 

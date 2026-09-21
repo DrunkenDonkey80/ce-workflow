@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -17,12 +19,18 @@ import { loadStore } from "../extensions/work-store.js";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
+	buildWorkFinishState,
 	buildWorkResumeState,
 	directRoleHandoffParams,
 	executeNumberedWorkAction,
 	executeOrchestratorAction,
 	handleWorkResumeCommand,
 	renderWorkResumeText,
+	writeActiveWorkflowRecord,
+	clearActiveWorkflowRecord,
+	restoreWorkflowAuthorization,
+	activeWorkflowRecordPath,
+	workflowClaimPath,
 } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "../extensions/work-models.ts")),
@@ -595,7 +603,8 @@ function printDirty() {
     console.log("?? .pi-subagents/artifacts/run-output.md");
   }
 }
-if (args.includes("--porcelain=v1")) printDirty();
+if (args[0] === "log") console.log(process.env.WORK_RESUME_HEAD_SUBJECT || "unrelated commit");
+else if (args.includes("--porcelain=v1")) printDirty();
 else { console.log("## feat/coded-work-resume"); printDirty(); }
 `,
 	);
@@ -612,6 +621,7 @@ const oldEnv = {
 	scenario: process.env.WORK_RESUME_SCENARIO,
 	dirty: process.env.WORK_RESUME_GIT_DIRTY,
 	gitFail: process.env.WORK_RESUME_GIT_FAIL,
+	headSubject: process.env.WORK_RESUME_HEAD_SUBJECT,
 	untracked: process.env.WORK_RESUME_UNTRACKED,
 };
 process.env.PI_CODING_AGENT_DIR = globalDir;
@@ -711,6 +721,223 @@ try {
 		),
 		"handoff carries finish-task execution-root contract",
 	);
+	{
+		const artifactDir = path.join(nestedRoot, "docs", "evidence", "work-1.6");
+		mkdirSync(artifactDir, { recursive: true });
+		const artifactText = "finish gate artifact regression\n";
+		writeFileSync(path.join(artifactDir, "verification.txt"), artifactText);
+		seedNativeStore(cwd, [
+			{
+				id: "E-1",
+				issue_type: "epic",
+				status: "open",
+				title: "Regression epic",
+			},
+			{
+				id: "FIN-NESTED",
+				parent_id: "E-1",
+				issue_type: "task",
+				status: "in_progress",
+				title: "File proof artifacts live in the execution repository",
+				verificationContract: {
+					version: 1,
+					required: [
+						{
+							id: "legacy-inspection",
+							capability: "inspection",
+							proof: "approval",
+							artifacts: ["result"],
+							inspection: "goal",
+							instructions: "Inspect and summarize.",
+							source: "regression source",
+						},
+					],
+				},
+			},
+		]);
+		const storeFile = path.join(cwd, ".ce-workflow", "work-items.json");
+		const seeded = JSON.parse(readFileSync(storeFile, "utf8"));
+		seeded.items["FIN-NESTED"].verificationRevision = "regression-rev-1";
+		seeded.items["FIN-NESTED"].evidence = [
+			{
+				kind: "verification-proof",
+				id: "legacy-inspection",
+				status: "PASS",
+				targetRevision: "regression-rev-1",
+				recordedAt: new Date().toISOString(),
+				issuer: { type: "goal", id: "goal" },
+				inspection: { by: "goal", summary: "nested artifact verified" },
+				artifacts: [
+					{
+						kind: "result",
+						path: "docs/evidence/work-1.6/verification.txt",
+						bytes: Buffer.byteLength(artifactText),
+						sha256: createHash("sha256").update(artifactText).digest("hex"),
+					},
+				],
+			},
+		];
+		writeFileSync(storeFile, JSON.stringify(seeded, null, "\t"));
+		const finishState = buildWorkFinishState(cwd, "FIN-NESTED");
+		assert(
+			finishState.reason !== "verification-contract-incomplete",
+			"finish resolves file proof artifacts against the nested execution repository instead of the owner cwd",
+		);
+		for (const args of [
+			["add", "-A"],
+			[
+				"-c",
+				"user.name=test",
+				"-c",
+				"user.email=test@example.invalid",
+				"commit",
+				"-m",
+				"FIN-NESTED: committed regression close",
+			],
+		])
+			execFileSync("git", ["-C", nestedRoot, ...args], { stdio: "ignore" });
+		let helperError = "";
+		try {
+			execFileSync(
+				process.execPath,
+				[
+					realpathSync(path.join(import.meta.dirname, "work-helper.mjs")),
+					"finish-task",
+					"FIN-NESTED",
+					"--execution-root",
+					realpathSync(nestedRoot),
+					"--message",
+					"committed regression close",
+				],
+				{ cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+			);
+		} catch (error) {
+			helperError = `${error.stderr ?? ""}${error.message ?? ""}`;
+		}
+		assert(
+			!helperError.includes("no related changes to commit"),
+			"finish-task closes a pre-committed clean checkout without demanding a second commit",
+		);
+	}
+	// workflow authorization survives reload/compaction via the durable record
+	{
+		const authCwd = mkdtempSync(path.join(tmpdir(), "wo-auth-"));
+		writeActiveWorkflowRecord(
+			authCwd,
+			{
+				workflowRunId: "wf-auth-1",
+				activity: "resume",
+				epicId: "E-1",
+				workItemId: "W-1",
+			},
+			"session-a",
+		);
+		assert(
+			restoreWorkflowAuthorization(
+				authCwd,
+				"session-a",
+				"continue workflow wf-auth-1",
+				false,
+			)?.workflowRunId === "wf-auth-1",
+			"durable record restores authorization for the owning session",
+		);
+		assert(
+			restoreWorkflowAuthorization(
+				authCwd,
+				"session-b",
+				"continue workflow wf-auth-1",
+				false,
+			) === null,
+			"other sessions do not inherit workflow authorization",
+		);
+		assert(
+			restoreWorkflowAuthorization(
+				authCwd,
+				"session-a",
+				"unrelated user message",
+				false,
+			) === null,
+			"prompts without the run id stay direct requests",
+		);
+		assert(
+			restoreWorkflowAuthorization(
+				authCwd,
+				"session-a",
+				"compaction summary without the run id",
+				true,
+			)?.workflowRunId === "wf-auth-1",
+			"compaction resume prompts stay authorized without the run id",
+		);
+		const claim = workflowClaimPath(authCwd, "wf-auth-1");
+		mkdirSync(path.dirname(claim), { recursive: true });
+		writeFileSync(claim, "{}\n");
+		assert(
+			restoreWorkflowAuthorization(
+				authCwd,
+				"session-a",
+				"continue workflow wf-auth-1",
+				true,
+			) === null,
+			"completed workflow runs no longer authorize turns",
+		);
+		clearActiveWorkflowRecord(authCwd, "wf-auth-1");
+		assert(
+			!existsSync(activeWorkflowRecordPath(authCwd)),
+			"clearActiveWorkflowRecord removes the record",
+		);
+		rmSync(authCwd, { recursive: true, force: true });
+	}
+	// interrupted in-progress launch auto-requeues on resume
+	{
+		const rqCwd = mkdtempSync(path.join(tmpdir(), "wo-requeue-"));
+		execFileSync("git", ["init"], { cwd: rqCwd, stdio: "ignore" });
+		seedNativeStore(rqCwd, [
+			{
+				id: "E-RQ",
+				issue_type: "epic",
+				status: "open",
+				title: "Requeue roadmap",
+			},
+			{
+				id: "RQ-1",
+				issue_type: "task",
+				status: "in_progress",
+				parent_id: "E-RQ",
+				title: "Interrupted launch",
+			},
+		]);
+		writeFileSync(path.join(rqCwd, ".gitignore"), ".ce-workflow/\n.pi/\n");
+		execFileSync("git", ["add", ".gitignore"], { cwd: rqCwd, stdio: "ignore" });
+		execFileSync(
+			"git",
+			["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"],
+			{ cwd: rqCwd, stdio: "ignore" },
+		);
+		const rqState = buildWorkResumeState(rqCwd, "E-RQ");
+		assert(
+			rqState.ok,
+			`requeue resume builds a valid state (${rqState.reason ?? rqState.action})`,
+		);
+		assert(
+			rqState.action !== "in-progress-agent",
+			`abandoned in_progress item auto-requeues instead of dead-ending (got ${rqState.action})`,
+		);
+		const rqItems = JSON.parse(
+			readFileSync(path.join(rqCwd, ".ce-workflow", "work-items.json"), "utf8"),
+		).items;
+		assert(
+			rqItems["RQ-1"]?.status === "open",
+			"interrupted in_progress item flips back to open in the store",
+		);
+		assert(
+			rqState.action === "run-implementation" &&
+				rqState.readyExecutable?.some(
+					(item) => item.id === "RQ-1" && item.status === "open",
+				),
+			`resume routes the requeued item to implementation (got ${rqState.action})`,
+		);
+		rmSync(rqCwd, { recursive: true, force: true });
+	}
 	process.env.WORK_ORCH_GIT_BIN = fakeGit;
 	assert(
 		state.ok && state.action === "run-debug",
@@ -736,7 +963,7 @@ try {
 		state.action === "run-implementation" &&
 			!state.inlineWork &&
 			directRoleHandoffParams(state, cwd)?.agent === "work-worker",
-		"unplanned implementation gets a coded slice plan and continues in the worker",
+		"ready implementation proceeds directly in the worker",
 	);
 	assert(
 		state.selectedWorkItem.id === "IMP-1",
@@ -744,13 +971,13 @@ try {
 	);
 	assert(
 		state.handoffPrompt?.includes("Implementation scope: medium"),
-		"coded slice planning avoids a separate planner boundary",
+		"implementation handoff preserves the coded scope classification",
 	);
 	assert(
 		state.handoffPrompt.includes("Selected work item: IMP-1") &&
 			state.handoffPrompt.includes("Implement feature slice") &&
 			!state.handoffPrompt.includes("[object Object]"),
-		"worker slice-plan target stays compact and readable",
+		"worker target stays compact and readable",
 	);
 
 	setScenario("oversizedImplementation");
@@ -776,7 +1003,7 @@ try {
 		state.action === "run-implementation" &&
 			!state.inlineWork &&
 			state.selectedWorkItem.executionMode === "agent",
-		"coded slice planning preserves the big/high-risk isolated-writer boundary",
+		"big/high-risk work preserves the isolated-writer boundary",
 	);
 
 	setScenario("ideasOnly");
@@ -801,76 +1028,10 @@ try {
 	);
 	assert(
 		state.handoffPrompt.includes(
-			"Plan: execute the wo:slice-plan note on WorkItem IMP-1 as your spec",
+			"Historical context: WorkItem IMP-1 contains legacy wo:slice-plan metadata",
 		),
-		"implementation handoff points to the slice plan, not the workItem alone",
+		"legacy slice metadata remains context instead of a planning gate",
 	);
-
-	const advisorCwd = mkdtempSync(path.join(tmpdir(), "work-resume-advisor-"));
-	try {
-		mkdirSync(path.join(advisorCwd, ".pi"), { recursive: true });
-		writeFileSync(
-			path.join(advisorCwd, ".pi", "settings.json"),
-			JSON.stringify({ workOrchestrator: { profile: "medium" } }),
-		);
-		seedNativeStore(advisorCwd, sourcesForScenario("plannedIdea"));
-		let advisorState = buildWorkResumeState(advisorCwd, "E-1");
-		assert(
-			advisorState.action === "advisor-gate-pending" &&
-				directRoleHandoffParams(advisorState, advisorCwd) === null,
-			"a planner-created slice stops at the coded advisor gate before its worker",
-		);
-		assert(
-			advisorState.handoffPrompt.includes("work-advisor") &&
-				advisorState.handoffPrompt.includes(
-					"wo:slice-advisor PASS agents=work-advisor",
-				),
-			"medium profile exposes the first configured advisor and exact durable PASS marker",
-		);
-
-		seedNativeStore(
-			advisorCwd,
-			sourcesForScenario("plannedIdea").map((item) =>
-				item.id === "IMP-1"
-					? {
-							...item,
-							notes: "wo:slice-advisor PASS agents=work-advisor",
-						}
-					: item,
-			),
-		);
-		advisorState = buildWorkResumeState(advisorCwd, "E-1");
-		assert(
-			advisorState.action === "run-implementation" &&
-				directRoleHandoffParams(advisorState, advisorCwd)?.agent === "work-worker",
-			"the exact durable advisor PASS releases implementation",
-		);
-
-		writeFileSync(
-			path.join(advisorCwd, ".pi", "settings.json"),
-			JSON.stringify({
-				workOrchestrator: {
-					profile: "high",
-					advisorEnabled: {
-						advisor: true,
-						advisor2: true,
-						advisor3: true,
-					},
-				},
-			}),
-		);
-		seedNativeStore(advisorCwd, sourcesForScenario("plannedIdea"));
-		advisorState = buildWorkResumeState(advisorCwd, "E-1");
-		assert(
-			advisorState.action === "advisor-gate-pending" &&
-				advisorState.handoffPrompt.includes(
-					"wo:slice-advisor PASS agents=work-advisor,work-advisor-2,work-advisor-3",
-				),
-			"high profile keeps all configured advisors pending before implementation",
-		);
-	} finally {
-		rmSync(advisorCwd, { recursive: true, force: true });
-	}
 
 	setScenario("planning");
 	state = buildWorkResumeState(cwd, "E-1");
@@ -914,9 +1075,21 @@ try {
 	);
 
 	setScenario("inProgressSensitiveContract");
+	process.env.WORK_RESUME_HEAD_SUBJECT = "AUTH-1: committed before closure";
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
-		state.action === "in-progress-agent" &&
+		state.action === "run-implementation" &&
+			state.handoffPrompt?.includes("Committed-worker recovery") &&
+			directRoleHandoffParams(state, cwd)?.params.task.includes(
+				"Do not redo implementation",
+			),
+		"a clean matching HEAD commit safely resumes proof and finish after a lost worker closure",
+	);
+	delete process.env.WORK_RESUME_HEAD_SUBJECT;
+	setScenario("inProgressSensitiveContract");
+	state = buildWorkResumeState(cwd, "E-1");
+	assert(
+		state.action === "run-implementation" &&
 			!state.selectedWorkItem.verificationReady,
 		"verification requirements do not masquerade as passing evidence or launch review early",
 	);
@@ -987,7 +1160,7 @@ try {
 	setScenario("inProgressFixStaleVerification");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
-		state.action === "in-progress-agent" &&
+		state.action === "run-implementation" &&
 			!state.selectedWorkItem.verificationReady,
 		"a verification PASS before a later production fix cannot launch re-review",
 	);
@@ -1011,7 +1184,7 @@ try {
 	setScenario("inProgressStaleReviewPass");
 	state = buildWorkResumeState(cwd, "E-1");
 	assert(
-		state.action === "in-progress-agent" &&
+		state.action === "run-implementation" &&
 			!state.selectedWorkItem.verificationReady,
 		"a PASS before the latest review scope requires fresh verification",
 	);
@@ -1975,6 +2148,9 @@ try {
 	else process.env.WORK_RESUME_GIT_DIRTY = oldEnv.dirty;
 	if (oldEnv.gitFail === undefined) delete process.env.WORK_RESUME_GIT_FAIL;
 	else process.env.WORK_RESUME_GIT_FAIL = oldEnv.gitFail;
+	if (oldEnv.headSubject === undefined)
+		delete process.env.WORK_RESUME_HEAD_SUBJECT;
+	else process.env.WORK_RESUME_HEAD_SUBJECT = oldEnv.headSubject;
 	if (oldEnv.untracked === undefined) delete process.env.WORK_RESUME_UNTRACKED;
 	else process.env.WORK_RESUME_UNTRACKED = oldEnv.untracked;
 	rmSync(bin, { recursive: true, force: true });

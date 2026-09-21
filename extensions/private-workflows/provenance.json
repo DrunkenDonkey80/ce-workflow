@@ -14,7 +14,7 @@
   },
   "translator": {
     "path": "scripts/generate-work-private-workflows.mjs",
-    "sha256": "4a5877461fa23f89792679a5de30832b3583b458aa301f10f4685d9b2064022d",
+    "sha256": "64791c158025d6d3a67fde93418f686b1e27de37e41de84564af75d28982f953",
     "version": 6,
     "rules": [
       "verify-complete-u1-brainstorm-closure",
@@ -52,14 +52,10 @@
       "verify-complete-u1-code-review-closure",
       "remove-pi-discovery-frontmatter-and-executable-helpers",
       "preserve-scoped-findings-read-only-review-and-bounded-rereview",
-      "adapt-output-to-work-finish-review-evidence-contract",
-      "verify-complete-u1-simplify-code-closure",
-      "remove-pi-discovery-frontmatter-and-executable-helpers",
-      "preserve-equivalent-scoped-simplification-and-noop",
-      "adapt-output-to-work-finish-simplify-evidence-contract"
+      "adapt-output-to-work-finish-review-evidence-contract"
     ]
   },
-  "sourceClosureSha256": "478c60b652c09241d82417bd9af81dbbc09d47726cb77638d6ad852d8b39b7fd",
+  "sourceClosureSha256": "796bf4e7ef0e9593b90af824277d5583b2807487e34f2adcfad9c41b435a978d",
   "sources": [
     {
       "path": "skills/ce-brainstorm/SKILL.md",
@@ -955,26 +951,6 @@
       "path": "skills/ce-code-review/scripts/review-scope.py",
       "bytes": 7014,
       "sha256": "571f1a24d794da0f59a36f9b3e912e3f311e11be74bee673467ab037b1697666"
-    },
-    {
-      "path": "skills/ce-simplify-code/SKILL.md",
-      "bytes": 6363,
-      "sha256": "fb15653735cd042a63960256c2e362e1e682581a74004e037db9d1cfbb2d9d25"
-    },
-    {
-      "path": "skills/ce-simplify-code/references/personas/code-quality-reviewer.md",
-      "bytes": 2384,
-      "sha256": "6512e07df89dea17c8b44c6f107d51dec8f3ee9228e99f2602efeb305d60242d"
-    },
-    {
-      "path": "skills/ce-simplify-code/references/personas/code-reuse-reviewer.md",
-      "bytes": 1257,
-      "sha256": "2bea1eab2df2c00146382d72edc24f4af0e2b25b5d7b4d6a94517c4117373be2"
-    },
-    {
-      "path": "skills/ce-simplify-code/references/personas/efficiency-reviewer.md",
-      "bytes": 1167,
-      "sha256": "baff2be0eadb4204de0353e9223c9d44b24751f9ab5832cae78cc69df05cd94b"
     }
   ]
 }

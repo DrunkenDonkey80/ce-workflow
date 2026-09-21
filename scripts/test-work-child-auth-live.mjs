@@ -8,7 +8,13 @@
 //
 // Usage: node scripts/test-work-child-auth-live.mjs [--model provider/id] [--keep]
 import { execSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -139,7 +145,11 @@ try {
 	if (!plannerFile)
 		fail(`no child session named subagent-work-planner-* in ${cwd}/sessions`);
 	const plannerLog = readFileSync(plannerFile, "utf8");
-	if (!/"name":\s*"subagent-work-planner-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-\d+"/.test(plannerLog))
+	if (
+		!/"name":\s*"subagent-work-planner-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-\d+"/.test(
+			plannerLog,
+		)
+	)
 		fail("child session name does not match subagent-work-<agent>-<uuid>-<n>");
 	if (/Direct request mode/.test(plannerLog))
 		fail(

@@ -23,7 +23,7 @@ Responsibilities:
 - Treat the handoff as precomputed intake. Never run `raw store`, `helper help`, `pwd`, `ls`, `find`, raw store JSON, or raw `work-ready-summary`; the exact handoff-provided helper commands and known syntax below replace them. Never substitute a user skill-directory helper or read a work items skill file. Planning does not run project tests or generic index checks; only the final handoff status check below is required.
 - Keep discovery to the handoff-provided `work-helper.mjs work-summary <id>`, one `work-children-summary <roadmap-id>`, targeted project files required to plan, and one `work-ready-summary <roadmap-id>` after mutation. Do not reread a planning work item already present in the handoff unless a required field is missing.
 - treat `wo:planning` in the assigned item's labels, notes, or authoritative handoff as a planning intake regardless of its native `task` type;
-- if the assigned work item is an executable task/bug without that planning marker, run a lightweight slice-planning pass only: read the roadmap plan/acceptance plus that work item, append one compact note headed `wo:slice-plan`, add label `wo:slice-planned`, and stop without creating child work items; the sole exception is a handoff that says the executable exceeds the finish-task file cap, which must be re-cut into finishable sibling tasks and closed as superseded;
+- executable tasks and bugs are never planning intake; if one exceeds the finish-task file cap, re-cut it into finishable sibling tasks and close it as superseded;
 - read the assigned planning work item with the handoff-provided `work-helper.mjs work-summary <id>` first; raw work-item records are forbidden because their large output is not needed;
 - when the handoff names an initiative, read `work-helper.mjs initiative-summary <initiative-id>`, consume its coded preparation state, select only the returned planning boundary or selected child, and scope broad planning mutations to that child; an initiative is aggregate state, never an executable target, and sibling roadmaps must not be planned or started;
 - after an initiative child broad plan is attached, do not create slice-planning or executable WorkItems and do not resume implementation; return the coded `plan_next`, `select_child`, `start_execution`, and `stop` choices, with execution only after an explicit `start_execution` choice;
@@ -62,7 +62,6 @@ Stop and contact the supervisor only when scope is ambiguous, the verification c
 
 Final response:
 
-- if this was a slice-planning pass: target work item updated, label added, risks/blockers found, and final line `Next: /wo → Resume work <roadmap-id>`;
 - created/updated work items;
 - planning work item closed or the exact reason it remains open;
 - dependencies added;

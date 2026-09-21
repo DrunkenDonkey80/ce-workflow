@@ -66,7 +66,6 @@ try {
 	assert(
 		JSON.stringify(mod.workPerformanceSettings(cwd)) ===
 			JSON.stringify({
-				prepareNextCandidate: false,
 				parallelReadOnlyLanes: true,
 				parallelVerification: false,
 				parallelBackgroundVerifiers: true,
@@ -90,9 +89,9 @@ try {
 		},
 	});
 	assert(
-		mod.workPerformanceSettings(cwd).prepareNextCandidate === false &&
+		!("prepareNextCandidate" in mod.workPerformanceSettings(cwd)) &&
 			mod.workPerformanceSettings(cwd).parallelVerification === false,
-		"project performance overrides are ignored",
+		"retired prefetch and project performance overrides are ignored",
 	);
 	writeSettings({ workOrchestrator: { serialReadOnlyLanes: true } });
 	assert(
@@ -133,8 +132,8 @@ try {
 		}),
 	);
 	assert(
-		mod.workResumeSettingsForTest(cwd).selfImproving === true,
-		"global hidden default enables self improvement",
+		mod.workResumeSettingsForTest(cwd).selfImproving === false,
+		"legacy global self-improvement defaults stay disabled",
 	);
 	assert(
 		mod.workResumeSettingsForTest(cwd).goalThinkingLevel === "medium",
@@ -151,7 +150,7 @@ try {
 	});
 	assert(
 		mod.workResumeSettingsForTest(cwd).selfImproving === false,
-		"project setting can opt out of the global default",
+		"legacy project self-improvement flags stay disabled",
 	);
 	const effective = mod.effectiveSettingsForTest(cwd);
 	assert(
@@ -186,16 +185,14 @@ try {
 		mod.workOrchSettings(cwd).creativeMode === "ask",
 		"creative sidecar defaults to one Quick/Wide question",
 	);
+	const legacyAdvisorResearchSettings = {};
 	assert(
-		mod.workOrchSettings(cwd).preBrainstormAdvisors === false,
-		"pre-brainstorm advisor research defaults off",
-	);
-	const advisorResearchSettings = {};
-	mod.setWorkOrchBoolean(advisorResearchSettings, "preBrainstormAdvisors", true);
-	writeSettings(advisorResearchSettings);
-	assert(
-		mod.workOrchSettings(cwd).preBrainstormAdvisors === true,
-		"pre-brainstorm advisor research persists",
+		mod.setWorkOrchBoolean(
+			legacyAdvisorResearchSettings,
+			"preBrainstormAdvisors",
+			true,
+		) === false && legacyAdvisorResearchSettings.workOrchestrator === undefined,
+		"retired pre-brainstorm advisor settings are ignored",
 	);
 	const creativeSettings = {};
 	mod.setWorkOrchCreativeMode(creativeSettings, "auto");
@@ -293,24 +290,8 @@ try {
 		"medium defaults to one inherited advisor",
 	);
 	assert(
-		mod.workOrchSettings(cwd).advisorUsageForSlicePlans === "first",
-		"medium uses first advisor on slice plans",
-	);
-	assert(
 		mod.workOrchSettings(cwd).advisorVerifyTask === true,
 		"medium advisor verify",
-	);
-	assert(
-		mod.workOrchSettings(cwd).slicePlanBeforeWork === true,
-		"medium slice planning",
-	);
-	assert(
-		mod.workOrchSettings(cwd).slicePlanWithCePlan === false,
-		"medium inline slice planning",
-	);
-	assert(
-		mod.workOrchSettings(cwd).slicePlanCeDepth === "Lightweight",
-		"medium lightweight slice depth",
 	);
 	assert(
 		mod.workOrchSettings(cwd).codeReviewBeforeCommit === "light",
@@ -322,8 +303,14 @@ try {
 		"legacy inline setting is ignored",
 	);
 	assert(
-		mod.workOrchSettings(cwd).simplifyBeforeReview === false,
-		"medium no simplify",
+		![
+			"advisorUsageForSlicePlans",
+			"slicePlanBeforeWork",
+			"slicePlanWithCePlan",
+			"slicePlanCeDepth",
+			"simplifyBeforeReview",
+		].some((key) => key in mod.workOrchSettings(cwd)),
+		"retired orchestration settings are absent",
 	);
 	assert(
 		mod.workOrchSettings(cwd).browserTestsOnUiDiff === true,
@@ -346,15 +333,8 @@ try {
 	writeSettings(settings);
 	const max = mod.workOrchSettings(cwd);
 	assert(max.profile === "max", "profile max");
-	assert(
-		max.advisorUsageForSlicePlans === "all",
-		"max uses all configured advisors on slice plans",
-	);
 	assert(max.advisorVerifyTask === true, "max advisor verify");
 	assert(max.codeReviewBeforeCommit === "full", "max full review");
-	assert(max.slicePlanWithCePlan === true, "max agent slice planner available");
-	assert(max.slicePlanCeDepth === "Deep", "max ce-plan deep");
-	assert(max.simplifyBeforeReview === true, "max simplify");
 	assert(max.browserTestsOnUiDiff === true, "max browser tests");
 	for (const agent of ["work-advisor", "work-advisor-2", "work-advisor-3"])
 		assert(
@@ -373,21 +353,16 @@ try {
 	// Flip a boolean live; profile label is preserved.
 	settings = readSettings();
 	mod.setWorkOrchBoolean(settings, "advisorVerifyTask", false);
-	mod.setWorkOrchBoolean(settings, "slicePlanBeforeWork", false);
-	mod.setWorkOrchBoolean(settings, "slicePlanWithCePlan", false);
+	assert(
+		mod.setWorkOrchBoolean(settings, "slicePlanBeforeWork", false) === false &&
+			mod.setWorkOrchBoolean(settings, "slicePlanWithCePlan", false) === false,
+		"retired slice-plan toggles cannot be restored",
+	);
 	mod.setWorkOrchReviewLevel(settings, "off");
 	writeSettings(settings);
 	assert(
 		mod.workOrchSettings(cwd).advisorVerifyTask === false,
 		"flipped verify off",
-	);
-	assert(
-		mod.workOrchSettings(cwd).slicePlanBeforeWork === false,
-		"flipped slice planning off",
-	);
-	assert(
-		mod.workOrchSettings(cwd).slicePlanWithCePlan === false,
-		"flipped ce-plan per slice off",
 	);
 	assert(
 		mod.workOrchSettings(cwd).codeReviewBeforeCommit === "off",
@@ -402,40 +377,13 @@ try {
 		"explicit profile stored",
 	);
 
-	mod.applyProfile((settings = readSettings()), "high");
-	writeSettings(settings);
-	assert(
-		mod.workOrchSettings(cwd).slicePlanWithCePlan === true,
-		"high enables agent slice planner",
-	);
-	assert(
-		mod.workOrchSettings(cwd).slicePlanCeDepth === "Standard",
-		"high slice-plan standard when agent planner is enabled",
-	);
-
 	// Apply low profile: critic and verify off.
 	mod.applyProfile((settings = readSettings()), "low");
 	writeSettings(settings);
 	const low = mod.workOrchSettings(cwd);
-	assert(
-		low.advisorUsageForSlicePlans === "none",
-		"low skips advisors on slice plans",
-	);
 	assert(low.advisorVerifyTask === false, "low no advisor verify");
-	assert(low.slicePlanBeforeWork === true, "low lightweight slice planning");
-	assert(low.slicePlanWithCePlan === false, "low no ce-plan per slice");
-	assert(low.slicePlanCeDepth === "Lightweight", "low ce-plan depth unused");
 	assert(low.codeReviewBeforeCommit === "off", "low no review");
-	assert(low.simplifyBeforeReview === false, "low no simplify");
 	assert(low.browserTestsOnUiDiff === false, "low no browser tests");
-
-	// Override slice-plan advisor usage explicitly.
-	mod.setWorkOrchAdvisorSliceUsage((settings = readSettings()), "all");
-	writeSettings(settings);
-	assert(
-		mod.workOrchSettings(cwd).advisorUsageForSlicePlans === "all",
-		"explicit slice-plan advisor usage",
-	);
 
 	const commands = {};
 	delete process.env.PI_ASK_USER_CONTEXT_EXPANDED;
@@ -578,26 +526,25 @@ try {
 		"workflow: off",
 		"OpenDesign executable: Auto",
 		"review proof: standard",
-		"advisor usage for slice plans: all",
-		"Planner writes slice plan before work",
-		"Agent slice planner for messy/large slices",
-		"ce-plan slice depth: Lightweight",
 		"pre-commit review:",
 		"implementation: configured Work model (isolated work-worker)",
-		"Private simplification before review",
 		"Private browser checks when diff touches UI",
 		"Performance tweaks (global)",
-		"off prepare next candidate",
 		"sequential verification shards",
 		"parallel background verifiers",
 		"parallel advisors",
-		"self-improving workflow reporting",
 		"new session between iterations",
 	])
 		assert(notices.at(-1).message.includes(phrase), `status lists ${phrase}`);
 	assert(
-		!notices.at(-1).message.includes("slice execution"),
-		"status removes the retired inline/agent option",
+		![
+			"slice execution",
+			"slice plan",
+			"simplification",
+			"prepare next candidate",
+			"self-improving workflow reporting",
+		].some((phrase) => notices.at(-1).message.toLowerCase().includes(phrase)),
+		"status omits retired orchestration settings",
 	);
 	assert(existsSync(settingsFile()), "settings file exists");
 
@@ -819,74 +766,6 @@ try {
 		"clearing a project override preserves the global value",
 	);
 
-	// Reopening an enum picker starts on the persisted value in either scope.
-	writeGlobalSettings({
-		workOrchestrator: { advisorUsageForSlicePlans: "all" },
-	});
-	writeSettings({
-		workOrchestrator: { advisorUsageForSlicePlans: "first" },
-	});
-	let globalUsageChoices;
-	await invoke("work-settings", "", {
-		...ctx,
-		ui: customUi(
-			[
-				{ target: "Advisor usage for slice plans ›", key: "enter" },
-				{
-					expectInitial: "Advisor usage for slice plans ›",
-					key: "escape",
-				},
-			],
-			{
-				select: async (title, labels) => {
-					if (title === "Advisor usage for slice plans") {
-						globalUsageChoices = labels;
-						return labels.find((label) => label.startsWith("None"));
-					}
-					return undefined;
-				},
-			},
-		),
-	});
-	assert(
-		globalUsageChoices?.[0]?.startsWith("● All"),
-		`global enum picker opens on its persisted value: ${JSON.stringify(globalUsageChoices)}`,
-	);
-	assert(
-		readGlobalSettings().workOrchestrator.advisorUsageForSlicePlans === "none",
-		"global enum selection persists",
-	);
-	let projectUsageChoices;
-	await invoke("work-settings", "", {
-		...ctx,
-		ui: customUi(
-			[
-				{ key: "\t" },
-				{ target: "Advisor usage for slice plans ›", key: "enter" },
-				{
-					expectInitial: "Advisor usage for slice plans ›",
-					key: "escape",
-				},
-			],
-			{
-				select: async (title, labels) => {
-					if (title === "Advisor usage for slice plans") {
-						projectUsageChoices = labels;
-						return labels.find((label) => label.startsWith("All"));
-					}
-					return undefined;
-				},
-			},
-		),
-	});
-	assert(
-		projectUsageChoices?.[0]?.startsWith("● First"),
-		"project enum picker opens on its persisted override",
-	);
-	assert(
-		readSettings().workOrchestrator.advisorUsageForSlicePlans === "all",
-		"project enum selection persists",
-	);
 	await invoke("work-settings", "", {
 		...ctx,
 		ui: customUi([

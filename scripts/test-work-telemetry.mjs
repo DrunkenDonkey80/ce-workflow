@@ -869,72 +869,20 @@ try {
 			path.join(cwd, ".pi", "settings.json"),
 			`${JSON.stringify({ workResume: { selfImproving: true } })}\n`,
 		);
-		const historyCtx = {
-			cwd,
-			getContextUsage: () => ({ tokens: 3200 }),
-			sessionManager: {
-				getSessionId: () => "sess-history",
-				getSessionFile: () => path.join(cwd, "session.jsonl"),
-			},
-		};
 		await hooks.before_agent_start(
 			{ prompt: routedPrompt, systemPrompt: "system" },
-			historyCtx,
-		);
-		await hooks.agent_start({}, historyCtx);
-		await hooks.message_end(
 			{
-				message: { role: "assistant", content: [{ type: "text", text: "ok" }] },
-			},
-			historyCtx,
-		);
-		await hooks.tool_execution_start(
-			{ toolCallId: "read-1", toolName: "read", args: { path: "README.md" } },
-			historyCtx,
-		);
-		await hooks.tool_execution_end(
-			{
-				toolCallId: "read-1",
-				toolName: "read",
-				isError: false,
-				result: {
-					content: [{ type: "text", text: "full local output".repeat(1_000) }],
+				cwd,
+				getContextUsage: () => ({ tokens: 3200 }),
+				sessionManager: {
+					getSessionId: () => "sess-history",
+					getSessionFile: () => path.join(cwd, "session.jsonl"),
 				},
 			},
-			historyCtx,
-		);
-		await hooks.agent_end({ messages: [] }, historyCtx);
-		await hooks.agent_settled({}, { ...historyCtx, isIdle: () => true });
-		const historyFile = path.join(
-			cwd,
-			".pi",
-			"work-runs",
-			"history",
-			commandEvent.workItemId,
-			"sess-history.jsonl",
-		);
-		assert(existsSync(historyFile), "self-improving history writes per task");
-		const historyLines = readFileSync(historyFile, "utf8")
-			.trim()
-			.split(/\r?\n/)
-			.map((line) => JSON.parse(line));
-		assert(
-			historyLines.some((line) => line.type === "message_end") &&
-				historyLines.some((line) => line.type === "tool_execution_end"),
-			"self-improving history records messages and tool results",
 		);
 		assert(
-			historyLines.every(
-				(line) => line.task.workItemId === commandEvent.workItemId,
-			),
-			"self-improving history is grouped by WorkItem task",
-		);
-		assert(
-			historyLines.some((line) => line.event.truncated) &&
-				readFileSync(historyFile, "utf8")
-					.split(/\r?\n/)
-					.every((line) => line.length < 12_000),
-			"self-improving history bounds large lifecycle payloads",
+			!existsSync(path.join(cwd, ".pi", "work-runs", "history")),
+			"legacy self-improving settings do not enable lifecycle history",
 		);
 		assert(
 			!fixture

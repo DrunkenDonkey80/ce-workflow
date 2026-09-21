@@ -33,7 +33,6 @@ const {
 	buildWorkMigrateState,
 	buildWorkSmallState,
 	buildWorkTelemetryState,
-	cePlanSliceStep,
 	directRoleHandoffParams,
 	createPiSubagentsVerifierAdapter,
 	shellQuote,
@@ -441,22 +440,6 @@ try {
 		fixture.logs().length === 0,
 		"raw master input does not mutate WorkItems",
 	);
-	for (const depth of ["Lightweight", "Standard", "Deep"]) {
-		const slice = cePlanSliceStep(
-			{ id: "SLICE-1", title: "Depth fixture", acceptance: "checked" },
-			fixture.cwd,
-			undefined,
-			depth,
-		);
-		assert(
-			slice.includes("BEGIN VERIFIED PRIVATE PLAN PLAYBOOK") &&
-				slice.includes(`Use ${depth} depth`) &&
-				slice.includes("wo:slice-plan") &&
-				!slice.includes("Invoke the ce-plan skill"),
-			`${depth} slice planning dispatches the verified private plan resource`,
-		);
-	}
-
 	state = buildWorkMasterState(fixture.cwd, "missing-plan.md");
 	assert(
 		!state.ok && state.reason === "missing-source",
@@ -835,9 +818,6 @@ try {
 		"max-profile resume routes verified non-trivial work to the coded finish pipeline before review",
 	);
 	state = buildWorkFinishState(finishCwd, "FIN-1");
-	const simplifyAt = state.handoffPrompt?.indexOf(
-		"BEGIN VERIFIED PRIVATE SCOPED SIMPLIFICATION PLAYBOOK",
-	);
 	const reviewAt = state.handoffPrompt?.indexOf(
 		"BEGIN VERIFIED PRIVATE SCOPED CODE-REVIEW PLAYBOOK",
 	);
@@ -847,19 +827,18 @@ try {
 	assert(
 		state.ok &&
 			state.action === "commit-ready" &&
-			simplifyAt >= 0 &&
-			simplifyAt < reviewAt &&
+			reviewAt >= 0 &&
 			browserAt === -1,
-		"contract-bearing UI finish keeps legacy simplify/review gates but delegates browser proof to capability contracts",
+		"contract-bearing UI finish keeps review but retires simplify and delegates browser proof to capability contracts",
 	);
 	assert(
-		state.handoffPrompt.includes("wo:simplify NOOP") &&
+		!state.handoffPrompt.includes("SCOPED SIMPLIFICATION") &&
 			state.handoffPrompt.includes("wo:review PASS") &&
 			state.handoffPrompt.includes("at most one targeted re-review") &&
 			!state.handoffPrompt.includes("wo:browser WAIVED") &&
 			!state.handoffPrompt.includes("run the ce-") &&
 			!state.handoffPrompt.includes("skill on the affected"),
-		"finish pipeline preserves bounded legacy gates without duplicating capability-owned browser proof",
+		"finish pipeline ignores stale simplify settings without duplicating capability-owned browser proof",
 	);
 	const blockedFinish = executeWorkFinishState(finishCwd, state);
 	assert(
@@ -874,7 +853,7 @@ try {
 	state = buildWorkFinishState(finishCwd, "FIN-1");
 	assert(
 		state.ok && !state.handoffPrompt,
-		"durable simplify no-op, review PASS, and explicit browser waiver satisfy the gated finish path",
+		"durable review PASS and explicit browser waiver satisfy the gated finish path",
 	);
 
 	fixture.reset("finishMissingVerification", "unknown");

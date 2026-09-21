@@ -1084,7 +1084,7 @@ for (const action of [
 	"Usage report",
 	"Context guard",
 	"Settings",
-	"Catch up project",
+	"Catch up packages",
 ])
 	assert(
 		orchestratorLabels.some((label) => label.includes(action)),
@@ -2710,7 +2710,7 @@ try {
 	rmSync(staleHandoffCwd, { recursive: true, force: true });
 	tempHooks.session_start?.({}, ctx);
 	assert.ok(activeTools.includes("ask_user"));
-	assert.ok(activeTools.includes("work_report_improvement"));
+	assert.ok(!activeTools.includes("work_report_improvement"));
 	assert.ok(!activeTools.includes("work_goal_complete"));
 	assert.ok(
 		!activeTools.includes("work_goal_human_decision"),
@@ -5502,13 +5502,17 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		ctx,
 	);
 	assert.deepEqual(plainPauseResult, { action: "handled" });
-	assert.equal(statuses["work-goal"], "paused");
-	assert.equal(aborts, abortsBeforePlainPause + 1);
+	assert.match(statuses["work-goal"], /^active/);
+	assert.equal(aborts, abortsBeforePlainPause);
 	assert.equal(
 		sent.length,
 		sentBeforePlainPause,
 		"bare pause does not queue another autonomous continuation",
 	);
+	await tempHooks.turn_end({}, ctx);
+	assert.equal(statuses["work-goal"], "paused");
+	assert.equal(aborts, abortsBeforePlainPause + 1);
+	await settle();
 	await invoke("work-goal", "resume", ctx);
 	const sentBeforePrefixedPause = sent.length;
 	const prefixedPauseResult = await tempHooks.input?.(
@@ -5516,12 +5520,15 @@ Selected WorkItem: work-7.1 Preserve workflow state`;
 		ctx,
 	);
 	assert.deepEqual(prefixedPauseResult, { action: "handled" });
-	assert.equal(statuses["work-goal"], "paused");
+	assert.match(statuses["work-goal"], /^active/);
 	assert.equal(
 		sent.length,
 		sentBeforePrefixedPause,
 		"prefixed pause does not queue another autonomous continuation",
 	);
+	await tempHooks.turn_end({}, ctx);
+	assert.equal(statuses["work-goal"], "paused");
+	await settle();
 
 	writeFileSync(
 		path.join(cwd, ".pi", "work-orchestrator-state.json"),

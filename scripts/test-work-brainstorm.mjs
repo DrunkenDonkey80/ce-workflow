@@ -307,16 +307,11 @@ try {
 		path.join(cwd, ".pi", "settings.json"),
 		JSON.stringify({ workOrchestrator: { preBrainstormAdvisors: true } }),
 	);
-	const researchedHandoff = brainstormHandoffPrompt(standalone, cwd);
+	const legacyHandoff = brainstormHandoffPrompt(standalone, cwd);
 	assert(
-		researchedHandoff.includes("Optional pre-brainstorm research gate") &&
-			researchedHandoff.includes("work-advisor") &&
-			researchedHandoff.includes(
-				"feed that synthesis into the main private brainstorm",
-			) &&
-			researchedHandoff.indexOf("Optional pre-brainstorm research gate") <
-				researchedHandoff.indexOf("Advisor critic gate"),
-		"optional configured advisors research the clarified request before the main brainstorm artifact",
+		!legacyHandoff.includes("Optional pre-brainstorm research gate") &&
+			legacyHandoff.includes("Advisor critic gate"),
+		"legacy pre-brainstorm settings are ignored and only the completed artifact is reviewed",
 	);
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), "{}\n");
 	writeFileSync(

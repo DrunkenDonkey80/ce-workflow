@@ -492,24 +492,8 @@ try {
 	);
 	assert(
 		activeTools.includes("unrelated_tool") &&
-			activeTools.includes("work_report_improvement"),
-		"enabled reporting adds only its tool",
-	);
-	const toolResult = await tools.work_report_improvement.execute(
-		"call",
-		report,
-		undefined,
-		undefined,
-		{
-			cwd: consumer,
-			sessionManager: { getSessionId: () => "session-fixture" },
-		},
-	);
-	assert(
-		toolResult.details.taskId &&
-			toolResult.details.epicId &&
-			toolResult.details.bundle,
-		"tool returns bounded task, epic, and bundle details",
+			!activeTools.includes("work_report_improvement"),
+		"legacy reporting flags do not activate the tool",
 	);
 	writeFileSync(
 		path.join(consumer, ".pi", "settings.json"),
@@ -525,16 +509,19 @@ try {
 	assert(
 		activeTools.includes("unrelated_tool") &&
 			!activeTools.includes("work_report_improvement"),
-		"disabled reporting removes only its tool",
+		"reporting stays disabled",
 	);
 	await tools.work_report_improvement
 		.execute("stale", report, undefined, undefined, { cwd: consumer })
 		.then(
 			() => assert(false, "stale invocation must fail"),
 			(error) =>
-				assert(/disabled/.test(error.message), "stale invocation fails closed"),
+				assert(
+					/explicit orchestrator maintenance/.test(error.message),
+					"stale invocation fails closed",
+				),
 		);
-	console.log("ok - work improvement reporting fixtures pass");
+	process.stdout.write("ok - work improvement reporting fixtures pass\n");
 } finally {
 	rmSync(root, { recursive: true, force: true });
 }

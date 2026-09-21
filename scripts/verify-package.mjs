@@ -518,6 +518,8 @@ const tests = [
 				"test-work-store-performance.mjs",
 				"test-work-remove-beads.mjs",
 				"test-work-remove-beads-windows.mjs",
+				// Provider-backed smoke: run explicitly; default verification must stay deterministic.
+				"test-work-child-auth-live.mjs",
 			].includes(name),
 	),
 	...listed("scripts").filter((name) =>

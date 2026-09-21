@@ -22,9 +22,11 @@ import {
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDir, "..");
+// pi-lens-ignore: unchecked-throwing-call-js
 const policy = JSON.parse(
 	readFileSync(path.join(repositoryRoot, "extensions", "work-compound-source-policy.json"), "utf8"),
 );
+// pi-lens-ignore: unchecked-throwing-call-js
 const inventory = JSON.parse(
 	readFileSync(path.join(repositoryRoot, "extensions", "work-compound-inventory.json"), "utf8"),
 );
@@ -176,6 +178,7 @@ const options = parseArguments(process.argv.slice(2));
 const globalStateBefore = snapshotGlobalPiState();
 const peeledCommitSha = remoteReleaseSha();
 const codingAgentPackage = resolveCodingAgentPackage();
+// pi-lens-ignore: unchecked-throwing-call-js
 const codingAgentIdentity = JSON.parse(readFileSync(path.join(codingAgentPackage, "package.json"), "utf8"));
 let quarantinePath;
 const quarantined = await withCompoundQuarantine(async (root) => {

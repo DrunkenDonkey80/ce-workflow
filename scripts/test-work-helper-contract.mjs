@@ -185,6 +185,59 @@ try {
 	assert.match(createdWithNotes.notes_tail, /source plan: PLAN\.md/);
 	assert.deepEqual(createdWithNotes.verificationContract, contract);
 	assert.deepEqual(createdWithNotes.verificationStatus.missing, ["check"]);
+	mutateStore(cwd, (store) => {
+		createWorkItem(store, {
+			id: "E-CAP",
+			type: "epic",
+			status: "open",
+			title: "Slice budget roadmap",
+		});
+		for (const index of [1, 2, 3])
+			createWorkItem(store, {
+				id: `E-CAP.${index}`,
+				type: "task",
+				status: "open",
+				title: `Slice ${index}`,
+				parentId: "E-CAP",
+			});
+		return store.items["E-CAP"];
+	});
+	const previousChildAgent = process.env.PI_SUBAGENT_CHILD_AGENT;
+	process.env.PI_SUBAGENT_CHILD_AGENT = "work-planner";
+	try {
+		assert.match(
+			failure("work-create", "Fourth slice", "--parent", "E-CAP"),
+			/slice budget exceeded/,
+			"a planner child cannot exceed the finite backlog cap",
+		);
+		assert.ok(
+			JSON.parse(
+				run(
+					"work-create",
+					"Self-improvement report",
+					"--parent",
+					"E-CAP",
+					"--label",
+					"report",
+				),
+			).id,
+			"report items are not executable slices and stay uncapped",
+		);
+		assert.ok(
+			JSON.parse(
+				run("work-create", "Fourth slice", "--parent", "E-CAP", "--exhaustive"),
+			).id,
+			"an explicit exhaustive request still allows more slices",
+		);
+	} finally {
+		if (previousChildAgent === undefined)
+			delete process.env.PI_SUBAGENT_CHILD_AGENT;
+		else process.env.PI_SUBAGENT_CHILD_AGENT = previousChildAgent;
+	}
+	assert.ok(
+		JSON.parse(run("work-create", "Fifth slice", "--parent", "E-CAP")).id,
+		"ordinary actor-driven creation is never capped",
+	);
 	const visualContract = {
 		version: 1,
 		required: [
@@ -1391,7 +1444,9 @@ try {
 		"tracked owner metadata gets a separate store-only commit",
 	);
 
-	const stateOnlyOwner = mkdtempSync(path.join(tmpdir(), "work-helper-state-only-"));
+	const stateOnlyOwner = mkdtempSync(
+		path.join(tmpdir(), "work-helper-state-only-"),
+	);
 	const stateOnlyExecution = mkdtempSync(
 		path.join(tmpdir(), "work-helper-state-execution-"),
 	);

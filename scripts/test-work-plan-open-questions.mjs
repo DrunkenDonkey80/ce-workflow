@@ -261,7 +261,7 @@ try {
 			children.every(
 				(item) =>
 					!item.labels.includes("wo:planning") &&
-					item.labels.includes("wo:slice-planned"),
+					!item.labels.includes("wo:slice-planned"),
 			) &&
 			!materialized.handoffPrompt?.includes("Advisor critic gate"),
 		`executable plan units materialize as planned work without another planner or advisor gate: ${JSON.stringify({ materialized, children })}`,
@@ -275,7 +275,6 @@ try {
 	);
 	assert(
 		children[1].acceptance.includes("DES-1") &&
-			children[1].notes.join("\n").includes("design-criteria: DES-1") &&
 			children[1].documentLinks.designApproval === designAuthority.approvalPath &&
 			children[1].implementationScope.nonGoals.includes(
 				"Copying or executing OpenDesign prototype code",

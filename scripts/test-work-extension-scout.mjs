@@ -778,21 +778,20 @@ try {
 	const { executeOrchestratorAction } = await import(
 		`../extensions/work-models.ts?scout=${Date.now()}`
 	);
-	const unavailable = await executeOrchestratorAction(
+	const explicitStatus = await executeOrchestratorAction(
 		"work-extension-scout",
-		"",
+		"status",
 		{ cwd, ui: { notify() {} } },
 		{},
 	);
 	assert(
-		unavailable === false,
-		"command is unavailable unless self-improving is enabled",
+		explicitStatus && explicitStatus.error == null,
+		"explicit scout commands do not require a legacy self-improving flag",
 	);
 
 	writeFileSync(
 		path.join(agentDir, "settings.json"),
 		JSON.stringify({
-			workResume: { selfImproving: true },
 			packages: [
 				"git:https://secret@example.com/acme/private?token=bad",
 				"C:/Users/example/private-extension",

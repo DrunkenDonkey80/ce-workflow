@@ -20,10 +20,10 @@ After drafting, self-audit for missing source decisions, weak or subjective proo
 
 ## Artifact and Open Question Gate
 
-Write the caller-requested Markdown plan under `docs/plans/`. A master plan includes a goal capsule, product and planning contracts, stable implementation units with Goal/Files/Approach/Test scenarios/Verification, scope boundaries, risks, sources, a verification contract, and definition of done. A slice plan stays compact and contains exactly the caller-requested implementation unit. Set implementation-ready metadata when producing a complete software plan.
+Write the caller-requested Markdown plan under `docs/plans/`. A master plan includes a goal capsule, product and planning contracts, stable implementation units with Goal/Files/Approach/Test scenarios/Verification, scope boundaries, risks, sources, a verification contract, and definition of done. Set implementation-ready metadata when producing a complete software plan.
 
 Keep unresolved questions explicit and classify blocking versus deferred. Do not bootstrap, attach, or hand implementation a plan with blocking open questions. Run the caller-provided work-helper bootstrap command when present; if its Open Question Gate blocks, ask each reported decision through the platform's blocking question UI, fold the answer into the plan, and rerun the same helper.
 
 ## Actor-visible handoff
 
-Follow the caller's exact handoff: master planning returns the hardened plan and coded roadmap/initiative next action; slice planning appends the requested `wo:slice-plan` note and stops for the next resume. Do not show the legacy post-generation menu, invoke legacy `ce-work`, or invent a different next command.
+Follow the caller's exact handoff: master planning returns the hardened plan and coded roadmap/initiative next action. Do not show the legacy post-generation menu, invoke legacy `ce-work`, or invent a different next command.

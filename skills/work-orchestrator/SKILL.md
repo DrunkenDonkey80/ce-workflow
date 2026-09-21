@@ -61,11 +61,11 @@ If it reports independent review required, use its complete labelled reviewer ha
 - **migrate** — exact `work-migrator`; source and branch inspection is read-only.
 - **init/status/report/usage/telemetry/roadmap/add/pause/finish** — deterministic extension paths; no agent.
 
-## Opt-in workflow improvement reporting
+## Explicit workflow maintenance
 
-This is off by default behind `workResume.selfImproving`. When enabled, `work_report_improvement` is available for an explicit, concrete ce-workflow problem with observation, expected behavior, impact, and one or more local logs. It copies accepted evidence into ignored local storage and creates one child task under the ce-workflow checkout's `Self-improving` roadmap.
+Ordinary project work never activates self-improvement reporting, injects improvement duties, or exposes `work_report_improvement`. Legacy `workResume.selfImproving` settings are ignored.
 
-Reporting never analyzes terminal workflows, launches an improver, changes, benchmarks, commits, pushes, reverts, or waits on the ce-workflow source. Source resolution is `workImprovement.sourceCheckout`, then `CE_WORKFLOW_SOURCE_DIR`, then the package checkout; a maintainer processes report tasks later through normal work-item flow.
+Maintenance runs only after an explicit user action such as `/wo → Improve orchestrator`, `/wo monitor`, `/wo → Scout Pi extensions`, or `/wo → Catch up packages`. These commands keep their existing safety and approval gates; nothing starts automatically from project development.
 
 ## Handoff hygiene
 

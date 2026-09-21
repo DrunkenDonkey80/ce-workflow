@@ -21,7 +21,6 @@
     "extensions/private-workflows/pov.md",
     "extensions/private-workflows/provenance.json",
     "extensions/private-workflows/review.md",
-    "extensions/private-workflows/simplify.md",
     "extensions/work-compound-inventory.json",
     "extensions/work-compound-source-policy.json",
     "extensions/work-compound-source.js",
@@ -76,14 +75,6 @@
       "artifacts": "review findings and PASS evidence",
       "failure": "do not commit or close",
       "actorVisibleOutcome": "actionable findings or review PASS"
-    },
-    "ce-simplify-code": {
-      "trigger": "non-trivial simplify-before-review gate",
-      "decisions": "remove duplication/dead flexibility without behavior change",
-      "toolBoundary": "scoped implementation diff",
-      "artifacts": "simplified source diff",
-      "failure": "leave verified behavior unchanged",
-      "actorVisibleOutcome": "smaller equivalent implementation"
     },
     "ce-test-browser": {
       "trigger": "UI-diff browser verification gate",

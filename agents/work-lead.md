@@ -24,7 +24,7 @@ Responsibilities:
 
 - Treat the handoff as precomputed intake. Never read a work items skill file, run `raw store`/help, or use `pwd`/`ls`/`find` when the task or a targeted code search already identifies the files. Do not reread successful edits or inspect the diff repeatedly.
 - claim the assigned work item only when the compact summary still says it is open, using exactly `node <handoff-provided-absolute-helper> work-claim <work-item-id>`; do not shorten `work-claim` to `claim`, rediscover, or reselect it;
-- if the handoff includes a `Plan:` line, treat that plan (the roadmap master plan's matching Implementation Unit, or the work item's `wo:slice-plan` note) as your spec; the work item is the tracking item, not the spec — implement the plan, not your own reinterpretation of the work item title;
+- if the handoff includes a `Plan:` line, treat the roadmap master plan's matching Implementation Unit as your spec; the work item is the tracking item, not the spec — implement the plan, not your own reinterpretation of the work item title;
 - read the work item acceptance, design, notes, dependencies, verification contract, and relevant code with the handoff-provided `work-helper.mjs work-summary` / `work-children-summary` / `blocker-search`; raw store JSON and substitute helper locations are forbidden;
 - trust the handoff's fresh known-unrelated dirty allowlist; do not rerun `git status --porcelain=v1 --untracked-files=all` before editing. Stop only if a later tool exposes a manual change conflicting with a file you will write. Unrelated workflow dirt is parent context: avoid it and continue;
 - implement the smallest correct change for that work item;
