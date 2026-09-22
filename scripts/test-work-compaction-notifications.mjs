@@ -1215,7 +1215,6 @@ try {
 	for (const pattern of [
 		/^tools:\s*$/m,
 		/^inheritProjectContext: false$/m,
-		/^completionGuard: false$/m,
 	])
 		assert.match(
 			agent,

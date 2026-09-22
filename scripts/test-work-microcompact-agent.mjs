@@ -86,6 +86,7 @@ function waitFor(predicate, label, timeout = 20_000) {
 }
 
 function textOf(message) {
+	if (typeof message?.content === "string") return message.content;
 	return (message?.content ?? [])
 		.filter((part) => part.type === "text")
 		.map((part) => part.text)
@@ -344,24 +345,21 @@ async function runChild(scenario) {
 		settingsManager,
 	});
 	const notices = [];
-	const uiContext = new Proxy(
-		{},
-		{
-			get: (_target, property) => {
-				if (property === "notify")
-					return (message) => {
-						notices.push(message);
-						if (process.env.CE_MICROCOMPACT_DEBUG) console.error(message);
-					};
-				if (["select", "input", "editor", "custom"].includes(property))
-					return async () => undefined;
-				if (property === "confirm") return async () => false;
-				if (property === "onTerminalInput") return () => () => {};
-				if (property === "getEditorText") return () => "";
-				return () => {};
-			},
+	const uiContext = {
+		notify: (message) => {
+			notices.push(message);
+			if (process.env.CE_MICROCOMPACT_DEBUG) console.error(message);
 		},
-	);
+		select: async () => undefined,
+		input: async () => undefined,
+		editor: async () => undefined,
+		custom: async () => undefined,
+		confirm: async () => false,
+		onTerminalInput: () => () => {},
+		getEditorText: () => "",
+		setEditorText: () => {},
+		setWidget: () => {},
+	};
 	await session.bindExtensions({ mode: "rpc", uiContext });
 
 	let compactions = 0;
@@ -404,6 +402,7 @@ async function runChild(scenario) {
 		(message) =>
 			message.role === "custom" && message.customType === "work-context-fill",
 	).length;
+	assert.deepEqual(ticks(cwd), [], "fixture warmup must not emit tool calls");
 	const requestsBeforeWork = modelRequests;
 	if (scenario === "idle") {
 		await session.prompt("/__test-f8");
@@ -472,7 +471,11 @@ async function runParent() {
 					cwd,
 					encoding: "utf8",
 					timeout: 90_000,
-					env: { ...process.env, CE_MICROCOMPACT_PI_ROOT: piRoot },
+					env: {
+						...process.env,
+						CE_MICROCOMPACT_PI_ROOT: piRoot,
+						PI_CODING_AGENT_DIR: path.join(cwd, "agent"),
+					},
 				},
 			);
 			const line = output
@@ -511,6 +514,7 @@ async function runParent() {
 		);
 		assert.equal(idle.f8At, undefined);
 
+		assert.equal(direct.requestsBeforeWork, 1, "only warmup runs before work");
 		assert.equal(direct.f8At, 3, "direct work invoked F8 after tick 3");
 		assert.deepEqual(
 			direct.ticks,

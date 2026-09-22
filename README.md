@@ -78,10 +78,13 @@ master plans; Auto chooses Wide without another prompt. Wide runs three fresh,
 mutually isolated `work-divergent` branches under fixed cognitive frames, forms
 the ordinary baseline independently, then merges only constraint-compatible
 candidates before the configured advisors critique the result. Generator
-branches reuse the enabled Advisor 1–3 model selections round-robin; with only
+branches use the dedicated **Brainstorm / Ideate** model selection; with
 Inherit configured, all three still run as separate contexts on the current
-model. Existing `wo:divergent-analysis` provenance is reused instead of
-regenerating it.
+model. When the optional `chatgpt_consult` tool is installed, that menu and the
+Advisor 1–3 menus also offer **ChatGPT Web**. The creative selection uses
+isolated temporary chats for brainstorming and ideation, while advisor
+selections use persistent advisor mode for critique. Existing
+`wo:divergent-analysis` provenance is reused instead of regenerating it.
 
 ## Background verifiers
 

@@ -9,7 +9,6 @@ const prompt = readFileSync(
 );
 
 for (const requirement of [
-	"completionGuard: false",
 	"bash, write, contact_supervisor",
 	"labels, notes, or authoritative handoff as a planning intake",
 	"requested date-prefixed `docs/plans/*-plan.md` file",

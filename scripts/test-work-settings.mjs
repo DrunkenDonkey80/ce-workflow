@@ -389,6 +389,7 @@ try {
 	delete process.env.PI_ASK_USER_CONTEXT_EXPANDED;
 	mod.default({
 		on: () => {},
+		getAllTools: () => [{ name: "chatgpt_consult" }],
 		registerCommand: (name, config) => {
 			commands[name] = config;
 		},
@@ -494,8 +495,11 @@ try {
 	assert(notices.length === 0, "escape exits without notify");
 	assert(
 		modelRows.includes(
-			"[text]Model Brainstorm/plan/migration: [Inherit: High] ›[/text]",
+			"[text]Model Plan / Migration: [Inherit: High] ›[/text]",
 		) &&
+			modelRows.includes(
+				"[text]Model Brainstorm / Ideate: [Inherit: High] ›[/text]",
+			) &&
 			modelRows.includes("[muted]   -> Backup: [None] ›[/muted]") &&
 			modelRows.includes("[text]Model Work: [Inherit: Medium] ›[/text]"),
 		"task model rows are white with indented light-gray backups",
@@ -1108,8 +1112,41 @@ try {
 		mod.workOrchSettings(cwd).advisorEnabled.advisor2 === false,
 		"advisor none disables its run slot",
 	);
+	await invoke("work-settings", "", {
+		...ctx,
+		ui: customUi([
+			{ expectText: "Settings: Global", key: "\t" },
+			{ target: "Model Advisor 2:", key: "enter" },
+			{
+				expectInitial: "None",
+				target: "ChatGPT Web",
+				key: "enter",
+			},
+			{ expectInitial: "Model Advisor 2: [ChatGPT Web]", key: "escape" },
+		]),
+	});
+	assert(
+		mod.workOrchSettings(cwd).advisorEnabled.advisor2 === true &&
+			readSettings().workOrchestrator.advisorSources.advisor2 === "chatgpt-web",
+		"installed ChatGPT Web is selectable as an advisor source",
+	);
+	await invoke("work-settings", "", {
+		...ctx,
+		ui: customUi([
+			{ expectText: "Settings: Global", key: "\t" },
+			{ target: "Model Brainstorm / Ideate:", key: "enter" },
+			{ target: "ChatGPT Web", key: "enter" },
+			{ key: "escape" },
+		]),
+	});
+	assert(
+		readSettings().workOrchestrator.creativeSource === "chatgpt-web",
+		"brainstorm and ideate have a dedicated ChatGPT Web source selector",
+	);
 
 	settings = readSettings();
+	delete settings.workOrchestrator.advisorSources;
+	delete settings.workOrchestrator.creativeSource;
 	settings.workOrchestrator.advisorEnabled = {
 		advisor: true,
 		advisor2: true,
@@ -1117,6 +1154,7 @@ try {
 	};
 	settings.subagents = {
 		agentOverrides: {
+			"work-divergent": { model: "test/generator-b" },
 			"work-advisor": { model: "test/generator-a" },
 			"work-advisor-2": { model: "test/generator-b" },
 			"work-advisor-3": { model: "test/generator-c" },
@@ -1140,9 +1178,29 @@ try {
 			creativeStep.includes("async:true") &&
 			creativeStep.includes("bg_wait with all:true") &&
 			creativeStep.includes("wo:divergent-analysis") &&
-			creativeStep.includes("test/generator-c"),
+			creativeStep.includes("test/generator-b"),
 		"creative sidecar uses unique stable-key workflowScript branches and preserves provenance",
 	);
+	settings.workOrchestrator.advisorSources = { advisor2: "chatgpt-web" };
+	settings.workOrchestrator.creativeSource = "chatgpt-web";
+	writeSettings(settings);
+	const chatgptCreative = mod.creativeSidecarStep(cwd, "brainstorm artifact");
+	const chatgptAdvisor = mod.advisorCriticStep(cwd, "brainstorm artifact");
+	const chatgptIdeate = mod.ideateSidecarStep(cwd, "ideation artifact");
+	assert(
+		(chatgptCreative.match(/work-divergent/g) ?? []).length === 0 &&
+			(chatgptCreative.match(/mode:"temp"/g) ?? []).length === 1 &&
+			chatgptCreative.includes("chatgpt_consult") &&
+			chatgptCreative.includes('mode:"temp"') &&
+			chatgptAdvisor.includes("call chatgpt_consult directly") &&
+			chatgptAdvisor.includes('mode:"advisor"') &&
+			chatgptIdeate.includes("chatgpt_consult") &&
+			chatgptIdeate.includes('mode:"temp"'),
+		"ChatGPT Web replaces only its selected advisor branch in brainstorm, critique, and ideate prompts",
+	);
+	delete settings.workOrchestrator.advisorSources;
+	delete settings.workOrchestrator.creativeSource;
+	writeSettings(settings);
 	const researchPrompt = mod.researchHandoffPrompt(cwd, "Which path is best?");
 	const researchKeys = researchPrompt.match(/"key":"divergent-\d+"/g) ?? [];
 	assert(
@@ -1160,8 +1218,8 @@ try {
 	);
 	assert(
 		JSON.stringify(healthTargets.map((target) => target.model)) ===
-			JSON.stringify(["test/generator-a", "test/generator-b", "test/generator-c"]),
-		"brainstorm health checks each configured advisor model once",
+			JSON.stringify(["test/generator-b"]),
+		"brainstorm health checks only the dedicated creative model",
 	);
 	const healthNotices = [];
 	const healthWidgets = [];
@@ -1202,17 +1260,17 @@ try {
 	);
 	assert(
 		healthWidgets.some(
-			({ value }) => value?.[0] === "Checking agents... (0/3)",
+			({ value }) => value?.[0] === "Checking agents... (0/1)",
 		) &&
-			healthWidgets.some(({ value }) =>
-				/^Checking agents\.\.\. \([1-3]\/3\)$/u.test(value?.[0] ?? ""),
+			healthWidgets.some(
+				({ value }) => value?.[0] === "Checking agents... (1/1)",
 			) &&
 			healthWidgets.at(-1)?.value === undefined,
 		"brainstorm preflight shows and clears live per-agent progress",
 	);
 	assert(
 		healthNotices.some(
-			({ message }) => message === "Agent check complete (3/3).",
+			({ message }) => message === "Agent check complete (1/1).",
 		),
 		"brainstorm preflight reports completion before opening the prompt",
 	);
@@ -1271,9 +1329,9 @@ try {
 		},
 	);
 	assert(
-		(offlineHandoff.match(/work-divergent/g) ?? []).length === 2 &&
+		(offlineHandoff.match(/work-divergent/g) ?? []).length === 0 &&
 			!offlineHandoff.includes("work-advisor-2"),
-		"continuing excludes failed models from divergent and advisor launches",
+		"continuing excludes the failed creative model and advisor launches",
 	);
 	const allAdvisors = mod.advisorCriticStep(cwd, "master plan", "all");
 	for (const agent of ["work-advisor", "work-advisor-2", "work-advisor-3"])
@@ -1338,8 +1396,8 @@ try {
 			mod
 				.selectedAgentHealthTargets(cwd, "test/control", "brainstorm")
 				.map((target) => target.model),
-		) === JSON.stringify(["test/control"]),
-		"disabled advisors still probe inherited creative divergence",
+		) === JSON.stringify(["test/generator-b"]),
+		"disabled advisors do not affect the dedicated creative model",
 	);
 	settings.workOrchestrator.backgroundVerifiers = {
 		__inherit_model__: {

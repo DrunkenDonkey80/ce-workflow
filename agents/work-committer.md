@@ -7,7 +7,6 @@ systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
 defaultContext: fresh
-completionGuard: false
 ---
 
 You are `work-committer`, the commit and close gate for the native work-item work orchestrator.

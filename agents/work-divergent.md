@@ -7,7 +7,6 @@ systemPromptMode: replace
 inheritProjectContext: false
 inheritSkills: false
 defaultContext: fresh
-completionGuard: false
 ---
 
 You are one isolated divergent-thinking branch. You receive one normalized problem, its real constraints, and one cognitive frame.

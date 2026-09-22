@@ -247,6 +247,7 @@ const WORK_STATE_FILE = "work-orchestrator-state.json";
 const WORK_SHORTCUT_STATUS = "/wo Orchestrator · F8 microcompact · F9 Fleet";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
+const CHATGPT_WEB_SOURCE = "chatgpt-web";
 const DEFAULT_THINKING = "__default_thinking__";
 const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 2;
@@ -421,11 +422,20 @@ const SLOTS = [
 	{
 		key: "plan",
 		kind: "role",
-		label: "Brainstorm/plan/migration",
+		label: "Plan / Migration",
 		agents: ["work-planner", "work-migrator"],
 		defaultThinking: "high",
 		description:
 			"Creating or importing roadmaps and slicing executable native work-item store",
+	},
+	{
+		key: "creative",
+		kind: "creative",
+		label: "Brainstorm / Ideate",
+		agents: ["work-divergent"],
+		defaultThinking: "high",
+		description:
+			"Isolated idea generation; may use ChatGPT Web without changing planning",
 	},
 	{
 		key: "work",
@@ -505,6 +515,7 @@ const THINKING_LEVELS = [
 const EFFORT_PROFILES = {
 	low: {
 		plan: "low",
+		creative: "high",
 		work: "low",
 		lead: "high",
 		debug: "medium",
@@ -518,6 +529,7 @@ const EFFORT_PROFILES = {
 	},
 	medium: {
 		plan: "medium",
+		creative: "high",
 		work: "medium",
 		lead: "high",
 		debug: "high",
@@ -531,6 +543,7 @@ const EFFORT_PROFILES = {
 	},
 	high: {
 		plan: "high",
+		creative: "high",
 		work: "high",
 		lead: "high",
 		debug: "high",
@@ -544,6 +557,7 @@ const EFFORT_PROFILES = {
 	},
 	max: {
 		plan: "max",
+		creative: "max",
 		work: "max",
 		lead: "high",
 		debug: "max",
@@ -658,6 +672,14 @@ function isAdvisorSlot(slot) {
 	return slot?.kind === "advisor";
 }
 
+function isCreativeSlot(slot) {
+	return slot?.kind === "creative";
+}
+
+function supportsChatgptWeb(slot) {
+	return isAdvisorSlot(slot) || isCreativeSlot(slot);
+}
+
 function advisorEnabledForSlot(settings, slot) {
 	return (
 		settings.workOrchestrator?.advisorEnabled?.[slot.key] ?? slot.defaultEnabled
@@ -668,6 +690,38 @@ function setAdvisorEnabled(settings, slot, enabled) {
 	const block = workOrchBlock(settings);
 	block.advisorEnabled ??= {};
 	block.advisorEnabled[slot.key] = Boolean(enabled);
+}
+
+function slotSourceForSlot(settings, slot) {
+	const source = isCreativeSlot(slot)
+		? settings.workOrchestrator?.creativeSource
+		: settings.workOrchestrator?.advisorSources?.[slot.key];
+	return supportsChatgptWeb(slot) && source === CHATGPT_WEB_SOURCE
+		? CHATGPT_WEB_SOURCE
+		: "model";
+}
+
+function setSlotSource(settings, slot, source) {
+	const block = workOrchBlock(settings);
+	const value = source === CHATGPT_WEB_SOURCE ? CHATGPT_WEB_SOURCE : "model";
+	if (isCreativeSlot(slot)) block.creativeSource = value;
+	else {
+		block.advisorSources ??= {};
+		block.advisorSources[slot.key] = value;
+	}
+}
+
+function chatgptConsultAvailable() {
+	try {
+		return Boolean(
+			workExtensionPi?.getAllTools?.().some(
+				(tool) =>
+					(typeof tool === "string" ? tool : tool?.name) === "chatgpt_consult",
+			),
+		);
+	} catch {
+		return false;
+	}
 }
 
 function configuredAdvisorSlots(settings, usage = "all") {
@@ -4259,29 +4313,69 @@ function advisorCriticStep(
 ) {
 	const settings = readEffectiveSettings(cwd);
 	const offline = new Set(offlineModels);
-	const slots = configuredAdvisorSlots(settings, usage).filter(
-		(slot) =>
-			!offline.has(
-				configuredModelId(slotSelection(slot, settings).model, currentModel),
-			),
-	);
-	if (!slots.length) return "";
-	const agents = slots.map((slot) => slot.agents[0]);
-	const first = agents[0];
 	const charters = [
 		"requirements/evidence auditor: challenge missing constraints, unsupported claims, and weak proof",
 		"builder/on-call critic: challenge feasibility, sequencing, operability, and recovery traps",
 		"adversarial simplifier: challenge unnecessary complexity, hidden assumptions, and cheaper alternatives",
 	];
-	const launch = workPerformanceSettings(cwd).parallelAdvisors
-		? `launch exactly one parallel subagent call via workflowScript using runs.all with context:fresh and one stable-key child for each configured agent: ${agents.join(", ")}`
-		: `launch these configured agents one at a time with separate context:fresh single-agent calls, waiting for each before starting the next: ${agents.join(", ")}`;
-	return [
-		`Advisor critic gate (read-only): after the exact ${target} path or WorkItem note is known, ${launch}. Use only these packaged work-advisor roles; never invoke ce-doc-review.`,
-		`Give every advisor the same exact ${target}, authoritative sources, and review contract, plus its independent charter: ${agents.map((agent, index) => `${agent} = ${charters[index]}`).join("; ")}. Require concrete locations and smallest fixes. Advisors must not edit files, mutate WorkItems, or launch subagents.`,
+	const advisors = configuredAdvisorSlots(settings, usage)
+		.map((slot, index) => ({
+			slot,
+			agent: slot.agents[0],
+			charter: charters[index],
+			source: slotSourceForSlot(settings, slot),
+			model: slotSelection(slot, settings).model,
+		}))
+		.filter(({ source, model }) =>
+			source === CHATGPT_WEB_SOURCE
+				? chatgptConsultAvailable()
+				: !offline.has(configuredModelId(model, currentModel)),
+		);
+	if (!advisors.length) return "";
+	const native = advisors.filter(
+		({ source }) => source !== CHATGPT_WEB_SOURCE,
+	);
+	const web = advisors.filter(({ source }) => source === CHATGPT_WEB_SOURCE);
+	const first =
+		advisors[0].source === CHATGPT_WEB_SOURCE
+			? "ChatGPT Web via chatgpt_consult"
+			: advisors[0].agent;
+	const lines = [`Advisor critic gate (read-only): after the exact ${target} path or WorkItem note is known:`];
+	if (native.length) {
+		const agents = native.map(({ agent }) => agent);
+		const launch = workPerformanceSettings(cwd).parallelAdvisors
+			? `launch exactly one parallel subagent call via workflowScript using runs.all with context:fresh and one stable-key child for each configured agent: ${agents.join(", ")}`
+			: `launch these configured agents one at a time with separate context:fresh single-agent calls, waiting for each before starting the next: ${agents.join(", ")}`;
+		lines.push(`${launch}. Use only these packaged work-advisor roles; never invoke ce-doc-review.`);
+	}
+	if (web.length)
+		lines.push(
+			`For each selected ChatGPT Web advisor (${web.map(({ slot }) => slot.label).join(", ")}), call chatgpt_consult directly with mode:"advisor". Put the exact ${target}, authoritative sources, review contract, and that slot's charter in the question; treat the returned answer as that advisor's read-only review.`,
+		);
+	lines.push(
+		`Give every advisor the same exact ${target}, authoritative sources, and review contract, plus its independent charter: ${advisors.map(({ source, agent, slot, charter }) => `${source === CHATGPT_WEB_SOURCE ? `${slot.label} (ChatGPT Web)` : agent} = ${charter}`).join("; ")}. Require concrete locations and smallest fixes. Advisors must not edit files, mutate WorkItems, or launch subagents.`,
 		"Wait for all configured advisors, deduplicate their findings, and apply only authority-grounded fixes. Complete this gate before any plan bootstrap, slicing, or implementation. Convert any unresolved blocking gap into a decision/blocker WorkItem before proceeding; an unavailable advisor is recorded and not replaced or retried.",
 		`If fixes changed the artifact, decide whether one focused re-review by ${first} is warranted. Re-run it once only for substantive cross-section changes, ambiguity resolution, or a fix that could create a new inconsistency; skip re-review for mechanical wording/traceability fixes. Never start a recursive review loop.`,
-	].join("\n");
+	);
+	return lines.join("\n");
+}
+
+function divergentSources(cwd, offlineModels = [], currentModel = "") {
+	const settings = readEffectiveSettings(cwd);
+	const offline = new Set(offlineModels);
+	const slot = slotByKey("creative");
+	const source = slotSourceForSlot(settings, slot);
+	const model = slotSelection(slot, settings).model;
+	return DIVERGENT_FRAMES.map((frame, index) => ({
+		frame,
+		key: `divergent-${index + 1}`,
+		source,
+		model,
+	})).filter(() =>
+		source === CHATGPT_WEB_SOURCE
+			? chatgptConsultAvailable()
+			: !offline.has(configuredModelId(model, currentModel)),
+	);
 }
 
 function divergentTaskModels(cwd) {
@@ -4299,15 +4393,11 @@ function creativeSidecarStep(
 	offlineModels = [],
 	currentModel = "",
 ) {
-	const models = divergentTaskModels(cwd);
-	const offline = new Set(offlineModels);
-	const tasks = DIVERGENT_FRAMES.map((frame, index) => ({
-		frame,
-		model: models[index],
-	}))
-		.filter(({ model }) => !offline.has(configuredModelId(model, currentModel)))
-		.map(({ frame, model }, index) => ({
-			key: `divergent-${index + 1}`,
+	const branches = divergentSources(cwd, offlineModels, currentModel);
+	const tasks = branches
+		.filter(({ source }) => source !== CHATGPT_WEB_SOURCE)
+		.map(({ frame, key, model }) => ({
+			key,
 			agent: "work-divergent",
 			...(model && model !== INHERIT_MODEL ? { model } : {}),
 			task: [
@@ -4316,12 +4406,23 @@ function creativeSidecarStep(
 				"Generate four non-obvious candidates as the agent contract requires.",
 			].join("\n"),
 		}));
-	if (!tasks.length) return "";
+	const web = branches
+		.filter(({ source }) => source === CHATGPT_WEB_SOURCE)
+		.map(({ frame, key }) => ({ key, frame }));
+	if (!tasks.length && !web.length) return "";
 	return [
-		`Creative sidecar gate for ${target}: finish required clarification and source reading first, then launch exactly one subagent workflowScript with async:true, context:fresh and runs.all over these stable-key child templates: ${JSON.stringify(tasks)}. Prepend the same normalized problem and real constraints to every child task; never include sibling output.`,
-		"While those branches run, form the normal baseline independently. Then call bg_wait with all:true, cluster duplicates, reject constraint violations, and merge only useful non-obvious candidates into the artifact or planning note. Preserve provenance as a compact `wo:divergent-analysis` section naming each frame and model. A failed branch is recorded and not retried.",
+		`Creative sidecar gate for ${target}: finish required clarification and source reading first.`,
+		tasks.length
+			? `Launch exactly one subagent workflowScript with async:true, context:fresh and runs.all over these stable-key child templates: ${JSON.stringify(tasks)}. Prepend the same normalized problem and real constraints to every child task; never include sibling output.`
+			: "",
+		web.length
+			? `For these ChatGPT Web branches, call chatgpt_consult once per frame with mode:"temp": ${JSON.stringify(web)}. Each question must include the same normalized problem and constraints, the frame prompt, and require exactly four compact JSON ideas. Do not include sibling output.`
+			: "",
+		`Form the normal baseline independently.${tasks.length ? " Then call bg_wait with all:true." : ""} Cluster duplicates, reject constraint violations, and merge only useful non-obvious candidates into the artifact or planning note. Preserve provenance as a compact \`wo:divergent-analysis\` section naming each frame and source. A failed branch is recorded and not retried.`,
 		"If an authoritative source already contains a current `wo:divergent-analysis` section for this problem, reuse it and skip generation. This is one bounded divergence pass: no branch deepening and no second generation round. Configured work-advisor critics challenge the merged artifact afterward.",
-	].join("\n");
+	]
+		.filter(Boolean)
+		.join("\n");
 }
 
 function researchHandoffPrompt(cwd, question) {
@@ -4573,6 +4674,7 @@ function titleCase(value) {
 function modelDisplayName(model, names = new Map()) {
 	if (!model || model === INHERIT_MODEL) return "Inherit";
 	if (model === NONE_MODEL) return "None";
+	if (model === CHATGPT_WEB_SOURCE) return "ChatGPT Web";
 	return names.get(model) ?? model;
 }
 
@@ -4608,6 +4710,8 @@ function backupSlotSelection(slot, settings) {
 function slotSummary(slot, settings) {
 	const { model, thinking } = slotSelection(slot, settings);
 	const backup = backupSlotSelection(slot, settings);
+	if (slotSourceForSlot(settings, slot) === CHATGPT_WEB_SOURCE)
+		return `Main source:ChatGPT Web${chatgptConsultAvailable() ? "" : " (unavailable)"} • effort:n/a • Backup:${backup ? `${backup.model}/${backup.thinking}` : "none"}`;
 	return `Main model:${model === NONE_MODEL ? "none" : (model ?? "inherit current")} • effort:${thinking} • Backup:${backup ? `${backup.model}/${backup.thinking}` : "none"}`;
 }
 
@@ -4636,11 +4740,12 @@ function selectedAgentHealthTargets(cwd, currentModel, scope = "all") {
 	const settings = readEffectiveSettings(cwd);
 	const slots =
 		scope === "brainstorm"
-			? configuredAdvisorSlots(settings)
+			? [slotByKey("creative")]
 			: SLOTS.filter(
 					(slot) => !isAdvisorSlot(slot) || advisorEnabledForSlot(settings, slot),
 				);
 	const selected = slots.flatMap((slot) => {
+		if (slotSourceForSlot(settings, slot) === CHATGPT_WEB_SOURCE) return [];
 		const backup = backupSlotSelection(slot, settings);
 		return [
 			{
@@ -4657,7 +4762,7 @@ function selectedAgentHealthTargets(cwd, currentModel, scope = "all") {
 				: []),
 		];
 	});
-	if (scope === "brainstorm" && !selected.length)
+	if (scope === "brainstorm" && !slots.length)
 		selected.push({ model: currentModel, role: "Creative divergence" });
 	if (scope === "all")
 		for (const profile of backgroundVerifierProfiles(cwd))
@@ -4908,6 +5013,7 @@ async function modelItems(
 	allowNone = false,
 	projectScope = false,
 	availableModels,
+	includeChatgptWeb = false,
 ) {
 	const items = [];
 	if (allowNone)
@@ -4915,6 +5021,13 @@ async function modelItems(
 			value: NONE_MODEL,
 			label: "None",
 			description: "Do not run this advisor",
+		});
+	if (includeChatgptWeb && chatgptConsultAvailable())
+		items.push({
+			value: CHATGPT_WEB_SOURCE,
+			label: "ChatGPT Web",
+			description:
+				"External read-only advisor; sends its assigned question and requested workspace files through chatgpt_consult",
 		});
 	items.push({
 		value: INHERIT_MODEL,
@@ -4997,6 +5110,8 @@ function resetAll(settings) {
 			delete settings.subagents?.agentOverrides?.[agent];
 	}
 	delete settings.subagents?.agentOverrides?.["work-advisor-backup"];
+	delete settings.workOrchestrator?.advisorSources;
+	delete settings.workOrchestrator?.creativeSource;
 	delete settings.workOrchestrator?.roleBackups;
 	delete settings.workOrchestrator?.modelStrategy;
 	compactOverrides(settings);
@@ -5034,8 +5149,15 @@ async function chooseModel(
 	currentModel = INHERIT_MODEL,
 	allowNone = false,
 	projectScope = false,
+	includeChatgptWeb = false,
 ) {
-	const allItems = await modelItems(ctx, allowNone, projectScope);
+	const allItems = await modelItems(
+		ctx,
+		allowNone,
+		projectScope,
+		undefined,
+		includeChatgptWeb,
+	);
 	const scopedModels = Array.isArray(ctx.scopedModels)
 		? ctx.scopedModels.filter((entry) => entry?.model)
 		: [];
@@ -5051,6 +5173,7 @@ async function chooseModel(
 		allowNone,
 		projectScope,
 		scopedModels,
+		includeChatgptWeb,
 	);
 	const current = allItems.find((item) => item.value === currentModel);
 	let scoped = true;
@@ -5092,6 +5215,7 @@ async function chooseModelAndEffort(
 		currentThinking,
 		allowNone = false,
 		projectScope = false,
+		includeChatgptWeb = false,
 		effortItems,
 	},
 ) {
@@ -5103,9 +5227,13 @@ async function chooseModelAndEffort(
 			model,
 			allowNone,
 			projectScope,
+			includeChatgptWeb,
 		);
 		if (selectedModel === undefined) return;
-		if (selectedModel === NONE_MODEL)
+		if (
+			selectedModel === NONE_MODEL ||
+			selectedModel === CHATGPT_WEB_SOURCE
+		)
 			return { model: selectedModel, thinking: currentThinking };
 		model = selectedModel;
 		const thinking = await choose(
@@ -5132,12 +5260,16 @@ async function editSlotModel(ctx, settings, slot, scope, backup = false) {
 	);
 	const selected = await chooseModelAndEffort(ctx, {
 		title: `${backup ? "Backup" : "Model"} ${slot.label}`,
-		currentModel: current.model ?? INHERIT_MODEL,
+		currentModel:
+			!backup && slotSourceForSlot(settings, slot) === CHATGPT_WEB_SOURCE
+				? CHATGPT_WEB_SOURCE
+				: (current.model ?? INHERIT_MODEL),
 		currentThinking: backup
 			? current.thinking
 			: (selectedThinking ?? DEFAULT_THINKING),
 		allowNone: backup || isAdvisorSlot(slot),
 		projectScope: scope === "project",
+		includeChatgptWeb: !backup && supportsChatgptWeb(slot),
 		effortItems: items,
 	});
 	if (!selected) return false;
@@ -5151,7 +5283,10 @@ async function editSlotModel(ctx, settings, slot, scope, backup = false) {
 				scope === "project" &&
 					Boolean(backupSlotSelection(slot, readGlobalSettings())),
 			);
-		else setAdvisorEnabled(settings, slot, false);
+		else {
+			setAdvisorEnabled(settings, slot, false);
+			setSlotSource(settings, slot, "model");
+		}
 		writeScopedSettings(ctx.cwd, scope, settings);
 		ctx.ui.notify(
 			`Saved ${backup ? `${slot.label} Backup` : slot.label}: model:none`,
@@ -5160,8 +5295,12 @@ async function editSlotModel(ctx, settings, slot, scope, backup = false) {
 		return true;
 	}
 	if (backup) setBackupSlot(settings, slot, selected.model, selected.thinking);
-	else {
+	else if (selected.model === CHATGPT_WEB_SOURCE) {
 		if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
+		setSlotSource(settings, slot, CHATGPT_WEB_SOURCE);
+	} else {
+		if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
+		if (supportsChatgptWeb(slot)) setSlotSource(settings, slot, "model");
 		setSlot(settings, slot, selected.model, selected.thinking);
 	}
 	writeScopedSettings(ctx.cwd, scope, settings);
@@ -17854,15 +17993,11 @@ function captureIdeationIdeas(
 }
 
 function ideateSidecarStep(cwd, target, offlineModels = [], currentModel = "") {
-	const models = divergentTaskModels(cwd);
-	const offline = new Set(offlineModels);
-	const tasks = DIVERGENT_FRAMES.map((frame, index) => ({
-		frame,
-		model: models[index],
-	}))
-		.filter(({ model }) => !offline.has(configuredModelId(model, currentModel)))
-		.map(({ frame, model }, index) => ({
-			key: `divergent-${index + 1}`,
+	const branches = divergentSources(cwd, offlineModels, currentModel);
+	const tasks = branches
+		.filter(({ source }) => source !== CHATGPT_WEB_SOURCE)
+		.map(({ frame, key, model }) => ({
+			key,
 			agent: "work-divergent",
 			...(model && model !== INHERIT_MODEL ? { model } : {}),
 			task: [
@@ -17871,11 +18006,22 @@ function ideateSidecarStep(cwd, target, offlineModels = [], currentModel = "") {
 				"Generate non-obvious idea candidates as the agent contract requires.",
 			].join("\n"),
 		}));
-	if (!tasks.length) return "";
+	const web = branches
+		.filter(({ source }) => source === CHATGPT_WEB_SOURCE)
+		.map(({ frame, key }) => ({ key, frame }));
+	if (!tasks.length && !web.length) return "";
 	return [
-		`Ideation sidecar gate for ${target}: launch exactly one subagent workflowScript with async:true, context:fresh and runs.all over these stable-key child templates: ${JSON.stringify(tasks)}. Prepend the same topic and constraints to every child task; never include sibling output.`,
-		"While those branches run, form the normal baseline independently. Then call bg_wait with all:true, cluster duplicates, merge semantically similar ideas into single entries keeping the max score, and produce one merged ranked JSON ideas[] (title, summary, area, score 0-100). A failed branch is recorded and not retried; this is one bounded divergence pass with no branch deepening.",
-	].join("\n");
+		`Ideation sidecar gate for ${target}:`,
+		tasks.length
+			? `Launch exactly one subagent workflowScript with async:true, context:fresh and runs.all over these stable-key child templates: ${JSON.stringify(tasks)}. Prepend the same topic and constraints to every child task; never include sibling output.`
+			: "",
+		web.length
+			? `For these ChatGPT Web branches, call chatgpt_consult once per frame with mode:"temp": ${JSON.stringify(web)}. Each question must include the same topic and constraints, the frame prompt, and request non-obvious idea candidates as compact JSON. Do not include sibling output.`
+			: "",
+		`Form the normal baseline independently.${tasks.length ? " Then call bg_wait with all:true." : ""} Cluster duplicates, merge semantically similar ideas into single entries keeping the max score, and produce one merged ranked JSON ideas[] (title, summary, area, score 0-100). A failed branch is recorded and not retried; this is one bounded divergence pass with no branch deepening.`,
+	]
+		.filter(Boolean)
+		.join("\n");
 }
 
 function ideationHandoffPrompt(
@@ -29864,6 +30010,7 @@ export {
 	setWorkOrchReviewPolicy,
 	setWorkOrchCreativeMode,
 	creativeSidecarStep,
+	ideateSidecarStep,
 	divergentTaskModels,
 	advisorCriticStep,
 	selectedAgentHealthTargets,
@@ -31917,7 +32064,10 @@ function hasProjectOverride(settings, item) {
 				const override = settings.subagents?.agentOverrides?.[agent];
 				return owns(override, "model") || owns(override, "thinking");
 			}) ||
-				(isAdvisorSlot(slot) && owns(block?.advisorEnabled, slot.key)),
+				(isAdvisorSlot(slot) &&
+					(owns(block?.advisorEnabled, slot.key) ||
+						owns(block?.advisorSources, slot.key))) ||
+				(isCreativeSlot(slot) && owns(block, "creativeSource")),
 		);
 	}
 	if (item.kind === "backupSlot") return owns(block?.roleBackups, item.value);
@@ -31970,9 +32120,15 @@ function clearProjectOverride(settings, item) {
 			delete settings.subagents?.agentOverrides?.[agent]?.model;
 			delete settings.subagents?.agentOverrides?.[agent]?.thinking;
 		}
-		if (isAdvisorSlot(slot)) delete block?.advisorEnabled?.[slot.key];
+		if (isAdvisorSlot(slot)) {
+			delete block?.advisorEnabled?.[slot.key];
+			delete block?.advisorSources?.[slot.key];
+		}
+		if (isCreativeSlot(slot)) delete block?.creativeSource;
 		if (block?.advisorEnabled && !Object.keys(block.advisorEnabled).length)
 			delete block.advisorEnabled;
+		if (block?.advisorSources && !Object.keys(block.advisorSources).length)
+			delete block.advisorSources;
 		compactOverrides(settings);
 	} else if (item.kind === "backupSlot") {
 		delete block.roleBackups?.[item.value];
@@ -32177,16 +32333,22 @@ async function workSettingsLoop(ctx) {
 			...SLOTS.flatMap((slot) => {
 				const selected = slotSelection(slot, settings);
 				const backup = backupSlotSelection(slot, settings);
-				const mainLabel = `Model ${slot.label}: [${modelEffortSummary(selected.model, selected.thinking, names)}] ${SUBMENU_ARROW}`;
+				const mainSummary =
+					slotSourceForSlot(settings, slot) === CHATGPT_WEB_SOURCE
+						? `ChatGPT Web${chatgptConsultAvailable() ? "" : " (unavailable)"}`
+						: modelEffortSummary(selected.model, selected.thinking, names);
+				const mainLabel = `Model ${slot.label}: [${mainSummary}] ${SUBMENU_ARROW}`;
 				const backupLabel = `   -> Backup: [${backup ? modelEffortSummary(backup.model, backup.thinking, names) : "None"}] ${SUBMENU_ARROW}`;
+				const main = {
+					kind: "slot",
+					value: slot.key,
+					label: mainLabel,
+					labelSegments: [{ text: mainLabel, color: "text" }],
+					description: `Main · ${slot.description}`,
+				};
+				if (isCreativeSlot(slot)) return [main];
 				return [
-					{
-						kind: "slot",
-						value: slot.key,
-						label: mainLabel,
-						labelSegments: [{ text: mainLabel, color: "text" }],
-						description: `Main · ${slot.description}`,
-					},
+					main,
 					{
 						kind: "backupSlot",
 						value: slot.key,
@@ -32224,7 +32386,7 @@ async function workSettingsLoop(ctx) {
 				value: "creativeMode",
 				label: `Creative sidecar: ${titleCase(resolved.creativeMode)} ${SUBMENU_ARROW}`,
 				description:
-					"3 isolated generators reuse Advisor 1–3 models; advisors critique the merged result",
+					"3 isolated generators use the Brainstorm / Ideate source; advisors critique the merged result",
 			},
 			{
 				kind: "designWorkflow",
