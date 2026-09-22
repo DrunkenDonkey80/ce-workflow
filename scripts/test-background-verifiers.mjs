@@ -1828,6 +1828,46 @@ try {
 		"manual analyzer reports its batch id",
 	);
 
+	const batchesBeforeSimplification = new Set(
+		Object.keys(loadVerifierStore(committedCwd).batches),
+	);
+	await invoke("work-simplify", "", {
+		cwd: committedCwd,
+		mode: "tui",
+		model: { provider: "test", id: "current" },
+		modelRegistry: {
+			getAvailable: async () => [
+				{ provider: "test", id: "current", name: "Current Friendly" },
+				{ provider: "openai", id: "gpt-5", name: "GPT Friendly" },
+			],
+		},
+		ui: {
+			notify: (message, level) => notices.push({ message, level }),
+			select: async (title, labels) => {
+				assert.equal(title, "Simplify code");
+				return labels.find((label) => label.includes("Launch background analysis"));
+			},
+			confirm: async (_title, message) => {
+				assert.match(message, /2 model\(s\).*1 analysis type\(s\).*project/);
+				return true;
+			},
+		},
+	});
+	await new Promise((resolve) => setImmediate(resolve));
+	const simplificationBatch = Object.values(
+		loadVerifierStore(committedCwd).batches,
+	).find((batch) => !batchesBeforeSimplification.has(batch.id));
+	assert(simplificationBatch, "manual simplifier batch persisted");
+	assert.equal(simplificationBatch.checkpoint.scope, "project");
+	assert(
+		simplificationBatch.profiles.every(
+			(profile) =>
+				profile.operations.length === 1 &&
+				profile.operations[0] === "simplification",
+		),
+		"manual simplifier defaults every model to the simplification check",
+	);
+
 	// The coded inline finish helper is observed by the extension and launches
 	// configured verifier models for the commit it just created.
 	const helperCwd = repo();

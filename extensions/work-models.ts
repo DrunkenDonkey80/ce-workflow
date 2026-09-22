@@ -2397,6 +2397,7 @@ function summarizeToolResult(event, started) {
 const ORCHESTRATOR_ACTION_LABELS = {
 	"work-add": "Add work",
 	"work-analyze": "Analyze",
+	"work-simplify": "Simplify code",
 	"work-agent-health": "Agent health",
 	"work-auto": "Auto-route task",
 	"work-big": "Large task",
@@ -11774,9 +11775,9 @@ async function chooseAnalyzeValues(ctx, title, values, selected, options = {}) {
 	return result?.values;
 }
 
-async function handleWorkAnalyzeCommand(_args, ctx, pi) {
+async function handleWorkAnalyzeCommand(_args, ctx, pi, defaults = {}) {
 	if (ctx.mode === "print" || ctx.mode === "json") {
-		ctx.ui.notify("Analyze requires an interactive UI", "warning");
+		ctx.ui.notify(`${defaults.title ?? "Analyze"} requires an interactive UI`, "warning");
 		return;
 	}
 	const currentModel = ctx.model
@@ -11847,12 +11848,12 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi) {
 			description: "Repository-relative, comma or newline separated",
 		},
 	];
-	let operations = [...BACKGROUND_VERIFIER_OPERATIONS];
+	let operations = defaults.operations ?? [...BACKGROUND_VERIFIER_OPERATIONS];
 	let models = configured.map((profile) => profile.model);
-	let scope = "changes";
+	let scope = defaults.scope ?? "changes";
 	let patterns;
 	for (;;) {
-		const action = await choose(ctx, "Work analyze", [
+		const action = await choose(ctx, defaults.title ?? "Work analyze", [
 			{
 				value: "operations",
 				label: `Analysis checks: [${operations.length} selected] ${SUBMENU_ARROW}`,
@@ -25711,6 +25712,12 @@ async function handleWorkMenuCommand(ctx, pi) {
 				"Choose background analyses to run on an immutable scope.\nResults are read-only and attached as evidence.",
 		},
 		{
+			value: "work-simplify",
+			label: "🧹 Simplify code",
+			description:
+				"Find simplifications across settled files, folders, or the project.\nReview findings before the existing workflow applies accepted fixes.",
+		},
+		{
 			value: "work-agent-health",
 			label: "🩺 Agent health",
 			description:
@@ -29672,6 +29679,14 @@ async function executeOrchestratorAction(
 	if (name === "work-analyze")
 		return withCommandTelemetry(name, text, ctx, () =>
 			handleWorkAnalyzeCommand(text, ctx, pi),
+		);
+	if (name === "work-simplify")
+		return withCommandTelemetry(name, text, ctx, () =>
+			handleWorkAnalyzeCommand(text, ctx, pi, {
+				title: "Simplify code",
+				operations: ["simplification"],
+				scope: "project",
+			}),
 		);
 	if (name === "work-review-analysis")
 		return withCommandTelemetry(name, text, ctx, () =>
