@@ -854,8 +854,13 @@ const WORK_MONITOR_BIND_TOOL = "work_monitor_bind";
 const ORCHESTRATOR_GOAL_CONTINUE_COMMAND = "__orchestrator-goal-continue";
 const ORCHESTRATOR_MONITOR_RELOAD_COMMAND = "__orchestrator-monitor-reload";
 const ORCHESTRATOR_AUTOMATION_PREFIX = "ORCHESTRATOR_RUN_V1";
-const ORCHESTRATOR_INPUT_HELP =
-	"Try: orchestrator list roadmaps | roadmaps | status | resume [last|<id>] | compact | pause | stop | report [id] | scout status | 1";
+export function extensionScoutEnabled(env = process.env) {
+	return env.CE_WORK_EXTENSION_SCOUT === "1";
+}
+
+function orchestratorInputHelp() {
+	return `Try: orchestrator list roadmaps | roadmaps | status | resume [last|<id>] | compact | pause | stop | report [id]${extensionScoutEnabled() ? " | scout status" : ""} | 1`;
+}
 const WORK_GOAL_STATUS_KEY = "work-goal";
 const WORK_GOAL_PROGRESS_WIDGET_KEY = "work-goal-progress";
 const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
@@ -25967,12 +25972,16 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description:
 				"Review monitored Pi/plugin releases and verified private-workflow updates.\nExplicit maintenance; no ordinary-work reporting is enabled.",
 		},
-		{
-			value: "work-extension-scout",
-			label: "🔭 Scout Pi extensions",
-			description:
-				"Explicitly scan catalog pages in the background with live progress.\nOpus 5 reviews candidates; nothing is installed automatically.",
-		},
+		...(extensionScoutEnabled()
+			? [
+					{
+						value: "work-extension-scout",
+						label: "🔭 Scout Pi extensions",
+						description:
+							"Explicitly scan catalog pages in the background with live progress.\nOpus 5 reviews candidates; nothing is installed automatically.",
+					},
+				]
+			: []),
 		...(privateWorkflowRollbackAvailable
 			? [
 					{
@@ -28913,6 +28922,11 @@ function extensionScoutProgressLines(progress = {}) {
 }
 
 function showExtensionScoutProgress(ctx, progress, runtime) {
+	if (!extensionScoutEnabled()) {
+		ctx.ui?.setStatus?.("work-extension-scout", undefined);
+		ctx.ui?.setWidget?.("work-extension-scout", undefined);
+		return;
+	}
 	if (runtime?.detached) return;
 	ctx.ui?.setStatus?.(
 		"work-extension-scout",
@@ -29369,12 +29383,12 @@ function parseOrchestratorInput(event = {}) {
 	);
 	if (!match) return;
 	const rawBody = String(match[1] ?? "").trim();
-	if (rawBody === "?") return { help: ORCHESTRATOR_INPUT_HELP };
+	if (rawBody === "?") return { help: orchestratorInputHelp() };
 	const body = rawBody.replace(/[.!?]+$/, "").replace(/\s+/g, " ");
 	const lower = body.toLowerCase();
 	if (!body || ["menu", "open"].includes(lower))
 		return { command: "work-menu", args: "" };
-	if (["help", "?"].includes(lower)) return { help: ORCHESTRATOR_INPUT_HELP };
+	if (["help", "?"].includes(lower)) return { help: orchestratorInputHelp() };
 	if (/^list roadmaps?$/.test(lower))
 		return { command: "work-roadmap", args: "list" };
 	if (/^roadmaps?$/.test(lower)) return { command: "work-roadmap", args: "" };
@@ -29383,7 +29397,7 @@ function parseOrchestratorInput(event = {}) {
 		return { command: "work-context", args: "compact" };
 	if (lower === "pause") return { command: "work-goal", args: "pause" };
 	if (lower === "stop") return { command: "work-stop", args: "" };
-	if (lower === "stop scout")
+	if (lower === "stop scout" && extensionScoutEnabled())
 		return { command: "work-extension-scout", args: "stop" };
 	const numbered = /^(\d+)$/.exec(body) ?? /^(\d+)\s*[).,:-]\s*(.+)$/.exec(body);
 	if (numbered) {
@@ -29392,25 +29406,31 @@ function parseOrchestratorInput(event = {}) {
 			? { number, note: String(numbered[2] ?? "").trim() }
 			: {
 					error: "Orchestrator choices start at 1.",
-					help: ORCHESTRATOR_INPUT_HELP,
+					help: orchestratorInputHelp(),
 				};
 	}
 	const routed = /^(resume|report|scout|design|redesign)(?:\s+(.+))?$/i.exec(
 		body,
 	);
 	if (routed) {
+		const route = routed[1].toLowerCase();
+		if (route === "scout" && !extensionScoutEnabled())
+			return {
+				error: `Unknown orchestrator command: ${body}`,
+				help: orchestratorInputHelp(),
+			};
 		const command = {
 			resume: "work-resume",
 			report: "work-report",
 			scout: "work-extension-scout",
 			design: "work-design",
 			redesign: "work-redesign",
-		}[routed[1].toLowerCase()];
+		}[route];
 		return { command, args: routed[2] ?? "" };
 	}
 	return {
 		error: `Unknown orchestrator command: ${body}`,
-		help: ORCHESTRATOR_INPUT_HELP,
+		help: orchestratorInputHelp(),
 	};
 }
 
@@ -29424,6 +29444,7 @@ async function executeOrchestratorAction(
 ) {
 	const name = String(command ?? "").replace(/^\//, "");
 	const text = String(args ?? "");
+	if (name === "work-extension-scout" && !extensionScoutEnabled()) return false;
 	if (
 		LONG_ORCHESTRATOR_ACTIONS.has(name) &&
 		(ctx.mode === "tui" || ctx.hasUI) &&
@@ -30711,14 +30732,19 @@ export default function workModelsExtension(pi) {
 			scheduleWorkMonitorCheck(pi, ctx, activeWorkGoal);
 		updateWorkGoalStatus(ctx);
 		updateWorkGoalProgress(ctx);
-		let scoutProgress = readExtensionScoutLedger(ctx.cwd).progress;
-		if (scoutProgress && ["running", "stopping"].includes(scoutProgress.status))
-			scoutProgress = updateExtensionScoutProgress(ctx.cwd, {
-				status: "stopped",
-				phase: "session restarted",
-				nextPage: scoutProgress.nextPage ?? scoutProgress.page,
-			});
-		if (scoutProgress) showExtensionScoutProgress(ctx, scoutProgress);
+		if (extensionScoutEnabled()) {
+			let scoutProgress = readExtensionScoutLedger(ctx.cwd).progress;
+			if (scoutProgress && ["running", "stopping"].includes(scoutProgress.status))
+				scoutProgress = updateExtensionScoutProgress(ctx.cwd, {
+					status: "stopped",
+					phase: "session restarted",
+					nextPage: scoutProgress.nextPage ?? scoutProgress.page,
+				});
+			if (scoutProgress) showExtensionScoutProgress(ctx, scoutProgress);
+		} else {
+			ctx.ui?.setStatus?.("work-extension-scout", undefined);
+			ctx.ui?.setWidget?.("work-extension-scout", undefined);
+		}
 		ctx.ui.notify(`work-orchestrator loaded · ${WORK_SHORTCUT_STATUS}`, "info");
 		resetWarpTitle(ctx);
 		startWorkGoalProgressTimer(ctx);

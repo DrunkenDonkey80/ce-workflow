@@ -775,9 +775,25 @@ try {
 	mkdirSync(agentDir, { recursive: true });
 	writeFileSync(path.join(agentDir, "settings.json"), "{}\n");
 	process.env.PI_CODING_AGENT_DIR = agentDir;
-	const { executeOrchestratorAction } = await import(
+	const previousScoutGate = process.env.CE_WORK_EXTENSION_SCOUT;
+	delete process.env.CE_WORK_EXTENSION_SCOUT;
+	const { executeOrchestratorAction, extensionScoutEnabled } = await import(
 		`../extensions/work-models.ts?scout=${Date.now()}`
 	);
+	const disabledNotices = [];
+	const disabledStatus = await executeOrchestratorAction(
+		"work-extension-scout",
+		"status",
+		{ cwd, ui: { notify: (message) => disabledNotices.push(message) } },
+		{},
+	);
+	assert(
+		disabledStatus === false &&
+			disabledNotices.length === 0 &&
+			!extensionScoutEnabled(),
+		"extension scout is gated off silently by default",
+	);
+	process.env.CE_WORK_EXTENSION_SCOUT = "1";
 	const explicitStatus = await executeOrchestratorAction(
 		"work-extension-scout",
 		"status",
@@ -1067,6 +1083,30 @@ try {
 			statuses.at(-1)?.includes("Scout failed"),
 		"scout immediately reports durable background progress and leaves the terminal state visible",
 	);
+
+	delete process.env.CE_WORK_EXTENSION_SCOUT;
+	let disabledMenuLabels = [];
+	await executeOrchestratorAction(
+		"work-menu",
+		"",
+		{
+			cwd,
+			ui: {
+				notify() {},
+				select(_title, labels) {
+					disabledMenuLabels = labels;
+					return undefined;
+				},
+			},
+		},
+		{},
+	);
+	assert(
+		!disabledMenuLabels.some((label) => label.includes("Scout Pi extensions")),
+		"disabled extension scout is absent from /wo menus",
+	);
+	if (previousScoutGate === undefined) delete process.env.CE_WORK_EXTENSION_SCOUT;
+	else process.env.CE_WORK_EXTENSION_SCOUT = previousScoutGate;
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 } finally {

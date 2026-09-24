@@ -133,7 +133,9 @@ The migration command is idempotent, validates export parity, keeps an ignored b
 
 ## Explicit workflow maintenance
 
-Ordinary project work never activates self-improvement reporting, injects improvement duties, or exposes `work_report_improvement`; legacy `workResume.selfImproving` settings are ignored. Maintenance starts only from an explicit user action: `/wo → Improve orchestrator`, `/wo monitor`, `/wo → Scout Pi extensions`, or `/wo → Catch up packages`. The monitor retains its bounded decision and safe-reload gates, and improve/catch-up continue through the normal work-goal lifecycle; none of these paths starts automatically during project development.
+Ordinary project work never activates self-improvement reporting, injects improvement duties, or exposes `work_report_improvement`; legacy `workResume.selfImproving` settings are ignored. Maintenance starts only from an explicit user action: `/wo → Improve orchestrator`, `/wo monitor`, or `/wo → Catch up packages`. The monitor retains its bounded decision and safe-reload gates, and improve/catch-up continue through the normal work-goal lifecycle; none of these paths starts automatically during project development.
+
+Extension scouting is gated off by default, including its menus and persisted progress display. Set `CE_WORK_EXTENSION_SCOUT=1` before starting or reloading Pi to re-enable it.
 
 ## Workflow evaluation harness
 
