@@ -494,4 +494,67 @@ const foreignPrevious = formatCompactionSummary({
 assert.doesNotMatch(foreignPrevious, /STALE-FOREIGN-CLAIM/);
 assert.match(foreignPrevious, /keep this/);
 
-process.stdout.write("ok - work compaction policy\n");
+const { compactMemory, decodeMemory, gather, fallbackMemory, coreText } = await import("../extensions/work-compaction-memory.js");
+const messages = [
+	{ role: "user", content: "Keep the supplier rollover and approval rule." },
+	{ role: "toolResult", toolName: "inspect", content: "Supplier rollover is 07:15 UTC; independent approval required." },
+];
+let calls = 0;
+let responseMode = "valid";
+const registry = {
+	find: (provider, id) => provider === "test" && id === "summary" ? { provider, id } : undefined,
+	streamSimple(_model, context, options) {
+		calls++;
+		assert.equal(options.reasoning, "low");
+		assert.equal(context.tools, undefined);
+		const task = context.messages[0].content[0].text;
+		const source = JSON.parse(task.slice(task.indexOf('\n') + 1)).delta[1].source;
+		const text = responseMode === "invalid" ? "not JSON" : JSON.stringify({
+			checkpoint: responseMode === "large" ? "x".repeat(17000) : "Rollover 07:15 UTC; independent approval required.",
+			knowledge: [{ claim: "Supplier rollover is 07:15 UTC.", status: "observed", sources: [responseMode === "citation" ? "invented:1" : source] }],
+		});
+		return { result: async () => ({ content: [{ type: "text", text }], stopReason: "stop", usage: { input: 50, output: 20 } }) };
+	},
+};
+const local = await compactMemory({ messages, registry });
+assert.equal(calls, 0, "None must never request a model");
+assert.equal(local.mode, "cleaned");
+assert.match(local.summary, /07:15 UTC/);
+assert.deepEqual(local.knowledge, []);
+const hybrid = await compactMemory({ messages, registry, model: "test/summary" });
+assert.equal(calls, 1, "summary and extraction share one call");
+assert.equal(hybrid.mode, "hybrid");
+assert.equal(hybrid.knowledge.length, 1);
+assert.equal(hybrid.usage.output, 20);
+assert.equal(decodeMemory(hybrid.summary).records.filter(r => r.kind === "user-request").length, 1);
+const later = [
+	{ role: "assistant", content: [{ type: "toolCall", id: "edit", name: "edit", arguments: { path: "src/a.js" } }] },
+	{ role: "toolResult", toolName: "edit", toolCallId: "edit", content: "Changed after the last tests." },
+	...messages.slice(1),
+];
+for (const invalid of ["invalid", "large", "citation"]) {
+	responseMode = invalid;
+	const failed = await compactMemory({ messages: later, previousSummary: hybrid.summary, registry, model: "test/summary" });
+	assert.equal(failed.mode, "fallback");
+	assert.match(failed.summary, /07:15 UTC/);
+	assert(failed.summary.includes(decodeMemory(hybrid.summary).tail));
+	assert(decodeMemory(failed.summary).records.some(r => r.tool === "edit"));
+	assert.deepEqual(failed.knowledge, [], "rejected output cannot create knowledge");
+	assert.equal(failed.usage.output, 20, "rejected output still incurs usage");
+	assert(failed.summary.length <= 32000);
+}
+assert.equal(calls, 4, "failures must not launch a second/fallback model call");
+const switchedOff = await compactMemory({ messages: later, previousSummary: hybrid.summary, registry });
+assert.equal(calls, 4);
+assert.match(switchedOff.summary, /07:15 UTC/);
+const unavailable = await compactMemory({ messages, registry, model: "missing/model" });
+assert.equal(unavailable.mode, "fallback");
+assert.equal(calls, 4);
+await assert.rejects(compactMemory({ messages, registry, model: "test/summary", signal: AbortSignal.abort() }), /cancelled/);
+assert.equal(calls, 4);
+await assert.rejects(compactMemory({ messages: [{ role: "user", content: "x".repeat(32000) }], registry }), /overflow/);
+const records = gather(later);
+const frame = { coreRecords: [], core: coreText([]) };
+const preserved = fallbackMemory(frame, decodeMemory(hybrid.summary).tail, records, 32000);
+assert(preserved.memory.includes(JSON.stringify(records.find(r => r.tool === "edit"))));
+process.stdout.write("ok - work compaction policy, cleaned/hybrid selection, one-call knowledge, bounded rejection fallback\n");

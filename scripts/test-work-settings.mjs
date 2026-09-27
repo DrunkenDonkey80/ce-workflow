@@ -74,6 +74,21 @@ try {
 		"performance defaults are conservative where model bursts can compound",
 	);
 	assert(!existsSync(settingsFile()), "no default source mutation");
+	const compactionDefault = mod.compactionModelSettings(cwd);
+	assert(compactionDefault.model === "__none_model__", "compaction defaults to cleaned code with no model");
+	const compactionSettings = { workKnowledge: { discoverer: { model: "old/model" } } };
+	mod.setCompactionModel(compactionSettings, { model: "test/summary", thinking: "high" });
+	assert(!compactionSettings.workKnowledge, "saving compaction removes the retired discoverer setting");
+	writeGlobalSettings(compactionSettings);
+	assert(mod.compactionModelSettings(cwd).model === "test/summary", "global compaction model selects hybrid");
+	const compactionOverride = {};
+	mod.setCompactionModel(compactionOverride, compactionDefault);
+	writeSettings(compactionOverride);
+	assert(mod.compactionModelSettings(cwd).model === compactionDefault.model, "project None overrides a global hybrid model");
+	writeGlobalSettings({});
+	writeSettings({ workKnowledge: { discoverer: { model: "old/model" } } });
+	assert(mod.compactionModelSettings(cwd).model === compactionDefault.model, "legacy knowledge settings cannot enable model calls");
+	writeSettings({});
 	process.env.WORK_ORCH_SERIAL = "1";
 	assert(
 		Object.values(mod.workPerformanceSettings(cwd)).every(

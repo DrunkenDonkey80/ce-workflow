@@ -211,6 +211,7 @@ import {
 	filesFromOps,
 	formatCompactionSummary,
 } from "./work-compaction.js";
+import { compactMemory } from "./work-compaction-memory.js";
 import {
 	buildKnowledgeQuery,
 	correctKnowledge,
@@ -737,10 +738,11 @@ const DEFAULT_CONTEXT = {
 	autoCompact: true,
 	compactAtTokens: 150_000,
 	keepRecentTokens: 30_000,
-	maxSummaryChars: 12_000,
+	maxSummaryChars: 32_000,
 };
 const MIN_COMPACT_AT_TOKENS = 30_000;
 const MODEL_KNOWLEDGE_WRITE_LIMIT = 20;
+const DEFAULT_COMPACTION_MODEL = Object.freeze({ model: NONE_MODEL, thinking: "low" });
 const DEFAULT_KNOWLEDGE_DISCOVERER = Object.freeze({
 	model: NONE_MODEL,
 	thinking: "low",
@@ -749,11 +751,6 @@ const KNOWLEDGE_DISCOVERER_MAX_CLAIMS = 3;
 const KNOWLEDGE_DISCOVERER_MAX_INPUT_CHARS = 400_000;
 const knowledgeDiscovererRuns = new Map();
 const knowledgeDiscovererCuts = new Set();
-// The in-work filter re-cuts on every turn while the session sits above the
-// compaction trigger, so the removed prefix grows instead of changing. Remember
-// the last message already handed to the discoverer and feed only what is new;
-// otherwise every turn re-derives the same claims at full subagent cost.
-let knowledgeDiscovererCutAnchor = null;
 // Images present when compaction completes must never leak back into later
 // provider requests, even when they were in the freshly retained tail.
 let imageCompactionCutoff = 0;
@@ -6094,6 +6091,25 @@ async function handleKnowledgeCommand(args, ctx) {
 	}
 }
 
+export function compactionModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
+	const configured = settings.workOrchestrator?.context ?? {};
+	return {
+		model: String(configured.compactionModel ?? DEFAULT_COMPACTION_MODEL.model),
+		thinking: THINKING_LEVELS.includes(configured.compactionThinking)
+			? configured.compactionThinking : DEFAULT_COMPACTION_MODEL.thinking,
+	};
+}
+
+export function setCompactionModel(settings, selection) {
+	settings.workOrchestrator ??= {};
+	settings.workOrchestrator.context ??= {};
+	settings.workOrchestrator.context.compactionModel = selection.model;
+	settings.workOrchestrator.context.compactionThinking = selection.thinking;
+	delete settings.workKnowledge?.discoverer;
+	if (settings.workKnowledge && !Object.keys(settings.workKnowledge).length)
+		delete settings.workKnowledge;
+}
+
 export function knowledgeDiscovererSettings(
 	cwd,
 	settings = readEffectiveSettings(cwd),
@@ -6109,18 +6125,6 @@ export function knowledgeDiscovererSettings(
 			? thinking
 			: DEFAULT_KNOWLEDGE_DISCOVERER.thinking,
 	};
-}
-
-function setKnowledgeDiscoverer(settings, selection) {
-	settings.workKnowledge ??= {};
-	settings.workKnowledge.discoverer ??= {};
-	if (selection.model === INHERIT_MODEL)
-		delete settings.workKnowledge.discoverer.model;
-	else settings.workKnowledge.discoverer.model = selection.model;
-	settings.workKnowledge.discoverer.thinking = selection.thinking;
-	if (!Object.keys(settings.workKnowledge.discoverer).length)
-		delete settings.workKnowledge.discoverer;
-	if (!Object.keys(settings.workKnowledge).length) delete settings.workKnowledge;
 }
 
 function discovererCutText(messages) {
@@ -6262,7 +6266,7 @@ export function absorbKnowledgeDiscovererCompletion(event) {
 	return { count, notify: tracked.notify };
 }
 
-function buildCompactionContext(event, ctx, current) {
+async function buildCompactionContext(event, ctx, current) {
 	const state = captureCompactionState(ctx);
 	const preparation = mergedCompactionPreparation(event);
 	const preparedMessages = [
@@ -6276,23 +6280,41 @@ function buildCompactionContext(event, ctx, current) {
 	let files = filesFromOps(preparation.fileOps);
 	if (!files.read.length && !files.modified.length)
 		files = filesFromOps(contextFilterFileOps(currentMessages));
-	return {
-		...state,
-		files,
-		summary: formatCompactionSummary({
-			profile: state.profile,
-			preparation,
-			currentMessages,
-			durable: state.durable,
-			goal: state.goal,
-			knowledge: knowledgeBlockForContext(ctx.cwd, {
-				messages: currentMessages,
-				state,
-				files,
-			}),
-			maxSummaryChars: effectiveSummaryChars(current),
-		}),
-	};
+	const compacted = await compactSessionMemory(ctx, current, state, preparation, currentMessages, event.signal);
+	return { ...state, files, ...compacted };
+}
+
+async function compactSessionMemory(ctx, current, state, preparation, currentMessages, signal) {
+	const configured = compactionModelSettings(ctx.cwd);
+	const max = effectiveSummaryChars(current);
+	const knowledge = knowledgeBlockForContext(ctx.cwd, { messages: currentMessages, state, files: filesFromOps(preparation.fileOps) });
+	const prefix = state.profile !== COMPACTION_PROFILES.FREEFORM || state.goal
+		? formatCompactionSummary({ profile: state.profile, durable: state.durable, goal: state.goal, knowledge, maxSummaryChars: Math.min(6000, Math.floor(max / 3)) }) + "\n\n"
+		: `## ce-workflow compact context (${state.profile})\nDurable state outranks conversational context.\n${knowledge}\n`;
+	const result = await compactMemory({
+		messages: [...asArray(preparation.messagesToSummarize), ...asArray(preparation.turnPrefixMessages)],
+		previousSummary: preparation.previousSummary ?? "", prefix, limit: max,
+		model: configured.model === NONE_MODEL ? null : configured.model === INHERIT_MODEL ? currentModelId(ctx) : configured.model,
+		thinking: configured.thinking, registry: ctx.modelRegistry, signal: signal ?? ctx.signal,
+		redact: text => redactOpenDesignText(text, 400_000),
+	});
+	if (result.fallback) ctx.ui?.notify?.(`Compaction used preserved-memory fallback: ${result.fallback}`, "warning");
+	return result;
+}
+
+function storeCompactionKnowledge(ctx, claims, bucket) {
+	let stored = 0;
+	for (const fact of claims ?? []) {
+		if (stored >= 3) break;
+		if (!["observed", "decision", "inferred"].includes(fact.status)) continue;
+		try {
+			const result = recordKnowledge(ctx.cwd, {
+				claim: fact.claim, kind: "fact", scope: "project", authority: "inferred",
+				source: { sessionId: ctx.sessionManager?.getSessionId?.(), writeBucket: `compaction:${bucket}` },
+			}, { allowedAuthorities: ["inferred"] });
+			if (!result.deduplicated) stored++;
+		} catch { /* Invalid, secret-shaped or over-budget candidates are not stored. */ }
+	}
 }
 
 function resetContextFilter() {
@@ -6364,7 +6386,7 @@ function captureContextFilterSnapshot(ctx) {
 	};
 }
 
-function prepareContextFilter(event) {
+async function prepareContextFilter(event, ctx) {
 	contextFilterState.requested = false;
 	const snapshot = contextFilterState.snapshot;
 	if (!snapshot) return false;
@@ -6380,8 +6402,9 @@ function prepareContextFilter(event) {
 		estimateContextMessageTokens,
 	);
 	if (!cutIndex) return false;
-	const removed = messages.slice(0, cutIndex);
-	const previousSummary = removed
+	const previousCut = contextFilterState.active ? contextFilterState.cutIndex : 0;
+	const removed = messages.slice(previousCut, cutIndex);
+	const previousSummary = contextFilterState.active ? contextFilterState.summary : removed
 		.filter((message) => message?.role === "compactionSummary")
 		.at(-1)?.summary;
 	const tokensBefore = contextMessagesTokens(messages);
@@ -6392,15 +6415,12 @@ function prepareContextFilter(event) {
 		fileOps: contextFilterFileOps(removed),
 		tokensBefore,
 	};
+	const compacted = await compactSessionMemory(ctx, current, state, preparation, messages, event.signal);
+	if (snapshot !== contextFilterState.snapshot || ctx.signal?.aborted) return false;
 	contextFilterState.active = true;
-	contextFilterState.summary = formatCompactionSummary({
-		profile: state.profile,
-		preparation,
-		currentMessages: messages,
-		durable: state.durable,
-		goal: state.goal,
-		maxSummaryChars: effectiveSummaryChars(current),
-	});
+	contextFilterState.summary = compacted.summary;
+	storeCompactionKnowledge(ctx, compacted.knowledge, contextMessageAnchor(messages[cutIndex - 1]));
+	if (compacted.usage) workExtensionPi?.appendEntry?.("work-compaction-usage", { model: compactionModelSettings(ctx.cwd).model, usage: compacted.usage, mode: compacted.mode });
 	contextFilterState.cutIndex = cutIndex;
 	contextFilterState.tokensBefore = tokensBefore;
 	contextFilterState.anchor = contextMessageAnchor(messages[cutIndex]);
@@ -6432,7 +6452,7 @@ function contextMessagesTokens(messages) {
 	);
 }
 
-function filteredContext(event, ctx) {
+async function filteredContext(event, ctx) {
 	const sourceMessages = Array.isArray(event.messages) ? event.messages : [];
 	const messages = sourceMessages.filter(
 		(message) =>
@@ -6457,27 +6477,7 @@ function filteredContext(event, ctx) {
 		)
 			contextFilterState.requested = true;
 	}
-	if (
-		contextFilterState.requested &&
-		prepareContextFilter({ ...event, messages })
-	) {
-		// A missing anchor (fresh session, or a native compaction rewrote the
-		// history) falls back to the whole removed prefix.
-		const start = knowledgeDiscovererCutAnchor
-			? messages.findIndex(
-					(message) =>
-						contextMessageAnchor(message) === knowledgeDiscovererCutAnchor,
-				) + 1
-			: 0;
-		const removed = messages.slice(start, contextFilterState.cutIndex);
-		if (removed.length) {
-			knowledgeDiscovererCutAnchor =
-				contextMessageAnchor(messages[contextFilterState.cutIndex - 1]) ?? null;
-			void launchKnowledgeDiscoverer(workExtensionPi, ctx, removed).catch(
-				() => {},
-			);
-		}
-	}
+	if (contextFilterState.requested) await prepareContextFilter({ ...event, messages }, ctx);
 	const state = contextFilterState.snapshot?.state ?? {
 		targetId: compactionTargetId(activeWorkGoal),
 		goal: compactionGoal(activeWorkGoal),
@@ -31451,15 +31451,14 @@ export default function workModelsExtension(pi) {
 			event.preparation && typeof event.preparation === "object"
 				? event.preparation
 				: {};
-		void launchKnowledgeDiscoverer(pi, ctx, [
-			...asArray(preparation.messagesToSummarize),
-			...asArray(preparation.turnPrefixMessages),
-		]).catch(() => {});
-		const compacted = buildCompactionContext(
-			{ ...event, preparation },
-			ctx,
-			current,
-		);
+		let compacted;
+		try {
+			compacted = await buildCompactionContext({ ...event, preparation }, ctx, current);
+			if (event.signal?.aborted) return { cancel: true };
+		} catch (error) {
+			ctx.ui?.notify?.(`Compaction cancelled without discarding context: ${error.message}`, "warning");
+			return { cancel: true };
+		}
 		const workflowMeta = activeWorkAgent?.meta ?? pendingWorkPrompt?.meta ?? {};
 		const workflowAuthorization = pendingSettledAgentEnd
 			? null
@@ -31484,6 +31483,7 @@ export default function workModelsExtension(pi) {
 		return {
 			compaction: {
 				summary: compacted.summary,
+				usage: compacted.usage,
 				firstKeptEntryId: preparation.firstKeptEntryId,
 				tokensBefore: preparation.tokensBefore,
 				details: {
@@ -31492,6 +31492,9 @@ export default function workModelsExtension(pi) {
 					reason: event.reason,
 					triggerOwner: triggeredByCe ? "ce-workflow" : "native",
 					profile: compacted.profile,
+					compactionMode: compacted.mode,
+					compactionModel: compactionModelSettings(ctx.cwd, settings).model,
+					knowledgeCandidates: compacted.knowledge,
 					workflowAuthorization,
 					durableStateAvailable: compacted.durable?.available ?? null,
 					files: compacted.files,
@@ -31510,6 +31513,7 @@ export default function workModelsExtension(pi) {
 	pi.on("session_tree", resetSessionContextFilter);
 
 	pi.on("session_compact", async (event, ctx) => {
+		storeCompactionKnowledge(ctx, event.compactionEntry?.details?.knowledgeCandidates, event.compactionEntry?.id);
 		recordSelfImprovementHistory(ctx, "session_compact", event);
 		resetContextFilter();
 		imageCompactionCutoff =
@@ -31919,7 +31923,7 @@ function workSettingsStatus(ctx) {
 	const resolved = workOrchSettings(ctx.cwd);
 	const performance = workPerformanceSettings(ctx.cwd);
 	const resume = workResumeSettings(ctx.cwd);
-	const discoverer = knowledgeDiscovererSettings(ctx.cwd, settings);
+	const compactor = compactionModelSettings(ctx.cwd, settings);
 	const lines = [
 		"Work settings",
 		"",
@@ -31949,9 +31953,9 @@ function workSettingsStatus(ctx) {
 				)
 			: ["  none configured"]),
 		"",
-		"Knowledge",
-		`  ${SUBMENU_ARROW} discoverer: ${modelEffortSummary(discoverer.model, discoverer.thinking)}`,
-		"  analyzes removed context in the background; failures do not block work",
+		"Compaction",
+		`  ${SUBMENU_ARROW} Compaction LLM model: ${modelEffortSummary(compactor.model, compactor.thinking)}`,
+		"  None: cleaned code; selected model: hybrid summary + knowledge in one call",
 		"",
 		"Performance tweaks (global)",
 		...WORK_PERFORMANCE_FLAGS.map(
@@ -32101,11 +32105,8 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "profile") return owns(block, "profile");
 	if (item.kind === "backgroundVerifiers")
 		return owns(block, "backgroundVerifiers");
-	if (item.kind === "knowledgeDiscoverer")
-		return (
-			owns(settings.workKnowledge?.discoverer, "model") ||
-			owns(settings.workKnowledge?.discoverer, "thinking")
-		);
+	if (item.kind === "compactionModel")
+		return owns(block?.context, "compactionModel") || owns(block?.context, "compactionThinking");
 	if (item.kind === "creativeMode") return owns(block, "creativeMode");
 	if (item.kind === "designWorkflow") return owns(block, "visualDesignWorkflow");
 	if (item.kind === "openDesignCommand") return owns(block, "openDesignCommand");
@@ -32163,10 +32164,9 @@ function clearProjectOverride(settings, item) {
 	} else if (item.kind === "modelStrategy") delete block.modelStrategy;
 	else if (item.kind === "profile") clearProfileOverride(settings);
 	else if (item.kind === "backgroundVerifiers") delete block.backgroundVerifiers;
-	else if (item.kind === "knowledgeDiscoverer") {
-		delete settings.workKnowledge?.discoverer;
-		if (settings.workKnowledge && !Object.keys(settings.workKnowledge).length)
-			delete settings.workKnowledge;
+	else if (item.kind === "compactionModel") {
+		delete block.context?.compactionModel;
+		delete block.context?.compactionThinking;
 	} else if (item.kind === "creativeMode") delete block.creativeMode;
 	else if (item.kind === "designWorkflow") delete block.visualDesignWorkflow;
 	else if (item.kind === "openDesignCommand") delete block.openDesignCommand;
@@ -32339,7 +32339,7 @@ async function workSettingsLoop(ctx) {
 		const resolved = workOrchSettings(ctx.cwd, settings);
 		const performance = workPerformanceSettings(ctx.cwd);
 		const resume = workResumeSettings(ctx.cwd, settings);
-		const discoverer = knowledgeDiscovererSettings(ctx.cwd, settings);
+		const compactor = compactionModelSettings(ctx.cwd, settings);
 		const names = await modelDisplayNames(ctx);
 		const items = [
 			{
@@ -32401,11 +32401,11 @@ async function workSettingsLoop(ctx) {
 					: "none configured",
 			},
 			{
-				kind: "knowledgeDiscoverer",
-				value: "knowledgeDiscoverer",
-				label: `Knowledge discoverer: [${modelEffortSummary(discoverer.model, discoverer.thinking, names)}] ${SUBMENU_ARROW}`,
+				kind: "compactionModel",
+				value: "compactionModel",
+				label: `Compaction LLM model: [${modelEffortSummary(compactor.model, compactor.thinking, names)}] ${SUBMENU_ARROW}`,
 				description:
-					"Optional non-blocking analysis of context removed during compaction",
+					"None: cleaned code only. Model: hybrid summary + knowledge in one call.",
 			},
 			{
 				kind: "creativeMode",
@@ -32613,27 +32613,27 @@ async function workSettingsLoop(ctx) {
 			}
 			continue;
 		}
-		if (pick.kind === "knowledgeDiscoverer") {
+		if (pick.kind === "compactionModel") {
 			const selected = await chooseModelAndEffort(ctx, {
-				title: "Knowledge discoverer",
-				currentModel: discoverer.model,
-				currentThinking: discoverer.thinking,
+				title: "Compaction LLM model",
+				currentModel: compactor.model,
+				currentThinking: compactor.thinking,
 				allowNone: true,
 				projectScope: scope === "project",
 				effortItems: THINKING_LEVELS.map((value) => ({
 					value,
 					label: value,
-					description: "Background analysis effort",
+					description: "Summary and knowledge extraction effort",
 				})),
 			});
 			if (!selected) continue;
 			settings = readScopedSettings(ctx.cwd, scope);
-			setKnowledgeDiscoverer(settings, selected);
+			setCompactionModel(settings, selected);
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(
 				selected.model === NONE_MODEL
-					? "Knowledge discoverer: off"
-					: `Knowledge discoverer: ${modelEffortSummary(selected.model, selected.thinking, names)}`,
+					? "Compaction LLM model: None (cleaned code only)"
+					: `Compaction LLM model: ${modelEffortSummary(selected.model, selected.thinking, names)} (summary + knowledge)`,
 				"info",
 			);
 			continue;

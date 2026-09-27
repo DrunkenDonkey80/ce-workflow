@@ -919,8 +919,16 @@ try {
 		"failed and aborted assistant responses do not consume an image",
 	);
 	resetContextFilter();
+	const oversizedRequest = [{ role: "user", content: "x".repeat(130_000) },
+		{ role: "assistant", content: "y".repeat(130_000) }];
+	const activeCtx = { ...ctx, model: { contextWindow: 200_000 } };
+	requestContextFilter(activeCtx);
+	await assert.rejects(hooks.context({ messages: oversizedRequest }, activeCtx), /overflow/,
+		"an oversized protected request cannot be silently clipped");
+	assert.equal(oversizedRequest[0].content.length, 130_000);
+	resetContextFilter();
 	const activeMessages = [
-		{ role: "user", content: "old " + "x".repeat(130_000) },
+		{ role: "assistant", content: "old " + "x".repeat(130_000) },
 		{ role: "assistant", content: [{ type: "text", text: "old answer" }] },
 		{ role: "user", content: "current turn" },
 		{
@@ -946,7 +954,6 @@ try {
 			content: [{ type: "text", text: "y".repeat(100_000) }],
 		},
 	];
-	const activeCtx = { ...ctx, model: { contextWindow: 200_000 } };
 	requestContextFilter(activeCtx);
 	const activeFiltered = await hooks.context(
 		{ messages: activeMessages },
@@ -1010,8 +1017,8 @@ try {
 		assert.equal(result.messages[0].role, "compactionSummary");
 		assert.match(result.messages[0].summary, /CURRENT-REQUEST/);
 		assert(
-			JSON.stringify(result.messages).length / 4 < 40_000,
-			"a 1M-window model must retain roughly 30k, not the entire 160k current turn",
+			JSON.stringify(result.messages).length / 4 < 42_000,
+			"a 1M-window model must retain roughly 30k plus the 8k summary and one batch, not the entire 160k turn",
 		);
 		const calls = new Set(
 			result.messages.flatMap((message) =>
@@ -1091,7 +1098,8 @@ try {
 	);
 	assertCompactTail(newUserTail);
 	assert(newUserTail.messages.includes(nextUser), "new user survives recovery");
-	assert.match(newUserTail.messages[0].summary, /NEXT-REQUEST/);
+	assert.match(JSON.stringify(newUserTail.messages), /NEXT-REQUEST/,
+		"latest request remains in the live tail rather than duplicating it in memory");
 	assert(!newUserTail.messages.includes(withInternalPrefix[0]));
 	const stableRecoveredTail = await hooks.context(
 		{ messages: newUserHistory },
@@ -1221,6 +1229,33 @@ try {
 			pattern,
 			"discovery has an enforced tool-free read-only contract",
 		);
+	// The production hook never launches the retired discovery job, even with legacy settings.
+	launch = null;
+	const preparation = {
+		messagesToSummarize: [{ role: "user", content: "Preserve this request." }],
+		firstKeptEntryId: "kept", tokensBefore: 100,
+	};
+	const cleaned = await hooks.session_before_compact({ preparation }, ctx);
+	assert.equal(cleaned.compaction.details.compactionMode, "cleaned");
+	assert.equal(launch, null);
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({
+		workOrchestrator: { context: { compactionModel: "test/summary", compactionThinking: "low" } },
+	}));
+	let memoryCalls = 0;
+	const hybridContext = { ...ctx, modelRegistry: {
+		find: (provider, id) => provider === "test" && id === "summary" ? { provider, id } : undefined,
+		streamSimple() {
+			memoryCalls++;
+			return { result: async () => ({ stopReason: "stop", usage: { input: 10, output: 5 },
+				content: [{ type: "text", text: JSON.stringify({ checkpoint: "Continue the task.", knowledge: [] }) }],
+			}) };
+		},
+	} };
+	const combined = await hooks.session_before_compact({ preparation }, hybridContext);
+	assert.equal(combined.compaction.details.compactionMode, "hybrid");
+	assert.equal(combined.compaction.usage.output, 5);
+	assert.equal(memoryCalls, 1);
+	assert.equal(launch, null, "hybrid summary/extraction cannot launch a separate discoverer");
 	console.log("ok - compaction internal failure and completion notifications");
 } finally {
 	await hooks.session_shutdown?.({}, ctx);
