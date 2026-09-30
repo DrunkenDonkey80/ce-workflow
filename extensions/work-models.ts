@@ -4430,17 +4430,21 @@ function creativeSidecarStep(
 		.join("\n");
 }
 
-function researchHandoffPrompt(cwd, question, { kind = "research", advisors = "ask" } = {}) {
+function researchHandoffPrompt(cwd, question, { kind = "research", advisors = "ask", currentModel = "", availableModels = null } = {}) {
 	const settings = readEffectiveSettings(cwd);
-	const slots = configuredAdvisorSlots(settings).map((slot, index) => ({
+	const candidates = configuredAdvisorSlots(settings).map((slot, index) => ({
 		name: slot.label,
 		source: slotSourceForSlot(settings, slot),
-		model: slotSelection(slot, settings).model,
+		model: configuredModelId(slotSelection(slot, settings).model, currentModel),
 		charter: ["evidence and assumptions", "feasibility and risks", "simplest viable alternative"][index],
-	}));
+	})).filter(({ source, model }) => source === CHATGPT_WEB_SOURCE
+		? chatgptConsultAvailable()
+		: model && model !== NONE_MODEL && model !== currentModel &&
+			(availableModels === null || availableModels.includes(model)));
+	const slots = advisors === "none" ? [] : advisors === "narrow" ? candidates.slice(0, 1) : candidates;
 	const advisorStep = slots.length
-		? `Consult each of these configured advisor slots independently using the same full question, constraints, sources, and draft; add its distinct charter. If subagent is not active, call subagents_enable; then call subagent action:list capabilities:true and action:models before launching. For model slots call subagent with agent:"oracle", context:"fresh", task containing the full question, draft and assigned charter plus 'Read-only critique; do not edit files, create artifacts, or launch subagents'; pass the slot's model unless it is absent or inherits the current model. For ChatGPT Web slots use chatgpt_consult mode:"temp" with the same question, draft, and charter. Slots: ${JSON.stringify(slots)}. Wait for every response, record unavailable slots without retry, then compare, deduplicate, and synthesize their disagreements into one answer. Never hand an advisor another advisor's output.`
-		: "No advisors are configured; critique the draft yourself and say so.";
+		? `Consult the selected configured advisor slots independently using the same full question, constraints, sources, and draft; add each slot's distinct charter. Exclude the inline model and unavailable models. ${advisors === "ask" ? "After the user chooses: Narrow uses only the first remaining slot in list order; Wide uses all remaining slots." : advisors === "narrow" ? "Narrow: use only the first available slot below." : "Wide: use all available slots below."} If subagent is not active, call subagents_enable; then call subagent action:list capabilities:true and action:models before launching. For model slots call subagent with agent:"oracle", context:"fresh", task containing the full question, draft and assigned charter plus 'Read-only critique; do not edit files, create artifacts, or launch subagents'; pass the slot's model unless it is absent or inherits the current model. For ChatGPT Web slots use chatgpt_consult mode:"temp" with the same question, draft, and charter. Slots: ${JSON.stringify(slots)}. Wait for every response, record unavailable slots without retry, then compare, deduplicate, and synthesize their disagreements into one answer. Never hand an advisor another advisor's output.`
+		: "No other configured advisor slots are available; continue with the inline agent alone and say so.";
 	return [
 		`Explore this ${kind} request without implementation or work-store capture: ${question}`,
 		"Research mode remains on after the answer. Read project context when relevant; verify external load-bearing claims with primary sources. Ask at most one genuinely blocking clarification.",
@@ -4448,8 +4452,8 @@ function researchHandoffPrompt(cwd, question, { kind = "research", advisors = "a
 			? "Generate 20–30 grounded candidates across distinct axes, critique each, merge duplicates, then present up to 20 ranked ideas with evidence, trade-offs and rejected directions. Do not invoke ideation capture or create WorkItems."
 			: "Independently draft the baseline answer and materially different options, with evidence, trade-offs, uncertainty, and open questions.",
 		advisors === "ask"
-			? `Before consulting anyone, ask the user directly with ask_user whether to use the configured advisors. If yes: ${advisorStep} If no, continue alone.`
-			: advisors === "yes" ? advisorStep : "Do not consult advisors; synthesize independently.",
+			? `Before consulting anyone, ask the user directly with ask_user to choose None (inline agent only), Narrow (first other available advisor in list order), or Wide (all other available advisors). None: do not consult advisors. Narrow/Wide: ${advisorStep}`
+			: advisors === "none" ? "Do not consult advisors; synthesize independently." : advisorStep,
 		"Record meaningful conclusions, citations, and unresolved questions using research_note in the system-temp notebook. Shell exploration, isolated installs, extracted archives, and scratch scripts are allowed in the same temp directory. Do not implement product changes or commit/push. Promote artifacts only when the user explicitly requests saving them. Return one coherent answer, not a stack of advisor transcripts.",
 	].join("\n");
 }
@@ -4457,17 +4461,32 @@ function researchHandoffPrompt(cwd, question, { kind = "research", advisors = "a
 async function chooseExplorationAdvisors(ctx) {
 	if (typeof ctx.ui?.custom !== "function" && typeof ctx.ui?.select !== "function") return "ask";
 	return await choose(ctx, "Explore with advisors?", [
-		{ value: "yes", label: "Use advisors", description: "Send the same request to configured advisor models, then merge their responses." },
-		{ value: "no", label: "Work alone", description: "Explore without consulting other models." },
-	], "no", { purpose: "Choose whether this exploration needs independent model perspectives." }) ?? null;
+		{ value: "none", label: "None", description: "Use only the inline agent." },
+		{ value: "narrow", label: "Narrow", description: "Use the first other available advisor in list order." },
+		{ value: "wide", label: "Wide", description: "Use all available advisors except the inline model." },
+	], "none", { purpose: "Choose how many independent model perspectives this exploration needs." }) ?? null;
 }
 
-async function startExploration(ctx, pi, question, kind, wide = false) {
-	if (!question.trim()) return notify(ctx, `Usage: /${kind} [wide] <${kind === "ideate" ? "topic" : "question"}>`, "warning");
-	const advisors = wide ? "yes" : await chooseExplorationAdvisors(ctx);
+async function startExploration(ctx, pi, question, kind, advisors = "ask") {
+	const prefix = question.trim().match(/^(none|narrow|wide)(?:\s+|$)/i);
+	if (advisors === "ask" && prefix) {
+		advisors = prefix[1].toLowerCase();
+		question = question.trim().slice(prefix[0].length);
+	}
+	if (!question.trim()) return notify(ctx, `Usage: /${kind} [none|narrow|wide] <${kind === "ideate" ? "topic" : "question"}>`, "warning");
+	if (advisors === "ask") advisors = await chooseExplorationAdvisors(ctx);
 	if (advisors === null) return notify(ctx, "Exploration cancelled.", "info");
+	let availableModels = null;
+	if (advisors !== "none" && ctx.modelRegistry?.getAvailable) {
+		try {
+			availableModels = (await ctx.modelRegistry.getAvailable()).map(model => `${model.provider}/${model.id}`);
+		} catch {
+			availableModels = [];
+			notify(ctx, "Model advisor availability could not be checked; skipping model advisors.", "warning");
+		}
+	}
 	setResearchContext(ctx, true);
-	await sendFollowUp(ctx, researchHandoffPrompt(ctx.cwd, question, { kind, advisors }), pi);
+	await sendFollowUp(ctx, researchHandoffPrompt(ctx.cwd, question, { kind, advisors, currentModel: currentModelId(ctx), availableModels }), pi);
 	return { ok: true, action: `run-${kind}`, advisors, message: `${kind} queued in research mode.` };
 }
 
@@ -6523,7 +6542,8 @@ function captureContextFilterSnapshot(ctx) {
 }
 
 async function prepareContextFilter(event, ctx) {
-	if (researchContext) return false;
+	const signal = event.signal ?? ctx.signal;
+	if (researchContext || signal?.aborted) return false;
 	contextFilterState.requested = false;
 	const snapshot = contextFilterState.snapshot;
 	if (!snapshot) return false;
@@ -6552,8 +6572,18 @@ async function prepareContextFilter(event, ctx) {
 		fileOps: contextFilterFileOps(removed),
 		tokensBefore,
 	};
-	const compacted = await compactSessionMemory(ctx, current, state, preparation, messages, event.signal);
-	if (snapshot !== contextFilterState.snapshot || ctx.signal?.aborted || researchContext) return false;
+	let compacted;
+	try {
+		compacted = await compactSessionMemory(ctx, current, state, preparation, messages, signal);
+	} catch (error) {
+		if (!signal?.aborted) throw error;
+	}
+	if (snapshot !== contextFilterState.snapshot || researchContext) return false;
+	if (signal?.aborted) {
+		// Cancellation is normal; keep the previous cut and retry on the next live turn.
+		contextFilterState.requested = true;
+		return false;
+	}
 	contextFilterState.active = true;
 	contextFilterState.summary = compacted.summary;
 	storeCompactionKnowledge(ctx, compacted.knowledge, contextMessageAnchor(messages[cutIndex - 1]));
@@ -17876,7 +17906,7 @@ function parseWorkIdeateArgs(args = "") {
 	if (!input) return { kind: "dashboard" };
 	const parts = input.split(/\s+/);
 	const head = parts[0]?.toLowerCase();
-	if (head === "wide" || head === "narrow")
+	if (["none", "narrow", "wide"].includes(head))
 		return { kind: "topic", topic: parts.slice(1).join(" "), agents: head };
 	if (IDEA_ACTIONS.has(head)) {
 		if ((head === "edit" || head === "delete") && parts.length > 1)
@@ -18670,7 +18700,7 @@ function buildWorkIdeateState(cwd, args = "", options = {}) {
 			if (!parsed.topic)
 				return errorState(
 					"missing-topic",
-					"Usage: /work-ideate [wide|narrow] <topic>",
+					"Usage: /work-ideate [none|narrow|wide] <topic>",
 					{ action: "usage" },
 				);
 			const runId = telemetryId("ideate");
@@ -19262,14 +19292,14 @@ async function handleWorkIdeateCommand(ctx, pi, text = "") {
 	if (parsed.kind === "topic" && !parsed.topic) {
 		const state = errorState(
 			"missing-topic",
-			"Usage: /work-ideate [wide|narrow] <topic>",
+			"Usage: /work-ideate [none|narrow|wide] <topic>",
 			{ action: "usage" },
 		);
 		notify(ctx, renderWorkIdeateText(state), "warning");
 		return stateTelemetry(state);
 	}
 	if (parsed.kind === "topic")
-		return startExploration(ctx, pi, parsed.topic, "ideate", parsed.agents === "wide");
+		return startExploration(ctx, pi, parsed.topic, "ideate", parsed.agents ?? "ask");
 	const state = buildWorkIdeateState(ctx.cwd, text);
 	notify(ctx, renderWorkIdeateText(state), state.ok ? "info" : "warning");
 	return stateTelemetry(state);
@@ -29833,7 +29863,7 @@ async function executeOrchestratorAction(
 				notify(ctx, state.message, "warning");
 				return state;
 			}
-			return startExploration(ctx, pi, question.replace(/^wide\s+/i, ""), "research", /^wide\s+/i.test(question));
+			return startExploration(ctx, pi, question, "research");
 		});
 	if (name === "work-brainstorm")
 		return withCommandTelemetry(name, text, ctx, async () => {
@@ -31944,7 +31974,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("research", {
-		description: "Toggle research mode, or explore a question (wide <question> uses advisors)",
+		description: "Toggle research mode, or explore a question ([none|narrow|wide] selects advisor usage)",
 		handler: async (args, ctx) => {
 			const action = args.trim();
 			if (action === "notes") return notify(ctx, researchNotes ?? "No temporary research notebook for this branch.", "info");
@@ -31955,17 +31985,17 @@ export default function workModelsExtension(pi) {
 				return notify(ctx, `Saved the temporary notebook to ${destination}`, "info");
 			}
 			if (action && !["on", "off"].includes(action))
-				return startExploration(ctx, pi, action.replace(/^wide\s+/i, ""), "research", /^wide\s+/i.test(action));
+				return startExploration(ctx, pi, action, "research");
 			setResearchContext(ctx, action === "on" || (action !== "off" && (!researchContext || researchContext.stopping)));
 			notifyResearchContext(ctx);
 		},
 	});
 	pi.registerCommand("ideate", {
-		description: "Explore ideas in system temp (wide <topic> uses advisors)",
+		description: "Explore ideas in system temp ([none|narrow|wide] selects advisor usage)",
 		handler: async (args, ctx) => {
 			const topic = args.trim();
-			if (!topic) return notify(ctx, "Usage: /ideate [wide] <topic>", "warning");
-			return startExploration(ctx, pi, topic.replace(/^wide\s+/i, ""), "ideate", /^wide\s+/i.test(topic));
+			if (!topic) return notify(ctx, "Usage: /ideate [none|narrow|wide] <topic>", "warning");
+			return startExploration(ctx, pi, topic, "ideate");
 		},
 	});
 	pi.registerShortcut?.("ctrl+r", {

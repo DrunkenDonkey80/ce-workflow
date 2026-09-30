@@ -1277,6 +1277,42 @@ try {
 	assert.equal(combined.compaction.usage.output, 5);
 	assert.equal(memoryCalls, 1);
 	assert.equal(launch, null, "hybrid summary/extraction cannot launch a separate discoverer");
+	// Context-hook compaction is optional: an aborted turn must not surface an extension error or publish a partial cut.
+	const cancellationMessagesBefore = JSON.stringify(activeMessages);
+	const hasSummary = result => result?.messages?.some(message => message.role === "compactionSummary") ?? false;
+	resetContextFilter();
+	const alreadyCancelledCtx = { ...hybridContext, model: { provider: "test", id: "summary", contextWindow: 200_000 },
+		signal: AbortSignal.abort() };
+	requestContextFilter(alreadyCancelledCtx);
+	const callsBeforeCancellation = memoryCalls;
+	const alreadyCancelled = await hooks.context({ messages: activeMessages }, alreadyCancelledCtx);
+	assert.equal(hasSummary(alreadyCancelled), false, "already-aborted turns keep the old context without a new summary");
+	assert.equal(memoryCalls, callsBeforeCancellation, "already-aborted turns make no summarizer request");
+	const freshCompactionCtx = { ...alreadyCancelledCtx, signal: new AbortController().signal };
+	const retriedAfterCancellation = await hooks.context({ messages: activeMessages }, freshCompactionCtx);
+	assert.equal(hasSummary(retriedAfterCancellation), true, "the next live turn retries the pending compaction automatically");
+	resetContextFilter();
+	const abortDuringSummary = new AbortController();
+	let cancelledSummaryCalls = 0;
+	const cancellingCtx = { ...freshCompactionCtx, signal: abortDuringSummary.signal,
+		modelRegistry: { ...hybridContext.modelRegistry,
+			streamSimple(selected, context, options) {
+				cancelledSummaryCalls++;
+				assert(options.signal instanceof AbortSignal, "summary receives the current operation signal");
+				return { result: async () => {
+					abortDuringSummary.abort();
+					throw new DOMException("This operation was aborted", "AbortError");
+				} };
+			} },
+	};
+	requestContextFilter(cancellingCtx);
+	const cancelledDuringSummary = await hooks.context({ messages: activeMessages }, cancellingCtx);
+	assert.equal(hasSummary(cancelledDuringSummary), false, "in-flight cancellation cannot publish a new cut");
+	assert.equal(cancelledSummaryCalls, 1, "user cancellation does not retry another summarizer");
+	assert.equal(hasSummary(await hooks.context({ messages: activeMessages }, freshCompactionCtx)), true,
+		"in-flight cancellation also leaves the next live turn's compaction pending");
+	assert.equal(JSON.stringify(activeMessages), cancellationMessagesBefore, "cancelled attempts never mutate saved history");
+	resetContextFilter();
 	const fallbackCalls = [];
 	const fallbackWarnings = [];
 	const fallbackContext = { ...hybridContext, model: { provider: "test", id: "current" },
@@ -1392,11 +1428,41 @@ try {
 	await hooks.agent_settled({}, researchCtx);
 	assert.equal(exitCompactions, 2, "repeated settled notifications cannot duplicate exit compaction");
 	const taskPrompts = [];
-	const taskCtx = { ...researchCtx, getContextUsage: () => ({ tokens: 1 }),
+	const taskSettingsPath = path.join(cwd, ".pi", "settings.json");
+	const taskSettings = JSON.parse(readFileSync(taskSettingsPath, "utf8"));
+	writeFileSync(taskSettingsPath, JSON.stringify({ ...taskSettings,
+		workOrchestrator: { ...taskSettings.workOrchestrator,
+			advisorEnabled: { advisor: true, advisor2: true, advisor3: true },
+			advisorSources: { advisor: "model", advisor2: "model", advisor3: "model" } },
+		subagents: { agentOverrides: {
+			"work-advisor": { model: "test/astra" },
+			"work-advisor-2": { model: "test/opus" },
+			"work-advisor-3": { model: "test/glm" } } },
+	}));
+	let availabilityChecks = 0;
+	const taskCtx = { ...researchCtx, model: { provider: "test", id: "glm" }, getContextUsage: () => ({ tokens: 1 }),
+		modelRegistry: { getAvailable: () => { availabilityChecks++; return ["astra", "opus", "glm"].map(id => ({ provider: "test", id })); } },
 		sendUserMessage: async message => taskPrompts.push(message) };
 	await commands.research.handler("wide compare options", taskCtx);
 	const taskNotebook = researchEntries.at(-1).data.notes;
-	assert.match(taskPrompts.at(-1), /Consult each of these configured advisor slots/);
+	const selectedTaskModels = () => JSON.parse(taskPrompts.at(-1).match(/Slots: (\[[^\n]+?\])\. Wait/)?.[1] ?? "[]").map(slot => slot.model);
+	assert.deepEqual(selectedTaskModels(), ["test/astra", "test/opus"], "Wide on GLM calls Astra and Opus, not GLM");
+	assert.doesNotMatch(taskPrompts.at(-1), /ask_user/, "explicit Wide does not ask again");
+	await commands.ideate.handler("wide compare alternatives", { ...taskCtx, model: { provider: "test", id: "sol" } });
+	assert.deepEqual(selectedTaskModels(), ["test/astra", "test/opus", "test/glm"], "Wide on another model calls all three advisors");
+	await commands.research.handler("narrow compare options", { ...taskCtx, model: { provider: "test", id: "astra" } });
+	assert.deepEqual(selectedTaskModels(), ["test/opus"], "Narrow skips the inline advisor before selecting the first other model");
+	await commands.ideate.handler("narrow compare alternatives", { ...taskCtx, model: { provider: "test", id: "sol" },
+		modelRegistry: { getAvailable: () => [{ provider: "test", id: "glm" }] } });
+	assert.deepEqual(selectedTaskModels(), ["test/glm"], "Narrow skips unavailable advisors in list order");
+	const checksBeforeNone = availabilityChecks;
+	await commands.research.handler("none compare options", taskCtx);
+	assert.deepEqual(selectedTaskModels(), []);
+	assert.match(taskPrompts.at(-1), /Do not consult advisors/);
+	assert.equal(availabilityChecks, checksBeforeNone, "None does not query advisor availability");
+	await commands.research.handler("narrow compare options", { ...taskCtx,
+		modelRegistry: { getAvailable: () => { throw new Error("Unavailable registry"); } } });
+	assert.deepEqual(selectedTaskModels(), [], "availability failures continue safely with the inline agent only");
 	await commands.ideate.handler("improve onboarding", taskCtx);
 	assert.match(taskPrompts.at(-1), /ask_user/);
 	assert.match(taskPrompts.at(-1), /Do not invoke ideation capture or create WorkItems/);

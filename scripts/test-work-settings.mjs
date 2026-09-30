@@ -1246,6 +1246,32 @@ try {
 			!researchPrompt.includes("workflowScript"),
 		"research offers configured read-only advisors and records temp findings",
 	);
+	assert(["None (", "Narrow (", "Wide ("].every(choice => researchPrompt.includes(choice)),
+		"headless research offers all three advisor modes");
+	for (const [advisors, currentModel, availableModels, expected] of [
+		["none", "test/control", null, []],
+		["narrow", "test/control", null, ["test/generator-a"]],
+		["narrow", "test/generator-a", null, ["test/generator-b"]],
+		["narrow", "test/control", ["test/generator-c"], ["test/generator-c"]],
+		["wide", "test/generator-c", null, ["test/generator-a", "test/generator-b"]],
+		["wide", "test/control", null, ["test/generator-a", "test/generator-b", "test/generator-c"]],
+		["wide", "test/generator-a", ["test/generator-a", "test/generator-c"], ["test/generator-c"]],
+		["wide", "test/control", [], []],
+	]) {
+		const prompt = mod.researchHandoffPrompt(cwd, "Compare alternatives", { advisors, currentModel, availableModels });
+		const slots = JSON.parse(prompt.match(/Slots: (\[[^\n]+?\])\. Wait/)?.[1] ?? "[]");
+		assert(JSON.stringify(slots.map(slot => slot.model)) === JSON.stringify(expected),
+			`${advisors} uses eligible configured advisors in list order, excluding ${currentModel}`);
+		assert(!prompt.includes("ask_user"), "explicit advisor modes do not ask again");
+		if (advisors === "none") assert(!prompt.includes("subagents_enable"), "None never delegates");
+	}
+	settings.subagents.agentOverrides["work-advisor"].model = "__inherit_model__";
+	writeSettings(settings);
+	const inheritedResearch = mod.researchHandoffPrompt(cwd, "Compare alternatives", { advisors: "narrow", currentModel: "test/control" });
+	assert(inheritedResearch.includes('"model":"test/generator-b"') && !inheritedResearch.includes('"model":"test/control"'),
+		"an inherited inline model is skipped before Narrow selects its advisor");
+	settings.subagents.agentOverrides["work-advisor"].model = "test/generator-a";
+	writeSettings(settings);
 	const healthTargets = mod.selectedAgentHealthTargets(
 		cwd,
 		"test/control",

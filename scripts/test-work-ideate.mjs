@@ -206,6 +206,10 @@ assert(
 	"narrow keyword parses",
 );
 assert(
+	parseWorkIdeateArgs("none deep work").agents === "none",
+	"none keyword parses",
+);
+assert(
 	JSON.stringify(parseWorkIdeateArgs("edit IDEA-3 new description text")) ===
 		JSON.stringify({
 			kind: "action",
@@ -729,7 +733,7 @@ try {
 	};
 
 	fixture.reset("ideas");
-	let handled = await runHandler(["Use advisors"], [], "improve onboarding");
+	let handled = await runHandler(["Wide"], [], "improve onboarding");
 	assert(
 		handled.followUps.length === 1 &&
 			handled.followUps[0].includes("Explore this ideate request") &&
@@ -754,6 +758,16 @@ try {
 	assert(handled.followUps.length === 1 && handled.selectCalls.length === 0 &&
 		handled.followUps[0].includes("configured advisor slots"),
 		"wide ideation uses advisors without asking");
+	for (const depth of ["none", "narrow", "wide"]) {
+		handled = await runHandler([depth[0].toUpperCase() + depth.slice(1)], [], "compare alternatives");
+		assert(handled.result.advisors === depth && handled.followUps.length === 1,
+			`${depth} is selectable from the shared advisor dialog`);
+		handled = await runHandler([], [], `${depth} compare alternatives`);
+		assert(handled.result.advisors === depth && handled.selectCalls.length === 0,
+			`${depth} prefix skips the advisor dialog`);
+		if (depth === "none") assert(handled.followUps[0].includes("Do not consult advisors"),
+			"None uses only the inline agent");
+	}
 
 	fixture.reset("ideas");
 	handled = await runHandler(["Contender idea", "Discuss"], [""], "");
