@@ -245,6 +245,7 @@ try {
 			registerCommand: (name, config) => {
 				commands[name] = config;
 			},
+			registerTool() {},
 		};
 		workModelsExtension(pi);
 		const messages = [];

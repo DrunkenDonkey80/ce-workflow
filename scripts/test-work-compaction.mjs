@@ -508,7 +508,9 @@ const registry = {
 		assert.equal(options.reasoning, "low");
 		assert.equal(context.tools, undefined);
 		const task = context.messages[0].content[0].text;
-		const source = JSON.parse(task.slice(task.indexOf('\n') + 1)).delta[1].source;
+		let source;
+		try { source = JSON.parse(task.slice(task.indexOf('\n') + 1)).delta[1].source; }
+		catch (error) { assert.fail(`Invalid compaction request JSON: ${error.message}`); }
 		const text = responseMode === "invalid" ? "not JSON" : JSON.stringify({
 			checkpoint: responseMode === "large" ? "x".repeat(17000) : "Rollover 07:15 UTC; independent approval required.",
 			knowledge: [{ claim: "Supplier rollover is 07:15 UTC.", status: "observed", sources: [responseMode === "citation" ? "invented:1" : source] }],
@@ -516,7 +518,7 @@ const registry = {
 		return { result: async () => ({ content: [{ type: "text", text }], stopReason: "stop", usage: { input: 50, output: 20 } }) };
 	},
 };
-const local = await compactMemory({ messages, registry });
+const local = await compactMemory({ messages, registry, currentModel: "test/summary" });
 assert.equal(calls, 0, "None must never request a model");
 assert.equal(local.mode, "cleaned");
 assert.match(local.summary, /07:15 UTC/);
@@ -543,7 +545,7 @@ for (const invalid of ["invalid", "large", "citation"]) {
 	assert.equal(failed.usage.output, 20, "rejected output still incurs usage");
 	assert(failed.summary.length <= 32000);
 }
-assert.equal(calls, 4, "failures must not launch a second/fallback model call");
+assert.equal(calls, 4, "without a current model, failures go straight to cleaned memory");
 const switchedOff = await compactMemory({ messages: later, previousSummary: hybrid.summary, registry });
 assert.equal(calls, 4);
 assert.match(switchedOff.summary, /07:15 UTC/);
@@ -557,4 +559,54 @@ const records = gather(later);
 const frame = { coreRecords: [], core: coreText([]) };
 const preserved = fallbackMemory(frame, decodeMemory(hybrid.summary).tail, records, 32000);
 assert(preserved.memory.includes(JSON.stringify(records.find(r => r.tool === "edit"))));
-process.stdout.write("ok - work compaction policy, cleaned/hybrid selection, one-call knowledge, bounded rejection fallback\n");
+// Each model gets at most one attempt; retain usage even for rejected responses.
+async function retryCase(primary, secondary = "valid", options = {}) {
+	const attempted = [];
+	const result = await compactMemory({
+		messages, previousSummary: hybrid.summary, model: "test/summary", currentModel: "test/current", ...options,
+		registry: {
+			find: (provider, id) => primary === "unavailable" && id === "summary" ? undefined : { provider, id },
+			streamSimple(selected, context, request) {
+				attempted.push(selected.id);
+				const outcome = selected.id === "summary" ? primary : secondary;
+				if (outcome === "throw") throw new Error("Provider unavailable");
+				responseMode = outcome;
+				const response = registry.streamSimple(selected, context, request);
+				return { result: async () => {
+					const value = await response.result();
+					value.usage.cost = { input: 0.1, output: 0.2, total: 0.3 };
+					if (outcome === "aborted") value.stopReason = "aborted";
+					if (outcome === "cancel") options.controller.abort();
+					return value;
+				} };
+			},
+		},
+	});
+	return { result, attempted };
+}
+for (const reason of ["invalid", "large", "citation", "throw", "unavailable", "aborted"]) {
+	const { result, attempted } = await retryCase(reason);
+	assert.equal(result.mode, "hybrid", reason);
+	assert.equal(result.model, "test/current");
+	assert.deepEqual(attempted, reason === "unavailable" ? ["current"] : ["summary", "current"]);
+	assert.equal(result.attempts.length, 2);
+	assert(result.attempts[0].error);
+	const responses = ["throw", "unavailable"].includes(reason) ? 1 : 2;
+	assert.equal(result.usage.output, 20 * responses);
+	assert.equal(result.usage.cost.total, 0.3 * responses);
+}
+const doubleFailure = await retryCase("invalid", "invalid");
+assert.equal(doubleFailure.result.mode, "fallback");
+assert.deepEqual(doubleFailure.attempted, ["summary", "current"]);
+assert(doubleFailure.result.summary.includes(decodeMemory(hybrid.summary).tail));
+assert.equal(doubleFailure.result.usage.output, 40);
+assert.deepEqual(doubleFailure.result.knowledge, []);
+const sameModel = await retryCase("invalid", "valid", { currentModel: "test/summary" });
+assert.deepEqual(sameModel.attempted, ["summary"]);
+assert.equal(sameModel.result.mode, "fallback");
+assert.deepEqual((await retryCase("valid")).attempted, ["summary"]);
+const controller = new AbortController();
+const beforeCancel = calls;
+await assert.rejects(retryCase("cancel", "valid", { controller, signal: controller.signal }), /cancelled/);
+assert.equal(calls, beforeCancel + 1, "user cancellation must not retry on the current model");
+process.stdout.write("ok - work compaction policy, selected/current/cleaned fallback, bounded attempts, usage, cancellation\n");

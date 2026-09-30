@@ -408,6 +408,7 @@ try {
 		registerCommand: (name, config) => {
 			commands[name] = config;
 		},
+		registerTool: () => {},
 	});
 	assert(
 		process.env.PI_ASK_USER_CONTEXT_EXPANDED === "true",
@@ -487,6 +488,7 @@ try {
 			}
 			action.capture?.(lines);
 			component.handleInput(action.key);
+			for (const key of action.afterKeys ?? []) component.handleInput(key);
 			assert(closed, `settings action ${action.key} did not close selector`);
 			return result;
 		},
@@ -528,6 +530,26 @@ try {
 		},
 	});
 	assert(notices.length === 0, "non-TUI settings fallback exits cleanly");
+	let visionChoices = "";
+	await invoke("work-settings", "", {
+		...ctx,
+		modelRegistry: { getAvailable: async () => [
+			{ provider: "test", id: "text-only", name: "Text Only", input: ["text"] },
+			{ provider: "test", id: "vision", name: "Vision Test", input: ["text", "image"] },
+		] },
+		ui: customUi([
+			{ target: "Vision model:", key: "enter" },
+			{ target: "Vision Test", key: "enter", capture: lines => { visionChoices = lines.join("\n"); } },
+			{ target: "Models without vision:", key: "enter" },
+			{ target: "Text Only", key: "enter", afterKeys: ["escape"] },
+			{ key: "escape" },
+		]),
+	});
+	assert(visionChoices.includes("Vision Test") && visionChoices.includes("Text Only"), "vision picker trusts the selected model");
+	assert(mod.visionModelSettings(cwd) === "test/vision", "selected vision model persists");
+	assert(JSON.stringify(mod.nonVisionModelsSettings(cwd)) === JSON.stringify(["test/text-only"]), "explicit non-vision checklist persists");
+	// Return to default so subsequent settings assertions remain independent.
+	writeSettings({});
 
 	// status reports the advisor slot and gates.
 	await invoke("work-settings", "status", ctx);
@@ -1217,14 +1239,12 @@ try {
 	delete settings.workOrchestrator.creativeSource;
 	writeSettings(settings);
 	const researchPrompt = mod.researchHandoffPrompt(cwd, "Which path is best?");
-	const researchKeys = researchPrompt.match(/"key":"divergent-\d+"/g) ?? [];
 	assert(
-		researchPrompt.includes("workflowScript") &&
-			researchPrompt.includes("runs.all") &&
-			researchKeys.length === 3 &&
-			new Set(researchKeys).size === 3 &&
-			!researchPrompt.includes("tasks mode"),
-		"research uses unique stable-key workflowScript branches without stale tasks-mode guidance",
+		researchPrompt.includes("ask_user") &&
+			researchPrompt.includes("configured advisor slots") &&
+			researchPrompt.includes("research_note") &&
+			!researchPrompt.includes("workflowScript"),
+		"research offers configured read-only advisors and records temp findings",
 	);
 	const healthTargets = mod.selectedAgentHealthTargets(
 		cwd,

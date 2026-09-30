@@ -698,10 +698,12 @@ try {
 		const notifications = [];
 		const followUps = [];
 		const selectCalls = [];
+		const statuses = [];
 		const ctx = {
 			cwd,
 			mode: "cli",
 			ui: {
+				setStatus: (key, value) => statuses.push({ key, value }),
 				workDialogsNative: true,
 				select: async (title, labels) => {
 					selectCalls.push(title);
@@ -722,27 +724,41 @@ try {
 			notifications,
 			followUps,
 			selectCalls,
+			statuses,
 		}));
 	};
 
 	fixture.reset("ideas");
-	let handled = await runHandler(["Wide"], [], "improve onboarding");
+	let handled = await runHandler(["Use advisors"], [], "improve onboarding");
 	assert(
 		handled.followUps.length === 1 &&
-			handled.followUps[0].includes("Ideation sidecar gate"),
-		"depth dialog selects wide and launches the sidecar handoff",
+			handled.followUps[0].includes("Explore this ideate request") &&
+			handled.followUps[0].includes("configured advisor slots"),
+		"ideation asks for advisors and dispatches temp-only exploration",
 	);
-	assert(
-		handled.followUps[0].includes("BEGIN VERIFIED PRIVATE IDEATE PLAYBOOK"),
-		"dialog-launched handoff carries the playbook",
-	);
+	assert(handled.statuses.some(s => s.value?.includes("RESEARCH MODE")),
+		"ideation enables persistent research mode");
+	assert(!handled.followUps[0].includes("captureIdeationIdeas"),
+		"ideation does not capture into the work store");
 
 	fixture.reset("ideas");
 	handled = await runHandler([], [], "improve onboarding");
 	assert(
 		handled.notifications.some((message) => message.includes("cancelled")),
-		"cancelling the depth dialog cancels ideation",
+		"cancelling the advisor dialog cancels ideation",
 	);
+	assert(handled.statuses.length === 0, "cancelled ideation does not enable research mode");
+
+	fixture.reset("ideas");
+	handled = await runHandler([], [], "wide improve onboarding");
+	assert(handled.followUps.length === 1 && handled.selectCalls.length === 0 &&
+		handled.followUps[0].includes("configured advisor slots"),
+		"wide ideation uses advisors without asking");
+
+	fixture.reset("ideas");
+	handled = await runHandler(["Contender idea", "Discuss"], [""], "");
+	assert(handled.followUps.length === 1,
+		"idea discussion remains available while research mode is already active");
 
 	fixture.reset("ideas");
 	handled = await runHandler(["Show rejected", undefined], [""], "");
@@ -782,13 +798,14 @@ try {
 		"dialog brainstorm flow hands off to the playbook",
 	);
 
-	// --- headless default: narrow, no dialog -----------------------------------
+	// --- headless: request advisor choice in chat ---------------------------------
 	const headlessFollowUps = [];
+	const headlessStatuses = [];
 	const headlessResult = await handleWorkIdeateCommand(
 		{
 			cwd,
 			mode: "cli",
-			ui: { notify: () => {}, workDialogsNative: true },
+			ui: { notify: () => {}, workDialogsNative: true, setStatus: (_key, value) => headlessStatuses.push(value) },
 			sendUserMessage: async (message) => headlessFollowUps.push(message),
 		},
 		null,
@@ -800,10 +817,12 @@ try {
 	);
 	assert(
 		headlessFollowUps.length === 1 &&
-			headlessFollowUps[0].includes("Depth: narrow") &&
+			headlessFollowUps[0].includes("ask_user") &&
 			!headlessFollowUps[0].includes("Ideation sidecar gate"),
-		"headless invocation defaults to narrow without a dialog",
+		"headless invocation asks the user before consulting advisors",
 	);
+	assert(headlessStatuses.length === 0,
+		"headless ideation keeps the already active research mode");
 } finally {
 	fixture.cleanup();
 }

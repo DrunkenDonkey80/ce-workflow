@@ -675,6 +675,7 @@ try {
 			registerCommand: (name, config) => {
 				commands[name] = config;
 			},
+			registerTool() {},
 			sendUserMessage: async (message, options) => sent.push({ message, options }),
 		};
 		workModelsExtension(pi);

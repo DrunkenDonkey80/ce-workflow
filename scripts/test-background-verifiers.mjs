@@ -1740,6 +1740,7 @@ try {
 		registerCommand(name, command) {
 			commands[name] = command;
 		},
+		registerTool() {},
 		getThinkingLevel: () => "xhigh",
 		events: {
 			on(name, listener) {

@@ -24,6 +24,12 @@ import workModelsExtension, {
 // on 2026-09-08. No provider, child process, or real project mutation is needed.
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-compaction-notifications-"));
 const hooks = {};
+const contextHooks = [];
+const tools = {};
+const commands = {};
+const researchEntries = [];
+const researchWidgets = [];
+const shortcuts = {};
 const listeners = new Map();
 let aborts = 0;
 let launch;
@@ -33,11 +39,25 @@ const runId = "43b46a2e-ec06-4f14-b99e-e3f81478d87a";
 let replyRunId = runId;
 const pi = {
 	on: (name, handler) => {
-		hooks[name] = handler;
+		if (name === "context") {
+			contextHooks.push(handler);
+			hooks.context = async (event, ctx) => {
+				let messages = event.messages;
+				let changed = false;
+				for (const callback of contextHooks) {
+					const result = await callback({ ...event, messages }, ctx);
+					if (result?.messages) { messages = result.messages; changed = true; }
+				}
+				return changed ? { messages } : undefined;
+			};
+		} else hooks[name] = handler;
 	},
-	registerTool() {},
-	registerCommand() {},
-	registerShortcut() {},
+	registerTool(tool) { tools[tool.name] = tool; },
+	registerCommand(name, command) { commands[name] = command; },
+	registerShortcut(key, shortcut) { shortcuts[key] = shortcut; },
+	appendEntry(customType, data) {
+		if (customType === "work-research-context") researchEntries.push({ type: "custom", customType, data: structuredClone(data) });
+	},
 	events: {
 		on(name, handler) {
 			listeners.set(name, handler);
@@ -74,7 +94,7 @@ const ctx = {
 		getBranch: () => [],
 		getEntries: () => [],
 	},
-	ui: { notify() {}, setStatus() {}, setWidget() {} },
+	ui: { notify() {}, setStatus() {}, setWidget(key, content) { if (key === "work-research-context") researchWidgets.push(content); } },
 };
 const failure = `Subagent failed: delegate\nRun: ${runId} step 1\nSignal: delegate completed without making edits for an implementation task`;
 const notices = [
@@ -101,6 +121,7 @@ try {
 	writeFileSync(
 		path.join(cwd, ".pi", "settings.json"),
 		JSON.stringify({
+			workOrchestrator: { context: { compactionModel: "__none_model__" } },
 			workKnowledge: { discoverer: { model: "test/free", thinking: "low" } },
 		}),
 	);
@@ -544,7 +565,7 @@ try {
 	);
 	const longLines = Array.from(
 		{ length: 105 },
-		(_, i) => `${i}: ` + "x".repeat(500),
+		(_, i) => `${i}: ${"x".repeat(500)}`,
 	).join("\n");
 	assert.ok(longLines.length >= 24_000, "long-line giant fixture");
 	const longLineCut = stripProcessedPayloads([
@@ -928,7 +949,7 @@ try {
 	assert.equal(oversizedRequest[0].content.length, 130_000);
 	resetContextFilter();
 	const activeMessages = [
-		{ role: "assistant", content: "old " + "x".repeat(130_000) },
+		{ role: "assistant", content: `old ${"x".repeat(130_000)}` },
 		{ role: "assistant", content: [{ type: "text", text: "old answer" }] },
 		{ role: "user", content: "current turn" },
 		{
@@ -1256,7 +1277,176 @@ try {
 	assert.equal(combined.compaction.usage.output, 5);
 	assert.equal(memoryCalls, 1);
 	assert.equal(launch, null, "hybrid summary/extraction cannot launch a separate discoverer");
-	console.log("ok - compaction internal failure and completion notifications");
+	const fallbackCalls = [];
+	const fallbackWarnings = [];
+	const fallbackContext = { ...hybridContext, model: { provider: "test", id: "current" },
+		ui: { notify: message => fallbackWarnings.push(message) },
+		modelRegistry: {
+			find: (provider, id) => ({ provider, id }),
+			streamSimple(selected) {
+				fallbackCalls.push(selected.id);
+				if (selected.id === "summary") throw new Error("Selected model unavailable");
+				return hybridContext.modelRegistry.streamSimple();
+			},
+		},
+	};
+	const retried = await hooks.session_before_compact({ preparation }, fallbackContext);
+	assert.deepEqual(fallbackCalls, ["summary", "current"]);
+	assert.equal(retried.compaction.details.compactionMode, "hybrid");
+	assert.equal(retried.compaction.details.compactionModel, "test/current");
+	assert.equal(retried.compaction.details.compactionAttempts.length, 2);
+	assert(fallbackWarnings.some(message => message.includes("current model test/current")));
+	assert.equal(launch, null, "fallback is also a direct call, never a child agent");
+	let exitCompactions = 0;
+	const researchCtx = { ...ctx, isIdle: () => true,
+		model: { provider: "test", id: "current", contextWindow: 1_000_000 },
+		getContextUsage: () => ({ tokens: 180_000 }),
+		compact: ({ onComplete }) => { exitCompactions++; onComplete?.({}); },
+		sessionManager: { ...ctx.sessionManager, getBranch: () => researchEntries },
+	};
+	const evidence = [
+		{ role: "user", content: "Compare these research sources" },
+		{ role: "assistant", content: [{ type: "toolCall", id: "research-read", name: "read", arguments: { path: "source.md" } }] },
+		{ role: "toolResult", toolCallId: "research-read", toolName: "read", content: [{ type: "text", text: "Important middle passage. ".repeat(300) }] },
+		{ role: "assistant", content: [{ type: "text", text: "Continue comparing sources." }], stopReason: "stop" },
+	];
+	assert(commands.research && !commands.researc && shortcuts["ctrl+r"]);
+	await assert.rejects(commands.research.handler("on", researchCtx), /current compaction to finish/);
+	await hooks.session_compact({ compactionEntry: retried.compaction }, researchCtx);
+	await shortcuts["ctrl+r"].handler(researchCtx);
+	const notebook = researchEntries.at(-1).data.notes;
+	assert.match(researchWidgets.at(-1)[0], /RESEARCH MODE/);
+	assert(notebook.startsWith(path.join(tmpdir(), "pi-research-")));
+	assert.equal(await hooks.tool_call({ toolName: "edit", input: { path: path.join(cwd, "source.js") } }, researchCtx).block, true);
+	const scratchScript = path.join(path.dirname(notebook), "explore.mjs");
+	for (const toolName of ["write", "edit"]) {
+		assert.equal(await hooks.tool_call({ toolName, input: { path: scratchScript } }, researchCtx)?.block, undefined, "temp exploratory scripts are allowed");
+		assert.equal(await hooks.tool_call({ toolName, input: { path: path.join(path.dirname(notebook), "..", "outside.js") } }, researchCtx)?.block, true, "scratch writes stay within the research directory");
+	}
+	for (const toolName of ["bash", "hypa_shell"]) {
+		for (const command of ["git diff", `npm install --prefix "${path.dirname(notebook)}" example`, `unzip archive.zip -d "${path.dirname(notebook)}"`, `node "${scratchScript}"`, "git log --grep=commit", "echo \"git commit\""]) {
+			assert.equal(await hooks.tool_call({ toolName, input: { command } }, researchCtx)?.block, undefined, `${command} is allowed for research`);
+		}
+		for (const command of ["git commit -m test", "git push", "git --no-pager push", `git -C "${cwd}" -c core.safecrlf=false commit --amend`, "git status && git push", "git.exe push", `"C:/Program Files/Git/bin/git.exe" commit`, "git commit-tree HEAD", "bash -lc \"git push\"", "powershell -Command \"git commit\""]) {
+			assert.equal(await hooks.tool_call({ toolName, input: { command } }, researchCtx)?.block, true, `${command} cannot publish research`);
+		}
+	}
+	assert.equal(await hooks.user_bash({ command: "git diff" }, researchCtx), undefined);
+	assert.throws(() => hooks.user_bash({ command: "git push" }, researchCtx), /blocks Git commit and push/);
+	assert.equal(await hooks.tool_call({ toolName: "read" }, researchCtx)?.block, undefined);
+	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "worker" } }, researchCtx).block, true);
+	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", task: "Read-only critique" } }, researchCtx)?.block, undefined);
+	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { action: "models" } }, researchCtx)?.block, undefined);
+	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", worktree: true } }, researchCtx).block, true);
+	assert.match((await hooks.before_agent_start({ prompt: "Explore options" }, researchCtx)).systemPrompt, /RESEARCH MODE: Explore/);
+	await tools.research_note.execute("note", { note: "Observed result: source.md:12" });
+	assert.match(readFileSync(notebook, "utf8"), /Observed result: source.md:12/);
+	assert.equal(requestContextFilter(researchCtx), false, "no early cut above our threshold");
+	assert.equal(await hooks.context({ messages: evidence }, researchCtx), undefined, "including full processed read contents");
+	assert.equal(await hooks.session_before_compact({ preparation }, researchCtx), undefined, "native compaction must fall through");
+	await hooks.session_compact({}, researchCtx);
+	await hooks.agent_end({ messages: [evidence.at(-1)] }, researchCtx);
+	await hooks.agent_settled({}, researchCtx);
+	assert.equal(researchEntries.at(-1).data.notes, notebook, "finished answers never exit research mode");
+	await hooks.session_tree({}, { ...researchCtx, sessionManager: { ...researchCtx.sessionManager, getBranch: () => researchEntries.slice(0, 1) } });
+	assert.equal(requestContextFilter(researchCtx), false, "restore research mode on the selected branch");
+	await commands.research.handler("off", researchCtx);
+	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: notebook });
+	assert.equal(researchWidgets.at(-1), undefined, "banner disappears on exit");
+	assert.equal(exitCompactions, 1, "exit compacts once above 150k");
+	assert.equal(requestContextFilter(researchCtx), true);
+	assert.match(readFileSync(notebook, "utf8"), /Observed result/);
+	const savedNotes = path.join(path.dirname(notebook), "saved.md");
+	await commands.research.handler(`save ${savedNotes}`, researchCtx);
+	assert.match(readFileSync(savedNotes, "utf8"), /Observed result/);
+	await assert.rejects(commands.research.handler(`save ${savedNotes}`, researchCtx), /EEXIST/, "explicit save never overwrites");
+	await shortcuts["ctrl+r"].handler(researchCtx);
+	const pendingNotebook = researchEntries.at(-1).data.notes;
+	const busyResearchCtx = { ...researchCtx, isIdle: () => false };
+	await shortcuts["ctrl+r"].handler(busyResearchCtx);
+	assert.equal(researchEntries.at(-1).data.stopping, true);
+	assert.match(researchWidgets.at(-1)[0], /RESEARCH STOPPING/);
+	assert.equal(requestContextFilter(busyResearchCtx), false, "stopping keeps compaction protection");
+	assert.equal(await hooks.context({ messages: evidence }, busyResearchCtx), undefined, "stopping keeps full evidence");
+	assert.equal(await hooks.session_before_compact({ preparation }, busyResearchCtx), undefined, "native context-limit safety remains available while stopping");
+	await tools.research_note.execute("last-note", { note: "Finding while stopping" });
+	await hooks.agent_end({ messages: [evidence.at(-1)] }, busyResearchCtx);
+	assert.equal(researchEntries.at(-1).data.stopping, true, "agent_end is not the final settlement boundary");
+	await hooks.agent_settled({}, busyResearchCtx);
+	await hooks.agent_settled({}, { ...researchCtx, hasPendingMessages: () => true });
+	assert.equal(exitCompactions, 1, "never compact while streaming or with queued continuation work");
+	assert.equal(researchEntries.at(-1).data.stopping, true);
+	await shortcuts["ctrl+r"].handler(busyResearchCtx);
+	assert.equal(researchEntries.at(-1).data.stopping, undefined, "Ctrl+R cancels a pending exit");
+	assert.equal(researchEntries.at(-1).data.notes, pendingNotebook, "cancelling keeps the same notebook");
+	await hooks.agent_settled({}, researchCtx);
+	assert.equal(exitCompactions, 1, "cancelled exit does not compact");
+	await commands.research.handler("off", busyResearchCtx);
+	await hooks.session_tree({}, researchCtx);
+	assert.match(researchWidgets.at(-1)[0], /RESEARCH STOPPING/, "pending exit survives branch restoration");
+	await hooks.agent_settled({}, researchCtx);
+	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: pendingNotebook });
+	assert.equal(researchWidgets.at(-1), undefined, "banner disappears only after work settles");
+	assert.equal(exitCompactions, 2, "deferred exit compacts once when idle");
+	assert.match(readFileSync(pendingNotebook, "utf8"), /Finding while stopping/);
+	await hooks.agent_settled({}, researchCtx);
+	assert.equal(exitCompactions, 2, "repeated settled notifications cannot duplicate exit compaction");
+	const taskPrompts = [];
+	const taskCtx = { ...researchCtx, getContextUsage: () => ({ tokens: 1 }),
+		sendUserMessage: async message => taskPrompts.push(message) };
+	await commands.research.handler("wide compare options", taskCtx);
+	const taskNotebook = researchEntries.at(-1).data.notes;
+	assert.match(taskPrompts.at(-1), /Consult each of these configured advisor slots/);
+	await commands.ideate.handler("improve onboarding", taskCtx);
+	assert.match(taskPrompts.at(-1), /ask_user/);
+	assert.match(taskPrompts.at(-1), /Do not invoke ideation capture or create WorkItems/);
+	assert.equal(researchEntries.at(-1).data.notes, taskNotebook, "exploration reuses the active temp notebook");
+	await commands.research.handler("off", { ...taskCtx, isIdle: () => false });
+	assert.equal(researchEntries.at(-1).data.stopping, true, "even below 150k protection waits until the work finishes");
+	await hooks.agent_settled({}, taskCtx);
+	assert.equal(researchEntries.at(-1).data.mode, "off");
+	assert.equal(exitCompactions, 2, "small research contexts exit without compaction");
+	rmSync(path.dirname(taskNotebook), { recursive: true, force: true });
+	rmSync(path.dirname(pendingNotebook), { recursive: true, force: true });
+	rmSync(path.dirname(notebook), { recursive: true, force: true });
+	resetContextFilter();
+	const pixels = "AQIDBA==";
+	const imageMessage = { role: "toolResult", toolName: "read", content: [
+		{ type: "text", text: "Read image file [image/png]\n[Current model does not support images. The image will be omitted from this request.]" },
+		{ type: "image", mimeType: "image/png", data: pixels },
+	] };
+	const visionCtx = { ...researchCtx, model: { provider: "test", id: "text", input: ["text"] },
+		modelRegistry: {
+			find: (provider, id) => ({ provider, id, input: ["text", "image"] }),
+			streamSimple(_model, request) {
+				assert(request.messages[0].content.some(part => part.type === "image" && part.data === pixels));
+				return { result: async () => ({ stopReason: "stop", content: [{ type: "text", text: "Error code 42; button disabled." }], usage: { input: 10, output: 8 } }) };
+			},
+		},
+	};
+	assert.equal(await hooks.context({ messages: [imageMessage] }, visionCtx), undefined, "models are presumed vision-capable unless selected");
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "__none_model__", nonVisionModels: ["test/text"] } }));
+	const projected = await hooks.context({ messages: [imageMessage] }, visionCtx);
+	assert.equal(imageMessage.content[1].data, pixels, "saved image remains untouched");
+	assert.equal(projected.messages[0].content.some(part => part.type === "image"), false);
+	assert.doesNotMatch(projected.messages[0].content[0].text, /image will be omitted/);
+	const imageId = /img-[a-f0-9]{16}/.exec(JSON.stringify(projected.messages))[0];
+	assert.equal((await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "text", input: ["text", "image"] } })).messages[0].content.some(part => part.type === "image"), false, "explicit non-vision overrides metadata");
+	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx), /Configure a vision model/);
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision", nonVisionModels: ["test/text", "test/vision"] } }));
+	assert.equal(await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "vision" } }), undefined, "selected vision model always keeps images");
+	const described = await tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx);
+	assert.match(described.content[0].text, /Interpretation by test\/vision.*Error code 42/s);
+	assert.equal(described.details.usage.output, 8);
+	assert.equal((await tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx)).details.cached, true);
+	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "" }, undefined, null, visionCtx), /specific image question/);
+	await assert.rejects(tools.process_image.execute("call", { image: "img-0000000000000000", question: "What?" }, undefined, null, visionCtx), /expired or unknown/);
+	assert.equal((await tools.process_image.execute("call", { image: imageId, question: "What is it?" }, undefined, null,
+		{ ...visionCtx, modelRegistry: { find: () => ({ input: ["text"] }), streamSimple: visionCtx.modelRegistry.streamSimple } })).content[0].text.includes("Error code 42"), true, "selected vision model ignores stale image metadata");
+	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "Read fine print" }, undefined, null,
+		{ ...visionCtx, modelRegistry: { find: () => ({ input: ["text", "image"] }), streamSimple: () => ({ result: async () => ({ stopReason: "error", errorMessage: "private-provider-token" }) }) } }), /Vision model failed/);
+	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, AbortSignal.abort(), null, visionCtx), /cancelled|abort/i);
+	console.log("ok - compaction fallback, research evidence and on-demand non-vision image bridge");
 } finally {
 	await hooks.session_shutdown?.({}, ctx);
 	rmSync(cwd, { recursive: true, force: true });

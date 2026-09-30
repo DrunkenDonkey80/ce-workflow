@@ -538,13 +538,12 @@ try {
 		researchState.ok &&
 			researchState.action === "run-research" &&
 			researchFollowUps.length === 1 &&
-			researchPrompt.includes("work-divergent") &&
-			researchPrompt.includes("web_search") &&
-			researchPrompt.includes("source_check") &&
-			researchPrompt.includes("answer-only") &&
+			researchPrompt.includes("ask_user") &&
+			researchPrompt.includes("configured advisor slots") &&
+			researchPrompt.includes("research_note") &&
 			Object.keys(fixture.store().items).join("\n") ===
 				researchItemsBefore.join("\n"),
-		"Research runs parallel evidence and critique without creating work state",
+		"Research asks for advisor choice and creates no work state",
 	);
 
 	fixture.reset("ideas");

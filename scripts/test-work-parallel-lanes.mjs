@@ -641,6 +641,7 @@ try {
 				hooks[name] = handler;
 			},
 			registerCommand() {},
+			registerTool() {},
 		});
 		const notifications = [];
 		const ctx = {

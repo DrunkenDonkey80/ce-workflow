@@ -395,7 +395,7 @@ check(
 );
 check(
 	"orchestrator has /wo plus F7/F8/F9 and no legacy work slash commands",
-	!existsSync(path.join(root, "prompts")) &&
+	!listed("prompts").some((name) => name.startsWith("work-")) &&
 		!models.match(/registerCommand\(["'`]work-/) &&
 		models.includes('registerCommand("wo"') &&
 		!models.includes('registerCommand("wf"') &&

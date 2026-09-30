@@ -93,6 +93,7 @@ try {
 			hooks[name] = handler;
 		},
 		registerCommand: () => {},
+		registerTool: () => {},
 		sendUserMessage: async (text, options) => {
 			followUps.push({ text, options });
 		},

@@ -1586,7 +1586,9 @@ assert.equal(
 	1,
 	"unrelated menu actions retain argument dialogs",
 );
-assert.equal(Object.keys(tools).length, 17);
+assert.equal(Object.keys(tools).length, 19);
+assert(tools.research_note);
+assert(tools.process_image);
 assert(tools.work_monitor_bind);
 assert(tools.work_monitor_reload);
 const assertStrictSchema = (schema) => {

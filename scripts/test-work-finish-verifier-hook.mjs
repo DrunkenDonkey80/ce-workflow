@@ -72,6 +72,7 @@ try {
 			hooks[name] = handler;
 		},
 		registerCommand() {},
+		registerTool() {},
 	};
 	workModelsExtension(pi);
 	const ctx = {
