@@ -74,6 +74,37 @@ try {
 		"performance defaults are conservative where model bursts can compound",
 	);
 	assert(!existsSync(settingsFile()), "no default source mutation");
+	assert(mod.compactionModeSettings(cwd) === "ultracompact", "existing settings default to Ultracompact");
+	const nativeMode = {};
+	mod.setCompactionMode(nativeMode, "native");
+	assert(!nativeMode.compaction, "mode selection never rewrites Pi's native settings");
+	writeGlobalSettings(nativeMode);
+	assert(mod.compactionModeSettings(cwd) === "native", "global native mode is inherited");
+	writeSettings({ workOrchestrator: { context: { enabled: true } } });
+	assert(mod.compactionModeSettings(cwd) === "ultracompact", "legacy project On overrides a global native mode");
+	writeSettings({ workOrchestrator: { context: { enabled: false } } });
+	assert(mod.compactionModeSettings(cwd) === "native", "legacy project Off fully disables Ultracompact");
+	mod.setCompactionMode(nativeMode, "native-200k");
+	writeSettings(nativeMode);
+	assert(mod.compactionModeSettings(cwd) === "native-200k", "project native-200k overrides global mode");
+	mod.setCompactionMode(nativeMode, "ultrafull");
+	writeSettings(nativeMode);
+	assert(mod.compactionModeSettings(cwd) === "ultrafull", "Ultrafull is a persisted project mode");
+	assert(nativeMode.workOrchestrator.context.enabled && nativeMode.workOrchestrator.context.autoCompact,
+		"Ultrafull enables early checkpoint triggers without rewriting native compaction settings");
+	assert(!nativeMode.compaction, "Ultrafull leaves Pi's retained-tail settings intact");
+	writeGlobalSettings(nativeMode);
+	writeSettings({});
+	assert(mod.compactionModeSettings(cwd) === "ultrafull", "Ultrafull can be inherited globally");
+	mod.setCompactionMode(nativeMode, "ultracompact");
+	writeGlobalSettings(nativeMode);
+	writeSettings({ workOrchestrator: { context: { enabled: false } } });
+	assert(mod.compactionModeSettings(cwd) === "native", "legacy project Off overrides global Ultracompact");
+	let invalidMode = false;
+	try { mod.setCompactionMode({}, "typo"); } catch { invalidMode = true; }
+	assert(invalidMode, "invalid modes cannot be persisted");
+	writeGlobalSettings({});
+	writeSettings({});
 	const compactionDefault = mod.compactionModelSettings(cwd);
 	assert(compactionDefault.model === "__none_model__", "compaction defaults to cleaned code with no model");
 	const compactionSettings = { workKnowledge: { discoverer: { model: "old/model" } } };
@@ -393,7 +424,8 @@ try {
 	);
 
 	// Apply low profile: critic and verify off.
-	mod.applyProfile((settings = readSettings()), "low");
+	settings = readSettings();
+	mod.applyProfile(settings, "low");
 	writeSettings(settings);
 	const low = mod.workOrchSettings(cwd);
 	assert(low.advisorVerifyTask === false, "low no advisor verify");
@@ -891,7 +923,8 @@ try {
 	);
 
 	// Enter and Space both flip booleans, retain the cursor, and color state.
-	mod.applyProfile((settings = readSettings()), "medium");
+	settings = readSettings();
+	mod.applyProfile(settings, "medium");
 	writeSettings(settings);
 	let enabledRender = "";
 	let disabledRender = "";

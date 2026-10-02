@@ -231,10 +231,11 @@ import {
 
 let copyToClipboard;
 let withFileMutationQueue = async (_file, mutation) => mutation();
+let generateNativeSummary;
 let estimateContextMessageTokens = (message) =>
 	Math.ceil(JSON.stringify(message ?? {}).length / 4);
 try {
-	({ copyToClipboard, withFileMutationQueue, estimateTokens: estimateContextMessageTokens } =
+	({ copyToClipboard, withFileMutationQueue, estimateTokens: estimateContextMessageTokens, generateSummaryWithUsage: generateNativeSummary } =
 		await import("@earendil-works/pi-coding-agent"));
 } catch {
 	// Local fixture runs do not install Pi peer dependencies.
@@ -248,7 +249,7 @@ const TELEMETRY_DIR_NAME = "work-runs";
 const HISTORY_DIR_NAME = "history";
 const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
-const WORK_SHORTCUT_STATUS = "/wo Orchestrator · F8 microcompact · F9 Fleet";
+const WORK_SHORTCUT_STATUS = "/wo Orchestrator · F8 compact · F9 Fleet";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
 const CHATGPT_WEB_SOURCE = "chatgpt-web";
@@ -743,6 +744,12 @@ const DEFAULT_CONTEXT = {
 	keepRecentTokens: 30_000,
 	maxSummaryChars: 32_000,
 };
+const COMPACTION_MODES = [
+	{ value: "ultracompact", label: "Ultracompact", description: "Early summaries and rolling evidence stripping (existing behavior)." },
+	{ value: "ultrafull", label: "Ultrafull compact", description: "Real checkpoints at 200k by default, with a recent tail and the configured summarizer; no rolling stripping." },
+	{ value: "native", label: "Native", description: "Pi's built-in compaction only; no Ultracompact filtering." },
+	{ value: "native-200k", label: "Native 200k", description: "Native summaries at 200k, after tools finish; research suspends this trigger." },
+];
 const MIN_COMPACT_AT_TOKENS = 30_000;
 const MODEL_KNOWLEDGE_WRITE_LIMIT = 20;
 const DEFAULT_COMPACTION_MODEL = Object.freeze({ model: NONE_MODEL, thinking: "low" });
@@ -781,6 +788,8 @@ const contextFilterState = {
 	snapshot: null,
 };
 let contextFilterPersistenceTimer = null;
+let boundaryCompactionRequested = false;
+let forcedUltracompact = false;
 let manualMicrocompactGoalResume = null;
 let pendingCompactionWorkflowAuthorization = null;
 let restoredActiveWorkflow = null;
@@ -997,7 +1006,11 @@ function mergeSettings(base, override) {
 }
 
 function readEffectiveSettings(cwd) {
-	return mergeSettings(readGlobalSettings(), readSettings(cwd));
+	const project = readSettings(cwd);
+	const context = project.workOrchestrator?.context;
+	if (context && !Object.hasOwn(context, "mode") && Object.hasOwn(context, "enabled"))
+		context.mode = context.enabled === false ? "native" : "ultracompact";
+	return mergeSettings(readGlobalSettings(), project);
 }
 
 function writeSettings(cwd, settings) {
@@ -4000,11 +4013,32 @@ function openUsageReport(file) {
 	}
 }
 
+function usesUltraSummary(mode) {
+	return mode === "ultracompact" || mode === "ultrafull";
+}
+
 function contextSettings(settings) {
-	return {
-		...DEFAULT_CONTEXT,
-		...(settings.workOrchestrator?.context ?? {}),
-	};
+	const configured = settings.workOrchestrator?.context ?? {};
+	const mode = COMPACTION_MODES.some(item => item.value === configured.mode)
+		? configured.mode : configured.enabled === false ? "native" : "ultracompact";
+	return { ...DEFAULT_CONTEXT, compactAtTokens: mode === "ultrafull" ? 200_000 : DEFAULT_CONTEXT.compactAtTokens,
+		...configured, mode, enabled: usesUltraSummary(mode) };
+}
+
+export function compactionModeSettings(cwd, settings = readEffectiveSettings(cwd)) {
+	return contextSettings(settings).mode;
+}
+
+function currentCompactionMode(ctx) {
+	try { return compactionModeSettings(ctx.cwd); }
+	catch { return "ultracompact"; }
+}
+
+export function setCompactionMode(settings, mode) {
+	if (!COMPACTION_MODES.some(item => item.value === mode)) throw new Error(`Unknown compaction mode: ${mode}`);
+	settings.workOrchestrator ??= {};
+	settings.workOrchestrator.context ??= {};
+	Object.assign(settings.workOrchestrator.context, { mode, enabled: usesUltraSummary(mode), autoCompact: usesUltraSummary(mode) });
 }
 
 function setContextSettings(settings, next) {
@@ -6578,7 +6612,7 @@ async function prepareContextFilter(event, ctx) {
 	} catch (error) {
 		if (!signal?.aborted) throw error;
 	}
-	if (snapshot !== contextFilterState.snapshot || researchContext) return false;
+	if (snapshot !== contextFilterState.snapshot || researchContext || currentCompactionMode(ctx) !== "ultracompact") return false;
 	if (signal?.aborted) {
 		// Cancellation is normal; keep the previous cut and retry on the next live turn.
 		contextFilterState.requested = true;
@@ -6595,6 +6629,52 @@ async function prepareContextFilter(event, ctx) {
 		messages.findLast((message) => message?.role === "user"),
 	);
 	return true;
+}
+
+// Pi's boundary entries persist a checkpoint without aborting the running agent.
+export async function buildBoundaryCompaction(event, ctx, mode, summarize = generateNativeSummary) {
+	const messages = event.context?.contextMessages;
+	const entries = event.context?.contextEntries;
+	if (!messages?.length || !entries?.length) throw new Error("Pi 0.99.1+ compaction boundaries are required");
+	const settings = workExtensionPi?.getSettings?.() ?? {};
+	const native = { reserveTokens: 16_384, keepRecentTokens: 20_000, ...settings.compaction,
+		...settings.compaction?.modelOverrides?.[`${ctx.model?.provider}/${ctx.model?.id}`] };
+	let cut = contextFilterCutIndex(messages, native.keepRecentTokens, native.keepRecentTokens, estimateContextMessageTokens);
+	let offset = 0;
+	let firstKeptEntryId;
+	for (const entry of entries) {
+		if (offset + entry.messages.length > cut) {
+			firstKeptEntryId = entry.sourceEntry.id;
+			cut = offset;
+			break;
+		}
+		offset += entry.messages.length;
+	}
+	if (!cut || !firstKeptEntryId) return;
+	const removed = messages.slice(0, cut);
+	const previousSummary = removed.filter(message => message.role === "compactionSummary")
+		.map(message => message.summary ?? "").filter(Boolean).join("\n\n") || undefined;
+	let result;
+	let files;
+	if (usesUltraSummary(mode)) {
+		const current = contextSettings(readEffectiveSettings(ctx.cwd));
+		const fileOps = contextFilterFileOps(removed);
+		files = filesFromOps(fileOps);
+		const preparation = { firstKeptEntryId, messagesToSummarize: removed, turnPrefixMessages: [],
+			previousSummary, tokensBefore: contextMessagesTokens(messages), fileOps };
+		result = await compactSessionMemory(ctx, current, captureCompactionState(ctx), preparation, messages, ctx.signal);
+	} else {
+		if (!summarize || !ctx.modelRegistry?.streamSimple || !ctx.model) throw new Error("Pi's native summary generator is unavailable");
+		const generated = await summarize(removed.filter(message => message.role !== "compactionSummary"), ctx.model,
+			native.reserveTokens, undefined, undefined, ctx.signal, undefined, previousSummary,
+			undefined, ctx.modelRegistry.streamSimple.bind(ctx.modelRegistry), undefined, settings.retry);
+		result = { summary: generated.text, usage: generated.usage };
+	}
+	if (ctx.signal?.aborted) throw new Error("Compaction cancelled");
+	if (!result.summary?.trim()) throw new Error("Compaction summary was empty");
+	return { type: "compaction", summary: result.summary, firstKeptEntryId, usage: result.usage,
+		details: { compactionMode: mode, compactionModel: result.model, compactionAttempts: result.attempts,
+			knowledgeCandidates: result.knowledge, files } };
 }
 
 function validFilteredContext(messages) {
@@ -6629,6 +6709,10 @@ async function filteredContext(event, ctx) {
 			!isKnowledgeDiscovererCompletionMessage(message),
 	);
 	const removedInternalMessages = messages.length !== sourceMessages.length;
+	if (currentCompactionMode(ctx) !== "ultracompact") {
+		resetContextFilter();
+		return removedInternalMessages ? { messages } : undefined;
+	}
 	if (researchContext) return removedInternalMessages ? { messages } : undefined;
 	if (contextFilterState.active && !validFilteredContext(messages)) {
 		// Rebuild in this request: returning undefined would send raw history.
@@ -7008,7 +7092,7 @@ export function stripProcessedPayloads(
 }
 
 function requestContextFilter(ctx) {
-	if (researchContext) return false;
+	if (researchContext || currentCompactionMode(ctx) !== "ultracompact") return false;
 	const snapshot =
 		contextFilterState.snapshot ?? captureContextFilterSnapshot(ctx);
 	contextFilterState.requested = true;
@@ -7044,6 +7128,7 @@ function contextStatus(ctx, settings) {
 	const threshold = compactionThresholdFor(ctx, settings);
 	const keep = `${threshold.requestedKeepRecentTokens.toLocaleString()} requested / ${threshold.effectiveKeepRecentTokens.toLocaleString()} effective`;
 	return [
+		`Compact: ${COMPACTION_MODES.find(item => item.value === current.mode).label}`,
 		`Work context guard: ${current.enabled === false ? "disabled" : "enabled"}`,
 		`Auto compact: ${current.autoCompact === true ? "enabled" : "disabled"}`,
 		`Usage: ${usage?.tokens ? `${usage.tokens.toLocaleString()} tokens` : "unknown"}`,
@@ -7102,6 +7187,8 @@ function resetContextCompaction() {
 	manualMicrocompactGoalResume = null;
 	pendingCompactionWorkflowAuthorization = null;
 	workGoalCompactionResume = null;
+	boundaryCompactionRequested = false;
+	forcedUltracompact = false;
 }
 
 function resumeWorkGoalAfterCompaction(ctx, goalId, generation) {
@@ -7120,8 +7207,14 @@ function resumeWorkGoalAfterCompaction(ctx, goalId, generation) {
 	return true;
 }
 
-function runNativeMicrocompact(ctx, customInstructions) {
-	if (researchContext) return false;
+function runNativeMicrocompact(ctx, customInstructions, force = false) {
+	const mode = currentCompactionMode(ctx);
+	if (!force && (researchContext || (!usesUltraSummary(mode) &&
+		(mode !== "native-200k" || (ctx.getContextUsage?.()?.tokens ?? 0) < 200_000)))) return false;
+	if (!force && mode === "ultrafull") {
+		const settings = readEffectiveSettings(ctx.cwd);
+		if (contextSettings(settings).autoCompact !== true || (ctx.getContextUsage?.()?.tokens ?? 0) < compactTriggerTokens(ctx, settings)) return false;
+	}
 	if (typeof ctx.compact !== "function" || contextCompactState.inFlight)
 		return false;
 	const pendingGoalContinuation =
@@ -7133,6 +7226,7 @@ function runNativeMicrocompact(ctx, customInstructions) {
 			pendingGoalContinuation)
 			? activeWorkGoal.id
 			: null;
+	forcedUltracompact = force && usesUltraSummary(mode);
 	const generation = beginContextCompaction(
 		contextFilterState.targetId ??
 			workGoalTargetId(liveCompactionGoal(activeWorkGoal)),
@@ -7147,6 +7241,7 @@ function runNativeMicrocompact(ctx, customInstructions) {
 		};
 	const finish = (error) => {
 		if (!finishContextCompaction(generation)) return;
+		forcedUltracompact = false;
 		if (error)
 			ctx.ui.notify(`Microcompaction failed: ${formatError(error)}`, "warning");
 		if (resumeGoalId)
@@ -7154,8 +7249,8 @@ function runNativeMicrocompact(ctx, customInstructions) {
 	};
 	try {
 		ctx.compact({
-			customInstructions: customInstructions ??
-				"work-context microcompact: preserve the latest user requests, live goal or parked-goal status, native work-item/git state, changed paths, decisions, blockers, failed-tool evidence, bounded successful-tool results, and next action. Omit reasoning, replayable read/write/edit payloads, filler, and full logs.",
+			customInstructions: customInstructions ?? (usesUltraSummary(mode) ?
+				"work-context microcompact: preserve the latest user requests, live goal or parked-goal status, native work-item/git state, changed paths, decisions, blockers, failed-tool evidence, bounded successful-tool results, and next action. Omit reasoning, replayable read/write/edit payloads, filler, and full logs." : undefined),
 			onComplete: () => finish(),
 			onError: finish,
 		});
@@ -7210,16 +7305,13 @@ function activeCompactionWorkflowAuthorization(authorization) {
 }
 
 function requestMicrocompact(ctx) {
-	if (researchContext) {
-		ctx.ui?.notify?.("Research/ideation protection is active. Use /compact for native compaction or /research off to restore microcompaction.", "info");
-		return false;
-	}
-	if (contextCompactState.inFlight) {
+	if (contextCompactState.inFlight || boundaryCompactionRequested) {
 		ctx.ui.notify("Microcompaction is already in progress", "info");
 		return false;
 	}
 	if (ctx.isIdle?.() === false) {
-		requestContextFilter(ctx);
+		if (!researchContext && currentCompactionMode(ctx) === "ultracompact") requestContextFilter(ctx);
+		else boundaryCompactionRequested = true;
 		ctx.ui.notify("Microcompaction queued", "info");
 		return true;
 	}
@@ -7230,7 +7322,7 @@ function requestMicrocompact(ctx) {
 		);
 		return false;
 	}
-	const started = runNativeMicrocompact(ctx);
+	const started = runNativeMicrocompact(ctx, undefined, true);
 	if (started) ctx.ui.notify("Microcompaction started", "info");
 	return started;
 }
@@ -23892,7 +23984,7 @@ async function sendWorkGoalPrompt(pi, ctx, prompt, options) {
 }
 
 async function microCompactThenSendWorkGoalPrompt(pi, ctx, goal, prompt) {
-	if (typeof ctx.compact !== "function" || contextCompactState.inFlight)
+	if (researchContext || currentCompactionMode(ctx) !== "ultracompact" || typeof ctx.compact !== "function" || contextCompactState.inFlight)
 		return sendWorkGoalPrompt(pi, ctx, prompt);
 	const generation = beginContextCompaction(workGoalTargetId(goal));
 	return new Promise((resolvePromise) => {
@@ -28804,17 +28896,15 @@ async function handleWorkContextCommand(args, ctx) {
 		requestMicrocompact(ctx);
 		return;
 	}
-	if (["off", "disable"].includes(command)) {
+	const mode = ["off", "disable"].includes(command) ? "native"
+		: ["on", "enable"].includes(command) ? "ultracompact"
+		: COMPACTION_MODES.some(item => item.value === command) ? command : null;
+	if (mode) {
 		settings = readSettings(ctx.cwd);
-		setContextSettings(settings, { enabled: false, autoCompact: false });
+		setCompactionMode(settings, mode);
 		writeSettings(ctx.cwd, settings);
-		return ctx.ui.notify("Disabled work context guard", "info");
-	}
-	if (["on", "enable"].includes(command)) {
-		settings = readSettings(ctx.cwd);
-		setContextSettings(settings, { enabled: true, autoCompact: true });
-		writeSettings(ctx.cwd, settings);
-		return ctx.ui.notify("Enabled work context guard", "info");
+		resetContextFilter();
+		return ctx.ui.notify(`Compact: ${COMPACTION_MODES.find(item => item.value === mode).label}`, "info");
 	}
 	if (command === "set") {
 		settings = readSettings(ctx.cwd);
@@ -28822,7 +28912,7 @@ async function handleWorkContextCommand(args, ctx) {
 		writeSettings(ctx.cwd, settings);
 		return ctx.ui.notify(contextStatus(ctx, settings), "info");
 	}
-	ctx.ui.notify("Use: status, compact, on, off, or set <tokens>", "warning");
+	ctx.ui.notify("Use: status, compact, ultracompact, ultrafull, native, native-200k, on, off, or set <tokens>", "warning");
 }
 
 async function screenExtensionMetadataWithLuna(items, ctx, signal) {
@@ -31589,7 +31679,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
-		if (researchContext) return; // Let Pi choose the native threshold and summary.
+		if ((researchContext && !forcedUltracompact) || !usesUltraSummary(currentCompactionMode(ctx))) return; // Let Pi summarize natively.
 		if (activeWorkGoal?.status === "active")
 			updateWorkGoalUsage(activeWorkGoal, ctx);
 		let settings = {};
@@ -31704,6 +31794,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_compact", async (event, ctx) => {
+		forcedUltracompact = false;
 		storeCompactionKnowledge(ctx, event.compactionEntry?.details?.knowledgeCandidates, event.compactionEntry?.id);
 		recordSelfImprovementHistory(ctx, "session_compact", event);
 		resetContextFilter();
@@ -31748,6 +31839,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_compact_failed", (event, ctx) => {
+		forcedUltracompact = false;
 		recordSelfImprovementHistory(ctx, "session_compact_failed", event);
 		const generation = contextCompactState.generation;
 		if (contextCompactState.inFlight) finishContextCompaction(generation);
@@ -31811,6 +31903,31 @@ export default function workModelsExtension(pi) {
 		await reachOrchestratorPauseBoundary(ctx, pi);
 		cleanupBenignInstructionDirt(ctx.cwd);
 		await flushWorkGoalContinuationRetry(ctx, pi);
+		const mode = currentCompactionMode(ctx);
+		const forced = boundaryCompactionRequested;
+		if (!forced) {
+			if (researchContext) return;
+			const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
+			if (mode === "native-200k") {
+				if (tokens < 200_000) return;
+			} else if (mode === "ultrafull") {
+				const settings = readEffectiveSettings(ctx.cwd);
+				if (contextSettings(settings).autoCompact !== true || tokens < compactTriggerTokens(ctx, settings)) return;
+			} else return;
+		}
+		if (contextCompactState.inFlight || ctx.signal?.aborted) return;
+		boundaryCompactionRequested = false;
+		const generation = beginContextCompaction(compactionTargetId(activeWorkGoal));
+		ctx.ui.setStatus?.("work-compaction", `Compacting (${COMPACTION_MODES.find(item => item.value === mode).label})…`);
+		try {
+			const entry = await buildBoundaryCompaction(event, ctx, mode);
+			return entry ? { entries: [entry] } : undefined;
+		} catch (error) {
+			ctx.ui.notify(`Compaction failed without discarding context: ${formatError(error)}`, "warning");
+		} finally {
+			finishContextCompaction(generation);
+			ctx.ui.setStatus?.("work-compaction", undefined);
+		}
 	});
 
 	pi.on("message_end", async (event, ctx) => {
@@ -32189,6 +32306,7 @@ function workSettingsStatus(ctx) {
 			: ["  none configured"]),
 		"",
 		"Compaction",
+		`  ${SUBMENU_ARROW} Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label}`,
 		`  ${SUBMENU_ARROW} Compaction LLM model: ${modelEffortSummary(compactor.model, compactor.thinking)}`,
 		`  ${SUBMENU_ARROW} Vision model: ${visionModel === NONE_MODEL ? "None" : visionModel}`,
 		`  ${SUBMENU_ARROW} Non-vision models: ${nonVisionModelsSettings(ctx.cwd, settings).join(", ") || "None"}`,
@@ -32342,6 +32460,7 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "profile") return owns(block, "profile");
 	if (item.kind === "backgroundVerifiers")
 		return owns(block, "backgroundVerifiers");
+	if (item.kind === "compactionMode") return owns(block?.context, "mode") || owns(block?.context, "enabled");
 	if (item.kind === "compactionModel")
 		return owns(block?.context, "compactionModel") || owns(block?.context, "compactionThinking");
 	if (item.kind === "visionModel") return owns(block, "visionModel");
@@ -32403,7 +32522,11 @@ function clearProjectOverride(settings, item) {
 	} else if (item.kind === "modelStrategy") delete block.modelStrategy;
 	else if (item.kind === "profile") clearProfileOverride(settings);
 	else if (item.kind === "backgroundVerifiers") delete block.backgroundVerifiers;
-	else if (item.kind === "compactionModel") {
+	else if (item.kind === "compactionMode") {
+		delete block.context?.mode;
+		delete block.context?.enabled;
+		delete block.context?.autoCompact;
+	} else if (item.kind === "compactionModel") {
 		delete block.context?.compactionModel;
 		delete block.context?.compactionThinking;
 	} else if (item.kind === "visionModel") delete block.visionModel;
@@ -32641,6 +32764,11 @@ async function workSettingsLoop(ctx) {
 							).length
 						} configured`
 					: "none configured",
+			},
+			{
+				kind: "compactionMode", value: "compactionMode",
+				label: `Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label} ${SUBMENU_ARROW}`,
+				description: "Ultracompact / Ultrafull compact / Native / Native 200k. F8 always forces compaction.",
 			},
 			{
 				kind: "compactionModel",
@@ -32900,6 +33028,16 @@ async function workSettingsLoop(ctx) {
 			if (selected === INHERIT_MODEL) delete settings.workOrchestrator.visionModel;
 			else settings.workOrchestrator.visionModel = selected;
 			writeScopedSettings(ctx.cwd, scope, settings);
+			continue;
+		}
+		if (pick.kind === "compactionMode") {
+			const mode = await choose(ctx, "Compact", COMPACTION_MODES, contextSettings(settings).mode);
+			if (!mode) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			setCompactionMode(settings, mode);
+			writeScopedSettings(ctx.cwd, scope, settings);
+			resetContextFilter();
+			ctx.ui.notify(`Compact: ${COMPACTION_MODES.find(item => item.value === mode).label}`, "info");
 			continue;
 		}
 		if (pick.kind === "compactionModel") {

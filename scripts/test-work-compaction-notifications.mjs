@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import workModelsExtension, {
 	absorbKnowledgeDiscovererCompletion,
+	buildBoundaryCompaction,
 	excludedModelParked,
 	isKnowledgeDiscovererCompletionMessage,
 	launchKnowledgeDiscoverer,
@@ -23,6 +24,8 @@ import workModelsExtension, {
 // Replay the delayed wakeups seen after compaction in LPGSlim and ce-workflow
 // on 2026-09-08. No provider, child process, or real project mutation is needed.
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-compaction-notifications-"));
+const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+process.env.PI_CODING_AGENT_DIR = path.join(cwd, "agent");
 const hooks = {};
 const contextHooks = [];
 const tools = {};
@@ -1296,7 +1299,7 @@ try {
 	let cancelledSummaryCalls = 0;
 	const cancellingCtx = { ...freshCompactionCtx, signal: abortDuringSummary.signal,
 		modelRegistry: { ...hybridContext.modelRegistry,
-			streamSimple(selected, context, options) {
+			streamSimple(_selected, _context, options) {
 				cancelledSummaryCalls++;
 				assert(options.signal instanceof AbortSignal, "summary receives the current operation signal");
 				return { result: async () => {
@@ -1476,6 +1479,134 @@ try {
 	rmSync(path.dirname(pendingNotebook), { recursive: true, force: true });
 	rmSync(path.dirname(notebook), { recursive: true, force: true });
 	resetContextFilter();
+	const modeSettingsFile = path.join(cwd, ".pi", "settings.json");
+	const selectCompactMode = mode => writeFileSync(modeSettingsFile, JSON.stringify({
+		workOrchestrator: { context: { mode, compactionModel: "__none_model__" } },
+	}));
+	const boundaryMessages = [
+		{ role: "compactionSummary", summary: "Previous checkpoint" },
+		{ role: "user", content: "Original request" },
+		{ role: "assistant", content: [{ type: "thinking", thinking: "Full retained reasoning" },
+			{ type: "toolCall", id: "old", name: "read", arguments: { path: "source.md" } }] },
+		{ role: "toolResult", toolCallId: "old", toolName: "read", content: [{ type: "text", text: "Full evidence. ".repeat(30_000) }] },
+		{ role: "assistant", content: [{ type: "text", text: "Old result" }] },
+		{ role: "user", content: "Current request" },
+		{ role: "assistant", content: [{ type: "toolCall", id: "recent", name: "read", arguments: { path: "recent.md" } }] },
+		{ role: "toolResult", toolCallId: "recent", toolName: "read", content: [{ type: "text", text: "Recent evidence. ".repeat(10_000) }] },
+		{ role: "assistant", content: [{ type: "text", text: "Continue" }], stopReason: "stop" },
+	];
+	const boundary = { context: { contextMessages: boundaryMessages, contextEntries: boundaryMessages.map((message, index) => ({
+		sourceEntry: { id: `boundary-${index}`, type: "message", message }, messages: [message],
+	})) }, message: boundaryMessages.at(-1), toolResults: [] };
+	let manualOptions;
+	const boundaryWarnings = [];
+	const nativeCtx = { ...researchCtx, getContextUsage: () => ({ tokens: 200_000 }),
+		compact: options => { manualOptions = options; },
+		modelRegistry: { streamSimple: () => ({ result: async () => ({ content: [{ type: "text", text: "Native checkpoint" }], stopReason: "stop", usage: { input: 10, output: 5 } }) }) },
+		ui: { ...ctx.ui, notify: message => boundaryWarnings.push(message) },
+	};
+	const abortsBeforeNative = aborts;
+	for (const mode of ["native", "native-200k"]) {
+		selectCompactMode(mode);
+		assert.equal(requestContextFilter(nativeCtx), false);
+		assert.equal(await hooks.context({ messages: boundaryMessages }, nativeCtx), undefined, "native modes send full evidence and thinking");
+		assert.equal(await hooks.session_before_compact({ preparation }, nativeCtx), undefined, "native formatter is not replaced");
+		await shortcuts.f8.handler(nativeCtx);
+		assert.equal(manualOptions.customInstructions, undefined, "F8 does not inject Ultracompact's stripping instructions");
+		manualOptions.onComplete({});
+		assert.equal(await hooks.turn_end(boundary, { ...nativeCtx, getContextUsage: () => ({ tokens: 199_999 }) }), undefined, "no forced compaction below 200k");
+	}
+	const nativeDraft = await buildBoundaryCompaction(boundary, nativeCtx, "native-200k", async (...args) => {
+		assert(args[0].some(message => message.content?.some?.(part => part.thinking === "Full retained reasoning")), "native summary gets unstripped reasoning");
+		assert(args[0].some(message => message.role === "toolResult" && message.toolCallId === "old" && message.content[0].text.length > 300_000));
+		assert.equal(args[7], "Previous checkpoint", "previous summary is merged");
+		assert.equal(args[6], undefined, "native prompt is unchanged");
+		return { text: "Native checkpoint", usage: { input: 10, output: 5 } };
+	});
+	assert.equal(nativeDraft.type, "compaction");
+	assert.equal(nativeDraft.firstKeptEntryId, "boundary-6", "retention keeps tool calls and results together");
+	assert.equal(nativeDraft.usage.output, 5);
+	await assert.rejects(buildBoundaryCompaction(boundary, nativeCtx, "native-200k", async () => ({ text: "" })), /empty/);
+	await assert.rejects(buildBoundaryCompaction(boundary, { ...nativeCtx, signal: AbortSignal.abort() }, "native-200k", async () => ({ text: "Discard me" })), /cancelled/);
+	const autoNative = await hooks.turn_end(boundary, nativeCtx);
+	assert(autoNative?.entries?.[0]?.type === "compaction" || boundaryWarnings.at(-1)?.includes("native summary generator is unavailable"), "200k attempts a native checkpoint; missing SDK fails without dropping context");
+	assert.equal(aborts, abortsBeforeNative, "native threshold never aborts a running turn");
+	await commands.research.handler("on", { ...nativeCtx, getContextUsage: () => ({ tokens: 1 }) });
+	const nativeNotebook = researchEntries.at(-1).data.notes;
+	assert.equal(await hooks.turn_end(boundary, nativeCtx), undefined, "research suspends forced 200k compaction");
+	await shortcuts.f8.handler(nativeCtx);
+	assert.equal(typeof manualOptions.onComplete, "function", "F8 works during native research");
+	manualOptions.onComplete({});
+	selectCompactMode("ultracompact");
+	await shortcuts.f8.handler({ ...nativeCtx, isIdle: () => false });
+	const researchManual = await hooks.turn_end(boundary, { ...nativeCtx, isIdle: () => false });
+	assert.equal(researchManual.entries[0].type, "compaction", "busy F8 overrides research protection at a tool boundary");
+	assert.equal(researchManual.entries[0].details.compactionMode, "ultracompact");
+	assert.equal(aborts, abortsBeforeNative, "busy F8 never aborts live tools");
+	await commands.research.handler("off", { ...nativeCtx, getContextUsage: () => ({ tokens: 1 }) });
+	rmSync(path.dirname(nativeNotebook), { recursive: true, force: true });
+	resetContextFilter();
+	selectCompactMode("ultrafull");
+	writeFileSync(modeSettingsFile, JSON.stringify({ workOrchestrator: {
+		context: { mode: "ultrafull", compactionModel: "test/summary", compactionThinking: "low" },
+	} }));
+	let fullCalls = 0;
+	const fullCtx = { ...nativeCtx, isIdle: () => false, modelRegistry: {
+		...hybridContext.modelRegistry,
+		streamSimple(selected, context) {
+			fullCalls++;
+			assert.equal(selected.id, "summary", "Ultrafull uses the predefined compaction model");
+			const prompt = JSON.stringify(context);
+			assert.match(prompt, /Original request/);
+			assert.match(prompt, /Previous checkpoint/, "prior compaction participates in the summary");
+			assert.doesNotMatch(prompt, /Full retained reasoning|Full evidence\./, "the existing microcompact evidence selection is reused");
+			return hybridContext.modelRegistry.streamSimple();
+		},
+	} };
+	const originalBoundary = JSON.stringify(boundaryMessages);
+	assert.equal(requestContextFilter(fullCtx), false, "Ultrafull never activates a transient cut");
+	assert.equal(await hooks.context({ messages: boundaryMessages }, fullCtx), undefined,
+		"Ultrafull sends the unstripped context before a real checkpoint");
+	assert.equal(await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 150_000 }) }), undefined, "Ultrafull no longer triggers at 150k by default");
+	assert.equal(await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 199_999 }) }), undefined);
+	const fullAuto = await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 200_000 }) });
+	assert.equal(fullAuto.entries[0].type, "compaction", "Ultrafull publishes a real Pi checkpoint at its threshold");
+	assert.equal(fullAuto.entries[0].details.compactionMode, "ultrafull");
+	assert.equal(fullAuto.entries[0].details.compactionModel, "test/summary");
+	assert.deepEqual(fullAuto.entries[0].details.files.read, ["source.md"]);
+	assert.match(fullAuto.entries[0].summary, /Original request/);
+	assert.equal(fullAuto.entries[0].firstKeptEntryId, "boundary-6", "the recent tool pair stays together");
+	assert.equal(fullCalls, 1);
+	assert.equal(fullAuto.entries[0].usage.output, 5);
+	const fullSettings = JSON.parse(readFileSync(modeSettingsFile, "utf8"));
+	fullSettings.workOrchestrator.context.compactAtTokens = 210_000;
+	writeFileSync(modeSettingsFile, JSON.stringify(fullSettings));
+	assert.equal(await hooks.turn_end(boundary, fullCtx), undefined, "an explicit threshold still overrides the 200k default");
+	delete fullSettings.workOrchestrator.context.compactAtTokens;
+	writeFileSync(modeSettingsFile, JSON.stringify(fullSettings));
+	const smallerFull = await hooks.turn_end(boundary, { ...fullCtx,
+		model: { ...fullCtx.model, contextWindow: 100_000 }, getContextUsage: () => ({ tokens: 99_999 }) });
+	assert.equal(smallerFull.entries[0].type, "compaction", "small model windows lower the trigger safely");
+	await assert.rejects(buildBoundaryCompaction(boundary, { ...fullCtx, signal: AbortSignal.abort() }, "ultrafull"), /cancelled/);
+	await commands.research.handler("on", { ...fullCtx, isIdle: () => true, getContextUsage: () => ({ tokens: 1 }) });
+	const fullNotebook = researchEntries.at(-1).data.notes;
+	assert.equal(await hooks.turn_end(boundary, fullCtx), undefined, "research suspends automatic Ultrafull checkpoints");
+	assert.equal(await hooks.session_before_compact({ preparation }, fullCtx), undefined, "research keeps native context-limit protection");
+	await shortcuts.f8.handler(fullCtx);
+	const fullForced = await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 1 }) });
+	assert.equal(fullForced.entries[0].details.compactionMode, "ultrafull", "busy F8 forces a real checkpoint even in research");
+	assert.equal(aborts, abortsBeforeNative, "Ultrafull never aborts live tools");
+	await shortcuts.f8.handler({ ...fullCtx, isIdle: () => true });
+	const idleFull = await hooks.session_before_compact({ preparation }, fullCtx);
+	assert.equal(idleFull.compaction.details.compactionModel, "test/summary", "idle F8 uses the same custom summarizer in research");
+	manualOptions.onComplete({});
+	let fullExitCompactions = 0;
+	await commands.research.handler("off", { ...fullCtx, isIdle: () => true,
+		getContextUsage: () => ({ tokens: 199_999 }), compact: () => { fullExitCompactions++; } });
+	assert.equal(fullExitCompactions, 0, "exiting research does not trigger Ultrafull below 200k");
+	rmSync(path.dirname(fullNotebook), { recursive: true, force: true });
+	assert.equal(JSON.stringify(boundaryMessages), originalBoundary, "checkpoint generation never edits the raw transcript");
+	resetContextFilter();
 	const pixels = "AQIDBA==";
 	const imageMessage = { role: "toolResult", toolName: "read", content: [
 		{ type: "text", text: "Read image file [image/png]\n[Current model does not support images. The image will be omitted from this request.]" },
@@ -1515,5 +1646,7 @@ try {
 	console.log("ok - compaction fallback, research evidence and on-demand non-vision image bridge");
 } finally {
 	await hooks.session_shutdown?.({}, ctx);
+	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 	rmSync(cwd, { recursive: true, force: true });
 }
