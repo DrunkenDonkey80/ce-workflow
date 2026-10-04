@@ -31,7 +31,13 @@ const pi = {
 	getThinkingLevel: () => "medium",
 	setThinkingLevel: () => {},
 	on: (name, handler) => {
-		hooks[name] = handler;
+		const previous = hooks[name];
+		hooks[name] = name === "context" && previous
+			? async (event, ctx) => {
+				const result = await previous(event, ctx);
+				return await handler(result ? { ...event, ...result } : event, ctx) ?? result;
+			}
+			: handler;
 	},
 	registerCommand: (name, config) => {
 		commands[name] = config;
@@ -101,7 +107,7 @@ try {
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
 		path.join(cwd, ".pi", "settings.json"),
-		JSON.stringify({ workResume: { selfImproving: false } }),
+		JSON.stringify({ workResume: { selfImproving: false }, workOrchestrator: { context: { mode: "ultracompact" } } }),
 	);
 	await commands.wo.handler("monitor peer-session", ctx);
 	assert.match(sent.at(-1).message, /WO_MONITOR_V1/);

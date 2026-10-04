@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Unit test for extensions/work-ask-remote.js (intercom answer channel for
-// ask_user) and a source-level check that the installed pi-ask-user carries
-// the remote-answer patch. The live end-to-end is test-ask-remote-live.mjs.
+// Offline bridge and optional pi-ask-user patch checks; never patch installed code.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
+import { stripTypeScriptTypes } from "node:module";
+import { runInNewContext } from "node:vm";
+import { patchAskUserSource, REMOTE_HELPERS } from "./patch-ask-user-remote-answer.mjs";
 import { registerRemoteAskAnswers } from "../extensions/work-ask-remote.js";
 
 const listeners = new Map();
@@ -87,11 +88,20 @@ fire("message_end", {
 });
 assert.equal(emits.length, 0);
 
-// 6. Valid answer: single title emits ask:answer and clears just that ask.
+// 6. Only the exact local recipient may answer a forwarded prompt.
+for (const details of [
+	{ from: { id: "other-peer" } },
+	{ from: { id: "monitor-1" }, crossMachine: { type: "ssh-relay", trust: "ssh-asserted" } },
+	{ from: { id: "monitor-1" }, message: { crossMachine: { type: "ssh-relay", trust: "ssh-asserted" } } },
+]) {
+	fire("message_end", { message: { customType: "intercom_message", details: { ...details, bodyText: `ANSWER ${askId}: Ship` } } });
+	assert.equal(emits.length, 0, "untrusted or unaddressed peer cannot answer");
+}
+// Windows local broker peers have trustedLocal:false; exact local answers still work.
 fire("message_end", {
 	message: {
 		customType: "intercom_message",
-		details: { from: { id: "monitor-1" }, bodyText: `ANSWER ${askId}: Hold` },
+		details: { from: { id: "monitor-1", trustedLocal: false }, bodyText: `ANSWER ${askId}: Hold` },
 	},
 });
 assert.equal(emits.length, 1);
@@ -129,7 +139,22 @@ fire("message_end", {
 });
 assert.equal(outbox.length, before, "non-intercom messages ignored");
 
-// 10. The installed pi-ask-user carries the remote-answer patch and an opt-in.
+// Shutdown discards the old prompt and routing identity.
+fire("ask:pending", ask);
+fire("session_shutdown", {});
+const beforeShutdown = outbox.length;
+fire("message_end", { message: { customType: "intercom_message", details: { from: { id: "monitor-1" }, bodyText: `ANSWER ${askId}: Ship` } } });
+assert.equal(outbox.length, beforeShutdown);
+assert.equal(emits.length, 2);
+fire("session_shutdown", {});
+fire("ask:pending", ask);
+assert.equal(outbox.length, beforeShutdown, "new session has no remembered peer");
+fire("message_end", { message: { customType: "intercom_message", details: { from: { id: "new-monitor" }, bodyText: `ANSWER ${askId}: Ship` } } });
+assert.equal(emits.length, 2, "answer cannot precede forwarding to its recipient");
+assert.equal(outbox.at(-1).to, "new-monitor");
+fire("ask:cancelled", {});
+
+// 10. Current upstream source patches in memory, idempotently, and rejects drift.
 const target = path.join(
 	homedir(),
 	".pi",
@@ -141,21 +166,59 @@ const target = path.join(
 );
 if (existsSync(target)) {
 	const source = readFileSync(target, "utf8");
-	assert.match(
-		source,
-		/ASK_PENDING_EVENT/,
-		"patched pi-ask-user emits ask:pending",
-	);
-	assert.match(
-		source,
-		/ASK_ANSWER_EVENT/,
-		"patched pi-ask-user accepts ask:answer",
-	);
-	assert.match(
-		source,
-		/PI_ASK_USER_REMOTE_ANSWERS/,
-		"remote answers stay opt-in",
-	);
+	const patched = patchAskUserSource(source);
+	assert.equal(patchAskUserSource(patched), patched);
+	assert.doesNotThrow(() => stripTypeScriptTypes(patched, { mode: "transform" }));
+	assert.match(patched, /signal: localSignal/);
+	assert.throws(() => patchAskUserSource("upstream anchors moved"), /anchor 1 matched 0/);
+	assert.throws(() => patchAskUserSource("ASK_ANSWER_EVENT"), /Legacy remote-answer patch/);
+	assert.equal(readFileSync(target, "utf8"), source, "installed source remains untouched");
 }
 
-console.log("ok - ask_user remote-answer bridge");
+// 11. Exercise the injected helper, not an imitation of its race/cleanup logic.
+const helperSource = stripTypeScriptTypes(REMOTE_HELPERS.replaceAll("export const", "const"));
+const env = {};
+const { runRemoteAsk, coerceRemoteAnswer } = runInNewContext(`${helperSource}\n({ runRemoteAsk, coerceRemoteAnswer })`, {
+	AbortController, globalThis: { crypto: globalThis.crypto }, process: { env },
+	parseBooleanPreference: (value) => value === "1",
+	createSelectionResponse: (selections, comment) => ({ kind: "selection", selections, comment }),
+	createFreeformResponse: (text) => text ? ({ kind: "freeform", text }) : null,
+});
+assert.equal(coerceRemoteAnswer({ text: "Unknown" }, ask.options, false, false, false), null);
+assert.equal(coerceRemoteAnswer({ selections: ["Ship", "Hold"] }, ask.options, false, false, false), null);
+let answerHandler;
+let remoteId;
+let disposed = 0;
+let emitted = 0;
+const remotePi = { events: {
+	on: (_name, handler) => { answerHandler = handler; return () => { disposed++; }; },
+	emit: (_name, payload) => { emitted++; remoteId = payload.askId; },
+} };
+assert.equal(await runRemoteAsk(remotePi, ask, false, false, false, undefined, async () => "local"), "local");
+assert.equal(emitted, 0, "disabled bridge is inert");
+env.PI_ASK_USER_REMOTE_ANSWERS = "1";
+let localSignal;
+const pendingAnswer = runRemoteAsk(remotePi, ask, false, false, false, undefined, (signal) => {
+	localSignal = signal;
+	return new Promise((resolve) => signal.addEventListener("abort", () => resolve(null), { once: true }));
+});
+await Promise.resolve();
+answerHandler({ askId: remoteId, text: "Invalid" });
+assert.equal(localSignal.aborted, false);
+answerHandler({ askId: remoteId, text: "Ship" });
+assert.equal((await pendingAnswer).selections[0], "Ship");
+assert.equal(localSignal.aborted, true, "remote winner closes losing local UI");
+assert.equal(disposed, 1);
+assert.equal(await runRemoteAsk(remotePi, ask, false, false, false, undefined, async () => "local"), "local");
+assert.equal(disposed, 2, "local winner unsubscribes remote channel");
+await assert.rejects(runRemoteAsk(remotePi, ask, false, false, false, undefined, async () => { throw new Error("UI failed"); }), /UI failed/);
+assert.equal(disposed, 3, "thrown UI error still cleans up");
+const caller = new AbortController();
+const cancelled = runRemoteAsk(remotePi, ask, false, false, false, caller.signal, (signal) => new Promise((resolve) => signal.addEventListener("abort", () => resolve(null), { once: true })));
+await Promise.resolve();
+caller.abort();
+assert.equal(await cancelled, null);
+assert.equal(disposed, 4, "caller abort cleans up");
+assert.equal(await runRemoteAsk(remotePi, ask, false, false, false, AbortSignal.abort(), async () => assert.fail("cancelled call must not prompt")), null);
+
+console.log("ok - ask_user remote-answer bridge and optional 0.16 patch");

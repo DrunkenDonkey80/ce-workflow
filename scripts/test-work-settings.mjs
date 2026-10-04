@@ -1240,7 +1240,7 @@ try {
 	const creativeKeys = creativeStep.match(/"key":"divergent-\d+"/g) ?? [];
 	assert(
 		(creativeStep.match(/work-divergent/g) ?? []).length === 3 &&
-			creativeStep.includes("workflowScript") &&
+			creativeStep.includes("workflow:true") &&
 			creativeStep.includes("runs.all") &&
 			creativeKeys.length === 3 &&
 			new Set(creativeKeys).size === 3 &&
@@ -1249,7 +1249,7 @@ try {
 			creativeStep.includes("bg_wait with all:true") &&
 			creativeStep.includes("wo:divergent-analysis") &&
 			creativeStep.includes("test/generator-b"),
-		"creative sidecar uses unique stable-key workflowScript branches and preserves provenance",
+		"creative sidecar uses unique stable-key workflow:true branches and preserves provenance",
 	);
 	settings.workOrchestrator.advisorSources = { advisor2: "chatgpt-web" };
 	settings.workOrchestrator.creativeSource = "chatgpt-web";
@@ -1432,7 +1432,7 @@ try {
 		assert(allAdvisors.includes(agent), `parallel gate includes ${agent}`);
 	assert(
 		allAdvisors.includes("exactly one parallel subagent call") &&
-			allAdvisors.includes("workflowScript using runs.all") &&
+			allAdvisors.includes("workflow:true") && allAdvisors.includes("using runs.all") &&
 			!allAdvisors.includes("tasks mode") &&
 			allAdvisors.includes("requirements/evidence auditor") &&
 			allAdvisors.includes("builder/on-call critic") &&

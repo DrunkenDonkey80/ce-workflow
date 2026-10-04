@@ -43,7 +43,8 @@ export function registerRemoteAskAnswers(pi) {
 	let requestSeq = 0;
 
 	const forward = (ask) => {
-		if (!peerId) return;
+		if (!peerId || (ask.remotePeerId && ask.remotePeerId !== peerId)) return;
+		ask.remotePeerId = peerId;
 		pi.events.emit("intercom:outbox-request", {
 			version: 1,
 			requestId: `work-ask-${ask.askId}-${++requestSeq}`,
@@ -56,22 +57,26 @@ export function registerRemoteAskAnswers(pi) {
 
 	pi.events.on("ask:pending", (ask) => {
 		if (!ask?.askId) return;
-		pending.set(ask.askId, ask);
-		forward(ask);
+		const entry = { ...ask, remotePeerId: "" };
+		pending.set(ask.askId, entry);
+		forward(entry);
 	});
 	pi.events.on("ask:answered", () => pending.clear());
 	pi.events.on("ask:cancelled", () => pending.clear());
+	pi.on("session_shutdown", () => { pending.clear(); peerId = ""; });
 
 	pi.on("message_end", (event) => {
 		const message = event?.message;
 		if (message?.customType !== "intercom_message") return;
+		if (message.details?.message?.crossMachine || message.details?.crossMachine) return;
 		const from = String(message.details?.from?.id ?? "").trim();
-		if (from) peerId = from;
+		if (!from || (pending.size && peerId && from !== peerId)) return;
+		peerId = from;
 		if (pending.size === 0) return;
 
 		const match = ANSWER_PATTERN.exec(messageText(message));
 		const ask = match ? pending.get(match[1]) : undefined;
-		if (!ask) {
+		if (!ask || ask.remotePeerId !== from) {
 			// A peer only just became reachable: retry the pending prompts.
 			for (const entry of pending.values()) forward(entry);
 			return;

@@ -3,8 +3,11 @@
 // compaction and NOTHING more. Reproduces the real replay path — pi-subagents
 // emits its resume message with pi.sendMessage(..., {triggerTurn:true}), which
 // calls _runAgentPrompt directly and never emits before_agent_start.
+// Delayed discovery notices use a synthetic owned run: production auto-discovery
+// is retired. The single module instance below exercises its dormant ownership
+// guard through real host events, with positive and unknown-child controls.
 //
-// Usage: node scripts/test-compaction-resume-idle.mjs [--model provider/id] [--keep]
+// Usage: node scripts/test-compaction-resume-idle.mjs [--model provider/id] [--compaction-mode ultracompact|ultrafull] [--keep]
 import { execSync, spawn } from "node:child_process";
 import {
 	appendFileSync,
@@ -16,7 +19,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -24,6 +27,10 @@ const model =
 	argv[argv.indexOf("--model") + 1]?.startsWith("-") || !argv.includes("--model")
 		? "openai-codex/gpt-5.6-luna"
 		: argv[argv.indexOf("--model") + 1];
+const compactionMode = argv.includes("--compaction-mode")
+	? argv[argv.indexOf("--compaction-mode") + 1] : "ultracompact";
+if (!["ultracompact", "ultrafull"].includes(compactionMode))
+	throw new Error("--compaction-mode must be ultracompact or ultrafull");
 const keep = argv.includes("--keep");
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-compact-resume-"));
 // Global install: pi is not a dependency of this repo, so resolve from npm root.
@@ -49,7 +56,8 @@ mkdirSync(path.join(cwd, ".pi"));
 writeFileSync(
 	path.join(cwd, ".pi", "settings.json"),
 	JSON.stringify({
-		workKnowledge: { discoverer: { model: "inherit", thinking: "low" } },
+		workOrchestrator: { context: { mode: compactionMode, compactionModel: "__none_model__" } },
+		workKnowledge: { discoverer: { model: "__inherit_model__", thinking: "low" } },
 	}),
 );
 // Replay both the immediate resume and delayed internal failure/control notices.
@@ -57,18 +65,32 @@ writeFileSync(
 writeFileSync(
 	path.join(cwd, "resume-stub.js"),
 	`import { writeFileSync } from "node:fs";
+import workModelsExtension, { launchKnowledgeDiscoverer } from ${JSON.stringify(pathToFileURL(path.join(repo, "extensions", "work-models.ts")).href)};
 export default function resumeStub(pi) {
+	// One import owns both registration and guards; Pi's per-extension jiti
+	// loaders do not share private run maps across separately loaded copies.
+	workModelsExtension(pi);
+	pi.registerCommand("__test-unowned-notice", {
+		description: "Fixture ownership control",
+		handler: () => pi.sendMessage({
+			customType: "subagent-notify", display: false,
+			content: "Background task completed: **workflow**\\nWorkflow run: user-owned-wrapper\\nChild runs: main=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee (completed)",
+		}, { triggerTurn: true }),
+	});
 	const runId = "43b46a2e-ec06-4f14-b99e-e3f81478d87a";
 	const timers = [];
 	pi.events.on("subagents:rpc:v1:request", (request) => {
 		if (request.method !== "spawn") return;
-		writeFileSync(${JSON.stringify(path.join(cwd, "discoverer-launched"))}, request.params.workflowScript);
+		writeFileSync(${JSON.stringify(path.join(cwd, "discoverer-launched"))}, request.params.script);
 		pi.events.emit("subagents:rpc:v1:reply:" + request.requestId, {
 			success: true, data: { runId },
 		});
 	});
 	pi.on("session_shutdown", () => timers.forEach(clearTimeout));
-	pi.on("session_compact", () => {
+	pi.on("session_compact", async (_event, ctx) => {
+		// Auto-discovery is retired. Explicitly register this synthetic run via
+		// the real launcher and local RPC stub; no child or provider is launched.
+		await launchKnowledgeDiscoverer(pi, ctx, [{ role: "user", content: "Synthetic fixture evidence for delayed notices." }]);
 		writeFileSync(${JSON.stringify(path.join(cwd, "stub-fired"))}, "1");
 		pi.sendMessage(
 			{
@@ -106,8 +128,6 @@ const child = spawn(
 		"--session-dir",
 		path.join(cwd, "sessions"),
 		"--no-extensions",
-		"-e",
-		path.join(repo, "extensions", "work-models.ts"),
 		"-e",
 		path.join(cwd, "resume-stub.js"),
 		"--model",
@@ -230,9 +250,20 @@ try {
 		fail(
 			`microcompact spent a model turn: ${spoke.length} post-compaction model events (${settledBefore} settled before)`,
 		);
+	// Positive controls: ownership-specific suppression must not globally
+	// disable providers or absorb an unrelated user's child completion.
+	const providerEvent = event => event.type === "message_update" ||
+		(event.type === "message_end" && event.message?.role === "assistant" && event.message.usage?.output > 0);
+	for (const message of ["Reply with exactly: CONTROL", "/__test-unowned-notice"]) {
+		const start = events.length;
+		send({ type: "prompt", message });
+		await waitFor(event => events.slice(start).includes(event) && providerEvent(event), 120_000, `${message} provider control`);
+		await waitFor(event => events.slice(start).includes(event) && event.type === "agent_settled", 120_000, `${message} settled control`);
+	}
 	console.log(
-		"ok - microcompact and delayed internal failure notices spend no model turn",
+		`ok - ${compactionMode}: live microcompact and stubbed delayed internal notices spend no model turn; ordinary prompt and unknown child both wake provider`,
 	);
+	if (keep) console.log(`Live artifacts: ${cwd}; model=${model}; thinking=off`);
 	cleanup();
 } catch (error) {
 	fail(error.message);

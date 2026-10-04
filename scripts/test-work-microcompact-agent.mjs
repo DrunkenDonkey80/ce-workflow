@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import workModelsExtension from "../extensions/work-models.ts";
 
 const scenarios = ["idle", "direct"];
+const modes = ["ultracompact", "ultrafull"];
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
 
@@ -115,6 +116,8 @@ function assistantMessage(content, stopReason, inputTokens = 10_000) {
 
 async function runChild(scenario) {
 	assert(scenarios.includes(scenario));
+	const mode = process.env.CE_MICROCOMPACT_MODE;
+	assert(modes.includes(mode));
 	const cwd = process.cwd();
 	const tickLimit = scenario === "direct" ? 24 : 0;
 	const piRoot = process.env.CE_MICROCOMPACT_PI_ROOT;
@@ -144,7 +147,7 @@ async function runChild(scenario) {
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 	writeFileSync(
 		path.join(cwd, ".pi", "settings.json"),
-		JSON.stringify({ workOrchestrator: { context: { autoCompact: false } } }),
+		JSON.stringify({ workOrchestrator: { context: { mode, autoCompact: false } } }),
 	);
 	execFileSync("git", ["add", "README.md", ".gitignore"], { cwd });
 	execFileSync(
@@ -293,10 +296,43 @@ async function runChild(scenario) {
 	});
 	modelRuntime.registerNativeProvider(provider);
 
+	// Pi 1.0.2 currently exposes the full manager at runtime, although its
+	// public context type promises only these readonly methods. Restrict the
+	// extension (not Pi's own internals) to that documented boundary.
+	const readonlyMethods = new Set([
+		"getCwd", "getSessionDir", "getSessionId", "getSessionFile", "getLeafId",
+		"getLeafEntry", "getEntry", "getLabel", "getBranch", "buildContextEntries",
+		"buildSessionProjection", "getHeader", "getEntries", "getTree", "getSessionName",
+	]);
+	const types = readFileSync(path.join(piRoot, "dist/core/session-manager.d.ts"), "utf8");
+	const declaredReadonly = types.match(/export type ReadonlySessionManager = Pick<SessionManager, ([^;]+)>;/)?.[1];
+	assert(declaredReadonly, "installed Pi declares its readonly session boundary");
+	assert.deepEqual(new Set([...declaredReadonly.matchAll(/"([^"]+)"/g)].map(match => match[1])), readonlyMethods);
+	let protectedReads = 0;
+	let projectionReads = 0;
+	const publicContext = ctx => new Proxy(ctx, {
+		get(target, property) {
+			if (property !== "sessionManager") return Reflect.get(target, property);
+			const manager = target.sessionManager;
+			return new Proxy(manager, {
+				get(source, key) {
+					if (!readonlyMethods.has(key)) {
+						protectedReads++;
+						throw new Error(`Test readonly boundary: sessionManager.${String(key)} is not public`);
+					}
+					if (key === "buildSessionProjection") projectionReads++;
+					const value = Reflect.get(source, key);
+					return typeof value === "function" ? value.bind(source) : value;
+				},
+			});
+		},
+	});
 	let f8;
 	const wrappedWorkModels = (extensionApi) => {
 		const api = new Proxy(extensionApi, {
 			get(target, property, receiver) {
+				if (property === "on")
+					return (name, handler) => target.on(name, (event, ctx) => handler(event, publicContext(ctx)));
 				if (property === "registerShortcut")
 					return (name, config) => {
 						if (name === "f8") f8 = config;
@@ -312,11 +348,11 @@ async function runChild(scenario) {
 			handler: (_args, ctx) =>
 				f8.handler(
 					ctx.isIdle?.() === false
-						? new Proxy(ctx, {
+						? new Proxy(publicContext(ctx), {
 								get: (target, property) =>
 									property === "compact" ? undefined : target[property],
 							})
-						: ctx,
+						: publicContext(ctx),
 				),
 		});
 	};
@@ -412,12 +448,15 @@ async function runChild(scenario) {
 			"Count from 1 to 24. For each number, make one separate bash tool call that records the current number, with an LLM pass between calls.",
 		);
 		await waitFor(() => ticks(cwd).length === tickLimit, "direct count", 60_000);
-		await waitFor(() => compactions === 1, "direct compaction");
+		await waitFor(() => sessionManager.getEntries().filter(entry => entry.type === "compaction").length === 1, "direct compaction");
 		await waitFor(() => session.isIdle, "direct settlement");
 	}
 	if (f8Error) throw f8Error;
 
 	const entries = sessionManager.getEntries();
+	if (scenario === "idle")
+		assert(entries.find(entry => entry.type === "compaction")?.summary.includes("Microcompact fixture warmup"),
+			"idle native preparation preserves the original user request");
 	const userMessages = session.messages
 		.filter((message) => message.role === "user")
 		.map(textOf);
@@ -429,6 +468,9 @@ async function runChild(scenario) {
 		.filter(Boolean);
 	const result = {
 		scenario,
+		mode,
+		protectedReads,
+		projectionReads,
 		pid: process.pid,
 		cwd: realpathSync(cwd),
 		contextFilled,
@@ -437,7 +479,8 @@ async function runChild(scenario) {
 			(message) =>
 				message.role === "custom" && message.customType === "work-context-fill",
 		).length,
-		compactions,
+		compactions: entries.filter(entry => entry.type === "compaction").length,
+		compactionEndEvents: compactions,
 		f8At,
 		ticks: ticks(cwd),
 		toolCommands,
@@ -461,7 +504,8 @@ async function runParent() {
 	const piRoot = locatePiPackage();
 	const dirs = [];
 	try {
-		const results = scenarios.map((scenario) => {
+		const cases = modes.flatMap(mode => scenarios.map(scenario => ({ mode, scenario })));
+		const results = cases.map(({ mode, scenario }) => {
 			const cwd = mkdtempSync(path.join(tmpdir(), `ce-microcompact-${scenario}-`));
 			dirs.push(cwd);
 			const output = execFileSync(
@@ -474,6 +518,7 @@ async function runParent() {
 					env: {
 						...process.env,
 						CE_MICROCOMPACT_PI_ROOT: piRoot,
+						CE_MICROCOMPACT_MODE: mode,
 						PI_CODING_AGENT_DIR: path.join(cwd, "agent"),
 					},
 				},
@@ -485,7 +530,11 @@ async function runParent() {
 			return JSON.parse(line.slice("MICROCOMPACT_RESULT ".length));
 		});
 		for (const [index, result] of results.entries()) {
-			assert.equal(result.scenario, scenarios[index]);
+			assert.equal(result.scenario, cases[index].scenario);
+			assert.equal(result.mode, cases[index].mode);
+			assert.equal(result.protectedReads, 0, "no undocumented session access");
+			if (result.mode === "ultracompact" || result.scenario === "idle")
+				assert(result.projectionReads > 0, "native preparation uses the public projection");
 			assert.notEqual(
 				result.pid,
 				process.pid,
@@ -500,12 +549,13 @@ async function runParent() {
 				`${result.scenario} removed obsolete context`,
 			);
 			assert(
-				result.notices.every((notice) => !/microcompaction failed/i.test(notice)),
+				result.notices.every((notice) => !/compaction.*(?:failed|cancelled)|readonly boundary/i.test(notice)),
 				`${result.scenario} compacted without fallback`,
 			);
 		}
 
-		const [idle, direct] = results;
+		for (const mode of modes) {
+		const [idle, direct] = results.filter(result => result.mode === mode);
 		assert.deepEqual(idle.ticks, []);
 		assert.equal(
 			idle.modelRequests,
@@ -525,7 +575,7 @@ async function runParent() {
 		);
 		assert(filtered, "direct work recorded filtered in-work context");
 		assert(filtered.nextTick >= 4);
-		assert.equal(filtered.persistedCompactions, 0);
+		assert.equal(filtered.persistedCompactions, mode === "ultracompact" ? 0 : 1);
 		assert(filtered.fillMessages < direct.fillMessagesBefore);
 		assert.equal(filtered.hasCurrentRequest, true);
 		assert.equal(filtered.toolResults.length, filtered.nextTick - 1);
@@ -535,11 +585,13 @@ async function runParent() {
 				context.compactionSummaries === 1 &&
 				context.toolResults.length < context.nextTick - 1,
 		);
-		assert(rebased, "long active work rebased the filtered tail");
-		assert(
-			rebased.toolResults.at(-1).startsWith(`result-${rebased.nextTick - 1}-`),
-			"rebasing retained the latest completed tool result",
-		);
+		if (mode === "ultracompact") {
+			assert(rebased, "long active work rebased the filtered tail");
+			assert(
+				rebased.toolResults.at(-1).startsWith(`result-${rebased.nextTick - 1}-`),
+				"rebasing retained the latest completed tool result",
+			);
+		}
 		assert.deepEqual(
 			direct.toolCommands,
 			Array.from({ length: 24 }, (_, index) => tickCommand(index + 1)),
@@ -558,7 +610,8 @@ async function runParent() {
 		);
 		assert.equal(directFilter.summaryProfile, "freeform");
 		assert.equal(directFilter.continuesStaleGoal, false);
-		console.log("microcompact filter-and-persist tests passed");
+		}
+		console.log("microcompact installed-Pi readonly-boundary tests passed (both modes, idle/direct/F8)");
 	} finally {
 		for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 	}

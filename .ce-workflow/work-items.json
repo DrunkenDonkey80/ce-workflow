@@ -6693,6 +6693,45 @@
       "type": "task",
       "updatedAt": "2026-08-26T06:00:32.028Z"
     },
+    "work-2.report-5084f184-38da-4636-989b-9549cf295beb": {
+      "createdAt": "2026-10-04T09:03:20.628Z",
+      "dependencies": [],
+      "dependencyEdges": [],
+      "description": "Observed: WO_CATCH_UP_V2 found ce-workflow coded specialist launches and mocks using RPC workflowScript, rejected by pi-subagents 0.74+, while the >=0.42.1 peer floor allowed incompatible releases. Independent review also found Windows backslash paths bypassing the direct-mode work-agent detector. Fixed during this catch-up: RPC script, current public workflow syntax, >=0.75.0 floor, both slash styles and regression checks.\nExpected: Launch fixtures should assert the current RPC contract and absence of retired fields; workflow-path guards should match Windows and POSIX plugin semantics; compatibility floors should match APIs actually used.\nImpact: Mocks concealed failures of discoverer, advisor, verifier and leased specialist launches; path recognition weakened direct-mode fencing on Windows. Current focused checks and targeted independent re-review pass.\nSuggested improvement: Already applied locally; retain RPC field-absence assertions, Windows workflow-path regression and the current compatibility-floor packaging check.",
+      "evidence": [
+        {
+          "bundle": ".pi/self-improvement-reports/c33e044f-69f2-45e6-8ab0-fbbf9a424287",
+          "extensionRevision": "package-0.1.0",
+          "files": [
+            {
+              "bytes": 2930,
+              "file": "01-summary.json",
+              "sha256": "f22fc59d385011590fee45ac238a9fd2a487adca164930dc3d87623e2e3feddc"
+            },
+            {
+              "bytes": 18085,
+              "file": "02-work-catch-up-baseline.json",
+              "sha256": "c9df28825425cc6a0f40aac8b79efbe068c804b73776e657f7f32cf16dd9acfd"
+            }
+          ],
+          "kind": "self-improvement-report",
+          "producer": "ce-workflow",
+          "submittedAt": "2026-10-04T09:03:20.620Z",
+          "workflowId": "01a0ef01-d9ba-7764-a410-6b3ca288409d"
+        }
+      ],
+      "id": "work-2.report-5084f184-38da-4636-989b-9549cf295beb",
+      "labels": [
+        "report",
+        "self-improvement"
+      ],
+      "notes": [],
+      "parentId": "work-2",
+      "status": "open",
+      "title": "Self-improvement report: WO_CATCH_UP_V2 found ce-workflow coded specialist launches and mocks using RPC workflowScript, rejected by pi-subagents 0.74+, whi",
+      "type": "task",
+      "updatedAt": "2026-10-04T09:03:20.628Z"
+    },
     "work-2.report-52aee41a-f985-4d4a-80c6-8ce324bcaa1c": {
       "createdAt": "2026-08-21T19:17:07.303Z",
       "dependencies": [
@@ -16571,7 +16610,7 @@
       "recordCount": 11,
       "sourceFingerprint": "b14327e6aa4ebc6e752b2854c9e7f0c1a62c8237b2c6112aaf37fe648099bd83"
     },
-    "updatedAt": "2026-09-30T12:10:48.203Z"
+    "updatedAt": "2026-10-04T09:03:20.629Z"
   },
   "schemaVersion": 1
 }

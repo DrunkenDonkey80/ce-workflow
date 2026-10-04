@@ -599,7 +599,7 @@ try {
 	assert.match(promptRedesign.handoffPrompt, /UI design input|UI-DESIGN-INPUT/);
 	assert.match(
 		promptRedesign.handoffPrompt,
-		/exactly one subagent workflowScript/,
+		/exactly one subagent workflow:true/,
 	);
 	const durableReference = path.join(
 		promptRoot,

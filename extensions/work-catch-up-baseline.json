@@ -1,27 +1,47 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-09-22T09:59:43.992Z",
+  "capturedAt": "2026-10-04T09:00:33.913Z",
+  "verification": {
+    "command": "npm run verify:quiet",
+    "fullRuns": 1,
+    "result": "All checks covered by the full run plus targeted reruns of its two failed tests; no production or package-surface changes followed the full run.",
+    "initialFailures": [
+      "test-work-goal.mjs: completed review had not yet advanced baseline versions; advancing only after per-decision verification resolves this temporary manifest mismatch.",
+      "test-work-wo-control.mjs: mock replaced rather than chained context handlers; chain them as Pi does and explicitly select ultracompact instead of inheriting global user mode."
+    ],
+    "review": "Independent initial sensitive review and one targeted re-review: PASS after Windows local-peer and backslash-path fixes.",
+    "limitations": "No live opt-in patched TUI/intercom test; installed ask-user package was not mutated. LSP oversized and inconclusive outcomes are not reported clean."
+  },
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "0.87.0",
-      "reviewedAt": "2026-09-22T09:20:50.992Z",
-      "reviewedVersion": "0.87.0",
+      "version": "1.0.2",
+      "reviewedAt": "2026-10-04T08:48:06.970Z",
+      "reviewedVersion": "1.0.2",
       "decisions": [
         {
-          "version": "0.87.0",
-          "title": "Adopt canonical context restoration for the ce-workflow context filter",
+          "version": "1.0.2",
+          "title": "Keep interactive workflow controls model-only",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 package rollback. Bottom line: use Pi 0.87.0's canonical provider-context handling with the existing ce-workflow context filter and no duplicate prompt/tool restoration code. Verified project fit: extensions/work-models.ts registers one context handler that returns a filtered messages array and never assigns session.agent.state.messages; its compaction path depends on built-in tool declarations surviving that filter. Verified upstream evidence: the installed 0.87.0 changelog, extension/session/compaction documentation, exported event types, runtime implementation, package metadata, and captured 0.85.1-to-0.87.0 artifact state that context handlers no longer receive system messages and Pi restores the prompt and tool state after they run. Benefit: filtered and compacted requests retain native tools without ce-workflow rebuilding host-owned transcript state. Cost/risk: ordinary host regression exposure. Confidence: high. Recommendation: adopt now and keep the context hook message-only.",
-          "verification": "node scripts/test-work-compaction-notifications.mjs; installed package metadata reports 0.87.0"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 tool metadata rollback. Bottom line: declare research_mode and work_* workflow control tools model-only using the shared registration seam. Verified project fit: research transitions settle only at the top-level batch boundary; work_goal_complete/dirty_continue and verifier mutations terminate or change coded state and must not be nested in scripts. Upstream evidence: Pi 0.99+ extensions.md Tool exposure, types.d.ts ToolExposure and captured 0.87-to-1.0.2 diff explicitly provide model-only for orchestrating/interactive tools; nested calls have parentToolCallId and no transcript entries. Benefit: preserve direct visibility while excluding script-based control bypasses and ignored termination. Cost/risk: callers must use these tools directly; ordinary process_image, knowledge and research_note stay callable. Confidence: high. Recommendation: adopt now and assert exposures in the existing extension registration test. tooTechnical:false.",
+          "tooTechnical": false,
+          "verification": "PASS: node scripts/test-work-compaction-notifications.mjs; installed Pi metadata reports 1.0.2. Tool registration assertions cover model-only controls and ordinary nested-callable helpers."
         },
         {
-          "version": "0.87.0",
-          "title": "Keep new lifecycle, model, image, provider, SDK, and TUI behavior host-owned",
+          "version": "1.0.2",
+          "title": "Retain explicit role routing and image interpretation",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Pi core Grade: Reject, Tier 2 routing/settings rollback: do not auto-enable codemode, replace explicit role routing with virtual/classifier models, tune sampling-by-thinking defaults, or remove the non-vision interpretation bridge. Project has deterministic leases, explicit user-selected role models and process_image for reasoning over references; native image generation/resizing does not replace interpretation. Upstream docs codemode/models/virtual-models and model registry type diff make these opt-in capabilities, not replacements. Benefit: retain control and avoid unmeasured cost/runtime changes; risks: benchmark required for future optimization; confidence high; recommendation retain incumbent routing, inherit opt-in host facilities."
+        },
+        {
+          "version": "1.0.2",
+          "title": "Inherit host context, SDK, dynamic tools, model and TUI lifecycle changes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit Pi's actionable settle boundaries, canonical context edits, provider/model fixes, image limits, cache warming, SDK, and TUI lifecycle without a ce-workflow adapter. Verified project fit: ce-workflow uses public event registration, SessionManager reads, modelRegistry lookup, and explicit turn_end/agent_settled orchestration; it does not use the removed shouldStopAfterTurn option, construct exhaustive SessionEntry or ExtensionEvent switches, assign provider message state, register a custom provider, or own image resizing and editor rendering. Verified upstream evidence: the installed 0.86.0 through 0.87.0 changelog entries, linked public docs, exported types, runtime source, and captured artifact define these as host capabilities. Benefit: reliability and model/runtime improvements arrive from their owner without duplicating scheduling or transcript machinery. Cost/risk: ce-workflow keeps its coded lease and goal-continuation gates rather than speculatively migrating them to agent_before_settle. Confidence: high. Recommendation: no local lifecycle or provider shim."
+          "rationale": "Pi core Grade: Not-our-problem, Tier 1 package rollback: hooks/context canonical semantics, SDK, native MCP dynamic loading, thinking/model catalog, samplingParamsByThinkingLevel, fullscreen/theme lifecycle, renderers, cache/model errors and OAuth are host-owned. Project uses supported context/boundary handlers, public modelRegistry and shared overlays; no removed node subpath or custom renderer override. Benefit inherit fixes without local shim; confidence high; recommendation no adapter.",
+          "costRisk": "Ordinary upstream regression exposure; no duplicate provider, SDK, MCP or TUI implementation."
         }
       ]
     },
@@ -46,76 +66,90 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.70.1",
-      "reviewedAt": "2026-09-22T09:20:50.992Z",
-      "reviewedVersion": "0.70.1",
+      "version": "0.75.0",
+      "reviewedAt": "2026-10-04T08:48:06.970Z",
+      "reviewedVersion": "0.75.0",
       "decisions": [
         {
-          "version": "0.70.1",
-          "title": "Remove retired completionGuard frontmatter",
+          "version": "0.75.0",
+          "title": "Migrate workflow launches and require the current RPC release",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 metadata and assertion cleanup. Bottom line: delete completionGuard from every ce-workflow agent because pi-subagents 0.70.1 removed the setting and now trusts process results plus explicit output and acceptance checks. Verified project fit: ten ce role files still declared completionGuard: false and two tests required the retired line, while direct role handoffs already pass acceptance level none because coded work-item gates own completion. Verified upstream evidence: the installed 0.70.1 changelog and current agent/tool-reference documentation remove completionGuard from supported frontmatter and describe explicit structured acceptance. Benefit: eliminates dead configuration and prevents stale tests from pinning an unsupported contract. Cost/risk: none beyond requiring the installed 0.70.1 semantics. Confidence: high. Recommendation: remove the retired field now.",
-          "verification": "node scripts/test-work-planner-slicing.mjs; node scripts/test-work-compaction-notifications.mjs"
+          "rationale": "Candidate: migrate pi-subagents workflow launch contract. Grade: Adopt. Reversibility: Tier 1 local API/guidance rollback. Bottom line: replace RPC workflowScript with script and generated model instructions with workflow:true or script-path syntax. Project fit: spawnSubagentRpc (work-models.ts:11347) routes discoverer, leases, advisors and verifier launches; fixtures currently mock removed field and hide the break. Upstream evidence: pi-subagents 0.74.0 changelog, docs/extension-api.md:122, captured diff public-execution removal errors all reject legacy fields, even RPC. Benefit: restore coded specialist launches and prevent invalid advisor calls. Cost/risk: preserve stable keys, models, acceptance and async controls; update direct-mode work-role guard for the new public forms. Confidence: high. Recommendation: adopt now; focused checks compaction-notifications, settings and goal/launch fixture tests. tooTechnical:false; no explanation playbook needed.",
+          "tooTechnical": false,
+          "additionalEvidence": "Existing workflow compatibility candidate also raises pi-subagents peer floor to >=0.75.0 so installation cannot resolve a release that lacks current RPC or Pi 1.0 runner support.",
+          "reviewResolution": "Recognize both slash and backslash workflow paths, including Windows .\\guard-workflow.js, and fail closed for unreadable or oversized script paths.",
+          "verification": "PASS: node scripts/test-work-compaction-notifications.mjs; node scripts/test-work-settings.mjs; node scripts/test-work-goal.mjs; node scripts/test-work-design.mjs. Installed metadata reports 0.75.0; current RPC fixtures assert script and absence of workflowScript."
         },
         {
-          "version": "0.70.1",
-          "title": "Keep ce-workflow's coded acceptance and child capability boundaries",
+          "version": "0.75.0",
+          "title": "Retain scoped child authority and coded work-item lifecycle",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1 role metadata or settings change. Bottom line: do not add acceptanceRole: writer, defaultSubagentOnlyExtensions, or allowedAgents to ce roles without an uncoded launch that needs them. Verified project fit: directRoleHandoffParams explicitly disables plugin acceptance in favor of ce-workflow's reviewer, verification, lease, and finish gates; immutable verifiers explicitly disable ambient project context and skills and receive only four checkpoint tools; ordinary roles do not launch descendants. Verified upstream evidence: 0.70.0 and 0.70.1 document these settings as optional defaults and restrictions, and state that explicit acceptance overrides inferred writer gates. Benefit: avoids duplicate review gates and wider child extension loading. Cost/risk: direct ad-hoc invocation of a package agent gets lightweight attestation, which is outside the coded workflow contract. Confidence: high. Recommendation: retain explicit per-launch acceptance and tools."
+          "rationale": "pi-subagents Grade: Reject, Tier 2 child-policy/settings rollback: no subagent_command grant, required-child extension registry, mission scheduler replacement or disabledFeatures optimization. Project uses explicit coded leases, scoped tool contracts and native acceptance; does not register required child policies, external runners or schedules, so requirements flag does not replace a current integration. Background checkpoint isolation remains mandatory. Benefit avoid speculative extra authority or duplicated mission lifecycle; confidence high; recommendation keep current per-launch restrictions.",
+          "costRisk": "Extra child command authority or replacing native store-backed lifecycle would increase risk without demonstrated project benefit."
         },
         {
-          "version": "0.70.1",
-          "title": "Inherit runtime routing, foreground launch, detach, watchdog, and status fixes",
+          "version": "0.75.0",
+          "title": "Inherit runtime, trust, model and resume-accounting improvements",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: take pi-subagents' model preference, host resolution, background settlement, detached visibility, supervisor wake, tool-budget, and status fixes without local copies. Verified project fit: ce-workflow launches through the supported RPC boundary with explicit run identity, async mode, attention controls, output routing, and recovery; it has no fallbackModels configuration and does not resolve the host SDK itself. Verified upstream evidence: the installed 0.67.0 through 0.70.1 changelog, current agent/workflow/tool docs, package metadata, and captured 0.66.0-to-0.70.1 artifact assign these behaviors to pi-subagents. Benefit: more reliable managed runs without parallel runtime code. Cost/risk: ordinary plugin regression exposure. Confidence: high. Recommendation: no local runtime adapter."
+          "rationale": "Grade: Not-our-problem, Tier 1 package rollback: inherit 0.71-0.75 async reload/reuse, terminal proof, cost/resume accounting, virtual model/preflight, model-only native orchestration tools, project trust/MCP and startup/runtime fixes from owner; ce telemetry already reconciles transcripts and launch IDs rather than copying plugin totals or deriving liveness from mtime. Recommendation no duplicate owner.",
+          "benefit": "Managed launches inherit reliability fixes without a second runtime or accounting owner.",
+          "costRisk": "Ordinary upstream regression exposure.",
+          "confidence": "high"
         }
       ]
     },
     {
       "name": "pi-ask-user",
-      "version": "0.15.0",
-      "reviewedAt": "2026-09-03T17:17:56.241Z",
-      "reviewedVersion": "0.15.0",
+      "version": "0.16.0",
+      "reviewedAt": "2026-10-04T08:48:06.970Z",
+      "reviewedVersion": "0.16.0",
       "decisions": [
         {
-          "version": "0.15.0",
-          "title": "Package-owned private outcome events and compatibility fixes",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit redacted ask outcome events, Kitty repeat/release filtering, and TypeBox-shim compatibility directly from pi-ask-user. Verified project fit: ce-workflow consumes ask_user through normal tool results and lifecycle hooks, has no ask:answered or ask:cancelled listener, does not set PI_ASK_USER_EMIT_FULL_EVENTS, and does not copy the plugin schema or overlay listener. Verified upstream evidence: the installed 0.15.0 README, package metadata, public schema, implementation diff, and captured 0.14.0-to-0.15.0 artifact document these surfaces; the package ships no changelog. Benefit: safer event privacy and more reliable prompts without a second owner. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local event adapter or full-event opt-in."
-        },
-        {
-          "version": "0.15.0",
-          "title": "Open ask_user decision context by default",
+          "version": "0.16.0",
+          "title": "Recognize answered, skipped and cancelled decision batches",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 environment default. Bottom line: set PI_ASK_USER_CONTEXT_EXPANDED=true when ce-workflow loads so decision evidence is visible without Ctrl+E. Verified project fit: ce-workflow routinely supplies decision context for planning, approvals, and recovery; the extension-level default covers every ask_user call while preserving an explicit true or false user environment preference. Verified upstream evidence: pi-ask-user 0.15.0 reads PI_ASK_USER_CONTEXT_EXPANDED at call time and supports contextExpanded as the per-call override. Benefit: actors see the full message immediately. Cost/risk: large contexts consume more terminal space. Confidence: high. Recommendation: use expanded context as ce-workflow's default.",
-          "verification": "node scripts/test-work-settings.mjs"
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 result-normalization rollback. Bottom line: recognize 0.16.0 batch answers without treating a successful batch as unavailable, and honor an explicit Pause/Wait selection in an answered batch. Project fit: recordWorkGoalAskUserResult currently requires details.response and incorrectly sets unavailable for every batch; askUserPauseSelection reads only the single result. Coded dirty/improvement approvals remain intentionally single-question and reject batches. Upstream evidence: README Result details, public schema and index.ts executeBatch define aligned questions/answers with answered or skipped status and empty answers on cancellation; malformed/UI failures throw. Benefit: independent decision batches work safely with work-goal continuation; skipped questions remain unresolved. Cost/risk: validate full alignment and require every question answered before clearing fallback-unavailable. Confidence: high. Recommendation: adopt now with single/batch/cancelled/skipped/pause regression cases. tooTechnical:false.",
+          "tooTechnical": false,
+          "verification": "PASS: node scripts/test-work-goal.mjs; node scripts/test-work-compaction-notifications.mjs. Regression cases cover single, complete batch, skipped, cancelled, malformed alignment and Pause/Wait."
+        },
+        {
+          "version": "0.16.0",
+          "title": "Retarget the optional remote-answer patch to the abortable UI lifecycle",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 patch-helper rollback. Bottom line: retarget the opt-in patch to current public UI lifecycle using an abortable race; do not mutate the installed package during catch-up. Project fit: packaged scripts/patch-ask-user-remote-answer.mjs and test-work-ask-remote.mjs promise remote answers but installed 0.16 is unpatched, env flag unset; test assumes a patch even when disabled. External evidence: captured ask-user diff and current execute(), dialog options and runCustomPrompt signal cleanup. Benefit: preserve optional single-question remote answering without leaking losing UI and make default verification independent of installed patch state. Cost/risk: batch remote answering remains unsupported and local UI remains available; patch must still fail loudly on anchor drift. Confidence: high. Recommendation: adopt with temp-source patch/idempotence and abort-race checks. tooTechnical:false.",
+          "tooTechnical": false,
+          "verification": "PASS: node scripts/test-work-ask-remote.mjs. Patches installed 0.16 source in memory only, asserts idempotence, syntax, anchor-drift rejection, winning-side races, abort cleanup and listener disposal. Live opt-in TUI/intercom interaction not exercised; installed source remains untouched."
         }
       ]
     },
     {
       "name": "pi-intercom",
-      "version": "0.13.0",
-      "reviewedAt": "2026-09-03T17:00:08.495Z",
-      "reviewedVersion": "0.13.0",
+      "version": "0.16.0",
+      "reviewedAt": "2026-10-04T08:48:06.970Z",
+      "reviewedVersion": "0.16.0",
       "decisions": [
         {
-          "version": "0.13.0",
-          "title": "Package-owned session alias command and Unicode-safe Windows broker launch",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit the /alias command and UTF-16LE Windows hidden-launcher fix from pi-intercom without a ce-workflow adapter. Verified project fit: ce-workflow does not name sessions or spawn the intercom broker, keeps pi-intercom optional, uses list-cwd only for operator discovery, and already requires exact session IDs for trust-sensitive or ambiguous coordination. Verified upstream evidence: the installed 0.13.0 README, package metadata, implementation diff, public command/tool behavior, and captured 0.12.1-to-0.13.0 artifact document both changes; the package ships no changelog. Benefit: users can persist a peer-friendly session name and Windows installations with non-ASCII paths launch reliably, while transport ownership stays in the plugin. Cost/risk: ordinary upstream regression exposure. Confidence: high. Recommendation: no local code, docs, or naming convention."
+          "version": "0.16.0",
+          "title": "Pin forwarded answers to the exact local recipient and session",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Grade: Adopt. Reversibility: Tier 1 bridge guard rollback. Bottom line: keep remote ask answers pinned to the exact local peer that received that prompt, refuse crossMachine (ssh-asserted) or trustedLocal:false messages, and reset bridge state on shutdown. Project fit: work-ask-remote.js currently learns peerId from every intercom message then accepts any matching ANSWER token; 0.16 adds cross-machine relay messages to that same message type. Upstream evidence: README cross-machine section, types.ts CrossMachineProvenance and Message.crossMachine, index.ts message renderer persist details.message; identities are explicitly unverified. Benefit: a new peer or SSH-asserted origin cannot hijack a forwarded human decision. Cost/risk: optional bridge continues local-only; actors use local UI for remote-origin decisions. Confidence: high. Recommendation: adopt with cross-machine, wrong-peer, correct-peer and shutdown tests. tooTechnical:false.",
+          "tooTechnical": false,
+          "reviewResolution": "The original POV is preserved above. Independent review and upstream broker/broker.ts:481 establish that trustedLocal:false also describes ordinary Windows local peers, not remote provenance. The implementation therefore rejects crossMachine at either nesting, not trustedLocal:false; it retains exact recipient pinning and shutdown reset. Windows local answering has a regression check.",
+          "verification": "PASS: node scripts/test-work-ask-remote.mjs; wrong peer, both crossMachine locations, Windows local trustedLocal:false, correct recipient, forward-before-answer and shutdown cases. Live broker/TUI interaction not exercised."
         },
         {
-          "version": "0.13.0",
-          "title": "Name ce-workflow role sessions through /alias",
-          "pov": "Reject",
+          "version": "0.16.0",
+          "title": "Keep transport, peer lifecycle and handover package-owned",
+          "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 1 optional naming policy. Bottom line: do not add alias mutation to coded role launches. Verified project fit: managed subagents already carry stable run and child identity, while delayed supervisor guidance intentionally prefers exact session IDs when identity matters. Verified upstream evidence: 0.13.0 presents /alias as a user-facing current-session command, not a subagent routing requirement. Benefit: preserves collision-resistant run identity and avoids persistent name churn. Cost/risk: operators may still set friendly aliases manually for long-lived peer sessions. Confidence: high. Recommendation: reserve /alias for user-managed peers."
+          "rationale": "Grade: Not-our-problem. Tier 1 package rollback. Keep handover, Herdr location/CLI, session identity claim, broker heartbeat and scope/steering lifecycle package-owned; ce-workflow already uses exact IDs and supported outbox, not broker or pane ownership. Benefit: inherit upstream improvements without duplicate transport. Confidence: high. Recommendation: no new peer orchestration or automatic handover.",
+          "costRisk": "Ordinary upstream regression exposure; do not automatically transfer workflow authority between sessions."
         }
       ]
     },
@@ -136,31 +170,17 @@
     },
     {
       "name": "pi-lens",
-      "version": "4.2.1",
-      "reviewedAt": "2026-09-22T09:20:50.992Z",
-      "reviewedVersion": "4.2.1",
+      "version": "4.3.0",
+      "reviewedAt": "2026-10-04T08:48:06.970Z",
+      "reviewedVersion": "4.3.0",
       "decisions": [
         {
-          "version": "4.2.1",
-          "title": "Adopt live diagnostics freshness and path-normalization fixes",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 package rollback. Bottom line: use pi-lens 4.2.1 for parent and reviewer live diagnostics without adding ce-workflow-side stale-result or path-casing logic. Verified project fit: ce-workflow guidance already requires source=lsp path probes when session findings are absent or stale and treats live diagnostics as parent/reviewer evidence; it does not cache or normalize lens findings itself. Verified upstream evidence: the installed 4.2.0 and 4.2.1 changelog, public tool schema, package metadata, and captured 4.1.4-to-4.2.1 artifact document carried-finding re-verification, explicit age labels, path normalization, silent-server warm-up, grouped delta rendering, and disposition-safe diagnostics. Benefit: fewer stale, orphaned, mis-grouped, and false-clean diagnostics. Cost/risk: ordinary plugin regression exposure. Confidence: high. Recommendation: adopt now through the existing public lens_diagnostics contract.",
-          "verification": "lens_diagnostics source=lsp scope=paths on the changed TypeScript and JavaScript files; installed package metadata reports 4.2.1"
-        },
-        {
-          "version": "4.2.1",
-          "title": "Keep immutable checkpoint verifiers isolated from live pi-lens expansion",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Grade: Reject. Reversibility: Tier 3 evidence-boundary change. Bottom line: do not grant analysisRoot, lens_diagnostics, project_report, or new language/tool capabilities to immutable checkpoint verifiers. Verified project fit: verifier claims are content-hash-bound to work_verifier_read/list/find/grep snapshots, while live pi-lens observes the mutable workspace and package-global configuration. Verified upstream evidence: pi-lens 4.2.x adds live Typst, explicit analysis roots, status controls, diagnostics re-verification, and analyzer/LSP fixes rather than immutable checkpoint semantics. Benefit: preserves deterministic evidence ownership while parent and reviewer paths inherit live improvements. Cost/risk: checkpoint verification remains text-bound. Confidence: high. Recommendation: keep the existing four-tool verifier allowlist."
-        },
-        {
-          "version": "4.2.1",
-          "title": "Leave LSP servers, formatters, analyzers, UI status, and graph internals package-owned",
+          "version": "4.3.0",
+          "title": "Inherit configuration, diagnostics and bounded analysis without a local shim",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Reversibility: Tier 1 package rollback. Bottom line: inherit pi-lens 4.2.x implementation fixes without ce-workflow adapters or settings. Verified project fit: ce-workflow consumes public lens tools but does not implement language classification, LSP warm-up, formatter policy, diagnostic disposition, cascade rendering, status widgets, or analyzer runners. Verified upstream evidence: the installed changelog and captured artifact assign these features and fixes to pi-lens. Benefit: diagnostics improve at their owner boundary. Cost/risk: ordinary plugin regression exposure. Confidence: high. Recommendation: no local implementation."
+          "rationale": "Grade: Not-our-problem. Tier 1 package rollback. Keep global agent-dir config discovery, diagnostic save/freshness/dispositions, scanner retirement, Windows paths and bounded spawning package-owned. Verified project fit: ce-workflow consumes lens_diagnostics source=lsp and module_report, not config paths or analyzer internals; immutable verifier contracts remain checkpoint-bound. Upstream: complete 4.3 changelog, docs/agent-tools.md and captured tool/config diffs; public parameter contract unchanged, explicit too-large outcome now documents 5000-line/2MiB limits. Benefit: better diagnostics with no local adapter. Cost/risk: work-models.ts exceeds LSP bound; do not misreport it clean. Confidence: high. Recommendation: no local shim or verifier capability expansion.",
+          "diagnosticEvidence": "Active LSP batch: 4 files confirmed clean, 5 inconclusive, extensions/work-models.ts (33416 lines) and scripts/test-work-goal.mjs (6054 lines) too_large. Empty diagnostics are not treated as proof of clean for unconfirmed paths."
         }
       ]
     }

@@ -270,13 +270,14 @@ export function assert(ok, message) {
 
 export function workflowChildParams(params) {
 	try {
-		const body = params.workflowScript.match(
+		assert(params.workflowScript === undefined, "removed RPC workflowScript field");
+		const body = params.script.match(
 			/^return runs\.run\("main", (.*)\)$/s,
 		)?.[1];
-		if (!body) throw new Error("missing one-child workflowScript");
+		if (!body) throw new Error("missing one-child RPC script");
 		return JSON.parse(body);
 	} catch (error) {
-		throw new Error(`Invalid one-child workflowScript: ${error.message}`);
+		throw new Error(`Invalid one-child RPC script: ${error.message}`);
 	}
 }
 

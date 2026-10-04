@@ -5,6 +5,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,6 +20,7 @@ import workModelsExtension, {
 	requestContextFilter,
 	resetContextFilter,
 	stripProcessedPayloads,
+	workSubagentToolCall,
 } from "../extensions/work-models.ts";
 
 // Replay the delayed wakeups seen after compaction in LPGSlim and ce-workflow
@@ -26,6 +28,14 @@ import workModelsExtension, {
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-compaction-notifications-"));
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 process.env.PI_CODING_AGENT_DIR = path.join(cwd, "agent");
+const scriptPath = path.join(cwd, "guard-workflow.js");
+writeFileSync(scriptPath, 'return runs.run("review", { agent: "work-reviewer" })');
+assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: "./guard-workflow.js" } }, { cwd }), true);
+assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: ".\\\\guard-workflow.js" } }, { cwd }), true);
+assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: "./missing.js" } }, { cwd }), true);
+const workflowContext = text => ({ cwd, sessionManager: { getBranch: () => [{ message: { role: "assistant", content: [{ type: "text", text }] } }] } });
+assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: true } }, workflowContext('```js workflow\nreturn runs.run("review", {"agent":"work-reviewer"})\n```')), true);
+assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: true } }, workflowContext('```js workflow\nreturn runs.run("main", {agent:"worker"})\n```')), false);
 const hooks = {};
 const contextHooks = [];
 const tools = {};
@@ -69,7 +79,8 @@ const pi = {
 		emit(name, event) {
 			if (name !== "subagents:rpc:v1:request") return;
 			try {
-				workflowScript = event.params.workflowScript;
+				assert.equal(event.params.workflowScript, undefined, "removed RPC field must never be sent");
+				workflowScript = event.params.script;
 				if (!discovererPayloadScript) discovererPayloadScript = workflowScript;
 				assert.match(workflowScript, /"agent":"work-knowledge-discoverer"/);
 				launch = { agent: "work-knowledge-discoverer" };
@@ -129,6 +140,11 @@ try {
 		}),
 	);
 	workModelsExtension(pi);
+	for (const tool of Object.values(tools)) {
+		assert.equal(tool.exposure, tool.name === "research_mode" || tool.name.startsWith("work_") ? "model-only" : undefined);
+	}
+	assert.equal((await tools.research_mode.execute("default", { action: "status" }, undefined, null, ctx)).details.enabled, true, "agent control defaults on");
+	await commands.research.handler("auto off", ctx);
 	await launchKnowledgeDiscoverer(pi, ctx, [
 		{
 			role: "user",
@@ -1360,8 +1376,17 @@ try {
 	const scratchScript = path.join(path.dirname(notebook), "explore.mjs");
 	for (const toolName of ["write", "edit"]) {
 		assert.equal(await hooks.tool_call({ toolName, input: { path: scratchScript } }, researchCtx)?.block, undefined, "temp exploratory scripts are allowed");
+		for (const plan of ["PLAN.md", "plans/feature.md", "docs/plans/feature/outline.md", path.join(cwd, "docs/plans/absolute.md")])
+			assert.equal(await hooks.tool_call({ toolName, input: { path: plan } }, researchCtx)?.block, undefined, `${plan} can be written during research`);
+		for (const denied of ["source.js", "README.md", "docs/plans/run.js", "docs/plans/AGENTS.md", "plans/.pi/settings.md", "docs/plans/../../source.md", "../plans/outside.md"])
+			assert.equal(await hooks.tool_call({ toolName, input: { path: denied } }, researchCtx)?.block, true, `${denied} is not a project plan`);
+		assert.equal(researchEntries.at(-1).data.mode, "research", "saving plans never exits research");
 		assert.equal(await hooks.tool_call({ toolName, input: { path: path.join(path.dirname(notebook), "..", "outside.js") } }, researchCtx)?.block, true, "scratch writes stay within the research directory");
 	}
+	mkdirSync(path.join(cwd, "docs/plans"), { recursive: true });
+	symlinkSync(path.dirname(notebook), path.join(cwd, "docs/plans/linked"), process.platform === "win32" ? "junction" : "dir");
+	assert.equal(await hooks.tool_call({ toolName: "write", input: { path: "docs/plans/linked/outside.md" } }, researchCtx)?.block, true, "plan links cannot escape the project");
+	rmSync(path.join(cwd, "docs/plans/linked"), { recursive: true, force: true });
 	for (const toolName of ["bash", "hypa_shell"]) {
 		for (const command of ["git diff", `npm install --prefix "${path.dirname(notebook)}" example`, `unzip archive.zip -d "${path.dirname(notebook)}"`, `node "${scratchScript}"`, "git log --grep=commit", "echo \"git commit\""]) {
 			assert.equal(await hooks.tool_call({ toolName, input: { command } }, researchCtx)?.block, undefined, `${command} is allowed for research`);
@@ -1377,7 +1402,7 @@ try {
 	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", task: "Read-only critique" } }, researchCtx)?.block, undefined);
 	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { action: "models" } }, researchCtx)?.block, undefined);
 	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", worktree: true } }, researchCtx).block, true);
-	assert.match((await hooks.before_agent_start({ prompt: "Explore options" }, researchCtx)).systemPrompt, /RESEARCH MODE: Explore/);
+	assert.match((await hooks.before_agent_start({ prompt: "Explore options" }, researchCtx)).systemPrompt, /Writing a project plan is part of research/);
 	await tools.research_note.execute("note", { note: "Observed result: source.md:12" });
 	assert.match(readFileSync(notebook, "utf8"), /Observed result: source.md:12/);
 	assert.equal(requestContextFilter(researchCtx), false, "no early cut above our threshold");
@@ -1387,12 +1412,12 @@ try {
 	await hooks.agent_end({ messages: [evidence.at(-1)] }, researchCtx);
 	await hooks.agent_settled({}, researchCtx);
 	assert.equal(researchEntries.at(-1).data.notes, notebook, "finished answers never exit research mode");
-	await hooks.session_tree({}, { ...researchCtx, sessionManager: { ...researchCtx.sessionManager, getBranch: () => researchEntries.slice(0, 1) } });
+	await hooks.session_tree({}, { ...researchCtx, sessionManager: { ...researchCtx.sessionManager, getBranch: () => researchEntries.filter(entry => entry.data?.mode === "research").slice(0, 1) } });
 	assert.equal(requestContextFilter(researchCtx), false, "restore research mode on the selected branch");
 	await commands.research.handler("off", researchCtx);
-	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: notebook });
+	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: notebook, agentControl: false });
 	assert.equal(researchWidgets.at(-1), undefined, "banner disappears on exit");
-	assert.equal(exitCompactions, 1, "exit compacts once above 150k");
+	assert.equal(exitCompactions, 0, "manual exit never compacts, even above 150k");
 	assert.equal(requestContextFilter(researchCtx), true);
 	assert.match(readFileSync(notebook, "utf8"), /Observed result/);
 	const savedNotes = path.join(path.dirname(notebook), "saved.md");
@@ -1413,23 +1438,23 @@ try {
 	assert.equal(researchEntries.at(-1).data.stopping, true, "agent_end is not the final settlement boundary");
 	await hooks.agent_settled({}, busyResearchCtx);
 	await hooks.agent_settled({}, { ...researchCtx, hasPendingMessages: () => true });
-	assert.equal(exitCompactions, 1, "never compact while streaming or with queued continuation work");
+	assert.equal(exitCompactions, 0, "never compact while streaming or with queued continuation work");
 	assert.equal(researchEntries.at(-1).data.stopping, true);
 	await shortcuts["ctrl+r"].handler(busyResearchCtx);
 	assert.equal(researchEntries.at(-1).data.stopping, undefined, "Ctrl+R cancels a pending exit");
 	assert.equal(researchEntries.at(-1).data.notes, pendingNotebook, "cancelling keeps the same notebook");
 	await hooks.agent_settled({}, researchCtx);
-	assert.equal(exitCompactions, 1, "cancelled exit does not compact");
+	assert.equal(exitCompactions, 0, "cancelled exit does not compact");
 	await commands.research.handler("off", busyResearchCtx);
 	await hooks.session_tree({}, researchCtx);
 	assert.match(researchWidgets.at(-1)[0], /RESEARCH STOPPING/, "pending exit survives branch restoration");
 	await hooks.agent_settled({}, researchCtx);
-	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: pendingNotebook });
+	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: pendingNotebook, agentControl: false });
 	assert.equal(researchWidgets.at(-1), undefined, "banner disappears only after work settles");
-	assert.equal(exitCompactions, 2, "deferred exit compacts once when idle");
+	assert.equal(exitCompactions, 0, "deferred exit does not compact when idle");
 	assert.match(readFileSync(pendingNotebook, "utf8"), /Finding while stopping/);
 	await hooks.agent_settled({}, researchCtx);
-	assert.equal(exitCompactions, 2, "repeated settled notifications cannot duplicate exit compaction");
+	assert.equal(exitCompactions, 0, "repeated settled notifications never request exit compaction");
 	const taskPrompts = [];
 	const taskSettingsPath = path.join(cwd, ".pi", "settings.json");
 	const taskSettings = JSON.parse(readFileSync(taskSettingsPath, "utf8"));
@@ -1474,7 +1499,7 @@ try {
 	assert.equal(researchEntries.at(-1).data.stopping, true, "even below 150k protection waits until the work finishes");
 	await hooks.agent_settled({}, taskCtx);
 	assert.equal(researchEntries.at(-1).data.mode, "off");
-	assert.equal(exitCompactions, 2, "small research contexts exit without compaction");
+	assert.equal(exitCompactions, 0, "small research contexts exit without compaction");
 	rmSync(path.dirname(taskNotebook), { recursive: true, force: true });
 	rmSync(path.dirname(pendingNotebook), { recursive: true, force: true });
 	rmSync(path.dirname(notebook), { recursive: true, force: true });
@@ -1643,7 +1668,110 @@ try {
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "Read fine print" }, undefined, null,
 		{ ...visionCtx, modelRegistry: { find: () => ({ input: ["text", "image"] }), streamSimple: () => ({ result: async () => ({ stopReason: "error", errorMessage: "private-provider-token" }) }) } }), /Vision model failed/);
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, AbortSignal.abort(), null, visionCtx), /cancelled|abort/i);
-	console.log("ok - compaction fallback, research evidence and on-demand non-vision image bridge");
+	// Agent-owned research defaults on, respects explicit overrides, and is boundary-only.
+	const phaseCtx = { ...fullCtx, getContextUsage: () => ({ tokens: 1 }) };
+	const phase = (action, note, context = phaseCtx) => tools.research_mode.execute("phase", { action, note }, undefined, null, context);
+	await hooks.session_tree({}, { ...phaseCtx, sessionManager: { ...phaseCtx.sessionManager, getBranch: () => [] } });
+	assert.equal((await phase("status")).details.enabled, true, "new branches default on");
+	await hooks.session_tree({}, { ...phaseCtx, sessionManager: { ...phaseCtx.sessionManager, getBranch: () => [
+		{ type: "custom", customType: "work-research-context", data: { mode: "off", notes: null } },
+	] } });
+	assert.equal((await phase("status")).details.enabled, true, "legacy session state defaults on");
+	await commands.research.handler("auto off", phaseCtx);
+	await hooks.session_tree({}, phaseCtx);
+	assert.equal((await phase("status")).details.enabled, false, "explicit off survives restoration");
+	await assert.rejects(async () => phase("enter", "Investigate"), /disabled/);
+	await commands.research.handler("auto on", phaseCtx);
+	await assert.rejects(async () => phase("enter", " "), /purpose or handoff/);
+	await hooks.session_tree({}, phaseCtx);
+	assert.equal((await phase("status")).details.enabled, true, "explicit on survives branch restoration");
+	pi.getActiveTools = () => ["read", "edit"];
+	assert.equal((await hooks.context({ messages: boundaryMessages }, phaseCtx))?.messages?.some(message => message.customType === "work-research-phase") ?? false, false, "tool-restricted children get no unavailable research hint");
+	delete pi.getActiveTools;
+	const phaseNotebooks = new Set();
+	for (const mode of ["native", "ultrafull", "ultracompact", "native-200k"]) {
+		selectCompactMode(mode);
+		const high = { ...phaseCtx, getContextUsage: () => ({ tokens: 220_000 }) };
+		await phase("enter", "Purpose: preserve the request and investigate evidence", high);
+		phaseNotebooks.add((await phase("status")).details.notes);
+		assert.match(researchWidgets.at(-1)[0], /RESEARCH STARTING/);
+		const startingPhase = (await phase("status")).details;
+		assert.equal(startingPhase.pending, "enter");
+		assert.deepEqual((await phase("enter", "Do not duplicate this purpose")).details, startingPhase, "repeated entry preserves its pending boundary");
+		assert.doesNotMatch(readFileSync(startingPhase.notes, "utf8"), /Do not duplicate this purpose/);
+		assert.equal((await hooks.tool_call({ toolName: "bash", input: { command: "git diff" } }, phaseCtx)).block, true, "same-batch exploration waits for entry");
+		for (const toolName of ["compress", "decompress", "search_context", "acp_status"])
+			assert.equal((await hooks.tool_call({ toolName, input: {} }, phaseCtx))?.block, undefined, `${toolName} context management is never blocked by research`);
+		await assert.rejects(async () => phase("finish", "Too early"), /pending/);
+		const entered = await hooks.turn_end(boundary, high);
+		assert.equal(entered.entries.some(entry => entry.type === "compaction"), false, `${mode} entry never compacts above its normal threshold`);
+		assert.equal((await phase("status")).details.pending, null);
+		assert.match((await hooks.context({ messages: boundaryMessages }, phaseCtx)).messages.at(-1).content, /Runtime research phase: ON/);
+		assert.equal((await hooks.tool_call({ toolName: "compress", input: { content: [] } }, phaseCtx))?.block, undefined, "compress works while research is ON");
+		assert.equal((await hooks.tool_call({ toolName: "some_writer", input: {} }, phaseCtx)).block, true, "other implementation tools stay blocked");
+		await phase("finish", "Conclusion: choose A. Source: evidence.md:12. Rejected B. Next: implement only if authorized.");
+		await assert.rejects(async () => phase("enter", "Cannot cancel the exit"), /pending/);
+		assert.match(researchWidgets.at(-1)[0], /RESEARCH FINISHING/);
+		assert.equal((await hooks.tool_call({ toolName: "edit", input: { path: "product.js" } }, phaseCtx)).block, true, "implementation remains blocked before the boundary");
+		const finished = await hooks.turn_end(boundary, high);
+		assert.equal(finished.entries.some(entry => entry.type === "compaction"), false, `${mode} exit never compacts above its normal threshold`);
+		assert.match(finished.entries.at(-1).content, /choose A/);
+		assert.equal((await phase("status")).details.mode, "off");
+		assert.match((await hooks.context({ messages: boundaryMessages }, phaseCtx)).messages.at(-1).content, /Runtime research phase: OFF/);
+		assert.match(readFileSync((await phase("status")).details.notes, "utf8"), /Source: evidence.md:12/);
+	}
+	selectCompactMode("ultrafull");
+	const crowdedPhaseCtx = { ...phaseCtx, getContextUsage: () => ({ tokens: 220_000 }) };
+	await phase("enter", "Crowded entry keeps this request", crowdedPhaseCtx);
+	phaseNotebooks.add((await phase("status")).details.notes);
+	assert.equal((await hooks.turn_end({}, crowdedPhaseCtx)).entries.some(entry => entry.type === "compaction"), false, "entry needs no compaction projection even in a crowded context");
+	await phase("finish", "Safe handoff before attempting implementation");
+	assert.equal(await hooks.turn_end(boundary, { ...crowdedPhaseCtx, signal: AbortSignal.abort() }), undefined);
+	assert.equal((await phase("status")).details.mode, "research", "cancellation never exits research");
+	assert.equal(await hooks.tool_call({ toolName: "edit", input: { path: "product.js" } }, phaseCtx).block, true);
+	await phase("finish", "Retry with explicit F8 and missing projection");
+	await shortcuts.f8.handler(crowdedPhaseCtx);
+	assert.equal(await hooks.turn_end({}, crowdedPhaseCtx), undefined);
+	assert.equal((await phase("status")).details.mode, "research", "failed explicit F8 retains research");
+	await phase("finish", "Retry explicit F8 with a valid projection");
+	assert.equal((await hooks.turn_end(boundary, phaseCtx)).entries[0].type, "compaction", "explicit F8 still works during a transition, even below the normal threshold");
+	await phase("enter", "Research can finish without a compaction projection");
+	phaseNotebooks.add((await phase("status")).details.notes);
+	await hooks.turn_end({}, phaseCtx);
+	await phase("finish", "No checkpoint needed");
+	assert.equal((await hooks.turn_end({}, crowdedPhaseCtx)).entries.some(entry => entry.type === "compaction"), false);
+	assert.equal((await phase("status")).details.mode, "off");
+	assert.equal((await hooks.turn_end(boundary, crowdedPhaseCtx)).entries[0].type, "compaction", "ordinary Ultrafull threshold resumes on subsequent work, not during exit");
+	await phase("enter", "Manual override wins");
+	phaseNotebooks.add((await phase("status")).details.notes);
+	await shortcuts["ctrl+r"].handler(phaseCtx);
+	assert.equal((await phase("status")).details.enabled, false);
+	assert.equal((await phase("status")).details.pending, null);
+	await assert.rejects(async () => phase("finish", "Cannot override user"), /disabled/);
+	await hooks.agent_settled({}, { ...phaseCtx, isIdle: () => true });
+	assert.equal((await phase("status")).details.mode, "off");
+	await commands.research.handler("auto on", phaseCtx);
+	await phase("enter", "Interrupted entry is safely restored");
+	phaseNotebooks.add((await phase("status")).details.notes);
+	await hooks.session_tree({}, phaseCtx);
+	assert.equal((await phase("status")).details.pending, null, "branch switch drops the pending transition");
+	assert.equal((await phase("status")).details.mode, "research");
+	await commands.research.handler("auto off", phaseCtx);
+	await hooks.session_tree({}, phaseCtx);
+	const manuallyActive = (await phase("status")).details;
+	assert.equal(manuallyActive.enabled, false);
+	assert.equal(manuallyActive.mode, "research");
+	const manualNotebook = readFileSync(manuallyActive.notes, "utf8");
+	assert.deepEqual((await phase("enter")).details, manuallyActive, "already-on research accepts entry without permission or a new note");
+	assert.deepEqual((await phase("enter", "Keep manual research unchanged")).details, manuallyActive);
+	assert.equal(readFileSync(manuallyActive.notes, "utf8"), manualNotebook, "no duplicate purpose or notebook mutation");
+	await assert.rejects(async () => phase("finish", "Cannot exit manual research"), /disabled/);
+	await commands.research.handler("off", { ...phaseCtx, isIdle: () => false });
+	await assert.rejects(async () => phase("enter", "Cannot cancel a manual exit"), /disabled/);
+	await commands.research.handler("off", { ...phaseCtx, isIdle: () => true });
+	assert.equal(aborts, abortsBeforeNative, "phase transitions never abort live tools");
+	for (const file of phaseNotebooks) rmSync(path.dirname(file), { recursive: true, force: true });
+	console.log("ok - compaction fallback, research phases and on-demand non-vision image bridge");
 } finally {
 	await hooks.session_shutdown?.({}, ctx);
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
