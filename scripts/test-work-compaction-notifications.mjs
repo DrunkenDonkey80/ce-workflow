@@ -1398,10 +1398,10 @@ try {
 	assert.equal(await hooks.user_bash({ command: "git diff" }, researchCtx), undefined);
 	assert.throws(() => hooks.user_bash({ command: "git push" }, researchCtx), /blocks Git commit and push/);
 	assert.equal(await hooks.tool_call({ toolName: "read" }, researchCtx)?.block, undefined);
-	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "worker" } }, researchCtx).block, true);
+	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "worker" } }, researchCtx)?.block, undefined, "research guides instead of blocking tools");
 	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", task: "Read-only critique" } }, researchCtx)?.block, undefined);
 	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { action: "models" } }, researchCtx)?.block, undefined);
-	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", worktree: true } }, researchCtx).block, true);
+	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", worktree: true } }, researchCtx)?.block, undefined);
 	assert.match((await hooks.before_agent_start({ prompt: "Explore options" }, researchCtx)).systemPrompt, /Writing a project plan is part of research/);
 	await tools.research_note.execute("note", { note: "Observed result: source.md:12" });
 	assert.match(readFileSync(notebook, "utf8"), /Observed result: source.md:12/);
@@ -1708,7 +1708,7 @@ try {
 		assert.equal((await phase("status")).details.pending, null);
 		assert.match((await hooks.context({ messages: boundaryMessages }, phaseCtx)).messages.at(-1).content, /Runtime research phase: ON/);
 		assert.equal((await hooks.tool_call({ toolName: "compress", input: { content: [] } }, phaseCtx))?.block, undefined, "compress works while research is ON");
-		assert.equal((await hooks.tool_call({ toolName: "some_writer", input: {} }, phaseCtx)).block, true, "other implementation tools stay blocked");
+		assert.equal((await hooks.tool_call({ toolName: "some_tool", input: {} }, phaseCtx))?.block, undefined, "every tool is available during research");
 		await phase("finish", "Conclusion: choose A. Source: evidence.md:12. Rejected B. Next: implement only if authorized.");
 		await assert.rejects(async () => phase("enter", "Cannot cancel the exit"), /pending/);
 		assert.match(researchWidgets.at(-1)[0], /RESEARCH FINISHING/);
