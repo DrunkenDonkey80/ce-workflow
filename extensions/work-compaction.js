@@ -208,6 +208,19 @@ function toolCalls(message) {
 	return [...contentCalls, ...(Array.isArray(legacy) ? legacy : [])];
 }
 
+export const COMPACTION_NOTE_TOOL = "compaction_note";
+
+// ponytail: newest note wins even if a later cycle never rewrote it; add per-compaction consumption if stale notes mislead.
+export function latestCompactionNote(messages = []) {
+	for (const message of messages.toReversed())
+		for (const call of toolCalls(message).toReversed()) {
+			if (baseToolName(call?.name ?? call?.function?.name) !== COMPACTION_NOTE_TOOL) continue;
+			const note = normalizeText((call.arguments ?? call.args)?.note);
+			if (note) return note;
+		}
+	return "";
+}
+
 function filesFromMessages(messages) {
 	const read = [];
 	const modified = [];

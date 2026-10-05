@@ -1578,8 +1578,13 @@ try {
 	} };
 	const originalBoundary = JSON.stringify(boundaryMessages);
 	assert.equal(requestContextFilter(fullCtx), false, "Ultrafull never activates a transient cut");
-	assert.equal(await hooks.context({ messages: boundaryMessages }, fullCtx), undefined,
+	assert.equal(await hooks.context({ messages: boundaryMessages }, { ...fullCtx, getContextUsage: () => ({ tokens: 1 }) }), undefined,
 		"Ultrafull sends the unstripped context before a real checkpoint");
+	const nudged = await hooks.context({ messages: boundaryMessages }, fullCtx);
+	assert.deepEqual(nudged.messages.slice(0, -1), boundaryMessages, "the near-trigger nudge only appends");
+	assert.match(nudged.messages.at(-1).content, /call compaction_note/);
+	const noted = [...boundaryMessages, { role: "assistant", content: [{ type: "toolCall", name: "compaction_note", arguments: { note: "handoff" } }] }];
+	assert.equal(await hooks.context({ messages: noted }, fullCtx), undefined, "no nudge once a note exists");
 	assert.equal(await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 150_000 }) }), undefined, "Ultrafull no longer triggers at 150k by default");
 	assert.equal(await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 199_999 }) }), undefined);
 	const fullAuto = await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 200_000 }) });
@@ -1625,7 +1630,7 @@ try {
 		{ type: "text", text: "Read image file [image/png]\n[Current model does not support images. The image will be omitted from this request.]" },
 		{ type: "image", mimeType: "image/png", data: pixels },
 	] };
-	const visionCtx = { ...researchCtx, model: { provider: "test", id: "text", input: ["text"] },
+	const visionCtx = { ...researchCtx, getContextUsage: () => ({ tokens: 1 }), model: { provider: "test", id: "text", input: ["text"] },
 		modelRegistry: {
 			find: (provider, id) => ({ provider, id, input: ["text", "image"] }),
 			streamSimple(_model, request) {

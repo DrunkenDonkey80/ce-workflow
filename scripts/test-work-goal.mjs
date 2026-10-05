@@ -1587,7 +1587,8 @@ assert.equal(
 	1,
 	"unrelated menu actions retain argument dialogs",
 );
-assert.equal(Object.keys(tools).length, 20);
+assert.equal(Object.keys(tools).length, 21);
+assert(tools.compaction_note);
 assert(tools.research_mode);
 assert(tools.research_note);
 assert(tools.process_image);

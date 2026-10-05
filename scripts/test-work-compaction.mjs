@@ -7,7 +7,18 @@ import {
 	contextFilterCutIndex,
 	filesFromOps,
 	formatCompactionSummary,
+	latestCompactionNote,
 } from "../extensions/work-compaction.js";
+
+assert.equal(latestCompactionNote([]), "");
+assert.equal(
+	latestCompactionNote([
+		{ role: "assistant", content: [{ type: "toolCall", name: "compaction_note", arguments: { note: "old" } }] },
+		{ role: "assistant", content: [{ type: "toolCall", name: "compaction_note", arguments: { note: " new " } }, { type: "toolCall", name: "read", arguments: { path: "a" } }] },
+		{ role: "assistant", content: [{ type: "toolCall", name: "compaction_note", arguments: { note: "" } }] },
+	]),
+	"new",
+);
 
 const threshold = (contextWindow, overrides = {}) =>
 	compactionThreshold({
