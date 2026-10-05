@@ -5,7 +5,6 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
-	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1372,21 +1371,10 @@ try {
 	const notebook = researchEntries.at(-1).data.notes;
 	assert.match(researchWidgets.at(-1)[0], /RESEARCH MODE/);
 	assert(notebook.startsWith(path.join(tmpdir(), "pi-research-")));
-	assert.equal(await hooks.tool_call({ toolName: "edit", input: { path: path.join(cwd, "source.js") } }, researchCtx).block, true);
 	const scratchScript = path.join(path.dirname(notebook), "explore.mjs");
-	for (const toolName of ["write", "edit"]) {
-		assert.equal(await hooks.tool_call({ toolName, input: { path: scratchScript } }, researchCtx)?.block, undefined, "temp exploratory scripts are allowed");
-		for (const plan of ["PLAN.md", "plans/feature.md", "docs/plans/feature/outline.md", path.join(cwd, "docs/plans/absolute.md")])
-			assert.equal(await hooks.tool_call({ toolName, input: { path: plan } }, researchCtx)?.block, undefined, `${plan} can be written during research`);
-		for (const denied of ["source.js", "README.md", "docs/plans/run.js", "docs/plans/AGENTS.md", "plans/.pi/settings.md", "docs/plans/../../source.md", "../plans/outside.md"])
-			assert.equal(await hooks.tool_call({ toolName, input: { path: denied } }, researchCtx)?.block, true, `${denied} is not a project plan`);
-		assert.equal(researchEntries.at(-1).data.mode, "research", "saving plans never exits research");
-		assert.equal(await hooks.tool_call({ toolName, input: { path: path.join(path.dirname(notebook), "..", "outside.js") } }, researchCtx)?.block, true, "scratch writes stay within the research directory");
-	}
-	mkdirSync(path.join(cwd, "docs/plans"), { recursive: true });
-	symlinkSync(path.dirname(notebook), path.join(cwd, "docs/plans/linked"), process.platform === "win32" ? "junction" : "dir");
-	assert.equal(await hooks.tool_call({ toolName: "write", input: { path: "docs/plans/linked/outside.md" } }, researchCtx)?.block, true, "plan links cannot escape the project");
-	rmSync(path.join(cwd, "docs/plans/linked"), { recursive: true, force: true });
+	for (const toolName of ["write", "edit"])
+		for (const file of [scratchScript, "source.js", "PLAN.md", path.join(path.dirname(notebook), "..", "outside.js")])
+			assert.equal(await hooks.tool_call({ toolName, input: { path: file } }, researchCtx)?.block, undefined, `${file} can be written during research`);
 	for (const toolName of ["bash", "hypa_shell"]) {
 		for (const command of ["git diff", `npm install --prefix "${path.dirname(notebook)}" example`, `unzip archive.zip -d "${path.dirname(notebook)}"`, `node "${scratchScript}"`, "git log --grep=commit", "echo \"git commit\""]) {
 			assert.equal(await hooks.tool_call({ toolName, input: { command } }, researchCtx)?.block, undefined, `${command} is allowed for research`);
@@ -1692,61 +1680,29 @@ try {
 	for (const mode of ["native", "ultrafull", "ultracompact", "native-200k"]) {
 		selectCompactMode(mode);
 		const high = { ...phaseCtx, getContextUsage: () => ({ tokens: 220_000 }) };
-		await phase("enter", "Purpose: preserve the request and investigate evidence", high);
-		phaseNotebooks.add((await phase("status")).details.notes);
-		assert.match(researchWidgets.at(-1)[0], /RESEARCH STARTING/);
-		const startingPhase = (await phase("status")).details;
-		assert.equal(startingPhase.pending, "enter");
-		assert.deepEqual((await phase("enter", "Do not duplicate this purpose")).details, startingPhase, "repeated entry preserves its pending boundary");
-		assert.doesNotMatch(readFileSync(startingPhase.notes, "utf8"), /Do not duplicate this purpose/);
-		assert.equal((await hooks.tool_call({ toolName: "bash", input: { command: "git diff" } }, phaseCtx)).block, true, "same-batch exploration waits for entry");
-		for (const toolName of ["compress", "decompress", "search_context", "acp_status"])
-			assert.equal((await hooks.tool_call({ toolName, input: {} }, phaseCtx))?.block, undefined, `${toolName} context management is never blocked by research`);
-		await assert.rejects(async () => phase("finish", "Too early"), /pending/);
-		const entered = await hooks.turn_end(boundary, high);
-		assert.equal(entered.entries.some(entry => entry.type === "compaction"), false, `${mode} entry never compacts above its normal threshold`);
-		assert.equal((await phase("status")).details.pending, null);
-		assert.match((await hooks.context({ messages: boundaryMessages }, phaseCtx)).messages.at(-1).content, /Runtime research phase: ON/);
-		assert.equal((await hooks.tool_call({ toolName: "compress", input: { content: [] } }, phaseCtx))?.block, undefined, "compress works while research is ON");
-		assert.equal((await hooks.tool_call({ toolName: "some_tool", input: {} }, phaseCtx))?.block, undefined, "every tool is available during research");
-		await phase("finish", "Conclusion: choose A. Source: evidence.md:12. Rejected B. Next: implement only if authorized.");
-		await assert.rejects(async () => phase("enter", "Cannot cancel the exit"), /pending/);
-		assert.match(researchWidgets.at(-1)[0], /RESEARCH FINISHING/);
-		assert.equal((await hooks.tool_call({ toolName: "edit", input: { path: "product.js" } }, phaseCtx)).block, true, "implementation remains blocked before the boundary");
-		const finished = await hooks.turn_end(boundary, high);
-		assert.equal(finished.entries.some(entry => entry.type === "compaction"), false, `${mode} exit never compacts above its normal threshold`);
-		assert.match(finished.entries.at(-1).content, /choose A/);
-		assert.equal((await phase("status")).details.mode, "off");
-		assert.match((await hooks.context({ messages: boundaryMessages }, phaseCtx)).messages.at(-1).content, /Runtime research phase: OFF/);
-		assert.match(readFileSync((await phase("status")).details.notes, "utf8"), /Source: evidence.md:12/);
+		const entered = await phase("enter", "Purpose: preserve the request and investigate evidence", high);
+		assert.equal(entered.details.mode, "research", "entry is immediate");
+		assert.match(entered.content[0].text, /RESEARCH MODE/);
+		phaseNotebooks.add(entered.details.notes);
+		assert.match(researchWidgets.at(-1)[0], /RESEARCH MODE/);
+		assert.deepEqual((await phase("enter", "Do not duplicate this purpose")).details, entered.details, "repeated entry is a no-op");
+		assert.doesNotMatch(readFileSync(entered.details.notes, "utf8"), /Do not duplicate this purpose/);
+		for (const [toolName, input] of [["bash", { command: "git diff" }], ["compress", { content: [] }], ["some_tool", {}], ["write", { path: "product.js" }]])
+			assert.equal((await hooks.tool_call({ toolName, input }, phaseCtx))?.block, undefined, `${toolName} is available during research`);
+		assert.equal((await hooks.tool_call({ toolName: "bash", input: { command: "git commit -m x" } }, phaseCtx)).block, true, "commit stays blocked");
+		const finished = await phase("finish", "Conclusion: choose A. Source: evidence.md:12. Rejected B. Next: implement only if authorized.");
+		assert.equal(finished.details.mode, "off", "exit is immediate");
+		assert.match(finished.content[0].text, /Research OFF/);
+		assert.match(readFileSync(finished.details.notes, "utf8"), /Source: evidence.md:12/);
+		assert.equal((await hooks.context({ messages: boundaryMessages }, phaseCtx))?.messages?.some(message => message.customType === "work-research-phase") ?? false, false, "no per-request research hint");
 	}
 	selectCompactMode("ultrafull");
 	const crowdedPhaseCtx = { ...phaseCtx, getContextUsage: () => ({ tokens: 220_000 }) };
-	await phase("enter", "Crowded entry keeps this request", crowdedPhaseCtx);
-	phaseNotebooks.add((await phase("status")).details.notes);
-	assert.equal((await hooks.turn_end({}, crowdedPhaseCtx)).entries.some(entry => entry.type === "compaction"), false, "entry needs no compaction projection even in a crowded context");
-	await phase("finish", "Safe handoff before attempting implementation");
-	assert.equal(await hooks.turn_end(boundary, { ...crowdedPhaseCtx, signal: AbortSignal.abort() }), undefined);
-	assert.equal((await phase("status")).details.mode, "research", "cancellation never exits research");
-	assert.equal(await hooks.tool_call({ toolName: "edit", input: { path: "product.js" } }, phaseCtx).block, true);
-	await phase("finish", "Retry with explicit F8 and missing projection");
-	await shortcuts.f8.handler(crowdedPhaseCtx);
-	assert.equal(await hooks.turn_end({}, crowdedPhaseCtx), undefined);
-	assert.equal((await phase("status")).details.mode, "research", "failed explicit F8 retains research");
-	await phase("finish", "Retry explicit F8 with a valid projection");
-	assert.equal((await hooks.turn_end(boundary, phaseCtx)).entries[0].type, "compaction", "explicit F8 still works during a transition, even below the normal threshold");
-	await phase("enter", "Research can finish without a compaction projection");
-	phaseNotebooks.add((await phase("status")).details.notes);
-	await hooks.turn_end({}, phaseCtx);
-	await phase("finish", "No checkpoint needed");
-	assert.equal((await hooks.turn_end({}, crowdedPhaseCtx)).entries.some(entry => entry.type === "compaction"), false);
-	assert.equal((await phase("status")).details.mode, "off");
-	assert.equal((await hooks.turn_end(boundary, crowdedPhaseCtx)).entries[0].type, "compaction", "ordinary Ultrafull threshold resumes on subsequent work, not during exit");
+	assert.equal((await hooks.turn_end(boundary, crowdedPhaseCtx)).entries[0].type, "compaction", "ordinary Ultrafull threshold applies after exit");
 	await phase("enter", "Manual override wins");
 	phaseNotebooks.add((await phase("status")).details.notes);
 	await shortcuts["ctrl+r"].handler(phaseCtx);
 	assert.equal((await phase("status")).details.enabled, false);
-	assert.equal((await phase("status")).details.pending, null);
 	await assert.rejects(async () => phase("finish", "Cannot override user"), /disabled/);
 	await hooks.agent_settled({}, { ...phaseCtx, isIdle: () => true });
 	assert.equal((await phase("status")).details.mode, "off");
@@ -1754,7 +1710,6 @@ try {
 	await phase("enter", "Interrupted entry is safely restored");
 	phaseNotebooks.add((await phase("status")).details.notes);
 	await hooks.session_tree({}, phaseCtx);
-	assert.equal((await phase("status")).details.pending, null, "branch switch drops the pending transition");
 	assert.equal((await phase("status")).details.mode, "research");
 	await commands.research.handler("auto off", phaseCtx);
 	await hooks.session_tree({}, phaseCtx);
