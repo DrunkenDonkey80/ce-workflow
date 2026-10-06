@@ -5,12 +5,13 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import workModelsExtension from "../extensions/work-models.ts";
@@ -20,8 +21,21 @@ const modes = ["ultracompact", "ultrafull"];
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
 
+// Pi's own installer keeps releases in ~/.pi/agent/install/releases/<version>; newest first.
+function piReleasePackages() {
+	const dir = path.join(homedir(), ".pi", "agent", "install", "releases");
+	try {
+		return readdirSync(dir)
+			.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+			.map((version) => path.join(dir, version, "node_modules", "@earendil-works", "pi-coding-agent"));
+	} catch {
+		return []; // Not installed by Pi's installer.
+	}
+}
+
 function locatePiPackage() {
 	const candidates = [
+		...piReleasePackages(),
 		path.join(repoRoot, "node_modules", "@earendil-works", "pi-coding-agent"),
 		process.env.APPDATA
 			? path.join(
@@ -124,18 +138,12 @@ async function runChild(scenario) {
 	const pi = await import(
 		pathToFileURL(path.join(piRoot, "dist", "index.js")).href
 	);
-	const ai = await import(
-		pathToFileURL(
-			path.join(
-				piRoot,
-				"node_modules",
-				"@earendil-works",
-				"pi-ai",
-				"dist",
-				"index.js",
-			),
-		).href
-	);
+	// npm nests pi-ai under pi-coding-agent; Pi's installer puts it next to it.
+	const aiEntry = [
+		path.join(piRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "index.js"),
+		path.join(piRoot, "..", "pi-ai", "dist", "index.js"),
+	].find((file) => existsSync(file));
+	const ai = await import(pathToFileURL(aiEntry).href);
 
 	execFileSync("git", ["init", "-q"], { cwd });
 	execFileSync("git", ["config", "core.autocrlf", "false"], { cwd });

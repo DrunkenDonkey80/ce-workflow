@@ -5,15 +5,29 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
+const homedir = os.homedir;
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const root = path.resolve(import.meta.dirname, "..");
+// Pi's own installer keeps releases in ~/.pi/agent/install/releases/<version>; newest first.
+function piReleasePackages() {
+	const dir = path.join(homedir(), ".pi", "agent", "install", "releases");
+	try {
+		return readdirSync(dir)
+			.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+			.map((version) => path.join(dir, version, "node_modules", "@earendil-works", "pi-coding-agent"));
+	} catch {
+		return []; // Not installed by Pi's installer.
+	}
+}
+
 const temp = mkdtempSync(path.join(os.tmpdir(), "ce-native-smoke-"));
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 process.env.PI_CODING_AGENT_DIR = path.join(temp, "agent");
@@ -70,13 +84,10 @@ try {
 	assert(existsSync(path.join(installed, "extensions", "work-store.ts")));
 	// The extension entry is TypeScript and Node refuses to strip types under
 	// node_modules, so load it exactly like Pi does: through Pi's own jiti.
-	const piPackage = path.join(
-		npmRun(["root", "-g"]).trim(),
-		"@earendil-works",
-		"pi-coding-agent",
-		"package.json",
-	);
-	assert(existsSync(piPackage), `pi is not installed globally: ${piPackage}`);
+	const piPackage = [...piReleasePackages(), path.join(npmRun(["root", "-g"]).trim(), "@earendil-works", "pi-coding-agent")]
+		.map((dir) => path.join(dir, "package.json"))
+		.find((file) => existsSync(file));
+	assert(piPackage, "pi is not installed (neither Pi's installer releases nor global npm)");
 	const { createJiti } = createRequire(piPackage)("jiti");
 	const jiti = createJiti(path.join(installed, "extensions", "smoke.mjs"));
 	const models = await jiti.import(path.join(installed, "extensions", "work-models.ts"));
@@ -170,7 +181,9 @@ try {
 
 	// Installed Jev tools through Pi's real SDK + codemode: faux main model, fake classifier, no network.
 	const sdk = await import(pathToFileURL(path.join(sdkRoot, "dist/index.js")).href);
-	const ai = await import(pathToFileURL(path.join(sdkRoot, "node_modules/@earendil-works/pi-ai/dist/index.js")).href);
+	// npm nests pi-ai under pi-coding-agent; Pi's installer puts it next to it.
+	const aiEntry = [path.join(sdkRoot, "node_modules/@earendil-works/pi-ai/dist/index.js"), path.join(sdkRoot, "../pi-ai/dist/index.js")].find((file) => existsSync(file));
+	const ai = await import(pathToFileURL(aiEntry).href);
 	const { createJevTools } = await jiti.import(path.join(installed, "extensions/jev-tools.ts"));
 	const jevCwd = path.join(temp, "jev");
 	mkdirSync(jevCwd);

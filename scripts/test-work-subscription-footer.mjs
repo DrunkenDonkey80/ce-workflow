@@ -144,8 +144,8 @@ function harness({
 		factories,
 		notices,
 		clock,
-		component() {
-			return factories.at(-1)({ requestRender: () => renders++ }, theme);
+		component(statuses = new Map()) {
+			return factories.at(-1)({ requestRender: () => renders++ }, theme, { getExtensionStatuses: () => statuses });
 		},
 		renders: () => renders,
 	};
@@ -657,8 +657,38 @@ assert.ok(
 		subsetLines.indexOf("Claude") < subsetLines.indexOf("GLM/Z.ai"),
 );
 assert.doesNotMatch(subsetLines, /Copilot|Kimi/);
+// Extension statuses (ctx.ui.setStatus) render as the last line, sorted by key, like Pi's own footer.
+const withStatus = subset.component(new Map([["zz", "\x1b[31mlast\x1b[0m"], ["plan3", "P3 1/3 \u00b7 CSV-02"]])).render(80).map(stripAnsi);
+assert.equal(withStatus.at(-1), "P3 1/3 \u00b7 CSV-02 last");
+assert.equal(subset.component().render(80).map(stripAnsi).join("\n"), subsetLines, "no statuses, no extra line");
 assert.equal(requestedIds.length, 3);
 subset.controller.shutdown(subset.ctx);
+
+// subscriptionFooter.hidden: a logged-in provider is neither requested nor shown; turning it back on re-resolves it.
+let hiddenSetting = { enabled: true, hidden: ["glm"] };
+const hiddenUrls = [];
+const hiding = harness({
+	providers: PRODUCTION_PROVIDERS,
+	settings: () => hiddenSetting,
+	auth: (id) => ["openai-codex", "anthropic", "zai"].includes(id) ? stored(`${id}-token`) : undefined,
+	fetchImpl: async (url) => {
+		hiddenUrls.push(url);
+		return jsonResponse(payloads[Object.keys(payloads).find((part) => url.includes(part))]);
+	},
+});
+assert.equal(hiding.controller.start(hiding.ctx), true);
+const hidingComponent = hiding.component();
+await flush();
+const hiddenLines = hidingComponent.render(80).map(stripAnsi).join("\n");
+assert.match(hiddenLines, /Codex[\s\S]*Claude/);
+assert.doesNotMatch(hiddenLines, /GLM/);
+assert.equal(hiddenUrls.length, 2, "hidden provider is not polled");
+hiddenSetting = { enabled: true, hidden: [] };
+hiding.controller.apply(hiding.ctx);
+await flush();
+assert.equal(hiding.controller.states.get("glm").authenticated, true, "re-enabled provider re-resolves without waiting a poll");
+assert.equal(hiddenUrls.length, 2, "toggling makes no network request");
+hiding.controller.shutdown(hiding.ctx);
 
 const ambient = harness({
 	providers: [PRODUCTION_PROVIDERS[0]],

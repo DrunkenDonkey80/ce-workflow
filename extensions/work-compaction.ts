@@ -455,8 +455,15 @@ function messagesFrom(preparation) {
 	return [...summarized, ...prefix];
 }
 
+// pi-subagents 0.76.1 / pi-intercom 0.16.1 wake an idle session with these user prompts.
+export const syntheticWakePrompt = (value) =>
+	["Subagent updates above.", "New intercom message above."].includes(
+		String(value ?? "").trim(),
+	);
+
 function syntheticUserRequest(value) {
 	return (
+		syntheticWakePrompt(value) ||
 		/work-goal-continuation:/i.test(value) ||
 		/<work_goal_objective>/i.test(value) ||
 		/^Compaction is complete\. Resume the parent task now\b/i.test(value) ||

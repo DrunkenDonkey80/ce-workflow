@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-10-04T09:00:33.913Z",
+  "capturedAt": "2026-10-06T12:43:35.629Z",
   "verification": {
     "command": "npm run verify:quiet",
     "fullRuns": 1,
@@ -15,33 +15,51 @@
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "1.0.2",
-      "reviewedAt": "2026-10-04T08:48:06.970Z",
-      "reviewedVersion": "1.0.2",
+      "version": "1.0.4",
+      "reviewedAt": "2026-10-06T12:43:35.629Z",
+      "reviewedVersion": "1.0.4",
       "decisions": [
         {
-          "version": "1.0.2",
-          "title": "Keep interactive workflow controls model-only",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 tool metadata rollback. Bottom line: declare research_mode and work_* workflow control tools model-only using the shared registration seam. Verified project fit: research transitions settle only at the top-level batch boundary; work_goal_complete/dirty_continue and verifier mutations terminate or change coded state and must not be nested in scripts. Upstream evidence: Pi 0.99+ extensions.md Tool exposure, types.d.ts ToolExposure and captured 0.87-to-1.0.2 diff explicitly provide model-only for orchestrating/interactive tools; nested calls have parentToolCallId and no transcript entries. Benefit: preserve direct visibility while excluding script-based control bypasses and ignored termination. Cost/risk: callers must use these tools directly; ordinary process_image, knowledge and research_note stay callable. Confidence: high. Recommendation: adopt now and assert exposures in the existing extension registration test. tooTechnical:false.",
-          "tooTechnical": false,
-          "verification": "PASS: node scripts/test-work-compaction-notifications.mjs; installed Pi metadata reports 1.0.2. Tool registration assertions cover model-only controls and ordinary nested-callable helpers."
-        },
-        {
-          "version": "1.0.2",
-          "title": "Retain explicit role routing and image interpretation",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Pi core Grade: Reject, Tier 2 routing/settings rollback: do not auto-enable codemode, replace explicit role routing with virtual/classifier models, tune sampling-by-thinking defaults, or remove the non-vision interpretation bridge. Project has deterministic leases, explicit user-selected role models and process_image for reasoning over references; native image generation/resizing does not replace interpretation. Upstream docs codemode/models/virtual-models and model registry type diff make these opt-in capabilities, not replacements. Benefit: retain control and avoid unmeasured cost/runtime changes; risks: benchmark required for future optimization; confidence high; recommendation retain incumbent routing, inherit opt-in host facilities."
-        },
-        {
-          "version": "1.0.2",
-          "title": "Inherit host context, SDK, dynamic tools, model and TUI lifecycle changes",
+          "title": "--tools keeps MCP tools; * patterns; --no-mcp",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Pi core Grade: Not-our-problem, Tier 1 package rollback: hooks/context canonical semantics, SDK, native MCP dynamic loading, thinking/model catalog, samplingParamsByThinkingLevel, fullscreen/theme lifecycle, renderers, cache/model errors and OAuth are host-owned. Project uses supported context/boundary handlers, public modelRegistry and shared overlays; no removed node subpath or custom renderer override. Benefit inherit fixes without local shim; confidence high; recommendation no adapter.",
-          "costRisk": "Ordinary upstream regression exposure; no duplicate provider, SDK, MCP or TUI implementation."
+          "rationale": "1.0.4: `--tools` now keeps MCP (mcp.json-configured server) tools unless an entry starts with mcp__, and --no-mcp disables MCP for a run. Our --tools callers (benchmark-image-strip-live, benchmark-reasoning-strip-live, workflow-evaluation-rpc) run with --no-extensions, and neither ~/.pi/agent/mcp.json nor .pi/mcp.json exists, so their tool sets are unchanged. Add --no-mcp only if an mcp.json is ever configured.",
+          "version": "1.0.4"
+        },
+        {
+          "title": "Codemode tools.read() returns image blocks; image() saves temp files",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.0.3/1.0.4: inside codemode scripts, reading an image file now yields an image block that image() can show, and image() also writes a temp file and names its path. extensions/work-vision.ts projects every image part in outgoing messages for non-vision models, so codemode images are already routed to process_image; no ce-workflow code calls tools.read or image().",
+          "version": "1.0.4"
+        },
+        {
+          "title": "Hidden tools left out of prompt rules; codemode shows per-tool prompt guidelines (ToolLoadout.getPromptGuidelines)",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.0.4: tools hidden by an extension's prepareLoadout are no longer named in system-prompt rules, and codemode lists each tool's promptGuidelines next to its declaration. ce-workflow does not use prepareLoadout (rg finds none); Jev tools already carry promptSnippet, so they benefit without changes.",
+          "version": "1.0.4"
+        },
+        {
+          "title": "Azure provider renamed azure-openai-responses -> azure (breaking)",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.0.3 breaking rename of a provider key. rg finds no azure-openai-responses in this repo or in ~/.pi/agent settings.json/auth.json; no models.json exists.",
+          "version": "1.0.4"
+        },
+        {
+          "title": "Home/End now always move the editor cursor; transcript top/bottom moved to Ctrl+Home/Ctrl+End",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.0.3 keybinding change in Pi's editor. extensions/work-dialogs.ts and plan3.ts bind no home/end keys.",
+          "version": "1.0.4"
+        },
+        {
+          "title": "Codemode built-ins frozen; restart hint after Pi update; output files user-only; OAuth/Bedrock/MCP OAuth/EIO/highlighting fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.0.3/1.0.4 runtime robustness fixes in Pi itself; no ce-workflow code patches codemode built-ins, depends on output-file permissions, or touches these providers. Benefit arrives automatically.",
+          "version": "1.0.4"
         }
       ]
     },
@@ -66,38 +84,52 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.75.0",
-      "reviewedAt": "2026-10-04T08:48:06.970Z",
-      "reviewedVersion": "0.75.0",
+      "version": "0.76.1",
+      "reviewedAt": "2026-10-06T12:43:35.629Z",
+      "reviewedVersion": "0.76.1",
       "decisions": [
         {
-          "version": "0.75.0",
-          "title": "Migrate workflow launches and require the current RPC release",
+          "title": "Idle-parent wake now sends a user prompt 'Subagent updates above.'",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Candidate: migrate pi-subagents workflow launch contract. Grade: Adopt. Reversibility: Tier 1 local API/guidance rollback. Bottom line: replace RPC workflowScript with script and generated model instructions with workflow:true or script-path syntax. Project fit: spawnSubagentRpc (work-models.ts:11347) routes discoverer, leases, advisors and verifier launches; fixtures currently mock removed field and hide the break. Upstream evidence: pi-subagents 0.74.0 changelog, docs/extension-api.md:122, captured diff public-execution removal errors all reject legacy fields, even RPC. Benefit: restore coded specialist launches and prevent invalid advisor calls. Cost/risk: preserve stable keys, models, acceptance and async controls; update direct-mode work-role guard for the new public forms. Confidence: high. Recommendation: adopt now; focused checks compaction-notifications, settings and goal/launch fixture tests. tooTechnical:false; no explanation playbook needed.",
-          "tooTechnical": false,
-          "additionalEvidence": "Existing workflow compatibility candidate also raises pi-subagents peer floor to >=0.75.0 so installation cannot resolve a release that lacks current RPC or Pi 1.0 runner support.",
-          "reviewResolution": "Recognize both slash and backslash workflow paths, including Windows .\\guard-workflow.js, and fail closed for unreadable or oversized script paths.",
-          "verification": "PASS: node scripts/test-work-compaction-notifications.mjs; node scripts/test-work-settings.mjs; node scripts/test-work-goal.mjs; node scripts/test-work-design.mjs. Installed metadata reports 0.75.0; current RPC fixtures assert script and absence of workflowScript."
+          "rationale": "0.76.1 (PARENT_WAKE_TEXT): a subagent result/supervisor notice that wakes an idle parent is followed by a real user message so Pi runs the normal prompt lifecycle (before_agent_start, prompt sections, cache). ce-workflow's compaction collectors treat every role:user message as a user request: work-compaction.ts latestUserRequests (filter syntheticUserRequest) and work-compaction-memory.ts gather (kind user-request = protected record). Wake prompts would crowd out real protected requests in summaries. Adopt: treat this exact text as synthetic in both collectors. Legacy workflow (switch ON) before_agent_start goal-turn matching may also misclassify these turns; user chose no-action for legacy (see Decisions).",
+          "verification": "node scripts/test-work-compaction.mjs -> ok (exit 0); wake-prompt assertion fails without the fix",
+          "version": "0.76.1"
         },
         {
-          "version": "0.75.0",
-          "title": "Retain scoped child authority and coded work-item lifecycle",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "pi-subagents Grade: Reject, Tier 2 child-policy/settings rollback: no subagent_command grant, required-child extension registry, mission scheduler replacement or disabledFeatures optimization. Project uses explicit coded leases, scoped tool contracts and native acceptance; does not register required child policies, external runners or schedules, so requirements flag does not replace a current integration. Background checkpoint isolation remains mandatory. Benefit avoid speculative extra authority or duplicated mission lifecycle; confidence high; recommendation keep current per-launch restrictions.",
-          "costRisk": "Extra child command authority or replacing native store-backed lifecycle would increase risk without demonstrated project benefit."
-        },
-        {
-          "version": "0.75.0",
-          "title": "Inherit runtime, trust, model and resume-accounting improvements",
+          "title": "/reload after a pi-subagents update now errors with 'restart Pi'",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem, Tier 1 package rollback: inherit 0.71-0.75 async reload/reuse, terminal proof, cost/resume accounting, virtual model/preflight, model-only native orchestration tools, project trust/MCP and startup/runtime fixes from owner; ce telemetry already reconciles transcripts and launch IDs rather than copying plugin totals or deriving liveness from mtime. Recommendation no duplicate owner.",
-          "benefit": "Managed launches inherit reliability fixes without a second runtime or accounting owner.",
-          "costRisk": "Ordinary upstream regression exposure.",
-          "confidence": "high"
+          "rationale": "0.76.1: Node cannot re-import an already-loaded ESM module, so pi-subagents refuses a mixed reload. ce-workflow avoids the same problem by loading .ts through jiti (AGENTS.md Extension File Rule); nothing to change.",
+          "version": "0.76.1"
+        },
+        {
+          "title": "Child system prompt now starts with Pi's base prompt (append mode)",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "0.76.1: affects systemPromptMode: append children only. All ce-workflow agents, including agents/plan3-advisor.md, use systemPromptMode: replace.",
+          "version": "0.76.1"
+        },
+        {
+          "title": "Partial output on child timeout/crash; outputSchema result saved to output file",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "0.76.0: failed children return text labeled 'Partial output before ...' with outputPartial:true, and structured results land in the output file. Plan3 advisors read the child's returned text and do not use outputSchema/output files; the legacy workflow is off. The outputSchema in extensions/jev-tools.ts is a Pi tool schema, not a subagent option.",
+          "version": "0.76.1"
+        },
+        {
+          "title": "Settings write-lock (settings.json.write-lock) for concurrent settings saves",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "0.76.0: pi-subagents locks its own read-modify-write of settings.json. ce-workflow writes workOrchestrator settings from interactive toggles only; honoring the lock would add locking code for a race requiring a simultaneous subagent settings save. Revisit if a lost setting is ever observed.",
+          "version": "0.76.1"
+        },
+        {
+          "title": "Daily/weekly schedules, worktree.cleanup apply, headless result delivery, capacity release, MCP name aliases, plain js workflow blocks, multiline descriptions, watchdog, Herdr pane color, doctor/stop fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "0.76.0/0.76.1 features and fixes inside pi-subagents. ce-workflow (workflow off) uses subagents only for Plan3 advisors (ideas/review), which need none of these; benefits arrive automatically.",
+          "version": "0.76.1"
         }
       ]
     },
@@ -129,27 +161,24 @@
     },
     {
       "name": "pi-intercom",
-      "version": "0.16.0",
-      "reviewedAt": "2026-10-04T08:48:06.970Z",
-      "reviewedVersion": "0.16.0",
+      "version": "0.16.1",
+      "reviewedAt": "2026-10-06T12:43:35.629Z",
+      "reviewedVersion": "0.16.1",
       "decisions": [
         {
-          "version": "0.16.0",
-          "title": "Pin forwarded answers to the exact local recipient and session",
+          "title": "Idle wake now sends a user prompt 'New intercom message above.'",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 bridge guard rollback. Bottom line: keep remote ask answers pinned to the exact local peer that received that prompt, refuse crossMachine (ssh-asserted) or trustedLocal:false messages, and reset bridge state on shutdown. Project fit: work-ask-remote.ts currently learns peerId from every intercom message then accepts any matching ANSWER token; 0.16 adds cross-machine relay messages to that same message type. Upstream evidence: README cross-machine section, types.ts CrossMachineProvenance and Message.crossMachine, index.ts message renderer persist details.message; identities are explicitly unverified. Benefit: a new peer or SSH-asserted origin cannot hijack a forwarded human decision. Cost/risk: optional bridge continues local-only; actors use local UI for remote-origin decisions. Confidence: high. Recommendation: adopt with cross-machine, wrong-peer, correct-peer and shutdown tests. tooTechnical:false.",
-          "tooTechnical": false,
-          "reviewResolution": "The original POV is preserved above. Independent review and upstream broker/broker.ts:481 establish that trustedLocal:false also describes ordinary Windows local peers, not remote provenance. The implementation therefore rejects crossMachine at either nesting, not trustedLocal:false; it retains exact recipient pinning and shutdown reset. Windows local answering has a regression check.",
-          "verification": "PASS: node scripts/test-work-ask-remote.mjs; wrong peer, both crossMachine locations, Windows local trustedLocal:false, correct recipient, forward-before-answer and shutdown cases. Live broker/TUI interaction not exercised."
+          "rationale": "0.16.1 index.ts: an inbound message that should trigger a turn on an idle session is followed by pi.sendUserMessage('New intercom message above.') because Pi skips before_agent_start for sendMessage({triggerTurn}) turns (pi#5581). Same compaction-memory pollution as the pi-subagents wake; covered by the same Phase 1 change.",
+          "verification": "node scripts/test-work-compaction.mjs -> ok (exit 0); wake-prompt assertion fails without the fix",
+          "version": "0.16.1"
         },
         {
-          "version": "0.16.0",
-          "title": "Keep transport, peer lifecycle and handover package-owned",
+          "title": "intercom send/ask renderCall shows the full message when expanded",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Tier 1 package rollback. Keep handover, Herdr location/CLI, session identity claim, broker heartbeat and scope/steering lifecycle package-owned; ce-workflow already uses exact IDs and supported outbox, not broker or pane ownership. Benefit: inherit upstream improvements without duplicate transport. Confidence: high. Recommendation: no new peer orchestration or automatic handover.",
-          "costRisk": "Ordinary upstream regression exposure; do not automatically transfer workflow authority between sessions."
+          "rationale": "0.16.1 UI-only rendering change in pi-intercom's tool call display; ce-workflow does not render intercom calls.",
+          "version": "0.16.1"
         }
       ]
     },

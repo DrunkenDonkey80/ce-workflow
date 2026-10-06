@@ -650,4 +650,15 @@ const controller = new AbortController();
 const beforeCancel = calls;
 await assert.rejects(retryCase("cancel", "valid", { controller, signal: controller.signal }), /cancelled/);
 assert.equal(calls, beforeCancel + 1, "user cancellation must not retry on the current model");
+// Subagent/intercom idle-wake prompts are not user requests; real requests survive.
+const wakeRequests = gather([
+	{ role: "user", content: "Subagent updates above." },
+	{ role: "user", content: [{ type: "text", text: " New intercom message above.\n" }] },
+	{ role: "user", content: "Fix the parser." },
+	{ role: "user", content: "Subagent updates above. Summarize them for me." },
+], [], "wake").filter(r => r.kind === "user-request").map(r => r.text);
+assert.deepEqual(wakeRequests, ["Fix the parser.", "Subagent updates above. Summarize them for me."]);
+// A malformed JSON line in a prior summary is skipped, not fatal.
+const { header } = await import("../extensions/work-compaction-memory.ts");
+assert.deepEqual(decodeMemory(`${header}{broken\n{"source":"s","kind":"user-request","text":"t"}\n`).records, [{ source: "s", kind: "user-request", text: "t" }]);
 process.stdout.write("ok - work compaction policy, selected/current/cleaned fallback, bounded attempts, usage, cancellation\n");

@@ -621,7 +621,7 @@ function authIdentity(result) {
 			Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"),
 		);
 		claim = payload.account_id ?? payload.sub;
-	} catch {}
+	} catch { /* Not a JWT: no account claim. */ }
 	return createHash("sha256")
 		.update(String(stable ?? claim ?? JSON.stringify(result.auth)))
 		.digest("hex");
@@ -830,10 +830,10 @@ async function acquirePollingOwnership(lockFile, fsImpl) {
 		} catch (error) {
 			try {
 				await handle.close();
-			} catch {}
+			} catch { /* Best-effort cleanup; the original error is rethrown. */ }
 			try {
 				await fsImpl.unlink(lockFile);
-			} catch {}
+			} catch { /* Best-effort cleanup; the original error is rethrown. */ }
 			throw error;
 		}
 		let released = false;
@@ -842,11 +842,11 @@ async function acquirePollingOwnership(lockFile, fsImpl) {
 			released = true;
 			try {
 				await handle.close();
-			} catch {}
+			} catch { /* Best-effort close of a lock handle. */ }
 			try {
 				const owner = JSON.parse(await fsImpl.readFile(lockFile, "utf8"));
 				if (owner?.nonce === nonce) await fsImpl.unlink(lockFile);
-			} catch {}
+			} catch { /* Lock already gone or owned by another process. */ }
 		};
 	};
 	try {
@@ -870,10 +870,10 @@ async function acquirePollingOwnership(lockFile, fsImpl) {
 	} finally {
 		try {
 			await recovery.handle.close();
-		} catch {}
+		} catch { /* Best-effort close of a stale recovery handle. */ }
 		try {
 			await fsImpl.unlink(recovery.path);
-		} catch {}
+		} catch { /* Stale recovery file already removed. */ }
 	}
 }
 
@@ -912,6 +912,10 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	const pollingLockFile = join(agentDir, "subscription-footer-poll.lock");
 	const setting = () =>
 		readGlobalSettings?.().workOrchestrator?.subscriptionFooter ?? {};
+	// subscriptionFooter.hidden: provider ids (codex, claude, ...) treated as logged out.
+	const isHidden = (entry) =>
+		Array.isArray(setting().hidden) && setting().hidden.includes(entry.id);
+	const shown = () => registry.filter((entry) => !isHidden(entry));
 
 	async function loadCache() {
 		try {
@@ -922,7 +926,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				typeof value.providers === "object"
 			)
 				cache = value;
-		} catch {}
+		} catch { /* Missing or corrupt cache: start empty. */ }
 	}
 
 	function saveCache() {
@@ -932,7 +936,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				const temporary = `${cacheFile}.${process.pid}.tmp`;
 				await fsImpl.writeFile(temporary, JSON.stringify(cache));
 				await fsImpl.rename(temporary, cacheFile);
-			} catch {}
+			} catch { /* Cache write is optional; quotas refetch next poll. */ }
 		});
 		return savePending;
 	}
@@ -1009,12 +1013,12 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	) {
 		if (gen !== generation || !activeCtx) return;
 		let resolved;
-		try {
+		if (!isHidden(entry)) try {
 			const auth = entry.resolveAuth
 				? await entry.resolveAuth(activeCtx)
 				: await activeCtx.modelRegistry?.getProviderAuth?.(entry.piProviderId);
 			resolved = storedAuth(auth);
-		} catch {}
+		} catch { /* No stored auth: provider shows as unavailable. */ }
 		if (gen !== generation) return;
 		const state = states.get(entry.id);
 		if (!resolved) {
@@ -1061,7 +1065,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 					windows: complete(cached.windows),
 				};
 				state.lastSuccessAt = cached.fetchedAt;
-			} catch {}
+			} catch { /* Missing or corrupt cached quota: fetch fresh. */ }
 		}
 		if (render) requestRender();
 		if (!allowNetwork) return;
@@ -1130,7 +1134,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			if (gen !== generation || releasePollingOwnership) return;
 			try {
 				await fsImpl.mkdir(agentDir, { recursive: true });
-			} catch {}
+			} catch { /* Agent dir exists or is unwritable; later writes report it. */ }
 			const release = await acquirePollingOwnership(pollingLockFile, fsImpl);
 			if (gen !== generation) await release?.();
 			else if (release) releasePollingOwnership = release;
@@ -1186,15 +1190,21 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		activeCtx = ctx;
 		installed = true;
 		const gen = generation;
-		ctx.ui.setFooter((tui, theme) => {
+		ctx.ui.setFooter((tui, theme, footerData) => {
 			requestRender = () => tui?.requestRender?.();
 			return {
 				invalidate() {},
 				render(width) {
 					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.());
+					// Pi's own footer draws ctx.ui.setStatus() entries; a replacement footer must too.
+					const statuses = [...(footerData?.getExtensionStatuses?.() ?? new Map())]
+						.sort(([a], [b]) => a.localeCompare(b))
+						.map(([, text]) => stripAnsi(text))
+						.join(" ");
+					const status = statuses.trim() ? [theme.fg("dim", truncatePlain(statuses, width))] : [];
 					return width < MIN_WIDTH
-						? model
-						: [...model, ...renderQuotaRows(registry, states, theme, width, now())];
+						? [...model, ...status]
+						: [...model, ...renderQuotaRows(shown(), states, theme, width, now()), ...status];
 				},
 				dispose() {
 					if (gen === generation) stop({ restore: false });
@@ -1213,6 +1223,10 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			if (activeCtx && activeCtx !== ctx) return false;
 			if (setting().enabled && activeCtx === ctx) {
 				reconcileIncidents(generation);
+				// Re-resolve from auth + cache (no network) so a provider toggled back on shows now.
+				const gen = generation;
+				void Promise.all(registry.map((entry) => refresh(entry, gen, false, false)))
+					.then(() => { reconcileIncidents(gen); requestRender(); });
 				requestRender();
 				return true;
 			}

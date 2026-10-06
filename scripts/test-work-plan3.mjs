@@ -6,12 +6,13 @@ import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node
 import os from "node:os";
 import path from "node:path";
 import plan3, { similarity } from "../extensions/plan3.ts";
+import { catchUpPlanText, changelogExcerpt, recordCatchUp } from "../extensions/plan3-catch-up.ts";
 import { createWorkItem, initStore, mutateStore, storePath } from "../extensions/work-store.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
 const agentDir = await mkdtemp(path.join(os.tmpdir(), "plan3-agent-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
-const commands = new Map(), tools = new Map(), hooks = new Map();
+const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map();
 const messages = [], notices = [], events = [], statuses = [];
 let entries = [];
 let idle = true, tokens = 0, compactions = 0, compactFails = false, compactError = "boom", selectScript = [];
@@ -43,7 +44,7 @@ plan3({
 	registerCommand: (name, command) => commands.set(name, command),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => hooks.set(name, handler),
-	events: { emit: (name, data) => events.push({ name, enabled: data.enabled }) },
+	events: { emit: (name, data) => events.push({ name, enabled: data.enabled }), on: (name, handler) => listeners.set(name, handler) },
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
 });
@@ -60,7 +61,7 @@ try {
 	assert(manifest.pi.extensions.includes("extensions/plan3.ts"));
 	assert.deepEqual([...commands.keys()], ["plan3", "plans3", "resume3"]);
 	assert(tools.has("plan3") && tools.get("plan3").promptSnippet);
-	assert.deepEqual(commands.get("plan3").getArgumentCompletions("re").map((item) => item.value), ["review", "review all"]);
+	assert.deepEqual(commands.get("plan3").getArgumentCompletions("re").map((item) => item.value), ["resolve", "review", "review all"]);
 
 	// Empty project: list and /plan3 without args only report.
 	await run("plans3");
@@ -88,7 +89,7 @@ try {
 	assert.match(prompt, /planning only/);
 	assert.match(prompt, /Do not implement product code/);
 	assert.match(prompt, /plan3 tool/);
-	assert.match(prompt, /Next: \/plan3 ideas · \/plan3 review · \/plan3 finish$/);
+	assert.match(prompt, /Next: \/plan3 ideas · \/plan3 review · \/plan3 finish — and while Open questions lists items/);
 	assert(!/independent Plan3 trial|\/resume3/.test(prompt), "official wording, no /resume3 during planning");
 	assert.equal(messages.at(-1).options.expandPromptTemplates, false);
 	assert.equal(compactions, 0, "tiny context is not compacted");
@@ -309,6 +310,61 @@ try {
 	await run("plan3", "review the auth code");
 	assert.equal((await files()).length, plansBefore + 1, "other text after review is a new request");
 	assert.match(messages.at(-1).message, /planning only/);
+	assert.match(messages.at(-1).message, /insert "\/plan3 resolve \(N open\) · "/, "planning replies learn the conditional hint");
+
+	// /plan3 resolve: open-question bullets drive the hint, tool output, /plans3 action and a one-at-a-time prompt.
+	const authId = entries.at(-1).data.id;
+	const authFile = path.join(directory, (await files()).find((name) => name.includes(authId)));
+	await run("plan3", "resolve");
+	assert.match(notices.at(-1).message, /has no open questions/, "placeholders are not questions");
+	await hooks.get("agent_end")({}, ctx);
+	assert.equal(notices.at(-1).message, "Next: /plan3 ideas · /plan3 review · /plan3 finish");
+	await writeFile(authFile, (await readFile(authFile, "utf8")).replace("Not assessed yet.", "Which session store?").replace("None recorded.", "- Rate limits: later\n  - detail line\n- None of the above applies to SSO"));
+	await hooks.get("agent_end")({}, ctx);
+	assert.equal(notices.at(-1).message, "Next: /plan3 resolve (3 open) · /plan3 ideas · /plan3 review · /plan3 finish");
+	assert.equal((await tool({ action: "get" })).openQuestions, 3);
+	assert.equal((await tool({ action: "get", plan: firstId })).openQuestions, undefined);
+	const beforeResolve = messages.length;
+	await run("plan3", `resolve ${authId}`);
+	assert.equal(messages.length, beforeResolve + 1);
+	assert(messages.at(-1).message.includes(JSON.stringify(authFile)));
+	assert.match(messages.at(-1).message, /Blocking first, then Deferred, one at a time[\s\S]*ask_user[\s\S]*keeping it deferred[\s\S]*Do not implement product code/);
+	assert.equal(entries.at(-1).data.planning, true, "resolve keeps the planning state");
+	await writeFile(authFile, (await readFile(authFile, "utf8")).replace("Which session store?", "None.").replace(/- Rate limits[\s\S]*?SSO/, "None."));
+
+	// Catch-up (workflow off): generated plan lists only changed targets, starts planning via plan3:start,
+	// and the recorder writes exactly the planned versions, all or nothing.
+	const catchUpState = { packages: [
+		{ name: "pi-lens", baselineVersion: "4.3.0", targetVersion: "4.6.0", installedVersion: "4.5.0", needsReview: true, diffPath: "lens.diff" },
+		{ name: "pi-intercom", baselineVersion: "0.16.0", targetVersion: "0.16.0", needsReview: false },
+	] };
+	const lensDiff = path.join(cwd, "lens.diff");
+	await writeFile(lensDiff, "diff --git a/CHANGELOG.md b/CHANGELOG.md\n+++ b/CHANGELOG.md\n+## 4.6.0\n+- new hook\n ## 4.3.0\ndiff --git a/index.js b/index.js\n+code();\n");
+	catchUpState.packages[0].diffPath = lensDiff;
+	const catchUpText = catchUpPlanText(catchUpState, "", "2026-10-06");
+	assert.equal(await readFile(changelogExcerpt(lensDiff), "utf8"), "## 4.6.0\n- new hook\n", "only added changelog lines");
+	assert(catchUpText.includes(path.join(cwd, "lens.changelog.md")));
+	assert.match(catchUpText, /^catch-up: {"pi-lens":"4.6.0"}$/m);
+	assert(!catchUpText.includes("pi-intercom") && /every release after the last reviewed version/.test(catchUpText));
+	assert(/research it first/.test(catchUpText) && /work-catch-up-record.mjs/.test(catchUpText));
+	const catchUpFile = path.join(directory, "2026-10-06-catch-up-pi-packages-cafe0001-plan3.md");
+	await writeFile(catchUpFile, catchUpText);
+	idle = true;
+	await listeners.get("plan3:start")({ ctx, file: catchUpFile });
+	assert(messages.at(-1).message.includes(JSON.stringify(catchUpFile)) && /planning only/.test(messages.at(-1).message));
+	assert(/Pending investigation/.test(catchUpText), "finish stays blocked until the review fills Phase 1");
+	const baselineFile = path.join(cwd, "baseline.json");
+	const baseline = { capturedAt: "old", packages: [{ name: "pi-lens", version: "4.3.0" }, { name: "pi-intercom", version: "0.16.0" }] };
+	await writeFile(baselineFile, JSON.stringify(baseline));
+	assert.throws(() => recordCatchUp(cwd, "cafe0001", baselineFile), /pi-lens has no recorded catch-up decisions/);
+	const decided = (decision) => catchUpText.replace('"pi-lens": []', `"pi-lens": [${JSON.stringify(decision)}]`);
+	await writeFile(catchUpFile, decided({ title: "New hook", pov: "Adopt", status: "adopted", rationale: "fits" }));
+	assert.throws(() => recordCatchUp(cwd, "cafe0001", baselineFile), /lacks verification/);
+	assert.equal(JSON.parse(await readFile(baselineFile, "utf8")).packages[0].version, "4.3.0", "a refused record writes nothing");
+	await writeFile(catchUpFile, decided({ title: "New hook", pov: "Adopt", status: "adopted", rationale: "fits", verification: "npm run verify:quiet: ok" }));
+	assert.deepEqual(recordCatchUp(cwd, "cafe0001", baselineFile, "2026-10-06T00:00:00Z"), ["pi-lens@4.6.0"]);
+	const recorded = JSON.parse(await readFile(baselineFile, "utf8"));
+	assert.deepEqual([recorded.capturedAt, recorded.packages[0].version, recorded.packages[0].reviewedVersion, recorded.packages[0].decisions[0].version, recorded.packages[1].version], ["2026-10-06T00:00:00Z", "4.6.0", "4.6.0", "4.6.0", "0.16.0"]);
 
 	console.log("Plan3 command self-checks passed");
 } finally {

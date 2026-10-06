@@ -52,6 +52,7 @@ import {
 } from "./work-compound-catch-up.ts";
 import {
 	createSubscriptionFooterController,
+	PRODUCTION_PROVIDERS,
 	SUBSCRIPTION_FOOTER_DEFAULTS,
 } from "./subscription-footer.ts";
 import {
@@ -219,6 +220,8 @@ import {
 import { compactMemory } from "./work-compaction-memory.ts";
 import { createVisionBridge } from "./work-vision.ts";
 import { createJevTools, jevStatus } from "./jev-tools.ts";
+import { catchUpPlanText, catchUpReviewBlocker, PLAN3_CATCH_UP_PACKAGES } from "./plan3-catch-up.ts";
+import { listPlans } from "./plan3.ts";
 import {
 	buildKnowledgeQuery,
 	correctKnowledge,
@@ -22836,6 +22839,18 @@ function npmLatestVersion(name) {
 	}
 }
 
+// Pi's own installer keeps releases in <agent dir>/install/releases/<version>; newest first.
+function piReleaseRoots() {
+	const dir = join(process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"), "install", "releases");
+	try {
+		return readdirSync(dir)
+			.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+			.map((version) => join(dir, version, "node_modules"));
+	} catch {
+		return []; // Pi installed another way: the npm roots above cover it.
+	}
+}
+
 function installedPackageVersion(name) {
 	const roots = [
 		join(WORKFLOW_REPO_DIR, "node_modules"),
@@ -22845,6 +22860,7 @@ function installedPackageVersion(name) {
 			"npm",
 			"node_modules",
 		),
+		...piReleaseRoots(),
 	];
 	for (const root of roots) {
 		try {
@@ -22884,33 +22900,7 @@ function writeWorkCatchUpDiff(cwd, dir, name, from, to) {
 	}
 }
 
-function catchUpReviewBlocker(pkg, targetVersion) {
-	if (!String(pkg?.reviewedAt ?? "").trim()) return "has no reviewedAt evidence";
-	if (pkg.reviewedVersion !== targetVersion)
-		return `review does not cover ${targetVersion}`;
-	if (!Array.isArray(pkg.decisions) || pkg.decisions.length === 0)
-		return "has no recorded catch-up decisions";
-	for (const decision of pkg.decisions) {
-		const status = String(decision.status ?? "");
-		const pov = String(decision.pov ?? "");
-		if (
-			decision.version !== targetVersion ||
-			!String(decision.title ?? "").trim() ||
-			!["Adopt", "Trial", "Hold", "Reject", "Not-our-problem"].includes(pov) ||
-			!String(decision.rationale ?? "").trim() ||
-			!["adopted", "no-action"].includes(status)
-		)
-			return "has an incomplete catch-up decision";
-		if (status === "adopted" && !["Adopt", "Trial"].includes(pov))
-			return "has an invalid adopted catch-up decision";
-		if (status === "no-action" && !["Reject", "Not-our-problem"].includes(pov))
-			return "has an actionable catch-up decision that was not adopted";
-		if (status === "adopted" && !String(decision.verification ?? "").trim())
-			return "adopted decision lacks verification";
-	}
-}
-
-function buildWorkCatchUpState(cwd) {
+function buildWorkCatchUpState(cwd, names) {
 	const baseline = readWorkCatchUpBaseline();
 	const dir = join(
 		cwd,
@@ -22919,7 +22909,7 @@ function buildWorkCatchUpState(cwd) {
 		new Date().toISOString().replace(/[:.]/g, "-"),
 	);
 	mkdirSync(dir, { recursive: true });
-	const packages = baseline.packages.map((item) => {
+	const packages = baseline.packages.filter((item) => !names || names.includes(item.name)).map((item) => {
 		const name = String(item.name ?? "").trim();
 		if (item.source === "official-github-stable-release") {
 			const policy = readWorkflowJson(
@@ -23094,6 +23084,7 @@ function catchUpCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 }
 
 async function handleWorkCatchUpCommand(args, pi, ctx) {
+	if (!workflowEnabled(ctx.cwd)) return startPlan3CatchUp(args, pi, ctx);
 	const state = buildWorkCatchUpState(ctx.cwd);
 	notify(ctx, renderWorkCatchUpText(state), state.ok ? "info" : "warning");
 	if (!state.ok) return;
@@ -23126,6 +23117,28 @@ async function handleWorkCatchUpCommand(args, pi, ctx) {
 		pi,
 		ctx,
 	);
+}
+
+// Workflow off: review only the packages ce-workflow still uses, as a Plan3 plan in this repository.
+async function startPlan3CatchUp(args, pi, ctx) {
+	// Native realpath gives the on-disk case; settings may load the package through a differently cased path.
+	if (realpathSync.native(ctx.cwd) !== realpathSync.native(WORKFLOW_REPO_DIR))
+		return notify(ctx, `Catch-up reviews and changes ce-workflow itself; run it from ${WORKFLOW_REPO_DIR}.`, "warning");
+	const open = (await listPlans(ctx.cwd)).find((plan) => plan.source === "catch-up" && plan.status !== "complete");
+	if (open) {
+		notify(ctx, `Continuing the open catch-up plan (delete it in /plans3 to regenerate): ${open.file}`, "info");
+		return pi.events?.emit?.("plan3:start", { ctx, file: open.file });
+	}
+	notify(ctx, `Checking ${PLAN3_CATCH_UP_PACKAGES.join(", ")} against their last reviewed versions (npm view + npm diff; can take a few minutes)…`, "info");
+	await new Promise((resolve) => setTimeout(resolve, 50)); // Let the notice render before the blocking npm calls.
+	const state = buildWorkCatchUpState(ctx.cwd, PLAN3_CATCH_UP_PACKAGES);
+	notify(ctx, renderWorkCatchUpText(state), "info");
+	if (!state.packages.some((pkg) => pkg.needsReview)) return;
+	const dir = join(ctx.cwd, "docs", "plans");
+	mkdirSync(dir, { recursive: true });
+	const file = join(dir, `${new Date().toISOString().slice(0, 10)}-catch-up-pi-packages-${randomUUID().slice(0, 8)}-plan3.md`);
+	writeFileSync(file, catchUpPlanText(state, String(args ?? "").trim()), { flag: "wx" });
+	pi.events?.emit?.("plan3:start", { ctx, file });
 }
 
 function workProjectAutopilotAppendix() {
@@ -32558,6 +32571,11 @@ async function editSubscriptionFooterSettings(ctx) {
 					...boolLabel("provider incident markers", current.incidents),
 					description: "Global only · Claude, Codex, and Copilot public status",
 				},
+				...PRODUCTION_PROVIDERS.map((entry) => ({
+					value: `provider:${entry.id}`,
+					...boolLabel(`${entry.label} quota row`, !(current.hidden ?? []).includes(entry.id)),
+					description: "Global only · shown when Pi has its login; off skips its quota requests",
+				})),
 			],
 			selectedIndex,
 			cursorKey: "work-subscription-footer-settings",
@@ -32567,6 +32585,21 @@ async function editSubscriptionFooterSettings(ctx) {
 		});
 		if (!result) return;
 		selectedIndex = result.index;
+		const providerId = result.item.value.startsWith("provider:")
+			? result.item.value.slice("provider:".length)
+			: undefined;
+		if (providerId) {
+			const settings = readGlobalSettings();
+			settings.workOrchestrator ??= {};
+			const footer = { ...SUBSCRIPTION_FOOTER_DEFAULTS, ...(settings.workOrchestrator.subscriptionFooter ?? {}) };
+			const hidden = new Set(Array.isArray(footer.hidden) ? footer.hidden : []);
+			if (hidden.has(providerId)) hidden.delete(providerId);
+			else hidden.add(providerId);
+			settings.workOrchestrator.subscriptionFooter = { ...footer, hidden: [...hidden] };
+			writeScopedSettings(ctx.cwd, "global", settings);
+			subscriptionFooterController.apply(ctx);
+			continue;
+		}
 		if (
 			result.item.value === "enabled" &&
 			!current.enabled &&
